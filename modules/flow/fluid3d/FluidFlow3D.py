@@ -46,11 +46,11 @@ _BARRIER_IMAGE: int = int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
 class DepthConfig(Settings):
     """3D depth/volume-specific parameters."""
-    layers          = Field(4,    min=4,    max=64,   description="Number of depth layers in the 3D volume")
-    scale           = Field(1.0,  min=0.5,  max=5.0,  description="Manual multiplier on auto-computed Z grid spacing (width/depth_layers)")
-    composite_mode  = Field(1,    min=0,    max=2,    description="3D->2D compositing: 0=alpha, 1=additive, 2=max")
-    injection_layer = Field(0.1,  min=0.0,  max=1.0,  description="Normalized depth for 2D->3D injection center")
-    injection_spread = Field(0.15, min=0.01, max=0.5, description="Gaussian sigma for depth spread during injection")
+    layers: Field[int]              = Field(4,    min=1,    max=64,     description="Number of depth layers in the 3D volume")
+    scale: Field[float]             = Field(1.0,  min=0.5,  max=5.0,    description="Manual multiplier on auto-computed Z grid spacing (width/depth_layers)")
+    composite_mode: Field[int]      = Field(1,    min=0,    max=2,      description="3D->2D compositing: 0=alpha, 1=additive, 2=max")
+    injection_layer: Field[float]   = Field(0.1,  min=0.0,  max=1.0,    description="Normalized depth for 2D->3D injection center")
+    injection_spread: Field[float]  = Field(0.15, min=0.01, max=0.5,    description="Gaussian sigma for depth spread during injection")
 
 
 class FluidFlow3DConfig(Settings):
@@ -61,19 +61,19 @@ class FluidFlow3DConfig(Settings):
     """
 
     # ---- Actions ----
-    reset_sim = Field(False, widget=Widget.button, description="Reset all simulation fields to zero")
+    reset_sim: Field[bool] = Field(False, widget=Widget.button, description="Reset all simulation fields to zero")
 
     # ---- Global ----
-    simulation_scale = Field(0.5, min=0.1, max=2.0, description="Resolution scale for simulation buffers")
-    avg_fps = Field(60, min=1, max=240, access=Field.READ, description="Current average FPS (bound from WindowManager)")
-    speed = Field(0.93, min=0.0, max=5.0, description="Base fluid transport rate")
+    simulation_scale: Field[float]  = Field(0.5,    min=0.1,    max=2.0,    description="Resolution scale for simulation buffers")
+    avg_fps: Field[int]             = Field(60,     min=1,      max=240,    description="Current average FPS (bound from WindowManager)", access=Field.READ)
+    speed: Field[float]             = Field(0.93,   min=0.0,    max=5.0,    description="Base fluid transport rate")
 
     # ---- Field groups ----
+    depth:       DepthConfig
     velocity:    VelocityConfig
     density:     DensityConfig
     temperature: TemperatureConfig
     pressure:    PressureConfig
-    depth:       DepthConfig
 
 
 # ---------------------------------------------------------------------------

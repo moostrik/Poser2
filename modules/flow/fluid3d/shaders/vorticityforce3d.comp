@@ -48,13 +48,12 @@ void main() {
     float gradLen = length(gradMag);
     vec3 N = (gradLen > 1e-6) ? gradMag / gradLen : vec3(0.0);
 
-    // Confinement force: F = ε * (N × ω) * dt
-    // Normalize by 1/√3 to compensate for 3 curl components feeding the
-    // cross product (2D only has 1 scalar curl → 2-component force).
-    // Without this, 3D vorticity injects ~√3× more energy than 2D at
-    // the same ε, causing disproportionately strong swirls.
-    const float INV_SQRT3 = 0.57735026919;  // 1/√3
-    vec3 force = uTimestep * cross(N, curlC) * INV_SQRT3;
+    // Confinement force: F = ε * (N × ω) * dt  (standard Fedkiw formulation)
+    // The 1/√3 factor that was here previously was compensating for a bug in
+    // the 2D pipeline where internal forces were routed through add_velocity()
+    // which applied an extra input_strength*dt. Now that both 2D and 3D use
+    // direct force injection (_add_force_to_velocity), no correction is needed.
+    vec3 force = uTimestep * cross(N, curlC);
 
     imageStore(uForce, gid, vec4(force, 0.0));
 }

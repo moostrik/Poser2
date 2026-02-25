@@ -319,6 +319,15 @@ class FluidFlow(FlowBase):
         effective = strength * self.config.velocity.input_strength * dt
         FlowUtil.add(self._input_fbo, texture, effective)
 
+    def _add_force_to_velocity(self, texture: Texture, strength: float = 1.0) -> None:
+        """Add internal force to velocity (no input_strength or dt scaling).
+
+        Use for simulation-internal forces (vorticity confinement, buoyancy)
+        that already carry their own dt scaling. Matches FluidFlow3D's
+        _add_force_to_velocity for 2D/3D parity.
+        """
+        FlowUtil.add(self._input_fbo, texture, strength)
+
     def add_velocity_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
         """Add velocity to a specific region."""
         FlowUtil.add_region(self._input_fbo, texture, x, y, w, h, strength)
@@ -541,8 +550,8 @@ class FluidFlow(FlowBase):
             )
             self._vorticity_force_fbo.end()
 
-            # 4c. Add force to velocity
-            self.add_velocity(self._vorticity_force_fbo.texture)
+            # 4c. Add force to velocity (direct — no input_strength*dt)
+            self._add_force_to_velocity(self._vorticity_force_fbo.texture)
 
         # ===== STEP 5 & 6: TEMPERATURE ADVECT & BUOYANCY =====
         # Only compute temperature if buoyancy is enabled
@@ -582,8 +591,8 @@ class FluidFlow(FlowBase):
             )
             self._buoyancy_fbo.end()
 
-            # Add buoyancy force to velocity
-            self.add_velocity(self._buoyancy_fbo.texture)
+            # Add buoyancy force to velocity (direct — no input_strength*dt)
+            self._add_force_to_velocity(self._buoyancy_fbo.texture)
             # Reset temperature when buoyancy disabled to prevent stale data
 
         # ===== STEP 7: PRESSURE ADVECT & DISSIPATE =====
