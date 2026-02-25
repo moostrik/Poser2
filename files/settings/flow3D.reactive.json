@@ -3,10 +3,10 @@
     "layer": {
       "select": {
         "preview": [
-          "fluid"
+          "fluid3D"
         ],
         "final": [
-          "fluid"
+          "fluid3D"
         ]
       },
       "lut": {

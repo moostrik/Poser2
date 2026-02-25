@@ -12,35 +12,35 @@ class VelocityConfig(Settings):
     input_strength: Field[float]    = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="Multiplier applied to all velocity inputs")
     self_advection: Field[float]    = Field(0.01,   min=0.0,    max=0.2,    color="blue-grey",      description="How much velocity advects itself. Keep low for stability.")
     fade_time: Field[float]         = Field(30.0,   min=0.1,    max=60.0,   color="deep-blue",      description="Seconds until velocity fades to ~1%")
-    dampen_threshold: Field[float]  = Field(5.0,    min=0.1,    max=50.0,   color="blue",           description="Magnitude above which velocity is dampened")
-    dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="blue",           description="Seconds for excess above threshold to decay to ~1%. 0=off")
+    dampen_threshold: Field[float]  = Field(5.0,    min=0.1,    max=50.0,   color="cyan",           description="Magnitude above which velocity is dampened")
+    dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
     vorticity: Field[float]         = Field(5.17,   min=0.0,    max=60.0,   color="purple",         description="Vortex confinement strength (adds turbulence)")
     vorticity_radius: Field[float]  = Field(2.82,   min=1.0,    max=30.0,   color="deep-purple",    description="Curl sampling radius in texels")
     viscosity: Field[float]         = Field(6.62,   min=0.0,    max=100.0,  color="indigo",         description="Fluid thickness/resistance to flow")
-    viscosity_iter: Field[int]      = Field(40,     min=1,      max=60,     color="indigo",         description="Solver iterations for viscosity")
+    viscosity_iter: Field[int]      = Field(40,     min=1,      max=60,     color="orange",         description="Solver iterations for viscosity")
 
 
 class DensityConfig(Settings):
     """Density field parameters."""
     input_strength: Field[float]    = Field(0.01,   min=0.0,    max=1.0,    color="teal",           description="Multiplier applied to all density inputs")
-    speed_offset: Field[float]      = Field(0.0,    min=-5.0,   max=5.0,    color="blue",           description="Added to base speed for density only. 0 = physically coupled.")
-    fade_time: Field[float]         = Field(4.0,    min=0.01,  max=60.0,  color="deep-blue",        description="Seconds until density fades to ~1%")
-    dampen_threshold: Field[float]  = Field(1.2,    min=0.1,    max=5.0,    color="blue",           description="Magnitude above which density is dampened")
-    dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="blue",           description="Seconds for excess above threshold to decay to ~1%. 0=off")
+    speed_offset: Field[float]      = Field(0.0,    min=-5.0,   max=5.0,    color="blue-grey",      description="Added to base speed for density only. 0 = physically coupled.")
+    fade_time: Field[float]         = Field(4.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%")
+    dampen_threshold: Field[float]  = Field(1.2,    min=0.1,    max=5.0,    color="cyan",           description="Magnitude above which density is dampened")
+    dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
 
 
 class TemperatureConfig(Settings):
     """Temperature field parameters."""
     input_strength: Field[float]    = Field(0.0,    min=0.0,    max=1.0,    color="teal",           description="Multiplier applied to all temperature inputs")
-    speed_offset: Field[float]      = Field(0.0,    min=-5.0,   max=5.0,    color="blue",           description="Added to base speed for temperature only. 0 = physically coupled.")
-    fade_time: Field[float]          = Field(3.0,    min=0.01,  max=60.0,  color="deep-blue",       description="Seconds until temperature fades to ~1%")
+    speed_offset: Field[float]      = Field(0.0,    min=-5.0,   max=5.0,    color="blue-grey",      description="Added to base speed for temperature only. 0 = physically coupled.")
+    fade_time: Field[float]         = Field(3.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until temperature fades to ~1%")
     buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Thermal buoyancy coefficient: hot air rises")
-    weight: Field[float]            = Field(-10.0,  min=-20.0,  max=2.0,    color="deep-orange",    description="Ratio of gravity/settling vs thermal lift")
-    ambient: Field[float]           = Field(0.2,    min=0.0,    max=1.0,    color="deep-orange",    description="Reference temperature (buoyancy = 0 at this temp)")
+    weight: Field[float]            = Field(-10.0,  min=-20.0,  max=2.0,    color="red",            description="Ratio of gravity/settling vs thermal lift")
+    ambient: Field[float]           = Field(0.2,    min=0.0,    max=1.0,    color="brown",          description="Reference temperature (buoyancy = 0 at this temp)")
 
 
 class PressureConfig(Settings):
     """Pressure field parameters."""
-    speed: Field[float]             = Field(0.0,    min=0.0,    max=2.0,    color="blue",           description="Pressure advection speed")
-    fade_time: Field[float]          = Field(8.0,    min=0.01,  max=60.0,  color="deep-blue",       description="Seconds until pressure fades to ~1%")
-    iterations: Field[int]          = Field(40,     min=1,      max=60,     color="indigo",         description="Solver iterations for pressure")
+    speed: Field[float]             = Field(0.0,    min=0.0,    max=2.0,    color="blue-grey",      description="Pressure advection speed")
+    fade_time: Field[float]         = Field(8.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until pressure fades to ~1%")
+    iterations: Field[int]          = Field(40,     min=1,      max=60,     color="orange",         description="Solver iterations for pressure")
