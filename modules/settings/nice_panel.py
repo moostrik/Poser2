@@ -802,47 +802,58 @@ def _build_settings_body(settings, timers, *, depth=0, expansions=None):
         _build_settings_card(child_name, child, timers, depth=depth, expansions=expansions)
 
 
+# Depth-based layer icons: 1 line → 2 lines → 3 lines.
+_DEPTH_ICONS = ["remove", "drag_handle", "menu"]
+
+def _layer_icon_for_depth(depth: int) -> str:
+    """Return an icon with increasing horizontal lines for deeper nesting."""
+    return _DEPTH_ICONS[min(depth, len(_DEPTH_ICONS) - 1)]
+
+
 def _build_settings_card(name, settings, timers, *, depth=0, expansions=None):
     """Build a card for one Settings instance.
 
     Always renders as a collapsible ``ui.expansion`` at any depth.
-    If the group has child groups, an expand/collapse-all button is placed
-    in the expansion header next to the fold arrow.
+    Every layer gets a consistent custom header with an icon and an
+    expand/collapse-all button (functional when children exist, hidden
+    otherwise so the layout stays uniform).
     """
     has_children = bool(settings.children)
+    icon = _layer_icon_for_depth(depth)
 
     exp = ui.expansion(
-        generate_label(name), icon="settings",
+        generate_label(name),
     ).props("duration=0").classes("w-full")
 
-    # Place an unfold-all button in the expansion header row if there are sub-groups.
-    if has_children:
-        child_expansions_ref: list = []
-        _state = {"all": False}
+    # Always use a custom header slot for consistent appearance.
+    child_expansions_ref: list = []
+    _state = {"all": False}
 
-        def _toggle_children():
-            _state["all"] = not _state["all"]
+    def _toggle_children():
+        _state["all"] = not _state["all"]
+        if _state["all"]:
+            # Ensure the parent expansion is open so children are visible
+            exp.open()
             for e in child_expansions_ref:
-                if _state["all"]:
-                    e.open()
-                else:
-                    e.close()
+                e.open()
+        else:
+            for e in child_expansions_ref:
+                e.close()
+            exp.close()
 
-        with exp.add_slot("header"):
-            with ui.row().classes("w-full items-center gap-1"):
-                ui.icon("settings").classes("text-lg")
-                ui.label(generate_label(name)).classes("flex-1")
+    with exp.add_slot("header"):
+        with ui.row().classes("w-full items-center gap-1"):
+            ui.icon(icon).classes("text-lg")
+            ui.label(generate_label(name)).classes("flex-1")
+            if has_children:
                 unfold_btn = ui.button(
                     icon="unfold_more",
                     on_click=_toggle_children,
                 ).props("dense flat round size=xs").tooltip(
-                    "Expand / Collapse all sub-groups"
+                    "Expand / Collapse All"
                 )
                 # Prevent the button click from toggling the expansion header
                 unfold_btn.on("click.stop", lambda: None)
-
-        # icon already rendered in custom header
-        exp._props.pop("icon", None)
 
     if expansions is not None:
         expansions.append(exp)
@@ -917,6 +928,18 @@ def _build_preset_controls(root):
     dropdown.on_value_change(_on_preset_change)
 
     # -- Action buttons ----------------------------------------------------
+    def do_load():
+        name = dropdown.value
+        if not name:
+            ui.notify("Select a preset first", type="warning")
+            return
+        p = presets.path(name)
+        if p.exists():
+            presets.load(root, p)
+            ui.notify(f"Loaded '{name}'", type="positive")
+        else:
+            ui.notify(f"Preset '{name}' not found", type="negative")
+
     def do_save():
         preset_name = dropdown.value
         if not preset_name:
@@ -975,6 +998,7 @@ def _build_preset_controls(root):
 
         dialog.open()
 
+    ui.button(icon="refresh", on_click=do_load).props("dense flat").tooltip("Reload selected preset")
     ui.button(icon="save", on_click=do_save).props("dense flat").tooltip("Save (overwrite selected)")
     ui.button(icon="save_as", on_click=do_save_as).props("dense flat").tooltip("Save as new preset")
     ui.button(icon="delete", on_click=do_delete).props("dense flat color=negative").tooltip("Delete preset")
@@ -1071,14 +1095,14 @@ def create_settings_panel(
         if _has_visible_content(child):
             tab_entries.append((child_name, child))
 
-    with ui.column().classes("w-full sticky top-0 z-50 gap-0 bg-dark text-white").style(
-        "background: #1d1d1d"
+    with ui.column().classes("w-full sticky top-0 z-50 bg-dark text-white").style(
+        "background: #1d1d1d !important; padding: 16px 12px 8px 12px !important; border-bottom: 2px solid #555; gap: 16px"
     ):
         with ui.row().classes("w-full items-center flex-wrap gap-1"):
             if title:
                 ui.label(title).classes("text-2xl font-bold")
             if port is not None:
-                with ui.button(icon="info").props("dense flat").tooltip("Show connection info"):
+                with ui.button(icon="lan").props("dense flat").tooltip("Show connection info"):
                     with ui.menu().props('anchor="bottom middle" self="top middle"'):
                         with ui.card().classes("gap-1").props("flat"):
                             ui.label("Connect").classes("text-base font-bold")

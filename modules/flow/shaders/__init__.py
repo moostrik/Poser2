@@ -6,6 +6,7 @@ from .ChannelAddRegion import ChannelAddRegion
 from .ChannelCopy import    ChannelCopy
 from .ChannelSetRegion import ChannelSetRegion
 from .Clamp import          Clamp
+from .Dampen import         Dampen
 from .GaussianBlur import   GaussianBlur
 from .HSV import            HSV
 from .Magnitude import      Magnitude

@@ -32,7 +32,7 @@ from .shaders import (
     Advect3D, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,
     VorticityCurl3D, VorticityForce3D, Buoyancy3D,
-    Inject3D, InjectChannel3D, Clamp3D, Composite3D, Add3D
+    Inject3D, InjectChannel3D, Clamp3D, Dampen3D, Composite3D, Add3D
 )
 
 # Combined memory barrier bits (cast to int for Pylance compatibility)
@@ -56,7 +56,7 @@ class DepthConfig(Settings):
 class FluidFlow3DConfig(Settings):
     """Configuration for 3D fluid simulation.
 
-    Same speed/lifetime/vorticity/buoyancy model as FluidFlowConfig,
+    Same speed/fade_time/vorticity/buoyancy model as FluidFlowConfig,
     with additional depth-specific parameters.
     """
 
@@ -169,6 +169,7 @@ class FluidFlow3D:
         self._inject_shader: Inject3D = Inject3D()
         self._inject_channel_shader: InjectChannel3D = InjectChannel3D()
         self._clamp_shader: Clamp3D = Clamp3D()
+        self._dampen_shader: Dampen3D = Dampen3D()
         self._composite_shader: Composite3D = Composite3D()
         self._add_shader: Add3D = Add3D()
 
@@ -244,6 +245,7 @@ class FluidFlow3D:
         self._inject_shader.allocate()
         self._inject_channel_shader.allocate()
         self._clamp_shader.allocate()
+        self._dampen_shader.allocate()
         self._composite_shader.allocate()
         self._add_shader.allocate()
 
@@ -273,6 +275,7 @@ class FluidFlow3D:
         self._inject_shader.deallocate()
         self._inject_channel_shader.deallocate()
         self._clamp_shader.deallocate()
+        self._dampen_shader.deallocate()
         self._composite_shader.deallocate()
         self._add_shader.deallocate()
 
@@ -291,6 +294,7 @@ class FluidFlow3D:
         self._inject_shader.reload()
         self._inject_channel_shader.reload()
         self._clamp_shader.reload()
+        self._dampen_shader.reload()
         self._composite_shader.reload()
         self._add_shader.reload()
 
@@ -329,11 +333,12 @@ class FluidFlow3D:
             self._reset_pending = False
             self.reset()
 
-        # Clamp inputs before simulation
-        self.clamp_density()
-        self._clamp_velocity()
-
+        # Dampen inputs before simulation
         delta_time: float = 1.0 / max(1, self.config.avg_fps)
+        vel = self.config.velocity
+        den = self.config.density
+        self._dampen(self._velocity, vel.dampen_threshold, vel.dampen_time, delta_time, include_alpha=False)
+        self._dampen(self._density,  den.dampen_threshold, den.dampen_time, delta_time, include_alpha=True)
 
         self._aspect = self._width / self._height if self._height > 0 else 1.0
         depth_scale: float = self._auto_depth_scale * self.config.depth.scale
@@ -341,7 +346,7 @@ class FluidFlow3D:
 
         # ===== STEP 1: ADVECT DENSITY =====
         advect_den_step = delta_time * (self.config.speed + self.config.density.speed_offset)
-        dissipate_den = self._calculate_dissipation(delta_time, self.config.density.lifetime)
+        dissipate_den = self._calculate_dissipation(delta_time, self.config.density.fade_time)
 
         self._density.swap()
         self._advect_shader.advect(
@@ -357,7 +362,7 @@ class FluidFlow3D:
 
         # ===== STEP 2: ADVECT VELOCITY (self-advection) =====
         advect_vel_step = delta_time * self.config.velocity.self_advection
-        dissipate_vel = self._calculate_dissipation(delta_time, self.config.velocity.lifetime)
+        dissipate_vel = self._calculate_dissipation(delta_time, self.config.velocity.fade_time)
 
         self._velocity.swap()
         self._advect_shader.advect(
@@ -422,7 +427,7 @@ class FluidFlow3D:
         else:
             # 5a. Advect temperature
             advect_tmp_step = delta_time * self.config.speed
-            dissipate_tmp = self._calculate_dissipation(delta_time, self.config.temperature.lifetime)
+            dissipate_tmp = self._calculate_dissipation(delta_time, self.config.temperature.fade_time)
 
             self._temperature.swap()
             self._advect_shader.advect(
@@ -455,7 +460,7 @@ class FluidFlow3D:
         # ===== STEP 7: PRESSURE ADVECT (optional, non-physical) =====
         if self.config.pressure.speed > 0.0:
             advect_prs_step = delta_time * self.config.pressure.speed
-            dissipate_prs = self._calculate_dissipation(delta_time, self.config.pressure.lifetime)
+            dissipate_prs = self._calculate_dissipation(delta_time, self.config.pressure.fade_time)
 
             self._pressure.swap()
             self._advect_shader.advect(
@@ -669,23 +674,26 @@ class FluidFlow3D:
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
-    def clamp_density(self) -> None:
-        """Clamp 3D density volume voxels to [0, config.density.clamp_max]."""
-        if not self._allocated:
-            return
-        self._clamp_shader.use(
-            self._density.texture, 0.0, self.config.density.clamp_max,
-            internal_format=GL_RGBA16F
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
+    def _dampen(self, volume: SwapTexture3D, threshold: float, dampen_time: float,
+               delta_time: float, include_alpha: bool,
+               internal_format: int = GL_RGBA16F) -> None:
+        """Exponential drag on magnitude excess above threshold.
 
-    def _clamp_velocity(self) -> None:
-        """Clamp 3D velocity volume voxels to [-velocity.clamp_max, velocity.clamp_max]."""
-        if not self._allocated:
+        Args:
+            volume: Volumetric field to dampen (in-place via compute shader)
+            threshold: Magnitude below which values are untouched
+            dampen_time: Seconds for excess to decay to ~1%. 0=off
+            delta_time: Frame delta time for frame-rate independence
+            include_alpha: True for density (RGBA magnitude), False for velocity (RGB)
+            internal_format: Image format for volume binding
+        """
+        if dampen_time <= 0.0:
             return
-        self._clamp_shader.use(
-            self._velocity.texture, -self.config.velocity.clamp_max, self.config.velocity.clamp_max,
-            internal_format=GL_RGBA16F
+        factor = pow(0.01, delta_time / dampen_time)
+        self._dampen_shader.use(
+            volume.texture, threshold, factor,
+            include_alpha=include_alpha,
+            internal_format=internal_format
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 

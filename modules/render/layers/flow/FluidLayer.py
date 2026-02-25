@@ -195,7 +195,7 @@ class FluidLayer(LayerBase):
         motion: float = pose.angle_motion.value if pose is not None else 0.0
         m_s = similarities
 
-        self.settings.fluid_flow.density.lifetime = 18.0 - (pow(motion, 2.0) * 14.0)  # More motion = faster decay
+        self.settings.fluid_flow.density.fade_time = 18.0 - (pow(motion, 2.0) * 14.0)  # More motion = faster decay
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)

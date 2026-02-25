@@ -40,9 +40,9 @@ class FluidFlowConfig(Settings):
         0 = physically coupled to velocity (density rides the flow).
         Positive = density flings further. Negative = density lags.
 
-    Lifetime model:
-        Exponential frame-rate-independent decay: multiplier = 0.01^(dt/lifetime).
-        lifetime=3.0 means the field retains ~1% after 3 seconds.
+    Fade_time model:
+        Exponential frame-rate-independent decay: multiplier = 0.01^(dt/fade_time).
+        fade_time=3.0 means the field retains ~1% after 3 seconds.
     """
 
     # ---- Actions ----
@@ -360,13 +360,21 @@ class FluidFlow(FlowBase):
         """Add density to a specific channel at a specific region."""
         FlowUtil.add_channel_region(self._output_fbo, texture, channel, x, y, w, h, strength)
 
-    def clamp_density(self) -> None:
-        """Clamp density values to [0, config.density.clamp_max]."""
-        FlowUtil.clamp(self._output_fbo, 0.0, self.config.density.clamp_max)
+    def _dampen(self, fbo: SwapFbo, threshold: float, dampen_time: float,
+               delta_time: float, include_alpha: bool) -> None:
+        """Exponential drag on magnitude excess above threshold.
 
-    def _clamp_velocity(self) -> None:
-        """Clamp velocity values to [-velocity.clamp_max, velocity.clamp_max]."""
-        FlowUtil.clamp(self._input_fbo, -self.config.velocity.clamp_max, self.config.velocity.clamp_max)
+        Args:
+            fbo: Field to dampen (ping-pong swap handled by FlowUtil)
+            threshold: Magnitude below which values are untouched
+            dampen_time: Seconds for excess to decay to ~1%. 0=off
+            delta_time: Frame delta time for frame-rate independence
+            include_alpha: True for density (RGBA magnitude), False for velocity (RGB)
+        """
+        if dampen_time <= 0.0:
+            return
+        factor = pow(0.01, delta_time / dampen_time)
+        FlowUtil.dampen(fbo, threshold, factor, include_alpha)
 
     # ----- Temperature -----
     def set_temperature(self, texture: Texture) -> None:
@@ -425,17 +433,19 @@ class FluidFlow(FlowBase):
             if new_w != self._width or new_h != self._height:
                 self.allocate(self._density_width, self._density_height)
 
-        # Clamp inputs before simulation
-        self.clamp_density()
-        self._clamp_velocity()
+        # Dampen inputs before simulation
+        delta_time: float = 1.0 / max(1, self.config.avg_fps)
+        vel = self.config.velocity
+        den = self.config.density
+        self._dampen(self._input_fbo,  vel.dampen_threshold, vel.dampen_time, delta_time, include_alpha=False)
+        self._dampen(self._output_fbo, den.dampen_threshold, den.dampen_time, delta_time, include_alpha=True)
 
         self._aspect = self._width / self._height if self._height > 0 else 1.0
-        delta_time: float = 1.0 / max(1, self.config.avg_fps)
 
         # ===== STEP 1: DENSITY ADVECT & DISSIPATE =====
         # Density uses base speed + artistic offset (0 offset = physically coupled)
         advect_den_step: float = delta_time * (self.config.speed + self.config.density.speed_offset)
-        dissipate_den: float = FluidFlow._calculate_dissipation(delta_time, self.config.density.lifetime)
+        dissipate_den: float = FluidFlow._calculate_dissipation(delta_time, self.config.density.fade_time)
 
         self._output_fbo.swap()
         self._output_fbo.begin()
@@ -452,7 +462,7 @@ class FluidFlow(FlowBase):
         # ===== STEP 2: VELOCITY ADVECT & DISSIPATE =====
         # Velocity self-advection uses separate low damper for numerical stability
         advect_vel_step: float = delta_time * self.config.velocity.self_advection
-        dissipate_vel: float = FluidFlow._calculate_dissipation(delta_time, self.config.velocity.lifetime)
+        dissipate_vel: float = FluidFlow._calculate_dissipation(delta_time, self.config.velocity.fade_time)
 
         self._input_fbo.swap()
         self._input_fbo.begin()
@@ -541,7 +551,7 @@ class FluidFlow(FlowBase):
         else:
             # 5a. Advect temperature (coupled to base flow speed)
             advect_tmp_step: float = delta_time * self.config.speed
-            dissipate_tmp: float = FluidFlow._calculate_dissipation(delta_time, self.config.temperature.lifetime)
+            dissipate_tmp: float = FluidFlow._calculate_dissipation(delta_time, self.config.temperature.fade_time)
 
             self._temperature_fbo.swap()
             self._temperature_fbo.begin()
@@ -581,7 +591,7 @@ class FluidFlow(FlowBase):
         # When prs_speed = 0, pressure is purely from projection (physical)
         if self.config.pressure.speed > 0.0:
             advect_prs_step: float = delta_time * self.config.pressure.speed
-            dissipate_prs: float = FluidFlow._calculate_dissipation(delta_time, self.config.pressure.lifetime)
+            dissipate_prs: float = FluidFlow._calculate_dissipation(delta_time, self.config.pressure.fade_time)
 
             self._pressure_fbo.swap()
             self._pressure_fbo.begin()

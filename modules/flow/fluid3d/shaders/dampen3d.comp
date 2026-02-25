@@ -1,0 +1,40 @@
+#version 460 core
+
+/*
+ * Dampen3D - Exponential drag on magnitude excess above a threshold.
+ *
+ * Per-voxel in-place operation via imageLoad/imageStore.
+ * Values below the threshold pass through unchanged.
+ * Values above are smoothly pulled back: excess *= dampenFactor per frame.
+ *
+ * uIncludeAlpha:
+ *   false → magnitude from .rgb only (velocity, temperature — avoids
+ *           phantom alpha=1 from OpenGL sampling of R/RG formats)
+ *   true  → magnitude from .rgba (density — alpha is real data)
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// 3D volume (read-write, in-place)
+layout(rgba16f, binding = 0) uniform image3D uVolume;
+
+uniform float uThreshold;
+uniform float uDampenFactor;
+uniform bool uIncludeAlpha;
+uniform ivec3 uSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    vec4 val = imageLoad(uVolume, gid);
+
+    float mag = uIncludeAlpha ? length(val) : length(val.rgb);
+
+    if (mag > uThreshold && mag > 0.0) {
+        float newMag = uThreshold + (mag - uThreshold) * uDampenFactor;
+        val *= newMag / mag;
+    }
+
+    imageStore(uVolume, gid, val);
+}

@@ -141,8 +141,9 @@
         "velocity": {
           "input_strength": 1.0,
           "self_advection": 0.01,
-          "lifetime": 30.0,
-          "clamp_max": 5.0,
+          "fade_time": 30.0,
+          "dampen_threshold": 5.0,
+          "dampen_time": 3.0,
           "vorticity": 5.17,
           "vorticity_radius": 2.82,
           "viscosity": 6.62,
@@ -151,20 +152,21 @@
         "density": {
           "input_strength": 0.01,
           "speed_offset": 0.0,
-          "lifetime": 4.0,
-          "clamp_max": 1.2
+          "fade_time": 4.0,
+          "dampen_threshold": 1.2,
+          "dampen_time": 3.0
         },
         "temperature": {
           "input_strength": 0.0,
           "speed_offset": 0.0,
-          "lifetime": 3.0,
+          "fade_time": 3.0,
           "buoyancy": 0.0,
           "weight": -10.0,
           "ambient": 0.2
         },
         "pressure": {
           "speed": 0.0,
-          "lifetime": 8.0,
+          "fade_time": 8.0,
           "iterations": 40
         }
       },
@@ -186,8 +188,9 @@
         "velocity": {
           "input_strength": 1.0,
           "self_advection": 0.02,
-          "lifetime": 60.0,
-          "clamp_max": 5.0,
+          "fade_time": 60.0,
+          "dampen_threshold": 5.0,
+          "dampen_time": 3.0,
           "vorticity": 0.0,
           "vorticity_radius": 1.0,
           "viscosity": 12.95,
@@ -196,20 +199,21 @@
         "density": {
           "input_strength": 0.66,
           "speed_offset": 0.0,
-          "lifetime": 10.24,
-          "clamp_max": 1.2
+          "fade_time": 10.24,
+          "dampen_threshold": 1.2,
+          "dampen_time": 3.0
         },
         "temperature": {
           "input_strength": 0.0,
           "speed_offset": 0.0,
-          "lifetime": 3.0,
+          "fade_time": 3.0,
           "buoyancy": 0.0,
           "weight": -10.0,
           "ambient": 0.2
         },
         "pressure": {
           "speed": 0.0,
-          "lifetime": 8.0,
+          "fade_time": 8.0,
           "iterations": 40
         },
         "depth": {

@@ -220,6 +220,33 @@ class FlowUtil:
         FlowUtil._clamp_shader.use(dst_fbo.back_texture, min_val, max_val)
         dst_fbo.end()
 
+    @staticmethod
+    def dampen(dst_fbo: SwapFbo, threshold: float, dampen_factor: float,
+              include_alpha: bool = False) -> None:
+        """Dampen values above a magnitude threshold via exponential drag.
+
+        Uses ping-pong buffer: reads from current state, writes dampened to swapped state.
+        Values below threshold pass through unchanged.
+
+        Args:
+            dst_fbo: Destination SwapFbo (will be swapped)
+            threshold: Magnitude below which values are untouched
+            dampen_factor: Precomputed decay multiplier for excess
+                           (pow(0.01, strength * dt); 1.0 = no effect)
+            include_alpha: If True, magnitude from RGBA. If False, RGB only.
+        """
+        # Lazy init shader
+        if not hasattr(FlowUtil, '_dampen_shader'):
+            from .shaders import Dampen
+            FlowUtil._dampen_shader = Dampen()
+            FlowUtil._dampen_shader.allocate()
+
+        # Swap and dampen: read from back, write dampened to front
+        dst_fbo.swap()
+        dst_fbo.begin()
+        FlowUtil._dampen_shader.use(dst_fbo.back_texture, threshold, dampen_factor, include_alpha)
+        dst_fbo.end()
+
     # ========== Region Operations ==========
 
     @staticmethod
