@@ -1,4 +1,4 @@
-# Bridge module for flow processing
+"""Bridge layers — convert raw signals into fluid-compatible fields."""
 
 from .DensityBridge import DensityBridge, DensityBridgeConfig
 from .SmoothTrail import SmoothTrail, VelocitySmoothTrail, SmoothTrailConfig

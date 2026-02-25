@@ -27,7 +27,7 @@ from modules.gl import Texture, SwapFbo, Fbo
 from modules.gl.Texture3D import Texture3D, SwapTexture3D
 from modules.gl.ComputeShader import ComputeShader
 from modules.settings import Field, Settings, Widget
-from ..fluid_config import VelocityConfig, DensityConfig, TemperatureConfig, PressureConfig
+from ..fluid.fluid_config import VelocityConfig, DensityConfig, TemperatureConfig, PressureConfig
 from .shaders import (
     Advect3D, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,

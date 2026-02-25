@@ -21,8 +21,7 @@ from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 
 from modules.settings import Field, Settings
-from modules.flow import Visualizer, VisualisationFieldConfig
-from modules.flow.fluid import FluidFlow, FluidFlowConfig
+from modules.flow import Visualizer, VisualisationFieldConfig, FluidFlow, FluidFlowConfig
 from modules.render.shaders import DensityColorize
 
 from .FlowLayer import FlowLayer

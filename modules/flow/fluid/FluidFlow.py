@@ -14,7 +14,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture, SwapFbo, Fbo
 from modules.settings import Field, Settings, Widget
 from .. import FlowBase, FlowUtil
-from ..fluid_config import VelocityConfig, DensityConfig, TemperatureConfig, PressureConfig
+from .fluid_config import VelocityConfig, DensityConfig, TemperatureConfig, PressureConfig
 from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,

@@ -9,7 +9,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture
 from modules.settings import Field, Settings
 from .. import FlowBase, FlowUtil
-from .shaders import Trail, GaussianBlur
+from ..shaders import Trail, GaussianBlur
 
 
 class SmoothTrailConfig(Settings):

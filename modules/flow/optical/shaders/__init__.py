@@ -1,4 +1,5 @@
-# Optical flow specific shaders
+"""Optical flow shaders."""
+
 from .Luminance import Luminance
 from .MergeRGB import MergeRGB
 from .OpticalFlow import OpticalFlow
