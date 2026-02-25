@@ -14,6 +14,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture, SwapFbo, Fbo
 from modules.settings import Field, Settings, Widget
 from .. import FlowBase, FlowUtil
+from ..fluid_config import VelocityConfig, DensityConfig, TemperatureConfig, PressureConfig
 from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,
@@ -31,11 +32,11 @@ class FluidFlowConfig(Settings):
         temperature, pressure). At speed=1.0, a velocity value of 1.0 moves
         fluid across the full texture width in 1 second.
 
-        vel_self_advection is a separate stability parameter that controls how
-        much the velocity field advects itself. Keep low to prevent numerical
+        velocity.self_advection is a separate stability parameter that controls
+        how much the velocity field advects itself. Keep low to prevent numerical
         blowup from the self-advection feedback loop.
 
-        den_speed_offset adds to base speed for density transport only.
+        density.speed_offset adds to base speed for density transport only.
         0 = physically coupled to velocity (density rides the flow).
         Positive = density flings further. Negative = density lags.
 
@@ -50,39 +51,13 @@ class FluidFlowConfig(Settings):
     # ---- Global ----
     simulation_scale = Field(0.5, min=0.1, max=2.0, description="Resolution scale for simulation buffers")
     avg_fps = Field(60, min=1, max=240, access=Field.READ, description="Current average FPS (bound from WindowManager)")
+    speed = Field(0.5, min=0.0, max=5.0, description="Base fluid transport rate")
 
-    # ---- Input strengths ----
-    vel_input_strength = Field(1.0, min=0.0, max=10.0, description="Multiplier applied to all velocity inputs")
-    den_input_strength = Field(0.01, min=0.0, max=1.0, description="Multiplier applied to all density inputs")
-    tmp_input_strength = Field(0.0, min=0.0, max=1.0, description="Multiplier applied to all temperature inputs")
-    vel_clamp_max = Field(5.0, min=0.1, max=50.0, description="Maximum velocity magnitude after clamping")
-    den_clamp_max = Field(1.2, min=0.1, max=5.0, description="Maximum density value after clamping")
-
-    # ---- Transport speed ----
-    speed = Field(1.0, min=0.0, max=5.0, description="Base fluid transport rate")
-    vel_self_advection = Field(0.01, min=0.0, max=0.2, description="How much velocity advects itself. Keep low for stability.")
-    den_speed_offset = Field(0.0, min=-5.0, max=5.0, description="Added to base speed for density only. 0 = physically coupled.")
-
-    # ---- Velocity parameters ----
-    vel_lifetime = Field(30.0, min=0.01, max=60.0, description="Seconds until velocity fades to ~1%")
-    vel_vorticity = Field(30.0, min=0.0, max=60.0, description="Vortex confinement strength (adds turbulence)")
-    vel_vorticity_radius = Field(10.0, min=1.0, max=30.0, description="Curl sampling radius in texels")
-    vel_viscosity = Field(50.0, min=0.0, max=100.0, description="Fluid thickness/resistance to flow")
-    vel_viscosity_iter = Field(40, min=1, max=60, description="Solver iterations for viscosity")
-
-    # ---- Pressure parameters ----
-    prs_speed = Field(0.0, min=0.0, max=2.0, description="Pressure advection speed")
-    prs_lifetime = Field(8.0, min=0.01, max=60.0, description="Seconds until pressure fades to ~1%")
-    prs_iterations = Field(40, min=1, max=60, description="Solver iterations for pressure")
-
-    # ---- Density parameters ----
-    den_lifetime = Field(30.0, min=0.01, max=60.0, description="Seconds until density fades to ~1%")
-
-    # ---- Temperature parameters ----
-    tmp_lifetime = Field(3.0, min=0.01, max=60.0, description="Seconds until temperature fades to ~1%")
-    tmp_buoyancy = Field(0.0, min=0.0, max=10.0, description="Thermal buoyancy coefficient: hot air rises")
-    tmp_weight = Field(-10.0, min=-20.0, max=2.0, description="Ratio of gravity/settling vs thermal lift")
-    tmp_ambient = Field(0.2, min=0.0, max=1.0, description="Reference temperature (buoyancy = 0 at this temp)")
+    # ---- Field groups ----
+    velocity:    VelocityConfig
+    density:     DensityConfig
+    temperature: TemperatureConfig
+    pressure:    PressureConfig
 
 
 class FluidFlow(FlowBase):
@@ -339,9 +314,9 @@ class FluidFlow(FlowBase):
         FlowUtil.set_region(self._input_fbo, texture, x, y, w, h, strength)
 
     def add_velocity(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to velocity field. Applies config vel_input_strength and delta_time."""
+        """Add to velocity field. Applies config velocity.input_strength and delta_time."""
         dt = 1.0 / max(1, self.config.avg_fps)
-        effective = strength * self.config.vel_input_strength * dt
+        effective = strength * self.config.velocity.input_strength * dt
         FlowUtil.add(self._input_fbo, texture, effective)
 
     def add_velocity_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
@@ -366,9 +341,9 @@ class FluidFlow(FlowBase):
         FlowUtil.set_channel_region(self._output_fbo, texture, channel, x, y, w, h, strength)
 
     def add_density(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to density field. Applies config den_input_strength and delta_time."""
+        """Add to density field. Applies config density.input_strength and delta_time."""
         dt = 1.0 / max(1, self.config.avg_fps)
-        effective = strength * self.config.den_input_strength * dt
+        effective = strength * self.config.density.input_strength * dt
         FlowUtil.add(self._output_fbo, texture, effective)
 
     def add_density_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
@@ -376,9 +351,9 @@ class FluidFlow(FlowBase):
         FlowUtil.add_region(self._output_fbo, texture, x, y, w, h, strength)
 
     def add_density_channel(self, texture: Texture, channel: int, strength: float = 1.0) -> None:
-        """Add single-channel texture to one of the density channels. Applies config den_input_strength and delta_time."""
+        """Add single-channel texture to one of the density channels. Applies config density.input_strength and delta_time."""
         dt = 1.0 / max(1, self.config.avg_fps)
-        effective = strength * self.config.den_input_strength * dt
+        effective = strength * self.config.density.input_strength * dt
         FlowUtil.add_channel(self._output_fbo, texture, channel, effective)
 
     def add_density_channel_region(self, texture: Texture, channel: int, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
@@ -386,12 +361,12 @@ class FluidFlow(FlowBase):
         FlowUtil.add_channel_region(self._output_fbo, texture, channel, x, y, w, h, strength)
 
     def clamp_density(self) -> None:
-        """Clamp density values to [0, config.den_clamp_max]."""
-        FlowUtil.clamp(self._output_fbo, 0.0, self.config.den_clamp_max)
+        """Clamp density values to [0, config.density.clamp_max]."""
+        FlowUtil.clamp(self._output_fbo, 0.0, self.config.density.clamp_max)
 
     def _clamp_velocity(self) -> None:
-        """Clamp velocity values to [-vel_clamp_max, vel_clamp_max]."""
-        FlowUtil.clamp(self._input_fbo, -self.config.vel_clamp_max, self.config.vel_clamp_max)
+        """Clamp velocity values to [-velocity.clamp_max, velocity.clamp_max]."""
+        FlowUtil.clamp(self._input_fbo, -self.config.velocity.clamp_max, self.config.velocity.clamp_max)
 
     # ----- Temperature -----
     def set_temperature(self, texture: Texture) -> None:
@@ -403,9 +378,9 @@ class FluidFlow(FlowBase):
         FlowUtil.set_region(self._temperature_fbo, texture, x, y, w, h, strength)
 
     def add_temperature(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to temperature field. Applies config tmp_input_strength and delta_time."""
+        """Add to temperature field. Applies config temperature.input_strength and delta_time."""
         dt = 1.0 / max(1, self.config.avg_fps)
-        effective = strength * self.config.tmp_input_strength * dt
+        effective = strength * self.config.temperature.input_strength * dt
         FlowUtil.add(self._temperature_fbo, texture, effective)
 
     def add_temperature_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
@@ -459,8 +434,8 @@ class FluidFlow(FlowBase):
 
         # ===== STEP 1: DENSITY ADVECT & DISSIPATE =====
         # Density uses base speed + artistic offset (0 offset = physically coupled)
-        advect_den_step: float = delta_time * (self.config.speed + self.config.den_speed_offset)
-        dissipate_den: float = FluidFlow._calculate_dissipation(delta_time, self.config.den_lifetime)
+        advect_den_step: float = delta_time * (self.config.speed + self.config.density.speed_offset)
+        dissipate_den: float = FluidFlow._calculate_dissipation(delta_time, self.config.density.lifetime)
 
         self._output_fbo.swap()
         self._output_fbo.begin()
@@ -476,8 +451,8 @@ class FluidFlow(FlowBase):
 
         # ===== STEP 2: VELOCITY ADVECT & DISSIPATE =====
         # Velocity self-advection uses separate low damper for numerical stability
-        advect_vel_step: float = delta_time * self.config.vel_self_advection
-        dissipate_vel: float = FluidFlow._calculate_dissipation(delta_time, self.config.vel_lifetime)
+        advect_vel_step: float = delta_time * self.config.velocity.self_advection
+        dissipate_vel: float = FluidFlow._calculate_dissipation(delta_time, self.config.velocity.lifetime)
 
         self._input_fbo.swap()
         self._input_fbo.begin()
@@ -492,9 +467,9 @@ class FluidFlow(FlowBase):
         self._input_fbo.end()
 
         # ===== STEP 3: VELOCITY DIFFUSE (viscosity) =====
-        if self.config.vel_viscosity > 0.0:
+        if self.config.velocity.viscosity > 0.0:
             # Scale viscosity by simulation_scale² for resolution independence
-            viscosity_dt: float = self.config.vel_viscosity * (self.config.simulation_scale ** 2) * delta_time
+            viscosity_dt: float = self.config.velocity.viscosity * (self.config.simulation_scale ** 2) * delta_time
 
             if self._use_compute_diffusion:
                 # Compute shader: multi-iteration with automatic ping-pong
@@ -506,7 +481,7 @@ class FluidFlow(FlowBase):
                     self.config.simulation_scale,
                     self._aspect,
                     viscosity_dt,
-                    total_iterations=self.config.vel_viscosity_iter,
+                    total_iterations=self.config.velocity.viscosity_iter,
                     iterations_per_dispatch=5
                 )
                 # Ensure the correct buffer is active after solve
@@ -514,7 +489,7 @@ class FluidFlow(FlowBase):
                     self._input_fbo.swap()
             else:
                 # Fragment shader fallback: one iteration per FBO swap
-                for _ in range(self.config.vel_viscosity_iter):
+                for _ in range(self.config.velocity.viscosity_iter):
                     self._input_fbo.swap()
                     self._input_fbo.begin()
                     self._jacobi_diffusion_shader.use(
@@ -528,12 +503,12 @@ class FluidFlow(FlowBase):
                     self._input_fbo.end()
 
         # ===== STEP 4: VELOCITY VORTICITY CONFINEMENT =====
-        if self.config.vel_vorticity > 0.0 and self.config.vel_vorticity_radius > 0.0:
+        if self.config.velocity.vorticity > 0.0 and self.config.velocity.vorticity_radius > 0.0:
             self._vorticity_curl_shader.reload()
             self._vorticity_force_shader.reload()
 
-            vorticity_radius: float = self.config.vel_vorticity_radius * self.config.simulation_scale
-            vorticity_force: float = (self.config.vel_vorticity * delta_time)
+            vorticity_radius: float = self.config.velocity.vorticity_radius * self.config.simulation_scale
+            vorticity_force: float = (self.config.velocity.vorticity * delta_time)
 
             # 4a. Compute vorticity curl
             self._vorticity_curl_fbo.begin()
@@ -561,12 +536,12 @@ class FluidFlow(FlowBase):
 
         # ===== STEP 5 & 6: TEMPERATURE ADVECT & BUOYANCY =====
         # Only compute temperature if buoyancy is enabled
-        if self.config.tmp_buoyancy == 0.0:
+        if self.config.temperature.buoyancy == 0.0:
             FlowUtil.zero(self._temperature_fbo)
         else:
             # 5a. Advect temperature (coupled to base flow speed)
             advect_tmp_step: float = delta_time * self.config.speed
-            dissipate_tmp: float = FluidFlow._calculate_dissipation(delta_time, self.config.tmp_lifetime)
+            dissipate_tmp: float = FluidFlow._calculate_dissipation(delta_time, self.config.temperature.lifetime)
 
             self._temperature_fbo.swap()
             self._temperature_fbo.begin()
@@ -583,8 +558,8 @@ class FluidFlow(FlowBase):
             # 6. Compute and apply buoyancy force
             # F = σ(T - T_ambient) - κρ  where κ = weight_ratio * σ
             # Both terms scaled by delta_time * simulation_scale for resolution independence
-            sigma: float = delta_time * self.config.simulation_scale * self.config.tmp_buoyancy
-            kappa: float = delta_time * self.config.simulation_scale * self.config.tmp_weight  # Weight as ratio of thermal effect
+            sigma: float = delta_time * self.config.simulation_scale * self.config.temperature.buoyancy
+            kappa: float = delta_time * self.config.simulation_scale * self.config.temperature.weight  # Weight as ratio of thermal effect
 
             self._buoyancy_fbo.begin()
             self._buoyancy_shader.use(
@@ -593,7 +568,7 @@ class FluidFlow(FlowBase):
                 self._output_fbo.texture,
                 sigma,
                 kappa,
-                self.config.tmp_ambient
+                self.config.temperature.ambient
             )
             self._buoyancy_fbo.end()
 
@@ -604,9 +579,9 @@ class FluidFlow(FlowBase):
         # ===== STEP 7: PRESSURE ADVECT & DISSIPATE =====
         # # Only advect pressure for artistic effects (non-physical)
         # When prs_speed = 0, pressure is purely from projection (physical)
-        if self.config.prs_speed > 0.0:
-            advect_prs_step: float = delta_time * self.config.prs_speed
-            dissipate_prs: float = FluidFlow._calculate_dissipation(delta_time, self.config.prs_lifetime)
+        if self.config.pressure.speed > 0.0:
+            advect_prs_step: float = delta_time * self.config.pressure.speed
+            dissipate_prs: float = FluidFlow._calculate_dissipation(delta_time, self.config.pressure.lifetime)
 
             self._pressure_fbo.swap()
             self._pressure_fbo.begin()
@@ -645,7 +620,7 @@ class FluidFlow(FlowBase):
                 self._obstacle_offset_fbo.texture,
                 self.config.simulation_scale,
                 self._aspect,
-                total_iterations=self.config.prs_iterations,
+                total_iterations=self.config.pressure.iterations,
                 iterations_per_dispatch=5
             )
             # Ensure the correct buffer is active after solve
@@ -653,7 +628,7 @@ class FluidFlow(FlowBase):
                 self._pressure_fbo.swap()
         else:
             # Fragment shader fallback: one iteration per FBO swap
-            for _ in range(self.config.prs_iterations):
+            for _ in range(self.config.pressure.iterations):
                 self._pressure_fbo.swap()
                 self._pressure_fbo.begin()
                 self._jacobi_pressure_shader.use(

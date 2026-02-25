@@ -79,6 +79,7 @@ class Field(Generic[T]):
         visible: bool = True,
         pinned: bool = False,
         widget: Widget = Widget.default,
+        color: str = "primary",  # UI color hint (e.g. 'primary', 'red', '#00f')
     ) -> None:
         # Infer type from default value
         if isinstance(default, list):
@@ -107,6 +108,7 @@ class Field(Generic[T]):
         self.visible = visible
         self.pinned = pinned
         self.widget = widget
+        self.color = color
         # Validate widget ↔ type compatibility
         if widget is not Widget.default and not widget.accepts(type_):
             raise TypeError(

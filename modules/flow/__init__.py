@@ -6,6 +6,9 @@ from .FlowUtil import FlowUtil
 # Import ConfigBase from parent modules
 from ..ConfigBase import ConfigBase
 
+# Shared config sub-groups
+from .fluid_config import VelocityConfig, DensityConfig, TemperatureConfig, PressureConfig
+
 # Layers
 from .optical import OpticalFlow, OpticalFlowConfig
 from .bridge import DensityBridge, DensityBridgeConfig, Magnitude, VelocityMagnitude, SmoothTrail, VelocitySmoothTrail, SmoothTrailConfig, TemperatureBridge, TemperatureBridgeConfig

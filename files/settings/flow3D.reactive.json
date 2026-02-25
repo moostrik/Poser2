@@ -137,27 +137,36 @@
       "blend_mode": "ADD",
       "fluid_flow": {
         "simulation_scale": 0.5,
-        "vel_input_strength": 1.0,
-        "den_input_strength": 0.01,
-        "tmp_input_strength": 0.0,
-        "vel_clamp_max": 5.0,
-        "den_clamp_max": 1.2,
         "speed": 0.5,
-        "vel_self_advection": 0.01,
-        "den_speed_offset": 0.0,
-        "vel_lifetime": 30.0,
-        "vel_vorticity": 5.17,
-        "vel_vorticity_radius": 2.82,
-        "vel_viscosity": 6.62,
-        "vel_viscosity_iter": 40,
-        "prs_speed": 0.0,
-        "prs_lifetime": 8.0,
-        "prs_iterations": 40,
-        "den_lifetime": 4.0000000000000036,
-        "tmp_lifetime": 3.0,
-        "tmp_buoyancy": 0.0,
-        "tmp_weight": -10.0,
-        "tmp_ambient": 0.2
+        "velocity": {
+          "input_strength": 1.0,
+          "self_advection": 0.01,
+          "lifetime": 30.0,
+          "clamp_max": 5.0,
+          "vorticity": 5.17,
+          "vorticity_radius": 2.82,
+          "viscosity": 6.62,
+          "viscosity_iter": 40
+        },
+        "density": {
+          "input_strength": 0.01,
+          "speed_offset": 0.0,
+          "lifetime": 4.0,
+          "clamp_max": 1.2
+        },
+        "temperature": {
+          "input_strength": 0.0,
+          "speed_offset": 0.0,
+          "lifetime": 3.0,
+          "buoyancy": 0.0,
+          "weight": -10.0,
+          "ambient": 0.2
+        },
+        "pressure": {
+          "speed": 0.0,
+          "lifetime": 8.0,
+          "iterations": 40
+        }
       },
       "visualisation": {
         "toggle_scalar": false,
@@ -173,32 +182,43 @@
       "blend_mode": "ADD",
       "fluid_flow": {
         "simulation_scale": 0.5,
-        "vel_input_strength": 1.0,
-        "den_input_strength": 0.66,
-        "tmp_input_strength": 0.0,
-        "vel_clamp_max": 5.0,
-        "den_clamp_max": 1.2,
-        "depth_layers": 4,
-        "depth_scale": 1.0,
-        "composite_mode": 1,
-        "injection_layer": 0.1,
-        "injection_spread": 0.15,
         "speed": 0.93,
-        "vel_self_advection": 0.02,
-        "den_speed_offset": 0.0,
-        "vel_lifetime": 60.0,
-        "vel_vorticity": 0.0,
-        "vel_vorticity_radius": 1.0,
-        "vel_viscosity": 12.95,
-        "vel_viscosity_iter": 40,
-        "prs_speed": 0.0,
-        "prs_lifetime": 8.0,
-        "prs_iterations": 40,
-        "den_lifetime": 10.24,
-        "tmp_lifetime": 3.0,
-        "tmp_buoyancy": 0.0,
-        "tmp_weight": -10.0,
-        "tmp_ambient": 0.2
+        "velocity": {
+          "input_strength": 1.0,
+          "self_advection": 0.02,
+          "lifetime": 60.0,
+          "clamp_max": 5.0,
+          "vorticity": 0.0,
+          "vorticity_radius": 1.0,
+          "viscosity": 12.95,
+          "viscosity_iter": 40
+        },
+        "density": {
+          "input_strength": 0.66,
+          "speed_offset": 0.0,
+          "lifetime": 10.24,
+          "clamp_max": 1.2
+        },
+        "temperature": {
+          "input_strength": 0.0,
+          "speed_offset": 0.0,
+          "lifetime": 3.0,
+          "buoyancy": 0.0,
+          "weight": -10.0,
+          "ambient": 0.2
+        },
+        "pressure": {
+          "speed": 0.0,
+          "lifetime": 8.0,
+          "iterations": 40
+        },
+        "depth": {
+          "layers": 4,
+          "scale": 1.0,
+          "composite_mode": 1,
+          "injection_layer": 0.1,
+          "injection_spread": 0.15
+        }
       },
       "visualisation": {
         "toggle_scalar": false,

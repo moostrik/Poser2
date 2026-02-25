@@ -136,15 +136,6 @@ def _build_toggle(settings, name, field, polls):
 
 # -- numeric builders --------------------------------------------------------
 
-# Cycling accent colors for slider controls.
-_SLIDER_COLORS = ["blue", "purple", "amber-8"]
-_slider_color_index = [0]
-
-def _next_slider_color() -> str:
-    """Return the next color in the blue → purple → yellow cycle."""
-    c = _SLIDER_COLORS[_slider_color_index[0] % len(_SLIDER_COLORS)]
-    _slider_color_index[0] += 1
-    return c
 
 
 @widget_builder(Widget.slider)
@@ -154,7 +145,7 @@ def _build_slider(settings, name, field, polls):
     is_disabled = field.access is Access.READ
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
     big_step = step * 10
-    color = _next_slider_color()
+    color = getattr(field, "color", "primary")
 
     with ui.column().classes("w-full gap-0 pt-2 pb-1"):
         with ui.row().classes("w-full items-center justify-between gap-0"):
@@ -459,7 +450,12 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
     active_set = set(value)
 
     with ui.column().classes("w-full gap-1 pt-2 pb-1"):
-        ui.label(label).classes("text-xs text-caption")
+        with ui.row().classes("w-full items-center gap-1"):
+            ui.label(label).classes("text-xs text-caption flex-1")
+            if with_checkboxes:
+                fold_btn = ui.button(icon="visibility_off", on_click=lambda: None).props(
+                    "dense flat round size=xs"
+                ).tooltip("Show/hide unchecked items")
         container = ui.column().classes("w-full gap-0 border rounded p-1")
 
         if with_checkboxes:
@@ -467,12 +463,21 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
         else:
             # Order-only: all members always active, ordered as in value
             ordered = list(value)
-        state = {"order": ordered, "active": set(value) if with_checkboxes else set(all_members)}
+        state = {
+            "order": ordered,
+            "active": set(value) if with_checkboxes else set(all_members),
+            "folded": True,
+        }
 
         def _rebuild(cont, st, _settings=settings, _name=name, _elem=elem_type, _cb=with_checkboxes):
             cont.clear()
+            folded = st.get("folded", False)
             with cont:
-                for idx, member in enumerate(st["order"]):
+                visible_members = [
+                    m for m in st["order"]
+                    if not (folded and _cb and m not in st["active"])
+                ]
+                for idx, member in enumerate(visible_members):
                     is_active = member in st["active"]
                     with ui.row().classes(
                         "w-full items-center gap-2 px-2 py-0.5 rounded cursor-move"
@@ -488,18 +493,21 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
 
                         ui.label(generate_label(member.name)).classes("text-sm flex-1")
 
+                        # Find the real index in st["order"] for move operations
+                        real_idx = st["order"].index(member)
+
                         up_btn = ui.button(
                             icon="arrow_upward",
-                            on_click=lambda _, i=idx: _move(cont, st, i, -1),
+                            on_click=lambda _, ri=real_idx: _move(cont, st, ri, -1),
                         ).props("dense flat size=xs").classes("my-0")
                         down_btn = ui.button(
                             icon="arrow_downward",
-                            on_click=lambda _, i=idx: _move(cont, st, i, 1),
+                            on_click=lambda _, ri=real_idx: _move(cont, st, ri, 1),
                         ).props("dense flat size=xs").classes("my-0")
 
                         if idx == 0:
                             up_btn.props("disable")
-                        if idx == len(st["order"]) - 1:
+                        if idx == len(visible_members) - 1:
                             down_btn.props("disable")
 
                         if _cb:
@@ -518,11 +526,28 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
                 _apply(cont, st)
 
         def _apply(cont, st):
+            # Reorder: active items first, then inactive (preserving relative order)
+            if with_checkboxes:
+                st["order"] = (
+                    [m for m in st["order"] if m in st["active"]]
+                    + [m for m in st["order"] if m not in st["active"]]
+                )
             new_list = [m for m in st["order"] if m in st["active"]]
             setattr(settings, name, new_list)
             _rebuild(cont, st)
 
         _rebuild(container, state)
+
+        # Wire up fold button
+        if with_checkboxes:
+            def _toggle_fold():
+                state["folded"] = not state["folded"]
+                fold_btn.props(
+                    f'icon={"visibility_off" if state["folded"] else "visibility"}'
+                )
+                fold_btn.update()
+                _rebuild(container, state)
+            fold_btn.on_click(_toggle_fold)
 
     def _list_setter(v, _cont=container, _st=state, _elem=elem_type, _cb=with_checkboxes):
         active_set_inner = set(v)
@@ -780,22 +805,62 @@ def _build_settings_body(settings, timers, *, depth=0, expansions=None):
 def _build_settings_card(name, settings, timers, *, depth=0, expansions=None):
     """Build a card for one Settings instance.
 
-    At *depth* 0 the card is a collapsible ``ui.expansion``.
-    At *depth* >= 1 it renders flat with a section divider + bold label.
+    Always renders as a collapsible ``ui.expansion`` at any depth.
+    If the group has child groups, an expand/collapse-all button is placed
+    in the expansion header next to the fold arrow.
     """
-    if depth >= 1:
-        # Flat rendering — no nested expansion
-        ui.separator().classes("mt-2")
-        ui.label(generate_label(name)).classes("text-sm font-bold text-primary")
-        _build_settings_body(settings, timers, depth=depth + 1, expansions=expansions)
-    else:
-        exp = ui.expansion(
-            generate_label(name), icon="settings",
-        ).props("duration=0").classes("w-full")
+    has_children = bool(settings.children)
+
+    exp = ui.expansion(
+        generate_label(name), icon="settings",
+    ).props("duration=0").classes("w-full")
+
+    # Place an unfold-all button in the expansion header row if there are sub-groups.
+    if has_children:
+        child_expansions_ref: list = []
+        _state = {"all": False}
+
+        def _toggle_children():
+            _state["all"] = not _state["all"]
+            for e in child_expansions_ref:
+                if _state["all"]:
+                    e.open()
+                else:
+                    e.close()
+
+        with exp.add_slot("header"):
+            with ui.row().classes("w-full items-center gap-1"):
+                ui.icon("settings").classes("text-lg")
+                ui.label(generate_label(name)).classes("flex-1")
+                unfold_btn = ui.button(
+                    icon="unfold_more",
+                    on_click=_toggle_children,
+                ).props("dense flat round size=xs").tooltip(
+                    "Expand / Collapse all sub-groups"
+                )
+                # Prevent the button click from toggling the expansion header
+                unfold_btn.on("click.stop", lambda: None)
+
+        # icon already rendered in custom header
+        exp._props.pop("icon", None)
+
+    if expansions is not None:
+        expansions.append(exp)
+
+    with exp:
+        child_expansions: list = []
+
+        _build_settings_body(
+            settings, timers,
+            depth=depth + 1, expansions=child_expansions,
+        )
+
         if expansions is not None:
-            expansions.append(exp)
-        with exp:
-            _build_settings_body(settings, timers, depth=depth + 1, expansions=expansions)
+            expansions.extend(child_expansions)
+
+        # Wire up the header button to the actual child expansions
+        if has_children:
+            child_expansions_ref.extend(child_expansions)
 
 
 def _build_preset_controls(root):

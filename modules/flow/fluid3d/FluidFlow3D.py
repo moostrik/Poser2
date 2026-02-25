@@ -27,6 +27,7 @@ from modules.gl import Texture, SwapFbo, Fbo
 from modules.gl.Texture3D import Texture3D, SwapTexture3D
 from modules.gl.ComputeShader import ComputeShader
 from modules.settings import Field, Settings, Widget
+from ..fluid_config import VelocityConfig, DensityConfig, TemperatureConfig, PressureConfig
 from .shaders import (
     Advect3D, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,
@@ -43,6 +44,15 @@ _BARRIER_IMAGE: int = int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 # Configuration
 # ---------------------------------------------------------------------------
 
+class DepthConfig(Settings):
+    """3D depth/volume-specific parameters."""
+    layers          = Field(4,    min=4,    max=64,   description="Number of depth layers in the 3D volume")
+    scale           = Field(1.0,  min=0.5,  max=5.0,  description="Manual multiplier on auto-computed Z grid spacing (width/depth_layers)")
+    composite_mode  = Field(1,    min=0,    max=2,    description="3D->2D compositing: 0=alpha, 1=additive, 2=max")
+    injection_layer = Field(0.1,  min=0.0,  max=1.0,  description="Normalized depth for 2D->3D injection center")
+    injection_spread = Field(0.15, min=0.01, max=0.5, description="Gaussian sigma for depth spread during injection")
+
+
 class FluidFlow3DConfig(Settings):
     """Configuration for 3D fluid simulation.
 
@@ -56,46 +66,14 @@ class FluidFlow3DConfig(Settings):
     # ---- Global ----
     simulation_scale = Field(0.5, min=0.1, max=2.0, description="Resolution scale for simulation buffers")
     avg_fps = Field(60, min=1, max=240, access=Field.READ, description="Current average FPS (bound from WindowManager)")
+    speed = Field(0.93, min=0.0, max=5.0, description="Base fluid transport rate")
 
-    # ---- Input strengths ----
-    vel_input_strength = Field(1.0, min=0.0, max=10.0, description="Multiplier applied to all velocity inputs")
-    den_input_strength = Field(0.01, min=0.0, max=1.0, description="Multiplier applied to all density inputs")
-    tmp_input_strength = Field(0.0, min=0.0, max=1.0, description="Multiplier applied to all temperature inputs")
-    vel_clamp_max = Field(5.0, min=0.1, max=50.0, description="Maximum velocity magnitude after clamping")
-    den_clamp_max = Field(1.2, min=0.1, max=5.0, description="Maximum density value after clamping")
-
-    # ---- Depth parameters ----
-    depth_layers = Field(16, min=4, max=64, description="Number of depth layers in the 3D volume")
-    depth_scale = Field(1.0, min=0.5, max=5.0, description="Manual multiplier on auto-computed Z grid spacing (width/depth_layers)")
-    composite_mode = Field(1, min=0, max=2, description="3D->2D compositing: 0=alpha, 1=additive, 2=max")
-    injection_layer = Field(0.5, min=0.0, max=1.0, description="Normalized depth for 2D->3D injection center")
-    injection_spread = Field(0.15, min=0.01, max=0.5, description="Gaussian sigma for depth spread during injection")
-
-    # ---- Transport speed ----
-    speed = Field(1.0, min=0.0, max=5.0, description="Base fluid transport rate")
-    vel_self_advection = Field(0.01, min=0.0, max=0.2, description="How much velocity advects itself")
-    den_speed_offset = Field(0.0, min=-5.0, max=5.0, description="Added to base speed for density only")
-
-    # ---- Velocity parameters ----
-    vel_lifetime = Field(10.0, min=0.01, max=60.0, description="Seconds until velocity fades to ~1%")
-    vel_vorticity = Field(5.0, min=0.0, max=60.0, description="Vortex confinement strength")
-    vel_vorticity_radius = Field(3.0, min=1.0, max=30.0, description="Curl sampling radius in texels")
-    vel_viscosity = Field(15.0, min=0.0, max=100.0, description="Fluid thickness/resistance to flow")
-    vel_viscosity_iter = Field(40, min=1, max=60, description="Solver iterations for viscosity")
-
-    # ---- Pressure parameters ----
-    prs_speed = Field(0.0, min=0.0, max=2.0, description="Pressure advection speed")
-    prs_lifetime = Field(8.0, min=0.01, max=60.0, description="Seconds until pressure fades to ~1%")
-    prs_iterations = Field(40, min=1, max=60, description="Solver iterations for pressure")
-
-    # ---- Density parameters ----
-    den_lifetime = Field(30.0, min=0.01, max=60.0, description="Seconds until density fades to ~1%")
-
-    # ---- Temperature parameters ----
-    tmp_lifetime = Field(3.0, min=0.01, max=60.0, description="Seconds until temperature fades to ~1%")
-    tmp_buoyancy = Field(0.0, min=0.0, max=10.0, description="Thermal buoyancy coefficient: hot air rises")
-    tmp_weight = Field(-10.0, min=-20.0, max=2.0, description="Ratio of gravity/settling vs thermal lift")
-    tmp_ambient = Field(0.2, min=0.0, max=1.0, description="Reference temperature (buoyancy = 0 at this temp)")
+    # ---- Field groups ----
+    velocity:    VelocityConfig
+    density:     DensityConfig
+    temperature: TemperatureConfig
+    pressure:    PressureConfig
+    depth:       DepthConfig
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +174,7 @@ class FluidFlow3D:
 
         # Bind settings actions
         self.config.bind(FluidFlow3DConfig.reset_sim, lambda _: self._request_reset())
-        self.config.bind(FluidFlow3DConfig.depth_layers, lambda _: self._request_reallocate())
+        self.config.depth.bind(DepthConfig.layers, lambda _: self._request_reallocate())
         self.config.bind(FluidFlow3DConfig.simulation_scale, lambda _: self._request_reallocate())
 
     # ========== Allocation ==========
@@ -215,7 +193,7 @@ class FluidFlow3D:
         self._width = self._align16(int(width * sim_scale))
         self._height = self._align16(int(height * sim_scale))
         self._aspect = self._width / self._height if self._height > 0 else 1.0
-        self._depth = self.config.depth_layers
+        self._depth = self.config.depth.layers
         self._auto_depth_scale = self._width / max(1, self._depth)
 
         sim_w = self._width
@@ -336,7 +314,7 @@ class FluidFlow3D:
         # Handle deferred reallocation from UI thread (depth_layers or simulation_scale changed)
         if self._reallocate_pending:
             self._reallocate_pending = False
-            new_depth = self.config.depth_layers
+            new_depth = self.config.depth.layers
             sim_scale = self.config.simulation_scale
             new_w = self._align16(int(self._density_width * sim_scale))
             new_h = self._align16(int(self._density_height * sim_scale))
@@ -358,12 +336,12 @@ class FluidFlow3D:
         delta_time: float = 1.0 / max(1, self.config.avg_fps)
 
         self._aspect = self._width / self._height if self._height > 0 else 1.0
-        depth_scale: float = self._auto_depth_scale * self.config.depth_scale
+        depth_scale: float = self._auto_depth_scale * self.config.depth.scale
         grid_scale: float = self.config.simulation_scale
 
         # ===== STEP 1: ADVECT DENSITY =====
-        advect_den_step = delta_time * (self.config.speed + self.config.den_speed_offset)
-        dissipate_den = self._calculate_dissipation(delta_time, self.config.den_lifetime)
+        advect_den_step = delta_time * (self.config.speed + self.config.density.speed_offset)
+        dissipate_den = self._calculate_dissipation(delta_time, self.config.density.lifetime)
 
         self._density.swap()
         self._advect_shader.advect(
@@ -378,8 +356,8 @@ class FluidFlow3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
         # ===== STEP 2: ADVECT VELOCITY (self-advection) =====
-        advect_vel_step = delta_time * self.config.vel_self_advection
-        dissipate_vel = self._calculate_dissipation(delta_time, self.config.vel_lifetime)
+        advect_vel_step = delta_time * self.config.velocity.self_advection
+        dissipate_vel = self._calculate_dissipation(delta_time, self.config.velocity.lifetime)
 
         self._velocity.swap()
         self._advect_shader.advect(
@@ -394,8 +372,8 @@ class FluidFlow3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
         # ===== STEP 3: VELOCITY DIFFUSE (viscosity) =====
-        if self.config.vel_viscosity > 0.0:
-            viscosity_dt = self.config.vel_viscosity * (self.config.simulation_scale ** 2) * delta_time
+        if self.config.velocity.viscosity > 0.0:
+            viscosity_dt = self.config.velocity.viscosity * (self.config.simulation_scale ** 2) * delta_time
 
             result = self._jacobi_diffusion_shader.solve(
                 self._velocity.texture,
@@ -403,7 +381,7 @@ class FluidFlow3D:
                 self._obstacle,
                 grid_scale, self._aspect, depth_scale,
                 viscosity_dt,
-                total_iterations=self.config.vel_viscosity_iter,
+                total_iterations=self.config.velocity.viscosity_iter,
                 iterations_per_dispatch=5
             )
             # Ensure correct buffer is active after solve
@@ -412,9 +390,9 @@ class FluidFlow3D:
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
         # ===== STEP 4: VORTICITY CONFINEMENT =====
-        if self.config.vel_vorticity > 0.0 and self.config.vel_vorticity_radius > 0.0:
-            vorticity_radius = self.config.vel_vorticity_radius * self.config.simulation_scale
-            vorticity_force = self.config.vel_vorticity * delta_time
+        if self.config.velocity.vorticity > 0.0 and self.config.velocity.vorticity_radius > 0.0:
+            vorticity_radius = self.config.velocity.vorticity_radius * self.config.simulation_scale
+            vorticity_force = self.config.velocity.vorticity * delta_time
 
             # 4a. Compute 3D curl (vorticity vector)
             self._vorticity_curl_shader.use(
@@ -439,12 +417,12 @@ class FluidFlow3D:
             self._add_force_to_velocity(self._vorticity_force_vol)
 
         # ===== STEP 5 & 6: TEMPERATURE ADVECT & BUOYANCY =====
-        if self.config.tmp_buoyancy == 0.0:
+        if self.config.temperature.buoyancy == 0.0:
             self._temperature.clear_all()
         else:
             # 5a. Advect temperature
             advect_tmp_step = delta_time * self.config.speed
-            dissipate_tmp = self._calculate_dissipation(delta_time, self.config.tmp_lifetime)
+            dissipate_tmp = self._calculate_dissipation(delta_time, self.config.temperature.lifetime)
 
             self._temperature.swap()
             self._advect_shader.advect(
@@ -460,14 +438,14 @@ class FluidFlow3D:
 
             # 6. Compute and apply buoyancy force
             # F = sigma*(T - T_ambient) - kappa*density
-            sigma = delta_time * self.config.simulation_scale * self.config.tmp_buoyancy
-            kappa = delta_time * self.config.simulation_scale * self.config.tmp_weight
+            sigma = delta_time * self.config.simulation_scale * self.config.temperature.buoyancy
+            kappa = delta_time * self.config.simulation_scale * self.config.temperature.weight
 
             self._buoyancy_shader.use(
                 self._temperature.texture,
                 self._density.texture,
                 self._buoyancy_force_vol,
-                sigma, kappa, self.config.tmp_ambient
+                sigma, kappa, self.config.temperature.ambient
             )
             glMemoryBarrier(_BARRIER_IMAGE)
 
@@ -475,9 +453,9 @@ class FluidFlow3D:
             self._add_force_to_velocity(self._buoyancy_force_vol)
 
         # ===== STEP 7: PRESSURE ADVECT (optional, non-physical) =====
-        if self.config.prs_speed > 0.0:
-            advect_prs_step = delta_time * self.config.prs_speed
-            dissipate_prs = self._calculate_dissipation(delta_time, self.config.prs_lifetime)
+        if self.config.pressure.speed > 0.0:
+            advect_prs_step = delta_time * self.config.pressure.speed
+            dissipate_prs = self._calculate_dissipation(delta_time, self.config.pressure.lifetime)
 
             self._pressure.swap()
             self._advect_shader.advect(
@@ -509,7 +487,7 @@ class FluidFlow3D:
             self._divergence_vol,
             self._obstacle,
             grid_scale, self._aspect, depth_scale,
-            total_iterations=self.config.prs_iterations,
+            total_iterations=self.config.pressure.iterations,
             iterations_per_dispatch=5
         )
         # Ensure correct buffer is active
@@ -532,7 +510,7 @@ class FluidFlow3D:
         self._composite_shader.use(
             self._density.texture,
             self._output_texture,
-            self.config.composite_mode
+            self.config.depth.composite_mode
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
@@ -605,16 +583,16 @@ class FluidFlow3D:
     def add_velocity(self, texture: Texture, strength: float = 1.0) -> None:
         """Inject 2D velocity texture into 3D velocity volume.
 
-        Uses gaussian depth spread centered at config.injection_layer.
-        Applies config vel_input_strength and delta_time.
+        Uses gaussian depth spread centered at config.depth.injection_layer.
+        Applies config velocity.input_strength and delta_time.
         """
         if not self._allocated:
             return
-        effective = strength * self.config.vel_input_strength * (1.0 / max(1, self.config.avg_fps))
+        effective = strength * self.config.velocity.input_strength * (1.0 / max(1, self.config.avg_fps))
         self._inject_shader.use(
             texture, self._velocity.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             effective, mode=0,
             internal_format=GL_RGBA16F
         )
@@ -630,23 +608,23 @@ class FluidFlow3D:
         self._velocity.clear_all()
         self._inject_shader.use(
             texture, self._velocity.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             strength, mode=1,
             internal_format=GL_RGBA16F
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def add_density(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject 2D density texture into 3D density volume. Applies config den_input_strength and delta_time."""
+        """Inject 2D density texture into 3D density volume. Applies config density.input_strength and delta_time."""
         if not self._allocated:
             return
         dt = 1.0 / max(1, self.config.avg_fps)
-        effective = strength * self.config.den_input_strength * dt
+        effective = strength * self.config.density.input_strength * dt
         self._inject_shader.use(
             texture, self._density.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             effective, mode=0,
             internal_format=GL_RGBA16F
         )
@@ -659,8 +637,8 @@ class FluidFlow3D:
         self._density.clear_all()
         self._inject_shader.use(
             texture, self._density.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             strength, mode=1,
             internal_format=GL_RGBA16F
         )
@@ -670,8 +648,8 @@ class FluidFlow3D:
                             strength: float = 1.0) -> None:
         """Inject single-channel 2D texture into one RGBA channel of the 3D density volume.
 
-        Uses gaussian depth spread centered at config.injection_layer.
-        Applies config den_input_strength.
+        Uses gaussian depth spread centered at config.depth.injection_layer.
+        Applies config density.input_strength.
 
         Args:
             texture: 2D source texture (reads .r component)
@@ -681,46 +659,46 @@ class FluidFlow3D:
         if not self._allocated:
             return
         dt = 1.0 / max(1, self.config.avg_fps)
-        effective = strength * self.config.den_input_strength * dt
+        effective = strength * self.config.density.input_strength * dt
         self._inject_channel_shader.use(
             texture, self._density.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             channel, effective, mode=0,
             internal_format=GL_RGBA16F
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def clamp_density(self) -> None:
-        """Clamp 3D density volume voxels to [0, config.den_clamp_max]."""
+        """Clamp 3D density volume voxels to [0, config.density.clamp_max]."""
         if not self._allocated:
             return
         self._clamp_shader.use(
-            self._density.texture, 0.0, self.config.den_clamp_max,
+            self._density.texture, 0.0, self.config.density.clamp_max,
             internal_format=GL_RGBA16F
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def _clamp_velocity(self) -> None:
-        """Clamp 3D velocity volume voxels to [-vel_clamp_max, vel_clamp_max]."""
+        """Clamp 3D velocity volume voxels to [-velocity.clamp_max, velocity.clamp_max]."""
         if not self._allocated:
             return
         self._clamp_shader.use(
-            self._velocity.texture, -self.config.vel_clamp_max, self.config.vel_clamp_max,
+            self._velocity.texture, -self.config.velocity.clamp_max, self.config.velocity.clamp_max,
             internal_format=GL_RGBA16F
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def add_temperature(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject 2D temperature texture into 3D temperature volume. Applies config tmp_input_strength and delta_time."""
+        """Inject 2D temperature texture into 3D temperature volume. Applies config temperature.input_strength and delta_time."""
         if not self._allocated:
             return
         dt = 1.0 / max(1, self.config.avg_fps)
-        effective = strength * self.config.tmp_input_strength * dt
+        effective = strength * self.config.temperature.input_strength * dt
         self._inject_shader.use(
             texture, self._temperature.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             effective, mode=0,
             internal_format=GL_R16F
         )
@@ -733,8 +711,8 @@ class FluidFlow3D:
         self._temperature.clear_all()
         self._inject_shader.use(
             texture, self._temperature.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             strength, mode=1,
             internal_format=GL_R16F
         )
@@ -746,8 +724,8 @@ class FluidFlow3D:
             return
         self._inject_shader.use(
             texture, self._pressure.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             strength, mode=0,
             internal_format=GL_R16F
         )
