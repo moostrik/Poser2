@@ -10,14 +10,16 @@ from modules.gl.ComputeShader import ComputeShader
 
 
 class JacobiPressure3D(ComputeShader):
-    """3D Jacobi pressure solver with shared memory tiling in XY.
+    """3D Jacobi pressure solver with shared memory tiling in XYZ.
 
-    Multi-iteration per dispatch. Z neighbors loaded from global memory.
+    Multi-iteration per dispatch. Workgroup processes a 16×16×2 tile with
+    Z-halo layers in shared memory, eliminating per-iteration global reads
+    for interior Z-neighbor pairs.
     """
 
     WORKGROUP_SIZE_X = 16
     WORKGROUP_SIZE_Y = 16
-    WORKGROUP_SIZE_Z = 1
+    WORKGROUP_SIZE_Z = 2
 
     DEFAULT_ITERATIONS_PER_DISPATCH = 5
 

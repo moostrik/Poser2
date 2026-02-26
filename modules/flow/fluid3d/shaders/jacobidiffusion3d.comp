@@ -11,11 +11,16 @@
  * solve), not the evolving iterate. This correctly solves the implicit
  * diffusion equation (I - νΔt∇²)v_new = v_old.
  *
- * Shared memory tiling for XY (18x18), Z from global memory.
+ * Uses shared memory tiling for XYZ: 18×18×4 (16×16×2 tile + 1-pixel
+ * halo on all six faces). Two Z layers per workgroup share Z-neighbor
+ * data through shared memory across iterations, eliminating per-iteration
+ * global reads for interior Z pairs.
  * Velocity is vec4 (xyz = u,v,w).
+ *
+ * Total shared memory: 4 × 18 × 18 × 16 bytes = 20,736 bytes/workgroup
  */
 
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 2) in;
 
 // Samplers
 layout(binding = 0) uniform sampler3D uObstacle;  // Obstacle mask (R8)
@@ -32,8 +37,13 @@ uniform int   uIterations;
 uniform ivec3 uSize;
 uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
 
-// Shared memory: store xyz velocity for XY tile with halo
-shared vec4 s_velocity[18][18];
+// Shared memory: 2 working Z layers + 2 Z halo layers, each with 18×18 XY halo.
+// Index: [z_slot][y+1][x+1]
+//   z_slot 0 = Z halo below (zBase - 1)
+//   z_slot 1 = working layer 0 (lz=0)
+//   z_slot 2 = working layer 1 (lz=1)
+//   z_slot 3 = Z halo above  (zBase + 2)
+shared vec4 s_velocity[4][18][18];
 
 vec4 loadVelocity(ivec3 coord) {
     coord = clamp(coord, ivec3(0), uSize - 1);
@@ -46,38 +56,49 @@ bool isObstacle(ivec3 coord) {
 }
 
 void main() {
-    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    int lz = int(gl_LocalInvocationID.z);              // 0 or 1 (local Z within pair)
+    int gz = int(gl_WorkGroupID.z) * 2 + lz;           // global Z index
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gz);
     ivec2 lid = ivec2(gl_LocalInvocationID.xy);
-    ivec2 sid = lid + 1;
+    ivec2 sid = lid + 1;                                // shared XY index (halo offset)
+    int sz = lz + 1;                                    // shared Z index (halo offset)
     ivec2 tileBase = ivec2(gl_WorkGroupID.xy) * 16;
-    int z = int(gl_WorkGroupID.z);
+    int zBase = int(gl_WorkGroupID.z) * 2;
 
-    bool validPixel = all(lessThan(gid, uSize));
+    bool validPixel = gz < uSize.z && all(lessThan(gid.xy, uSize.xy));
     bool obstacle = uHasObstacles && validPixel && isObstacle(gid);
 
     // Check Z neighbor obstacles
     bool obsFront = false;
     bool obsBack  = false;
     if (uHasObstacles) {
-        obsFront = (z + 1 < uSize.z) ? isObstacle(ivec3(gid.xy, z + 1)) : false;
-        obsBack  = (z - 1 >= 0)      ? isObstacle(ivec3(gid.xy, z - 1)) : false;
+        obsFront = (gz + 1 < uSize.z) ? isObstacle(ivec3(gid.xy, gz + 1)) : false;
+        obsBack  = (gz - 1 >= 0)      ? isObstacle(ivec3(gid.xy, gz - 1)) : false;
     }
 
-    // Initial shared memory load
+    // Initial shared memory load (each lz loads its own Z slice)
     vec4 myVelocity = validPixel ? loadVelocity(gid) : vec4(0.0);
     vec4 v_old = myVelocity;  // preserve original for source term
-    s_velocity[sid.y][sid.x] = myVelocity;
+    s_velocity[sz][sid.y][sid.x] = myVelocity;
 
-    // Halo loads
-    if (lid.y == 0)  s_velocity[0][sid.x]  = loadVelocity(ivec3(tileBase + ivec2(lid.x, -1), z));
-    if (lid.y == 15) s_velocity[17][sid.x] = loadVelocity(ivec3(tileBase + ivec2(lid.x, 16), z));
-    if (lid.x == 0)  s_velocity[sid.y][0]  = loadVelocity(ivec3(tileBase + ivec2(-1, lid.y), z));
-    if (lid.x == 15) s_velocity[sid.y][17] = loadVelocity(ivec3(tileBase + ivec2(16, lid.y), z));
+    // XY halo loads (both Z layers load their own XY halos)
+    if (lid.y == 0)  s_velocity[sz][0][sid.x]  = loadVelocity(ivec3(tileBase + ivec2(lid.x, -1), gz));
+    if (lid.y == 15) s_velocity[sz][17][sid.x] = loadVelocity(ivec3(tileBase + ivec2(lid.x, 16), gz));
+    if (lid.x == 0)  s_velocity[sz][sid.y][0]  = loadVelocity(ivec3(tileBase + ivec2(-1, lid.y), gz));
+    if (lid.x == 15) s_velocity[sz][sid.y][17] = loadVelocity(ivec3(tileBase + ivec2(16, lid.y), gz));
 
-    if (lid.x == 0  && lid.y == 0)  s_velocity[0][0]   = loadVelocity(ivec3(tileBase + ivec2(-1, -1), z));
-    if (lid.x == 15 && lid.y == 0)  s_velocity[0][17]  = loadVelocity(ivec3(tileBase + ivec2(16, -1), z));
-    if (lid.x == 0  && lid.y == 15) s_velocity[17][0]  = loadVelocity(ivec3(tileBase + ivec2(-1, 16), z));
-    if (lid.x == 15 && lid.y == 15) s_velocity[17][17] = loadVelocity(ivec3(tileBase + ivec2(16, 16), z));
+    if (lid.x == 0  && lid.y == 0)  s_velocity[sz][0][0]   = loadVelocity(ivec3(tileBase + ivec2(-1, -1), gz));
+    if (lid.x == 15 && lid.y == 0)  s_velocity[sz][0][17]  = loadVelocity(ivec3(tileBase + ivec2(16, -1), gz));
+    if (lid.x == 0  && lid.y == 15) s_velocity[sz][17][0]  = loadVelocity(ivec3(tileBase + ivec2(-1, 16), gz));
+    if (lid.x == 15 && lid.y == 15) s_velocity[sz][17][17] = loadVelocity(ivec3(tileBase + ivec2(16, 16), gz));
+
+    // Z halo loads: lz=0 loads the below-halo (slot 0), lz=1 loads the above-halo (slot 3)
+    if (lz == 0) {
+        s_velocity[0][sid.y][sid.x] = loadVelocity(ivec3(gid.xy, zBase - 1));
+    }
+    if (lz == 1) {
+        s_velocity[3][sid.y][sid.x] = loadVelocity(ivec3(gid.xy, zBase + 2));
+    }
 
     barrier();
 
@@ -85,17 +106,21 @@ void main() {
 
     for (int iter = 0; iter < uIterations; iter++) {
         if (validPixel && !obstacle) {
-            vec4 vC = s_velocity[sid.y][sid.x];
+            vec4 vC = s_velocity[sz][sid.y][sid.x];
 
             // XY neighbors from shared memory
-            vec4 vR = s_velocity[sid.y][sid.x + 1];
-            vec4 vL = s_velocity[sid.y][sid.x - 1];
-            vec4 vT = s_velocity[sid.y + 1][sid.x];
-            vec4 vB = s_velocity[sid.y - 1][sid.x];
+            vec4 vR = s_velocity[sz][sid.y][sid.x + 1];
+            vec4 vL = s_velocity[sz][sid.y][sid.x - 1];
+            vec4 vT = s_velocity[sz][sid.y + 1][sid.x];
+            vec4 vB = s_velocity[sz][sid.y - 1][sid.x];
 
-            // Z neighbors from global memory
-            vec4 vF = (z + 1 < uSize.z) ? loadVelocity(ivec3(gid.xy, z + 1)) : vC;
-            vec4 vK = (z - 1 >= 0)      ? loadVelocity(ivec3(gid.xy, z - 1)) : vC;
+            // Z neighbors from shared memory (interior pair + halo layers)
+            vec4 vF = s_velocity[sz + 1][sid.y][sid.x];
+            vec4 vK = s_velocity[sz - 1][sid.y][sid.x];
+
+            // Domain boundary: clamp to center (Neumann / no-slip)
+            if (gz + 1 >= uSize.z) vF = vC;
+            if (gz - 1 < 0)        vK = vC;
 
             // No-slip BCs for interior obstacles
             if (uHasObstacles) {
@@ -125,7 +150,7 @@ void main() {
         }
 
         barrier();
-        s_velocity[sid.y][sid.x] = newVelocity;
+        s_velocity[sz][sid.y][sid.x] = newVelocity;
         barrier();
     }
 

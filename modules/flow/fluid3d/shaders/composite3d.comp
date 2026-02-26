@@ -3,13 +3,19 @@
 /*
  * Composite3D - Composite 3D density volume into 2D output.
  *
- * Supports multiple compositing modes:
+ * All modes ray-march through the volume with uRaySteps steps, which can
+ * be higher than the physical layer count. The sampler3D trilinear
+ * filtering interpolates between sparse Z layers automatically — same
+ * principle as simulating at low XY resolution and displaying at full res.
+ *
+ * Modes:
  *   0 = Front-to-back alpha compositing (standard over operator)
- *   1 = Additive blending (sum all layers)
+ *   1 = Additive blending (sum all steps, normalized by step count / depth)
  *   2 = Maximum intensity projection
+ *   3 = Volumetric emission-absorption (Beer's law)
+ *   4 = Debug: depth spectrum (density tinted by layer hue)
  *
  * Dispatched as a 2D compute (one thread per output pixel).
- * Each thread iterates through all depth layers.
  */
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
@@ -21,75 +27,119 @@ layout(binding = 0) uniform sampler3D uDensity;  // RGBA16F
 layout(rgba16f, binding = 0) writeonly uniform image2D uOutput;
 
 // Parameters
-uniform int   uMode;        // 0=alpha, 1=additive, 2=max, 3=emission-absorption
-uniform int   uDepth;       // Number of depth layers
+uniform int   uMode;        // 0=alpha, 1=additive, 2=max, 3=emission-absorption, 4=debug depth
+uniform int   uDepth;       // Number of physical depth layers
 uniform ivec2 uOutputSize;  // 2D output dimensions
-uniform float uAbsorption;  // Beer's law absorption coefficient (mode 3)
-uniform int   uRaySteps;    // Number of ray-march steps (mode 3), oversamples volume
+uniform float uAbsorption;  // Absorption coefficient (mode 3: Beer's law, mode 1: unused)
+uniform int   uRaySteps;    // Ray-march steps (all modes). More steps = smoother Z interpolation
 
 void main() {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
     if (any(greaterThanEqual(gid, uOutputSize))) return;
 
     vec2 uv = (vec2(gid) + 0.5) / vec2(uOutputSize);
+    int steps = max(uRaySteps, 1);
+    float inv_steps = 1.0 / float(steps);
+
+    // Normalization: when oversampling (steps > depth), scale contribution
+    // per step so total brightness matches what depth-many layers would give.
+    float step_weight = float(uDepth) * inv_steps;
+
     vec4 result = vec4(0.0);
 
     if (uMode == 0) {
         // Front-to-back alpha compositing
-        // Iterate layers front (z=0) to back (z=depth-1)
         float accum_alpha = 0.0;
-        for (int z = 0; z < uDepth; z++) {
-            float z_norm = (float(z) + 0.5) / float(uDepth);
+        for (int i = 0; i < steps; i++) {
+            float z_norm = (float(i) + 0.5) * inv_steps;
             vec4 sample_val = texture(uDensity, vec3(uv, z_norm));
 
-            // Standard over operator: C_out = C_in + (1 - α_accum) * C_layer
-            float layer_alpha = sample_val.a;
+            // Scale alpha by step_weight so oversampling doesn't over-opacify
+            float layer_alpha = sample_val.a * step_weight;
             float weight = (1.0 - accum_alpha) * layer_alpha;
             result.rgb += weight * sample_val.rgb;
             accum_alpha += weight;
 
-            // Early exit if nearly opaque
             if (accum_alpha > 0.99) break;
         }
         result.a = accum_alpha;
     }
     else if (uMode == 1) {
-        // Additive: sum all layers
-        for (int z = 0; z < uDepth; z++) {
-            float z_norm = (float(z) + 0.5) / float(uDepth);
+        // Additive: sum all steps, normalized
+        for (int i = 0; i < steps; i++) {
+            float z_norm = (float(i) + 0.5) * inv_steps;
             result += texture(uDensity, vec3(uv, z_norm));
         }
+        result *= step_weight;
     }
     else if (uMode == 2) {
-        // Maximum intensity projection
-        for (int z = 0; z < uDepth; z++) {
-            float z_norm = (float(z) + 0.5) / float(uDepth);
+        // Maximum intensity projection (no normalization needed)
+        for (int i = 0; i < steps; i++) {
+            float z_norm = (float(i) + 0.5) * inv_steps;
             result = max(result, texture(uDensity, vec3(uv, z_norm)));
         }
     }
     else if (uMode == 3) {
-        // Volumetric additive with Z-blur: at each layer center, gather a
-        // gaussian-weighted kernel along Z to create genuinely smooth
-        // transitions between discrete layers. uAbsorption controls the
-        // blur sigma (in normalized Z units). Larger = softer/more diffuse.
-        float sigma = max(uAbsorption, 0.001);
-        int taps = 9;  // blur kernel size (odd)
-        int half_taps = taps / 2;
-        float inv_depth = 1.0 / float(uDepth);
+        // Emission-absorption (Beer's law volumetric rendering)
+        // T = transmittance, starts at 1 (fully transparent)
+        // Per step: emit light proportional to density, attenuate by absorption
+        float dt = step_weight;  // step thickness relative to layer spacing
+        float T = 1.0;
 
-        for (int z = 0; z < uDepth; z++) {
-            float z_center = (float(z) + 0.5) * inv_depth;
+        for (int i = 0; i < steps; i++) {
+            float z_norm = (float(i) + 0.5) * inv_steps;
+            vec4 sample_val = texture(uDensity, vec3(uv, z_norm));
 
-            // Gaussian blur kernel along Z (unnormalized — preserves brightness)
-            vec4 blurred = vec4(0.0);
-            for (int t = -half_taps; t <= half_taps; t++) {
-                float z_sample = z_center + float(t) * sigma / float(half_taps);
-                z_sample = clamp(z_sample, 0.0, 1.0);
-                float w = exp(-0.5 * pow(float(t) / float(half_taps), 2.0));
-                blurred += texture(uDensity, vec3(uv, z_sample)) * w;
-            }
-            result += blurred;
+            float density_mag = length(sample_val.rgb);
+            float absorption_step = uAbsorption * density_mag * dt;
+
+            // Emission: add light weighted by current transmittance
+            result.rgb += T * sample_val.rgb * dt;
+
+            // Absorption: Beer's law attenuation
+            T *= exp(-absorption_step);
+
+            if (T < 0.01) break;
         }
+        result.a = 1.0 - T;
+    }
+    else if (uMode == 4) {
+        // Debug: depth spectrum — dominant layer visualization.
+        // At each pixel, find which layer has the highest density and
+        // show its depth-hue. Brightness = that layer's density magnitude.
+        // Red=BACK(last), green=middle, cyan=~1/2, blue=~1/3, violet=FRONT(0).
+        // No additive mixing — pure per-pixel depth readout.
+        float max_density = 0.0;
+        int max_z = 0;
+        for (int z = 0; z < uDepth; z++) {
+            float z_norm = (float(z) + 0.5) / float(uDepth);
+            float density_mag = length(texture(uDensity, vec3(uv, z_norm)).rgb);
+            if (density_mag > max_density) {
+                max_density = density_mag;
+                max_z = z;
+            }
+        }
+
+        // Hue from depth: 0.8 (violet/front) to 0.0 (red/back)
+        float hue = 0.8 * (1.0 - float(max_z) / max(float(uDepth - 1), 1.0));
+
+        // HSV to RGB (S=1, V=1)
+        float h6 = hue * 6.0;
+        float c = 1.0;
+        float x = 1.0 - abs(mod(h6, 2.0) - 1.0);
+        vec3 rgb;
+        if      (h6 < 1.0) rgb = vec3(c, x, 0.0);
+        else if (h6 < 2.0) rgb = vec3(x, c, 0.0);
+        else if (h6 < 3.0) rgb = vec3(0.0, c, x);
+        else if (h6 < 4.0) rgb = vec3(0.0, x, c);
+        else if (h6 < 5.0) rgb = vec3(x, 0.0, c);
+        else               rgb = vec3(c, 0.0, x);
+
+        // Brightness: use presence (step function) rather than raw density
+        // so colors are clearly visible for debugging
+        float brightness = min(max_density * 10.0, 1.0);
+        result.rgb = rgb * brightness;
+        result.a = 1.0;
     }
 
     imageStore(uOutput, gid, result);

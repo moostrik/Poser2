@@ -178,7 +178,7 @@ class Fluid3DLayer(LayerBase):
             self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
 
             # Add Z-velocity from motion magnitude (pushes fluid back -> front)
-            self._fluid_flow.add_velocity_z(flow_layer.magnitude, vel_strength)
+            self._fluid_flow.add_velocity_z(flow_layer.magnitude, vel_strength * 3)
 
             # Add density to per-camera channel (R=cam0, G=cam1, B=cam2, A=cam3)
             channel: int = cam_id % 4

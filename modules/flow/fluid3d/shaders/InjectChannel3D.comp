@@ -33,8 +33,12 @@ void main() {
     // Normalized Z position of this voxel
     float z_norm = (float(gid.z) + 0.5) / float(uSize.z);
 
+    // Remap uTargetLayer [0,1] to texel-center space:
+    // 0.0 -> center of first layer, 1.0 -> center of last layer
+    float target = (0.5 + uTargetLayer * (float(uSize.z) - 1.0)) / float(uSize.z);
+
     // Gaussian weight along depth
-    float dz = (z_norm - uTargetLayer) / max(uSpread, 0.001);
+    float dz = (z_norm - target) / max(uSpread, 0.001);
     float weight = exp(-0.5 * dz * dz) * uStrength;
 
     if (weight < 0.001) return;  // Skip negligible contributions

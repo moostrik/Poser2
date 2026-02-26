@@ -53,7 +53,7 @@ LARGE_LAYERS: list[Layers] = [
     # Layers.centre_pose,
     Layers.flow,
     Layers.fluid,
-    Layers.fluid3D,
+    # Layers.fluid3D,
     Layers.composite,
 ]
 

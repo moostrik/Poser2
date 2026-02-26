@@ -7,14 +7,16 @@
  *   p^(k+1) = β * (αx*(pL + pR) + αy*(pB + pT) + αz*(pF + pK) - div)
  *   β = 1 / (2*αx + 2*αy + 2*αz)
  *
- * Uses shared memory tiling for XY plane (18x18 with halo).
- * Z±1 neighbors loaded from global memory (only 2 extra reads per thread).
+ * Uses shared memory tiling for XYZ: 18×18×4 (16×16×2 tile + 1-pixel
+ * halo on all six faces). Two Z layers per workgroup share Z-neighbor
+ * data through shared memory across iterations, eliminating per-iteration
+ * global reads for interior Z pairs.
  *
  * Boundary: pressure uses CLAMP_TO_EDGE → Neumann at domain walls.
  * Interior obstacles: Neumann via pCenter substitution.
  */
 
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 2) in;
 
 // Samplers for read access (filtered)
 layout(binding = 0) uniform sampler3D uDivergence;  // Velocity divergence (R16F)
@@ -31,8 +33,14 @@ uniform int   uIterations;  // Iterations per dispatch
 uniform ivec3 uSize;          // Volume dimensions
 uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
 
-// Shared memory: XY tile with 1-pixel halo
-shared float s_pressure[18][18];
+// Shared memory: 2 working Z layers + 2 Z halo layers, each with 18×18 XY halo.
+// Index: [z_slot][y+1][x+1]
+//   z_slot 0 = Z halo below (zBase - 1)
+//   z_slot 1 = working layer 0 (lz=0)
+//   z_slot 2 = working layer 1 (lz=1)
+//   z_slot 3 = Z halo above  (zBase + 2)
+// Total: 4 × 18 × 18 × 4 bytes = 5,184 bytes per workgroup
+shared float s_pressure[4][18][18];
 
 float loadPressure(ivec3 coord) {
     coord = clamp(coord, ivec3(0), uSize - 1);
@@ -50,13 +58,16 @@ float sampleDivergence(ivec3 coord) {
 }
 
 void main() {
-    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    int lz = int(gl_LocalInvocationID.z);              // 0 or 1 (local Z within pair)
+    int gz = int(gl_WorkGroupID.z) * 2 + lz;           // global Z index
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gz);
     ivec2 lid = ivec2(gl_LocalInvocationID.xy);
-    ivec2 sid = lid + 1;
+    ivec2 sid = lid + 1;                                // shared XY index (halo offset)
+    int sz = lz + 1;                                    // shared Z index (halo offset)
     ivec2 tileBase = ivec2(gl_WorkGroupID.xy) * 16;
-    int z = int(gl_WorkGroupID.z);
+    int zBase = int(gl_WorkGroupID.z) * 2;
 
-    bool validPixel = all(lessThan(gid, uSize));
+    bool validPixel = gz < uSize.z && all(lessThan(gid.xy, uSize.xy));
     bool obstacle = uHasObstacles && validPixel && isObstacle(gid);
     float divergence = validPixel ? sampleDivergence(gid) : 0.0;
 
@@ -64,24 +75,34 @@ void main() {
     bool obsFront = false;
     bool obsBack  = false;
     if (uHasObstacles) {
-        obsFront = (z + 1 < uSize.z) ? isObstacle(ivec3(gid.xy, z + 1)) : false;
-        obsBack  = (z - 1 >= 0)      ? isObstacle(ivec3(gid.xy, z - 1)) : false;
+        obsFront = (gz + 1 < uSize.z) ? isObstacle(ivec3(gid.xy, gz + 1)) : false;
+        obsBack  = (gz - 1 >= 0)      ? isObstacle(ivec3(gid.xy, gz - 1)) : false;
     }
 
     // ===== Initial shared memory load =====
+    // Load own layer (each lz loads its own Z slice)
     float myPressure = validPixel ? loadPressure(gid) : 0.0;
-    s_pressure[sid.y][sid.x] = myPressure;
+    s_pressure[sz][sid.y][sid.x] = myPressure;
 
-    // Halo loads
-    if (lid.y == 0)  s_pressure[0][sid.x]  = loadPressure(ivec3(tileBase + ivec2(lid.x, -1), z));
-    if (lid.y == 15) s_pressure[17][sid.x] = loadPressure(ivec3(tileBase + ivec2(lid.x, 16), z));
-    if (lid.x == 0)  s_pressure[sid.y][0]  = loadPressure(ivec3(tileBase + ivec2(-1, lid.y), z));
-    if (lid.x == 15) s_pressure[sid.y][17] = loadPressure(ivec3(tileBase + ivec2(16, lid.y), z));
+    // XY halo loads (both Z layers load their own XY halos)
+    if (lid.y == 0)  s_pressure[sz][0][sid.x]  = loadPressure(ivec3(tileBase + ivec2(lid.x, -1), gz));
+    if (lid.y == 15) s_pressure[sz][17][sid.x] = loadPressure(ivec3(tileBase + ivec2(lid.x, 16), gz));
+    if (lid.x == 0)  s_pressure[sz][sid.y][0]  = loadPressure(ivec3(tileBase + ivec2(-1, lid.y), gz));
+    if (lid.x == 15) s_pressure[sz][sid.y][17] = loadPressure(ivec3(tileBase + ivec2(16, lid.y), gz));
 
-    if (lid.x == 0  && lid.y == 0)  s_pressure[0][0]   = loadPressure(ivec3(tileBase + ivec2(-1, -1), z));
-    if (lid.x == 15 && lid.y == 0)  s_pressure[0][17]  = loadPressure(ivec3(tileBase + ivec2(16, -1), z));
-    if (lid.x == 0  && lid.y == 15) s_pressure[17][0]  = loadPressure(ivec3(tileBase + ivec2(-1, 16), z));
-    if (lid.x == 15 && lid.y == 15) s_pressure[17][17] = loadPressure(ivec3(tileBase + ivec2(16, 16), z));
+    if (lid.x == 0  && lid.y == 0)  s_pressure[sz][0][0]   = loadPressure(ivec3(tileBase + ivec2(-1, -1), gz));
+    if (lid.x == 15 && lid.y == 0)  s_pressure[sz][0][17]  = loadPressure(ivec3(tileBase + ivec2(16, -1), gz));
+    if (lid.x == 0  && lid.y == 15) s_pressure[sz][17][0]  = loadPressure(ivec3(tileBase + ivec2(-1, 16), gz));
+    if (lid.x == 15 && lid.y == 15) s_pressure[sz][17][17] = loadPressure(ivec3(tileBase + ivec2(16, 16), gz));
+
+    // Z halo loads: lz=0 loads the below-halo (slot 0), lz=1 loads the above-halo (slot 3)
+    // Only interior tile positions needed (Z neighbors are never accessed at XY halo coords)
+    if (lz == 0) {
+        s_pressure[0][sid.y][sid.x] = loadPressure(ivec3(gid.xy, zBase - 1));
+    }
+    if (lz == 1) {
+        s_pressure[3][sid.y][sid.x] = loadPressure(ivec3(gid.xy, zBase + 2));
+    }
 
     barrier();
 
@@ -90,17 +111,21 @@ void main() {
 
     for (int iter = 0; iter < uIterations; iter++) {
         if (validPixel && !obstacle) {
-            float pC = s_pressure[sid.y][sid.x];
+            float pC = s_pressure[sz][sid.y][sid.x];
 
             // XY neighbors from shared memory
-            float pR = s_pressure[sid.y][sid.x + 1];
-            float pL = s_pressure[sid.y][sid.x - 1];
-            float pT = s_pressure[sid.y + 1][sid.x];
-            float pB = s_pressure[sid.y - 1][sid.x];
+            float pR = s_pressure[sz][sid.y][sid.x + 1];
+            float pL = s_pressure[sz][sid.y][sid.x - 1];
+            float pT = s_pressure[sz][sid.y + 1][sid.x];
+            float pB = s_pressure[sz][sid.y - 1][sid.x];
 
-            // Z neighbors from global memory (can't tile Z affordably)
-            float pF = (z + 1 < uSize.z) ? loadPressure(ivec3(gid.xy, z + 1)) : pC;
-            float pK = (z - 1 >= 0)      ? loadPressure(ivec3(gid.xy, z - 1)) : pC;
+            // Z neighbors from shared memory (interior pair + halo layers)
+            float pF = s_pressure[sz + 1][sid.y][sid.x];
+            float pK = s_pressure[sz - 1][sid.y][sid.x];
+
+            // Domain boundary: clamp to center (Neumann)
+            if (gz + 1 >= uSize.z) pF = pC;
+            if (gz - 1 < 0)        pK = pC;
 
             // Neumann BCs for interior obstacles
             if (uHasObstacles) {
@@ -128,7 +153,7 @@ void main() {
         }
 
         barrier();
-        s_pressure[sid.y][sid.x] = newPressure;
+        s_pressure[sz][sid.y][sid.x] = newPressure;
         barrier();
     }
 

@@ -12,12 +12,14 @@ from modules.gl.ComputeShader import ComputeShader
 class JacobiDiffusion3D(ComputeShader):
     """3D Jacobi diffusion solver for velocity viscosity.
 
-    Multi-iteration with shared memory tiling in XY plane.
+    Multi-iteration with shared memory tiling in XYZ. Workgroup processes
+    a 16×16×2 tile with Z-halo layers in shared memory, eliminating
+    per-iteration global reads for interior Z-neighbor pairs.
     """
 
     WORKGROUP_SIZE_X = 16
     WORKGROUP_SIZE_Y = 16
-    WORKGROUP_SIZE_Z = 1
+    WORKGROUP_SIZE_Z = 2
 
     DEFAULT_ITERATIONS_PER_DISPATCH = 5
 

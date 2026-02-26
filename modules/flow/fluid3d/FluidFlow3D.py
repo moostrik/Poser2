@@ -53,7 +53,7 @@ class DepthConfig(Settings):
     """3D depth/volume-specific parameters."""
     layers: Field[int]              = Field(4,    min=1,    max=64,     description="Number of depth layers in the 3D volume")
     scale: Field[float]             = Field(1.0,  min=0.5,  max=5.0,    description="Manual multiplier on auto-computed Z grid spacing (width/depth_layers)")
-    composite_mode: Field[int]      = Field(3,    min=0,    max=3,      description="3D->2D compositing: 0=alpha, 1=additive, 2=max, 3=emission-absorption")
+    composite_mode: Field[int]      = Field(3,    min=0,    max=4,      description="3D->2D compositing: 0=alpha, 1=additive, 2=max, 3=emission-absorption, 4=debug depth")
     ray_steps: Field[int]           = Field(32,   min=1,    max=128,    description="Number of ray-march steps for volumetric composite (mode 3). More steps = smoother inter-layer interpolation")
     absorption: Field[float]        = Field(4.0,  min=0.01,  max=50.0,   description="Beer's law absorption coefficient (higher = more opaque per unit density)")
     injection_layer: Field[float]   = Field(1.0,  min=0.0,  max=1.0,    description="Normalized depth for 2D->3D injection center")

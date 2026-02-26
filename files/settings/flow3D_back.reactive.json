@@ -184,33 +184,33 @@
       "blend_mode": "ALPHA",
       "fluid_flow": {
         "simulation_scale": 0.2,
-        "speed": 1.0,
+        "speed": 0.79,
         "depth": {
-          "layers": 28,
+          "layers": 64,
           "scale": 1.0,
           "composite_mode": 1,
-          "ray_steps": 89,
+          "ray_steps": 128,
           "absorption": 24.33,
           "injection_layer": 0.1,
           "injection_spread": 0.15
         },
         "velocity": {
-          "input_strength": 1.0,
-          "self_advection": 0.02,
-          "fade_time": 20.54,
-          "dampen_threshold": 5.0,
-          "dampen_time": 3.0,
-          "vorticity": 0.0,
+          "input_strength": 0.94,
+          "self_advection": 0.2,
+          "fade_time": 27.72,
+          "dampen_threshold": 7.97,
+          "dampen_time": 5.13,
+          "vorticity": 20.47,
           "vorticity_radius": 1.0,
-          "viscosity": 0.0,
+          "viscosity": 52.94,
           "viscosity_iter": 20
         },
         "density": {
           "input_strength": 1.0,
           "speed_offset": 0.0,
-          "fade_time": 10.24,
-          "dampen_threshold": 1.2,
-          "dampen_time": 3.0
+          "fade_time": 29.93,
+          "dampen_threshold": 0.1,
+          "dampen_time": 1.13
         },
         "temperature": {
           "input_strength": 0.0,
@@ -222,8 +222,8 @@
         },
         "pressure": {
           "speed": 0.0,
-          "fade_time": 8.0,
-          "iterations": 40
+          "fade_time": 0.01,
+          "iterations": 20
         }
       },
       "visualisation": {
@@ -288,7 +288,7 @@
       "width": 1080,
       "height": 1000,
       "secondary_list": [
-        "M1"
+        "M0"
       ]
     }
   },
