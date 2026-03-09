@@ -159,7 +159,7 @@ class FluidFlow3DArray:
 
         # Bind settings actions
         self.config.bind(FluidFlowConfig.reset_sim, lambda _: self._request_reset())
-        self.config.z.bind(DepthConfig.depth, lambda _: self._request_reallocate())
+        self.config.depth.bind(DepthConfig.depth, lambda _: self._request_reallocate())
         self.config.bind(FluidFlowConfig.width, lambda _: self._request_reallocate())
         self.config.bind(FluidFlowConfig.height, lambda _: self._request_reallocate())
 
@@ -223,8 +223,8 @@ class FluidFlow3DArray:
         self._simulation_height = self._align32(self.config.height)
         self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
         self._grid_scale = self._simulation_width / self._density_width if self._density_width > 0 else 1.0
-        self._depth = self.config.z.depth
-        self._depth_aspect = (self._simulation_width / max(1, self._depth)) * self.config.z.scale
+        self._depth = self.config.depth.depth
+        self._depth_aspect = (self._simulation_width / max(1, self._depth)) * self.config.depth.scale
 
     def _allocate_density_fields(self) -> None:
         """(Re)allocate density-resolution volumes (full output resolution × depth)."""
@@ -625,9 +625,9 @@ class FluidFlow3DArray:
         self._composite_density_shader.use(
             self._density.texture,
             self._output_texture,
-            self.config.z.composite_mode,
-            absorption=self.config.z.absorption,
-            ray_steps=self.config.z.ray_steps
+            self.config.depth.composite_mode,
+            absorption=self.config.depth.absorption,
+            ray_steps=self.config.depth.ray_steps
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
@@ -747,8 +747,8 @@ class FluidFlow3DArray:
         effective = strength * self.config.velocity.input_strength * (1.0 / max(1, self.config.fps))
         self._inject_shader.use(
             texture, self._velocity.texture,
-            self.config.z.injection_layer,
-            self.config.z.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             effective, mode=0,
             internal_format=GL_RGBA16F
         )
@@ -767,8 +767,8 @@ class FluidFlow3DArray:
         effective = strength * self.config.velocity.input_strength * dt
         self._inject_channel_shader.use(
             texture, self._velocity.texture,
-            self.config.z.injection_layer,
-            self.config.z.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             2, effective, mode=0,  # channel 2 = B component = W (Z-velocity)
             internal_format=GL_RGBA16F
         )
@@ -784,8 +784,8 @@ class FluidFlow3DArray:
         self._velocity.clear_all()
         self._inject_shader.use(
             texture, self._velocity.texture,
-            self.config.z.injection_layer,
-            self.config.z.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             strength, mode=1,
             internal_format=GL_RGBA16F
         )
@@ -799,8 +799,8 @@ class FluidFlow3DArray:
         effective = strength * self.config.density.input_strength * dt
         self._inject_density_shader.use(
             texture, self._density.texture,
-            self.config.z.injection_layer,
-            self.config.z.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             effective, mode=0,
             internal_format=GL_RGBA16F
         )
@@ -813,8 +813,8 @@ class FluidFlow3DArray:
         self._density.clear_all()
         self._inject_density_shader.use(
             texture, self._density.texture,
-            self.config.z.injection_layer,
-            self.config.z.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             strength, mode=1,
             internal_format=GL_RGBA16F
         )
@@ -838,8 +838,8 @@ class FluidFlow3DArray:
         effective = strength * self.config.density.input_strength * dt
         self._inject_density_channel_shader.use(
             texture, self._density.texture,
-            self.config.z.injection_layer,
-            self.config.z.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             channel, effective, mode=0,
             internal_format=GL_RGBA16F
         )
@@ -853,8 +853,8 @@ class FluidFlow3DArray:
         effective = strength * self.config.temperature.input_strength * dt
         self._inject_shader.use(
             texture, self._temperature.texture,
-            self.config.z.injection_layer,
-            self.config.z.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             effective, mode=0,
             internal_format=GL_R16F
         )
@@ -867,8 +867,8 @@ class FluidFlow3DArray:
         self._temperature.clear_all()
         self._inject_shader.use(
             texture, self._temperature.texture,
-            self.config.z.injection_layer,
-            self.config.z.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             strength, mode=1,
             internal_format=GL_R16F
         )
@@ -880,8 +880,8 @@ class FluidFlow3DArray:
             return
         self._inject_shader.use(
             texture, self._pressure.texture,
-            self.config.z.injection_layer,
-            self.config.z.injection_spread,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
             strength, mode=0,
             internal_format=GL_R16F
         )

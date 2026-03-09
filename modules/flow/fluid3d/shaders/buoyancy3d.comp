@@ -43,7 +43,7 @@ void main() {
     vec3 buoyancy = vec3(0.0);
 
     if (abs(dtemp) > 0.0001) {
-        float density = texture(uDensity, st).a;
+        float density = texture(uDensity, st).r;  // R16F scalar density
         float force = dtemp * uSigma - density * uKappa;
         // Apply in Y direction (negative Y = up in screen space)
         buoyancy = vec3(0.0, -1.0, 0.0) * force;

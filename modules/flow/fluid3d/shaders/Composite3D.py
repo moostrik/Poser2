@@ -9,13 +9,17 @@ from modules.gl.ComputeShader import ComputeShader
 
 
 class Composite3D(ComputeShader):
-    """Composite 3D density volume into 2D image.
+    """Composite 3D density+colour volumes into 2D image.
+
+    Takes a split R16F density volume (scalar brightness) and an RGBA16F
+    colour volume (sim resolution), reconstructing voxels as rgb * V.
 
     Modes:
         0 = Front-to-back alpha compositing
         1 = Additive blending
         2 = Maximum intensity projection
         3 = Emission-absorption (Beer's law volumetric)
+        4 = Debug depth spectrum
     """
 
     WORKGROUP_SIZE_X = 16
@@ -25,16 +29,17 @@ class Composite3D(ComputeShader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, density: Texture3D, output_2d: Texture,
+    def use(self, density: Texture3D, color: Texture3D, output_2d: Texture,
             mode: int = 0, absorption: float = 4.0,
             ray_steps: int = 32) -> None:
         """Composite 3D volume to 2D image.
 
         Args:
-            density: 3D density volume (RGBA16F)
+            density:  R16F 3D scalar brightness volume (output resolution)
+            color:    RGBA16F 3D colour volume (sim resolution)
             output_2d: 2D output texture (RGBA16F) — written via imageStore
             mode: 0=front-to-back alpha, 1=additive, 2=max intensity,
-                  3=emission-absorption (Beer's law)
+                  3=emission-absorption (Beer's law), 4=debug depth
             absorption: Absorption coefficient for mode 3 (higher = more opaque)
             ray_steps: Number of ray-march steps for mode 3 (more = smoother)
         """
@@ -43,8 +48,11 @@ class Composite3D(ComputeShader):
 
         glUseProgram(self.shader_program)
 
-        # Bind 3D density as sampler (trilinear filtering)
+        # Bind R16F density as sampler at binding 0
         self.bind_texture_3d(0, density, "uDensity")
+
+        # Bind RGBA16F colour as sampler at binding 1
+        self.bind_texture_3d(1, color, "uColor")
 
         # Bind 2D output as image
         self.bind_image_write(0, output_2d, GL_RGBA16F)

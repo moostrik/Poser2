@@ -1,7 +1,14 @@
 #version 460 core
 
 /*
- * Composite3D - Composite 3D density volume into 2D output.
+ * Composite3D - Composite 3D density+colour volumes into 2D output.
+ *
+ * The density volume (R16F, output resolution) stores scalar brightness V.
+ * The colour volume (RGBA16F, sim resolution) stores RGB colour.
+ * Each voxel contributes vec4(rgb, V) to the ray — the colour volume
+ * already carries brightness (raw injected RGBA), so V is used only as the
+ * opacity/density scalar for accumulation. Colour is bilinearly upsampled
+ * to output resolution by the trilinear sampler.
  *
  * All modes ray-march through the volume with uRaySteps steps, which can
  * be higher than the physical layer count. The sampler3D trilinear
@@ -10,7 +17,7 @@
  *
  * Modes:
  *   0 = Front-to-back alpha compositing (standard over operator)
- *   1 = Additive blending (sum all steps, normalized by step count / depth)
+ *   1 = Additive blending (sum all steps, normalised by step count / depth)
  *   2 = Maximum intensity projection
  *   3 = Volumetric emission-absorption (Beer's law)
  *   4 = Debug: depth spectrum (density tinted by layer hue)
@@ -20,8 +27,11 @@
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-// Input: 3D density volume
-layout(binding = 0) uniform sampler3D uDensity;  // RGBA16F
+// Input: R16F scalar brightness at output resolution
+layout(binding = 0) uniform sampler3D uDensity;  // R16F
+
+// Input: RGBA16F colour at sim resolution (upsampled by trilinear)
+layout(binding = 1) uniform sampler3D uColor;    // RGBA16F
 
 // Output: 2D composited image
 layout(rgba16f, binding = 0) writeonly uniform image2D uOutput;
@@ -32,6 +42,15 @@ uniform int   uDepth;       // Number of physical depth layers
 uniform ivec2 uOutputSize;  // 2D output dimensions
 uniform float uAbsorption;  // Absorption coefficient (mode 3: Beer's law, mode 1: unused)
 uniform int   uRaySteps;    // Ray-march steps (all modes). More steps = smoother Z interpolation
+
+// Reconstruct a vec4 voxel from the split density+colour volumes.
+// rgb = raw colour (brightness already encoded by Inject3D),  a = V scalar density.
+// V is the opacity term only — do NOT multiply rgb by V again here.
+vec4 sample_voxel(vec2 uv, float z_norm) {
+    float v = texture(uDensity, vec3(uv, z_norm)).r;
+    vec3  c = texture(uColor,   vec3(uv, z_norm)).rgb;
+    return vec4(c, v);
+}
 
 void main() {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
@@ -52,7 +71,7 @@ void main() {
         float accum_alpha = 0.0;
         for (int i = 0; i < steps; i++) {
             float z_norm = (float(i) + 0.5) * inv_steps;
-            vec4 sample_val = texture(uDensity, vec3(uv, z_norm));
+            vec4 sample_val = sample_voxel(uv, z_norm);
 
             // Scale alpha by step_weight so oversampling doesn't over-opacify
             float layer_alpha = sample_val.a * step_weight;
@@ -68,7 +87,7 @@ void main() {
         // Additive: sum all steps, normalized
         for (int i = 0; i < steps; i++) {
             float z_norm = (float(i) + 0.5) * inv_steps;
-            result += texture(uDensity, vec3(uv, z_norm));
+            result += sample_voxel(uv, z_norm);
         }
         result *= step_weight;
     }
@@ -76,7 +95,7 @@ void main() {
         // Maximum intensity projection (no normalization needed)
         for (int i = 0; i < steps; i++) {
             float z_norm = (float(i) + 0.5) * inv_steps;
-            result = max(result, texture(uDensity, vec3(uv, z_norm)));
+            result = max(result, sample_voxel(uv, z_norm));
         }
     }
     else if (uMode == 3) {
@@ -88,13 +107,13 @@ void main() {
 
         for (int i = 0; i < steps; i++) {
             float z_norm = (float(i) + 0.5) * inv_steps;
-            vec4 sample_val = texture(uDensity, vec3(uv, z_norm));
+            float v = texture(uDensity, vec3(uv, z_norm)).r;
+            vec3  c = texture(uColor,   vec3(uv, z_norm)).rgb;
 
-            float density_mag = length(sample_val.rgb);
-            float absorption_step = uAbsorption * density_mag * dt;
+            float absorption_step = uAbsorption * v * dt;
 
-            // Emission: add light weighted by current transmittance
-            result.rgb += T * sample_val.rgb * dt;
+            // Emission: c already encodes brightness; T and dt weight the contribution
+            result.rgb += T * c * dt;
 
             // Absorption: Beer's law attenuation
             T *= exp(-absorption_step);
@@ -109,13 +128,13 @@ void main() {
         // show its depth-hue. Brightness = that layer's density magnitude.
         // Red=BACK(last), green=middle, cyan=~1/2, blue=~1/3, violet=FRONT(0).
         // No additive mixing — pure per-pixel depth readout.
-        float max_density = 0.0;
+        float max_v = 0.0;
         int max_z = 0;
         for (int z = 0; z < uDepth; z++) {
             float z_norm = (float(z) + 0.5) / float(uDepth);
-            float density_mag = length(texture(uDensity, vec3(uv, z_norm)).rgb);
-            if (density_mag > max_density) {
-                max_density = density_mag;
+            float v = texture(uDensity, vec3(uv, z_norm)).r;
+            if (v > max_v) {
+                max_v = v;
                 max_z = z;
             }
         }
@@ -136,8 +155,8 @@ void main() {
         else               rgb = vec3(c, 0.0, x);
 
         // Brightness: use presence (step function) rather than raw density
-        // so colors are clearly visible for debugging
-        float brightness = min(max_density * 10.0, 1.0);
+        // so colours are clearly visible for debugging
+        float brightness = min(max_v * 10.0, 1.0);
         result.rgb = rgb * brightness;
         result.a = 1.0;
     }

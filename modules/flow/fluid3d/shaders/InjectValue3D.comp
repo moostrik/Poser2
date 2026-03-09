@@ -1,0 +1,61 @@
+#version 460 core
+
+/*
+ * InjectValue3D - Inject brightness (V = max(r,g,b)) from an RGBA 2D input
+ *                 into a R16F 3D volume at a target depth layer.
+ *
+ * Mirrors Inject3D's gaussian spread logic but:
+ *   • Extracts scalar brightness V = max(r, g, b) from the RGBA source.
+ *   • Writes only the R channel into an R16F image3D.
+ *
+ * Used when the density volume stores a scalar brightness field separate
+ * from the colour volume (RGBA16F at sim resolution).
+ *
+ * Weight = exp(-0.5 * ((z_norm - target) / spread)²) * strength
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// 2D RGBA source texture (brightness extracted as max(r,g,b))
+layout(binding = 0) uniform sampler2D uInput;
+
+// R16F 3D density volume (read-write for additive mode)
+layout(r16f, binding = 0) uniform image3D uVolume;
+
+// Parameters
+uniform float uTargetLayer;  // Normalized depth [0, 1] — centre of injection
+uniform float uSpread;       // Gaussian sigma in normalised depth units
+uniform float uStrength;     // Injection strength multiplier
+uniform int   uMode;         // 0 = additive, 1 = set (replace)
+uniform ivec3 uSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    // Normalised Z position of this voxel
+    float z_norm = (float(gid.z) + 0.5) / float(uSize.z);
+
+    // Remap uTargetLayer [0,1] to texel-centre space
+    float target = (0.5 + uTargetLayer * (float(uSize.z) - 1.0)) / float(uSize.z);
+
+    // Gaussian weight along depth
+    float dz = (z_norm - target) / max(uSpread, 0.001);
+    float weight = exp(-0.5 * dz * dz) * uStrength;
+
+    if (weight < 0.001) return;  // Skip negligible contributions
+
+    // Sample 2D input and extract brightness
+    vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
+    vec3 rgb = texture(uInput, uv).rgb;
+    float v = max(rgb.r, max(rgb.g, rgb.b)) * weight;
+
+    if (uMode == 0) {
+        // Additive: read current R + add brightness
+        float current = imageLoad(uVolume, gid).r;
+        imageStore(uVolume, gid, vec4(current + v, 0.0, 0.0, 1.0));
+    } else {
+        // Set: replace
+        imageStore(uVolume, gid, vec4(v, 0.0, 0.0, 1.0));
+    }
+}

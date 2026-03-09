@@ -2,8 +2,8 @@
 
 Volumetric extension of FluidLayer. Receives 2D velocity, density, and
 temperature from all FlowLayers and runs a full 3D Navier-Stokes simulation
-with gaussian depth injection.  The composited 2D density output feeds into
-the same DensityColorize pipeline as FluidLayer.
+with gaussian depth injection.  The composited 2D density output is already
+RGB-coloured — no post-composite colorisation step is needed.
 """
 
 # Standard library imports
@@ -15,14 +15,13 @@ from OpenGL.GL import *  # type: ignore
 import numpy as np
 
 # Local application imports
-from modules.gl import Texture, Style, Fbo
+from modules.gl import Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 
 from modules.settings import Field, Settings
 from modules.flow import Visualizer, VisualisationFieldConfig, FluidFlow, FluidFlow3D, FluidFlow3DArray, FluidFlowConfig
-from modules.render.shaders import DensityColorize
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -53,8 +52,8 @@ class Fluid3DDrawMode(IntEnum):
     """Draw modes for Fluid3DLayer.
 
     Only fields with a 2D composited output are exposed:
-        DENSITY      - Colorized density (composited 3D->2D, then per-channel colored)
-        DENSITY_RAW  - Raw composited density before colorization (RGBA16F)
+        DENSITY      - RGB-coloured composited density (colour baked in during injection)
+        DENSITY_RAW  - Alias for DENSITY (kept for API compatibility)
     """
     DENSITY = 0
     DENSITY_RAW = auto()
@@ -77,10 +76,13 @@ class Fluid3DLayer(LayerBase):
     Receives velocity, density, and temperature from all FlowLayers and runs
     a volumetric Navier-Stokes fluid simulation:
     1. Aggregate inputs from connected FlowLayers
-    2. Inject velocity, per-channel density, temperature into 3D volume
+    2. Inject velocity, density (decomposed to V+colour), temperature into 3D volume
     3. Run 3D advection, pressure projection, viscosity, buoyancy, vorticity
-    4. Composite 3D density -> 2D output
-    5. Colorize per-channel density with track colors
+    4. Composite 3D density+colour -> 2D output (colour is already baked in)
+
+    The density volume stores scalar brightness (R16F, output resolution).
+    The colour volume stores RGB colour (RGBA16F, sim resolution).
+    Both are composited by Composite3D into a final RGBA16F 2D output.
 
     Cross-camera support:
         Each Fluid3DLayer receives a dict of all FlowLayers, enabling
@@ -120,10 +122,6 @@ class Fluid3DLayer(LayerBase):
         self._swap_engine_pending: bool = False
 
         self._visualizer: Visualizer = Visualizer(self.config.visualisation)
-
-        # Colorization resources
-        self._colorized_fbo: Fbo = Fbo()
-        self._density_colorize_shader: DensityColorize = DensityColorize()
 
         # Defer engine swap to GL thread (callbacks fire from websocket thread)
         self.config.bind(Fluid3DLayerSettings.sim_engine, lambda _: self._request_swap_engine())
@@ -178,16 +176,10 @@ class Fluid3DLayer(LayerBase):
         self._fluid_flow.allocate(width, height)
         self._visualizer.allocate(self._fluid_flow.sim_width, self._fluid_flow.sim_height)
 
-        # Colorization FBO at density (full output) resolution
-        self._colorized_fbo.allocate(width, height, GL_RGBA16F)
-        self._density_colorize_shader.allocate()
-
     def deallocate(self) -> None:
         """Deallocate all resources."""
         self._fluid_flow.deallocate()
         self._visualizer.deallocate()
-        self._colorized_fbo.deallocate()
-        self._density_colorize_shader.deallocate()
 
     def reset(self) -> None:
         """Reset fluid simulation state."""
@@ -256,9 +248,6 @@ class Fluid3DLayer(LayerBase):
         if self._fluid_flow.sim_width != prev_sw or self._fluid_flow.sim_height != prev_sh:
             self._visualizer.allocate(self._fluid_flow.sim_width, self._fluid_flow.sim_height)
 
-        # Colorize density channels with track colors
-        self._colorize_density()
-
         # Update visualization
         self._visualizer.update(self._get_draw_texture())
 
@@ -285,18 +274,10 @@ class Fluid3DLayer(LayerBase):
         return textures.get(self.config.draw_mode, self._fluid_flow.density)
 
     def _colorize_density(self) -> None:
-        """Colorize density channels with track colors.
+        """Removed: colour is now baked into the density volume during injection.
 
-        Maps each RGBA density channel to a corresponding track color and
-        composites them additively. Works unchanged because FluidFlow3D.density
-        returns a 2D Texture (composited from 3D volume).
+        The RGBA16F colour volume at sim resolution is composited with the R16F
+        density volume by Composite3D, producing an already-coloured 2D output.
+        No post-processing colorisation step is required.
         """
-        # Build padded color list (up to 4 channels) from settings each frame
-        colors: list[tuple[float, float, float, float]] = list(self._color_settings.track_color_tuples[:4])
-        while len(colors) < 4:
-            colors.append((0.0, 0.0, 0.0, 0.0))
-
-        self._density_colorize_shader.reload()
-        self._colorized_fbo.begin()
-        self._density_colorize_shader.use(self._fluid_flow.density, colors)
-        self._colorized_fbo.end()
+        pass  # No-op — kept for API compatibility
