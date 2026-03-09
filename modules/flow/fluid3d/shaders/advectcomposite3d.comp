@@ -1,0 +1,195 @@
+#version 460 core
+
+/*
+ * AdvectComposite3D — Fused density advection + colour lookup + 2D compositing.
+ *
+ * Replaces the separate Advect3D (density) + Composite3D dispatches with a
+ * single 2D pass.  For every output pixel, the shader iterates over each
+ * physical depth layer and:
+ *
+ *   1. Performs semi-Lagrangian advection of the R16F density field inline
+ *      (backtrace through velocity, sample previous density, apply dissipation).
+ *   2. Writes the advected density to the front buffer via imageStore so it
+ *      is available for buoyancy / injection next frame.
+ *   3. Samples the already-advected colour volume (sim resolution, trilinear
+ *      upsampled to output resolution).
+ *   4. Accumulates the composite contribution according to the selected mode.
+ *
+ * This eliminates one full output-resolution 3D dispatch and halves density
+ * bandwidth — the advected value is produced and consumed in the same thread
+ * without an intermediate global-memory round-trip.
+ *
+ * Composite modes (identical to composite3d.comp):
+ *   0 = Front-to-back alpha compositing (standard over operator)
+ *   1 = Additive blending (sum all layers)
+ *   2 = Maximum intensity projection
+ *   3 = Volumetric emission-absorption (Beer's law)
+ *   4 = Debug: depth spectrum (density tinted by layer hue)
+ *
+ * Dispatched as 2D — one thread per output pixel (x, y).
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// ---- Samplers (read-only, trilinear filtered) ----
+layout(binding = 0) uniform sampler3D uVelocity;      // Velocity field (RGBA16F, sim resolution)
+layout(binding = 1) uniform sampler3D uDensityBack;    // Previous frame density (R16F, output resolution)
+layout(binding = 2) uniform sampler3D uColor;          // Already-advected colour (RGBA16F, sim resolution)
+layout(binding = 3) uniform sampler3D uObstacle;       // Density obstacle mask (R8, output resolution)
+
+// ---- Images (write-only) ----
+layout(r16f,    binding = 0) writeonly uniform image3D  uDensityFront;  // Advected density output (R16F, output resolution)
+layout(rgba16f, binding = 1) writeonly uniform image2D  uOutput;        // Composited 2D result
+
+// ---- Advection uniforms ----
+uniform float uTimestep;      // dt * speed (advection distance)
+uniform vec3  uRdx;           // (1.0, 1.0/aspect, 1.0/depth_scale) — aspect-corrected inverse grid
+uniform float uDissipation;   // Exponential decay multiplier per frame
+uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
+
+// ---- Composite uniforms ----
+uniform int   uMode;          // 0=alpha, 1=additive, 2=max, 3=emission-absorption, 4=debug depth
+uniform int   uDepth;         // Number of physical depth layers
+uniform ivec2 uOutputSize;    // 2D output pixel dimensions
+uniform float uAbsorption;    // Absorption coefficient (Beer's law, mode 3)
+
+// ---- Inline density advection for one voxel ----
+// Returns the advected+dissipated density scalar and writes it to the front buffer.
+float advect_density_at(ivec2 pixel, int z) {
+    ivec3 gid = ivec3(pixel, z);
+    vec3 st = (vec3(gid) + 0.5) / vec3(uOutputSize, uDepth);
+
+    // Obstacle: preserve current value (no advection)
+    if (uHasObstacles) {
+        float obs = texture(uObstacle, st).r;
+        if (obs > 0.5) {
+            float current = texture(uDensityBack, st).r;
+            imageStore(uDensityFront, gid, vec4(current, 0.0, 0.0, 1.0));
+            return current;
+        }
+    }
+
+    // Backtrace through velocity (trilinear upsampled from sim-res)
+    vec3 velocity = texture(uVelocity, st).xyz;
+    vec3 st_back = st - uTimestep * uRdx * velocity;
+
+    // If backtrace lands inside obstacle, fall back to current position
+    if (uHasObstacles && texture(uObstacle, st_back).r > 0.5) {
+        st_back = st;
+    }
+
+    // Sample previous-frame density with trilinear interpolation + dissipation
+    float advected = uDissipation * texture(uDensityBack, st_back).r;
+
+    // Persist for next frame (buoyancy, injection, etc.)
+    imageStore(uDensityFront, gid, vec4(advected, 0.0, 0.0, 1.0));
+
+    return advected;
+}
+
+void main() {
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(gid, uOutputSize))) return;
+
+    vec2 uv = (vec2(gid) + 0.5) / vec2(uOutputSize);
+
+    vec4 result = vec4(0.0);
+
+    if (uMode == 0) {
+        // ---- Front-to-back alpha compositing ----
+        float accum_alpha = 0.0;
+        for (int z = 0; z < uDepth; z++) {
+            float z_norm = (float(z) + 0.5) / float(uDepth);
+            float v = advect_density_at(gid, z);
+            vec3  c = texture(uColor, vec3(uv, z_norm)).rgb;
+
+            float layer_alpha = v;  // step_weight = 1.0 (one layer per step)
+            float weight = (1.0 - accum_alpha) * layer_alpha;
+            result.rgb += weight * c;
+            accum_alpha += weight;
+
+            if (accum_alpha > 0.99) {
+                // Still need to advect remaining layers for persistence
+                for (int zr = z + 1; zr < uDepth; zr++) {
+                    advect_density_at(gid, zr);
+                }
+                break;
+            }
+        }
+        result.a = accum_alpha;
+    }
+    else if (uMode == 1) {
+        // ---- Additive blending ----
+        for (int z = 0; z < uDepth; z++) {
+            float z_norm = (float(z) + 0.5) / float(uDepth);
+            float v = advect_density_at(gid, z);
+            vec3  c = texture(uColor, vec3(uv, z_norm)).rgb;
+            result += vec4(c, v);
+        }
+        // step_weight = 1.0, no additional scaling needed
+    }
+    else if (uMode == 2) {
+        // ---- Maximum intensity projection ----
+        for (int z = 0; z < uDepth; z++) {
+            float z_norm = (float(z) + 0.5) / float(uDepth);
+            float v = advect_density_at(gid, z);
+            vec3  c = texture(uColor, vec3(uv, z_norm)).rgb;
+            result = max(result, vec4(c, v));
+        }
+    }
+    else if (uMode == 3) {
+        // ---- Emission-absorption (Beer's law) ----
+        float T = 1.0;
+        for (int z = 0; z < uDepth; z++) {
+            float z_norm = (float(z) + 0.5) / float(uDepth);
+            float v = advect_density_at(gid, z);
+            vec3  c = texture(uColor, vec3(uv, z_norm)).rgb;
+
+            float absorption_step = uAbsorption * v;  // dt=1.0 (one layer per step)
+            result.rgb += T * c;
+            T *= exp(-absorption_step);
+
+            if (T < 0.01) {
+                // Advect remaining layers
+                for (int zr = z + 1; zr < uDepth; zr++) {
+                    advect_density_at(gid, zr);
+                }
+                break;
+            }
+        }
+        result.a = 1.0 - T;
+    }
+    else if (uMode == 4) {
+        // ---- Debug: depth spectrum ----
+        float max_v = 0.0;
+        int max_z = 0;
+        for (int z = 0; z < uDepth; z++) {
+            float v = advect_density_at(gid, z);
+            if (v > max_v) {
+                max_v = v;
+                max_z = z;
+            }
+        }
+
+        // Hue from depth: 0.8 (violet/front) to 0.0 (red/back)
+        float hue = 0.8 * (1.0 - float(max_z) / max(float(uDepth - 1), 1.0));
+
+        // HSV to RGB (S=1, V=1)
+        float h6 = hue * 6.0;
+        float cv = 1.0;
+        float x = 1.0 - abs(mod(h6, 2.0) - 1.0);
+        vec3 rgb;
+        if      (h6 < 1.0) rgb = vec3(cv, x, 0.0);
+        else if (h6 < 2.0) rgb = vec3(x, cv, 0.0);
+        else if (h6 < 3.0) rgb = vec3(0.0, cv, x);
+        else if (h6 < 4.0) rgb = vec3(0.0, x, cv);
+        else if (h6 < 5.0) rgb = vec3(x, 0.0, cv);
+        else               rgb = vec3(cv, 0.0, x);
+
+        float brightness = min(max_v * 10.0, 1.0);
+        result.rgb = rgb * brightness;
+        result.a = 1.0;
+    }
+
+    imageStore(uOutput, gid, result);
+}

@@ -6,6 +6,7 @@
           "fluid3D"
         ],
         "final": [
+          "centre_frg",
           "fluid3D"
         ]
       },
@@ -75,10 +76,10 @@
         "gamma": 1.0,
         "offset": 0.0,
         "contrast": 1.1,
-        "saturation": 2.0,
+        "saturation": 1.16,
         "levels": 9,
         "smoothness": 0.33,
-        "colorize": 0.17,
+        "colorize": 0.0,
         "sharpen": 0.0,
         "use_mask": true
       },
@@ -100,7 +101,7 @@
     },
     "flow": {
       "fps": 60.0,
-      "draw_mode": "TEMP_BRIDGE_OUTPUT",
+      "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
       "blend_mode": "ADD",
       "width": 288,
       "height": 512,
@@ -140,7 +141,7 @@
         "width": 288,
         "height": 512,
         "speed": 0.5,
-        "z": {
+        "depth": {
           "depth": 4,
           "scale": 1.0,
           "composite_mode": 3,
@@ -191,7 +192,7 @@
     },
     "fluid3D": {
       "num_players": 3,
-      "sim_engine": "FLUID_3D_ARRAY",
+      "sim_engine": "FLUID_3D",
       "draw_mode": "DENSITY_RAW",
       "blend_mode": "ALPHA",
       "fluid_flow": {
@@ -200,26 +201,26 @@
         "speed": 0.79,
         "depth": {
           "depth": 32,
-          "scale": 1.0,
-          "composite_mode": 1,
+          "scale": 0.5,
+          "composite_mode": 2,
           "ray_steps": 128,
           "absorption": 24.33,
           "injection_layer": 0.1,
           "injection_spread": 0.15
         },
         "velocity": {
-          "input_strength": 0.94,
+          "input_strength": 0.72,
           "self_advection": 0.2,
           "fade_time": 27.72,
           "dampen_threshold": 7.97,
           "dampen_time": 5.13,
-          "vorticity": 0.0,
+          "vorticity": 6.99,
           "vorticity_radius": 1.0,
-          "viscosity": 0.0,
+          "viscosity": 18.65,
           "viscosity_iter": 20
         },
         "density": {
-          "input_strength": 1.0,
+          "input_strength": 2.0,
           "speed_offset": 0.0,
           "fade_time": 29.93,
           "dampen_threshold": 1.47,
@@ -301,7 +302,7 @@
       "width": 1080,
       "height": 1000,
       "secondary_list": [
-        "M1"
+        "M2"
       ]
     }
   },

@@ -228,7 +228,7 @@ class Fluid3DLayer(LayerBase):
 
             # Add Z-velocity from motion magnitude (3D engines only)
             if isinstance(self._fluid_flow, (FluidFlow3D, FluidFlow3DArray)):
-                self._fluid_flow.add_velocity_z(flow_layer.magnitude, vel_strength * 3)
+                self._fluid_flow.add_velocity_z(flow_layer.magnitude, vel_strength * 0.1)
 
             # Add density to per-camera channel (R=cam0, G=cam1, B=cam2, A=cam3)
             channel: int = cam_id % 4

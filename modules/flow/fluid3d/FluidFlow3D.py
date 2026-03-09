@@ -17,9 +17,8 @@ Pipeline:
     6. Apply buoyancy force
     7. Advect pressure (optional, non-physical)
     8. Enforce incompressibility (divergence -> Jacobi solve -> gradient subtraction)
-    9. Advect density  (R16F scalar, 3D semi-Lagrangian, output resolution)
-   10. Advect colour   (RGBA16F RGB,  3D semi-Lagrangian, sim resolution)
-   11. Composite 3D density+colour -> 2D output
+    9. Advect colour   (RGBA16F RGB,  3D semi-Lagrangian, sim resolution)
+   10. Fused: advect density (R16F, output res) + colour lookup + 2D composite
 
 Boundary conditions via per-field wrap modes (no explicit border obstacles):
     Velocity/density:  GL_CLAMP_TO_BORDER(0,0,0,0)  -> no-slip / Dirichlet
@@ -39,7 +38,7 @@ from .shaders import (
     JacobiPressure3D, JacobiDiffusion3D,
     VorticityCurl3D, VorticityForce3D, Buoyancy3D,
     Inject3D, InjectChannel3D, InjectValue3D,
-    Clamp3D, Dampen3D, Composite3D, Add3D,
+    Clamp3D, Dampen3D, Composite3D, AdvectComposite3D, Add3D,
     Blit3D, InjectBinary3D
 )
 
@@ -153,6 +152,7 @@ class FluidFlow3D:
         self._clamp_shader: Clamp3D = Clamp3D()
         self._dampen_shader: Dampen3D = Dampen3D()
         self._composite_shader: Composite3D = Composite3D()
+        self._advect_composite_shader: AdvectComposite3D = AdvectComposite3D()
         self._add_shader: Add3D = Add3D()
         self._blit_shader: Blit3D = Blit3D()
         self._inject_binary_shader: InjectBinary3D = InjectBinary3D()
@@ -203,6 +203,7 @@ class FluidFlow3D:
         self._clamp_shader.allocate()
         self._dampen_shader.allocate()
         self._composite_shader.allocate()
+        self._advect_composite_shader.allocate()
         self._add_shader.allocate()
         self._blit_shader.allocate()
         self._inject_binary_shader.allocate()
@@ -287,6 +288,7 @@ class FluidFlow3D:
         self._clamp_shader.deallocate()
         self._dampen_shader.deallocate()
         self._composite_shader.deallocate()
+        self._advect_composite_shader.deallocate()
         self._add_shader.deallocate()
         self._blit_shader.deallocate()
         self._inject_binary_shader.deallocate()
@@ -310,6 +312,7 @@ class FluidFlow3D:
         self._clamp_shader.reload()
         self._dampen_shader.reload()
         self._composite_shader.reload()
+        self._advect_composite_shader.reload()
         self._add_shader.reload()
         self._blit_shader.reload()
         self._inject_binary_shader.reload()
@@ -336,6 +339,7 @@ class FluidFlow3D:
 
         # Per-frame state
         self._dt = 1.0 / max(1, self.config.fps)
+        self._depth_aspect = (self._simulation_width / max(1, self._depth)) * self.config.depth.scale
 
         profiling = self._profile_enabled
 
@@ -374,19 +378,16 @@ class FluidFlow3D:
         self._enforce_incompressibility()
         self._profile_end("incompress", profiling)
 
-        self._profile_begin("advect_den", profiling)
-        self._advect_density()
-        self._profile_end("advect_den", profiling)
-
         self._profile_begin("advect_color", profiling)
         self._advect_color()
         self._profile_end("advect_color", profiling)
 
         # Density dampen disabled — not meaningful for 3D and wastes a full-volume pass
 
-        self._profile_begin("composite", profiling)
-        self._composite_output()
-        self._profile_end("composite", profiling)
+        # Fused: advect density inline + colour lookup + 2D composite in one pass
+        self._profile_begin("advect_composite", profiling)
+        self._advect_density_and_composite()
+        self._profile_end("advect_composite", profiling)
 
         if profiling:
             self._profile_report()
@@ -575,21 +576,31 @@ class FluidFlow3D:
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-    def _advect_density(self) -> None:
-        """Advect & dissipate scalar density (brightness) field."""
+    def _advect_density_and_composite(self) -> None:
+        """Fused: advect density inline + colour lookup + 2D composite.
+
+        Replaces the separate _advect_density() + _composite_output() calls.
+        Density advection is performed inline during the composite ray-march,
+        eliminating one full output-resolution 3D dispatch and halving density
+        bandwidth.
+        """
         advect_step = self._dt * (self.config.speed + self.config.density.speed_offset)
         dissipation = self._calculate_dissipation(self._dt, self.config.density.fade_time)
 
         self._density.swap()
-        self._advect_shader.advect(
+        self._advect_composite_shader.use(
+            self._velocity.texture,
             self._density.back_texture,
             self._density.texture,
-            self._velocity.texture,
+            self._color.texture,
             self._density_obstacle,
+            self._output_texture,
+            advect_step,
             self._aspect, self._depth_aspect,
-            advect_step, dissipation,
-            internal_format=GL_R16F,
-            has_obstacles=self._has_obstacles
+            dissipation,
+            mode=self.config.depth.composite_mode,
+            absorption=self.config.depth.absorption,
+            has_obstacles=self._has_obstacles,
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
@@ -634,18 +645,6 @@ class FluidFlow3D:
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
-    def _composite_output(self) -> None:
-        """Composite 3D density+colour -> 2D output texture."""
-        self._composite_shader.use(
-            self._density.texture,
-            self._color.texture,
-            self._output_texture,
-            self.config.depth.composite_mode,
-            absorption=self.config.depth.absorption,
-            ray_steps=self.config.depth.ray_steps
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
-
     # ========== GPU Profiling ==========
 
     def _profile_begin(self, name: str, enabled: bool) -> None:
@@ -675,7 +674,7 @@ class FluidFlow3D:
         pass_names = [
             "dampen_vel", "advect_vel", "viscosity", "vorticity",
             "advect_temp", "buoyancy", "advect_pres", "incompress",
-            "advect_den", "advect_color", "dampen_den", "composite"
+            "advect_color", "advect_composite",
         ]
 
         total = 0.0
