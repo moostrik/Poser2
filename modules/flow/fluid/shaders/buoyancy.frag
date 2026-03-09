@@ -43,7 +43,8 @@ void main() {
 
     if (abs(dtemp) > 0.0001) {
         // Sample density (R channel — R16F scalar density)
-        float density = texture(uDensity, st).r;
+        vec4 den = texture(uDensity, st);
+        float density = max(den.r, max(den.g, den.b)); // Use max of RGB channels for density
 
         // Buoyancy force: F = sigma * (T - T_ambient) - kappa * density
         // Hot air rises (positive dtemp), dense fluid falls (positive density)
