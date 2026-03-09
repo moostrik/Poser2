@@ -1,4 +1,4 @@
-"""JacobiPressure shader - Iterative Poisson pressure solver."""
+﻿"""JacobiPressure shader - Iterative Poisson pressure solver."""
 
 from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad

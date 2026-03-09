@@ -1,4 +1,4 @@
-"""VorticityCurl shader - Compute curl of velocity field."""
+﻿"""VorticityCurl shader - Compute curl of velocity field."""
 
 from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
@@ -18,7 +18,7 @@ class VorticityCurl(Shader):
         Args:
             velocity: Velocity field (RG32F)
             obstacle: Obstacle mask (R8/R32F)
-            grid_scale: Grid spacing (typically simulation_scale)
+            grid_scale: Grid spacing (derived from config width / output width)
             aspect: Aspect ratio (width/height) for isotropic derivatives
             has_obstacles: When False, skip obstacle texture reads for performance
         """

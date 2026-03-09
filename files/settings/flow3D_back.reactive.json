@@ -102,7 +102,8 @@
       "fps": 60.0,
       "draw_mode": "TEMP_BRIDGE_OUTPUT",
       "blend_mode": "ADD",
-      "simulation_scale": 0.25,
+      "width": 288,
+      "height": 512,
       "visualisation": {
         "toggle_scalar": false,
         "scale": 1.0,
@@ -136,8 +137,18 @@
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",
       "fluid_flow": {
-        "simulation_scale": 0.5,
+        "width": 288,
+        "height": 512,
         "speed": 0.5,
+        "z": {
+          "depth": 4,
+          "scale": 1.0,
+          "composite_mode": 3,
+          "ray_steps": 32,
+          "absorption": 4.0,
+          "injection_layer": 1.0,
+          "injection_spread": 0.001
+        },
         "velocity": {
           "input_strength": 1.0,
           "self_advection": 0.01,
@@ -180,13 +191,15 @@
     },
     "fluid3D": {
       "num_players": 3,
+      "sim_engine": "FLUID_3D_ARRAY",
       "draw_mode": "DENSITY_RAW",
       "blend_mode": "ALPHA",
       "fluid_flow": {
-        "simulation_scale": 0.2,
+        "width": 288,
+        "height": 512,
         "speed": 0.79,
-        "depth": {
-          "layers": 32,
+        "z": {
+          "depth": 32,
           "scale": 1.0,
           "composite_mode": 1,
           "ray_steps": 128,

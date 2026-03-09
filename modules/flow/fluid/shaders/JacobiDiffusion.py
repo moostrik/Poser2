@@ -1,4 +1,4 @@
-"""JacobiDiffusion shader - Iterative diffusion solver for velocity viscosity."""
+﻿"""JacobiDiffusion shader - Iterative diffusion solver for velocity viscosity."""
 
 from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad

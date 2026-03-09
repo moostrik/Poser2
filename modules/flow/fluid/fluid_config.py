@@ -46,10 +46,10 @@ class PressureConfig(Settings):
     iterations: Field[int]          = Field(40,     min=1,      max=60,     color="orange",         description="Solver quality for pressure (iterations at 60fps, auto-scaled for frame rate)")
 
 
-class DepthConfig(Settings):
-    """3D depth/volume-specific parameters (ignored by 2D simulations)."""
-    layers: Field[int]              = Field(4,    min=1,    max=64,     description="Number of depth layers in the 3D volume")
-    scale: Field[float]             = Field(1.0,  min=0.5,  max=5.0,    description="Manual multiplier on auto-computed Z grid spacing (width/depth_layers)")
+class ZConfig(Settings):
+    """Z-axis / volume parameters (ignored by 2D simulations)."""
+    depth: Field[int]               = Field(4,    min=1,    max=64,     description="Number of depth layers in the 3D volume")
+    scale: Field[float]             = Field(1.0,  min=0.5,  max=5.0,    description="Manual multiplier on auto-computed Z grid spacing (width/depth)")
     composite_mode: Field[int]      = Field(3,    min=0,    max=4,      description="3D->2D compositing: 0=alpha, 1=additive, 2=max, 3=emission-absorption, 4=debug depth")
     ray_steps: Field[int]           = Field(32,   min=1,    max=128,    description="Number of ray-march steps for volumetric composite (mode 3). More steps = smoother inter-layer interpolation")
     absorption: Field[float]        = Field(4.0,  min=0.01,  max=50.0,   description="Beer's law absorption coefficient (higher = more opaque per unit density)")
@@ -69,21 +69,22 @@ class FluidConfig(Settings):
         Exponential frame-rate-independent decay: multiplier = 0.01^(dt/fade_time).
         fade_time=3.0 means the field retains ~1% after 3 seconds.
 
-    Depth:
-        3D simulations use the depth sub-group for volume parameters.
+    Z-axis:
+        3D simulations use the z sub-group for volume parameters.
         2D simulations ignore it.
     """
 
     # ---- Actions ----
     reset_sim: Field[bool] = Field(False, widget=Widget.button, description="Reset all simulation fields to zero")
 
-    # ---- Global ----
-    simulation_scale: Field[float]  = Field(0.5,    min=0.1,    max=2.0,    description="Resolution scale for simulation buffers")
+    # ---- Grid dimensions (multiples of 32) ----
+    width: Field[int]               = Field(1024,   min=32,     max=4096,   step=32,    description="Simulation grid width")
+    height: Field[int]              = Field(576,    min=32,     max=4096,   step=32,    description="Simulation grid height")
     fps: Field[int]                 = Field(60,     min=1,      max=240,    description="Current average FPS for dt calculation (bound from WindowManager)", access=Field.READ)
     speed: Field[float]             = Field(1.0,    min=0.0,    max=5.0,    description="Base fluid transport rate")
 
     # ---- Field groups ----
-    depth:       DepthConfig
+    z:           ZConfig
     velocity:    VelocityConfig
     density:     DensityConfig
     temperature: TemperatureConfig

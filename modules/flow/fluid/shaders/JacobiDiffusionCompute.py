@@ -1,4 +1,4 @@
-"""JacobiDiffusionCompute - Compute shader diffusion solver.
+﻿"""JacobiDiffusionCompute - Compute shader diffusion solver.
 
 Multi-iteration Jacobi solver for velocity viscosity using shared memory tiling.
 Performs multiple iterations per dispatch, reducing the number of texture swaps

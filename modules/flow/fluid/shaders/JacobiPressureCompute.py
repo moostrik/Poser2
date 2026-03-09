@@ -1,4 +1,4 @@
-"""JacobiPressureCompute - Compute shader Jacobi pressure solver.
+﻿"""JacobiPressureCompute - Compute shader Jacobi pressure solver.
 
 Multi-iteration Jacobi solver using shared memory tiling for improved performance.
 Performs multiple iterations per dispatch, reducing the number of texture swaps

@@ -1,4 +1,4 @@
-"""Gradient shader - Subtract pressure gradient from velocity."""
+﻿"""Gradient shader - Subtract pressure gradient from velocity."""
 
 from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
@@ -19,7 +19,7 @@ class Gradient(Shader):
             velocity: Current velocity field (RG32F)
             pressure: Pressure field (R32F)
             obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
-            grid_scale: Grid scaling factor (typically simulation_scale)
+            grid_scale: Grid scaling factor (derived from config width / output width)
             aspect: Aspect ratio (width/height) for isotropic derivatives
             has_obstacles: When False, skip obstacle texture reads for performance
         """

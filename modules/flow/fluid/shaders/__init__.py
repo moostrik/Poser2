@@ -1,4 +1,4 @@
-"""Fluid simulation shaders."""
+﻿"""Fluid simulation shaders."""
 
 from .Advect import Advect
 from .Divergence import Divergence

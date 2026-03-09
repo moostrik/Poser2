@@ -1,4 +1,4 @@
-"""Buoyancy shader - Compute temperature-driven buoyancy forces."""
+﻿"""Buoyancy shader - Compute temperature-driven buoyancy forces."""
 
 from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad

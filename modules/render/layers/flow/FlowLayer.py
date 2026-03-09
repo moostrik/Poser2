@@ -57,7 +57,8 @@ class FlowLayerSettings(Settings):
     fps = Field(60.0, min=1.0, max=240.0)
     draw_mode = Field(FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR)
     blend_mode = Field(Style.BlendMode.ADD)
-    simulation_scale = Field(0.5, min=0.1, max=2.0)
+    width: Field[int] = Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
+    height: Field[int] = Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
 
     visualisation:      VisualisationFieldConfig
     optical_flow:       OpticalFlowConfig
@@ -157,8 +158,8 @@ class FlowLayer(LayerBase):
             height: Processing height
             internal_format: Ignored (formats determined by each stage)
         """
-        sim_width = int(width * self.config.simulation_scale)
-        sim_height = int(height * self.config.simulation_scale)
+        sim_width = self.config.width
+        sim_height = self.config.height
 
         self._optical_flow.allocate(sim_width, sim_height)
         self._velocity_trail.allocate(sim_width, sim_height, width, height)

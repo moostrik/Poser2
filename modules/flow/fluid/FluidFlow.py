@@ -120,7 +120,8 @@ class FluidFlow:
 
         # Bind settings actions
         self.config.bind(FluidConfig.reset_sim, lambda _: self._request_reset())
-        self.config.bind(FluidConfig.simulation_scale, lambda _: self._request_reallocate())
+        self.config.bind(FluidConfig.width, lambda _: self._request_reallocate())
+        self.config.bind(FluidConfig.height, lambda _: self._request_reallocate())
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -161,10 +162,10 @@ class FluidFlow:
 
     def _update_simulation_dimensions(self) -> None:
         """Recompute simulation dimensions from current config."""
-        sim_scale = self.config.simulation_scale
-        self._simulation_width = self._align16(int(self._density_width * sim_scale))
-        self._simulation_height = self._align16(int(self._density_height * sim_scale))
+        self._simulation_width = self._align32(self.config.width)
+        self._simulation_height = self._align32(self.config.height)
         self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
+        self._grid_scale = self._simulation_width / self._density_width if self._density_width > 0 else 1.0
 
     def _allocate_density_fields(self) -> None:
         """(Re)allocate density-resolution FBOs (full output resolution)."""
@@ -300,7 +301,7 @@ class FluidFlow:
         if self.config.velocity.viscosity <= 0.0:
             return
 
-        viscosity_dt = self.config.velocity.viscosity * (self.config.simulation_scale ** 2) * self._dt
+        viscosity_dt = self.config.velocity.viscosity * (self._grid_scale ** 2) * self._dt
         iterations = self._scale_iterations(self.config.velocity.viscosity_iter)
 
         if self._use_compute_diffusion:
@@ -308,7 +309,7 @@ class FluidFlow:
                 self._velocity_fbo.texture,
                 self._velocity_fbo.back_texture,
                 self._simulation_obstacle_fbo.texture,
-                self.config.simulation_scale,
+                self._grid_scale,
                 self._aspect,
                 viscosity_dt,
                 total_iterations=iterations,
@@ -324,7 +325,7 @@ class FluidFlow:
                 self._jacobi_diffusion_shader.use(
                     self._velocity_fbo.back_texture,
                     self._simulation_obstacle_fbo.texture,
-                    self.config.simulation_scale,
+                    self._grid_scale,
                     self._aspect,
                     viscosity_dt,
                     has_obstacles=self._has_obstacles
@@ -336,7 +337,7 @@ class FluidFlow:
         if self.config.velocity.vorticity <= 0.0 or self.config.velocity.vorticity_radius <= 0.0:
             return
 
-        vorticity_radius = self.config.velocity.vorticity_radius * self.config.simulation_scale
+        vorticity_radius = self.config.velocity.vorticity_radius * self._grid_scale
         vorticity_force = self.config.velocity.vorticity * self._dt
 
         # a. Compute curl
@@ -344,7 +345,7 @@ class FluidFlow:
         self._vorticity_curl_shader.use(
             self._velocity_fbo.texture,
             self._simulation_obstacle_fbo.texture,
-            self.config.simulation_scale,
+            self._grid_scale,
             self._aspect,
             vorticity_radius,
             has_obstacles=self._has_obstacles
@@ -356,7 +357,7 @@ class FluidFlow:
         self._vorticity_force_shader.use(
             self._vorticity_curl_fbo.texture,
             self._simulation_obstacle_fbo.texture,
-            self.config.simulation_scale,
+            self._grid_scale,
             self._aspect,
             vorticity_force,
             has_obstacles=self._has_obstacles
@@ -393,8 +394,8 @@ class FluidFlow:
         if self.config.temperature.buoyancy == 0.0:
             return
 
-        sigma = self._dt * self.config.simulation_scale * self.config.temperature.buoyancy
-        kappa = self._dt * self.config.simulation_scale * self.config.temperature.weight
+        sigma = self._dt * self._grid_scale * self.config.temperature.buoyancy
+        kappa = self._dt * self._grid_scale * self.config.temperature.weight
 
         self._buoyancy_fbo.begin()
         self._buoyancy_shader.use(
@@ -439,7 +440,7 @@ class FluidFlow:
         self._divergence_shader.use(
             self._velocity_fbo.texture,
             self._simulation_obstacle_fbo.texture,
-            self.config.simulation_scale,
+            self._grid_scale,
             self._aspect,
             has_obstacles=self._has_obstacles
         )
@@ -454,7 +455,7 @@ class FluidFlow:
                 self._pressure_fbo.back_texture,
                 self._divergence_fbo.texture,
                 self._simulation_obstacle_fbo.texture,
-                self.config.simulation_scale,
+                self._grid_scale,
                 self._aspect,
                 total_iterations=iterations,
                 iterations_per_dispatch=5,
@@ -470,7 +471,7 @@ class FluidFlow:
                     self._pressure_fbo.back_texture,
                     self._divergence_fbo.texture,
                     self._simulation_obstacle_fbo.texture,
-                    self.config.simulation_scale,
+                    self._grid_scale,
                     self._aspect,
                     has_obstacles=self._has_obstacles
                 )
@@ -483,7 +484,7 @@ class FluidFlow:
             self._velocity_fbo.back_texture,
             self._pressure_fbo.texture,
             self._simulation_obstacle_fbo.texture,
-            self.config.simulation_scale,
+            self._grid_scale,
             self._aspect,
             has_obstacles=self._has_obstacles
         )
@@ -558,9 +559,9 @@ class FluidFlow:
         return max(1, int(base_iterations * ratio + 0.5))
 
     @staticmethod
-    def _align16(v: int) -> int:
-        """Round up to the nearest multiple of 16."""
-        return (v + 15) & ~15
+    def _align32(v: int) -> int:
+        """Round up to the nearest multiple of 32."""
+        return (v + 31) & ~31
 
     @staticmethod
     def _calculate_dissipation(delta_time: float, decay_time: float) -> float:

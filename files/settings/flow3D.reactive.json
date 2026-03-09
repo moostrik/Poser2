@@ -102,7 +102,8 @@
       "fps": 60.0,
       "draw_mode": "DENSITY_BRIDGE_INPUT_COLOR",
       "blend_mode": "ADD",
-      "simulation_scale": 0.25,
+      "width": 288,
+      "height": 512,
       "visualisation": {
         "toggle_scalar": false,
         "scale": 1.0,
@@ -136,7 +137,8 @@
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",
       "fluid_flow": {
-        "simulation_scale": 0.5,
+        "width": 288,
+        "height": 512,
         "speed": 0.5,
         "velocity": {
           "input_strength": 1.0,
@@ -183,10 +185,11 @@
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",
       "fluid_flow": {
-        "simulation_scale": 0.5,
+        "width": 288,
+        "height": 512,
         "speed": 0.93,
-        "depth": {
-          "layers": 4,
+        "z": {
+          "depth": 4,
           "scale": 1.0,
           "composite_mode": 1,
           "injection_layer": 0.1,

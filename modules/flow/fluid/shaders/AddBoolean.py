@@ -1,4 +1,4 @@
-"""AddBoolean shader - Boolean union of obstacle masks."""
+﻿"""AddBoolean shader - Boolean union of obstacle masks."""
 
 from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
