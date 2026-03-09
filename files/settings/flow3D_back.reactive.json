@@ -186,7 +186,7 @@
         "simulation_scale": 0.2,
         "speed": 0.79,
         "depth": {
-          "layers": 64,
+          "layers": 32,
           "scale": 1.0,
           "composite_mode": 1,
           "ray_steps": 128,
@@ -200,17 +200,17 @@
           "fade_time": 27.72,
           "dampen_threshold": 7.97,
           "dampen_time": 5.13,
-          "vorticity": 20.47,
+          "vorticity": 0.0,
           "vorticity_radius": 1.0,
-          "viscosity": 52.94,
+          "viscosity": 0.0,
           "viscosity_iter": 20
         },
         "density": {
           "input_strength": 1.0,
           "speed_offset": 0.0,
           "fade_time": 29.93,
-          "dampen_threshold": 0.1,
-          "dampen_time": 1.13
+          "dampen_threshold": 1.47,
+          "dampen_time": 3.48
         },
         "temperature": {
           "input_strength": 0.0,
@@ -284,11 +284,11 @@
       "fullscreen": false,
       "monitor": 0,
       "x": 20,
-      "y": 80,
+      "y": 40,
       "width": 1080,
       "height": 1000,
       "secondary_list": [
-        "M0"
+        "M1"
       ]
     }
   },

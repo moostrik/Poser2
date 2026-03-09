@@ -1,8 +1,8 @@
-"""FluidFlow3D - 3D Navier-Stokes fluid simulation using volumetric textures.
+"""FluidFlow3DArray - 3D Navier-Stokes fluid simulation using GL_TEXTURE_2D_ARRAY for density.
 
-All-compute pipeline operating on GL_TEXTURE_3D volumes with trilinear
-filtering between depth layers. Produces a composited 2D output for
-downstream rendering compatibility.
+Same pipeline as FluidFlow3D but density is stored as GL_TEXTURE_2D_ARRAY
+for optimal per-layer 2D tiling. Velocity, pressure, temperature, and
+obstacles remain GL_TEXTURE_3D at simulation scale.
 
 Pipeline:
     1. Dampen velocity (magnitude clamping)
@@ -13,9 +13,8 @@ Pipeline:
     6. Apply buoyancy force
     7. Advect pressure (optional, non-physical)
     8. Enforce incompressibility (divergence -> Jacobi solve -> gradient subtraction)
-    9. Advect density (3D semi-Lagrangian)
-   10. Dampen density (magnitude clamping)
-   11. Composite 3D density -> 2D output
+    9. Advect density (GL_TEXTURE_2D_ARRAY, manual Z-lerp)
+   10. Composite 3D density -> 2D output
 
 Boundary conditions via per-field wrap modes (no explicit border obstacles):
     Velocity/density:  GL_CLAMP_TO_BORDER(0,0,0,0)  -> no-slip / Dirichlet
@@ -26,16 +25,16 @@ from OpenGL.GL import *  # type: ignore
 import time
 import logging
 
-from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D
+from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, Texture2DArray, SwapTexture2DArray
 from ..fluid.fluid_config import FluidConfig, DepthConfig, VelocityConfig
 from ..fluid.shaders import AddBoolean
 from ..FlowUtil import FlowUtil
 from .shaders import (
-    Advect3D, Divergence3D, Gradient3D,
+    Advect3D, Advect3DDensity, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,
-    VorticityCurl3D, VorticityForce3D, Buoyancy3D,
-    Inject3D, InjectChannel3D,
-    Clamp3D, Dampen3D, Composite3D, Add3D,
+    VorticityCurl3D, VorticityForce3D, Buoyancy3D, Buoyancy3DDensity,
+    Inject3D, Inject3DDensity, InjectChannel3D, InjectChannel3DDensity,
+    Clamp3D, Dampen3D, Composite3D, Composite3DDensity, Add3D,
     Blit3D, InjectBinary3D
 )
 
@@ -51,19 +50,21 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 # 3D Fluid Simulation
 # ---------------------------------------------------------------------------
 
-class FluidFlow3D:
-    """3D Navier-Stokes fluid simulation using volumetric compute shaders.
+class FluidFlow3DArray:
+    """3D Navier-Stokes fluid simulation with GL_TEXTURE_2D_ARRAY density.
 
-    Does NOT inherit FlowBase -- the internal representation is entirely
-    different (SwapTexture3D instead of SwapFbo). Provides a compatible
-    public API with the 2D FluidFlow where applicable.
+    Same pipeline as FluidFlow3D but density is stored as
+    SwapTexture2DArray (GL_TEXTURE_2D_ARRAY) for optimal per-layer
+    2D tiling at high resolutions. Density advection, injection,
+    buoyancy, and compositing use dedicated shaders with
+    sampler2DArray / image2DArray bindings.
 
     Fields:
-        velocity:    SwapTexture3D RGBA16F  (u, v, w, spare)
-        density:     SwapTexture3D RGBA16F  (r, g, b, a)
-        temperature: SwapTexture3D R16F
-        pressure:    SwapTexture3D R16F
-        obstacle:    Texture3D     R8       (no swap needed -- set externally)
+        velocity:    SwapTexture3D      RGBA16F  (u, v, w, spare)
+        density:     SwapTexture2DArray RGBA16F  (r, g, b, a)
+        temperature: SwapTexture3D      R16F
+        pressure:    SwapTexture3D      R16F
+        obstacle:    Texture3D          R8
 
     Intermediate (single-buffer):
         divergence:       Texture3D R16F
@@ -108,8 +109,8 @@ class FluidFlow3D:
         # ---- Volumetric fields (SwapTexture3D for ping-pong) ----
         # Velocity: CLAMP_TO_BORDER(0) = no-slip walls
         self._velocity: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
-        # Density: CLAMP_TO_BORDER(0) = nothing leaks out
-        self._density: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
+        # Density: GL_TEXTURE_2D_ARRAY for optimal per-layer 2D tiling
+        self._density: SwapTexture2DArray = SwapTexture2DArray(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         # Temperature: CLAMP_TO_EDGE = insulated walls (Neumann)
         self._temperature: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_EDGE)
         # Pressure: CLAMP_TO_EDGE = zero-gradient walls (Neumann)
@@ -145,6 +146,12 @@ class FluidFlow3D:
         self._clamp_shader: Clamp3D = Clamp3D()
         self._dampen_shader: Dampen3D = Dampen3D()
         self._composite_shader: Composite3D = Composite3D()
+        # Density-specific shaders (GL_TEXTURE_2D_ARRAY bindings)
+        self._advect_density_shader: Advect3DDensity = Advect3DDensity()
+        self._buoyancy_density_shader: Buoyancy3DDensity = Buoyancy3DDensity()
+        self._inject_density_shader: Inject3DDensity = Inject3DDensity()
+        self._inject_density_channel_shader: InjectChannel3DDensity = InjectChannel3DDensity()
+        self._composite_density_shader: Composite3DDensity = Composite3DDensity()
         self._add_shader: Add3D = Add3D()
         self._blit_shader: Blit3D = Blit3D()
         self._inject_binary_shader: InjectBinary3D = InjectBinary3D()
@@ -193,6 +200,11 @@ class FluidFlow3D:
         self._clamp_shader.allocate()
         self._dampen_shader.allocate()
         self._composite_shader.allocate()
+        self._advect_density_shader.allocate()
+        self._buoyancy_density_shader.allocate()
+        self._inject_density_shader.allocate()
+        self._inject_density_channel_shader.allocate()
+        self._composite_density_shader.allocate()
         self._add_shader.allocate()
         self._blit_shader.allocate()
         self._inject_binary_shader.allocate()
@@ -274,6 +286,11 @@ class FluidFlow3D:
         self._clamp_shader.deallocate()
         self._dampen_shader.deallocate()
         self._composite_shader.deallocate()
+        self._advect_density_shader.deallocate()
+        self._buoyancy_density_shader.deallocate()
+        self._inject_density_shader.deallocate()
+        self._inject_density_channel_shader.deallocate()
+        self._composite_density_shader.deallocate()
         self._add_shader.deallocate()
         self._blit_shader.deallocate()
         self._inject_binary_shader.deallocate()
@@ -296,6 +313,11 @@ class FluidFlow3D:
         self._clamp_shader.reload()
         self._dampen_shader.reload()
         self._composite_shader.reload()
+        self._advect_density_shader.reload()
+        self._buoyancy_density_shader.reload()
+        self._inject_density_shader.reload()
+        self._inject_density_channel_shader.reload()
+        self._composite_density_shader.reload()
         self._add_shader.reload()
         self._blit_shader.reload()
         self._inject_binary_shader.reload()
@@ -482,7 +504,7 @@ class FluidFlow3D:
         sigma = self._dt * self.config.simulation_scale * self.config.temperature.buoyancy
         kappa = self._dt * self.config.simulation_scale * self.config.temperature.weight
 
-        self._buoyancy_shader.use(
+        self._buoyancy_density_shader.use(
             self._temperature.texture,
             self._density.texture,
             self._simulation_obstacle,
@@ -562,7 +584,7 @@ class FluidFlow3D:
         dissipation = self._calculate_dissipation(self._dt, self.config.density.fade_time)
 
         self._density.swap()
-        self._advect_shader.advect(
+        self._advect_density_shader.advect(
             self._density.back_texture,
             self._density.texture,
             self._velocity.texture,
@@ -599,7 +621,7 @@ class FluidFlow3D:
 
     def _composite_output(self) -> None:
         """Composite 3D density → 2D output texture."""
-        self._composite_shader.use(
+        self._composite_density_shader.use(
             self._density.texture,
             self._output_texture,
             self.config.depth.composite_mode,
@@ -641,7 +663,7 @@ class FluidFlow3D:
         ]
 
         total = 0.0
-        lines = [f"FluidFlow3D GPU profile ({self._simulation_width}x{self._simulation_height}x{self._depth}, "
+        lines = [f"FluidFlow3DArray GPU profile ({self._simulation_width}x{self._simulation_height}x{self._depth}, "
                  f"density {self._density_width}x{self._density_height}x{self._depth}, "
                  f"avg over {n} frames):"]
         for name in pass_names:
@@ -774,7 +796,7 @@ class FluidFlow3D:
             return
         dt = 1.0 / max(1, self.config.fps)
         effective = strength * self.config.density.input_strength * dt
-        self._inject_shader.use(
+        self._inject_density_shader.use(
             texture, self._density.texture,
             self.config.depth.injection_layer,
             self.config.depth.injection_spread,
@@ -788,7 +810,7 @@ class FluidFlow3D:
         if not self._allocated:
             return
         self._density.clear_all()
-        self._inject_shader.use(
+        self._inject_density_shader.use(
             texture, self._density.texture,
             self.config.depth.injection_layer,
             self.config.depth.injection_spread,
@@ -813,7 +835,7 @@ class FluidFlow3D:
             return
         dt = 1.0 / max(1, self.config.fps)
         effective = strength * self.config.density.input_strength * dt
-        self._inject_channel_shader.use(
+        self._inject_density_channel_shader.use(
             texture, self._density.texture,
             self.config.depth.injection_layer,
             self.config.depth.injection_spread,
@@ -930,8 +952,8 @@ class FluidFlow3D:
         return self._velocity.texture
 
     @property
-    def density_volume(self) -> Texture3D:
-        """RGBA16F density volume (GL_TEXTURE_3D)."""
+    def density_volume(self) -> Texture2DArray:
+        """RGBA16F density volume (GL_TEXTURE_2D_ARRAY)."""
         return self._density.texture
 
     @property

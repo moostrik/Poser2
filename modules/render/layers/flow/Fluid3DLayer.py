@@ -21,13 +21,33 @@ from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 
 from modules.settings import Field, Settings
-from modules.flow import Visualizer, VisualisationFieldConfig, FluidFlow3D, FluidFlow3DConfig
+from modules.flow import Visualizer, VisualisationFieldConfig, FluidFlow, FluidFlow3D, FluidFlow3DArray, FluidConfig
 from modules.render.shaders import DensityColorize
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from .FlowLayer import FlowLayer
 from modules.render.color_settings import ColorSettings
+
+class FluidSimEngine(IntEnum):
+    """Simulation engine selection.
+
+    FLUID_2D:       2D Navier-Stokes (FluidFlow) — fastest, no depth
+    FLUID_3D:       3D volumetric with GL_TEXTURE_3D density (FluidFlow3D)
+    FLUID_3D_ARRAY: 3D volumetric with GL_TEXTURE_2D_ARRAY density (FluidFlow3DArray) — fastest 3D
+    """
+    FLUID_2D = 0
+    FLUID_3D = auto()
+    FLUID_3D_ARRAY = auto()
+
+
+# Map enum -> class for engine creation
+_ENGINE_CLASSES: dict[FluidSimEngine, type] = {
+    FluidSimEngine.FLUID_2D: FluidFlow,
+    FluidSimEngine.FLUID_3D: FluidFlow3D,
+    FluidSimEngine.FLUID_3D_ARRAY: FluidFlow3DArray,
+}
+
 
 class Fluid3DDrawMode(IntEnum):
     """Draw modes for Fluid3DLayer.
@@ -43,10 +63,11 @@ class Fluid3DDrawMode(IntEnum):
 class Fluid3DLayerSettings(Settings):
     """Configuration for Fluid3DLayer (3D fluid simulation)."""
     num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
+    sim_engine: Field[FluidSimEngine] =     Field(FluidSimEngine.FLUID_3D_ARRAY)
     draw_mode: Field[Fluid3DDrawMode] =     Field(Fluid3DDrawMode.DENSITY)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
 
-    fluid_flow:    FluidFlow3DConfig
+    fluid_flow:    FluidConfig
     visualisation: VisualisationFieldConfig
 
 
@@ -92,14 +113,43 @@ class Fluid3DLayer(LayerBase):
         self.config: Fluid3DLayerSettings = settings or Fluid3DLayerSettings()
         self._color_settings: ColorSettings = color_settings
 
-        self._fluid_flow: FluidFlow3D = FluidFlow3D(self.config.fluid_flow)
+        # Simulation engine (swappable at runtime)
+        self._fluid_flow: FluidFlow | FluidFlow3D | FluidFlow3DArray = self._create_engine()
+        self._alloc_width: int = 0
+        self._alloc_height: int = 0
+        self._swap_engine_pending: bool = False
+
         self._visualizer: Visualizer = Visualizer(self.config.visualisation)
 
         # Colorization resources
         self._colorized_fbo: Fbo = Fbo()
         self._density_colorize_shader: DensityColorize = DensityColorize()
 
+        # Defer engine swap to GL thread (callbacks fire from websocket thread)
+        self.config.bind(Fluid3DLayerSettings.sim_engine, lambda _: self._request_swap_engine())
+
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
+
+    def _create_engine(self) -> FluidFlow | FluidFlow3D | FluidFlow3DArray:
+        """Instantiate the selected simulation engine with the shared config."""
+        cls = _ENGINE_CLASSES[self.config.sim_engine]
+        return cls(self.config.fluid_flow)
+
+    def _request_swap_engine(self) -> None:
+        """Request engine swap (deferred to next update on GL thread)."""
+        self._swap_engine_pending = True
+
+    def _swap_engine(self) -> None:
+        """Swap simulation engine at runtime, preserving allocation state.
+
+        Must run on the GL thread (called from update).
+        """
+        was_allocated = self._alloc_width > 0
+        if was_allocated:
+            self._fluid_flow.deallocate()
+        self._fluid_flow = self._create_engine()
+        if was_allocated:
+            self._fluid_flow.allocate(self._alloc_width, self._alloc_height)
 
     # ========== Output Access ==========
 
@@ -123,6 +173,8 @@ class Fluid3DLayer(LayerBase):
             height: Processing height
             internal_format: Ignored (formats determined by FluidFlow3D)
         """
+        self._alloc_width = width
+        self._alloc_height = height
         self._fluid_flow.allocate(width, height)
         self._visualizer.allocate(self._fluid_flow.sim_width, self._fluid_flow.sim_height)
 
@@ -145,6 +197,11 @@ class Fluid3DLayer(LayerBase):
 
     def update(self) -> None:
         """Update 3D fluid simulation with inputs from all flow layers."""
+        # Handle deferred engine swap (must run on GL thread)
+        if self._swap_engine_pending:
+            self._swap_engine_pending = False
+            self._swap_engine()
+
         # Get motion data from pose
         pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
         similarities: np.ndarray = (
@@ -177,8 +234,9 @@ class Fluid3DLayer(LayerBase):
             # Add velocity from each flow layer
             self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
 
-            # Add Z-velocity from motion magnitude (pushes fluid back -> front)
-            self._fluid_flow.add_velocity_z(flow_layer.magnitude, vel_strength * 3)
+            # Add Z-velocity from motion magnitude (3D engines only)
+            if isinstance(self._fluid_flow, (FluidFlow3D, FluidFlow3DArray)):
+                self._fluid_flow.add_velocity_z(flow_layer.magnitude, vel_strength * 3)
 
             # Add density to per-camera channel (R=cam0, G=cam1, B=cam2, A=cam3)
             channel: int = cam_id % 4

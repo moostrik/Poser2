@@ -23,9 +23,8 @@ Boundary conditions via per-field wrap modes:
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, SwapFbo, Fbo
-from modules.settings import Field, Settings, Widget
 from .. import FlowUtil
-from .fluid_config import VelocityConfig, DensityConfig, TemperatureConfig, PressureConfig
+from .fluid_config import FluidConfig, VelocityConfig, DensityConfig
 from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,
@@ -33,46 +32,6 @@ from .shaders import (
 )
 
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-
-class FluidFlowConfig(Settings):
-    """Configuration for fluid simulation.
-
-    Speed model:
-        One 'speed' parameter controls all passive scalar transport (density,
-        temperature, pressure). At speed=1.0, a velocity value of 1.0 moves
-        fluid across the full texture width in 1 second.
-
-        velocity.self_advection is a separate stability parameter that controls
-        how much the velocity field advects itself. Keep low to prevent numerical
-        blowup from the self-advection feedback loop.
-
-        density.speed_offset adds to base speed for density transport only.
-        0 = physically coupled to velocity (density rides the flow).
-        Positive = density flings further. Negative = density lags.
-
-    Fade_time model:
-        Exponential frame-rate-independent decay: multiplier = 0.01^(dt/fade_time).
-        fade_time=3.0 means the field retains ~1% after 3 seconds.
-    """
-
-    # ---- Actions ----
-    reset_sim: Field[bool]          = Field(False, widget=Widget.button, description="Reset all simulation fields to zero")
-
-    # ---- Global ----
-    simulation_scale: Field[float]  = Field(0.5, min=0.1, max=2.0, description="Resolution scale for simulation buffers")
-    fps: Field[int]                 = Field(60, min=1, max=240, access=Field.READ, description="Current average FPS for dt calculation (bound from WindowManager)")
-    speed: Field[float]             = Field(0.5, min=0.0, max=5.0, description="Base fluid transport rate")
-
-    # ---- Field groups ----
-    velocity:    VelocityConfig
-    density:     DensityConfig
-    temperature: TemperatureConfig
-    pressure:    PressureConfig
 
 
 # ---------------------------------------------------------------------------
@@ -101,8 +60,8 @@ class FluidFlow:
         buoyancy:         Fbo RG16F
     """
 
-    def __init__(self, config: FluidFlowConfig | None = None) -> None:
-        self.config: FluidFlowConfig = config or FluidFlowConfig()
+    def __init__(self, config: FluidConfig | None = None) -> None:
+        self.config: FluidConfig = config or FluidConfig()
 
         # ---- Simulation dimensions and state ---
         self._simulation_width: int = 0
@@ -160,8 +119,8 @@ class FluidFlow:
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
         # Bind settings actions
-        self.config.bind(FluidFlowConfig.reset_sim, lambda _: self._request_reset())
-        self.config.bind(FluidFlowConfig.simulation_scale, lambda _: self._request_reallocate())
+        self.config.bind(FluidConfig.reset_sim, lambda _: self._request_reset())
+        self.config.bind(FluidConfig.simulation_scale, lambda _: self._request_reallocate())
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 

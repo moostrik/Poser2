@@ -1,0 +1,47 @@
+#version 460 core
+
+/*
+ * Inject3D Density - Inject 2D input into a density volume stored as
+ *                    GL_TEXTURE_2D_ARRAY.
+ *
+ * Identical logic to inject3d.comp but uses image2DArray for the volume.
+ * imageLoad/imageStore with ivec3 work the same for image2DArray.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// 2D input texture
+layout(binding = 0) uniform sampler2D uInput;
+
+// 2D array output volume
+layout(rgba16f, binding = 0) uniform image2DArray uVolume;
+
+// Parameters
+uniform float uTargetLayer;
+uniform float uSpread;
+uniform float uStrength;
+uniform int   uMode;         // 0 = additive, 1 = set
+uniform ivec3 uSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    float z_norm = (float(gid.z) + 0.5) / float(uSize.z);
+    float target = (0.5 + uTargetLayer * (float(uSize.z) - 1.0)) / float(uSize.z);
+
+    float dz = (z_norm - target) / max(uSpread, 0.001);
+    float weight = exp(-0.5 * dz * dz) * uStrength;
+
+    if (weight < 0.001) return;
+
+    vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
+    vec4 input_val = texture(uInput, uv) * weight;
+
+    if (uMode == 0) {
+        vec4 current = imageLoad(uVolume, gid);
+        imageStore(uVolume, gid, current + input_val);
+    } else {
+        imageStore(uVolume, gid, input_val);
+    }
+}

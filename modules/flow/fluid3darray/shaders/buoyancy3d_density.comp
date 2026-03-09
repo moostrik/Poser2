@@ -1,0 +1,77 @@
+#version 460 core
+
+/*
+ * Buoyancy3D Density - Temperature-driven buoyancy with density stored
+ *                      as GL_TEXTURE_2D_ARRAY.
+ *
+ * F = σ(T - T_ambient) - κ·density
+ * Temperature and obstacle remain sampler3D (GL_TEXTURE_3D at sim scale).
+ * Density is sampler2DArray with manual Z interpolation.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler3D      uTemperature;  // Temperature (R16F)
+layout(binding = 1) uniform sampler2DArray  uDensity;      // Density (RGBA16F, 2D array)
+layout(binding = 2) uniform sampler3D      uObstacle;      // Obstacle mask (R8)
+
+layout(rgba16f, binding = 0) writeonly uniform image3D uForce;
+
+uniform float uSigma;               // Thermal buoyancy (includes dt * scale)
+uniform float uKappa;               // Density weight (includes dt * scale)
+uniform float uAmbientTemperature;  // Reference temperature
+uniform ivec3 uSize;
+uniform bool  uHasObstacles;
+uniform int   uDensityLayers;       // Number of density array layers
+
+/*
+ * Manual Z-interpolated sample from density sampler2DArray.
+ */
+vec4 sampleDensity(vec3 uvw) {
+    int layers = uDensityLayers;
+    float z_coord = uvw.z * float(layers) - 0.5;
+
+    if (z_coord < -0.5 || z_coord > float(layers) - 0.5) {
+        return vec4(0.0);
+    }
+
+    int z0 = int(floor(z_coord));
+    int z1 = z0 + 1;
+    float frac = z_coord - float(z0);
+
+    vec4 s0 = (z0 >= 0 && z0 < layers)
+        ? texture(uDensity, vec3(uvw.xy, float(z0))) : vec4(0.0);
+    vec4 s1 = (z1 >= 0 && z1 < layers)
+        ? texture(uDensity, vec3(uvw.xy, float(z1))) : vec4(0.0);
+
+    return mix(s0, s1, frac);
+}
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+
+    // Obstacle check
+    if (uHasObstacles) {
+        float obstacle = texture(uObstacle, st).r;
+        if (obstacle > 0.5) {
+            imageStore(uForce, gid, vec4(0.0));
+            return;
+        }
+    }
+
+    float temperature = texture(uTemperature, st).r;
+    float dtemp = temperature - uAmbientTemperature;
+
+    vec3 buoyancy = vec3(0.0);
+
+    if (abs(dtemp) > 0.0001) {
+        float density = sampleDensity(st).a;
+        float force = dtemp * uSigma - density * uKappa;
+        buoyancy = vec3(0.0, -1.0, 0.0) * force;
+    }
+
+    imageStore(uForce, gid, vec4(buoyancy, 0.0));
+}

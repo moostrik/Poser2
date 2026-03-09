@@ -26,6 +26,7 @@ from OpenGL.GL import *  # type: ignore
 from .Shader import Shader
 from .Texture import Texture
 from .Texture3D import Texture3D
+from .Texture2DArray import Texture2DArray
 
 
 class ComputeShader(Shader):
@@ -273,6 +274,48 @@ class ComputeShader(Shader):
         glActiveTexture(int(GL_TEXTURE0) + unit)
         glBindTexture(GL_TEXTURE_3D, texture.tex_id)
         glUniform1i(self.get_uniform_loc(uniform_name), unit)
+
+    # ========== 2D Array Texture Binding Methods ==========
+
+    def bind_texture_2d_array(self, unit: int, texture: Texture2DArray, uniform_name: str) -> None:
+        """Bind 2D array texture for sampler2DArray access.
+
+        Args:
+            unit: Texture unit (0, 1, 2, ...)
+            texture: Texture2DArray to bind
+            uniform_name: Name of sampler2DArray uniform in shader
+        """
+        glActiveTexture(int(GL_TEXTURE0) + unit)
+        glBindTexture(GL_TEXTURE_2D_ARRAY, texture.tex_id)
+        glUniform1i(self.get_uniform_loc(uniform_name), unit)
+
+    def bind_image_2d_array(self, unit: int, texture: Texture2DArray, access: int,
+                            internal_format: int | None = None) -> None:
+        """Bind 2D array texture as layered image for imageLoad/imageStore.
+
+        Args:
+            unit: Image unit (0, 1, 2, ...)
+            texture: Texture2DArray to bind
+            access: GL_READ_ONLY, GL_WRITE_ONLY, or GL_READ_WRITE
+            internal_format: Override format (defaults to texture's format)
+        """
+        fmt = internal_format if internal_format is not None else texture.internal_format
+        glBindImageTexture(unit, texture.tex_id, 0, GL_TRUE, 0, access, fmt)
+
+    def bind_image_2d_array_read(self, unit: int, texture: Texture2DArray,
+                                 internal_format: int | None = None) -> None:
+        """Bind 2D array texture as read-only layered image."""
+        self.bind_image_2d_array(unit, texture, GL_READ_ONLY, internal_format)
+
+    def bind_image_2d_array_write(self, unit: int, texture: Texture2DArray,
+                                  internal_format: int | None = None) -> None:
+        """Bind 2D array texture as write-only layered image."""
+        self.bind_image_2d_array(unit, texture, GL_WRITE_ONLY, internal_format)
+
+    def bind_image_2d_array_readwrite(self, unit: int, texture: Texture2DArray,
+                                      internal_format: int | None = None) -> None:
+        """Bind 2D array texture as read-write layered image."""
+        self.bind_image_2d_array(unit, texture, GL_READ_WRITE, internal_format)
 
     # ========== Memory Barriers ==========
 

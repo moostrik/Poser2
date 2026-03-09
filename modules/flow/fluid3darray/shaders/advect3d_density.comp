@@ -1,0 +1,99 @@
+#version 460 core
+
+/*
+ * Advect3D Density - Semi-Lagrangian advection for density stored as
+ *                    GL_TEXTURE_2D_ARRAY (optimal 2D tiling per layer).
+ *
+ * Velocity and obstacle remain sampler3D (they are GL_TEXTURE_3D at
+ * simulation scale). Density source is sampler2DArray with manual
+ * Z interpolation between layers.
+ *
+ * The manual Z-lerp replaces hardware trilinear: two bilinear reads +
+ * mix() — each with optimal 2D spatial locality per layer.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// Input textures
+layout(binding = 0) uniform sampler3D      uVelocity;  // Velocity field (RGBA16F: xyz = u,v,w)
+layout(binding = 1) uniform sampler2DArray  uSource;    // Density to advect (2D array)
+layout(binding = 2) uniform sampler3D      uObstacle;   // Obstacle mask (R8)
+
+// Output image (2D array)
+layout(rgba16f, binding = 0) writeonly uniform image2DArray uResult;
+
+// Parameters
+uniform float uTimestep;      // dt * speed
+uniform vec3  uRdx;           // (1.0, 1.0/aspect, 1.0/depth_scale)
+uniform float uDissipation;   // Exponential decay multiplier
+uniform ivec3 uSize;          // Volume dimensions (width, height, depth)
+uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
+
+/*
+ * Manual Z-interpolated sample from a sampler2DArray.
+ *
+ * Converts normalized Z [0,1] to fractional layer index, reads the two
+ * adjacent layers with hardware-bilinear XY, and lerps between them.
+ * Returns border color (vec4(0)) for coordinates outside [0,1] in Z,
+ * matching GL_CLAMP_TO_BORDER(0,0,0,0) semantics.
+ *
+ * XY clamping/border is handled by the sampler's own wrap mode.
+ */
+vec4 sampleDensity(vec3 uvw) {
+    int layers = uSize.z;
+    // Convert normalized Z to continuous layer coordinate
+    // z=0 maps to center of first layer (-0.5..+0.5), z=1 maps past last layer
+    float z_coord = uvw.z * float(layers) - 0.5;
+
+    // Boundary check: return border color for out-of-range Z
+    if (z_coord < -0.5 || z_coord > float(layers) - 0.5) {
+        return vec4(0.0);
+    }
+
+    // The two layers to interpolate between
+    int z0 = int(floor(z_coord));
+    int z1 = z0 + 1;
+    float frac = z_coord - float(z0);
+
+    // Sample each layer (sampler handles XY bilinear + wrap)
+    // Clamp layer indices to valid range for border emulation
+    vec4 s0 = (z0 >= 0 && z0 < layers)
+        ? texture(uSource, vec3(uvw.xy, float(z0))) : vec4(0.0);
+    vec4 s1 = (z1 >= 0 && z1 < layers)
+        ? texture(uSource, vec3(uvw.xy, float(z1))) : vec4(0.0);
+
+    return mix(s0, s1, frac);
+}
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+
+    // Bounds check
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    // Normalized 3D coordinates (center of voxel) — used for velocity/obstacle lookup
+    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+
+    // Obstacle check
+    if (uHasObstacles) {
+        float obstacle = texture(uObstacle, st).r;
+        if (obstacle > 0.5) {
+            imageStore(uResult, gid, sampleDensity(st));
+            return;
+        }
+    }
+
+    // Backward trace along 3D velocity
+    vec3 velocity = texture(uVelocity, st).xyz;
+    vec3 st_back = st - uTimestep * uRdx * velocity;
+
+    // If backtrace lands inside an obstacle, fall back to current position
+    if (uHasObstacles && texture(uObstacle, st_back).r > 0.5) {
+        st_back = st;
+    }
+
+    // Sample source with manual Z interpolation and apply dissipation
+    vec4 result = uDissipation * sampleDensity(st_back);
+
+    imageStore(uResult, gid, result);
+}

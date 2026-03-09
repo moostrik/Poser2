@@ -24,7 +24,10 @@ from .bridge import (
 from .visualization import VisualisationFieldConfig, Visualizer, VelocityField
 
 # 2D fluid simulation
-from .fluid import FluidFlow, FluidFlowConfig
+from .fluid import FluidFlow, FluidConfig, DepthConfig
 
 # 3D fluid simulation
-from .fluid3d import FluidFlow3D, FluidFlow3DConfig
+from .fluid3d import FluidFlow3D
+
+# 3D fluid simulation (GL_TEXTURE_2D_ARRAY density variant)
+from .fluid3darray import FluidFlow3DArray
