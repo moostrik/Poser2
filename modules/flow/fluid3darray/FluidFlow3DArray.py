@@ -1,4 +1,4 @@
-"""FluidFlow3DArray - 3D Navier-Stokes fluid simulation using GL_TEXTURE_2D_ARRAY for density.
+﻿"""FluidFlow3DArray - 3D Navier-Stokes fluid simulation using GL_TEXTURE_2D_ARRAY for density.
 
 Same pipeline as FluidFlow3D but density is stored as GL_TEXTURE_2D_ARRAY
 for optimal per-layer 2D tiling. Velocity, pressure, temperature, and
@@ -26,7 +26,7 @@ import time
 import logging
 
 from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, Texture2DArray, SwapTexture2DArray
-from ..fluid.fluid_config import FluidConfig, ZConfig, VelocityConfig
+from ..fluid.fluid_config import FluidFlowConfig, DepthConfig, VelocityConfig
 from ..fluid.shaders import AddBoolean
 from ..FlowUtil import FlowUtil
 from .shaders import (
@@ -76,8 +76,8 @@ class FluidFlow3DArray:
         _output_texture:  Texture RGBA16F    (composited from 3D density)
     """
 
-    def __init__(self, config: FluidConfig | None = None) -> None:
-        self.config: FluidConfig = config or FluidConfig()
+    def __init__(self, config: FluidFlowConfig | None = None) -> None:
+        self.config: FluidFlowConfig = config or FluidFlowConfig()
 
         # ---- Simulation dimensions and state ---
         self._simulation_width: int = 0
@@ -158,10 +158,10 @@ class FluidFlow3DArray:
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
         # Bind settings actions
-        self.config.bind(FluidConfig.reset_sim, lambda _: self._request_reset())
-        self.config.z.bind(ZConfig.depth, lambda _: self._request_reallocate())
-        self.config.bind(FluidConfig.width, lambda _: self._request_reallocate())
-        self.config.bind(FluidConfig.height, lambda _: self._request_reallocate())
+        self.config.bind(FluidFlowConfig.reset_sim, lambda _: self._request_reset())
+        self.config.z.bind(DepthConfig.depth, lambda _: self._request_reallocate())
+        self.config.bind(FluidFlowConfig.width, lambda _: self._request_reallocate())
+        self.config.bind(FluidFlowConfig.height, lambda _: self._request_reallocate())
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 

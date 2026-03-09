@@ -24,7 +24,7 @@ from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, SwapFbo, Fbo
 from .. import FlowUtil
-from .fluid_config import FluidConfig, VelocityConfig, DensityConfig
+from .fluid_config import FluidFlowConfig, VelocityConfig, DensityConfig
 from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,
@@ -60,8 +60,8 @@ class FluidFlow:
         buoyancy:         Fbo RG16F
     """
 
-    def __init__(self, config: FluidConfig | None = None) -> None:
-        self.config: FluidConfig = config or FluidConfig()
+    def __init__(self, config: FluidFlowConfig | None = None) -> None:
+        self.config: FluidFlowConfig = config or FluidFlowConfig()
 
         # ---- Simulation dimensions and state ---
         self._simulation_width: int = 0
@@ -119,9 +119,9 @@ class FluidFlow:
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
         # Bind settings actions
-        self.config.bind(FluidConfig.reset_sim, lambda _: self._request_reset())
-        self.config.bind(FluidConfig.width, lambda _: self._request_reallocate())
-        self.config.bind(FluidConfig.height, lambda _: self._request_reallocate())
+        self.config.bind(FluidFlowConfig.reset_sim, lambda _: self._request_reset())
+        self.config.bind(FluidFlowConfig.width, lambda _: self._request_reallocate())
+        self.config.bind(FluidFlowConfig.height, lambda _: self._request_reallocate())
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 

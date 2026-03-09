@@ -24,7 +24,7 @@ from .bridge import (
 from .visualization import VisualisationFieldConfig, Visualizer, VelocityField
 
 # 2D fluid simulation
-from .fluid import FluidFlow, FluidConfig, ZConfig
+from .fluid import FluidFlow, FluidFlowConfig, DepthConfig
 
 # 3D fluid simulation
 from .fluid3d import FluidFlow3D

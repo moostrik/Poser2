@@ -46,7 +46,7 @@ class PressureConfig(Settings):
     iterations: Field[int]          = Field(40,     min=1,      max=60,     color="orange",         description="Solver quality for pressure (iterations at 60fps, auto-scaled for frame rate)")
 
 
-class ZConfig(Settings):
+class DepthConfig(Settings):
     """Z-axis / volume parameters (ignored by 2D simulations)."""
     depth: Field[int]               = Field(4,    min=1,    max=64,     description="Number of depth layers in the 3D volume")
     scale: Field[float]             = Field(1.0,  min=0.5,  max=5.0,    description="Manual multiplier on auto-computed Z grid spacing (width/depth)")
@@ -57,7 +57,7 @@ class ZConfig(Settings):
     injection_spread: Field[float]  = Field(0.001, min=0.001, max=0.5,   description="Gaussian sigma for depth spread during injection")
 
 
-class FluidConfig(Settings):
+class FluidFlowConfig(Settings):
     """Unified configuration for all fluid simulations (2D and 3D).
 
     Speed model:
@@ -84,7 +84,7 @@ class FluidConfig(Settings):
     speed: Field[float]             = Field(1.0,    min=0.0,    max=5.0,    description="Base fluid transport rate")
 
     # ---- Field groups ----
-    z:           ZConfig
+    z:           DepthConfig
     velocity:    VelocityConfig
     density:     DensityConfig
     temperature: TemperatureConfig
