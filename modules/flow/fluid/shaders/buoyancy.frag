@@ -42,8 +42,8 @@ void main() {
     vec2 buoyancy = vec2(0.0);
 
     if (abs(dtemp) > 0.0001) {
-        // Sample density (use alpha channel)
-        float density = texture(uDensity, st).a;
+        // Sample density (R channel — R16F scalar density)
+        float density = texture(uDensity, st).r;
 
         // Buoyancy force: F = sigma * (T - T_ambient) - kappa * density
         // Hot air rises (positive dtemp), dense fluid falls (positive density)
