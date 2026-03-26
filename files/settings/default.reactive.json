@@ -133,36 +133,60 @@
       }
     },
     "fluid": {
-      "fps": 110.0,
       "num_players": 3,
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",
-      "width": 512,
-      "height": 288,
+      "fluid_flow": {
+        "width": 288,
+        "height": 512,
+        "speed": 1.0,
+        "depth": {
+          "depth": 4,
+          "scale": 1.0,
+          "composite_mode": 3,
+          "ray_steps": 32,
+          "absorption": 4.0,
+          "injection_layer": 1.0,
+          "injection_spread": 0.001
+        },
+        "velocity": {
+          "input_strength": 0.73,
+          "self_advection": 0.01,
+          "fade_time": 31.77,
+          "dampen_threshold": 9.62,
+          "dampen_time": 3.0,
+          "vorticity": 0.0,
+          "vorticity_radius": 8.98,
+          "viscosity": 0.0,
+          "viscosity_iter": 20
+        },
+        "density": {
+          "input_strength": 7.25,
+          "speed_offset": 0.0,
+          "fade_time": 18.0,
+          "dampen_threshold": 1.47,
+          "dampen_time": 3.63
+        },
+        "temperature": {
+          "input_strength": 0.0,
+          "speed_offset": 0.0,
+          "fade_time": 3.0,
+          "buoyancy": 0.0,
+          "weight": -10.0,
+          "ambient": 0.2
+        },
+        "pressure": {
+          "speed": 0.0,
+          "fade_time": 8.0,
+          "iterations": 40
+        }
+      },
       "visualisation": {
         "toggle_scalar": false,
         "scale": 1.0,
         "spacing": 20.0,
         "element_length": 40.0,
         "element_width": 1.0
-      },
-      "fluid_flow": {
-        "speed": 1.0,
-        "vel_self_advection": 0.01,
-        "den_speed_offset": 0.0,
-        "vel_fade_time": 30.0,
-        "vel_vorticity": 30.0,
-        "vel_vorticity_radius": 10.0,
-        "vel_viscosity": 50.0,
-        "vel_viscosity_iter": 40,
-        "prs_speed": 0.0,
-        "prs_fade_time": 8.0,
-        "prs_iterations": 40,
-        "den_fade_time": 18.0,
-        "tmp_fade_time": 3.0,
-        "tmp_buoyancy": 0.0,
-        "tmp_weight": -10.0,
-        "tmp_ambient": 0.2
       }
     },
     "colors": {

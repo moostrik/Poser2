@@ -53,7 +53,6 @@ LARGE_LAYERS: list[Layers] = [
     # Layers.centre_pose,
     Layers.flow,
     Layers.fluid,
-    Layers.fluid3D,
     Layers.composite,
 ]
 
@@ -104,7 +103,6 @@ class RenderManager(RenderBase):
             ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.data_hub,   centre_frg.texture, cmt,    settings.centre.color,      settings.colors)
             flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask,  centre_mask.texture, centre_frg.texture, settings.flow)
             fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows,                      settings.fluid,             settings.colors)
-            fluid3D =  self.L[Layers.fluid3D][i] =          ls.Fluid3DLayer(        i, self.data_hub,   flows,                      settings.fluid3D,           settings.colors)
 
             lut =           self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid, ms_mask],           settings.layer.lut)
 
@@ -125,7 +123,6 @@ class RenderManager(RenderBase):
         # Propagate window fps to fluid simulation configs
         def _propagate_fps(fps: int) -> None:
             settings.fluid.fluid_flow.fps = fps
-            settings.fluid3D.fluid_flow.fps = fps
         settings.window.bind(WindowSettings.avg_fps, _propagate_fps)
 
         # hot reloader

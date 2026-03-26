@@ -3,10 +3,10 @@
     "layer": {
       "select": {
         "preview": [
-          "fluid3D"
+          "centre_frg"
         ],
         "final": [
-          "fluid3D"
+          "composite"
         ]
       },
       "lut": {
@@ -75,10 +75,10 @@
         "gamma": 1.0,
         "offset": 0.0,
         "contrast": 1.1,
-        "saturation": 1.16,
+        "saturation": 2.0,
         "levels": 9,
         "smoothness": 0.33,
-        "colorize": 0.0,
+        "colorize": 0.96,
         "sharpen": 0.0,
         "use_mask": true
       },
@@ -163,7 +163,7 @@
         "density": {
           "input_strength": 1.0,
           "speed_offset": 0.0,
-          "fade_time": 4.0000000000000036,
+          "fade_time": 18.0,
           "dampen_threshold": 1.2,
           "dampen_time": 3.0
         },
@@ -179,64 +179,6 @@
           "speed": 0.0,
           "fade_time": 8.0,
           "iterations": 40
-        }
-      },
-      "visualisation": {
-        "toggle_scalar": false,
-        "scale": 1.0,
-        "spacing": 20.0,
-        "element_length": 40.0,
-        "element_width": 1.0
-      }
-    },
-    "fluid3D": {
-      "num_players": 3,
-      "sim_engine": "FLUID_3D",
-      "draw_mode": "DENSITY_RAW",
-      "blend_mode": "ALPHA",
-      "fluid_flow": {
-        "width": 288,
-        "height": 512,
-        "speed": 0.79,
-        "depth": {
-          "depth": 32,
-          "scale": 1.0,
-          "composite_mode": 2,
-          "ray_steps": 8,
-          "absorption": 24.33,
-          "injection_layer": 0.1,
-          "injection_spread": 0.15
-        },
-        "velocity": {
-          "input_strength": 0.72,
-          "self_advection": 0.2,
-          "fade_time": 19.93,
-          "dampen_threshold": 7.97,
-          "dampen_time": 5.13,
-          "vorticity": 10.49,
-          "vorticity_radius": 2.69,
-          "viscosity": 36.13,
-          "viscosity_iter": 20
-        },
-        "density": {
-          "input_strength": 7.18,
-          "speed_offset": 0.0,
-          "fade_time": 7.98,
-          "dampen_threshold": 1.47,
-          "dampen_time": 3.48
-        },
-        "temperature": {
-          "input_strength": 0.0,
-          "speed_offset": 0.0,
-          "fade_time": 3.0,
-          "buoyancy": 0.0,
-          "weight": -10.0,
-          "ambient": 0.2
-        },
-        "pressure": {
-          "speed": 0.0,
-          "fade_time": 0.01,
-          "iterations": 20
         }
       },
       "visualisation": {

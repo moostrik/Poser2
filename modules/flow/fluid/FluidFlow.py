@@ -157,8 +157,8 @@ class FluidFlow:
         self._allocated = True
 
         # DEBUG: inject test obstacle shapes
-        from .debug_utils import upload_debug_obstacle
-        upload_debug_obstacle(self, self._simulation_width, self._simulation_height)
+        # from .debug_utils import upload_debug_obstacle
+        # upload_debug_obstacle(self, self._simulation_width, self._simulation_height)
 
     def _update_simulation_dimensions(self) -> None:
         """Recompute simulation dimensions from current config."""
