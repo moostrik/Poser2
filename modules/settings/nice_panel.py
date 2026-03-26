@@ -231,7 +231,7 @@ def _build_knob(settings, name, field, polls):
     min_val = field.min if field.min is not None else 0
     max_val = field.max if field.max is not None else 100
 
-    with ui.column().classes("items-center gap-0"):
+    with ui.row().classes("items-center gap-2"):
         kn = ui.knob(
             value=value, min=min_val, max=max_val, step=step,
             show_value=True, size="lg",
@@ -320,7 +320,7 @@ def _build_input(settings, name, field, polls):
     return WidgetSize.full
 
 
-@widget_builder(Widget.ip)
+@widget_builder(Widget.ip_field)
 def _build_ip(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
@@ -332,9 +332,9 @@ def _build_ip(settings, name, field, polls):
 
     inp = ui.input(
         label=label, value=value,
-        validation={"Invalid IP": is_valid_ip},
+        validation={"": is_valid_ip},
     ).props(
-        'dense outlined' + (" disable" if is_disabled else "")
+        'dense outlined hide-bottom-space' + (" disable" if is_disabled else "")
     ).classes("w-40")
 
     if not is_disabled:
@@ -345,6 +345,44 @@ def _build_ip(settings, name, field, polls):
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
+    return WidgetSize.small
+
+
+@widget_builder(Widget.number_field)
+def _build_number_input(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.access is Access.READ
+    lo = field.min
+    hi = field.max
+    ft = field.type_
+
+    def is_valid(v: str) -> bool:
+        try:
+            n = ft(v)
+            if lo is not None and n < lo:
+                return False
+            if hi is not None and n > hi:
+                return False
+            return True
+        except (ValueError, TypeError):
+            return False
+
+    inp = ui.input(
+        label=label, value=str(value),
+        validation={"": is_valid},
+    ).props(
+        'dense outlined hide-bottom-space' + (" disable" if is_disabled else "")
+    ).classes("w-28")
+
+    if not is_disabled:
+        def on_change(e, inp=inp):
+            if is_valid(e.value):
+                setattr(settings, name, ft(e.value))
+        inp.on_value_change(on_change)
+
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(str(v))))
     return WidgetSize.small
 
 
@@ -376,20 +414,34 @@ def _build_color(settings, name, field, polls):
     label = generate_label(name)
     is_disabled = field.access is Access.READ
 
+    def _color_style(hex_val: str) -> str:
+        c = Color.from_hex(hex_val)
+        luminance = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
+        text = '#000000' if luminance > 0.5 else '#ffffff'
+        return f'background:{hex_val};border-radius:4px;color:{text}'
+
     hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
+
     ci = ui.color_input(
         label=label, value=hex_val
-    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-40")
+    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-36").style(
+        _color_style(hex_val)
+    )
 
     if not is_disabled:
         def on_color_change(e):
             if e.value:
                 c = Color.from_hex(e.value)
                 setattr(settings, name, Color(c.r, c.g, c.b, 1.0))
+                ci.style(_color_style(e.value))
         ci.on_value_change(on_color_change)
 
     if field.access is not Access.WRITE:
-        polls.append((settings, name, [value], lambda v, _ci=ci: _ci.set_value(v.to_hex() if isinstance(v, Color) else '#000000')))
+        def _poll_color(v, _ci=ci):
+            h = v.to_hex() if isinstance(v, Color) else '#000000'
+            _ci.set_value(h)
+            _ci.style(_color_style(h))
+        polls.append((settings, name, [value], _poll_color))
     return WidgetSize.small
 
 

@@ -12,10 +12,10 @@ from modules.settings import Settings, Field, Widget
 
 class OscControlConfig(Settings):
     port_in        = Field(9000, min=1024, max=65535, access=Field.INIT, widget=Widget.number, description="Incoming OSC port")
-    ip_address_in  = Field("127.0.0.1",              access=Field.INIT, widget=Widget.ip,     description="Incoming OSC IP address")
+    ip_address_in  = Field("127.0.0.1",              access=Field.INIT, widget=Widget.ip_field,     description="Incoming OSC IP address")
     return_messages = Field(True,                                                               description="Echo received messages back to sender")
     port_out       = Field(9001, min=1024, max=65535, access=Field.INIT, widget=Widget.number, description="Outgoing OSC port")
-    ip_address_out = Field("127.0.0.1",              access=Field.INIT, widget=Widget.ip,     description="Outgoing OSC IP address")
+    ip_address_out = Field("127.0.0.1",              access=Field.INIT, widget=Widget.ip_field,     description="Outgoing OSC IP address")
 
 
 @dataclass

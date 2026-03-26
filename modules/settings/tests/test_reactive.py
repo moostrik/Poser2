@@ -1633,10 +1633,10 @@ class TestWidgetAccepts(unittest.TestCase):
         self.assertFalse(Widget.checklist.accepts(RenderMode))
 
     def test_ip_accepts_str(self):
-        self.assertTrue(Widget.ip.accepts(str))
+        self.assertTrue(Widget.ip_field.accepts(str))
 
     def test_ip_rejects_int(self):
-        self.assertFalse(Widget.ip.accepts(int))
+        self.assertFalse(Widget.ip_field.accepts(int))
 
     def test_color_accepts_color(self):
         self.assertTrue(Widget.color.accepts(Color))
@@ -1702,7 +1702,7 @@ class TestWidgetValidation(unittest.TestCase):
 
     def test_incompatible_widget_raises(self):
         with self.assertRaises(TypeError):
-            Field(1.0, widget=Widget.ip)
+            Field(1.0, widget=Widget.ip_field)
 
     def test_incompatible_bool_on_slider(self):
         with self.assertRaises(TypeError):
@@ -1710,7 +1710,7 @@ class TestWidgetValidation(unittest.TestCase):
 
     def test_compatible_passes(self):
         # Should not raise
-        Field("0.0.0.0", widget=Widget.ip)
+        Field("0.0.0.0", widget=Widget.ip_field)
         Field(True, widget=Widget.toggle)
         Field(True, widget=Widget.button)
         Field(50, widget=Widget.slider, min=0, max=100)

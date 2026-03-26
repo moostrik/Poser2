@@ -74,12 +74,13 @@ class Widget(Enum):
     slider      = (int, float)
     number      = (int, float)
     knob        = (int, float)
+    number_field = (int, float)
     # enum widgets
     select      = (Enum,)
     radio       = (Enum,)
     # string widgets
     input       = (str,)
-    ip          = (str,)
+    ip_field          = (str,)
     textarea    = (str,)
     # color widgets (accepts() uses lazy Color import)
     color       = None

@@ -65,12 +65,12 @@ class ArtNetBarsSettings(Settings):
     enabled: Field[bool]            = Field(True, description="Enable ArtNet output")
     verbose: Field[bool]            = Field(True, description="Enable detailed logging (warnings always shown)")
 
-    ip_address: Field[str]          = Field("192.168.1.100", widget=Widget.ip,     description="Controller IP address")
+    ip_address: Field[str]          = Field("192.168.1.100", widget=Widget.ip_field,     description="Controller IP address")
     base_universe: Field[int]       = Field(0, min=0, max=14, description="First ArtNet universe (second bar uses +1)", visible=False)
-    fps: Field[int]                 = Field(40, min=1, max=44, description="Update rate (frames per second)", widget=Widget.knob)
-
     channel_order: Field[ChannelOrder] = Field(ChannelOrder.RGBW, description="DMX channel order (e.g., RGBW, GRBW, WRGB)")
-    num_pixels: Field[int]          = Field(90, min=1, max=128, description="Number of RGBW pixels per bar")
+    fps: Field[int]                 = Field(40, min=1, max=44, widget=Widget.knob, description="Update rate (frames per second)")
+
+    pixels: Field[int]              = Field(90, min=1, max=128, widget=Widget.knob, description="Number of RGBW pixels per bar")
 
     # Accent color
     color: Field[Color]             = Field(Color(1.0, 0.0, 0.0), widget=Widget.color, description="Accent color for lit pixels")
@@ -116,7 +116,7 @@ class ArtNetBars:
         # Calculate DMX size: single bar × num_pixels × 4 channels (RGBW)
         # Both bars receive the same data on consecutive universes
         self._channels_per_pixel: int = 4
-        self._total_channels: int = config.num_pixels * self._channels_per_pixel
+        self._total_channels: int = config.pixels * self._channels_per_pixel
 
         # Initialize ArtNet
         self._artnet: StupidArtnet = StupidArtnet(
@@ -145,7 +145,7 @@ class ArtNetBars:
         self._setup_watchers()
 
         print(f"ArtNetLed: Initialized for {config.ip_address} universes {config.base_universe}/{config.base_universe + 1}, "
-              f"{config.num_pixels} pixels/bar")
+              f"{config.pixels} pixels/bar")
 
     def start(self) -> None:
         """Start the ArtNet output thread.
@@ -222,12 +222,12 @@ class ArtNetBars:
     def _update_packet_size(self) -> None:
         """Update packet size when num_pixels changes."""
         with self._lock:
-            self._total_channels = self._config.num_pixels * self._channels_per_pixel
+            self._total_channels = self._config.pixels * self._channels_per_pixel
             self._artnet.set_packet_size(self._total_channels)
             self._artnet.clear()  # Sync internal buffer to new packet_size
             self._buffer = bytearray(self._total_channels)
             if self._config.verbose:
-                print(f"ArtNetLed: Updated packet size to {self._total_channels} channels ({self._config.num_pixels} pixels/bar)")
+                print(f"ArtNetLed: Updated packet size to {self._total_channels} channels ({self._config.pixels} pixels/bar)")
 
     def _update_universe(self) -> None:
         """Update universe when it changes."""
@@ -258,7 +258,7 @@ class ArtNetBars:
                     pass
 
             # Recalculate DMX size (single bar)
-            self._total_channels = self._config.num_pixels * self._channels_per_pixel
+            self._total_channels = self._config.pixels * self._channels_per_pixel
             self._buffer = bytearray(self._total_channels)
 
             # Recreate ArtNet instance
@@ -273,7 +273,7 @@ class ArtNetBars:
 
             if self._config.verbose:
                 print(f"ArtNetLed: Recreated instance for {self._config.ip_address} universes {self._config.base_universe}/{self._config.base_universe + 1}, "
-                      f"{self._config.num_pixels} pixels/bar, {self._total_channels} channels, {self._config.fps} fps")
+                      f"{self._config.pixels} pixels/bar, {self._total_channels} channels, {self._config.fps} fps")
 
         # Restart if it was running
         if was_running:
@@ -328,7 +328,7 @@ class ArtNetBars:
         Both bars receive identical data (sent to consecutive universes).
         Bar fills from bottom (pixel 0) upward.
         """
-        num_pixels: int = self._config.num_pixels
+        num_pixels: int = self._config.pixels
         bar_value: float = self._config.bar
         white_intensity: float = self._config.white_strength
         color_intensity: float = self._config.color_strength
