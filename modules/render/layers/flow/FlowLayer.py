@@ -210,6 +210,7 @@ class FlowLayer(LayerBase):
         self._velocity_magnitude.update()
 
         self._density_bridge.set_color(self._image)
+        self._density_bridge.set_color(self._mask)
         # self._density_bridge.set_velocity(self._mask)
         # self._density_bridge.update(motion)
         self._density_bridge.set_velocity(self._velocity_trail.velocity)

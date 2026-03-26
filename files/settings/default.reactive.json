@@ -3,7 +3,7 @@
     "layer": {
       "select": {
         "preview": [
-          "composite"
+          "flow"
         ],
         "final": [
           "composite"
@@ -100,7 +100,7 @@
     },
     "flow": {
       "fps": 60.0,
-      "draw_mode": "DENSITY_BRIDGE_INPUT_COLOR",
+      "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
       "blend_mode": "ADD",
       "width": 512,
       "height": 288,
@@ -119,14 +119,14 @@
         "boost": 0.0
       },
       "velocity_trail": {
-        "scale": 1.0,
+        "scale": 1.54,
         "trail_weight": 0.9,
         "blur_radius": 8.0,
         "blur_steps": 4
       },
       "density_bridge": {
         "saturation": 1.2,
-        "brightness": 1.0
+        "brightness": 2.0
       },
       "temperature_bridge": {
         "scale": 0.5
@@ -137,8 +137,8 @@
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",
       "fluid_flow": {
-        "width": 288,
-        "height": 512,
+        "width": 1088,
+        "height": 1920,
         "speed": 1.0,
         "depth": {
           "depth": 4,
@@ -161,7 +161,7 @@
           "viscosity_iter": 20
         },
         "density": {
-          "input_strength": 7.25,
+          "input_strength": 10.0,
           "speed_offset": 0.0,
           "fade_time": 18.0,
           "dampen_threshold": 1.47,
