@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import socket
 from enum import Enum
+from pathlib import Path
 from typing import Callable, get_origin, get_args
 
 from nicegui import ui
@@ -21,6 +23,29 @@ from modules.utils import Color, Point2f, Rect
 # and thread-safety issues (GL thread calling NiceGUI API).
 # ---------------------------------------------------------------------------
 POLL_INTERVAL = 0.25  # seconds
+
+# ---------------------------------------------------------------------------
+# Expansion state persistence — remembers which sections are open/closed.
+# ---------------------------------------------------------------------------
+_EXPANSION_STATE_FILE = Path("files/settings/.ui_state.json")
+_expansion_state: dict[str, bool | str] = {}
+
+def _load_expansion_state() -> None:
+    global _expansion_state
+    if _EXPANSION_STATE_FILE.exists():
+        try:
+            _expansion_state = json.loads(_EXPANSION_STATE_FILE.read_text())
+        except Exception:
+            _expansion_state = {}
+
+def _save_expansion_state() -> None:
+    try:
+        _EXPANSION_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _EXPANSION_STATE_FILE.write_text(json.dumps(_expansion_state))
+    except Exception:
+        pass
+
+_load_expansion_state()
 
 
 def generate_label(name):
@@ -785,7 +810,7 @@ def _make_poll_timer(polls, timers):
     timers.append(t)
 
 
-def _build_settings_body(settings, timers, *, depth=0, expansions=None):
+def _build_settings_body(settings, timers, *, depth=0, expansions=None, path=""):
     """Emit the controls for a single Settings instance (no wrapper).
 
     Renders fields in **declaration order**, grouping consecutive runs
@@ -854,7 +879,7 @@ def _build_settings_body(settings, timers, *, depth=0, expansions=None):
 
     # Children (recursive)
     for child_name, child in settings.children.items():
-        _build_settings_card(child_name, child, timers, depth=depth, expansions=expansions)
+        _build_settings_card(child_name, child, timers, depth=depth, expansions=expansions, path=path)
 
 
 # Depth-based layer icons: 1 line → 2 lines → 3 lines.
@@ -865,7 +890,7 @@ def _layer_icon_for_depth(depth: int) -> str:
     return _DEPTH_ICONS[min(depth, len(_DEPTH_ICONS) - 1)]
 
 
-def _build_settings_card(name, settings, timers, *, depth=0, expansions=None):
+def _build_settings_card(name, settings, timers, *, depth=0, expansions=None, path=""):
     """Build a card for one Settings instance.
 
     Always renders as a collapsible ``ui.expansion`` at any depth.
@@ -875,10 +900,15 @@ def _build_settings_card(name, settings, timers, *, depth=0, expansions=None):
     """
     has_children = bool(settings.children)
     icon = _layer_icon_for_depth(depth)
+    key = f"{path}.{name}" if path else name
+    is_open: bool = _expansion_state.get(key) is True
 
     exp = ui.expansion(
         generate_label(name),
+        value=is_open,
     ).props("duration=0 dense").classes("w-full")
+    exp.on("show", lambda: (_expansion_state.update({key: True}), _save_expansion_state()))
+    exp.on("hide", lambda: (_expansion_state.update({key: False}), _save_expansion_state()))
 
     # Always use a custom header slot for consistent appearance.
     child_expansions_ref: list = []
@@ -918,7 +948,7 @@ def _build_settings_card(name, settings, timers, *, depth=0, expansions=None):
 
         _build_settings_body(
             settings, timers,
-            depth=depth + 1, expansions=child_expansions,
+            depth=depth + 1, expansions=child_expansions, path=key,
         )
 
         if expansions is not None:
@@ -1113,12 +1143,16 @@ def create_settings_panel(
         if (document.getElementById("shutdown-overlay")) return;
         var d = document.createElement("div");
         d.id = "shutdown-overlay";
-        d.style.cssText = "position:fixed;inset:0;background:black;z-index:99999;"
-          + "display:flex;align-items:center;justify-content:center;pointer-events:none;";
-        d.innerHTML = '<div style="text-align:center">'
+        d.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;"
+          + "display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);"
+          + "-webkit-backdrop-filter:blur(4px);";
+        d.innerHTML = '<div style="text-align:center;color:#e4e4e7">'
           + '{_title_markup}'
-          + '<span class="material-icons" style="font-size:80px;color:#3f3f46">'
-          + 'power_settings_new</span></div>';
+          + '<span class="material-icons" style="font-size:64px;color:#71717a;margin-bottom:0.75rem;display:block">'
+          + 'cloud_off</span>'
+          + '<div style="font-size:1rem;font-weight:500;color:#a1a1aa">No connection</div>'
+          + '<div style="font-size:0.8rem;color:#71717a;margin-top:0.25rem">Waiting for server\u2026</div>'
+          + '</div>';
         document.body.appendChild(d);
       }};
       var _t = null;
@@ -1208,16 +1242,23 @@ def create_settings_panel(
             ui.label("No settings registered.")
 
         if tab_entries:
+            saved_tab = _expansion_state.get("__active_tab__")
+            initial_tab_label = saved_tab if saved_tab in dict(tab_entries) else tab_entries[0][0]
             with ui.tabs().classes("w-full") as tabs:
                 tab_map = {}
                 for label, _ in tab_entries:
-                    tab_map[label] = ui.tab(generate_label(label))
+                    t = ui.tab(generate_label(label))
+                    def _on_tab_click(l=label):
+                        _expansion_state["__active_tab__"] = l
+                        _save_expansion_state()
+                    t.on("click", _on_tab_click)
+                    tab_map[label] = t
     # -- end of sticky header --
 
     if not tab_entries:
         return
 
-    with ui.tab_panels(tabs, value=tab_map[tab_entries[0][0]]).classes("w-full"):
+    with ui.tab_panels(tabs, value=tab_map[initial_tab_label]).classes("w-full"):
         for label, root_settings in tab_entries:
             with ui.tab_panel(tab_map[label]):
                 expansions: list = []
@@ -1227,7 +1268,7 @@ def create_settings_panel(
 
                 _build_settings_body(
                     root_settings, timers,
-                    depth=0, expansions=expansions,
+                    depth=0, expansions=expansions, path=label,
                 )
 
                 # Expand / Collapse-all toggle (only if there are expansions)
