@@ -22,7 +22,7 @@ class VelocityConfig(Settings):
 
 class DensityConfig(Settings):
     """Density field parameters."""
-    input_strength: Field[float]    = Field(1.0,    min=0.0,    max=2.0,    color="teal",           description="Multiplier applied to all density inputs")
+    input_strength: Field[float]    = Field(1.0,    min=0.0,    max=10.0,    color="teal",          description="Multiplier applied to all density inputs")
     speed_offset: Field[float]      = Field(0.0,    min=-5.0,   max=5.0,    color="blue-grey",      description="Added to base speed for density only. 0 = physically coupled.")
     fade_time: Field[float]         = Field(4.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%")
     dampen_threshold: Field[float]  = Field(1.2,    min=0.1,    max=5.0,    color="cyan",           description="Magnitude above which density is dampened")

@@ -6,7 +6,6 @@
           "fluid3D"
         ],
         "final": [
-          "centre_frg",
           "fluid3D"
         ]
       },
@@ -101,7 +100,7 @@
     },
     "flow": {
       "fps": 60.0,
-      "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
+      "draw_mode": "DENSITY_BRIDGE_OUTPUT",
       "blend_mode": "ADD",
       "width": 288,
       "height": 512,
@@ -201,9 +200,9 @@
         "speed": 0.79,
         "depth": {
           "depth": 32,
-          "scale": 0.5,
+          "scale": 1.0,
           "composite_mode": 2,
-          "ray_steps": 128,
+          "ray_steps": 8,
           "absorption": 24.33,
           "injection_layer": 0.1,
           "injection_spread": 0.15
@@ -211,18 +210,18 @@
         "velocity": {
           "input_strength": 0.72,
           "self_advection": 0.2,
-          "fade_time": 27.72,
+          "fade_time": 19.93,
           "dampen_threshold": 7.97,
           "dampen_time": 5.13,
-          "vorticity": 6.99,
-          "vorticity_radius": 1.0,
-          "viscosity": 18.65,
+          "vorticity": 10.49,
+          "vorticity_radius": 2.69,
+          "viscosity": 36.13,
           "viscosity_iter": 20
         },
         "density": {
-          "input_strength": 2.0,
+          "input_strength": 7.18,
           "speed_offset": 0.0,
-          "fade_time": 29.93,
+          "fade_time": 7.98,
           "dampen_threshold": 1.47,
           "dampen_time": 3.48
         },
