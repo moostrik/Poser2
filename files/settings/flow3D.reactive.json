@@ -247,18 +247,24 @@
       ]
     }
   },
-  "in_out": {
+  "inout": {
+    "osc_sound": {
+      "ip_addresses": "127.0.0.1",
+      "port": 9000,
+      "max_players": 3,
+      "stage": "LERP"
+    },
     "artnet_1": {
       "verbose": false,
       "ip_address": "10.0.0.4",
       "base_universe": 0,
       "fps": 40,
-      "accent_color": {"r": 1.0, "g": 0.0, "b": 0.0, "a": 1.0},
-      "num_pixels": 94,
+      "color": {"r": 1.0, "g": 0.0, "b": 0.0, "a": 1.0},
+      "pixels": 94,
       "channel_order": "GRBW",
       "enabled": true,
-      "white": 0.66,
-      "color": 1.0,
+      "white_strength": 0.66,
+      "color_strength": 1.0,
       "bar": 1.0
     },
     "artnet_2": {
@@ -266,12 +272,12 @@
       "ip_address": "10.0.0.3",
       "base_universe": 0,
       "fps": 40,
-      "accent_color": {"r": 0.0, "g": 0.32, "b": 1.0, "a": 1.0},
-      "num_pixels": 94,
+      "color": {"r": 0.0, "g": 0.32, "b": 1.0, "a": 1.0},
+      "pixels": 94,
       "channel_order": "GRBW",
       "enabled": true,
-      "white": 0.66,
-      "color": 1.0,
+      "white_strength": 0.66,
+      "color_strength": 1.0,
       "bar": 1.0
     },
     "artnet_3": {
@@ -279,19 +285,13 @@
       "ip_address": "10.0.0.5",
       "base_universe": 0,
       "fps": 40,
-      "accent_color": {"r": 0.68, "g": 0.34, "b": 0.0, "a": 1.0},
-      "num_pixels": 94,
+      "color": {"r": 0.68, "g": 0.34, "b": 0.0, "a": 1.0},
+      "pixels": 94,
       "channel_order": "GRBW",
       "enabled": true,
-      "white": 0.66,
-      "color": 1.0,
+      "white_strength": 0.66,
+      "color_strength": 1.0,
       "bar": 1.0
-    },
-    "osc_sound": {
-      "ip_addresses": "127.0.0.1",
-      "port": 9000,
-      "max_players": 3,
-      "stage": "LERP"
     }
   },
   "server": {

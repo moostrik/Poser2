@@ -16,7 +16,8 @@ from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers
 from modules.utils import Timer, TimerConfig
 
-class ArtnetGroup(NewSettings):
+class InOutGroup(NewSettings):
+    osc_sound: OscSoundConfig
     artnet_1: ArtNetBarsSettings
     artnet_2: ArtNetBarsSettings
     artnet_3: ArtNetBarsSettings
@@ -25,8 +26,7 @@ class MainSettings(NewSettings):
     num_players: Field[int] = Field(3, access=Field.INIT, visible=False)
     render: RenderSettings
     server: NiceSettings
-    artnet: ArtnetGroup
-    osc_sound: OscSoundConfig
+    inout: InOutGroup
 
 class Main():
     def __init__(self, settings: OldSettings) -> None:
@@ -43,7 +43,7 @@ class Main():
         self.new_settings.initialize()
 
         # Create controllers after preset loading so INIT fields (num_pixels, ip, etc.) are final
-        self.artnet_controllers = [ArtNetBars(cfg) for cfg in self.new_settings.artnet.children.values()]
+        self.artnet_controllers = [ArtNetBars(cfg) for cfg in self.new_settings.inout.children.values() if isinstance(cfg, ArtNetBarsSettings)]
 
         self.is_running: bool = False
         self.is_finished: bool = False
@@ -72,7 +72,7 @@ class Main():
 
         # DATA
         self.data_hub = DataHub()
-        self.sound_osc = OscSound(self.data_hub, self.new_settings.osc_sound)
+        self.sound_osc = OscSound(self.data_hub, self.new_settings.inout.osc_sound)
 
         # TIMER
         self.timer_config = TimerConfig(duration=30.0, intermezzo=5.0)

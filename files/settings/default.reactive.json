@@ -249,7 +249,13 @@
       ]
     }
   },
-  "artnet": {
+  "inout": {
+    "osc_sound": {
+      "ip_addresses": "127.0.0.1",
+      "port": 9000,
+      "max_players": 3,
+      "stage": "LERP"
+    },
     "artnet_1": {
       "verbose": false,
       "ip_address": "10.0.0.4",
@@ -289,12 +295,6 @@
       "color_strength": 1.0,
       "bar": 1.0
     }
-  },
-  "osc_sound": {
-    "ip_addresses": "127.0.0.1",
-    "port": 9000,
-    "max_players": 3,
-    "stage": "LERP"
   },
   "server": {
     "title": "POSER",

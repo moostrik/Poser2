@@ -878,7 +878,7 @@ def _build_settings_card(name, settings, timers, *, depth=0, expansions=None):
 
     exp = ui.expansion(
         generate_label(name),
-    ).props("duration=0").classes("w-full")
+    ).props("duration=0 dense").classes("w-full")
 
     # Always use a custom header slot for consistent appearance.
     child_expansions_ref: list = []
@@ -899,7 +899,7 @@ def _build_settings_card(name, settings, timers, *, depth=0, expansions=None):
     with exp.add_slot("header"):
         with ui.row().classes("w-full items-center gap-1"):
             ui.icon(icon).classes("text-lg")
-            ui.label(generate_label(name)).classes("flex-1")
+            ui.label(generate_label(name).upper()).classes("flex-1")
             if has_children:
                 unfold_btn = ui.button(
                     icon="unfold_more",
