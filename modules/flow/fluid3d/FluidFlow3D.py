@@ -389,8 +389,8 @@ class FluidFlow3D:
         self._advect_density_and_composite()
         self._profile_end("advect_composite", profiling)
 
-        if profiling:
-            self._profile_report()
+        # if profiling:
+        #     self._profile_report()
 
     # ========== Pipeline Steps ==========
 
