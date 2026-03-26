@@ -115,8 +115,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     if args.nopose:
         settings.pose.model_type = ModelType.NONE
 
-    settings.sound_osc.num_players = args.players
-
     app = Main(settings)
     app.start()
 

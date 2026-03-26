@@ -326,18 +326,21 @@ def _build_ip(settings, name, field, polls):
     label = generate_label(name)
     is_disabled = field.access is Access.READ
 
+    def is_valid_ip(v: str) -> bool:
+        parts = v.split(".")
+        return len(parts) == 4 and all(p.isdigit() and 0 <= int(p) <= 255 for p in parts)
+
     inp = ui.input(
         label=label, value=value,
-        validation={"Invalid IP": lambda v: all(
-            p.isdigit() and 0 <= int(p) <= 255 for p in v.split(".")
-        ) if v.count(".") == 3 else False},
+        validation={"Invalid IP": is_valid_ip},
     ).props(
-        'dense outlined mask="###.###.###.###"' + (" disable" if is_disabled else "")
+        'dense outlined' + (" disable" if is_disabled else "")
     ).classes("w-40")
 
     if not is_disabled:
         def on_ip_change(e):
-            setattr(settings, name, e.value)
+            if is_valid_ip(e.value):
+                setattr(settings, name, e.value)
         inp.on_value_change(on_ip_change)
 
     if field.access is not Access.WRITE:

@@ -4,7 +4,6 @@ Controls pairs of vertical RGBW LED bars with bar-fill visualization.
 Each instance controls one controller (one IP) with two bars.
 """
 
-from dataclasses import dataclass, field
 from enum import IntEnum
 from threading import Thread, Event, Lock
 import socket
@@ -12,10 +11,9 @@ import time
 
 from stupidArtnet import StupidArtnet
 
-from modules.ConfigBase import ConfigBase, config_field
-from modules.inout.NetworkValidation import validate_connection
-
-CONFIG_MODE: bool = False
+from modules.settings import Settings, Field, Widget, Access
+from modules.utils.Color import Color
+from modules.inout.network_validation import validate_connection
 
 
 class ChannelOrder(IntEnum):
@@ -54,48 +52,37 @@ def _parse_channel_order(order_enum: ChannelOrder) -> tuple[int, int, int, int]:
     return (order.index('R'), order.index('G'), order.index('B'), order.index('W'))
 
 
-@dataclass
-class ArtNetLedConfig(ConfigBase):
+class ArtNetBarsSettings(Settings):
     """Configuration for a single ArtNet LED bar controller.
 
-    Fixed fields (set at init, then locked):
-        ip_address: Controller IP address
-        base_universe: First ArtNet universe (0-14). Second bar uses base_universe+1.
-        fps: Update rate in frames per second
-        num_pixels: Number of RGBW pixels per bar
-        channel_order: DMX channel layout (e.g., "RGBW", "GRBW")
+    Init fields (set via preset, then locked after initialize()):
+        ip_address, base_universe, fps, r, g, b, num_pixels, channel_order, verbose
 
-    Runtime fields (adjustable):
-        white: Base white level for all pixels (0.0-1.0)
-        color: Accent color brightness (0.0-1.0)
-        bar: Bar fill level (0.0-1.0), 0=empty, 1=full
-        enabled: Enable/disable output
+    Runtime fields (adjustable at any time):
+        enabled, white, color, bar
     """
 
-    verbose: bool = config_field(default=True, fixed=True, description="Enable detailed logging (warnings always shown)")
+    enabled: Field[bool]            = Field(True, description="Enable ArtNet output")
+    verbose: Field[bool]            = Field(True, description="Enable detailed logging (warnings always shown)")
 
-    # Fixed network settings
-    ip_address: str = config_field(default="192.168.1.100", fixed= not CONFIG_MODE, description="Controller IP address")
-    base_universe: int = config_field(default=0, fixed= not CONFIG_MODE, min=0, max=14, description="First ArtNet universe (second bar uses +1)")
-    fps: int = config_field(default=40, fixed= not CONFIG_MODE, min=1, max=44, description="Update rate (frames per second)")
+    ip_address: Field[str]          = Field("192.168.1.100", widget=Widget.ip,     description="Controller IP address")
+    base_universe: Field[int]       = Field(0, min=0, max=14, description="First ArtNet universe (second bar uses +1)", visible=False)
+    fps: Field[int]                 = Field(40, min=1, max=44, description="Update rate (frames per second)", widget=Widget.knob)
 
-    # Accent color RGB components (0.0-1.0)
-    r: float = config_field(default=1.0, fixed=not CONFIG_MODE, min=0.0, max=1.0, description="Red component of accent color")
-    g: float = config_field(default=0.0, fixed=not CONFIG_MODE, min=0.0, max=1.0, description="Green component of accent color")
-    b: float = config_field(default=0.0, fixed=not CONFIG_MODE, min=0.0, max=1.0, description="Blue component of accent color")
+    channel_order: Field[ChannelOrder] = Field(ChannelOrder.RGBW, description="DMX channel order (e.g., RGBW, GRBW, WRGB)")
+    num_pixels: Field[int]          = Field(90, min=1, max=128, description="Number of RGBW pixels per bar")
 
-    # Fixed LED configuration
-    num_pixels: int = config_field(default=90, fixed= not CONFIG_MODE, min=1, max=128, description="Number of RGBW pixels per bar")
-    channel_order: ChannelOrder = config_field(default=ChannelOrder.RGBW, fixed= not CONFIG_MODE, description="DMX channel order (e.g., RGBW, GRBW, WRGB)")
+    # Accent color
+    color: Field[Color]             = Field(Color(1.0, 0.0, 0.0), widget=Widget.color, description="Accent color for lit pixels")
+
 
     # Runtime controls
-    enabled: bool = config_field(default=True, description="Enable ArtNet output")
-    white: float = config_field(default=0.5, min=0.0, max=1.0, description="Base white intensity for all pixels")
-    color: float = config_field(default=0.5, min=0.0, max=1.0, description="Accent color intensity")
-    bar: float = config_field(default=0.5, min=0.0, max=1.0, description="Bar fill level (0=empty, 1=full)")
+    white_strength: Field[float]    = Field(0.5, min=0.0, max=1.0, description="Base white intensity for all pixels")
+    color_strength: Field[float]    = Field(0.5, min=0.0, max=1.0, description="Accent color intensity")
+    bar: Field[float]               = Field(0.5, min=0.0, max=1.0, description="Bar fill level (0=empty, 1=full)")
 
 
-class ArtNetLed:
+class ArtNetBars:
     """ArtNet controller for a pair of RGBW LED bars.
 
     Drives two vertical LED bars with identical bar-fill visualization.
@@ -119,8 +106,8 @@ class ArtNetLed:
         >>> controller.stop()
     """
 
-    def __init__(self, config: ArtNetLedConfig) -> None:
-        self._config: ArtNetLedConfig = config
+    def __init__(self, config: ArtNetBarsSettings) -> None:
+        self._config: ArtNetBarsSettings = config
         self._lock: Lock = Lock()
 
         # Parse channel order
@@ -154,8 +141,7 @@ class ArtNetLed:
         self._last_periodic_time: float = 0.0
         self._periodic_interval: float = 1.0  # Send at least once per second
 
-        # Watch config changes to trigger immediate update
-        self._unwatchers: list = []
+        # Bind config changes to trigger immediate update
         self._setup_watchers()
 
         print(f"ArtNetLed: Initialized for {config.ip_address} universes {config.base_universe}/{config.base_universe + 1}, "
@@ -190,10 +176,9 @@ class ArtNetLed:
         # Blackout using internal method
         self._blackout()
 
-        # Clean up watchers
-        for unwatch in self._unwatchers:
-            unwatch()
-        self._unwatchers.clear()
+        # Clean up bindings
+        self._config.unbind_all(self._on_config_change)
+        self._config.unbind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]
 
         if self._config.verbose:
             print(f"ArtNetLed: Stopped output to {self._config.ip_address}")
@@ -207,19 +192,11 @@ class ArtNetLed:
         self._config.bar = max(0.0, min(1.0, value))
 
     def _setup_watchers(self) -> None:
-        """Set up config watchers to trigger updates on change."""
-        # Global watcher: mark dirty and wake thread on any change
-        self._unwatchers.append(self._config.watch(self._on_config_change))
-
-        # Specific handlers for fields that need reinit
-        self._unwatchers.append(self._config.watch(lambda val: self._validate_and_reinit_artnet(), 'ip_address'))
-        self._unwatchers.append(self._config.watch(lambda val: self._reinit_artnet(), 'fps'))
-        self._unwatchers.append(self._config.watch(lambda val: self._update_universe(), 'base_universe'))
-        self._unwatchers.append(self._config.watch(lambda val: self._update_packet_size(), 'num_pixels'))
-        self._unwatchers.append(self._config.watch(lambda val: self._reinit_channel_order(), 'channel_order'))
-
-        # Blackout when disabled
-        self._unwatchers.append(self._config.watch(lambda val: self._on_enabled_change(val), 'enabled'))
+        """Bind config fields to trigger updates on change."""
+        # Bind all fields: mark dirty and wake thread on any change
+        self._config.bind_all(self._on_config_change)
+        # Specific handler for enabled: blackout when disabled
+        self._config.bind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]
 
     def _on_enabled_change(self, enabled: bool) -> None:
         """Called when enabled state changes."""
@@ -228,7 +205,7 @@ class ArtNetLed:
             if self._config.verbose:
                 print(f"ArtNetLed: Output disabled, LEDs blacked out")
 
-    def _on_config_change(self) -> None:
+    def _on_config_change(self, _=None) -> None:
         """Called on any config change - mark dirty and wake thread."""
         self._dirty = True
         self._update_event.set()
@@ -353,13 +330,14 @@ class ArtNetLed:
         """
         num_pixels: int = self._config.num_pixels
         bar_value: float = self._config.bar
-        white_intensity: float = self._config.white
-        color_intensity: float = self._config.color
+        white_intensity: float = self._config.white_strength
+        color_intensity: float = self._config.color_strength
 
         # Get accent color RGB (0-255 range)
-        accent_r = int(self._config.r * 255)
-        accent_g = int(self._config.g * 255)
-        accent_b = int(self._config.b * 255)
+        c = self._config.color
+        accent_r = int(c.r * 255)
+        accent_g = int(c.g * 255)
+        accent_b = int(c.b * 255)
 
         # Calculate how many pixels are "lit" by the bar
         lit_count: int = int(bar_value * num_pixels + 0.5)  # Round to nearest
@@ -438,12 +416,11 @@ class ArtNetLed:
         """Cleanup on deletion."""
         if self._running:
             self.stop()
-        elif self._unwatchers:
-            for unwatch in self._unwatchers:
-                unwatch()
-            self._unwatchers.clear()
+        else:
+            self._config.unbind_all(self._on_config_change)
+            self._config.unbind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]
 
     @property
-    def config(self) -> ArtNetLedConfig:
+    def config(self) -> ArtNetBarsSettings:
         """Access the configuration object."""
         return self._config

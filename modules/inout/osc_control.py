@@ -1,5 +1,5 @@
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from threading import Thread, Lock
 from typing import Callable
 
@@ -8,16 +8,14 @@ from pythonosc.udp_client import SimpleUDPClient
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 
-from modules.ConfigBase import ConfigBase
+from modules.settings import Settings, Field, Widget
 
-@dataclass
-class OscControlConfig(ConfigBase):
-    port_in: int = field(default=9000, metadata={"min": 1024, "max": 65535, "description": "Incoming OSC port"})
-    ip_address_in: str = field(default_factory=lambda: "127.0.0.1", metadata={"description": "Incoming OSC IP address"})
-
-    return_messages: bool = field(default=True, metadata={"description": "Echo received messages back to sender"})
-    port_out: int = field(default=9001, metadata={"min": 1024, "max": 65535, "description": "Outgoing OSC port"})
-    ip_address_out: str = field(default_factory=lambda: "127.0.0.1", metadata={"description": "Outgoing OSC IP address"})
+class OscControlConfig(Settings):
+    port_in        = Field(9000, min=1024, max=65535, access=Field.INIT, widget=Widget.number, description="Incoming OSC port")
+    ip_address_in  = Field("127.0.0.1",              access=Field.INIT, widget=Widget.ip,     description="Incoming OSC IP address")
+    return_messages = Field(True,                                                               description="Echo received messages back to sender")
+    port_out       = Field(9001, min=1024, max=65535, access=Field.INIT, widget=Widget.number, description="Outgoing OSC port")
+    ip_address_out = Field("127.0.0.1",              access=Field.INIT, widget=Widget.ip,     description="Outgoing OSC IP address")
 
 
 @dataclass

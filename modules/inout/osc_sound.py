@@ -1,5 +1,4 @@
-from dataclasses import dataclass, field
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 from time import perf_counter
 import socket
 
@@ -13,17 +12,16 @@ from modules.pose.Frame import Frame
 from modules.pose.features.Angles import AngleLandmark
 
 from modules.DataHub import DataHub, DataHubType, Stage
-from modules.ConfigBase import ConfigBase
+from modules.settings import Settings, Field, Widget
 from modules.utils.Timer import TimerState
 from modules.utils.HotReloadMethods import HotReloadMethods
-from modules.inout.NetworkValidation import validate_connection
+from modules.inout.network_validation import validate_connection
 
-@dataclass
-class OscSoundConfig(ConfigBase):
-    ip_addresses: str = field(default_factory=lambda: "127.0.0.1", metadata={"description": "Target OSC IP address"})
-    port: int = field(default=9000, metadata={"min": 1024, "max": 65535, "description": "Target OSC port"})
-    num_players: int = field(default=8, metadata={"min": 1, "max": 16, "description": "Number of pose tracking slots"})
-    stage: Stage = field(default=Stage.LERP, metadata={"description": "Pipeline stage to read poses from"})
+class OscSoundConfig(Settings):
+    ip_addresses: Field[str] = Field("127.0.0.1", widget=Widget.ip, description="Target OSC IP address")
+    port: Field[int]         = Field(9000, min=1024, max=65535,     description="Target OSC port")
+    stage: Field[Stage]      = Field(Stage.LERP,                    description="Pipeline stage to read poses from")
+    max_players: Field[int]  = Field(4,    min=1,    max=16,        description="Max number of player poses to send (IDs 0 to N-1)")
 
 
 class OscSound:
@@ -34,21 +32,25 @@ class OscSound:
 
         self._config: OscSoundConfig = settings
         self._data_hub: DataHub = data_hub
+        self._client_lock: Lock = Lock()
         self._client: SimpleUDPClient = SimpleUDPClient(self._config.ip_addresses, self._config.port)
 
         print(f"SoundOSC: Initialized OSC client to {self._config.ip_addresses}:{self._config.port}")
+
+        self._config.bind(OscSoundConfig.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
+        self._config.bind(OscSoundConfig.port, self._on_connection_change)          # type: ignore[arg-type]
 
         self._running = False
         self._update_event: Event = Event()
         self._thread: Thread | None = None
         # Initialize inactive message counts for all players
-        self._inactive_message_counts: dict[int, int] = {id: 0 for id in range(self._config.num_players)}
+        self._inactive_message_counts: dict[int, int] = {id: 0 for id in range(self._config.max_players)}
 
         # Pre-build inactive messages for all players
         self._inactive_messages: dict[int, list[OscBundle]] = {}
-        for id in range(self._config.num_players):
+        for id in range(self._config.max_players):
             bundle_builder = OscBundleBuilder(IMMEDIATELY)  # type: ignore
-            OscSound._build_inactive_message(id, bundle_builder, self._config.num_players)
+            OscSound._build_inactive_message(id, bundle_builder, self._config.max_players)
             self._inactive_messages[id] = bundle_builder._contents
 
         # hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -117,7 +119,7 @@ class OscSound:
         bundle_builder.add_content(timer_time_msg.build()) # type: ignore
 
         poses: dict[int, Frame] = self._data_hub.get_poses(self._config.stage)
-        num_players = self._config.num_players
+        num_players = self._config.max_players
 
         for id in range(num_players):
             if id not in poses:
@@ -136,7 +138,13 @@ class OscSound:
 
         # Send the bundle if it contains any messages
         if bundle_builder._contents:
-            self._client.send(bundle)
+            with self._client_lock:
+                self._client.send(bundle)
+
+    def _on_connection_change(self, _=None) -> None:
+        with self._client_lock:
+            self._client = SimpleUDPClient(self._config.ip_addresses, self._config.port)
+        print(f"SoundOSC: Reconnected to {self._config.ip_addresses}:{self._config.port}")
 
     @staticmethod
     def _build_inactive_message(id: int, bundle_builder: OscBundleBuilder, num_players: int) -> None:

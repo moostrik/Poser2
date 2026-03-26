@@ -4,24 +4,29 @@ from typing import Optional
 from functools import partial
 
 # Local application imports
-from modules.settings import Settings as NewSettings , presets, NiceServer, NiceSettings
+from modules.settings import Settings as NewSettings, presets, NiceServer, NiceSettings, Field
 from modules.Settings import Settings as OldSettings
 from modules.render import RenderManager, RenderSettings
 from modules.DataHub import DataHub, Stage
 from modules.gui import Gui
 from modules.gui.ConfigGuiGenerator import ConfigGuiGenerator
-from modules.inout import OscSound, ArtNetLed
+from modules.inout import OscSound, OscSoundConfig, ArtNetBars, ArtNetBarsSettings
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers
 from modules.utils import Timer, TimerConfig
 
+class ArtnetGroup(NewSettings):
+    artnet_1: ArtNetBarsSettings
+    artnet_2: ArtNetBarsSettings
+    artnet_3: ArtNetBarsSettings
 
-# M SETTINGS (root BaseSettings — children auto-detected)
 class MainSettings(NewSettings):
+    num_players: Field[int] = Field(3, access=Field.INIT, visible=False)
     render: RenderSettings
     server: NiceSettings
-
+    artnet: ArtnetGroup
+    osc_sound: OscSoundConfig
 
 class Main():
     def __init__(self, settings: OldSettings) -> None:
@@ -31,9 +36,14 @@ class Main():
         num_players: int = settings.num_players
 
         self.new_settings = MainSettings()
+
         if not presets.load(self.new_settings, presets.startup_path()):
             presets.save(self.new_settings, presets.startup_path())  # create default preset if loading failed
+
         self.new_settings.initialize()
+
+        # Create controllers after preset loading so INIT fields (num_pixels, ip, etc.) are final
+        self.artnet_controllers = [ArtNetBars(cfg) for cfg in self.new_settings.artnet.children.values()]
 
         self.is_running: bool = False
         self.is_finished: bool = False
@@ -62,16 +72,7 @@ class Main():
 
         # DATA
         self.data_hub = DataHub()
-        self.sound_osc = OscSound(self.data_hub, settings.sound_osc)
-
-        # ARTNET LED CONTROLLERS
-        self.artnet_configs = settings.artnet_leds
-        self.artnet_controllers = [ArtNetLed(cfg) for cfg in self.artnet_configs]
-        self.artnet_guis = [
-            ConfigGuiGenerator(self.artnet_configs[0], self.gui, "ArtNet Bar 1"),
-            ConfigGuiGenerator(self.artnet_configs[1], self.gui, "ArtNet Bar 2"),
-            ConfigGuiGenerator(self.artnet_configs[2], self.gui, "ArtNet Bar 3"),
-        ]
+        self.sound_osc = OscSound(self.data_hub, self.new_settings.osc_sound)
 
         # TIMER
         self.timer_config = TimerConfig(duration=30.0, intermezzo=5.0)
@@ -336,7 +337,6 @@ class Main():
             else:
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
 
-        self.gui.addFrame([self.artnet_guis[0].frame, self.artnet_guis[1].frame, self.artnet_guis[2].frame])
         self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(), self.b_box_interp_gui.get_gui_frame(), self.timer_gui.frame])
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame(), self.a_vel_smooth_gui.get_gui_frame()])

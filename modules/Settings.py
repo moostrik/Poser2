@@ -10,8 +10,6 @@ from typing_extensions import get_args, get_origin
 
 from modules.cam.Config import Config as CamConfig
 from modules.gui.PyReallySimpleGui import GuiConfig
-from modules.inout import OscSoundConfig
-from modules.inout.ArtNetLed import ArtNetLedConfig
 
 from modules.pose.Settings import Settings as PoseSettings, ModelType
 from modules.tracker.TrackerBase import TrackerType
@@ -32,10 +30,6 @@ class Settings():
 
     # GUI SETTINGS
     gui: GuiConfig = GuiConfig()
-
-    # INOUT SETTINGS
-    sound_osc: OscSoundConfig = OscSoundConfig()
-    artnet_leds: list[ArtNetLedConfig] = field(default_factory=list)
 
 
     def save(self, path: str, sort_keys: bool = False) -> None:
