@@ -1,5 +1,8 @@
+# 2DO:
+
+
+
 # Standard library imports
-from math import ceil
 from typing import Optional
 from functools import partial
 
@@ -12,6 +15,7 @@ from modules.gui import Gui
 from modules.gui.ConfigGuiGenerator import ConfigGuiGenerator
 from modules.inout import OscSound, OscSoundConfig, ArtNetBars, ArtNetBarsSettings
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
+from modules.cam.CamSettings import CameraSettings
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers
 from modules.utils import Timer, TimerConfig
@@ -24,23 +28,31 @@ class InOutGroup(NewSettings):
 
 class MainSettings(NewSettings):
     num_players: Field[int] = Field(3, access=Field.INIT, visible=False)
+    camera: CameraSettings
+    inout:  InOutGroup
     render: RenderSettings
     server: NiceSettings
-    inout: InOutGroup
 
 class Main():
-    def __init__(self, settings: OldSettings) -> None:
+    def __init__(self, settings: OldSettings, simulation: bool = False) -> None:
 
         self.old_settings: OldSettings = settings
         self.gui = Gui(settings.gui)
-        num_players: int = settings.num_players
 
         self.new_settings = MainSettings()
 
         if not presets.load(self.new_settings, presets.startup_path()):
             presets.save(self.new_settings, presets.startup_path())  # create default preset if loading failed
 
+        # CLI override: --simulation flag takes precedence over preset
+        if simulation:
+            self.new_settings.camera.sim_enabled = True
+
         self.new_settings.initialize()
+
+        num_players: int = self.new_settings.num_players
+        cam_settings = self.new_settings.camera
+        cam_settings.num_cameras = len(cam_settings.ids)
 
         # Create controllers after preset loading so INIT fields (num_pixels, ip, etc.) are final
         self.artnet_controllers = [ArtNetBars(cfg) for cfg in self.new_settings.inout.children.values() if isinstance(cfg, ArtNetBarsSettings)]
@@ -52,23 +64,23 @@ class Main():
         self.cameras: list[DepthCam | DepthSimulator] = []
         self.recorder: Optional[Recorder] = None
         self.player: Optional[Player] = None
-        if settings.camera.sim_enabled:
-            self.player = Player(self.gui, settings.camera)
-            for cam_id in settings.camera.ids:
-                self.cameras.append(DepthSimulator(self.gui, self.player, cam_id, settings.camera))
+        if cam_settings.sim_enabled:
+            self.player = Player(cam_settings)
+            for cam_id in cam_settings.ids:
+                self.cameras.append(DepthSimulator(self.gui, self.player, cam_id, cam_settings))
         else:
-            self.recorder = Recorder(self.gui, settings.camera)
-            for cam_id in settings.camera.ids:
-                camera = DepthCam(self.gui, cam_id, settings.camera)
+            self.recorder = Recorder(cam_settings)
+            for cam_id in cam_settings.ids:
+                camera = DepthCam(self.gui, cam_id, cam_settings)
                 self.cameras.append(camera)
-        self.frame_sync_bang = FrameSyncBang(settings.camera, False, 'frame_sync')
+        self.frame_sync_bang = FrameSyncBang(cam_settings, False, 'frame_sync')
 
         # TRACKER
         if settings.tracker_type == TrackerType.PANORAMIC:
-            self.tracker = PanoramicTracker(self.gui, settings.num_players, settings.camera.num)
+            self.tracker = PanoramicTracker(self.gui, num_players, len(cam_settings.ids))
         else:
-            self.tracker = OnePerCamTracker(self.gui, settings.num_players)
-        self.tracklet_sync_bang = FrameSyncBang(settings.camera, False, 'tracklet_sync')
+            self.tracker = OnePerCamTracker(self.gui, num_players)
+        self.tracklet_sync_bang = FrameSyncBang(cam_settings, False, 'tracklet_sync')
 
         # DATA
         self.data_hub = DataHub()
@@ -80,7 +92,7 @@ class Main():
         self.timer_gui = ConfigGuiGenerator(self.timer_config, self.gui, "Timer")
 
         self.render_settings = self.new_settings.render
-        self.render = RenderManager(self.data_hub, self.render_settings, num_cams=len(self.cameras), num_players=settings.num_players)
+        self.render = RenderManager(self.data_hub, self.render_settings, num_cams=len(self.cameras), num_players=num_players)
 
 
         # Start settings server
@@ -90,7 +102,7 @@ class Main():
         # POSE CONFIGURATION
         # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion_width=settings.pose.crop_expansion_width, expansion_height=settings.pose.crop_expansion_height, output_width=384, output_height=512, max_poses=settings.pose.max_poses)
         self.gpu_crop_config =      batch.ImageCropConfig(expansion_width=settings.pose.crop_expansion_width, expansion_height=settings.pose.crop_expansion_height, output_width=768, output_height=1024, max_poses=settings.pose.max_poses, verbose=False, enable_prev_crop=False)
-        self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera.fps)
+        self.prediction_config =    nodes.PredictorConfig(frequency=cam_settings.fps)
 
         self.b_box_smooth_config =  nodes.EuroSmootherConfig()
         self.b_box_rate_config =    nodes.RateLimiterConfig(max_increase= 10, max_decrease= 0.2)
@@ -105,11 +117,11 @@ class Main():
         self.a_vel_smooth_gui =     guis.EuroSmootherGui(self.a_vel_smooth_config, self.gui, 'ANGLE VEL')
         self.simil_smooth_gui =     guis.EuroSmootherGui(self.simil_smooth_config, self.gui, 'SIMILARITY')
 
-        # self.b_box_interp_config =  nodes.LerpInterpolatorConfig(input_frequency=settings.camera.fps)
-        self.b_box_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
-        self.point_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
-        self.angle_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
-        self.simil_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
+        # self.b_box_interp_config =  nodes.LerpInterpolatorConfig(input_frequency=cam_settings.fps)
+        self.b_box_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=cam_settings.fps)
+        self.point_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=cam_settings.fps)
+        self.angle_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=cam_settings.fps)
+        self.simil_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=cam_settings.fps)
 
         self.b_box_interp_gui =     guis.InterpolatorGui(self.b_box_interp_config, self.gui, 'BBOX')
         self.point_interp_gui =     guis.InterpolatorGui(self.point_interp_config, self.gui, 'POINT')
@@ -133,11 +145,11 @@ class Main():
         self.mask_extractor =       batch.MaskBatchExtractor(settings.pose)   # GPU-based segmentation mask extractor
         self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
 
-        self.window_similator_config = batch.WindowSimilarityConfig(window_length=int(0.5 * settings.camera.fps))
+        self.window_similator_config = batch.WindowSimilarityConfig(window_length=int(0.5 * cam_settings.fps))
         self.window_similator=      batch.WindowSimilarity(self.window_similator_config)
         self.window_similarity_gui = guis.WindowSimilarityGui(self.window_similator_config, self.gui, 'SIMILARITY')
 
-        self.window_correlator_config = batch.WindowCorrelationConfig(window_length=int(0.5 * settings.camera.fps))
+        self.window_correlator_config = batch.WindowCorrelationConfig(window_length=int(0.5 * cam_settings.fps))
         self.window_correlator =    batch.WindowCorrelation(self.window_correlator_config)
         self.window_correlation_gui = guis.WindowCorrelationGui(self.window_correlator_config, self.gui, 'CORRELATION')
 
@@ -150,12 +162,12 @@ class Main():
         self.debug_tracker =        trackers.DebugTracker(num_players)
 
         # WINDOW TRACKERS
-        self.window_tracker_R =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * settings.camera.fps)))
-        self.window_tracker_S =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * settings.camera.fps)))
+        self.window_tracker_R =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * cam_settings.fps)))
+        self.window_tracker_S =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * cam_settings.fps)))
         self.window_tracker_I =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * self.render_settings.window.avg_fps)))
 
         self.bbox_filters =      trackers.FilterTracker(
-            settings.num_players,
+            num_players,
             [
                 lambda: nodes.BBoxEuroSmoother(self.b_box_smooth_config),
                 lambda: nodes.BBoxPredictor(self.prediction_config),
@@ -164,22 +176,22 @@ class Main():
         )
 
         self.pose_raw_filters =     trackers.FilterTracker(
-            settings.num_players,
+            num_players,
             [
                 lambda: nodes.PointDualConfFilter(nodes.DualConfFilterConfig(settings.pose.confidence_low, settings.pose.confidence_high)),
                 # lambda: nodes.PointTemporalStabilizer(nodes.TemporalStabilizerConfig()),
                 nodes.AngleExtractor,
-                lambda: nodes.AngleVelExtractor(fps=settings.camera.fps),
+                lambda: nodes.AngleVelExtractor(fps=cam_settings.fps),
                 # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Raw")),
             ]
         )
 
         self.pose_smooth_filters = trackers.FilterTracker(
-            settings.num_players,
+            num_players,
             [
                 lambda: nodes.PointEuroSmoother(self.point_smooth_config),
                 nodes.AngleExtractor,
-                lambda: nodes.AngleVelExtractor(fps=settings.camera.fps),
+                lambda: nodes.AngleVelExtractor(fps=cam_settings.fps),
                 lambda: nodes.AngleVelEuroSmoother(self.angle_smooth_config),
                 lambda: nodes.AngleEuroSmoother(self.angle_smooth_config),
                 # lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=False)),
@@ -198,7 +210,7 @@ class Main():
 
 
         self.pose_prediction_filters = trackers.FilterTracker(
-            settings.num_players,
+            num_players,
             [
                 lambda: nodes.PointPredictor(self.prediction_config),
                 lambda: nodes.AnglePredictor(self.prediction_config),
@@ -210,7 +222,7 @@ class Main():
         )
 
         self.interpolator = trackers.InterpolatorTracker(
-            settings.num_players,
+            num_players,
             [
                 lambda: nodes.BBoxChaseInterpolator(self.b_box_interp_config),
                 lambda: nodes.PointChaseInterpolator(self.point_interp_config),
@@ -221,7 +233,7 @@ class Main():
         )
 
         self.pose_interpolation_pipeline = trackers.FilterTracker(
-            settings.num_players,
+            num_players,
             [
                 # lambda: nodes.AngleVelExtractor(fps=settings.render.fps),
                 nodes.AngleSymExtractor,
@@ -328,36 +340,18 @@ class Main():
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
         self.gui.exit_callback = self.stop
 
-        for i in range(ceil(len(self.cameras) / 3.0)):
-            c: int = i * 3
-            if c + 2 < len(self.cameras):
-                self.gui.addFrame([self.cameras[c].gui.get_gui_frame(), self.cameras[c+1].gui.get_gui_frame(), self.cameras[c+2].gui.get_gui_frame()])
-            elif c + 1 < len(self.cameras):
-                self.gui.addFrame([self.cameras[c].gui.get_gui_frame(), self.cameras[c+1].gui.get_gui_frame()])
-            else:
-                self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
-
         self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(), self.b_box_interp_gui.get_gui_frame(), self.timer_gui.frame])
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame(), self.a_vel_smooth_gui.get_gui_frame()])
         self.gui.addFrame([self.motion_extractor_gui.get_gui_frame(), self.motion_ma_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.window_correlation_gui.get_gui_frame(),self.window_similarity_gui.get_gui_frame(), self.simil_smooth_gui.get_gui_frame()])
-        if self.player:
-            self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])
-        if self.recorder:
-            self.gui.addFrame([self.recorder.get_gui_frame(), self.tracker.gui.get_gui_frame()])
         self.gui.start()
         self.gui.bringToFront()
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
 
-        for camera in self.cameras:
-            camera.gui.gui_check()
-
         if self.player:
-            self.player.gui_check()
             self.player.start()
         if self.recorder:
-            self.recorder.gui_check()
             self.recorder.start() # start after gui to prevent record at startup
 
         self.is_running = True

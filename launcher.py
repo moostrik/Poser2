@@ -86,15 +86,9 @@ torch.backends.cudnn.allow_tf32 = True
 if __name__ == '__main__': # For Windows compatibility with multiprocessing
     mp.freeze_support()
     parser: ArgumentParser = ArgumentParser()
-    parser.add_argument('-fps',     '--fps',            type=float, default=23.0,   help='frames per second')
-    parser.add_argument('-pls',     '--players',        type=int,   default=3,      help='number of players')
-    parser.add_argument('-cms',     '--cameras',        type=int,   default=3,      help='number of cameras')
-    parser.add_argument('-ny',      '--noyolo',         action='store_true',        help='do not do yolo person detection')
     parser.add_argument('-np',      '--nopose',         action='store_true',        help='do not do pose detection')
-    parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecored video with camera')
-    parser.add_argument('-cm',      '--cammanual',      action='store_true',        help='camera manual settings')
-
-    parser.add_argument('-s',      '--settings',        type=str, default='default',help='settings file')
+    parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecorded video with camera')
+    parser.add_argument('-s',       '--settings',       type=str, default='default',help='settings file')
 
     args: Namespace = parser.parse_args()
 
@@ -103,19 +97,10 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     logging.info(f"Loading settings from: {settings_path}")
     settings: Settings = Settings.load(settings_path)
 
-    if args.cameras < len(settings.camera.ids):
-        settings.camera.ids = settings.camera.ids[:args.cameras]
-
-    settings.camera.fps = args.fps
-    settings.camera.sim_enabled = args.simulation
-    settings.camera.yolo = not args.noyolo
-    settings.camera.manual = args.cammanual
-
-    settings.pose.max_poses = args.players
     if args.nopose:
         settings.pose.model_type = ModelType.NONE
 
-    app = Main(settings)
+    app = Main(settings, simulation=args.simulation)
     app.start()
 
     shutdown_event = Event()

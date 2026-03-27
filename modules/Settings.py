@@ -8,7 +8,6 @@ from typing import Any, TypeVar, cast
 from typing_extensions import get_args, get_origin
 
 
-from modules.cam.Config import Config as CamConfig
 from modules.gui.PyReallySimpleGui import GuiConfig
 
 from modules.pose.Settings import Settings as PoseSettings, ModelType
@@ -21,9 +20,6 @@ class Settings():
     # GENERAL
     num_players: int =          field(default=3)
     tracker_type: TrackerType = field(default=TrackerType.ONEPERCAM)
-
-    # CAMERA SETTINGS
-    camera: CamConfig = CamConfig()
 
     # POSE SETTINGS
     pose: PoseSettings = PoseSettings()

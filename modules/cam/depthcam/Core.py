@@ -9,18 +9,17 @@ from numpy import ndarray
 from typing import Set
 from threading import Thread, Event
 
-from modules.cam.Config import Config
+from modules.cam.CamSettings import CameraSettings
 from modules.cam.depthcam.Pipeline import setup_pipeline, get_frame_types, PerspectiveConfig
 from modules.cam.depthcam.Definitions import *
 from modules.cam.depthcam.CoreSettings import CoreSettings
-from modules.cam.depthcam.Gui import Gui
 from modules.utils.FPS import FPS
 
 class Core(Thread):
     _id_counter = 0
     _pipeline: dai.Pipeline | None = None
 
-    def __init__(self, gui, device_id: str, general_settings:Config) -> None:
+    def __init__(self, gui, device_id: str, general_settings: CameraSettings) -> None:
         super().__init__()
         self.stop_event = Event()
         self.running: bool = False
@@ -71,7 +70,6 @@ class Core(Thread):
         # SETTINGS
         self.preview_type =             FrameType.VIDEO
         self.settings: CoreSettings =   CoreSettings(self)
-        self.gui: Gui =                 Gui(gui, self.settings, general_settings)
 
         self.cntr: int = 0
 
@@ -157,7 +155,6 @@ class Core(Thread):
     def _video_callback(self, msg: dai.ImgFrame) -> None:
         # print('RV', msg.getTimestamp())
         self._update_fps(FrameType.VIDEO)
-        self.gui.update_from_frame()
         if self.do_color:
             self.settings.update_color_control(msg)
         if self.do_stereo or not self.do_color:
@@ -212,7 +209,6 @@ class Core(Thread):
         self._update_tps()
         Ts: list[Tracklet] = msg.tracklets
         self.num_tracklets = len(Ts)
-        self.gui.update_from_tracker()
         self._update_tracker_callbacks(Ts)
 
     # FPS

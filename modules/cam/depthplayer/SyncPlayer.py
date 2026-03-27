@@ -6,7 +6,7 @@ from enum import Enum, auto
 from queue import Queue
 from time import sleep
 
-from modules.cam.Config import Config
+from modules.cam.CamSettings import CameraSettings, CoderType, CoderFormat, PlayerSettings
 from modules.cam.depthcam.Definitions import FrameType, FrameCallback
 from modules.cam.depthplayer.FFmpegPlayer import FFmpegPlayer
 from modules.cam.recorder.SyncRecorder import make_file_name, is_folder_for_settings
@@ -20,16 +20,16 @@ class State(Enum):
     STOPPING = auto()
     NEXT = auto()
 
-HwaccelString: dict[Config.CoderType, str] = {
-    Config.CoderType.CPU:  '',
-    Config.CoderType.GPU:  'd3d12va',
-    Config.CoderType.iGPU: 'd3d12va'
+HwaccelString: dict[CoderType, str] = {
+    CoderType.CPU:  '',
+    CoderType.GPU:  'd3d12va',
+    CoderType.iGPU: 'd3d12va'
 }
 
-HwaccelDeviceString: dict[Config.CoderType, str] = {
-    Config.CoderType.CPU:  '',
-    Config.CoderType.GPU:  '0',
-    Config.CoderType.iGPU: '1'
+HwaccelDeviceString: dict[CoderType, str] = {
+    CoderType.CPU:  '',
+    CoderType.GPU:  '0',
+    CoderType.iGPU: '1'
 }
 
 class MessageType(Enum):
@@ -51,10 +51,11 @@ class Folder():
 FolderDict = Dict[str, Folder]
 
 class SyncPlayer(Thread):
-    def __init__(self, settings: Config) -> None:
+    def __init__(self, settings: CameraSettings) -> None:
         super().__init__()
+        self.settings: CameraSettings = settings
         self.input_path: Path = Path(settings.video_path)
-        self.num_cams: int = settings.num
+        self.num_cams: int = len(settings.ids)
         self.types: list[FrameType] = settings.video_frame_types
         self.fps: float = settings.sim_fps
 
@@ -91,6 +92,13 @@ class SyncPlayer(Thread):
 
         self.playback_lock: Lock = Lock()
         self.frameCallbacks: Set[FrameCallback] = set()
+
+        # Bind player settings callbacks
+        self.settings.player.bind(PlayerSettings.start, self._on_start)
+        self.settings.player.bind(PlayerSettings.stop, self._on_stop)
+        self.settings.player.bind(PlayerSettings.folder, self._on_folder_changed)
+        self.settings.player.bind(PlayerSettings.range_start, self._on_range_changed)
+        self.settings.player.bind(PlayerSettings.range_end, self._on_range_changed)
 
     def stop(self) -> None:
         self._set_play_chunk(-1)
@@ -362,7 +370,7 @@ class SyncPlayer(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def _get_video_folders(settings: Config) -> FolderDict :
+    def _get_video_folders(settings: CameraSettings) -> FolderDict :
         folders: FolderDict = {}
         video_path: Path = Path(settings.video_path)
         for folder in video_path.iterdir():
@@ -371,7 +379,7 @@ class SyncPlayer(Thread):
                     continue
                 max_chunk: int = -1
                 for file in folder.iterdir():
-                    if file.is_file() and (file.name.endswith(Config.CoderFormat.H264.value) or file.name.endswith(Config.CoderFormat.H265.value)):
+                    if file.is_file() and (file.name.endswith(CoderFormat.H264.value) or file.name.endswith(CoderFormat.H265.value)):
                         n: str = file.stem.split('_')[2]
                         if n.isdigit():
                             max_chunk = max(max_chunk, int(n))
@@ -379,6 +387,27 @@ class SyncPlayer(Thread):
                     folders[folder.name] = (Folder(folder.name, folder, max_chunk))
         return folders
 
-    # GUI HACK
+    # SETTINGS CALLBACKS
+    def _on_start(self, _=None) -> None:
+        folder: str = self.settings.player.folder
+        if folder:
+            self.play(True, folder)
+
+    def _on_stop(self, _=None) -> None:
+        self.play(False, '')
+
+    def _on_folder_changed(self, folder: str) -> None:
+        if folder and folder in self.folders:
+            num_chunks: int = self.get_num_folder_chunks(folder)
+            self.settings.player.max_chunks = num_chunks
+            self.settings.player.range_start = 0
+            self.settings.player.range_end = num_chunks
+            self.set_chunk_range(0, num_chunks)
+
+    def _on_range_changed(self, _=None) -> None:
+        r0: int = self.settings.player.range_start
+        r1: int = self.settings.player.range_end
+        self.set_chunk_range(r0, r1)
+
     def update_gui(self) -> None:
-        pass
+        self.settings.player.current_chunk = self.get_current_chunk()
