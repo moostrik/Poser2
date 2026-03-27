@@ -1,4 +1,183 @@
 {
+  "num_players": 3,
+  "camera": {
+    "num_cameras": 3,
+    "fps": 23.0,
+    "yolo": true,
+    "color": true,
+    "square": true,
+    "stereo": false,
+    "hd_ready": true,
+    "sim_enabled": false,
+    "model_path": "models",
+    "video_path": "recordings",
+    "temp_path": "temp",
+    "video_format": "H264",
+    "video_frame_types": [
+      "VIDEO"
+    ],
+    "cores": [
+      {
+        "device_id": "14442C101136D1D200",
+        "show_stereo": false,
+        "manual": false,
+        "flip_h": false,
+        "flip_v": true,
+        "perspective": -0.22,
+        "color_auto_exposure": true,
+        "color_exposure": 1000,
+        "color_iso": 100,
+        "color_auto_balance": true,
+        "color_balance": 1000,
+        "color_brightness": 0,
+        "color_contrast": 0,
+        "color_saturation": 0,
+        "color_luma_denoise": 0,
+        "color_sharpness": 0,
+        "mono_auto_exposure": true,
+        "mono_exposure": 1000,
+        "mono_iso": 100,
+        "ir_grid_light": 0.0,
+        "ir_flood_light": 0.0,
+        "stereo_depth_min": 500,
+        "stereo_depth_max": 15000,
+        "stereo_brightness_min": 0,
+        "stereo_brightness_max": 255,
+        "stereo_median_filter": "OFF"
+      },
+      {
+        "device_id": "14442C10F124D9D600",
+        "show_stereo": false,
+        "manual": false,
+        "flip_h": false,
+        "flip_v": true,
+        "perspective": -0.22,
+        "color_auto_exposure": true,
+        "color_exposure": 1000,
+        "color_iso": 100,
+        "color_auto_balance": true,
+        "color_balance": 1000,
+        "color_brightness": 0,
+        "color_contrast": 0,
+        "color_saturation": 0,
+        "color_luma_denoise": 0,
+        "color_sharpness": 0,
+        "mono_auto_exposure": true,
+        "mono_exposure": 1000,
+        "mono_iso": 100,
+        "ir_grid_light": 0.0,
+        "ir_flood_light": 0.0,
+        "stereo_depth_min": 500,
+        "stereo_depth_max": 15000,
+        "stereo_brightness_min": 0,
+        "stereo_brightness_max": 255,
+        "stereo_median_filter": "OFF"
+      },
+      {
+        "device_id": "14442C10110AD3D200",
+        "show_stereo": false,
+        "manual": false,
+        "flip_h": false,
+        "flip_v": true,
+        "perspective": -0.22,
+        "color_auto_exposure": true,
+        "color_exposure": 1000,
+        "color_iso": 100,
+        "color_auto_balance": true,
+        "color_balance": 1000,
+        "color_brightness": 0,
+        "color_contrast": 0,
+        "color_saturation": 0,
+        "color_luma_denoise": 0,
+        "color_sharpness": 0,
+        "mono_auto_exposure": true,
+        "mono_exposure": 1000,
+        "mono_iso": 100,
+        "ir_grid_light": 0.0,
+        "ir_flood_light": 0.0,
+        "stereo_depth_min": 500,
+        "stereo_depth_max": 15000,
+        "stereo_brightness_min": 0,
+        "stereo_brightness_max": 255,
+        "stereo_median_filter": "OFF"
+      }
+    ],
+    "recorder": {
+      "group_id": "no_id",
+      "video_encoder": "iGPU",
+      "video_chunk_length": 10.0
+    },
+    "player": {
+      "folder": "",
+      "range_start": 0,
+      "range_end": 0,
+      "sim_fps": 23.0,
+      "sim_passthrough": false,
+      "video_decoder": "iGPU"
+    }
+  },
+  "inout": {
+    "osc_sound": {
+      "ip_addresses": "127.0.0.1",
+      "port": 9000,
+      "stage": "LERP",
+      "max_players": 3
+    },
+    "artnet_1": {
+      "enabled": true,
+      "verbose": false,
+      "ip_address": "10.0.0.4",
+      "base_universe": 0,
+      "channel_order": "GRBW",
+      "fps": 40,
+      "pixels": 94,
+      "color": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "white_strength": 0.66,
+      "color_strength": 1.0,
+      "bar": 1.0
+    },
+    "artnet_2": {
+      "enabled": true,
+      "verbose": false,
+      "ip_address": "10.0.0.5",
+      "base_universe": 0,
+      "channel_order": "GRBW",
+      "fps": 40,
+      "pixels": 94,
+      "color": {
+        "r": 0.0,
+        "g": 0.32,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "white_strength": 0.66,
+      "color_strength": 1.0,
+      "bar": 1.0
+    },
+    "artnet_3": {
+      "enabled": true,
+      "verbose": false,
+      "ip_address": "10.0.0.6",
+      "base_universe": 0,
+      "channel_order": "GRBW",
+      "fps": 40,
+      "pixels": 94,
+      "color": {
+        "r": 0.68,
+        "g": 0.34,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "white_strength": 0.66,
+      "color_strength": 1.0,
+      "bar": 1.0
+    }
+  },
   "render": {
     "layer": {
       "select": {
@@ -249,105 +428,8 @@
       ]
     }
   },
-  "inout": {
-    "osc_sound": {
-      "ip_addresses": "127.0.0.1",
-      "port": 9000,
-      "max_players": 3,
-      "stage": "LERP"
-    },
-    "artnet_1": {
-      "verbose": false,
-      "ip_address": "10.0.0.4",
-      "base_universe": 0,
-      "fps": 40,
-      "color": {"r": 1.0, "g": 0.0, "b": 0.0, "a": 1.0},
-      "pixels": 94,
-      "channel_order": "GRBW",
-      "enabled": true,
-      "white_strength": 0.66,
-      "color_strength": 1.0,
-      "bar": 1.0
-    },
-    "artnet_2": {
-      "verbose": false,
-      "ip_address": "10.0.0.5",
-      "base_universe": 0,
-      "fps": 40,
-      "color": {"r": 0.0, "g": 0.32, "b": 1.0, "a": 1.0},
-      "pixels": 94,
-      "channel_order": "GRBW",
-      "enabled": true,
-      "white_strength": 0.66,
-      "color_strength": 1.0,
-      "bar": 1.0
-    },
-    "artnet_3": {
-      "verbose": false,
-      "ip_address": "10.0.0.6",
-      "base_universe": 0,
-      "fps": 40,
-      "color": {"r": 0.68, "g": 0.34, "b": 0.0, "a": 1.0},
-      "pixels": 94,
-      "channel_order": "GRBW",
-      "enabled": true,
-      "white_strength": 0.66,
-      "color_strength": 1.0,
-      "bar": 1.0
-    }
-  },
   "server": {
     "title": "POSER",
     "port": 666
-  },
-  "camera": {
-    "num_cameras": 3,
-    "fps": 23.0,
-    "yolo": true,
-    "color": true,
-    "square": true,
-    "stereo": false,
-    "hd_ready": true,
-    "sim_enabled": true,
-    "model_path": "models",
-    "video_path": "recordings",
-    "temp_path": "temp",
-    "video_format": "H264",
-    "video_frame_types": ["VIDEO"],
-    "cores": [
-      {
-        "device_id": "14442C101136D1D200",
-        "show_stereo": false,
-        "manual": false,
-        "flip_h": false,
-        "flip_v": true,
-        "perspective": -0.22
-      },
-      {
-        "device_id": "14442C10F124D9D600",
-        "show_stereo": false,
-        "manual": false,
-        "flip_h": false,
-        "flip_v": true,
-        "perspective": -0.22
-      },
-      {
-        "device_id": "14442C10110AD3D200",
-        "show_stereo": false,
-        "manual": false,
-        "flip_h": false,
-        "flip_v": true,
-        "perspective": -0.22
-      }
-    ],
-    "player": {
-      "sim_fps": 23.0,
-      "sim_passthrough": false,
-      "video_decoder": "iGPU"
-    },
-    "recorder": {
-      "video_encoder": "iGPU",
-      "video_chunk_length": 10.0
-    }
   }
 }

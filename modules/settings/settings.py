@@ -117,10 +117,10 @@ class Settings(metaclass=SettingsMeta):
                     except Exception:
                         continue
                 if isinstance(resolved, type) and issubclass(resolved, Settings) and resolved is not Settings:
-                    logger.warning(
-                        "%s: annotation-based child '%s' is deprecated — use Child() descriptor",
-                        type(self).__name__, attr_name,
-                    )
+                    # logger.warning(
+                    #     "%s: annotation-based child '%s' is deprecated — use Child() descriptor",
+                    #     type(self).__name__, attr_name,
+                    # )
                     child = resolved()
                     object.__setattr__(child, "_parent", self)
                     self._children[attr_name] = child

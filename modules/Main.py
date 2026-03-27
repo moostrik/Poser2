@@ -46,8 +46,7 @@ class Main():
             presets.save(self.new_settings, presets.startup_path())  # create default preset if loading failed
 
         # CLI override: --simulation flag takes precedence over preset
-        if simulation:
-            self.new_settings.camera.sim_enabled = True
+        self.new_settings.camera.sim_enabled = simulation
 
         self.new_settings.initialize()
 
