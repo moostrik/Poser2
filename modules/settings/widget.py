@@ -82,6 +82,7 @@ class Widget(Enum):
     input       = (str,)
     ip_field          = (str,)
     textarea    = (str,)
+    text_select = (str,)
     # color widgets (accepts() uses lazy Color import)
     color       = None
     color_alpha = None

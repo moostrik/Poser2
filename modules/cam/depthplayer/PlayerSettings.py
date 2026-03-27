@@ -3,7 +3,8 @@ from modules.settings import Settings, Field, Widget
 
 
 class PlayerSettings(Settings):
-    folder:         Field[str]  = Field("", widget=Widget.input, description="Recording folder name")
+    available_folders: Field[list[str]] = Field(["–"], access=Field.READ, visible=False, description="Available recording folders")
+    folder:         Field[str]  = Field("", widget=Widget.text_select, options=available_folders, description="Recording folder")
     start:          Field[bool] = Field(False, widget=Widget.button, description="Start playback")
     stop:           Field[bool] = Field(False, widget=Widget.button, description="Stop playback")
     current_chunk:  Field[int]  = Field(0, access=Field.READ, description="Current chunk")

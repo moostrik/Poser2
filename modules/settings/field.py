@@ -80,6 +80,7 @@ class Field(Generic[T]):
         pinned: bool = False,
         widget: Widget = Widget.default,
         color: str = "primary",  # UI color hint (e.g. 'primary', 'red', '#00f')
+        options: Field | None = None,  # Field holding list[str] options (for text_select)
     ) -> None:
         # Infer type from default value
         if isinstance(default, list):
@@ -109,6 +110,7 @@ class Field(Generic[T]):
         self.pinned = pinned
         self.widget = widget
         self.color = color
+        self.options: Field | None = options
         # Validate widget ↔ type compatibility
         if widget is not Widget.default and not widget.accepts(type_):
             raise TypeError(

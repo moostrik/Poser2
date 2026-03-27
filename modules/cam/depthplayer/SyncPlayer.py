@@ -74,6 +74,7 @@ class SyncPlayer(Thread):
         self.suffix: str = settings.player.video_format.value
 
         self.folders: FolderDict = self._get_video_folders(settings)
+        self.settings.player.available_folders = list(self.folders.keys())
 
         self.hwt: str = HwaccelString[settings.player.video_decoder]
         self.hwd: str = HwaccelDeviceString[settings.player.video_decoder]
@@ -111,6 +112,16 @@ class SyncPlayer(Thread):
     def run(self) -> None:
         state: State = State.IDLE
         self.running = True
+
+        # Apply preset chunk range
+        self.set_chunk_range(self.settings.player.range_start, self.settings.player.range_end)
+
+        # Auto-start if a folder was loaded from preset
+        folder = self.settings.player.folder
+        if folder and folder in self.folders:
+            num_chunks = self.get_num_folder_chunks(folder)
+            self.settings.player.max_chunks = num_chunks
+            self.play(True, folder)
 
         while self.running:
             message: Message | None = None
@@ -401,9 +412,8 @@ class SyncPlayer(Thread):
         if folder and folder in self.folders:
             num_chunks: int = self.get_num_folder_chunks(folder)
             self.settings.player.max_chunks = num_chunks
-            self.settings.player.range_start = 0
-            self.settings.player.range_end = num_chunks
             self.set_chunk_range(0, num_chunks)
+            self.play(True, folder)
 
     def _on_range_changed(self, _=None) -> None:
         r0: int = self.settings.player.range_start

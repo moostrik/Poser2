@@ -300,6 +300,50 @@ def _build_select(settings, name, field, polls):
     return WidgetSize.small
 
 
+@widget_builder(Widget.text_select)
+def _build_text_select(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.access is Access.READ
+
+    # Resolve the options Field → current list[str] value
+    options_field = field.options
+    option_list = getattr(settings, options_field.name) if options_field else []
+    sel = ui.select(
+        options=option_list,
+        value=value if value in option_list else None,
+        label=label,
+    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("min-w-[120px]")
+
+    if not is_disabled:
+        def on_select_change(e):
+            setattr(settings, name, e.value)
+        sel.on_value_change(on_select_change)
+
+    # Poll both the value and the options list for changes
+    last_options = [list(option_list)]
+    last_value = [value]
+
+    def _poll_text_select():
+        cur_options = getattr(settings, options_field.name) if options_field else []
+        cur_value = getattr(settings, name)
+        if cur_options != last_options[0]:
+            last_options[0] = list(cur_options)
+            sel.options = cur_options
+            sel.update()
+        if cur_value != last_value[0]:
+            last_value[0] = cur_value
+            sel.set_value(cur_value if cur_value in cur_options else None)
+
+    polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v)))
+    # Add a custom poll for the options field too
+    if options_field:
+        polls.append((settings, options_field.name, [list(option_list)],
+                       lambda v, s=sel: (setattr(s, 'options', v), s.update())))
+
+    return WidgetSize.small
+
+
 @widget_builder(Widget.radio)
 def _build_radio(settings, name, field, polls):
     value = getattr(settings, name)
