@@ -29,8 +29,9 @@ def scan() -> list[str]:
 def get_startup() -> str:
     """Return the preset name to load on startup (falls back to 'default')."""
     try:
-        return (SETTINGS_DIR / "_startup_preset.txt").read_text().strip() or "default"
-    except FileNotFoundError:
+        data = json.loads((SETTINGS_DIR / ".ui_preset.json").read_text())
+        return data.get("startup_preset") or "default"
+    except (FileNotFoundError, json.JSONDecodeError):
         return "default"
 
 
@@ -40,7 +41,7 @@ def set_startup(name: str) -> None:
     if not name or "/" in name or "\\" in name or name.startswith("."):
         raise ValueError(f"Invalid preset name: {name!r}")
     SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
-    (SETTINGS_DIR / "_startup_preset.txt").write_text(name)
+    (SETTINGS_DIR / ".ui_preset.json").write_text(json.dumps({"startup_preset": name}, indent=2))
 
 
 def save(root: Settings, filepath) -> None:
