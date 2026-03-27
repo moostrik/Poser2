@@ -10,7 +10,7 @@ from modules.cam.CamSettings import CameraSettings
 class FrameSyncBang:
 
     def __init__(self, settings: CameraSettings, verbose: bool = False, stream_name: str = '') -> None:
-        num_cams: int = len(settings.ids)
+        num_cams: int = settings.num_cameras
         self.verbose: bool = verbose
         self.stream_name: str = stream_name
         self.max_gap_s: float = 1.0 / settings.fps

@@ -301,11 +301,6 @@
     "port": 666
   },
   "camera": {
-    "ids": [
-      "14442C101136D1D200",
-      "14442C10F124D9D600",
-      "14442C10110AD3D200"
-    ],
     "num_cameras": 3,
     "fps": 23.0,
     "yolo": true,
@@ -313,21 +308,46 @@
     "square": true,
     "stereo": false,
     "hd_ready": true,
-    "show_stereo": false,
-    "manual": false,
-    "flip_h": false,
-    "flip_v": true,
-    "perspective": -0.22,
+    "sim_enabled": true,
     "model_path": "models",
     "video_path": "recordings",
     "temp_path": "temp",
-    "sim_enabled": true,
-    "sim_passthrough": false,
-    "sim_fps": 23.0,
-    "video_chunk_length": 10.0,
-    "video_encoder": "iGPU",
-    "video_decoder": "iGPU",
     "video_format": "H264",
-    "video_frame_types": ["VIDEO"]
+    "video_frame_types": ["VIDEO"],
+    "cores": [
+      {
+        "device_id": "14442C101136D1D200",
+        "show_stereo": false,
+        "manual": false,
+        "flip_h": false,
+        "flip_v": true,
+        "perspective": -0.22
+      },
+      {
+        "device_id": "14442C10F124D9D600",
+        "show_stereo": false,
+        "manual": false,
+        "flip_h": false,
+        "flip_v": true,
+        "perspective": -0.22
+      },
+      {
+        "device_id": "14442C10110AD3D200",
+        "show_stereo": false,
+        "manual": false,
+        "flip_h": false,
+        "flip_v": true,
+        "perspective": -0.22
+      }
+    ],
+    "player": {
+      "sim_fps": 23.0,
+      "sim_passthrough": false,
+      "video_decoder": "iGPU"
+    },
+    "recorder": {
+      "video_encoder": "iGPU",
+      "video_chunk_length": 10.0
+    }
   }
 }

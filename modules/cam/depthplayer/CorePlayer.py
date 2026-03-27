@@ -1,6 +1,8 @@
 
 from depthai import Pipeline
 from modules.cam.depthcam.Core import *
+from modules.cam.depthcam.CoreSettings import CoreSettings
+from modules.cam.depthplayer.PlayerSettings import PlayerSettings
 from modules.cam.depthplayer.SyncPlayer import SyncPlayer
 from cv2 import resize, COLOR_RGB2GRAY, cvtColor
 from time import process_time
@@ -8,19 +10,19 @@ from datetime import timedelta
 
 class CorePlayer(Core):
 
-    def __init__(self, gui, syncplayer: SyncPlayer, device_id: str, settings: CameraSettings) -> None:
+    def __init__(self, syncplayer: SyncPlayer, core_settings: CoreSettings, player_settings: PlayerSettings) -> None:
 
-        if settings.stereo and not settings.yolo:
-            settings.show_stereo = True  # stereo pipeline needs to be connected (in case of no person detection)
+        if core_settings.stereo and not core_settings.yolo:
+            core_settings.show_stereo = True  # stereo pipeline needs to be connected (in case of no person detection)
 
-        super().__init__(gui, device_id, settings)
+        super().__init__(core_settings)
 
         self.sync_player: SyncPlayer = syncplayer
         self.ex_video:  dai.DataInputQueue
         self.ex_left:   dai.DataInputQueue
         self.ex_right:  dai.DataInputQueue
 
-        self.passthrough: bool = settings.sim_passthrough
+        self.passthrough: bool = player_settings.sim_passthrough
 
     def start(self) -> None: # override
         if self.passthrough:
@@ -36,7 +38,7 @@ class CorePlayer(Core):
             super().run()
 
     def _setup_pipeline(self, pipeline: Pipeline) -> None: # override
-        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.do_720p, self.show_stereo, simulate=True)
+        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.do_720p, self.show_stereo, self.perspective, simulate=True)
 
 
     def _setup_queues(self) -> None: # override

@@ -1,1 +1,1 @@
-{"inout.artnet_2": true, "__active_tab__": "camera", "render.fluid": false, "render.fluid.fluid_flow": true, "render.flow": false, "render.centre": false, "render.colors": true}
+{"inout.artnet_2": true, "__active_tab__": "camera", "render.fluid": false, "render.fluid.fluid_flow": true, "render.flow": false, "render.centre": false, "render.colors": true, "camera.cores 0": true, "camera.player": false}

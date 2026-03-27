@@ -62,6 +62,15 @@ class StereoMedianFilterType(Enum):
 
 STEREO_FILTER_NAMES: list[str] = [e.name for e in StereoMedianFilterType]
 
+class CoderType(Enum):
+    CPU =   0
+    GPU =   1
+    iGPU =  2
+
+class CoderFormat(Enum):
+    H264 = '.mp4'
+    H265 = '.hevc'
+
 FrameCallback = Callable[[int, FrameType, np.ndarray], None]
 SyncCallback = Callable[[int, dict[FrameType, np.ndarray], float], None]
 DetectionCallback = Callable[[int, ImgDetection], None]

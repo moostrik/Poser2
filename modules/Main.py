@@ -53,7 +53,6 @@ class Main():
 
         num_players: int = self.new_settings.num_players
         cam_settings = self.new_settings.camera
-        cam_settings.num_cameras = len(cam_settings.ids)
 
         # Create controllers after preset loading so INIT fields (num_pixels, ip, etc.) are final
         self.artnet_controllers = [ArtNetBars(cfg) for cfg in self.new_settings.inout.children.values() if isinstance(cfg, ArtNetBarsSettings)]
@@ -67,18 +66,18 @@ class Main():
         self.player: Optional[Player] = None
         if cam_settings.sim_enabled:
             self.player = Player(cam_settings)
-            for cam_id in cam_settings.ids:
-                self.cameras.append(DepthSimulator(self.gui, self.player, cam_id, cam_settings))
+            for i in range(cam_settings.num_cameras):
+                self.cameras.append(DepthSimulator(self.player, cam_settings.cores[i], cam_settings.player))
         else:
             self.recorder = Recorder(cam_settings)
-            for cam_id in cam_settings.ids:
-                camera = DepthCam(self.gui, cam_id, cam_settings)
+            for i in range(cam_settings.num_cameras):
+                camera = DepthCam(cam_settings.cores[i])
                 self.cameras.append(camera)
         self.frame_sync_bang = FrameSyncBang(cam_settings, False, 'frame_sync')
 
         # TRACKER
         if settings.tracker_type == TrackerType.PANORAMIC:
-            self.tracker = PanoramicTracker(self.gui, num_players, len(cam_settings.ids))
+            self.tracker = PanoramicTracker(self.gui, num_players, cam_settings.num_cameras)
         else:
             self.tracker = OnePerCamTracker(self.gui, num_players)
         self.tracklet_sync_bang = FrameSyncBang(cam_settings, False, 'tracklet_sync')

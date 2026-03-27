@@ -2161,14 +2161,14 @@ class PlayerSettings(Settings):
 class ParentWithChild(Settings):
     fps    = Field(30.0, access=Field.INIT)
     color  = Field(True, access=Field.INIT)
-    player = Child(PlayerSettings)
-    cores  = Child(CoreSettings, count=3, share=[fps, color])
+    player = PlayerSettings(share=[])
+    cores  = CoreSettings(count=3, share=[fps, color])
 
 
 class ParentWithFieldCount(Settings):
     num   = Field(2, access=Field.INIT)
     fps   = Field(60.0, access=Field.INIT)
-    items = Child(CoreSettings, count=num, share=[fps])
+    items = CoreSettings(count=num, share=[fps])
 
 
 class TestChildDescriptorSingle(unittest.TestCase):
@@ -2392,7 +2392,7 @@ class TestValidateShare(unittest.TestCase):
     def test_share_field_missing_from_parent(self):
         with self.assertRaises(TypeError) as ctx:
             class BadParent(Settings):
-                cores = Child(CoreSettings, count=2, share=[CoreSettings.exposure])
+                cores = CoreSettings(count=2, share=[CoreSettings.exposure])
             BadParent()
         self.assertIn("not found on parent", str(ctx.exception))
 
@@ -2403,7 +2403,7 @@ class TestValidateShare(unittest.TestCase):
 
             class BadParent2(Settings):
                 fps = Field(30.0, access=Field.INIT)
-                items = Child(ChildWithoutFps, count=2, share=[fps])
+                items = ChildWithoutFps(count=2, share=[fps])
             BadParent2()
         self.assertIn("not found on child", str(ctx.exception))
 
@@ -2414,7 +2414,7 @@ class TestValidateShare(unittest.TestCase):
 
             class BadParent3(Settings):
                 fps = Field(30.0)  # float
-                items = Child(ChildIntFps, count=2, share=[fps])
+                items = ChildIntFps(count=2, share=[fps])
             BadParent3()
         self.assertIn("type mismatch", str(ctx.exception))
 

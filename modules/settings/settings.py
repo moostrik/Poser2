@@ -1,4 +1,4 @@
-"""S
+"""
 Settings — a reactive dataclass.
 
 Declare fields as class attributes; use them as plain variables.
@@ -22,8 +22,8 @@ Child settings group related fields into nested scopes::
     class CameraSettings(Settings):
         num    = Field(3, access=Field.INIT)
         fps    = Field(30.0, access=Field.INIT)
-        player = Child(PlayerSettings)                                 # single child
-        cores  = Child(CoreSettings, count=num, share=[fps])           # N children
+        player = PlayerSettings(share=[fps])              # single child
+        cores  = CoreSettings(count=num, share=[fps])     # N children
 """
 
 import copy
@@ -39,25 +39,29 @@ from modules.settings.widget import Widget
 logger = logging.getLogger(__name__)
 
 
-class Settings:
-    """Reactive dataclass — declare fields and children as class attributes.
+class SettingsMeta(type):
+    """Metaclass that intercepts ``share`` / ``count`` in constructor kwargs.
 
-    Fields::
+    When a Settings subclass is called with ``share=`` or ``count=`` it
+    returns a :class:`Child` descriptor instead of a normal instance::
 
-        class CameraSettings(Settings):
-            exposure = Field(1000, min=100, max=10000)
-            resolution = Field(1080, access=Field.INIT)
-
-        settings = CameraSettings(resolution=720)
-
-    Children::
-
-        class CameraSettings(Settings):
-            num    = Field(3, access=Field.INIT)
-            fps    = Field(30.0, access=Field.INIT)
-            player = Child(PlayerSettings)
-            cores  = Child(CoreSettings, count=num, share=[fps])
+        player = PlayerSettings(share=[fps])          # → Child descriptor
+        cores  = CoreSettings(count=num, share=[fps]) # → Child descriptor
+        s      = PlayerSettings()                     # → normal instance
     """
+
+    def __call__(cls, *args, **kwargs):
+        if 'share' in kwargs or 'count' in kwargs:
+            return Child(
+                cls,
+                count=kwargs.pop('count', None),
+                share=kwargs.pop('share', None),
+            )
+        return super().__call__(*args, **kwargs)
+
+
+class Settings(metaclass=SettingsMeta):
+    """Reactive dataclass — declare fields and children as class attributes."""
 
     def __init__(self, **kwargs):
         object.__setattr__(self, "_initialized", False)
@@ -67,9 +71,9 @@ class Settings:
         object.__setattr__(self, "_callbacks", {})
         object.__setattr__(self, "_locks", {})
         object.__setattr__(self, "_children", {})
-        object.__setattr__(self, "_child_descriptors", {})
 
-        # Collect Field descriptors and Child descriptors from the class hierarchy
+        # Collect Field and Child descriptors from the class hierarchy
+        child_names: set[str] = set()
         for cls in type(self).__mro__:
             for attr_name, attr_value in vars(cls).items():
                 if attr_name.startswith("_"):
@@ -80,15 +84,15 @@ class Settings:
                     self._values[attr_name] = copy.deepcopy(default) if isinstance(default, list) else default
                     self._callbacks[attr_name] = []
                     self._locks[attr_name] = threading.Lock()
-                elif isinstance(attr_value, Child) and attr_name not in self._child_descriptors:
-                    self._child_descriptors[attr_name] = attr_value
+                elif isinstance(attr_value, Child) and attr_name not in child_names:
+                    child_names.add(attr_name)
                 elif (
                     isinstance(attr_value, type)
                     and issubclass(attr_value, Settings)
                     and attr_value is not Settings
                     and attr_name not in self._fields
                     and attr_name not in self._children
-                    and attr_name not in self._child_descriptors
+                    and attr_name not in child_names
                 ):
                     # Legacy: bare Settings subclass as class attribute
                     child = attr_value()
@@ -100,7 +104,7 @@ class Settings:
         for cls in type(self).__mro__:
             annotations = vars(cls).get("__annotations__", {})
             for attr_name, ann in annotations.items():
-                if attr_name in self._fields or attr_name in self._children or attr_name in self._child_descriptors:
+                if attr_name in self._fields or attr_name in self._children or attr_name in child_names:
                     continue
                 resolved = ann
                 if isinstance(ann, str):
@@ -131,21 +135,24 @@ class Settings:
             self._fields[name].set(self, value)
 
         # Create children from Child descriptors (after kwargs so count fields have updated values)
-        for attr_name, child_desc in self._child_descriptors.items():
-            count = child_desc.resolve_count(self)
+        for attr_name in child_names:
+            child_desc = self._get_child_descriptor(attr_name)
+            if child_desc is None:
+                continue
             child_desc.validate_share(self)
             share_kwargs = child_desc.build_share_kwargs(self)
-            if child_desc.is_single:
-                child = child_desc.settings_type(**share_kwargs)
-                object.__setattr__(child, "_parent", self)
-                self._children[attr_name] = child
-            else:
+            if child_desc.is_list:
+                count = child_desc.resolve_count(self)
                 children = []
                 for _ in range(count):
                     child = child_desc.settings_type(**share_kwargs)
                     object.__setattr__(child, "_parent", self)
                     children.append(child)
                 self._children[attr_name] = children
+            else:
+                child = child_desc.settings_type(**share_kwargs)
+                object.__setattr__(child, "_parent", self)
+                self._children[attr_name] = child
 
     # -- Attribute access guard ----------------------------------------------
 
@@ -205,8 +212,19 @@ class Settings:
 
     @property
     def children(self):
-        """Read-only view of all child instances, keyed by name."""
-        return dict(self._children)
+        """Read-only view of all child instances, keyed by name.
+
+        List children are flattened: ``cores`` with 3 items becomes
+        ``{'cores 0': c0, 'cores 1': c1, 'cores 2': c2}``.
+        """
+        out = {}
+        for name, child_or_list in self._children.items():
+            if isinstance(child_or_list, list):
+                for i, child in enumerate(child_or_list):
+                    out[f"{name} {i}"] = child
+            else:
+                out[name] = child_or_list
+        return out
 
     # -- Callback registration -----------------------------------------------
 
@@ -260,8 +278,11 @@ class Settings:
                 continue
             result[name] = field.to_json_value(self)
         for name, child_or_list in self._children.items():
-            child_desc = self._child_descriptors.get(name)
-            shared = set(child_desc.share) if child_desc else set()
+            try:
+                child_desc = self._get_child_descriptor(name)
+                shared = set(child_desc.share)
+            except LookupError:
+                shared = set()
             if isinstance(child_or_list, list):
                 result[name] = [c.to_dict(_exclude=shared) for c in child_or_list]
             else:
@@ -292,20 +313,11 @@ class Settings:
         Bad values are logged and skipped — one broken field does not
         prevent the remaining fields from loading.
         """
+        # Pass 1: update own fields (so count fields like num_cameras are current)
+        child_data = {}
         for name, raw in data.items():
             if name in self._children:
-                child_or_list = self._children[name]
-                if isinstance(child_or_list, list) and isinstance(raw, list):
-                    for child, child_data in zip(child_or_list, raw):
-                        if isinstance(child_data, dict):
-                            child.update_from_dict(child_data)
-                elif not isinstance(child_or_list, list) and isinstance(raw, dict):
-                    child_or_list.update_from_dict(raw)
-                else:
-                    logger.warning(
-                        "%s.update_from_dict: type mismatch for child '%s' — skipping",
-                        type(self).__name__, name,
-                    )
+                child_data[name] = raw
             elif name in self._fields:
                 field = self._fields[name]
                 if field.access is Access.INIT and self._initialized:
@@ -322,27 +334,78 @@ class Settings:
                     "%s.update_from_dict: ignoring unknown key '%s'",
                     type(self).__name__, name,
                 )
+
+        # Resize multi-children lists if their count field changed
+        if not self._initialized:
+            self._resize_children()
+
+        # Pass 2: forward child data
+        for name, raw in child_data.items():
+            child_or_list = self._children[name]
+            if isinstance(child_or_list, list) and isinstance(raw, list):
+                for child, child_dict in zip(child_or_list, raw):
+                    if isinstance(child_dict, dict):
+                        child.update_from_dict(child_dict)
+            elif not isinstance(child_or_list, list) and isinstance(raw, dict):
+                child_or_list.update_from_dict(raw)
+            else:
+                logger.warning(
+                    "%s.update_from_dict: type mismatch for child '%s' — skipping",
+                    type(self).__name__, name,
+                )
         # Re-propagate shared fields to children after own fields are updated
         self._propagate_shared()
 
     # -- Equality ------------------------------------------------------------
 
+    def _resize_children(self):
+        """Resize list children to match their descriptor's current count."""
+        for name, child_or_list in self._children.items():
+            if not isinstance(child_or_list, list):
+                continue
+            try:
+                child_desc = self._get_child_descriptor(name)
+            except LookupError:
+                continue
+            target = child_desc.resolve_count(self)
+            if len(child_or_list) == target:
+                continue
+            share_kwargs = child_desc.build_share_kwargs(self)
+            if len(child_or_list) < target:
+                for _ in range(target - len(child_or_list)):
+                    child = child_desc.settings_type(**share_kwargs)
+                    object.__setattr__(child, "_parent", self)
+                    child_or_list.append(child)
+            else:
+                del child_or_list[target:]
+
     def _propagate_shared(self):
         """Copy shared field values from this parent into its children."""
         if self._initialized:
             return
-        for name, child_desc in self._child_descriptors.items():
+        for name, child_or_list in self._children.items():
+            try:
+                child_desc = self._get_child_descriptor(name)
+            except LookupError:
+                continue
             if not child_desc.share:
                 continue
             share_kwargs = child_desc.build_share_kwargs(self)
-            child_or_list = self._children.get(name)
-            if child_or_list is None:
-                continue
             targets = child_or_list if isinstance(child_or_list, list) else [child_or_list]
             for child in targets:
                 for field_name, value in share_kwargs.items():
                     if field_name in child._fields:
                         child._fields[field_name].set(child, value)
+
+    # -- Helpers -------------------------------------------------------------
+
+    def _get_child_descriptor(self, name: str) -> Child:
+        """Look up a Child descriptor from the class hierarchy."""
+        for cls in type(self).__mro__:
+            attr = vars(cls).get(name)
+            if isinstance(attr, Child):
+                return attr
+        raise LookupError(f"No Child descriptor '{name}' on {type(self).__name__}")
 
     # -- Equality ------------------------------------------------------------
 

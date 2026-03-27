@@ -6,8 +6,9 @@ from enum import Enum, auto
 from queue import Queue
 from time import sleep
 
-from modules.cam.CamSettings import CameraSettings, CoderType, CoderFormat, PlayerSettings
-from modules.cam.depthcam.Definitions import FrameType, FrameCallback
+from modules.cam.CamSettings import CameraSettings
+from modules.cam.depthcam.Definitions import CoderType, CoderFormat, FrameType, FrameCallback
+from modules.cam.depthplayer.PlayerSettings import PlayerSettings
 from modules.cam.depthplayer.FFmpegPlayer import FFmpegPlayer
 from modules.cam.recorder.SyncRecorder import make_file_name, is_folder_for_settings
 
@@ -54,10 +55,10 @@ class SyncPlayer(Thread):
     def __init__(self, settings: CameraSettings) -> None:
         super().__init__()
         self.settings: CameraSettings = settings
-        self.input_path: Path = Path(settings.video_path)
-        self.num_cams: int = len(settings.ids)
-        self.types: list[FrameType] = settings.video_frame_types
-        self.fps: float = settings.sim_fps
+        self.input_path: Path = Path(settings.player.video_path)
+        self.num_cams: int = settings.num_cameras
+        self.types: list[FrameType] = settings.player.video_frame_types
+        self.fps: float = settings.player.sim_fps
 
         self.running: bool = False
         self.state_messages: Queue[Message] = Queue()
@@ -70,12 +71,12 @@ class SyncPlayer(Thread):
         self.chunk_range_0: int = 0
         self.chunk_range_1: int = 0
         self.load_folder: str = ''
-        self.suffix: str = settings.video_format.value
+        self.suffix: str = settings.player.video_format.value
 
         self.folders: FolderDict = self._get_video_folders(settings)
 
-        self.hwt: str = HwaccelString[settings.video_decoder]
-        self.hwd: str = HwaccelDeviceString[settings.video_decoder]
+        self.hwt: str = HwaccelString[settings.player.video_decoder]
+        self.hwd: str = HwaccelDeviceString[settings.player.video_decoder]
 
         self.players: list[FFmpegPlayer] = []
         self.loaders: list[FFmpegPlayer] = []

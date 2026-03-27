@@ -1,4 +1,18 @@
-"""Child descriptor for declaring nested Settings."""
+"""Child descriptor for declaring nested Settings.
+
+Created automatically when a Settings subclass is called with ``share=``
+or ``count=`` kwargs — users never write ``Child(...)`` directly::
+
+    class CameraSettings(Settings):
+        num    = Field(3, access=Field.INIT)
+        fps    = Field(30.0, access=Field.INIT)
+        player = PlayerSettings(share=[fps])
+        cores  = CoreSettings(count=num, share=[fps])
+
+    cam = CameraSettings()
+    cam.player.folder           # single instance
+    cam.cores[0].exposure       # list, indexed access
+"""
 
 from __future__ import annotations
 
@@ -11,57 +25,52 @@ if TYPE_CHECKING:
 
 
 class Child:
-    """Descriptor for declaring child Settings on a parent Settings class.
+    """Descriptor that declares a child Settings on a parent.
 
-    Single child (default, count=1) — accessed directly::
+    Single child (no *count*)::
 
-        player = Child(PlayerSettings)
-        # cam.player.folder
+        player = PlayerSettings(share=[fps])
 
-    Multiple children — accessed by index::
+    Multiple children::
 
-        cores = Child(CoreSettings, count=3, share=[fps, color])
-        # cam.cores[0].exposure
+        cores = CoreSettings(count=num, share=[fps])
 
-    ``count`` accepts an int literal or a Field reference::
+    ``count`` accepts an int literal or a Field reference.
+    ``share`` accepts a list of Field descriptors from the parent.
 
-        num   = Field(3, access=Field.INIT)
-        cores = Child(CoreSettings, count=num, share=[fps])
-
-    ``share`` takes a list of Field descriptors declared on the *parent*.
-    Their values are copied to each child at construction time (passed
-    as kwargs).  Shared fields are excluded from the child's
-    serialization — the parent is the single source of truth.
+    Users never instantiate ``Child`` directly — the Settings metaclass
+    creates one when it detects ``share`` or ``count`` in the constructor
+    kwargs.
     """
 
     def __init__(
         self,
-        settings_type: type[Settings],
+        settings_type: type,
         *,
-        count: int | Field = 1,
+        count: int | Field | None = None,
         share: list[Field] | None = None,
     ):
         self.settings_type = settings_type
-        self.count = count          # int literal or Field descriptor
+        self.is_list: bool = count is not None
+        self.count = count
         self._share_refs: list[Field] = list(share) if share else []
-        self.share: list[str] = []  # resolved lazily via _resolve_share()
+        self.share: list[str] = []
         self.name = ""
 
     def __set_name__(self, owner, name):
         self.name = name
-        # __set_name__ is called after the class body finishes, so Field
-        # descriptors now have their .name set — safe to resolve.
+        # Resolve share Field refs → names (Fields have .name set by now)
         self.share = [f.name for f in self._share_refs]
 
     # -- Descriptor protocol -------------------------------------------------
 
     def __get__(self, obj, objtype=None):
         if obj is None:
-            return self                         # class-level access
+            return self
         children = obj._children[self.name]
-        if self.is_single:
-            return children                     # single Settings instance
-        return tuple(children)                  # immutable snapshot of the list
+        if self.is_list:
+            return tuple(children)
+        return children
 
     def __set__(self, obj, value):
         raise AttributeError(
@@ -70,11 +79,6 @@ class Child:
 
     # -- Helpers used by Settings.__init__ -----------------------------------
 
-    @property
-    def is_single(self) -> bool:
-        """True when count is the literal int 1 (direct access, not a list)."""
-        return isinstance(self.count, int) and self.count == 1
-
     def resolve_count(self, owner: Settings) -> int:
         """Resolve count to an integer.
 
@@ -82,8 +86,9 @@ class Child:
         """
         if isinstance(self.count, int):
             return self.count
-        # Field descriptor — read its value from the owner instance
-        return self.count.__get__(owner, type(owner))
+        if isinstance(self.count, Field):
+            return self.count.__get__(owner, type(owner))
+        raise TypeError(f"{self.name}: count is None — cannot resolve")
 
     def validate_share(self, owner: Settings) -> None:
         """Check that every shared field exists on both parent and child with matching types."""
