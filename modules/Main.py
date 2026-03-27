@@ -1,5 +1,6 @@
-# 2DO:
-
+# TODO:
+# make dynamic list of children in settings
+# find a better way to add children to settings that is more in line with adding Fields
 
 
 # Standard library imports
@@ -27,7 +28,7 @@ class InOutGroup(NewSettings):
     artnet_3: ArtNetBarsSettings
 
 class MainSettings(NewSettings):
-    num_players: Field[int] = Field(3, access=Field.INIT, visible=False)
+    num_players: Field[int] = Field(3, access=Field.INIT, visible=True)
     camera: CameraSettings
     inout:  InOutGroup
     render: RenderSettings

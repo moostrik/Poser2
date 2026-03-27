@@ -1,5 +1,6 @@
 """Thread-safe reactive settings system with descriptor-based field definitions."""
 
+from .child import Child
 from .field import Field, Access
 from .widget import Widget, WidgetSize
 from .settings import Settings

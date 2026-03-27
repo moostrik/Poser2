@@ -1,4 +1,30 @@
-"""Settings — collection of Field descriptors with attribute access, callbacks, and serialization."""
+"""S
+Settings — a reactive dataclass.
+
+Declare fields as class attributes; use them as plain variables.
+Each field is a single line that can optionally carry GUI hints,
+access restrictions, and value constraints — but these are declarations,
+not code. The functional class that uses Settings never deals with GUI,
+serialization, or threading logic.
+
+    class CameraSettings(Settings):
+        exposure = Field(1000, min=100, max=10000)
+        resolution = Field(1080, access=Field.INIT)
+        manual = Field(False)
+
+    settings = CameraSettings(resolution=720)
+    settings.exposure = 500          # set like a normal variable
+    x = settings.exposure            # get like a normal variable
+    settings.bind(CameraSettings.exposure, on_changed)  # react to changes
+
+Child settings group related fields into nested scopes::
+
+    class CameraSettings(Settings):
+        num    = Field(3, access=Field.INIT)
+        fps    = Field(30.0, access=Field.INIT)
+        player = Child(PlayerSettings)                                 # single child
+        cores  = Child(CoreSettings, count=num, share=[fps])           # N children
+"""
 
 import copy
 import logging
@@ -6,6 +32,7 @@ import sys
 import threading
 import typing
 
+from modules.settings.child import Child
 from modules.settings.field import Field, Access
 from modules.settings.widget import Widget
 
@@ -13,10 +40,9 @@ logger = logging.getLogger(__name__)
 
 
 class Settings:
-    """Collection of Field descriptors with attribute access, callbacks, and serialization.
+    """Reactive dataclass — declare fields and children as class attributes.
 
-    Subclass and declare Field descriptors as class attributes.
-    Override init_only fields via constructor kwargs::
+    Fields::
 
         class CameraSettings(Settings):
             exposure = Field(1000, min=100, max=10000)
@@ -24,22 +50,26 @@ class Settings:
 
         settings = CameraSettings(resolution=720)
 
-    Child settings are declared via type annotations::
+    Children::
 
-        class RenderSettings(Settings):
-            flow: FlowSettings          # auto-instantiated child
-            fps = Field(60.0)
+        class CameraSettings(Settings):
+            num    = Field(3, access=Field.INIT)
+            fps    = Field(30.0, access=Field.INIT)
+            player = Child(PlayerSettings)
+            cores  = Child(CoreSettings, count=num, share=[fps])
     """
 
     def __init__(self, **kwargs):
         object.__setattr__(self, "_initialized", False)
+        object.__setattr__(self, "_parent", None)
         object.__setattr__(self, "_fields", {})
         object.__setattr__(self, "_values", {})
         object.__setattr__(self, "_callbacks", {})
         object.__setattr__(self, "_locks", {})
         object.__setattr__(self, "_children", {})
+        object.__setattr__(self, "_child_descriptors", {})
 
-        # Collect Field descriptors and child Settings from the class hierarchy
+        # Collect Field descriptors and Child descriptors from the class hierarchy
         for cls in type(self).__mro__:
             for attr_name, attr_value in vars(cls).items():
                 if attr_name.startswith("_"):
@@ -50,22 +80,27 @@ class Settings:
                     self._values[attr_name] = copy.deepcopy(default) if isinstance(default, list) else default
                     self._callbacks[attr_name] = []
                     self._locks[attr_name] = threading.Lock()
+                elif isinstance(attr_value, Child) and attr_name not in self._child_descriptors:
+                    self._child_descriptors[attr_name] = attr_value
                 elif (
                     isinstance(attr_value, type)
                     and issubclass(attr_value, Settings)
                     and attr_value is not Settings
                     and attr_name not in self._fields
                     and attr_name not in self._children
+                    and attr_name not in self._child_descriptors
                 ):
+                    # Legacy: bare Settings subclass as class attribute
                     child = attr_value()
+                    object.__setattr__(child, "_parent", self)
                     self._children[attr_name] = child
                     object.__setattr__(self, attr_name, child)
 
-        # Also detect children from type annotations
+        # Also detect children from type annotations (deprecated)
         for cls in type(self).__mro__:
             annotations = vars(cls).get("__annotations__", {})
             for attr_name, ann in annotations.items():
-                if attr_name in self._fields or attr_name in self._children:
+                if attr_name in self._fields or attr_name in self._children or attr_name in self._child_descriptors:
                     continue
                 resolved = ann
                 if isinstance(ann, str):
@@ -78,7 +113,12 @@ class Settings:
                     except Exception:
                         continue
                 if isinstance(resolved, type) and issubclass(resolved, Settings) and resolved is not Settings:
+                    logger.warning(
+                        "%s: annotation-based child '%s' is deprecated — use Child() descriptor",
+                        type(self).__name__, attr_name,
+                    )
                     child = resolved()
+                    object.__setattr__(child, "_parent", self)
                     self._children[attr_name] = child
                     object.__setattr__(self, attr_name, child)
 
@@ -89,6 +129,23 @@ class Settings:
                     f"{type(self).__name__}() got unexpected keyword argument '{name}'"
                 )
             self._fields[name].set(self, value)
+
+        # Create children from Child descriptors (after kwargs so count fields have updated values)
+        for attr_name, child_desc in self._child_descriptors.items():
+            count = child_desc.resolve_count(self)
+            child_desc.validate_share(self)
+            share_kwargs = child_desc.build_share_kwargs(self)
+            if child_desc.is_single:
+                child = child_desc.settings_type(**share_kwargs)
+                object.__setattr__(child, "_parent", self)
+                self._children[attr_name] = child
+            else:
+                children = []
+                for _ in range(count):
+                    child = child_desc.settings_type(**share_kwargs)
+                    object.__setattr__(child, "_parent", self)
+                    children.append(child)
+                self._children[attr_name] = children
 
     # -- Attribute access guard ----------------------------------------------
 
@@ -142,6 +199,11 @@ class Settings:
         return {n: f for n, f in self._fields.items() if f.widget == Widget.button}
 
     @property
+    def parent(self) -> 'Settings | None':
+        """The parent Settings that owns this child, or None for root."""
+        return self._parent
+
+    @property
     def children(self):
         """Read-only view of all child instances, keyed by name."""
         return dict(self._children)
@@ -178,22 +240,32 @@ class Settings:
 
     # -- Serialization -------------------------------------------------------
 
-    def to_dict(self):
+    def to_dict(self, *, _exclude: set[str] | None = None):
         """Serialize mutable fields to a dict.
 
         Excludes ``Access.READ`` fields and ``Widget.button`` fields.
         ``Access.INIT`` fields **are** included (they are editable in JSON but
         cannot be changed at runtime after construction).
 
-        Children are serialized as nested dicts.
+        Children are serialized as nested dicts.  Shared fields (declared
+        via ``Child(..., share=[...])``) are excluded from child dicts —
+        the parent is the single source of truth.
         """
         result = {}
+        exclude = _exclude or set()
         for name, field in self._fields.items():
+            if name in exclude:
+                continue
             if field.access is Access.READ or field.widget == Widget.button:
                 continue
             result[name] = field.to_json_value(self)
-        for name, child in self._children.items():
-            result[name] = child.to_dict()
+        for name, child_or_list in self._children.items():
+            child_desc = self._child_descriptors.get(name)
+            shared = set(child_desc.share) if child_desc else set()
+            if isinstance(child_or_list, list):
+                result[name] = [c.to_dict(_exclude=shared) for c in child_or_list]
+            else:
+                result[name] = child_or_list.to_dict(_exclude=shared)
         return result
 
     def initialize(self):
@@ -203,8 +275,12 @@ class Settings:
         programmatically or via ``update_from_dict``.
         """
         object.__setattr__(self, '_initialized', True)
-        for child in self._children.values():
-            child.initialize()
+        for child_or_list in self._children.values():
+            if isinstance(child_or_list, list):
+                for child in child_or_list:
+                    child.initialize()
+            else:
+                child_or_list.initialize()
 
     def update_from_dict(self, data):
         """Restore fields from a dict.
@@ -217,13 +293,19 @@ class Settings:
         prevent the remaining fields from loading.
         """
         for name, raw in data.items():
-            if name in self._children and isinstance(raw, dict):
-                self._children[name].update_from_dict(raw)
-            elif name in self._children:
-                logger.warning(
-                    "%s.update_from_dict: expected dict for child '%s', got %s — skipping",
-                    type(self).__name__, name, type(raw).__name__,
-                )
+            if name in self._children:
+                child_or_list = self._children[name]
+                if isinstance(child_or_list, list) and isinstance(raw, list):
+                    for child, child_data in zip(child_or_list, raw):
+                        if isinstance(child_data, dict):
+                            child.update_from_dict(child_data)
+                elif not isinstance(child_or_list, list) and isinstance(raw, dict):
+                    child_or_list.update_from_dict(raw)
+                else:
+                    logger.warning(
+                        "%s.update_from_dict: type mismatch for child '%s' — skipping",
+                        type(self).__name__, name,
+                    )
             elif name in self._fields:
                 field = self._fields[name]
                 if field.access is Access.INIT and self._initialized:
@@ -240,6 +322,27 @@ class Settings:
                     "%s.update_from_dict: ignoring unknown key '%s'",
                     type(self).__name__, name,
                 )
+        # Re-propagate shared fields to children after own fields are updated
+        self._propagate_shared()
+
+    # -- Equality ------------------------------------------------------------
+
+    def _propagate_shared(self):
+        """Copy shared field values from this parent into its children."""
+        if self._initialized:
+            return
+        for name, child_desc in self._child_descriptors.items():
+            if not child_desc.share:
+                continue
+            share_kwargs = child_desc.build_share_kwargs(self)
+            child_or_list = self._children.get(name)
+            if child_or_list is None:
+                continue
+            targets = child_or_list if isinstance(child_or_list, list) else [child_or_list]
+            for child in targets:
+                for field_name, value in share_kwargs.items():
+                    if field_name in child._fields:
+                        child._fields[field_name].set(child, value)
 
     # -- Equality ------------------------------------------------------------
 
@@ -248,8 +351,15 @@ class Settings:
             return NotImplemented
         if self._values != other._values:
             return False
-        for name, child in self._children.items():
-            if child != other._children.get(name):
+        for name, child_or_list in self._children.items():
+            other_child = other._children.get(name)
+            if isinstance(child_or_list, list):
+                if not isinstance(other_child, list) or len(child_or_list) != len(other_child):
+                    return False
+                for a, b in zip(child_or_list, other_child):
+                    if a != b:
+                        return False
+            elif child_or_list != other_child:
                 return False
         return True
 
@@ -263,7 +373,11 @@ class Settings:
             if field.visible:
                 value = self._values[name]
                 parts.append(f"{name}={value!r}")
-        for name, child in self._children.items():
-            parts.append(f"{name}={type(child).__name__}(...)")
+        for name, child_or_list in self._children.items():
+            if isinstance(child_or_list, list):
+                type_name = type(child_or_list[0]).__name__ if child_or_list else '?'
+                parts.append(f"{name}=[{type_name}(...) \u00d7 {len(child_or_list)}]")
+            else:
+                parts.append(f"{name}={type(child_or_list).__name__}(...)")
         class_name = type(self).__name__
         return f"{class_name}({', '.join(parts)})"
