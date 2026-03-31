@@ -9,7 +9,7 @@ import numpy as np
 from torch import Tensor
 
 # Local application imports for setter types
-from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
+from modules.oak.camera.definitions import Tracklet as DepthTracklet
 from modules.pose.Frame import FrameDict, FrameField
 from modules.tracker.Tracklet import TrackletDict
 from modules.utils.Timer import TimerState

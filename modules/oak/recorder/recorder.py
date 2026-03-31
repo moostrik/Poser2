@@ -1,4 +1,3 @@
-
 from threading import Thread, Lock, Event
 from pathlib import Path
 import time
@@ -6,10 +5,9 @@ from enum import Enum, auto
 from numpy import ndarray
 from queue import Queue, Empty
 
-from modules.cam.CamSettings import CameraSettings
-from modules.cam.depthcam.Definitions import CoderType, CoderFormat, FrameType, FRAME_TYPE_LABEL_DICT
-from modules.cam.recorder.RecorderSettings import RecorderSettings
-from modules.cam.recorder.FFmpegRecorder import FFmpegRecorder
+from ..camera.definitions import CoderType, CoderFormat, FrameType, FRAME_TYPE_LABEL_DICT
+from .settings import RecorderSettings
+from .stream_writer import StreamWriter
 
 from pythonosc.udp_client import SimpleUDPClient
 from pythonosc.osc_server import ThreadingOSCUDPServer
@@ -21,17 +19,17 @@ def make_file_name(c: int, t: FrameType, chunk: int, format: str) -> str:
 def make_folder_name(num_cams: int, square: bool, color: bool, stereo: bool, group_id: str ="") -> str:
     return time.strftime("%Y%m%d-%H%M%S") + '_' + str(num_cams) + ('_square' if square else '_wide') + ('_color' if color else '_mono') + ('_stereo' if stereo else '') + '_' + group_id
 
-def is_folder_for_settings(name: str, settings: CameraSettings) -> bool:
+def is_folder_for_settings(name: str, num_cameras: int, square: bool, color: bool, stereo: bool) -> bool:
     parts: list[str] = name.split('_')
     if len(parts) < 2:
         return False
     if not parts[1].isdigit() or not  ('wide' in parts or 'square' in parts) or not ('color' in parts or 'mono' in parts):
         return False
     num_cams = int(parts[1])
-    square: bool = 'square' in parts
-    color: bool = 'color' in parts
-    stereo: bool = 'stereo' in parts
-    if num_cams >= settings.num_cameras and square == settings.square and color == settings.color and stereo == settings.stereo:
+    sq: bool = 'square' in parts
+    col: bool = 'color' in parts
+    st: bool = 'stereo' in parts
+    if num_cams >= num_cameras and sq == square and col == color and st == stereo:
         return True
     return False
 
@@ -54,15 +52,15 @@ class RecState(Enum):
     REC =   auto()
     STOP =  auto()
 
-class SyncRecorder(Thread):
-    def __init__(self, settings: CameraSettings) -> None:
+class Recorder(Thread):
+    def __init__(self, settings: RecorderSettings) -> None:
         super().__init__()
         self.output_path: Path = Path(settings.video_path)
         self.temp_path: Path = Path(settings.temp_path)
 
-        self.settings: CameraSettings = settings
+        self.settings: RecorderSettings = settings
 
-        self.recorders: dict[int, dict[FrameType, FFmpegRecorder]] = {}
+        self.recorders: dict[int, dict[FrameType, StreamWriter]] = {}
         self.fps: dict[int, float] = {}
         self.frames: dict[int, Queue[dict[FrameType, ndarray]]] = {}
         self.folder_path: Path = Path()
@@ -71,13 +69,13 @@ class SyncRecorder(Thread):
             self.recorders[c] = {}
             self.fps[c] = settings.fps
             self.frames[c] = Queue()
-            for t in self.settings.recorder.video_frame_types:
-                self.recorders[c][t] = FFmpegRecorder(EncoderString[settings.recorder.video_format][settings.recorder.video_encoder])
+            for t in self.settings.video_frame_types:
+                self.recorders[c][t] = StreamWriter(EncoderString[settings.video_format][settings.video_encoder])
 
         self.start_time: float
         self.chunk_index = 0
         self.rec_name: str
-        self.suffix: str = settings.recorder.video_format.value
+        self.suffix: str = settings.video_format.value
 
         self.state: RecState = RecState.IDLE
         self.state_lock = Lock()
@@ -88,9 +86,9 @@ class SyncRecorder(Thread):
         self.group_id: str = 'no_id'
 
         # Bind recorder settings callbacks
-        self.settings.recorder.bind(RecorderSettings.start, self._on_start)
-        self.settings.recorder.bind(RecorderSettings.stop, self._on_stop)
-        self.settings.recorder.bind(RecorderSettings.group_id, self.set_group_id)
+        self.settings.bind(RecorderSettings.start, self._on_start)
+        self.settings.bind(RecorderSettings.stop, self._on_stop)
+        self.settings.bind(RecorderSettings.group_id, self.set_group_id)
 
         # OSC bridge (moved from SyncRecorderGui)
         self.osc_client = SimpleUDPClient("10.0.0.148", 8600)
@@ -131,7 +129,7 @@ class SyncRecorder(Thread):
 
         for c in range(self.settings.num_cameras):
             fps: float = self.get_fps(c)
-            for t in self.settings.recorder.video_frame_types:
+            for t in self.settings.video_frame_types:
                 path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
                 self.recorders[c][t].start(str(path), fps)
 
@@ -140,26 +138,26 @@ class SyncRecorder(Thread):
 
     def _stop_recording(self) -> None:
         for c in range(self.settings.num_cameras):
-            for t in self.settings.recorder.video_frame_types:
+            for t in self.settings.video_frame_types:
                 self.recorders[c][t].stop()
 
     def _update_recording(self) -> None:
-        if time.time() - self.start_time > self.settings.recorder.video_chunk_length:
+        if time.time() - self.start_time > self.settings.video_chunk_length:
             self.chunk_index += 1
 
             for c in range(self.settings.num_cameras):
                 fps: float = self.get_fps(c)
-                for t in self.settings.recorder.video_frame_types:
+                for t in self.settings.video_frame_types:
                     path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
                     self.recorders[c][t].split(str(path), fps)
-            self.start_time += self.settings.recorder.video_chunk_length
+            self.start_time += self.settings.video_chunk_length
 
         for c in range(self.settings.num_cameras):
             try:
                 frames: dict[FrameType, ndarray] = self.frames[c].get(timeout=0.01)
             except Empty:
                 continue
-            for t in self.settings.recorder.video_frame_types:
+            for t in self.settings.video_frame_types:
                 if t in frames:
                     self.recorders[c][t].add_frame(frames[t])
 
@@ -193,10 +191,10 @@ class SyncRecorder(Thread):
     def record(self, value: bool) -> None:
         if value:
             self._set_state(RecState.START)
-            self.settings.recorder.recording = True
+            self.settings.recording = True
         else:
             self._set_state(RecState.STOP)
-            self.settings.recorder.recording = False
+            self.settings.recording = False
 
     def set_group_id(self, value: str) -> None:
         with self.group_id_lock:
@@ -209,7 +207,7 @@ class SyncRecorder(Thread):
     # SETTINGS CALLBACKS
     def _on_start(self, _=None) -> None:
         self.set_group_id('no_id')
-        self.settings.recorder.group_id = 'no_id'
+        self.settings.group_id = 'no_id'
         self.record(True)
 
     def _on_stop(self, _=None) -> None:
@@ -220,7 +218,7 @@ class SyncRecorder(Thread):
         print(address, args)
         if address == '/group/id':
             self.set_group_id(args[0])
-            self.settings.recorder.group_id = args[0]
+            self.settings.group_id = args[0]
         if address == '/start/recording':
             self.record(True)
         if address == '/stop/recording':

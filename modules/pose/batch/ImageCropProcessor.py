@@ -16,7 +16,7 @@ from modules.pose.batch.ImageFrame import ImageFrame, ImageFrameDict, ImageFrame
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.PerformanceTimer import PerformanceTimer
 
-from modules.cam.depthcam.Definitions import FrameType
+from modules.oak.camera.definitions import FrameType
 
 
 class ImageCropConfig:
@@ -77,7 +77,7 @@ class ImageCropProcessor:
             frame_type: Type of frame (only VIDEO frames are processed)
             image: BGR uint8 image (H, W, 3) on CPU
         """
-        from modules.cam.depthcam.Definitions import FrameType
+        from modules.oak.camera.definitions import FrameType
 
         if frame_type != FrameType.VIDEO:
             return

@@ -6,11 +6,10 @@ from enum import Enum, auto
 from queue import Queue
 from time import sleep
 
-from modules.cam.CamSettings import CameraSettings
-from modules.cam.depthcam.Definitions import CoderType, CoderFormat, FrameType, FrameCallback
-from modules.cam.depthplayer.PlayerSettings import PlayerSettings
-from modules.cam.depthplayer.FFmpegPlayer import FFmpegPlayer
-from modules.cam.recorder.SyncRecorder import make_file_name, is_folder_for_settings
+from ..camera.definitions import CoderType, CoderFormat, FrameType, FrameCallback
+from .settings import SimulatorSettings
+from .stream_reader import StreamReader
+from ..recorder.recorder import make_file_name, is_folder_for_settings
 
 class State(Enum):
     IDLE = auto()
@@ -51,14 +50,14 @@ class Folder():
 
 FolderDict = Dict[str, Folder]
 
-class SyncPlayer(Thread):
-    def __init__(self, settings: CameraSettings) -> None:
+class Player(Thread):
+    def __init__(self, settings: SimulatorSettings) -> None:
         super().__init__()
-        self.settings: CameraSettings = settings
-        self.input_path: Path = Path(settings.player.video_path)
+        self.settings: SimulatorSettings = settings
+        self.input_path: Path = Path(settings.video_path)
         self.num_cams: int = settings.num_cameras
-        self.types: list[FrameType] = settings.player.video_frame_types
-        self.fps: float = settings.player.sim_fps
+        self.types: list[FrameType] = settings.video_frame_types
+        self.fps: float = settings.sim_fps
 
         self.running: bool = False
         self.state_messages: Queue[Message] = Queue()
@@ -71,17 +70,17 @@ class SyncPlayer(Thread):
         self.chunk_range_0: int = 0
         self.chunk_range_1: int = 0
         self.load_folder: str = ''
-        self.suffix: str = settings.player.video_format.value
+        self.suffix: str = settings.video_format.value
 
         self.folders: FolderDict = self._get_video_folders(settings)
-        self.settings.player.available_folders = list(self.folders.keys())
+        self.settings.available_folders = list(self.folders.keys())
 
-        self.hwt: str = HwaccelString[settings.player.video_decoder]
-        self.hwd: str = HwaccelDeviceString[settings.player.video_decoder]
+        self.hwt: str = HwaccelString[settings.video_decoder]
+        self.hwd: str = HwaccelDeviceString[settings.video_decoder]
 
-        self.players: list[FFmpegPlayer] = []
-        self.loaders: list[FFmpegPlayer] = []
-        self.closers: list[FFmpegPlayer] = []
+        self.players: list[StreamReader] = []
+        self.loaders: list[StreamReader] = []
+        self.closers: list[StreamReader] = []
 
         self.sync_lock: Lock = Lock()
         self.frame_sync_dict: Dict[int, Dict[int, Dict[FrameType, ndarray]]] = {}
@@ -96,11 +95,11 @@ class SyncPlayer(Thread):
         self.frameCallbacks: Set[FrameCallback] = set()
 
         # Bind player settings callbacks
-        self.settings.player.bind(PlayerSettings.start, self._on_start)
-        self.settings.player.bind(PlayerSettings.stop, self._on_stop)
-        self.settings.player.bind(PlayerSettings.folder, self._on_folder_changed)
-        self.settings.player.bind(PlayerSettings.range_start, self._on_range_changed)
-        self.settings.player.bind(PlayerSettings.range_end, self._on_range_changed)
+        self.settings.bind(SimulatorSettings.start, self._on_start)
+        self.settings.bind(SimulatorSettings.stop, self._on_stop)
+        self.settings.bind(SimulatorSettings.folder, self._on_folder_changed)
+        self.settings.bind(SimulatorSettings.range_start, self._on_range_changed)
+        self.settings.bind(SimulatorSettings.range_end, self._on_range_changed)
 
     def stop(self) -> None:
         self._set_play_chunk(-1)
@@ -114,13 +113,13 @@ class SyncPlayer(Thread):
         self.running = True
 
         # Apply preset chunk range
-        self.set_chunk_range(self.settings.player.range_start, self.settings.player.range_end)
+        self.set_chunk_range(self.settings.range_start, self.settings.range_end)
 
         # Auto-start if a folder was loaded from preset
-        folder = self.settings.player.folder
+        folder = self.settings.folder
         if folder and folder in self.folders:
             num_chunks = self.get_num_folder_chunks(folder)
-            self.settings.player.max_chunks = num_chunks
+            self.settings.max_chunks = num_chunks
             self.play(True, folder)
 
         while self.running:
@@ -176,7 +175,7 @@ class SyncPlayer(Thread):
                 path: Path = folder.path / make_file_name(c, t, self.load_chunk, self.suffix)
                 if path.is_file():
 
-                    player: FFmpegPlayer = FFmpegPlayer(c, t, self._frame_sync_callback, self.hwt, self.hwd, self.fps)
+                    player: StreamReader = StreamReader(c, t, self._frame_sync_callback, self.hwt, self.hwd, self.fps)
                     player.load(str(path), self.load_chunk)
                     self.loaders.append(player)
                 else:
@@ -382,12 +381,12 @@ class SyncPlayer(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def _get_video_folders(settings: CameraSettings) -> FolderDict :
+    def _get_video_folders(settings: SimulatorSettings) -> FolderDict :
         folders: FolderDict = {}
         video_path: Path = Path(settings.video_path)
         for folder in video_path.iterdir():
             if folder.is_dir():
-                if not is_folder_for_settings(str(folder), settings):
+                if not is_folder_for_settings(str(folder), settings.num_cameras, settings.square, settings.color, settings.stereo):
                     continue
                 max_chunk: int = -1
                 for file in folder.iterdir():
@@ -401,7 +400,7 @@ class SyncPlayer(Thread):
 
     # SETTINGS CALLBACKS
     def _on_start(self, _=None) -> None:
-        folder: str = self.settings.player.folder
+        folder: str = self.settings.folder
         if folder:
             self.play(True, folder)
 
@@ -411,14 +410,14 @@ class SyncPlayer(Thread):
     def _on_folder_changed(self, folder: str) -> None:
         if folder and folder in self.folders:
             num_chunks: int = self.get_num_folder_chunks(folder)
-            self.settings.player.max_chunks = num_chunks
+            self.settings.max_chunks = num_chunks
             self.set_chunk_range(0, num_chunks)
             self.play(True, folder)
 
     def _on_range_changed(self, _=None) -> None:
-        r0: int = self.settings.player.range_start
-        r1: int = self.settings.player.range_end
+        r0: int = self.settings.range_start
+        r1: int = self.settings.range_end
         self.set_chunk_range(r0, r1)
 
     def update_gui(self) -> None:
-        self.settings.player.current_chunk = self.get_current_chunk()
+        self.settings.current_chunk = self.get_current_chunk()

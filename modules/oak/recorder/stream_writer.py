@@ -6,7 +6,7 @@ from enum import Enum
 from time import sleep
 
 
-class FFmpegRecorder:
+class StreamWriter:
     def __init__(self, encoder_string: str) -> None:
         self.output_file: str = ''
         self.fps: float = 30.0

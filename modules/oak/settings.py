@@ -1,11 +1,11 @@
-from modules.cam.depthcam.CoreSettings import CoreSettings
-from modules.cam.depthcam.Definitions import FrameType, CoderFormat
-from modules.cam.depthplayer.PlayerSettings import PlayerSettings
-from modules.cam.recorder.RecorderSettings import RecorderSettings
+from .camera.settings import CameraSettings
+from .camera.definitions import FrameType, CoderFormat
+from .simulator.settings import SimulatorSettings
+from .recorder.settings import RecorderSettings
 from modules.settings import Settings, Field
 
 
-class CameraSettings(Settings):
+class OakSettings(Settings):
 
     # Camera count — source of truth for cores Child count
     num_cameras:    Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
@@ -29,6 +29,6 @@ class CameraSettings(Settings):
     video_frame_types: Field[list[FrameType]] = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record")
 
     # Children
-    cores: list[CoreSettings]       = CoreSettings(count=num_cameras, share=[fps, color, square, stereo, yolo, hd_ready, sim_enabled, model_path])  # type: ignore[assignment]
-    player: PlayerSettings          = PlayerSettings(share=[video_path, video_format, video_frame_types])
-    recorder: RecorderSettings      = RecorderSettings(share=[video_path, temp_path, video_format, video_frame_types, color, square, stereo])
+    cores: list[CameraSettings]     = CameraSettings(count=num_cameras, share=[fps, color, square, stereo, yolo, hd_ready, sim_enabled, model_path])  # type: ignore[assignment]
+    simulator: SimulatorSettings    = SimulatorSettings(share=[video_path, video_format, video_frame_types, num_cameras, color, square, stereo])
+    recorder: RecorderSettings      = RecorderSettings(share=[video_path, temp_path, video_format, video_frame_types, color, square, stereo, num_cameras, fps])

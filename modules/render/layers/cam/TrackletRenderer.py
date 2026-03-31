@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl import Text
 from modules.render.shaders import DrawColoredRectangle
 
-from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
+from modules.oak.camera.definitions import Tracklet as DepthTracklet
 
 from modules.DataHub import DataHub, DataHubType
 from modules.render.layers.LayerBase import LayerBase

@@ -2,7 +2,7 @@ import depthai as dai
 from datetime import timedelta
 from pathlib import Path
 
-from modules.cam.depthcam.Definitions import *
+from .definitions import *
 from dataclasses import dataclass
 
 @dataclass

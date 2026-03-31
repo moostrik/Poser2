@@ -2,34 +2,33 @@
 # https://oak-web.readthedocs.io/
 # https://docs.luxonis.com/software/depthai/examples/depth_post_processing/
 
-from __future__ import annotations
 import depthai as dai
 from cv2 import applyColorMap, COLORMAP_JET
 from numpy import ndarray
 from typing import Set
 from threading import Thread, Event
 
-from modules.cam.depthcam.Pipeline import setup_pipeline, get_frame_types, PerspectiveConfig
-from modules.cam.depthcam.Definitions import *
-from modules.cam.depthcam.CoreSettings import CoreSettings
+from .pipeline import setup_pipeline, get_frame_types, PerspectiveConfig
+from .definitions import *
+from .settings import CameraSettings
 from modules.utils.FPS import FPS
 
-class Core(Thread):
+class Camera(Thread):
     _id_counter = 0
     _pipeline: dai.Pipeline | None = None
 
-    def __init__(self, core_settings: CoreSettings) -> None:
+    def __init__(self, core_settings: CameraSettings) -> None:
         super().__init__()
         self.stop_event = Event()
         self.running: bool = False
 
         # ID
-        self.id: int =                  Core._id_counter
-        Core._id_counter +=             1
+        self.id: int =                  Camera._id_counter
+        Camera._id_counter +=             1
         self.id_string: str =           str(self.id)
 
         # SETTINGS (reactive)
-        self.settings: CoreSettings =   core_settings
+        self.settings: CameraSettings =   core_settings
 
         # FIXED SETTINGS (read from INIT fields once)
         self.device_id: str =           core_settings.device_id
@@ -92,12 +91,12 @@ class Core(Thread):
             print(f'Camera: {self.device_id} NOT AVAILABLE in {device_list}')
             return False
 
-        if Core._pipeline is None:
-            Core._pipeline = dai.Pipeline()
-            self._setup_pipeline(Core._pipeline)
+        if Camera._pipeline is None:
+            Camera._pipeline = dai.Pipeline()
+            self._setup_pipeline(Camera._pipeline)
 
         try:
-            self.device = self._try_device(self.device_id, Core._pipeline, num_tries=1)
+            self.device = self._try_device(self.device_id, Camera._pipeline, num_tries=1)
         except Exception as e:
             print(f'Could not open device: {e}')
             return False

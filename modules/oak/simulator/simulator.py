@@ -1,23 +1,23 @@
 
 from depthai import Pipeline
-from modules.cam.depthcam.Core import *
-from modules.cam.depthcam.CoreSettings import CoreSettings
-from modules.cam.depthplayer.PlayerSettings import PlayerSettings
-from modules.cam.depthplayer.SyncPlayer import SyncPlayer
+from ..camera.camera import *
+from ..camera.settings import CameraSettings
+from .settings import SimulatorSettings
+from .player import Player
 from cv2 import resize, COLOR_RGB2GRAY, cvtColor
 from time import process_time
 from datetime import timedelta
 
-class CorePlayer(Core):
+class Simulator(Camera):
 
-    def __init__(self, syncplayer: SyncPlayer, core_settings: CoreSettings, player_settings: PlayerSettings) -> None:
+    def __init__(self, syncplayer: Player, core_settings: CameraSettings, player_settings: SimulatorSettings) -> None:
 
         if core_settings.stereo and not core_settings.yolo:
             core_settings.show_stereo = True  # stereo pipeline needs to be connected (in case of no person detection)
 
         super().__init__(core_settings)
 
-        self.sync_player: SyncPlayer = syncplayer
+        self.sync_player: Player = syncplayer
         self.ex_video:  dai.DataInputQueue
         self.ex_left:   dai.DataInputQueue
         self.ex_right:  dai.DataInputQueue

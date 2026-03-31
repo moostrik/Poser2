@@ -8,6 +8,7 @@ from typing import Optional
 from functools import partial
 
 # Local application imports
+from modules.oak import Camera, FrameSync, OakSettings, Simulator, Player, Recorder
 from modules.settings import Settings as NewSettings, presets, NiceServer, NiceSettings, Field
 from modules.Settings import Settings as OldSettings
 from modules.render import RenderManager, RenderSettings
@@ -15,8 +16,6 @@ from modules.DataHub import DataHub, Stage
 from modules.gui import Gui
 from modules.gui.ConfigGuiGenerator import ConfigGuiGenerator
 from modules.inout import OscSound, OscSoundConfig, ArtNetBars, ArtNetBarsSettings
-from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
-from modules.cam.CamSettings import CameraSettings
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers
 from modules.utils import Timer, TimerConfig
@@ -29,7 +28,7 @@ class InOutGroup(NewSettings):
 
 class MainSettings(NewSettings):
     num_players: Field[int] = Field(3, access=Field.INIT, visible=False)
-    camera: CameraSettings
+    camera: OakSettings
     inout:  InOutGroup
     render: RenderSettings
     server: NiceSettings
@@ -60,26 +59,26 @@ class Main():
         self.is_finished: bool = False
 
         # CAMERA
-        self.cameras: list[DepthCam | DepthSimulator] = []
+        self.cameras: list[Camera | Simulator] = []
         self.recorder: Optional[Recorder] = None
         self.player: Optional[Player] = None
         if cam_settings.sim_enabled:
-            self.player = Player(cam_settings)
+            self.player = Player(cam_settings.simulator)
             for i in range(cam_settings.num_cameras):
-                self.cameras.append(DepthSimulator(self.player, cam_settings.cores[i], cam_settings.player))
+                self.cameras.append(Simulator(self.player, cam_settings.cores[i], cam_settings.player))
         else:
-            self.recorder = Recorder(cam_settings)
+            self.recorder = Recorder(cam_settings.recorder)
             for i in range(cam_settings.num_cameras):
-                camera = DepthCam(cam_settings.cores[i])
+                camera = Camera(cam_settings.cores[i])
                 self.cameras.append(camera)
-        self.frame_sync_bang = FrameSyncBang(cam_settings, False, 'frame_sync')
+        self.frame_sync_bang = FrameSync(cam_settings, False, 'frame_sync')
 
         # TRACKER
         if settings.tracker_type == TrackerType.PANORAMIC:
             self.tracker = PanoramicTracker(self.gui, num_players, cam_settings.num_cameras)
         else:
             self.tracker = OnePerCamTracker(self.gui, num_players)
-        self.tracklet_sync_bang = FrameSyncBang(cam_settings, False, 'tracklet_sync')
+        self.tracklet_sync_bang = FrameSync(cam_settings, False, 'tracklet_sync')
 
         # DATA
         self.data_hub = DataHub()

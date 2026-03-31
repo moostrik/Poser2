@@ -7,7 +7,7 @@ from cv2 import cvtColor, COLOR_RGB2BGR
 import time
 
 
-from modules.cam.depthcam.Definitions import FrameType, FrameCallback
+from ..camera.definitions import FrameType
 
 class HwAccelerationType(Enum):
     CPU =   0
@@ -27,7 +27,7 @@ HwaccelDeviceString: dict[HwAccelerationType, str] = {
 # PlayerCallback = Callable[[int, FrameType, np.ndarray, ], None]
 EndCallback = Callable[[int], None]
 
-class FFmpegPlayer:
+class StreamReader:
     def __init__(self, cam_id: int, frameType: FrameType, frameCallback,
                  hw_acceleration_type: str = '', hw_acceleration_device: str = '', fps: float = 0.0) -> None:
         self.frame_callback = frameCallback

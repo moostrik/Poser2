@@ -1,17 +1,16 @@
-from __future__ import annotations
 import depthai as dai
 
-from modules.cam.depthcam.Definitions import (
+from .definitions import (
     EXPOSURE_RANGE, ISO_RANGE, BALANCE_RANGE, CONTRAST_RANGE, BRIGHTNESS_RANGE,
     LUMA_DENOISE_RANGE, SATURATION_RANGE, SHARPNESS_RANGE,
     STEREO_DEPTH_RANGE, STEREO_BRIGHTNESS_RANGE, StereoMedianFilterType,
     Input,
 )
-from modules.cam.depthcam.Pipeline import get_stereo_config
+from .pipeline import get_stereo_config
 from modules.settings import Settings, Field, Widget
 
 
-class CoreSettings(Settings):
+class CameraSettings(Settings):
     """Per-camera runtime settings. Instantiated N times via Child(count=num_cameras)."""
 
     # Identity
@@ -93,54 +92,54 @@ class CoreSettings(Settings):
 
     def _bind(self) -> None:
         # Color controls
-        self.bind(CoreSettings.color_auto_exposure, self._on_color_auto_exposure)
-        self.bind(CoreSettings.color_exposure, self._on_color_exposure)
-        self.bind(CoreSettings.color_iso, self._on_color_iso)
-        self.bind(CoreSettings.color_auto_balance, self._on_color_auto_balance)
-        self.bind(CoreSettings.color_balance, self._on_color_balance)
-        self.bind(CoreSettings.color_brightness, self._on_color_brightness)
-        self.bind(CoreSettings.color_contrast, self._on_color_contrast)
-        self.bind(CoreSettings.color_saturation, self._on_color_saturation)
-        self.bind(CoreSettings.color_luma_denoise, self._on_color_luma_denoise)
-        self.bind(CoreSettings.color_sharpness, self._on_color_sharpness)
+        self.bind(CameraSettings.color_auto_exposure, self._on_color_auto_exposure)
+        self.bind(CameraSettings.color_exposure, self._on_color_exposure)
+        self.bind(CameraSettings.color_iso, self._on_color_iso)
+        self.bind(CameraSettings.color_auto_balance, self._on_color_auto_balance)
+        self.bind(CameraSettings.color_balance, self._on_color_balance)
+        self.bind(CameraSettings.color_brightness, self._on_color_brightness)
+        self.bind(CameraSettings.color_contrast, self._on_color_contrast)
+        self.bind(CameraSettings.color_saturation, self._on_color_saturation)
+        self.bind(CameraSettings.color_luma_denoise, self._on_color_luma_denoise)
+        self.bind(CameraSettings.color_sharpness, self._on_color_sharpness)
 
         # Mono controls
-        self.bind(CoreSettings.mono_auto_exposure, self._on_mono_auto_exposure)
-        self.bind(CoreSettings.mono_exposure, self._on_mono_exposure)
-        self.bind(CoreSettings.mono_iso, self._on_mono_iso)
+        self.bind(CameraSettings.mono_auto_exposure, self._on_mono_auto_exposure)
+        self.bind(CameraSettings.mono_exposure, self._on_mono_exposure)
+        self.bind(CameraSettings.mono_iso, self._on_mono_iso)
 
         # IR controls
-        self.bind(CoreSettings.ir_flood_light, self._on_ir_flood_light)
-        self.bind(CoreSettings.ir_grid_light, self._on_ir_grid_light)
+        self.bind(CameraSettings.ir_flood_light, self._on_ir_flood_light)
+        self.bind(CameraSettings.ir_grid_light, self._on_ir_grid_light)
 
         # Stereo controls
-        self.bind(CoreSettings.stereo_depth_min, self._on_stereo_config)
-        self.bind(CoreSettings.stereo_depth_max, self._on_stereo_config)
-        self.bind(CoreSettings.stereo_brightness_min, self._on_stereo_config)
-        self.bind(CoreSettings.stereo_brightness_max, self._on_stereo_config)
-        self.bind(CoreSettings.stereo_median_filter, self._on_stereo_config)
+        self.bind(CameraSettings.stereo_depth_min, self._on_stereo_config)
+        self.bind(CameraSettings.stereo_depth_max, self._on_stereo_config)
+        self.bind(CameraSettings.stereo_brightness_min, self._on_stereo_config)
+        self.bind(CameraSettings.stereo_brightness_max, self._on_stereo_config)
+        self.bind(CameraSettings.stereo_median_filter, self._on_stereo_config)
 
     def _unbind(self) -> None:
-        self.unbind(CoreSettings.color_auto_exposure, self._on_color_auto_exposure)
-        self.unbind(CoreSettings.color_exposure, self._on_color_exposure)
-        self.unbind(CoreSettings.color_iso, self._on_color_iso)
-        self.unbind(CoreSettings.color_auto_balance, self._on_color_auto_balance)
-        self.unbind(CoreSettings.color_balance, self._on_color_balance)
-        self.unbind(CoreSettings.color_brightness, self._on_color_brightness)
-        self.unbind(CoreSettings.color_contrast, self._on_color_contrast)
-        self.unbind(CoreSettings.color_saturation, self._on_color_saturation)
-        self.unbind(CoreSettings.color_luma_denoise, self._on_color_luma_denoise)
-        self.unbind(CoreSettings.color_sharpness, self._on_color_sharpness)
-        self.unbind(CoreSettings.mono_auto_exposure, self._on_mono_auto_exposure)
-        self.unbind(CoreSettings.mono_exposure, self._on_mono_exposure)
-        self.unbind(CoreSettings.mono_iso, self._on_mono_iso)
-        self.unbind(CoreSettings.ir_flood_light, self._on_ir_flood_light)
-        self.unbind(CoreSettings.ir_grid_light, self._on_ir_grid_light)
-        self.unbind(CoreSettings.stereo_depth_min, self._on_stereo_config)
-        self.unbind(CoreSettings.stereo_depth_max, self._on_stereo_config)
-        self.unbind(CoreSettings.stereo_brightness_min, self._on_stereo_config)
-        self.unbind(CoreSettings.stereo_brightness_max, self._on_stereo_config)
-        self.unbind(CoreSettings.stereo_median_filter, self._on_stereo_config)
+        self.unbind(CameraSettings.color_auto_exposure, self._on_color_auto_exposure)
+        self.unbind(CameraSettings.color_exposure, self._on_color_exposure)
+        self.unbind(CameraSettings.color_iso, self._on_color_iso)
+        self.unbind(CameraSettings.color_auto_balance, self._on_color_auto_balance)
+        self.unbind(CameraSettings.color_balance, self._on_color_balance)
+        self.unbind(CameraSettings.color_brightness, self._on_color_brightness)
+        self.unbind(CameraSettings.color_contrast, self._on_color_contrast)
+        self.unbind(CameraSettings.color_saturation, self._on_color_saturation)
+        self.unbind(CameraSettings.color_luma_denoise, self._on_color_luma_denoise)
+        self.unbind(CameraSettings.color_sharpness, self._on_color_sharpness)
+        self.unbind(CameraSettings.mono_auto_exposure, self._on_mono_auto_exposure)
+        self.unbind(CameraSettings.mono_exposure, self._on_mono_exposure)
+        self.unbind(CameraSettings.mono_iso, self._on_mono_iso)
+        self.unbind(CameraSettings.ir_flood_light, self._on_ir_flood_light)
+        self.unbind(CameraSettings.ir_grid_light, self._on_ir_grid_light)
+        self.unbind(CameraSettings.stereo_depth_min, self._on_stereo_config)
+        self.unbind(CameraSettings.stereo_depth_max, self._on_stereo_config)
+        self.unbind(CameraSettings.stereo_brightness_min, self._on_stereo_config)
+        self.unbind(CameraSettings.stereo_brightness_max, self._on_stereo_config)
+        self.unbind(CameraSettings.stereo_median_filter, self._on_stereo_config)
 
     def _apply(self) -> None:
         """Push all current field values to hardware (called once after open)."""

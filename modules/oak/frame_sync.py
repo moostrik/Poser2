@@ -4,12 +4,12 @@ import numpy as np
 import time
 from collections import deque
 
-from modules.cam.CamSettings import CameraSettings
+from .settings import OakSettings
 
 
-class FrameSyncBang:
+class FrameSync:
 
-    def __init__(self, settings: CameraSettings, verbose: bool = False, stream_name: str = '') -> None:
+    def __init__(self, settings: OakSettings, verbose: bool = False, stream_name: str = '') -> None:
         num_cams: int = settings.num_cameras
         self.verbose: bool = verbose
         self.stream_name: str = stream_name
@@ -27,7 +27,7 @@ class FrameSyncBang:
 
         with self._lock:
             self._timestamp_history.append((cam_id, timestamp))
-            trigger_cam_id: int = FrameSyncBang._find_sync_trigger_camera(self._timestamp_history, self.max_gap_s)
+            trigger_cam_id: int = FrameSync._find_sync_trigger_camera(self._timestamp_history, self.max_gap_s)
 
             if cam_id == trigger_cam_id:
                 # if self.verbose:
@@ -58,7 +58,7 @@ class FrameSyncBang:
             Camera ID that should trigger the sync callback
         """
 
-        camera_ids: set[int] = FrameSyncBang._get_unique_cameras_in_history(timestamp_history)
+        camera_ids: set[int] = FrameSync._get_unique_cameras_in_history(timestamp_history)
 
         if len(timestamp_history) < 2:
             return next(iter(camera_ids))
@@ -107,7 +107,7 @@ class FrameSyncBang:
         if len(timestamp_history) == 0:
             return 0.0
 
-        camera_ids: set[int] = FrameSyncBang._get_unique_cameras_in_history(timestamp_history)
+        camera_ids: set[int] = FrameSync._get_unique_cameras_in_history(timestamp_history)
 
         if not camera_ids:  # Extra safety
             return 0.0

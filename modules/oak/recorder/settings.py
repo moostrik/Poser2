@@ -1,4 +1,4 @@
-from modules.cam.depthcam.Definitions import FrameType, CoderType, CoderFormat
+from ..camera.definitions import FrameType, CoderType, CoderFormat
 from modules.settings import Settings, Field, Widget
 
 
@@ -12,7 +12,7 @@ class RecorderSettings(Settings):
     video_encoder:      Field[CoderType]        = Field(CoderType.iGPU, access=Field.INIT, description="Video encoder type")
     video_chunk_length: Field[float]            = Field(10.0, min=1.0, max=300.0, description="Video chunk duration (seconds)")
 
-    # Shared fields (populated from parent via share=[...] in Phase 4)
+    # Shared fields (populated from parent via share=[...])
     video_path:         Field[str]              = Field("recordings", access=Field.INIT, visible=False, description="Video recordings directory")
     temp_path:          Field[str]              = Field("temp", access=Field.INIT, visible=False, description="Temporary files directory")
     video_format:       Field[CoderFormat]      = Field(CoderFormat.H264, access=Field.INIT, visible=False, description="Video format")
@@ -20,3 +20,5 @@ class RecorderSettings(Settings):
     color:              Field[bool]             = Field(True, access=Field.INIT, visible=False, description="Enable color capture")
     square:             Field[bool]             = Field(True, access=Field.INIT, visible=False, description="Use square aspect ratio")
     stereo:             Field[bool]             = Field(False, access=Field.INIT, visible=False, description="Enable stereo mode")
+    num_cameras:        Field[int]              = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
+    fps:                Field[float]            = Field(30.0, access=Field.INIT, visible=False, description="Camera frame rate")
