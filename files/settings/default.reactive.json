@@ -16,15 +16,7 @@
     "video_frame_types": [
       "VIDEO"
     ],
-    "player": {
-      "folder": "20251212-130516_3_square_color_no_id",
-      "range_start": 3,
-      "range_end": 3,
-      "sim_fps": 23.0,
-      "sim_passthrough": false,
-      "video_decoder": "iGPU"
-    },
-    "cores": [
+    "cameras": [
       {
         "device_id": "14442C101136D1D200",
         "show_stereo": false,
@@ -110,11 +102,34 @@
         "stereo_median_filter": "OFF"
       }
     ],
+    "simulator": {
+      "folder": "20251212-130516_3_square_color_no_id",
+      "range_start": 3,
+      "range_end": 3,
+      "sim_fps": 30.0,
+      "sim_passthrough": false,
+      "video_decoder": "iGPU"
+    },
     "recorder": {
       "group_id": "no_id",
       "video_encoder": "iGPU",
       "video_chunk_length": 10.0
     }
+  },
+  "pose": {
+    "max_poses": 3,
+    "model_type": "TRT",
+    "pose_resolution": "STANDARD",
+    "flow_resolution": "EXTREME",
+    "model_path": "models",
+    "confidence_low": 0.5,
+    "confidence_high": 0.6,
+    "verbose": false,
+    "crop_expansion_width": 0.1,
+    "crop_expansion_height": 0.1,
+    "segmentation_enabled": true,
+    "segmentation_reset_interval": 240,
+    "flow_enabled": false
   },
   "inout": {
     "osc_sound": {

@@ -97,9 +97,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     logging.info(f"Loading settings from: {settings_path}")
     settings: Settings = Settings.load(settings_path)
 
-    if args.nopose:
-        settings.pose.model_type = ModelType.NONE
-
     app = Main(settings, simulation=args.simulation)
     app.start()
 

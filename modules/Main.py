@@ -18,6 +18,7 @@ from modules.gui.ConfigGuiGenerator import ConfigGuiGenerator
 from modules.inout import OscSound, OscSoundConfig, ArtNetBars, ArtNetBarsSettings
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers
+from modules.pose.Settings import Settings as PoseSettings
 from modules.utils import Timer, TimerConfig
 
 class InOutGroup(NewSettings):
@@ -29,6 +30,7 @@ class InOutGroup(NewSettings):
 class MainSettings(NewSettings):
     num_players: Field[int] = Field(3, access=Field.INIT, visible=False)
     camera: OakSettings
+    pose:   PoseSettings
     inout:  InOutGroup
     render: RenderSettings
     server: NiceSettings
@@ -65,11 +67,11 @@ class Main():
         if cam_settings.sim_enabled:
             self.player = Player(cam_settings.simulator)
             for i in range(cam_settings.num_cameras):
-                self.cameras.append(Simulator(self.player, cam_settings.cores[i], cam_settings.player))
+                self.cameras.append(Simulator(self.player, cam_settings.cameras[i], cam_settings.simulator))
         else:
             self.recorder = Recorder(cam_settings.recorder)
             for i in range(cam_settings.num_cameras):
-                camera = Camera(cam_settings.cores[i])
+                camera = Camera(cam_settings.cameras[i])
                 self.cameras.append(camera)
         self.frame_sync_bang = FrameSync(cam_settings, False, 'frame_sync')
 
@@ -98,8 +100,9 @@ class Main():
         self.settings_server.start()
 
         # POSE CONFIGURATION
-        # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion_width=settings.pose.crop_expansion_width, expansion_height=settings.pose.crop_expansion_height, output_width=384, output_height=512, max_poses=settings.pose.max_poses)
-        self.gpu_crop_config =      batch.ImageCropConfig(expansion_width=settings.pose.crop_expansion_width, expansion_height=settings.pose.crop_expansion_height, output_width=768, output_height=1024, max_poses=settings.pose.max_poses, verbose=False, enable_prev_crop=False)
+        pose_settings = self.new_settings.pose
+        # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion_width=pose_settings.crop_expansion_width, expansion_height=pose_settings.crop_expansion_height, output_width=384, output_height=512, max_poses=pose_settings.max_poses)
+        self.gpu_crop_config =      batch.ImageCropConfig(expansion_width=pose_settings.crop_expansion_width, expansion_height=pose_settings.crop_expansion_height, output_width=768, output_height=1024, max_poses=pose_settings.max_poses, verbose=False, enable_prev_crop=False)
         self.prediction_config =    nodes.PredictorConfig(frequency=cam_settings.fps)
 
         self.b_box_smooth_config =  nodes.EuroSmootherConfig()
@@ -139,9 +142,9 @@ class Main():
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
 
         self.gpu_crop_processor =   batch.ImageCropProcessor(self.gpu_crop_config)
-        self.point_extractor =      batch.PointBatchExtractor(settings.pose)  # GPU-based 2D point extractor
-        self.mask_extractor =       batch.MaskBatchExtractor(settings.pose)   # GPU-based segmentation mask extractor
-        self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
+        self.point_extractor =      batch.PointBatchExtractor(pose_settings)  # GPU-based 2D point extractor
+        self.mask_extractor =       batch.MaskBatchExtractor(pose_settings)   # GPU-based segmentation mask extractor
+        self.flow_extractor =       batch.FlowBatchExtractor(pose_settings)   # GPU-based optical flow extractor
 
         self.window_similator_config = batch.WindowSimilarityConfig(window_length=int(0.5 * cam_settings.fps))
         self.window_similator=      batch.WindowSimilarity(self.window_similator_config)
@@ -152,9 +155,9 @@ class Main():
         self.window_correlation_gui = guis.WindowCorrelationGui(self.window_correlator_config, self.gui, 'CORRELATION')
 
         # Feature applicators (replace SimilarityExtractor)
-        self.similarity_applicator = nodes.SimilarityApplicator(max_poses=settings.pose.max_poses)
-        self.leader_applicator =     nodes.LeaderScoreApplicator(max_poses=settings.pose.max_poses)
-        self.motion_gate_applicator = nodes.MotionGateApplicator(nodes.MotionGateApplicatorConfig(max_poses=settings.pose.max_poses))
+        self.similarity_applicator = nodes.SimilarityApplicator(max_poses=pose_settings.max_poses)
+        self.leader_applicator =     nodes.LeaderScoreApplicator(max_poses=pose_settings.max_poses)
+        self.motion_gate_applicator = nodes.MotionGateApplicator(nodes.MotionGateApplicatorConfig(max_poses=pose_settings.max_poses))
         self.motion_gate_tracker =   trackers.FilterTracker(num_players, [lambda: self.motion_gate_applicator])
 
         self.debug_tracker =        trackers.DebugTracker(num_players)
@@ -176,7 +179,7 @@ class Main():
         self.pose_raw_filters =     trackers.FilterTracker(
             num_players,
             [
-                lambda: nodes.PointDualConfFilter(nodes.DualConfFilterConfig(settings.pose.confidence_low, settings.pose.confidence_high)),
+                lambda: nodes.PointDualConfFilter(nodes.DualConfFilterConfig(pose_settings.confidence_low, pose_settings.confidence_high)),
                 # lambda: nodes.PointTemporalStabilizer(nodes.TemporalStabilizerConfig()),
                 nodes.AngleExtractor,
                 lambda: nodes.AngleVelExtractor(fps=cam_settings.fps),

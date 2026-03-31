@@ -7,10 +7,10 @@ from modules.settings import Settings, Field
 
 class OakSettings(Settings):
 
-    # Camera count — source of truth for cores Child count
+    # Camera count — source of truth for cameras Child count
     num_cameras:    Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
 
-    # Core camera settings (shared to cores, recorder, player as needed)
+    # Camera settings (shared to cameras, recorder, simulator as needed)
     fps:            Field[float]            = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
     yolo:           Field[bool]             = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color:          Field[bool]             = Field(True, access=Field.INIT, description="Enable color capture")
@@ -29,6 +29,6 @@ class OakSettings(Settings):
     video_frame_types: Field[list[FrameType]] = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record")
 
     # Children
-    cores: list[CameraSettings]     = CameraSettings(count=num_cameras, share=[fps, color, square, stereo, yolo, hd_ready, sim_enabled, model_path])  # type: ignore[assignment]
+    cameras: list[CameraSettings]   = CameraSettings(count=num_cameras, share=[fps, color, square, stereo, yolo, hd_ready, sim_enabled, model_path])  # type: ignore[assignment]
     simulator: SimulatorSettings    = SimulatorSettings(share=[video_path, video_format, video_frame_types, num_cameras, color, square, stereo])
     recorder: RecorderSettings      = RecorderSettings(share=[video_path, temp_path, video_format, video_frame_types, color, square, stereo, num_cameras, fps])

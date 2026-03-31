@@ -1,5 +1,6 @@
-from dataclasses import dataclass, field
 from enum import IntEnum, auto
+
+from modules.settings import Settings as ReactiveSettings, Field
 
 
 class ModelType(IntEnum):
@@ -76,28 +77,27 @@ RESOLUTION_DIMS = {
 }
 
 
-@dataclass
-class Settings:
+class Settings(ReactiveSettings):
 
-    max_poses: int =                    field(default=1)
-    model_type: ModelType =             field(default=ModelType.TRT)
+    max_poses:                  Field[int]          = Field(1, min=1, max=16, access=Field.INIT)
+    model_type:                 Field[ModelType]    = Field(ModelType.TRT, access=Field.INIT)
 
     # Per-model resolution settings
-    pose_resolution: Resolution =       field(default=Resolution.STANDARD)
-    flow_resolution: Resolution =       field(default=Resolution.STANDARD)
+    pose_resolution:            Field[Resolution]   = Field(Resolution.STANDARD, access=Field.INIT)
+    flow_resolution:            Field[Resolution]   = Field(Resolution.STANDARD, access=Field.INIT)
 
-    model_path: str =                   field(default="models")
+    model_path:                 Field[str]          = Field("models", access=Field.INIT, visible=False)
 
-    confidence_low: float =             field(default=0.5)
-    confidence_high: float =            field(default=0.7)
-    verbose: bool =                     field(default=False)
-    crop_expansion_width: float =       field(default=0.0)
-    crop_expansion_height: float =      field(default=0.0)
+    confidence_low:             Field[float]        = Field(0.5, min=0.0, max=1.0, access=Field.INIT)
+    confidence_high:            Field[float]        = Field(0.7, min=0.0, max=1.0, access=Field.INIT)
+    verbose:                    Field[bool]         = Field(False, access=Field.INIT)
+    crop_expansion_width:       Field[float]        = Field(0.0, min=0.0, max=1.0, access=Field.INIT)
+    crop_expansion_height:      Field[float]        = Field(0.0, min=0.0, max=1.0, access=Field.INIT)
 
     # Feature toggles
-    segmentation_enabled: bool =        field(default=True)
-    segmentation_reset_interval: int =  field(default=60)
-    flow_enabled: bool =                field(default=True)
+    segmentation_enabled:       Field[bool]         = Field(True, access=Field.INIT)
+    segmentation_reset_interval: Field[int]         = Field(60, min=1, access=Field.INIT)
+    flow_enabled:               Field[bool]         = Field(True, access=Field.INIT)
 
     # Segmentation resolution follows flow resolution
     @property
