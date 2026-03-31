@@ -19,6 +19,8 @@ from modules.inout import OscSound, OscSoundConfig, ArtNetBars, ArtNetBarsSettin
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers
 from modules.pose.Settings import Settings as PoseSettings
+from modules.pose.batch.WindowSimilarity import WindowSimilarityConfig
+from modules.pose.batch.WindowCorrelation import WindowCorrelationConfig
 from modules.utils import Timer, TimerConfig
 
 class InOutGroup(NewSettings):
@@ -27,10 +29,15 @@ class InOutGroup(NewSettings):
     artnet_2: ArtNetBarsSettings
     artnet_3: ArtNetBarsSettings
 
+class PoseGroup(NewSettings):
+    pose: PoseSettings
+    window_similarity: WindowSimilarityConfig
+    window_correlation: WindowCorrelationConfig
+
 class MainSettings(NewSettings):
     num_players: Field[int] = Field(3, access=Field.INIT, visible=False)
     camera: OakSettings
-    pose:   PoseSettings
+    pose:   PoseGroup
     inout:  InOutGroup
     render: RenderSettings
     server: NiceSettings
@@ -100,7 +107,7 @@ class Main():
         self.settings_server.start()
 
         # POSE CONFIGURATION
-        pose_settings = self.new_settings.pose
+        pose_settings = self.new_settings.pose.pose
         # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion_width=pose_settings.crop_expansion_width, expansion_height=pose_settings.crop_expansion_height, output_width=384, output_height=512, max_poses=pose_settings.max_poses)
         self.gpu_crop_config =      batch.ImageCropConfig(expansion_width=pose_settings.crop_expansion_width, expansion_height=pose_settings.crop_expansion_height, output_width=768, output_height=1024, max_poses=pose_settings.max_poses, verbose=False, enable_prev_crop=False)
         self.prediction_config =    nodes.PredictorConfig(frequency=cam_settings.fps)
@@ -146,13 +153,11 @@ class Main():
         self.mask_extractor =       batch.MaskBatchExtractor(pose_settings)   # GPU-based segmentation mask extractor
         self.flow_extractor =       batch.FlowBatchExtractor(pose_settings)   # GPU-based optical flow extractor
 
-        self.window_similator_config = batch.WindowSimilarityConfig(window_length=int(0.5 * cam_settings.fps))
+        self.window_similator_config = self.new_settings.pose.window_similarity
         self.window_similator=      batch.WindowSimilarity(self.window_similator_config)
-        self.window_similarity_gui = guis.WindowSimilarityGui(self.window_similator_config, self.gui, 'SIMILARITY')
 
-        self.window_correlator_config = batch.WindowCorrelationConfig(window_length=int(0.5 * cam_settings.fps))
+        self.window_correlator_config = self.new_settings.pose.window_correlation
         self.window_correlator =    batch.WindowCorrelation(self.window_correlator_config)
-        self.window_correlation_gui = guis.WindowCorrelationGui(self.window_correlator_config, self.gui, 'CORRELATION')
 
         # Feature applicators (replace SimilarityExtractor)
         self.similarity_applicator = nodes.SimilarityApplicator(max_poses=pose_settings.max_poses)
@@ -345,7 +350,7 @@ class Main():
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame(), self.a_vel_smooth_gui.get_gui_frame()])
         self.gui.addFrame([self.motion_extractor_gui.get_gui_frame(), self.motion_ma_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
-        self.gui.addFrame([self.window_correlation_gui.get_gui_frame(),self.window_similarity_gui.get_gui_frame(), self.simil_smooth_gui.get_gui_frame()])
+        self.gui.addFrame([self.simil_smooth_gui.get_gui_frame()])
         self.gui.start()
         self.gui.bringToFront()
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI

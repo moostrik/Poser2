@@ -94,7 +94,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings_path: str = f"files/settings/{args.settings}.json"
 
-    logging.info(f"Loading settings from: {settings_path}")
     settings: Settings = Settings.load(settings_path)
 
     app = Main(settings, simulation=args.simulation)

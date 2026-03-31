@@ -1,5 +1,4 @@
 # Standard library imports
-from dataclasses import dataclass
 from enum import IntEnum
 import threading
 import time
@@ -12,7 +11,7 @@ import numpy as np
 from numpy.fft import rfft, irfft
 
 # Pose imports
-from modules.ConfigBase import ConfigBase, config_field
+from modules.settings import Settings as ReactiveSettings, Field
 from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.Frame import FrameField
 from modules.pose.nodes.windows.WindowNode import FeatureWindow
@@ -47,19 +46,18 @@ class _JointAggregator(NormalizedScalarFeature):
             cls._joint_enum = cast(type[IntEnum], IntEnum("JointIndex", {f"J{i}": i for i in range(num_joints)}))
 
 
-@dataclass
-class WindowCorrelationConfig(ConfigBase):
+class WindowCorrelationConfig(ReactiveSettings):
     """Configuration for WindowCorrelation."""
-    max_poses: int = config_field(3, min=1, max=10, description="Maximum number of tracked poses")
-    window_length: int = config_field(30, min=4, max=300, description="Number of frames for correlation")
-    method: AggregationMethod = AggregationMethod.HARMONIC_MEAN
-    max_lag: int = config_field(15, min=1, max=150, description="Maximum lag to search (±frames)")
-    min_variance: float = config_field(0.01, min=0.001, max=0.5, description="Minimum variance for valid correlation")
-    use_motion_weighting: bool = config_field(True, description="Weight correlation by motion magnitude")
-    remap_low: float = config_field(0.0, min=-1.0, max=1.0, description="Correlation that maps to 0")
-    remap_high: float = config_field(1.0, min=-1.0, max=1.0, description="Correlation that maps to 1")
-    enabled: bool = config_field(False, description="Enable correlation computation")
-    verbose: bool = config_field(False, description="Enable verbose logging")
+    max_poses:              Field[int]                = Field(3, min=1, max=10, access=Field.INIT, description="Maximum number of tracked poses")
+    window_length:          Field[int]                = Field(30, min=4, max=300, description="Number of frames for correlation")
+    method:                 Field[AggregationMethod]  = Field(AggregationMethod.HARMONIC_MEAN, description="Aggregation method")
+    max_lag:                Field[int]                = Field(15, min=1, max=150, description="Maximum lag to search (±frames)")
+    min_variance:           Field[float]              = Field(0.01, min=0.001, max=0.5, description="Minimum variance for valid correlation")
+    use_motion_weighting:   Field[bool]               = Field(True, description="Weight correlation by motion magnitude")
+    remap_low:              Field[float]              = Field(0.0, min=-1.0, max=1.0, description="Correlation that maps to 0")
+    remap_high:             Field[float]              = Field(1.0, min=-1.0, max=1.0, description="Correlation that maps to 1")
+    enabled:                Field[bool]               = Field(False, description="Enable correlation computation")
+    verbose:                Field[bool]               = Field(False, description="Enable verbose logging")
 
 
 class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int, LeaderScore]]]):

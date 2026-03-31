@@ -117,19 +117,47 @@
     }
   },
   "pose": {
-    "max_poses": 3,
-    "model_type": "TRT",
-    "pose_resolution": "STANDARD",
-    "flow_resolution": "EXTREME",
-    "model_path": "models",
-    "confidence_low": 0.5,
-    "confidence_high": 0.6,
-    "verbose": false,
-    "crop_expansion_width": 0.1,
-    "crop_expansion_height": 0.1,
-    "segmentation_enabled": true,
-    "segmentation_reset_interval": 240,
-    "flow_enabled": false
+    "pose": {
+      "max_poses": 3,
+      "model_type": "TRT",
+      "pose_resolution": "STANDARD",
+      "flow_resolution": "EXTREME",
+      "model_path": "models",
+      "confidence_low": 0.5,
+      "confidence_high": 0.6,
+      "verbose": false,
+      "crop_expansion_width": 0.1,
+      "crop_expansion_height": 0.1,
+      "segmentation_enabled": true,
+      "segmentation_reset_interval": 240,
+      "flow_enabled": false
+    },
+    "window_similarity": {
+      "window_length": 11,
+      "method": "HARMONIC_MEAN",
+      "use_angle_similarity": true,
+      "angle_scale": 0.8,
+      "use_velocity_similarity": true,
+      "vel_scale": 1.0,
+      "use_motion_weighting": true,
+      "use_time_penalty": false,
+      "time_decay_exp": 2.5,
+      "remap_low": 0.0,
+      "remap_high": 0.75,
+      "enabled": false,
+      "verbose": false
+    },
+    "window_correlation": {
+      "window_length": 7,
+      "method": "HARMONIC_MEAN",
+      "max_lag": 7,
+      "min_variance": 0.01,
+      "use_motion_weighting": true,
+      "remap_low": 0.0,
+      "remap_high": 0.75,
+      "enabled": true,
+      "verbose": false
+    }
   },
   "inout": {
     "osc_sound": {
