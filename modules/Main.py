@@ -28,7 +28,7 @@ class InOutGroup(NewSettings):
     artnet_3: ArtNetBarsSettings
 
 class MainSettings(NewSettings):
-    num_players: Field[int] = Field(3, access=Field.INIT, visible=True)
+    num_players: Field[int] = Field(3, access=Field.INIT, visible=False)
     camera: CameraSettings
     inout:  InOutGroup
     render: RenderSettings
