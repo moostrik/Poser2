@@ -14,7 +14,7 @@ from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCall
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from modules.pose.Settings import PoseSettings
+    from .SegmentationSettings import SegmentationSettings
 
 
 class RecurrentState:
@@ -39,19 +39,19 @@ class ONNXSegmentation(Thread):
     All results delivered via callbacks in notification order.
     """
 
-    def __init__(self, settings: 'PoseSettings') -> None:
+    def __init__(self, settings: 'SegmentationSettings') -> None:
         super().__init__()
 
-        self.enabled: bool = settings.segmentation_enabled
+        self.enabled: bool = settings.enabled
         if not self.enabled:
             print('Segmentation WARNING: Segmentation is disabled')
 
         self.model_path: str = settings.model_path
-        self.model_name: str = settings.segmentation_model
+        self.model_name: str = settings.model
         self.model_file: str = f"{self.model_path}/{self.model_name}"
-        self.model_width: int = settings.segmentation_width
-        self.model_height: int = settings.segmentation_height
-        self.resolution_name: str = settings.segmentation_resolution.name
+        self.model_width: int = settings.width
+        self.model_height: int = settings.height
+        self.resolution_name: str = settings.resolution.name
         self.verbose: bool = settings.verbose
 
         # Thread coordination
@@ -74,7 +74,7 @@ class ONNXSegmentation(Thread):
         # Per-tracklet recurrent states for temporal coherence
         self._recurrent_states: dict[int, RecurrentState] = {}
         self._frame_counter: int = 0  # For periodic state reset
-        self._state_reset_interval: int = settings.segmentation_reset_interval  # Reset all states every N frames (0=disabled)
+        self._state_reset_interval: int = settings.reset_interval  # Reset all states every N frames (0=disabled)
 
         # ONNX session (initialized in run thread)
         self._session: ort.InferenceSession | None = None

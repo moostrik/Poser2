@@ -7,7 +7,8 @@ import torch
 from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.batch.ImageFrame import ImageFrameDict
 from modules.pose.Frame import FrameDict
-from modules.pose.Settings import PoseSettings, ModelType
+from ..model_types import ModelType
+from .FlowSettings import FlowSettings
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 from .InOut import OpticalFlowInput, OpticalFlowOutput
@@ -31,7 +32,7 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
     for real-time fluid simulation where recent data is more valuable than old data.
     """
 
-    def __init__(self, settings: PoseSettings):
+    def __init__(self, settings: FlowSettings):
         super().__init__()
         self._optical_flow: OpticalFlow = ONNXOpticalFlow(settings)
         if settings.model_type is ModelType.ONNX:

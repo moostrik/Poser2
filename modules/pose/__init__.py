@@ -1,1 +1,1 @@
-from .Settings import PoseSettings
+from .batch.model_types import ModelType, Resolution, RESOLUTION_DIMS

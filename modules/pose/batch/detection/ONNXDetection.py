@@ -11,7 +11,7 @@ import torch
 
 from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
 
-from modules.pose.Settings import PoseSettings
+from .DetectionSettings import DetectionSettings
 
 # ImageNet normalization constants (RGB order) - scaled to [0,1] range
 IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(1, 3, 1, 1)
@@ -25,18 +25,18 @@ class ONNXDetection(Thread):
     Architecture identical to MMDetection for drop-in replacement.
     """
 
-    def __init__(self, settings: 'PoseSettings') -> None:
+    def __init__(self, settings: 'DetectionSettings') -> None:
         super().__init__()
 
-        self.model_file: str = settings.model_path + '/' + settings.pose_model
-        self.model_width: int = settings.pose_width
-        self.model_height: int = settings.pose_height
+        self.model_file: str = settings.model_path + '/' + settings.model
+        self.model_width: int = settings.width
+        self.model_height: int = settings.height
         self.model_num_warmups: int = settings.max_poses
         self.num_keypoints: int = 17  # RTMPose COCO format
         self.simcc_split_ratio: float = 2.0  # From RTMPose config
 
         self.verbose: bool = settings.verbose
-        self.resolution_name: str = settings.pose_resolution.name
+        self.resolution_name: str = settings.resolution.name
 
         # Thread coordination (identical to MMDetection)
         self._shutdown_event: Event = Event()

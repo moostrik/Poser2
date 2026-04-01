@@ -12,7 +12,7 @@ import onnxruntime as ort
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from modules.pose.Settings import PoseSettings
+    from .FlowSettings import FlowSettings
 
 from .InOut import OpticalFlowInput, OpticalFlowOutput, OpticalFlowOutputCallback
 
@@ -29,19 +29,19 @@ class ONNXOpticalFlow(Thread):
     All results (success and dropped) are delivered via callbacks in notification order.
     """
 
-    def __init__(self, settings: 'PoseSettings') -> None:
+    def __init__(self, settings: 'FlowSettings') -> None:
         super().__init__()
 
-        self.enabled: bool = settings.flow_enabled if hasattr(settings, 'flow_enabled') else False
+        self.enabled: bool = settings.enabled
         if not self.enabled:
             print('Optical Flow WARNING: Optical flow is disabled')
 
         self.model_path: str = settings.model_path
-        self.model_name: str = settings.flow_model
+        self.model_name: str = settings.model
         self.model_file: str = f"{self.model_path}/{self.model_name}"
-        self.model_width: int = settings.flow_width
-        self.model_height: int = settings.flow_height
-        self.resolution_name: str = settings.flow_resolution.name
+        self.model_width: int = settings.width
+        self.model_height: int = settings.height
+        self.resolution_name: str = settings.resolution.name
         self.verbose: bool = settings.verbose
 
         # Thread coordination

@@ -137,17 +137,22 @@
   },
   "pose": {
     "max_poses": 3,
+    "model_type": "TRT",
+    "model_path": "models",
+    "verbose": false,
     "frequency": 30.0,
     "output_frequency": 60.0,
-    "pose": {
-      "model_type": "TRT",
-      "pose_resolution": "STANDARD",
-      "flow_resolution": "EXTREME",
-      "model_path": "models",
-      "verbose": false,
-      "segmentation_enabled": true,
-      "segmentation_reset_interval": 240,
-      "flow_enabled": false
+    "detection": {
+      "resolution": "STANDARD"
+    },
+    "segmentation": {
+      "resolution": "EXTREME",
+      "enabled": true,
+      "reset_interval": 240
+    },
+    "flow": {
+      "resolution": "EXTREME",
+      "enabled": false
     },
     "image_crop": {
       "expansion_width": 0.1,

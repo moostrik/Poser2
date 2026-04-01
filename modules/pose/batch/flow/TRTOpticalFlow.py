@@ -13,9 +13,9 @@ from .InOut import OpticalFlowInput, OpticalFlowOutput, OpticalFlowOutputCallbac
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from modules.pose.Settings import PoseSettings
+    from .FlowSettings import FlowSettings
 
-from modules.pose.batch.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
+from ..tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 
 
 class TRTOpticalFlow(Thread):
@@ -32,19 +32,19 @@ class TRTOpticalFlow(Thread):
     All results (success and dropped) are delivered via callbacks in notification order.
     """
 
-    def __init__(self, settings: 'PoseSettings') -> None:
+    def __init__(self, settings: 'FlowSettings') -> None:
         super().__init__()
 
-        self.enabled: bool = settings.flow_enabled if hasattr(settings, 'flow_enabled') else False
+        self.enabled: bool = settings.enabled
         if not self.enabled:
             print('TensorRT Optical Flow WARNING: Optical flow is disabled')
 
         self.model_path: str = settings.model_path
-        self.model_name: str = settings.flow_model
+        self.model_name: str = settings.model
         self.model_file: str = f"{self.model_path}/{self.model_name}"
-        self.model_width: int = settings.flow_width
-        self.model_height: int = settings.flow_height
-        self.resolution_name: str = settings.flow_resolution.name
+        self.model_width: int = settings.width
+        self.model_height: int = settings.height
+        self.resolution_name: str = settings.resolution.name
         self.verbose: bool = settings.verbose
 
         # Thread coordination
@@ -72,7 +72,7 @@ class TRTOpticalFlow(Thread):
         self.output_name: str
 
         # Model configuration (initialized in _setup())
-        self._max_batch: int = min(getattr(settings, 'max_poses', 3), 4)
+        self._max_batch: int = min(settings.max_poses, 4)
         self._torch_dtype: torch.dtype
         self.model_precision: str
 

@@ -68,9 +68,9 @@ class Main():
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
 
         self.gpu_crop_processor =   batch.ImageCropProcessor(self.settings.pose.image_crop)
-        self.point_extractor =      batch.PointBatchExtractor(self.settings.pose.pose)
-        self.mask_extractor =       batch.MaskBatchExtractor(self.settings.pose.pose)
-        self.flow_extractor =       batch.FlowBatchExtractor(self.settings.pose.pose)
+        self.point_extractor =      batch.PointBatchExtractor(self.settings.pose.detection)
+        self.mask_extractor =       batch.MaskBatchExtractor(self.settings.pose.segmentation)
+        self.flow_extractor =       batch.FlowBatchExtractor(self.settings.pose.flow)
 
         self.window_similator =     batch.WindowSimilarity(self.settings.pose.window_similarity)
         self.window_correlator =    batch.WindowCorrelation(self.settings.pose.window_correlation)

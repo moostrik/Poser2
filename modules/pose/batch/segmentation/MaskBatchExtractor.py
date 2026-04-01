@@ -7,7 +7,8 @@ import torch
 
 from modules.pose.batch.ImageFrame import ImageFrame, ImageFrameDict, ImageFrameCallback
 from modules.pose.Frame import FrameDict
-from modules.pose.Settings import PoseSettings, ModelType
+from ..model_types import ModelType
+from .SegmentationSettings import SegmentationSettings
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 
@@ -33,7 +34,7 @@ class MaskBatchExtractor:
     for real-time visualization where recent data is more valuable than old data.
     """
 
-    def __init__(self, settings: PoseSettings):
+    def __init__(self, settings: SegmentationSettings):
         self._segmentation: Segmentation = ONNXSegmentation(settings)
         if settings.model_type is ModelType.ONNX:
             self._segmentation = ONNXSegmentation(settings)
