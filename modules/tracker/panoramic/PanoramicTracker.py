@@ -11,11 +11,22 @@ from modules.oak.camera.definitions import Tracklet as DepthTracklet
 from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback
 from modules.tracker.panoramic.PanoramicTrackletManager import PanoramicTrackletManager
-from modules.tracker.panoramic.PanoramicTrackerGui import PanoramicTrackerGui
 from modules.tracker.panoramic.PanoramicGeometry import PanoramicGeometry
 from modules.tracker.panoramic.PanoramicDefinitions import *
+from modules.settings import Settings as ReactiveSettings, Field
 
 from modules.utils.HotReloadMethods import HotReloadMethods
+
+
+class PanoramicTrackerConfig(ReactiveSettings):
+    """Configuration for PanoramicTracker."""
+    fov:                      Field[float] = Field(CAM_360_FOV,              min=90.0, max=130.0, step=0.5)
+    tracklet_min_age:         Field[int]   = Field(5,                        min=0,    max=9,     step=1)
+    tracklet_min_height:      Field[float] = Field(0.25,                     min=0.0,  max=1.0,   step=0.05)
+    timeout:                  Field[float] = Field(2.0,                      min=1.0,  max=5.0,   step=0.1)
+    cam_360_edge_threshold:   Field[float] = Field(CAM_360_EDGE_THRESHOLD,   min=0.0,  max=0.6,   step=0.1)
+    cam_360_overlap_expansion:Field[float] = Field(CAM_360_OVERLAP_EXPANSION,min=0.0,  max=1.0,   step=0.1)
+    cam_360_hysteresis_factor:Field[float] = Field(CAM_360_HYSTERESIS_FACTOR)
 
 
 @dataclass (frozen=True)
@@ -36,7 +47,7 @@ class PanoramicOverlapInfo:
     reason: str
 
 class PanoramicTracker(Thread, BaseTracker):
-    def __init__(self, gui, num_players: int,  num_cameras: int) -> None:
+    def __init__(self, config: PanoramicTrackerConfig, num_players: int, num_cameras: int) -> None:
         super().__init__()
 
         self.running: bool = False
@@ -48,18 +59,14 @@ class PanoramicTracker(Thread, BaseTracker):
 
         self.tracklet_manager: PanoramicTrackletManager = PanoramicTrackletManager(self.max_players)
 
-        self.geometry: PanoramicGeometry = PanoramicGeometry(num_cameras, CAM_360_FOV, CAM_360_TARGET_FOV)
+        self.config: PanoramicTrackerConfig = config
+        self.geometry: PanoramicGeometry = PanoramicGeometry(num_cameras, config.fov, CAM_360_TARGET_FOV)
 
-        self.tracklet_min_age: int =            5
-        self.tracklet_min_height: float =       0.25
-        self.timeout: float =                   2.0
-        self.cam_360_edge_threshold: float =    CAM_360_EDGE_THRESHOLD
-        self.cam_360_overlap_expansion: float = CAM_360_OVERLAP_EXPANSION
-        self.cam_360_hysteresis_factor: float = CAM_360_HYSTERESIS_FACTOR
+        # Wire fov changes to geometry
+        PanoramicTrackerConfig.fov.bind(config, lambda v: self.geometry.set_fov(v))
 
         self.callback_lock = Lock()
         self.tracklet_callbacks: set[TrackletDictCallback] = set()
-        self.gui = PanoramicTrackerGui(gui, self)
 
         # hot_reload = HotReloadMethods(self.__class__)
 
@@ -115,17 +122,17 @@ class PanoramicTracker(Thread, BaseTracker):
             return
 
         # filter out tracklets that are too young or too small
-        if new_tracklet.external_age_in_frames <= self.tracklet_min_age:
+        if new_tracklet.external_age_in_frames <= self.config.tracklet_min_age:
             return
-        if new_tracklet.roi.height < self.tracklet_min_height:
+        if new_tracklet.roi.height < self.config.tracklet_min_height:
             return
 
         # Construct PanoramicTrackerInfo with local and world angles
-        local_angle, world_angle, _overlap = self.geometry.get_angles_and_overlap(new_tracklet.roi, new_tracklet.cam_id, self.cam_360_edge_threshold)
+        local_angle, world_angle, _overlap = self.geometry.get_angles_and_overlap(new_tracklet.roi, new_tracklet.cam_id, self.config.cam_360_edge_threshold)
         new_tracklet = replace(new_tracklet, metadata=PanoramicMetadata(local_angle, world_angle, _overlap))
 
         # Filter out tracklets that are too close to the edge of a camera's field of view
-        if self.geometry.angle_in_edge(local_angle, self.cam_360_edge_threshold):
+        if self.geometry.angle_in_edge(local_angle, self.config.cam_360_edge_threshold):
             return
 
         # Check if the new tracklet already exists in the tracker and replace
@@ -140,7 +147,7 @@ class PanoramicTracker(Thread, BaseTracker):
     def _update_tracklets(self) -> None:
         # retire expired tracklets
         for tracklet in self.tracklet_manager.all_tracklets():
-            if tracklet.is_expired(self.timeout):
+            if tracklet.is_expired(self.config.timeout):
                 self.tracklet_manager.retire_tracklet(tracklet.id)
 
         # merge overlapping tracklets
@@ -167,7 +174,7 @@ class PanoramicTracker(Thread, BaseTracker):
         for i, tracklet in enumerate(tracklets):
             # Reconstruct PanoramicTrackerInfo with updated overlap field
             if isinstance(tracklet.metadata, PanoramicMetadata):
-                updated_overlap = self.geometry.angle_in_overlap(tracklet.metadata.local_angle, self.cam_360_overlap_expansion)
+                updated_overlap = self.geometry.angle_in_overlap(tracklet.metadata.local_angle, self.config.cam_360_overlap_expansion)
 
                 tracklets[i] = replace(
                     tracklet,
@@ -187,7 +194,7 @@ class PanoramicTracker(Thread, BaseTracker):
                 continue
 
             angle_diff: float = self.geometry.angle_diff(getattr(P_A.metadata, "world_angle", 45.0), getattr(P_B.metadata, "world_angle", 45.0))
-            if angle_diff > self.geometry.fov_overlap * (1.0 + self.cam_360_overlap_expansion):
+            if angle_diff > self.geometry.fov_overlap * (1.0 + self.config.cam_360_overlap_expansion):
                 continue
 
             # look at the hight of the trackets for extra filtering
@@ -213,7 +220,7 @@ class PanoramicTracker(Thread, BaseTracker):
             edge_newest: float = self.geometry.angle_from_edge(getattr(newest.metadata, "local_angle", 45.0))
             edge_oldest: float = self.geometry.angle_from_edge(getattr(oldest.metadata, "local_angle", 45.0))
             # print(f"Comparing newest {newest.id} (edge {edge_newest}) to oldest {oldest.id} (edge {edge_oldest})")
-            if edge_newest >= edge_oldest / self.cam_360_hysteresis_factor:
+            if edge_newest >= edge_oldest / self.config.cam_360_hysteresis_factor:
                 overlaps.append(PanoramicOverlapInfo(newest.id, oldest.id, angle_diff, f'{edge_newest} >= {edge_oldest}'))
             else:
                 overlaps.append(PanoramicOverlapInfo(oldest.id, newest.id, angle_diff,  f'{edge_newest} < {edge_oldest}'))

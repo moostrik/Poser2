@@ -2,11 +2,10 @@
 
 import time
 import threading
-from dataclasses import dataclass
 from enum import IntEnum, auto
 from typing import Callable, Set
 
-from modules.ConfigBase import ConfigBase, config_field
+from modules.settings import Settings as ReactiveSettings, Field
 
 
 class TimerState(IntEnum):
@@ -16,16 +15,14 @@ class TimerState(IntEnum):
     INTERMEZZO =    auto()
 
 
-@dataclass
-class TimerConfig(ConfigBase):
-    """Configuration for Timer with GUI-integrated controls."""
-
-    fps: float = config_field(60.0, min=1.0, max=240.0, fixed=True, description="Update rate in frames per second")
-    run: bool = config_field(False, description="Run the timer")
-    duration: float = config_field(10.0, min=0.1, max=600.0, description="Timer duration in seconds")
-    intermezzo: float = config_field(0.0, min=0.0, max=60.0, description="Wait duration before going idle")
-    auto: bool = config_field(False, repr=False, description="Automatically restart after intermezzo")
-    verbose: bool = config_field(False, repr=False, description="Print timer state and time updates")
+class TimerConfig(ReactiveSettings):
+    """Configuration for Timer."""
+    fps:        Field[float] = Field(60.0, access=Field.INIT)
+    run:        Field[bool]  = Field(False)
+    duration:   Field[float] = Field(10.0)
+    intermezzo: Field[float] = Field(0.0)
+    auto:       Field[bool]  = Field(False, visible=False)
+    verbose:    Field[bool]  = Field(False, visible=False)
 
 
 class Timer(threading.Thread):
@@ -77,7 +74,7 @@ class Timer(threading.Thread):
 
     def _setup_watchers(self) -> None:
         """Setup config watcher for run control."""
-        self.config.watch(self._on_run_change, 'run')
+        self.config.bind(TimerConfig.run, self._on_run_change)
 
     def _on_run_change(self, value: bool) -> None:
         """Handle run config change."""

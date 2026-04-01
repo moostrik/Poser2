@@ -10,23 +10,13 @@ from functools import partial
 # Local application imports
 from modules.oak import Camera, FrameSync, OakSettings, Simulator, Player, Recorder
 from modules.settings import Settings as NewSettings, presets, NiceServer, NiceSettings, Field
-from modules.Settings import Settings as OldSettings
 from modules.render import RenderManager, RenderSettings
 from modules.DataHub import DataHub, Stage
-from modules.gui import Gui
-from modules.gui.ConfigGuiGenerator import ConfigGuiGenerator
 from modules.inout import OscSound, OscSoundConfig, ArtNetBars, ArtNetBarsSettings
-from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
-from modules.pose import batch, nodes, trackers
-from modules.pose.Settings import Settings as PoseSettings
-from modules.pose.batch.WindowSimilarity import WindowSimilarityConfig
-from modules.pose.batch.WindowCorrelation import WindowCorrelationConfig
-from modules.pose.nodes.filters.EuroSmoothers import EuroSmootherConfig
-from modules.pose.nodes.interpolators.ChaseInterpolators import ChaseInterpolatorConfig
-from modules.pose.nodes.filters.Predictors import PredictorConfig
-from modules.pose.nodes.filters.MovingAverageSmoothers import MovingAverageConfig
-from modules.pose.nodes.extractors.AngleMotionExtractor import AngleMotionExtractorConfig
+from modules.tracker import OnePerCamTracker, OnePerCamTrackerConfig
+from modules.pose import batch, nodes, trackers, Settings as PoseSettings
 from modules.utils import Timer, TimerConfig
+
 
 class InOutGroup(NewSettings):
     osc_sound: OscSoundConfig
@@ -35,43 +25,45 @@ class InOutGroup(NewSettings):
     artnet_3: ArtNetBarsSettings
 
 class SmoothedFeatureGroup(NewSettings):
-    smoother:     EuroSmootherConfig
-    interpolator: ChaseInterpolatorConfig
-    prediction:   PredictorConfig
+    smoother:           nodes.EuroSmootherConfig
+    interpolator:       nodes.ChaseInterpolatorConfig
+    prediction:         nodes.PredictorConfig
 
 class AngleFeatureGroup(NewSettings):
-    smoother:         EuroSmootherConfig
-    angle_vel_smoother: EuroSmootherConfig
-    interpolator:     ChaseInterpolatorConfig
-    prediction:       PredictorConfig
+    smoother:           nodes.EuroSmootherConfig
+    angle_vel_smoother: nodes.EuroSmootherConfig
+    interpolator:       nodes.ChaseInterpolatorConfig
+    prediction:         nodes.PredictorConfig
 
 class MotionGroup(NewSettings):
-    extractor:      AngleMotionExtractorConfig
-    moving_average: MovingAverageConfig
+    extractor:          nodes.AngleMotionExtractorConfig
+    moving_average:     nodes.MovingAverageConfig
 
 class PoseGroup(NewSettings):
-    pose: PoseSettings
-    window_similarity: WindowSimilarityConfig
-    window_correlation: WindowCorrelationConfig
-    bbox:       SmoothedFeatureGroup
-    point:      SmoothedFeatureGroup
-    angle:      AngleFeatureGroup
-    similarity: SmoothedFeatureGroup
-    motion:     MotionGroup
+    pose:               PoseSettings
+    window_similarity:  batch.WindowSimilarityConfig
+    window_correlation: batch.WindowCorrelationConfig
+    bbox:               SmoothedFeatureGroup
+    point:              SmoothedFeatureGroup
+    angle:              AngleFeatureGroup
+    similarity:         SmoothedFeatureGroup
+    motion:             MotionGroup
+
+class TTGroup(NewSettings):
+    timer:              TimerConfig
+    tracker:            OnePerCamTrackerConfig
 
 class MainSettings(NewSettings):
-    num_players: Field[int] = Field(3, access=Field.INIT, visible=False)
-    camera: OakSettings
-    pose:   PoseGroup
-    inout:  InOutGroup
-    render: RenderSettings
-    server: NiceSettings
+    num_players:        Field[int] = Field(3, access=Field.INIT, visible=False)
+    camera:             OakSettings
+    tt:                 TTGroup
+    pose:               PoseGroup
+    render:             RenderSettings
+    inout:              InOutGroup
+    server:             NiceSettings
 
 class Main():
-    def __init__(self, settings: OldSettings, simulation: bool = False) -> None:
-
-        self.old_settings: OldSettings = settings
-        self.gui = Gui(settings.gui)
+    def __init__(self, simulation: bool = False) -> None:
 
         self.new_settings = MainSettings()
 
@@ -108,10 +100,7 @@ class Main():
         self.frame_sync_bang = FrameSync(cam_settings, False, 'frame_sync')
 
         # TRACKER
-        if settings.tracker_type == TrackerType.PANORAMIC:
-            self.tracker = PanoramicTracker(self.gui, num_players, cam_settings.num_cameras)
-        else:
-            self.tracker = OnePerCamTracker(self.gui, num_players)
+        self.tracker = OnePerCamTracker(self.new_settings.tt.tracker, num_players)
         self.tracklet_sync_bang = FrameSync(cam_settings, False, 'tracklet_sync')
 
         # DATA
@@ -119,9 +108,7 @@ class Main():
         self.sound_osc = OscSound(self.data_hub, self.new_settings.inout.osc_sound)
 
         # TIMER
-        self.timer_config = TimerConfig(duration=30.0, intermezzo=5.0)
-        self.timer = Timer(self.timer_config)
-        self.timer_gui = ConfigGuiGenerator(self.timer_config, self.gui, "Timer")
+        self.timer = Timer(self.new_settings.tt.timer)
 
         self.render_settings = self.new_settings.render
         self.render = RenderManager(self.data_hub, self.render_settings, num_cams=len(self.cameras), num_players=num_players)
@@ -350,14 +337,6 @@ class Main():
         self.timer.add_time_callback(lambda t: self.data_hub.set_timer_time(t))
         self.timer.add_state_callback(lambda s: self.data_hub.set_timer_state(s))
 
-        # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
-        self.gui.exit_callback = self.stop
-
-        self.gui.addFrame([self.timer_gui.frame])
-        self.gui.start()
-        self.gui.bringToFront()
-        # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
-
         if self.player:
             self.player.start()
         if self.recorder:
@@ -366,7 +345,6 @@ class Main():
         self.is_running = True
 
         self.render.window_manager.add_exit_callback(self.stop)
-        self.render.window_manager.add_keyboard_callback(self.render_keyboard_callback)
         self.render.window_manager.start()
 
     def stop(self) -> None:
@@ -400,15 +378,9 @@ class Main():
 
         self.settings_server.stop()
 
-        self.gui.stop()
 
         for camera in self.cameras:
             camera.join(timeout=10)
 
         self.is_finished = True
 
-    def render_keyboard_callback(self, key, x, y) -> None:
-        if not  self.is_running: return
-        if key == b'g' or key == b'G':
-            if not self.gui or not self.gui.running: return
-            self.gui.bringToFront()

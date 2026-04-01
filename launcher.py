@@ -74,7 +74,6 @@ from os import path
 from signal import signal, SIGINT
 
 from modules.Main import Main
-from modules.Settings import Settings, ModelType
 
 import multiprocessing as mp
 
@@ -86,17 +85,11 @@ torch.backends.cudnn.allow_tf32 = True
 if __name__ == '__main__': # For Windows compatibility with multiprocessing
     mp.freeze_support()
     parser: ArgumentParser = ArgumentParser()
-    parser.add_argument('-np',      '--nopose',         action='store_true',        help='do not do pose detection')
     parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecorded video with camera')
-    parser.add_argument('-s',       '--settings',       type=str, default='default',help='settings file')
 
     args: Namespace = parser.parse_args()
 
-    settings_path: str = f"files/settings/{args.settings}.json"
-
-    settings: Settings = Settings.load(settings_path)
-
-    app = Main(settings, simulation=args.simulation)
+    app = Main(simulation=args.simulation)
     app.start()
 
     shutdown_event = Event()

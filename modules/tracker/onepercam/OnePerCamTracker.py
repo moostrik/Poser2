@@ -10,10 +10,21 @@ from modules.oak.camera.definitions import Tracklet as DepthTracklet
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback
 from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
 from modules.tracker.onepercam.OnePerCamTrackletManager import OnePerCamTrackletManager as TrackletManager
-from modules.tracker.onepercam.OnePerCamTrackerGui import OnePerCamTrackerGui
+from modules.settings import Settings as ReactiveSettings, Field
 
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.HotReloadMethods import HotReloadMethods
+
+
+class OnePerCamTrackerConfig(ReactiveSettings):
+    """Configuration for OnePerCamTracker."""
+    tracklet_min_age:         Field[int]   = Field(3,    min=0,   max=9,   step=1)
+    timeout:                  Field[float] = Field(2.0,  min=1.0, max=5.0, step=0.1)
+    add_centre_threshold:     Field[float] = Field(0.15, min=0.0, max=1.0, step=0.05)
+    add_height_threshold:     Field[float] = Field(0.5,  min=0.0, max=1.0, step=0.05)
+    add_bottom_threshold:     Field[float] = Field(0.2,  min=0.0, max=1.0, step=0.05)
+    update_centre_threshold:  Field[float] = Field(0.3,  min=0.0, max=1.0, step=0.05)
+    update_height_threshold:  Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05)
 
 
 @dataclass (frozen=True)
@@ -25,7 +36,7 @@ class OnePerCamMetadata(TrackerMetadata):
         return TrackerType.ONEPERCAM
 
 class OnePerCamTracker(Thread, BaseTracker):
-    def __init__(self, gui, num_trackers: int) -> None:
+    def __init__(self, config: OnePerCamTrackerConfig, num_trackers: int) -> None:
         super().__init__()
 
         self._running: bool = False
@@ -34,20 +45,10 @@ class OnePerCamTracker(Thread, BaseTracker):
         self._callback_lock = Lock()
         self._tracklet_callbacks: set[TrackletDictCallback] = set()
 
-        self._num_cams: int =                   num_trackers
-        self.tracklet_min_age: int =            3
-        self.timeout: float =                   2.0
-
-        self.update_centre_threshold: float =   0.3
-        self.update_height_treshold: float =    0.25
-
-        self.add_centre_threshold: float =      0.15
-        self.add_height_threshold: float =      0.5
-        self.add_bottom_threshold: float =      0.2
+        self._num_cams: int = num_trackers
+        self.config: OnePerCamTrackerConfig = config
 
         self.tracklet_manager: TrackletManager = TrackletManager(self._num_cams)
-
-        self.gui = OnePerCamTrackerGui(gui, self)
 
         # hot_reload = HotReloadMethods(self.__class__)
 
@@ -103,8 +104,8 @@ class OnePerCamTracker(Thread, BaseTracker):
             # if tracklet is LOST, too small or too far from centre, lose it
             if (
                 update_tracklet.is_lost or
-                update_tracklet.roi.height < self.update_height_treshold or
-                abs(update_tracklet.roi.center.x - 0.5) > self.update_centre_threshold
+                update_tracklet.roi.height < self.config.update_height_threshold or
+                abs(update_tracklet.roi.center.x - 0.5) > self.config.update_centre_threshold
             ):
                 self.tracklet_manager.lose_tracklet(update_tracklet.cam_id)
                 return
@@ -117,19 +118,19 @@ class OnePerCamTracker(Thread, BaseTracker):
         add_tracklets: List[Tracklet] = []
         for t in tracklets:
 
-            if t.external_age_in_frames <= self.tracklet_min_age:
+            if t.external_age_in_frames <= self.config.tracklet_min_age:
                 continue
 
             if not t.is_active:
                 continue
 
-            if abs(t.roi.center.x - 0.5) > self.add_centre_threshold:
+            if abs(t.roi.center.x - 0.5) > self.config.add_centre_threshold:
                 continue
 
-            if t.roi.height < self.add_height_threshold:
+            if t.roi.height < self.config.add_height_threshold:
                 continue
 
-            if t.roi.bottom < 1.0 - self.add_bottom_threshold:
+            if t.roi.bottom < 1.0 - self.config.add_bottom_threshold:
                 continue
 
             add_tracklets.append(t)
@@ -144,7 +145,7 @@ class OnePerCamTracker(Thread, BaseTracker):
     def _update_and_notify(self) -> None:
         # retire expired tracklets
         for tracklet in self.tracklet_manager.all_tracklets():
-            if tracklet.is_expired(self.timeout):
+            if tracklet.is_expired(self.config.timeout):
                 self.tracklet_manager.retire_tracklet(tracklet.id)
                 # print(f"Retiring expired tracklet {tracklet.id} at {time()}")
 

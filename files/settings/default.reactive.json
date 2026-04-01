@@ -535,6 +535,21 @@
       ]
     }
   },
+  "tt": {
+    "timer": {
+      "duration": 30.0,
+      "intermezzo": 5.0
+    },
+    "tracker": {
+      "tracklet_min_age": 3,
+      "timeout": 2.0,
+      "add_centre_threshold": 0.25,
+      "add_height_threshold": 0.25,
+      "add_bottom_threshold": 0.25,
+      "update_centre_threshold": 0.35,
+      "update_height_threshold": 0.2
+    }
+  },
   "server": {
     "title": "POSER",
     "port": 666
