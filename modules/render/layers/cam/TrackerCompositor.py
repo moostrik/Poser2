@@ -3,7 +3,7 @@
 # Local application imports
 from modules.settings import Field, Settings
 from modules.gl import Fbo, Texture, Blit
-from modules.DataHub import DataHub, Stage
+from modules.data_hub import DataHub, Stage
 from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.render.layers.cam.BBoxRenderer import BBoxRenderer, BBoxRendererSettings

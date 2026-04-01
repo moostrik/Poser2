@@ -14,7 +14,7 @@ from modules.gl.WindowManager import MonitorId, WindowSettings
 from modules.render.layer_settings import Layers
 from modules.render.layers import LayerBase
 
-from modules.DataHub import DataHub
+from modules.data_hub import DataHub
 from modules.render.render_settings import RenderSettings
 from modules.utils.PointsAndRects import Rect, Point2f
 

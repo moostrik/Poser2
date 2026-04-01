@@ -6,7 +6,7 @@ from typing import Tuple
 from OpenGL.GL import *  # type: ignore
 
 # Local application imports
-from modules.DataHub import DataHub, Stage
+from modules.data_hub import DataHub, Stage
 from modules.gl import Fbo, Texture, Blit, clear_color, Text
 from modules.pose.features import PoseFeatureType
 from modules.pose.Frame import Frame, FrameField, ScalarFrameField

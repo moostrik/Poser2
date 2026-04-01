@@ -10,7 +10,7 @@ from modules.render.shaders import DrawColoredRectangle
 
 from modules.oak.camera.definitions import Tracklet as DepthTracklet
 
-from modules.DataHub import DataHub, DataHubType
+from modules.data_hub import DataHub, DataHubType
 from modules.render.layers.LayerBase import LayerBase
 
 

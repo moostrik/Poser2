@@ -3,11 +3,11 @@ from typing import Optional
 from functools import partial
 
 # Local application imports
-from modules.AppSettings import MainSettings
+from modules.main_settings import MainSettings
 from modules.oak import Camera, FrameSync, Simulator, Player, Recorder
 from modules.settings import presets, NiceServer
 from modules.render import RenderManager
-from modules.DataHub import DataHub, Stage
+from modules.data_hub import DataHub, Stage
 from modules.inout import OscSound, ArtNetBars, ArtNetBarsSettings
 from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers

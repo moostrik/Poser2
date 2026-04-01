@@ -73,7 +73,7 @@ from argparse import ArgumentParser, Namespace
 from os import path
 from signal import signal, SIGINT
 
-from modules.Main import Main
+from modules.pain import Main
 
 import multiprocessing as mp
 

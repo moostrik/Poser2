@@ -10,7 +10,7 @@ from modules.gl.RenderBase import RenderBase
 
 from modules.Settings import Settings
 
-from modules.DataHub import DataHub
+from modules.data_hub import DataHub
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.layers.meshes.deprecated.AllMeshRenderer import AllMeshRenderer
 from modules.render.layers.meshes.deprecated.AngleMeshes import AngleMeshes

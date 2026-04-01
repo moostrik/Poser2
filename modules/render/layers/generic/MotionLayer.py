@@ -5,7 +5,7 @@ from OpenGL.GL import * # type: ignore
 from pytweening import *    # type: ignore
 
 # Local application imports
-from modules.DataHub import DataHub, Stage
+from modules.data_hub import DataHub, Stage
 
 from modules.gl import Fbo, Texture, Style
 from modules.render.layers.LayerBase import LayerBase, DataCache

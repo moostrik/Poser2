@@ -6,7 +6,7 @@ from OpenGL.GL import GL_R16F
 from pytweening import *    # type: ignore
 
 # Local application imports
-from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
+from modules.data_hub import DataHub, DataHubType, PoseDataHubTypes
 from modules.gl import Fbo, Texture, Style, clear_color
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect

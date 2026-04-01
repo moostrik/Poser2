@@ -11,7 +11,7 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 from modules.pose.Frame import Frame
 from modules.pose.features.Angles import AngleLandmark
 
-from modules.DataHub import DataHub, DataHubType, Stage
+from modules.data_hub import DataHub, DataHubType, Stage
 from modules.settings import Settings, Field, Widget
 from modules.utils.Timer import TimerState
 from modules.utils.HotReloadMethods import HotReloadMethods

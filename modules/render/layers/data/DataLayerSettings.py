@@ -3,7 +3,7 @@ from enum import IntEnum, auto
 
 # Local application imports
 from modules.settings import Field, Settings
-from modules.DataHub import Stage
+from modules.data_hub import Stage
 from modules.pose.Frame import FrameField, ScalarFrameField
 from modules.render.color_settings import ColorSettings
 

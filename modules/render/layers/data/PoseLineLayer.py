@@ -5,7 +5,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.settings import Field, Settings
-from modules.DataHub import DataHub, Stage
+from modules.data_hub import DataHub, Stage
 from modules.gl import Fbo, Texture, Blit, clear_color
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D

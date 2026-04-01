@@ -17,7 +17,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture, Style, Fbo
 from modules.gl.shaders import Blit, BlitRegion
 from modules.render.layers.LayerBase import LayerBase
-from modules.DataHub import DataHub, Stage
+from modules.data_hub import DataHub, Stage
 from modules.pose.Frame import Frame
 
 from modules.settings import Field, Settings
