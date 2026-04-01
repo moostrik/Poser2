@@ -14,18 +14,16 @@ import numpy as np
 # Pose imports
 from modules.pose.features import Angles, BBox, Points2D, AngleSymmetry
 from modules.pose.nodes._utils.ArrayPredict import AnglePredict, PointPredict, Predict, PredictionMethod
-from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
 from modules.pose.nodes.filters.RateLimiters import RateLimiterConfig
+from modules.settings import Settings as ReactiveSettings, Field
 
 
-class PredictorConfig(NodeConfigBase):
-    """Configuration for pose prediction with automatic change notification."""
-
-    def __init__(self, frequency: float = 30.0, method: PredictionMethod = PredictionMethod.QUADRATIC) -> None:
-        super().__init__()
-        self.frequency: float = frequency
-        self.method: PredictionMethod = method
+class PredictorConfig(ReactiveSettings):
+    """Configuration for pose prediction."""
+    frequency: Field[float] = Field(30.0, access=Field.INIT)
+    method:    Field[PredictionMethod] = Field(PredictionMethod.QUADRATIC)
 
 
 class FeaturePredictor(FilterNode):
@@ -49,12 +47,12 @@ class FeaturePredictor(FilterNode):
             method=config.method,
             clamp_range=pose_field.get_type().range()
         )
-        self._config.add_listener(self._on_config_changed)
+        self._config.bind_all(self._on_config_changed)
 
     def __del__(self):
         """Cleanup config listener to prevent memory leaks."""
         try:
-            self._config.remove_listener(self._on_config_changed)
+            self._config.unbind_all(self._on_config_changed)
         except (AttributeError, ValueError):
             pass
 
@@ -95,7 +93,7 @@ class FeaturePredictor(FilterNode):
         """Reset the predictor's internal state (clear sample history)."""
         self._predictor.reset()
 
-    def _on_config_changed(self) -> None:
+    def _on_config_changed(self, _=None) -> None:
         """Handle configuration changes by updating predictor parameters."""
         self._predictor.input_frequency = self._config.frequency
         self._predictor.method = self._config.method

@@ -8,9 +8,10 @@ from typing import Callable
 import pytweening  # type: ignore
 
 # Pose imports
-from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.features.base import NormalizedSingleValue
 from modules.pose.Frame import Frame, FrameField
+from modules.settings import Settings as ReactiveSettings, Field
 
 
 # Available easing functions from pytweening
@@ -37,12 +38,9 @@ EASING_FUNCTIONS: dict[str, Callable[[float], float]] = {
 }
 
 
-class EasingConfig(NodeConfigBase):
+class EasingConfig(ReactiveSettings):
     """Configuration for easing with selectable function."""
-
-    def __init__(self, easing_name: str = 'easeInOutSine') -> None:
-        super().__init__()
-        self.easing_name: str = easing_name
+    easing_name: Field[str] = Field('easeInOutSine')
 
     @property
     def easing_function(self) -> Callable[[float], float]:

@@ -5,16 +5,14 @@ from threading import Lock
 import numpy as np
 
 from modules.pose.features.MotionGate import MotionGate, configure_motion_gate
-from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameDict
+from modules.settings import Settings as ReactiveSettings, Field
 
 
-class MotionGateApplicatorConfig(NodeConfigBase):
+class MotionGateApplicatorConfig(ReactiveSettings):
     """Configuration for MotionGateApplicator."""
-
-    def __init__(self, max_poses: int = 4) -> None:
-        super().__init__()
-        self.max_poses: int = max_poses
+    max_poses: Field[int] = Field(4)
 
 
 class MotionGateApplicator(FilterNode):

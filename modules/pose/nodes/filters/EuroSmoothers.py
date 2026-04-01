@@ -13,19 +13,17 @@ import numpy as np
 
 # Pose imports
 from modules.pose.nodes._utils.ArrayEuroSmooth import EuroSmooth, AngleEuroSmooth, PointEuroSmooth
-from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
+from modules.settings import Settings as ReactiveSettings, Field
 
 
-class EuroSmootherConfig(NodeConfigBase):
-    """Configuration for pose smoothing with automatic change notification."""
-
-    def __init__(self, frequency: float = 30.0, min_cutoff: float = 1.0, beta: float = 0.025, d_cutoff: float = 1.0) -> None:
-        super().__init__()
-        self.frequency: float = frequency
-        self.min_cutoff: float = min_cutoff
-        self.beta: float = beta
-        self.d_cutoff: float = d_cutoff
+class EuroSmootherConfig(ReactiveSettings):
+    """Configuration for pose smoothing."""
+    frequency:  Field[float] = Field(30.0,  access=Field.INIT)
+    min_cutoff: Field[float] = Field(1.0)
+    beta:       Field[float] = Field(0.025)
+    d_cutoff:   Field[float] = Field(1.0)
 
 
 class FeatureEuroSmoother(FilterNode):
@@ -52,16 +50,16 @@ class FeatureEuroSmoother(FilterNode):
             d_cutoff=config.d_cutoff,
             clamp_range=pose_field.get_type().range()
         )
-        self._config.add_listener(self._on_config_changed)
+        self._config.bind_all(self._on_config_changed)
 
     def __del__(self):
         """Cleanup config listener to prevent memory leaks."""
         try:
-            self._config.remove_listener(self._on_config_changed)
+            self._config.unbind_all(self._on_config_changed)
         except (AttributeError, ValueError):
             pass  # Config already cleaned up or listener not found
 
-    def _on_config_changed(self) -> None:
+    def _on_config_changed(self, _=None) -> None:
         self._smoother.frequency = self._config.frequency
         self._smoother.min_cutoff = self._config.min_cutoff
         self._smoother.beta = self._config.beta

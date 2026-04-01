@@ -53,7 +53,7 @@ class FeatureLerpInterpolator(FeatureInterpolatorBase[LerpInterpolatorConfig]):
             clamp_range=clamp_range
         )
 
-    def _on_config_changed(self) -> None:
+    def _on_config_changed(self, _=None) -> None:
         """Handle configuration changes by updating interpolator parameters."""
         with self._lock:
             # Cast to VectorLerp to access input_frequency property

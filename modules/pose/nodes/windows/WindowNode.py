@@ -8,7 +8,8 @@ import numpy as np
 
 from modules.pose.Frame import Frame, FrameField
 from modules.pose.features import BaseScalarFeature, Angles, AngleMotion, AngleSymmetry, AngleVelocity, BBox, Similarity
-from modules.pose.nodes.Nodes import NodeBase, NodeConfigBase
+from modules.pose.nodes.Nodes import NodeBase
+from modules.settings import Settings as ReactiveSettings, Field
 
 
 TEnum = TypeVar('TEnum', bound=IntEnum)
@@ -61,13 +62,10 @@ class FeatureWindow(Generic[TEnum]):
         return self.values.shape[1]
 
 
-class WindowNodeConfig(NodeConfigBase):
+class WindowNodeConfig(ReactiveSettings):
     """Configuration for window nodes."""
-
-    def __init__(self, window_size: int = 30, emit_partial: bool = True) -> None:
-        super().__init__()
-        self.window_size = window_size
-        self.emit_partial = emit_partial  # If False, only emit when window is full
+    window_size:  Field[int]  = Field(30)
+    emit_partial: Field[bool] = Field(True)
 
 
 TFeature = TypeVar('TFeature', bound=BaseScalarFeature)
@@ -97,7 +95,7 @@ class WindowNode(NodeBase, Generic[TFeature]):
         self._allocate_buffers()
 
         # Listen for config changes
-        self._config.add_listener(self._on_config_change)
+        self._config.bind_all(self._on_config_change)
 
     @property
     def frame_field(self) -> FrameField:
@@ -188,7 +186,7 @@ class WindowNode(NodeBase, Generic[TFeature]):
         """Window nodes are always ready to process."""
         return True
 
-    def _on_config_change(self) -> None:
+    def _on_config_change(self, _=None) -> None:
         """Handle config changes - reallocate buffer if size changed."""
         with self._lock:
             if self._values.shape[0] != self._config.window_size:

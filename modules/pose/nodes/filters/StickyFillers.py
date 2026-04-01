@@ -14,26 +14,17 @@ import numpy as np
 
 # Pose imports
 from modules.pose.features import BaseFeature, PoseFeatureType
-from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
+from modules.settings import Settings as ReactiveSettings, Field
 
 TFeature = TypeVar('TFeature', bound=BaseFeature)
 
 
-class StickyFillerConfig(NodeConfigBase):
-    """Configuration for pose hold filter with automatic change notification."""
-
-    def __init__(self, init_to_zero: bool = False, hold_scores: bool = False) -> None:
-        """
-        Args:
-            init_to_zero: If True, initialize with zeros to prevent NaN at start.
-                         If False, first NaN values will remain NaN until valid data arrives.
-            hold_scores: If True, preserve last valid scores when holding values.
-                        If False, set scores to 0.0 for held (NaN) values.
-        """
-        super().__init__()
-        self.init_to_zero: bool = init_to_zero
-        self.hold_scores: bool = hold_scores
+class StickyFillerConfig(ReactiveSettings):
+    """Configuration for pose hold filter."""
+    init_to_zero: Field[bool] = Field(False)
+    hold_scores:  Field[bool] = Field(False)
 
 
 class FeatureStickyFiller(FilterNode):

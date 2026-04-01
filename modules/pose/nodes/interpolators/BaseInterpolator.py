@@ -23,24 +23,15 @@ import numpy as np
 
 # Pose imports
 from modules.pose.features import PoseFeatureType, Angles, BBox, Points2D, AngleSymmetry
-from modules.pose.nodes.Nodes import InterpolatorNode, NodeConfigBase
+from modules.pose.nodes.Nodes import InterpolatorNode
 from modules.pose.Frame import Frame, FrameField
+from modules.settings import Settings as ReactiveSettings, Field
 
 
-class InterpolatorConfigBase(NodeConfigBase):
+class InterpolatorConfigBase(ReactiveSettings):
     """Base config for interpolators with input/output frequency settings."""
-
-    def __init__(self, input_frequency: float = 30.0, output_frequency: float = 60.0) -> None:
-        super().__init__()
-        if output_frequency < input_frequency:
-            import warnings
-            warnings.warn(
-                f"output_frequency ({output_frequency}) < input_frequency ({input_frequency}). "
-                "Interpolators are designed to upsample, not downsample.",
-                RuntimeWarning
-            )
-        self.input_frequency: float = input_frequency
-        self.output_frequency: float = output_frequency
+    input_frequency:  Field[float] = Field(30.0, access=Field.INIT)
+    output_frequency: Field[float] = Field(60.0, access=Field.INIT)
 
 
 # Generic type variable for config
@@ -83,12 +74,12 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
         self._last_pose: Frame | None = None
         self._output_interval: float = 1.0 / config.output_frequency
         self._interpolator: InterpolatorProtocol = self._create_interpolator()
-        self._config.add_listener(self._on_config_changed)
+        self._config.bind_all(self._on_config_changed)
 
     def __del__(self):
         """Cleanup config listener to prevent memory leaks."""
         try:
-            self._config.remove_listener(self._on_config_changed)
+            self._config.unbind_all(self._on_config_changed)
         except (AttributeError, ValueError):
             pass
 
@@ -98,7 +89,7 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
         pass
 
     @abstractmethod
-    def _on_config_changed(self) -> None:
+    def _on_config_changed(self, _=None) -> None:
         """Handle configuration changes by updating interpolator parameters."""
         pass
 

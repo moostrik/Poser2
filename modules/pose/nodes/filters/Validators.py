@@ -3,21 +3,15 @@
 from threading import Lock
 from modules.pose.features.base import BaseFeature
 
-from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
+from modules.settings import Settings as ReactiveSettings, Field
 
 
-class ValidatorConfig(NodeConfigBase):
+class ValidatorConfig(ReactiveSettings):
     """Configuration for pose validators."""
-
-    def __init__(self, check_ranges: bool = True, name: str = "default") -> None:
-        """
-        Args:
-            check_ranges: Whether to validate value ranges (default: True)
-        """
-        super().__init__()
-        self.check_ranges: bool = check_ranges
-        self.name: str = name
+    check_ranges: Field[bool] = Field(True)
+    name:         Field[str]  = Field('default')
 
 
 class FeatureValidator(FilterNode):

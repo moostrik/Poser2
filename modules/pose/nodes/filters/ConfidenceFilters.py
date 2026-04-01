@@ -10,25 +10,15 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
+from modules.settings import Settings as ReactiveSettings, Field
 
 
-class ConfidenceFilterConfig(NodeConfigBase):
-    """Configuration for confidence filtering with automatic change notification."""
-
-    def __init__(self, confidence_threshold: float = 0.5, rescale_scores: bool = True) -> None:
-        """
-        Args:
-            confidence_threshold: Minimum confidence score to keep values.
-                                Values below this are set to NaN.
-                                Range: [0.0, 0.99] (clamped automatically)
-            rescale_scores: If True, rescale remaining scores to [0, 1] range.
-                          If False, keep original scores for values above threshold.
-        """
-        super().__init__()
-        self.confidence_threshold: float = max(0.0, min(0.99, confidence_threshold))
-        self.rescale_scores: bool = rescale_scores
+class ConfidenceFilterConfig(ReactiveSettings):
+    """Configuration for confidence filtering."""
+    confidence_threshold: Field[float] = Field(0.5)
+    rescale_scores:       Field[bool]  = Field(True)
 
 
 class ConfidenceFilter(FilterNode):

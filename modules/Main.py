@@ -17,10 +17,15 @@ from modules.gui import Gui
 from modules.gui.ConfigGuiGenerator import ConfigGuiGenerator
 from modules.inout import OscSound, OscSoundConfig, ArtNetBars, ArtNetBarsSettings
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
-from modules.pose import batch, guis, nodes, trackers
+from modules.pose import batch, nodes, trackers
 from modules.pose.Settings import Settings as PoseSettings
 from modules.pose.batch.WindowSimilarity import WindowSimilarityConfig
 from modules.pose.batch.WindowCorrelation import WindowCorrelationConfig
+from modules.pose.nodes.filters.EuroSmoothers import EuroSmootherConfig
+from modules.pose.nodes.interpolators.ChaseInterpolators import ChaseInterpolatorConfig
+from modules.pose.nodes.filters.Predictors import PredictorConfig
+from modules.pose.nodes.filters.MovingAverageSmoothers import MovingAverageConfig
+from modules.pose.nodes.extractors.AngleMotionExtractor import AngleMotionExtractorConfig
 from modules.utils import Timer, TimerConfig
 
 class InOutGroup(NewSettings):
@@ -29,10 +34,30 @@ class InOutGroup(NewSettings):
     artnet_2: ArtNetBarsSettings
     artnet_3: ArtNetBarsSettings
 
+class SmoothedFeatureGroup(NewSettings):
+    smoother:     EuroSmootherConfig
+    interpolator: ChaseInterpolatorConfig
+    prediction:   PredictorConfig
+
+class AngleFeatureGroup(NewSettings):
+    smoother:         EuroSmootherConfig
+    angle_vel_smoother: EuroSmootherConfig
+    interpolator:     ChaseInterpolatorConfig
+    prediction:       PredictorConfig
+
+class MotionGroup(NewSettings):
+    extractor:      AngleMotionExtractorConfig
+    moving_average: MovingAverageConfig
+
 class PoseGroup(NewSettings):
     pose: PoseSettings
     window_similarity: WindowSimilarityConfig
     window_correlation: WindowCorrelationConfig
+    bbox:       SmoothedFeatureGroup
+    point:      SmoothedFeatureGroup
+    angle:      AngleFeatureGroup
+    similarity: SmoothedFeatureGroup
+    motion:     MotionGroup
 
 class MainSettings(NewSettings):
     num_players: Field[int] = Field(3, access=Field.INIT, visible=False)
@@ -108,42 +133,24 @@ class Main():
 
         # POSE CONFIGURATION
         pose_settings = self.new_settings.pose.pose
+        pose_group = self.new_settings.pose
         # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion_width=pose_settings.crop_expansion_width, expansion_height=pose_settings.crop_expansion_height, output_width=384, output_height=512, max_poses=pose_settings.max_poses)
         self.gpu_crop_config =      batch.ImageCropConfig(expansion_width=pose_settings.crop_expansion_width, expansion_height=pose_settings.crop_expansion_height, output_width=768, output_height=1024, max_poses=pose_settings.max_poses, verbose=False, enable_prev_crop=False)
-        self.prediction_config =    nodes.PredictorConfig(frequency=cam_settings.fps)
-
-        self.b_box_smooth_config =  nodes.EuroSmootherConfig()
+        self.b_box_smooth_config =  pose_group.bbox.smoother
         self.b_box_rate_config =    nodes.RateLimiterConfig(max_increase= 10, max_decrease= 0.2)
-        self.point_smooth_config =  nodes.EuroSmootherConfig()
-        self.angle_smooth_config =  nodes.EuroSmootherConfig()
-        self.a_vel_smooth_config =  nodes.EuroSmootherConfig()
-        self.simil_smooth_config =  nodes.EuroSmootherConfig()
+        self.point_smooth_config =  pose_group.point.smoother
+        self.angle_smooth_config =  pose_group.angle.smoother
+        self.a_vel_smooth_config =  pose_group.angle.angle_vel_smoother
+        self.simil_smooth_config =  pose_group.similarity.smoother
 
-        self.b_box_smooth_gui =     guis.EuroSmootherGui(self.b_box_smooth_config, self.gui, 'BBOX')
-        self.point_smooth_gui =     guis.EuroSmootherGui(self.point_smooth_config, self.gui, 'POINT')
-        self.angle_smooth_gui =     guis.EuroSmootherGui(self.angle_smooth_config, self.gui, 'ANGLE')
-        self.a_vel_smooth_gui =     guis.EuroSmootherGui(self.a_vel_smooth_config, self.gui, 'ANGLE VEL')
-        self.simil_smooth_gui =     guis.EuroSmootherGui(self.simil_smooth_config, self.gui, 'SIMILARITY')
+        self.b_box_interp_config =  pose_group.bbox.interpolator
+        self.point_interp_config =  pose_group.point.interpolator
+        self.angle_interp_config =  pose_group.angle.interpolator
+        self.simil_interp_config =  pose_group.similarity.interpolator
 
-        # self.b_box_interp_config =  nodes.LerpInterpolatorConfig(input_frequency=cam_settings.fps)
-        self.b_box_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=cam_settings.fps)
-        self.point_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=cam_settings.fps)
-        self.angle_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=cam_settings.fps)
-        self.simil_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=cam_settings.fps)
-
-        self.b_box_interp_gui =     guis.InterpolatorGui(self.b_box_interp_config, self.gui, 'BBOX')
-        self.point_interp_gui =     guis.InterpolatorGui(self.point_interp_config, self.gui, 'POINT')
-        self.angle_interp_gui =     guis.InterpolatorGui(self.angle_interp_config, self.gui, 'ANGLE')
-        self.simil_interp_gui =     guis.InterpolatorGui(self.simil_interp_config, self.gui, 'SIMILARITY')
-
-        # self.motion_smooth_config = nodes.EmaSmootherConfig(attack=0.95, release=0.8)
-        # self.motion_smooth_gui =    guis.EmaSmootherGui(self.motion_smooth_config, self.gui, 'MOTION')
-        self.motion_ma_config =     nodes.MovingAverageConfig(window_size=30, window_type=nodes.WindowType.TRIANGULAR)
-        self.motion_ma_gui =        guis.MovingAverageSmootherGui(self.motion_ma_config, self.gui, 'MOTION')
+        self.motion_ma_config =     pose_group.motion.moving_average
         self.motion_easing_config = nodes.EasingConfig(easing_name='easeInOutSine')
-        self.motion_easing_gui =    guis.EasingGui(self.motion_easing_config, self.gui, 'MOTION_EASE')
-        self.motion_extractor_config = nodes.AngleMotionExtractorConfig(noise_threshold=0.05, max_threshold=0.5)
-        self.motion_extractor_gui = guis.AngleMotionExtractorGui(self.motion_extractor_config, self.gui, 'MOTION')
+        self.motion_extractor_config = pose_group.motion.extractor
 
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
@@ -176,7 +183,7 @@ class Main():
             num_players,
             [
                 lambda: nodes.BBoxEuroSmoother(self.b_box_smooth_config),
-                lambda: nodes.BBoxPredictor(self.prediction_config),
+                lambda: nodes.BBoxPredictor(pose_group.bbox.prediction),
                 # lambda: nodes.BBoxRateLimiter(self.b_box_rate_config),
             ]
         )
@@ -184,7 +191,7 @@ class Main():
         self.pose_raw_filters =     trackers.FilterTracker(
             num_players,
             [
-                lambda: nodes.PointDualConfFilter(nodes.DualConfFilterConfig(pose_settings.confidence_low, pose_settings.confidence_high)),
+                lambda: nodes.PointDualConfFilter(nodes.DualConfFilterConfig(threshold_low=pose_settings.confidence_low, threshold_high=pose_settings.confidence_high)),
                 # lambda: nodes.PointTemporalStabilizer(nodes.TemporalStabilizerConfig()),
                 nodes.AngleExtractor,
                 lambda: nodes.AngleVelExtractor(fps=cam_settings.fps),
@@ -218,9 +225,9 @@ class Main():
         self.pose_prediction_filters = trackers.FilterTracker(
             num_players,
             [
-                lambda: nodes.PointPredictor(self.prediction_config),
-                lambda: nodes.AnglePredictor(self.prediction_config),
-                lambda: nodes.AngleVelPredictor(self.prediction_config),
+                lambda: nodes.PointPredictor(pose_group.point.prediction),
+                lambda: nodes.AnglePredictor(pose_group.angle.prediction),
+                lambda: nodes.AngleVelPredictor(pose_group.angle.prediction),
                 lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=True)),
                 lambda: nodes.SimilarityStickyFiller(nodes.StickyFillerConfig(init_to_zero=True, hold_scores=False)),
                 # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Prediction")),
@@ -346,11 +353,7 @@ class Main():
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
         self.gui.exit_callback = self.stop
 
-        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(), self.b_box_interp_gui.get_gui_frame(), self.timer_gui.frame])
-        self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
-        self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame(), self.a_vel_smooth_gui.get_gui_frame()])
-        self.gui.addFrame([self.motion_extractor_gui.get_gui_frame(), self.motion_ma_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
-        self.gui.addFrame([self.simil_smooth_gui.get_gui_frame()])
+        self.gui.addFrame([self.timer_gui.frame])
         self.gui.start()
         self.gui.bringToFront()
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI

@@ -16,22 +16,15 @@ import numpy as np
 # Pose imports
 from modules.pose.features import PoseFeatureType, Angles, BBox, Points2D, AngleSymmetry
 from modules.pose.nodes._utils.ArrayRateLimit import RateLimit, AngleRateLimit, PointRateLimit
-from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
+from modules.settings import Settings as ReactiveSettings, Field
 
 
-class RateLimiterConfig(NodeConfigBase):
-    """Configuration for rate limiting with automatic change notification."""
-
-    def __init__(self, max_increase: float = 1.0, max_decrease: float = 1.0) -> None:
-        """
-        Args:
-            max_increase: Maximum allowed increase per second (units/s)
-            max_decrease: Maximum allowed decrease per second (units/s)
-        """
-        super().__init__()
-        self.max_increase: float = max_increase
-        self.max_decrease: float = max_decrease
+class RateLimiterConfig(ReactiveSettings):
+    """Configuration for rate limiting."""
+    max_increase: Field[float] = Field(1.0)
+    max_decrease: Field[float] = Field(1.0)
 
 
 class FeatureRateLimiter(FilterNode):
@@ -49,12 +42,12 @@ class FeatureRateLimiter(FilterNode):
         self._config: RateLimiterConfig = config
         self._pose_field: FrameField = pose_field
         self._limiter: RateLimit = self._create_limiter()
-        self._config.add_listener(self._on_config_changed)
+        self._config.bind_all(self._on_config_changed)
 
     def __del__(self):
         """Cleanup config listener."""
         try:
-            self._config.remove_listener(self._on_config_changed)
+            self._config.unbind_all(self._on_config_changed)
         except (AttributeError, ValueError):
             pass
 
@@ -70,7 +63,7 @@ class FeatureRateLimiter(FilterNode):
             clamp_range=clamp_range
         )
 
-    def _on_config_changed(self) -> None:
+    def _on_config_changed(self, _=None) -> None:
         """Handle configuration changes by updating limiter parameters."""
         self._limiter.max_increase = self._config.max_increase
         self._limiter.max_decrease = self._config.max_decrease

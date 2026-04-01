@@ -13,8 +13,9 @@ import numpy as np
 
 # Pose imports
 from modules.pose.nodes._utils.ArrayMovingAverage import MovingAverage, WindowType
-from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
+from modules.settings import Settings as ReactiveSettings, Field
 
 
 # Re-export WindowType for convenience
@@ -22,17 +23,10 @@ __all__ = ['WindowType', 'MovingAverageConfig', 'FeatureMovingAverageSmoother',
            'AngleMotionMovingAverageSmoother', 'SimilarityMovingAverageSmoother']
 
 
-class MovingAverageConfig(NodeConfigBase):
-    """Configuration for moving average smoothing with automatic change notification."""
-
-    def __init__(
-        self,
-        window_size: int = 30,
-        window_type: WindowType = WindowType.TRIANGULAR
-    ) -> None:
-        super().__init__()
-        self.window_size: int = window_size
-        self.window_type: WindowType = window_type
+class MovingAverageConfig(ReactiveSettings):
+    """Configuration for moving average smoothing."""
+    window_size: Field[int]        = Field(30)
+    window_type: Field[WindowType] = Field(WindowType.TRIANGULAR)
 
 
 class FeatureMovingAverageSmoother(FilterNode):
@@ -47,16 +41,16 @@ class FeatureMovingAverageSmoother(FilterNode):
             window_type=config.window_type,
             clamp_range=pose_field.get_type().range()
         )
-        self._config.add_listener(self._on_config_changed)
+        self._config.bind_all(self._on_config_changed)
 
     def __del__(self):
         """Cleanup config listener to prevent memory leaks."""
         try:
-            self._config.remove_listener(self._on_config_changed)
+            self._config.unbind_all(self._on_config_changed)
         except (AttributeError, ValueError):
             pass  # Config already cleaned up or listener not found
 
-    def _on_config_changed(self) -> None:
+    def _on_config_changed(self, _=None) -> None:
         self._smoother.window_size = self._config.window_size
         self._smoother.window_type = self._config.window_type
 

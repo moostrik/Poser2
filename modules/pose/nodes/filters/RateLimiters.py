@@ -8,22 +8,15 @@ import numpy as np
 
 from modules.pose.features import PoseFeatureType
 from modules.pose.nodes._utils.ArrayRateLimit import RateLimit, AngleRateLimit, PointRateLimit, ArrayRateLimit
-from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
+from modules.settings import Settings as ReactiveSettings, Field
 
 
-class RateLimiterConfig(NodeConfigBase):
-    """Configuration for pose rate limiting with validated parameter ranges."""
-
-    _PARAM_RANGES = {
-        'max_increase': (0.0, np.pi),
-        'max_decrease': (0.0, np.pi),
-    }
-
-    def __init__(self, max_increase: float = 1.0, max_decrease: float = 1.0) -> None:
-        super().__init__()
-        self.max_increase = max_increase  # Automatically clamped by __setattr__
-        self.max_decrease = max_decrease
+class RateLimiterConfig(ReactiveSettings):
+    """Configuration for pose rate limiting."""
+    max_increase: Field[float] = Field(1.0)
+    max_decrease: Field[float] = Field(1.0)
 
 
 class FeatureRateLimiter(FilterNode):
@@ -47,15 +40,15 @@ class FeatureRateLimiter(FilterNode):
             max_decrease=config.max_decrease,
             clamp_range= pose_field.get_type().range()
         )
-        self._config.add_listener(self._on_config_changed)
+        self._config.bind_all(self._on_config_changed)
 
     def __del__(self):
         try:
-            self._config.remove_listener(self._on_config_changed)
+            self._config.unbind_all(self._on_config_changed)
         except (AttributeError, ValueError):
             pass
 
-    def _on_config_changed(self) -> None:
+    def _on_config_changed(self, _=None) -> None:
         self._limiter.max_increase = self._config.max_increase
         self._limiter.max_decrease = self._config.max_decrease
 

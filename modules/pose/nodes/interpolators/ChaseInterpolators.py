@@ -27,16 +27,13 @@ from modules.pose.features import PoseFeatureType, Angles, BBox, Points2D, Angle
 from modules.pose.nodes._utils.ArrayChase import AngleChase, PointChase, Chase
 from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase, InterpolatorConfigBase
 from modules.pose.Frame import Frame, FrameField
+from modules.settings import Field
 
 
 class ChaseInterpolatorConfig(InterpolatorConfigBase):
-    """Configuration for pose chase interpolation with automatic change notification."""
-
-    def __init__(self, input_frequency: float = 30.0, output_frequency: float = 60.0,
-                 responsiveness: float = 0.2, friction: float = 0.03) -> None:
-        super().__init__(input_frequency, output_frequency)
-        self.responsiveness: float = responsiveness
-        self.friction: float = friction
+    """Configuration for pose chase interpolation."""
+    responsiveness: Field[float] = Field(0.2)
+    friction:       Field[float] = Field(0.03)
 
 
 class FeatureChaseInterpolator(FeatureInterpolatorBase[ChaseInterpolatorConfig]):
@@ -65,7 +62,7 @@ class FeatureChaseInterpolator(FeatureInterpolatorBase[ChaseInterpolatorConfig])
         )
 
 
-    def _on_config_changed(self) -> None:
+    def _on_config_changed(self, _=None) -> None:
         """Handle configuration changes by updating interpolator parameters."""
         with self._lock:
             cast(Chase, self._interpolator).input_frequency = self._config.input_frequency

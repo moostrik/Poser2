@@ -4,28 +4,21 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.features import AngleMotion
 from modules.pose.features.Angles import AngleLandmark
 from modules.pose.features.AngleMotion import ANGLE_MOTION_NORMALISATION
 from modules.pose.Frame import Frame
+from modules.settings import Settings as ReactiveSettings, Field
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class AngleMotionExtractorConfig(NodeConfigBase):
+class AngleMotionExtractorConfig(ReactiveSettings):
     """Configuration for motion extraction with tunable thresholds."""
-
-    def __init__(
-        self,
-        noise_threshold: float = 0.1,
-        max_threshold: float = 1.0,
-        n_top_motions: int = 3,
-    ) -> None:
-        super().__init__()
-        self.noise_threshold: float = noise_threshold  # Noise floor - ignore motion below this
-        self.max_threshold: float = max_threshold      # Upper limit for normalization
-        self.n_top_motions: int = n_top_motions        # Number of highest motions to average
+    noise_threshold: Field[float] = Field(0.1)
+    max_threshold:   Field[float] = Field(1.0)
+    n_top_motions:   Field[int]   = Field(3)
 
 
 class AngleMotionExtractor(FilterNode):

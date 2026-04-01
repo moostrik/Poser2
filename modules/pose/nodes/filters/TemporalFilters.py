@@ -11,38 +11,15 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
+from modules.settings import Settings as ReactiveSettings, Field
 
 
-class TemporalStabilizerConfig(NodeConfigBase):
-    """Configuration for temporal stability filtering with automatic change notification.
-
-    Temporal stability filtering requires values to be consistently valid (non-NaN)
-    for multiple consecutive frames before they become visible. This prevents
-    momentary detections and flickering.
-
-    Note: This filter works on already-filtered data. Apply confidence/hysteresis
-    filtering BEFORE this filter in the pipeline.
-    """
-
-    def __init__(
-        self,
-        min_consecutive_frames: int = 3,
-        max_gap_frames: int = 0
-    ) -> None:
-        """
-        Args:
-            min_consecutive_frames: Number of consecutive frames a value must be valid
-                                   before it becomes visible.
-                                   Range: [1, 30] (clamped automatically)
-            max_gap_frames: Maximum number of frames a value can be invalid
-                           before the consecutive counter resets. Allows brief dropouts.
-                           Range: [0, 10] (clamped automatically)
-        """
-        super().__init__()
-        self.min_consecutive_frames: int = max(1, min(30, min_consecutive_frames))
-        self.max_gap_frames: int = max(0, min(10, max_gap_frames))
+class TemporalStabilizerConfig(ReactiveSettings):
+    """Configuration for temporal stability filtering."""
+    min_consecutive_frames: Field[int] = Field(3)
+    max_gap_frames:         Field[int] = Field(0)
 
 
 class TemporalStabilizer(FilterNode):

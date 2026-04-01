@@ -4,43 +4,16 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
+from modules.settings import Settings as ReactiveSettings, Field
 
 
-class DualConfFilterConfig(NodeConfigBase):
-    """Configuration for hysteresis confidence filtering with automatic change notification.
-
-    Hysteresis filtering uses dual thresholds to prevent flickering when scores
-    hover near a single threshold. Once a value exceeds threshold_high, it stays
-    visible until it drops below threshold_low.
-    """
-
-    def __init__(
-        self,
-        threshold_low: float = 0.3,
-        threshold_high: float = 0.5,
-        rescale_scores: bool = True
-    ) -> None:
-        """
-        Args:
-            threshold_low: Lower threshold - values below this turn off.
-                          Range: [0.0, 0.99] (clamped automatically)
-            threshold_high: Upper threshold - values above this turn on.
-                           Must be >= threshold_low.
-                           Range: [0.0, 0.99] (clamped automatically)
-            rescale_scores: If True, rescale remaining scores to [0, 1] range.
-                          If False, keep original scores for visible values.
-        """
-        super().__init__()
-        self.threshold_low: float = max(0.0, min(0.99, threshold_low))
-        self.threshold_high: float = max(0.0, min(0.99, threshold_high))
-
-        # Ensure high >= low
-        if self.threshold_high < self.threshold_low:
-            self.threshold_high = self.threshold_low
-
-        self.rescale_scores: bool = rescale_scores
+class DualConfFilterConfig(ReactiveSettings):
+    """Configuration for hysteresis confidence filtering."""
+    threshold_low:  Field[float] = Field(0.3)
+    threshold_high: Field[float] = Field(0.5)
+    rescale_scores: Field[bool]  = Field(True)
 
 
 class DualConfidenceFilter(FilterNode):
