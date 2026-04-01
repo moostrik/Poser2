@@ -9,7 +9,7 @@ from modules.settings.settings import Settings
 logger = logging.getLogger(__name__)
 
 SETTINGS_DIR = Path("files/settings")
-PRESET_SUFFIX = ".reactive.json"
+PRESET_SUFFIX = ".json"
 
 
 def path(name: str) -> Path:

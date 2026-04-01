@@ -1,66 +1,18 @@
-# TODO:
-# make dynamic list of children in settings
-# find a better way to add children to settings that is more in line with adding Fields
-
-
 # Standard library imports
 from typing import Optional
 from functools import partial
 
 # Local application imports
-from modules.oak import Camera, FrameSync, OakSettings, Simulator, Player, Recorder
-from modules.settings import Settings as NewSettings, presets, NiceServer, NiceSettings, Field
-from modules.render import RenderManager, RenderSettings
+from modules.AppSettings import MainSettings
+from modules.oak import Camera, FrameSync, Simulator, Player, Recorder
+from modules.settings import presets, NiceServer
+from modules.render import RenderManager
 from modules.DataHub import DataHub, Stage
-from modules.inout import OscSound, OscSoundConfig, ArtNetBars, ArtNetBarsSettings
-from modules.tracker import OnePerCamTracker, OnePerCamTrackerConfig
-from modules.pose import batch, nodes, trackers, Settings as PoseSettings
-from modules.utils import Timer, TimerConfig
+from modules.inout import OscSound, ArtNetBars, ArtNetBarsSettings
+from modules.tracker import OnePerCamTracker
+from modules.pose import batch, nodes, trackers
+from modules.utils import Timer
 
-
-class InOutGroup(NewSettings):
-    osc_sound: OscSoundConfig
-    artnet_1: ArtNetBarsSettings
-    artnet_2: ArtNetBarsSettings
-    artnet_3: ArtNetBarsSettings
-
-class SmoothedFeatureGroup(NewSettings):
-    smoother:           nodes.EuroSmootherConfig
-    interpolator:       nodes.ChaseInterpolatorConfig
-    prediction:         nodes.PredictorConfig
-
-class AngleFeatureGroup(NewSettings):
-    smoother:           nodes.EuroSmootherConfig
-    angle_vel_smoother: nodes.EuroSmootherConfig
-    interpolator:       nodes.ChaseInterpolatorConfig
-    prediction:         nodes.PredictorConfig
-
-class MotionGroup(NewSettings):
-    extractor:          nodes.AngleMotionExtractorConfig
-    moving_average:     nodes.MovingAverageConfig
-
-class PoseGroup(NewSettings):
-    pose:               PoseSettings
-    window_similarity:  batch.WindowSimilarityConfig
-    window_correlation: batch.WindowCorrelationConfig
-    bbox:               SmoothedFeatureGroup
-    point:              SmoothedFeatureGroup
-    angle:              AngleFeatureGroup
-    similarity:         SmoothedFeatureGroup
-    motion:             MotionGroup
-
-class TTGroup(NewSettings):
-    timer:              TimerConfig
-    tracker:            OnePerCamTrackerConfig
-
-class MainSettings(NewSettings):
-    num_players:        Field[int] = Field(3, access=Field.INIT, visible=False)
-    camera:             OakSettings
-    tt:                 TTGroup
-    pose:               PoseGroup
-    render:             RenderSettings
-    inout:              InOutGroup
-    server:             NiceSettings
 
 class Main():
     def __init__(self, simulation: bool = False) -> None:

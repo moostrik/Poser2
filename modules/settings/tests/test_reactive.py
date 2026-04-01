@@ -2010,7 +2010,7 @@ class TestPresetsUtilities(unittest.TestCase):
 
     def test_path_returns_expected(self):
         p = presets.path("mypreset")
-        self.assertEqual(p.name, "mypreset.reactive.json")
+        self.assertEqual(p.name, "mypreset.json")
 
     def test_set_startup_get_startup_round_trip(self):
         with tempfile.TemporaryDirectory() as d:
@@ -2040,8 +2040,8 @@ class TestPresetsUtilities(unittest.TestCase):
             orig_dir = presets.SETTINGS_DIR
             presets.SETTINGS_DIR = Path(d)
             try:
-                (Path(d) / "beta.reactive.json").write_text("{}")
-                (Path(d) / "alpha.reactive.json").write_text("{}")
+                (Path(d) / "beta.json").write_text("{}")
+                (Path(d) / "alpha.json").write_text("{}")
                 result = presets.scan()
                 self.assertEqual(result, ["alpha", "beta"])
             finally:

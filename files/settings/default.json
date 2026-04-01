@@ -8,7 +8,7 @@
     "square": true,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "models",
     "video_path": "recordings",
     "temp_path": "temp",
@@ -16,6 +16,11 @@
     "video_frame_types": [
       "VIDEO"
     ],
+    "recorder": {
+      "group_id": "no_id",
+      "video_encoder": "iGPU",
+      "video_chunk_length": 10.0
+    },
     "cameras": [
       {
         "device_id": "14442C101136D1D200",
@@ -109,11 +114,25 @@
       "sim_fps": 30.0,
       "sim_passthrough": false,
       "video_decoder": "iGPU"
+    }
+  },
+  "tt": {
+    "timer": {
+      "fps": 60.0,
+      "run": false,
+      "duration": 30.0,
+      "intermezzo": 5.0,
+      "auto": false,
+      "verbose": false
     },
-    "recorder": {
-      "group_id": "no_id",
-      "video_encoder": "iGPU",
-      "video_chunk_length": 10.0
+    "tracker": {
+      "tracklet_min_age": 3,
+      "timeout": 2.0,
+      "add_centre_threshold": 0.25,
+      "add_height_threshold": 0.25,
+      "add_bottom_threshold": 0.25,
+      "update_centre_threshold": 0.35,
+      "update_height_threshold": 0.2
     }
   },
   "pose": {
@@ -133,6 +152,7 @@
       "flow_enabled": false
     },
     "window_similarity": {
+      "max_poses": 3,
       "window_length": 11,
       "method": "HARMONIC_MEAN",
       "use_angle_similarity": true,
@@ -148,6 +168,7 @@
       "verbose": false
     },
     "window_correlation": {
+      "max_poses": 3,
       "window_length": 7,
       "method": "HARMONIC_MEAN",
       "max_lag": 7,
@@ -160,56 +181,81 @@
     },
     "bbox": {
       "smoother": {
+        "frequency": 30.0,
         "min_cutoff": 0.01,
         "beta": 0.2,
         "d_cutoff": 1.0
       },
       "interpolator": {
         "responsiveness": 0.16,
-        "friction": 0.05
+        "friction": 0.05,
+        "input_frequency": 30.0,
+        "output_frequency": 60.0
       },
-      "prediction": {}
+      "prediction": {
+        "frequency": 30.0,
+        "method": "QUADRATIC"
+      }
     },
     "point": {
       "smoother": {
+        "frequency": 30.0,
         "min_cutoff": 1.5,
         "beta": 5.0,
         "d_cutoff": 1.0
       },
       "interpolator": {
         "responsiveness": 0.5,
-        "friction": 0.05
+        "friction": 0.05,
+        "input_frequency": 30.0,
+        "output_frequency": 60.0
       },
-      "prediction": {}
+      "prediction": {
+        "frequency": 30.0,
+        "method": "QUADRATIC"
+      }
     },
     "angle": {
       "smoother": {
+        "frequency": 30.0,
         "min_cutoff": 0.1,
         "beta": 0.7,
         "d_cutoff": 1.0
       },
       "angle_vel_smoother": {
+        "frequency": 30.0,
         "min_cutoff": 0.5,
         "beta": 2.5,
         "d_cutoff": 1.0
       },
       "interpolator": {
         "responsiveness": 0.33,
-        "friction": 0.05
+        "friction": 0.05,
+        "input_frequency": 30.0,
+        "output_frequency": 60.0
       },
-      "prediction": {}
+      "prediction": {
+        "frequency": 30.0,
+        "method": "QUADRATIC"
+      }
     },
     "similarity": {
       "smoother": {
+        "frequency": 30.0,
         "min_cutoff": 0.01,
         "beta": 0.4,
         "d_cutoff": 1.0
       },
       "interpolator": {
         "responsiveness": 0.33,
-        "friction": 0.05
+        "friction": 0.05,
+        "input_frequency": 30.0,
+        "output_frequency": 60.0
       },
-      "prediction": {}
+      "prediction": {
+        "frequency": 30.0,
+        "method": "QUADRATIC"
+      }
     },
     "motion": {
       "extractor": {
@@ -221,68 +267,6 @@
         "window_size": 23,
         "window_type": "UNIFORM"
       }
-    }
-  },
-  "inout": {
-    "osc_sound": {
-      "ip_addresses": "127.0.0.1",
-      "port": 9000,
-      "stage": "LERP",
-      "max_players": 3
-    },
-    "artnet_1": {
-      "enabled": true,
-      "verbose": false,
-      "ip_address": "10.0.0.4",
-      "base_universe": 0,
-      "channel_order": "GRBW",
-      "fps": 40,
-      "pixels": 94,
-      "color": {
-        "r": 1.0,
-        "g": 0.0,
-        "b": 0.0,
-        "a": 1.0
-      },
-      "white_strength": 0.66,
-      "color_strength": 1.0,
-      "bar": 1.0
-    },
-    "artnet_2": {
-      "enabled": true,
-      "verbose": false,
-      "ip_address": "10.0.0.5",
-      "base_universe": 0,
-      "channel_order": "GRBW",
-      "fps": 40,
-      "pixels": 94,
-      "color": {
-        "r": 0.0,
-        "g": 0.32,
-        "b": 1.0,
-        "a": 1.0
-      },
-      "white_strength": 0.66,
-      "color_strength": 1.0,
-      "bar": 1.0
-    },
-    "artnet_3": {
-      "enabled": true,
-      "verbose": false,
-      "ip_address": "10.0.0.6",
-      "base_universe": 0,
-      "channel_order": "GRBW",
-      "fps": 40,
-      "pixels": 94,
-      "color": {
-        "r": 0.68,
-        "g": 0.34,
-        "b": 0.0,
-        "a": 1.0
-      },
-      "white_strength": 0.66,
-      "color_strength": 1.0,
-      "bar": 1.0
     }
   },
   "render": {
@@ -535,19 +519,66 @@
       ]
     }
   },
-  "tt": {
-    "timer": {
-      "duration": 30.0,
-      "intermezzo": 5.0
+  "inout": {
+    "osc_sound": {
+      "ip_addresses": "127.0.0.1",
+      "port": 9000,
+      "stage": "LERP",
+      "max_players": 3
     },
-    "tracker": {
-      "tracklet_min_age": 3,
-      "timeout": 2.0,
-      "add_centre_threshold": 0.25,
-      "add_height_threshold": 0.25,
-      "add_bottom_threshold": 0.25,
-      "update_centre_threshold": 0.35,
-      "update_height_threshold": 0.2
+    "artnet_1": {
+      "enabled": true,
+      "verbose": false,
+      "ip_address": "10.0.0.4",
+      "base_universe": 0,
+      "channel_order": "GRBW",
+      "fps": 40,
+      "pixels": 94,
+      "color": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "white_strength": 0.66,
+      "color_strength": 1.0,
+      "bar": 1.0
+    },
+    "artnet_2": {
+      "enabled": true,
+      "verbose": false,
+      "ip_address": "10.0.0.5",
+      "base_universe": 0,
+      "channel_order": "GRBW",
+      "fps": 40,
+      "pixels": 94,
+      "color": {
+        "r": 0.0,
+        "g": 0.32,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "white_strength": 0.66,
+      "color_strength": 1.0,
+      "bar": 1.0
+    },
+    "artnet_3": {
+      "enabled": true,
+      "verbose": false,
+      "ip_address": "10.0.0.6",
+      "base_universe": 0,
+      "channel_order": "GRBW",
+      "fps": 40,
+      "pixels": 94,
+      "color": {
+        "r": 0.68,
+        "g": 0.34,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "white_strength": 0.66,
+      "color_strength": 1.0,
+      "bar": 1.0
     }
   },
   "server": {
