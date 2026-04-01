@@ -88,11 +88,7 @@ class Settings(ReactiveSettings):
 
     model_path:                 Field[str]          = Field("models", access=Field.INIT, visible=False)
 
-    confidence_low:             Field[float]        = Field(0.5, min=0.0, max=1.0, access=Field.INIT)
-    confidence_high:            Field[float]        = Field(0.7, min=0.0, max=1.0, access=Field.INIT)
     verbose:                    Field[bool]         = Field(False, access=Field.INIT)
-    crop_expansion_width:       Field[float]        = Field(0.0, min=0.0, max=1.0, access=Field.INIT)
-    crop_expansion_height:      Field[float]        = Field(0.0, min=0.0, max=1.0, access=Field.INIT)
 
     # Feature toggles
     segmentation_enabled:       Field[bool]         = Field(True, access=Field.INIT)

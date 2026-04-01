@@ -15,23 +15,23 @@ from modules.utils import Timer
 
 
 class Main():
-    def __init__(self, simulation: bool = False) -> None:
+    def __init__(self, simulation: bool = False, num_cameras: int = 3, fps: float = 0.0) -> None:
 
-        self.new_settings = MainSettings()
+        self.settings = MainSettings()
 
-        if not presets.load(self.new_settings, presets.startup_path()):
-            presets.save(self.new_settings, presets.startup_path())  # create default preset if loading failed
+        if not presets.load(self.settings, presets.startup_path()):
+            presets.save(self.settings, presets.startup_path())  # create default preset if loading failed (not responsibility of main!)
 
         # CLI override: --simulation flag takes precedence over preset
-        self.new_settings.camera.sim_enabled = simulation
+        self.settings.camera.sim_enabled = simulation
 
-        self.new_settings.initialize()
 
-        num_players: int = self.new_settings.num_players
-        cam_settings = self.new_settings.camera
+        self.settings.initialize()
+
+        num_players: int = self.settings.num_players
 
         # Create controllers after preset loading so INIT fields (num_pixels, ip, etc.) are final
-        self.artnet_controllers = [ArtNetBars(cfg) for cfg in self.new_settings.inout.children.values() if isinstance(cfg, ArtNetBarsSettings)]
+        self.artnet_controllers = [ArtNetBars(cfg) for cfg in self.settings.inout.children.values() if isinstance(cfg, ArtNetBarsSettings)]
 
         self.is_running: bool = False
         self.is_finished: bool = False
@@ -40,100 +40,70 @@ class Main():
         self.cameras: list[Camera | Simulator] = []
         self.recorder: Optional[Recorder] = None
         self.player: Optional[Player] = None
-        if cam_settings.sim_enabled:
-            self.player = Player(cam_settings.simulator)
-            for i in range(cam_settings.num_cameras):
-                self.cameras.append(Simulator(self.player, cam_settings.cameras[i], cam_settings.simulator))
+        if self.settings.camera.sim_enabled:
+            self.player = Player(self.settings.camera.simulator)
+            for i in range(self.settings.camera.num_cameras):
+                self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
-            self.recorder = Recorder(cam_settings.recorder)
-            for i in range(cam_settings.num_cameras):
-                camera = Camera(cam_settings.cameras[i])
+            self.recorder = Recorder(self.settings.camera.recorder)
+            for i in range(self.settings.camera.num_cameras):
+                camera = Camera(self.settings.camera.cameras[i])
                 self.cameras.append(camera)
-        self.frame_sync_bang = FrameSync(cam_settings, False, 'frame_sync')
+        self.frame_sync_bang = FrameSync(self.settings.camera, False, 'frame_sync')
 
         # TRACKER
-        self.tracker = OnePerCamTracker(self.new_settings.tt.tracker, num_players)
-        self.tracklet_sync_bang = FrameSync(cam_settings, False, 'tracklet_sync')
+        self.tracker = OnePerCamTracker(self.settings.tt.tracker, num_players)
+        self.tracklet_sync_bang = FrameSync(self.settings.camera, False, 'tracklet_sync')
 
         # DATA
         self.data_hub = DataHub()
-        self.sound_osc = OscSound(self.data_hub, self.new_settings.inout.osc_sound)
+        self.sound_osc = OscSound(self.data_hub, self.settings.inout.osc_sound)
 
         # TIMER
-        self.timer = Timer(self.new_settings.tt.timer)
-
-        self.render_settings = self.new_settings.render
-        self.render = RenderManager(self.data_hub, self.render_settings, num_cams=len(self.cameras), num_players=num_players)
-
-
-        # Start settings server
-        self.settings_server = NiceServer(self.new_settings, self.new_settings.server, on_exit=self.stop)
-        self.settings_server.start()
-
-        # POSE CONFIGURATION
-        pose_settings = self.new_settings.pose.pose
-        pose_group = self.new_settings.pose
-        # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion_width=pose_settings.crop_expansion_width, expansion_height=pose_settings.crop_expansion_height, output_width=384, output_height=512, max_poses=pose_settings.max_poses)
-        self.gpu_crop_config =      batch.ImageCropConfig(expansion_width=pose_settings.crop_expansion_width, expansion_height=pose_settings.crop_expansion_height, output_width=768, output_height=1024, max_poses=pose_settings.max_poses, verbose=False, enable_prev_crop=False)
-        self.b_box_smooth_config =  pose_group.bbox.smoother
-        self.b_box_rate_config =    nodes.RateLimiterConfig(max_increase= 10, max_decrease= 0.2)
-        self.point_smooth_config =  pose_group.point.smoother
-        self.angle_smooth_config =  pose_group.angle.smoother
-        self.a_vel_smooth_config =  pose_group.angle.angle_vel_smoother
-        self.simil_smooth_config =  pose_group.similarity.smoother
-
-        self.b_box_interp_config =  pose_group.bbox.interpolator
-        self.point_interp_config =  pose_group.point.interpolator
-        self.angle_interp_config =  pose_group.angle.interpolator
-        self.simil_interp_config =  pose_group.similarity.interpolator
-
-        self.motion_ma_config =     pose_group.motion.moving_average
-        self.motion_easing_config = nodes.EasingConfig(easing_name='easeInOutSine')
-        self.motion_extractor_config = pose_group.motion.extractor
+        self.timer = Timer(self.settings.tt.timer)
+        self.render = RenderManager(self.data_hub, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
+        self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
 
-        self.gpu_crop_processor =   batch.ImageCropProcessor(self.gpu_crop_config)
-        self.point_extractor =      batch.PointBatchExtractor(pose_settings)  # GPU-based 2D point extractor
-        self.mask_extractor =       batch.MaskBatchExtractor(pose_settings)   # GPU-based segmentation mask extractor
-        self.flow_extractor =       batch.FlowBatchExtractor(pose_settings)   # GPU-based optical flow extractor
+        self.gpu_crop_processor =   batch.ImageCropProcessor(self.settings.pose.image_crop)
+        self.point_extractor =      batch.PointBatchExtractor(self.settings.pose.pose)
+        self.mask_extractor =       batch.MaskBatchExtractor(self.settings.pose.pose)
+        self.flow_extractor =       batch.FlowBatchExtractor(self.settings.pose.pose)
 
-        self.window_similator_config = self.new_settings.pose.window_similarity
-        self.window_similator=      batch.WindowSimilarity(self.window_similator_config)
+        self.window_similator =     batch.WindowSimilarity(self.settings.pose.window_similarity)
+        self.window_correlator =    batch.WindowCorrelation(self.settings.pose.window_correlation)
 
-        self.window_correlator_config = self.new_settings.pose.window_correlation
-        self.window_correlator =    batch.WindowCorrelation(self.window_correlator_config)
-
-        # Feature applicators (replace SimilarityExtractor)
-        self.similarity_applicator = nodes.SimilarityApplicator(max_poses=pose_settings.max_poses)
-        self.leader_applicator =     nodes.LeaderScoreApplicator(max_poses=pose_settings.max_poses)
-        self.motion_gate_applicator = nodes.MotionGateApplicator(nodes.MotionGateApplicatorConfig(max_poses=pose_settings.max_poses))
+        # Feature applicators
+        self.similarity_applicator = nodes.SimilarityApplicator(max_poses=self.settings.pose.max_poses)
+        self.leader_applicator =     nodes.LeaderScoreApplicator(max_poses=self.settings.pose.max_poses)
+        self.motion_gate_applicator= nodes.MotionGateApplicator(self.settings.pose.motion_gate)
         self.motion_gate_tracker =   trackers.FilterTracker(num_players, [lambda: self.motion_gate_applicator])
 
         self.debug_tracker =        trackers.DebugTracker(num_players)
 
         # WINDOW TRACKERS
-        self.window_tracker_R =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * cam_settings.fps)))
-        self.window_tracker_S =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * cam_settings.fps)))
-        self.window_tracker_I =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * self.render_settings.window.avg_fps)))
+        self.window_tracker_R =     trackers.AllWindowTracker(num_players, self.settings.pose.window_raw)
+        self.window_tracker_S =     trackers.AllWindowTracker(num_players, self.settings.pose.window_smooth)
+        self.window_tracker_I =     trackers.AllWindowTracker(num_players, self.settings.pose.window_lerp)
 
         self.bbox_filters =      trackers.FilterTracker(
             num_players,
             [
-                lambda: nodes.BBoxEuroSmoother(self.b_box_smooth_config),
-                lambda: nodes.BBoxPredictor(pose_group.bbox.prediction),
-                # lambda: nodes.BBoxRateLimiter(self.b_box_rate_config),
+                lambda: nodes.BBoxEuroSmoother(self.settings.pose.bbox.smoother),
+                lambda: nodes.BBoxPredictor(self.settings.pose.bbox.prediction),
+                # lambda: nodes.BBoxRateLimiter(self.new_settings.pose.rate_limiter),
             ]
         )
 
         self.pose_raw_filters =     trackers.FilterTracker(
             num_players,
             [
-                lambda: nodes.PointDualConfFilter(nodes.DualConfFilterConfig(threshold_low=pose_settings.confidence_low, threshold_high=pose_settings.confidence_high)),
+                lambda: nodes.PointDualConfFilter(self.settings.pose.confidence_filter),
                 # lambda: nodes.PointTemporalStabilizer(nodes.TemporalStabilizerConfig()),
                 nodes.AngleExtractor,
-                lambda: nodes.AngleVelExtractor(fps=cam_settings.fps),
+                lambda: nodes.AngleVelExtractor(fps=self.settings.camera.fps),
                 # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Raw")),
             ]
         )
@@ -141,34 +111,33 @@ class Main():
         self.pose_smooth_filters = trackers.FilterTracker(
             num_players,
             [
-                lambda: nodes.PointEuroSmoother(self.point_smooth_config),
+                lambda: nodes.PointEuroSmoother(self.settings.pose.point.smoother),
                 nodes.AngleExtractor,
-                lambda: nodes.AngleVelExtractor(fps=cam_settings.fps),
-                lambda: nodes.AngleVelEuroSmoother(self.angle_smooth_config),
-                lambda: nodes.AngleEuroSmoother(self.angle_smooth_config),
+                lambda: nodes.AngleVelExtractor(fps=self.settings.camera.fps),
+                lambda: nodes.AngleVelEuroSmoother(self.settings.pose.angle.smoother),
+                lambda: nodes.AngleEuroSmoother(self.settings.pose.angle.smoother),
                 # lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=False)),
-                lambda: nodes.AngleMotionExtractor(self.motion_extractor_config),
-                lambda: nodes.AngleMotionMovingAverageSmoother(self.motion_ma_config),
-                # lambda: nodes.AngleMotionEasingNode(self.motion_easing_config),
+                lambda: nodes.AngleMotionExtractor(self.settings.pose.motion.extractor),
+                lambda: nodes.AngleMotionMovingAverageSmoother(self.settings.pose.motion.moving_average),
+                # lambda: nodes.AngleMotionEasingNode(self.new_settings.pose.easing),
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeExtractor,
                 nodes.AgeExtractor,
                 lambda: self.similarity_applicator,
                 lambda: self.leader_applicator,
-                lambda: nodes.SimilarityEuroSmoother(self.simil_smooth_config),
+                lambda: nodes.SimilarityEuroSmoother(self.settings.pose.similarity.smoother),
                 # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Smooth")),
             ]
         )
 
-
         self.pose_prediction_filters = trackers.FilterTracker(
             num_players,
             [
-                lambda: nodes.PointPredictor(pose_group.point.prediction),
-                lambda: nodes.AnglePredictor(pose_group.angle.prediction),
-                lambda: nodes.AngleVelPredictor(pose_group.angle.prediction),
-                lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=True)),
-                lambda: nodes.SimilarityStickyFiller(nodes.StickyFillerConfig(init_to_zero=True, hold_scores=False)),
+                lambda: nodes.PointPredictor(self.settings.pose.point.prediction),
+                lambda: nodes.AnglePredictor(self.settings.pose.angle.prediction),
+                lambda: nodes.AngleVelPredictor(self.settings.pose.angle.prediction),
+                lambda: nodes.AngleStickyFiller(self.settings.pose.angle_sticky),
+                lambda: nodes.SimilarityStickyFiller(self.settings.pose.similarity_sticky),
                 # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Prediction")),
             ]
         )
@@ -176,11 +145,11 @@ class Main():
         self.interpolator = trackers.InterpolatorTracker(
             num_players,
             [
-                lambda: nodes.BBoxChaseInterpolator(self.b_box_interp_config),
-                lambda: nodes.PointChaseInterpolator(self.point_interp_config),
-                lambda: nodes.AngleChaseInterpolator(self.angle_interp_config),
-                lambda: nodes.AngleVelChaseInterpolator(self.angle_interp_config),
-                lambda: nodes.SimilarityChaseInterpolator(self.simil_interp_config),
+                lambda: nodes.BBoxChaseInterpolator(self.settings.pose.bbox.interpolator),
+                lambda: nodes.PointChaseInterpolator(self.settings.pose.point.interpolator),
+                lambda: nodes.AngleChaseInterpolator(self.settings.pose.angle.interpolator),
+                lambda: nodes.AngleVelChaseInterpolator(self.settings.pose.angle.interpolator),
+                lambda: nodes.SimilarityChaseInterpolator(self.settings.pose.similarity.interpolator),
             ]
         )
 
@@ -191,15 +160,18 @@ class Main():
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeExtractor,
                 nodes.AgeExtractor,
-                lambda: nodes.AngleVelStickyFiller(nodes.StickyFillerConfig(init_to_zero=True, hold_scores=False)),
-                lambda: nodes.AngleVelEuroSmoother(self.a_vel_smooth_config),
-                lambda: nodes.AngleMotionExtractor(self.motion_extractor_config),
-                lambda: nodes.AngleMotionMovingAverageSmoother(self.motion_ma_config),
+                lambda: nodes.AngleVelStickyFiller(self.settings.pose.angle_vel_sticky),
+                lambda: nodes.AngleVelEuroSmoother(self.settings.pose.angle.angle_vel_smoother),
+                lambda: nodes.AngleMotionExtractor(self.settings.pose.motion.extractor),
+                lambda: nodes.AngleMotionMovingAverageSmoother(self.settings.pose.motion.moving_average),
                 # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Interpolation")),
             ]
         )
 
     def start(self) -> None:
+
+        self.settings_server.start()
+
         for camera in self.cameras:
 
             camera.add_preview_callback(self.data_hub.set_cam_image)
@@ -222,10 +194,8 @@ class Main():
         self.pose_raw_filters.add_poses_callback(self.window_tracker_R.process)
         self.window_tracker_R.add_callback(partial(self.data_hub.set_feature_windows, Stage.RAW))
 
-        # POSE SMOOTH
+        # POSE SMOOTH & PREDICT
         self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
-
-        # POSE PREDICTION
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
         self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, Stage.SMOOTH))
         self.pose_smooth_filters.add_poses_callback(self.window_tracker_S.process)
@@ -329,7 +299,6 @@ class Main():
         self.window_correlator.stop()
 
         self.settings_server.stop()
-
 
         for camera in self.cameras:
             camera.join(timeout=10)

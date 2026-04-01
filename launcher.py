@@ -86,10 +86,13 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     mp.freeze_support()
     parser: ArgumentParser = ArgumentParser()
     parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecorded video with camera')
+    parser.add_argument('-nc',      '--num_cameras',    type=int,   default=3,      help='set the number of cameras (default: 3)')
+    parser.add_argument('-fps',     '--fps',            type=float, default=0.0,    help='set the frames per second for the camera and pose processing, 0 for settings default')
+
 
     args: Namespace = parser.parse_args()
 
-    app = Main(simulation=args.simulation)
+    app = Main(simulation=args.simulation, num_cameras=args.num_cameras, fps=args.fps)
     app.start()
 
     shutdown_event = Event()

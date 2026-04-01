@@ -12,13 +12,21 @@ or ``count=`` kwargs — users never write ``Child(...)`` directly::
     cam = CameraSettings()
     cam.player.folder           # single instance
     cam.cores[0].exposure       # list, indexed access
+
+Name-mapped sharing allows a parent field to be shared under a different
+name in the child::
+
+    frequency = Field(30.0)
+    interp = InterpolatorSettings(share=[frequency.as_('input_frequency')])
+
+The parent's ``frequency`` value is shared to the child as ``input_frequency``.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from modules.settings.field import Field
+from modules.settings.field import Field, FieldAlias
 
 if TYPE_CHECKING:
     from modules.settings.settings import Settings
@@ -36,7 +44,12 @@ class Child:
         cores = CoreSettings(count=num, share=[fps])
 
     ``count`` accepts an int literal or a Field reference.
-    ``share`` accepts a list of Field descriptors from the parent.
+    ``share`` accepts a list of Field descriptors (or FieldAlias) from the parent.
+
+    Name-mapped sharing::
+
+        frequency = Field(30.0)
+        interp = InterpolatorSettings(share=[frequency.as_('input_frequency')])
 
     Users never instantiate ``Child`` directly — the Settings metaclass
     creates one when it detects ``share`` or ``count`` in the constructor
@@ -48,19 +61,29 @@ class Child:
         settings_type: type,
         *,
         count: int | Field | None = None,
-        share: list[Field] | None = None,
+        share: list[Field | FieldAlias] | None = None,
     ):
         self.settings_type = settings_type
         self.is_list: bool = count is not None
         self.count = count
-        self._share_refs: list[Field] = list(share) if share else []
-        self.share: list[str] = []
+        self._share_refs: list[Field | FieldAlias] = list(share) if share else []
+        self.share: list[str] = []  # parent field names
+        self.share_map: dict[str, str] = {}  # parent_name → child_name
         self.name = ""
 
     def __set_name__(self, owner, name):
         self.name = name
         # Resolve share Field refs → names (Fields have .name set by now)
-        self.share = [f.name for f in self._share_refs]
+        # Build both the parent names list and the parent→child mapping
+        for ref in self._share_refs:
+            if isinstance(ref, FieldAlias):
+                parent_name = ref.field.name
+                child_name = ref.child_name
+            else:
+                parent_name = ref.name
+                child_name = ref.name  # same name
+            self.share.append(parent_name)
+            self.share_map[parent_name] = child_name
 
     # -- Descriptor protocol -------------------------------------------------
 
@@ -97,29 +120,35 @@ class Child:
             for name, f in vars(cls).items()
             if isinstance(f, Field)
         }
-        for field_name in self.share:
-            if field_name not in owner._fields:
+        for parent_name in self.share:
+            child_name = self.share_map[parent_name]
+            if parent_name not in owner._fields:
                 raise TypeError(
-                    f"{type(owner).__name__}.{self.name}: shared field '{field_name}' "
+                    f"{type(owner).__name__}.{self.name}: shared field '{parent_name}' "
                     f"not found on parent {type(owner).__name__}"
                 )
-            if field_name not in child_fields:
+            if child_name not in child_fields:
                 raise TypeError(
-                    f"{type(owner).__name__}.{self.name}: shared field '{field_name}' "
+                    f"{type(owner).__name__}.{self.name}: shared field '{child_name}' "
                     f"not found on child {self.settings_type.__name__}"
                 )
-            parent_type = owner._fields[field_name].type_
-            child_type = child_fields[field_name].type_
+            parent_type = owner._fields[parent_name].type_
+            child_type = child_fields[child_name].type_
             if parent_type != child_type:
                 raise TypeError(
                     f"{type(owner).__name__}.{self.name}: type mismatch for shared field "
-                    f"'{field_name}' — parent {parent_type.__name__} != child {child_type.__name__}"
+                    f"'{parent_name}' → '{child_name}' — parent {parent_type.__name__} != child {child_type.__name__}"
                 )
 
     def build_share_kwargs(self, owner: Settings) -> dict:
-        """Build constructor kwargs from the parent's shared field values."""
+        """Build constructor kwargs from the parent's shared field values.
+
+        Keys are child field names (which may differ from parent names when
+        using ``field.as_('child_name')``).
+        """
         kwargs = {}
-        for field_name in self.share:
-            if field_name in owner._fields:
-                kwargs[field_name] = owner._values[field_name]
+        for parent_name in self.share:
+            child_name = self.share_map[parent_name]
+            if parent_name in owner._fields:
+                kwargs[child_name] = owner._values[parent_name]
         return kwargs

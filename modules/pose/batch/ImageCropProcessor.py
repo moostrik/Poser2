@@ -17,19 +17,18 @@ from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 from modules.oak.camera.definitions import FrameType
+from modules.settings import Settings as ReactiveSettings, Field
 
 
-class ImageCropConfig:
+class ImageCropConfig(ReactiveSettings):
     """Configuration for GPU-based image cropping."""
-
-    def __init__(self, expansion_width: float = 0.0, expansion_height: float = 0.0, output_width: int = 384, output_height: int = 512, max_poses: int = 4, enable_prev_crop: bool = True, verbose: bool = False) -> None:
-        self.expansion_width: float = expansion_width
-        self.expansion_height: float = expansion_height
-        self.output_width: int = output_width
-        self.output_height: int = output_height
-        self.max_poses: int = max_poses
-        self.enable_prev_crop: bool = enable_prev_crop  # Enable previous frame crops for optical flow
-        self.verbose: bool = verbose
+    expansion_width:  Field[float] = Field(0.0, min=0.0, max=1.0, access=Field.INIT)
+    expansion_height: Field[float] = Field(0.0, min=0.0, max=1.0, access=Field.INIT)
+    output_width:     Field[int]   = Field(384, access=Field.INIT)
+    output_height:    Field[int]   = Field(512, access=Field.INIT)
+    max_poses:        Field[int]   = Field(4, min=1, max=16, access=Field.INIT)
+    enable_prev_crop: Field[bool]  = Field(True, access=Field.INIT)
+    verbose:          Field[bool]  = Field(False, access=Field.INIT)
 
 
 class ImageCropProcessor:

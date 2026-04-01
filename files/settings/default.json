@@ -136,23 +136,28 @@
     }
   },
   "pose": {
+    "max_poses": 3,
+    "frequency": 30.0,
+    "output_frequency": 60.0,
     "pose": {
-      "max_poses": 3,
       "model_type": "TRT",
       "pose_resolution": "STANDARD",
       "flow_resolution": "EXTREME",
       "model_path": "models",
-      "confidence_low": 0.5,
-      "confidence_high": 0.6,
       "verbose": false,
-      "crop_expansion_width": 0.1,
-      "crop_expansion_height": 0.1,
       "segmentation_enabled": true,
       "segmentation_reset_interval": 240,
       "flow_enabled": false
     },
+    "image_crop": {
+      "expansion_width": 0.1,
+      "expansion_height": 0.1,
+      "output_width": 768,
+      "output_height": 1024,
+      "enable_prev_crop": false,
+      "verbose": false
+    },
     "window_similarity": {
-      "max_poses": 3,
       "window_length": 11,
       "method": "HARMONIC_MEAN",
       "use_angle_similarity": true,
@@ -168,7 +173,6 @@
       "verbose": false
     },
     "window_correlation": {
-      "max_poses": 3,
       "window_length": 7,
       "method": "HARMONIC_MEAN",
       "max_lag": 7,
@@ -181,79 +185,62 @@
     },
     "bbox": {
       "smoother": {
-        "frequency": 30.0,
         "min_cutoff": 0.01,
         "beta": 0.2,
         "d_cutoff": 1.0
       },
       "interpolator": {
         "responsiveness": 0.16,
-        "friction": 0.05,
-        "input_frequency": 30.0,
-        "output_frequency": 60.0
+        "friction": 0.05
       },
       "prediction": {
-        "frequency": 30.0,
         "method": "QUADRATIC"
       }
     },
     "point": {
       "smoother": {
-        "frequency": 30.0,
         "min_cutoff": 1.5,
         "beta": 5.0,
         "d_cutoff": 1.0
       },
       "interpolator": {
         "responsiveness": 0.5,
-        "friction": 0.05,
-        "input_frequency": 30.0,
-        "output_frequency": 60.0
+        "friction": 0.05
       },
       "prediction": {
-        "frequency": 30.0,
         "method": "QUADRATIC"
       }
     },
     "angle": {
       "smoother": {
-        "frequency": 30.0,
         "min_cutoff": 0.1,
         "beta": 0.7,
         "d_cutoff": 1.0
       },
       "angle_vel_smoother": {
-        "frequency": 30.0,
         "min_cutoff": 0.5,
         "beta": 2.5,
         "d_cutoff": 1.0
       },
       "interpolator": {
         "responsiveness": 0.33,
-        "friction": 0.05,
-        "input_frequency": 30.0,
-        "output_frequency": 60.0
+        "friction": 0.05
       },
       "prediction": {
-        "frequency": 30.0,
         "method": "QUADRATIC"
       }
     },
     "similarity": {
       "smoother": {
-        "frequency": 30.0,
         "min_cutoff": 0.01,
         "beta": 0.4,
         "d_cutoff": 1.0
       },
       "interpolator": {
         "responsiveness": 0.33,
-        "friction": 0.05,
-        "input_frequency": 30.0,
-        "output_frequency": 60.0
+        "friction": 0.05
       },
       "prediction": {
-        "frequency": 30.0,
         "method": "QUADRATIC"
       }
     },
@@ -267,6 +254,33 @@
         "window_size": 23,
         "window_type": "UNIFORM"
       }
+    },
+    "motion_gate": {},
+    "confidence_filter": {
+      "threshold_low": 0.5,
+      "threshold_high": 0.6,
+      "rescale_scores": true
+    },
+    "angle_sticky": {
+      "init_to_zero": false,
+      "hold_scores": true
+    },
+    "similarity_sticky": {
+      "init_to_zero": true,
+      "hold_scores": false
+    },
+    "angle_vel_sticky": {
+      "init_to_zero": true,
+      "hold_scores": false
+    },
+    "window_raw": {
+      "window_size": 180
+    },
+    "window_smooth": {
+      "window_size": 180
+    },
+    "window_lerp": {
+      "window_size": 360
     }
   },
   "render": {

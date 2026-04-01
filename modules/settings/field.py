@@ -3,12 +3,28 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from enum import Enum
 from typing import Generic, TypeVar, overload, Any, cast, get_origin, get_args
 
 from modules.settings.widget import Widget
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class FieldAlias:
+    """A Field reference with an alternate name for sharing to a child.
+
+    Created via ``Field.as_('child_name')`` and used in share lists::
+
+        frequency = Field(30.0)
+        interpolator = InterpolatorSettings(share=[frequency.as_('input_frequency')])
+
+    The parent field ``frequency`` is shared to the child as ``input_frequency``.
+    """
+    field: 'Field'
+    child_name: str
 
 T = TypeVar("T")
 
@@ -348,3 +364,15 @@ class Field(Generic[T]):
         if self.widget != Widget.default:
             parts.append(f"widget={self.widget!r}")
         return f"Field({', '.join(parts)})"
+
+    def as_(self, child_name: str) -> FieldAlias:
+        """Return an alias for sharing this field under a different name.
+
+        Usage::
+
+            frequency = Field(30.0)
+            interp = InterpolatorSettings(share=[frequency.as_('input_frequency')])
+
+        The parent's ``frequency`` value is shared to the child as ``input_frequency``.
+        """
+        return FieldAlias(self, child_name)

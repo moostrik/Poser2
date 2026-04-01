@@ -267,7 +267,8 @@ class Settings(metaclass=SettingsMeta):
 
         Children are serialized as nested dicts.  Shared fields (declared
         via ``Child(..., share=[...])``) are excluded from child dicts —
-        the parent is the single source of truth.
+        the parent is the single source of truth.  When name-mapped sharing
+        is used (``field.as_('child_name')``), the child name is excluded.
         """
         result = {}
         exclude = _exclude or set()
@@ -280,7 +281,8 @@ class Settings(metaclass=SettingsMeta):
         for name, child_or_list in self._children.items():
             try:
                 child_desc = self._get_child_descriptor(name)
-                shared = set(child_desc.share)
+                # Use child names (share_map values) for exclusion
+                shared = set(child_desc.share_map.values())
             except LookupError:
                 shared = set()
             if isinstance(child_or_list, list):
