@@ -6,7 +6,6 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
-from modules.gui.PyReallySimpleGui import Frame
 from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.gl import Tensor, SwapFbo, Texture, Blit
 
