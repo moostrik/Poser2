@@ -1,3 +1,3 @@
 """Optical flow computation."""
 
-from .OpticalFlow import OpticalFlow, OpticalFlowConfig
+from .OpticalFlow import OpticalFlow, OpticalFlowSettings

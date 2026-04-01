@@ -1,6 +1,6 @@
 from ..FilterTracker import FilterTracker
 from modules.pose.nodes import (
-    EuroSmootherConfig,
+    EuroSmootherSettings,
     AngleEuroSmoother,
     BBoxEuroSmoother,
     PointEuroSmoother,
@@ -11,7 +11,7 @@ from modules.pose.nodes import (
 class BboxSmootherTracker(FilterTracker):
     """Convenience tracker for bounding box smoothing interpolation."""
 
-    def __init__(self, num_tracks: int, config: EuroSmootherConfig) -> None:
+    def __init__(self, num_tracks: int, config: EuroSmootherSettings) -> None:
         super().__init__(
             num_tracks=num_tracks,
             filter_factory=lambda: BBoxEuroSmoother(config)
@@ -21,7 +21,7 @@ class BboxSmootherTracker(FilterTracker):
 class PointSmootherTracker(FilterTracker):
     """Convenience tracker for point smoothing interpolation."""
 
-    def __init__(self, num_tracks: int, config: EuroSmootherConfig) -> None:
+    def __init__(self, num_tracks: int, config: EuroSmootherSettings) -> None:
         super().__init__(
             num_tracks=num_tracks,
             filter_factory=lambda: PointEuroSmoother(config)
@@ -30,7 +30,7 @@ class PointSmootherTracker(FilterTracker):
 class AngleSmootherTracker(FilterTracker):
     """Convenience tracker for angle smoothing interpolation."""
 
-    def __init__(self, num_tracks: int, config: EuroSmootherConfig) -> None:
+    def __init__(self, num_tracks: int, config: EuroSmootherSettings) -> None:
         super().__init__(
             num_tracks=num_tracks,
             filter_factory=lambda: AngleEuroSmoother(config)
@@ -40,7 +40,7 @@ class AngleSmootherTracker(FilterTracker):
 class AngleVelSmootherTracker(FilterTracker):
     """Convenience tracker for delta smoothing interpolation."""
 
-    def __init__(self, num_tracks: int, config: EuroSmootherConfig) -> None:
+    def __init__(self, num_tracks: int, config: EuroSmootherSettings) -> None:
         super().__init__(
             num_tracks=num_tracks,
             filter_factory=lambda: AngleVelEuroSmoother(config)

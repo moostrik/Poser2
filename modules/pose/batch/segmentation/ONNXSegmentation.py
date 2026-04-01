@@ -14,7 +14,7 @@ from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCall
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from modules.pose.Settings import Settings
+    from modules.pose.Settings import PoseSettings
 
 
 class RecurrentState:
@@ -39,7 +39,7 @@ class ONNXSegmentation(Thread):
     All results delivered via callbacks in notification order.
     """
 
-    def __init__(self, settings: 'Settings') -> None:
+    def __init__(self, settings: 'PoseSettings') -> None:
         super().__init__()
 
         self.enabled: bool = settings.segmentation_enabled

@@ -17,10 +17,10 @@ from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 from modules.oak.camera.definitions import FrameType
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 
-class ImageCropConfig(ReactiveSettings):
+class ImageCropSettings(Settings):
     """Configuration for GPU-based image cropping."""
     expansion_width:  Field[float] = Field(0.0, min=0.0, max=1.0, access=Field.INIT)
     expansion_height: Field[float] = Field(0.0, min=0.0, max=1.0, access=Field.INIT)
@@ -43,13 +43,13 @@ class ImageCropProcessor:
     Full frames are stored as float16 RGB CHW [0,1].
     """
 
-    def __init__(self, config: ImageCropConfig) -> None:
+    def __init__(self, config: ImageCropSettings) -> None:
         """Initialize GPU crop processor.
 
         Args:
             config: Configuration for GPU crop processor
         """
-        self._config: ImageCropConfig = config
+        self._config: ImageCropSettings = config
 
         # Per-camera GPU frame storage (float32 BGR [0,1])
         self._gpu_images: dict[int, torch.Tensor] = {}  # cam_id -> full frame on GPU

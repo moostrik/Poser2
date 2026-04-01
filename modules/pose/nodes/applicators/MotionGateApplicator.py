@@ -7,10 +7,10 @@ import numpy as np
 from modules.pose.features.MotionGate import MotionGate, configure_motion_gate
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameDict
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 
-class MotionGateApplicatorConfig(ReactiveSettings):
+class MotionGateApplicatorSettings(Settings):
     """Configuration for MotionGateApplicator."""
     max_poses: Field[int] = Field(4)
 
@@ -28,8 +28,8 @@ class MotionGateApplicator(FilterNode):
     Thread-safe: Uses lock to protect stored motion gate dict.
     """
 
-    def __init__(self, config: MotionGateApplicatorConfig | None = None) -> None:
-        self._config = config if config is not None else MotionGateApplicatorConfig()
+    def __init__(self, config: MotionGateApplicatorSettings | None = None) -> None:
+        self._config = config if config is not None else MotionGateApplicatorSettings()
         configure_motion_gate(self._config.max_poses)
         self._motion_gate_dict: dict[int, MotionGate] = {}
         self._lock: Lock = Lock()

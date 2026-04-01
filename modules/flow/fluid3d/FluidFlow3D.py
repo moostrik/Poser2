@@ -30,7 +30,7 @@ import time
 import logging
 
 from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D
-from ..fluid.fluid_config import FluidFlowConfig, DepthConfig, VelocityConfig
+from ..fluid.fluid_config import FluidFlowSettings, DepthSettings, VelocitySettings
 from ..fluid.shaders import AddBoolean
 from ..FlowUtil import FlowUtil
 from .shaders import (
@@ -79,8 +79,8 @@ class FluidFlow3D:
         _output_texture:  Texture RGBA16F    (composited from density * colour)
     """
 
-    def __init__(self, config: FluidFlowConfig | None = None) -> None:
-        self.config: FluidFlowConfig = config or FluidFlowConfig()
+    def __init__(self, config: FluidFlowSettings | None = None) -> None:
+        self.config: FluidFlowSettings = config or FluidFlowSettings()
 
         # ---- Simulation dimensions and state ---
         self._simulation_width: int = 0
@@ -159,10 +159,10 @@ class FluidFlow3D:
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
         # Bind settings actions
-        self.config.bind(FluidFlowConfig.reset_sim, lambda _: self._request_reset())
-        self.config.depth.bind(DepthConfig.depth, lambda _: self._request_reallocate())
-        self.config.bind(FluidFlowConfig.width, lambda _: self._request_reallocate())
-        self.config.bind(FluidFlowConfig.height, lambda _: self._request_reallocate())
+        self.config.bind(FluidFlowSettings.reset_sim, lambda _: self._request_reset())
+        self.config.depth.bind(DepthSettings.depth, lambda _: self._request_reallocate())
+        self.config.bind(FluidFlowSettings.width, lambda _: self._request_reallocate())
+        self.config.bind(FluidFlowSettings.height, lambda _: self._request_reallocate())
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -344,7 +344,7 @@ class FluidFlow3D:
         profiling = self._profile_enabled
 
         # Dampen velocity (clean input for all steps)
-        vel: VelocityConfig = self.config.velocity
+        vel: VelocitySettings = self.config.velocity
         self._profile_begin("dampen_vel", profiling)
         self._dampen(self._velocity, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
         self._profile_end("dampen_vel", profiling)

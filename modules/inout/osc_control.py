@@ -10,7 +10,7 @@ from pythonosc.dispatcher import Dispatcher
 
 from modules.settings import Settings, Field, Widget
 
-class OscControlConfig(Settings):
+class OscControlSettings(Settings):
     port_in        = Field(9000, min=1024, max=65535, access=Field.INIT, widget=Widget.number, description="Incoming OSC port")
     ip_address_in  = Field("127.0.0.1",              access=Field.INIT, widget=Widget.ip_field,     description="Incoming OSC IP address")
     return_messages = Field(True,                                                               description="Echo received messages back to sender")
@@ -28,9 +28,9 @@ ControlMessageCallback = Callable[[ControlMessage], None]
 
 class OscControl:
 
-    def __init__(self, config: OscControlConfig) -> None:
+    def __init__(self, config: OscControlSettings) -> None:
 
-        self.config: OscControlConfig = config
+        self.config: OscControlSettings = config
 
         self.osc_receive: Dispatcher = Dispatcher()
         self.osc_receive.set_default_handler(self._osc_handler, needs_reply_address=True)

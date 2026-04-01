@@ -11,7 +11,7 @@ import pytweening  # type: ignore
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.features.base import NormalizedSingleValue
 from modules.pose.Frame import Frame, FrameField
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 
 # Available easing functions from pytweening
@@ -38,7 +38,7 @@ EASING_FUNCTIONS: dict[str, Callable[[float], float]] = {
 }
 
 
-class EasingConfig(ReactiveSettings):
+class EasingSettings(Settings):
     """Configuration for easing with selectable function."""
     easing_name: Field[str] = Field('easeInOutSine')
 
@@ -55,12 +55,12 @@ class EasingNode(FilterNode):
     (e.g., AngleMotion, LeaderScore).
     """
 
-    def __init__(self, config: EasingConfig, pose_field: FrameField) -> None:
-        self._config: EasingConfig = config
+    def __init__(self, config: EasingSettings, pose_field: FrameField) -> None:
+        self._config: EasingSettings = config
         self._pose_field: FrameField = pose_field
 
     @property
-    def config(self) -> EasingConfig:
+    def config(self) -> EasingSettings:
         return self._config
 
     def process(self, pose: Frame) -> Frame:
@@ -93,5 +93,5 @@ class EasingNode(FilterNode):
 class AngleMotionEasingNode(EasingNode):
     """Convenience class for easing angle_motion."""
 
-    def __init__(self, config: EasingConfig) -> None:
+    def __init__(self, config: EasingSettings) -> None:
         super().__init__(config, FrameField.angle_motion)

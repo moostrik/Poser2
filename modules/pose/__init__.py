@@ -1,1 +1,1 @@
-from .Settings import Settings
+from .Settings import PoseSettings

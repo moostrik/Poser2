@@ -13,12 +13,12 @@ from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus,
 from modules.tracker.panoramic.PanoramicTrackletManager import PanoramicTrackletManager
 from modules.tracker.panoramic.PanoramicGeometry import PanoramicGeometry
 from modules.tracker.panoramic.PanoramicDefinitions import *
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class PanoramicTrackerConfig(ReactiveSettings):
+class PanoramicTrackerSettings(Settings):
     """Configuration for PanoramicTracker."""
     fov:                      Field[float] = Field(CAM_360_FOV,              min=90.0, max=130.0, step=0.5)
     tracklet_min_age:         Field[int]   = Field(5,                        min=0,    max=9,     step=1)
@@ -47,7 +47,7 @@ class PanoramicOverlapInfo:
     reason: str
 
 class PanoramicTracker(Thread, BaseTracker):
-    def __init__(self, config: PanoramicTrackerConfig, num_players: int, num_cameras: int) -> None:
+    def __init__(self, config: PanoramicTrackerSettings, num_players: int, num_cameras: int) -> None:
         super().__init__()
 
         self.running: bool = False
@@ -59,11 +59,11 @@ class PanoramicTracker(Thread, BaseTracker):
 
         self.tracklet_manager: PanoramicTrackletManager = PanoramicTrackletManager(self.max_players)
 
-        self.config: PanoramicTrackerConfig = config
+        self.config: PanoramicTrackerSettings = config
         self.geometry: PanoramicGeometry = PanoramicGeometry(num_cameras, config.fov, CAM_360_TARGET_FOV)
 
         # Wire fov changes to geometry
-        PanoramicTrackerConfig.fov.bind(config, lambda v: self.geometry.set_fov(v))
+        PanoramicTrackerSettings.fov.bind(config, lambda v: self.geometry.set_fov(v))
 
         self.callback_lock = Lock()
         self.tracklet_callbacks: set[TrackletDictCallback] = set()

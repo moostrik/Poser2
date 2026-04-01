@@ -5,7 +5,7 @@ from .DebugTracker import           DebugTracker
 from .FilterTracker import          FilterTracker
 from .InterpolatorTracker import    InterpolatorTracker
 
-from .convenience.InterpolatorTrackers import   ChaseInterpolatorConfig, AngleChaseInterpolatorTracker, BBoxChaseInterpolatorTracker, AngleVelChaseInterpolatorTracker, PointChaseInterpolatorTracker, BPAChaseInterpolatorTracker
-from .convenience.InterpolatorTrackers import   LerpInterpolatorConfig, AngleLerpInterpolatorTracker, BBoxLerpInterpolatorTracker, DeltaLerpInterpolatorTracker, PointLerpInterpolatorTracker, BPAChaseInterpolatorTracker
-from .convenience.SmootherTrackers import       EuroSmootherConfig, AngleSmootherTracker, BboxSmootherTracker, AngleVelSmootherTracker, PointSmootherTracker
-from .convenience.WindowTrackers import         WindowNodeConfig, AllWindowTracker, AngleMotionWindowTracker, AngleSymmetryWindowTracker, AngleVelocityWindowTracker, AngleWindowTracker, BBoxWindowTracker, SimilarityWindowTracker
+from .convenience.InterpolatorTrackers import   ChaseInterpolatorSettings, AngleChaseInterpolatorTracker, BBoxChaseInterpolatorTracker, AngleVelChaseInterpolatorTracker, PointChaseInterpolatorTracker, BPAChaseInterpolatorTracker
+from .convenience.InterpolatorTrackers import   LerpInterpolatorSettings, AngleLerpInterpolatorTracker, BBoxLerpInterpolatorTracker, DeltaLerpInterpolatorTracker, PointLerpInterpolatorTracker, BPAChaseInterpolatorTracker
+from .convenience.SmootherTrackers import       EuroSmootherSettings, AngleSmootherTracker, BboxSmootherTracker, AngleVelSmootherTracker, PointSmootherTracker
+from .convenience.WindowTrackers import         WindowNodeSettings, AllWindowTracker, AngleMotionWindowTracker, AngleSymmetryWindowTracker, AngleVelocityWindowTracker, AngleWindowTracker, BBoxWindowTracker, SimilarityWindowTracker

@@ -21,7 +21,7 @@ from .. import FlowBase, FlowUtil
 from .shaders.TemperatureBridge import TemperatureBridge as TemperatureBridgeShader
 
 
-class TemperatureBridgeConfig(Settings):
+class TemperatureBridgeSettings(Settings):
     """Configuration for temperature bridge."""
     scale = Field(0.5, min=-1.0, max=2.0, description="Temperature output multiplier")
 
@@ -48,10 +48,10 @@ class TemperatureBridge(FlowBase):
         Interpret → TemperatureBridgeShader → output_fbo (R32F)
     """
 
-    def __init__(self, config: TemperatureBridgeConfig | None = None) -> None:
+    def __init__(self, config: TemperatureBridgeSettings | None = None) -> None:
         super().__init__()
 
-        self.config: TemperatureBridgeConfig = config or TemperatureBridgeConfig()
+        self.config: TemperatureBridgeSettings = config or TemperatureBridgeSettings()
 
         # Define internal formats
         self._input_internal_format = GL_RGB16F   # RGB color interpretation

@@ -11,7 +11,7 @@ import tensorrt as trt
 from ..tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
 
-from modules.pose.Settings import Settings
+from modules.pose.Settings import PoseSettings
 
 class RecurrentState:
     """Container for RVM recurrent states (r1, r2, r3, r4)."""
@@ -37,7 +37,7 @@ class TRTSegmentation(Thread):
     All results delivered via callbacks in notification order.
     """
 
-    def __init__(self, settings: 'Settings') -> None:
+    def __init__(self, settings: 'PoseSettings') -> None:
         super().__init__()
 
         self.enabled: bool = settings.segmentation_enabled

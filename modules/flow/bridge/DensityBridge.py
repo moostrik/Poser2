@@ -13,7 +13,7 @@ from .shaders.DensityBridgeShader import DensityBridgeShader
 from ..shaders.HSV import HSV
 
 
-class DensityBridgeConfig(Settings):
+class DensityBridgeSettings(Settings):
     """Configuration for density bridge."""
     saturation = Field(1.2, min=0.0, max=5.0, description="Color saturation boost")
     brightness = Field(1.0, min=0.0, max=2.0, description="Brightness/value adjustment")
@@ -36,10 +36,10 @@ class DensityBridge(FlowBase):
         HSV adjust → output_fbo (in-place)
     """
 
-    def __init__(self, config: DensityBridgeConfig | None = None) -> None:
+    def __init__(self, config: DensityBridgeSettings | None = None) -> None:
         super().__init__()
 
-        self.config: DensityBridgeConfig = config or DensityBridgeConfig()
+        self.config: DensityBridgeSettings = config or DensityBridgeSettings()
 
         # Define internal formats
         self._input_internal_format = GL_RGBA16F   # RGB density input

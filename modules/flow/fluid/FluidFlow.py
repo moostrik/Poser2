@@ -24,7 +24,7 @@ from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, SwapFbo, Fbo
 from .. import FlowUtil
-from .fluid_config import FluidFlowConfig, VelocityConfig, DensityConfig
+from .fluid_config import FluidFlowSettings, VelocitySettings, DensitySettings
 from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,
@@ -60,8 +60,8 @@ class FluidFlow:
         buoyancy:         Fbo RG16F
     """
 
-    def __init__(self, config: FluidFlowConfig | None = None) -> None:
-        self.config: FluidFlowConfig = config or FluidFlowConfig()
+    def __init__(self, config: FluidFlowSettings | None = None) -> None:
+        self.config: FluidFlowSettings = config or FluidFlowSettings()
 
         # ---- Simulation dimensions and state ---
         self._simulation_width: int = 0
@@ -119,9 +119,9 @@ class FluidFlow:
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
         # Bind settings actions
-        self.config.bind(FluidFlowConfig.reset_sim, lambda _: self._request_reset())
-        self.config.bind(FluidFlowConfig.width, lambda _: self._request_reallocate())
-        self.config.bind(FluidFlowConfig.height, lambda _: self._request_reallocate())
+        self.config.bind(FluidFlowSettings.reset_sim, lambda _: self._request_reset())
+        self.config.bind(FluidFlowSettings.width, lambda _: self._request_reallocate())
+        self.config.bind(FluidFlowSettings.height, lambda _: self._request_reallocate())
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -254,7 +254,7 @@ class FluidFlow:
         self._dt = 1.0 / max(1, self.config.fps)
 
         # Dampen velocity (clean input for all steps)
-        vel: VelocityConfig = self.config.velocity
+        vel: VelocitySettings = self.config.velocity
         self._dampen(self._velocity_fbo, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
 
         # Simulation steps
@@ -268,7 +268,7 @@ class FluidFlow:
         self._advect_density()
 
         # Dampen density (clean output)
-        den: DensityConfig = self.config.density
+        den: DensitySettings = self.config.density
         self._dampen(self._density_fbo, den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
 
 

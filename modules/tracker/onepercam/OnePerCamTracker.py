@@ -10,13 +10,13 @@ from modules.oak.camera.definitions import Tracklet as DepthTracklet
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback
 from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
 from modules.tracker.onepercam.OnePerCamTrackletManager import OnePerCamTrackletManager as TrackletManager
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class OnePerCamTrackerConfig(ReactiveSettings):
+class OnePerCamTrackerSettings(Settings):
     """Configuration for OnePerCamTracker."""
     tracklet_min_age:         Field[int]   = Field(3,    min=0,   max=9,   step=1)
     timeout:                  Field[float] = Field(2.0,  min=1.0, max=5.0, step=0.1)
@@ -36,7 +36,7 @@ class OnePerCamMetadata(TrackerMetadata):
         return TrackerType.ONEPERCAM
 
 class OnePerCamTracker(Thread, BaseTracker):
-    def __init__(self, config: OnePerCamTrackerConfig, num_trackers: int) -> None:
+    def __init__(self, config: OnePerCamTrackerSettings, num_trackers: int) -> None:
         super().__init__()
 
         self._running: bool = False
@@ -46,7 +46,7 @@ class OnePerCamTracker(Thread, BaseTracker):
         self._tracklet_callbacks: set[TrackletDictCallback] = set()
 
         self._num_cams: int = num_trackers
-        self.config: OnePerCamTrackerConfig = config
+        self.config: OnePerCamTrackerSettings = config
 
         self.tracklet_manager: TrackletManager = TrackletManager(self._num_cams)
 

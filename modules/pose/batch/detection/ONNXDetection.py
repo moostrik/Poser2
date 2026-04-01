@@ -11,7 +11,7 @@ import torch
 
 from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
 
-from modules.pose.Settings import Settings
+from modules.pose.Settings import PoseSettings
 
 # ImageNet normalization constants (RGB order) - scaled to [0,1] range
 IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(1, 3, 1, 1)
@@ -25,7 +25,7 @@ class ONNXDetection(Thread):
     Architecture identical to MMDetection for drop-in replacement.
     """
 
-    def __init__(self, settings: 'Settings') -> None:
+    def __init__(self, settings: 'PoseSettings') -> None:
         super().__init__()
 
         self.model_file: str = settings.model_path + '/' + settings.pose_model

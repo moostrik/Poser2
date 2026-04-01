@@ -17,7 +17,7 @@ from modules.utils.Timer import TimerState
 from modules.utils.HotReloadMethods import HotReloadMethods
 from modules.inout.network_validation import validate_connection
 
-class OscSoundConfig(Settings):
+class OscSoundSettings(Settings):
     ip_addresses: Field[str] = Field("127.0.0.1",               widget=Widget.ip_field,     description="Target OSC IP address")
     port: Field[int]         = Field(9000, min=1024, max=65535, widget=Widget.number_field, description="Target OSC port")
     stage: Field[Stage]      = Field(Stage.LERP,                                            description="Pipeline stage to read poses from")
@@ -28,17 +28,17 @@ class OscSound:
     """
     Sends smooth pose data over OSC at a configurable frame rate in its own thread.
     """
-    def __init__(self, data_hub: DataHub, settings: OscSoundConfig) -> None:
+    def __init__(self, data_hub: DataHub, settings: OscSoundSettings) -> None:
 
-        self._config: OscSoundConfig = settings
+        self._config: OscSoundSettings = settings
         self._data_hub: DataHub = data_hub
         self._client_lock: Lock = Lock()
         self._client: SimpleUDPClient = SimpleUDPClient(self._config.ip_addresses, self._config.port)
 
         print(f"SoundOSC: Initialized OSC client to {self._config.ip_addresses}:{self._config.port}")
 
-        self._config.bind(OscSoundConfig.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
-        self._config.bind(OscSoundConfig.port, self._on_connection_change)          # type: ignore[arg-type]
+        self._config.bind(OscSoundSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
+        self._config.bind(OscSoundSettings.port, self._on_connection_change)          # type: ignore[arg-type]
 
         self._running = False
         self._update_event: Event = Event()

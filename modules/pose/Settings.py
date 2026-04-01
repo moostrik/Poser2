@@ -1,6 +1,6 @@
 from enum import IntEnum, auto
 
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 
 class ModelType(IntEnum):
@@ -77,7 +77,7 @@ RESOLUTION_DIMS = {
 }
 
 
-class Settings(ReactiveSettings):
+class PoseSettings(Settings):
 
     max_poses:                  Field[int]          = Field(1, min=1, max=16, access=Field.INIT)
     model_type:                 Field[ModelType]    = Field(ModelType.TRT, access=Field.INIT)

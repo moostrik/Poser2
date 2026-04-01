@@ -1,4 +1,4 @@
 """Fluid simulation module."""
 
 from .FluidFlow import FluidFlow
-from .fluid_config import FluidFlowConfig, DepthConfig, VelocityConfig, DensityConfig, TemperatureConfig, PressureConfig
+from .fluid_config import FluidFlowSettings, DepthSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings

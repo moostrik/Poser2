@@ -16,12 +16,12 @@ import numpy as np
 from modules.pose.features import BaseFeature, PoseFeatureType
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 TFeature = TypeVar('TFeature', bound=BaseFeature)
 
 
-class StickyFillerConfig(ReactiveSettings):
+class StickyFillerSettings(Settings):
     """Configuration for pose hold filter."""
     init_to_zero: Field[bool] = Field(False)
     hold_scores:  Field[bool] = Field(False)
@@ -30,9 +30,9 @@ class StickyFillerConfig(ReactiveSettings):
 class FeatureStickyFiller(FilterNode):
     """Generic sticky filler for pose features."""
 
-    def __init__(self, config: StickyFillerConfig, pose_field: FrameField) -> None:
+    def __init__(self, config: StickyFillerSettings, pose_field: FrameField) -> None:
 
-        self._config: StickyFillerConfig = config
+        self._config: StickyFillerSettings = config
         self._pose_field: FrameField = pose_field
         self._feature_class = pose_field.get_type()
         self._last_valid = self._initialize_last_valid()
@@ -52,7 +52,7 @@ class FeatureStickyFiller(FilterNode):
         return mask[:, np.newaxis] if values.ndim > 1 else mask
 
     @property
-    def config(self) -> StickyFillerConfig:
+    def config(self) -> StickyFillerSettings:
         return self._config
 
     def process(self, pose: Frame) -> Frame:
@@ -86,29 +86,29 @@ class FeatureStickyFiller(FilterNode):
 
 # Convenience classes
 class BBoxStickyFiller(FeatureStickyFiller):
-    def __init__(self, config: StickyFillerConfig) -> None:
+    def __init__(self, config: StickyFillerSettings) -> None:
         super().__init__(config, FrameField.bbox)
 
 
 class PointStickyFiller(FeatureStickyFiller):
-    def __init__(self, config: StickyFillerConfig) -> None:
+    def __init__(self, config: StickyFillerSettings) -> None:
         super().__init__(config, FrameField.points)
 
 
 class AngleStickyFiller(FeatureStickyFiller):
-    def __init__(self, config: StickyFillerConfig) -> None:
+    def __init__(self, config: StickyFillerSettings) -> None:
         super().__init__(config, FrameField.angles)
 
 
 class AngleVelStickyFiller(FeatureStickyFiller):
-    def __init__(self, config: StickyFillerConfig) -> None:
+    def __init__(self, config: StickyFillerSettings) -> None:
         super().__init__(config, FrameField.angle_vel)
 
 
 class AngleSymStickyFiller(FeatureStickyFiller):
-    def __init__(self, config: StickyFillerConfig) -> None:
+    def __init__(self, config: StickyFillerSettings) -> None:
         super().__init__(config, FrameField.angle_sym)
 
 class SimilarityStickyFiller(FeatureStickyFiller):
-    def __init__(self, config: StickyFillerConfig) -> None:
+    def __init__(self, config: StickyFillerSettings) -> None:
         super().__init__(config, FrameField.similarity)

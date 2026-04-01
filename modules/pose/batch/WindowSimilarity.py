@@ -10,7 +10,7 @@ import warnings
 import numpy as np
 
 # Pose imports
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.Frame import FrameField
 from modules.pose.nodes.windows.WindowNode import FeatureWindow
@@ -50,7 +50,7 @@ class _JointAggregator(NormalizedScalarFeature):
             cls._joint_enum = cast(type[IntEnum], IntEnum("JointIndex", {f"J{i}": i for i in range(num_joints)}))
 
 
-class WindowSimilarityConfig(ReactiveSettings):
+class WindowSimilaritySettings(Settings):
     """Configuration for WindowSimilarity."""
     max_poses:              Field[int]                = Field(3, min=1, max=10, access=Field.INIT, description="Maximum number of tracked poses")
     window_length:          Field[int]                = Field(30, min=1, max=300, description="Number of frames to compare")
@@ -84,10 +84,10 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
         - leader_dict: Maps track_id -> LeaderScore (temporal offset/who leads)
     """
 
-    def __init__(self, config: WindowSimilarityConfig | None = None) -> None:
+    def __init__(self, config: WindowSimilaritySettings | None = None) -> None:
         super().__init__()
 
-        self._config = config if config is not None else WindowSimilarityConfig()
+        self._config = config if config is not None else WindowSimilaritySettings()
 
         # Configure Similarity and LeaderScore modules with max_poses
         configure_similarity(self._config.max_poses)

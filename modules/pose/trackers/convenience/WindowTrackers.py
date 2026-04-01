@@ -6,7 +6,7 @@ from traceback import print_exc
 from typing import Callable
 
 from ..WindowTracker import WindowTracker, WindowDictCallback
-from modules.pose.nodes import AngleMotionWindowNode, AngleSymmetryWindowNode, AngleVelocityWindowNode, AngleWindowNode, BBoxWindowNode, SimilarityWindowNode, WindowNodeConfig
+from modules.pose.nodes import AngleMotionWindowNode, AngleSymmetryWindowNode, AngleVelocityWindowNode, AngleWindowNode, BBoxWindowNode, SimilarityWindowNode, WindowNodeSettings
 from modules.pose.nodes.windows.WindowNode import WindowNode, FeatureWindow
 from modules.pose.Frame import FrameDict, FrameField
 
@@ -30,9 +30,9 @@ class AllWindowTracker:
         tracker.add_window_callback(FrameField.angles, similarity_callback)
     """
 
-    def __init__(self, num_tracks: int, config: WindowNodeConfig | None = None) -> None:
+    def __init__(self, num_tracks: int, config: WindowNodeSettings | None = None) -> None:
         if config is None:
-            config = WindowNodeConfig()
+            config = WindowNodeSettings()
 
         self._trackers: dict[FrameField, WindowTracker] = {}
         for ff in FrameField.get_scalar_fields():
@@ -115,9 +115,9 @@ class AngleWindowTracker(WindowTracker):
     Buffers angle values over time and returns windows with shape (time, 9).
     """
 
-    def __init__(self, num_tracks: int, config: WindowNodeConfig | None = None) -> None:
+    def __init__(self, num_tracks: int, config: WindowNodeSettings | None = None) -> None:
         if config is None:
-            config = WindowNodeConfig()
+            config = WindowNodeSettings()
         super().__init__(
             num_tracks=num_tracks,
             window_factory=lambda: AngleWindowNode(config)
@@ -130,9 +130,9 @@ class AngleVelocityWindowTracker(WindowTracker):
     Buffers angular velocity values over time and returns windows with shape (time, 9).
     """
 
-    def __init__(self, num_tracks: int, config: WindowNodeConfig | None = None) -> None:
+    def __init__(self, num_tracks: int, config: WindowNodeSettings | None = None) -> None:
         if config is None:
-            config = WindowNodeConfig()
+            config = WindowNodeSettings()
         super().__init__(
             num_tracks=num_tracks,
             window_factory=lambda: AngleVelocityWindowNode(config)
@@ -145,9 +145,9 @@ class AngleMotionWindowTracker(WindowTracker):
     Buffers angular motion magnitude over time and returns windows with shape (time, 9).
     """
 
-    def __init__(self, num_tracks: int, config: WindowNodeConfig | None = None) -> None:
+    def __init__(self, num_tracks: int, config: WindowNodeSettings | None = None) -> None:
         if config is None:
-            config = WindowNodeConfig()
+            config = WindowNodeSettings()
         super().__init__(
             num_tracks=num_tracks,
             window_factory=lambda: AngleMotionWindowNode(config)
@@ -160,9 +160,9 @@ class AngleSymmetryWindowTracker(WindowTracker):
     Buffers angular symmetry metrics over time and returns windows with shape (time, 9).
     """
 
-    def __init__(self, num_tracks: int, config: WindowNodeConfig | None = None) -> None:
+    def __init__(self, num_tracks: int, config: WindowNodeSettings | None = None) -> None:
         if config is None:
-            config = WindowNodeConfig()
+            config = WindowNodeSettings()
         super().__init__(
             num_tracks=num_tracks,
             window_factory=lambda: AngleSymmetryWindowNode(config)
@@ -175,9 +175,9 @@ class BBoxWindowTracker(WindowTracker):
     Buffers bounding box trajectories over time and returns windows with shape (time, 4).
     """
 
-    def __init__(self, num_tracks: int, config: WindowNodeConfig | None = None) -> None:
+    def __init__(self, num_tracks: int, config: WindowNodeSettings | None = None) -> None:
         if config is None:
-            config = WindowNodeConfig()
+            config = WindowNodeSettings()
         super().__init__(
             num_tracks=num_tracks,
             window_factory=lambda: BBoxWindowNode(config)
@@ -190,9 +190,9 @@ class SimilarityWindowTracker(WindowTracker):
     Buffers similarity trajectories over time and returns windows with shape (time, 1).
     """
 
-    def __init__(self, num_tracks: int, config: WindowNodeConfig | None = None) -> None:
+    def __init__(self, num_tracks: int, config: WindowNodeSettings | None = None) -> None:
         if config is None:
-            config = WindowNodeConfig()
+            config = WindowNodeSettings()
         super().__init__(
             num_tracks=num_tracks,
             window_factory=lambda: SimilarityWindowNode(config)

@@ -5,7 +5,7 @@ import threading
 from enum import IntEnum, auto
 from typing import Callable, Set
 
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 
 class TimerState(IntEnum):
@@ -15,7 +15,7 @@ class TimerState(IntEnum):
     INTERMEZZO =    auto()
 
 
-class TimerConfig(ReactiveSettings):
+class TimerSettings(Settings):
     """Configuration for Timer."""
     fps:        Field[float] = Field(60.0, access=Field.INIT)
     run:        Field[bool]  = Field(False)
@@ -36,7 +36,7 @@ class Timer(threading.Thread):
     - INTERMEZZO: Waiting before going idle
 
     Example:
-        >>> config = TimerConfig(duration=10.0, fps=30.0)
+        >>> config = TimerSettings(duration=10.0, fps=30.0)
         >>> timer = Timer(config)
         >>> timer.add_time_callback(lambda t: print(f"Elapsed: {t:.2f}s"))
         >>> timer.add_state_callback(lambda state: print(f"State: {state.name}"))
@@ -47,7 +47,7 @@ class Timer(threading.Thread):
         >>> timer.stop()  # Stop thread
     """
 
-    def __init__(self, config: TimerConfig | None = None) -> None:
+    def __init__(self, config: TimerSettings | None = None) -> None:
         """Initialize timer with configuration.
 
         Args:
@@ -55,7 +55,7 @@ class Timer(threading.Thread):
         """
         super().__init__(daemon=True, name="Timer")
 
-        self.config: TimerConfig = config or TimerConfig()
+        self.config: TimerSettings = config or TimerSettings()
 
         # Callback management
         self._time_callbacks: Set[Callable[[float], None]] = set()
@@ -74,7 +74,7 @@ class Timer(threading.Thread):
 
     def _setup_watchers(self) -> None:
         """Setup config watcher for run control."""
-        self.config.bind(TimerConfig.run, self._on_run_change)
+        self.config.bind(TimerSettings.run, self._on_run_change)
 
     def _on_run_change(self, value: bool) -> None:
         """Handle run config change."""

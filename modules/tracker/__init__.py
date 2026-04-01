@@ -1,3 +1,3 @@
 from .TrackerBase import TrackerType
-from .panoramic.PanoramicTracker import PanoramicTracker, PanoramicTrackerConfig
-from .onepercam.OnePerCamTracker import OnePerCamTracker, OnePerCamTrackerConfig
+from .panoramic.PanoramicTracker import PanoramicTracker, PanoramicTrackerSettings
+from .onepercam.OnePerCamTracker import OnePerCamTracker, OnePerCamTrackerSettings

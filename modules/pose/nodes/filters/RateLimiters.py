@@ -10,10 +10,10 @@ from modules.pose.features import PoseFeatureType
 from modules.pose.nodes._utils.ArrayRateLimit import RateLimit, AngleRateLimit, PointRateLimit, ArrayRateLimit
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 
-class RateLimiterConfig(ReactiveSettings):
+class RateLimiterSettings(Settings):
     """Configuration for pose rate limiting."""
     max_increase: Field[float] = Field(1.0)
     max_decrease: Field[float] = Field(1.0)
@@ -30,8 +30,8 @@ class FeatureRateLimiter(FilterNode):
         }
     )
 
-    def __init__(self, config: RateLimiterConfig, pose_field: FrameField) -> None:
-        self._config: RateLimiterConfig = config
+    def __init__(self, config: RateLimiterSettings, pose_field: FrameField) -> None:
+        self._config: RateLimiterSettings = config
         self._pose_field: FrameField = pose_field
         limiter_cls = self._FEATURE_LIMIT_MAP[pose_field]
         self._limiter: ArrayRateLimit = limiter_cls(
@@ -53,7 +53,7 @@ class FeatureRateLimiter(FilterNode):
         self._limiter.max_decrease = self._config.max_decrease
 
     @property
-    def config(self) -> RateLimiterConfig:
+    def config(self) -> RateLimiterSettings:
         return self._config
 
     def process(self, pose: Frame) -> Frame:
@@ -69,34 +69,34 @@ class FeatureRateLimiter(FilterNode):
 
 # Convenience classes
 class BBoxRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterConfig) -> None:
+    def __init__(self, config: RateLimiterSettings) -> None:
         super().__init__(config, FrameField.bbox)
 
 
 class PointRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterConfig) -> None:
+    def __init__(self, config: RateLimiterSettings) -> None:
         super().__init__(config, FrameField.points)
 
 
 class AngleRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterConfig) -> None:
+    def __init__(self, config: RateLimiterSettings) -> None:
         super().__init__(config, FrameField.angles)
 
 
 class AngleVelRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterConfig) -> None:
+    def __init__(self, config: RateLimiterSettings) -> None:
         super().__init__(config, FrameField.angle_vel)
 
 
 class AngleSymRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterConfig) -> None:
+    def __init__(self, config: RateLimiterSettings) -> None:
         super().__init__(config, FrameField.angle_sym)
 
 
 class SimilarityRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterConfig) -> None:
+    def __init__(self, config: RateLimiterSettings) -> None:
         super().__init__(config, FrameField.similarity)
 
 class AngleMotionRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterConfig) -> None:
+    def __init__(self, config: RateLimiterSettings) -> None:
         super().__init__(config, FrameField.angle_motion)

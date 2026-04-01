@@ -19,7 +19,7 @@ import torch
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
 
-from modules.pose.Settings import Settings
+from modules.pose.Settings import PoseSettings
 
 # MMDetection uses hardcoded RTMPose-L model paths
 POSE_MODEL_CONFIG = 'models/base/rtmpose-l_8xb256-420e_aic-coco-256x192.py'
@@ -54,7 +54,7 @@ class MMDetection(Thread):
     which may differ from batch_id order due to async processing.
     """
 
-    def __init__(self, settings: 'Settings') -> None:
+    def __init__(self, settings: 'PoseSettings') -> None:
         super().__init__()
 
         # Hardcoded RTMPose-L model paths (MMPose framework requirement)

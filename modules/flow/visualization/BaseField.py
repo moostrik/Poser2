@@ -12,7 +12,7 @@ from modules.utils.PointsAndRects import Rect
 from modules.settings import Field, Settings
 
 
-class VisualisationFieldConfig(Settings):
+class VisualisationFieldSettings(Settings):
     """Base configuration for field visualizations."""
     toggle_scalar = Field(False, description="Toggle between direction map and arrow field")
     scale = Field(1.0, min=0.0, max=10.0, description="Visualization scale multiplier")

@@ -25,18 +25,18 @@ import numpy as np
 # Pose imports
 from modules.pose.features import PoseFeatureType, Angles, BBox, Points2D, AngleSymmetry
 from modules.pose.nodes._utils.ArrayChase import AngleChase, PointChase, Chase
-from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase, InterpolatorConfigBase
+from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase, InterpolatorSettingsBase
 from modules.pose.Frame import Frame, FrameField
 from modules.settings import Field
 
 
-class ChaseInterpolatorConfig(InterpolatorConfigBase):
+class ChaseInterpolatorSettings(InterpolatorSettingsBase):
     """Configuration for pose chase interpolation."""
     responsiveness: Field[float] = Field(0.2)
     friction:       Field[float] = Field(0.03)
 
 
-class FeatureChaseInterpolator(FeatureInterpolatorBase[ChaseInterpolatorConfig]):
+class FeatureChaseInterpolator(FeatureInterpolatorBase[ChaseInterpolatorSettings]):
     """Generic pose feature chase interpolator."""
 
     _INTERP_MAP: defaultdict[FrameField, type] = defaultdict(
@@ -73,30 +73,30 @@ class FeatureChaseInterpolator(FeatureInterpolatorBase[ChaseInterpolatorConfig])
 
 # Convenience classes
 class BBoxChaseInterpolator(FeatureChaseInterpolator):
-    def __init__(self, config: ChaseInterpolatorConfig) -> None:
+    def __init__(self, config: ChaseInterpolatorSettings) -> None:
         super().__init__(config, FrameField.bbox)
 
 
 class PointChaseInterpolator(FeatureChaseInterpolator):
-    def __init__(self, config: ChaseInterpolatorConfig) -> None:
+    def __init__(self, config: ChaseInterpolatorSettings) -> None:
         super().__init__(config, FrameField.points)
 
 
 class AngleChaseInterpolator(FeatureChaseInterpolator):
-    def __init__(self, config: ChaseInterpolatorConfig) -> None:
+    def __init__(self, config: ChaseInterpolatorSettings) -> None:
         super().__init__(config, FrameField.angles)
 
 
 class AngleVelChaseInterpolator(FeatureChaseInterpolator):
-    def __init__(self, config: ChaseInterpolatorConfig) -> None:
+    def __init__(self, config: ChaseInterpolatorSettings) -> None:
         super().__init__(config, FrameField.angle_vel)
 
 
 class AngleSymChaseInterpolator(FeatureChaseInterpolator):
-    def __init__(self, config: ChaseInterpolatorConfig) -> None:
+    def __init__(self, config: ChaseInterpolatorSettings) -> None:
         super().__init__(config, FrameField.angle_sym)
 
 
 class SimilarityChaseInterpolator(FeatureChaseInterpolator):
-    def __init__(self, config: ChaseInterpolatorConfig) -> None:
+    def __init__(self, config: ChaseInterpolatorSettings) -> None:
         super().__init__(config, FrameField.similarity)

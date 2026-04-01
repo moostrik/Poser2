@@ -7,7 +7,7 @@ with prefixes stripped — the group name provides context.
 from modules.settings import Field, Settings, Widget
 
 
-class VelocityConfig(Settings):
+class VelocitySettings(Settings):
     """Velocity field parameters."""
     input_strength: Field[float]    = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="Multiplier applied to all velocity inputs")
     self_advection: Field[float]    = Field(0.01,   min=0.0,    max=0.2,    color="blue-grey",      description="How much velocity advects itself. Keep low for stability.")
@@ -20,7 +20,7 @@ class VelocityConfig(Settings):
     viscosity_iter: Field[int]      = Field(40,     min=1,      max=60,     color="orange",         description="Solver quality for viscosity (iterations at 60fps, auto-scaled for frame rate)")
 
 
-class DensityConfig(Settings):
+class DensitySettings(Settings):
     """Density field parameters."""
     input_strength: Field[float]    = Field(1.0,    min=0.0,    max=10.0,    color="teal",          description="Multiplier applied to all density inputs")
     speed_offset: Field[float]      = Field(0.0,    min=-5.0,   max=5.0,    color="blue-grey",      description="Added to base speed for density only. 0 = physically coupled.")
@@ -29,7 +29,7 @@ class DensityConfig(Settings):
     dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
 
 
-class TemperatureConfig(Settings):
+class TemperatureSettings(Settings):
     """Temperature field parameters."""
     input_strength: Field[float]    = Field(0.0,    min=0.0,    max=2.0,    color="teal",           description="Multiplier applied to all temperature inputs")
     speed_offset: Field[float]      = Field(0.0,    min=-5.0,   max=5.0,    color="blue-grey",      description="Added to base speed for temperature only. 0 = physically coupled.")
@@ -39,14 +39,14 @@ class TemperatureConfig(Settings):
     ambient: Field[float]           = Field(0.2,    min=0.0,    max=1.0,    color="brown",          description="Reference temperature (buoyancy = 0 at this temp)")
 
 
-class PressureConfig(Settings):
+class PressureSettings(Settings):
     """Pressure field parameters."""
     speed: Field[float]             = Field(0.0,    min=0.0,    max=2.0,    color="blue-grey",      description="Pressure advection speed")
     fade_time: Field[float]         = Field(8.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until pressure fades to ~1%")
     iterations: Field[int]          = Field(40,     min=1,      max=60,     color="orange",         description="Solver quality for pressure (iterations at 60fps, auto-scaled for frame rate)")
 
 
-class DepthConfig(Settings):
+class DepthSettings(Settings):
     """Z-axis / volume parameters (ignored by 2D simulations)."""
     depth: Field[int]               = Field(4,    min=1,    max=64,     description="Number of depth layers in the 3D volume")
     scale: Field[float]             = Field(1.0,  min=0.01,  max=5.0,    description="Manual multiplier on auto-computed Z grid spacing (width/depth)")
@@ -57,7 +57,7 @@ class DepthConfig(Settings):
     injection_spread: Field[float]  = Field(0.001, min=0.001, max=0.5,   description="Gaussian sigma for depth spread during injection")
 
 
-class FluidFlowConfig(Settings):
+class FluidFlowSettings(Settings):
     """Unified configuration for all fluid simulations (2D and 3D).
 
     Speed model:
@@ -84,8 +84,8 @@ class FluidFlowConfig(Settings):
     speed: Field[float]             = Field(1.0,    min=0.0,    max=5.0,    description="Base fluid transport rate")
 
     # ---- Field groups ----
-    depth:       DepthConfig
-    velocity:    VelocityConfig
-    density:     DensityConfig
-    temperature: TemperatureConfig
-    pressure:    PressureConfig
+    depth:       DepthSettings
+    velocity:    VelocitySettings
+    density:     DensitySettings
+    temperature: TemperatureSettings
+    pressure:    PressureSettings

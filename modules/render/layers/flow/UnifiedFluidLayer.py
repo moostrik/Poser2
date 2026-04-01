@@ -21,7 +21,7 @@ from modules.data_hub import DataHub, Stage
 from modules.pose.Frame import Frame
 
 from modules.settings import Field, Settings
-from modules.flow import Visualizer, VisualisationFieldConfig, FluidFlow, FluidFlowConfig
+from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlowSettings
 from modules.render.shaders import DensityColorize
 
 from .FlowLayer import FlowLayer
@@ -65,8 +65,8 @@ class UnifiedFluidLayerSettings(Settings):
     draw_mode = Field(UnifiedFluidDrawMode.DENSITY)
     blend_mode = Field(Style.BlendMode.ADD)
 
-    visualisation: VisualisationFieldConfig
-    fluid_flow:    FluidFlowConfig
+    visualisation: VisualisationFieldSettings
+    fluid_flow:    FluidFlowSettings
 
 
 class UnifiedFluidLayer(LayerBase):

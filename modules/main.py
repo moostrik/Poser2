@@ -76,8 +76,8 @@ class Main():
         self.window_correlator =    batch.WindowCorrelation(self.settings.pose.window_correlation)
 
         # Feature applicators
-        self.similarity_applicator = nodes.SimilarityApplicator(max_poses=self.settings.pose.max_poses)
-        self.leader_applicator =     nodes.LeaderScoreApplicator(max_poses=self.settings.pose.max_poses)
+        self.similarity_applicator = nodes.SimilarityApplicator(self.settings.pose.similarity_applicator)
+        self.leader_applicator =     nodes.LeaderScoreApplicator(self.settings.pose.leader_applicator)
         self.motion_gate_applicator= nodes.MotionGateApplicator(self.settings.pose.motion_gate)
         self.motion_gate_tracker =   trackers.FilterTracker(num_players, [lambda: self.motion_gate_applicator])
 
@@ -101,10 +101,10 @@ class Main():
             num_players,
             [
                 lambda: nodes.PointDualConfFilter(self.settings.pose.confidence_filter),
-                # lambda: nodes.PointTemporalStabilizer(nodes.TemporalStabilizerConfig()),
+                # lambda: nodes.PointTemporalStabilizer(nodes.TemporalStabilizerSettings()),
                 nodes.AngleExtractor,
-                lambda: nodes.AngleVelExtractor(fps=self.settings.camera.fps),
-                # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Raw")),
+                lambda: nodes.AngleVelExtractor(self.settings.pose.angle_vel_extractor),
+                # lambda: nodes.PoseValidator(nodes.ValidatorSettings(name="Raw")),
             ]
         )
 
@@ -113,10 +113,10 @@ class Main():
             [
                 lambda: nodes.PointEuroSmoother(self.settings.pose.point.smoother),
                 nodes.AngleExtractor,
-                lambda: nodes.AngleVelExtractor(fps=self.settings.camera.fps),
+                lambda: nodes.AngleVelExtractor(self.settings.pose.angle_vel_extractor),
                 lambda: nodes.AngleVelEuroSmoother(self.settings.pose.angle.smoother),
                 lambda: nodes.AngleEuroSmoother(self.settings.pose.angle.smoother),
-                # lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=False)),
+                # lambda: nodes.AngleStickyFiller(nodes.StickyFillerSettings(init_to_zero=False, hold_scores=False)),
                 lambda: nodes.AngleMotionExtractor(self.settings.pose.motion.extractor),
                 lambda: nodes.AngleMotionMovingAverageSmoother(self.settings.pose.motion.moving_average),
                 # lambda: nodes.AngleMotionEasingNode(self.new_settings.pose.easing),
@@ -126,7 +126,7 @@ class Main():
                 lambda: self.similarity_applicator,
                 lambda: self.leader_applicator,
                 lambda: nodes.SimilarityEuroSmoother(self.settings.pose.similarity.smoother),
-                # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Smooth")),
+                # lambda: nodes.PoseValidator(nodes.ValidatorSettings(name="Smooth")),
             ]
         )
 
@@ -138,7 +138,7 @@ class Main():
                 lambda: nodes.AngleVelPredictor(self.settings.pose.angle.prediction),
                 lambda: nodes.AngleStickyFiller(self.settings.pose.angle_sticky),
                 lambda: nodes.SimilarityStickyFiller(self.settings.pose.similarity_sticky),
-                # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Prediction")),
+                # lambda: nodes.PoseValidator(nodes.ValidatorSettings(name="Prediction")),
             ]
         )
 
@@ -164,7 +164,7 @@ class Main():
                 lambda: nodes.AngleVelEuroSmoother(self.settings.pose.angle.angle_vel_smoother),
                 lambda: nodes.AngleMotionExtractor(self.settings.pose.motion.extractor),
                 lambda: nodes.AngleMotionMovingAverageSmoother(self.settings.pose.motion.moving_average),
-                # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Interpolation")),
+                # lambda: nodes.PoseValidator(nodes.ValidatorSettings(name="Interpolation")),
             ]
         )
 

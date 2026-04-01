@@ -16,12 +16,12 @@ from modules.render.layers.source.MaskSourceLayer import MaskSourceLayer
 
 from modules.settings import Field, Settings
 from modules.flow import (
-    OpticalFlow, OpticalFlowConfig,
-    VelocitySmoothTrail, SmoothTrailConfig,
+    OpticalFlow, OpticalFlowSettings,
+    VelocitySmoothTrail, SmoothTrailSettings,
     Magnitude, VelocityMagnitude,
-    TemperatureBridge, TemperatureBridgeConfig,
-    DensityBridge, DensityBridgeConfig,
-    Visualizer, VisualisationFieldConfig
+    TemperatureBridge, TemperatureBridgeSettings,
+    DensityBridge, DensityBridgeSettings,
+    Visualizer, VisualisationFieldSettings
 )
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -60,11 +60,11 @@ class FlowLayerSettings(Settings):
     width: Field[int] = Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] = Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
 
-    visualisation:      VisualisationFieldConfig
-    optical_flow:       OpticalFlowConfig
-    velocity_trail:     SmoothTrailConfig
-    density_bridge:     DensityBridgeConfig
-    temperature_bridge: TemperatureBridgeConfig
+    visualisation:      VisualisationFieldSettings
+    optical_flow:       OpticalFlowSettings
+    velocity_trail:     SmoothTrailSettings
+    density_bridge:     DensityBridgeSettings
+    temperature_bridge: TemperatureBridgeSettings
 
 
 # Keep FlowSettings as alias for backward compatibility

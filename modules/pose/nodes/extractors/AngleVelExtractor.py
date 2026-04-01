@@ -7,6 +7,12 @@ from numpy import pi
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.features import Angles, AngleVelocity
 from modules.pose.Frame import Frame
+from modules.settings import Settings, Field
+
+
+class AngleVelExtractorSettings(Settings):
+    """Configuration for AngleVelExtractor."""
+    fps: Field[float] = Field(30.0, access=Field.INIT)
 
 
 class AngleVelExtractor(FilterNode):
@@ -18,10 +24,11 @@ class AngleVelExtractor(FilterNode):
     Handles occlusion: Sets deltas to NaN when joints reappear after being invalid.
     """
 
-    def __init__(self, fps: float) -> None:
+    def __init__(self, settings: AngleVelExtractorSettings | None = None) -> None:
         super().__init__()
+        self._settings = settings if settings is not None else AngleVelExtractorSettings()
         self._prev_pose: Frame | None = None
-        self._dt = 1.0 / fps
+        self._dt = 1.0 / self._settings.fps
 
     def process(self, pose: Frame) -> Frame:
         # Compute deltas (or empty if no previous pose)

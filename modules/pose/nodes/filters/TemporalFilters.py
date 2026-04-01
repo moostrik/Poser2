@@ -13,10 +13,10 @@ import numpy as np
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 
-class TemporalStabilizerConfig(ReactiveSettings):
+class TemporalStabilizerSettings(Settings):
     """Configuration for temporal stability filtering."""
     min_consecutive_frames: Field[int] = Field(3)
     max_gap_frames:         Field[int] = Field(0)
@@ -49,7 +49,7 @@ class TemporalStabilizer(FilterNode):
         filter = TemporalStabilityFilter(config, FrameField.points)
     """
 
-    def __init__(self, config: TemporalStabilizerConfig, pose_field: FrameField):
+    def __init__(self, config: TemporalStabilizerSettings, pose_field: FrameField):
         self._config = config
         self._pose_field = pose_field
         # Get number of elements from pose field
@@ -64,7 +64,7 @@ class TemporalStabilizer(FilterNode):
         self._visible: np.ndarray = np.zeros(n_elements, dtype=bool)
 
     @property
-    def config(self) -> TemporalStabilizerConfig:
+    def config(self) -> TemporalStabilizerSettings:
         return self._config
 
     def reset(self) -> None:
@@ -127,25 +127,25 @@ class TemporalStabilizer(FilterNode):
 
 # Convenience classes for temporal stability filtering
 class BBoxTemporalStabilizer(TemporalStabilizer):
-    def __init__(self, config: TemporalStabilizerConfig) -> None:
+    def __init__(self, config: TemporalStabilizerSettings) -> None:
         super().__init__(config, FrameField.bbox)
 
 
 class PointTemporalStabilizer(TemporalStabilizer):
-    def __init__(self, config: TemporalStabilizerConfig) -> None:
+    def __init__(self, config: TemporalStabilizerSettings) -> None:
         super().__init__(config, FrameField.points)
 
 
 class AngleTemporalStabilizer(TemporalStabilizer):
-    def __init__(self, config: TemporalStabilizerConfig) -> None:
+    def __init__(self, config: TemporalStabilizerSettings) -> None:
         super().__init__(config, FrameField.angles)
 
 
 class AngleVelTemporalStabilizer(TemporalStabilizer):
-    def __init__(self, config: TemporalStabilizerConfig) -> None:
+    def __init__(self, config: TemporalStabilizerSettings) -> None:
         super().__init__(config, FrameField.angle_vel)
 
 
 class AngleSymTemporalStabilizer(TemporalStabilizer):
-    def __init__(self, config: TemporalStabilizerConfig) -> None:
+    def __init__(self, config: TemporalStabilizerSettings) -> None:
         super().__init__(config, FrameField.angle_sym)

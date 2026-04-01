@@ -13,7 +13,7 @@ from .InOut import OpticalFlowInput, OpticalFlowOutput, OpticalFlowOutputCallbac
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from modules.pose.Settings import Settings
+    from modules.pose.Settings import PoseSettings
 
 from modules.pose.batch.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 
@@ -32,7 +32,7 @@ class TRTOpticalFlow(Thread):
     All results (success and dropped) are delivered via callbacks in notification order.
     """
 
-    def __init__(self, settings: 'Settings') -> None:
+    def __init__(self, settings: 'PoseSettings') -> None:
         super().__init__()
 
         self.enabled: bool = settings.flow_enabled if hasattr(settings, 'flow_enabled') else False

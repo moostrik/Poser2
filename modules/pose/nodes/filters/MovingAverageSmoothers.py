@@ -15,15 +15,15 @@ import numpy as np
 from modules.pose.nodes._utils.ArrayMovingAverage import MovingAverage, WindowType
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 
 # Re-export WindowType for convenience
-__all__ = ['WindowType', 'MovingAverageConfig', 'FeatureMovingAverageSmoother',
+__all__ = ['WindowType', 'MovingAverageSettings', 'FeatureMovingAverageSmoother',
            'AngleMotionMovingAverageSmoother', 'SimilarityMovingAverageSmoother']
 
 
-class MovingAverageConfig(ReactiveSettings):
+class MovingAverageSettings(Settings):
     """Configuration for moving average smoothing."""
     window_size: Field[int]        = Field(30)
     window_type: Field[WindowType] = Field(WindowType.TRIANGULAR)
@@ -32,8 +32,8 @@ class MovingAverageConfig(ReactiveSettings):
 class FeatureMovingAverageSmoother(FilterNode):
     """Generic pose feature smoother using weighted moving average."""
 
-    def __init__(self, config: MovingAverageConfig, pose_field: FrameField) -> None:
-        self._config: MovingAverageConfig = config
+    def __init__(self, config: MovingAverageSettings, pose_field: FrameField) -> None:
+        self._config: MovingAverageSettings = config
         self._pose_field: FrameField = pose_field
         self._smoother = MovingAverage(
             vector_size=len(pose_field.get_type().enum()),
@@ -55,7 +55,7 @@ class FeatureMovingAverageSmoother(FilterNode):
         self._smoother.window_type = self._config.window_type
 
     @property
-    def config(self) -> MovingAverageConfig:
+    def config(self) -> MovingAverageSettings:
         return self._config
 
     def process(self, pose: Frame) -> Frame:
@@ -72,35 +72,35 @@ class FeatureMovingAverageSmoother(FilterNode):
 # Convenience classes for specific features
 class AngleMotionMovingAverageSmoother(FeatureMovingAverageSmoother):
     """Moving average smoother for angle motion feature."""
-    def __init__(self, config: MovingAverageConfig) -> None:
+    def __init__(self, config: MovingAverageSettings) -> None:
         super().__init__(config, FrameField.angle_motion)
 
 
 class SimilarityMovingAverageSmoother(FeatureMovingAverageSmoother):
     """Moving average smoother for similarity feature."""
-    def __init__(self, config: MovingAverageConfig) -> None:
+    def __init__(self, config: MovingAverageSettings) -> None:
         super().__init__(config, FrameField.similarity)
 
 
 class BBoxMovingAverageSmoother(FeatureMovingAverageSmoother):
     """Moving average smoother for bounding box."""
-    def __init__(self, config: MovingAverageConfig) -> None:
+    def __init__(self, config: MovingAverageSettings) -> None:
         super().__init__(config, FrameField.bbox)
 
 
 class PointMovingAverageSmoother(FeatureMovingAverageSmoother):
     """Moving average smoother for points."""
-    def __init__(self, config: MovingAverageConfig) -> None:
+    def __init__(self, config: MovingAverageSettings) -> None:
         super().__init__(config, FrameField.points)
 
 
 class AngleMovingAverageSmoother(FeatureMovingAverageSmoother):
     """Moving average smoother for angles."""
-    def __init__(self, config: MovingAverageConfig) -> None:
+    def __init__(self, config: MovingAverageSettings) -> None:
         super().__init__(config, FrameField.angles)
 
 
 class AngleVelMovingAverageSmoother(FeatureMovingAverageSmoother):
     """Moving average smoother for angle velocity."""
-    def __init__(self, config: MovingAverageConfig) -> None:
+    def __init__(self, config: MovingAverageSettings) -> None:
         super().__init__(config, FrameField.angle_vel)

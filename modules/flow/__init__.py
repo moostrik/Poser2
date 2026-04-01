@@ -10,21 +10,21 @@ from .FlowBase import FlowBase
 from .FlowUtil import FlowUtil
 
 # Optical flow
-from .optical import OpticalFlow, OpticalFlowConfig
+from .optical import OpticalFlow, OpticalFlowSettings
 
 # Bridge layers
 from .bridge import (
-    DensityBridge, DensityBridgeConfig,
+    DensityBridge, DensityBridgeSettings,
     Magnitude, VelocityMagnitude,
-    SmoothTrail, VelocitySmoothTrail, SmoothTrailConfig,
-    TemperatureBridge, TemperatureBridgeConfig,
+    SmoothTrail, VelocitySmoothTrail, SmoothTrailSettings,
+    TemperatureBridge, TemperatureBridgeSettings,
 )
 
 # Visualization
-from .visualization import VisualisationFieldConfig, Visualizer, VelocityField
+from .visualization import VisualisationFieldSettings, Visualizer, VelocityField
 
 # 2D fluid simulation
-from .fluid import FluidFlow, FluidFlowConfig, DepthConfig
+from .fluid import FluidFlow, FluidFlowSettings, DepthSettings
 
 # 3D fluid simulation
 from .fluid3d import FluidFlow3D

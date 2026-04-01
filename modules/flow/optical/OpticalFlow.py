@@ -15,7 +15,7 @@ from .shaders import Luminance, MergeRGB, OpticalFlow as OpticalFlowShader, Opti
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class OpticalFlowConfig(Settings):
+class OpticalFlowSettings(Settings):
     offset = Field(3, min=1, max=10, description="Gradient sample offset in pixels")
     threshold = Field(0.0, min=0.0, max=0.2, description="Motion detection threshold")
     strength_x = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)")
@@ -29,7 +29,7 @@ class OpticalFlow(FlowBase):
     Uses input_fbo as SwapFbo to store current and previous frames.
     """
 
-    def __init__(self, config: OpticalFlowConfig | None = None) -> None:
+    def __init__(self, config: OpticalFlowSettings | None = None) -> None:
         super().__init__()
 
         # Define internal formats
@@ -37,7 +37,7 @@ class OpticalFlow(FlowBase):
         self._output_internal_format = GL_RG16F  # Velocity output
 
         # Configuration with change notification
-        self.config: OpticalFlowConfig = config or OpticalFlowConfig()
+        self.config: OpticalFlowSettings = config or OpticalFlowSettings()
         self.config.bind_all(lambda v: self._on_config_changed())
 
         # State

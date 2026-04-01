@@ -5,7 +5,7 @@ from modules.pose.batch.ImageFrame import ImageFrameDict
 from modules.pose.features import Points2D
 from modules.pose.callback.mixins import PoseDictCallbackMixin
 from modules.pose.Frame import FrameDict
-from modules.pose.Settings import Settings, ModelType
+from modules.pose.Settings import PoseSettings, ModelType
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 from .InOut import DetectionInput, DetectionOutput
@@ -25,7 +25,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
     for real-time visualization where recent data is more valuable than old data.
     """
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: PoseSettings):
         super().__init__()
         self._detection: Detection = TRTDetection(settings)
         if settings.model_type is ModelType.ONNX:

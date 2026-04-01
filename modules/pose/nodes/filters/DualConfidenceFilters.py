@@ -6,10 +6,10 @@ import numpy as np
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame, FrameField
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 
-class DualConfFilterConfig(ReactiveSettings):
+class DualConfFilterSettings(Settings):
     """Configuration for hysteresis confidence filtering."""
     threshold_low:  Field[float] = Field(0.3)
     threshold_high: Field[float] = Field(0.5)
@@ -36,7 +36,7 @@ class DualConfidenceFilter(FilterNode):
         filter = FeatureHysteresisFilter(config, FrameField.points)
     """
 
-    def __init__(self, config: DualConfFilterConfig, pose_field: FrameField):
+    def __init__(self, config: DualConfFilterSettings, pose_field: FrameField):
         self._config = config
         self._pose_field = pose_field
         # State: tracks which elements are currently "on" (visible)
@@ -44,7 +44,7 @@ class DualConfidenceFilter(FilterNode):
         self._state_on: np.ndarray = np.zeros(n_elements, dtype=bool)
 
     @property
-    def config(self) -> DualConfFilterConfig:
+    def config(self) -> DualConfFilterSettings:
         return self._config
 
     def reset(self) -> None:
@@ -105,25 +105,25 @@ class DualConfidenceFilter(FilterNode):
 
 # Convenience classes for hysteresis filtering
 class BBoxDualConfFilter(DualConfidenceFilter):
-    def __init__(self, config: DualConfFilterConfig) -> None:
+    def __init__(self, config: DualConfFilterSettings) -> None:
         super().__init__(config, FrameField.bbox)
 
 
 class PointDualConfFilter(DualConfidenceFilter):
-    def __init__(self, config: DualConfFilterConfig) -> None:
+    def __init__(self, config: DualConfFilterSettings) -> None:
         super().__init__(config, FrameField.points)
 
 
 class AngleDualConfFilter(DualConfidenceFilter):
-    def __init__(self, config: DualConfFilterConfig) -> None:
+    def __init__(self, config: DualConfFilterSettings) -> None:
         super().__init__(config, FrameField.angles)
 
 
 class AngleVelDualConfFilter(DualConfidenceFilter):
-    def __init__(self, config: DualConfFilterConfig) -> None:
+    def __init__(self, config: DualConfFilterSettings) -> None:
         super().__init__(config, FrameField.angle_vel)
 
 
 class AngleSymDualConfidenceFilter(DualConfidenceFilter):
-    def __init__(self, config: DualConfFilterConfig) -> None:
+    def __init__(self, config: DualConfFilterSettings) -> None:
         super().__init__(config, FrameField.angle_sym)

@@ -5,6 +5,12 @@ from threading import Lock
 from modules.pose.features.LeaderScore import LeaderScore, configure_leader_score
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame
+from modules.settings import Settings, Field
+
+
+class LeaderScoreApplicatorSettings(Settings):
+    """Configuration for LeaderScoreApplicator."""
+    max_poses: Field[int] = Field(4)
 
 
 class LeaderScoreApplicator(FilterNode):
@@ -18,8 +24,9 @@ class LeaderScoreApplicator(FilterNode):
     Thread-safe: Uses lock to protect stored leader score dict.
     """
 
-    def __init__(self, max_poses: int) -> None:
-        configure_leader_score(max_poses)
+    def __init__(self, settings: LeaderScoreApplicatorSettings | None = None) -> None:
+        self._settings = settings if settings is not None else LeaderScoreApplicatorSettings()
+        configure_leader_score(self._settings.max_poses)
         self._leader_dict: dict[int, LeaderScore] = {}
         self._lock: Lock = Lock()
 

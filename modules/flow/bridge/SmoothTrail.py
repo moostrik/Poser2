@@ -12,7 +12,7 @@ from .. import FlowBase, FlowUtil
 from ..shaders import Trail, GaussianBlur
 
 
-class SmoothTrailConfig(Settings):
+class SmoothTrailSettings(Settings):
     """Configuration for trail smoothing."""
     scale = Field(1.0, min=-10.0, max=10.0, description="Converts optical flow to simulation velocity")
     trail_weight = Field(0.9, min=0.0, max=0.99, description="Temporal smoothing (0=no trail, 0.99=long trail)")
@@ -36,7 +36,7 @@ class SmoothTrail(FlowBase):
         - output_fbo: Stores smoothed output
     """
 
-    def __init__(self, format: int = GL_RGBA16F, config: SmoothTrailConfig | None = None) -> None:
+    def __init__(self, format: int = GL_RGBA16F, config: SmoothTrailSettings | None = None) -> None:
         """Initialize trail processor."""
         super().__init__()
 
@@ -44,7 +44,7 @@ class SmoothTrail(FlowBase):
         self._input_internal_format = format
         self._output_internal_format = format
 
-        self.config: SmoothTrailConfig = config or SmoothTrailConfig()
+        self.config: SmoothTrailSettings = config or SmoothTrailSettings()
 
         # Shaders
         self._trail_shader: Trail = Trail()
@@ -127,7 +127,7 @@ class SmoothTrail(FlowBase):
 class VelocitySmoothTrail(SmoothTrail):
     """Convenience class: Trail preset for velocity fields with scaling."""
 
-    def __init__(self, config: SmoothTrailConfig | None = None) -> None:
+    def __init__(self, config: SmoothTrailSettings | None = None) -> None:
         """Initialize velocity smoothing.
 
         Args:

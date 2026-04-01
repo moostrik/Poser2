@@ -1,4 +1,4 @@
-from .Timer import Timer, TimerConfig
+from .Timer import Timer, TimerSettings
 from .FPS import FPS
 from .PerformanceTimer import PerformanceTimer
 from .HotReloadMethods import HotReloadMethods, MethodType, MethodInfo

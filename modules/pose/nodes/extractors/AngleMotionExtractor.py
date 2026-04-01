@@ -9,12 +9,12 @@ from modules.pose.features import AngleMotion
 from modules.pose.features.Angles import AngleLandmark
 from modules.pose.features.AngleMotion import ANGLE_MOTION_NORMALISATION
 from modules.pose.Frame import Frame
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class AngleMotionExtractorConfig(ReactiveSettings):
+class AngleMotionExtractorSettings(Settings):
     """Configuration for motion extraction with tunable thresholds."""
     noise_threshold: Field[float] = Field(0.1)
     max_threshold:   Field[float] = Field(1.0)
@@ -28,9 +28,9 @@ class AngleMotionExtractor(FilterNode):
     joint-specific weights, then averages the top N highest motions to produce a single [0, 1] value.
     """
 
-    def __init__(self, config: AngleMotionExtractorConfig | None = None) -> None:
+    def __init__(self, config: AngleMotionExtractorSettings | None = None) -> None:
         super().__init__()
-        self._config = config if config is not None else AngleMotionExtractorConfig()
+        self._config = config if config is not None else AngleMotionExtractorSettings()
         self._normalisation_factors: np.ndarray = np.array(
             [ANGLE_MOTION_NORMALISATION[landmark] for landmark in AngleLandmark],
             dtype=np.float32

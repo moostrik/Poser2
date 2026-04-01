@@ -9,7 +9,7 @@ import numpy as np
 from modules.pose.Frame import Frame, FrameField
 from modules.pose.features import BaseScalarFeature, Angles, AngleMotion, AngleSymmetry, AngleVelocity, BBox, Similarity
 from modules.pose.nodes.Nodes import NodeBase
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 
 TEnum = TypeVar('TEnum', bound=IntEnum)
@@ -62,7 +62,7 @@ class FeatureWindow(Generic[TEnum]):
         return self.values.shape[1]
 
 
-class WindowNodeConfig(ReactiveSettings):
+class WindowNodeSettings(Settings):
     """Configuration for window nodes."""
     window_size:  Field[int]  = Field(30)
     emit_partial: Field[bool] = Field(True)
@@ -84,9 +84,9 @@ class WindowNode(NodeBase, Generic[TFeature]):
         Unfilled slots have mask=False.
     """
 
-    def __init__(self, frame_field: FrameField, config: WindowNodeConfig | None = None) -> None:
+    def __init__(self, frame_field: FrameField, config: WindowNodeSettings | None = None) -> None:
         self._frame_field = frame_field
-        self._config: WindowNodeConfig = config if config is not None else WindowNodeConfig()
+        self._config: WindowNodeSettings = config if config is not None else WindowNodeSettings()
         self._lock: Lock = Lock()
         self._head: int = 0  # Next insertion index
         self._count: int = 0  # Number of filled slots
@@ -199,32 +199,32 @@ class WindowNode(NodeBase, Generic[TFeature]):
         return self._count
 
     @property
-    def config(self) -> WindowNodeConfig:
+    def config(self) -> WindowNodeSettings:
         """Access the node configuration."""
         return self._config
 
 
     # CONVIENCE CLASSES
-def AngleWindowNode(config: WindowNodeConfig | None = None) -> WindowNode[Angles]:
+def AngleWindowNode(config: WindowNodeSettings | None = None) -> WindowNode[Angles]:
     """Angle trajectories - shape (time, 9) for 9 angles."""
     return WindowNode(FrameField.angles, config)
 
-def AngleVelocityWindowNode(config: WindowNodeConfig | None = None) -> WindowNode[AngleVelocity]:
+def AngleVelocityWindowNode(config: WindowNodeSettings | None = None) -> WindowNode[AngleVelocity]:
     """Angular velocity trajectories - shape (time, 9)."""
     return WindowNode(FrameField.angle_vel, config)
 
-def AngleMotionWindowNode(config: WindowNodeConfig | None = None) -> WindowNode[AngleMotion]:
+def AngleMotionWindowNode(config: WindowNodeSettings | None = None) -> WindowNode[AngleMotion]:
     """Angular motion magnitude - shape (time, 9)."""
     return WindowNode(FrameField.angle_motion, config)
 
-def AngleSymmetryWindowNode(config: WindowNodeConfig | None = None) -> WindowNode[AngleSymmetry]:
+def AngleSymmetryWindowNode(config: WindowNodeSettings | None = None) -> WindowNode[AngleSymmetry]:
     """Angular symmetry metrics - shape (time, 9)."""
     return WindowNode(FrameField.angle_sym, config)
 
-def BBoxWindowNode(config: WindowNodeConfig | None = None) -> WindowNode[BBox]:
+def BBoxWindowNode(config: WindowNodeSettings | None = None) -> WindowNode[BBox]:
     """Bounding box trajectory - shape (time, 4) for [x, y, w, h]."""
     return WindowNode(FrameField.bbox, config)
 
-def SimilarityWindowNode(config: WindowNodeConfig | None = None) -> WindowNode[Similarity]:
+def SimilarityWindowNode(config: WindowNodeSettings | None = None) -> WindowNode[Similarity]:
     """Similarity trajectory - shape (time, 1)."""
     return WindowNode(FrameField.similarity, config)

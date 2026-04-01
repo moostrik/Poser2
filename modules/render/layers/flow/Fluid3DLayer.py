@@ -21,7 +21,7 @@ from modules.data_hub import DataHub, Stage
 from modules.pose.Frame import Frame
 
 from modules.settings import Field, Settings
-from modules.flow import Visualizer, VisualisationFieldConfig, FluidFlow, FluidFlow3D, FluidFlow3DArray, FluidFlowConfig
+from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlow3D, FluidFlow3DArray, FluidFlowSettings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -66,8 +66,8 @@ class Fluid3DLayerSettings(Settings):
     draw_mode: Field[Fluid3DDrawMode] =     Field(Fluid3DDrawMode.DENSITY)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
 
-    fluid_flow:    FluidFlowConfig
-    visualisation: VisualisationFieldConfig
+    fluid_flow:    FluidFlowSettings
+    visualisation: VisualisationFieldSettings
 
 
 class Fluid3DLayer(LayerBase):

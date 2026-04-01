@@ -25,17 +25,17 @@ import numpy as np
 from modules.pose.features import PoseFeatureType, Angles, BBox, Points2D, AngleSymmetry
 from modules.pose.nodes.Nodes import InterpolatorNode
 from modules.pose.Frame import Frame, FrameField
-from modules.settings import Settings as ReactiveSettings, Field
+from modules.settings import Settings, Field
 
 
-class InterpolatorConfigBase(ReactiveSettings):
+class InterpolatorSettingsBase(Settings):
     """Base config for interpolators with input/output frequency settings."""
     input_frequency:  Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(60.0, access=Field.INIT)
 
 
 # Generic type variable for config
-ConfigType = TypeVar('ConfigType', bound=InterpolatorConfigBase)
+ConfigType = TypeVar('ConfigType', bound=InterpolatorSettingsBase)
 
 
 class InterpolatorProtocol(Protocol):
