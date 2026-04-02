@@ -17,7 +17,7 @@ import numpy as np
 from modules.pose.features import PoseFeatureType, Angles, BBox, Points2D, AngleSymmetry
 from modules.pose.nodes._utils.ArrayRateLimit import RateLimit, AngleRateLimit, PointRateLimit
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.Frame import Frame, FrameField
+from modules.pose.frame import Frame, FrameField
 from modules.settings import Settings, Field
 
 

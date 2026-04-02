@@ -4,7 +4,7 @@ from threading import Lock
 
 from modules.pose.features.LeaderScore import LeaderScore, configure_leader_score
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 from modules.settings import Settings, Field
 
 

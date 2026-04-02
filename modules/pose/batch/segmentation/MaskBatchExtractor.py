@@ -6,7 +6,7 @@ from typing import Union
 import torch
 
 from modules.pose.batch.ImageFrame import ImageFrame, ImageFrameDict, ImageFrameCallback
-from modules.pose.Frame import FrameDict
+from modules.pose.frame import FrameDict
 from ..model_types import ModelType
 from .SegmentationSettings import SegmentationSettings
 from modules.utils.PerformanceTimer import PerformanceTimer

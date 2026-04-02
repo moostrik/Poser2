@@ -5,7 +5,7 @@ from dataclasses import replace
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.features import AngleSymmetry
 from modules.pose.nodes._utils.SymmetryUtils import SymmetryUtils
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 
 
 class AngleSymExtractor(FilterNode):

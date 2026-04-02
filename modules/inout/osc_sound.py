@@ -8,7 +8,7 @@ from pythonosc.osc_bundle import OscBundle
 from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 from modules.pose.features.Angles import AngleLandmark
 
 from modules.data_hub import DataHub, DataHubType, Stage

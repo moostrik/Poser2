@@ -3,7 +3,7 @@ from dataclasses import replace
 
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 
 
 class AgeExtractor(FilterNode):

@@ -10,3 +10,4 @@ from .ImageCropProcessor import                 ImageCropProcessor, ImageCropSet
 from .ImageFrame import                         ImageFrame, ImageFrameDict
 from .WindowSimilarity import                   WindowSimilarity, WindowSimilaritySettings
 from .WindowCorrelation import                  WindowCorrelation, WindowCorrelationSettings
+from .model_types import                        ModelType, Resolution, RESOLUTION_DIMS

@@ -6,7 +6,7 @@ from typing import Generic, TypeVar
 
 import numpy as np
 
-from modules.pose.Frame import Frame, FrameField
+from modules.pose.frame import Frame, FrameField
 from modules.pose.features import BaseScalarFeature, Angles, AngleMotion, AngleSymmetry, AngleVelocity, BBox, Similarity
 from modules.pose.nodes.Nodes import NodeBase
 from modules.settings import Settings, Field

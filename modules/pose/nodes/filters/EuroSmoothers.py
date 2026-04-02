@@ -14,7 +14,7 @@ import numpy as np
 # Pose imports
 from modules.pose.nodes._utils.ArrayEuroSmooth import EuroSmooth, AngleEuroSmooth, PointEuroSmooth
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.Frame import Frame, FrameField
+from modules.pose.frame import Frame, FrameField
 from modules.settings import Settings, Field
 
 

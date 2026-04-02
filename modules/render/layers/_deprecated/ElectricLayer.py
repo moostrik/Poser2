@@ -10,7 +10,7 @@ from OpenGL.GL import * # type: ignore
 from modules.data_hub import DataHub, DataHubType, PoseDataHubTypes
 from modules.gl import Fbo, Texture, Blit, Style, clear_color
 from modules.pose.features import Points2D
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.render.shaders import PoseElectric as shader
 

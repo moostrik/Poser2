@@ -8,7 +8,7 @@ from OpenGL.GL import *  # type: ignore
 
 # Local application imports
 from modules.data_hub import DataHub, Stage
-from modules.pose.Frame import FrameField
+from modules.pose.frame import FrameField
 from modules.gl import Fbo, Texture, Blit, Image, clear_color, Text
 from modules.pose.nodes import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect

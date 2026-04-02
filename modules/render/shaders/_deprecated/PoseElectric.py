@@ -4,7 +4,7 @@ import time as pytime
 from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 from modules.pose.features import Points2D
 
 class PoseElectric(Shader):

@@ -6,7 +6,7 @@ from typing import Callable
 
 from .TrackerBase import TrackerBase
 from modules.pose.nodes.windows.WindowNode import WindowNode, FeatureWindow
-from modules.pose.Frame import FrameDict
+from modules.pose.frame import FrameDict
 
 
 # Type alias for window dict callbacks

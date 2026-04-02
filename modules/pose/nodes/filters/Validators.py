@@ -4,7 +4,7 @@ from threading import Lock
 from modules.pose.features.base import BaseFeature
 
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.Frame import Frame, FrameField
+from modules.pose.frame import Frame, FrameField
 from modules.settings import Settings, Field
 
 

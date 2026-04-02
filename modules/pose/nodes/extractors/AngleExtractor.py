@@ -5,7 +5,7 @@ from dataclasses import replace
 from modules.pose.features import Angles
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.nodes._utils.AngleUtils import AngleUtils
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 
 
 class AngleExtractor(FilterNode):

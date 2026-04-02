@@ -8,7 +8,7 @@ from pytweening import *    # type: ignore
 # Local application imports
 from modules.data_hub import DataHub, DataHubType, PoseDataHubTypes
 from modules.gl import Fbo, Texture, Style, clear_color
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.layers.generic.HDTPrepare import HDTPrepare
 from modules.render.shaders import MaskApply, MaskMultiply, HDTTripleBlend

@@ -15,7 +15,7 @@ import numpy as np
 # Pose imports
 from modules.pose.features import BaseFeature, PoseFeatureType
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.Frame import Frame, FrameField
+from modules.pose.frame import Frame, FrameField
 from modules.settings import Settings, Field
 
 TFeature = TypeVar('TFeature', bound=BaseFeature)

@@ -4,7 +4,7 @@ from dataclasses import replace
 from traceback import print_exc
 from typing import Callable
 
-from modules.pose.Frame import Frame, FrameDict
+from modules.pose.frame import Frame, FrameDict
 from modules.pose.nodes.Nodes import InterpolatorNode
 from .TrackerBase import TrackerBase
 

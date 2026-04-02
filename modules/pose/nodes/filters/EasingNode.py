@@ -10,7 +10,7 @@ import pytweening  # type: ignore
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.features.base import NormalizedSingleValue
-from modules.pose.Frame import Frame, FrameField
+from modules.pose.frame import Frame, FrameField
 from modules.settings import Settings, Field
 
 

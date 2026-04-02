@@ -19,7 +19,7 @@ from collections import defaultdict
 from modules.pose.features import Angles, BBox, Points2D, AngleSymmetry
 from modules.pose.nodes._utils.ArrayLerp import AngleLerp, PointLerp, Lerp
 from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase, InterpolatorSettingsBase
-from modules.pose.Frame import Frame, FrameField
+from modules.pose.frame import Frame, FrameField
 from typing import cast
 
 

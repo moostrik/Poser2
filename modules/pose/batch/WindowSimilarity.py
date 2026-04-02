@@ -11,8 +11,8 @@ import numpy as np
 
 # Pose imports
 from modules.settings import Settings, Field
-from modules.pose.callback.mixins import TypedCallbackMixin
-from modules.pose.Frame import FrameField
+from modules.utils.TypedCallbackMixin import TypedCallbackMixin
+from modules.pose.frame import FrameField
 from modules.pose.nodes.windows.WindowNode import FeatureWindow
 from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod, NormalizedScalarFeature
 from modules.pose.features.Similarity import configure_similarity, Similarity

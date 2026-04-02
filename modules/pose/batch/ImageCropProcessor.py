@@ -11,7 +11,7 @@ import torch.nn.functional as F
 
 # Local application imports
 from modules.pose.features import BBox
-from modules.pose.Frame import FrameDict
+from modules.pose.frame import FrameDict
 from modules.pose.batch.ImageFrame import ImageFrame, ImageFrameDict, ImageFrameCallback
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.PerformanceTimer import PerformanceTimer

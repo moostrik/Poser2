@@ -6,7 +6,7 @@ from typing import Callable, TYPE_CHECKING
 import torch
 
 # Local application imports
-from modules.pose.Frame import FrameDict
+from modules.pose.frame import FrameDict
 
 
 @dataclass(frozen=True)

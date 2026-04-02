@@ -10,7 +10,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.data_hub import DataHub, Stage
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 
 from modules.render.layers.source.MaskSourceLayer import MaskSourceLayer
 

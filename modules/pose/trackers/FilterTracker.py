@@ -5,7 +5,7 @@ from typing import Any, Callable
 
 from .TrackerBase import TrackerBase
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.Frame import Frame, FrameDict
+from modules.pose.frame import Frame, FrameDict
 
 
 class FilterTracker(TrackerBase):

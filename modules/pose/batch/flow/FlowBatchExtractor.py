@@ -4,9 +4,9 @@ from typing import Union
 
 import torch
 
-from modules.pose.callback.mixins import TypedCallbackMixin
+from modules.utils.TypedCallbackMixin import TypedCallbackMixin
 from modules.pose.batch.ImageFrame import ImageFrameDict
-from modules.pose.Frame import FrameDict
+from modules.pose.frame import FrameDict
 from ..model_types import ModelType
 from .FlowSettings import FlowSettings
 from modules.utils.PerformanceTimer import PerformanceTimer

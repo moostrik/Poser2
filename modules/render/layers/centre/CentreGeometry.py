@@ -11,7 +11,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.data_hub import DataHub, DataHubType, Stage
 from modules.settings import Field, Settings
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
 from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.utils.PointsAndRects import Rect, Point2f

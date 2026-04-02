@@ -1,8 +1,8 @@
 from threading import Lock
 from traceback import print_exc
 
-from modules.pose.callback import PoseDictCallbackMixin
-from modules.pose.Frame import Frame, FrameDict
+from modules.pose.frame import PoseDictCallbackMixin
+from modules.pose.frame import Frame, FrameDict
 from modules.pose.features import BBox
 from modules.tracker.Tracklet import Tracklet
 

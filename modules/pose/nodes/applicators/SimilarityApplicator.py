@@ -6,7 +6,7 @@ import numpy as np
 
 from modules.pose.features.Similarity import Similarity, configure_similarity
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 from modules.settings import Settings, Field
 
 

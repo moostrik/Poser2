@@ -8,7 +8,7 @@ from typing import Callable
 from ..WindowTracker import WindowTracker, WindowDictCallback
 from modules.pose.nodes import AngleMotionWindowNode, AngleSymmetryWindowNode, AngleVelocityWindowNode, AngleWindowNode, BBoxWindowNode, SimilarityWindowNode, WindowNodeSettings
 from modules.pose.nodes.windows.WindowNode import WindowNode, FeatureWindow
-from modules.pose.Frame import FrameDict, FrameField
+from modules.pose.frame import FrameDict, FrameField
 
 
 # {track_id: {FrameField: FeatureWindow}}

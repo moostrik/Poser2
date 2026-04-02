@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 from modules.settings import Field, Settings
 from modules.data_hub import DataHub, Stage
 from modules.gl import Fbo, Texture, clear_color
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import DrawRoi
 

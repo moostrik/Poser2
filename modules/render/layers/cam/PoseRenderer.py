@@ -6,7 +6,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.settings import Field, Settings
 from modules.data_hub import DataHub, Stage
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 from modules.pose.features.Points2D import Points2D
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import PosePointLines

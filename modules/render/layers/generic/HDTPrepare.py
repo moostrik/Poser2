@@ -14,7 +14,7 @@ from modules.gl import Fbo, Texture, Blit, Style, clear_color
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import MaskApply as shader, Tint
 
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

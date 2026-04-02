@@ -6,7 +6,7 @@ from numpy import pi
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.features import Angles, AngleVelocity
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 from modules.settings import Settings, Field
 
 

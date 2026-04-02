@@ -6,7 +6,7 @@ import numpy as np
 
 from modules.pose.features.MotionGate import MotionGate, configure_motion_gate
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.Frame import Frame, FrameDict
+from modules.pose.frame import Frame, FrameDict
 from modules.settings import Settings, Field
 
 

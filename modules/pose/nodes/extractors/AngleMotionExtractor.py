@@ -8,7 +8,7 @@ from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.features import AngleMotion
 from modules.pose.features.Angles import AngleLandmark
 from modules.pose.features.AngleMotion import ANGLE_MOTION_NORMALISATION
-from modules.pose.Frame import Frame
+from modules.pose.frame import Frame
 from modules.settings import Settings, Field
 
 from modules.utils.HotReloadMethods import HotReloadMethods
