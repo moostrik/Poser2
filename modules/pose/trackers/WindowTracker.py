@@ -61,7 +61,7 @@ class WindowTracker(TrackerBase):
                 print_exc()
 
         # Notify pose callbacks (for downstream pose processing)
-        self._notify_poses_callbacks(poses)
+        self._notify_frames_callbacks(poses)
 
         # Notify window callbacks (for DataHub/visualization)
         self._notify_window_callbacks(results)

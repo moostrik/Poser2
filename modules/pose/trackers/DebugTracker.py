@@ -52,7 +52,7 @@ class DebugTracker(TrackerBase):
         self._tracked_ids = current_ids
 
         # Pass through poses unchanged
-        self._notify_poses_callbacks(poses)
+        self._notify_frames_callbacks(poses)
         return poses
 
     def reset(self) -> None:

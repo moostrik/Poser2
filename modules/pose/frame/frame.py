@@ -1,10 +1,13 @@
 # Standard library imports
+from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Callable, Any
+from typing import Callable, Any, TypeAlias, TYPE_CHECKING
 import time
 
-# Pose imports
-from modules.pose.features import Points2D, Angles, AngleVelocity, AngleMotion, AngleSymmetry, BBox, Similarity, LeaderScore, MotionGate
+from ..features import Points2D, Angles, AngleVelocity, AngleMotion, AngleSymmetry, BBox, Similarity, LeaderScore, MotionGate
+
+if TYPE_CHECKING:
+    from .field import FrameField
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,9 +37,9 @@ class Frame:
         return getattr(self, feature.name)
 
     def __repr__(self) -> str:
-        return (f"Pose(id={self.track_id}, points={self.points.valid_count}")
+        return (f"Frame(id={self.track_id}, points={self.points.valid_count})")
 
 
-FrameCallback = Callable[[Frame], Any]
-FrameDict = dict[int, Frame]
-FrameDictCallback = Callable[[FrameDict], Any]
+FrameCallback: TypeAlias =      Callable[[Frame], Any]
+FrameDict: TypeAlias =          dict[int, Frame]
+FrameDictCallback: TypeAlias =  Callable[[FrameDict], Any]

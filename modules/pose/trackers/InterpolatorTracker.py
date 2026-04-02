@@ -76,7 +76,7 @@ class InterpolatorTracker(TrackerBase):
             print_exc()
 
         # Emit callbacks with interpolated poses
-        self._notify_poses_callbacks(interpolated_poses)
+        self._notify_frames_callbacks(interpolated_poses)
 
         return interpolated_poses
 

@@ -1,13 +1,13 @@
 from threading import Lock
 from traceback import print_exc
 
-from modules.pose.frame import PoseDictCallbackMixin
+from modules.pose.frame import FrameDictCallbackMixin
 from modules.pose.frame import Frame, FrameDict
 from modules.pose.features import BBox
 from modules.tracker.Tracklet import Tracklet
 
 
-class PosesFromTracklets(PoseDictCallbackMixin):
+class PosesFromTracklets(FrameDictCallbackMixin):
     """Generates poses from tracklets, maintaining state per track."""
 
     def __init__(self, num_tracks: int) -> None:
@@ -67,7 +67,7 @@ class PosesFromTracklets(PoseDictCallbackMixin):
                 print(f"PoseFromTrackletGenerator: Error generating pose {track_id}: {e}")
                 print_exc()
 
-        self._notify_poses_callbacks(generated_poses)
+        self._notify_frames_callbacks(generated_poses)
 
         return generated_poses
 

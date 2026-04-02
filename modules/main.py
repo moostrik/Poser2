@@ -185,32 +185,32 @@ class Main():
             camera.start()
 
         # BBOX
-        self.poses_from_tracklets.add_poses_callback(self.bbox_filters.process)
-        self.bbox_filters.add_poses_callback(self.gpu_crop_processor.process)
+        self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
+        self.bbox_filters.add_frames_callback(self.gpu_crop_processor.process)
 
         # POSE RAW
-        self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
-        self.pose_raw_filters.add_poses_callback(partial(self.data_hub.set_poses, Stage.RAW))
-        self.pose_raw_filters.add_poses_callback(self.window_tracker_R.process)
+        self.point_extractor.add_frames_callback(self.pose_raw_filters.process)
+        self.pose_raw_filters.add_frames_callback(partial(self.data_hub.set_poses, Stage.RAW))
+        self.pose_raw_filters.add_frames_callback(self.window_tracker_R.process)
         self.window_tracker_R.add_callback(partial(self.data_hub.set_feature_windows, Stage.RAW))
 
         # POSE SMOOTH & PREDICT
-        self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
-        self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
-        self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, Stage.SMOOTH))
-        self.pose_smooth_filters.add_poses_callback(self.window_tracker_S.process)
+        self.pose_raw_filters.add_frames_callback(self.pose_smooth_filters.process)
+        self.pose_smooth_filters.add_frames_callback(self.pose_prediction_filters.process)
+        self.pose_prediction_filters.add_frames_callback(partial(self.data_hub.set_poses, Stage.SMOOTH))
+        self.pose_smooth_filters.add_frames_callback(self.window_tracker_S.process)
         self.window_tracker_S.add_callback(partial(self.data_hub.set_feature_windows, Stage.SMOOTH))
 
         # INTERPOLATION
         self.data_hub.add_update_callback(self.interpolator.update)
-        self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
-        self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
+        self.pose_prediction_filters.add_frames_callback(self.interpolator.submit)
+        self.interpolator.add_frames_callback(self.pose_interpolation_pipeline.process)
 
         # MOTION GATE (after interpolation pipeline, before DataHub)
-        self.pose_interpolation_pipeline.add_poses_callback(self.motion_gate_applicator.submit) # dit slaat nergens op??
-        self.pose_interpolation_pipeline.add_poses_callback(self.motion_gate_tracker.process)
-        self.motion_gate_tracker.add_poses_callback(partial(self.data_hub.set_poses, Stage.LERP))
-        self.motion_gate_tracker.add_poses_callback(self.window_tracker_I.process)
+        self.pose_interpolation_pipeline.add_frames_callback(self.motion_gate_applicator.submit) # dit slaat nergens op??
+        self.pose_interpolation_pipeline.add_frames_callback(self.motion_gate_tracker.process)
+        self.motion_gate_tracker.add_frames_callback(partial(self.data_hub.set_poses, Stage.LERP))
+        self.motion_gate_tracker.add_frames_callback(self.window_tracker_I.process)
         self.window_tracker_I.add_callback(partial(self.data_hub.set_feature_windows, Stage.LERP))
 
         # SIMILARITY COMPUTATION (uses combined callback for motion gate and velocity weighting)

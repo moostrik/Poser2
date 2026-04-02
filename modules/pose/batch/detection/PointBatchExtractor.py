@@ -3,7 +3,7 @@ from threading import Lock
 from typing import Union
 from modules.pose.batch.ImageFrame import ImageFrameDict
 from modules.pose.features import Points2D
-from modules.pose.frame import PoseDictCallbackMixin
+from modules.pose.frame import FrameDictCallbackMixin
 from modules.pose.frame import FrameDict
 from ..model_types import ModelType
 from .DetectionSettings import DetectionSettings
@@ -15,7 +15,7 @@ from .TRTDetection import TRTDetection
 
 Detection = Union[ONNXDetection, TRTDetection]
 
-class PointBatchExtractor(PoseDictCallbackMixin):
+class PointBatchExtractor(FrameDictCallbackMixin):
     """GPU-based batch extractor for 2D pose points using RTMPose detection.
 
     Batches are processed asynchronously on GPU. Under load, pending batches may
@@ -107,7 +107,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
                     )
                     result_poses[tracklet_id] = replace(original_poses[tracklet_id], points=point_feature)
 
-            self._notify_poses_callbacks(result_poses)
+            self._notify_frames_callbacks(result_poses)
 
     def reset(self) -> None:
         """Clear all pending and buffered data."""

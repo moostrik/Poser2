@@ -2,9 +2,9 @@
 
 from abc import ABC, abstractmethod
 
-from modules.pose.frame import PoseDictCallbackMixin
+from modules.pose.frame import FrameDictCallbackMixin
 
-class TrackerBase(PoseDictCallbackMixin, ABC):
+class TrackerBase(FrameDictCallbackMixin, ABC):
     """Base class for tracking multiple node instances.
 
     Provides callback system and defines common interface for all trackers.
