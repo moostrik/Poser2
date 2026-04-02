@@ -1,15 +1,14 @@
 """Tracks pose windows for multiple tracks independently."""
 
-from threading import Lock
 from traceback import print_exc
 from typing import Callable
 
 from .TrackerBase import TrackerBase
 from modules.pose.nodes.windows.WindowNode import WindowNode
-from modules.pose.frame import FrameDict, FeatureWindow, FeatureWindowDict, FeatureWindowDictCallback
+from modules.pose.frame import FrameDict, FeatureWindowDict, FeatureWindowDictCallbackMixin
 
 
-class WindowTracker(TrackerBase):
+class WindowTracker(TrackerBase, FeatureWindowDictCallbackMixin):
     """Tracks multiple poses, maintaining a separate WindowNode for each.
 
     Each track_id gets its own WindowNode which maintains an independent buffer.
@@ -17,21 +16,18 @@ class WindowTracker(TrackerBase):
 
     Note: This tracker has TWO callback mechanisms:
     - add_frames_callback: Receives input poses (FrameDict) - for chaining with other pose processors
-    - add_window_callback: Receives output windows (WindowDict) - for DataHub/visualization
+    - add_window_callback: Receives output windows (FeatureWindowDict) - for DataHub/visualization
     """
 
     def __init__(self, num_tracks: int, window_factory: Callable[[], WindowNode]) -> None:
         """Initialize tracker with a window node per track."""
-        super().__init__()
+        TrackerBase.__init__(self)
+        FeatureWindowDictCallbackMixin.__init__(self)
 
         self._window_factory = window_factory
         self._windows: dict[int, WindowNode] = {
             id: window_factory() for id in range(num_tracks)
         }
-
-        # Window output callbacks (separate from pose callbacks)
-        self._window_callbacks: set[FeatureWindowDictCallback] = set()
-        self._window_callback_lock = Lock()
 
     def process(self, poses: FrameDict) -> FeatureWindowDict:
         """Process poses through window nodes.
@@ -63,40 +59,6 @@ class WindowTracker(TrackerBase):
         self._notify_window_callbacks(results)
 
         return results
-
-    def _notify_window_callbacks(self, windows: FeatureWindowDict) -> None:
-        """Emit window callbacks.
-
-        Broadcasts windows to all registered callbacks in a thread-safe manner.
-
-        Args:
-            windows: Dictionary of FeatureWindows to broadcast to callbacks.
-        """
-        with self._window_callback_lock:
-            for callback in self._window_callbacks:
-                try:
-                    callback(windows)
-                except Exception as e:
-                    print(f"{self.__class__.__name__}: Error in window callback: {e}")
-                    print_exc()
-
-    def add_window_callback(self, callback: FeatureWindowDictCallback) -> None:
-        """Register window output callback.
-
-        Args:
-            callback: Function to call with window dictionaries.
-        """
-        with self._window_callback_lock:
-            self._window_callbacks.add(callback)
-
-    def remove_window_callback(self, callback: FeatureWindowDictCallback) -> None:
-        """Unregister window output callback.
-
-        Args:
-            callback: Function to remove from callbacks.
-        """
-        with self._window_callback_lock:
-            self._window_callbacks.discard(callback)
 
     def reset(self) -> None:
         """Reset all window buffers."""

@@ -67,7 +67,7 @@ class Main():
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
 
-        self.gpu_crop_processor =   batch.ImageCropProcessor(self.settings.pose.image_crop)
+        self.image_crop_processor =   batch.ImageCropProcessor(self.settings.pose.image_crop)
         self.point_extractor =      batch.PointBatchExtractor(self.settings.pose.detection)
         self.mask_extractor =       batch.MaskBatchExtractor(self.settings.pose.segmentation)
         self.flow_extractor =       batch.FlowBatchExtractor(self.settings.pose.flow)
@@ -84,9 +84,9 @@ class Main():
         self.debug_tracker =        trackers.DebugTracker(num_players)
 
         # WINDOW TRACKERS
-        self.window_tracker_R =     trackers.AllWindowTracker(num_players, self.settings.pose.window_raw)
-        self.window_tracker_S =     trackers.AllWindowTracker(num_players, self.settings.pose.window_smooth)
-        self.window_tracker_I =     trackers.AllWindowTracker(num_players, self.settings.pose.window_lerp)
+        self.window_tracker_R =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_raw)
+        self.window_tracker_S =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_smooth)
+        self.window_tracker_I =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_lerp)
 
         self.bbox_filters =      trackers.FilterTracker(
             num_players,
@@ -177,7 +177,7 @@ class Main():
             camera.add_preview_callback(self.data_hub.set_cam_frame)
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
-            camera.add_frame_callback(self.gpu_crop_processor.set_image)
+            camera.add_frame_callback(self.image_crop_processor.set_image)
             camera.add_frame_callback(self.frame_sync_bang.add_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
             camera.add_tracker_callback(self.data_hub.set_depth_tracklets)
@@ -186,20 +186,20 @@ class Main():
 
         # BBOX
         self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
-        self.bbox_filters.add_frames_callback(self.gpu_crop_processor.process)
+        self.bbox_filters.add_frames_callback(self.image_crop_processor.process)
 
         # POSE RAW
         self.point_extractor.add_frames_callback(self.pose_raw_filters.process)
         self.pose_raw_filters.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.RAW))
         self.pose_raw_filters.add_frames_callback(self.window_tracker_R.process)
-        self.window_tracker_R.add_callback(partial(self.data_hub.set_pose_windows, Stage.RAW))
+        self.window_tracker_R.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.RAW))
 
         # POSE SMOOTH & PREDICT
         self.pose_raw_filters.add_frames_callback(self.pose_smooth_filters.process)
         self.pose_smooth_filters.add_frames_callback(self.pose_prediction_filters.process)
         self.pose_prediction_filters.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.SMOOTH))
         self.pose_smooth_filters.add_frames_callback(self.window_tracker_S.process)
-        self.window_tracker_S.add_callback(partial(self.data_hub.set_pose_windows, Stage.SMOOTH))
+        self.window_tracker_S.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.SMOOTH))
 
         # INTERPOLATION
         self.data_hub.add_update_callback(self.interpolator.update)
@@ -211,31 +211,31 @@ class Main():
         self.pose_interpolation_pipeline.add_frames_callback(self.motion_gate_tracker.process)
         self.motion_gate_tracker.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.LERP))
         self.motion_gate_tracker.add_frames_callback(self.window_tracker_I.process)
-        self.window_tracker_I.add_callback(partial(self.data_hub.set_pose_windows, Stage.LERP))
+        self.window_tracker_I.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.LERP))
 
         # SIMILARITY COMPUTATION (uses combined callback for motion gate and velocity weighting)
-        self.window_tracker_S.add_callback(self.window_similator.submit_all)
+        self.window_tracker_S.add_frame_windows_callback(self.window_similator.submit_all)
         self.window_similator.add_callback(lambda result: self.similarity_applicator.submit(result[0]))
         self.window_similator.add_callback(lambda result: self.leader_applicator.submit(result[1]))
         self.window_similator.start()
 
         # CORRELATION COMPUTATION (alternative to similarity)
-        self.window_tracker_S.add_callback(self.window_correlator.submit_all)
+        self.window_tracker_S.add_frame_windows_callback(self.window_correlator.submit_all)
         self.window_correlator.add_callback(lambda result: self.similarity_applicator.submit(result[0]))
         self.window_correlator.add_callback(lambda result: self.leader_applicator.submit(result[1]))
         self.window_correlator.start()
 
         # POSE ESTIMATION
-        self.gpu_crop_processor.add_callback(self.point_extractor.process)
+        self.image_crop_processor.add_callback(self.point_extractor.process)
         self.point_extractor.start()
 
         # SEGMENTATION
-        self.gpu_crop_processor.add_callback(self.mask_extractor.process)
+        self.image_crop_processor.add_callback(self.mask_extractor.process)
         self.mask_extractor.add_callback(self.data_hub.set_gpu_frames)
         self.mask_extractor.start()
 
         # FLOW
-        self.gpu_crop_processor.add_callback(self.flow_extractor.process)
+        self.image_crop_processor.add_callback(self.flow_extractor.process)
         self.flow_extractor.add_callback(self.data_hub.set_flow_tensors)
         self.flow_extractor.start()
 

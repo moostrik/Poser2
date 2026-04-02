@@ -130,7 +130,7 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
         """Update all window types and trigger similarity processing.
 
         Extracts angle, motion, and velocity windows from the combined
-        AllWindowTracker output format.
+        FrameWindowTracker output format.
 
         Args:
             all_windows: Combined dict {FrameField: {track_id: FeatureWindow}}

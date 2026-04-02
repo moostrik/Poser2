@@ -1,9 +1,10 @@
-"""Callback mixin for frame dict broadcasting."""
+"""Callback mixins for frame-related broadcasting."""
 
 from threading import Lock
 from traceback import print_exc
 
 from .frame import Frame, FrameCallback, FrameDict, FrameDictCallback
+from .window import FeatureWindowDict, FeatureWindowDictCallback, FrameWindowDict, FrameWindowDictCallback
 
 class FrameCallbackMixin:
     """Mixin providing callback management for single frame broadcasting.
@@ -120,3 +121,61 @@ class FrameDictCallbackMixin:
         """
         with self._frames_callback_lock:
             self._frames_callbacks.discard(callback)
+
+
+class FeatureWindowDictCallbackMixin:
+    """Mixin providing callback management for feature window dict broadcasting.
+
+    Provides thread-safe callback registration and emission for components
+    that broadcast FeatureWindowDict updates (single-field windows per track).
+    """
+
+    def __init__(self) -> None:
+        self._feature_window_callbacks: set[FeatureWindowDictCallback] = set()
+        self._feature_window_callback_lock: Lock = Lock()
+
+    def _notify_window_callbacks(self, windows: FeatureWindowDict) -> None:
+        with self._feature_window_callback_lock:
+            for callback in self._feature_window_callbacks:
+                try:
+                    callback(windows)
+                except Exception as e:
+                    print(f"{self.__class__.__name__}: Error in callback: {e}")
+                    print_exc()
+
+    def add_windows_callback(self, callback: FeatureWindowDictCallback) -> None:
+        with self._feature_window_callback_lock:
+            self._feature_window_callbacks.add(callback)
+
+    def remove_windows_callback(self, callback: FeatureWindowDictCallback) -> None:
+        with self._feature_window_callback_lock:
+            self._feature_window_callbacks.discard(callback)
+
+
+class FrameWindowDictCallbackMixin:
+    """Mixin providing callback management for frame window dict broadcasting.
+
+    Provides thread-safe callback registration and emission for components
+    that broadcast FrameWindowDict updates (all fields' windows per track).
+    """
+
+    def __init__(self) -> None:
+        self._frame_window_callbacks: set[FrameWindowDictCallback] = set()
+        self._frame_window_callback_lock: Lock = Lock()
+
+    def _notify_frame_window_callbacks(self, windows: FrameWindowDict) -> None:
+        with self._frame_window_callback_lock:
+            for callback in self._frame_window_callbacks:
+                try:
+                    callback(windows)
+                except Exception as e:
+                    print(f"{self.__class__.__name__}: Error in callback: {e}")
+                    print_exc()
+
+    def add_frame_windows_callback(self, callback: FrameWindowDictCallback) -> None:
+        with self._frame_window_callback_lock:
+            self._frame_window_callbacks.add(callback)
+
+    def remove_frame_windows_callback(self, callback: FrameWindowDictCallback) -> None:
+        with self._frame_window_callback_lock:
+            self._frame_window_callbacks.discard(callback)
