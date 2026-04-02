@@ -8,7 +8,7 @@ from modules.oak import Camera, FrameSync, Simulator, Player, Recorder
 from modules.settings import presets, NiceServer
 from modules.render import RenderManager
 from modules.data_hub import DataHub, Stage
-from modules.inout import OscSound, ArtNetBars, ArtNetBarsSettings
+from modules.inout import OscSound, ArtNetBars
 from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers
 from modules.utils import Timer
@@ -17,24 +17,21 @@ from modules.utils import Timer
 class Main():
     def __init__(self, simulation: bool = False, num_cameras: int = 3, fps: float = 0.0) -> None:
 
-        self.settings = MainSettings()
+        self.is_running: bool = False
+        self.is_finished: bool = False
 
+        # SETTINGS
+        self.settings = MainSettings()
         if not presets.load(self.settings, presets.startup_path()):
             presets.save(self.settings, presets.startup_path())  # create default preset if loading failed (not responsibility of main!)
-
-        # CLI override: --simulation flag takes precedence over preset
         self.settings.camera.sim_enabled = simulation
-
-
         self.settings.initialize()
+        self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
         num_players: int = self.settings.num_players
 
-        # Create controllers after preset loading so INIT fields (num_pixels, ip, etc.) are final
-        self.artnet_controllers = [ArtNetBars(cfg) for cfg in self.settings.inout.children.values() if isinstance(cfg, ArtNetBarsSettings)]
-
-        self.is_running: bool = False
-        self.is_finished: bool = False
+        # DATA_HUB
+        self.data_hub = DataHub()
 
         # CAMERA
         self.cameras: list[Camera | Simulator] = []
@@ -42,11 +39,11 @@ class Main():
         self.player: Optional[Player] = None
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator)
-            for i in range(self.settings.camera.num_cameras):
+            for i in range(num_players):
                 self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
             self.recorder = Recorder(self.settings.camera.recorder)
-            for i in range(self.settings.camera.num_cameras):
+            for i in range(num_players):
                 camera = Camera(self.settings.camera.cameras[i])
                 self.cameras.append(camera)
         self.frame_sync_bang = FrameSync(self.settings.camera, False, 'frame_sync')
@@ -55,19 +52,20 @@ class Main():
         self.tracker = OnePerCamTracker(self.settings.tt.tracker, num_players)
         self.tracklet_sync_bang = FrameSync(self.settings.camera, False, 'tracklet_sync')
 
-        # DATA
-        self.data_hub = DataHub()
-        self.sound_osc = OscSound(self.data_hub, self.settings.inout.osc_sound)
-
         # TIMER
         self.timer = Timer(self.settings.tt.timer)
         self.render = RenderManager(self.data_hub, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
-        self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
+
+        # IN_OUT
+        self.sound_osc = OscSound(self.data_hub, self.settings.inout.osc_sound)
+        self.artnet_controllers: list[ArtNetBars] = []
+        for i in range(num_players):
+            self.artnet_controllers.append(ArtNetBars(self.settings.inout.artnets[i]))
 
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
 
-        self.image_crop_processor =   batch.ImageCropProcessor(self.settings.pose.image_crop)
+        self.image_crop_processor = batch.ImageCropProcessor(self.settings.pose.image_crop)
         self.point_extractor =      batch.PointBatchExtractor(self.settings.pose.detection)
         self.mask_extractor =       batch.MaskBatchExtractor(self.settings.pose.segmentation)
         self.flow_extractor =       batch.FlowBatchExtractor(self.settings.pose.flow)
@@ -76,12 +74,10 @@ class Main():
         self.window_correlator =    batch.WindowCorrelation(self.settings.pose.window_correlation)
 
         # Feature applicators
-        self.similarity_applicator = nodes.SimilarityApplicator(self.settings.pose.similarity_applicator)
-        self.leader_applicator =     nodes.LeaderScoreApplicator(self.settings.pose.leader_applicator)
-        self.motion_gate_applicator= nodes.MotionGateApplicator(self.settings.pose.motion_gate)
-        self.motion_gate_tracker =   trackers.FilterTracker(num_players, [lambda: self.motion_gate_applicator])
-
-        self.debug_tracker =        trackers.DebugTracker(num_players)
+        self.similarity_applicator =    nodes.SimilarityApplicator(self.settings.pose.similarity_applicator)
+        self.leader_applicator =        nodes.LeaderScoreApplicator(self.settings.pose.leader_applicator)
+        self.motion_gate_applicator =   nodes.MotionGateApplicator(self.settings.pose.motion_gate)
+        self.motion_gate_tracker =      trackers.FilterTracker(num_players, [lambda: self.motion_gate_applicator])
 
         # WINDOW TRACKERS
         self.window_tracker_R =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_raw)
@@ -142,7 +138,7 @@ class Main():
             ]
         )
 
-        self.interpolator = trackers.InterpolatorTracker(
+        self.interpolators = trackers.InterpolatorTracker(
             num_players,
             [
                 lambda: nodes.BBoxChaseInterpolator(self.settings.pose.bbox.interpolator),
@@ -153,7 +149,7 @@ class Main():
             ]
         )
 
-        self.pose_interpolation_pipeline = trackers.FilterTracker(
+        self.pose_interpolation_filters = trackers.FilterTracker(
             num_players,
             [
                 # lambda: nodes.AngleVelExtractor(fps=settings.render.fps),
@@ -173,7 +169,6 @@ class Main():
         self.settings_server.start()
 
         for camera in self.cameras:
-
             camera.add_preview_callback(self.data_hub.set_cam_frame)
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
@@ -202,13 +197,13 @@ class Main():
         self.window_tracker_S.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.SMOOTH))
 
         # INTERPOLATION
-        self.data_hub.add_update_callback(self.interpolator.update)
-        self.pose_prediction_filters.add_frames_callback(self.interpolator.submit)
-        self.interpolator.add_frames_callback(self.pose_interpolation_pipeline.process)
+        self.data_hub.add_update_callback(self.interpolators.update)
+        self.pose_prediction_filters.add_frames_callback(self.interpolators.submit)
+        self.interpolators.add_frames_callback(self.pose_interpolation_filters.process)
 
         # MOTION GATE (after interpolation pipeline, before DataHub)
-        self.pose_interpolation_pipeline.add_frames_callback(self.motion_gate_applicator.submit) # dit slaat nergens op??
-        self.pose_interpolation_pipeline.add_frames_callback(self.motion_gate_tracker.process)
+        self.pose_interpolation_filters.add_frames_callback(self.motion_gate_applicator.submit) # dit slaat nergens op??
+        self.pose_interpolation_filters.add_frames_callback(self.motion_gate_tracker.process)
         self.motion_gate_tracker.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.LERP))
         self.motion_gate_tracker.add_frames_callback(self.window_tracker_I.process)
         self.window_tracker_I.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.LERP))

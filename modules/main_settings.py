@@ -9,10 +9,9 @@ from modules.utils import TimerSettings
 
 
 class InOutGroup(Settings):
+    num_artnet:         Field[int]      = Field(3, access=Field.INIT, visible=False)
     osc_sound:          OscSoundSettings
-    artnet_1:           ArtNetBarsSettings
-    artnet_2:           ArtNetBarsSettings
-    artnet_3:           ArtNetBarsSettings
+    artnets: list[ArtNetBarsSettings] = ArtNetBarsSettings(count=num_artnet)  # type: ignore[assignment]
 
 class SmoothedFeatureGroup(Settings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
@@ -74,9 +73,9 @@ class TTGroup(Settings):
 
 class MainSettings(Settings):
     num_players:        Field[int] = Field(3, access=Field.INIT, visible=False)
-    camera:             OakSettings
+    camera              = OakSettings(share=[num_players.as_('num_cameras')])
     tt:                 TTGroup
     pose                = PoseGroup(share=[num_players.as_('max_poses')])
     render:             RenderSettings
-    inout:              InOutGroup
+    inout               = InOutGroup(share=[num_players.as_('num_artnet')])
     server:             NiceSettings

@@ -1,7 +1,6 @@
 {
   "num_players": 3,
   "camera": {
-    "num_cameras": 3,
     "fps": 23.0,
     "yolo": true,
     "color": true,
@@ -545,60 +544,62 @@
       "stage": "LERP",
       "max_players": 3
     },
-    "artnet_1": {
-      "enabled": true,
-      "verbose": false,
-      "ip_address": "10.0.0.4",
-      "base_universe": 0,
-      "channel_order": "GRBW",
-      "fps": 40,
-      "pixels": 94,
-      "color": {
-        "r": 1.0,
-        "g": 0.0,
-        "b": 0.0,
-        "a": 1.0
+    "artnets": [
+      {
+        "enabled": true,
+        "verbose": false,
+        "ip_address": "10.0.0.4",
+        "base_universe": 0,
+        "channel_order": "GRBW",
+        "fps": 40,
+        "pixels": 94,
+        "color": {
+          "r": 1.0,
+          "g": 0.0,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "white_strength": 0.66,
+        "color_strength": 1.0,
+        "bar": 1.0
       },
-      "white_strength": 0.66,
-      "color_strength": 1.0,
-      "bar": 1.0
-    },
-    "artnet_2": {
-      "enabled": true,
-      "verbose": false,
-      "ip_address": "10.0.0.5",
-      "base_universe": 0,
-      "channel_order": "GRBW",
-      "fps": 40,
-      "pixels": 94,
-      "color": {
-        "r": 0.0,
-        "g": 0.32,
-        "b": 1.0,
-        "a": 1.0
+      {
+        "enabled": true,
+        "verbose": false,
+        "ip_address": "10.0.0.5",
+        "base_universe": 0,
+        "channel_order": "GRBW",
+        "fps": 40,
+        "pixels": 94,
+        "color": {
+          "r": 0.0,
+          "g": 0.32,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "white_strength": 0.66,
+        "color_strength": 1.0,
+        "bar": 1.0
       },
-      "white_strength": 0.66,
-      "color_strength": 1.0,
-      "bar": 1.0
-    },
-    "artnet_3": {
-      "enabled": true,
-      "verbose": false,
-      "ip_address": "10.0.0.6",
-      "base_universe": 0,
-      "channel_order": "GRBW",
-      "fps": 40,
-      "pixels": 94,
-      "color": {
-        "r": 0.68,
-        "g": 0.34,
-        "b": 0.0,
-        "a": 1.0
-      },
-      "white_strength": 0.66,
-      "color_strength": 1.0,
-      "bar": 1.0
-    }
+      {
+        "enabled": true,
+        "verbose": false,
+        "ip_address": "10.0.0.6",
+        "base_universe": 0,
+        "channel_order": "GRBW",
+        "fps": 40,
+        "pixels": 94,
+        "color": {
+          "r": 0.68,
+          "g": 0.34,
+          "b": 0.0,
+          "a": 1.0
+        },
+        "white_strength": 0.66,
+        "color_strength": 1.0,
+        "bar": 1.0
+      }
+    ]
   },
   "server": {
     "title": "POSER",
