@@ -4,7 +4,7 @@ from functools import partial
 
 # Local application imports
 from modules.main_settings import MainSettings
-from modules.oak import Camera, FrameSync, Simulator, Player, Recorder
+from modules.oak import Camera, Simulator, Player, Recorder, Sync
 from modules.settings import presets, NiceServer
 from modules.render import RenderManager
 from modules.data_hub import DataHub, Stage
@@ -46,11 +46,11 @@ class Main():
             for i in range(num_players):
                 camera = Camera(self.settings.camera.cameras[i])
                 self.cameras.append(camera)
-        self.frame_sync_bang = FrameSync(self.settings.camera, False, 'frame_sync')
+        self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
 
         # TRACKER
         self.tracker = OnePerCamTracker(self.settings.tt.tracker, num_players)
-        self.tracklet_sync_bang = FrameSync(self.settings.camera, False, 'tracklet_sync')
+        self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
 
         # TIMER
         self.timer = Timer(self.settings.tt.timer)

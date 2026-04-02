@@ -4,12 +4,12 @@ import numpy as np
 import time
 from collections import deque
 
-from .settings import OakSettings
+from .settings import SyncSettings
 
 
-class FrameSync:
+class Sync:
 
-    def __init__(self, settings: OakSettings, verbose: bool = False, stream_name: str = '') -> None:
+    def __init__(self, settings: SyncSettings, verbose: bool = False, stream_name: str = '') -> None:
         num_cams: int = settings.num_cameras
         self.verbose: bool = verbose
         self.stream_name: str = stream_name
@@ -27,11 +27,11 @@ class FrameSync:
 
         with self._lock:
             self._timestamp_history.append((cam_id, timestamp))
-            trigger_cam_id: int = FrameSync._find_sync_trigger_camera(self._timestamp_history, self.max_gap_s)
+            trigger_cam_id: int = Sync._find_sync_trigger_camera(self._timestamp_history, self.max_gap_s)
 
             if cam_id == trigger_cam_id:
                 # if self.verbose:
-                #     print(f"{self.stream_name}Max time diff: {FrameSyncBang._get_max_time_diff(self._timestamp_history):.3f}, from cam {cam_id}")
+                #     print(f"{self.stream_name}Max time diff: {Sync._get_max_time_diff(self._timestamp_history):.3f}, from cam {cam_id}")
 
                 current_time_s: float = time.time()
                 time_since_last_bang: float = current_time_s - self.last_bang_time_s
@@ -58,7 +58,7 @@ class FrameSync:
             Camera ID that should trigger the sync callback
         """
 
-        camera_ids: set[int] = FrameSync._get_unique_cameras_in_history(timestamp_history)
+        camera_ids: set[int] = Sync._get_unique_cameras_in_history(timestamp_history)
 
         if len(timestamp_history) < 2:
             return next(iter(camera_ids))
@@ -107,7 +107,7 @@ class FrameSync:
         if len(timestamp_history) == 0:
             return 0.0
 
-        camera_ids: set[int] = FrameSync._get_unique_cameras_in_history(timestamp_history)
+        camera_ids: set[int] = Sync._get_unique_cameras_in_history(timestamp_history)
 
         if not camera_ids:  # Extra safety
             return 0.0
