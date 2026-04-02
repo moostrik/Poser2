@@ -12,20 +12,13 @@ import numpy as np
 # Pose imports
 from modules.settings import Settings, Field
 from modules.utils.TypedCallbackMixin import TypedCallbackMixin
-from modules.pose.frame import FrameField
-from modules.pose.nodes.windows.WindowNode import FeatureWindow
+from modules.pose.frame import FrameField, FeatureWindow, FeatureWindowDict, FrameWindowDict
 from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod, NormalizedScalarFeature
 from modules.pose.features.Similarity import configure_similarity, Similarity
 from modules.pose.features.LeaderScore import configure_leader_score, LeaderScore
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-# Type alias for window dictionary (track_id -> FeatureWindow)
-WindowDict = dict[int, FeatureWindow]
-
-# Type alias for combined window dict from AllWindowTracker: {track_id: {FrameField: FeatureWindow}}
-AllWindowDict = dict[int, dict[FrameField, FeatureWindow]]
 
 
 class _JointAggregator(NormalizedScalarFeature):
@@ -98,9 +91,9 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
 
         # INPUTS - Just store the latest data with a lock
         self._input_lock = threading.Lock()
-        self._input_windows: WindowDict = {}  # Angle windows (required)
-        self._input_motion_windows: WindowDict = {}  # AngleMotion windows (optional)
-        self._input_velocity_windows: WindowDict = {}  # Angle velocity windows (optional)
+        self._input_windows: FeatureWindowDict = {}  # Angle windows (required)
+        self._input_motion_windows: FeatureWindowDict = {}  # AngleMotion windows (optional)
+        self._input_velocity_windows: FeatureWindowDict = {}  # Angle velocity windows (optional)
         self._update_event = threading.Event()
 
         # OUTPUT
@@ -121,7 +114,7 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
         self._stop_event.set()
         self._update_event.set()  # Wake the thread so it can see stop_event
 
-    def submit(self, windows: WindowDict) -> None:
+    def submit(self, windows: FeatureWindowDict) -> None:
         """Update angle windows and trigger similarity processing.
 
         DEPRECATED: Use submit_all() for motion gate and velocity weighting.
@@ -133,30 +126,22 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
             self._input_windows = windows
             self._update_event.set()
 
-    def submit_all(self, all_windows: AllWindowDict) -> None:
+    def submit_all(self, all_windows: FrameWindowDict) -> None:
         """Update all window types and trigger similarity processing.
 
         Extracts angle, motion, and velocity windows from the combined
         AllWindowTracker output format.
 
         Args:
-            all_windows: Combined dict {track_id: {FrameField: FeatureWindow}}
+            all_windows: Combined dict {FrameField: {track_id: FeatureWindow}}
         """
         if not self._config.enabled:
             return
 
         # Extract per-field window dicts
-        angle_windows: WindowDict = {}
-        motion_windows: WindowDict = {}
-        velocity_windows: WindowDict = {}
-
-        for track_id, field_windows in all_windows.items():
-            if FrameField.angles in field_windows:
-                angle_windows[track_id] = field_windows[FrameField.angles]
-            if FrameField.angle_motion in field_windows:
-                motion_windows[track_id] = field_windows[FrameField.angle_motion]
-            if FrameField.angle_vel in field_windows:
-                velocity_windows[track_id] = field_windows[FrameField.angle_vel]
+        angle_windows: FeatureWindowDict = all_windows.get(FrameField.angles, {})
+        motion_windows: FeatureWindowDict = all_windows.get(FrameField.angle_motion, {})
+        velocity_windows: FeatureWindowDict = all_windows.get(FrameField.angle_vel, {})
 
         with self._input_lock:
             self._input_windows = angle_windows
@@ -175,9 +160,9 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
             try:
                 # get input windows
                 with self._input_lock:
-                    windows: WindowDict = self._input_windows
-                    motion_windows: WindowDict = self._input_motion_windows
-                    velocity_windows: WindowDict = self._input_velocity_windows
+                    windows: FeatureWindowDict = self._input_windows
+                    motion_windows: FeatureWindowDict = self._input_motion_windows
+                    velocity_windows: FeatureWindowDict = self._input_velocity_windows
 
                 # Process similarity and leader scores
                 start_time: float = time.perf_counter()
@@ -198,9 +183,9 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
 
     def _process(
         self,
-        windows: WindowDict,
-        motion_windows: WindowDict | None = None,
-        velocity_windows: WindowDict | None = None
+        windows: FeatureWindowDict,
+        motion_windows: FeatureWindowDict | None = None,
+        velocity_windows: FeatureWindowDict | None = None
     ) -> tuple[dict[int,Similarity], dict[int, LeaderScore]]:
         """Process windows and return both Similarity and LeaderScore dicts.
 

@@ -1,5 +1,3 @@
-from abc import abstractmethod
-from dataclasses import dataclass
 from enum import IntEnum
 from threading import Lock
 from typing import Generic, TypeVar
@@ -7,68 +5,19 @@ from typing import Generic, TypeVar
 import numpy as np
 
 from modules.pose.frame import Frame, FrameField
+from modules.pose.frame.window import FeatureWindow
 from modules.pose.features import BaseScalarFeature, Angles, AngleMotion, AngleSymmetry, AngleVelocity, BBox, Similarity
 from modules.pose.nodes.Nodes import NodeBase
 from modules.settings import Settings, Field
 
 
-TEnum = TypeVar('TEnum', bound=IntEnum)
-
-
-@dataclass(frozen=True)
-class FeatureWindow(Generic[TEnum]):
-    """Window of feature values with metadata.
-
-    Shape: (time, feature_len) where time is oldest-first.
-
-    Attributes:
-        values: Feature values array of shape (time, feature_len)
-        mask: Boolean validity mask of shape (time, feature_len)
-        feature_enum: Enum class for feature elements (e.g., AngleLandmark)
-        range: (min, max) tuple for validation range
-        display_range: (min, max) tuple for visualization range
-    """
-    values: np.ndarray       # (time, feature_len)
-    mask: np.ndarray         # (time, feature_len) bool
-    feature_enum: type[TEnum]  # e.g., AngleLandmark
-    range: tuple[float, float]  # (min, max) validation range
-    display_range: tuple[float, float]  # (min, max) visualization range
-
-    @property
-    def feature_names(self) -> list[str]:
-        """Derive feature names from enum."""
-        return [e.name for e in self.feature_enum]
-
-    def __getitem__(self, landmark: TEnum | int) -> np.ndarray:
-        """Get time series for one feature element.
-
-        Example: window[AngleLandmark.left_elbow] returns (time,) array
-        """
-        return self.values[:, landmark]
-
-    @property
-    def shape(self) -> tuple[int, ...]:
-        """Return (time, feature_len) shape."""
-        return self.values.shape
-
-    @property
-    def time_len(self) -> int:
-        """Number of time samples in window."""
-        return self.values.shape[0]
-
-    @property
-    def feature_len(self) -> int:
-        """Number of feature elements."""
-        return self.values.shape[1]
+TFeature = TypeVar('TFeature', bound=BaseScalarFeature)
 
 
 class WindowNodeSettings(Settings):
     """Configuration for window nodes."""
     window_size:  Field[int]  = Field(30)
     emit_partial: Field[bool] = Field(True)
-
-
-TFeature = TypeVar('TFeature', bound=BaseScalarFeature)
 
 
 class WindowNode(NodeBase, Generic[TFeature]):

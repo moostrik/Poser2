@@ -13,20 +13,13 @@ from numpy.fft import rfft, irfft
 # Pose imports
 from modules.settings import Settings, Field
 from modules.utils.TypedCallbackMixin import TypedCallbackMixin
-from modules.pose.frame import FrameField
-from modules.pose.nodes.windows.WindowNode import FeatureWindow
+from modules.pose.frame import FrameField, FeatureWindow, FeatureWindowDict, FrameWindowDict
 from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod, NormalizedScalarFeature
 from modules.pose.features.Similarity import configure_similarity, Similarity
 from modules.pose.features.LeaderScore import configure_leader_score, LeaderScore
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-# Type alias for window dictionary (track_id -> FeatureWindow)
-WindowDict = dict[int, FeatureWindow]
-
-# Type alias for combined window dict from AllWindowTracker: {track_id: {FrameField: FeatureWindow}}
-AllWindowDict = dict[int, dict[FrameField, FeatureWindow]]
 
 
 class _JointAggregator(NormalizedScalarFeature):
@@ -87,8 +80,8 @@ class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int
 
         # INPUTS
         self._input_lock = threading.Lock()
-        self._input_windows: WindowDict = {}
-        self._input_motion_windows: WindowDict = {}
+        self._input_windows: FeatureWindowDict = {}
+        self._input_motion_windows: FeatureWindowDict = {}
         self._update_event = threading.Event()
 
         # OUTPUT
@@ -108,23 +101,17 @@ class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int
         self._stop_event.set()
         self._update_event.set()
 
-    def submit_all(self, all_windows: AllWindowDict) -> None:
+    def submit_all(self, all_windows: FrameWindowDict) -> None:
         """Update all window types and trigger correlation processing.
 
         Args:
-            all_windows: Combined dict {track_id: {FrameField: FeatureWindow}}
+            all_windows: Combined dict {FrameField: {track_id: FeatureWindow}}
         """
         if not self._config.enabled:
             return
 
-        angle_windows: WindowDict = {}
-        motion_windows: WindowDict = {}
-
-        for track_id, field_windows in all_windows.items():
-            if FrameField.angles in field_windows:
-                angle_windows[track_id] = field_windows[FrameField.angles]
-            if FrameField.angle_motion in field_windows:
-                motion_windows[track_id] = field_windows[FrameField.angle_motion]
+        angle_windows: FeatureWindowDict = all_windows.get(FrameField.angles, {})
+        motion_windows: FeatureWindowDict = all_windows.get(FrameField.angle_motion, {})
 
         with self._input_lock:
             self._input_windows = angle_windows
@@ -141,8 +128,8 @@ class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int
 
             try:
                 with self._input_lock:
-                    windows: WindowDict = self._input_windows
-                    motion_windows: WindowDict = self._input_motion_windows
+                    windows: FeatureWindowDict = self._input_windows
+                    motion_windows: FeatureWindowDict = self._input_motion_windows
 
                 start_time: float = time.perf_counter()
                 result = self._process(windows, motion_windows)
@@ -159,8 +146,8 @@ class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int
 
     def _process(
         self,
-        windows: WindowDict,
-        motion_windows: WindowDict | None = None
+        windows: FeatureWindowDict,
+        motion_windows: FeatureWindowDict | None = None
     ) -> tuple[dict[int, Similarity], dict[int, LeaderScore]]:
         """Process windows and return correlation and leader score dicts."""
 

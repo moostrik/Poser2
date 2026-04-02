@@ -5,12 +5,8 @@ from traceback import print_exc
 from typing import Callable
 
 from .TrackerBase import TrackerBase
-from modules.pose.nodes.windows.WindowNode import WindowNode, FeatureWindow
-from modules.pose.frame import FrameDict
-
-
-# Type alias for window dict callbacks
-WindowDictCallback = Callable[[dict[int, FeatureWindow]], None]
+from modules.pose.nodes.windows.WindowNode import WindowNode
+from modules.pose.frame import FrameDict, FeatureWindow, FeatureWindowDict, FeatureWindowDictCallback
 
 
 class WindowTracker(TrackerBase):
@@ -20,8 +16,8 @@ class WindowTracker(TrackerBase):
     Windows are automatically reset when their pose is lost.
 
     Note: This tracker has TWO callback mechanisms:
-    - add_poses_callback: Receives input poses (FrameDict) - for chaining with other pose processors
-    - add_window_callback: Receives output windows (dict[int, FeatureWindow]) - for DataHub/visualization
+    - add_frames_callback: Receives input poses (FrameDict) - for chaining with other pose processors
+    - add_window_callback: Receives output windows (WindowDict) - for DataHub/visualization
     """
 
     def __init__(self, num_tracks: int, window_factory: Callable[[], WindowNode]) -> None:
@@ -34,10 +30,10 @@ class WindowTracker(TrackerBase):
         }
 
         # Window output callbacks (separate from pose callbacks)
-        self._window_callbacks: set[WindowDictCallback] = set()
+        self._window_callbacks: set[FeatureWindowDictCallback] = set()
         self._window_callback_lock = Lock()
 
-    def process(self, poses: FrameDict) -> dict[int, FeatureWindow]:
+    def process(self, poses: FrameDict) -> FeatureWindowDict:
         """Process poses through window nodes.
 
         Returns:
@@ -49,7 +45,7 @@ class WindowTracker(TrackerBase):
             if id not in poses:
                 self.reset_at(id)
 
-        results: dict[int, FeatureWindow] = {}
+        results: FeatureWindowDict = {}
 
         for id, pose in poses.items():
             try:
@@ -68,7 +64,7 @@ class WindowTracker(TrackerBase):
 
         return results
 
-    def _notify_window_callbacks(self, windows: dict[int, FeatureWindow]) -> None:
+    def _notify_window_callbacks(self, windows: FeatureWindowDict) -> None:
         """Emit window callbacks.
 
         Broadcasts windows to all registered callbacks in a thread-safe manner.
@@ -84,7 +80,7 @@ class WindowTracker(TrackerBase):
                     print(f"{self.__class__.__name__}: Error in window callback: {e}")
                     print_exc()
 
-    def add_window_callback(self, callback: WindowDictCallback) -> None:
+    def add_window_callback(self, callback: FeatureWindowDictCallback) -> None:
         """Register window output callback.
 
         Args:
@@ -93,7 +89,7 @@ class WindowTracker(TrackerBase):
         with self._window_callback_lock:
             self._window_callbacks.add(callback)
 
-    def remove_window_callback(self, callback: WindowDictCallback) -> None:
+    def remove_window_callback(self, callback: FeatureWindowDictCallback) -> None:
         """Unregister window output callback.
 
         Args:

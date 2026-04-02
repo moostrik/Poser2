@@ -3,30 +3,24 @@
 from __future__ import annotations
 from threading import Lock
 from traceback import print_exc
-from typing import Callable
 
-from ..WindowTracker import WindowTracker, WindowDictCallback
+from ..WindowTracker import WindowTracker
 from modules.pose.nodes import AngleMotionWindowNode, AngleSymmetryWindowNode, AngleVelocityWindowNode, AngleWindowNode, BBoxWindowNode, SimilarityWindowNode, WindowNodeSettings
-from modules.pose.nodes.windows.WindowNode import WindowNode, FeatureWindow
-from modules.pose.frame import FrameDict, FrameField
-
-
-# {track_id: {FrameField: FeatureWindow}}
-AllWindowDict = dict[int, dict[FrameField, FeatureWindow]]
-AllWindowDictCallback = Callable[[AllWindowDict], None]
+from modules.pose.nodes.windows.WindowNode import WindowNode
+from modules.pose.frame import FrameDict, FrameField, FeatureWindow, FeatureWindowDict, FeatureWindowDictCallback, FrameWindowDict, FrameWindowDictCallback
 
 
 class AllWindowTracker:
     """Auto-creates a WindowTracker for every BaseScalarFeature field in Frame.
 
     Discovers all scalar features via FrameField.get_scalar_fields() and creates
-    one WindowTracker per feature. Results are pivoted into:
-        {track_id: {FrameField: FeatureWindow}}
+    one WindowTracker per feature. Results are emitted as:
+        {FrameField: {track_id: FeatureWindow}}
 
     Usage:
         tracker = AllWindowTracker(num_tracks, config)
         some_filter.add_poses_callback(tracker.process)
-        tracker.add_callback(data_hub.set_feature_windows)
+        tracker.add_callback(data_hub.set_frame_windows)
         tracker.add_window_callback(FrameField.angles, similarity_callback)
     """
 
@@ -41,7 +35,7 @@ class AllWindowTracker:
                 window_factory=lambda f=ff: WindowNode(f, config)
             )
 
-        self._callbacks: set[AllWindowDictCallback] = set()
+        self._callbacks: set[FrameWindowDictCallback] = set()
         self._callback_lock = Lock()
 
     @property
@@ -50,48 +44,38 @@ class AllWindowTracker:
         return list(self._trackers.keys())
 
     def process(self, poses: FrameDict) -> None:
-        """Process poses through all inner WindowTrackers and emit pivoted result."""
-        # Collect per-field results
-        per_field: dict[FrameField, dict[int, FeatureWindow]] = {}
+        """Process poses through all inner WindowTrackers and emit result."""
+        result: FrameWindowDict = {}
         for field, tracker in self._trackers.items():
-            per_field[field] = tracker.process(poses)
+            result[field] = tracker.process(poses)
 
-        # Pivot to {track_id: {FrameField: FeatureWindow}}
-        combined: AllWindowDict = {}
-        for field, track_windows in per_field.items():
-            for track_id, window in track_windows.items():
-                if track_id not in combined:
-                    combined[track_id] = {}
-                combined[track_id][field] = window
-
-        # Emit combined callback
-        self._notify_callbacks(combined)
+        self._notify_callbacks(result)
 
     def get_tracker(self, field: FrameField) -> WindowTracker:
         """Get the WindowTracker for a specific feature field."""
         return self._trackers[field]
 
     # Per-field window callbacks (for selective consumers like WindowSimilarity)
-    def add_window_callback(self, field: FrameField, callback: WindowDictCallback) -> None:
+    def add_window_callback(self, field: FrameField, callback: FeatureWindowDictCallback) -> None:
         """Register a window callback for a specific feature."""
         self._trackers[field].add_window_callback(callback)
 
-    def remove_window_callback(self, field: FrameField, callback: WindowDictCallback) -> None:
+    def remove_window_callback(self, field: FrameField, callback: FeatureWindowDictCallback) -> None:
         """Unregister a window callback for a specific feature."""
         self._trackers[field].remove_window_callback(callback)
 
     # Combined callbacks (for DataHub storage)
-    def add_callback(self, callback: AllWindowDictCallback) -> None:
-        """Register a callback for the pivoted {track_id: {FrameField: FeatureWindow}} dict."""
+    def add_callback(self, callback: FrameWindowDictCallback) -> None:
+        """Register a callback for the {FrameField: {track_id: FeatureWindow}} dict."""
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def remove_callback(self, callback: AllWindowDictCallback) -> None:
+    def remove_callback(self, callback: FrameWindowDictCallback) -> None:
         """Unregister a combined callback."""
         with self._callback_lock:
             self._callbacks.discard(callback)
 
-    def _notify_callbacks(self, combined: AllWindowDict) -> None:
+    def _notify_callbacks(self, combined: FrameWindowDict) -> None:
         with self._callback_lock:
             for callback in self._callbacks:
                 try:

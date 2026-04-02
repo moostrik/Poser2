@@ -10,7 +10,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.data_hub import DataHub, Stage
 from modules.pose.frame import FrameField
 from modules.gl import Fbo, Texture, Blit, Image, clear_color, Text
-from modules.pose.nodes import FeatureWindow
+from modules.pose.frame import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import WindowShader
 from modules.render.layers.data.DataLayerSettings import DataLayerSettings, LayerMode

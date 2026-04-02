@@ -10,7 +10,7 @@ from torch import Tensor
 
 # Local application imports for setter types
 from modules.oak.camera.definitions import Tracklet as DepthTracklet
-from modules.pose.frame import FrameDict, FrameField
+from modules.pose.frame import FrameDict, FrameField, FeatureWindow, FrameWindowDict
 from modules.tracker.Tracklet import TrackletDict
 from modules.utils.Timer import TimerState
 
@@ -123,7 +123,7 @@ class DataHub:
                 return None
             return track_windows.get(field)
 
-    def get_feature_windows_for_track(self, stage: Stage, track_id: int) -> dict[FrameField, Any]:
+    def get_feature_windows_for_track(self, stage: Stage, track_id: int) -> dict[FrameField, FeatureWindow]:
         """Get all feature windows for a specific stage and track."""
         with self.mutex:
             return dict(self._data.get(_WINDOW_TYPES[stage], {}).get(track_id, {}))
@@ -142,7 +142,7 @@ class DataHub:
             self._data[data_type] = dict(values)
 
     # TYPE-SPECIFIC SETTERS WITH CAM_ID KEY
-    def set_cam_image(self, key: int, frame_type, value: np.ndarray) -> None:
+    def set_cam_frame(self, key: int, frame_type, value: np.ndarray) -> None:
         self.set_item(DataHubType.cam_image, key, value)
 
     def set_depth_tracklets(self, key: int, value: list[DepthTracklet]) -> None:
@@ -160,12 +160,18 @@ class DataHub:
         self.set_dict(DataHubType.gpu_frames, gpu_frames)
 
     # POSE SETTERS
-    def set_poses(self, stage: Stage, poses: FrameDict) -> None:
+    def set_pose_frames(self, stage: Stage, poses: FrameDict) -> None:
         self.set_dict(_FRAME_TYPES[stage], poses)
 
-    def set_feature_windows(self, stage: Stage, windows: dict[int, dict[FrameField, Any]]) -> None:
-        """Store feature windows. Expects {track_id: {FrameField: FeatureWindow}}."""
-        self.set_dict(_WINDOW_TYPES[stage], windows)
+    def set_pose_windows(self, stage: Stage, windows: FrameWindowDict) -> None:
+        """Store feature windows. Pivots {FrameField: {track_id: FeatureWindow}} to track-first for storage."""
+        pivoted: dict[int, Any] = {}
+        for field, track_windows in windows.items():
+            for track_id, window in track_windows.items():
+                if track_id not in pivoted:
+                    pivoted[track_id] = {}
+                pivoted[track_id][field] = window
+        self.set_dict(_WINDOW_TYPES[stage], pivoted)
 
     # TIMER
     def set_timer_state(self, state: TimerState) -> None:
