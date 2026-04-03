@@ -6,6 +6,9 @@ from collections import deque
 
 from .settings import SyncSettings
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Sync:
 
@@ -41,7 +44,7 @@ class Sync:
                     self._notify_callbacks()
                 else:
                     if self.verbose:
-                        print(f"{self.stream_name}Skipped bang (only {time_since_last_bang:.3f}s since last, from cam {cam_id})")
+                        logger.info(f"{self.stream_name}Skipped bang (only {time_since_last_bang:.3f}s since last, from cam {cam_id})")
 
     @staticmethod
     def _find_sync_trigger_camera(timestamp_history: deque[tuple[int, float]], max_gap_s: float) -> int:

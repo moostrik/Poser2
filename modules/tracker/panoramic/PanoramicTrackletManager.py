@@ -8,6 +8,9 @@ from modules.tracker.Tracklet import Tracklet, TrackingStatus
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+import logging
+logger = logging.getLogger(__name__)
+
 class TrackletIdPool:
     def __init__(self, max_size: int) -> None:
         self._available: set[int] = set(range(max_size))
@@ -52,7 +55,7 @@ class PanoramicTrackletManager:
             try:
                 id = self._id_pool.acquire()
             except Exception as e:
-                print(f"TrackletManager: No more IDs available: {e}")
+                logger.info(f"TrackletManager: No more IDs available: {e}")
                 return None
 
             new_tracklet: Tracklet = replace(
@@ -70,7 +73,7 @@ class PanoramicTrackletManager:
             if tracklet is not None:
                 self._id_pool.release(id)
             else:
-                print(f"TrackletManager: Attempted to remove non-existent tracklet with ID {id}.")
+                logger.warning(f"TrackletManager: Attempted to remove non-existent tracklet with ID {id}.")
 
     def all_tracklets(self) -> list[Tracklet]:
         with self._lock:
@@ -87,7 +90,7 @@ class PanoramicTrackletManager:
         with self._lock:
             old_tracklet: Tracklet | None = self._tracklets.get(id)
             if old_tracklet is None:
-                print(f"TrackletManager: Attempted to replace non-existent tracklet with ID {id}.")
+                logger.warning(f"TrackletManager: Attempted to replace non-existent tracklet with ID {id}.")
                 return -1
 
             # if new_tracklet.time_stamp == old_tracklet.time_stamp:
@@ -117,18 +120,18 @@ class PanoramicTrackletManager:
         with self._lock:
             # Validate IDs
             if keep_id in (-1, None) or keep_id == remove_id:
-                print(f"TrackletManager: Invalid merge (keep.id={keep_id}, remove.id={remove_id})")
+                logger.warning(f"TrackletManager: Invalid merge (keep.id={keep_id}, remove.id={remove_id})")
                 return -1, -1
 
             keep: Optional[Tracklet] = self._tracklets.get(keep_id)
             remove: Optional[Tracklet] = self._tracklets.get(remove_id)
 
             if keep is None or remove is None:
-                print(f"TrackletManager: One of the tracklets in the merge {keep_id} and {remove_id} is None. Skipping merge.")
+                logger.warning(f"TrackletManager: One of the tracklets in the merge {keep_id} and {remove_id} is None. Skipping merge.")
                 return -1, -1
 
             if not keep.is_active:
-                print(f"TrackletManager: Cannot merge tracklet with status {keep.status} (keep.id={keep.id}, remove.id={remove.id})")
+                logger.warning(f"TrackletManager: Cannot merge tracklet with status {keep.status} (keep.id={keep.id}, remove.id={remove.id})")
                 return -1, -1
 
             # if keep.time_stamp == remove.time_stamp:
@@ -169,7 +172,7 @@ class PanoramicTrackletManager:
         with self._lock:
             tracklet: Tracklet | None = self._tracklets.get(id)
             if tracklet is None:
-                print(f"TrackletManager: Attempted to retire non-existent tracklet with ID {id}.")
+                logger.warning(f"TrackletManager: Attempted to retire non-existent tracklet with ID {id}.")
                 return
 
             removed_tracklet: Tracklet = replace(

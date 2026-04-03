@@ -1,9 +1,11 @@
 # Standard library imports
+import logging
 from enum import Enum, IntEnum
 from threading import Thread, Lock, current_thread
 from time import sleep, time_ns
-import traceback
 from typing import Callable, Optional
+
+logger = logging.getLogger(__name__)
 
 # Third-party imports
 from OpenGL.GL import (  # type: ignore
@@ -66,7 +68,7 @@ class WindowManager():
         self._actual_height: int = settings.height
         self.windowed_fullscreen: bool = False
         self.frame_interval: None | int = None
-        print(f"WindowManager initialized with width={settings.width}, height={settings.height}, fullscreen={settings.fullscreen}, v_sync={settings.v_sync}, fps={settings.avg_fps}, frame_interval={self.frame_interval}ns")
+        logger.info("Initialized with width=%s, height=%s, fullscreen=%s, v_sync=%s, fps=%s, frame_interval=%sns", settings.width, settings.height, settings.fullscreen, settings.v_sync, settings.avg_fps, self.frame_interval)
         self.fps = FpsCounter()
         self.mouse_x: float = 0.0
         self.mouse_y: float = 0.0
@@ -113,12 +115,12 @@ class WindowManager():
         """Stop the rendering thread"""
         # Early exit if thread doesn't exist or isn't running
         if not self.render_thread or not self.render_thread.is_alive():
-            print(f"Render thread is not running, nothing to stop")
+            logger.debug("Render thread is not running, nothing to stop")
             return
 
         # Check if we're calling from the render thread itself
         if current_thread() is self.render_thread:
-            print(f"Render thread self-terminating")
+            logger.debug("Render thread self-terminating")
             return
 
         # Normal case - external thread stopping the render thread
@@ -129,7 +131,7 @@ class WindowManager():
 
         self.render_thread.join(timeout=2.0)  # Wait for thread to finish with timeout
         if self.render_thread.is_alive():
-            print(f"Warning: Render thread didn't stop gracefully")
+            logger.warning("Render thread didn't stop gracefully")
 
     def _run(self) -> None:
         self._setup()
@@ -167,7 +169,7 @@ class WindowManager():
         monitors = glfw.get_monitors()
 
         if monitor_id < 0 or monitor_id >= len(monitors):
-            print(f"{self.__class__.__name__} ID: {monitor_id} out of range for available monitors: {len(monitors)}, defaulting to primary monitor")
+            logger.warning("%s ID: %s out of range for available monitors: %s, defaulting to primary monitor", type(self).__name__, monitor_id, len(monitors))
             monitor_id = 0
 
         self.monitor = monitors[self._ordered_monitor_ids[monitor_id]]
@@ -185,7 +187,7 @@ class WindowManager():
         version = glGetString(GL_VERSION)
         if isinstance(version, bytes):
             opengl_version: str = version.decode("utf-8")
-            print("OpenGL version:", opengl_version)
+            logger.info("OpenGL version: %s", opengl_version)
         else:
             raise RuntimeError("OpenGL context is not valid")
 
@@ -200,11 +202,11 @@ class WindowManager():
         glfw.set_cursor_pos_callback(self.main_window, self._notify_cursor_pos_callback)
         glfw.set_mouse_button_callback(self.main_window, self._notify_invoke_mouse_button_callbacks)
 
-        print(f"Setting up secondary monitors: {self.settings.secondary_list}")
+        logger.info("Setting up secondary monitors: %s", self.settings.secondary_list)
 
         for id in self.settings.secondary_list:
             if id < 0 or id >= len(self._ordered_monitor_ids):
-                print(f"{self.__class__.__name__} ID: {id} out of range for available monitors: {self._ordered_monitor_ids}")
+                logger.warning("%s ID: %s out of range for available monitors: %s", type(self).__name__, id, self._ordered_monitor_ids)
                 continue
 
             monitor_id: int = self._ordered_monitor_ids[id]
@@ -298,8 +300,7 @@ class WindowManager():
         try:
             self.renderer.update()
         except Exception as e:
-            print(f"Error in update: {e}")
-            traceback.print_exc()
+            logger.exception("Error in update")
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
@@ -313,7 +314,7 @@ class WindowManager():
                 self.main_window = None
             glfw.terminate()
         except Exception as e:
-            print(f"Error cleaning up GLFW: {e}")
+            logger.error("Error cleaning up GLFW: %s", e)
 
         self._notify_exit_callbacks()
 
@@ -353,27 +354,26 @@ class WindowManager():
         try:
             self.renderer.draw_main(self._actual_width, self._actual_height)
         except Exception as e:
-            print(f"Error in draw: {e}")
-            traceback.print_exc()
+            logger.exception("Error in draw")
 
         glfw.swap_buffers(self.main_window)
 
     # SECONDARY WINDOWS
     def _create_secondary_window(self, name:str, monitor_id: int) -> Optional[glfw._GLFWwindow]:
         if self.main_window is None:
-            print("Main window must be created before secondary windows.")
+            logger.error("Main window must be created before secondary windows")
             return None
 
         monitors: list[glfw._GLFWmonitor] = glfw.get_monitors()
         if monitor_id < 0 or monitor_id >= len(monitors):
-            print(f"Monitor ID {monitor_id} is out of range for available monitors: {len(monitors)}")
+            logger.warning("Monitor ID %s is out of range for available monitors: %s", monitor_id, len(monitors))
             return None
 
         monitor: glfw._GLFWmonitor = monitors[monitor_id]
 
         win: Optional[glfw._GLFWwindow] = glfw.create_window(100, 100, name, None, self.main_window)
         if not win:
-            print("Failed to create secondary window")
+            logger.error("Failed to create secondary window")
             return None
 
         glfw.set_mouse_button_callback(win, self._invoke_secondary_callbacks)
@@ -397,7 +397,7 @@ class WindowManager():
         """Setup a secondary window with the given monitor ID and fullscreen mode"""
         monitor: Optional[glfw._GLFWmonitor] = glfw.get_monitors()[monitor_id] if monitor_id < len(glfw.get_monitors()) else None
         if not monitor:
-            print(f"Monitor {monitor_id} not found")
+            logger.warning("Monitor %s not found", monitor_id)
             return
 
         mode: glfw._GLFWvidmode = glfw.get_video_mode(monitor)
@@ -431,8 +431,7 @@ class WindowManager():
         try:
             self.renderer.draw_secondary(monitor_id, width, height)
         except Exception as e:
-            print(f"Error in draw_secondary: {e}")
-            traceback.print_exc()  # This prints the stack trace
+            logger.exception("Error in draw_secondary")
         glfw.swap_buffers(window)
 
     @staticmethod
@@ -516,7 +515,7 @@ class WindowManager():
                 try:
                     callback()
                 except Exception as e:
-                    print(f"Error in exit callback: {e}")
+                    logger.exception("Error in exit callback")
 
     def add_mouse_callback(self, callback) -> None:
         with self.callback_lock:
@@ -582,7 +581,7 @@ class WindowManager():
             )
         else:
             # Restore windowed mode from settings (preserved during fullscreen)
-            print("Restoring windowed mode")
+            logger.info("Restoring windowed mode")
             glfw.set_window_attrib(self.main_window, glfw.DECORATED, glfw.TRUE)
             glfw.set_window_monitor(
                 self.main_window, None, self.settings.x, self.settings.y,

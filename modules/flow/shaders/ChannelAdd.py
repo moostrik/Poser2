@@ -7,6 +7,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class ChannelAdd(Shader):
     """Add single-channel texture to specific RGBA channel."""
@@ -21,10 +24,10 @@ class ChannelAdd(Shader):
             strength: Multiplier for the addition (default 1.0)
         """
         if not self.allocated or not self.shader_program:
-            print("ChannelAdd shader not allocated or shader program missing.")
+            logger.warning("ChannelAdd shader not allocated or shader program missing.")
             return
         if not dst.allocated or not src.allocated:
-            print("ChannelAdd shader: input texture not allocated.")
+            logger.warning("ChannelAdd shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

@@ -8,6 +8,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class SetRegion(Shader):
     """Set a specific region of destination to source texture."""
@@ -27,10 +30,10 @@ class SetRegion(Shader):
             strength: Multiplier for source texture
         """
         if not self.allocated or not self.shader_program:
-            print("SetRegion shader not allocated or shader program missing.")
+            logger.warning("SetRegion shader not allocated or shader program missing.")
             return
         if not dst.allocated or not src.allocated:
-            print("SetRegion shader: input textures not allocated.")
+            logger.warning("SetRegion shader: input textures not allocated.")
             return
 
         glUseProgram(self.shader_program)

@@ -7,6 +7,9 @@ from typing import Callable, Set
 
 from modules.settings import Settings, Field
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class TimerState(IntEnum):
     """Timer state enum."""
@@ -119,7 +122,7 @@ class Timer(threading.Thread):
             try:
                 callback(elapsed)
             except Exception as e:
-                print(f"Timer: Error in time callback: {e}")
+                logger.error(f"Timer: Error in time callback: {e}")
 
     # Callback management - State callbacks
     def add_state_callback(self, callback: Callable[[TimerState], None]) -> None:
@@ -161,7 +164,7 @@ class Timer(threading.Thread):
             try:
                 callback(state)
             except Exception as e:
-                print(f"Timer: Error in state callback: {e}")
+                logger.error(f"Timer: Error in state callback: {e}")
 
     def run(self) -> None:
         """Main timer loop with frame-accurate timing."""
@@ -179,7 +182,7 @@ class Timer(threading.Thread):
 
             # Print state and time every update (if verbose)
             if self.config.verbose:
-                print(f"Timer: {self._state.name} | Time: {elapsed:.2f}s")
+                logger.debug(f"Timer: {self._state.name} | Time: {elapsed:.2f}s")
 
             # Handle intermezzo state
             if self._state == TimerState.INTERMEZZO:
@@ -236,7 +239,7 @@ class Timer(threading.Thread):
         if self.is_alive():
             self.join(timeout=1.0)
             if self.is_alive():
-                print(f"WARNING: Timer thread did not exit cleanly within timeout")
+                logger.warning(f"WARNING: Timer thread did not exit cleanly within timeout")
 
         # Clear all callbacks
         with self._callback_lock:

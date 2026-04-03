@@ -2,7 +2,6 @@
 from queue import Queue, Empty
 from threading import Thread, Lock, Event
 import time
-import traceback
 
 # Third-party imports
 import numpy as np
@@ -14,6 +13,9 @@ from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, 
 
 from .DetectionSettings import DetectionSettings
 from ..tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
+
+import logging
+logger = logging.getLogger(__name__)
 
 # ImageNet normalization constants (RGB order) - scaled to [0,1] range
 IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(1, 3, 1, 1)
@@ -96,7 +98,7 @@ class TRTDetection(Thread):
         self.join(timeout=2.0)
 
         if self.is_alive():
-            print("Warning: TensorRT inference thread did not stop cleanly")
+            logger.warning("Warning: TensorRT inference thread did not stop cleanly")
 
         try:
             self._callback_queue.put_nowait(None)
@@ -105,7 +107,7 @@ class TRTDetection(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            print("Warning: TensorRT callback thread did not stop cleanly")
+            logger.warning("Warning: TensorRT callback thread did not stop cleanly")
 
     def run(self) -> None:
         self._setup()
@@ -121,9 +123,7 @@ class TRTDetection(Thread):
             try:
                 self._process()
             except Exception as e:
-                print(f"TensorRT Detection Error: {str(e)}")
-                traceback.print_exc()
-
+                logger.error(f"TensorRT Detection Error: {str(e)}")
     def submit(self, input_batch: DetectionInput) -> None:
         """Submit batch for processing. Replaces pending batch if not yet started.
 
@@ -137,7 +137,7 @@ class TRTDetection(Thread):
 
         # Validate batch size
         if len(input_batch.gpu_images) > self._max_batch:
-            print(f"TensorRT Detection Warning: Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
+            logger.warning(f"TensorRT Detection Warning: Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: DetectionInput | None = None
 
@@ -146,7 +146,7 @@ class TRTDetection(Thread):
                 dropped_batch = self._pending_batch
                 if self.verbose:
                     lag = int((time.time() - self._input_timestamp) * 1000)
-                    print(f"TensorRT Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms")
+                    logger.info(f"TensorRT Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -173,7 +173,7 @@ class TRTDetection(Thread):
 
                 self.engine = runtime.deserialize_cuda_engine(engine_data)
                 if self.engine is None:
-                    print("TensorRT Detection ERROR: Failed to load engine")
+                    logger.error("TensorRT Detection ERROR: Failed to load engine")
                     return
 
                 self.context = self.engine.create_execution_context()
@@ -194,7 +194,7 @@ class TRTDetection(Thread):
 
             # Validate expected tensor counts
             if len(self.output_names) != 2:
-                print(f"TensorRT Detection ERROR: Expected 2 outputs, got {len(self.output_names)}")
+                logger.error(f"TensorRT Detection ERROR: Expected 2 outputs, got {len(self.output_names)}")
                 return
 
             # Determine model precision from input tensor
@@ -246,11 +246,10 @@ class TRTDetection(Thread):
             self.context.set_tensor_address(self.input_name, self._input_buffer.data_ptr())
 
             self._model_ready.set()
-            print(f"TensorRT Detection: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
+            logger.info(f"TensorRT Detection: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
 
         except Exception as e:
-            print(f"TensorRT Detection Error: Failed to load model - {str(e)}")
-            traceback.print_exc()
+            logger.error(f"TensorRT Detection Error: Failed to load model - {str(e)}")
             return
 
     def _claim(self) -> DetectionInput | None:
@@ -292,7 +291,7 @@ class TRTDetection(Thread):
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            print("TensorRT Detection Warning: Callback queue full")
+            logger.warning("TensorRT Detection Warning: Callback queue full")
 
     def _infer(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray, float, float]:
         """Run TensorRT inference on batch of GPU images.
@@ -399,9 +398,7 @@ class TRTDetection(Thread):
                     try:
                         callback(output)
                     except Exception as e:
-                        print(f"TensorRT Detection Callback Error: {str(e)}")
-                        traceback.print_exc()
-
+                        logger.exception("Error in callback")
                 self._callback_queue.task_done()
             except Empty:
                 continue

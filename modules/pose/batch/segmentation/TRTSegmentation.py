@@ -2,7 +2,6 @@
 from queue import Queue, Empty
 from threading import Thread, Lock, Event
 import time
-import traceback
 
 # Third-party imports
 import torch
@@ -12,6 +11,9 @@ from ..tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
 
 from .SegmentationSettings import SegmentationSettings
+
+import logging
+logger = logging.getLogger(__name__)
 
 class RecurrentState:
     """Container for RVM recurrent states (r1, r2, r3, r4)."""
@@ -42,7 +44,7 @@ class TRTSegmentation(Thread):
 
         self.enabled: bool = settings.enabled
         if not self.enabled:
-            print('TRT RVM Segmentation WARNING: Segmentation is disabled')
+            logger.warning('TRT RVM Segmentation WARNING: Segmentation is disabled')
 
         self.model_path: str = settings.model_path
         self.model_name: str = settings.model
@@ -121,7 +123,7 @@ class TRTSegmentation(Thread):
         self.join(timeout=2.0)
 
         if self.is_alive():
-            print("Warning: TRT RVM Segmentation inference thread did not stop cleanly")
+            logger.warning("Warning: TRT RVM Segmentation inference thread did not stop cleanly")
 
         # Wake up callback thread with sentinel
         try:
@@ -131,7 +133,7 @@ class TRTSegmentation(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            print("Warning: TRT RVM Segmentation callback thread did not stop cleanly")
+            logger.warning("Warning: TRT RVM Segmentation callback thread did not stop cleanly")
 
     def run(self) -> None:
         self._setup()
@@ -148,9 +150,7 @@ class TRTSegmentation(Thread):
                 self._process()
 
             except Exception as e:
-                print(f"TRT RVM Segmentation Error: {str(e)}")
-                traceback.print_exc()
-
+                logger.error(f"TRT RVM Segmentation Error: {str(e)}")
     def submit(self, input_batch: SegmentationInput) -> None:
         """Submit batch for processing. Replaces pending batch if not yet started.
 
@@ -164,7 +164,7 @@ class TRTSegmentation(Thread):
 
         # Validate batch size
         if len(input_batch.gpu_images) > self._max_batch:
-            print(f"TRT RVM Segmentation Warning: Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
+            logger.warning(f"TRT RVM Segmentation Warning: Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: SegmentationInput | None = None
 
@@ -173,7 +173,7 @@ class TRTSegmentation(Thread):
                 dropped_batch = self._pending_batch
                 if self.verbose:
                     lag = int((time.time() - self._input_timestamp) * 1000)
-                    print(f"TRT RVM Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
+                    logger.info(f"TRT RVM Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -206,7 +206,7 @@ class TRTSegmentation(Thread):
 
                 self.engine = runtime.deserialize_cuda_engine(engine_data)
                 if self.engine is None:
-                    print("TRT RVM Segmentation ERROR: Failed to load engine")
+                    logger.error("TRT RVM Segmentation ERROR: Failed to load engine")
                     return
 
                 self.context = self.engine.create_execution_context()
@@ -228,11 +228,11 @@ class TRTSegmentation(Thread):
 
             # Expected: 5 inputs (src, r1i-r4i), 6 outputs (fgr, pha, r1o-r4o)
             if len(self.input_names) != 5:
-                print(f"TRT RVM Segmentation ERROR: Expected 5 inputs, got {len(self.input_names)}")
+                logger.error(f"TRT RVM Segmentation ERROR: Expected 5 inputs, got {len(self.input_names)}")
                 return
 
             if len(self.output_names) != 6:
-                print(f"TRT RVM Segmentation ERROR: Expected 6 outputs, got {len(self.output_names)}")
+                logger.error(f"TRT RVM Segmentation ERROR: Expected 6 outputs, got {len(self.output_names)}")
                 return
 
             # Determine model precision from 'src' input tensor
@@ -302,11 +302,10 @@ class TRTSegmentation(Thread):
             self.context.set_tensor_address('r4i', self._r4i_buffer.data_ptr())
 
             self._model_ready.set()
-            print(f"TRT RVM Segmentation: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
+            logger.info(f"TRT RVM Segmentation: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
 
         except Exception as e:
-            print(f"TRT RVM Segmentation Error: Failed to load model - {str(e)}")
-            traceback.print_exc()
+            logger.error(f"TRT RVM Segmentation Error: Failed to load model - {str(e)}")
             return
 
     def _claim(self) -> SegmentationInput | None:
@@ -329,7 +328,7 @@ class TRTSegmentation(Thread):
         # Periodic state reset as failsafe (0=disabled)
         if self._state_reset_interval > 0 and self._frame_counter % self._state_reset_interval == 0:
             if self.verbose:
-                print(f"RVM TRT Segmentation: Periodic state reset at frame {self._frame_counter}")
+                logger.debug(f"RVM TRT Segmentation: Periodic state reset at frame {self._frame_counter}")
             self._recurrent_states.clear()
 
         output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=False)
@@ -351,14 +350,12 @@ class TRTSegmentation(Thread):
                     lock_time_ms=lock_wait_ms
                 )
             except Exception as e:
-                print(f"TRT RVM Segmentation Error: Batched inference failed: {str(e)}")
-                traceback.print_exc()
-
+                logger.error(f"TRT RVM Segmentation Error: Batched inference failed: {str(e)}")
         # Queue for callbacks
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            print("TRT RVM Segmentation Warning: Callback queue full, dropping inference results")
+            logger.warning("TRT RVM Segmentation Warning: Callback queue full, dropping inference results")
 
     def _infer(self, gpu_imgs: list[torch.Tensor], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float, float]:
         """Run batched TensorRT inference with per-tracklet recurrent states.
@@ -510,7 +507,7 @@ class TRTSegmentation(Thread):
         while not self._shutdown_event.is_set():
             try:
                 if self._callback_queue.qsize() > 1:
-                    print("TRT RVM Segmentation Warning: Callback queue size > 1, consumers may be falling behind")
+                    logger.warning("TRT RVM Segmentation Warning: Callback queue size > 1, consumers may be falling behind")
 
                 output: SegmentationOutput | None = self._callback_queue.get(timeout=0.5)
 
@@ -524,9 +521,7 @@ class TRTSegmentation(Thread):
                     try:
                         callback(output)
                     except Exception as e:
-                        print(f"TensorRT Segmentation Callback Error: {str(e)}")
-                        traceback.print_exc()
-
+                        logger.exception("Error in callback")
                 self._callback_queue.task_done()
             except Empty:
                 continue

@@ -1,10 +1,13 @@
 from OpenGL.GL import * # type: ignore
+import logging
 from modules.gl.Fbo import Fbo
 from modules.gl.Texture import Texture, get_data_type
 from modules.gl.Utils import BlitFlip
 import numpy as np
 from threading import Lock
 from typing import Literal
+
+logger = logging.getLogger(__name__)
 
 
 def _get_format_bgr(internal_format, channel_order: Literal['BGR', 'RGB']) -> Constant:
@@ -43,7 +46,7 @@ def _get_format_bgr(internal_format, channel_order: Literal['BGR', 'RGB']) -> Co
     if internal_format == GL_RG8: return GL_RG
     if internal_format == GL_RG16F: return GL_RG
     if internal_format == GL_RG32F: return GL_RG
-    print('GL_Image', 'internal format not supported')
+    logger.warning("GL_Image: internal format not supported")
     return GL_NONE
 
 def _get_internal_format(image: np.ndarray) -> Constant:
@@ -79,7 +82,7 @@ def _get_internal_format(image: np.ndarray) -> Constant:
             elif image.shape[2] == 4:  # RGBA image
                 return GL_RGBA32F
 
-    print('GL_texture', 'image format not supported')
+    logger.warning("GL_Image: image format not supported")
     return GL_NONE
 
 

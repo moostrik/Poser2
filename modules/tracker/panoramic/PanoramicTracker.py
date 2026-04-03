@@ -17,6 +17,9 @@ from modules.settings import Settings, Field
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class PanoramicTrackerSettings(Settings):
     """Configuration for PanoramicTracker."""
@@ -272,6 +275,6 @@ class PanoramicTracker(Thread, BaseTracker):
         for t in cam_tracklets:
             tracklet: Optional[Tracklet] = Tracklet.from_depthcam(cam_id, t)
             if tracklet is None:
-                print(f"PanoramicTracker: Invalid tracklet from camera {cam_id}, skipping.")
+                logger.warning(f"PanoramicTracker: Invalid tracklet from camera {cam_id}, skipping.")
                 return
             self.input_queue.put(tracklet)

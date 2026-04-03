@@ -1,12 +1,14 @@
 """Tracks and interpolates multiple poses independently."""
 
 from dataclasses import replace
-from traceback import print_exc
 from typing import Callable
 
 from modules.pose.frame import Frame, FrameDict
 from modules.pose.nodes.Nodes import InterpolatorNode
 from .TrackerBase import TrackerBase
+
+import logging
+logger = logging.getLogger(__name__)
 
 # MAKE AVAILABLE FOR FACTORY LISTS (like filter trackers)
 class InterpolatorTracker(TrackerBase):
@@ -43,9 +45,7 @@ class InterpolatorTracker(TrackerBase):
                 for node in self._interpolator_pipeline[id]:
                     node.submit(pose)
         except Exception as e:
-            print(f"InterpolatorTracker: Error submitting pose {id}: {e}")
-            print_exc()
-
+            logger.error(f"InterpolatorTracker: Error submitting pose {id}: {e}")
     def update(self) -> FrameDict:
         """Get interpolated poses using configured output frequency."""
 
@@ -71,10 +71,7 @@ class InterpolatorTracker(TrackerBase):
                     interpolated_poses[id] = pose
 
         except Exception as e:
-            print(f"InterpolatorTracker: Error updating pose {id}: {e}")
-            from traceback import print_exc
-            print_exc()
-
+            logger.error(f"InterpolatorTracker: Error updating pose {id}: {e}")
         # Emit callbacks with interpolated poses
         self._notify_frames_callbacks(interpolated_poses)
 

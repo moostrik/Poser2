@@ -7,6 +7,9 @@ from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, FrameField
 from modules.settings import Settings, Field
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class ValidatorSettings(Settings):
     """Configuration for pose validators."""
@@ -58,7 +61,7 @@ class FeatureValidator(FilterNode):
         is_valid, error_message = feature_data.validate(check_ranges=check_ranges)
 
         if not is_valid:
-            print(f"{name} validation error in '{self._pose_field.name}' of pose {pose.track_id}: {error_message}")
+            logger.error(f"{name} validation error in '{self._pose_field.name}' of pose {pose.track_id}: {error_message}")
 
         # Always return original pose (no fixing, just validation)
         return pose

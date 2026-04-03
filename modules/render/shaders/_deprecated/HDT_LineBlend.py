@@ -2,13 +2,16 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 class HDT_LineBlend(Shader):
     def use(self, tex0: Texture, line_tex: Texture, color: tuple[float, float, float, float], visibility: float, param0: float, param1: float) -> None:
         if not self.allocated or not self.shader_program:
-            print("HDT_LineBlend shader not allocated or shader program missing.")
+            logger.warning("HDT_LineBlend shader not allocated or shader program missing.")
             return
         if not tex0.allocated:
-            print("HDT_LineBlend shader: input texture not allocated.")
+            logger.warning("HDT_LineBlend shader: input texture not allocated.")
             return
 
         # Activate shader program

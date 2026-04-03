@@ -8,6 +8,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class HSV(Shader):
     """HSV color adjustment shader."""
@@ -23,10 +26,10 @@ class HSV(Shader):
             value: Value/brightness multiplier (0 = black, 1 = original, >1 = brighter)
         """
         if not self.allocated or not self.shader_program:
-            print("HSV shader not allocated or shader program missing.")
+            logger.warning("HSV shader not allocated or shader program missing.")
             return
         if not source.allocated:
-            print("HSV shader: input texture not allocated.")
+            logger.warning("HSV shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

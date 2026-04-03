@@ -4,6 +4,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Gradient(Shader):
     """Subtract pressure gradient from velocity (projection step)."""
@@ -24,10 +27,10 @@ class Gradient(Shader):
             has_obstacles: When False, skip obstacle texture reads for performance
         """
         if not self.allocated or not self.shader_program:
-            print("Gradient shader not allocated or shader program missing.")
+            logger.warning("Gradient shader not allocated or shader program missing.")
             return
         if not velocity.allocated or not pressure.allocated or not obstacle.allocated:
-            print("Gradient shader: input texture(s) not allocated.")
+            logger.warning("Gradient shader: input texture(s) not allocated.")
             return
 
         glUseProgram(self.shader_program)

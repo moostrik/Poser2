@@ -9,6 +9,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Advect(Shader):
     """Semi-Lagrangian advection shader with dissipation and aspect correction."""
@@ -31,10 +34,10 @@ class Advect(Shader):
             has_obstacles: When False, skip obstacle texture reads for performance
         """
         if not self.allocated or not self.shader_program:
-            print("Advect shader not allocated or shader program missing.")
+            logger.warning("Advect shader not allocated or shader program missing.")
             return
         if not source.allocated or not velocity.allocated or not obstacle.allocated:
-            print("Advect shader: input texture(s) not allocated.")
+            logger.warning("Advect shader: input texture(s) not allocated.")
             return
 
         glUseProgram(self.shader_program)

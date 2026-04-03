@@ -11,6 +11,9 @@ from .settings import SimulatorSettings
 from .stream_reader import StreamReader
 from ..recorder.recorder import make_file_name, is_folder_for_settings
 
+import logging
+logger = logging.getLogger(__name__)
+
 class State(Enum):
     IDLE = auto()
     LOAD = auto()
@@ -179,7 +182,7 @@ class Player(Thread):
                     player.load(str(path), self.load_chunk)
                     self.loaders.append(player)
                 else:
-                    print(f"File {path} not found")
+                    logger.warning(f"File {path} not found")
 
     def _start(self) -> None:
         for p in self.players:
@@ -254,7 +257,7 @@ class Player(Thread):
 
             for key in cam_frames.keys():
                 if key < frame_id - 3:
-                    print(f"Frame {key} is older than {frame_id}, marking for removal")
+                    logger.info(f"Frame {key} is older than {frame_id}, marking for removal")
                     keys_to_delete.append(key)
 
             for key in keys_to_delete:
@@ -335,7 +338,7 @@ class Player(Thread):
     def play(self, value: bool, name: str = '') -> None:
         if value:
             if not name in self.folders:
-                print(f"Folder {name} not found")
+                logger.warning(f"Folder {name} not found")
                 return
             message: Message = Message(MessageType.START, name)
         else:
@@ -375,7 +378,7 @@ class Player(Thread):
     # CALLBACKS
     def addFrameCallback(self, callback: FrameCallback) -> None:
         if self.running:
-            print('Camera: cannot add callback while player is running')
+            logger.warning('Camera: cannot add callback while player is running')
             return
         self.frameCallbacks.add(callback)
 

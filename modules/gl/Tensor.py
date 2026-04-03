@@ -1,5 +1,8 @@
 # Standard library imports
+import logging
 from threading import Lock
+
+logger = logging.getLogger(__name__)
 
 # Third-party imports
 import numpy as np
@@ -167,10 +170,10 @@ class Tensor(Texture):
                 runtime.cudaGraphicsRegisterFlags.cudaGraphicsRegisterFlagsWriteDiscard
             )
             if err != runtime.cudaError_t.cudaSuccess:
-                print(f"TensorTexture: CUDA-GL interop registration failed (error {err}), using CPU fallback")
+                logger.warning("CUDA-GL interop registration failed (error %s), using CPU fallback", err)
                 self._cuda_gl_resource = None
         except Exception as e:
-            print(f"TensorTexture: CUDA-GL interop registration failed ({e}), using CPU fallback")
+            logger.warning("CUDA-GL interop registration failed (%s), using CPU fallback", e)
             self._cuda_gl_resource = None
 
     def deallocate(self) -> None:
@@ -233,9 +236,7 @@ class Tensor(Texture):
             else:
                 self._update_with_pbo(tensor)
         except Exception as e:
-            print(f"TensorTexture.update() error: {e}, tensor shape: {tensor.shape if tensor is not None else 'None'}")
-            import traceback
-            traceback.print_exc()
+            logger.exception("update() error, tensor shape: %s", tensor.shape if tensor is not None else 'None')
         finally:
             # Ensure clean OpenGL state
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
@@ -328,7 +329,7 @@ class Tensor(Texture):
         err = glGetError()
         if err != 0:
             type_name = 'uint8' if gl_type == GL_UNSIGNED_BYTE else ('FP16' if gl_type == GL_HALF_FLOAT else 'FP32')
-            print(f"TensorTexture: OpenGL error after glTexSubImage2D: {err} (channels={channels}, format={upload_format}, type={type_name})")
+            logger.error("OpenGL error after glTexSubImage2D: %s (channels=%s, format=%s, type=%s)", err, channels, upload_format, type_name)
 
         self.unbind()
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)

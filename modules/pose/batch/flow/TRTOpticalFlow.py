@@ -2,7 +2,6 @@
 from queue import Queue, Empty
 from threading import Thread, Lock, Event
 import time
-import traceback
 
 # Third-party imports
 import torch
@@ -16,6 +15,9 @@ if TYPE_CHECKING:
     from .FlowSettings import FlowSettings
 
 from ..tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class TRTOpticalFlow(Thread):
@@ -37,7 +39,7 @@ class TRTOpticalFlow(Thread):
 
         self.enabled: bool = settings.enabled
         if not self.enabled:
-            print('TensorRT Optical Flow WARNING: Optical flow is disabled')
+            logger.warning('TensorRT Optical Flow WARNING: Optical flow is disabled')
 
         self.model_path: str = settings.model_path
         self.model_name: str = settings.model
@@ -104,7 +106,7 @@ class TRTOpticalFlow(Thread):
         self.join(timeout=2.0)
 
         if self.is_alive():
-            print("Warning: TensorRT Optical Flow inference thread did not stop cleanly")
+            logger.warning("Warning: TensorRT Optical Flow inference thread did not stop cleanly")
 
         # Wake up callback thread with sentinel
         try:
@@ -114,15 +116,14 @@ class TRTOpticalFlow(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            print("Warning: TensorRT Optical Flow callback thread did not stop cleanly")
+            logger.warning("Warning: TensorRT Optical Flow callback thread did not stop cleanly")
 
     def run(self) -> None:
         """Main inference thread loop. Initializes TensorRT engine and processes batches."""
         try:
             self._setup()
         except Exception as e:
-            print(f"TensorRT Optical Flow Error: Failed to load model - {str(e)}")
-            traceback.print_exc()
+            logger.error(f"TensorRT Optical Flow Error: Failed to load model - {str(e)}")
             return
 
         while not self._shutdown_event.is_set():
@@ -137,9 +138,7 @@ class TRTOpticalFlow(Thread):
                 self._process()
 
             except Exception as e:
-                print(f"TensorRT Optical Flow Error: {str(e)}")
-                traceback.print_exc()
-
+                logger.error(f"TensorRT Optical Flow Error: {str(e)}")
     def submit(self, input_batch: OpticalFlowInput) -> None:
         """Submit batch for processing. Replaces any pending (not yet started) batch."""
         if self._shutdown_event.is_set():
@@ -150,7 +149,7 @@ class TRTOpticalFlow(Thread):
 
         # Validate batch size
         if len(input_batch.gpu_image_pairs) > self._max_batch:
-            print(f"TensorRT Optical Flow Warning: Batch size {len(input_batch.gpu_image_pairs)} exceeds max {self._max_batch}, will process only first {self._max_batch} pairs")
+            logger.warning(f"TensorRT Optical Flow Warning: Batch size {len(input_batch.gpu_image_pairs)} exceeds max {self._max_batch}, will process only first {self._max_batch} pairs")
 
         dropped_batch: OpticalFlowInput | None = None
 
@@ -159,7 +158,7 @@ class TRTOpticalFlow(Thread):
                 dropped_batch = self._pending_batch
                 if self.verbose:
                     lag = int((time.time() - self._input_timestamp) * 1000)
-                    print(f"TensorRT Optical Flow: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
+                    logger.info(f"TensorRT Optical Flow: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -185,7 +184,7 @@ class TRTOpticalFlow(Thread):
         with get_init_lock():
             runtime = get_tensorrt_runtime()
 
-            print(f"TensorRT Optical Flow: Loading engine from {self.model_file}")
+            logger.info(f"TensorRT Optical Flow: Loading engine from {self.model_file}")
             with open(self.model_file, 'rb') as f:
                 engine_data = f.read()
 
@@ -252,7 +251,7 @@ class TRTOpticalFlow(Thread):
         self.context.set_tensor_address(self.input_names[1], self._img2_buffer.data_ptr())
 
         self._model_ready.set()
-        print(f"TensorRT Optical Flow: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
+        logger.info(f"TensorRT Optical Flow: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
 
     def _claim(self) -> OpticalFlowInput | None:
         """Atomically get and clear pending batch."""
@@ -288,8 +287,7 @@ class TRTOpticalFlow(Thread):
                     lock_time_ms=lock_wait_ms
                 )
             except Exception as e:
-                print(f"TensorRT Optical Flow Error: Inference failed: {str(e)}")
-                traceback.print_exc()
+                logger.error(f"TensorRT Optical Flow Error: Inference failed: {str(e)}")
         else:
             output = OpticalFlowOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
 
@@ -297,7 +295,7 @@ class TRTOpticalFlow(Thread):
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            print("TensorRT Optical Flow Warning: Callback queue full, dropping results")
+            logger.warning("TensorRT Optical Flow Warning: Callback queue full, dropping results")
 
     def _infer(self, gpu_pairs: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, float, float]:
         """Run TensorRT RAFT inference on batch of GPU frame pairs.
@@ -404,9 +402,7 @@ class TRTOpticalFlow(Thread):
                     try:
                         callback(output)
                     except Exception as e:
-                        print(f"TensorRT Optical Flow Callback Error: {str(e)}")
-                        traceback.print_exc()
-
+                        logger.exception("Error in callback")
                 self._callback_queue.task_done()
             except Empty:
                 continue

@@ -3,6 +3,9 @@
 from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class DrawColoredRectangle(Shader):
     """Draw a filled rectangle with specified color and position."""
@@ -18,7 +21,7 @@ class DrawColoredRectangle(Shader):
             r, g, b, a: Color components (0.0-1.0)
         """
         if not self.allocated or not self.shader_program:
-            print("DrawColoredRectangle shader not allocated or shader program missing.")
+            logger.warning("DrawColoredRectangle shader not allocated or shader program missing.")
             return
 
         glUseProgram(self.shader_program)

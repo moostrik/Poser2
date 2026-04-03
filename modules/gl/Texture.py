@@ -1,5 +1,8 @@
 from OpenGL.GL import * # type: ignore
+import logging
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def get_numpy_dtype(data_type: Constant, internal_format: Constant) -> type | None:
@@ -66,7 +69,7 @@ def get_format(internal_format) -> Constant:
     if internal_format == GL_RG8: return GL_RG
     if internal_format == GL_RG16F: return GL_RG
     if internal_format == GL_RG32F: return GL_RG
-    print('GL_texture', 'internal format not supported')
+    logger.warning("GL_texture: internal format not supported")
     return GL_RGB  # fallback
 
 
@@ -85,7 +88,7 @@ def get_data_type(internal_format) -> Constant:
     if internal_format == GL_RG8: return GL_UNSIGNED_BYTE
     if internal_format == GL_RG16F: return GL_FLOAT
     if internal_format == GL_RG32F: return GL_FLOAT
-    print('GL_texture', 'internal format not supported')
+    logger.warning("GL_texture: internal format not supported")
     return GL_NONE
 
 
@@ -188,13 +191,13 @@ class Texture():
         # Get NumPy dtype from GL types
         dtype = get_numpy_dtype(self.data_type, self.internal_format)
         if dtype is None:
-            print(f"Texture.read_to_numpy: Unsupported data type {self.data_type}")
+            logger.warning("Unsupported data type %s", self.data_type)
             return None
 
         # Get channel count from format
         channels = get_channel_count(self.format)
         if channels is None:
-            print(f"Texture.read_to_numpy: Unsupported format {self.format}")
+            logger.warning("Unsupported format %s", self.format)
             return None
 
         # Allocate output array

@@ -13,6 +13,9 @@ from .definitions import *
 from .settings import CameraSettings
 from modules.utils.FPS import FPS
 
+import logging
+logger = logging.getLogger(__name__)
+
 class Camera(Thread):
     _id_counter = 0
     _pipeline: dai.Pipeline | None = None
@@ -88,7 +91,7 @@ class Camera(Thread):
         device_list: list[str] = get_device_list(verbose=False)
 
         if self.device_id not in device_list:
-            print(f'Camera: {self.device_id} NOT AVAILABLE in {device_list}')
+            logger.warning(f'Camera: {self.device_id} NOT AVAILABLE in {device_list}')
             return False
 
         if Camera._pipeline is None:
@@ -98,12 +101,12 @@ class Camera(Thread):
         try:
             self.device = self._try_device(self.device_id, Camera._pipeline, num_tries=1)
         except Exception as e:
-            print(f'Could not open device: {e}')
+            logger.error(f'Could not open device: {e}')
             return False
 
         self._setup_queues()
 
-        print(f'Camera: {self.device_id} OPEN')
+        logger.info(f'Camera: {self.device_id} OPEN')
         self.running = True
         self.settings.connect(self.device, self.inputs, self.do_color)
         return True
@@ -151,7 +154,7 @@ class Camera(Thread):
         self.sync_callbacks.clear()
         self.tracker_callbacks.clear()
 
-        print(f'Camera: {self.device_id} CLOSED')
+        logger.info(f'Camera: {self.device_id} CLOSED')
 
     def _video_callback(self, msg: dai.ImgFrame) -> None:
         # print('RV', msg.getTimestamp())
@@ -200,7 +203,7 @@ class Camera(Thread):
                 elif name == 'stereo':
                     self._stereo_callback(msg)
                 else:
-                    print('unknown message', name)
+                    logger.info('unknown message', name)
         self._update_sync_callbacks(frames, self.fps)
 
         self.cntr = self.cntr + 1
@@ -251,25 +254,25 @@ class Camera(Thread):
 
     def add_frame_callback(self, callback: FrameCallback) -> None:
         if self.running:
-            print('Camera: cannot add callback while camera is running')
+            logger.warning('Camera: cannot add callback while camera is running')
             return
         self.frame_callbacks.add(callback)
 
     def add_sync_callback(self, callback: SyncCallback) -> None:
         if self.running:
-            print('Camera: cannot add callback while camera is running')
+            logger.warning('Camera: cannot add callback while camera is running')
             return
         self.sync_callbacks.add(callback)
 
     def add_preview_callback(self, callback: FrameCallback) -> None:
         if self.running:
-            print('Camera: cannot add callback while camera is running')
+            logger.warning('Camera: cannot add callback while camera is running')
             return
         self.preview_callbacks.add(callback)
 
     def add_tracker_callback(self, callback: TrackerCallback) -> None:
         if self.running:
-            print('Camera: cannot add callback while camera is running')
+            logger.warning('Camera: cannot add callback while camera is running')
             return
         self.tracker_callbacks.add(callback)
 

@@ -5,13 +5,16 @@ import numpy as np
 
 from modules.pose.features import PoseFeatureType as PoseFeatureUnion
 
+import logging
+logger = logging.getLogger(__name__)
+
 class FeatureShader(Shader):
     def use(self, feature: PoseFeatureUnion, colors: list[tuple[float, float, float, float]],
             line_width: float = 0.1, line_smooth: float = 0.01, use_scores: bool = False,
             display_range: tuple[float, float] | None = None,
             deltas: np.ndarray | None = None) -> None:
         if not self.allocated or not self.shader_program:
-            print("FeatureBand shader not allocated or shader program missing.")
+            logger.warning("FeatureBand shader not allocated or shader program missing.")
             return
 
         # Flatten values and scores to pass to shader

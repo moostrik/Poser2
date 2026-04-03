@@ -108,6 +108,9 @@ from typing_extensions import Self
 
 from modules.pose.features.base.BaseFeature import BaseFeature, FeatureEnum
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class BaseScalarFeature(BaseFeature[FeatureEnum]):
     """Base class for scalar features (1D value per element).
@@ -261,13 +264,13 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
             # Check if mask matches actual data
             actual_valid = not np.isnan(self._values[element])
             if is_valid != actual_valid:
-                print(f"VALIDATION ERROR: {self.enum()(element).name} mask={is_valid} but actual={actual_valid}")
-                print(f"  Value: {self._values[element]}")
-                print(f"  Score: {self._scores[element]}")
+                logger.error(f"VALIDATION ERROR: {self.enum()(element).name} mask={is_valid} but actual={actual_valid}")
+                logger.info(f"  Value: {self._values[element]}")
+                logger.info(f"  Score: {self._scores[element]}")
 
             # Check if invalid values have score 0.0
             if not is_valid and self._scores[element] != 0.0:
-                print(f"VALIDATION ERROR: {self.enum()(element).name} is invalid but has non-zero score {self._scores[element]}")
+                logger.error(f"VALIDATION ERROR: {self.enum()(element).name} is invalid but has non-zero score {self._scores[element]}")
 
         return is_valid
 

@@ -7,6 +7,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Blit(Shader):
     """Copy/stretch texture to target FBO."""
@@ -18,7 +21,7 @@ class Blit(Shader):
             tex: Source texture to copy
         """
         if not self.allocated or not self.shader_program:
-            print("Blit shader not allocated or shader program missing.")
+            logger.warning("Blit shader not allocated or shader program missing.")
             return
         if not tex.allocated:
             return

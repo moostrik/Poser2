@@ -23,6 +23,9 @@ from modules.gl.Utils import FpsCounter
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 
 class WSPipeline(Thread):
@@ -92,7 +95,7 @@ class WSPipeline(Thread):
             try:
                 self._update()
             except Exception as e:
-                print(f"Error in Comp update: {e}")
+                logger.error(f"Error in Comp update: {e}")
 
             next_time += self.interval
             sleep_time: float = next_time - time()

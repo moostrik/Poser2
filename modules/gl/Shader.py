@@ -7,6 +7,8 @@ import threading
 import logging
 import ctypes
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -130,7 +132,7 @@ class Shader():
         with self._reload_lock:
             self.need_reload = False
             compiled: bool = self._compile_shaders(verbose=True)
-            print(f"Shader {self.shader_name} reload {'succeeded' if compiled else 'failed'}")
+            logger.info("%s reload %s", self.shader_name, 'succeeded' if compiled else 'failed')
             return True  # We attempted reload
 
     def get_uniform_loc(self, name: str) -> int:
@@ -160,7 +162,7 @@ class Shader():
             if gl_generic_vertex_path.exists():
                 vertex_source = self.read_shader_source(str(gl_generic_vertex_path))
         if not vertex_source:
-            logging.error(f"{self.shader_name}: No vertex shader found! Looking for {self.vertex_file_path} or {self.shader_dir / '_generic.vert'} or {Path(__file__).parent / 'shaders' / '_generic.vert'}")
+            logger.error(f"{self.shader_name}: No vertex shader found! Looking for {self.vertex_file_path} or {self.shader_dir / '_generic.vert'} or {Path(__file__).parent / 'shaders' / '_generic.vert'}")
             return False
 
         # Load fragment shader source
@@ -178,7 +180,7 @@ class Shader():
             if gl_generic_fragment_path.exists():
                 fragment_source = self.read_shader_source(str(gl_generic_fragment_path))
         if not fragment_source:
-            logging.error(f"{self.shader_name}: No fragment shader found! Looking for {self.fragment_file_path} or {self.shader_dir / '_generic.frag'} or {Path(__file__).parent / 'shaders' / '_generic.frag'}")
+            logger.error(f"{self.shader_name}: No fragment shader found! Looking for {self.fragment_file_path} or {self.shader_dir / '_generic.frag'} or {Path(__file__).parent / 'shaders' / '_generic.frag'}")
             return False
 
         try:
@@ -188,7 +190,7 @@ class Shader():
             glCompileShader(vertex_shader)
             if not glGetShaderiv(vertex_shader, GL_COMPILE_STATUS):
                 error = glGetShaderInfoLog(vertex_shader).decode()
-                logging.error(f" {self.shader_name} VERTEX SHADER ERROR:\n{error}")
+                logger.error(f" {self.shader_name} VERTEX SHADER ERROR:\n{error}")
                 glDeleteShader(vertex_shader)
                 return False
 
@@ -198,7 +200,7 @@ class Shader():
             glCompileShader(fragment_shader)
             if not glGetShaderiv(fragment_shader, GL_COMPILE_STATUS):
                 error = glGetShaderInfoLog(fragment_shader).decode()
-                logging.error(f"{self.shader_name} FRAGMENT SHADER ERROR:\n{error}")
+                logger.error(f"{self.shader_name} FRAGMENT SHADER ERROR:\n{error}")
                 glDeleteShader(vertex_shader)
                 glDeleteShader(fragment_shader)
                 return False
@@ -211,7 +213,7 @@ class Shader():
 
             if not glGetProgramiv(new_program, GL_LINK_STATUS):
                 error = glGetProgramInfoLog(new_program).decode()
-                logging.error(f"{self.shader_name} LINK ERROR:\n{error}")
+                logger.error(f"{self.shader_name} LINK ERROR:\n{error}")
                 glDeleteShader(vertex_shader)
                 glDeleteShader(fragment_shader)
                 glDeleteProgram(new_program)
@@ -230,11 +232,11 @@ class Shader():
             self._uniform_cache.clear()
 
             if verbose:
-                logging.info(f"{self.shader_name} loaded successfully")
+                logger.info(f"{self.shader_name} loaded successfully")
             return True
 
         except Exception as e:
-            logging.error(f"{self.shader_name} UNEXPECTED ERROR: {e}")
+            logger.error(f"{self.shader_name} UNEXPECTED ERROR: {e}")
             return False
 
     def _on_file_changed(self, file_path: Path) -> None:
@@ -265,7 +267,7 @@ class Shader():
                 if shader.shader_dir:
                     cls._watch_directory(shader.shader_dir)
             if cls._directory_observers:
-                logging.info(f"Hot-reload enabled for {len(cls._directory_observers)} directories")
+                logger.info(f"Hot-reload enabled for {len(cls._directory_observers)} directories")
 
     @classmethod
     def _watch_directory(cls, shader_dir: Path) -> None:
@@ -273,7 +275,7 @@ class Shader():
         if shader_dir not in cls._directory_observers:
             observer = monitor_path(str(shader_dir), cls._on_any_file_changed)
             cls._directory_observers[shader_dir] = observer
-            # logging.info(f"Watching shader directory: {shader_dir}")
+            # logger.info(f"Watching shader directory: {shader_dir}")
 
     @classmethod
     def disable_hot_reload(cls) -> None:
@@ -285,7 +287,7 @@ class Shader():
                 observer.stop()
                 observer.join(timeout=2.0)
             cls._directory_observers.clear()
-            logging.info("Hot-reload disabled")
+            logger.info("Hot-reload disabled")
 
     @classmethod
     def _on_any_file_changed(cls, filepath: str) -> None:

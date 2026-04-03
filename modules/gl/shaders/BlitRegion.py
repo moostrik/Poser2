@@ -8,6 +8,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class BlitRegion(Shader):
     """Draw a region of a texture to fill the entire viewport."""
@@ -23,10 +26,10 @@ class BlitRegion(Shader):
             h: Height in normalized texture coordinates [0, 1]
         """
         if not self.allocated or not self.shader_program:
-            print("BlitRegion shader not allocated or shader program missing.")
+            logger.warning("BlitRegion shader not allocated or shader program missing.")
             return
         if not tex.allocated:
-            print("BlitRegion shader: input texture not allocated.")
+            logger.warning("BlitRegion shader: input texture not allocated.")
             return
 
         # Activate shader program

@@ -2,13 +2,16 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 class DenseFlowFilter(Shader):
     def use(self, tex0: Texture, scale: float = 1.0, gamma: float = 1.0, noise_threshold: float = 0.01) -> None:
         if not self.allocated or not self.shader_program:
-            print("DenseFlowFilter shader not allocated or shader program missing.")
+            logger.warning("DenseFlowFilter shader not allocated or shader program missing.")
             return
         if not tex0.allocated:
-            print("DenseFlowFilter shader: input texture not allocated.")
+            logger.warning("DenseFlowFilter shader: input texture not allocated.")
             return
 
         # Activate shader program

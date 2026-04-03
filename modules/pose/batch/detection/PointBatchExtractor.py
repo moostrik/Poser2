@@ -13,6 +13,9 @@ from .InOut import DetectionInput, DetectionOutput
 from .ONNXDetection import ONNXDetection
 from .TRTDetection import TRTDetection
 
+import logging
+logger = logging.getLogger(__name__)
+
 Detection = Union[ONNXDetection, TRTDetection]
 
 class PointBatchExtractor(FrameDictCallbackMixin):
@@ -88,7 +91,7 @@ class PointBatchExtractor(FrameDictCallbackMixin):
             batch_data: tuple[FrameDict, list[int]] | None = self._waiting_batches.pop(output.batch_id, None)
 
         if not batch_data:
-            print(f"Point2DExtractor Warning: No waiting batch for batch_id {output.batch_id} (possible reset during processing)")
+            logger.warning(f"Point2DExtractor Warning: No waiting batch for batch_id {output.batch_id} (possible reset during processing)")
             return
 
         original_poses, tracklet_ids = batch_data

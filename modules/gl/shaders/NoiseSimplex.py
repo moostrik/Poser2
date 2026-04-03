@@ -3,10 +3,13 @@ from modules.gl.Shader import Shader, draw_quad
  # ...existing code...
 from time import time
 
+import logging
+logger = logging.getLogger(__name__)
+
 class NoiseSimplex(Shader):
     def use(self, speed: float, blend: float) -> None:
         if not self.allocated or not self.shader_program:
-            print("NoiseSimplex shader not allocated or shader program missing.")
+            logger.warning("NoiseSimplex shader not allocated or shader program missing.")
             return
 
         t: float = (time() * speed % (3600.0))

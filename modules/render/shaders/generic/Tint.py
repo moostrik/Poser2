@@ -2,16 +2,19 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Tint(Shader):
     """Draw a texture multiplied by a tint color. Modern GL replacement for glColor4f()."""
 
     def use(self, tex: Texture, r: float = 1.0, g: float = 1.0, b: float = 1.0, a: float = 1.0) -> None:
         if not self.allocated or not self.shader_program:
-            print("Tint shader not allocated or shader program missing.")
+            logger.warning("Tint shader not allocated or shader program missing.")
             return
         if not tex.allocated:
-            print("Tint shader: input texture not allocated.")
+            logger.warning("Tint shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

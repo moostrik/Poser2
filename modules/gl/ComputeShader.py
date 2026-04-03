@@ -21,6 +21,8 @@ import logging
 import math
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 from OpenGL.GL import *  # type: ignore
 
 from .Shader import Shader
@@ -97,7 +99,7 @@ class ComputeShader(Shader):
             compute_source = self.read_shader_source(str(self.compute_file_path))
 
         if not compute_source:
-            logging.error(f"{self.shader_name}: No compute shader found at {self.compute_file_path}")
+            logger.error(f"{self.shader_name}: No compute shader found at {self.compute_file_path}")
             return False
 
         try:
@@ -108,7 +110,7 @@ class ComputeShader(Shader):
 
             if not glGetShaderiv(compute_shader, GL_COMPILE_STATUS):
                 error = glGetShaderInfoLog(compute_shader).decode()
-                logging.error(f"{self.shader_name} COMPUTE SHADER ERROR:\n{error}")
+                logger.error(f"{self.shader_name} COMPUTE SHADER ERROR:\n{error}")
                 glDeleteShader(compute_shader)
                 return False
 
@@ -119,7 +121,7 @@ class ComputeShader(Shader):
 
             if not glGetProgramiv(new_program, GL_LINK_STATUS):
                 error = glGetProgramInfoLog(new_program).decode()
-                logging.error(f"{self.shader_name} LINK ERROR:\n{error}")
+                logger.error(f"{self.shader_name} LINK ERROR:\n{error}")
                 glDeleteShader(compute_shader)
                 glDeleteProgram(new_program)
                 return False
@@ -136,11 +138,11 @@ class ComputeShader(Shader):
             self._uniform_cache.clear()
 
             if verbose:
-                logging.info(f"{self.shader_name} compute shader loaded successfully")
+                logger.info(f"{self.shader_name} compute shader loaded successfully")
             return True
 
         except Exception as e:
-            logging.error(f"{self.shader_name} UNEXPECTED ERROR: {e}")
+            logger.error(f"{self.shader_name} UNEXPECTED ERROR: {e}")
             return False
 
     def reload(self) -> bool:
@@ -151,7 +153,7 @@ class ComputeShader(Shader):
         with self._reload_lock:
             self.need_reload = False
             compiled = self._compile_compute_shader(verbose=True)
-            print(f"Compute shader {self.shader_name} reload {'succeeded' if compiled else 'failed'}")
+            logger.info("%s reload %s", self.shader_name, 'succeeded' if compiled else 'failed')
             return True
 
     def _on_file_changed(self, file_path: Path) -> None:

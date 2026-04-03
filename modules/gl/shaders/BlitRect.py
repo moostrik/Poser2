@@ -8,6 +8,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class BlitRect(Shader):
     """Draw texture to a specific rectangle in the viewport."""
@@ -23,10 +26,10 @@ class BlitRect(Shader):
             h: Height in normalized device coordinates
         """
         if not self.allocated or not self.shader_program:
-            print("BlitRect shader not allocated or shader program missing.")
+            logger.warning("BlitRect shader not allocated or shader program missing.")
             return
         if not tex.allocated:
-            print("BlitRect shader: input texture not allocated.")
+            logger.warning("BlitRect shader: input texture not allocated.")
             return
 
         # Activate shader program

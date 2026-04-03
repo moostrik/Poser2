@@ -8,6 +8,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Add(Shader):
     """Add two textures with individual strength multipliers."""
@@ -24,10 +27,10 @@ class Add(Shader):
             strength1: Multiplier for second texture
         """
         if not self.allocated or not self.shader_program:
-            print("Blend shader not allocated or shader program missing.")
+            logger.warning("Blend shader not allocated or shader program missing.")
             return
         if not dst.allocated or not src.allocated:
-            print("Blend shader: input textures not allocated.")
+            logger.warning("Blend shader: input textures not allocated.")
             return
 
         # Activate shader program

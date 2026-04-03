@@ -3,6 +3,9 @@
 from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class DrawRectangleOutline(Shader):
     """Draw a rectangle outline with specified color, position, and line width."""
@@ -20,7 +23,7 @@ class DrawRectangleOutline(Shader):
             line_width_y: Line width for horizontal lines in normalized coordinates
         """
         if not self.allocated or not self.shader_program:
-            print("DrawRectangleOutline shader not allocated or shader program missing.")
+            logger.warning("DrawRectangleOutline shader not allocated or shader program missing.")
             return
 
         glUseProgram(self.shader_program)

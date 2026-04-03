@@ -4,6 +4,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class JacobiPressure(Shader):
     """Jacobi iterative solver for Poisson pressure equation."""
@@ -24,10 +27,10 @@ class JacobiPressure(Shader):
             has_obstacles: When False, skip obstacle texture reads for performance
         """
         if not self.allocated or not self.shader_program:
-            print("JacobiPressure shader not allocated or shader program missing.")
+            logger.warning("JacobiPressure shader not allocated or shader program missing.")
             return
         if not source.allocated or not divergence.allocated or not obstacle.allocated:
-            print("JacobiPressure shader: input texture(s) not allocated.")
+            logger.warning("JacobiPressure shader: input texture(s) not allocated.")
             return
 
         # Compute Jacobi parameters

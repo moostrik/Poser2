@@ -8,6 +8,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class ChannelAddRegion(Shader):
     """Add source to a specific channel at a specific region."""
@@ -28,10 +31,10 @@ class ChannelAddRegion(Shader):
             strength: Multiplier for the addition
         """
         if not self.allocated or not self.shader_program:
-            print("ChannelAddRegion shader not allocated or shader program missing.")
+            logger.warning("ChannelAddRegion shader not allocated or shader program missing.")
             return
         if not dst.allocated or not src.allocated:
-            print("ChannelAddRegion shader: input textures not allocated.")
+            logger.warning("ChannelAddRegion shader: input textures not allocated.")
             return
 
         glUseProgram(self.shader_program)

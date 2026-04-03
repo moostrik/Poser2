@@ -3,10 +3,13 @@ from modules.gl.Shader import Shader, draw_quad
  # ...existing code...
 from random import random
 
+import logging
+logger = logging.getLogger(__name__)
+
 class Noise(Shader):
     def use(self) -> None:
         if not self.allocated or not self.shader_program:
-            print("Noise shader not allocated or shader program missing.")
+            logger.warning("Noise shader not allocated or shader program missing.")
             return
 
         # Activate shader program

@@ -2,7 +2,6 @@
 from queue import Queue, Empty
 from threading import Thread, Lock, Event
 import time
-import traceback
 
 # Third-party imports
 import numpy as np
@@ -12,6 +11,9 @@ import torch
 from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
 
 from .DetectionSettings import DetectionSettings
+
+import logging
+logger = logging.getLogger(__name__)
 
 # ImageNet normalization constants (RGB order) - scaled to [0,1] range
 IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(1, 3, 1, 1)
@@ -78,7 +80,7 @@ class ONNXDetection(Thread):
         self.join(timeout=2.0)
 
         if self.is_alive():
-            print("Warning: ONNX inference thread did not stop cleanly")
+            logger.warning("Warning: ONNX inference thread did not stop cleanly")
 
         try:
             self._callback_queue.put_nowait(None)
@@ -87,7 +89,7 @@ class ONNXDetection(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            print("Warning: ONNX callback thread did not stop cleanly")
+            logger.warning("Warning: ONNX callback thread did not stop cleanly")
 
     def run(self) -> None:
         self._setup()
@@ -103,9 +105,7 @@ class ONNXDetection(Thread):
             try:
                 self._process()
             except Exception as e:
-                print(f"ONNX Detection Error: {str(e)}")
-                traceback.print_exc()
-
+                logger.error(f"ONNX Detection Error: {str(e)}")
     def submit(self, input_batch: DetectionInput) -> None:
         """Submit batch for processing. Identical to MMDetection."""
         if self._shutdown_event.is_set():
@@ -116,7 +116,7 @@ class ONNXDetection(Thread):
 
         # Validate batch size
         if len(input_batch.gpu_images) > self._max_batch:
-            print(f"ONNX Detection Warning: Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
+            logger.warning(f"ONNX Detection Warning: Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: DetectionInput | None = None
 
@@ -125,7 +125,7 @@ class ONNXDetection(Thread):
                 dropped_batch = self._pending_batch
                 if self.verbose:
                     lag = int((time.time() - self._input_timestamp) * 1000)
-                    print(f"ONNX Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
+                    logger.info(f"ONNX Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -166,7 +166,7 @@ class ONNXDetection(Thread):
             # Verify CUDA provider is active
             providers_used = self._session.get_providers()
             if 'CUDAExecutionProvider' not in providers_used:
-                print("ONNX Detection WARNING: CUDA provider not available, using CPU")
+                logger.warning("ONNX Detection WARNING: CUDA provider not available, using CPU")
 
             # Determine model precision from 'input' tensor
             input_tensor = self._session.get_inputs()[0]  # First input is 'input'
@@ -224,12 +224,10 @@ class ONNXDetection(Thread):
             self._warmup()
 
             self._model_ready.set()
-            print(f"ONNX Detection: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
+            logger.info(f"ONNX Detection: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
 
         except Exception as e:
-            print(f"ONNX Detection Error: Failed to load model - {str(e)}")
-            traceback.print_exc()
-
+            logger.error(f"ONNX Detection Error: Failed to load model - {str(e)}")
     def _claim(self) -> DetectionInput | None:
         """Atomically get and clear pending batch."""
         with self._input_lock:
@@ -269,7 +267,7 @@ class ONNXDetection(Thread):
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            print("ONNX Detection Warning: Callback queue full")
+            logger.warning("ONNX Detection Warning: Callback queue full")
 
     def _infer(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray]:
         """Run inference on GPU images using IOBinding for zero-copy.
@@ -378,9 +376,7 @@ class ONNXDetection(Thread):
             keypoints, scores = self._infer(dummy_images)
 
         except Exception as e:
-            print(f"ONNX Detection: Warmup failed (non-critical) - {str(e)}")
-            traceback.print_exc()
-
+            logger.info(f"ONNX Detection: Warmup failed (non-critical) - {str(e)}")
     # CALLBACK METHODS
     def register_callback(self, callback: PoseDetectionOutputCallback) -> None:
         """Register callback to receive results."""
@@ -408,9 +404,7 @@ class ONNXDetection(Thread):
                     try:
                         callback(output)
                     except Exception as e:
-                        print(f"ONNX Detection Callback Error: {str(e)}")
-                        traceback.print_exc()
-
+                        logger.exception("Error in callback")
                 self._callback_queue.task_done()
             except Empty:
                 continue

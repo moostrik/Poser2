@@ -8,6 +8,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class AddRegion(Shader):
     """Add source texture to a specific region of destination."""
@@ -27,10 +30,10 @@ class AddRegion(Shader):
             src_strength: Multiplier for source texture
         """
         if not self.allocated or not self.shader_program:
-            print("BlendRegion shader not allocated or shader program missing.")
+            logger.warning("BlendRegion shader not allocated or shader program missing.")
             return
         if not dst.allocated or not src.allocated:
-            print("BlendRegion shader: input textures not allocated.")
+            logger.warning("BlendRegion shader: input textures not allocated.")
             return
 
         glUseProgram(self.shader_program)

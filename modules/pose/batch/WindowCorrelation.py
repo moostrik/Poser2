@@ -2,7 +2,6 @@
 from enum import IntEnum
 import threading
 import time
-import traceback
 from typing import Optional, cast
 import warnings
 
@@ -20,6 +19,9 @@ from modules.pose.features.LeaderScore import configure_leader_score, LeaderScor
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 from modules.utils.HotReloadMethods import HotReloadMethods
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class _JointAggregator(NormalizedScalarFeature):
@@ -141,9 +143,7 @@ class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int
                 self._notify_callbacks(result)
 
             except Exception as e:
-                print(f"WindowCorrelation: Processing error: {e}")
-                traceback.print_exc()
-
+                logger.error(f"WindowCorrelation: Processing error: {e}")
     def _process(
         self,
         windows: FeatureWindowDict,
@@ -185,7 +185,7 @@ class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int
                         sim_val = sim_feature.values[other_id]
                         lead_val = leader_feature.values[other_id]
                         results.append(f"({track_id},{other_id}):corr={sim_val:.3f},lag={lead_val:+.2f}")
-            print(f"Pairs: {' | '.join(results)}")
+            logger.info(f"Pairs: {' | '.join(results)}")
 
         return similarity_dict, leader_dict
 

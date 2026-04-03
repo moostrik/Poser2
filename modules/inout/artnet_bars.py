@@ -15,6 +15,9 @@ from modules.settings import Settings, Field, Widget, Access
 from modules.utils.Color import Color
 from modules.inout.network_validation import validate_connection
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class ChannelOrder(IntEnum):
     """Common RGBW channel orderings for different LED strips.
@@ -144,8 +147,8 @@ class ArtNetBars:
         # Bind config changes to trigger immediate update
         self._setup_watchers()
 
-        print(f"ArtNetLed: Initialized for {config.ip_address} universes {config.base_universe}/{config.base_universe + 1}, "
-              f"{config.pixels} pixels/bar")
+        logger.info("Initialized for %s universes %s/%s, %s pixels/bar",
+                    config.ip_address, config.base_universe, config.base_universe + 1, config.pixels)
 
     def start(self) -> None:
         """Start the ArtNet output thread.
@@ -159,7 +162,7 @@ class ArtNetBars:
         self._thread = Thread(target=self._update_loop, daemon=True, name=f"ArtNetLed-{self._config.ip_address}")
         self._thread.start()
         if self._config.verbose:
-            print(f"ArtNetLed: Starting output to {self._config.ip_address}...")
+            logger.info(f"ArtNetLed: Starting output to {self._config.ip_address}...")
 
     def stop(self) -> None:
         """Stop the ArtNet output thread and blackout."""
@@ -181,7 +184,7 @@ class ArtNetBars:
         self._config.unbind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]
 
         if self._config.verbose:
-            print(f"ArtNetLed: Stopped output to {self._config.ip_address}")
+            logger.info(f"ArtNetLed: Stopped output to {self._config.ip_address}")
 
     def set_bar(self, value: float) -> None:
         """Set the bar fill level.
@@ -203,7 +206,7 @@ class ArtNetBars:
         if not enabled:
             self._blackout()
             if self._config.verbose:
-                print(f"ArtNetLed: Output disabled, LEDs blacked out")
+                logger.info(f"ArtNetLed: Output disabled, LEDs blacked out")
 
     def _on_config_change(self, _=None) -> None:
         """Called on any config change - mark dirty and wake thread."""
@@ -214,7 +217,7 @@ class ArtNetBars:
         """Reinitialize ArtNet connection after IP change with validation."""
         # Validate the new IP before reinitializing
         if not validate_connection(self._config.ip_address, 5568, "ArtNetLed"):
-            print(f"ArtNetLed WARNING: New IP {self._config.ip_address} is not reachable. Changes saved but output may fail.")
+            logger.warning(f"ArtNetLed WARNING: New IP {self._config.ip_address} is not reachable. Changes saved but output may fail.")
             # Don't return - still reinit so user can fix it later
 
         self._reinit_artnet()
@@ -227,14 +230,14 @@ class ArtNetBars:
             self._artnet.clear()  # Sync internal buffer to new packet_size
             self._buffer = bytearray(self._total_channels)
             if self._config.verbose:
-                print(f"ArtNetLed: Updated packet size to {self._total_channels} channels ({self._config.pixels} pixels/bar)")
+                logger.info(f"ArtNetLed: Updated packet size to {self._total_channels} channels ({self._config.pixels} pixels/bar)")
 
     def _update_universe(self) -> None:
         """Update universe when it changes."""
         with self._lock:
             self._artnet.set_universe(self._config.base_universe)
             if self._config.verbose:
-                print(f"ArtNetLed: Updated base universe to {self._config.base_universe}/{self._config.base_universe + 1}")
+                logger.info(f"ArtNetLed: Updated base universe to {self._config.base_universe}/{self._config.base_universe + 1}")
 
     def _reinit_artnet(self) -> None:
         """Full reinitialize for IP or FPS changes (requires new instance)."""
@@ -272,8 +275,9 @@ class ArtNetBars:
             )
 
             if self._config.verbose:
-                print(f"ArtNetLed: Recreated instance for {self._config.ip_address} universes {self._config.base_universe}/{self._config.base_universe + 1}, "
-                      f"{self._config.pixels} pixels/bar, {self._total_channels} channels, {self._config.fps} fps")
+                logger.info("Recreated instance for %s universes %s/%s, %s pixels/bar, %s channels, %s fps",
+                            self._config.ip_address, self._config.base_universe, self._config.base_universe + 1,
+                            self._config.pixels, self._total_channels, self._config.fps)
 
         # Restart if it was running
         if was_running:
@@ -281,7 +285,7 @@ class ArtNetBars:
             self._thread = Thread(target=self._update_loop, daemon=True, name=f"ArtNetLed-{self._config.ip_address}")
             self._thread.start()
             if self._config.verbose:
-                print(f"ArtNetLed: Restarted output thread")
+                logger.info(f"ArtNetLed: Restarted output thread")
 
     def _reinit_channel_order(self) -> None:
         """Update channel order parsing."""
@@ -289,9 +293,9 @@ class ArtNetBars:
             try:
                 self._channel_indices = _parse_channel_order(self._config.channel_order)
                 if self._config.verbose:
-                    print(f"ArtNetLed: Channel order updated to {self._config.channel_order.name}")
+                    logger.info(f"ArtNetLed: Channel order updated to {self._config.channel_order.name}")
             except ValueError as e:
-                print(f"ArtNetLed: Invalid channel order - {e}")
+                logger.warning(f"ArtNetLed: Invalid channel order - {e}")
 
     def _blackout(self) -> None:
         """Clear all pixels (set to 0) and send to both universes."""
@@ -403,11 +407,11 @@ class ArtNetBars:
                 self._update_event.wait(timeout=frame_time)
                 self._update_event.clear()
             except socket.error as e:
-                print(f"ArtNetLed ERROR: Socket error with exception: {e}")
+                logger.error(f"ArtNetLed ERROR: Socket error with exception: {e}")
                 self._running = False
                 break
             except Exception as e:
-                print(f"ArtNetLed: Error in update loop: {e}")
+                logger.error(f"ArtNetLed: Error in update loop: {e}")
 
         # Blackout after exiting the loop
         self._blackout()

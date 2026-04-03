@@ -2,6 +2,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class CelShade(Shader):
     """Cel shading with integrated color correction."""
@@ -12,10 +15,10 @@ class CelShade(Shader):
             levels: int = 4, smoothness: float = 0.1,
             saturation: float = 1.0) -> None:
         if not self.allocated or not self.shader_program:
-            print("CelShade shader not allocated or shader program missing.")
+            logger.warning("CelShade shader not allocated or shader program missing.")
             return
         if not tex.allocated:
-            print("CelShade shader: input texture not allocated.")
+            logger.warning("CelShade shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

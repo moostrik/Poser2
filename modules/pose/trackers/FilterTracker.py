@@ -1,11 +1,13 @@
 """Tracks and filters multiple poses independently."""
 
-from traceback import print_exc
 from typing import Any, Callable
 
 from .TrackerBase import TrackerBase
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, FrameDict
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class FilterTracker(TrackerBase):
@@ -49,8 +51,7 @@ class FilterTracker(TrackerBase):
                     filtered_pose = filter_node.process(filtered_pose)
                 filtered_poses[id] = filtered_pose
             except Exception as e:
-                print(f"FilterTracker: Error processing pose {id}: {e}")
-                print_exc()
+                logger.error(f"FilterTracker: Error processing pose {id}: {e}")
                 filtered_poses[id] = pose
 
         self._notify_frames_callbacks(filtered_poses)

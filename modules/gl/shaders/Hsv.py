@@ -2,13 +2,16 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 class Hsv(Shader):
     def use(self, tex0: Texture, hue: float, saturation: float, value: float) -> None:
         if not self.allocated or not self.shader_program:
-            print("Hsv shader not allocated or shader program missing.")
+            logger.warning("Hsv shader not allocated or shader program missing.")
             return
         if not tex0.allocated:
-            print("Hsv shader: input texture not allocated.")
+            logger.warning("Hsv shader: input texture not allocated.")
             return
 
         # Activate shader program

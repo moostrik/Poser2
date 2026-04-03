@@ -2,6 +2,9 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 class HDTTripleBlend(Shader):
     def use(self,
             tex0: Texture, tex1: Texture, tex2: Texture,
@@ -9,13 +12,13 @@ class HDTTripleBlend(Shader):
             blend0: float, blend1: float, blend2: float,
             c1, c2, c3) -> None:
         if not self.allocated or not self.shader_program:
-            print("HDTTripleBlend shader not allocated or shader program missing.")
+            logger.warning("HDTTripleBlend shader not allocated or shader program missing.")
             return
         if not tex0.allocated or not tex1.allocated or not tex2.allocated:
-            print("HDTTripleBlend shader: one or more input textures not allocated.")
+            logger.warning("HDTTripleBlend shader: one or more input textures not allocated.")
             return
         if not mask0.allocated or not mask1.allocated or not mask2.allocated:
-            print("HDTTripleBlend shader: one or more mask textures not allocated.")
+            logger.warning("HDTTripleBlend shader: one or more mask textures not allocated.")
             return
 
         # Activate shader program

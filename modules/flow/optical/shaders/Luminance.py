@@ -8,6 +8,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Luminance(Shader):
     """Convert RGB texture to luminance (grayscale) with optional Y-flip for Image textures."""
@@ -20,10 +23,10 @@ class Luminance(Shader):
             source_tex: Source RGB texture
         """
         if not self.allocated or not self.shader_program:
-            print("Luminance shader not allocated or shader program missing.")
+            logger.warning("Luminance shader not allocated or shader program missing.")
             return
         if not source_tex.allocated:
-            print("Luminance shader: input texture not allocated.")
+            logger.warning("Luminance shader: input texture not allocated.")
             return
 
         # Activate shader program

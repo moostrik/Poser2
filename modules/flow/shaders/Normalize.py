@@ -7,6 +7,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Normalize(Shader):
     """Normalize vectors to unit length."""
@@ -18,10 +21,10 @@ class Normalize(Shader):
             source: Source texture
         """
         if not self.allocated or not self.shader_program:
-            print("Normalize shader not allocated or shader program missing.")
+            logger.warning("Normalize shader not allocated or shader program missing.")
             return
         if not source.allocated:
-            print("Normalize shader: input texture not allocated.")
+            logger.warning("Normalize shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

@@ -2,7 +2,9 @@
 
 from threading import Lock
 from typing import Callable, Generic, TypeVar
-from traceback import print_exc
+
+import logging
+logger = logging.getLogger(__name__)
 
 T = TypeVar('T')
 Callback = Callable[[T], None]
@@ -22,9 +24,7 @@ class TypedCallbackMixin(Generic[T]):
                 try:
                     callback(output)
                 except Exception as e:
-                    print(f"{self.__class__.__name__}: Error in callback: {e}")
-                    print_exc()
-
+                    logger.exception("Error in callback")
     def add_callback(self, callback: Callback) -> None:
         """Register output callback."""
         with self._typed_callback_lock:

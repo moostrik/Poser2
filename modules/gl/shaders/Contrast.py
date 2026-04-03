@@ -2,13 +2,16 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 class Contrast(Shader):
     def use(self, tex0: Texture, brightness: float, contrast: float) -> None:
         if not self.allocated or not self.shader_program:
-            print("Contrast shader not allocated or shader program missing.")
+            logger.warning("Contrast shader not allocated or shader program missing.")
             return
         if not tex0.allocated:
-            print("Contrast shader: input texture not allocated.")
+            logger.warning("Contrast shader: input texture not allocated.")
             return
 
         # Activate shader program

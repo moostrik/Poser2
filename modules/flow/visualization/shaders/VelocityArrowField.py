@@ -8,6 +8,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class VelocityArrowField(Shader):
     """Visualize velocity field using procedural arrows.
@@ -28,10 +31,10 @@ class VelocityArrowField(Shader):
             arrow_thickness: Arrow line thickness in pixels
         """
         if not self.allocated or not self.shader_program:
-            print("VelocityArrowField shader not allocated or shader program missing.")
+            logger.warning("VelocityArrowField shader not allocated or shader program missing.")
             return
         if not velocity_tex.allocated:
-            print("VelocityArrowField shader: input texture not allocated.")
+            logger.warning("VelocityArrowField shader: input texture not allocated.")
             return
 
         viewport = glGetIntegerv(GL_VIEWPORT)

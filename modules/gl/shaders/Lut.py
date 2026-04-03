@@ -4,6 +4,9 @@ from modules.gl import Texture
 import numpy as np
 from pathlib import Path
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Lut(Shader):
     """
@@ -52,17 +55,17 @@ class Lut(Shader):
         """
         path = Path(filepath)
         if not path.exists():
-            print(f"Lut: File not found: {filepath}")
+            logger.warning("Lut: File not found: %s", filepath)
             return False
 
         if path.suffix.lower() != '.cube':
-            print(f"Lut: Unsupported file format: {path.suffix}")
+            logger.warning("Lut: Unsupported file format: %s", path.suffix)
             return False
 
         try:
             lut_data, size, title, domain_min, domain_max = self._parse_cube_file(path)
         except Exception as e:
-            print(f"Lut: Failed to parse .cube file: {e}")
+            logger.error("Lut: Failed to parse .cube file: %s", e)
             return False
 
         # Clean up existing LUT texture if one was loaded
@@ -78,7 +81,7 @@ class Lut(Shader):
         self._domain_max = domain_max
         self._lut_loaded = True
 
-        print(f"Lut: Loaded '{title}' ({size}x{size}x{size})")
+        logger.info("Lut: Loaded '%s' (%sx%sx%s)", title, size, size, size)
         return True
 
     def _parse_cube_file(self, path: Path) -> tuple[np.ndarray, int, str, tuple, tuple]:
@@ -185,7 +188,7 @@ class Lut(Shader):
             return True
 
         except Exception as e:
-            print(f"Lut: Failed to create 3D texture: {e}")
+            logger.error("Lut: Failed to create 3D texture: %s", e)
             if self._lut_tex_id:
                 glDeleteTextures(1, [self._lut_tex_id])
                 self._lut_tex_id = 0
@@ -213,13 +216,13 @@ class Lut(Shader):
             strength: Blend strength between original (0.0) and LUT result (1.0)
         """
         if not self.allocated or not self.shader_program:
-            print("Lut shader not allocated or shader program missing.")
+            logger.warning("Lut shader not allocated or shader program missing.")
             return
         if not tex0.allocated:
-            print("Lut shader: input texture not allocated.")
+            logger.warning("Lut shader: input texture not allocated.")
             return
         if not self._lut_loaded:
-            print("Lut shader: no LUT loaded. Call load_cube() first.")
+            logger.warning("Lut shader: no LUT loaded. Call load_cube() first.")
             return
 
         # Activate shader program

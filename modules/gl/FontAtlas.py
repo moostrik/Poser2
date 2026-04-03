@@ -5,8 +5,11 @@ characters. Glyph metrics are stored for text rendering.
 """
 
 from dataclasses import dataclass
+import logging
 from pathlib import Path
 from typing import Dict
+
+logger = logging.getLogger(__name__)
 
 import freetype
 import numpy as np
@@ -56,14 +59,14 @@ class FontAtlas:
         """
         font_path = Path(font_path)
         if not font_path.exists():
-            print(f"FontAtlas: Font file not found: {font_path}")
+            logger.error("Font file not found: %s", font_path)
             return False
 
         try:
             face = freetype.Face(str(font_path))
             face.set_pixel_sizes(0, font_size)
         except Exception as e:
-            print(f"FontAtlas: Failed to load font: {e}")
+            logger.error("Failed to load font: %s", e)
             return False
 
         # Printable ASCII characters

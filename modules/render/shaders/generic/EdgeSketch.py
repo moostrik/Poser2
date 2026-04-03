@@ -2,16 +2,19 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class EdgeSketch(Shader):
     """Sobel edge detection shader for sketch/contour effect."""
 
     def use(self, tex: Texture, threshold: float = 0.1, strength: float = 1.0, invert: bool = False) -> None:
         if not self.allocated or not self.shader_program:
-            print("EdgeSketch shader not allocated or shader program missing.")
+            logger.warning("EdgeSketch shader not allocated or shader program missing.")
             return
         if not tex.allocated:
-            print("EdgeSketch shader: input texture not allocated.")
+            logger.warning("EdgeSketch shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

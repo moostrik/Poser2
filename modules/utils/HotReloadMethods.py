@@ -5,7 +5,6 @@ import inspect
 import os
 import sys
 import time
-import traceback
 from dataclasses import dataclass
 from enum import Enum, auto
 from importlib.machinery import ModuleSpec
@@ -17,6 +16,9 @@ from typing import Any, Callable, ClassVar, Dict, List, Optional, Type
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.api import BaseObserver
+
+import logging
+logger = logging.getLogger(__name__)
 
 class MethodType(Enum):
     STATIC = auto()
@@ -172,12 +174,10 @@ class HotReloadMethods:
                 pass
                 # self._notify_file_changed_callbacks()
             else:
-                print(f"[{HotReloadMethods.__name__}] {self._target_class.__name__} No changes")
+                logger.debug(f"[{HotReloadMethods.__name__}] {self._target_class.__name__} No changes")
 
         except Exception as e:
-            print(f"[{HotReloadMethods.__name__}] {self._target_class.__name__} Error loading {self._file_module_path}: {e}")
-            traceback.print_exc()
-
+            logger.error(f"[{HotReloadMethods.__name__}] {self._target_class.__name__} Error loading {self._file_module_path}: {e}")
     def add_file_changed_callback(self, callback: Callable[[], None]) -> None:
         """Register a callback to be called after code reload."""
         self._on_reload_callbacks.append(callback)
@@ -187,7 +187,7 @@ class HotReloadMethods:
             try:
                 callback()
             except Exception as e:
-                print(f"[{self.__class__.__name__}] Error in reload callback: {e}")
+                logger.error(f"[{self.__class__.__name__}] Error in reload callback: {e}")
 
     @staticmethod
     def _load_module(module_name: str, file_path: str) -> Optional[ModuleType]:
@@ -200,7 +200,7 @@ class HotReloadMethods:
             # Get the original module to use its namespace (for imports)
             original_module = sys.modules.get(module_name)
             if original_module is None:
-                print(f"[{HotReloadMethods.__name__}] Original module {module_name} not found in sys.modules")
+                logger.warning(f"[{HotReloadMethods.__name__}] Original module {module_name} not found in sys.modules")
                 return None
 
             # Parse the source to extract class definitions and module-level assignments
@@ -219,7 +219,7 @@ class HotReloadMethods:
                     filtered_nodes.append(node)
 
             if not filtered_nodes:
-                print(f"[{HotReloadMethods.__name__}] No class definitions or constants found in {file_path}")
+                logger.info(f"[{HotReloadMethods.__name__}] No class definitions or constants found in {file_path}")
                 return None
 
             # Create a new module with only class definitions and constants
@@ -234,8 +234,7 @@ class HotReloadMethods:
             return original_module
 
         except Exception as e:
-            print(f"[{HotReloadMethods.__name__}] Error loading module {file_path}: {e}")
-            traceback.print_exc()
+            logger.error(f"[{HotReloadMethods.__name__}] Error loading module {file_path}: {e}")
             return None
 
     @staticmethod
@@ -263,11 +262,11 @@ class HotReloadMethods:
     def _get_methods_from_module(module: ModuleType, class_name: str) -> Optional[MethodMap]:
         """Extract methods from the class in a module."""
         if not hasattr(module, class_name):
-            print(f"[{HotReloadMethods.__name__}] Class {class_name} not found in module")
+            logger.warning(f"[{HotReloadMethods.__name__}] Class {class_name} not found in module")
             return None
         class_obj = getattr(module, class_name)
         if not inspect.isclass(class_obj):
-            print(f"[{HotReloadMethods.__name__}] {class_name} is not a class in module {module.__name__}")
+            logger.info(f"[{HotReloadMethods.__name__}] {class_name} is not a class in module {module.__name__}")
             return None
         return HotReloadMethods._get_methods_from_class(class_obj)
 
@@ -332,14 +331,14 @@ class HotReloadMethods:
         """Remove methods and constants that no longer exist in the updated code."""
         for name, info in deleted_methods.items():
             if hasattr(target_class, name):
-                print(f"[{HotReloadMethods.__name__}] {target_class.__name__} Remove {info.type.name} {'constant' if info.type == MethodType.CONSTANT else 'method'}: {name}")
+                logger.debug(f"[{HotReloadMethods.__name__}] {target_class.__name__} Remove {info.type.name} {'constant' if info.type == MethodType.CONSTANT else 'method'}: {name}")
                 delattr(target_class, name)
 
     @staticmethod
     def _update_methods(target_class: Type[Any], methods_to_update: Dict[str, MethodInfo]) -> None:
         """Update methods and constants that have changed."""
         for name, info in methods_to_update.items():
-            print(f"[{HotReloadMethods.__name__}] {target_class.__name__} Patch {info.type.name} {'constant' if info.type == MethodType.CONSTANT else 'method'}: {name}")
+            logger.debug(f"[{HotReloadMethods.__name__}] {target_class.__name__} Patch {info.type.name} {'constant' if info.type == MethodType.CONSTANT else 'method'}: {name}")
             if info.type == MethodType.STATIC:
                 setattr(target_class, name, staticmethod(info.func))
             elif info.type == MethodType.CLASS:
@@ -353,7 +352,7 @@ class HotReloadMethods:
     def _add_methods(target_class: Type[Any], methods_to_add: Dict[str, MethodInfo]) -> None:
         """Add methods and constants that are new in the updated code."""
         for name, info in methods_to_add.items():
-            print(f"[{HotReloadMethods.__name__}] {target_class.__name__} Add {info.type.name} {'constant' if info.type == MethodType.CONSTANT else 'method'}: {name}")
+            logger.debug(f"[{HotReloadMethods.__name__}] {target_class.__name__} Add {info.type.name} {'constant' if info.type == MethodType.CONSTANT else 'method'}: {name}")
             if info.type == MethodType.STATIC:
                 setattr(target_class, name, staticmethod(info.func))
             elif info.type == MethodType.CLASS:

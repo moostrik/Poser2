@@ -3,6 +3,9 @@
 from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class DrawCircles(Shader):
     """Draw up to 8 circles with individual positions, sizes, and colors."""
@@ -20,7 +23,7 @@ class DrawCircles(Shader):
             Maximum 8 circles supported.
         """
         if not self.allocated or not self.shader_program:
-            print("DrawCircles shader not allocated or shader program missing.")
+            logger.warning("DrawCircles shader not allocated or shader program missing.")
             return
 
         num_circles = min(len(positions), 8)

@@ -7,6 +7,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class ChannelCopy(Shader):
     """Copy single-channel texture to specific RGBA channel."""
@@ -20,10 +23,10 @@ class ChannelCopy(Shader):
             channel: Target channel index (0=R, 1=G, 2=B, 3=A)
         """
         if not self.allocated or not self.shader_program:
-            print("ChannelCopy shader not allocated or shader program missing.")
+            logger.warning("ChannelCopy shader not allocated or shader program missing.")
             return
         if not dst.allocated or not src.allocated:
-            print("ChannelCopy shader: input texture not allocated.")
+            logger.warning("ChannelCopy shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

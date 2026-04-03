@@ -13,6 +13,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture
 from modules.gl.ComputeShader import ComputeShader
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class JacobiPressureCompute(ComputeShader):
     """Compute shader Jacobi solver with shared memory tiling.
@@ -62,12 +65,12 @@ class JacobiPressureCompute(ComputeShader):
             swapping pressure_in/pressure_out each call.
         """
         if not self.allocated or not self.shader_program:
-            print("JacobiPressureCompute shader not allocated.")
+            logger.warning("JacobiPressureCompute shader not allocated.")
             return
 
         # Validate inputs
         if not all(t.allocated for t in [pressure_in, pressure_out, divergence, obstacle]):
-            print("JacobiPressureCompute: input texture(s) not allocated.")
+            logger.warning("JacobiPressureCompute: input texture(s) not allocated.")
             return
 
         # Compute Jacobi parameters (same as fragment shader version)

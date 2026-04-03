@@ -1,7 +1,7 @@
 # Standard library imports
+import logging
 from enum import IntEnum, auto
 from threading import Lock
-from traceback import print_exc
 from typing import Callable, Any
 
 # Third party imports
@@ -63,6 +63,8 @@ class PoseDataHubTypes(IntEnum):
 # SIMILARITY_ENUMS: set[DataType] = {DataType.sim_P, DataType.sim_M}
 
 class DataHub:
+    _logger = logging.getLogger(__name__)
+
     def __init__(self) -> None:
         self.mutex: Lock = Lock()
         self._data: dict[DataHubType, dict[int, Any]] = {}
@@ -189,8 +191,7 @@ class DataHub:
                 try:
                     callback()
                 except Exception as e:
-                    print(f"{self.__class__.__name__}: Error in callback: {e}")
-                    print_exc()
+                    self._logger.exception("Error in callback")
 
     def add_update_callback(self, callback: Callable) -> None:
         """Register output callback."""

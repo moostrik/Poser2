@@ -4,7 +4,6 @@ from enum import IntEnum, auto
 from queue import Queue, Empty
 from threading import Thread, Lock, Event
 import time
-import traceback
 from typing import Callable
 
 # Third-party imports
@@ -20,6 +19,9 @@ import torch
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
 
 from .DetectionSettings import DetectionSettings
+
+import logging
+logger = logging.getLogger(__name__)
 
 # MMDetection uses hardcoded RTMPose-L model paths
 POSE_MODEL_CONFIG = 'models/base/rtmpose-l_8xb256-420e_aic-coco-256x192.py'
@@ -102,7 +104,7 @@ class MMDetection(Thread):
         self.join(timeout=2.0)
 
         if self.is_alive():
-            print("Warning: Inference thread did not stop cleanly")
+            logger.warning("Warning: Inference thread did not stop cleanly")
 
         # Wake up callback thread with sentinel
         try:
@@ -112,7 +114,7 @@ class MMDetection(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            print("Warning: Callback thread did not stop cleanly")
+            logger.warning("Warning: Callback thread did not stop cleanly")
 
     def run(self) -> None:
         torch.cuda.set_device(0)
@@ -130,7 +132,7 @@ class MMDetection(Thread):
         pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline) # pyright: ignore
         self._model_warmup(model, pipeline, self.model_width, self.model_height, self.model_num_warmups)
         self._model_ready.set()  # Signal model is ready
-        print(f"PoseDetection: {self.resolution_name} model ready ({self.model_width}x{self.model_height})")
+        logger.info(f"PoseDetection: {self.resolution_name} model ready ({self.model_width}x{self.model_height})")
 
         while not self._shutdown_event.is_set():
             self._notify_update_event.wait()
@@ -144,9 +146,7 @@ class MMDetection(Thread):
                 self._process_pending_batch(model, pipeline, stream)
 
             except Exception as e:
-                print(f"Pose Detection Error: {str(e)}")
-                traceback.print_exc()
-
+                logger.error(f"Pose Detection Error: {str(e)}")
     def submit_batch(self, input_batch: DetectionInput) -> None:
         """Submit batch for processing. Replaces any pending (not yet started) batch.
 
@@ -162,7 +162,7 @@ class MMDetection(Thread):
                 dropped_batch = self._pending_batch
                 if self.verbose:
                     lag = int((time.time() - self._input_timestamp) * 1000)
-                    print(f"Pose Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
+                    logger.info(f"Pose Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -178,7 +178,7 @@ class MMDetection(Thread):
                 self._callback_queue.put_nowait(dropped_output)
             except:
                 if self.verbose:
-                    print("Pose Detection Warning: Callback queue full, not critical for dropped notifications")
+                    logger.warning("Pose Detection Warning: Callback queue full, not critical for dropped notifications")
                 pass  # Queue full, not critical for dropped notifications
 
         self._notify_update_event.set()
@@ -200,7 +200,7 @@ class MMDetection(Thread):
 
         if batch is None:
             if self.verbose:
-                print("Pose Detection Warning: No pending batch to process, this should not happen")
+                logger.warning("Pose Detection Warning: No pending batch to process, this should not happen")
             return
         output = DetectionOutput(batch_id=batch.batch_id, processed=True)
 
@@ -230,7 +230,7 @@ class MMDetection(Thread):
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            print("Pose Detection Warning: Callback queue full, dropping inference results")
+            logger.warning("Pose Detection Warning: Callback queue full, dropping inference results")
 
     # CALLBACK
     def _callback_worker_loop(self) -> None:
@@ -238,7 +238,7 @@ class MMDetection(Thread):
         while not self._shutdown_event.is_set():
             try:
                 if self._callback_queue.qsize() > 1:
-                    print("Pose Detection Warning: Callback queue size > 1, consumers may be falling behind")
+                    logger.warning("Pose Detection Warning: Callback queue size > 1, consumers may be falling behind")
 
                 output: DetectionOutput | None = self._callback_queue.get(timeout=0.5)
 
@@ -252,9 +252,7 @@ class MMDetection(Thread):
                     try:
                         callback(output)
                     except Exception as e:
-                        print(f"Pose Detection Callback Error: {str(e)}")
-                        traceback.print_exc()
-
+                        logger.exception("Error in callback")
                 self._callback_queue.task_done()
             except Empty:
                 continue

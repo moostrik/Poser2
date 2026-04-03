@@ -2,6 +2,9 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 import numpy as np
 
+import logging
+logger = logging.getLogger(__name__)
+
 class RStream(Shader):
     def __init__(self) -> None:
         super().__init__()
@@ -21,7 +24,7 @@ class RStream(Shader):
     def use(self, correlation_data: np.ndarray, pair_index: int, total_pairs: int,
             line_color: tuple = (1.0, 1.0, 1.0), line_width: float = 5.0) -> None:
         if not self.allocated or not self.shader_program or self.texture_id is None:
-            print("RStream shader not allocated, shader program missing, or texture not allocated.")
+            logger.warning("RStream shader not allocated, shader program missing, or texture not allocated.")
             return
 
         # Upload correlation data to texture

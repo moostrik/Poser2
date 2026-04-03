@@ -9,6 +9,9 @@ import time
 
 from ..camera.definitions import FrameType
 
+import logging
+logger = logging.getLogger(__name__)
+
 class HwAccelerationType(Enum):
     CPU =   0
     GPU =   1
@@ -71,10 +74,10 @@ class StreamReader:
 
     def play(self) -> None:
         if not self.is_loaded():
-            print('video not loaded')
+            logger.warning('video not loaded')
             return
         if self._play_thread is not None:
-            print('video already playing')
+            logger.warning('video already playing')
             return
 
         self._play_thread = Thread(target=self._play)
@@ -98,7 +101,7 @@ class StreamReader:
             if self.frame_rate == 0.0:
                 self.frame_rate = frame_rate
         except Exception as e:
-            print('Error getting video dimensions:', e)
+            logger.error('Error getting video dimensions:', e)
             self.ffmpeg_process = None
             return
 
@@ -125,7 +128,7 @@ class StreamReader:
                 )
 
         except ffmpeg.Error as e:
-            print('Error loading:', e)
+            logger.error('Error loading:', e)
             self.ffmpeg_process = None
 
         with self._load_lock:
@@ -134,7 +137,7 @@ class StreamReader:
 
     def _play(self) -> None:
         if self.ffmpeg_process is None:
-            print('video not loaded')
+            logger.warning('video not loaded')
             return
         frame_interval: float = 1.0 / self.frame_rate
 
@@ -148,7 +151,7 @@ class StreamReader:
                     # print ('End of stream', self.frame_type)
                     break
             except ffmpeg.Error as e:
-                print('Error reading frame:', e)
+                logger.error('Error reading frame:', e)
                 break
 
             if self.frame_type == FrameType.VIDEO:

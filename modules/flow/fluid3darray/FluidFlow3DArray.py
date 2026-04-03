@@ -23,7 +23,6 @@ Boundary conditions via per-field wrap modes (no explicit border obstacles):
 """
 from OpenGL.GL import *  # type: ignore
 import time
-import logging
 
 from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, Texture2DArray, SwapTexture2DArray
 from ..fluid.fluid_config import FluidFlowSettings, DepthSettings, VelocitySettings
@@ -44,6 +43,9 @@ _BARRIER_IMAGE: int = int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
 
 from modules.utils.HotReloadMethods import HotReloadMethods
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -675,7 +677,7 @@ class FluidFlow3DArray:
         lines.append(f"  {'TOTAL':<14s} {total:6.2f} ms  ({1000.0 / max(total, 0.001):.0f} fps budget)")
 
         logging.info("\n".join(lines))
-        print("\n".join(lines))
+        logger.debug("\n".join(lines))
 
         # Reset accumulators
         self._profile_frame_count = 0

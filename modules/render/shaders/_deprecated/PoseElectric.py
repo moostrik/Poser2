@@ -7,6 +7,9 @@ from modules.gl.Shader import Shader, draw_quad
 from modules.pose.frame import Frame
 from modules.pose.features import Points2D
 
+import logging
+logger = logging.getLogger(__name__)
+
 class PoseElectric(Shader):
     def __init__(self) -> None:
         super().__init__()
@@ -14,10 +17,10 @@ class PoseElectric(Shader):
 
     def use(self, pose: Frame) -> None:
         if not self.allocated or not self.shader_program:
-            print("PoseElectric shader not allocated or shader program missing.")
+            logger.warning("PoseElectric shader not allocated or shader program missing.")
             return
         if not pose:
-            print("PoseElectric shader: pose not provided.")
+            logger.warning("PoseElectric shader: pose not provided.")
             return
 
         points: Points2D = pose.points

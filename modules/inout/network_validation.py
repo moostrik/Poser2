@@ -4,6 +4,9 @@ import socket
 import ipaddress
 import subprocess
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 def validate_network(ip_address: str, port: int) -> bool:
     """Validate network connectivity by attempting socket connection.
@@ -83,16 +86,16 @@ def validate_connection(ip_address: str, port: int, class_name: str) -> bool:
     """
     # Check network first - if no network, nothing else matters
     if not validate_network(ip_address, port):
-        print(f"{class_name} ERROR: Network unreachable to {ip_address}:{port}. Stopping sender thread.")
+        logger.error(f"{class_name} ERROR: Network unreachable to {ip_address}:{port}. Stopping sender thread.")
         return False
 
     # Check IP format
     if not validate_ip(ip_address):
-        print(f"{class_name} ERROR: Invalid IP address format: {ip_address}")
+        logger.error(f"{class_name} ERROR: Invalid IP address format: {ip_address}")
         return False
 
     # Ping is optional - warn but don't fail
     if not ping_ip(ip_address):
-        print(f"{class_name} WARNING: IP {ip_address} is not reachable (ping failed). Device may appear later.")
+        logger.error(f"{class_name} WARNING: IP {ip_address} is not reachable (ping failed). Device may appear later.")
 
     return True

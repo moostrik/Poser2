@@ -2,6 +2,9 @@ import threading
 import numpy as np
 from typing import Optional
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class PerformanceTimer:
     """Track and report performance timing statistics over a rolling window."""
@@ -103,7 +106,7 @@ class PerformanceTimer:
         avg = self.get_average()
         min_time = self.get_minimum()
         max_time = self.get_maximum()
-        print(f"{self.color_start}{self.name}: avg={avg:.2f}ms, min={min_time:.2f}ms, max={max_time:.2f}ms{self.color_end}")
+        logger.info(f"{self.color_start}{self.name}: avg={avg:.2f}ms, min={min_time:.2f}ms, max={max_time:.2f}ms{self.color_end}")
 
     def reset(self) -> None:
         """Reset all timing data."""

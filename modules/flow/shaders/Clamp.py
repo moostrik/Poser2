@@ -7,6 +7,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Clamp(Shader):
     """Clamp texture values to a range."""
@@ -20,10 +23,10 @@ class Clamp(Shader):
             max_val: Maximum value for all channels
         """
         if not self.allocated or not self.shader_program:
-            print("Clamp shader not allocated or shader program missing.")
+            logger.warning("Clamp shader not allocated or shader program missing.")
             return
         if not src.allocated:
-            print("Clamp shader: input texture not allocated.")
+            logger.warning("Clamp shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

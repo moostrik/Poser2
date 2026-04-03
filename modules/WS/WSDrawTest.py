@@ -7,6 +7,9 @@ from modules.WS.WSOutput import WS_IMG_TYPE
 from modules.utils.HotReloadMethods import HotReloadMethods
 from typing import Optional
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class TestPattern(IntEnum):
     NONE = 0
@@ -67,7 +70,7 @@ class WSDrawTest():
             self.output_img[0, :, 0] = self.white_array[0, :]
             self.output_img[0, :, 1] = self.blue_array[0, :]
         except Exception as e:
-            print(f"[CompTest] Error generating pattern: {e}")
+            logger.error(f"[CompTest] Error generating pattern: {e}")
             # Clear output image to be safe
             self.output_img.fill(0)
 

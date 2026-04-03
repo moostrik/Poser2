@@ -2,13 +2,16 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 class MaskApply(Shader):
     def use(self, color: Texture, mask: Texture, multiply: float = 1.0) -> None:
         if not self.allocated or not self.shader_program:
-            print("MaskApply shader not allocated or shader program missing.")
+            logger.warning("MaskApply shader not allocated or shader program missing.")
             return
         if not color.allocated or not mask.allocated:
-            print("MaskApply shader: input textures not allocated.")
+            logger.warning("MaskApply shader: input textures not allocated.")
             return
 
         # Activate shader program

@@ -9,6 +9,9 @@ from modules.tracker.Tracklet import Tracklet, TrackingStatus
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+import logging
+logger = logging.getLogger(__name__)
+
 class OnePerCamTrackletManager:
     def __init__(self, max_players: int) -> None:
         self._lock = Lock()
@@ -25,11 +28,11 @@ class OnePerCamTrackletManager:
             id: int = tracklet.cam_id
 
             if id in self._tracklets:
-                print(f"ScreenBoundTrackletManager: Tracklet with cam_id {id} already exists. Skipping addition.")
+                logger.warning(f"ScreenBoundTrackletManager: Tracklet with cam_id {id} already exists. Skipping addition.")
                 return None
 
             if id >= self._max_size:
-                print(f"ScreenBoundTrackletManager: Tracklet with cam_id {id} exceeds max size {self._max_size}. Skipping addition.")
+                logger.warning(f"ScreenBoundTrackletManager: Tracklet with cam_id {id} exceeds max size {self._max_size}. Skipping addition.")
                 return None
 
             new_tracklet: Tracklet = replace(
@@ -45,7 +48,7 @@ class OnePerCamTrackletManager:
         with self._lock:
             tracklet: Tracklet | None = self._tracklets.pop(id, None)
             if tracklet is None:
-                print(f"TrackletManager: Attempted to remove non-existent tracklet with ID {id}.")
+                logger.warning(f"TrackletManager: Attempted to remove non-existent tracklet with ID {id}.")
 
     def get_tracklet(self, id: int) -> Optional[Tracklet]:
         with self._lock:
@@ -66,7 +69,7 @@ class OnePerCamTrackletManager:
         with self._lock:
             old_tracklet: Tracklet | None = self._tracklets.get(id)
             if old_tracklet is None:
-                print(f"TrackletManager: Attempted to replace non-existent tracklet with ID {id}.")
+                logger.warning(f"TrackletManager: Attempted to replace non-existent tracklet with ID {id}.")
                 return -1
 
             status: TrackingStatus = new_tracklet.status
@@ -93,7 +96,7 @@ class OnePerCamTrackletManager:
         with self._lock:
             tracklet: Tracklet | None = self._tracklets.get(id)
             if tracklet is None:
-                print(f"TrackletManager: Attempted to retire non-existent tracklet with ID {id}.")
+                logger.warning(f"TrackletManager: Attempted to retire non-existent tracklet with ID {id}.")
                 return
 
             removed_tracklet: Tracklet = replace(
@@ -107,7 +110,7 @@ class OnePerCamTrackletManager:
         with self._lock:
             tracklet: Tracklet | None = self._tracklets.get(id)
             if tracklet is None:
-                print(f"TrackletManager: Attempted to retire non-existent tracklet with ID {id}.")
+                logger.warning(f"TrackletManager: Attempted to retire non-existent tracklet with ID {id}.")
                 return
 
             removed_tracklet: Tracklet = replace(
@@ -131,7 +134,7 @@ class OnePerCamTrackletManager:
         with self._lock:
             tracklet: Tracklet | None = self._tracklets.get(id)
             if tracklet is None:
-                print(f"TrackletManager: Attempted to update metadata for non-existent tracklet with ID {id}.")
+                logger.warning(f"TrackletManager: Attempted to update metadata for non-existent tracklet with ID {id}.")
                 return
 
             updated_tracklet: Tracklet = replace(

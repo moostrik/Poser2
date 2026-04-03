@@ -7,6 +7,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Magnitude(Shader):
     """Compute vector magnitude from texture."""
@@ -18,10 +21,10 @@ class Magnitude(Shader):
             source: Source texture
         """
         if not self.allocated or not self.shader_program:
-            print("Magnitude shader not allocated or shader program missing.")
+            logger.warning("Magnitude shader not allocated or shader program missing.")
             return
         if not src.allocated:
-            print("Magnitude shader: input texture not allocated.")
+            logger.warning("Magnitude shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

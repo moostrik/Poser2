@@ -1,11 +1,8 @@
 # TODO
-#   better group lists
 # log visible in gui
 # what to do with mainsettings in tabs
-# refactor settings
 # share fps / frequencies across all settings
-# update all settings to use new system
-
+# better width handling in nice panel
 
 from modules.settings import Settings, NiceSettings, Field, Group
 from modules.oak import CameraSettings, FrameType, CoderFormat, SimulatorSettings, RecorderSettings, SyncSettings

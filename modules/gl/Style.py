@@ -4,8 +4,11 @@ Application-side state tracking to avoid expensive glGet* calls that cause CPU-G
 All state changes go through this module to keep shadow state in sync with actual GL state.
 """
 from OpenGL.GL import * # type: ignore
+import logging
 from dataclasses import dataclass
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class BlendMode(Enum):
@@ -64,7 +67,7 @@ def push_style() -> None:
 
     if len(_style_stack) > _MAX_STYLE_HISTORY:
         _style_stack.pop(0)
-        print(f"push_style(): maximum style stack depth {_MAX_STYLE_HISTORY} reached")
+        logger.warning("push_style(): maximum style stack depth %s reached", _MAX_STYLE_HISTORY)
 
 
 def pop_style() -> None:
@@ -72,7 +75,7 @@ def pop_style() -> None:
     global _current_state
 
     if not _style_stack:
-        print("pop_style() called without matching push_style()")
+        logger.warning("pop_style() called without matching push_style()")
         return
 
     state = _style_stack.pop()

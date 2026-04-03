@@ -17,6 +17,9 @@ from modules.utils.Timer import TimerState
 from modules.utils.HotReloadMethods import HotReloadMethods
 from modules.inout.network_validation import validate_connection
 
+import logging
+logger = logging.getLogger(__name__)
+
 class OscSoundSettings(Settings):
     ip_addresses: Field[str] = Field("127.0.0.1",               widget=Widget.ip_field,     description="Target OSC IP address")
     port: Field[int]         = Field(9000, min=1024, max=65535, widget=Widget.number_field, description="Target OSC port")
@@ -35,7 +38,7 @@ class OscSound:
         self._client_lock: Lock = Lock()
         self._client: SimpleUDPClient = SimpleUDPClient(self._config.ip_addresses, self._config.port)
 
-        print(f"SoundOSC: Initialized OSC client to {self._config.ip_addresses}:{self._config.port}")
+        logger.info(f"SoundOSC: Initialized OSC client to {self._config.ip_addresses}:{self._config.port}")
 
         self._config.bind(OscSoundSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
         self._config.bind(OscSoundSettings.port, self._on_connection_change)          # type: ignore[arg-type]
@@ -95,11 +98,11 @@ class OscSound:
                 try:
                     self._send_data()
                 except socket.error as e:
-                    print(f"ERROR: Socket error with exception: {e}")
+                    logger.error(f"ERROR: Socket error with exception: {e}")
                     self._running = False
                     break
                 except Exception as e:
-                    print(f"Error sending OSC data: {e}")
+                    logger.error(f"Error sending OSC data: {e}")
 
     def _send_data(self) -> None:
         t = perf_counter()
@@ -144,7 +147,7 @@ class OscSound:
     def _on_connection_change(self, _=None) -> None:
         with self._client_lock:
             self._client = SimpleUDPClient(self._config.ip_addresses, self._config.port)
-        print(f"SoundOSC: Reconnected to {self._config.ip_addresses}:{self._config.port}")
+        logger.info(f"SoundOSC: Reconnected to {self._config.ip_addresses}:{self._config.port}")
 
     @staticmethod
     def _build_inactive_message(id: int, bundle_builder: OscBundleBuilder, num_players: int) -> None:

@@ -2,6 +2,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class HueShift(Shader):
     """Shift image hue toward a target color while preserving luminance."""
@@ -10,10 +13,10 @@ class HueShift(Shader):
             target_r: float = 1.0, target_g: float = 0.0, target_b: float = 0.0,
             strength: float = 0.5) -> None:
         if not self.allocated or not self.shader_program:
-            print("HueShift shader not allocated or shader program missing.")
+            logger.warning("HueShift shader not allocated or shader program missing.")
             return
         if not tex.allocated:
-            print("HueShift shader: input texture not allocated.")
+            logger.warning("HueShift shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

@@ -1,6 +1,5 @@
 from dataclasses import replace
 from threading import Lock
-from traceback import print_exc
 from typing import Union
 
 import torch
@@ -15,6 +14,9 @@ from modules.utils.PerformanceTimer import PerformanceTimer
 from .InOut import SegmentationInput, SegmentationOutput
 from .ONNXSegmentation import ONNXSegmentation
 from .TRTSegmentation import TRTSegmentation
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 Segmentation = Union[ONNXSegmentation, TRTSegmentation]
@@ -152,9 +154,7 @@ class MaskBatchExtractor:
                 try:
                     callback(poses, gpu_frames)
                 except Exception as e:
-                    print(f"{self.__class__.__name__}: Error in callback: {e}")
-                    print_exc()
-
+                    logger.exception("Error in callback")
     def add_callback(self, callback: ImageFrameCallback) -> None:
         """Register callback to receive poses and GPU frames with masks."""
         with self._callback_lock:

@@ -2,6 +2,11 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import numpy as np
+
+import logging
+logger = logging.getLogger(__name__)
+
 
 class WindowShader(Shader):
     """Base class for feature window visualization shaders.
@@ -47,10 +52,10 @@ class WindowShader(Shader):
             colors: List of RGBA colors to cycle through (default orange/cyan)
         """
         if not self.allocated or not self.shader_program:
-            print(f"{self.__class__.__name__} shader not allocated or shader program missing.")
+            logger.warning(f"{self.__class__.__name__} shader not allocated or shader program missing.")
             return
         if not tex0.allocated:
-            print(f"{self.__class__.__name__} shader: input texture not allocated.")
+            logger.warning(f"{self.__class__.__name__} shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)
@@ -67,7 +72,6 @@ class WindowShader(Shader):
         glUniform2f(self.get_uniform_loc("display_range"), display_range[0], display_range[1])
 
         # Upload colors array
-        import numpy as np
         colors_array = np.array(colors, dtype=np.float32).flatten()
         glUniform4fv(self.get_uniform_loc("colors"), len(colors), colors_array)
         glUniform1i(self.get_uniform_loc("num_colors"), len(colors))

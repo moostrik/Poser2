@@ -3,10 +3,13 @@ from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 from modules.utils.PointsAndRects import Rect, Point2f
 
+import logging
+logger = logging.getLogger(__name__)
+
 class DrawRoi(Shader):
     def use(self, tex0: Texture, roi: Rect, rotation_radians: float = 0.0, rotation_center_texture_space: Point2f = Point2f(0.5, 0.5), texture_aspect: float = 1.0) -> None:
         if not self.allocated or not self.shader_program:
-            print("DrawRoi shader not allocated or shader program missing.")
+            logger.warning("DrawRoi shader not allocated or shader program missing.")
             return
         if not tex0.allocated:
             # print("DrawRoi shader: input texture not allocated.")

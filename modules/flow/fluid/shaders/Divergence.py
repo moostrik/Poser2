@@ -4,6 +4,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Divergence(Shader):
     """Compute velocity field divergence."""
@@ -23,10 +26,10 @@ class Divergence(Shader):
             has_obstacles: When False, skip obstacle texture reads for performance
         """
         if not self.allocated or not self.shader_program:
-            print("Divergence shader not allocated or shader program missing.")
+            logger.warning("Divergence shader not allocated or shader program missing.")
             return
         if not velocity.allocated or not obstacle.allocated:
-            print("Divergence shader: input texture(s) not allocated.")
+            logger.warning("Divergence shader: input texture(s) not allocated.")
             return
 
         glUseProgram(self.shader_program)

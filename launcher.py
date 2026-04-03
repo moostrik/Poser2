@@ -6,62 +6,7 @@ import os
 os.environ["PYTHONWARNINGS"] = "ignore::DeprecationWarning"
 
 
-import sys
 import logging
-from datetime import datetime
-from pathlib import Path
-
-
-# Tee class to write output to both console and log file
-class Tee:
-    def __init__(self, console, log_file):
-        self.console = console
-        self.log_file = log_file  # Binary unbuffered file
-
-    def write(self, data):
-        self.console.write(data)
-        self.log_file.write(data.encode('utf-8'))
-        return len(data)
-
-    def flush(self):
-        self.console.flush()
-        self.log_file.flush()
-
-    def isatty(self):
-        return self.console.isatty() if hasattr(self.console, 'isatty') else False
-
-
-# Setup logging to file with timestamp
-log_dir = Path(__file__).parent / "logs"
-log_dir.mkdir(exist_ok=True)
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_file = log_dir / f"poser_{timestamp}.log"
-
-# Binary unbuffered - writes immediately to disk, survives crashes
-log_handle = open(log_file, 'wb', buffering=0)
-
-# Save original stdout/stderr
-original_stdout = sys.stdout
-original_stderr = sys.stderr
-
-sys.stdout = Tee(original_stdout, log_handle)
-sys.stderr = Tee(original_stderr, log_handle)
-
-# Setup logging module
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s: %(message)s',
-    handlers=[
-        logging.StreamHandler(original_stdout),
-        logging.FileHandler(log_file, encoding='utf-8')
-    ]
-)
-
-logging.info(f"Logging to: {log_file}")
-logging.info(f"Process PID: {os.getpid()}")
-
-
-
 from threading import Event
 
 import psutil
@@ -70,9 +15,9 @@ p.nice(psutil.REALTIME_PRIORITY_CLASS)
 
 
 from argparse import ArgumentParser, Namespace
-from os import path
 from signal import signal, SIGINT
 
+from modules.log_config import setup_logging
 from modules.main import Main
 
 import multiprocessing as mp
@@ -88,9 +33,14 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecorded video with camera')
     parser.add_argument('-nc',      '--num_cameras',    type=int,   default=3,      help='set the number of cameras (default: 3)')
     parser.add_argument('-fps',     '--fps',            type=float, default=0.0,    help='set the frames per second for the camera and pose processing, 0 for settings default')
+    parser.add_argument('-v',       '--verbose',        action='store_true',        help='enable verbose (DEBUG) console output')
 
 
     args: Namespace = parser.parse_args()
+
+    log_file = setup_logging(verbose=args.verbose)
+    logging.info("Logging to: %s", log_file)
+    logging.info("Process PID: %s", os.getpid())
 
     app = Main(simulation=args.simulation, num_cameras=args.num_cameras, fps=args.fps)
     app.start()

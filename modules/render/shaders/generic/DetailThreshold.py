@@ -2,6 +2,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class DetailThreshold(Shader):
     """Adaptive threshold shader that preserves detail in high-contrast areas (faces)."""
@@ -9,10 +12,10 @@ class DetailThreshold(Shader):
     def use(self, tex: Texture, threshold: float = 0.5, detail_boost: float = 1.0,
             radius: float = 5.0, invert: bool = False) -> None:
         if not self.allocated or not self.shader_program:
-            print("DetailThreshold shader not allocated or shader program missing.")
+            logger.warning("DetailThreshold shader not allocated or shader program missing.")
             return
         if not tex.allocated:
-            print("DetailThreshold shader: input texture not allocated.")
+            logger.warning("DetailThreshold shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

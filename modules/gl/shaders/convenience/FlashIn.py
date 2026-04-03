@@ -2,13 +2,16 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 class FlashIn(Shader):
     def use(self, tex0: Texture, tex1: Texture, flash: float) -> None:
         if not self.allocated or not self.shader_program:
-            print("FlashIn shader not allocated or shader program missing.")
+            logger.warning("FlashIn shader not allocated or shader program missing.")
             return
         if not tex0.allocated or not tex1.allocated:
-            print("FlashIn shader: input textures not allocated.")
+            logger.warning("FlashIn shader: input textures not allocated.")
             return
 
         # Activate shader program

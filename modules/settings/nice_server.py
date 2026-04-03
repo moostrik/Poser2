@@ -71,8 +71,8 @@ class NiceServer:
         BLUE = "\033[94m" if use_ansi else ""
         RESET = "\033[0m" if use_ansi else ""
         for ip in _get_local_ips():
-            print(f"Settings UI: {BLUE}http://{ip}:{port}{RESET}", flush=True)
-        print(f"Settings UI: {BLUE}http://localhost:{port}{RESET}", flush=True)
+            logger.info("Settings UI: %shttp://%s:%s%s", BLUE, ip, port, RESET)
+        logger.info("Settings UI: %shttp://localhost:%s%s", BLUE, port, RESET)
 
     def stop(self) -> None:
         """Shut down the NiceGUI settings server."""

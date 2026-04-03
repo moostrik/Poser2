@@ -5,13 +5,16 @@ from modules.gl.Shader import Shader, draw_quad
 
 from modules.pose.features import Points2D
 
+import logging
+logger = logging.getLogger(__name__)
+
 class PosePointDots(Shader):
     def use(self, points: Points2D, dot_size: float = 0.01, dot_smooth: float = 0.01, color: tuple[float, float, float, float] | None = None) -> None:
         if not self.allocated or not self.shader_program:
-            print("PosePointDots shader not allocated or shader program missing.")
+            logger.warning("PosePointDots shader not allocated or shader program missing.")
             return
         if not points:
-            print("PosePointDots shader: points not provided.")
+            logger.warning("PosePointDots shader: points not provided.")
             return
 
         # Pack data: [x, y, score, visibility] per point

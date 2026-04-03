@@ -8,6 +8,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class GaussianBlur(Shader):
     """Separable Gaussian blur shader.
@@ -26,10 +29,10 @@ class GaussianBlur(Shader):
             horizontal: True for horizontal pass, False for vertical
         """
         if not self.allocated or not self.shader_program:
-            print("GaussianBlur shader not allocated or shader program missing.")
+            logger.warning("GaussianBlur shader not allocated or shader program missing.")
             return
         if not source_texture.allocated:
-            print("GaussianBlur shader: input texture not allocated.")
+            logger.warning("GaussianBlur shader: input texture not allocated.")
             return
         if radius <= 0:
             # No blur, just draw source

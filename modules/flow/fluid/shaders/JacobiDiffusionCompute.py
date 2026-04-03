@@ -13,6 +13,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture
 from modules.gl.ComputeShader import ComputeShader
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class JacobiDiffusionCompute(ComputeShader):
     """Compute shader Jacobi solver for diffusion with shared memory tiling.
@@ -56,12 +59,12 @@ class JacobiDiffusionCompute(ComputeShader):
             has_obstacles: When False, skip obstacle texture reads for performance
         """
         if not self.allocated or not self.shader_program:
-            print("JacobiDiffusionCompute shader not allocated.")
+            logger.warning("JacobiDiffusionCompute shader not allocated.")
             return
 
         # Validate inputs
         if not all(t.allocated for t in [velocity_in, velocity_out, obstacle]):
-            print("JacobiDiffusionCompute: input texture(s) not allocated.")
+            logger.warning("JacobiDiffusionCompute: input texture(s) not allocated.")
             return
 
         # Compute Jacobi parameters (same as fragment shader version)

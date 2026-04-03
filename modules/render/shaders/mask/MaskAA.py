@@ -2,13 +2,16 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 class MaskAA(Shader):
     def use(self, tex0: Texture, texel_size: tuple | None = None, blur_radius: float = 1.0, aa_mode: int = 1) -> None:
         if not self.allocated or not self.shader_program:
-            print("MaskAA shader not allocated or shader program missing.")
+            logger.warning("MaskAA shader not allocated or shader program missing.")
             return
         if not tex0.allocated:
-            print("MaskAA shader: input texture not allocated.")
+            logger.warning("MaskAA shader: input texture not allocated.")
             return
 
         if texel_size is None:

@@ -8,6 +8,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Set(Shader):
     """Multiply texture by scalar force value."""
@@ -20,10 +23,10 @@ class Set(Shader):
             force: Multiplier value
         """
         if not self.allocated or not self.shader_program:
-            print("MultiplyForce shader not allocated or shader program missing.")
+            logger.warning("MultiplyForce shader not allocated or shader program missing.")
             return
         if not src.allocated:
-            print("MultiplyForce shader: input texture not allocated.")
+            logger.warning("MultiplyForce shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

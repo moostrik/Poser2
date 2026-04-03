@@ -2,6 +2,9 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 class HDT_LineFields(Shader):
     def use(self,
             cam_tex_0: Texture, cam_tex_1: Texture, cam_tex_2: Texture, line_tex_l: Texture, line_tex_r: Texture,
@@ -9,7 +12,7 @@ class HDT_LineFields(Shader):
             cam_color_0: tuple[float, float, float, float], cam_color_1: tuple[float, float, float, float], cam_color_2: tuple[float, float, float, float],
             param_0: float, param_1: float, param_2: float) -> None:
         if not self.allocated or not self.shader_program:
-            print("HDT_LineFields shader not allocated or shader program missing.")
+            logger.warning("HDT_LineFields shader not allocated or shader program missing.")
             return
 
         # Activate shader program

@@ -19,6 +19,9 @@ from modules.utils.PerformanceTimer import PerformanceTimer
 from modules.oak.camera.definitions import FrameType
 from modules.settings import Settings, Field
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class ImageCropSettings(Settings):
     """Configuration for GPU-based image cropping."""
@@ -126,7 +129,7 @@ class ImageCropProcessor:
                     continue
 
                 if pose_count >= self._config.max_poses:
-                    print(f"GPUCropProcessor: Exceeded max poses ({self._config.max_poses}), skipping {pose_id}")
+                    logger.warning(f"GPUCropProcessor: Exceeded max poses ({self._config.max_poses}), skipping {pose_id}")
                     continue
 
                 try:
@@ -164,7 +167,7 @@ class ImageCropProcessor:
                     pose_count += 1
 
                 except Exception as e:
-                    print(f"GPUCropProcessor: Error processing pose {pose_id}: {e}")
+                    logger.error(f"GPUCropProcessor: Error processing pose {pose_id}: {e}")
 
             # Emit camera-only frames for cameras without poses
             # This ensures camera feeds remain visible even when no tracklets exist for that camera
@@ -190,7 +193,7 @@ class ImageCropProcessor:
             try:
                 callback(cropped_poses, gpu_frames)
             except Exception as e:
-                print(f"GPUCropProcessor: Error in callback: {e}")
+                logger.exception("Error in callback")
 
     def _calculate_crop_roi(self, bbox_rect: Rect, img_width: int, img_height: int) -> Rect:
         """Calculate crop region maintaining aspect ratio.

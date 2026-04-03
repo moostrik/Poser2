@@ -19,6 +19,9 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 from modules.WS.WSOutput import WSOutput, WS_IMG_TYPE
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 
 OscMessageList = list[Union[OscMessage, OscBundle]]  # Type alias for OSC messages or bundles
@@ -77,7 +80,7 @@ class WSUdpSenderSettings:
                     # print(f"Using perfect divisor: {divisor} chunks of size {chunk_size} bytes for {byte_length} bytes")
                     return chunk_size, divisor
 
-        print(f"No perfect divisor found for {byte_length} bytes, using maximum {min_chunks} chunks with a size of {max_chunk_size} bytes, totalling {min_chunks * max_chunk_size * byte_size} bytes")
+        logger.info(f"No perfect divisor found for {byte_length} bytes, using maximum {min_chunks} chunks with a size of {max_chunk_size} bytes, totalling {min_chunks * max_chunk_size * byte_size} bytes")
         return max_chunk_size, min_chunks
 
 
@@ -110,12 +113,12 @@ class WSUdpSender(threading.Thread):
         valid_ips: list[str] = [ip for ip in self.settings.ip_addresses if self._check_ip_adress_availability(ip)]
 
         if not valid_ips:
-            print("No valid IP addresses found. Exiting UdpSender thread.")
+            logger.info("No valid IP addresses found. Exiting UdpSender thread.")
             return
 
         for ip in valid_ips:
             self.osc_clients[ip] = UDPClient(ip, self.settings.port)
-        print(f"UDP SENDER: port {self.settings.port} and addresses {valid_ips}. Data is split in {self.settings._num_chunks} chunks of {self.settings._chunk_size} bytes each.")
+        logger.info(f"UDP SENDER: port {self.settings.port} and addresses {valid_ips}. Data is split in {self.settings._num_chunks} chunks of {self.settings._chunk_size} bytes each.")
 
         info_message: OscBundle = self._build_info_message(self.settings)
         self.osc_clients[ip].send(info_message)
@@ -132,7 +135,7 @@ class WSUdpSender(threading.Thread):
                             try:
                                 self.osc_clients[ip].send(message)
                             except Exception as e:
-                                print(f"Error sending message to {ip}: {e}")
+                                logger.error(f"Error sending message to {ip}: {e}")
             except queue.Empty:
                 continue
 
@@ -192,7 +195,7 @@ class WSUdpSender(threading.Thread):
             return message_list
 
         except Exception as e:
-            print(f"Error preparing data: {e}")
+            logger.error(f"Error preparing data: {e}")
             return None
 
     @staticmethod
@@ -281,7 +284,7 @@ class WSUdpSender(threading.Thread):
                     # print(f"Using perfect divisor: {divisor} chunks of size {chunk_size} bytes for {byte_length} bytes")
                     return chunk_size, divisor
 
-        print(f"No perfect divisor found for {byte_length} bytes, using maximum {min_chunks} chunks with a size of {max_chunk_size} bytes, totalling {min_chunks * max_chunk_size * byte_size} bytes")
+        logger.info(f"No perfect divisor found for {byte_length} bytes, using maximum {min_chunks} chunks with a size of {max_chunk_size} bytes, totalling {min_chunks * max_chunk_size * byte_size} bytes")
         return max_chunk_size, min_chunks
 
     @staticmethod
@@ -302,7 +305,7 @@ class WSUdpSender(threading.Thread):
         try:
             socket.inet_aton(ip_address)
         except socket.error:
-            print(f"WARNING: Invalid IP address format: {ip_address}")
+            logger.warning(f"WARNING: Invalid IP address format: {ip_address}")
             return False
 
         # For non-localhost addresses, try a simple ping test
@@ -313,8 +316,8 @@ class WSUdpSender(threading.Thread):
             if response == 0:
                 return True
             else:
-                print(f"WARNING: IP address {ip_address} is not reachable")
+                logger.warning(f"WARNING: IP address {ip_address} is not reachable")
                 return False
         except Exception as e:
-            print(f"WARNING: IP address {ip_address} check failed: {e}")
+            logger.error(f"WARNING: IP address {ip_address} check failed: {e}")
             return False

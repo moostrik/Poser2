@@ -8,6 +8,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class OpticalFlowMM(Shader):
     """Compute optical flow velocity field between two luminance frames."""
@@ -28,10 +31,10 @@ class OpticalFlowMM(Shader):
             power: Power curve for magnitude (related to boost)
         """
         if not self.allocated or not self.shader_program:
-            print("OpticalFlow shader not allocated or shader program missing.")
+            logger.warning("OpticalFlow shader not allocated or shader program missing.")
             return
         if not curr_tex.allocated or not prev_tex.allocated:
-            print("OpticalFlow shader: input textures not allocated.")
+            logger.warning("OpticalFlow shader: input textures not allocated.")
             return
 
         # Activate shader program

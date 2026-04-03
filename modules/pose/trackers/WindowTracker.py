@@ -1,11 +1,13 @@
 """Tracks pose windows for multiple tracks independently."""
 
-from traceback import print_exc
 from typing import Callable
 
 from .TrackerBase import TrackerBase
 from modules.pose.nodes.windows.WindowNode import WindowNode
 from modules.pose.frame import FrameDict, FeatureWindowDict, FeatureWindowDictCallbackMixin
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class WindowTracker(TrackerBase, FeatureWindowDictCallbackMixin):
@@ -49,9 +51,7 @@ class WindowTracker(TrackerBase, FeatureWindowDictCallbackMixin):
                 if window is not None:  # Only add if window was emitted
                     results[id] = window
             except Exception as e:
-                print(f"WindowTracker: Error processing pose {id}: {e}")
-                print_exc()
-
+                logger.error(f"WindowTracker: Error processing pose {id}: {e}")
         # Notify pose callbacks (for downstream pose processing)
         self._notify_frames_callbacks(poses)
 

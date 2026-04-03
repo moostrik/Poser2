@@ -8,6 +8,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class TemperatureBridge(Shader):
     """Temperature bridge: interprets RGB as warm/neutral/cold × mask."""
@@ -21,10 +24,10 @@ class TemperatureBridge(Shader):
             scale: Output multiplier
         """
         if not self.allocated or not self.shader_program:
-            print("TemperatureBridge shader not allocated or shader program missing.")
+            logger.warning("TemperatureBridge shader not allocated or shader program missing.")
             return
         if not color.allocated or not mask.allocated:
-            print("TemperatureBridge shader: input texture(s) not allocated.")
+            logger.warning("TemperatureBridge shader: input texture(s) not allocated.")
             return
 
         glUseProgram(self.shader_program)

@@ -8,6 +8,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class VelocityDirectionMap(Shader):
     """Visualize velocity field using HSV color encoding.
@@ -24,10 +27,10 @@ class VelocityDirectionMap(Shader):
             scale: Velocity scale multiplier
         """
         if not self.allocated or not self.shader_program:
-            print("VelocityDirectionMap shader not allocated or shader program missing.")
+            logger.warning("VelocityDirectionMap shader not allocated or shader program missing.")
             return
         if not velocity_tex.allocated:
-            print("VelocityDirectionMap shader: input texture not allocated.")
+            logger.warning("VelocityDirectionMap shader: input texture not allocated.")
             return
 
         # Activate shader program

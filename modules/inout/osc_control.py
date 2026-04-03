@@ -10,6 +10,9 @@ from pythonosc.dispatcher import Dispatcher
 
 from modules.settings import Settings, Field, Widget
 
+import logging
+logger = logging.getLogger(__name__)
+
 class OscControlSettings(Settings):
     port_in        = Field(9000, min=1024, max=65535, access=Field.INIT, widget=Widget.number, description="Incoming OSC port")
     ip_address_in  = Field("127.0.0.1",              access=Field.INIT, widget=Widget.ip_field,     description="Incoming OSC IP address")
@@ -46,10 +49,10 @@ class OscControl:
 
     def _osc_handler(self, client_address, address, *args) -> None:
         if client_address[0] != self.config.ip_address_in:
-            print(f"ControlOsc: Ignoring message from unauthorized IP: {client_address[0]}")
+            logger.info(f"ControlOsc: Ignoring message from unauthorized IP: {client_address[0]}")
             return
 
-        print(f"ControlOsc: From {client_address}: {address} {args}")
+        logger.info(f"ControlOsc: From {client_address}: {address} {args}")
 
         if self.config.return_messages:
             self.osc_return_client.send_message(address, args)

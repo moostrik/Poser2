@@ -4,6 +4,9 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class BlitFlip(Shader):
     """Copy texture to target with optional X/Y flip."""
@@ -17,10 +20,10 @@ class BlitFlip(Shader):
             flip_y: Flip vertically if True
         """
         if not self.allocated or not self.shader_program:
-            print("BlitFlip shader not allocated or shader program missing.")
+            logger.warning("BlitFlip shader not allocated or shader program missing.")
             return
         if not tex.allocated:
-            print("BlitFlip shader: input texture not allocated.")
+            logger.warning("BlitFlip shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

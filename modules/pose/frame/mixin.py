@@ -1,10 +1,12 @@
 """Callback mixins for frame-related broadcasting."""
 
 from threading import Lock
-from traceback import print_exc
 
 from .frame import Frame, FrameCallback, FrameDict, FrameDictCallback
 from .window import FeatureWindowDict, FeatureWindowDictCallback, FrameWindowDict, FrameWindowDictCallback
+
+import logging
+logger = logging.getLogger(__name__)
 
 class FrameCallbackMixin:
     """Mixin providing callback management for single frame broadcasting.
@@ -42,10 +44,7 @@ class FrameCallbackMixin:
                 try:
                     callback(frame)
                 except Exception as e:
-                    print(f"{self.__class__.__name__}: Error in callback: {e}")
-                    print_exc()
-
-
+                    logger.exception("Error in callback")
     def add_frame_callback(self, callback: FrameCallback) -> None:
         """Register output callback.
 
@@ -101,9 +100,7 @@ class FrameDictCallbackMixin:
                 try:
                     callback(frames)
                 except Exception as e:
-                    print(f"{self.__class__.__name__}: Error in callback: {e}")
-                    print_exc()
-
+                    logger.exception("Error in callback")
     def add_frames_callback(self, callback: FrameDictCallback) -> None:
         """Register output callback.
 
@@ -140,9 +137,7 @@ class FeatureWindowDictCallbackMixin:
                 try:
                     callback(windows)
                 except Exception as e:
-                    print(f"{self.__class__.__name__}: Error in callback: {e}")
-                    print_exc()
-
+                    logger.exception("Error in callback")
     def add_windows_callback(self, callback: FeatureWindowDictCallback) -> None:
         with self._feature_window_callback_lock:
             self._feature_window_callbacks.add(callback)
@@ -169,9 +164,7 @@ class FrameWindowDictCallbackMixin:
                 try:
                     callback(windows)
                 except Exception as e:
-                    print(f"{self.__class__.__name__}: Error in callback: {e}")
-                    print_exc()
-
+                    logger.exception("Error in callback")
     def add_frame_windows_callback(self, callback: FrameWindowDictCallback) -> None:
         with self._frame_window_callback_lock:
             self._frame_window_callbacks.add(callback)

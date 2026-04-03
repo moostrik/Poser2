@@ -13,6 +13,9 @@ from pythonosc.udp_client import SimpleUDPClient
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 
+import logging
+logger = logging.getLogger(__name__)
+
 def make_file_name(c: int, t: FrameType, chunk: int, format: str) -> str:
     return f"{c}_{FRAME_TYPE_LABEL_DICT[t]}_{chunk:03d}{format}"
 
@@ -215,7 +218,7 @@ class Recorder(Thread):
 
     # OSC BRIDGE
     def _receive_osc(self, address, *args) -> None:
-        print(address, args)
+        logger.info(address, args)
         if address == '/group/id':
             self.set_group_id(args[0])
             self.settings.group_id = args[0]

@@ -5,6 +5,9 @@ from enum import Enum, IntEnum, auto
 from typing import Callable
 from depthai import Tracklet, TrackerType, ImgDetection, Rect, Point3f, Device, SpatialLocationCalculatorAlgorithm
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 YOLOV8_WIDE_5S: str = "yolov8n_coco_640x352_5S.blob"
 YOLOV8_WIDE_6S: str = "yolov8n_coco_640x352_6S.blob"
@@ -96,11 +99,11 @@ class Output(IntEnum):
 def get_device_list(verbose: bool = False) -> list[str]:
     device_list: list[str] = []
     if verbose:
-        print('-- CAMERAS --------------------------------------------------')
+        logger.info('-- CAMERAS --------------------------------------------------')
     for device in Device.getAllAvailableDevices():
         device_list.append(device.getMxId())
         if verbose:
-            print(f"Camera: {device.getMxId()} {device.state}")
+            logger.info(f"Camera: {device.getMxId()} {device.state}")
     if verbose:
-        print('-------------------------------------------------------------')
+        logger.info('-------------------------------------------------------------')
     return device_list

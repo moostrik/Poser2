@@ -1,5 +1,8 @@
 # Standard library imports
+import logging
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -79,7 +82,7 @@ class WSRenderManager(RenderBase):
         version = glGetString(GL_VERSION)
         if isinstance(version, bytes):
             opengl_version: str = version.decode("utf-8")
-            print("OpenGL version:", opengl_version)
+            logger.info("OpenGL version: %s", opengl_version)
         else:
             raise RuntimeError("OpenGL context is not valid")
 
