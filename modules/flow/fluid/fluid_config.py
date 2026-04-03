@@ -4,7 +4,7 @@ Groups fields by physical domain (velocity, density, temperature, pressure)
 with prefixes stripped — the group name provides context.
 """
 
-from modules.settings import Field, Settings, Widget
+from modules.settings import Field, Settings, Widget, Group
 
 
 class VelocitySettings(Settings):
@@ -84,8 +84,8 @@ class FluidFlowSettings(Settings):
     speed: Field[float]             = Field(1.0,    min=0.0,    max=5.0,    description="Base fluid transport rate")
 
     # ---- Field groups ----
-    depth:       DepthSettings
-    velocity:    VelocitySettings
-    density:     DensitySettings
-    temperature: TemperatureSettings
-    pressure:    PressureSettings
+    depth: Group[DepthSettings]             = Group(DepthSettings)
+    velocity: Group[VelocitySettings]       = Group(VelocitySettings)
+    density: Group[DensitySettings]         = Group(DensitySettings)
+    temperature: Group[TemperatureSettings] = Group(TemperatureSettings)
+    pressure: Group[PressureSettings]       = Group(PressureSettings)

@@ -13,7 +13,7 @@ from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.data_hub import DataHub, Stage
 from modules.pose.frame import Frame
 
-from modules.settings import Field, Settings
+from modules.settings import Field, Settings, Group
 from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlowSettings
 from modules.render.shaders import DensityColorize
 
@@ -54,8 +54,8 @@ class FluidLayerSettings(Settings):
     draw_mode: Field[FluidDrawMode] =       Field(FluidDrawMode.DENSITY)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
 
-    fluid_flow:    FluidFlowSettings
-    visualisation: VisualisationFieldSettings
+    fluid_flow: Group[FluidFlowSettings]            = Group(FluidFlowSettings)
+    visualisation: Group[VisualisationFieldSettings]= Group(VisualisationFieldSettings)
 
 
 class FluidLayer(LayerBase):

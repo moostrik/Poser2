@@ -14,7 +14,7 @@ from modules.pose.frame import Frame
 
 from modules.render.layers.source.MaskSourceLayer import MaskSourceLayer
 
-from modules.settings import Field, Settings
+from modules.settings import Field, Settings, Group
 from modules.flow import (
     OpticalFlow, OpticalFlowSettings,
     VelocitySmoothTrail, SmoothTrailSettings,
@@ -60,11 +60,11 @@ class FlowLayerSettings(Settings):
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
 
-    visualisation:      VisualisationFieldSettings
-    optical_flow:       OpticalFlowSettings
-    velocity_trail:     SmoothTrailSettings
-    density_bridge:     DensityBridgeSettings
-    temperature_bridge: TemperatureBridgeSettings
+    visualisation      = Group(VisualisationFieldSettings)
+    optical_flow       = Group(OpticalFlowSettings)
+    velocity_trail     = Group(SmoothTrailSettings)
+    density_bridge     = Group(DensityBridgeSettings)
+    temperature_bridge = Group(TemperatureBridgeSettings)
 
 
 # Keep FlowSettings as alias for backward compatibility

@@ -10,6 +10,7 @@ from enum import Enum
 from modules.settings.field import Field
 from modules.settings.widget import Widget
 from modules.settings.settings import Settings
+from modules.settings.group import Group
 from modules.settings import presets
 from modules.utils import Color, Point2f, Rect
 
@@ -399,7 +400,7 @@ class TestPresetSaveLoad(unittest.TestCase):
 
     def _make_root(self):
         class Root(Settings):
-            camera: CameraSettings
+            camera = Group(CameraSettings)
         return Root()
 
     def test_save_and_load(self):
@@ -663,23 +664,23 @@ class InnerSettings(Settings):
 
 class OuterSettings(Settings):
     fps = Field(60.0, min=1.0, max=240.0)
-    inner: InnerSettings
+    inner = Group(InnerSettings)
 
 
 class DoubleChildSettings(Settings):
     name = Field("default")
-    alpha: InnerSettings
-    beta: InnerSettings
+    alpha = Group(InnerSettings)
+    beta = Group(InnerSettings)
 
 
 class MiddleSettings(Settings):
     weight = Field(0.5, min=0.0, max=1.0)
-    inner: InnerSettings
+    inner = Group(InnerSettings)
 
 
 class DeepSettings(Settings):
     label = Field("root")
-    middle: MiddleSettings
+    middle = Group(MiddleSettings)
 
 
 class TestChild(unittest.TestCase):
@@ -806,17 +807,17 @@ class TestChild(unittest.TestCase):
         self.assertIn("InnerSettings(...)", r)
         self.assertIn("fps=", r)
 
-    # -- Class-level attribute access (child type on the class) ----------------
+    # -- Class-level attribute access (Group descriptor on the class) --------
 
-    def test_class_level_annotation_exists(self):
-        ann = OuterSettings.__annotations__
-        self.assertIn("inner", ann)
+    def test_class_level_group_descriptor_exists(self):
+        desc = OuterSettings.__dict__.get("inner")
+        self.assertIsInstance(desc, Group)
 
     # -- Preset save/load with children -------------------------------------
 
     def test_save_load_with_children(self):
         class Root(Settings):
-            outer: OuterSettings
+            outer = Group(OuterSettings)
         root = Root()
         root.outer.fps = 30.0
         root.outer.inner.speed = 2.0
@@ -1851,7 +1852,7 @@ class TestUpdateFromDictEdgeCases(unittest.TestCase):
         s = OuterSettings()
         with self.assertLogs("modules.settings.settings", level="WARNING") as cm:
             s.update_from_dict({"inner": 42})
-        self.assertTrue(any("type mismatch for child 'inner'" in m for m in cm.output))
+        self.assertTrue(any("expected dict for child 'inner'" in m for m in cm.output))
         # inner should be unchanged
         self.assertEqual(s.inner.speed, 1.0)
 
@@ -1980,7 +1981,7 @@ class TestLoadReturnValue(unittest.TestCase):
 
     def _make_root(self):
         class Root(Settings):
-            camera: CameraSettings
+            camera = Group(CameraSettings)
         return Root()
 
     def test_load_success_returns_true(self):
@@ -2141,9 +2142,9 @@ class TestListCopyOnRead(unittest.TestCase):
         self.assertIsNot(s.ids, s.ids)
 
 
-# ── Child descriptor tests ────────────────────────────────────────────────
+# ── Group descriptor tests ────────────────────────────────────────────────
 
-from modules.settings.child import Child
+from modules.settings.group import Group
 
 
 class CoreSettings(Settings):
@@ -2161,18 +2162,18 @@ class PlayerSettings(Settings):
 class ParentWithChild(Settings):
     fps    = Field(30.0, access=Field.INIT)
     color  = Field(True, access=Field.INIT)
-    player = PlayerSettings(share=[])
-    cores  = CoreSettings(count=3, share=[fps, color])
+    player = Group(PlayerSettings)
+    core_0 = Group(CoreSettings, share=[fps, color])
+    core_1 = Group(CoreSettings, share=[fps, color])
+    core_2 = Group(CoreSettings, share=[fps, color])
+
+    @property
+    def cores(self) -> list[CoreSettings]:
+        return [self.core_0, self.core_1, self.core_2]
 
 
-class ParentWithFieldCount(Settings):
-    num   = Field(2, access=Field.INIT)
-    fps   = Field(60.0, access=Field.INIT)
-    items = CoreSettings(count=num, share=[fps])
-
-
-class TestChildDescriptorSingle(unittest.TestCase):
-    """Tests for Child(Type) — count=1, single instance."""
+class TestGroupSingle(unittest.TestCase):
+    """Tests for Group(Type) — single child instance."""
 
     def test_access(self):
         s = ParentWithChild()
@@ -2208,11 +2209,11 @@ class TestChildDescriptorSingle(unittest.TestCase):
         self.assertEqual(b.player.folder, "")
 
     def test_class_access_returns_descriptor(self):
-        self.assertIsInstance(ParentWithChild.__dict__["player"], Child)
+        self.assertIsInstance(ParentWithChild.__dict__["player"], Group)
 
 
-class TestChildDescriptorMulti(unittest.TestCase):
-    """Tests for Child(Type, count=N) — multiple children."""
+class TestGroupMulti(unittest.TestCase):
+    """Tests for named Group children accessed via property."""
 
     def test_count(self):
         s = ParentWithChild()
@@ -2225,12 +2226,12 @@ class TestChildDescriptorMulti(unittest.TestCase):
 
     def test_each_instance_independent(self):
         s = ParentWithChild()
-        s.cores[0].exposure = 500
-        self.assertEqual(s.cores[1].exposure, 1000)
+        s.core_0.exposure = 500
+        self.assertEqual(s.core_1.exposure, 1000)
 
-    def test_returns_tuple(self):
+    def test_returns_list(self):
         s = ParentWithChild()
-        self.assertIsInstance(s.cores, tuple)
+        self.assertIsInstance(s.cores, list)
 
     def test_parent_wired(self):
         s = ParentWithChild()
@@ -2240,10 +2241,10 @@ class TestChildDescriptorMulti(unittest.TestCase):
     def test_not_replaceable(self):
         s = ParentWithChild()
         with self.assertRaises(AttributeError):
-            s.cores = []
+            s.core_0 = CoreSettings()
 
 
-class TestChildShare(unittest.TestCase):
+class TestGroupShare(unittest.TestCase):
     """Tests for share=[fps, color] — parent pushes values to children."""
 
     def test_shared_values_propagated(self):
@@ -2261,8 +2262,8 @@ class TestChildShare(unittest.TestCase):
     def test_shared_excluded_from_child_serialization(self):
         s = ParentWithChild()
         d = s.to_dict()
-        # children serialized as list of dicts
-        for core_dict in d["cores"]:
+        for i in range(3):
+            core_dict = d[f"core_{i}"]
             self.assertNotIn("fps", core_dict)
             self.assertNotIn("color", core_dict)
             self.assertIn("exposure", core_dict)
@@ -2275,7 +2276,7 @@ class TestChildShare(unittest.TestCase):
 
     def test_non_shared_fields_not_affected(self):
         s = ParentWithChild()
-        self.assertEqual(s.cores[0].exposure, 1000)
+        self.assertEqual(s.core_0.exposure, 1000)
 
     def test_share_re_propagated_on_update_from_dict(self):
         s = ParentWithChild()
@@ -2285,57 +2286,33 @@ class TestChildShare(unittest.TestCase):
 
     def test_round_trip(self):
         s1 = ParentWithChild(fps=45.0, color=False)
-        s1.cores[0].exposure = 2000
-        s1.cores[2].exposure = 500
+        s1.core_0.exposure = 2000
+        s1.core_2.exposure = 500
         data = s1.to_dict()
 
         s2 = ParentWithChild()
         s2.update_from_dict(data)
         self.assertEqual(s2.fps, 45.0)
-        self.assertEqual(s2.cores[0].fps, 45.0)
-        self.assertEqual(s2.cores[0].exposure, 2000)
-        self.assertEqual(s2.cores[2].exposure, 500)
+        self.assertEqual(s2.core_0.fps, 45.0)
+        self.assertEqual(s2.core_0.exposure, 2000)
+        self.assertEqual(s2.core_2.exposure, 500)
 
 
-class TestChildFieldCount(unittest.TestCase):
-    """Tests for Child(Type, count=Field) — count from a Field reference."""
-
-    def test_default_count(self):
-        s = ParentWithFieldCount()
-        self.assertEqual(len(s.items), 2)
-
-    def test_kwarg_count(self):
-        s = ParentWithFieldCount(num=5)
-        self.assertEqual(len(s.items), 5)
-
-    def test_share_works_with_field_count(self):
-        s = ParentWithFieldCount(num=3, fps=120.0)
-        self.assertEqual(len(s.items), 3)
-        for item in s.items:
-            self.assertEqual(item.fps, 120.0)
-
-    def test_field_count_always_returns_tuple(self):
-        """Even when Field resolves to 1, count=Field means list mode."""
-        s = ParentWithFieldCount(num=1)
-        self.assertIsInstance(s.items, tuple)
-        self.assertEqual(len(s.items), 1)
-
-
-class TestChildSerialization(unittest.TestCase):
-    """Tests for to_dict / update_from_dict with Child descriptors."""
+class TestGroupSerialization(unittest.TestCase):
+    """Tests for to_dict / update_from_dict with Group descriptors."""
 
     def test_single_child_serializes_as_dict(self):
         s = ParentWithChild()
         d = s.to_dict()
         self.assertIsInstance(d["player"], dict)
 
-    def test_multi_child_serializes_as_list(self):
+    def test_named_children_serialize_as_dicts(self):
         s = ParentWithChild()
         d = s.to_dict()
-        self.assertIsInstance(d["cores"], list)
-        self.assertEqual(len(d["cores"]), 3)
+        for i in range(3):
+            self.assertIsInstance(d[f"core_{i}"], dict)
 
-    def test_initialize_recurses_into_multi_children(self):
+    def test_initialize_recurses_into_children(self):
         s = ParentWithChild()
         s.initialize()
         self.assertTrue(s._initialized)
@@ -2347,11 +2324,11 @@ class TestChildSerialization(unittest.TestCase):
         s = ParentWithChild()
         s.initialize()
         with self.assertRaises(AttributeError):
-            s.cores[0].fps = 999.0
+            s.core_0.fps = 999.0
 
 
-class TestChildRepr(unittest.TestCase):
-    """Tests for __repr__ with Child descriptors."""
+class TestGroupRepr(unittest.TestCase):
+    """Tests for __repr__ with Group descriptors."""
 
     def test_repr_single(self):
         s = ParentWithChild()
@@ -2361,12 +2338,11 @@ class TestChildRepr(unittest.TestCase):
     def test_repr_multi(self):
         s = ParentWithChild()
         r = repr(s)
-        self.assertIn("CoreSettings", r)
-        self.assertIn("3", r)
+        self.assertIn("core_0=CoreSettings(...)", r)
 
 
-class TestChildEquality(unittest.TestCase):
-    """Tests for __eq__ with Child descriptors."""
+class TestGroupEquality(unittest.TestCase):
+    """Tests for __eq__ with Group descriptors."""
 
     def test_equal(self):
         a = ParentWithChild()
@@ -2376,7 +2352,7 @@ class TestChildEquality(unittest.TestCase):
     def test_not_equal_field(self):
         a = ParentWithChild()
         b = ParentWithChild()
-        b.cores[0].exposure = 999
+        b.core_0.exposure = 999
         self.assertNotEqual(a, b)
 
     def test_not_equal_single_child(self):
@@ -2392,7 +2368,7 @@ class TestValidateShare(unittest.TestCase):
     def test_share_field_missing_from_parent(self):
         with self.assertRaises(TypeError) as ctx:
             class BadParent(Settings):
-                cores = CoreSettings(count=2, share=[CoreSettings.exposure])
+                core = Group(CoreSettings, share=[CoreSettings.exposure])
             BadParent()
         self.assertIn("not found on parent", str(ctx.exception))
 
@@ -2403,7 +2379,7 @@ class TestValidateShare(unittest.TestCase):
 
             class BadParent2(Settings):
                 fps = Field(30.0, access=Field.INIT)
-                items = ChildWithoutFps(count=2, share=[fps])
+                item = Group(ChildWithoutFps, share=[fps])
             BadParent2()
         self.assertIn("not found on child", str(ctx.exception))
 
@@ -2414,7 +2390,7 @@ class TestValidateShare(unittest.TestCase):
 
             class BadParent3(Settings):
                 fps = Field(30.0)  # float
-                items = ChildIntFps(count=2, share=[fps])
+                item = Group(ChildIntFps, share=[fps])
             BadParent3()
         self.assertIn("type mismatch", str(ctx.exception))
 
@@ -2423,18 +2399,6 @@ class TestValidateShare(unittest.TestCase):
         s = ParentWithChild()
         self.assertEqual(len(s.cores), 3)
 
-
-class TestLegacyAnnotationDeprecation(unittest.TestCase):
-    """Tests that annotation-based children still work but log a warning."""
-
-    def test_annotation_children_still_created(self):
-        """OuterSettings uses annotation syntax — should still work."""
-        cfg = OuterSettings()
-        self.assertIsInstance(cfg.inner, InnerSettings)
-
-    def test_annotation_children_have_parent(self):
-        cfg = OuterSettings()
-        self.assertIs(cfg.inner.parent, cfg)
 
 
 if __name__ == "__main__":

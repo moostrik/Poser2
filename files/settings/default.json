@@ -20,8 +20,7 @@
       "video_encoder": "iGPU",
       "video_chunk_length": 10.0
     },
-    "cameras": [
-      {
+    "cam_0": {
         "device_id": "14442C101136D1D200",
         "show_stereo": false,
         "manual": false,
@@ -48,8 +47,8 @@
         "stereo_brightness_min": 0,
         "stereo_brightness_max": 255,
         "stereo_median_filter": "OFF"
-      },
-      {
+    },
+    "cam_1": {
         "device_id": "14442C10F124D9D600",
         "show_stereo": false,
         "manual": false,
@@ -76,8 +75,8 @@
         "stereo_brightness_min": 0,
         "stereo_brightness_max": 255,
         "stereo_median_filter": "OFF"
-      },
-      {
+    },
+    "cam_2": {
         "device_id": "14442C10110AD3D200",
         "show_stereo": false,
         "manual": false,
@@ -104,8 +103,7 @@
         "stereo_brightness_min": 0,
         "stereo_brightness_max": 255,
         "stereo_median_filter": "OFF"
-      }
-    ],
+    },
     "simulator": {
       "folder": "20251212-130516_3_square_color_no_id",
       "range_start": 3,
@@ -536,7 +534,7 @@
       "width": 1080,
       "height": 1000,
       "secondary_list": [
-        "M1",
+        "M0",
         "M2",
         "M3"
       ]
@@ -549,62 +547,60 @@
       "stage": "LERP",
       "max_players": 3
     },
-    "artnets": [
-      {
-        "enabled": true,
-        "verbose": false,
-        "ip_address": "10.0.0.4",
-        "base_universe": 0,
-        "channel_order": "GRBW",
-        "fps": 40,
-        "pixels": 94,
-        "color": {
-          "r": 1.0,
-          "g": 0.0,
-          "b": 0.0,
-          "a": 1.0
-        },
-        "white_strength": 0.66,
-        "color_strength": 1.0,
-        "bar": 1.0
+    "artnet_0": {
+      "enabled": true,
+      "verbose": false,
+      "ip_address": "10.0.0.4",
+      "base_universe": 0,
+      "channel_order": "GRBW",
+      "fps": 40,
+      "pixels": 94,
+      "color": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 0.0,
+        "a": 1.0
       },
-      {
-        "enabled": true,
-        "verbose": false,
-        "ip_address": "10.0.0.5",
-        "base_universe": 0,
-        "channel_order": "GRBW",
-        "fps": 40,
-        "pixels": 94,
-        "color": {
-          "r": 0.0,
-          "g": 0.32,
-          "b": 1.0,
-          "a": 1.0
-        },
-        "white_strength": 0.66,
-        "color_strength": 1.0,
-        "bar": 1.0
+      "white_strength": 0.66,
+      "color_strength": 1.0,
+      "bar": 1.0
+    },
+    "artnet_1": {
+      "enabled": true,
+      "verbose": false,
+      "ip_address": "10.0.0.5",
+      "base_universe": 0,
+      "channel_order": "GRBW",
+      "fps": 40,
+      "pixels": 94,
+      "color": {
+        "r": 0.0,
+        "g": 0.32,
+        "b": 1.0,
+        "a": 1.0
       },
-      {
-        "enabled": true,
-        "verbose": false,
-        "ip_address": "10.0.0.6",
-        "base_universe": 0,
-        "channel_order": "GRBW",
-        "fps": 40,
-        "pixels": 94,
-        "color": {
-          "r": 0.68,
-          "g": 0.34,
-          "b": 0.0,
-          "a": 1.0
-        },
-        "white_strength": 0.66,
-        "color_strength": 1.0,
-        "bar": 1.0
-      }
-    ]
+      "white_strength": 0.66,
+      "color_strength": 1.0,
+      "bar": 1.0
+    },
+    "artnet_2": {
+      "enabled": true,
+      "verbose": false,
+      "ip_address": "10.0.0.6",
+      "base_universe": 0,
+      "channel_order": "GRBW",
+      "fps": 40,
+      "pixels": 94,
+      "color": {
+        "r": 0.68,
+        "g": 0.34,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "white_strength": 0.66,
+      "color_strength": 1.0,
+      "bar": 1.0
+    }
   },
   "server": {
     "title": "POSER",
