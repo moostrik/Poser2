@@ -161,58 +161,37 @@
       "enable_prev_crop": false,
       "verbose": false
     },
-    "window_similarity": {
-      "window_length": 11,
-      "method": "HARMONIC_MEAN",
-      "use_angle_similarity": true,
-      "angle_scale": 0.8,
-      "use_velocity_similarity": true,
-      "vel_scale": 1.0,
-      "use_motion_weighting": true,
-      "use_time_penalty": false,
-      "time_decay_exp": 2.5,
-      "remap_low": 0.0,
-      "remap_high": 0.75,
-      "enabled": false,
-      "verbose": false
-    },
-    "window_correlation": {
-      "window_length": 7,
-      "method": "HARMONIC_MEAN",
-      "max_lag": 7,
-      "min_variance": 0.01,
-      "use_motion_weighting": true,
-      "remap_low": 0.0,
-      "remap_high": 0.75,
-      "enabled": true,
-      "verbose": false
-    },
     "bbox": {
       "smoother": {
         "min_cutoff": 0.01,
         "beta": 0.2,
         "d_cutoff": 1.0
       },
+      "prediction": {
+        "method": "QUADRATIC"
+      },
       "interpolator": {
         "responsiveness": 0.16,
         "friction": 0.05
-      },
-      "prediction": {
-        "method": "QUADRATIC"
       }
     },
     "point": {
+      "confidence_filter": {
+        "threshold_low": 0.5,
+        "threshold_high": 0.6,
+        "rescale_scores": true
+      },
       "smoother": {
         "min_cutoff": 1.5,
         "beta": 5.0,
         "d_cutoff": 1.0
       },
+      "prediction": {
+        "method": "QUADRATIC"
+      },
       "interpolator": {
         "responsiveness": 0.5,
         "friction": 0.05
-      },
-      "prediction": {
-        "method": "QUADRATIC"
       }
     },
     "angle": {
@@ -221,31 +200,34 @@
         "beta": 0.7,
         "d_cutoff": 1.0
       },
-      "angle_vel_smoother": {
+      "prediction": {
+        "method": "QUADRATIC"
+      },
+      "interpolator": {
+        "responsiveness": 0.33,
+        "friction": 0.05
+      },
+      "sticky": {
+        "init_to_zero": false,
+        "hold_scores": true
+      }
+    },
+    "velocity": {
+      "smoother": {
         "min_cutoff": 0.5,
         "beta": 2.5,
         "d_cutoff": 1.0
       },
-      "interpolator": {
-        "responsiveness": 0.33,
-        "friction": 0.05
-      },
       "prediction": {
         "method": "QUADRATIC"
-      }
-    },
-    "similarity": {
-      "smoother": {
-        "min_cutoff": 0.01,
-        "beta": 0.4,
-        "d_cutoff": 1.0
       },
       "interpolator": {
         "responsiveness": 0.33,
         "friction": 0.05
       },
-      "prediction": {
-        "method": "QUADRATIC"
+      "sticky": {
+        "init_to_zero": true,
+        "hold_scores": false
       }
     },
     "motion": {
@@ -259,23 +241,46 @@
         "window_type": "UNIFORM"
       }
     },
-    "motion_gate": {},
-    "confidence_filter": {
-      "threshold_low": 0.5,
-      "threshold_high": 0.6,
-      "rescale_scores": true
-    },
-    "angle_sticky": {
-      "init_to_zero": false,
-      "hold_scores": true
-    },
-    "similarity_sticky": {
-      "init_to_zero": true,
-      "hold_scores": false
-    },
-    "angle_vel_sticky": {
-      "init_to_zero": true,
-      "hold_scores": false
+    "similarity": {
+      "window_similarity": {
+        "window_length": 11,
+        "method": "HARMONIC_MEAN",
+        "use_angle_similarity": true,
+        "angle_scale": 0.8,
+        "use_velocity_similarity": true,
+        "vel_scale": 1.0,
+        "use_motion_weighting": true,
+        "use_time_penalty": false,
+        "time_decay_exp": 2.5,
+        "remap_low": 0.0,
+        "remap_high": 0.75,
+        "enabled": false,
+        "verbose": false
+      },
+      "window_correlation": {
+        "window_length": 7,
+        "method": "HARMONIC_MEAN",
+        "max_lag": 7,
+        "min_variance": 0.01,
+        "use_motion_weighting": true,
+        "remap_low": 0.0,
+        "remap_high": 0.75,
+        "enabled": true,
+        "verbose": false
+      },
+      "smoother": {
+        "min_cutoff": 0.01,
+        "beta": 0.4,
+        "d_cutoff": 1.0
+      },
+      "interpolator": {
+        "responsiveness": 0.33,
+        "friction": 0.05
+      },
+      "sticky": {
+        "init_to_zero": true,
+        "hold_scores": false
+      }
     },
     "window_raw": {
       "window_size": 180

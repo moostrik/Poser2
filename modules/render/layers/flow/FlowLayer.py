@@ -54,11 +54,11 @@ class FlowDrawMode(IntEnum):
 
 class FlowLayerSettings(Settings):
     """Configuration for FlowLayer (optical flow + bridges)."""
-    fps = Field(60.0, min=1.0, max=240.0)
-    draw_mode = Field(FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR)
-    blend_mode = Field(Style.BlendMode.ADD)
-    width: Field[int] = Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
-    height: Field[int] = Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
+    fps: Field[float] =                     Field(60.0, min=1.0, max=240.0)
+    draw_mode: Field[FlowDrawMode] =        Field(FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR)
+    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
+    width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
+    height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
 
     visualisation:      VisualisationFieldSettings
     optical_flow:       OpticalFlowSettings

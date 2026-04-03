@@ -45,26 +45,59 @@ class InOutGroup(Settings):
     osc_sound:          OscSoundSettings
     artnets: list[ArtNetBarsSettings] = ArtNetBarsSettings(count=num_artnet)  # type: ignore[assignment]
 
-class SmoothedFeatureGroup(Settings):
+class BboxFeature(Settings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
 
     smoother            = nodes.EuroSmootherSettings(share=[frequency])
-    interpolator        = nodes.ChaseInterpolatorSettings(share=[frequency.as_('input_frequency'), output_frequency])
     prediction          = nodes.PredictorSettings(share=[frequency])
+    interpolator        = nodes.ChaseInterpolatorSettings(share=[frequency.as_('input_frequency'), output_frequency])
 
-class AngleFeatureGroup(Settings):
+class PointFeature(Settings):
+    frequency:          Field[float] = Field(30.0, access=Field.INIT)
+    output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
+
+    confidence_filter:  nodes.DualConfFilterSettings
+    smoother            = nodes.EuroSmootherSettings(share=[frequency])
+    prediction          = nodes.PredictorSettings(share=[frequency])
+    interpolator        = nodes.ChaseInterpolatorSettings(share=[frequency.as_('input_frequency'), output_frequency])
+
+class AngleFeature(Settings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
 
     smoother            = nodes.EuroSmootherSettings(share=[frequency])
-    angle_vel_smoother  = nodes.EuroSmootherSettings(share=[frequency])
-    interpolator        = nodes.ChaseInterpolatorSettings(share=[frequency.as_('input_frequency'), output_frequency])
     prediction          = nodes.PredictorSettings(share=[frequency])
+    interpolator        = nodes.ChaseInterpolatorSettings(share=[frequency.as_('input_frequency'), output_frequency])
+    sticky:             nodes.StickyFillerSettings
 
-class MotionGroup(Settings):
+class VelocityFeature(Settings):
+    frequency:          Field[float] = Field(30.0, access=Field.INIT)
+    output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
+
+    extractor           = nodes.AngleVelExtractorSettings(share=[frequency.as_('fps')])
+    smoother            = nodes.EuroSmootherSettings(share=[frequency])
+    prediction          = nodes.PredictorSettings(share=[frequency])
+    interpolator        = nodes.ChaseInterpolatorSettings(share=[frequency.as_('input_frequency'), output_frequency])
+    sticky:             nodes.StickyFillerSettings
+
+class MotionFeature(Settings):
     extractor:          nodes.AngleMotionExtractorSettings
     moving_average:     nodes.MovingAverageSettings
+
+class SimilarityFeature(Settings):
+    frequency:          Field[float] = Field(30.0, access=Field.INIT)
+    output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
+    max_poses:          Field[int]   = Field(3, min=1, max=16, access=Field.INIT)
+
+    window_similarity   = batch.WindowSimilaritySettings(share=[max_poses])
+    window_correlation  = batch.WindowCorrelationSettings(share=[max_poses])
+    similarity_applicator = nodes.SimilarityApplicatorSettings(share=[max_poses])
+    leader_applicator   = nodes.LeaderScoreApplicatorSettings(share=[max_poses])
+    smoother            = nodes.EuroSmootherSettings(share=[frequency])
+    interpolator        = nodes.ChaseInterpolatorSettings(share=[frequency.as_('input_frequency'), output_frequency])
+    sticky:             nodes.StickyFillerSettings
+    motion_gate         = nodes.MotionGateApplicatorSettings(share=[max_poses])
 
 class PoseGroup(Settings):
     max_poses:          Field[int]          = Field(3, min=1, max=16, access=Field.INIT)
@@ -78,26 +111,15 @@ class PoseGroup(Settings):
     segmentation        = batch.SegmentationSettings(share=[max_poses, model_type, model_path, verbose])
     flow                = batch.FlowSettings(share=[max_poses, model_type, model_path, verbose])
     image_crop          = batch.ImageCropSettings(share=[max_poses])
-    window_similarity   = batch.WindowSimilaritySettings(share=[max_poses])
-    window_correlation  = batch.WindowCorrelationSettings(share=[max_poses])
-    motion_gate         = nodes.MotionGateApplicatorSettings(share=[max_poses])
-    similarity_applicator = nodes.SimilarityApplicatorSettings(share=[max_poses])
-    leader_applicator   = nodes.LeaderScoreApplicatorSettings(share=[max_poses])
-    angle_vel_extractor = nodes.AngleVelExtractorSettings(share=[frequency.as_('fps')])
-    confidence_filter:  nodes.DualConfFilterSettings
-    bbox                = SmoothedFeatureGroup(share=[frequency, output_frequency])
-    point               = SmoothedFeatureGroup(share=[frequency, output_frequency])
-    angle               = AngleFeatureGroup(share=[frequency, output_frequency])
-    similarity          = SmoothedFeatureGroup(share=[frequency, output_frequency])
-    motion:             MotionGroup
-    angle_sticky:       nodes.StickyFillerSettings
-    similarity_sticky:  nodes.StickyFillerSettings
-    angle_vel_sticky:   nodes.StickyFillerSettings
+    bbox                = BboxFeature(share=[frequency, output_frequency])
+    point               = PointFeature(share=[frequency, output_frequency])
+    angle               = AngleFeature(share=[frequency, output_frequency])
+    velocity            = VelocityFeature(share=[frequency, output_frequency])
+    motion:             MotionFeature
+    similarity          = SimilarityFeature(share=[frequency, output_frequency, max_poses])
     window_raw:         trackers.WindowNodeSettings
     window_smooth:      trackers.WindowNodeSettings
     window_lerp:        trackers.WindowNodeSettings
-    # rate_limiter:     nodes.RateLimiterSettings
-    # easing:           nodes.EasingSettings
 
 class TTGroup(Settings):
     timer:              TimerSettings
