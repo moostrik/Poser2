@@ -259,15 +259,23 @@ class Settings:
     # -- Share propagation ---------------------------------------------------
 
     def _propagate_shared(self):
-        """Copy shared field values from this parent into its children."""
+        """Copy shared field values from this parent into its children.
+
+        INIT fields are skipped when the child is already initialized — they
+        were frozen by ``initialize()`` and cannot be changed at runtime.
+        """
         for name, child in self._children.items():
             desc = self._get_group_descriptor(name)
             if desc is None or not desc.share_map:
                 continue
             share_kwargs = desc.build_share_kwargs(self)
             for field_name, value in share_kwargs.items():
-                if field_name in child._fields:
-                    child._fields[field_name].set(child, value)
+                if field_name not in child._fields:
+                    continue
+                child_field = child._fields[field_name]
+                if child_field.access is Access.INIT and child._initialized:
+                    continue  # frozen — skip silently
+                child_field.set(child, value)
 
     # -- Helpers -------------------------------------------------------------
 

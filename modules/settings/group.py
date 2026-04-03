@@ -24,7 +24,7 @@ in the child::
 
 from typing import TYPE_CHECKING, Generic, TypeVar, overload, Sequence
 
-from modules.settings.field import Field, FieldAlias
+from modules.settings.field import Field, FieldAlias, Access
 
 if TYPE_CHECKING:
     from modules.settings.settings import Settings
@@ -84,7 +84,17 @@ class Group(Generic[T]):
     # -- Helpers used by Settings.__init__ -----------------------------------
 
     def validate_share(self, owner: 'Settings') -> None:
-        """Check that every shared field exists on both parent and child with matching types."""
+        """Check that every shared field exists on both parent and child with matching types and access modes.
+
+        Raises ``TypeError`` if:
+
+        - a parent field name is not found on the parent
+        - a child field name is not found on the child
+        - the field types don't match
+        - the parent field is ``INIT`` but the child field is not (shared INIT fields
+          must be INIT on the child too, otherwise ``_propagate_shared`` would attempt
+          to write a locked field after ``initialize()`` is called)
+        """
         child_fields = {
             name: f for cls in self.settings_type.__mro__
             for name, f in vars(cls).items()
@@ -101,12 +111,20 @@ class Group(Generic[T]):
                     f"{type(owner).__name__}.{self.name}: shared field '{child_name}' "
                     f"not found on child {self.settings_type.__name__}"
                 )
-            parent_type = owner._fields[parent_name].type_
-            child_type = child_fields[child_name].type_
+            parent_field = owner._fields[parent_name]
+            child_field = child_fields[child_name]
+            parent_type = parent_field.type_
+            child_type = child_field.type_
             if parent_type != child_type:
                 raise TypeError(
                     f"{type(owner).__name__}.{self.name}: type mismatch for shared field "
                     f"'{parent_name}' → '{child_name}' — parent {parent_type.__name__} != child {child_type.__name__}"
+                )
+            if parent_field.access is Access.INIT and child_field.access is not Access.INIT:
+                raise TypeError(
+                    f"{type(owner).__name__}.{self.name}: access mismatch for shared field "
+                    f"'{parent_name}' → '{child_name}' — parent is INIT but child is {child_field.access.name}. "
+                    f"Shared INIT fields must be INIT on the child too."
                 )
 
     def build_share_kwargs(self, owner: 'Settings') -> dict:

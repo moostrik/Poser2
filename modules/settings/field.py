@@ -65,6 +65,30 @@ class Field(Generic[T]):
     The descriptor handles get/set, type enforcement, init-only guards,
     callbacks, and JSON serialization.
 
+    **Parameters and GUI hints**
+
+    Only *default* affects the runtime behaviour of the class that uses the
+    setting.  All other keyword parameters are metadata consumed by the UI
+    layer (``nice_panel.py``) and are never enforced by the descriptor itself:
+
+    - ``min``, ``max``, ``step`` — range hints for sliders; the descriptor
+      does **not** clamp or validate values against them.
+    - ``description`` — tooltip / label text.
+    - ``visible`` — whether the field appears in the panel.
+    - ``pinned`` — whether the field is shown in a pinned summary section.
+    - ``widget`` — explicit widget override (validated for type compatibility
+      at construction time, but has no effect on get/set).
+    - ``color`` — UI colour hint for the control.
+    - ``options`` — a Field holding a ``list[str]`` of options for
+      ``Widget.text_select``.
+
+    The one keyword parameter with a runtime effect is ``access``:
+
+    - ``access=Field.INIT`` prevents writes after ``settings.initialize()``
+      has been called (raises ``AttributeError``).
+    - ``access=Field.READ`` is a UI hint only — code can still write the
+      field freely at runtime.
+
     Custom types used as Field values should implement ``__eq__`` so that
     change detection (skip callback when value unchanged) works correctly.
 
@@ -86,10 +110,10 @@ class Field(Generic[T]):
     def __init__(
         self,
         default: T,
-        *, # the keyword-only parameters below are GUI presentation hints only.
-        min: T | None = None,   # min/max/step are not enforced by the descriptor
-        max: T | None = None,   # they are just hints for the UI to show sliders, etc.
-        step: T | None = None,
+        *,
+        min: T | None = None,   # UI hint only — not enforced by the descriptor
+        max: T | None = None,   # UI hint only — not enforced by the descriptor
+        step: T | None = None,  # UI hint only — not enforced by the descriptor
         description: str = "",
         access: Access = Access.WRITE,
         visible: bool = True,
