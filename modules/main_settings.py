@@ -75,7 +75,7 @@ class VelocityFeature(Settings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
 
-    extractor           = nodes.AngleVelExtractorSettings(share=[frequency.as_('fps')])
+    extractor           = nodes.AngleVelExtractorSettings(share=[frequency])
     smoother            = nodes.EuroSmootherSettings(share=[frequency])
     prediction          = nodes.PredictorSettings(share=[frequency])
     interpolator        = nodes.ChaseInterpolatorSettings(share=[frequency.as_('input_frequency'), output_frequency])
@@ -131,7 +131,7 @@ class MainSettings(Settings):
 
     camera              = OakGroup(share=[num_players.as_('num_cameras'), fps])
     tt:                 TTGroup
-    pose                = PoseGroup(share=[num_players.as_('max_poses')])
+    pose                = PoseGroup(share=[num_players.as_('max_poses'), fps.as_('frequency')])
     render:             RenderSettings
     inout               = InOutGroup(share=[num_players.as_('num_artnet')])
     server:             NiceSettings

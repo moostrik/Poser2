@@ -12,7 +12,7 @@ from modules.settings import Settings, Field
 
 class AngleVelExtractorSettings(Settings):
     """Configuration for AngleVelExtractor."""
-    fps: Field[float] = Field(30.0, access=Field.INIT)
+    frequency: Field[float] = Field(30.0, access=Field.INIT)
 
 
 class AngleVelExtractor(FilterNode):
@@ -28,7 +28,7 @@ class AngleVelExtractor(FilterNode):
         super().__init__()
         self._settings = settings if settings is not None else AngleVelExtractorSettings()
         self._prev_pose: Frame | None = None
-        self._dt = 1.0 / self._settings.fps
+        self._dt = 1.0 / self._settings.frequency
 
     def process(self, pose: Frame) -> Frame:
         # Compute deltas (or empty if no previous pose)
