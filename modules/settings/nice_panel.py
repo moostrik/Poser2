@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import socket
 from enum import Enum
 from pathlib import Path
@@ -1252,6 +1253,13 @@ def create_settings_panel(
                             ui.link(_url_local, _url_local, new_tab=True).classes("text-sm")
             with ui.row().classes("flex-1 items-center gap-1 flex-nowrap justify-center"):
                 _build_preset_controls(root)
+
+            # Log drawer toggle — drawer itself is built outside the header below
+            _log_toggle_holder: list = []
+            ui.button(icon="terminal", on_click=lambda: _log_toggle_holder[0]() if _log_toggle_holder else None).props(
+                "dense flat"
+            ).tooltip("Toggle log panel")
+
             if on_exit:
                 async def _do_exit():
                     await ui.run_javascript('showShutdownScreen()')
@@ -1304,10 +1312,14 @@ def create_settings_panel(
                     tab_map[label] = t
     # -- end of sticky header --
 
+    # Build log drawer outside the header so it's a top-level fixed element
+    _, _toggle_log_fn = _build_log_drawer(timers)
+    _log_toggle_holder.append(_toggle_log_fn)
+
     if not tab_entries:
         return
 
-    with ui.tab_panels(tabs, value=tab_map[initial_tab_label]).classes("w-full"):
+    with ui.tab_panels(tabs, value=tab_map[initial_tab_label]).classes("w-full").style("padding-bottom: 320px;"):
         for label, root_settings in tab_entries:
             with ui.tab_panel(tab_map[label]):
                 expansions: list = []
@@ -1338,3 +1350,210 @@ def create_settings_panel(
                         ).props("dense flat size=sm")
                 else:
                     toggle_row.delete()
+
+
+# ---------------------------------------------------------------------------
+# Log drawer — slide-up panel showing recent log output
+# ---------------------------------------------------------------------------
+
+_LOG_LEVEL_COLORS = {
+    'DEBUG':    '#888888',
+    'INFO':     '#cccccc',
+    'WARNING':  '#f59e0b',
+    'ERROR':    '#ef4444',
+    'CRITICAL': '#ef4444',
+}
+
+_LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
+
+
+def _build_log_drawer(timers: list) -> tuple:
+    """Build a slide-up log drawer anchored to the bottom of the page.
+
+    Returns (drawer_element, toggle_function) so the caller can place
+    a toggle button in the header.
+    """
+    from modules.log_config import get_log_buffer
+
+    # Per-client state
+    state = {
+        'cursor': 0,
+        'filter_level': logging.INFO,
+        'auto_scroll': True,
+    }
+
+    # CSS for log lines and drag handle
+    ui.add_css('''
+    .log-drawer { font-family: 'Roboto Mono', monospace; font-size: 13px; }
+    .log-drawer .log-line { padding: 1px 8px; white-space: pre-wrap; word-break: break-all; line-height: 1.4; }
+    .log-chip-active { opacity: 1.0 !important; }
+    .log-chip-inactive { opacity: 0.35 !important; }
+    .log-drag-handle {
+        height: 6px; cursor: ns-resize; background: #333;
+        flex-shrink: 0; transition: background 0.15s;
+    }
+    .log-drag-handle:hover, .log-drag-handle:active { background: #4af; }
+    ''')
+
+    # Drawer container — fixed to bottom, initially hidden
+    drawer = ui.element('div').classes('log-drawer').style(
+        'position: fixed; bottom: 0; left: 0; right: 0; height: 300px;'
+        'background: #141414; border-top: 2px solid #333; z-index: 9999;'
+        'display: flex; flex-direction: column;'
+    )
+    drawer.set_visibility(False)
+
+    with drawer:
+        # Drag handle for resizing
+        drag_handle = ui.element('div').classes('log-drag-handle')
+
+        # Header row
+        with ui.row().classes('w-full items-center gap-2').style(
+            'padding: 4px 12px; background: #1a1a1a; border-bottom: 1px solid #333; flex-shrink: 0;'
+        ):
+            ui.icon('terminal').classes('text-lg text-grey-5')
+            ui.label('Log').classes('text-sm font-bold text-grey-4')
+
+            # Level filter chips
+            chips: dict[str, ui.element] = {}
+            for level_name in _LOG_LEVELS:
+                color = _LOG_LEVEL_COLORS[level_name]
+
+                chip = ui.button(level_name, on_click=lambda _, ln=level_name: _set_filter(ln)).props(
+                    'dense flat size=xs no-caps'
+                ).style(f'color: {color}; font-size: 11px; min-height: 24px; padding: 0 8px;')
+                chips[level_name] = chip
+
+            ui.element('div').classes('flex-1')  # spacer
+
+            # Clear button
+            ui.button(icon='delete_sweep', on_click=lambda: _clear_log()).props(
+                'dense flat size=xs'
+            ).tooltip('Clear log')
+
+        # Scrollable log area
+        log_area = ui.element('div').style(
+            'flex: 1; overflow-y: auto; padding: 4px 0;'
+        )
+
+    def _update_chip_styles():
+        for name, chip in chips.items():
+            level_val = getattr(logging, name)
+            if level_val >= state['filter_level']:
+                chip.classes(remove='log-chip-inactive', add='log-chip-active')
+            else:
+                chip.classes(remove='log-chip-active', add='log-chip-inactive')
+
+    _update_chip_styles()
+
+    def _set_filter(level_name: str):
+        state['filter_level'] = getattr(logging, level_name)
+        _update_chip_styles()
+        # Re-render all entries with new filter
+        _full_refresh()
+
+    def _clear_log():
+        log_area.clear()
+        buf = get_log_buffer()
+        if buf:
+            state['cursor'] = buf._counter
+        state['auto_scroll'] = True
+
+    def _make_line_html(entry) -> str:
+        import html as html_mod
+        color = _LOG_LEVEL_COLORS.get(entry.level, '#cccccc')
+        ts = html_mod.escape(entry.timestamp)
+        src = html_mod.escape(entry.source)
+        msg = html_mod.escape(entry.message)
+        # First line gets timestamp/source prefix, continuation lines are indented
+        lines = msg.split('\n')
+        prefix = f'<span style="color:#555">{ts}</span> <span style="color:{color}">{entry.level:<7s}</span> <span style="color:#7cacf8">{src}</span>: '
+        first = prefix + lines[0]
+        if len(lines) > 1:
+            indent = '&nbsp;' * 27  # align with message start
+            rest = '\n'.join(indent + line for line in lines[1:])
+            return first + '\n' + rest
+        return first
+
+    def _append_entries(entries):
+        with log_area:
+            for entry in entries:
+                if getattr(logging, entry.level) >= state['filter_level']:
+                    line_html = _make_line_html(entry)
+                    ui.html(f'<div class="log-line">{line_html}</div>')
+        if state['auto_scroll']:
+            _scroll_to_bottom()
+
+    def _scroll_to_bottom():
+        ui.run_javascript(f'''
+            var el = document.getElementById("c{log_area.id}");
+            if (el) {{ el.scrollTop = el.scrollHeight; }}
+        ''')
+
+    def _full_refresh():
+        log_area.clear()
+        buf = get_log_buffer()
+        if not buf:
+            return
+        _, all_entries = buf.get_entries_since(0)
+        _append_entries(all_entries)
+        state['auto_scroll'] = True
+        _scroll_to_bottom()
+
+    def _poll_log():
+        buf = get_log_buffer()
+        if not buf:
+            return
+        try:
+            new_cursor, entries = buf.get_entries_since(state['cursor'])
+            if entries:
+                state['cursor'] = new_cursor
+                _append_entries(entries)
+        except RuntimeError:
+            pass
+
+    t = ui.timer(POLL_INTERVAL, _poll_log)
+    timers.append(t)
+
+    # Track scroll position to disable auto-scroll when user scrolls up
+    log_area.on('scroll', lambda: ui.run_javascript(f'''
+        var el = document.getElementById("c{log_area.id}");
+        if (el) {{
+            var atBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 30;
+            emitEvent("log_scroll", {{atBottom: atBottom}});
+        }}
+    '''))
+    ui.on('log_scroll', lambda e: state.update({'auto_scroll': e.args.get('atBottom', True)}))
+
+    # Drag-to-resize: mousedown on handle starts tracking, mousemove adjusts height
+    ui.run_javascript(f'''
+        (function() {{
+            var handle = document.getElementById("c{drag_handle.id}");
+            var drawer = document.getElementById("c{drawer.id}");
+            if (!handle || !drawer) return;
+            var startY = 0, startH = 0, dragging = false;
+            handle.addEventListener("mousedown", function(e) {{
+                dragging = true; startY = e.clientY;
+                startH = drawer.offsetHeight;
+                e.preventDefault();
+            }});
+            document.addEventListener("mousemove", function(e) {{
+                if (!dragging) return;
+                var newH = startH + (startY - e.clientY);
+                newH = Math.max(100, Math.min(window.innerHeight - 60, newH));
+                drawer.style.height = newH + "px";
+            }});
+            document.addEventListener("mouseup", function() {{ dragging = false; }});
+        }})();
+    ''')
+
+    # Toggle function
+    visible = {'v': False}
+
+    def _toggle():
+        visible['v'] = not visible['v']
+        drawer.set_visibility(visible['v'])
+        if visible['v']:
+            _full_refresh()
+
+    return drawer, _toggle
