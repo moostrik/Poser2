@@ -12,7 +12,7 @@ from modules.settings import Settings, Field
 
 class SimilarityApplicatorSettings(Settings):
     """Configuration for SimilarityApplicator."""
-    max_poses: Field[int] = Field(4)
+    max_poses: Field[int] = Field(4, access=Field.INIT, min=1, max=16)
 
 
 class SimilarityApplicator(FilterNode):

@@ -35,11 +35,19 @@ def get_startup() -> str:
         return "default"
 
 
-def set_startup(name: str) -> None:
-    """Persist *name* as the preset to load on next startup."""
-    # Reject names that could escape the settings directory
+def validate_name(name: str) -> None:
+    """Raise ``ValueError`` if *name* is not a safe preset name.
+
+    Rejects empty names, names containing path separators, and names
+    starting with '.' — all of which could escape the settings directory.
+    """
     if not name or "/" in name or "\\" in name or name.startswith("."):
         raise ValueError(f"Invalid preset name: {name!r}")
+
+
+def set_startup(name: str) -> None:
+    """Persist *name* as the preset to load on next startup."""
+    validate_name(name)
     SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
     (SETTINGS_DIR / ".ui_preset.json").write_text(json.dumps({"startup_preset": name}, indent=2))
 

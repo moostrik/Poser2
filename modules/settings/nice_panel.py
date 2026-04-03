@@ -1090,6 +1090,11 @@ def _build_preset_controls(root):
                     if not preset_name:
                         ui.notify("Enter a preset name", type="warning")
                         return
+                    try:
+                        presets.validate_name(preset_name)
+                    except ValueError:
+                        ui.notify("Invalid preset name — no slashes or leading dots", type="negative")
+                        return
                     presets.save(root, presets.path(preset_name))
                     _refresh_dropdown()
                     dropdown.set_value(preset_name)

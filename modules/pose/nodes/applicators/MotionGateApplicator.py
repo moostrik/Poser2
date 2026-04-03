@@ -12,7 +12,7 @@ from modules.settings import Settings, Field
 
 class MotionGateApplicatorSettings(Settings):
     """Configuration for MotionGateApplicator."""
-    max_poses: Field[int] = Field(4)
+    max_poses: Field[int] = Field(4, min=1, max=16, access=Field.INIT)
 
 
 class MotionGateApplicator(FilterNode):

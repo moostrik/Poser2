@@ -307,7 +307,7 @@ class TestSerialization(unittest.TestCase):
 
     def test_update_from_dict_ignores_unknown_keys(self):
         s = CameraSettings()
-        with self.assertLogs("modules.settings.settings", level="WARNING") as cm:
+        with self.assertLogs(level="WARNING") as cm:
             s.update_from_dict({"unknown_key": 42})
         self.assertTrue(any("unknown key 'unknown_key'" in m for m in cm.output))
 
@@ -323,7 +323,7 @@ class TestSerialization(unittest.TestCase):
 
     def test_update_from_dict_bad_value_logs_warning(self):
         s = CameraSettings()
-        with self.assertLogs("modules.settings.settings", level="WARNING") as cm:
+        with self.assertLogs(level="WARNING") as cm:
             s.update_from_dict({"exposure": "not_a_number"})
         self.assertTrue(any("exposure" in m for m in cm.output))
 
@@ -1850,7 +1850,7 @@ class TestUpdateFromDictEdgeCases(unittest.TestCase):
 
     def test_non_dict_child_logs_warning(self):
         s = OuterSettings()
-        with self.assertLogs("modules.settings.settings", level="WARNING") as cm:
+        with self.assertLogs(level="WARNING") as cm:
             s.update_from_dict({"inner": 42})
         self.assertTrue(any("expected dict for child 'inner'" in m for m in cm.output))
         # inner should be unchanged
@@ -2399,6 +2399,88 @@ class TestValidateShare(unittest.TestCase):
         s = ParentWithChild()
         self.assertEqual(len(s.cores), 3)
 
+    def test_share_access_mismatch_raises(self):
+        """INIT parent field shared to non-INIT child field must raise at construction."""
+        with self.assertRaises(TypeError) as ctx:
+            class ChildWithWriteFps(Settings):
+                fps = Field(30.0)  # WRITE, not INIT
+
+            class BadAccessParent(Settings):
+                fps = Field(30.0, access=Field.INIT)
+                item = Group(ChildWithWriteFps, share=[fps])
+
+            BadAccessParent()
+        self.assertIn("access mismatch", str(ctx.exception))
+        self.assertIn("INIT", str(ctx.exception))
+
+
+class TestPropagatSharedAfterInitialize(unittest.TestCase):
+    """_propagate_shared must not raise when called after initialize().
+
+    Regression test for the bug where update_from_dict() called
+    _propagate_shared() which tried to set INIT fields on an already-
+    initialized child, raising AttributeError.
+    """
+
+    def test_update_from_dict_after_initialize_does_not_raise(self):
+        """Calling update_from_dict after initialize() must not raise."""
+        s = ParentWithChild()
+        s.initialize()
+        # Should not raise even though fps/color are shared INIT fields
+        s.update_from_dict({"core_0": {"exposure": 500}})
+        self.assertEqual(s.core_0.exposure, 500)
+
+    def test_init_shared_fields_not_updated_after_initialize(self):
+        """Shared INIT fields in children must stay frozen after initialize()."""
+        s = ParentWithChild(fps=30.0)
+        s.initialize()
+        # Even if the parent dict contains a new fps, children must keep their frozen value
+        s.update_from_dict({"fps": 60.0, "core_0": {"exposure": 999}})
+        # fps on parent is also INIT → skipped by update_from_dict
+        self.assertEqual(s.fps, 30.0)
+        self.assertEqual(s.core_0.fps, 30.0)
+
+    def test_non_init_shared_fields_still_propagate_after_initialize(self):
+        """Non-INIT shared fields must still propagate after initialize()."""
+        class LiveParent(Settings):
+            level = Field(1)  # WRITE — not INIT
+            child = Group(MinimalSettings, share=[level.as_('value')])
+
+        s = LiveParent()
+        s.initialize()
+        s.update_from_dict({"level": 42})
+        # level is WRITE so update_from_dict updates it, then propagates to child
+        self.assertEqual(s.level, 42)
+        self.assertEqual(s.child.value, 42)
+
+
+class TestValidateName(unittest.TestCase):
+    """Tests for presets.validate_name()."""
+
+    def test_valid_name_passes(self):
+        presets.validate_name("default")
+        presets.validate_name("my_preset")
+        presets.validate_name("preset-1")
+
+    def test_empty_raises(self):
+        with self.assertRaises(ValueError):
+            presets.validate_name("")
+
+    def test_forward_slash_raises(self):
+        with self.assertRaises(ValueError):
+            presets.validate_name("foo/bar")
+
+    def test_backslash_raises(self):
+        with self.assertRaises(ValueError):
+            presets.validate_name("foo\\bar")
+
+    def test_dot_prefix_raises(self):
+        with self.assertRaises(ValueError):
+            presets.validate_name(".hidden")
+
+    def test_path_traversal_raises(self):
+        with self.assertRaises(ValueError):
+            presets.validate_name("../etc/passwd")
 
 
 if __name__ == "__main__":

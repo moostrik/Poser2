@@ -1,7 +1,6 @@
 # TODO
-# better group lists
+#   better group lists
 # log visible in gui
-# why are groups after other settings
 # what to do with mainsettings in tabs
 # refactor settings
 # share fps / frequencies across all settings

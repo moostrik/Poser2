@@ -27,6 +27,7 @@ class NiceServer:
         self.settings = settings
         self.on_exit = on_exit
         self._thread: Optional[threading.Thread] = None
+        self._page_registered = False
 
     def start(self) -> None:
         """Start the NiceGUI settings UI in a daemon thread."""
@@ -39,12 +40,15 @@ class NiceServer:
         port = self.settings.port
         on_exit = self.on_exit
 
-        @ui.page("/")
-        def index():
-            ui.dark_mode(True)
-            ui.add_head_html('<style>* { transition-duration: 0s !important; animation-duration: 0s !important; }</style>')
-            with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-                create_settings_panel(root, title=title, port=port, on_exit=on_exit)
+        if not self._page_registered:
+            self._page_registered = True
+
+            @ui.page("/")
+            def index():
+                ui.dark_mode(True)
+                ui.add_head_html('<style>* { transition-duration: 0s !important; animation-duration: 0s !important; }</style>')
+                with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
+                    create_settings_panel(root, title=title, port=port, on_exit=on_exit)
 
         def _run():
             ui.run(
