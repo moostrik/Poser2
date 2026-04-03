@@ -13,6 +13,7 @@ from modules.pose.frame import Frame, FrameField, ScalarFrameField
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import FeatureShader
 from modules.render.layers.data.DataLayerSettings import DataLayerSettings, LayerMode
+from modules.render.color_settings import ColorSettings
 
 
 class FeatureFrameLayer(LayerBase):
@@ -23,10 +24,17 @@ class FeatureFrameLayer(LayerBase):
     """
     LAYER_MODE: LayerMode = LayerMode.FRAME
 
-    def __init__(self, track_id: int, data_hub: DataHub, config: DataLayerSettings) -> None:
+    _TRACK_COLOR_FIELDS: set[ScalarFrameField] = {
+        ScalarFrameField.similarity,
+        ScalarFrameField.leader,
+        ScalarFrameField.motion_gate,
+    }
+
+    def __init__(self, track_id: int, data_hub: DataHub, config: DataLayerSettings, color_settings: ColorSettings) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._config: DataLayerSettings = config
+        self._color_settings: ColorSettings = color_settings
         self._was_active: bool = False
 
         self._fbo: Fbo = Fbo()
@@ -97,8 +105,7 @@ class FeatureFrameLayer(LayerBase):
         # If showing angles, also fetch velocity for thickness modulation
         deltas = pose.angle_vel.values if self._config.feature_field == ScalarFrameField.angles else None
 
-        # Resolve colors from config (override → track colors → DEFAULT_COLORS)
-        colors = self._config.get_colors()
+        colors = self._resolve_colors()
 
         line_width = 1.0 / self._fbo.height * self._config.line_width
         line_smooth = 1.0 / self._fbo.height * self._config.line_smooth
@@ -132,8 +139,7 @@ class FeatureFrameLayer(LayerBase):
 
         step: float = rect.width / num_labels
 
-        # Resolve colors from config (override → track colors → DEFAULT_COLORS)
-        colors = self._config.get_colors()
+        colors = self._resolve_colors()
 
         for i in range(num_labels):
             string: str = labels[i]
@@ -148,3 +154,9 @@ class FeatureFrameLayer(LayerBase):
 
         fbo.end()
 
+    def _resolve_colors(self) -> list[tuple[float, float, float, float]]:
+        if self._config.use_history_color:
+            return [self._color_settings.history.to_tuple()]
+        if self._config.feature_field in self._TRACK_COLOR_FIELDS:
+            return self._color_settings.track_color_tuples
+        return self._color_settings.default_color_tuples

@@ -14,6 +14,8 @@ from modules.pose.frame import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import WindowShader
 from modules.render.layers.data.DataLayerSettings import DataLayerSettings, LayerMode
+from modules.render.color_settings import ColorSettings
+from modules.pose.frame import ScalarFrameField
 
 
 class FeatureWindowLayer(LayerBase):
@@ -25,10 +27,17 @@ class FeatureWindowLayer(LayerBase):
     """
     LAYER_MODE: LayerMode = LayerMode.WINDOW
 
-    def __init__(self, track_id: int, data_hub: DataHub, config: DataLayerSettings) -> None:
+    _TRACK_COLOR_FIELDS: set[ScalarFrameField] = {
+        ScalarFrameField.similarity,
+        ScalarFrameField.leader,
+        ScalarFrameField.motion_gate,
+    }
+
+    def __init__(self, track_id: int, data_hub: DataHub, config: DataLayerSettings, color_settings: ColorSettings) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._config: DataLayerSettings = config
+        self._color_settings: ColorSettings = color_settings
         self._was_active: bool = False
 
         self._fbo: Fbo = Fbo()
@@ -117,8 +126,7 @@ class FeatureWindowLayer(LayerBase):
         # Use window's display_range
         display_range = window.display_range
 
-        # Resolve colors from config (override → track colors → DEFAULT_COLORS)
-        colors = self._config.get_colors()
+        colors = self._resolve_colors()
 
         # Render using shader
         self._fbo.begin()
@@ -160,7 +168,7 @@ class FeatureWindowLayer(LayerBase):
         clear_color()
 
         feature_num: int = len(feature_names)
-        colors = self._config.get_colors()
+        colors = self._resolve_colors()
 
         for i in range(feature_num):
             string: str = feature_names[i]
@@ -175,3 +183,9 @@ class FeatureWindowLayer(LayerBase):
 
         fbo.end()
 
+    def _resolve_colors(self) -> list[tuple[float, float, float, float]]:
+        if self._config.use_history_color:
+            return [self._color_settings.history.to_tuple()]
+        if self._config.feature_field in self._TRACK_COLOR_FIELDS:
+            return self._color_settings.track_color_tuples
+        return self._color_settings.default_color_tuples

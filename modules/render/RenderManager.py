@@ -77,10 +77,7 @@ class RenderManager(RenderBase):
         # Set data.b overrides (class defaults match data.a)
         settings.data.b.line_width = 6.0
         settings.data.b.line_smooth = 6.0
-        settings.data.b.colors = [settings.colors.history.to_tuple()]
-        # Wire color_settings reference to data layer configs
-        settings.data.a.color_settings = settings.colors
-        settings.data.b.color_settings = settings.colors
+        settings.data.b.use_history_color = True
 
         flows: dict[int, ls.FlowLayer] = {}
         cmt: dict[int, Texture] = {}
@@ -101,15 +98,15 @@ class RenderManager(RenderBase):
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(     i, centre_gmtry,                                settings.centre.pose,       settings.colors)
 
             ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.data_hub,   centre_frg.texture, cmt,    settings.centre.color,      settings.colors)
-            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask,  centre_mask.texture, centre_frg.texture, settings.flow)
+            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask,  centre_mask.texture, centre_frg.texture,     settings.flow)
             fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows,                      settings.fluid,             settings.colors)
 
             lut =           self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid, ms_mask],           settings.layer.lut)
 
-            self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, settings.data.a)
-            self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, settings.data.a)
-            self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, settings.data.b)
-            self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, settings.data.b)
+            self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, settings.data.a, settings.colors)
+            self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, settings.data.a, settings.colors)
+            self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, settings.data.b, settings.colors)
+            self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, settings.data.b, settings.colors)
             self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.data_hub)
 
         # composition
