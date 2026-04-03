@@ -110,9 +110,8 @@ class Field(Generic[T]):
         elif isinstance(default, bool):
             # bool check must come before int (bool is a subclass of int)
             type_ = cast(type[T], bool)
-        elif isinstance(default, Enum):
-            type_ = cast(type[T], type(default))
         else:
+            # Covers Enum subclasses and plain types (int, float, str, Color, …)
             type_ = cast(type[T], type(default))
 
         self.type_: type[T] = type_
@@ -231,6 +230,7 @@ class Field(Generic[T]):
                 raise TypeError(
                     f"Cannot construct {self._type_name} from {value!r}"
                 )
+        # tuple/list → positional-arg construction (e.g. Color(r, g, b), Point2f(x, y))
         if isinstance(value, (tuple, list)):
             try:
                 return self.type_(*value)
@@ -241,10 +241,10 @@ class Field(Generic[T]):
         if isinstance(value, dict) and hasattr(self.type_, "from_dict"):
             try:
                 return self.type_.from_dict(value)  # type: ignore[union-attr]
-            except Exception:
+            except (TypeError, ValueError, KeyError, AttributeError) as exc:
                 raise TypeError(
                     f"Cannot construct {self._type_name} from dict: {value!r}"
-                )
+                ) from exc
         raise TypeError(
             f"Field '{self.name}' expects {self._type_name}, "
             f"got {type(value).__name__}: {value!r}"
@@ -291,9 +291,10 @@ class Field(Generic[T]):
     def fire(self, obj):
         """Invoke all registered callbacks (for Widget.button actions).
 
-        Unlike set(), fire() does not change the value — it just triggers
-        every callback with ``True`` so that all callbacks share the same
-        ``callback(value)`` signature regardless of field type.
+        Unlike set(), fire() does not change the value — it triggers every
+        callback with ``True``.  Button callbacks therefore always receive
+        ``True``; this keeps the ``callback(value)`` signature uniform across
+        all field types, but callers should document which fields are buttons.
         """
         lock = obj._locks[self.name]
         with lock:
@@ -329,12 +330,22 @@ class Field(Generic[T]):
         if isinstance(value, Enum):
             return value.name
         if isinstance(value, list):
-            return [
-                v.name if isinstance(v, Enum)
-                else v.to_dict() if hasattr(v, 'to_dict')
-                else v
-                for v in value
-            ]
+            result = []
+            for v in value:
+                if isinstance(v, Enum):
+                    result.append(v.name)
+                elif hasattr(v, 'to_dict'):
+                    result.append(v.to_dict())
+                elif isinstance(v, (int, float, str, bool, type(None))):
+                    result.append(v)
+                else:
+                    logger.warning(
+                        "Field '%s': list element %r (type %s) may not be "
+                        "JSON-serializable",
+                        self.name, v, type(v).__name__,
+                    )
+                    result.append(v)
+            return result
         return value
 
     def from_json_value(self, obj, raw):
