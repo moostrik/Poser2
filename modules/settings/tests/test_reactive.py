@@ -1584,7 +1584,7 @@ class TestWidgetClass(unittest.TestCase):
     def test_iteration(self):
         members = list(Widget)
         self.assertIn(Widget.button, members)
-        self.assertEqual(len(members), 17)
+        self.assertEqual(len(members), 18)
 
     def test_match_statement(self):
         """Widget members work in match/case."""

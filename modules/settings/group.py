@@ -52,7 +52,6 @@ class Group(Generic[T]):
     ):
         self.settings_type = settings_type
         self._share_refs: list[Field | FieldAlias] = list(share) if share else []
-        self.share: list[str] = []          # parent field names
         self.share_map: dict[str, str] = {} # parent_name → child_name
         self.name = ""
 
@@ -65,7 +64,6 @@ class Group(Generic[T]):
             else:
                 parent_name = ref.name
                 child_name = ref.name
-            self.share.append(parent_name)
             self.share_map[parent_name] = child_name
 
     @overload
@@ -92,8 +90,7 @@ class Group(Generic[T]):
             for name, f in vars(cls).items()
             if isinstance(f, Field)
         }
-        for parent_name in self.share:
-            child_name = self.share_map[parent_name]
+        for parent_name, child_name in self.share_map.items():
             if parent_name not in owner._fields:
                 raise TypeError(
                     f"{type(owner).__name__}.{self.name}: shared field '{parent_name}' "
@@ -115,8 +112,7 @@ class Group(Generic[T]):
     def build_share_kwargs(self, owner: 'Settings') -> dict:
         """Build constructor kwargs from the parent's shared field values."""
         kwargs = {}
-        for parent_name in self.share:
-            child_name = self.share_map[parent_name]
+        for parent_name, child_name in self.share_map.items():
             if parent_name in owner._fields:
                 kwargs[child_name] = owner._values[parent_name]
         return kwargs

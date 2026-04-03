@@ -49,7 +49,7 @@ class Settings:
         object.__setattr__(self, "_children", {})
 
         # Collect Field and Group descriptors from the class hierarchy
-        group_names: set[str] = set()
+        group_names: dict[str, None] = {}
         for cls in type(self).__mro__:
             for attr_name, attr_value in vars(cls).items():
                 if attr_name.startswith("_"):
@@ -61,7 +61,7 @@ class Settings:
                     self._callbacks[attr_name] = []
                     self._locks[attr_name] = threading.Lock()
                 elif isinstance(attr_value, Group) and attr_name not in group_names:
-                    group_names.add(attr_name)
+                    group_names[attr_name] = None
 
         # Apply kwargs (init_only fields are still writable here)
         for name, value in kwargs.items():
@@ -104,7 +104,7 @@ class Settings:
         self._fields[name].set(self, value)
 
     def __getattr__(self, name):
-        # Children are stored as instance attributes — they don't reach here.
+        # Children are accessed via Group descriptors — they don't reach here.
         # Fallback — normally the descriptor __get__ handles known fields.
         fields = object.__getattribute__(self, "_fields")
         if name in fields:
@@ -256,15 +256,13 @@ class Settings:
         # Re-propagate shared fields to children after own fields are updated
         self._propagate_shared()
 
-    # -- Equality ------------------------------------------------------------
+    # -- Share propagation ---------------------------------------------------
 
     def _propagate_shared(self):
         """Copy shared field values from this parent into its children."""
-        if self._initialized:
-            return
         for name, child in self._children.items():
             desc = self._get_group_descriptor(name)
-            if desc is None or not desc.share:
+            if desc is None or not desc.share_map:
                 continue
             share_kwargs = desc.build_share_kwargs(self)
             for field_name, value in share_kwargs.items():
