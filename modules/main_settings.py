@@ -1,5 +1,4 @@
 # TODO
-# log visible in gui
 # what to do with mainsettings in tabs
 # share fps / frequencies across all settings
 # better width handling in nice panel

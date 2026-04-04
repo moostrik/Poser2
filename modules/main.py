@@ -15,7 +15,7 @@ from modules.utils import Timer
 
 
 class Main():
-    def __init__(self, simulation: bool = False, num_cameras: int = 3, fps: float = 0.0) -> None:
+    def __init__(self, simulation: bool = False) -> None:
 
         self.is_running: bool = False
         self.is_finished: bool = False
