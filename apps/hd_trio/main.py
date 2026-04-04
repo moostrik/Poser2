@@ -1,29 +1,34 @@
-# Standard library imports
+"""HD Trio — 3-camera interactive installation with fluid rendering."""
+
 from typing import Optional
 from functools import partial
 
-# Local application imports
-from modules.main_settings import MainSettings
 from modules.oak import Camera, Simulator, Player, Recorder, Sync
 from modules.settings import presets, NiceServer
-from modules.render import RenderManager
 from modules.data_hub import DataHub, Stage
 from modules.inout import OscSound, ArtNetBars
 from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers
 from modules.utils import Timer
 
+from .settings import HDTrioSettings
+from .render import HDTrioRender
 
-class Main():
+APP_NAME = 'hd_trio'
+
+
+class HDTrioMain:
     def __init__(self, simulation: bool = False) -> None:
 
         self.is_running: bool = False
         self.is_finished: bool = False
 
         # SETTINGS
-        self.settings = MainSettings()
-        if not presets.load(self.settings, presets.startup_path()):
-            presets.save(self.settings, presets.startup_path())  # create default preset if loading failed (not responsibility of main!)
+        presets.set_app(APP_NAME)
+        self.settings = HDTrioSettings()
+        preset_file = presets.startup_path()
+        if not presets.load(self.settings, preset_file):
+            raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
         self.settings.camera.sim_enabled = simulation
         self.settings.initialize()
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
@@ -54,7 +59,9 @@ class Main():
 
         # TIMER
         self.timer = Timer(self.settings.tt.timer)
-        self.render = RenderManager(self.data_hub, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
+
+        # RENDER
+        self.render = HDTrioRender(self.data_hub, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
 
         # IN_OUT
         self.sound_osc = OscSound(self.data_hub, self.settings.inout.osc_sound)
@@ -89,7 +96,6 @@ class Main():
             [
                 lambda: nodes.BBoxEuroSmoother(self.settings.pose.bbox.smoother),
                 lambda: nodes.BBoxPredictor(self.settings.pose.bbox.prediction),
-                # lambda: nodes.BBoxRateLimiter(self.new_settings.pose.rate_limiter),
             ]
         )
 
@@ -97,10 +103,8 @@ class Main():
             num_players,
             [
                 lambda: nodes.PointDualConfFilter(self.settings.pose.point.confidence_filter),
-                # lambda: nodes.PointTemporalStabilizer(nodes.TemporalStabilizerSettings()),
                 nodes.AngleExtractor,
                 lambda: nodes.AngleVelExtractor(self.settings.pose.velocity.extractor),
-                # lambda: nodes.PoseValidator(nodes.ValidatorSettings(name="Raw")),
             ]
         )
 
@@ -112,17 +116,14 @@ class Main():
                 lambda: nodes.AngleVelExtractor(self.settings.pose.velocity.extractor),
                 lambda: nodes.AngleVelEuroSmoother(self.settings.pose.velocity.smoother),
                 lambda: nodes.AngleEuroSmoother(self.settings.pose.angle.smoother),
-                # lambda: nodes.AngleStickyFiller(nodes.StickyFillerSettings(init_to_zero=False, hold_scores=False)),
                 lambda: nodes.AngleMotionExtractor(self.settings.pose.motion.extractor),
                 lambda: nodes.AngleMotionMovingAverageSmoother(self.settings.pose.motion.moving_average),
-                # lambda: nodes.AngleMotionEasingNode(self.new_settings.pose.easing),
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeExtractor,
                 nodes.AgeExtractor,
                 lambda: self.similarity_applicator,
                 lambda: self.leader_applicator,
                 lambda: nodes.SimilarityEuroSmoother(self.settings.pose.similarity.smoother),
-                # lambda: nodes.PoseValidator(nodes.ValidatorSettings(name="Smooth")),
             ]
         )
 
@@ -134,7 +135,6 @@ class Main():
                 lambda: nodes.AngleVelPredictor(self.settings.pose.velocity.prediction),
                 lambda: nodes.AngleStickyFiller(self.settings.pose.angle.sticky),
                 lambda: nodes.SimilarityStickyFiller(self.settings.pose.similarity.sticky),
-                # lambda: nodes.PoseValidator(nodes.ValidatorSettings(name="Prediction")),
             ]
         )
 
@@ -152,7 +152,6 @@ class Main():
         self.pose_interpolation_filters = trackers.FilterTracker(
             num_players,
             [
-                # lambda: nodes.AngleVelExtractor(fps=settings.render.fps),
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeExtractor,
                 nodes.AgeExtractor,
@@ -160,7 +159,6 @@ class Main():
                 lambda: nodes.AngleVelEuroSmoother(self.settings.pose.velocity.smoother),
                 lambda: nodes.AngleMotionExtractor(self.settings.pose.motion.extractor),
                 lambda: nodes.AngleMotionMovingAverageSmoother(self.settings.pose.motion.moving_average),
-                # lambda: nodes.PoseValidator(nodes.ValidatorSettings(name="Interpolation")),
             ]
         )
 
@@ -202,19 +200,19 @@ class Main():
         self.interpolators.add_frames_callback(self.pose_interpolation_filters.process)
 
         # MOTION GATE (after interpolation pipeline, before DataHub)
-        self.pose_interpolation_filters.add_frames_callback(self.motion_gate_applicator.submit) # dit slaat nergens op??
+        self.pose_interpolation_filters.add_frames_callback(self.motion_gate_applicator.submit)
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_tracker.process)
         self.motion_gate_tracker.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.LERP))
         self.motion_gate_tracker.add_frames_callback(self.window_tracker_I.process)
         self.window_tracker_I.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.LERP))
 
-        # SIMILARITY COMPUTATION (uses combined callback for motion gate and velocity weighting)
+        # SIMILARITY COMPUTATION
         self.window_tracker_S.add_frame_windows_callback(self.window_similator.submit_all)
         self.window_similator.add_callback(lambda result: self.similarity_applicator.submit(result[0]))
         self.window_similator.add_callback(lambda result: self.leader_applicator.submit(result[1]))
         self.window_similator.start()
 
-        # CORRELATION COMPUTATION (alternative to similarity)
+        # CORRELATION COMPUTATION
         self.window_tracker_S.add_frame_windows_callback(self.window_correlator.submit_all)
         self.window_correlator.add_callback(lambda result: self.similarity_applicator.submit(result[0]))
         self.window_correlator.add_callback(lambda result: self.leader_applicator.submit(result[1]))
@@ -257,7 +255,7 @@ class Main():
         if self.player:
             self.player.start()
         if self.recorder:
-            self.recorder.start() # start after gui to prevent record at startup
+            self.recorder.start()
 
         self.is_running = True
 
@@ -299,4 +297,3 @@ class Main():
             camera.join(timeout=10)
 
         self.is_finished = True
-

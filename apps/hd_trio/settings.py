@@ -1,17 +1,63 @@
-# TODO
-# what to do with mainsettings in tabs
-# share fps / frequencies across all settings
-# better width handling in nice panel
+"""HD Trio settings — 3-camera interactive installation with fluid rendering."""
+
+from enum import IntEnum, auto
 
 from modules.settings import Settings, NiceSettings, Field, Group
 from modules.oak import CameraSettings, FrameType, CoderFormat, SimulatorSettings, RecorderSettings, SyncSettings
-from modules.render import RenderSettings
+from modules.render.color_settings import ColorSettings
+from modules.render import layers
 from modules.inout import OscSoundSettings, ArtNetBarsSettings
 from modules.tracker import OnePerCamTrackerSettings
 from modules.pose import batch, nodes, trackers
 from modules.pose.batch.model_types import ModelType
 from modules.utils import TimerSettings
+from modules.gl.WindowManager import WindowSettings
 
+
+# ---------------------------------------------------------------------------
+#  Layers enum  (defines which render layers this app uses)
+# ---------------------------------------------------------------------------
+
+class Layers(IntEnum):
+    # source layers
+    cam_image =     0
+    cam_mask =      auto()
+    cam_frg=        auto()
+    cam_crop =      auto()
+    # composite layers
+    tracker =       auto()
+    poser =         auto()
+    # centre layers
+    centre_geom=    auto()
+    centre_cam =    auto()
+    centre_mask =   auto()
+    centre_frg =    auto()
+    centre_pose =   auto()
+    # data layers
+    data_B_W =      auto()
+    data_B_F =      auto()
+    data_A_W =      auto()
+    data_A_F =      auto()
+    data_time =     auto()
+    # composition layers
+    color_mask =    auto()
+    flow =          auto()
+    fluid =         auto()
+    composite =     auto()
+
+
+# ---------------------------------------------------------------------------
+#  Layer selection settings
+# ---------------------------------------------------------------------------
+
+class LayerSettings(Settings):
+    preview: Field[list[Layers]] = Field([Layers.composite], description="Layers drawn in the preview viewports")
+    final:   Field[list[Layers]] = Field([Layers.composite], description="Layers drawn on the output monitors")
+
+
+# ---------------------------------------------------------------------------
+#  Oak camera group (3 cameras)
+# ---------------------------------------------------------------------------
 
 class OakGroup(Settings):
     num_cameras:        Field[int]               = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
@@ -42,6 +88,10 @@ class OakGroup(Settings):
         return [self.cam_0, self.cam_1, self.cam_2]
 
 
+# ---------------------------------------------------------------------------
+#  InOut group (OSC + 3 ArtNet controllers)
+# ---------------------------------------------------------------------------
+
 class InOutGroup(Settings):
     osc_sound   = Group(OscSoundSettings)
     artnet_0    = Group(ArtNetBarsSettings)
@@ -51,6 +101,11 @@ class InOutGroup(Settings):
     @property
     def artnets(self) -> list[ArtNetBarsSettings]:
         return [self.artnet_0, self.artnet_1, self.artnet_2]
+
+
+# ---------------------------------------------------------------------------
+#  Pose feature groups
+# ---------------------------------------------------------------------------
 
 class BboxFeature(Settings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
@@ -106,6 +161,11 @@ class SimilarityFeature(Settings):
     sticky                = Group(nodes.StickyFillerSettings)
     motion_gate           = Group(nodes.MotionGateApplicatorSettings, share=[max_poses])
 
+
+# ---------------------------------------------------------------------------
+#  Pose pipeline group
+# ---------------------------------------------------------------------------
+
 class PoseGroup(Settings):
     max_poses:          Field[int]          = Field(3, min=1, max=16, access=Field.INIT)
     model_type:         Field[ModelType]    = Field(ModelType.TRT, access=Field.INIT)
@@ -131,17 +191,62 @@ class PoseGroup(Settings):
     window_smooth = Group(trackers.WindowNodeSettings)
     window_lerp  = Group(trackers.WindowNodeSettings)
 
+
+# ---------------------------------------------------------------------------
+#  Tracker + Timer
+# ---------------------------------------------------------------------------
+
 class TTGroup(Settings):
     timer   = Group(TimerSettings)
     tracker = Group(OnePerCamTrackerSettings)
 
-class MainSettings(Settings):
+
+# ---------------------------------------------------------------------------
+#  Render settings (layer configs, centre, flow, fluid, colors, window)
+# ---------------------------------------------------------------------------
+
+class LayerGroup(Settings):
+    select = Group(LayerSettings)
+    lut    = Group(layers.CompositeLayerSettings)
+
+class DataGroup(Settings):
+    a = Group(layers.DataLayerSettings)
+    b = Group(layers.DataLayerSettings)
+
+class PreviewGroup(Settings):
+    tracker = Group(layers.TrackerCompSettings)
+    poser   = Group(layers.PoseCompSettings)
+
+class CentreGroup(Settings):
+    geometry = Group(layers.CentreGeomSettings)
+    mask     = Group(layers.CentreMaskSettings)
+    cam      = Group(layers.CentreCamSettings)
+    frg      = Group(layers.CentreFrgSettings)
+    pose     = Group(layers.CentrePoseSettings)
+    color    = Group(layers.ColorMaskLayerSettings)
+
+class RenderGroup(Settings):
+    layer   = Group(LayerGroup)
+    data    = Group(DataGroup)
+    preview = Group(PreviewGroup)
+    centre  = Group(CentreGroup)
+    flow    = Group(layers.FlowLayerSettings)
+    fluid   = Group(layers.FluidLayerSettings)
+    colors  = Group(ColorSettings)
+    window  = Group(WindowSettings)
+
+
+# ---------------------------------------------------------------------------
+#  Root settings
+# ---------------------------------------------------------------------------
+
+class HDTrioSettings(Settings):
     num_players:        Field[int]   = Field(3, access=Field.INIT, visible=False)
     fps:                Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
 
     camera  = Group(OakGroup, share=[num_players.as_('num_cameras'), fps])
     tt      = Group(TTGroup)
     pose    = Group(PoseGroup, share=[num_players.as_('max_poses'), fps.as_('frequency')])
-    render  = Group(RenderSettings)
+    render  = Group(RenderGroup)
     inout   = Group(InOutGroup)
     server  = Group(NiceSettings)

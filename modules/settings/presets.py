@@ -11,25 +11,42 @@ logger = logging.getLogger(__name__)
 SETTINGS_DIR = Path("files/settings")
 PRESET_SUFFIX = ".json"
 
+_current_app: str | None = None
 
-def path(name: str) -> Path:
+
+def set_app(app_name: str | None) -> None:
+    """Set the active app name.  All subsequent preset calls use this app's directory."""
+    global _current_app
+    _current_app = app_name
+
+
+def _app_dir(app_name: str | None = None) -> Path:
+    """Return the settings directory, optionally scoped to an app."""
+    name = app_name if app_name is not None else _current_app
+    if name:
+        return SETTINGS_DIR / name
+    return SETTINGS_DIR
+
+
+def path(name: str, app_name: str | None = None) -> Path:
     """Return the full file path for a preset by name."""
-    return SETTINGS_DIR / f"{name}{PRESET_SUFFIX}"
+    return _app_dir(app_name) / f"{name}{PRESET_SUFFIX}"
 
 
-def scan() -> list[str]:
+def scan(app_name: str | None = None) -> list[str]:
     """Return sorted list of preset names (without suffix) from the settings directory."""
-    SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
+    d = _app_dir(app_name)
+    d.mkdir(parents=True, exist_ok=True)
     return sorted(
         p.name.removesuffix(PRESET_SUFFIX)
-        for p in SETTINGS_DIR.glob(f"*{PRESET_SUFFIX}")
+        for p in d.glob(f"*{PRESET_SUFFIX}")
     )
 
 
-def get_startup() -> str:
+def get_startup(app_name: str | None = None) -> str:
     """Return the preset name to load on startup (falls back to 'default')."""
     try:
-        data = json.loads((SETTINGS_DIR / ".ui_preset.json").read_text())
+        data = json.loads((_app_dir(app_name) / ".ui_preset.json").read_text())
         return data.get("startup_preset") or "default"
     except (FileNotFoundError, json.JSONDecodeError):
         return "default"
@@ -45,11 +62,12 @@ def validate_name(name: str) -> None:
         raise ValueError(f"Invalid preset name: {name!r}")
 
 
-def set_startup(name: str) -> None:
+def set_startup(name: str, app_name: str | None = None) -> None:
     """Persist *name* as the preset to load on next startup."""
     validate_name(name)
-    SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
-    (SETTINGS_DIR / ".ui_preset.json").write_text(json.dumps({"startup_preset": name}, indent=2))
+    d = _app_dir(app_name)
+    d.mkdir(parents=True, exist_ok=True)
+    (d / ".ui_preset.json").write_text(json.dumps({"startup_preset": name}, indent=2))
 
 
 def save(root: Settings, filepath) -> None:
@@ -75,13 +93,13 @@ def save(root: Settings, filepath) -> None:
         raise
 
 
-def startup_path() -> Path:
+def startup_path(app_name: str | None = None) -> Path:
     """Return the file path for the startup preset.
 
     If the file does not exist yet, a default preset is **not** created
     here — the caller decides what to do.
     """
-    return path(get_startup())
+    return path(get_startup(app_name), app_name)
 
 
 def load(root: Settings, filepath) -> bool:
