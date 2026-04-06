@@ -5,8 +5,8 @@ from enum import IntEnum, auto
 # Local application imports
 from modules.settings import Field, Settings
 from modules.data_hub import Stage
-from modules.pose.features import FEATURES
-from modules.pose.features.base.BaseScalarFeature import BaseScalarFeature
+from modules.pose.features import SCALAR_FEATURES, TRACK_FEATURES
+from modules.pose.features.base import BaseScalarFeature
 
 
 # ---------------------------------------------------------------------------
@@ -14,9 +14,8 @@ from modules.pose.features.base.BaseScalarFeature import BaseScalarFeature
 # ---------------------------------------------------------------------------
 
 _VISUALIZABLE = sorted(
-    [f for f in FEATURES
-     if issubclass(f, BaseScalarFeature)
-     and math.isfinite(f.display_range()[0])
+    [f for f in SCALAR_FEATURES
+     if math.isfinite(f.display_range()[0])
      and math.isfinite(f.display_range()[1])],
     key=lambda c: c.__name__,
 )
@@ -37,8 +36,7 @@ FEATURE_MAP: dict[ScalarFeatureSelect, type[BaseScalarFeature]] = {  # type: ign
 }
 
 # Features where each element represents a different track (use per-track colors)
-from modules.pose.features import Similarity, LeaderScore, MotionGate
-TRACK_COLOR_FEATURES: set[type[BaseScalarFeature]] = {Similarity, LeaderScore, MotionGate}
+TRACK_COLOR_FEATURES = TRACK_FEATURES
 
 
 class LayerMode(IntEnum):

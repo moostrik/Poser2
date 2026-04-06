@@ -3,8 +3,13 @@
 FRAME — ECS-LITE POSE DATA STRUCTURE
 =============================================================================
 
+Design Principle:
+  All data is always there. If data is not set, lost, or invalid, it is
+  NaN with score 0.0. Consumers never check for feature presence — they
+  read data and handle NaN naturally.
+
 Immutable container for pose data with 3 identity slots + a feature dict
-keyed by feature class. Each app puts only its own features on Frame.
+keyed by feature class.
 
 Identity (fixed slots):
   • track_id: int          — Tracked object ID
@@ -12,10 +17,9 @@ Identity (fixed slots):
   • time_stamp: float      — Capture timestamp (default: time.time())
 
 Feature Access:
-  • frame[FeatureType]           → feature instance (KeyError if absent)
-  • frame.get(FeatureType)       → feature instance or None
-  • FeatureType in frame         → membership check
-  • len(frame)                   → number of features stored
+  • frame[FeatureType]           → feature instance (NaN dummy if not yet set)
+  • FeatureType in frame         → True only if explicitly set
+  • len(frame)                   → number of explicitly set features
 
 Mutation (functional — returns new Frame):
   • replace(frame, {Angles: new_angles, ...})  → new Frame with merged features
@@ -47,14 +51,9 @@ To add a new feature to the system:
   4. Wire the extractor into the app's FilterTracker pipeline
      (e.g. pose_smooth_filters in main.py).
 
-  5. If the feature should be windowed, add it to the app's
-     scalar_features list passed to FrameWindowTracker.
-
-  6. If the feature needs UI selection in data layers, add a member
-     to ScalarFeatureSelect and FEATURE_MAP in DataLayerSettings.
-
   No Frame class changes are needed — any BaseFeature subclass can be
   stored on Frame without modification (ECS-Lite principle).
+  Scalar features are automatically windowed and available in data layers.
 =============================================================================
 """
 from __future__ import annotations
@@ -101,15 +100,11 @@ class Frame:
     # ========== FEATURE ACCESS ==========
 
     def __getitem__(self, feature_type: type[T]) -> T:
-        """Get feature by type. Raises KeyError if absent."""
+        """Get feature by type. Returns cached NaN dummy if not yet set."""
         try:
             return self._features[feature_type]
         except KeyError:
-            raise KeyError(f"Frame has no {feature_type.__name__} feature")
-
-    def get(self, feature_type: type[T], default: T | None = None) -> T | None:
-        """Get feature by type, or default if absent."""
-        return self._features.get(feature_type, default)
+            return feature_type.create_dummy()  # type: ignore[union-attr]
 
     def __contains__(self, feature_type: type) -> bool:
         """Check if a feature type is present."""

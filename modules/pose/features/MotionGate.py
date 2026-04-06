@@ -41,19 +41,6 @@ from modules.pose.features.base.NormalizedScalarFeature import NormalizedScalarF
 _PoseEnum: type[IntEnum] | None = None
 
 
-def configure_motion_gate(max_poses: int) -> None:
-    """Configure MotionGate feature with number of poses to track.
-
-    Must be called once at application initialization before creating any Frame instances.
-
-    Args:
-        max_poses: Maximum number of poses to compare motion gates for
-    """
-    global _PoseEnum
-    if _PoseEnum is None:
-        _PoseEnum = cast(type[IntEnum], IntEnum("PoseIndex", {f"POSE_{i}": i for i in range(max_poses)}))
-
-
 class MotionGate(NormalizedScalarFeature):
     """Motion gate scores between current pose and other tracked poses.
 
@@ -61,10 +48,17 @@ class MotionGate(NormalizedScalarFeature):
     low/zero values when either pose is stationary or missing.
     """
 
+    @classmethod
+    def configure(cls, max_poses: int) -> None:
+        """Configure with number of poses to track. Idempotent."""
+        global _PoseEnum
+        if _PoseEnum is None:
+            _PoseEnum = cast(type[IntEnum], IntEnum("PoseIndex", {f"POSE_{i}": i for i in range(max_poses)}))
+
     def __init__(self, values: np.ndarray, scores: np.ndarray) -> None:
         if _PoseEnum is None:
             raise RuntimeError(
-                "MotionGate not configured. Call configure_motion_gate(max_poses) at app startup."
+                "MotionGate not configured. Call configure_features(max_poses) at app startup."
             )
         super().__init__(values, scores)
 
@@ -72,21 +66,23 @@ class MotionGate(NormalizedScalarFeature):
     def enum(cls) -> type[IntEnum]:
         if _PoseEnum is None:
             raise RuntimeError(
-                "MotionGate not configured. Call configure_motion_gate(max_poses) at app startup."
+                "MotionGate not configured. Call configure_features(max_poses) at app startup."
             )
         return _PoseEnum
 
     @classmethod
     def create_dummy(cls) -> 'MotionGate':
         """Create a dummy MotionGate with all zeros (no motion gate computed)."""
-        if _PoseEnum is None:
-            # Return minimal dummy if not configured yet
-            return cls.__new__(cls)
-        n = len(_PoseEnum)
-        return cls(
-            values=np.zeros(n, dtype=np.float32),
-            scores=np.zeros(n, dtype=np.float32)
-        )
+        if cls._empty_instance is None:
+            if _PoseEnum is None:
+                # Return minimal dummy if not configured yet
+                return cls.__new__(cls)
+            n = len(_PoseEnum)
+            cls._empty_instance = cls(
+                values=np.zeros(n, dtype=np.float32),
+                scores=np.zeros(n, dtype=np.float32)
+            )
+        return cls._empty_instance
 
     def overall_gate(self) -> float:
         """Compute overall motion gate using max (highest synchronized movement)."""

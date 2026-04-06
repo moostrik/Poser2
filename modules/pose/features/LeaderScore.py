@@ -18,19 +18,6 @@ from modules.pose.features.base.BaseScalarFeature import BaseScalarFeature, Feat
 _PoseEnum: type[IntEnum] | None = None
 
 
-def configure_leader_score(max_poses: int) -> None:
-    """Configure LeaderScore feature with number of poses to track.
-
-    Must be called once at application initialization before creating any Frame instances.
-
-    Args:
-        max_poses: Maximum number of poses to compare leader scores for
-    """
-    global _PoseEnum
-    if _PoseEnum is None:
-        _PoseEnum = cast(type[IntEnum], IntEnum("PoseIndex", {f"POSE_{i}": i for i in range(max_poses)}))
-
-
 class LeaderScore(BaseScalarFeature[FeatureEnum]):
     """Leader scores tracking temporal offset between pose pairs.
 
@@ -42,10 +29,17 @@ class LeaderScore(BaseScalarFeature[FeatureEnum]):
     Scores represent confidence in the temporal alignment detection.
     """
 
+    @classmethod
+    def configure(cls, max_poses: int) -> None:
+        """Configure with number of poses to track. Idempotent."""
+        global _PoseEnum
+        if _PoseEnum is None:
+            _PoseEnum = cast(type[IntEnum], IntEnum("PoseIndex", {f"POSE_{i}": i for i in range(max_poses)}))
+
     def __init__(self, values: np.ndarray, scores: np.ndarray) -> None:
         if _PoseEnum is None:
             raise RuntimeError(
-                "LeaderScore not configured. Call configure_leader_score(max_poses) at app startup."
+                "LeaderScore not configured. Call configure_features(max_poses) at app startup."
             )
         super().__init__(values, scores)
 
@@ -53,7 +47,7 @@ class LeaderScore(BaseScalarFeature[FeatureEnum]):
     def enum(cls) -> type[IntEnum]:
         if _PoseEnum is None:
             raise RuntimeError(
-                "LeaderScore not configured. Call configure_leader_score(max_poses) at app startup."
+                "LeaderScore not configured. Call configure_features(max_poses) at app startup."
             )
         return _PoseEnum
 
@@ -65,10 +59,12 @@ class LeaderScore(BaseScalarFeature[FeatureEnum]):
     @classmethod
     def create_dummy(cls) -> 'LeaderScore':
         """Create empty LeaderScore with all zero values and zero scores."""
-        if _PoseEnum is None:
-            raise RuntimeError(
-                "LeaderScore not configured. Call configure_leader_score(max_poses) at app startup."
-            )
-        values = np.zeros(len(_PoseEnum), dtype=np.float32)
-        scores = np.zeros(len(_PoseEnum), dtype=np.float32)
-        return cls(values, scores)
+        if cls._empty_instance is None:
+            if _PoseEnum is None:
+                raise RuntimeError(
+                "LeaderScore not configured. Call configure_features(max_poses) at app startup."
+                )
+            values = np.zeros(len(_PoseEnum), dtype=np.float32)
+            scores = np.zeros(len(_PoseEnum), dtype=np.float32)
+            cls._empty_instance = cls(values, scores)
+        return cls._empty_instance

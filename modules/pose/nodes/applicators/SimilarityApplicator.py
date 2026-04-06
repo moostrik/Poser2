@@ -3,7 +3,7 @@ from threading import Lock
 
 import numpy as np
 
-from modules.pose.features.Similarity import Similarity, configure_similarity
+from modules.pose.features.Similarity import Similarity
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
 from modules.settings import Settings, Field
@@ -27,7 +27,6 @@ class SimilarityApplicator(FilterNode):
     def __init__(self, settings: SimilarityApplicatorSettings | None = None) -> None:
         self._settings = settings if settings is not None else SimilarityApplicatorSettings()
         max_poses = self._settings.max_poses
-        configure_similarity(max_poses)
         self._similarity_dict: dict[int, Similarity] = {}
         self._lock: Lock = Lock()
         # Zero similarity with valid scores - used when a track is absent so that

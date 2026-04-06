@@ -215,26 +215,20 @@ from modules.pose.features.base.NormalizedScalarFeature import NormalizedScalarF
 _PoseEnum: type[IntEnum] | None = None
 
 
-def configure_similarity(max_poses: int) -> None:
-    """Configure Similarity feature with number of poses to track.
-
-    Must be called once at application initialization before creating any Frame instances.
-
-    Args:
-        max_poses: Maximum number of poses to compare similarities for
-    """
-    global _PoseEnum
-    if _PoseEnum is None:
-        _PoseEnum = cast(type[IntEnum], IntEnum("PoseIndex", {f"POSE_{i}": i for i in range(max_poses)}))
-
-
 class Similarity(NormalizedScalarFeature):
     """Similarity scores between current pose and multiple tracked poses."""
+
+    @classmethod
+    def configure(cls, max_poses: int) -> None:
+        """Configure with number of poses to track. Idempotent."""
+        global _PoseEnum
+        if _PoseEnum is None:
+            _PoseEnum = cast(type[IntEnum], IntEnum("PoseIndex", {f"POSE_{i}": i for i in range(max_poses)}))
 
     def __init__(self, values: np.ndarray, scores: np.ndarray) -> None:
         if _PoseEnum is None:
             raise RuntimeError(
-                "Similarity not configured. Call configure_similarity(max_poses) at app startup."
+                "Similarity not configured. Call configure_features(max_poses) at app startup."
             )
         super().__init__(values, scores)
 
@@ -242,7 +236,7 @@ class Similarity(NormalizedScalarFeature):
     def enum(cls) -> type[IntEnum]:
         if _PoseEnum is None:
             raise RuntimeError(
-                "Similarity not configured. Call configure_similarity(max_poses) at app startup."
+                "Similarity not configured. Call configure_features(max_poses) at app startup."
             )
         return _PoseEnum
 

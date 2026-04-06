@@ -71,10 +71,7 @@ class WindowNode(NodeBase):
             FeatureWindow with values and mask arrays, both shape (current_len, feature_len), oldest first.
             Returns None if emit_partial=False and window not yet full.
         """
-        # Extract feature from frame (may be absent in ECS-lite model)
-        feature = frame.get(self._feature_type)
-        if feature is None:
-            return None
+        feature = frame[self._feature_type]
 
         with self._lock:
             # Write to ring buffer at head position

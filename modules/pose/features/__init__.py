@@ -5,11 +5,12 @@ from .Angles import         Angles, AngleLandmark
 from .AngleVelocity import  AngleVelocity
 from .AngleMotion import    AngleMotion
 from .AngleSymmetry import  AngleSymmetry, SymmetryElement
-from .Similarity import     Similarity, configure_similarity
-from .LeaderScore import    LeaderScore, configure_leader_score
-from .MotionGate import     MotionGate, configure_motion_gate
+from .Similarity import     Similarity
+from .LeaderScore import    LeaderScore
+from .MotionGate import     MotionGate
 from .MotionTime import     MotionTime
 from .Age import            Age
+
 
 def _collect_concrete(cls: type) -> list[type[BaseFeature]]:
     """Recursively collect all concrete (non-abstract, non-private, non-base)
@@ -29,3 +30,21 @@ def _collect_concrete(cls: type) -> list[type[BaseFeature]]:
 
 
 FEATURES: list[type[BaseFeature]] = _collect_concrete(BaseFeature)
+
+SCALAR_FEATURES: list[type[BaseScalarFeature]] = [
+    f for f in FEATURES if issubclass(f, BaseScalarFeature)
+]
+
+TRACK_FEATURES: set[type[BaseScalarFeature]] = {Similarity, LeaderScore, MotionGate}
+"""Scalar features whose elements are indexed by track (pose), not by joint/body part."""
+
+
+def configure_features(max_poses: int) -> None:
+    """Configure all track-indexed features at startup.
+
+    Must be called once before building the pipeline so that every feature
+    can produce data (or NaN dummies). Idempotent — only the first call
+    has effect.
+    """
+    for ft in TRACK_FEATURES:
+        ft.configure(max_poses)  # type: ignore[attr-defined]

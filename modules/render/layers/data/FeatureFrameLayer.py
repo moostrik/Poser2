@@ -93,13 +93,10 @@ class FeatureFrameLayer(LayerBase):
 
         # Extract feature from frame
         feature_type = FEATURE_MAP[self._config.feature_field]
-        feature = pose.get(feature_type)
-        if feature is None:
-            return
+        feature = pose[feature_type]
 
         # If showing angles, also fetch velocity for thickness modulation
-        angle_vel = pose.get(AngleVelocity) if self._config.feature_field == ScalarFeatureSelect.Angles else None  # type: ignore[attr-defined]
-        deltas = angle_vel.values if angle_vel is not None else None
+        deltas = pose[AngleVelocity].values if self._config.feature_field == ScalarFeatureSelect.Angles else None  # type: ignore[attr-defined]
 
         colors = self._resolve_colors()
 

@@ -15,8 +15,8 @@ from modules.utils.TypedCallbackMixin import TypedCallbackMixin
 from modules.pose.frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
 from modules.pose.features import Angles, AngleMotion
 from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod, NormalizedScalarFeature
-from modules.pose.features.Similarity import configure_similarity, Similarity
-from modules.pose.features.LeaderScore import configure_leader_score, LeaderScore
+from modules.pose.features.Similarity import Similarity
+from modules.pose.features.LeaderScore import LeaderScore
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -73,10 +73,6 @@ class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int
         super().__init__()
 
         self._config = config if config is not None else WindowCorrelationSettings()
-
-        # Configure Similarity and LeaderScore modules with max_poses
-        configure_similarity(self._config.max_poses)
-        configure_leader_score(self._config.max_poses)
 
         self._correlation_thread = threading.Thread(target=self.run, daemon=True)
         self._stop_event = threading.Event()

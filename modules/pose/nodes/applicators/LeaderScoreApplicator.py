@@ -1,7 +1,7 @@
 # Standard library imports
 from threading import Lock
 
-from modules.pose.features.LeaderScore import LeaderScore, configure_leader_score
+from modules.pose.features.LeaderScore import LeaderScore
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
 from modules.settings import Settings, Field
@@ -25,7 +25,6 @@ class LeaderScoreApplicator(FilterNode):
 
     def __init__(self, settings: LeaderScoreApplicatorSettings | None = None) -> None:
         self._settings = settings if settings is not None else LeaderScoreApplicatorSettings()
-        configure_leader_score(self._settings.max_poses)
         self._leader_dict: dict[int, LeaderScore] = {}
         self._lock: Lock = Lock()
 

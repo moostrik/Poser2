@@ -49,10 +49,12 @@ class SingleValue(BaseScalarFeature[SingleElement]):
     @classmethod
     def create_dummy(cls) -> Self:
         """Create a dummy instance with NaN value and zero score."""
-        return cls(
-            values=np.array([np.nan], dtype=np.float32),
-            scores=np.array([0.0], dtype=np.float32),
-        )
+        if cls._empty_instance is None:
+            cls._empty_instance = cls(
+                values=np.array([np.nan], dtype=np.float32),
+                scores=np.array([0.0], dtype=np.float32),
+            )
+        return cls._empty_instance
 
     @classmethod
     def from_value(cls, value: float, score: float = 1.0) -> Self:

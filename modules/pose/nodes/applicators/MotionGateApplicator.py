@@ -4,7 +4,7 @@ from threading import Lock
 import numpy as np
 
 from modules.pose.features import AngleMotion
-from modules.pose.features.MotionGate import MotionGate, configure_motion_gate
+from modules.pose.features.MotionGate import MotionGate
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, FrameDict, replace
 from modules.settings import Settings, Field
@@ -30,7 +30,6 @@ class MotionGateApplicator(FilterNode):
 
     def __init__(self, config: MotionGateApplicatorSettings | None = None) -> None:
         self._config = config if config is not None else MotionGateApplicatorSettings()
-        configure_motion_gate(self._config.max_poses)
         self._motion_gate_dict: dict[int, MotionGate] = {}
         self._lock: Lock = Lock()
 
@@ -45,12 +44,8 @@ class MotionGateApplicator(FilterNode):
         # Step 1: Extract motion values for each pose
         motion_values: dict[int, float] = {}
         for track_id, frame in frames.items():
-            angle_motion = frame.get(AngleMotion)
-            if angle_motion is not None:
-                motion = angle_motion.value
-                motion_values[track_id] = motion if not np.isnan(motion) else 0.0
-            else:
-                motion_values[track_id] = 0.0
+            motion = frame[AngleMotion].value
+            motion_values[track_id] = motion if not np.isnan(motion) else 0.0
 
         # Step 2: Build MotionGate for each pose
         motion_gate_dict: dict[int, MotionGate] = {}

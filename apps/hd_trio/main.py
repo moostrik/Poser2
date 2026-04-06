@@ -9,10 +9,7 @@ from modules.data_hub import DataHub, Stage
 from modules.inout import OscSound, ArtNetBars
 from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers
-from modules.pose.features import (
-    BBox, Angles, AngleVelocity, AngleMotion, AngleSymmetry,
-    Similarity, LeaderScore, MotionGate, MotionTime, Age,
-)
+from modules.pose.features import configure_features
 from modules.utils import Timer
 
 from .settings import HDTrioSettings
@@ -38,6 +35,7 @@ class HDTrioMain:
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
         num_players: int = self.settings.num_players
+        configure_features(num_players)
 
         # DATA_HUB
         self.data_hub = DataHub()
@@ -91,10 +89,9 @@ class HDTrioMain:
         self.motion_gate_tracker =      trackers.FilterTracker(num_players, [lambda: self.motion_gate_applicator])
 
         # WINDOW TRACKERS
-        window_features = [BBox, Angles, AngleVelocity, AngleMotion, AngleSymmetry, Similarity, LeaderScore, MotionGate, MotionTime, Age]
-        self.window_tracker_R =     trackers.FrameWindowTracker(num_players, window_features, self.settings.pose.window_raw)
-        self.window_tracker_S =     trackers.FrameWindowTracker(num_players, window_features, self.settings.pose.window_smooth)
-        self.window_tracker_I =     trackers.FrameWindowTracker(num_players, window_features, self.settings.pose.window_lerp)
+        self.window_tracker_R =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_raw)
+        self.window_tracker_S =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_smooth)
+        self.window_tracker_I =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_lerp)
 
         self.bbox_filters =      trackers.FilterTracker(
             num_players,
