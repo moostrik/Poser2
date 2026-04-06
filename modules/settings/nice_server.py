@@ -1,14 +1,16 @@
 """NiceGUI settings server — runs on a background thread alongside the main app."""
 
+import importlib
 import logging
 import threading
+from pathlib import Path
 from typing import Callable, Optional
 
 from nicegui import ui, app as nicegui_app
 
 from modules.settings.base_settings import BaseSettings
 from modules.settings.field import Field
-from modules.settings.nice_panel import create_settings_panel, _get_local_ips
+from modules.settings import nice_panel as nice_panel_module
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,7 @@ class NiceServer:
         self.on_exit = on_exit
         self._thread: Optional[threading.Thread] = None
         self._page_registered = False
+        self._panel_file = Path(nice_panel_module.__file__).resolve() if nice_panel_module.__file__ else None
 
     def start(self) -> None:
         """Start the NiceGUI settings UI in a daemon thread."""
@@ -45,10 +48,32 @@ class NiceServer:
 
             @ui.page("/")
             def index():
+                panel_module = nice_panel_module
                 ui.dark_mode(True)
                 ui.add_head_html('<style>* { transition-duration: 0s !important; animation-duration: 0s !important; }</style>')
+
+                panel_file = self._panel_file
+                if panel_file is not None:
+                    last_panel_mtime = {'value': panel_file.stat().st_mtime}
+
+                    def _reload_panel_if_changed() -> None:
+                        try:
+                            current_mtime = panel_file.stat().st_mtime
+                        except OSError:
+                            return
+                        if current_mtime <= last_panel_mtime['value']:
+                            return
+                        last_panel_mtime['value'] = current_mtime
+                        try:
+                            importlib.reload(panel_module)
+                            ui.navigate.reload()
+                        except Exception:
+                            logger.warning('Settings UI reload failed', exc_info=True)
+
+                    ui.timer(0.5, _reload_panel_if_changed)
+
                 with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-                    create_settings_panel(root, title=title, port=port, on_exit=on_exit)
+                    panel_module.create_settings_panel(root, title=title, port=port, on_exit=on_exit)
 
         def _run():
             ui.run(
@@ -66,13 +91,9 @@ class NiceServer:
         self._thread.start()
 
         # Log connection URLs (skip loopback and link-local addresses)
-        import sys
-        use_ansi = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
-        BLUE = "\033[94m" if use_ansi else ""
-        RESET = "\033[0m" if use_ansi else ""
-        for ip in _get_local_ips():
-            logger.info("Settings UI: %shttp://%s:%s%s", BLUE, ip, port, RESET)
-        logger.info("Settings UI: %shttp://localhost:%s%s", BLUE, port, RESET)
+        for ip in nice_panel_module._get_local_ips():
+            logger.info("Settings UI: http://%s:%s", ip, port)
+        logger.info("Settings UI: http://localhost:%s", port)
 
     def stop(self) -> None:
         """Shut down the NiceGUI settings server."""

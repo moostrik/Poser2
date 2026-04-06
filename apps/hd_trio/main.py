@@ -293,9 +293,9 @@ class HDTrioMain:
         self.window_similator.stop()
         self.window_correlator.stop()
 
-        self.settings_server.stop()
-
         for camera in self.cameras:
             camera.join(timeout=10)
+
+        self.settings_server.stop()
 
         self.is_finished = True

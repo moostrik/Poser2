@@ -24,6 +24,7 @@ from modules.utils import Color, Point2f, Rect
 # and thread-safety issues (GL thread calling NiceGUI API).
 # ---------------------------------------------------------------------------
 POLL_INTERVAL = 0.25  # seconds
+LOG_DRAWER_DEFAULT_HEIGHT = '33vh'
 
 # ---------------------------------------------------------------------------
 # Expansion state persistence — remembers which sections are open/closed.
@@ -1177,6 +1178,8 @@ def create_settings_panel(
         .poser-grid { grid-template-columns: 1fr !important; }
     }
     .q-slider__pin { opacity: 0.65 !important; }
+    .q-tooltip { z-index: 10050 !important; }
+    #popup.nicegui-error-popup { display: none !important; }
     ''')
 
     # -- Shutdown overlay (client-side JS) ---------------------------------
@@ -1193,10 +1196,9 @@ def create_settings_panel(
         if (document.getElementById("shutdown-overlay")) return;
         var d = document.createElement("div");
         d.id = "shutdown-overlay";
-        d.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;"
-          + "display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);"
-          + "-webkit-backdrop-filter:blur(4px);";
-        d.innerHTML = '<div style="text-align:center;color:#e4e4e7">'
+                d.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9998;"
+                    + "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);";
+                d.innerHTML = '<div style="position:absolute;left:50%;top:calc((100vh - {LOG_DRAWER_DEFAULT_HEIGHT}) / 2);transform:translate(-50%, -50%);text-align:center;color:#e4e4e7">'
           + '{_title_markup}'
           + '<span class="material-icons" style="font-size:64px;color:#71717a;margin-bottom:0.75rem;display:block">'
           + 'cloud_off</span>'
@@ -1224,12 +1226,6 @@ def create_settings_panel(
     # -- Header row: title | preset controls | exit button -----------------
     # Collect tab entries early so we can build tabs inside the sticky header.
     tab_entries: list[tuple[str, BaseSettings]] = []  # (name, settings)
-    root_has_fields = any(
-        f.visible and f.widget != Widget.button
-        for f in root.fields.values()
-    ) or any(f.visible for f in root.actions.values())
-    if root_has_fields:
-        tab_entries.append((type(root).__name__, root))
     for child_name, child in root.children.items():
         if _has_visible_content(child):
             tab_entries.append((child_name, child))
@@ -1240,8 +1236,16 @@ def create_settings_panel(
         with ui.row().classes("w-full items-center flex-wrap gap-1"):
             if title:
                 ui.label(title).classes("text-2xl font-bold")
+
+            # Log drawer toggle — drawer itself is built outside the header below
+            _log_toggle_holder: list = []
+            _log_show_holder: list = []
+            ui.button(icon="terminal", on_click=lambda: _log_toggle_holder[0]() if _log_toggle_holder else None).props(
+                "dense flat"
+            ).tooltip("Log panel")
+
             if port is not None:
-                with ui.button(icon="lan").props("dense flat").tooltip("Show connection info"):
+                with ui.button(icon="lan").props("dense flat").tooltip("Connection info"):
                     with ui.menu().props('anchor="bottom middle" self="top middle"'):
                         with ui.card().classes("gap-1").props("flat"):
                             ui.label("Connect").classes("text-base font-bold")
@@ -1254,15 +1258,11 @@ def create_settings_panel(
             with ui.row().classes("flex-1 items-center gap-1 flex-nowrap justify-center"):
                 _build_preset_controls(root)
 
-            # Log drawer toggle — drawer itself is built outside the header below
-            _log_toggle_holder: list = []
-            ui.button(icon="terminal", on_click=lambda: _log_toggle_holder[0]() if _log_toggle_holder else None).props(
-                "dense flat"
-            ).tooltip("Toggle log panel")
-
             if on_exit:
                 async def _do_exit():
-                    await ui.run_javascript('showShutdownScreen()')
+                    if _log_show_holder:
+                        _log_show_holder[0]()
+                    await ui.run_javascript('window.showPoserLogDrawer?.(); showShutdownScreen()')
                     on_exit()
                 ui.button(icon="power_settings_new", on_click=_do_exit).props(
                     "dense flat color=negative"
@@ -1289,7 +1289,14 @@ def create_settings_panel(
             pinned_polls: list[tuple] = []
             with ui.row().classes("w-full gap-4 flex-wrap items-end"):
                 for settings, field_name, field in pinned_fields:
-                    _build_field_control(settings, field_name, field, pinned_polls)
+                    if field.access is Access.INIT:
+                        with ui.row().classes("items-center gap-1"):
+                            ui.label(generate_label(field_name)).classes("text-xs text-caption")
+                            ui.label(str(getattr(settings, field_name))).classes(
+                                "text-sm text-secondary italic"
+                            )
+                    else:
+                        _build_field_control(settings, field_name, field, pinned_polls)
                 for settings, action_name, action_field in pinned_actions:
                     _build_action_button(settings, action_name, action_field)
             _make_poll_timer(pinned_polls, timers)
@@ -1313,8 +1320,9 @@ def create_settings_panel(
     # -- end of sticky header --
 
     # Build log drawer outside the header so it's a top-level fixed element
-    _, _toggle_log_fn = _build_log_drawer(timers)
+    _, _toggle_log_fn, _show_log_fn = _build_log_drawer(timers)
     _log_toggle_holder.append(_toggle_log_fn)
+    _log_show_holder.append(_show_log_fn)
 
     if not tab_entries:
         return
@@ -1358,20 +1366,29 @@ def create_settings_panel(
 
 _LOG_LEVEL_COLORS = {
     'DEBUG':    '#888888',
-    'INFO':     '#cccccc',
+    'INFO':     '#ffffff',
     'WARNING':  '#f59e0b',
     'ERROR':    '#ef4444',
     'CRITICAL': '#ef4444',
 }
 
+_LOG_LEVEL_BUTTON_COLORS = {
+    'DEBUG':    'grey-6',
+    'INFO':     'grey-1',
+    'WARNING':  'orange-5',
+    'ERROR':    'red-5',
+    'CRITICAL': 'red-5',
+}
+
 _LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
+_LOG_SOURCE_ICON = 'code'
 
 
 def _build_log_drawer(timers: list) -> tuple:
     """Build a slide-up log drawer anchored to the bottom of the page.
 
-    Returns (drawer_element, toggle_function) so the caller can place
-    a toggle button in the header.
+    Returns (drawer_element, toggle_function, show_function) so the caller can
+    place a toggle button in the header and force the drawer open on shutdown.
     """
     from modules.log_config import get_log_buffer
 
@@ -1380,12 +1397,17 @@ def _build_log_drawer(timers: list) -> tuple:
         'cursor': 0,
         'filter_level': logging.INFO,
         'auto_scroll': True,
+        'show_time': False,
+        'show_source': False,
     }
 
     # CSS for log lines and drag handle
     ui.add_css('''
     .log-drawer { font-family: 'Roboto Mono', monospace; font-size: 13px; }
-    .log-drawer .log-line { padding: 1px 8px; white-space: pre-wrap; word-break: break-all; line-height: 1.4; }
+    .log-drawer .log-line {
+        padding: 1px 8px;
+        white-space: pre-wrap; word-break: break-all; line-height: 1.4;
+    }
     .log-chip-active { opacity: 1.0 !important; }
     .log-chip-inactive { opacity: 0.35 !important; }
     .log-drag-handle {
@@ -1397,11 +1419,12 @@ def _build_log_drawer(timers: list) -> tuple:
 
     # Drawer container — fixed to bottom, initially hidden
     drawer = ui.element('div').classes('log-drawer').style(
-        'position: fixed; bottom: 0; left: 0; right: 0; height: 300px;'
+        f'position: fixed; bottom: 0; left: 0; right: 0; height: {LOG_DRAWER_DEFAULT_HEIGHT};'
         'background: #141414; border-top: 2px solid #333; z-index: 9999;'
         'display: flex; flex-direction: column;'
     )
     drawer.set_visibility(False)
+    toggle_holder: list[Callable[[], None]] = []
 
     with drawer:
         # Drag handle for resizing
@@ -1411,24 +1434,35 @@ def _build_log_drawer(timers: list) -> tuple:
         with ui.row().classes('w-full items-center gap-2').style(
             'padding: 4px 12px; background: #1a1a1a; border-bottom: 1px solid #333; flex-shrink: 0;'
         ):
-            ui.icon('terminal').classes('text-lg text-grey-5')
-            ui.label('Log').classes('text-sm font-bold text-grey-4')
+            ui.button(icon='terminal', on_click=lambda: toggle_holder[0]() if toggle_holder else None).props(
+                'dense flat size=sm color=primary'
+            ).tooltip('Hide panel')
+
+            # Timestamp toggle
+            time_btn = ui.button(icon='schedule', on_click=lambda: _toggle_time()).props(
+                'dense flat size=sm'
+            ).tooltip('Show Timestamps').classes('log-chip-inactive')
+
+            # Source toggle
+            source_btn = ui.button(icon=_LOG_SOURCE_ICON, on_click=lambda: _toggle_source()).props(
+                'dense flat size=sm'
+            ).tooltip('Show Source')
 
             # Level filter chips
             chips: dict[str, ui.element] = {}
             for level_name in _LOG_LEVELS:
-                color = _LOG_LEVEL_COLORS[level_name]
+                button_color = _LOG_LEVEL_BUTTON_COLORS[level_name]
 
                 chip = ui.button(level_name, on_click=lambda _, ln=level_name: _set_filter(ln)).props(
-                    'dense flat size=xs no-caps'
-                ).style(f'color: {color}; font-size: 11px; min-height: 24px; padding: 0 8px;')
+                    f'dense flat size=sm no-caps color={button_color}'
+                ).style('font-size: 13px; min-height: 30px; padding: 0 10px;')
                 chips[level_name] = chip
 
             ui.element('div').classes('flex-1')  # spacer
 
             # Clear button
             ui.button(icon='delete_sweep', on_click=lambda: _clear_log()).props(
-                'dense flat size=xs'
+                'dense flat size=sm color=primary'
             ).tooltip('Clear log')
 
         # Scrollable log area
@@ -1444,12 +1478,37 @@ def _build_log_drawer(timers: list) -> tuple:
             else:
                 chip.classes(remove='log-chip-active', add='log-chip-inactive')
 
+    def _update_toggle_styles():
+        time_btn.props(f'color={"primary" if state["show_time"] else "grey-7"}')
+        if state['show_time']:
+            time_btn.classes(remove='log-chip-inactive', add='log-chip-active')
+        else:
+            time_btn.classes(remove='log-chip-active', add='log-chip-inactive')
+        time_btn.update()
+        source_btn.props(f'color={"primary" if state["show_source"] else "grey-7"}')
+        if state['show_source']:
+            source_btn.classes(remove='log-chip-inactive', add='log-chip-active')
+        else:
+            source_btn.classes(remove='log-chip-active', add='log-chip-inactive')
+        source_btn.update()
+
     _update_chip_styles()
+    _update_toggle_styles()
 
     def _set_filter(level_name: str):
         state['filter_level'] = getattr(logging, level_name)
         _update_chip_styles()
         # Re-render all entries with new filter
+        _full_refresh()
+
+    def _toggle_time():
+        state['show_time'] = not state['show_time']
+        _update_toggle_styles()
+        _full_refresh()
+
+    def _toggle_source():
+        state['show_source'] = not state['show_source']
+        _update_toggle_styles()
         _full_refresh()
 
     def _clear_log():
@@ -1459,28 +1518,21 @@ def _build_log_drawer(timers: list) -> tuple:
             state['cursor'] = buf._counter
         state['auto_scroll'] = True
 
-    def _make_line_html(entry) -> str:
-        import html as html_mod
+    def _make_line_text(entry) -> tuple[str, str]:
         color = _LOG_LEVEL_COLORS.get(entry.level, '#cccccc')
-        ts = html_mod.escape(entry.timestamp)
-        src = html_mod.escape(entry.source)
-        msg = html_mod.escape(entry.message)
-        # First line gets timestamp/source prefix, continuation lines are indented
-        lines = msg.split('\n')
-        prefix = f'<span style="color:#555">{ts}</span> <span style="color:{color}">{entry.level:<7s}</span> <span style="color:#7cacf8">{src}</span>: '
-        first = prefix + lines[0]
-        if len(lines) > 1:
-            indent = '&nbsp;' * 27  # align with message start
-            rest = '\n'.join(indent + line for line in lines[1:])
-            return first + '\n' + rest
-        return first
+        time_prefix = f'{entry.timestamp} ' if state['show_time'] else ''
+        source_prefix = f'{entry.source}: ' if state['show_source'] else ''
+        text = f'{time_prefix}{source_prefix}{entry.message}'
+        return text, color
 
     def _append_entries(entries):
         with log_area:
             for entry in entries:
                 if getattr(logging, entry.level) >= state['filter_level']:
-                    line_html = _make_line_html(entry)
-                    ui.html(f'<div class="log-line">{line_html}</div>')
+                    text, color = _make_line_text(entry)
+                    ui.label(text).classes('log-line w-full').style(
+                        f'color: {color}; white-space: pre-wrap;'
+                    )
         if state['auto_scroll']:
             _scroll_to_bottom()
 
@@ -1547,8 +1599,36 @@ def _build_log_drawer(timers: list) -> tuple:
         }})();
     ''')
 
+    # Auto-show the drawer on disconnect so the last buffered log remains visible.
+    ui.run_javascript(f'''
+        (function() {{
+            var drawer = document.getElementById("c{drawer.id}");
+            if (!drawer) return;
+
+            window.__poserLogDrawer = drawer;
+
+            function showLogDrawerOnDisconnect() {{
+                if (!window.__poserLogDrawer) return;
+                window.__poserLogDrawer.style.display = 'flex';
+            }}
+
+            window.showPoserLogDrawer = showLogDrawerOnDisconnect;
+
+            var waitForSocket = setInterval(function() {{
+                if (!window.socket) return;
+                window.socket.on("disconnect", showLogDrawerOnDisconnect);
+                clearInterval(waitForSocket);
+            }}, 100);
+        }})();
+    ''')
+
     # Toggle function
     visible = {'v': False}
+
+    def _show():
+        visible['v'] = True
+        drawer.set_visibility(True)
+        _full_refresh()
 
     def _toggle():
         visible['v'] = not visible['v']
@@ -1556,4 +1636,6 @@ def _build_log_drawer(timers: list) -> tuple:
         if visible['v']:
             _full_refresh()
 
-    return drawer, _toggle
+    toggle_holder.append(_toggle)
+
+    return drawer, _toggle, _show

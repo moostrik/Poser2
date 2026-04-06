@@ -7,7 +7,7 @@
     "square": true,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "models",
     "video_path": "recordings",
     "temp_path": "temp",
@@ -158,9 +158,6 @@
       "output_height": 1024,
       "enable_prev_crop": false,
       "verbose": false
-    },
-    "angle_extractor": {
-      "aspect_ratio": 0.75
     },
     "bbox": {
       "smoother": {
