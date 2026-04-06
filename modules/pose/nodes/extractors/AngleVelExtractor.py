@@ -4,10 +4,10 @@ from numpy import pi
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.features import Angles, AngleVelocity
 from modules.pose.frame import Frame, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class AngleVelExtractorSettings(Settings):
+class AngleVelExtractorSettings(BaseSettings):
     """Configuration for AngleVelExtractor."""
     frequency: Field[float] = Field(30.0, access=Field.INIT)
 

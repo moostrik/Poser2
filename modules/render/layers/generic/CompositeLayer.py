@@ -9,7 +9,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Fbo, Texture, Style
 from modules.gl.shaders import Blit, Lut
 from modules.render.layers.LayerBase import LayerBase
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -57,7 +57,7 @@ LutSelection = _discover_luts()
 # Configuration
 # ============================================================================
 
-class CompositeLayerSettings(Settings):
+class CompositeLayerSettings(BaseSettings):
     """Configuration for CompositeLayer."""
     blend_mode:     Field[Style.BlendMode] = Field(Style.BlendMode.ALPHA)
     lut:            Field[LutSelection]    = Field(LutSelection.NONE)  # type: ignore

@@ -4,7 +4,7 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 from modules.data_hub import DataHub, Stage
 from modules.gl import Fbo, Texture, clear_color
 from modules.pose.frame import Frame
@@ -16,7 +16,7 @@ from modules.utils.PointsAndRects import Rect
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class PoseDotSettings(Settings):
+class PoseDotSettings(BaseSettings):
     stage:      Field[Stage] = Field(Stage.LERP, access=Field.INIT, description="Pipeline stage for pose data")
     dot_size:   Field[float] = Field(4.0, min=1.0, max=20.0, description="Dot size in pixels")
     dot_smooth: Field[float] = Field(2.0, min=0.0, max=10.0, description="Dot smoothing/antialiasing width")

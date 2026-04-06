@@ -4,10 +4,10 @@ from threading import Lock
 from modules.pose.features.LeaderScore import LeaderScore
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class LeaderScoreApplicatorSettings(Settings):
+class LeaderScoreApplicatorSettings(BaseSettings):
     """Configuration for LeaderScoreApplicator."""
     max_poses: Field[int] = Field(4, access=Field.INIT, min=1, max=16)
 

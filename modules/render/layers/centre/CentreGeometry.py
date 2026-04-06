@@ -10,7 +10,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.data_hub import DataHub, DataHubType, Stage
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 from modules.pose.frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
 from modules.pose.features import BBox
@@ -21,7 +21,7 @@ from modules.gl import Texture
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CentreGeomSettings(Settings):
+class CentreGeomSettings(BaseSettings):
     """Configuration for CentreGeometry anchor point positioning."""
     stage:              Field[Stage] = Field(Stage.SMOOTH, description="Pose data pipeline stage")
     cam_aspect:         Field[float] = Field(1.7778, access=Field.INIT, description="Camera aspect ratio (16/9 = 1.7778)")

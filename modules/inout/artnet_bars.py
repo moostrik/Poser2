@@ -11,7 +11,7 @@ import time
 
 from stupidArtnet import StupidArtnet
 
-from modules.settings import Settings, Field, Widget, Access
+from modules.settings import BaseSettings, Field, Widget, Access
 from modules.utils.Color import Color
 from modules.inout.network_validation import validate_connection
 
@@ -55,7 +55,7 @@ def _parse_channel_order(order_enum: ChannelOrder) -> tuple[int, int, int, int]:
     return (order.index('R'), order.index('G'), order.index('B'), order.index('W'))
 
 
-class ArtNetBarsSettings(Settings):
+class ArtNetBarsSettings(BaseSettings):
     """Configuration for a single ArtNet LED bar controller.
 
     Init fields (set via preset, then locked after initialize()):

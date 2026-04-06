@@ -5,11 +5,11 @@ render_settings.py (which imports layer Settings classes) and the
 layer modules (which need ColorSettings at runtime).
 """
 
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 from modules.utils import Color
 
 
-class ColorSettings(Settings):
+class ColorSettings(BaseSettings):
     """Per-player track colors (one color picker per player in the panel)."""
     player_0:    Field[Color] = Field(Color(1.0, 0.0, 0.0))  # Red
     player_1:    Field[Color] = Field(Color(0.0, 0.0, 1.0))  # Blue

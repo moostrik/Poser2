@@ -15,7 +15,7 @@ from modules.pose.features import AngleMotion
 
 from modules.render.layers.source.MaskSourceLayer import MaskSourceLayer
 
-from modules.settings import Field, Settings, Group
+from modules.settings import Field, BaseSettings, Group
 from modules.flow import (
     OpticalFlow, OpticalFlowSettings,
     VelocitySmoothTrail, SmoothTrailSettings,
@@ -53,7 +53,7 @@ class FlowDrawMode(IntEnum):
     TEMP_BRIDGE_OUTPUT = auto()
 
 
-class FlowLayerSettings(Settings):
+class FlowLayerSettings(BaseSettings):
     """Configuration for FlowLayer (optical flow + bridges)."""
     fps: Field[float] =                     Field(60.0, min=1.0, max=240.0)
     draw_mode: Field[FlowDrawMode] =        Field(FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR)

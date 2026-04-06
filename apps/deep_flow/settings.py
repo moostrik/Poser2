@@ -2,7 +2,7 @@
 
 from enum import IntEnum, auto
 
-from modules.settings import Settings, NiceSettings, Field, Group
+from modules.settings import BaseSettings, NiceSettings, Field, Group
 from modules.oak import CameraSettings, FrameType, CoderFormat, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render.color_settings import ColorSettings
 from modules.render import layers
@@ -50,7 +50,7 @@ class Layers(IntEnum):
 #  Layer selection settings (split view)
 # ---------------------------------------------------------------------------
 
-class LayerSettings(Settings):
+class LayerSettings(BaseSettings):
     left:   Field[list[Layers]] = Field([Layers.composite],  description="Layers drawn in the left viewport")
     right:  Field[list[Layers]] = Field([Layers.tracker],    description="Layers drawn in the right viewport")
     final:  Field[list[Layers]] = Field([Layers.composite],  description="Layers drawn on the output monitors")
@@ -60,7 +60,7 @@ class LayerSettings(Settings):
 #  Oak camera group (1 camera)
 # ---------------------------------------------------------------------------
 
-class OakGroup(Settings):
+class OakGroup(BaseSettings):
     num_cameras:        Field[int]               = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
     fps:                Field[float]             = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
     yolo:               Field[bool]              = Field(True, access=Field.INIT, description="Enable YOLO person detection")
@@ -91,7 +91,7 @@ class OakGroup(Settings):
 #  InOut group (OSC sound + OSC control)
 # ---------------------------------------------------------------------------
 
-class InOutGroup(Settings):
+class InOutGroup(BaseSettings):
     osc_sound   = Group(OscSoundSettings)
     osc_control = Group(OscControlSettings)
 
@@ -100,7 +100,7 @@ class InOutGroup(Settings):
 #  Pose feature groups
 # ---------------------------------------------------------------------------
 
-class BboxFeature(Settings):
+class BboxFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
 
@@ -108,7 +108,7 @@ class BboxFeature(Settings):
     prediction   = Group(nodes.PredictorSettings, share=[frequency])
     interpolator = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
-class PointFeature(Settings):
+class PointFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
 
@@ -117,7 +117,7 @@ class PointFeature(Settings):
     prediction   = Group(nodes.PredictorSettings, share=[frequency])
     interpolator = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
-class AngleFeature(Settings):
+class AngleFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
 
@@ -126,7 +126,7 @@ class AngleFeature(Settings):
     interpolator = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     sticky       = Group(nodes.StickyFillerSettings)
 
-class VelocityFeature(Settings):
+class VelocityFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
 
@@ -136,7 +136,7 @@ class VelocityFeature(Settings):
     interpolator  = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     sticky           = Group(nodes.StickyFillerSettings)
 
-class MotionFeature(Settings):
+class MotionFeature(BaseSettings):
     extractor       = Group(nodes.AngleMotionExtractorSettings)
     moving_average  = Group(nodes.MovingAverageSettings)
 
@@ -145,7 +145,7 @@ class MotionFeature(Settings):
 #  Pose pipeline group (no similarity — single player)
 # ---------------------------------------------------------------------------
 
-class PoseGroup(Settings):
+class PoseGroup(BaseSettings):
     max_poses:          Field[int]          = Field(1, min=1, max=16, access=Field.INIT)
     model_type:         Field[ModelType]    = Field(ModelType.TRT, access=Field.INIT)
     model_path:         Field[str]          = Field("models", access=Field.INIT, visible=False)
@@ -175,7 +175,7 @@ class PoseGroup(Settings):
 #  Tracker + Timer
 # ---------------------------------------------------------------------------
 
-class TTGroup(Settings):
+class TTGroup(BaseSettings):
     timer   = Group(TimerSettings)
     tracker = Group(OnePerCamTrackerSettings)
 
@@ -184,19 +184,19 @@ class TTGroup(Settings):
 #  Render settings
 # ---------------------------------------------------------------------------
 
-class LayerGroup(Settings):
+class LayerGroup(BaseSettings):
     select = Group(LayerSettings)
     lut    = Group(layers.CompositeLayerSettings)
 
-class DataGroup(Settings):
+class DataGroup(BaseSettings):
     a = Group(layers.DataLayerSettings)
     b = Group(layers.DataLayerSettings)
 
-class PreviewGroup(Settings):
+class PreviewGroup(BaseSettings):
     tracker = Group(layers.TrackerCompSettings)
     poser   = Group(layers.PoseCompSettings)
 
-class CentreGroup(Settings):
+class CentreGroup(BaseSettings):
     geometry = Group(layers.CentreGeomSettings)
     mask     = Group(layers.CentreMaskSettings)
     cam      = Group(layers.CentreCamSettings)
@@ -204,7 +204,7 @@ class CentreGroup(Settings):
     pose     = Group(layers.CentrePoseSettings)
     color    = Group(layers.ColorMaskLayerSettings)
 
-class RenderGroup(Settings):
+class RenderGroup(BaseSettings):
     layer   = Group(LayerGroup)
     data    = Group(DataGroup)
     preview = Group(PreviewGroup)
@@ -219,7 +219,7 @@ class RenderGroup(Settings):
 #  Root settings
 # ---------------------------------------------------------------------------
 
-class DeepFlowSettings(Settings):
+class DeepFlowSettings(BaseSettings):
     num_players:        Field[int]   = Field(1, access=Field.INIT, visible=False)
     fps:                Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
 

@@ -1,14 +1,14 @@
 """Renders centered and rotated optical flow visualization with optional mask."""
 
 # Local application imports
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, MaskApply
 from modules.gl import Fbo, Texture, Style
 
 
-class CentreDlowSettings(Settings):
+class CentreDlowSettings(BaseSettings):
     """Configuration for CentreDenseFlowLayer optical flow visualization."""
     mask_opacity:   Field[float] = Field(1.0, min=0.0, max=1.0, description="Flow mask opacity")
     use_mask:       Field[bool]  = Field(True, description="Enable flow masking")

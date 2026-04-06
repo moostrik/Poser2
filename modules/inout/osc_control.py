@@ -8,12 +8,12 @@ from pythonosc.udp_client import SimpleUDPClient
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 
-from modules.settings import Settings, Field, Widget
+from modules.settings import BaseSettings, Field, Widget
 
 import logging
 logger = logging.getLogger(__name__)
 
-class OscControlSettings(Settings):
+class OscControlSettings(BaseSettings):
     port_in        = Field(9000, min=1024, max=65535, access=Field.INIT, widget=Widget.number, description="Incoming OSC port")
     ip_address_in  = Field("127.0.0.1",              access=Field.INIT, widget=Widget.ip_field,     description="Incoming OSC IP address")
     return_messages = Field(True,                                                               description="Echo received messages back to sender")

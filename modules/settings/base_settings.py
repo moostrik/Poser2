@@ -36,7 +36,7 @@ from modules.settings.widget import Widget
 logger = logging.getLogger(__name__)
 
 
-class Settings:
+class BaseSettings:
     """Reactive dataclass — declare fields and groups as class attributes."""
 
     def __init__(self, **kwargs):
@@ -134,7 +134,7 @@ class Settings:
         return {n: f for n, f in self._fields.items() if f.widget == Widget.button}
 
     @property
-    def parent(self) -> 'Settings | None':
+    def parent(self) -> 'BaseSettings | None':
         """The parent Settings that owns this child, or None for root."""
         return self._parent
 

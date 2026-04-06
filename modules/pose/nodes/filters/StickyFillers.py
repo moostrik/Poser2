@@ -13,10 +13,10 @@ from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, BBox, Po
 from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class StickyFillerSettings(Settings):
+class StickyFillerSettings(BaseSettings):
     """Configuration for pose hold filter."""
     init_to_zero: Field[bool] = Field(False)
     hold_scores:  Field[bool] = Field(False)

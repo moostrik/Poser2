@@ -1,7 +1,7 @@
 """Renders centered and rotated foreground with temporal blending and optional mask."""
 
 # Local application imports
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, Blend, MaskApply, CelShade, HueShift
@@ -13,7 +13,7 @@ from modules.render.color_settings import ColorSettings
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CentreFrgSettings(Settings):
+class CentreFrgSettings(BaseSettings):
     """Configuration for CentreFrgLayer foreground rendering."""
     blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Foreground temporal blending")
     exposure:       Field[float] = Field(1.2, min=0.1, max=3.0, description="Exposure multiplier")

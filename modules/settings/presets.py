@@ -4,7 +4,7 @@ import json
 import logging
 from pathlib import Path
 
-from modules.settings.settings import Settings
+from modules.settings.base_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def set_startup(name: str, app_name: str | None = None) -> None:
     (d / ".ui_preset.json").write_text(json.dumps({"startup_preset": name}, indent=2))
 
 
-def save(root: Settings, filepath) -> None:
+def save(root: BaseSettings, filepath) -> None:
     """Serialize all settings to a JSON file (atomic write)."""
     import os
     import tempfile
@@ -102,7 +102,7 @@ def startup_path(app_name: str | None = None) -> Path:
     return path(get_startup(app_name), app_name)
 
 
-def load(root: Settings, filepath) -> bool:
+def load(root: BaseSettings, filepath) -> bool:
     """Restore settings from a JSON file.
 
     Skips unknown fields and init_only fields.  Silently handles

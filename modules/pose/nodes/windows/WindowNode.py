@@ -7,10 +7,10 @@ from modules.pose.frame.window import FeatureWindow
 from modules.pose.features import BaseScalarFeature, Angles, AngleMotion, AngleSymmetry, AngleVelocity, BBox, Similarity
 from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import NodeBase
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class WindowNodeSettings(Settings):
+class WindowNodeSettings(BaseSettings):
     """Configuration for window nodes."""
     window_size:  Field[int]  = Field(30)
     emit_partial: Field[bool] = Field(True)

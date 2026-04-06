@@ -5,7 +5,7 @@ import threading
 from enum import IntEnum, auto
 from typing import Callable, Set
 
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 import logging
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ class TimerState(IntEnum):
     INTERMEZZO =    auto()
 
 
-class TimerSettings(Settings):
+class TimerSettings(BaseSettings):
     """Configuration for Timer."""
     fps:        Field[float] = Field(60.0, access=Field.INIT)
     run:        Field[bool]  = Field(False)

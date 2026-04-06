@@ -21,7 +21,7 @@ from modules.data_hub import DataHub, Stage
 from modules.pose.frame import Frame
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 
-from modules.settings import Field, Settings, Group
+from modules.settings import Field, BaseSettings, Group
 from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlowSettings
 from modules.render.shaders import DensityColorize
 
@@ -59,7 +59,7 @@ class UnifiedFluidDrawMode(IntEnum):
     PRESSURE = auto()
 
 
-class UnifiedFluidLayerSettings(Settings):
+class UnifiedFluidLayerSettings(BaseSettings):
     """Configuration for UnifiedFluidLayer."""
     num_players = Field(3, min=1, max=8)
     gap_ratio = Field(0.5, min=0.0, max=2.0, description="Gap = ratio * slot width")

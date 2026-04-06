@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar, overload, Sequence
 from modules.settings.field import Field, FieldAlias, Access
 
 if TYPE_CHECKING:
-    from modules.settings.settings import Settings
+    from modules.settings.base_settings import BaseSettings
 
 T = TypeVar("T")
 
@@ -69,21 +69,21 @@ class Group(Generic[T]):
     @overload
     def __get__(self, obj: None, objtype: type) -> 'Group[T]': ...
     @overload
-    def __get__(self, obj: 'Settings', objtype: type) -> T: ...
+    def __get__(self, obj: 'BaseSettings', objtype: type) -> T: ...
 
     def __get__(self, obj, objtype=None):
         if obj is None:
             return self
         return obj._children[self.name]
 
-    def __set__(self, obj: 'Settings', value):
+    def __set__(self, obj: 'BaseSettings', value):
         raise AttributeError(
             f"Cannot replace group '{self.name}' — mutate its fields instead"
         )
 
     # -- Helpers used by Settings.__init__ -----------------------------------
 
-    def validate_share(self, owner: 'Settings') -> None:
+    def validate_share(self, owner: 'BaseSettings') -> None:
         """Check that every shared field exists on both parent and child with matching types and access modes.
 
         Raises ``TypeError`` if:
@@ -127,7 +127,7 @@ class Group(Generic[T]):
                     f"Shared INIT fields must be INIT on the child too."
                 )
 
-    def build_share_kwargs(self, owner: 'Settings') -> dict:
+    def build_share_kwargs(self, owner: 'BaseSettings') -> dict:
         """Build constructor kwargs from the parent's shared field values."""
         kwargs = {}
         for parent_name, child_name in self.share_map.items():

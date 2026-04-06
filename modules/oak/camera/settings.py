@@ -7,10 +7,10 @@ from .definitions import (
     Input,
 )
 from .pipeline import get_stereo_config
-from modules.settings import Settings, Field, Widget
+from modules.settings import BaseSettings, Field, Widget
 
 
-class CameraSettings(Settings):
+class CameraSettings(BaseSettings):
     """Per-camera runtime settings. Instantiated N times via Child(count=num_cameras)."""
 
     # Identity

@@ -13,7 +13,7 @@ from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, Similari
 from modules.pose.features.Angles import AngleLandmark
 
 from modules.data_hub import DataHub, DataHubType, Stage
-from modules.settings import Settings, Field, Widget
+from modules.settings import BaseSettings, Field, Widget
 from modules.utils.Timer import TimerState
 from modules.utils.HotReloadMethods import HotReloadMethods
 from modules.inout.network_validation import validate_connection
@@ -21,7 +21,7 @@ from modules.inout.network_validation import validate_connection
 import logging
 logger = logging.getLogger(__name__)
 
-class OscSoundSettings(Settings):
+class OscSoundSettings(BaseSettings):
     ip_addresses: Field[str] = Field("127.0.0.1",               widget=Widget.ip_field,     description="Target OSC IP address")
     port: Field[int]         = Field(9000, min=1024, max=65535, widget=Widget.number_field, description="Target OSC port")
     stage: Field[Stage]      = Field(Stage.LERP,                                            description="Pipeline stage to read poses from")

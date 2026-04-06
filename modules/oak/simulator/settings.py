@@ -1,8 +1,8 @@
 from ..camera.definitions import FrameType, CoderType, CoderFormat
-from modules.settings import Settings, Field, Widget
+from modules.settings import BaseSettings, Field, Widget
 
 
-class SimulatorSettings(Settings):
+class SimulatorSettings(BaseSettings):
     available_folders: Field[list[str]] = Field(["–"], access=Field.READ, visible=False, description="Available recording folders")
     folder:         Field[str]  = Field("", widget=Widget.text_select, options=available_folders, description="Recording folder")
     start:          Field[bool] = Field(False, widget=Widget.button, description="Start playback")

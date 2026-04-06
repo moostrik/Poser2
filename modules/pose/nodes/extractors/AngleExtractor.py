@@ -3,10 +3,10 @@ from modules.pose.features import Angles, Points2D
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.nodes._utils.AngleUtils import AngleUtils
 from modules.pose.frame import Frame, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class AngleExtractorSettings(Settings):
+class AngleExtractorSettings(BaseSettings):
     """Configuration for AngleExtractor."""
     aspect_ratio: Field[float] = Field(0.75, access=Field.INIT)
 

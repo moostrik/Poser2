@@ -21,7 +21,7 @@ from modules.data_hub import DataHub, Stage
 from modules.pose.frame import Frame
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 
-from modules.settings import Field, Settings, Group
+from modules.settings import Field, BaseSettings, Group
 from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlow3D, FluidFlow3DArray, FluidFlowSettings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -60,7 +60,7 @@ class Fluid3DDrawMode(IntEnum):
     DENSITY_RAW = auto()
 
 
-class Fluid3DLayerSettings(Settings):
+class Fluid3DLayerSettings(BaseSettings):
     """Configuration for Fluid3DLayer (3D fluid simulation)."""
     num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
     sim_engine: Field[FluidSimEngine] =     Field(FluidSimEngine.FLUID_3D_ARRAY)

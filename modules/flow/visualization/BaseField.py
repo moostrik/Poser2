@@ -9,10 +9,10 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Fbo, Texture, Blit
 from modules.utils.PointsAndRects import Rect
 
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 
 
-class VisualisationFieldSettings(Settings):
+class VisualisationFieldSettings(BaseSettings):
     """Base configuration for field visualizations."""
     toggle_scalar = Field(False, description="Toggle between direction map and arrow field")
     scale = Field(1.0, min=0.0, max=10.0, description="Visualization scale multiplier")

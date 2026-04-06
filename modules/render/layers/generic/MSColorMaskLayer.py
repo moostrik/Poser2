@@ -13,7 +13,7 @@ from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.data_hub import DataHub, Stage
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 from modules.pose.frame import Frame
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 
 from modules.render.shaders.hdt.MSColorMask import MSColorMask
 from modules.render.shaders.hdt.AddDodgeBlend import AddDodgeBlend
@@ -24,7 +24,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 from modules.render.color_settings import ColorSettings
 
 
-class ColorMaskLayerSettings(Settings):
+class ColorMaskLayerSettings(BaseSettings):
     """Configuration for MSColorMaskLayer."""
     num_players:            Field[int]   = Field(3, access=Field.INIT)
     blend_mode:             Field[Style.BlendMode] = Field(Style.BlendMode.ALPHA)

@@ -16,10 +16,10 @@ from modules.pose.features import Angles, Points2D, AngleVelocity, AngleMotion, 
 from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class EmaSmootherSettings(Settings):
+class EmaSmootherSettings(BaseSettings):
     """Configuration for EMA smoothing with automatic change notification."""
     attack:  Field[float] = Field(0.95)
     release: Field[float] = Field(0.8)

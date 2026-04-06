@@ -7,10 +7,10 @@ from modules.pose.features import AngleMotion
 from modules.pose.features.MotionGate import MotionGate
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, FrameDict, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class MotionGateApplicatorSettings(Settings):
+class MotionGateApplicatorSettings(BaseSettings):
     """Configuration for MotionGateApplicator."""
     max_poses: Field[int] = Field(4, min=1, max=16, access=Field.INIT)
 

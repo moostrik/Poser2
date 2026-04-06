@@ -16,12 +16,12 @@ from dataclasses import dataclass, field
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, SwapFbo
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
 from .shaders.TemperatureBridge import TemperatureBridge as TemperatureBridgeShader
 
 
-class TemperatureBridgeSettings(Settings):
+class TemperatureBridgeSettings(BaseSettings):
     """Configuration for temperature bridge."""
     scale = Field(0.5, min=-1.0, max=2.0, description="Temperature output multiplier")
 

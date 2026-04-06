@@ -1,5 +1,5 @@
 from ..model_types import ModelType, Resolution, RESOLUTION_DIMS, ASPECT_RATIOS
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 _MODELS = {
     'onnx': {
@@ -17,7 +17,7 @@ _MODELS = {
 }
 
 
-class DetectionSettings(Settings):
+class DetectionSettings(BaseSettings):
     """Settings for pose detection (RTMPose)."""
 
     max_poses:  Field[int]        = Field(1, min=1, max=16, access=Field.INIT)

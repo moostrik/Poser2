@@ -1,6 +1,6 @@
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class SyncSettings(Settings):
+class SyncSettings(BaseSettings):
     num_cameras:    Field[int]   = Field(1, access=Field.INIT)
     fps:            Field[float] = Field(30.0, access=Field.INIT)

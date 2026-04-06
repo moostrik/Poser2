@@ -2,7 +2,7 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 from modules.data_hub import DataHub, Stage
 from modules.pose.frame import Frame
 from modules.pose.features import BBox
@@ -11,7 +11,7 @@ from modules.render.shaders import DrawRectangleOutline
 from modules.utils import Color
 
 
-class BBoxRendererSettings(Settings):
+class BBoxRendererSettings(BaseSettings):
     stage:      Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
     line_width: Field[float] = Field(2.0, min=1.0, max=10.0, description="Bounding box line width in pixels")
     color:      Field[Color] = Field(Color(1.0, 1.0, 1.0), description="Bounding box color")

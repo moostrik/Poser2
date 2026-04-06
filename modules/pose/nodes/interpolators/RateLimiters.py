@@ -18,10 +18,10 @@ from modules.pose.features.base import BaseFeature
 from modules.pose.nodes._utils.ArrayRateLimit import RateLimit, AngleRateLimit, PointRateLimit
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class RateLimiterSettings(Settings):
+class RateLimiterSettings(BaseSettings):
     """Configuration for rate limiting."""
     max_increase: Field[float] = Field(1.0)
     max_decrease: Field[float] = Field(1.0)

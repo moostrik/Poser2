@@ -13,7 +13,7 @@ from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus,
 from modules.tracker.panoramic.PanoramicTrackletManager import PanoramicTrackletManager
 from modules.tracker.panoramic.PanoramicGeometry import PanoramicGeometry
 from modules.tracker.panoramic.PanoramicDefinitions import *
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -21,7 +21,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class PanoramicTrackerSettings(Settings):
+class PanoramicTrackerSettings(BaseSettings):
     """Configuration for PanoramicTracker."""
     fov:                      Field[float] = Field(CAM_360_FOV,              min=90.0, max=130.0, step=0.5)
     tracklet_min_age:         Field[int]   = Field(5,                        min=0,    max=9,     step=1)

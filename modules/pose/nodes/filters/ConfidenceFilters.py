@@ -12,10 +12,10 @@ from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, BBox, Po
 from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class ConfidenceFilterSettings(Settings):
+class ConfidenceFilterSettings(BaseSettings):
     """Configuration for confidence filtering."""
     confidence_threshold: Field[float] = Field(0.5)
     rescale_scores:       Field[bool]  = Field(True)

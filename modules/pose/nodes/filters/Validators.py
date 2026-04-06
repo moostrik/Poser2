@@ -6,13 +6,13 @@ from modules.pose.features.base import BaseFeature
 
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class ValidatorSettings(Settings):
+class ValidatorSettings(BaseSettings):
     """Configuration for pose validators."""
     check_ranges: Field[bool] = Field(True)
     name:         Field[str]  = Field('default')

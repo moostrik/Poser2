@@ -4,7 +4,7 @@
 from OpenGL.GL import GL_R16F
 
 # Local application imports
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur, MaskDilate
@@ -12,7 +12,7 @@ from modules.gl import Fbo, SwapFbo, Texture, Style
 from modules.utils import HotReloadMethods
 
 
-class CentreMaskSettings(Settings):
+class CentreMaskSettings(BaseSettings):
     """Configuration for CentreMaskLayer temporal blending and blur."""
     blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Temporal blending strength (0=static, 1=instant)")
     dilation_steps: Field[int]   = Field(0, min=0, max=5, description="Number of mask dilation iterations")

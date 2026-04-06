@@ -7,12 +7,12 @@ for any field type (velocity, density, etc).
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
 from ..shaders import Trail, GaussianBlur
 
 
-class SmoothTrailSettings(Settings):
+class SmoothTrailSettings(BaseSettings):
     """Configuration for trail smoothing."""
     scale = Field(1.0, min=-10.0, max=10.0, description="Converts optical flow to simulation velocity")
     trail_weight = Field(0.9, min=0.0, max=0.99, description="Temporal smoothing (0=no trail, 0.99=long trail)")

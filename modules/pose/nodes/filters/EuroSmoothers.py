@@ -16,10 +16,10 @@ from modules.pose.features import Angles, Points2D, AngleVelocity, AngleSymmetry
 from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class EuroSmootherSettings(Settings):
+class EuroSmootherSettings(BaseSettings):
     """Configuration for pose smoothing."""
     frequency:  Field[float] = Field(30.0,  access=Field.INIT)
     min_cutoff: Field[float] = Field(1.0)

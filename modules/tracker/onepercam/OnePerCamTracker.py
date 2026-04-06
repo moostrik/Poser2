@@ -10,13 +10,13 @@ from modules.oak.camera.definitions import Tracklet as DepthTracklet
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback
 from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
 from modules.tracker.onepercam.OnePerCamTrackletManager import OnePerCamTrackletManager as TrackletManager
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class OnePerCamTrackerSettings(Settings):
+class OnePerCamTrackerSettings(BaseSettings):
     """Configuration for OnePerCamTracker."""
     tracklet_min_age:         Field[int]   = Field(3,    min=0,   max=9,   step=1)
     timeout:                  Field[float] = Field(2.0,  min=1.0, max=5.0, step=0.1)

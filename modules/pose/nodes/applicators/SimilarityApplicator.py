@@ -6,10 +6,10 @@ import numpy as np
 from modules.pose.features.Similarity import Similarity
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class SimilarityApplicatorSettings(Settings):
+class SimilarityApplicatorSettings(BaseSettings):
     """Configuration for SimilarityApplicator."""
     max_poses: Field[int] = Field(4, access=Field.INIT, min=1, max=16)
 

@@ -11,7 +11,7 @@ from typing import Callable, get_origin, get_args
 
 from nicegui import ui
 
-from modules.settings.settings import Settings
+from modules.settings.base_settings import BaseSettings
 from modules.settings import presets
 from modules.settings.field import Field, Access
 from modules.settings.widget import Widget, WidgetSize
@@ -1223,7 +1223,7 @@ def create_settings_panel(
 
     # -- Header row: title | preset controls | exit button -----------------
     # Collect tab entries early so we can build tabs inside the sticky header.
-    tab_entries: list[tuple[str, Settings]] = []  # (name, settings)
+    tab_entries: list[tuple[str, BaseSettings]] = []  # (name, settings)
     root_has_fields = any(
         f.visible and f.widget != Widget.button
         for f in root.fields.values()
@@ -1269,10 +1269,10 @@ def create_settings_panel(
                 ).tooltip("Exit application")
 
         # Collect pinned fields and actions from all registered modules
-        pinned_fields: list[tuple[Settings, str, Field]] = []
-        pinned_actions: list[tuple[Settings, str, Field]] = []
+        pinned_fields: list[tuple[BaseSettings, str, Field]] = []
+        pinned_actions: list[tuple[BaseSettings, str, Field]] = []
 
-        def _collect_pinned(settings: Settings) -> None:
+        def _collect_pinned(settings: BaseSettings) -> None:
             for field_name, field in settings.fields.items():
                 if field.pinned and field.visible:
                     pinned_fields.append((settings, field_name, field))

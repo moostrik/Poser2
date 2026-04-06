@@ -1,8 +1,8 @@
 from ..camera.definitions import FrameType, CoderType, CoderFormat
-from modules.settings import Settings, Field, Widget
+from modules.settings import BaseSettings, Field, Widget
 
 
-class RecorderSettings(Settings):
+class RecorderSettings(BaseSettings):
     start:      Field[bool] = Field(False, widget=Widget.button, description="Start recording")
     stop:       Field[bool] = Field(False, widget=Widget.button, description="Stop recording")
     recording:  Field[bool] = Field(False, access=Field.READ, description="Recording active")

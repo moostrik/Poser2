@@ -6,10 +6,10 @@ from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, BBox, Po
 from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class DualConfFilterSettings(Settings):
+class DualConfFilterSettings(BaseSettings):
     """Configuration for hysteresis confidence filtering."""
     threshold_low:  Field[float] = Field(0.3)
     threshold_high: Field[float] = Field(0.5)

@@ -14,7 +14,7 @@ from modules.data_hub import DataHub, Stage
 from modules.pose.frame import Frame
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 
-from modules.settings import Field, Settings, Group
+from modules.settings import Field, BaseSettings, Group
 from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlowSettings
 from modules.render.shaders import DensityColorize
 
@@ -49,7 +49,7 @@ class FluidDrawMode(IntEnum):
     OBSTACLE = auto()
 
 
-class FluidLayerSettings(Settings):
+class FluidLayerSettings(BaseSettings):
     """Configuration for FluidLayer (fluid simulation)."""
     num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
     draw_mode: Field[FluidDrawMode] =       Field(FluidDrawMode.DENSITY)

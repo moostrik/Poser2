@@ -4,7 +4,7 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture, Blit
 from modules.data_hub import DataHub, Stage
 from modules.render.layers.LayerBase import LayerBase
@@ -18,7 +18,7 @@ from modules.utils import Color
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class PoseCompSettings(Settings):
+class PoseCompSettings(BaseSettings):
     stage:      Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
     line_width: Field[float] = Field(2.0, min=0.5, max=20.0, description="Base line width (multiplied per stage)")
     line_smooth:Field[float] = Field(0.0, min=0.0, max=10.0, description="Base line smoothing (multiplied per stage)")

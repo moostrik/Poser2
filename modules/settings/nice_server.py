@@ -6,14 +6,14 @@ from typing import Callable, Optional
 
 from nicegui import ui, app as nicegui_app
 
-from modules.settings.settings import Settings
+from modules.settings.base_settings import BaseSettings
 from modules.settings.field import Field
 from modules.settings.nice_panel import create_settings_panel, _get_local_ips
 
 logger = logging.getLogger(__name__)
 
 
-class NiceSettings(Settings):
+class NiceSettings(BaseSettings):
     """Configuration for the NiceGUI settings server."""
     title: Field[str] = Field("Settings", access=Field.INIT, visible=False)
     port: Field[int] = Field(666, access=Field.INIT, visible=False)
@@ -22,7 +22,7 @@ class NiceSettings(Settings):
 class NiceServer:
     """NiceGUI settings server that runs on a background thread."""
 
-    def __init__(self, root: Settings, settings: NiceSettings, on_exit: Optional[Callable[[], None]] = None):
+    def __init__(self, root: BaseSettings, settings: NiceSettings, on_exit: Optional[Callable[[], None]] = None):
         self.root = root
         self.settings = settings
         self.on_exit = on_exit

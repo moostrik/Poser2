@@ -17,10 +17,10 @@ from modules.pose.nodes._utils.ArrayPredict import AnglePredict, PointPredict, P
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
 from modules.pose.nodes.filters.RateLimiters import RateLimiterSettings
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class PredictorSettings(Settings):
+class PredictorSettings(BaseSettings):
     """Configuration for pose prediction."""
     frequency: Field[float] = Field(30.0, access=Field.INIT)
     method:    Field[PredictionMethod] = Field(PredictionMethod.QUADRATIC)

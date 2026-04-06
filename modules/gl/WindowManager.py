@@ -21,7 +21,7 @@ import ctypes
 # Local application imports
 from modules.gl.RenderBase import RenderBase
 from modules.gl.Utils import FpsCounter
-from modules.settings import Field, Settings, Widget
+from modules.settings import Field, BaseSettings, Widget
 
 
 class MonitorId(IntEnum):
@@ -32,7 +32,7 @@ class MonitorId(IntEnum):
     M3 = 3
 
 
-class WindowSettings(Settings):
+class WindowSettings(BaseSettings):
     """Window / init configuration — set once before RenderManager starts."""
     title: Field[str] =           Field("Poser", access=Field.INIT, visible=False)
     avg_fps: Field[int] =             Field(60, access=Field.READ, pinned=True, description="Average Camera FPS")

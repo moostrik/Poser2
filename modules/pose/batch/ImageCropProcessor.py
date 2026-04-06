@@ -16,13 +16,13 @@ from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 from modules.oak.camera.definitions import FrameType
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class ImageCropSettings(Settings):
+class ImageCropSettings(BaseSettings):
     """Configuration for GPU-based image cropping."""
     expansion_width:  Field[float] = Field(0.0, min=0.0, max=1.0, access=Field.INIT)
     expansion_height: Field[float] = Field(0.0, min=0.0, max=1.0, access=Field.INIT)

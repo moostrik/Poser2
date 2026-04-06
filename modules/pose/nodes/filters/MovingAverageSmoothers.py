@@ -16,7 +16,7 @@ from modules.pose.features import Angles, AngleVelocity, AngleMotion, BBox, Poin
 from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
 # Re-export WindowType for convenience
@@ -24,7 +24,7 @@ __all__ = ['WindowType', 'MovingAverageSettings', 'FeatureMovingAverageSmoother'
            'AngleMotionMovingAverageSmoother', 'SimilarityMovingAverageSmoother']
 
 
-class MovingAverageSettings(Settings):
+class MovingAverageSettings(BaseSettings):
     """Configuration for moving average smoothing."""
     window_size: Field[int]        = Field(30)
     window_type: Field[WindowType] = Field(WindowType.TRIANGULAR)

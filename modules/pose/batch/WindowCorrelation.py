@@ -10,7 +10,7 @@ import numpy as np
 from numpy.fft import rfft, irfft
 
 # Pose imports
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 from modules.utils.TypedCallbackMixin import TypedCallbackMixin
 from modules.pose.frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
 from modules.pose.features import Angles, AngleMotion
@@ -42,7 +42,7 @@ class _JointAggregator(NormalizedScalarFeature):
             cls._joint_enum = cast(type[IntEnum], IntEnum("JointIndex", {f"J{i}": i for i in range(num_joints)}))
 
 
-class WindowCorrelationSettings(Settings):
+class WindowCorrelationSettings(BaseSettings):
     """Configuration for WindowCorrelation."""
     max_poses:              Field[int]                = Field(3, min=1, max=10, access=Field.INIT, description="Maximum number of tracked poses")
     window_length:          Field[int]                = Field(30, min=4, max=300, description="Number of frames for correlation")

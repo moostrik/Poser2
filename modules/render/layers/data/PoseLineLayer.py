@@ -4,7 +4,7 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 from modules.data_hub import DataHub, Stage
 from modules.gl import Fbo, Texture, Blit, clear_color
 from modules.pose.frame import Frame
@@ -14,7 +14,7 @@ from modules.render.shaders import PosePointLines as shader
 from modules.utils import Color
 
 
-class PoseLineSettings(Settings):
+class PoseLineSettings(BaseSettings):
     stage:      Field[Stage] = Field(Stage.LERP, access=Field.INIT, description="Pipeline stage for pose data")
     line_width: Field[float] = Field(4.0, min=0.5, max=20.0, description="Line width in pixels")
     line_smooth:Field[float] = Field(2.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")

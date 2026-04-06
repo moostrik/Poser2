@@ -3,7 +3,7 @@ import math
 from enum import IntEnum, auto
 
 # Local application imports
-from modules.settings import Field, Settings
+from modules.settings import Field, BaseSettings
 from modules.data_hub import Stage
 from modules.pose.features import SCALAR_FEATURES, TRACK_FEATURES
 from modules.pose.features.base import BaseScalarFeature
@@ -46,7 +46,7 @@ class LayerMode(IntEnum):
     WINDOW =    auto()
 
 
-class DataLayerSettings(Settings):
+class DataLayerSettings(BaseSettings):
     """Unified configuration for data visualization layers."""
     mode:           Field[LayerMode]            = Field(LayerMode.WINDOW)
     feature_field:  Field[ScalarFeatureSelect]  = Field(ScalarFeatureSelect.AngleMotion)  # type: ignore[attr-defined]

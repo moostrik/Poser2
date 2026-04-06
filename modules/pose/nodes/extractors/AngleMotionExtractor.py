@@ -6,12 +6,12 @@ from modules.pose.features import AngleVelocity, AngleMotion
 from modules.pose.features.Angles import AngleLandmark
 from modules.pose.features.AngleMotion import ANGLE_MOTION_NORMALISATION
 from modules.pose.frame import Frame, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class AngleMotionExtractorSettings(Settings):
+class AngleMotionExtractorSettings(BaseSettings):
     """Configuration for motion extraction with tunable thresholds."""
     noise_threshold: Field[float] = Field(0.1)
     max_threshold:   Field[float] = Field(1.0)

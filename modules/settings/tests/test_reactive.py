@@ -9,7 +9,7 @@ from enum import Enum
 
 from modules.settings.field import Field
 from modules.settings.widget import Widget
-from modules.settings.settings import Settings
+from modules.settings.base_settings import BaseSettings
 from modules.settings.group import Group
 from modules.settings import presets
 from modules.utils import Color, Point2f, Rect
@@ -29,7 +29,7 @@ class RenderMode(Enum):
 # Test settings classes
 # ---------------------------------------------------------------------------
 
-class CameraSettings(Settings):
+class CameraSettings(BaseSettings):
     exposure = Field(1000, min=100, max=10000, step=100, description="Exposure time (µs)")
     gain = Field(1.0, min=0.0, max=16.0, step=0.1)
     overlay_color = Field(Color(1, 0, 0))
@@ -38,11 +38,11 @@ class CameraSettings(Settings):
     mode = Field(RenderMode.SOLID)
 
 
-class MinimalSettings(Settings):
+class MinimalSettings(BaseSettings):
     value = Field(0)
 
 
-class SettingsWithActions(Settings):
+class SettingsWithActions(BaseSettings):
     exposure = Field(1000)
     reset = Field(False, widget=Widget.button, description="Reset all values")
     hidden_action = Field(False, widget=Widget.button, visible=False)
@@ -399,7 +399,7 @@ class TestPresetSaveLoad(unittest.TestCase):
     """Tests for preset save/load using a root Settings."""
 
     def _make_root(self):
-        class Root(Settings):
+        class Root(BaseSettings):
             camera = Group(CameraSettings)
         return Root()
 
@@ -564,7 +564,7 @@ class TestPresetExtras(unittest.TestCase):
     """Tests for preset edge cases (missing/corrupt files)."""
 
     def _make_root(self):
-        class Root(Settings):
+        class Root(BaseSettings):
             cam: CameraSettings
         return Root()
 
@@ -657,28 +657,28 @@ class TestAction(unittest.TestCase):
 
 # ===== Child descriptor tests =============================================
 
-class InnerSettings(Settings):
+class InnerSettings(BaseSettings):
     speed = Field(1.0, min=0.0, max=10.0)
     scale = Field(0.5)
 
 
-class OuterSettings(Settings):
+class OuterSettings(BaseSettings):
     fps = Field(60.0, min=1.0, max=240.0)
     inner = Group(InnerSettings)
 
 
-class DoubleChildSettings(Settings):
+class DoubleChildSettings(BaseSettings):
     name = Field("default")
     alpha = Group(InnerSettings)
     beta = Group(InnerSettings)
 
 
-class MiddleSettings(Settings):
+class MiddleSettings(BaseSettings):
     weight = Field(0.5, min=0.0, max=1.0)
     inner = Group(InnerSettings)
 
 
-class DeepSettings(Settings):
+class DeepSettings(BaseSettings):
     label = Field("root")
     middle = Group(MiddleSettings)
 
@@ -816,7 +816,7 @@ class TestChild(unittest.TestCase):
     # -- Preset save/load with children -------------------------------------
 
     def test_save_load_with_children(self):
-        class Root(Settings):
+        class Root(BaseSettings):
             outer = Group(OuterSettings)
         root = Root()
         root.outer.fps = 30.0
@@ -925,7 +925,7 @@ class TestChild(unittest.TestCase):
 
 # ── List Setting ───────────────────────────────────────────────────────────
 
-class ListSettings(Settings):
+class ListSettings(BaseSettings):
     tags = Field(["default"])
     ids = Field([1, 2, 3])
 
@@ -1031,7 +1031,7 @@ class TestListSetting(unittest.TestCase):
             s.ids = [True, 2, 3]
 
     def test_reject_bool_in_float_list(self):
-        class FloatListSettings(Settings):
+        class FloatListSettings(BaseSettings):
             vals = Field([1.0, 2.0])
         s = FloatListSettings()
         with self.assertRaises(TypeError):
@@ -1298,15 +1298,15 @@ class TestRectSerialization(unittest.TestCase):
 # Setting integration with Color, Point2f, Rect
 # ---------------------------------------------------------------------------
 
-class _ColorSettings(Settings):
+class _ColorSettings(BaseSettings):
     color = Field(Color(1.0, 0.0, 0.0))
 
 
-class _PointSettings(Settings):
+class _PointSettings(BaseSettings):
     pos = Field(Point2f(0.0, 0.0))
 
 
-class _RectSettings(Settings):
+class _RectSettings(BaseSettings):
     region = Field(Rect(0.0, 0.0, 1.0, 1.0))
 
 
@@ -1512,7 +1512,7 @@ class TestDeepCopyDefaults(unittest.TestCase):
     """List defaults must be deep-copied between instances (#10)."""
 
     def test_list_not_shared(self):
-        class TagSettings(Settings):
+        class TagSettings(BaseSettings):
             tags = Field(["a", "b"])
 
         s1 = TagSettings()
@@ -1521,7 +1521,7 @@ class TestDeepCopyDefaults(unittest.TestCase):
         self.assertEqual(s2.tags, ["a", "b"])
 
     def test_nested_list_not_shared(self):
-        class NestedList(Settings):
+        class NestedList(BaseSettings):
             items = Field(["x"])
 
         a = NestedList()
@@ -1727,7 +1727,7 @@ class TestWidgetValidation(unittest.TestCase):
 
 # ── Enum list support ──────────────────────────────────────────────────────
 
-class EnumListSettings(Settings):
+class EnumListSettings(BaseSettings):
     modes = Field([RenderMode.SOLID])
 
 
@@ -1783,7 +1783,7 @@ class TestEnumCoercion(unittest.TestCase):
         class Priority(Enum):
             LOW = 1
             HIGH = 2
-        class PrioSettings(Settings):
+        class PrioSettings(BaseSettings):
             level = Field(Priority.LOW)
         s = PrioSettings()
         s.level = 2  # type: ignore
@@ -1876,7 +1876,7 @@ class TestEqualityWithChildren(unittest.TestCase):
 
 # ── @property setter routing ──────────────────────────────────────────────
 
-class SettingsWithProperty(Settings):
+class SettingsWithProperty(BaseSettings):
     raw_val = Field(0)
 
     @property
@@ -1980,7 +1980,7 @@ class TestLoadReturnValue(unittest.TestCase):
     """load() should return True on success, False on failure."""
 
     def _make_root(self):
-        class Root(Settings):
+        class Root(BaseSettings):
             camera = Group(CameraSettings)
         return Root()
 
@@ -2073,7 +2073,7 @@ class TestToJsonValueListElements(unittest.TestCase):
     """Bug 1: to_json_value should serialize list elements with to_dict()."""
 
     def test_list_of_colors_serialized(self):
-        class ColorListSettings(Settings):
+        class ColorListSettings(BaseSettings):
             colors = Field([Color(1, 0, 0)])
 
         s = ColorListSettings()
@@ -2147,19 +2147,19 @@ class TestListCopyOnRead(unittest.TestCase):
 from modules.settings.group import Group
 
 
-class CoreSettings(Settings):
+class CoreSettings(BaseSettings):
     """Standalone settings — no knowledge of any parent."""
     fps      = Field(30.0, access=Field.INIT)
     color    = Field(True, access=Field.INIT)
     exposure = Field(1000)
 
 
-class PlayerSettings(Settings):
+class PlayerSettings(BaseSettings):
     folder = Field("")
     playing = Field(False, access=Field.READ)
 
 
-class ParentWithChild(Settings):
+class ParentWithChild(BaseSettings):
     fps    = Field(30.0, access=Field.INIT)
     color  = Field(True, access=Field.INIT)
     player = Group(PlayerSettings)
@@ -2367,17 +2367,17 @@ class TestValidateShare(unittest.TestCase):
 
     def test_share_field_missing_from_parent(self):
         with self.assertRaises(TypeError) as ctx:
-            class BadParent(Settings):
+            class BadParent(BaseSettings):
                 core = Group(CoreSettings, share=[CoreSettings.exposure])
             BadParent()
         self.assertIn("not found on parent", str(ctx.exception))
 
     def test_share_field_missing_from_child(self):
         with self.assertRaises(TypeError) as ctx:
-            class ChildWithoutFps(Settings):
+            class ChildWithoutFps(BaseSettings):
                 name = Field("")
 
-            class BadParent2(Settings):
+            class BadParent2(BaseSettings):
                 fps = Field(30.0, access=Field.INIT)
                 item = Group(ChildWithoutFps, share=[fps])
             BadParent2()
@@ -2385,10 +2385,10 @@ class TestValidateShare(unittest.TestCase):
 
     def test_share_type_mismatch(self):
         with self.assertRaises(TypeError) as ctx:
-            class ChildIntFps(Settings):
+            class ChildIntFps(BaseSettings):
                 fps = Field(30)  # int, not float
 
-            class BadParent3(Settings):
+            class BadParent3(BaseSettings):
                 fps = Field(30.0)  # float
                 item = Group(ChildIntFps, share=[fps])
             BadParent3()
@@ -2402,10 +2402,10 @@ class TestValidateShare(unittest.TestCase):
     def test_share_access_mismatch_raises(self):
         """INIT parent field shared to non-INIT child field must raise at construction."""
         with self.assertRaises(TypeError) as ctx:
-            class ChildWithWriteFps(Settings):
+            class ChildWithWriteFps(BaseSettings):
                 fps = Field(30.0)  # WRITE, not INIT
 
-            class BadAccessParent(Settings):
+            class BadAccessParent(BaseSettings):
                 fps = Field(30.0, access=Field.INIT)
                 item = Group(ChildWithWriteFps, share=[fps])
 
@@ -2442,7 +2442,7 @@ class TestPropagatSharedAfterInitialize(unittest.TestCase):
 
     def test_non_init_shared_fields_still_propagate_after_initialize(self):
         """Non-INIT shared fields must still propagate after initialize()."""
-        class LiveParent(Settings):
+        class LiveParent(BaseSettings):
             level = Field(1)  # WRITE — not INIT
             child = Group(MinimalSettings, share=[level.as_('value')])
 

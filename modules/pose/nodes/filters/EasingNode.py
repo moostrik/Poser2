@@ -12,7 +12,7 @@ from modules.pose.features import AngleMotion
 from modules.pose.features.base import BaseFeature
 from modules.pose.features.base.NormalizedSingleValue import NormalizedSingleValue
 from modules.pose.frame import Frame, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
 # Available easing functions from pytweening
@@ -39,7 +39,7 @@ EASING_FUNCTIONS: dict[str, Callable[[float], float]] = {
 }
 
 
-class EasingSettings(Settings):
+class EasingSettings(BaseSettings):
     """Configuration for easing with selectable function."""
     easing_name: Field[str] = Field('easeInOutSine')
 

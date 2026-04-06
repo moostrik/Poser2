@@ -13,10 +13,10 @@ from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, BBox, Po
 from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
-from modules.settings import Settings, Field
+from modules.settings import BaseSettings, Field
 
 
-class TemporalStabilizerSettings(Settings):
+class TemporalStabilizerSettings(BaseSettings):
     """Configuration for temporal stability filtering."""
     min_consecutive_frames: Field[int] = Field(3)
     max_gap_frames:         Field[int] = Field(0)
