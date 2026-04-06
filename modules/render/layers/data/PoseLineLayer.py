@@ -8,7 +8,7 @@ from modules.settings import Field, Settings
 from modules.data_hub import DataHub, Stage
 from modules.gl import Fbo, Texture, Blit, clear_color
 from modules.pose.frame import Frame
-from modules.pose.features.Points2D import Points2D
+from modules.pose.features import Points2D, BBox
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import PosePointLines as shader
 from modules.utils import Color
@@ -61,9 +61,9 @@ class PoseLineLayer(LayerBase):
             return
 
         # Transform points to image space if use_bbox is enabled
-        points = pose.points
+        points = pose[Points2D]
         if self._config.use_bbox:
-            points = PoseLineLayer._transform_to_image_space(points, pose.bbox.to_rect())
+            points = PoseLineLayer._transform_to_image_space(points, pose[BBox].to_rect())
 
         line_width: float = 1.0 / self._fbo.height * self._config.line_width
         line_smooth: float = 1.0 / self._fbo.height * self._config.line_smooth

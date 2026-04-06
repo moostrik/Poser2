@@ -13,6 +13,7 @@ from modules.data_hub import DataHub, DataHubType, Stage
 from modules.settings import Field, Settings
 from modules.pose.frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
+from modules.pose.features import BBox
 from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.gl import Texture
@@ -129,10 +130,10 @@ class CentreGeometry(LayerBase):
 
         # Get current body landmarks (bbox-relative coordinates)
         shoulder_mid = CentreGeometry._get_midpoint(
-            pose.points, PointLandmark.left_shoulder, PointLandmark.right_shoulder
+            pose[Points2D], PointLandmark.left_shoulder, PointLandmark.right_shoulder
         )
         hip_mid = CentreGeometry._get_midpoint(
-            pose.points, PointLandmark.left_hip, PointLandmark.right_hip
+            pose[Points2D], PointLandmark.left_hip, PointLandmark.right_hip
         )
 
         if not shoulder_mid or not hip_mid:
@@ -140,7 +141,7 @@ class CentreGeometry(LayerBase):
             return
 
         # Calculate anchor points in image space (full image coordinates)
-        bbox = pose.bbox.to_rect()
+        bbox = pose[BBox].to_rect()
         anchor_top_img = shoulder_mid * bbox.size + bbox.position
         anchor_bot_img = hip_mid * bbox.size + bbox.position
 
@@ -189,7 +190,7 @@ class CentreGeometry(LayerBase):
 
         # Transform pose points using camera geometry (in image space)
         self._transformed_points = CentreGeometry._transform_points(
-            pose.points, bbox, anchor_top_img, self._cam_aspect, cam_rotation_img, cam_crop_roi_img
+            pose[Points2D], bbox, anchor_top_img, self._cam_aspect, cam_rotation_img, cam_crop_roi_img
         )
 
     @staticmethod

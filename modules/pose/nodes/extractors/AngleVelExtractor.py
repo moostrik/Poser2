@@ -1,12 +1,9 @@
-# Standard library imports
-from dataclasses import replace
-
 from numpy import pi
 
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.features import Angles, AngleVelocity
-from modules.pose.frame import Frame
+from modules.pose.frame import Frame, replace
 from modules.settings import Settings, Field
 
 
@@ -41,7 +38,7 @@ class AngleVelExtractor(FilterNode):
             # print(dt)
 
             # Compute angular displacement
-            angle_displacement: Angles = pose.angles.subtract(self._prev_pose.angles)
+            angle_displacement: Angles = pose[Angles].subtract(self._prev_pose[Angles])
 
             # Convert to angular velocity (rad/s) by dividing by dt
             if dt > 0:
@@ -56,7 +53,7 @@ class AngleVelExtractor(FilterNode):
         # Create enriched pose
         enriched_pose: Frame = replace(
             pose,
-            angle_vel=angle_vel
+            {AngleVelocity: angle_vel}
         )
 
         return enriched_pose

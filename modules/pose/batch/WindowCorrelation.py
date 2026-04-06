@@ -12,7 +12,8 @@ from numpy.fft import rfft, irfft
 # Pose imports
 from modules.settings import Settings, Field
 from modules.utils.TypedCallbackMixin import TypedCallbackMixin
-from modules.pose.frame import FrameField, FeatureWindow, FeatureWindowDict, FrameWindowDict
+from modules.pose.frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
+from modules.pose.features import Angles, AngleMotion
 from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod, NormalizedScalarFeature
 from modules.pose.features.Similarity import configure_similarity, Similarity
 from modules.pose.features.LeaderScore import configure_leader_score, LeaderScore
@@ -107,13 +108,13 @@ class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int
         """Update all window types and trigger correlation processing.
 
         Args:
-            all_windows: Combined dict {FrameField: {track_id: FeatureWindow}}
+             all_windows: Combined dict {type[BaseFeature]: {track_id: FeatureWindow}}
         """
         if not self._config.enabled:
             return
 
-        angle_windows: FeatureWindowDict = all_windows.get(FrameField.angles, {})
-        motion_windows: FeatureWindowDict = all_windows.get(FrameField.angle_motion, {})
+        angle_windows: FeatureWindowDict = all_windows.get(Angles, {})
+        motion_windows: FeatureWindowDict = all_windows.get(AngleMotion, {})
 
         with self._input_lock:
             self._input_windows = angle_windows

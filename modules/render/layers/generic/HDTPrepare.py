@@ -15,6 +15,7 @@ from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import MaskApply as shader, Tint
 
 from modules.pose.frame import Frame
+from modules.pose.features import AngleMotion
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -93,7 +94,7 @@ class HDTPrepare(LayerBase):
         mask = self._centre_mask  # MotionMultiply currently doesn't use mask separately
 
         # Motion value is already normalized [0,1] and eased by pipeline
-        motion: float = pose.angle_motion.value
+        motion: float = pose[AngleMotion].value
         self._motion = easeInSine(motion)
         # self._motion = motion
 

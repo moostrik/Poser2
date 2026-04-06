@@ -5,7 +5,6 @@ response rates for increasing vs decreasing values.
 """
 
 # Standard library imports
-from dataclasses import replace
 from collections import defaultdict
 
 # Third-party imports
@@ -13,8 +12,10 @@ import numpy as np
 
 # Pose imports
 from modules.pose.nodes._utils.ArrayEmaSmooth import EMASmooth, AngleEMASmooth, PointEMASmooth
+from modules.pose.features import Angles, Points2D, AngleVelocity, AngleMotion, AngleSymmetry, BBox, Similarity
+from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, FrameField
+from modules.pose.frame import Frame, replace
 from modules.settings import Settings, Field
 
 
@@ -27,24 +28,24 @@ class EmaSmootherSettings(Settings):
 class FeatureEmaSmoother(FilterNode):
     """Generic pose feature smoother using EMA with attack/release."""
 
-    # Registry mapping feature classes to smoother classes
-    _SMOOTH_MAP = defaultdict(
+    # Registry mapping feature types to smoother classes
+    _SMOOTH_MAP: dict[type[BaseFeature], type] = defaultdict(
         lambda: EMASmooth,
         {
-            FrameField.angles: AngleEMASmooth,
-            FrameField.points: PointEMASmooth,
+            Angles: AngleEMASmooth,
+            Points2D: PointEMASmooth,
         }
     )
 
-    def __init__(self, config: EmaSmootherSettings, pose_field: FrameField) -> None:
+    def __init__(self, config: EmaSmootherSettings, feature_type: type[BaseFeature]) -> None:
         self._config: EmaSmootherSettings = config
-        self._pose_field: FrameField = pose_field
-        smoother_cls = self._SMOOTH_MAP[pose_field]
+        self._feature_type: type[BaseFeature] = feature_type
+        smoother_cls = self._SMOOTH_MAP[feature_type]
         self._smoother = smoother_cls(
-            vector_size=len(pose_field.get_type().enum()),
+            vector_size=feature_type.length(),
             attack=config.attack,
             release=config.release,
-            clamp_range=pose_field.get_type().range()
+            clamp_range=feature_type.range()
         )
         self._config.bind_all(self._on_config_changed)
 
@@ -64,11 +65,11 @@ class FeatureEmaSmoother(FilterNode):
         return self._config
 
     def process(self, pose: Frame) -> Frame:
-        feature_data = pose.get_feature(self._pose_field)
+        feature_data = pose[self._feature_type]
         self._smoother.update(feature_data.values)
         smoothed_values: np.ndarray = self._smoother.value
         smoothed_data = type(feature_data)(values=smoothed_values, scores=feature_data.scores)
-        return replace(pose, **{self._pose_field.name: smoothed_data})
+        return replace(pose, {self._feature_type: smoothed_data})
 
     def reset(self) -> None:
         self._smoother.reset()
@@ -77,34 +78,34 @@ class FeatureEmaSmoother(FilterNode):
 # Convenience classes
 class BBoxEmaSmoother(FeatureEmaSmoother):
     def __init__(self, config: EmaSmootherSettings) -> None:
-        super().__init__(config, FrameField.bbox)
+        super().__init__(config, BBox)
 
 
 class PointEmaSmoother(FeatureEmaSmoother):
     def __init__(self, config: EmaSmootherSettings) -> None:
-        super().__init__(config, FrameField.points)
+        super().__init__(config, Points2D)
 
 
 class AngleEmaSmoother(FeatureEmaSmoother):
     def __init__(self, config: EmaSmootherSettings) -> None:
-        super().__init__(config, FrameField.angles)
+        super().__init__(config, Angles)
 
 
 class AngleVelEmaSmoother(FeatureEmaSmoother):
     def __init__(self, config: EmaSmootherSettings) -> None:
-        super().__init__(config, FrameField.angle_vel)
+        super().__init__(config, AngleVelocity)
 
 
 class AngleSymEmaSmoother(FeatureEmaSmoother):
     def __init__(self, config: EmaSmootherSettings) -> None:
-        super().__init__(config, FrameField.angle_sym)
+        super().__init__(config, AngleSymmetry)
 
 
 class SimilarityEmaSmoother(FeatureEmaSmoother):
     def __init__(self, config: EmaSmootherSettings) -> None:
-        super().__init__(config, FrameField.similarity)
+        super().__init__(config, Similarity)
 
 
 class AngleMotionEmaSmoother(FeatureEmaSmoother):
     def __init__(self, config: EmaSmootherSettings) -> None:
-        super().__init__(config, FrameField.angle_motion)
+        super().__init__(config, AngleMotion)

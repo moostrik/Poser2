@@ -1,12 +1,10 @@
-# Standard library imports
-from dataclasses import replace
-
 # Third-party imports
 import numpy as np
 
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame
+from modules.pose.features import AngleVelocity, MotionTime
+from modules.pose.frame import Frame, replace
 
 
 class MotionTimeExtractor(FilterNode):
@@ -27,12 +25,12 @@ class MotionTimeExtractor(FilterNode):
         dt: float = pose.time_stamp - self.prev_time_stamp
         self.prev_time_stamp = pose.time_stamp
 
-        total_delta: float = np.nansum(np.abs(pose.angle_vel.values)) / np.pi * dt
+        total_delta: float = np.nansum(np.abs(pose[AngleVelocity].values)) / np.pi * dt
         # total_delta: float = np.nansum(np.abs(pose.deltas.values)) / len(pose.deltas) * dt
 
         self.motion_time = self.motion_time + total_delta
 
-        return replace(pose, motion_time=self.motion_time)
+        return replace(pose, {MotionTime: MotionTime.from_value(self.motion_time)})
 
     def reset(self) -> None:
         self.motion_time = 0.0

@@ -13,7 +13,6 @@ Uses a lock to serialize all access, preventing concurrent set_target() and upda
 
 # Standard library imports
 from abc import ABC, abstractmethod
-from dataclasses import replace
 from threading import Lock
 from typing import TypeVar, Generic, Protocol
 from collections import defaultdict
@@ -22,9 +21,9 @@ from collections import defaultdict
 import numpy as np
 
 # Pose imports
-from modules.pose.features import PoseFeatureType, Angles, BBox, Points2D, AngleSymmetry
+from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import InterpolatorNode
-from modules.pose.frame import Frame, FrameField
+from modules.pose.frame import Frame, replace
 from modules.settings import Settings, Field
 
 
@@ -62,14 +61,14 @@ class InterpolatorProtocol(Protocol):
 class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
     """Base class for pose feature interpolators."""
 
-    # Registry mapping feature classes to interpolator classes
+    # Registry mapping feature types to interpolator classes
     # Subclasses must override this with their specific interpolator types
-    _INTERP_MAP: defaultdict[FrameField, type]
+    _INTERP_MAP: defaultdict[type[BaseFeature], type]
 
-    def __init__(self, config: ConfigType, pose_field: FrameField):
+    def __init__(self, config: ConfigType, feature_type: type[BaseFeature]):
         """Initialize the feature interpolator."""
         self._config: ConfigType = config
-        self._pose_field: FrameField = pose_field
+        self._feature_type: type[BaseFeature] = feature_type
         self._lock: Lock = Lock()
         self._last_pose: Frame | None = None
         self._output_interval: float = 1.0 / config.output_frequency
@@ -103,13 +102,13 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
         return self._config
 
     @property
-    def pose_field(self) -> FrameField:
-        """Return the FrameField this interpolator processes."""
-        return self._pose_field
+    def feature_type(self) -> type[BaseFeature]:
+        """Return the feature type this interpolator processes."""
+        return self._feature_type
 
     def submit(self, pose: Frame) -> None:
         """Set target from pose. Call at input frequency (e.g., 30 FPS)."""
-        feature_data = pose.get_feature(self._pose_field)
+        feature_data = pose[self._feature_type]
 
         with self._lock:
             self._interpolator.set_target(feature_data.values)
@@ -131,12 +130,12 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
             self._interpolator.update(self._output_interval)
             interpolated_values: np.ndarray = self._interpolator.value
 
-        feature_data = last_pose.get_feature(self._pose_field)
+        feature_data = last_pose[self._feature_type]
         interpolated_data = self._create_interpolated_data(feature_data, interpolated_values)
-        return replace(last_pose, **{self._pose_field.name: interpolated_data})
+        return replace(last_pose, {self._feature_type: interpolated_data})
 
-    def _create_interpolated_data(self, original_data: PoseFeatureType,
-                                 interpolated_values: np.ndarray) -> PoseFeatureType:
+    def _create_interpolated_data(self, original_data: BaseFeature,
+                                 interpolated_values: np.ndarray) -> BaseFeature:
         """Create feature data with interpolated values and adjusted scores."""
         if interpolated_values.ndim > 1:
             has_nan = np.any(np.isnan(interpolated_values), axis=-1)

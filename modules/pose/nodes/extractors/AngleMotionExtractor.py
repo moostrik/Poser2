@@ -1,14 +1,11 @@
-# Standard library imports
-from dataclasses import replace
-
 import numpy as np
 
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.features import AngleMotion
+from modules.pose.features import AngleVelocity, AngleMotion
 from modules.pose.features.Angles import AngleLandmark
 from modules.pose.features.AngleMotion import ANGLE_MOTION_NORMALISATION
-from modules.pose.frame import Frame
+from modules.pose.frame import Frame, replace
 from modules.settings import Settings, Field
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -39,7 +36,8 @@ class AngleMotionExtractor(FilterNode):
 
     def process(self, pose: Frame) -> Frame:
         # Get absolute angular velocities
-        motions: np.ndarray = np.abs(pose.angle_vel.values)
+        angle_vel = pose[AngleVelocity]
+        motions: np.ndarray = np.abs(angle_vel.values)
 
         # Remove noise: subtract threshold and clip negative values to 0
         motions = np.maximum(motions - self._config.noise_threshold, 0.0)
@@ -63,11 +61,11 @@ class AngleMotionExtractor(FilterNode):
             avg_motion = 0.0
 
         # Compute average score from valid joints
-        valid_mask = ~np.isnan(pose.angle_vel.values)
-        avg_score = float(np.mean(pose.angle_vel.scores[valid_mask])) if np.any(valid_mask) else 0.0
+        valid_mask = ~np.isnan(angle_vel.values)
+        avg_score = float(np.mean(angle_vel.scores[valid_mask])) if np.any(valid_mask) else 0.0
 
         angle_motion: AngleMotion = AngleMotion.from_value(avg_motion, avg_score)
-        return replace(pose, angle_motion=angle_motion)
+        return replace(pose, {AngleMotion: angle_motion})
 
     def reset(self) -> None:
         pass

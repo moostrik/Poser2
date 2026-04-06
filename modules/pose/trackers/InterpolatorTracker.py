@@ -1,9 +1,8 @@
 """Tracks and interpolates multiple poses independently."""
 
-from dataclasses import replace
 from typing import Callable
 
-from modules.pose.frame import Frame, FrameDict
+from modules.pose.frame import Frame, FrameDict, replace
 from modules.pose.nodes.Nodes import InterpolatorNode
 from .TrackerBase import TrackerBase
 
@@ -64,8 +63,8 @@ class InterpolatorTracker(TrackerBase):
                             pose = interpolated_pose
                         else:
                             # Merge subsequent interpolator's feature into combined pose
-                            field_name = node.pose_field.name
-                            pose = replace(pose, **{field_name: getattr(interpolated_pose, field_name)})
+                            ft = node.feature_type
+                            pose = replace(pose, {ft: interpolated_pose[ft]})
 
                 if pose is not None:
                     interpolated_poses[id] = pose

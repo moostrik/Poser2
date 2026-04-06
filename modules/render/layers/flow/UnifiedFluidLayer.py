@@ -19,6 +19,7 @@ from modules.gl.shaders import Blit, BlitRegion
 from modules.render.layers.LayerBase import LayerBase
 from modules.data_hub import DataHub, Stage
 from modules.pose.frame import Frame
+from modules.pose.features import Similarity, MotionGate, AngleMotion
 
 from modules.settings import Field, Settings, Group
 from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlowSettings
@@ -220,9 +221,9 @@ class UnifiedFluidLayer(LayerBase):
 
         for cam_id in self._flow_layers.keys():
             pose: Frame | None = self._data_hub.get_pose(Stage.LERP, cam_id)
-            motions[cam_id] = pose.angle_motion.value if pose else 0.0
-            similarities[cam_id] = pose.similarity.values if pose else np.full((self._num_slots,), 0.0)
-            motion_gates[cam_id] = pose.motion_gate.values if pose else np.full((self._num_slots,), 0.0)
+            motions[cam_id] = pose[AngleMotion].value if pose and AngleMotion in pose else 0.0
+            similarities[cam_id] = pose[Similarity].values if pose and Similarity in pose else np.full((self._num_slots,), 0.0)
+            motion_gates[cam_id] = pose[MotionGate].values if pose and MotionGate in pose else np.full((self._num_slots,), 0.0)
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)

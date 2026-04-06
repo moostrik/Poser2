@@ -1,4 +1,4 @@
-from ..model_types import ModelType, Resolution, RESOLUTION_DIMS
+from ..model_types import ModelType, Resolution, RESOLUTION_DIMS, ASPECT_RATIOS
 from modules.settings import Settings, Field
 
 _MODELS = {
@@ -33,6 +33,10 @@ class DetectionSettings(Settings):
     @property
     def height(self) -> int:
         return RESOLUTION_DIMS[self.resolution][1]
+
+    @property
+    def aspect_ratio(self) -> float:
+        return ASPECT_RATIOS[self.resolution]
 
     @property
     def model(self) -> str:

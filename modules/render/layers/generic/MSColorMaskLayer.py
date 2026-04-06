@@ -11,6 +11,7 @@ import math
 from modules.gl import Fbo, SwapFbo, Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.data_hub import DataHub, Stage
+from modules.pose.features import Similarity, MotionGate, AngleMotion
 from modules.pose.frame import Frame
 from modules.settings import Field, Settings
 
@@ -113,9 +114,9 @@ class MSColorMaskLayer(LayerBase):
 
         # Extract similarity and motion data
         num_players = self.config.num_players
-        similarities: np.ndarray = pose.similarity.values if pose is not None else np.zeros(num_players, dtype=np.float32)
-        motion_gates: np.ndarray = pose.motion_gate.values if pose is not None else np.zeros(num_players, dtype=np.float32)
-        motion: float = pose.angle_motion.value if pose is not None else 0.0
+        similarities: np.ndarray = pose[Similarity].values if pose is not None else np.zeros(num_players, dtype=np.float32)
+        motion_gates: np.ndarray = pose[MotionGate].values if pose is not None else np.zeros(num_players, dtype=np.float32)
+        motion: float = pose[AngleMotion].value if pose is not None else 0.0
         motion = easeInOutSine(motion)
 
         # Apply similarity threshold and exponent

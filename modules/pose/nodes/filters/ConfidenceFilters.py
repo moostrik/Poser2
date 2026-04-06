@@ -5,13 +5,13 @@ below threshold are set to NaN and scores are rescaled to [0, 1] range.
 """
 
 # Standard library imports
-from dataclasses import replace
-
 import numpy as np
 
 # Pose imports
+from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, BBox, Points2D
+from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, FrameField
+from modules.pose.frame import Frame, replace
 from modules.settings import Settings, Field
 
 
@@ -38,9 +38,9 @@ class ConfidenceFilter(FilterNode):
         filter = FeatureConfidenceFilter(config, Point2DFeature, "points")
     """
 
-    def __init__(self, config: ConfidenceFilterSettings, pose_field: FrameField):
+    def __init__(self, config: ConfidenceFilterSettings, feature_type: type[BaseFeature]):
         self._config = config
-        self._pose_field = pose_field
+        self._feature_type = feature_type
 
     @property
     def config(self) -> ConfidenceFilterSettings:
@@ -48,7 +48,7 @@ class ConfidenceFilter(FilterNode):
 
     def process(self, pose: Frame) -> Frame:
         """Filter values based on confidence threshold."""
-        feature_data = pose.get_feature(self._pose_field)
+        feature_data = pose[self._feature_type]
 
         # Skip if no valid values
         if feature_data.valid_count == 0:
@@ -86,30 +86,30 @@ class ConfidenceFilter(FilterNode):
         filtered_data = type(feature_data)(values=filtered_values, scores=filtered_scores)
 
         # Return new pose with filtered feature
-        return replace(pose, **{self._pose_field.name: filtered_data})
+        return replace(pose, {self._feature_type: filtered_data})
 
 
 # Convenience classes
 class BBoxConfidenceFilter(ConfidenceFilter):
     def __init__(self, config: ConfidenceFilterSettings) -> None:
-        super().__init__(config, FrameField.bbox)
+        super().__init__(config, BBox)
 
 
 class PointConfidenceFilter(ConfidenceFilter):
     def __init__(self, config: ConfidenceFilterSettings) -> None:
-        super().__init__(config, FrameField.points)
+        super().__init__(config, Points2D)
 
 
 class AngleConfidenceFilter(ConfidenceFilter):
     def __init__(self, config: ConfidenceFilterSettings) -> None:
-        super().__init__(config, FrameField.angles)
+        super().__init__(config, Angles)
 
 
 class AngleVelConfidenceFilter(ConfidenceFilter):
     def __init__(self, config: ConfidenceFilterSettings) -> None:
-        super().__init__(config, FrameField.angle_vel)
+        super().__init__(config, AngleVelocity)
 
 
 class AngleSymConfFilter(ConfidenceFilter):
     def __init__(self, config: ConfidenceFilterSettings) -> None:
-        super().__init__(config, FrameField.angle_sym)
+        super().__init__(config, AngleSymmetry)

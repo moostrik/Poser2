@@ -5,7 +5,6 @@ of circular values and coordinate clamping.
 """
 
 # Standard library imports
-from dataclasses import replace
 from collections import defaultdict
 
 # Third-party imports
@@ -13,8 +12,10 @@ import numpy as np
 
 # Pose imports
 from modules.pose.nodes._utils.ArrayEuroSmooth import EuroSmooth, AngleEuroSmooth, PointEuroSmooth
+from modules.pose.features import Angles, Points2D, AngleVelocity, AngleSymmetry, BBox, Similarity
+from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, FrameField
+from modules.pose.frame import Frame, replace
 from modules.settings import Settings, Field
 
 
@@ -29,26 +30,26 @@ class EuroSmootherSettings(Settings):
 class FeatureEuroSmoother(FilterNode):
     """Generic pose feature smoother using OneEuroFilter."""
 
-    # Registry mapping feature classes to smoother classes
-    _SMOOTH_MAP = defaultdict(
+    # Registry mapping feature types to smoother classes
+    _SMOOTH_MAP: dict[type[BaseFeature], type] = defaultdict(
         lambda: EuroSmooth,
         {
-            FrameField.angles: AngleEuroSmooth,
-            FrameField.points: PointEuroSmooth,
+            Angles: AngleEuroSmooth,
+            Points2D: PointEuroSmooth,
         }
     )
 
-    def __init__(self, config: EuroSmootherSettings, pose_field: FrameField) -> None:
+    def __init__(self, config: EuroSmootherSettings, feature_type: type[BaseFeature]) -> None:
         self._config: EuroSmootherSettings = config
-        self._pose_field: FrameField = pose_field
-        smoother_cls = self._SMOOTH_MAP[pose_field]
+        self._feature_type: type[BaseFeature] = feature_type
+        smoother_cls = self._SMOOTH_MAP[feature_type]
         self._smoother = smoother_cls(
-            vector_size=len(pose_field.get_type().enum()),
+            vector_size=feature_type.length(),
             frequency=config.frequency,
             min_cutoff=config.min_cutoff,
             beta=config.beta,
             d_cutoff=config.d_cutoff,
-            clamp_range=pose_field.get_type().range()
+            clamp_range=feature_type.range()
         )
         self._config.bind_all(self._on_config_changed)
 
@@ -70,11 +71,11 @@ class FeatureEuroSmoother(FilterNode):
         return self._config
 
     def process(self, pose: Frame) -> Frame:
-        feature_data = pose.get_feature(self._pose_field)
+        feature_data = pose[self._feature_type]
         self._smoother.add_sample(feature_data.values)
         smoothed_values: np.ndarray = self._smoother.value
         smoothed_data = type(feature_data)(values=smoothed_values, scores=feature_data.scores)
-        return replace(pose, **{self._pose_field.name: smoothed_data})
+        return replace(pose, {self._feature_type: smoothed_data})
 
     def reset(self) -> None:
         self._smoother.reset()
@@ -83,29 +84,29 @@ class FeatureEuroSmoother(FilterNode):
 # Convenience classes
 class BBoxEuroSmoother(FeatureEuroSmoother):
     def __init__(self, config: EuroSmootherSettings) -> None:
-        super().__init__(config, FrameField.bbox)
+        super().__init__(config, BBox)
 
 
 class PointEuroSmoother(FeatureEuroSmoother):
     def __init__(self, config: EuroSmootherSettings) -> None:
-        super().__init__(config, FrameField.points)
+        super().__init__(config, Points2D)
 
 
 class AngleEuroSmoother(FeatureEuroSmoother):
     def __init__(self, config: EuroSmootherSettings) -> None:
-        super().__init__(config, FrameField.angles)
+        super().__init__(config, Angles)
 
 
 class AngleVelEuroSmoother(FeatureEuroSmoother):
     def __init__(self, config: EuroSmootherSettings) -> None:
-        super().__init__(config, FrameField.angle_vel)
+        super().__init__(config, AngleVelocity)
 
 
 class AngleSymEuroSmoother(FeatureEuroSmoother):
     def __init__(self, config: EuroSmootherSettings) -> None:
-        super().__init__(config, FrameField.angle_sym)
+        super().__init__(config, AngleSymmetry)
 
 
 class SimilarityEuroSmoother(FeatureEuroSmoother):
     def __init__(self, config: EuroSmootherSettings) -> None:
-        super().__init__(config, FrameField.similarity)
+        super().__init__(config, Similarity)

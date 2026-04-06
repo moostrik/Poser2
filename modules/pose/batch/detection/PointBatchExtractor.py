@@ -1,9 +1,8 @@
-from dataclasses import replace
 from threading import Lock
 from typing import Union
 from modules.pose.batch.ImageFrame import ImageFrameDict
 from modules.pose.features import Points2D
-from modules.pose.frame import FrameDictCallbackMixin
+from modules.pose.frame import FrameDictCallbackMixin, replace
 from modules.pose.frame import FrameDict
 from ..model_types import ModelType
 from .DetectionSettings import DetectionSettings
@@ -108,7 +107,7 @@ class PointBatchExtractor(FrameDictCallbackMixin):
                         values=output.point_batch[idx],
                         scores=output.score_batch[idx]
                     )
-                    result_poses[tracklet_id] = replace(original_poses[tracklet_id], points=point_feature)
+                    result_poses[tracklet_id] = replace(original_poses[tracklet_id], {Points2D: point_feature})
 
             self._notify_frames_callbacks(result_poses)
 

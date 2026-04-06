@@ -1,7 +1,7 @@
 {
   "num_players": 3,
+  "fps": 30.0,
   "camera": {
-    "fps": 23.0,
     "yolo": true,
     "color": true,
     "square": true,
@@ -15,94 +15,89 @@
     "video_frame_types": [
       "VIDEO"
     ],
-    "recorder": {
-      "group_id": "no_id",
-      "video_encoder": "iGPU",
-      "video_chunk_length": 10.0
-    },
     "cam_0": {
-        "device_id": "14442C101136D1D200",
-        "show_stereo": false,
-        "manual": false,
-        "flip_h": false,
-        "flip_v": true,
-        "perspective": -0.22,
-        "color_auto_exposure": true,
-        "color_exposure": 1000,
-        "color_iso": 100,
-        "color_auto_balance": true,
-        "color_balance": 1000,
-        "color_brightness": 0,
-        "color_contrast": 0,
-        "color_saturation": 0,
-        "color_luma_denoise": 0,
-        "color_sharpness": 0,
-        "mono_auto_exposure": true,
-        "mono_exposure": 1000,
-        "mono_iso": 100,
-        "ir_grid_light": 0.0,
-        "ir_flood_light": 0.0,
-        "stereo_depth_min": 500,
-        "stereo_depth_max": 15000,
-        "stereo_brightness_min": 0,
-        "stereo_brightness_max": 255,
-        "stereo_median_filter": "OFF"
+      "device_id": "14442C101136D1D200",
+      "show_stereo": false,
+      "manual": false,
+      "flip_h": false,
+      "flip_v": true,
+      "perspective": -0.22,
+      "color_auto_exposure": true,
+      "color_exposure": 1000,
+      "color_iso": 100,
+      "color_auto_balance": true,
+      "color_balance": 1000,
+      "color_brightness": 0,
+      "color_contrast": 0,
+      "color_saturation": 0,
+      "color_luma_denoise": 0,
+      "color_sharpness": 0,
+      "mono_auto_exposure": true,
+      "mono_exposure": 1000,
+      "mono_iso": 100,
+      "ir_grid_light": 0.0,
+      "ir_flood_light": 0.0,
+      "stereo_depth_min": 500,
+      "stereo_depth_max": 15000,
+      "stereo_brightness_min": 0,
+      "stereo_brightness_max": 255,
+      "stereo_median_filter": "OFF"
     },
     "cam_1": {
-        "device_id": "14442C10F124D9D600",
-        "show_stereo": false,
-        "manual": false,
-        "flip_h": false,
-        "flip_v": true,
-        "perspective": -0.22,
-        "color_auto_exposure": true,
-        "color_exposure": 1000,
-        "color_iso": 100,
-        "color_auto_balance": true,
-        "color_balance": 1000,
-        "color_brightness": 0,
-        "color_contrast": 0,
-        "color_saturation": 0,
-        "color_luma_denoise": 0,
-        "color_sharpness": 0,
-        "mono_auto_exposure": true,
-        "mono_exposure": 1000,
-        "mono_iso": 100,
-        "ir_grid_light": 0.0,
-        "ir_flood_light": 0.0,
-        "stereo_depth_min": 500,
-        "stereo_depth_max": 15000,
-        "stereo_brightness_min": 0,
-        "stereo_brightness_max": 255,
-        "stereo_median_filter": "OFF"
+      "device_id": "14442C10F124D9D600",
+      "show_stereo": false,
+      "manual": false,
+      "flip_h": false,
+      "flip_v": true,
+      "perspective": -0.22,
+      "color_auto_exposure": true,
+      "color_exposure": 1000,
+      "color_iso": 100,
+      "color_auto_balance": true,
+      "color_balance": 1000,
+      "color_brightness": 0,
+      "color_contrast": 0,
+      "color_saturation": 0,
+      "color_luma_denoise": 0,
+      "color_sharpness": 0,
+      "mono_auto_exposure": true,
+      "mono_exposure": 1000,
+      "mono_iso": 100,
+      "ir_grid_light": 0.0,
+      "ir_flood_light": 0.0,
+      "stereo_depth_min": 500,
+      "stereo_depth_max": 15000,
+      "stereo_brightness_min": 0,
+      "stereo_brightness_max": 255,
+      "stereo_median_filter": "OFF"
     },
     "cam_2": {
-        "device_id": "14442C10110AD3D200",
-        "show_stereo": false,
-        "manual": false,
-        "flip_h": false,
-        "flip_v": true,
-        "perspective": -0.22,
-        "color_auto_exposure": true,
-        "color_exposure": 1000,
-        "color_iso": 100,
-        "color_auto_balance": true,
-        "color_balance": 1000,
-        "color_brightness": 0,
-        "color_contrast": 0,
-        "color_saturation": 0,
-        "color_luma_denoise": 0,
-        "color_sharpness": 0,
-        "mono_auto_exposure": true,
-        "mono_exposure": 1000,
-        "mono_iso": 100,
-        "ir_grid_light": 0.0,
-        "ir_flood_light": 0.0,
-        "stereo_depth_min": 500,
-        "stereo_depth_max": 15000,
-        "stereo_brightness_min": 0,
-        "stereo_brightness_max": 255,
-        "stereo_median_filter": "OFF"
+      "device_id": "14442C10110AD3D200",
+      "show_stereo": false,
+      "manual": false,
+      "flip_h": false,
+      "flip_v": true,
+      "perspective": -0.22,
+      "color_auto_exposure": true,
+      "color_exposure": 1000,
+      "color_iso": 100,
+      "color_auto_balance": true,
+      "color_balance": 1000,
+      "color_brightness": 0,
+      "color_contrast": 0,
+      "color_saturation": 0,
+      "color_luma_denoise": 0,
+      "color_sharpness": 0,
+      "mono_auto_exposure": true,
+      "mono_exposure": 1000,
+      "mono_iso": 100,
+      "ir_grid_light": 0.0,
+      "ir_flood_light": 0.0,
+      "stereo_depth_min": 500,
+      "stereo_depth_max": 15000,
+      "stereo_brightness_min": 0,
+      "stereo_brightness_max": 255,
+      "stereo_median_filter": "OFF"
     },
     "simulator": {
       "folder": "20251212-130516_3_square_color_no_id",
@@ -111,7 +106,14 @@
       "sim_fps": 30.0,
       "sim_passthrough": false,
       "video_decoder": "iGPU"
-    }
+    },
+    "recorder": {
+      "group_id": "no_id",
+      "video_encoder": "iGPU",
+      "video_chunk_length": 10.0
+    },
+    "frame_sync": {},
+    "tracklet_sync": {}
   },
   "tt": {
     "timer": {
@@ -133,11 +135,9 @@
     }
   },
   "pose": {
-    "max_poses": 3,
     "model_type": "TRT",
     "model_path": "models",
     "verbose": false,
-    "frequency": 30.0,
     "output_frequency": 60.0,
     "detection": {
       "resolution": "STANDARD"
@@ -158,6 +158,9 @@
       "output_height": 1024,
       "enable_prev_crop": false,
       "verbose": false
+    },
+    "angle_extractor": {
+      "aspect_ratio": 0.75
     },
     "bbox": {
       "smoother": {
@@ -211,6 +214,7 @@
       }
     },
     "velocity": {
+      "extractor": {},
       "smoother": {
         "min_cutoff": 0.5,
         "beta": 2.5,
@@ -266,6 +270,8 @@
         "enabled": true,
         "verbose": false
       },
+      "similarity_applicator": {},
+      "leader_applicator": {},
       "smoother": {
         "min_cutoff": 0.01,
         "beta": 0.4,
@@ -278,16 +284,20 @@
       "sticky": {
         "init_to_zero": true,
         "hold_scores": false
-      }
+      },
+      "motion_gate": {}
     },
     "window_raw": {
-      "window_size": 180
+      "window_size": 180,
+      "emit_partial": true
     },
     "window_smooth": {
-      "window_size": 180
+      "window_size": 180,
+      "emit_partial": true
     },
     "window_lerp": {
-      "window_size": 360
+      "window_size": 360,
+      "emit_partial": true
     }
   },
   "render": {
@@ -309,21 +319,23 @@
     "data": {
       "a": {
         "mode": "WINDOW",
-        "feature_field": "angle_motion",
+        "feature_field": "AngleMotion",
         "stage": "SMOOTH",
         "line_width": 3.0,
         "line_smooth": 1.0,
         "use_scores": false,
-        "render_labels": true
+        "render_labels": true,
+        "use_history_color": false
       },
       "b": {
         "mode": "WINDOW",
-        "feature_field": "angle_motion",
+        "feature_field": "AngleMotion",
         "stage": "SMOOTH",
         "line_width": 6.0,
         "line_smooth": 6.0,
         "use_scores": false,
-        "render_labels": true
+        "render_labels": true,
+        "use_history_color": true
       }
     },
     "preview": {

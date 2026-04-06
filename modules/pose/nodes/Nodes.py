@@ -1,6 +1,10 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Any
-from modules.pose.frame import Frame, FrameField
+from typing import Any, TYPE_CHECKING
+from modules.pose.frame import Frame
+
+if TYPE_CHECKING:
+    from modules.pose.features.base import BaseFeature
 
 
 class NodeBase(ABC):
@@ -53,6 +57,6 @@ class InterpolatorNode(NodeBase):
 
     @property
     @abstractmethod
-    def pose_field(self) -> FrameField:
-        """Return the FrameField this interpolator processes."""
+    def feature_type(self) -> type[BaseFeature]:
+        """Return the feature type this interpolator processes."""
         pass

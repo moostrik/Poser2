@@ -1,9 +1,7 @@
-# Standard library imports
-from dataclasses import replace
-
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame
+from modules.pose.features import Age
+from modules.pose.frame import Frame, replace
 
 
 class AgeExtractor(FilterNode):
@@ -23,7 +21,7 @@ class AgeExtractor(FilterNode):
 
         age: float = pose.time_stamp - self.oldest_time_stamp
 
-        return replace(pose, age=age)
+        return replace(pose, {Age: Age.from_value(age)})
 
     def reset(self) -> None:
         self.motion_time = 0.0

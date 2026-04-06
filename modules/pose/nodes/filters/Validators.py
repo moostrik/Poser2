@@ -1,10 +1,11 @@
 """Pose validators for data integrity checks."""
 
 from threading import Lock
+from modules.pose.features import BBox, Points2D, Angles, AngleVelocity, AngleSymmetry
 from modules.pose.features.base import BaseFeature
 
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, FrameField
+from modules.pose.frame import Frame
 from modules.settings import Settings, Field
 
 import logging
@@ -32,13 +33,9 @@ class FeatureValidator(FilterNode):
         validator = FeatureValidator(config, PoseField.points)
     """
 
-    def __init__(self, config: ValidatorSettings, pose_field: FrameField) -> None:
-        if not issubclass(pose_field.get_type(), BaseFeature):
-            raise ValueError(f"PoseField '{pose_field.value}' is not a feature field")
-
+    def __init__(self, config: ValidatorSettings, feature_type: type[BaseFeature]) -> None:
         self._config = config
-        self._pose_field = pose_field
-        self._feature_class = pose_field.get_type()
+        self._feature_type: type[BaseFeature] = feature_type
 
         self._config_lock: Lock = Lock()
         self._check_ranges: bool = config.check_ranges
@@ -51,7 +48,7 @@ class FeatureValidator(FilterNode):
 
     def process(self, pose: Frame) -> Frame:
         """Validate feature data and print any errors."""
-        feature_data = pose.get_feature(self._pose_field)
+        feature_data = pose[self._feature_type]
 
         with self._config_lock:
             check_ranges: bool = self._check_ranges
@@ -61,7 +58,7 @@ class FeatureValidator(FilterNode):
         is_valid, error_message = feature_data.validate(check_ranges=check_ranges)
 
         if not is_valid:
-            logger.error(f"{name} validation error in '{self._pose_field.name}' of pose {pose.track_id}: {error_message}")
+            logger.error(f"{name} validation error in '{self._feature_type.__name__}' of pose {pose.track_id}: {error_message}")
 
         # Always return original pose (no fixing, just validation)
         return pose
@@ -77,31 +74,31 @@ class FeatureValidator(FilterNode):
 class BBoxValidator(FeatureValidator):
     """Validates bounding box feature data integrity."""
     def __init__(self, config: ValidatorSettings) -> None:
-        super().__init__(config, FrameField.bbox)
+        super().__init__(config, BBox)
 
 
 class PointValidator(FeatureValidator):
     """Validates point feature data integrity."""
     def __init__(self, config: ValidatorSettings) -> None:
-        super().__init__(config, FrameField.points)
+        super().__init__(config, Points2D)
 
 
 class AngleValidator(FeatureValidator):
     """Validates angle feature data integrity."""
     def __init__(self, config: ValidatorSettings) -> None:
-        super().__init__(config, FrameField.angles)
+        super().__init__(config, Angles)
 
 
 class AngleVelValidator(FeatureValidator):
     """Validates angle velocity feature data integrity."""
     def __init__(self, config: ValidatorSettings) -> None:
-        super().__init__(config, FrameField.angle_vel)
+        super().__init__(config, AngleVelocity)
 
 
 class AngleSymValidator(FeatureValidator):
     """Validates symmetry feature data integrity."""
     def __init__(self, config: ValidatorSettings) -> None:
-        super().__init__(config, FrameField.angle_sym)
+        super().__init__(config, AngleSymmetry)
 
 
 class PoseValidator(FilterNode):

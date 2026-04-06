@@ -5,17 +5,17 @@ extrapolation with proper handling of circular values and coordinate clamping.
 """
 
 # Standard library imports
-from dataclasses import replace
 from collections import defaultdict
 
 # Third-party imports
 import numpy as np
 
 # Pose imports
-from modules.pose.features import Angles, BBox, Points2D, AngleSymmetry
+from modules.pose.features import Angles, BBox, Points2D, AngleVelocity, AngleSymmetry
+from modules.pose.features.base import BaseFeature
 from modules.pose.nodes._utils.ArrayPredict import AnglePredict, PointPredict, Predict, PredictionMethod
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, FrameField
+from modules.pose.frame import Frame, replace
 from modules.pose.nodes.filters.RateLimiters import RateLimiterSettings
 from modules.settings import Settings, Field
 
@@ -29,23 +29,23 @@ class PredictorSettings(Settings):
 class FeaturePredictor(FilterNode):
     """Generic pose feature predictor."""
 
-    _PREDICT_MAP = defaultdict(
+    _PREDICT_MAP: dict[type[BaseFeature], type] = defaultdict(
         lambda: Predict,
         {
-            FrameField.angles: AnglePredict,
-            FrameField.points: PointPredict,
+            Angles: AnglePredict,
+            Points2D: PointPredict,
         }
     )
 
-    def __init__(self, config: PredictorSettings, pose_field: FrameField) -> None:
+    def __init__(self, config: PredictorSettings, feature_type: type[BaseFeature]) -> None:
         self._config = config
-        self._pose_field = pose_field
-        predictor_cls = self._PREDICT_MAP[pose_field]
+        self._feature_type = feature_type
+        predictor_cls = self._PREDICT_MAP[feature_type]
         self._predictor = predictor_cls(
-            vector_size=len(pose_field.get_type().enum()),
+            vector_size=feature_type.length(),
             input_frequency=config.frequency,
             method=config.method,
-            clamp_range=pose_field.get_type().range()
+            clamp_range=feature_type.range()
         )
         self._config.bind_all(self._on_config_changed)
 
@@ -77,7 +77,7 @@ class FeaturePredictor(FilterNode):
 
     def process(self, pose: Frame) -> Frame:
         """Add current feature data to predictor and return pose with predicted values."""
-        feature_data = pose.get_feature(self._pose_field)
+        feature_data = pose[self._feature_type]
 
         # Add sample and get prediction
         self._predictor.add_sample(feature_data.values)
@@ -87,7 +87,7 @@ class FeaturePredictor(FilterNode):
         predicted_data = self._create_predicted_data(feature_data, predicted_values)
 
         # Return new pose with predicted feature
-        return replace(pose, **{self._pose_field.name: predicted_data})
+        return replace(pose, {self._feature_type: predicted_data})
 
     def reset(self) -> None:
         """Reset the predictor's internal state (clear sample history)."""
@@ -103,24 +103,24 @@ class FeaturePredictor(FilterNode):
 
 class BBoxPredictor(FeaturePredictor):
     def __init__(self, config: PredictorSettings) -> None:
-        super().__init__(config, FrameField.bbox)
+        super().__init__(config, BBox)
 
 
 class PointPredictor(FeaturePredictor):
     def __init__(self, config: PredictorSettings) -> None:
-        super().__init__(config, FrameField.points)
+        super().__init__(config, Points2D)
 
 
 class AnglePredictor(FeaturePredictor):
     def __init__(self, config: PredictorSettings) -> None:
-        super().__init__(config, FrameField.angles)
+        super().__init__(config, Angles)
 
 
 class AngleVelPredictor(FeaturePredictor):
     def __init__(self, config: PredictorSettings) -> None:
-        super().__init__(config, FrameField.angle_vel)
+        super().__init__(config, AngleVelocity)
 
 
 class AngleSymPredictor(FeaturePredictor):
     def __init__(self, config: PredictorSettings) -> None:
-        super().__init__(config, FrameField.angle_sym)
+        super().__init__(config, AngleSymmetry)

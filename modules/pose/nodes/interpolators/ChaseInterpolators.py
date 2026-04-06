@@ -23,10 +23,11 @@ from typing import cast
 import numpy as np
 
 # Pose imports
-from modules.pose.features import PoseFeatureType, Angles, BBox, Points2D, AngleSymmetry
+from modules.pose.features import Angles, BBox, Points2D, AngleVelocity, AngleSymmetry, Similarity
+from modules.pose.features.base import BaseFeature
 from modules.pose.nodes._utils.ArrayChase import AngleChase, PointChase, Chase
 from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase, InterpolatorSettingsBase
-from modules.pose.frame import Frame, FrameField
+from modules.pose.frame import Frame
 from modules.settings import Field
 
 
@@ -39,20 +40,20 @@ class ChaseInterpolatorSettings(InterpolatorSettingsBase):
 class FeatureChaseInterpolator(FeatureInterpolatorBase[ChaseInterpolatorSettings]):
     """Generic pose feature chase interpolator."""
 
-    _INTERP_MAP: defaultdict[FrameField, type] = defaultdict(
+    _INTERP_MAP: defaultdict[type[BaseFeature], type] = defaultdict(
         lambda: Chase,
         {
-            FrameField.angles: AngleChase,
-            FrameField.points: PointChase,
+            Angles: AngleChase,
+            Points2D: PointChase,
         }
     )
 
 
     def _create_interpolator(self):
-        """Create the underlying rate limiter instance."""
-        interpolator_cls = self._INTERP_MAP[self._pose_field]
-        vector_size = len(self._pose_field.get_type().enum())
-        clamp_range = self._pose_field.get_type().range()
+        """Create the underlying chase interpolator instance."""
+        interpolator_cls = self._INTERP_MAP[self._feature_type]
+        vector_size = self._feature_type.length()
+        clamp_range = self._feature_type.range()
         return interpolator_cls(
             vector_size=vector_size,
             input_frequency=self._config.input_frequency,
@@ -74,29 +75,29 @@ class FeatureChaseInterpolator(FeatureInterpolatorBase[ChaseInterpolatorSettings
 # Convenience classes
 class BBoxChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, config: ChaseInterpolatorSettings) -> None:
-        super().__init__(config, FrameField.bbox)
+        super().__init__(config, BBox)
 
 
 class PointChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, config: ChaseInterpolatorSettings) -> None:
-        super().__init__(config, FrameField.points)
+        super().__init__(config, Points2D)
 
 
 class AngleChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, config: ChaseInterpolatorSettings) -> None:
-        super().__init__(config, FrameField.angles)
+        super().__init__(config, Angles)
 
 
 class AngleVelChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, config: ChaseInterpolatorSettings) -> None:
-        super().__init__(config, FrameField.angle_vel)
+        super().__init__(config, AngleVelocity)
 
 
 class AngleSymChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, config: ChaseInterpolatorSettings) -> None:
-        super().__init__(config, FrameField.angle_sym)
+        super().__init__(config, AngleSymmetry)
 
 
 class SimilarityChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, config: ChaseInterpolatorSettings) -> None:
-        super().__init__(config, FrameField.similarity)
+        super().__init__(config, Similarity)

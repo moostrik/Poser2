@@ -11,6 +11,7 @@ from modules.gl import Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.data_hub import DataHub, Stage
 from modules.pose.frame import Frame
+from modules.pose.features import AngleMotion
 
 from modules.render.layers.source.MaskSourceLayer import MaskSourceLayer
 
@@ -191,7 +192,7 @@ class FlowLayer(LayerBase):
         """Update optical flow and bridges."""
         # Get motion data from pose
         pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
-        motion = pose.angle_motion.value if pose is not None else 0.0
+        motion = pose[AngleMotion].value if pose is not None and AngleMotion in pose else 0.0
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)

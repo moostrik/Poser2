@@ -1,6 +1,6 @@
 """Pose filter modules for processing and enriching pose data."""
 
-from .extractors.AngleExtractor import          AngleExtractor
+from .extractors.AngleExtractor import          AngleExtractor, AngleExtractorSettings
 from .extractors.AngleVelExtractor import       AngleVelExtractor, AngleVelExtractorSettings
 from .extractors.AngleMotionExtractor import    AngleMotionExtractor, AngleMotionExtractorSettings
 from .extractors.AngleSymExtractor import       AngleSymExtractor

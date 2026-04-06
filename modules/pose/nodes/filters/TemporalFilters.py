@@ -6,13 +6,13 @@ This prevents transient detections and flickering.
 """
 
 # Standard library imports
-from dataclasses import replace
-
 import numpy as np
 
 # Pose imports
+from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, BBox, Points2D
+from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, FrameField
+from modules.pose.frame import Frame, replace
 from modules.settings import Settings, Field
 
 
@@ -39,21 +39,21 @@ class TemporalStabilizer(FilterNode):
 
     Args:
         config: Temporal stability filter configuration
-        pose_field: FrameField enum specifying which feature to filter
+        feature_type: Feature type specifying which feature to filter
 
     Example:
         config = TemporalStabilityConfig(
             min_consecutive_frames=3,
             max_gap_frames=1
         )
-        filter = TemporalStabilityFilter(config, FrameField.points)
+        filter = TemporalStabilityFilter(config, Points2D)
     """
 
-    def __init__(self, config: TemporalStabilizerSettings, pose_field: FrameField):
+    def __init__(self, config: TemporalStabilizerSettings, feature_type: type[BaseFeature]):
         self._config = config
-        self._pose_field = pose_field
-        # Get number of elements from pose field
-        n_elements = pose_field.get_length()
+        self._feature_type = feature_type
+        # Get number of elements from feature type
+        n_elements = feature_type.length()
 
         # State: tracks consecutive frame count for each element
         # Positive values = consecutive frames valid, 0 = not yet stable
@@ -76,7 +76,7 @@ class TemporalStabilizer(FilterNode):
 
     def process(self, pose: Frame) -> Frame:
         """Filter values requiring temporal stability."""
-        feature_data = pose.get_feature(self._pose_field)
+        feature_data = pose[self._feature_type]
 
         # Skip if no valid values
         if feature_data.valid_count == 0:
@@ -122,30 +122,30 @@ class TemporalStabilizer(FilterNode):
         filtered_data = type(feature_data)(values=filtered_values, scores=filtered_scores)
 
         # Return new pose with filtered feature
-        return replace(pose, **{self._pose_field.name: filtered_data})
+        return replace(pose, {self._feature_type: filtered_data})
 
 
 # Convenience classes for temporal stability filtering
 class BBoxTemporalStabilizer(TemporalStabilizer):
     def __init__(self, config: TemporalStabilizerSettings) -> None:
-        super().__init__(config, FrameField.bbox)
+        super().__init__(config, BBox)
 
 
 class PointTemporalStabilizer(TemporalStabilizer):
     def __init__(self, config: TemporalStabilizerSettings) -> None:
-        super().__init__(config, FrameField.points)
+        super().__init__(config, Points2D)
 
 
 class AngleTemporalStabilizer(TemporalStabilizer):
     def __init__(self, config: TemporalStabilizerSettings) -> None:
-        super().__init__(config, FrameField.angles)
+        super().__init__(config, Angles)
 
 
 class AngleVelTemporalStabilizer(TemporalStabilizer):
     def __init__(self, config: TemporalStabilizerSettings) -> None:
-        super().__init__(config, FrameField.angle_vel)
+        super().__init__(config, AngleVelocity)
 
 
 class AngleSymTemporalStabilizer(TemporalStabilizer):
     def __init__(self, config: TemporalStabilizerSettings) -> None:
-        super().__init__(config, FrameField.angle_sym)
+        super().__init__(config, AngleSymmetry)

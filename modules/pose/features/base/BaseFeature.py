@@ -168,6 +168,13 @@ class BaseFeature(ABC, Generic[FeatureEnum]):
     See module docstring for full API reference and design philosophy.
     """
 
+    def __init__(self, values: np.ndarray, scores: np.ndarray) -> None:
+        """Initialize feature with values and scores.
+
+        Concrete implementations in BaseScalarFeature and BaseVectorFeature.
+        """
+        ...
+
     # ========== STRUCTURE ==========
 
     @classmethod

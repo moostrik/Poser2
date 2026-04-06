@@ -8,7 +8,7 @@ from typing import Callable, Generic, TypeVar, TypeAlias, TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from modules.pose.frame.field import FrameField
+    from modules.pose.features.base import BaseFeature
 
 TEnum = TypeVar('TEnum', bound=IntEnum)
 
@@ -64,6 +64,6 @@ class FeatureWindow(Generic[TEnum]):
 FeatureWindowDict: TypeAlias =          dict[int, FeatureWindow]
 FeatureWindowDictCallback: TypeAlias =  Callable[[FeatureWindowDict], None]
 
-# {FrameField: FeatureWindowDict}  (field-first: each field maps to its per-track windows)
-FrameWindowDict: TypeAlias =            dict['FrameField', FeatureWindowDict]
+# {type[BaseFeature]: FeatureWindowDict}  (field-first: each field maps to its per-track windows)
+FrameWindowDict: TypeAlias =            dict[type['BaseFeature'], FeatureWindowDict]
 FrameWindowDictCallback: TypeAlias =    Callable[[FrameWindowDict], None]

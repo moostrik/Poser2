@@ -14,7 +14,7 @@ from .centre.CentreFrgLayer import          CentreFrgLayer, CentreFrgSettings
 from .centre.CentrePoseLayer import         CentrePoseLayer, CentrePoseSettings
 from .centre.CentreDenseFlowLayer import    CentreDenseFlowLayer, CentreDlowSettings
 
-from .data.DataLayerSettings import         DataLayerSettings, ScalarFrameField, LayerMode
+from .data.DataLayerSettings import         DataLayerSettings, ScalarFeatureSelect, LayerMode
 from .data.FeatureFrameLayer import         FeatureFrameLayer
 from .data.FeatureWindowLayer import        FeatureWindowLayer
 from .data.MTimeRenderer import             MTimeRenderer, MTimeRendererSettings

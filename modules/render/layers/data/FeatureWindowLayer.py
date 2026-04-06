@@ -8,14 +8,12 @@ from OpenGL.GL import *  # type: ignore
 
 # Local application imports
 from modules.data_hub import DataHub, Stage
-from modules.pose.frame import FrameField
 from modules.gl import Fbo, Texture, Blit, Image, clear_color, Text
 from modules.pose.frame import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import WindowShader
-from modules.render.layers.data.DataLayerSettings import DataLayerSettings, LayerMode
+from modules.render.layers.data.DataLayerSettings import DataLayerSettings, LayerMode, ScalarFeatureSelect, FEATURE_MAP, TRACK_COLOR_FEATURES
 from modules.render.color_settings import ColorSettings
-from modules.pose.frame import ScalarFrameField
 
 
 class FeatureWindowLayer(LayerBase):
@@ -26,12 +24,6 @@ class FeatureWindowLayer(LayerBase):
     via DataHub per-track windows.
     """
     LAYER_MODE: LayerMode = LayerMode.WINDOW
-
-    _TRACK_COLOR_FIELDS: set[ScalarFrameField] = {
-        ScalarFrameField.similarity,
-        ScalarFrameField.leader,
-        ScalarFrameField.motion_gate,
-    }
 
     def __init__(self, track_id: int, data_hub: DataHub, config: DataLayerSettings, color_settings: ColorSettings) -> None:
         self._track_id: int = track_id
@@ -101,9 +93,10 @@ class FeatureWindowLayer(LayerBase):
         self._was_active = active
         if not active:
             return
-        # ScalarFrameField.value matches FrameField.value for dict key lookup
+        # ScalarFeatureSelect maps to feature type for DataHub lookup
+        feature_type = FEATURE_MAP[self._config.feature_field]
         window: FeatureWindow | None = self._data_hub.get_feature_window(
-            self._config.stage, FrameField(self._config.feature_field), self._track_id
+            self._config.stage, feature_type, self._track_id
         )
         self._data_cache.update(window)
 
@@ -186,6 +179,7 @@ class FeatureWindowLayer(LayerBase):
     def _resolve_colors(self) -> list[tuple[float, float, float, float]]:
         if self._config.use_history_color:
             return [self._color_settings.history.to_tuple()]
-        if self._config.feature_field in self._TRACK_COLOR_FIELDS:
+        feature_type = FEATURE_MAP[self._config.feature_field]
+        if feature_type in TRACK_COLOR_FEATURES:
             return self._color_settings.track_color_tuples
         return self._color_settings.default_color_tuples

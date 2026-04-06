@@ -8,11 +8,11 @@ from OpenGL.GL import *  # type: ignore
 # Local application imports
 from modules.data_hub import DataHub, Stage
 from modules.gl import Fbo, Texture, Blit, clear_color, Text
-from modules.pose.features import PoseFeatureType
-from modules.pose.frame import Frame, FrameField, ScalarFrameField
+from modules.pose.features import AngleVelocity
+from modules.pose.frame import Frame
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import FeatureShader
-from modules.render.layers.data.DataLayerSettings import DataLayerSettings, LayerMode
+from modules.render.layers.data.DataLayerSettings import DataLayerSettings, LayerMode, ScalarFeatureSelect, FEATURE_MAP, TRACK_COLOR_FEATURES
 from modules.render.color_settings import ColorSettings
 
 
@@ -23,12 +23,6 @@ class FeatureFrameLayer(LayerBase):
     a configurable color list. Transparent background.
     """
     LAYER_MODE: LayerMode = LayerMode.FRAME
-
-    _TRACK_COLOR_FIELDS: set[ScalarFrameField] = {
-        ScalarFrameField.similarity,
-        ScalarFrameField.leader,
-        ScalarFrameField.motion_gate,
-    }
 
     def __init__(self, track_id: int, data_hub: DataHub, config: DataLayerSettings, color_settings: ColorSettings) -> None:
         self._track_id: int = track_id
@@ -98,12 +92,14 @@ class FeatureFrameLayer(LayerBase):
             return
 
         # Extract feature from frame
-        feature = pose.get_feature(FrameField(self._config.feature_field))
-        if not isinstance(feature, PoseFeatureType):
-            raise ValueError(f"FeatureFrameLayer expected PoseFeatureType, got {type(feature)}")
+        feature_type = FEATURE_MAP[self._config.feature_field]
+        feature = pose.get(feature_type)
+        if feature is None:
+            return
 
         # If showing angles, also fetch velocity for thickness modulation
-        deltas = pose.angle_vel.values if self._config.feature_field == ScalarFrameField.angles else None
+        angle_vel = pose.get(AngleVelocity) if self._config.feature_field == ScalarFeatureSelect.Angles else None  # type: ignore[attr-defined]
+        deltas = angle_vel.values if angle_vel is not None else None
 
         colors = self._resolve_colors()
 
@@ -157,6 +153,7 @@ class FeatureFrameLayer(LayerBase):
     def _resolve_colors(self) -> list[tuple[float, float, float, float]]:
         if self._config.use_history_color:
             return [self._color_settings.history.to_tuple()]
-        if self._config.feature_field in self._TRACK_COLOR_FIELDS:
+        feature_type = FEATURE_MAP[self._config.feature_field]
+        if feature_type in TRACK_COLOR_FEATURES:
             return self._color_settings.track_color_tuples
         return self._color_settings.default_color_tuples

@@ -21,3 +21,5 @@ RESOLUTION_DIMS = {
     Resolution.ULTRA: (384, 512),
     Resolution.EXTREME: (768, 1024),
 }
+
+ASPECT_RATIOS = {res: w / h for res, (w, h) in RESOLUTION_DIMS.items()}

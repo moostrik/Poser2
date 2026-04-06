@@ -5,6 +5,7 @@ from OpenGL.GL import * # type: ignore
 from modules.settings import Field, Settings
 from modules.data_hub import DataHub, Stage
 from modules.pose.frame import Frame
+from modules.pose.features import BBox
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import DrawRectangleOutline
 from modules.utils import Color
@@ -56,4 +57,4 @@ class BBoxRenderer(LayerBase):
         cam_poses: set[Frame] = self._data.get_poses_for_cam(self.settings.stage, self._cam_id)
         self._cam_bbox_rects = []
         for pose in cam_poses:
-            self._cam_bbox_rects.append(pose.bbox.to_rect())
+            self._cam_bbox_rects.append(pose[BBox].to_rect())

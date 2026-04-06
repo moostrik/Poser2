@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 from modules.settings import Field, Settings
 from modules.data_hub import DataHub, Stage
 from modules.pose.frame import Frame
-from modules.pose.features.Points2D import Points2D
+from modules.pose.features import Points2D, BBox
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import PosePointLines
 from modules.render.color_settings import ColorSettings
@@ -52,9 +52,9 @@ class PoseRenderer(LayerBase):
                 color = colors[pose.track_id % len(colors)]
 
             # Transform points to image space if use_bbox is enabled
-            points: Points2D = pose.points
+            points: Points2D = pose[Points2D]
             if self.settings.use_bbox:
-                points = self._transform_to_image_space(points, pose.bbox.to_rect())
+                points = self._transform_to_image_space(points, pose[BBox].to_rect())
 
             self._shader.use(points, line_width, line_smooth, color=color, use_scores=self.settings.use_scores)
 

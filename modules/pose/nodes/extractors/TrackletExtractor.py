@@ -35,7 +35,5 @@ class TrackletExtractor(NodeBase):
             track_id=tracklet.id,
             cam_id=tracklet.cam_id,
             time_stamp=time.time(),
-            bbox=bbox,
-
-            is_removed=tracklet.is_removed
+            features={BBox: bbox},
         )

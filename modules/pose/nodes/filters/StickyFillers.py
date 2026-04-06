@@ -5,20 +5,15 @@ are replaced by the last valid value seen. Useful for maintaining continuity
 when pose detection temporarily fails.
 """
 
-# Standard library imports
-from dataclasses import replace
-from typing import TypeVar
-
 # Third-party imports
 import numpy as np
 
 # Pose imports
-from modules.pose.features import BaseFeature, PoseFeatureType
+from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, BBox, Points2D, Similarity
+from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, FrameField
+from modules.pose.frame import Frame, replace
 from modules.settings import Settings, Field
-
-TFeature = TypeVar('TFeature', bound=BaseFeature)
 
 
 class StickyFillerSettings(Settings):
@@ -30,16 +25,15 @@ class StickyFillerSettings(Settings):
 class FeatureStickyFiller(FilterNode):
     """Generic sticky filler for pose features."""
 
-    def __init__(self, config: StickyFillerSettings, pose_field: FrameField) -> None:
+    def __init__(self, config: StickyFillerSettings, feature_type: type[BaseFeature]) -> None:
 
         self._config: StickyFillerSettings = config
-        self._pose_field: FrameField = pose_field
-        self._feature_class = pose_field.get_type()
+        self._feature_type: type[BaseFeature] = feature_type
         self._last_valid = self._initialize_last_valid()
 
-    def _initialize_last_valid(self) -> PoseFeatureType:
+    def _initialize_last_valid(self) -> BaseFeature:
         """Initialize last valid state based on config."""
-        empty_data = self._feature_class.create_dummy()
+        empty_data = self._feature_type.create_dummy()
         if self._config.init_to_zero:
             values = np.zeros_like(empty_data.values)
             scores = np.ones_like(empty_data.scores)
@@ -57,7 +51,7 @@ class FeatureStickyFiller(FilterNode):
 
     def process(self, pose: Frame) -> Frame:
         """Replace invalid values with last valid, update state with new valid values."""
-        feature_data: PoseFeatureType = pose.get_feature(self._pose_field)
+        feature_data = pose[self._feature_type]
         valid_mask = feature_data.valid_mask
         invalid_mask = ~valid_mask
 
@@ -77,7 +71,7 @@ class FeatureStickyFiller(FilterNode):
 
         # Return updated pose
         held_data = type(feature_data)(values=held_values, scores=held_scores)
-        return replace(pose, **{self._pose_field.name: held_data})
+        return replace(pose, {self._feature_type: held_data})
 
     def reset(self) -> None:
         """Reset to initial state."""
@@ -87,28 +81,28 @@ class FeatureStickyFiller(FilterNode):
 # Convenience classes
 class BBoxStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerSettings) -> None:
-        super().__init__(config, FrameField.bbox)
+        super().__init__(config, BBox)
 
 
 class PointStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerSettings) -> None:
-        super().__init__(config, FrameField.points)
+        super().__init__(config, Points2D)
 
 
 class AngleStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerSettings) -> None:
-        super().__init__(config, FrameField.angles)
+        super().__init__(config, Angles)
 
 
 class AngleVelStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerSettings) -> None:
-        super().__init__(config, FrameField.angle_vel)
+        super().__init__(config, AngleVelocity)
 
 
 class AngleSymStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerSettings) -> None:
-        super().__init__(config, FrameField.angle_sym)
+        super().__init__(config, AngleSymmetry)
 
 class SimilarityStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerSettings) -> None:
-        super().__init__(config, FrameField.similarity)
+        super().__init__(config, Similarity)

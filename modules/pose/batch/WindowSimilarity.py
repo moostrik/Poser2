@@ -11,7 +11,8 @@ import numpy as np
 # Pose imports
 from modules.settings import Settings, Field
 from modules.utils.TypedCallbackMixin import TypedCallbackMixin
-from modules.pose.frame import FrameField, FeatureWindow, FeatureWindowDict, FrameWindowDict
+from modules.pose.frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
+from modules.pose.features import Angles, AngleMotion, AngleVelocity
 from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod, NormalizedScalarFeature
 from modules.pose.features.Similarity import configure_similarity, Similarity
 from modules.pose.features.LeaderScore import configure_leader_score, LeaderScore
@@ -135,15 +136,15 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
         FrameWindowTracker output format.
 
         Args:
-            all_windows: Combined dict {FrameField: {track_id: FeatureWindow}}
+             all_windows: Combined dict {type[BaseFeature]: {track_id: FeatureWindow}}
         """
         if not self._config.enabled:
             return
 
         # Extract per-field window dicts
-        angle_windows: FeatureWindowDict = all_windows.get(FrameField.angles, {})
-        motion_windows: FeatureWindowDict = all_windows.get(FrameField.angle_motion, {})
-        velocity_windows: FeatureWindowDict = all_windows.get(FrameField.angle_vel, {})
+        angle_windows: FeatureWindowDict = all_windows.get(Angles, {})
+        motion_windows: FeatureWindowDict = all_windows.get(AngleMotion, {})
+        velocity_windows: FeatureWindowDict = all_windows.get(AngleVelocity, {})
 
         with self._input_lock:
             self._input_windows = angle_windows

@@ -1,17 +1,13 @@
 from enum import IntEnum
 from threading import Lock
-from typing import Generic, TypeVar
-
 import numpy as np
 
-from modules.pose.frame import Frame, FrameField
+from modules.pose.frame import Frame
 from modules.pose.frame.window import FeatureWindow
 from modules.pose.features import BaseScalarFeature, Angles, AngleMotion, AngleSymmetry, AngleVelocity, BBox, Similarity
+from modules.pose.features.base import BaseFeature
 from modules.pose.nodes.Nodes import NodeBase
 from modules.settings import Settings, Field
-
-
-TFeature = TypeVar('TFeature', bound=BaseScalarFeature)
 
 
 class WindowNodeSettings(Settings):
@@ -20,7 +16,7 @@ class WindowNodeSettings(Settings):
     emit_partial: Field[bool] = Field(True)
 
 
-class WindowNode(NodeBase, Generic[TFeature]):
+class WindowNode(NodeBase):
     """Base class for nodes that buffer poses and output feature windows.
 
     Uses a preallocated numpy ring buffer for performance.
@@ -33,8 +29,8 @@ class WindowNode(NodeBase, Generic[TFeature]):
         Unfilled slots have mask=False.
     """
 
-    def __init__(self, frame_field: FrameField, config: WindowNodeSettings | None = None) -> None:
-        self._frame_field = frame_field
+    def __init__(self, feature_type: type[BaseScalarFeature], config: WindowNodeSettings | None = None) -> None:
+        self._feature_type: type[BaseScalarFeature] = feature_type
         self._config: WindowNodeSettings = config if config is not None else WindowNodeSettings()
         self._lock: Lock = Lock()
         self._head: int = 0  # Next insertion index
@@ -47,15 +43,14 @@ class WindowNode(NodeBase, Generic[TFeature]):
         self._config.bind_all(self._on_config_change)
 
     @property
-    def frame_field(self) -> FrameField:
-        """Return the FrameField this window node extracts."""
-        return self._frame_field
+    def feature_type(self) -> type[BaseScalarFeature]:
+        """Return the feature type this window node extracts."""
+        return self._feature_type
 
     @property
     def feature_enum(self) -> type[IntEnum]:
         """Return the feature enum class, derived from feature type."""
-        feature_type = self.frame_field.get_type()
-        return feature_type.enum()
+        return self._feature_type.enum()
 
     @property
     def feature_length(self) -> int:
@@ -76,8 +71,10 @@ class WindowNode(NodeBase, Generic[TFeature]):
             FeatureWindow with values and mask arrays, both shape (current_len, feature_len), oldest first.
             Returns None if emit_partial=False and window not yet full.
         """
-        # Extract feature from frame
-        feature: TFeature = frame.get_feature(self.frame_field)
+        # Extract feature from frame (may be absent in ECS-lite model)
+        feature = frame.get(self._feature_type)
+        if feature is None:
+            return None
 
         with self._lock:
             # Write to ring buffer at head position
@@ -115,8 +112,8 @@ class WindowNode(NodeBase, Generic[TFeature]):
             values=values,
             mask=mask,
             feature_enum=self.feature_enum,
-            range=self.frame_field.get_range(),
-            display_range=self.frame_field.get_display_range()
+            range=self._feature_type.range(),
+            display_range=self._feature_type.display_range()
         )
 
     def _reset_buffer(self) -> None:
@@ -154,26 +151,26 @@ class WindowNode(NodeBase, Generic[TFeature]):
 
 
     # CONVIENCE CLASSES
-def AngleWindowNode(config: WindowNodeSettings | None = None) -> WindowNode[Angles]:
+def AngleWindowNode(config: WindowNodeSettings | None = None) -> WindowNode:
     """Angle trajectories - shape (time, 9) for 9 angles."""
-    return WindowNode(FrameField.angles, config)
+    return WindowNode(Angles, config)
 
-def AngleVelocityWindowNode(config: WindowNodeSettings | None = None) -> WindowNode[AngleVelocity]:
+def AngleVelocityWindowNode(config: WindowNodeSettings | None = None) -> WindowNode:
     """Angular velocity trajectories - shape (time, 9)."""
-    return WindowNode(FrameField.angle_vel, config)
+    return WindowNode(AngleVelocity, config)
 
-def AngleMotionWindowNode(config: WindowNodeSettings | None = None) -> WindowNode[AngleMotion]:
+def AngleMotionWindowNode(config: WindowNodeSettings | None = None) -> WindowNode:
     """Angular motion magnitude - shape (time, 9)."""
-    return WindowNode(FrameField.angle_motion, config)
+    return WindowNode(AngleMotion, config)
 
-def AngleSymmetryWindowNode(config: WindowNodeSettings | None = None) -> WindowNode[AngleSymmetry]:
+def AngleSymmetryWindowNode(config: WindowNodeSettings | None = None) -> WindowNode:
     """Angular symmetry metrics - shape (time, 9)."""
-    return WindowNode(FrameField.angle_sym, config)
+    return WindowNode(AngleSymmetry, config)
 
-def BBoxWindowNode(config: WindowNodeSettings | None = None) -> WindowNode[BBox]:
+def BBoxWindowNode(config: WindowNodeSettings | None = None) -> WindowNode:
     """Bounding box trajectory - shape (time, 4) for [x, y, w, h]."""
-    return WindowNode(FrameField.bbox, config)
+    return WindowNode(BBox, config)
 
-def SimilarityWindowNode(config: WindowNodeSettings | None = None) -> WindowNode[Similarity]:
+def SimilarityWindowNode(config: WindowNodeSettings | None = None) -> WindowNode:
     """Similarity trajectory - shape (time, 1)."""
-    return WindowNode(FrameField.similarity, config)
+    return WindowNode(Similarity, config)

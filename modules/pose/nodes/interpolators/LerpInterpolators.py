@@ -16,10 +16,11 @@ serializes all access using a lock to prevent concurrent set_target() and update
 from collections import defaultdict
 
 # Pose imports
-from modules.pose.features import Angles, BBox, Points2D, AngleSymmetry
+from modules.pose.features import Angles, BBox, Points2D, AngleVelocity, AngleSymmetry
+from modules.pose.features.base import BaseFeature
 from modules.pose.nodes._utils.ArrayLerp import AngleLerp, PointLerp, Lerp
 from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase, InterpolatorSettingsBase
-from modules.pose.frame import Frame, FrameField
+from modules.pose.frame import Frame
 from typing import cast
 
 
@@ -31,22 +32,22 @@ class LerpInterpolatorSettings(InterpolatorSettingsBase):
 class FeatureLerpInterpolator(FeatureInterpolatorBase[LerpInterpolatorSettings]):
     """Generic pose feature linear interpolator."""
 
-    _INTERP_MAP: defaultdict[FrameField, type] = defaultdict(
+    _INTERP_MAP: defaultdict[type[BaseFeature], type] = defaultdict(
         lambda: Lerp,
         {
-            FrameField.angles: AngleLerp,
-            FrameField.points: PointLerp,
+            Angles: AngleLerp,
+            Points2D: PointLerp,
         }
     )
 
-    def __init__(self, config: LerpInterpolatorSettings, pose_field: FrameField):
-        super().__init__(config, pose_field)
+    def __init__(self, config: LerpInterpolatorSettings, feature_type: type[BaseFeature]):
+        super().__init__(config, feature_type)
 
     def _create_interpolator(self):
         """Create the underlying lerp interpolator instance."""
-        interp_class: type = self._INTERP_MAP[self._pose_field]
-        vector_size = len(self._pose_field.get_type().enum())
-        clamp_range = self._pose_field.get_type().range()
+        interp_class: type = self._INTERP_MAP[self._feature_type]
+        vector_size = self._feature_type.length()
+        clamp_range = self._feature_type.range()
         return interp_class(
             vector_size=vector_size,
             input_frequency=self._config.input_frequency,
@@ -64,24 +65,24 @@ class FeatureLerpInterpolator(FeatureInterpolatorBase[LerpInterpolatorSettings])
 # Convenience classes
 class BBoxLerpInterpolator(FeatureLerpInterpolator):
     def __init__(self, config: LerpInterpolatorSettings) -> None:
-        super().__init__(config, FrameField.bbox)
+        super().__init__(config, BBox)
 
 
 class PointLerpInterpolator(FeatureLerpInterpolator):
     def __init__(self, config: LerpInterpolatorSettings) -> None:
-        super().__init__(config, FrameField.points)
+        super().__init__(config, Points2D)
 
 
 class AngleLerpInterpolator(FeatureLerpInterpolator):
     def __init__(self, config: LerpInterpolatorSettings) -> None:
-        super().__init__(config, FrameField.angles)
+        super().__init__(config, Angles)
 
 
 class AngleVelLerpInterpolator(FeatureLerpInterpolator):
     def __init__(self, config: LerpInterpolatorSettings) -> None:
-        super().__init__(config, FrameField.angle_vel)
+        super().__init__(config, AngleVelocity)
 
 
 class AngleSymLerpInterpolator(FeatureLerpInterpolator):
     def __init__(self, config: LerpInterpolatorSettings) -> None:
-        super().__init__(config, FrameField.angle_sym)
+        super().__init__(config, AngleSymmetry)

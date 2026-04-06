@@ -1,7 +1,6 @@
 """Easing filter node for applying pytweening functions to normalized values."""
 
 # Standard library imports
-from dataclasses import replace
 from typing import Callable
 
 # Third-party imports
@@ -9,8 +8,10 @@ import pytweening  # type: ignore
 
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.features.base import NormalizedSingleValue
-from modules.pose.frame import Frame, FrameField
+from modules.pose.features import AngleMotion
+from modules.pose.features.base import BaseFeature
+from modules.pose.features.base.NormalizedSingleValue import NormalizedSingleValue
+from modules.pose.frame import Frame, replace
 from modules.settings import Settings, Field
 
 
@@ -55,16 +56,16 @@ class EasingNode(FilterNode):
     (e.g., AngleMotion, LeaderScore).
     """
 
-    def __init__(self, config: EasingSettings, pose_field: FrameField) -> None:
+    def __init__(self, config: EasingSettings, feature_type: type[NormalizedSingleValue]) -> None:
         self._config: EasingSettings = config
-        self._pose_field: FrameField = pose_field
+        self._feature_type: type[NormalizedSingleValue] = feature_type
 
     @property
     def config(self) -> EasingSettings:
         return self._config
 
     def process(self, pose: Frame) -> Frame:
-        feature: NormalizedSingleValue = pose.get_feature(self._pose_field)
+        feature = pose[self._feature_type]
 
         # Get original value and apply easing
         original_value = feature.value
@@ -87,11 +88,11 @@ class EasingNode(FilterNode):
                 scores=feature.scores
             )
 
-        return replace(pose, **{self._pose_field.name: new_feature})
+        return replace(pose, {self._feature_type: new_feature})
 
 
 class AngleMotionEasingNode(EasingNode):
     """Convenience class for easing angle_motion."""
 
     def __init__(self, config: EasingSettings) -> None:
-        super().__init__(config, FrameField.angle_motion)
+        super().__init__(config, AngleMotion)

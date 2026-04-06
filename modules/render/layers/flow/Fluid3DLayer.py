@@ -19,6 +19,7 @@ from modules.gl import Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.data_hub import DataHub, Stage
 from modules.pose.frame import Frame
+from modules.pose.features import Similarity, MotionGate, AngleMotion
 
 from modules.settings import Field, Settings, Group
 from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlow3D, FluidFlow3DArray, FluidFlowSettings
@@ -197,14 +198,14 @@ class Fluid3DLayer(LayerBase):
         # Get motion data from pose
         pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
         similarities: np.ndarray = (
-            pose.similarity.values if pose is not None
+            pose[Similarity].values if pose is not None and Similarity in pose
             else np.full((self.config.num_players,), 0.0)
         )
         motion_gates: np.ndarray = (
-            pose.motion_gate.values if pose is not None
+            pose[MotionGate].values if pose is not None and MotionGate in pose
             else np.full((self.config.num_players,), 0.0)
         )
-        motion: float = pose.angle_motion.value if pose is not None else 0.0
+        motion: float = pose[AngleMotion].value if pose is not None and AngleMotion in pose else 0.0
         m_s = similarities
 
         # self.config.fluid_flow.density.fade_time = 18.0 - (pow(motion, 2.0) * 14.0)

@@ -1,12 +1,11 @@
 # Standard library imports
-from dataclasses import replace
 from threading import Lock
 
 import numpy as np
 
 from modules.pose.features.Similarity import Similarity, configure_similarity
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame
+from modules.pose.frame import Frame, replace
 from modules.settings import Settings, Field
 
 
@@ -63,4 +62,4 @@ class SimilarityApplicator(FilterNode):
         # signals the downstream SimilarityStickyFiller with valid zeros instead of NaN)
         if similarity is None:
             similarity = self._zero_similarity
-        return replace(pose, similarity=similarity)
+        return replace(pose, {Similarity: similarity})

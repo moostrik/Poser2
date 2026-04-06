@@ -9,6 +9,10 @@ from modules.data_hub import DataHub, Stage
 from modules.inout import OscSound, ArtNetBars
 from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers
+from modules.pose.features import (
+    BBox, Angles, AngleVelocity, AngleMotion, AngleSymmetry,
+    Similarity, LeaderScore, MotionGate, MotionTime, Age,
+)
 from modules.utils import Timer
 
 from .settings import HDTrioSettings
@@ -87,9 +91,10 @@ class HDTrioMain:
         self.motion_gate_tracker =      trackers.FilterTracker(num_players, [lambda: self.motion_gate_applicator])
 
         # WINDOW TRACKERS
-        self.window_tracker_R =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_raw)
-        self.window_tracker_S =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_smooth)
-        self.window_tracker_I =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_lerp)
+        window_features = [BBox, Angles, AngleVelocity, AngleMotion, AngleSymmetry, Similarity, LeaderScore, MotionGate, MotionTime, Age]
+        self.window_tracker_R =     trackers.FrameWindowTracker(num_players, window_features, self.settings.pose.window_raw)
+        self.window_tracker_S =     trackers.FrameWindowTracker(num_players, window_features, self.settings.pose.window_smooth)
+        self.window_tracker_I =     trackers.FrameWindowTracker(num_players, window_features, self.settings.pose.window_lerp)
 
         self.bbox_filters =      trackers.FilterTracker(
             num_players,
@@ -103,7 +108,7 @@ class HDTrioMain:
             num_players,
             [
                 lambda: nodes.PointDualConfFilter(self.settings.pose.point.confidence_filter),
-                nodes.AngleExtractor,
+                lambda: nodes.AngleExtractor(nodes.AngleExtractorSettings(aspect_ratio=self.settings.pose.detection.aspect_ratio)),
                 lambda: nodes.AngleVelExtractor(self.settings.pose.velocity.extractor),
             ]
         )
@@ -112,7 +117,7 @@ class HDTrioMain:
             num_players,
             [
                 lambda: nodes.PointEuroSmoother(self.settings.pose.point.smoother),
-                nodes.AngleExtractor,
+                lambda: nodes.AngleExtractor(nodes.AngleExtractorSettings(aspect_ratio=self.settings.pose.detection.aspect_ratio)),
                 lambda: nodes.AngleVelExtractor(self.settings.pose.velocity.extractor),
                 lambda: nodes.AngleVelEuroSmoother(self.settings.pose.velocity.smoother),
                 lambda: nodes.AngleEuroSmoother(self.settings.pose.angle.smoother),

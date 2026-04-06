@@ -1,7 +1,6 @@
 #TODO: torch.nograd() where applicable
 
 # Standard library imports
-from dataclasses import replace
 import time
 
 # Third-party imports
@@ -11,7 +10,7 @@ import torch.nn.functional as F
 
 # Local application imports
 from modules.pose.features import BBox
-from modules.pose.frame import FrameDict
+from modules.pose.frame import FrameDict, replace
 from modules.pose.batch.ImageFrame import ImageFrame, ImageFrameDict, ImageFrameCallback
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.PerformanceTimer import PerformanceTimer
@@ -136,7 +135,7 @@ class ImageCropProcessor:
                     gpu_image = self._gpu_images[pose_id]
                     # CHW format: (3, H, W)
                     img_height, img_width = gpu_image.shape[1:3]
-                    bbox_rect = pose.bbox.to_rect().zoom(Point2f(1.0 + self._config.expansion_width, 1.0 + self._config.expansion_height))
+                    bbox_rect = pose[BBox].to_rect().zoom(Point2f(1.0 + self._config.expansion_width, 1.0 + self._config.expansion_height))
 
                     # Calculate crop region (same logic as ImageProcessor)
                     crop_roi = self._calculate_crop_roi(bbox_rect, img_width, img_height)
@@ -154,7 +153,7 @@ class ImageCropProcessor:
 
                     # Normalize crop ROI for output
                     normalized_roi = crop_roi.scale(Point2f(1.0 / img_width, 1.0 / img_height))
-                    cropped_poses[pose_id] = replace(pose, bbox=BBox.from_rect(normalized_roi))
+                    cropped_poses[pose_id] = replace(pose, {BBox: BBox.from_rect(normalized_roi)})
 
                     # Build GPUFrame with PyTorch tensors
                     gpu_frames[pose_id] = ImageFrame(

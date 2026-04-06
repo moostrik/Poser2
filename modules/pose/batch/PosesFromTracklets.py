@@ -60,10 +60,8 @@ class PosesFromTracklets(FrameDictCallbackMixin):
                 generated_poses[track_id] = Frame(
                     track_id=tracklet.id,
                     cam_id=tracklet.cam_id,
-                    # batch_id=batch_id,
-                    bbox=bounding_box,
                     time_stamp=tracklet.time_stamp,
-                    # is_removed=tracklet.is_removed
+                    features={BBox: bounding_box},
                 )
             except Exception as e:
                 logger.error(f"PoseFromTrackletGenerator: Error generating pose {track_id}: {e}")

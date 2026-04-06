@@ -10,7 +10,8 @@ from torch import Tensor
 
 # Local application imports for setter types
 from modules.oak.camera.definitions import Tracklet as DepthTracklet
-from modules.pose.frame import FrameDict, FrameField, FeatureWindow, FrameWindowDict
+from modules.pose.frame import FrameDict, FeatureWindow, FrameWindowDict
+from modules.pose.features.base import BaseFeature
 from modules.tracker.Tracklet import TrackletDict
 from modules.utils.Timer import TimerState
 
@@ -33,9 +34,9 @@ class DataHubType(IntEnum):
     pose_frame_S =      auto()   # sorted by track_id, has cam_id
     pose_frame_I =      auto()   # sorted by track_id, has cam_id
 
-    pose_window_R =     auto()   # sorted by track_id, {FrameField: FeatureWindow}
-    pose_window_S =     auto()   # sorted by track_id, {FrameField: FeatureWindow}
-    pose_window_I =     auto()   # sorted by track_id, {FrameField: FeatureWindow}
+    pose_window_R =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow}
+    pose_window_S =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow}
+    pose_window_I =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow}
 
     timer_state =       auto()   # TimerState int value (IDLE=0, RUNNING=1, INTERMEZZO=2)
     timer_time =        auto()   # float, elapsed time in seconds
@@ -116,16 +117,16 @@ class DataHub:
         with self.mutex:
             return len(self._data.get(_FRAME_TYPES[stage], {}))
 
-    # FEATURE WINDOW GETTERS (stored as _data[pose_window_X] = {track_id: {FrameField: FeatureWindow}})
-    def get_feature_window(self, stage: Stage, field: FrameField, track_id: int) -> Any | None:
-        """Get a single feature window for a specific stage, field, and track."""
+    # FEATURE WINDOW GETTERS (stored as _data[pose_window_X] = {track_id: {type[BaseFeature]: FeatureWindow}})
+    def get_feature_window(self, stage: Stage, feature_type: type[BaseFeature], track_id: int) -> Any | None:
+        """Get a single feature window for a specific stage, feature type, and track."""
         with self.mutex:
             track_windows = self._data.get(_WINDOW_TYPES[stage], {}).get(track_id)
             if track_windows is None:
                 return None
-            return track_windows.get(field)
+            return track_windows.get(feature_type)
 
-    def get_feature_windows_for_track(self, stage: Stage, track_id: int) -> dict[FrameField, FeatureWindow]:
+    def get_feature_windows_for_track(self, stage: Stage, track_id: int) -> dict[type[BaseFeature], FeatureWindow]:
         """Get all feature windows for a specific stage and track."""
         with self.mutex:
             return dict(self._data.get(_WINDOW_TYPES[stage], {}).get(track_id, {}))
@@ -166,7 +167,7 @@ class DataHub:
         self.set_dict(_FRAME_TYPES[stage], poses)
 
     def set_pose_windows(self, stage: Stage, windows: FrameWindowDict) -> None:
-        """Store feature windows. Pivots {FrameField: {track_id: FeatureWindow}} to track-first for storage."""
+        """Store feature windows. Pivots {type[BaseFeature]: {track_id: FeatureWindow}} to track-first for storage."""
         pivoted: dict[int, Any] = {}
         for field, track_windows in windows.items():
             for track_id, window in track_windows.items():

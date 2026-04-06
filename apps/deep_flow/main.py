@@ -6,10 +6,12 @@ from functools import partial
 from modules.oak import Camera, Simulator, Player, Recorder, Sync
 from modules.settings import presets, NiceServer
 from modules.data_hub import DataHub, Stage
-from modules.inout import OscSound, OscControl
+from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers
-from modules.pose.features import configure_similarity, configure_leader_score
+from modules.pose.features import (
+    BBox, Angles, AngleVelocity, AngleMotion, AngleSymmetry, MotionGate, MotionTime, Age,
+)
 from modules.utils import Timer
 
 from .settings import DeepFlowSettings
@@ -66,7 +68,6 @@ class DeepFlowMain:
 
         # IN_OUT
         self.sound_osc = OscSound(self.data_hub, self.settings.inout.osc_sound)
-        self.osc_control = OscControl(self.settings.inout.osc_control)
 
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
@@ -76,16 +77,14 @@ class DeepFlowMain:
         self.mask_extractor =       batch.MaskBatchExtractor(self.settings.pose.segmentation)
         self.flow_extractor =       batch.FlowBatchExtractor(self.settings.pose.flow)
 
-        # Configure global feature enums (required by WindowNode even if unused)
-        configure_similarity(num_players)
-        configure_leader_score(num_players)
         self.motion_gate_applicator =   nodes.MotionGateApplicator(self.settings.pose.motion_gate)
         self.motion_gate_tracker =      trackers.FilterTracker(num_players, [lambda: self.motion_gate_applicator])
 
         # WINDOW TRACKERS
-        self.window_tracker_R =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_raw)
-        self.window_tracker_S =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_smooth)
-        self.window_tracker_I =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_lerp)
+        _scalar_features = [BBox, Angles, AngleVelocity, AngleMotion, AngleSymmetry, MotionGate, MotionTime, Age]
+        self.window_tracker_R =     trackers.FrameWindowTracker(num_players, _scalar_features, self.settings.pose.window_raw)
+        self.window_tracker_S =     trackers.FrameWindowTracker(num_players, _scalar_features, self.settings.pose.window_smooth)
+        self.window_tracker_I =     trackers.FrameWindowTracker(num_players, _scalar_features, self.settings.pose.window_lerp)
 
         self.bbox_filters = trackers.FilterTracker(
             num_players,
@@ -99,7 +98,7 @@ class DeepFlowMain:
             num_players,
             [
                 lambda: nodes.PointDualConfFilter(self.settings.pose.point.confidence_filter),
-                nodes.AngleExtractor,
+                lambda: nodes.AngleExtractor(nodes.AngleExtractorSettings(aspect_ratio=self.settings.pose.detection.aspect_ratio)),
                 lambda: nodes.AngleVelExtractor(self.settings.pose.velocity.extractor),
             ]
         )
@@ -108,7 +107,7 @@ class DeepFlowMain:
             num_players,
             [
                 lambda: nodes.PointEuroSmoother(self.settings.pose.point.smoother),
-                nodes.AngleExtractor,
+                lambda: nodes.AngleExtractor(nodes.AngleExtractorSettings(aspect_ratio=self.settings.pose.detection.aspect_ratio)),
                 lambda: nodes.AngleVelExtractor(self.settings.pose.velocity.extractor),
                 lambda: nodes.AngleVelEuroSmoother(self.settings.pose.velocity.smoother),
                 lambda: nodes.AngleEuroSmoother(self.settings.pose.angle.smoother),

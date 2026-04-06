@@ -9,6 +9,7 @@ from pytweening import *    # type: ignore
 from modules.data_hub import DataHub, DataHubType, PoseDataHubTypes
 from modules.gl import Fbo, Texture, Style, clear_color
 from modules.pose.frame import Frame
+from modules.pose.features import Similarity
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.layers.generic.HDTPrepare import HDTPrepare
 from modules.render.shaders import MaskApply, MaskMultiply, HDTTripleBlend
@@ -102,7 +103,7 @@ class HDTBlend(LayerBase):
         # print(f"{self._layers[index].motion:.2f}, {self._layers[other_1_index].motion:.2f}, {self._layers[other_2_index].motion:.2f}")
 
 
-        similarities = np.nan_to_num(pose.similarity.values)
+        similarities = np.nan_to_num(pose[Similarity].values)
         threshold = 0.33
         similarities = np.clip((similarities - threshold) / (1.0 - threshold), 0.0, 1.0)
         exponent = 1.5

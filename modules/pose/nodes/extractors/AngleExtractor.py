@@ -1,11 +1,14 @@
-# Standard library imports
-from dataclasses import replace
-
 # Pose imports
-from modules.pose.features import Angles
+from modules.pose.features import Angles, Points2D
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.nodes._utils.AngleUtils import AngleUtils
-from modules.pose.frame import Frame
+from modules.pose.frame import Frame, replace
+from modules.settings import Settings, Field
+
+
+class AngleExtractorSettings(Settings):
+    """Configuration for AngleExtractor."""
+    aspect_ratio: Field[float] = Field(0.75, access=Field.INIT)
 
 
 class AngleExtractor(FilterNode):
@@ -19,7 +22,10 @@ class AngleExtractor(FilterNode):
     rotation offsets and symmetric mirroring for right-side joints.
     """
 
+    def __init__(self, config: AngleExtractorSettings | None = None) -> None:
+        self._config = config if config is not None else AngleExtractorSettings()
+
     def process(self, pose: Frame) -> Frame:
         """Compute angles for all poses and emit enriched results."""
-        angles: Angles = AngleUtils.from_points(pose.points, aspect_ratio=pose.model_ar)
-        return replace(pose, angles=angles)
+        angles: Angles = AngleUtils.from_points(pose[Points2D], aspect_ratio=self._config.aspect_ratio)
+        return replace(pose, {Angles: angles})

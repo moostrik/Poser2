@@ -3,13 +3,13 @@ from modules.gl.Shader import Shader, draw_quad
 
 import numpy as np
 
-from modules.pose.features import PoseFeatureType as PoseFeatureUnion
+from modules.pose.features.base import BaseFeature
 
 import logging
 logger = logging.getLogger(__name__)
 
 class FeatureShader(Shader):
-    def use(self, feature: PoseFeatureUnion, colors: list[tuple[float, float, float, float]],
+    def use(self, feature: BaseFeature, colors: list[tuple[float, float, float, float]],
             line_width: float = 0.1, line_smooth: float = 0.01, use_scores: bool = False,
             display_range: tuple[float, float] | None = None,
             deltas: np.ndarray | None = None) -> None:

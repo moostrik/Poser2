@@ -7,17 +7,17 @@ This is a stateful filter (like StickyFiller) - it processes each input immediat
 with rate constraints based on the time since last update.
 """
 
-from dataclasses import replace
 from typing import cast
 from collections import defaultdict
 
 import numpy as np
 
 # Pose imports
-from modules.pose.features import PoseFeatureType, Angles, BBox, Points2D, AngleSymmetry
+from modules.pose.features import Angles, BBox, Points2D, AngleVelocity, AngleSymmetry
+from modules.pose.features.base import BaseFeature
 from modules.pose.nodes._utils.ArrayRateLimit import RateLimit, AngleRateLimit, PointRateLimit
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, FrameField
+from modules.pose.frame import Frame, replace
 from modules.settings import Settings, Field
 
 
@@ -30,17 +30,17 @@ class RateLimiterSettings(Settings):
 class FeatureRateLimiter(FilterNode):
     """Generic pose feature rate limiter (stateful filter)."""
 
-    _LIMITER_MAP: defaultdict[FrameField, type] = defaultdict(
+    _LIMITER_MAP: defaultdict[type[BaseFeature], type] = defaultdict(
         lambda: RateLimit,
         {
-            FrameField.angles: AngleRateLimit,
-            FrameField.points: PointRateLimit,
+            Angles: AngleRateLimit,
+            Points2D: PointRateLimit,
         }
     )
 
-    def __init__(self, config: RateLimiterSettings, pose_field: FrameField) -> None:
+    def __init__(self, config: RateLimiterSettings, feature_type: type[BaseFeature]) -> None:
         self._config: RateLimiterSettings = config
-        self._pose_field: FrameField = pose_field
+        self._feature_type: type[BaseFeature] = feature_type
         self._limiter: RateLimit = self._create_limiter()
         self._config.bind_all(self._on_config_changed)
 
@@ -53,9 +53,9 @@ class FeatureRateLimiter(FilterNode):
 
     def _create_limiter(self) -> RateLimit:
         """Create the underlying rate limiter instance."""
-        limiter_cls = self._LIMITER_MAP[self._pose_field]
-        vector_size = len(self._pose_field.get_type().enum())
-        clamp_range = self._pose_field.get_type().range()
+        limiter_cls = self._LIMITER_MAP[self._feature_type]
+        vector_size = self._feature_type.length()
+        clamp_range = self._feature_type.range()
         return limiter_cls(
             vector_size=vector_size,
             max_increase=self._config.max_increase,
@@ -74,7 +74,7 @@ class FeatureRateLimiter(FilterNode):
 
     def process(self, pose: Frame) -> Frame:
         """Apply rate limiting to pose feature and return limited pose."""
-        feature_data: PoseFeatureType = pose.get_feature(self._pose_field)
+        feature_data = pose[self._feature_type]
 
         # Update limiter with new values (uses internal time tracking)
         self._limiter.update(feature_data.values)
@@ -88,7 +88,7 @@ class FeatureRateLimiter(FilterNode):
         limited_scores = np.where(has_nan, 0.0, feature_data.scores).astype(np.float32)
 
         limited_data = type(feature_data)(values=limited_values, scores=limited_scores)
-        return replace(pose, **{self._pose_field.name: limited_data})
+        return replace(pose, {self._feature_type: limited_data})
 
     def reset(self) -> None:
         """Reset the limiter's internal state."""
@@ -98,24 +98,24 @@ class FeatureRateLimiter(FilterNode):
 # Convenience classes
 class BBoxRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterSettings) -> None:
-        super().__init__(config, FrameField.bbox)
+        super().__init__(config, BBox)
 
 
 class PointRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterSettings) -> None:
-        super().__init__(config, FrameField.points)
+        super().__init__(config, Points2D)
 
 
 class AngleRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterSettings) -> None:
-        super().__init__(config, FrameField.angles)
+        super().__init__(config, Angles)
 
 
 class AngleVelRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterSettings) -> None:
-        super().__init__(config, FrameField.angle_vel)
+        super().__init__(config, AngleVelocity)
 
 
 class AngleSymRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterSettings) -> None:
-        super().__init__(config, FrameField.angle_sym)
+        super().__init__(config, AngleSymmetry)

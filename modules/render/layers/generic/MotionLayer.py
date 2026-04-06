@@ -12,6 +12,7 @@ from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.render.shaders import Tint as shader
 
 from modules.pose.frame import Frame
+from modules.pose.features import AngleMotion
 from modules.render.color_settings import ColorSettings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -59,10 +60,10 @@ class MotionLayer(LayerBase):
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         mask = self._centre_mask  # MotionMultiply currently doesn't use mask separately
-        # print("Motion value:", pose.angle_motion.value)
+        # print("Motion value:", pose[AngleMotion].value)
 
         # Motion value is already normalized [0,1] and eased by pipeline
-        motion: float = easeInOutSine(pose.angle_motion.value)
+        motion: float = easeInOutSine(pose[AngleMotion].value)
 
         color = self._color_settings.track_colors[self._cam_id % len(self._color_settings.track_colors)]
         self._fbo.begin()

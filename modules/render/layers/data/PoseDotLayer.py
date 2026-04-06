@@ -8,6 +8,7 @@ from modules.settings import Field, Settings
 from modules.data_hub import DataHub, Stage
 from modules.gl import Fbo, Texture, clear_color
 from modules.pose.frame import Frame
+from modules.pose.features import Points2D
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import PosePointDots as shader
 from modules.utils.PointsAndRects import Rect
@@ -62,5 +63,5 @@ class PoseDotLayer(LayerBase):
 
         self._fbo.begin()
         clear_color()
-        self._shader.use(pose.points, dot_size=dot_size, dot_smooth=dot_smooth, color=self.color)
+        self._shader.use(pose[Points2D], dot_size=dot_size, dot_smooth=dot_smooth, color=self.color)
         self._fbo.end()

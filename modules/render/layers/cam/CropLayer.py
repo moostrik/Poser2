@@ -8,6 +8,7 @@ from modules.settings import Field, Settings
 from modules.data_hub import DataHub, Stage
 from modules.gl import Fbo, Texture, clear_color
 from modules.pose.frame import Frame
+from modules.pose.features import BBox
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import DrawRoi
 
@@ -50,7 +51,7 @@ class CropLayer(LayerBase):
         if self._data_cache.idle or pose is None:
             return
 
-        pose_rect: Rect = pose.bbox.to_rect()
+        pose_rect: Rect = pose[BBox].to_rect()
         # convert to texture space
         pose_rect = pose_rect.flip_y(0.5)
 

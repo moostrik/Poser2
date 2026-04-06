@@ -1,12 +1,12 @@
 # Standard library imports
-from dataclasses import replace
 from threading import Lock
 
 import numpy as np
 
+from modules.pose.features import AngleMotion
 from modules.pose.features.MotionGate import MotionGate, configure_motion_gate
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, FrameDict
+from modules.pose.frame import Frame, FrameDict, replace
 from modules.settings import Settings, Field
 
 
@@ -45,8 +45,9 @@ class MotionGateApplicator(FilterNode):
         # Step 1: Extract motion values for each pose
         motion_values: dict[int, float] = {}
         for track_id, frame in frames.items():
-            if frame.angle_motion is not None:
-                motion = frame.angle_motion.value
+            angle_motion = frame.get(AngleMotion)
+            if angle_motion is not None:
+                motion = angle_motion.value
                 motion_values[track_id] = motion if not np.isnan(motion) else 0.0
             else:
                 motion_values[track_id] = 0.0
@@ -92,6 +93,6 @@ class MotionGateApplicator(FilterNode):
             motion_gate: MotionGate | None = self._motion_gate_dict.get(pose.track_id)
 
         if motion_gate is not None:
-            pose = replace(pose, motion_gate=motion_gate)
+            pose = replace(pose, {MotionGate: motion_gate})
 
         return pose

@@ -9,6 +9,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from modules.pose.frame import Frame
+from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, Similarity, MotionGate, LeaderScore, MotionTime, Age
 from modules.pose.features.Angles import AngleLandmark
 
 from modules.data_hub import DataHub, DataHubType, Stage
@@ -221,53 +222,53 @@ class OscSound:
         bundle_builder.add_content(active_msg.build()) # type: ignore
 
         # when there is normal motion, about 1 per second
-        motion_time: float = pose.motion_time
+        motion_time: float = pose[MotionTime].value if MotionTime in pose else 0.0
         change_msg = OscMessageBuilder(address=f"/pose/{id}/time/motion")
         change_msg.add_arg(float(motion_time), OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(change_msg.build()) # type: ignore
 
         # in seconds
-        age: float = pose.age
+        age: float = pose[Age].value if Age in pose else 0.0
         change_msg = OscMessageBuilder(address=f"/pose/{id}/time/age")
         change_msg.add_arg(float(age), OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(change_msg.build()) # type: ignore
 
         # range [-pi, pi]
-        angle_rad_values: list[float] = pose.angles.values.tolist()
+        angle_rad_values: list[float] = pose[Angles].values.tolist()
         angle_rad_msg = OscMessageBuilder(address=f"/pose/{id}/angle/rad")
         for angle in angle_rad_values:
             angle_rad_msg.add_arg(angle, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(angle_rad_msg.build()) # type: ignore
 
         # range [-finite, finite] -> [-2pi, 2pi]
-        angle_vel_values: list[float] = pose.angle_vel.values.tolist()
+        angle_vel_values: list[float] = pose[AngleVelocity].values.tolist()
         angle_vel_msg = OscMessageBuilder(address=f"/pose/{id}/angle/vel")
         for angle_vel in angle_vel_values:
             angle_vel_msg.add_arg(angle_vel, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(angle_vel_msg.build()) # type: ignore
 
         # range [0, 1]
-        mean_sym: float = pose.angle_sym.overall_symmetry()
+        mean_sym: float = pose[AngleSymmetry].overall_symmetry() if AngleSymmetry in pose else 0.0
         mean_sym_msg = OscMessageBuilder(address=f"/pose/{id}/angle/sym")
         mean_sym_msg.add_arg(float(mean_sym), OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(mean_sym_msg.build()) # type: ignore
 
         # range [0, 1] - raw angle similarity
-        pose_sim_values: list[float] = pose.similarity.values.tolist()
+        pose_sim_values: list[float] = pose[Similarity].values.tolist() if Similarity in pose else [0.0] * num_players
         pose_sim_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/pose")
         for val in pose_sim_values:
             pose_sim_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(pose_sim_msg.build()) # type: ignore
 
         # range [0, 1] - motion gate (both poses moving)
-        gate_values: list[float] = pose.motion_gate.values.tolist()
+        gate_values: list[float] = pose[MotionGate].values.tolist() if MotionGate in pose else [0.0] * num_players
         gate_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/gate")
         for val in gate_values:
             gate_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(gate_msg.build()) # type: ignore
 
         # range [0, 1] - motion-gated similarity (similarity * motion_gate)
-        motion_sim_values: list[float] = (pose.similarity.values).tolist()
+        motion_sim_values: list[float] = pose[Similarity].values.tolist() if Similarity in pose else [0.0] * num_players
         motion_sim_values = [0.0 if np.isnan(v) else v for v in motion_sim_values]
         motion_sim_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/motion")
         for val in motion_sim_values:
@@ -275,7 +276,7 @@ class OscSound:
         bundle_builder.add_content(motion_sim_msg.build()) # type: ignore
 
         # range [-1, 1] - leader scores (negative=this leads, positive=other leads)
-        leader_values: list[float] = pose.leader.values.tolist()
+        leader_values: list[float] = pose[LeaderScore].values.tolist() if LeaderScore in pose else [0.0] * num_players
         leader_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/leader")
         for val in leader_values:
             leader_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
@@ -283,7 +284,7 @@ class OscSound:
 
         # DEPRECATED: Compute motion-gated similarity using old method (backward compatibility)
 
-        similarity_values: list[float] = np.nan_to_num(pose.similarity.values, nan=0.0).tolist()
+        similarity_values: list[float] = np.nan_to_num(pose[Similarity].values, nan=0.0).tolist() if Similarity in pose else [0.0] * num_players
 
         # range [0, 1] - DEPRECATED backward-compatible motion-gated similarity
         similarity_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")

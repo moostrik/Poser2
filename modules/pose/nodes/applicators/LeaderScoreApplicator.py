@@ -1,10 +1,9 @@
 # Standard library imports
-from dataclasses import replace
 from threading import Lock
 
 from modules.pose.features.LeaderScore import LeaderScore, configure_leader_score
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame
+from modules.pose.frame import Frame, replace
 from modules.settings import Settings, Field
 
 
@@ -52,6 +51,6 @@ class LeaderScoreApplicator(FilterNode):
             leader: LeaderScore | None = self._leader_dict.get(pose.track_id)
 
         if leader is not None:
-            pose = replace(pose, leader=leader)
+            pose = replace(pose, {LeaderScore: leader})
 
         return pose

@@ -6,6 +6,7 @@ from OpenGL.GL import * # type: ignore
 from modules.settings import Field, Settings
 from modules.data_hub import DataHub, Stage
 from modules.pose.frame import Frame
+from modules.pose.features import MotionTime
 from modules.render.layers.LayerBase import LayerBase
 from modules.gl import Text
 
@@ -58,5 +59,5 @@ class MTimeRenderer(LayerBase):
         if pose is None:
             self._motion_time = None
         else:
-            time_str: str = f"MT: {pose.motion_time:.2f}"
+            time_str: str = f"MT: {pose[MotionTime].value:.2f}"
             self._motion_time = time_str
