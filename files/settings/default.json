@@ -25,7 +25,6 @@
     "cam_0": {
         "device_id": "14442C101136D1D200",
         "show_stereo": false,
-        "manual": false,
         "flip_h": false,
         "flip_v": true,
         "perspective": -0.22,
@@ -53,7 +52,6 @@
     "cam_1": {
         "device_id": "14442C10F124D9D600",
         "show_stereo": false,
-        "manual": false,
         "flip_h": false,
         "flip_v": true,
         "perspective": -0.22,
@@ -81,7 +79,6 @@
     "cam_2": {
         "device_id": "14442C10110AD3D200",
         "show_stereo": false,
-        "manual": false,
         "flip_h": false,
         "flip_v": true,
         "perspective": -0.22,

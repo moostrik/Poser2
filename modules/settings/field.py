@@ -76,6 +76,7 @@ class Field(Generic[T]):
     - ``description`` — tooltip / label text.
     - ``visible`` — whether the field appears in the panel.
     - ``pinned`` — whether the field is shown in a pinned summary section.
+        - ``newline`` — start this field on a new compact UI row.
     - ``widget`` — explicit widget override (validated for type compatibility
       at construction time, but has no effect on get/set).
     - ``color`` — UI colour hint for the control.
@@ -118,6 +119,7 @@ class Field(Generic[T]):
         access: Access = Access.WRITE,
         visible: bool = True,
         pinned: bool = False,
+        newline: bool = False,
         widget: Widget = Widget.default,
         color: str = "primary",  # UI color hint (e.g. 'primary', 'red', '#00f')
         options: Field | None = None,  # Field holding list[str] options (for text_select)
@@ -147,6 +149,7 @@ class Field(Generic[T]):
         self.access = access
         self.visible = visible
         self.pinned = pinned
+        self.newline = newline
         self.widget = widget
         self.color = color
         self.options: Field | None = options

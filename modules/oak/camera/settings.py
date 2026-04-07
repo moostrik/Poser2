@@ -13,65 +13,51 @@ from modules.settings import BaseSettings, Field, Widget
 class CameraSettings(BaseSettings):
     """Per-camera runtime settings. Instantiated N times via Child(count=num_cameras)."""
 
-    # Identity
+    video_fps: Field[float] =       Field(0.0, access=Field.READ, description="Video FPS")
+    tracker_fps: Field[float] =     Field(0.0, access=Field.READ, description="Tracker updates/s")
+    tracklets: Field[int] =         Field(0, access=Field.READ, description="Active tracklets")
     device_id:      Field[str]   = Field("", access=Field.INIT, description="Camera device ID (MxID)")
+    fps:            Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera FPS")
 
-    # Pipeline config (shared from parent via Child.share)
-    fps:            Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, visible=False)
-    color:          Field[bool]  = Field(True, access=Field.INIT, visible=False)
-    square:         Field[bool]  = Field(True, access=Field.INIT, visible=False)
-    stereo:         Field[bool]  = Field(False, access=Field.INIT, visible=False)
-    yolo:           Field[bool]  = Field(True, access=Field.INIT, visible=False)
-    hd_ready:       Field[bool]  = Field(False, access=Field.INIT, visible=False)
-    sim_enabled:    Field[bool]  = Field(False, access=Field.INIT, visible=False)
-    model_path:     Field[str]   = Field("models", access=Field.INIT, visible=False)
-
-    # Per-camera pipeline settings (INIT — affect pipeline build)
+    # Initial settings
+    color:          Field[bool]  = Field(True, access=Field.INIT, newline=True)
+    mono:           Field[bool]  = Field(False, access=Field.INIT)
+    square:         Field[bool]  = Field(True, access=Field.INIT)
+    stereo:         Field[bool]  = Field(False, access=Field.INIT)
+    yolo:           Field[bool]  = Field(True, access=Field.INIT)
+    hd_ready:       Field[bool]  = Field(False, access=Field.INIT)
+    sim_enabled:    Field[bool]  = Field(False, access=Field.INIT)
+    model_path:     Field[str]   = Field("models", access=Field.INIT)
     show_stereo:    Field[bool]  = Field(False, access=Field.INIT, description="Show stereo visualization")
-    manual:         Field[bool]  = Field(False, access=Field.INIT, description="Manual camera control")
     flip_h:         Field[bool]  = Field(False, access=Field.INIT, description="Flip horizontal")
     flip_v:         Field[bool]  = Field(False, access=Field.INIT, description="Flip vertical")
     perspective:    Field[float] = Field(0.0, min=-1.0, max=1.0, access=Field.INIT, description="Perspective correction")
 
-    # --- Color controls (WRITE — runtime adjustable) ---
-    color_auto_exposure:Field[bool] = Field(True, widget=Widget.switch, description="Auto exposure")
-    color_exposure:     Field[int]  = Field(EXPOSURE_RANGE[0], min=EXPOSURE_RANGE[0], max=EXPOSURE_RANGE[1], widget=Widget.slider, description="Exposure (µs)")
-    color_iso:          Field[int]  = Field(ISO_RANGE[0], min=ISO_RANGE[0], max=ISO_RANGE[1], widget=Widget.slider, description="ISO")
-    color_auto_balance: Field[bool] = Field(True, widget=Widget.switch, description="Auto white balance")
-    color_balance:      Field[int]  = Field(BALANCE_RANGE[0], min=BALANCE_RANGE[0], max=BALANCE_RANGE[1], widget=Widget.slider, description="White balance")
-    color_brightness:   Field[int]  = Field(0, min=BRIGHTNESS_RANGE[0], max=BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Brightness")
+    # --- Color controls ---
+    color_auto_exposure:Field[bool] = Field(True, widget=Widget.switch, description="Auto exposure", newline=True)
+    color_exposure:     Field[int]  = Field(EXPOSURE_RANGE[0], min=EXPOSURE_RANGE[0], max=EXPOSURE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Exposure (µs)")
+    color_iso:          Field[int]  = Field(ISO_RANGE[0], min=ISO_RANGE[0], max=ISO_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="ISO")
+    color_auto_balance: Field[bool] = Field(True, widget=Widget.switch, description="Auto white balance", newline=True)
+    color_balance:      Field[int]  = Field(BALANCE_RANGE[0], min=BALANCE_RANGE[0], max=BALANCE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="White balance")
+    color_brightness:   Field[int]  = Field(0, min=BRIGHTNESS_RANGE[0], max=BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Brightness", newline=True)
     color_contrast:     Field[int]  = Field(0, min=CONTRAST_RANGE[0], max=CONTRAST_RANGE[1], widget=Widget.slider, description="Contrast")
     color_saturation:   Field[int]  = Field(0, min=SATURATION_RANGE[0], max=SATURATION_RANGE[1], widget=Widget.slider, description="Saturation")
     color_luma_denoise: Field[int]  = Field(0, min=LUMA_DENOISE_RANGE[0], max=LUMA_DENOISE_RANGE[1], widget=Widget.slider, description="Luma denoise")
     color_sharpness:    Field[int]  = Field(0, min=SHARPNESS_RANGE[0], max=SHARPNESS_RANGE[1], widget=Widget.slider, description="Sharpness")
 
-    # --- Mono controls (WRITE) ---
-    mono_auto_exposure: Field[bool] = Field(True, widget=Widget.switch, description="Mono auto exposure")
-    mono_exposure:      Field[int]  = Field(EXPOSURE_RANGE[0], min=EXPOSURE_RANGE[0], max=EXPOSURE_RANGE[1], widget=Widget.slider, description="Mono exposure (µs)")
-    mono_iso:           Field[int]  = Field(ISO_RANGE[0], min=ISO_RANGE[0], max=ISO_RANGE[1], widget=Widget.slider, description="Mono ISO")
-
-    # --- IR controls (WRITE) ---
+    # --- Mono controls ---
+    mono_auto_exposure: Field[bool] = Field(True, widget=Widget.switch, description="Mono auto exposure", newline=True)
+    mono_exposure:      Field[int]  = Field(EXPOSURE_RANGE[0], min=EXPOSURE_RANGE[0], max=EXPOSURE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Mono exposure (µs)")
+    mono_iso:           Field[int]  = Field(ISO_RANGE[0], min=ISO_RANGE[0], max=ISO_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Mono ISO")
     ir_grid_light:  Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR grid projector")
     ir_flood_light: Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
 
     # --- Stereo controls (WRITE) ---
     stereo_depth_min:       Field[int]  = Field(STEREO_DEPTH_RANGE[0], min=STEREO_DEPTH_RANGE[0], max=STEREO_DEPTH_RANGE[1], widget=Widget.slider, description="Depth min (mm)")
     stereo_depth_max:       Field[int]  = Field(STEREO_DEPTH_RANGE[1], min=STEREO_DEPTH_RANGE[0], max=STEREO_DEPTH_RANGE[1], widget=Widget.slider, description="Depth max (mm)")
-    stereo_brightness_min:  Field[int]  = Field(0, min=STEREO_BRIGHTNESS_RANGE[0], max=STEREO_BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Stereo brightness min")
-    stereo_brightness_max:  Field[int]  = Field(STEREO_BRIGHTNESS_RANGE[1], min=STEREO_BRIGHTNESS_RANGE[0], max=STEREO_BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Stereo brightness max")
+    stereo_bright_min:      Field[int]  = Field(0, min=STEREO_BRIGHTNESS_RANGE[0], max=STEREO_BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Stereo brightness min")
+    stereo_bright_max:      Field[int]  = Field(STEREO_BRIGHTNESS_RANGE[1], min=STEREO_BRIGHTNESS_RANGE[0], max=STEREO_BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Stereo brightness max")
     stereo_median_filter:   Field[StereoMedianFilterType] = Field(StereoMedianFilterType.OFF, widget=Widget.select, description="Stereo median filter")
-
-    # --- Auto readback (READ — written by Core from camera frames) ---
-    actual_color_exposure:  Field[int]  = Field(0, access=Field.READ, description="Actual exposure (µs)")
-    actual_color_iso:       Field[int]  = Field(0, access=Field.READ, description="Actual ISO")
-    actual_color_balance:   Field[int]  = Field(0, access=Field.READ, description="Actual white balance")
-    actual_mono_exposure:   Field[int]  = Field(0, access=Field.READ, description="Actual mono exposure")
-    actual_mono_iso:        Field[int]  = Field(0, access=Field.READ, description="Actual mono ISO")
-
-    # --- Status (READ — written by Core) ---
-    fps_video:      Field[float] = Field(0.0, access=Field.READ, description="Video FPS")
-    tps:            Field[float] = Field(0.0, access=Field.READ, description="Tracker updates/s")
-    num_tracklets:  Field[int]   = Field(0, access=Field.READ, description="Active tracklets")
 
     # ── Hardware connection ────────────────────────────────────────────
 
@@ -115,8 +101,8 @@ class CameraSettings(BaseSettings):
         # Stereo controls
         self.bind(CameraSettings.stereo_depth_min, self._on_stereo_config)
         self.bind(CameraSettings.stereo_depth_max, self._on_stereo_config)
-        self.bind(CameraSettings.stereo_brightness_min, self._on_stereo_config)
-        self.bind(CameraSettings.stereo_brightness_max, self._on_stereo_config)
+        self.bind(CameraSettings.stereo_bright_min, self._on_stereo_config)
+        self.bind(CameraSettings.stereo_bright_max, self._on_stereo_config)
         self.bind(CameraSettings.stereo_median_filter, self._on_stereo_config)
 
     def _unbind(self) -> None:
@@ -137,8 +123,8 @@ class CameraSettings(BaseSettings):
         self.unbind(CameraSettings.ir_grid_light, self._on_ir_grid_light)
         self.unbind(CameraSettings.stereo_depth_min, self._on_stereo_config)
         self.unbind(CameraSettings.stereo_depth_max, self._on_stereo_config)
-        self.unbind(CameraSettings.stereo_brightness_min, self._on_stereo_config)
-        self.unbind(CameraSettings.stereo_brightness_max, self._on_stereo_config)
+        self.unbind(CameraSettings.stereo_bright_min, self._on_stereo_config)
+        self.unbind(CameraSettings.stereo_bright_max, self._on_stereo_config)
         self.unbind(CameraSettings.stereo_median_filter, self._on_stereo_config)
 
     def _apply(self) -> None:
@@ -205,7 +191,7 @@ class CameraSettings(BaseSettings):
             self._on_color_balance(self.color_balance)
 
     def _on_color_balance(self, value: int = 0) -> None:
-        if self._device is None: return
+        if self._device is None or self.color_auto_balance: return
         ctrl = dai.CameraControl()
         ctrl.setManualWhiteBalance(self.color_balance)
         self._send_control(Input.COLOR_CONTROL, ctrl)
@@ -281,8 +267,8 @@ class CameraSettings(BaseSettings):
         if self._device is None: return
         self._stereo_config.postProcessing.thresholdFilter.minRange = self.stereo_depth_min
         self._stereo_config.postProcessing.thresholdFilter.maxRange = self.stereo_depth_max
-        self._stereo_config.postProcessing.brightnessFilter.minBrightness = self.stereo_brightness_min
-        self._stereo_config.postProcessing.brightnessFilter.maxBrightness = self.stereo_brightness_max
+        self._stereo_config.postProcessing.brightnessFilter.minBrightness = self.stereo_bright_min
+        self._stereo_config.postProcessing.brightnessFilter.maxBrightness = self.stereo_bright_max
         mf = self.stereo_median_filter
         if mf == StereoMedianFilterType.OFF:
             self._stereo_config.postProcessing.median = dai.MedianFilter.MEDIAN_OFF
@@ -298,15 +284,15 @@ class CameraSettings(BaseSettings):
 
     def update_color_readback(self, frame: dai.ImgFrame) -> None:
         if self.color_auto_exposure:
-            self.actual_color_exposure = int(frame.getExposureTime().total_seconds() * 1000000)
-            self.actual_color_iso = frame.getSensitivity()
+            self.color_exposure = int(frame.getExposureTime().total_seconds() * 1000000)
+            self.color_iso = frame.getSensitivity()
         if self.color_auto_balance:
-            self.actual_color_balance = frame.getColorTemperature()
+            self.color_balance = frame.getColorTemperature()
 
     def update_mono_readback(self, frame: dai.ImgFrame) -> None:
         if self.mono_auto_exposure:
-            self.actual_mono_exposure = int(frame.getExposureTime().total_seconds() * 1000000)
-            self.actual_mono_iso = frame.getSensitivity()
+            self.mono_exposure = int(frame.getExposureTime().total_seconds() * 1000000)
+            self.mono_iso = frame.getSensitivity()
 
 
 

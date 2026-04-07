@@ -490,6 +490,10 @@ class TestSettingMetadata(unittest.TestCase):
         self.assertEqual(field.min, 100)
         self.assertEqual(field.max, 10000)
 
+    def test_newline_metadata(self):
+        field = Field(0, newline=True)
+        self.assertTrue(field.newline)
+
 
 class TestMinMaxMetadata(unittest.TestCase):
     """Tests that min/max/step are stored as GUI metadata, not enforced."""

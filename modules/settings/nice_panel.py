@@ -93,7 +93,7 @@ def generate_label(name):
     return " ".join(result)
 
 
-def _build_field_title(label: str, description: str | None, *, classes: str = "text-xs text-caption"):
+def _build_field_title(label: str, description: str | None, *, classes: str = ""):
     """Create a shared field title area with an optional hover description."""
     title = ui.label(label).classes(classes)
     if description:
@@ -124,7 +124,7 @@ def _build_field_header(
     label: str,
     description: str | None,
     *,
-    title_classes: str = "text-xs text-caption",
+    title_classes: str = "",
     row_classes: str = "w-full items-center justify-between gap-2",
     actions: Callable[[], None] | None = None,
     action_classes: str = "items-center gap-0",
@@ -137,78 +137,41 @@ def _build_field_header(
                 actions()
 
 
-class _PanelLayout:
-    """Owns field classification and container placement for the settings panel."""
+def _build_init_field(settings, name: str) -> None:
+    """Render a single init-only field without forcing it into a separate section."""
+    with ui.row().classes("items-center gap-2"):
+        ui.label(generate_label(name))
+        ui.label(str(getattr(settings, name))).classes("text-secondary italic")
 
-    _WIDE_WIDGETS = {Widget.input, Widget.textarea}
-    _COMPOUND_WIDGETS = {
-        Widget.slider,
-        Widget.knob,
-        Widget.radio,
-        Widget.checklist,
-        Widget.order,
-        Widget.color_alpha,
-        Widget.point2f,
-        Widget.rect,
-    }
 
-    @classmethod
-    def kind_for_field(cls, field: Field) -> str:
-        """Return the layout bucket for a field in the settings body."""
-        if field.widget == Widget.button:
-            return "button"
-        if field.access is Access.INIT:
-            return "init"
+def _build_settings_entry(settings, name: str, field: Field, polls) -> None:
+    """Render one visible field in declaration order."""
+    if field.widget == Widget.button:
+        _build_action_button(settings, name, field)
+        return
+    if field.access is Access.INIT:
+        _build_init_field(settings, name)
+        return
+    _build_field_control(settings, name, field, polls)
 
-        resolved = Widget.resolve(field)
 
-        if resolved in cls._WIDE_WIDGETS:
-            return "wide"
 
-        if resolved in cls._COMPOUND_WIDGETS:
-            return "compound"
+def _split_fields_into_rows(fields: list[tuple[str, Field]]) -> list[list[tuple[str, Field]]]:
+    """Split visible fields into rows, breaking only on explicit ``field.newline``."""
+    rows: list[list[tuple[str, Field]]] = []
+    current_row: list[tuple[str, Field]] = []
 
-        return "compact"
+    for item in fields:
+        _name, field = item
+        if field.newline and current_row:
+            rows.append(current_row)
+            current_row = []
+        current_row.append(item)
 
-    @staticmethod
-    def render_run(kind: str, run: list[tuple[str, str, Field]], settings, polls) -> None:
-        """Render one consecutive run of fields that share a layout bucket."""
-        if kind == "init":
-            with ui.row().classes("w-full gap-4 flex-wrap"):
-                for _, field_name, _field in run:
-                    with ui.row().classes("items-center gap-1"):
-                        ui.label(generate_label(field_name)).classes("text-xs text-caption")
-                        ui.label(str(getattr(settings, field_name))).classes(
-                            "text-sm text-secondary italic"
-                        )
-            return
+    if current_row:
+        rows.append(current_row)
 
-        if kind == "button":
-            with ui.row().classes("gap-2"):
-                for _, action_name, action_field in run:
-                    _build_action_button(settings, action_name, action_field)
-            return
-
-        if kind == "compact":
-            with ui.row().classes("w-full gap-4 flex-wrap items-end content-start"):
-                for _, field_name, field in run:
-                    _build_field_control(settings, field_name, field, polls)
-            return
-
-        if kind == "compound":
-            with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-3 poser-grid"):
-                for _, field_name, field in run:
-                    with ui.column().classes("w-full gap-0"):
-                        _build_field_control(settings, field_name, field, polls)
-            return
-
-        if kind == "wide":
-            with ui.column().classes("w-full gap-2"):
-                for _, field_name, field in run:
-                    _build_field_control(settings, field_name, field, polls)
-            return
-
-        raise ValueError(f"Unknown panel layout kind: {kind}")
+    return rows
 
 
 def _build_field_control(settings, name, field, polls):
@@ -297,22 +260,52 @@ def _build_slider(settings, name, field, polls):
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
     color = getattr(field, "color", "primary")
 
-    with ui.column().classes("w-full gap-1 py-1"):
-        _build_field_title(label, desc)
+    with ui.column().classes("w-[12rem] max-w-full gap-1"):
+        with ui.row().classes("w-full items-center justify-between"):
+            _build_field_title(label, desc)
+            fmt = "%.0f" if field.type_ is int else "%.2f"
+            val_input = ui.number(
+                value=value,
+                step=step,
+                format=fmt,
+            ).props(
+                "dense borderless"
+                + (" disable" if is_disabled else "")
+            ).classes("w-16")
         sl = ui.slider(
             min=field.min, max=field.max, step=step, value=value
         ).props(
-            f"dense label-always color={color}"
+            f"dense color={color}"
             + (" disable" if is_disabled else "")
         ).classes("w-full")
 
+    _updating = {"lock": False}
+
     if not is_disabled:
         def on_slider_change(e):
-            setattr(settings, name, field.type_(e.value))
+            if not _updating["lock"]:
+                _updating["lock"] = True
+                setattr(settings, name, field.type_(e.value))
+                val_input.set_value(e.value)
+                _updating["lock"] = False
         sl.on_value_change(on_slider_change)
 
+        def on_input_change(e):
+            if not _updating["lock"] and e.value is not None:
+                _updating["lock"] = True
+                clamped = max(field.min, min(field.max, field.type_(e.value)))
+                setattr(settings, name, clamped)
+                sl.set_value(clamped)
+                if clamped != e.value:
+                    val_input.set_value(clamped)
+                _updating["lock"] = False
+        val_input.on_value_change(on_input_change)
+
     if _field_needs_poll(settings, name, field):
-        polls.append((settings, name, [value], lambda v, sl=sl: sl.set_value(v)))
+        def _poll_slider(v, _sl=sl, _vi=val_input):
+            _sl.set_value(v)
+            _vi.set_value(v)
+        polls.append((settings, name, [value], _poll_slider))
 
 
 @widget_builder(Widget.number)
@@ -349,7 +342,7 @@ def _build_knob(settings, name, field, polls):
     min_val = field.min if field.min is not None else 0
     max_val = field.max if field.max is not None else 100
 
-    with ui.column().classes("gap-1 py-1"):
+    with ui.column().classes("gap-1"):
         _build_field_title(label, desc)
         kn = ui.knob(
             value=value, min=min_val, max=max_val, step=step,
@@ -381,7 +374,7 @@ def _build_select(settings, name, field, polls):
         options=options,
         value=value,
         label=label,
-    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("min-w-[120px]"), desc)
+    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-48 max-w-full"), desc)
 
     if not is_disabled:
         def on_select_change(e):
@@ -406,7 +399,7 @@ def _build_text_select(settings, name, field, polls):
         options=option_list,
         value=value if value in option_list else None,
         label=label,
-    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("min-w-[120px]"), desc)
+    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-48 max-w-full"), desc)
 
     if not is_disabled:
         def on_select_change(e):
@@ -428,7 +421,7 @@ def _build_radio(settings, name, field, polls):
     is_disabled = _is_field_read_only(settings, name, field)
 
     options = {m: generate_label(m.name) for m in field.type_}
-    with ui.column().classes("gap-1 py-1"):
+    with ui.column().classes("gap-1"):
         _build_field_title(label, desc)
         rg = ui.toggle(options=options, value=value).props(
             "dense" + (" disable" if is_disabled else "")
@@ -599,7 +592,7 @@ def _build_color_alpha(settings, name, field, polls):
     hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
     alpha = value.a if isinstance(value, Color) else 1.0
 
-    with ui.column().classes("w-full gap-1 py-1"):
+    with ui.column().classes("w-full gap-1"):
         _build_field_title(label, field.description)
         with ui.row().classes("items-end gap-2"):
             ci = ui.color_input(
@@ -660,11 +653,11 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
                 "dense flat round size=xs"
             ).tooltip("Show/hide unchecked items")
 
-    with ui.column().classes("w-full gap-1 py-1"):
+    with ui.column().classes("w-[20rem] max-w-full gap-1"):
         _build_field_header(
             label,
             desc,
-            title_classes="text-xs text-caption flex-1",
+            title_classes="flex-1",
             row_classes="w-full items-center gap-1",
             actions=_build_sortable_actions if with_checkboxes else None,
         )
@@ -703,7 +696,7 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
                                 value=is_active,
                             ).props("dense").classes("my-0")
 
-                        ui.label(generate_label(member.name)).classes("text-sm flex-1")
+                        ui.label(generate_label(member.name)).classes("flex-1")
 
                         # Find the real index in st["order"] for move operations
                         real_idx = st["order"].index(member)
@@ -793,7 +786,7 @@ def _build_point2f(settings, name, field, polls):
     label = generate_label(name)
     is_disabled = _is_field_read_only(settings, name, field)
 
-    with ui.column().classes("w-full gap-1 py-1"):
+    with ui.column().classes("w-full gap-1"):
         _build_field_title(label, field.description)
         with ui.row().classes("items-end gap-2"):
             x_num = ui.number(
@@ -833,7 +826,7 @@ def _build_rect(settings, name, field, polls):
     label = generate_label(name)
     is_disabled = _is_field_read_only(settings, name, field)
 
-    with ui.column().classes("w-full gap-1 py-1"):
+    with ui.column().classes("w-full gap-1"):
         _build_field_title(label, field.description)
         with ui.row().classes("items-end gap-2 flex-wrap"):
             rx = ui.number(
@@ -899,8 +892,8 @@ def _build_fallback(settings, name, field, polls):
 
     # -- Generic fallback: read-only label -----------------------------------
     with ui.row().classes("items-center gap-2"):
-        ui.label(label).classes("text-sm")
-        lbl = ui.label(str(value)).classes("text-sm text-secondary")
+        ui.label(label)
+        lbl = ui.label(str(value)).classes("text-secondary")
 
     if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, lbl=lbl: lbl.set_text(str(v))))
@@ -968,37 +961,31 @@ def _make_poll_timer(polls, timers):
 def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=""):
     """Emit the controls for a single Settings instance (no wrapper).
 
-    Renders fields in **declaration order**, grouping consecutive runs
-    into layout-specific containers:
-    - ``init``    → compact read-only label
-    - ``button``  → action button row
-      - ``compact`` → wrapping inline row for native compact controls
-      - ``compound`` → 2-column grid for titled compound fields
-    - ``wide``    → full-width stack for controls that naturally span a row
+    Renders fields strictly in **declaration order**.
+    The only layout hint respected here is ``field.newline``, which adds
+    a bit of top padding before the field. Widget builders control the
+    shape of their own controls; the body renderer does not regroup fields
+    by type or access mode.
 
     *depth* tracks nesting level (0 = top, 1+ = child of child).
     *expansions* collects ``ui.expansion`` elements for expand/collapse-all.
     """
     polls: list[tuple] = []
 
-    # Classify each field into a kind while preserving declaration order.
-    ordered: list[tuple[str, str, Field]] = []  # (kind, name, field)
-    for field_name, field in settings.fields.items():
-        if not field.visible:
-            continue
-        ordered.append((_PanelLayout.kind_for_field(field), field_name, field))
+    visible_fields = [
+        (field_name, field)
+        for field_name, field in settings.fields.items()
+        if field.visible
+    ]
 
-    # Emit consecutive runs of the same kind in one container.
-    i = 0
-    while i < len(ordered):
-        kind = ordered[i][0]
-        # Collect the run of consecutive same-kind fields.
-        run: list[tuple[str, str, Field]] = []
-        while i < len(ordered) and ordered[i][0] == kind:
-            run.append(ordered[i])
-            i += 1
-
-        _PanelLayout.render_run(kind, run, settings, polls)
+    with ui.column().classes("w-full gap-1"):
+        for index, row in enumerate(_split_fields_into_rows(visible_fields)):
+            row_classes = "w-full gap-4 flex-wrap items-center content-start justify-between"
+            if index > 0:
+                row_classes += " pt-2"
+            with ui.row().classes(row_classes):
+                for field_name, field in row:
+                    _build_settings_entry(settings, field_name, field, polls)
 
     # Register this card's polls with the page-level timer.
     _register_polls(polls, all_polls)
@@ -1382,9 +1369,9 @@ def create_settings_panel(
                 for settings, field_name, field in pinned_fields:
                     if field.access is Access.INIT:
                         with ui.row().classes("items-center gap-1"):
-                            ui.label(generate_label(field_name)).classes("text-xs text-caption")
+                            ui.label(generate_label(field_name))
                             ui.label(str(getattr(settings, field_name))).classes(
-                                "text-sm text-secondary italic"
+                                "text-secondary italic"
                             )
                     else:
                         _build_field_control(settings, field_name, field, pinned_polls)

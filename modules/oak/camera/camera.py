@@ -213,18 +213,18 @@ class Camera(Thread):
         self._update_tps()
         Ts: list[Tracklet] = msg.tracklets
         self.num_tracklets = len(Ts)
-        self.settings.num_tracklets = self.num_tracklets
+        self.settings.tracklets = self.num_tracklets
         self._update_tracker_callbacks(Ts)
 
     # FPS
     def _update_fps(self, fps_type: FrameType) -> None:
         self.fps_counters[fps_type].processed()
         if fps_type == FrameType.VIDEO:
-            self.settings.fps_video = self.fps_counters[fps_type].get_rate_average()
+            self.settings.video_fps = self.fps_counters[fps_type].get_rate_average()
 
     def _update_tps(self) -> None:
         self.tps_counter.processed()
-        self.settings.tps = self.tps_counter.get_rate_average()
+        self.settings.tracker_fps = self.tps_counter.get_rate_average()
 
     # CALLBACKS
     def _update_frame_callbacks(self, frame_type: FrameType, frame: ndarray) -> None:
