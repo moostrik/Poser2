@@ -241,12 +241,13 @@ class RenderGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class HDTrioSettings(BaseSettings):
-    num_players:        Field[int]   = Field(3, access=Field.INIT, pinned=True)
-    fps:                Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, pinned=True)
+    num_players:    Field[int]   = Field(3, access=Field.INIT, pinned=True)
+    input_fps:      Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, pinned=True)
+    render_fps:     Field[float] = Field(60.0, min=1.0, max=120.0, access=Field.READ, pinned=True)
 
-    camera  = Group(OakGroup, share=[num_players.as_('num_cameras'), fps])
+    camera  = Group(OakGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
     tt      = Group(TTGroup)
-    pose    = Group(PoseGroup, share=[num_players.as_('max_poses'), fps.as_('frequency')])
+    pose    = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     render  = Group(RenderGroup)
     inout   = Group(InOutGroup)
     server  = Group(NiceSettings)

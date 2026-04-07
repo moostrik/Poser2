@@ -1,6 +1,7 @@
 {
   "num_players": 3,
-  "fps": 30.0,
+  "input_fps": 23.0,
+  "render_fps": 60.0,
   "camera": {
     "yolo": true,
     "color": true,
@@ -138,7 +139,6 @@
     "model_type": "TRT",
     "model_path": "models",
     "verbose": false,
-    "output_frequency": 60.0,
     "detection": {
       "resolution": "STANDARD"
     },

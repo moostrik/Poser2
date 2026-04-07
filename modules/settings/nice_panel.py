@@ -30,7 +30,6 @@ Design principles for settings widgets and layout:
 from __future__ import annotations
 
 import json
-import logging
 import socket
 from enum import Enum
 from pathlib import Path
@@ -39,6 +38,7 @@ from typing import Callable, get_origin, get_args
 from nicegui import ui
 
 from modules.settings.base_settings import BaseSettings
+from modules.settings.nice_log import LOG_DRAWER_DEFAULT_HEIGHT, build_log_drawer
 from modules.settings import presets
 from modules.settings.field import Field, Access
 from modules.settings.widget import Widget
@@ -51,8 +51,6 @@ from modules.utils import Color, Point2f, Rect
 # and thread-safety issues (GL thread calling NiceGUI API).
 # ---------------------------------------------------------------------------
 POLL_INTERVAL = 0.25  # seconds
-LOG_DRAWER_DEFAULT_HEIGHT = '33vh'
-
 # ---------------------------------------------------------------------------
 # Expansion state persistence — remembers which sections are open/closed.
 # ---------------------------------------------------------------------------
@@ -104,6 +102,14 @@ def _build_field_title(label: str, description: str | None, *, classes: str = "t
     return title
 
 
+def _attach_description_tooltip(element, description: str | None):
+    """Attach a tooltip to a native labeled control when a description exists."""
+    if description:
+        with element:
+            ui.tooltip(description).props('delay=500')
+    return element
+
+
 def _build_field_header(
     label: str,
     description: str | None,
@@ -132,8 +138,9 @@ class _PanelLayout:
         Widget.checklist,
         Widget.order,
         Widget.color_alpha,
+        Widget.point2f,
+        Widget.rect,
     }
-    _COMPOUND_TYPES = {Point2f, Rect}
 
     @classmethod
     def kind_for_field(cls, field: Field) -> str:
@@ -148,7 +155,7 @@ class _PanelLayout:
         if resolved in cls._WIDE_WIDGETS:
             return "wide"
 
-        if resolved in cls._COMPOUND_WIDGETS or field.type_ in cls._COMPOUND_TYPES:
+        if resolved in cls._COMPOUND_WIDGETS:
             return "compound"
 
         return "compact"
@@ -231,11 +238,12 @@ def widget_builder(widget: Widget):
 def _build_switch(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
+    desc = field.description
     is_disabled = field.access is Access.READ
 
-    sw = ui.switch(label, value=value).props(
+    sw = _attach_description_tooltip(ui.switch(label, value=value).props(
         "dense" + (" disable" if is_disabled else "")
-    )
+    ), desc)
 
     if not is_disabled:
         def on_switch_change(e):
@@ -250,11 +258,12 @@ def _build_switch(settings, name, field, polls):
 def _build_toggle(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
+    desc = field.description
     is_disabled = field.access is Access.READ
 
-    tg = ui.toggle({True: label, False: label}, value=value).props(
+    tg = _attach_description_tooltip(ui.toggle({True: label, False: label}, value=value).props(
         "dense" + (" disable" if is_disabled else "")
-    )
+    ), desc)
 
     if not is_disabled:
         def on_toggle_change(e):
@@ -300,14 +309,15 @@ def _build_slider(settings, name, field, polls):
 def _build_number(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
+    desc = field.description
     is_disabled = field.access is Access.READ
 
-    num = ui.number(
+    num = _attach_description_tooltip(ui.number(
         label=label,
         value=value,
         step=field.step if field.step is not None else (1 if field.type_ is int else 0.01),
         format="%.0f" if field.type_ is int else "%.2f",
-    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24"), desc)
 
     if not is_disabled:
         def on_num_change(e):
@@ -353,58 +363,45 @@ def _build_knob(settings, name, field, polls):
 def _build_select(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
+    desc = field.description
     is_disabled = field.access is Access.READ
 
-    options = {m.name: m.name for m in field.type_}
-    sel = ui.select(
+    options = {m: generate_label(m.name) for m in field.type_}
+    sel = _attach_description_tooltip(ui.select(
         options=options,
-        value=value.name,
+        value=value,
         label=label,
-    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("min-w-[120px]")
-
-    if not is_disabled:
-        def on_select_change(e, f=field):
-            setattr(settings, name, f.type_[e.value])
-        sel.on_value_change(on_select_change)
-
-    if field.access is not Access.WRITE:
-        polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v.name if isinstance(v, Enum) else v)))
-
-
-@widget_builder(Widget.text_select)
-def _build_text_select(settings, name, field, polls):
-    value = getattr(settings, name)
-    label = generate_label(name)
-    is_disabled = field.access is Access.READ
-
-    # Resolve the options Field → current list[str] value
-    options_field = field.options
-    option_list = getattr(settings, options_field.name) if options_field else []
-    sel = ui.select(
-        options=option_list,
-        value=value if value in option_list else None,
-        label=label,
-    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("min-w-[120px]")
+    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("min-w-[120px]"), desc)
 
     if not is_disabled:
         def on_select_change(e):
             setattr(settings, name, e.value)
         sel.on_value_change(on_select_change)
 
-    # Poll both the value and the options list for changes
-    last_options = [list(option_list)]
-    last_value = [value]
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v)))
 
-    def _poll_text_select():
-        cur_options = getattr(settings, options_field.name) if options_field else []
-        cur_value = getattr(settings, name)
-        if cur_options != last_options[0]:
-            last_options[0] = list(cur_options)
-            sel.options = cur_options
-            sel.update()
-        if cur_value != last_value[0]:
-            last_value[0] = cur_value
-            sel.set_value(cur_value if cur_value in cur_options else None)
+
+@widget_builder(Widget.text_select)
+def _build_text_select(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    desc = field.description
+    is_disabled = field.access is Access.READ
+
+    # Resolve the options Field → current list[str] value
+    options_field = field.options
+    option_list = getattr(settings, options_field.name) if options_field else []
+    sel = _attach_description_tooltip(ui.select(
+        options=option_list,
+        value=value if value in option_list else None,
+        label=label,
+    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("min-w-[120px]"), desc)
+
+    if not is_disabled:
+        def on_select_change(e):
+            setattr(settings, name, e.value)
+        sel.on_value_change(on_select_change)
 
     polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v)))
     # Add a custom poll for the options field too
@@ -442,11 +439,12 @@ def _build_radio(settings, name, field, polls):
 def _build_input(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
+    desc = field.description
     is_disabled = field.access is Access.READ
 
-    inp = ui.input(label=label, value=value).props(
+    inp = _attach_description_tooltip(ui.input(label=label, value=value).props(
         "dense outlined" + (" disable" if is_disabled else "")
-    )
+    ), desc)
 
     if not is_disabled:
         def on_input_change(e):
@@ -461,18 +459,19 @@ def _build_input(settings, name, field, polls):
 def _build_ip(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
+    desc = field.description
     is_disabled = field.access is Access.READ
 
     def is_valid_ip(v: str) -> bool:
         parts = v.split(".")
         return len(parts) == 4 and all(p.isdigit() and 0 <= int(p) <= 255 for p in parts)
 
-    inp = ui.input(
+    inp = _attach_description_tooltip(ui.input(
         label=label, value=value,
         validation={"": is_valid_ip},
     ).props(
         'dense outlined hide-bottom-space' + (" disable" if is_disabled else "")
-    ).classes("w-40")
+    ).classes("w-40"), desc)
 
     if not is_disabled:
         def on_ip_change(e):
@@ -488,6 +487,7 @@ def _build_ip(settings, name, field, polls):
 def _build_number_input(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
+    desc = field.description
     is_disabled = field.access is Access.READ
     lo = field.min
     hi = field.max
@@ -504,12 +504,12 @@ def _build_number_input(settings, name, field, polls):
         except (ValueError, TypeError):
             return False
 
-    inp = ui.input(
+    inp = _attach_description_tooltip(ui.input(
         label=label, value=str(value),
         validation={"": is_valid},
     ).props(
         'dense outlined hide-bottom-space' + (" disable" if is_disabled else "")
-    ).classes("w-28")
+    ).classes("w-28"), desc)
 
     if not is_disabled:
         def on_change(e, inp=inp):
@@ -525,11 +525,12 @@ def _build_number_input(settings, name, field, polls):
 def _build_textarea(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
+    desc = field.description
     is_disabled = field.access is Access.READ
 
-    ta = ui.textarea(label=label, value=value).props(
+    ta = _attach_description_tooltip(ui.textarea(label=label, value=value).props(
         "dense outlined" + (" disable" if is_disabled else "")
-    )
+    ), desc)
 
     if not is_disabled:
         def on_ta_change(e):
@@ -546,6 +547,7 @@ def _build_textarea(settings, name, field, polls):
 def _build_color(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
+    desc = field.description
     is_disabled = field.access is Access.READ
 
     def _color_style(hex_val: str) -> str:
@@ -556,11 +558,11 @@ def _build_color(settings, name, field, polls):
 
     hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
 
-    ci = ui.color_input(
+    ci = _attach_description_tooltip(ui.color_input(
         label=label, value=hex_val
     ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-36").style(
         _color_style(hex_val)
-    )
+    ), desc)
 
     if not is_disabled:
         def on_color_change(e):
@@ -775,105 +777,115 @@ def _build_order(settings, name, field, polls):
     return _build_sortable_list(settings, name, field, polls, with_checkboxes=False)
 
 
-# -- Fallback for unregistered types (Point2f, Rect, unknown) ----------------
+@widget_builder(Widget.point2f)
+def _build_point2f(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.access is Access.READ
+
+    with ui.column().classes("w-full gap-1 py-1"):
+        _build_field_title(label, field.description)
+        with ui.row().classes("items-end gap-2"):
+            x_num = ui.number(
+                label="X", value=value.x if isinstance(value, Point2f) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            y_num = ui.number(
+                label="Y", value=value.y if isinstance(value, Point2f) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+
+    if not is_disabled:
+        def on_x_change(e, _y=y_num):
+            if e.value is not None:
+                cur = getattr(settings, name)
+                setattr(settings, name, Point2f(float(e.value), cur.y))
+        x_num.on_value_change(on_x_change)
+
+        def on_y_change(e, _x=x_num):
+            if e.value is not None:
+                cur = getattr(settings, name)
+                setattr(settings, name, Point2f(cur.x, float(e.value)))
+        y_num.on_value_change(on_y_change)
+
+    def _point_setter(v, _x=x_num, _y=y_num):
+        if isinstance(v, Point2f):
+            _x.set_value(v.x)
+            _y.set_value(v.y)
+
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], _point_setter))
+
+
+@widget_builder(Widget.rect)
+def _build_rect(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.access is Access.READ
+
+    with ui.column().classes("w-full gap-1 py-1"):
+        _build_field_title(label, field.description)
+        with ui.row().classes("items-end gap-2 flex-wrap"):
+            rx = ui.number(
+                label="X", value=value.x if isinstance(value, Rect) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ry = ui.number(
+                label="Y", value=value.y if isinstance(value, Rect) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            rw = ui.number(
+                label="W", value=value.width if isinstance(value, Rect) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            rh = ui.number(
+                label="H", value=value.height if isinstance(value, Rect) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+
+    if not is_disabled:
+        def on_rx(e, _ry=ry, _rw=rw, _rh=rh):
+            if e.value is not None:
+                cur = getattr(settings, name)
+                setattr(settings, name, Rect(float(e.value), cur.y, cur.width, cur.height))
+        rx.on_value_change(on_rx)
+
+        def on_ry(e, _rx=rx, _rw=rw, _rh=rh):
+            if e.value is not None:
+                cur = getattr(settings, name)
+                setattr(settings, name, Rect(cur.x, float(e.value), cur.width, cur.height))
+        ry.on_value_change(on_ry)
+
+        def on_rw(e, _rx=rx, _ry=ry, _rh=rh):
+            if e.value is not None:
+                cur = getattr(settings, name)
+                setattr(settings, name, Rect(cur.x, cur.y, float(e.value), cur.height))
+        rw.on_value_change(on_rw)
+
+        def on_rh(e, _rx=rx, _ry=ry, _rw=rw):
+            if e.value is not None:
+                cur = getattr(settings, name)
+                setattr(settings, name, Rect(cur.x, cur.y, cur.width, float(e.value)))
+        rh.on_value_change(on_rh)
+
+    def _rect_setter(v, _rx=rx, _ry=ry, _rw=rw, _rh=rh):
+        if isinstance(v, Rect):
+            _rx.set_value(v.x)
+            _ry.set_value(v.y)
+            _rw.set_value(v.width)
+            _rh.set_value(v.height)
+
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], _rect_setter))
+
+
+# -- Fallback for unregistered / unsupported types --------------------------
 
 def _build_fallback(settings, name, field, polls):
     """Build a control for types without a registered Widget builder."""
     value = getattr(settings, name)
     label = generate_label(name)
     is_disabled = field.access is Access.READ
-
-    # -- Point2f → x/y number row --------------------------------------------
-    if field.type_ is Point2f:
-        with ui.column().classes("w-full gap-1 py-1"):
-            _build_field_title(label, field.description)
-            with ui.row().classes("items-end gap-2"):
-                x_num = ui.number(
-                    label="X", value=value.x if isinstance(value, Point2f) else 0.0,
-                    step=0.01, format="%.3f",
-                ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
-                y_num = ui.number(
-                    label="Y", value=value.y if isinstance(value, Point2f) else 0.0,
-                    step=0.01, format="%.3f",
-                ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
-
-        if not is_disabled:
-            def on_x_change(e, _y=y_num):
-                if e.value is not None:
-                    cur = getattr(settings, name)
-                    setattr(settings, name, Point2f(float(e.value), cur.y))
-            x_num.on_value_change(on_x_change)
-
-            def on_y_change(e, _x=x_num):
-                if e.value is not None:
-                    cur = getattr(settings, name)
-                    setattr(settings, name, Point2f(cur.x, float(e.value)))
-            y_num.on_value_change(on_y_change)
-
-        def _point_setter(v, _x=x_num, _y=y_num):
-            if isinstance(v, Point2f):
-                _x.set_value(v.x)
-                _y.set_value(v.y)
-        if field.access is not Access.WRITE:
-            polls.append((settings, name, [value], _point_setter))
-        return
-
-    # -- Rect → x/y/w/h number row -------------------------------------------
-    if field.type_ is Rect:
-        with ui.column().classes("w-full gap-1 py-1"):
-            _build_field_title(label, field.description)
-            with ui.row().classes("items-end gap-2 flex-wrap"):
-                rx = ui.number(
-                    label="X", value=value.x if isinstance(value, Rect) else 0.0,
-                    step=0.01, format="%.3f",
-                ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
-                ry = ui.number(
-                    label="Y", value=value.y if isinstance(value, Rect) else 0.0,
-                    step=0.01, format="%.3f",
-                ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
-                rw = ui.number(
-                    label="W", value=value.width if isinstance(value, Rect) else 0.0,
-                    step=0.01, format="%.3f",
-                ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
-                rh = ui.number(
-                    label="H", value=value.height if isinstance(value, Rect) else 0.0,
-                    step=0.01, format="%.3f",
-                ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
-
-        if not is_disabled:
-            def on_rx(e, _ry=ry, _rw=rw, _rh=rh):
-                if e.value is not None:
-                    cur = getattr(settings, name)
-                    setattr(settings, name, Rect(float(e.value), cur.y, cur.width, cur.height))
-            rx.on_value_change(on_rx)
-
-            def on_ry(e, _rx=rx, _rw=rw, _rh=rh):
-                if e.value is not None:
-                    cur = getattr(settings, name)
-                    setattr(settings, name, Rect(cur.x, float(e.value), cur.width, cur.height))
-            ry.on_value_change(on_ry)
-
-            def on_rw(e, _rx=rx, _ry=ry, _rh=rh):
-                if e.value is not None:
-                    cur = getattr(settings, name)
-                    setattr(settings, name, Rect(cur.x, cur.y, float(e.value), cur.height))
-            rw.on_value_change(on_rw)
-
-            def on_rh(e, _rx=rx, _ry=ry, _rw=rw):
-                if e.value is not None:
-                    cur = getattr(settings, name)
-                    setattr(settings, name, Rect(cur.x, cur.y, cur.width, float(e.value)))
-            rh.on_value_change(on_rh)
-
-        def _rect_setter(v, _rx=rx, _ry=ry, _rw=rw, _rh=rh):
-            if isinstance(v, Rect):
-                _rx.set_value(v.x)
-                _ry.set_value(v.y)
-                _rw.set_value(v.width)
-                _rh.set_value(v.height)
-        if field.access is not Access.WRITE:
-            polls.append((settings, name, [value], _rect_setter))
-        return
 
     # -- Generic fallback: read-only label -----------------------------------
     with ui.row().classes("items-center gap-2"):
@@ -1389,7 +1401,7 @@ def create_settings_panel(
     # -- end of sticky header --
 
     # Build log drawer outside the header so it's a top-level fixed element
-    _, _toggle_log_fn = _build_log_drawer(timers)
+    _, _toggle_log_fn = build_log_drawer(timers, poll_interval=POLL_INTERVAL)
     _log_toggle_holder.append(_toggle_log_fn)
 
     _make_poll_timer(all_polls, timers)
@@ -1429,255 +1441,3 @@ def create_settings_panel(
                 else:
                     toggle_row.delete()
 
-
-# ---------------------------------------------------------------------------
-# Log drawer — slide-up panel showing recent log output
-# ---------------------------------------------------------------------------
-
-_LOG_LEVEL_COLORS = {
-    'DEBUG':    '#888888',
-    'INFO':     '#ffffff',
-    'WARNING':  '#f59e0b',
-    'ERROR':    '#ef4444',
-    'CRITICAL': '#ef4444',
-}
-
-_LOG_LEVEL_BUTTON_COLORS = {
-    'DEBUG':    'grey-6',
-    'INFO':     'grey-1',
-    'WARNING':  'orange-5',
-    'ERROR':    'red-5',
-    'CRITICAL': 'red-5',
-}
-
-_LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
-_LOG_SOURCE_ICON = 'code'
-
-
-def _build_log_drawer(timers: list) -> tuple:
-    """Build a slide-up log drawer anchored to the bottom of the page.
-
-    Returns (drawer_element, toggle_function) so the caller can place
-    a toggle button in the header.
-    """
-    from modules.log_config import get_log_buffer
-
-    # Per-client state
-    state = {
-        'cursor': 0,
-        'filter_level': logging.INFO,
-        'auto_scroll': True,
-        'show_time': False,
-        'show_source': False,
-    }
-
-    # CSS for log lines and drag handle
-    ui.add_css('''
-    .log-drawer { font-family: 'Roboto Mono', monospace; font-size: 13px; }
-    .log-drawer .log-line {
-        padding: 1px 8px;
-        white-space: pre-wrap; word-break: break-all; line-height: 1.4;
-    }
-    .log-chip-active { opacity: 1.0 !important; }
-    .log-chip-inactive { opacity: 0.35 !important; }
-    .log-drag-handle {
-        height: 6px; cursor: ns-resize; background: #333;
-        flex-shrink: 0; transition: background 0.15s;
-    }
-    .log-drag-handle:hover, .log-drag-handle:active { background: #4af; }
-    ''')
-
-    # Drawer container — fixed to bottom, initially hidden
-    drawer = ui.element('div').classes('log-drawer').style(
-        f'position: fixed; bottom: 0; left: 0; right: 0; height: {LOG_DRAWER_DEFAULT_HEIGHT};'
-        'background: #141414; border-top: 2px solid #333; z-index: 9999;'
-        'display: flex; flex-direction: column;'
-    )
-    drawer.set_visibility(False)
-    toggle_holder: list[Callable[[], None]] = []
-
-    with drawer:
-        # Drag handle for resizing
-        drag_handle = ui.element('div').classes('log-drag-handle')
-
-        # Header row
-        with ui.row().classes('w-full items-center gap-2').style(
-            'padding: 4px 12px; background: #1a1a1a; border-bottom: 1px solid #333; flex-shrink: 0;'
-        ):
-            ui.button(icon='terminal', on_click=lambda: toggle_holder[0]() if toggle_holder else None).props(
-                'dense flat size=sm color=primary'
-            ).tooltip('Hide panel')
-
-            # Timestamp toggle
-            time_btn = ui.button(icon='schedule', on_click=lambda: _toggle_time()).props(
-                'dense flat size=sm'
-            ).tooltip('Show Timestamps').classes('log-chip-inactive')
-
-            # Source toggle
-            source_btn = ui.button(icon=_LOG_SOURCE_ICON, on_click=lambda: _toggle_source()).props(
-                'dense flat size=sm'
-            ).tooltip('Show Source')
-
-            # Level filter chips
-            chips: dict[str, ui.element] = {}
-            for level_name in _LOG_LEVELS:
-                button_color = _LOG_LEVEL_BUTTON_COLORS[level_name]
-
-                chip = ui.button(level_name, on_click=lambda _, ln=level_name: _set_filter(ln)).props(
-                    f'dense flat size=sm no-caps color={button_color}'
-                ).style('font-size: 13px; min-height: 30px; padding: 0 10px;')
-                chips[level_name] = chip
-
-            ui.element('div').classes('flex-1')  # spacer
-
-            # Clear button
-            ui.button(icon='delete_sweep', on_click=lambda: _clear_log()).props(
-                'dense flat size=sm color=primary'
-            ).tooltip('Clear log')
-
-        # Scrollable log area
-        log_area = ui.element('div').style(
-            'flex: 1; overflow-y: auto; padding: 4px 0;'
-        )
-
-    def _update_chip_styles():
-        for name, chip in chips.items():
-            level_val = getattr(logging, name)
-            if level_val >= state['filter_level']:
-                chip.classes(remove='log-chip-inactive', add='log-chip-active')
-            else:
-                chip.classes(remove='log-chip-active', add='log-chip-inactive')
-
-    def _update_toggle_styles():
-        time_btn.props(f'color={"primary" if state["show_time"] else "grey-7"}')
-        if state['show_time']:
-            time_btn.classes(remove='log-chip-inactive', add='log-chip-active')
-        else:
-            time_btn.classes(remove='log-chip-active', add='log-chip-inactive')
-        time_btn.update()
-        source_btn.props(f'color={"primary" if state["show_source"] else "grey-7"}')
-        if state['show_source']:
-            source_btn.classes(remove='log-chip-inactive', add='log-chip-active')
-        else:
-            source_btn.classes(remove='log-chip-active', add='log-chip-inactive')
-        source_btn.update()
-
-    _update_chip_styles()
-    _update_toggle_styles()
-
-    def _set_filter(level_name: str):
-        state['filter_level'] = getattr(logging, level_name)
-        _update_chip_styles()
-        # Re-render all entries with new filter
-        _full_refresh()
-
-    def _toggle_time():
-        state['show_time'] = not state['show_time']
-        _update_toggle_styles()
-        _full_refresh()
-
-    def _toggle_source():
-        state['show_source'] = not state['show_source']
-        _update_toggle_styles()
-        _full_refresh()
-
-    def _clear_log():
-        log_area.clear()
-        buf = get_log_buffer()
-        if buf:
-            state['cursor'] = buf._counter
-        state['auto_scroll'] = True
-
-    def _make_line_text(entry) -> tuple[str, str]:
-        color = _LOG_LEVEL_COLORS.get(entry.level, '#cccccc')
-        time_prefix = f'{entry.timestamp} ' if state['show_time'] else ''
-        source_prefix = f'{entry.source}: ' if state['show_source'] else ''
-        text = f'{time_prefix}{source_prefix}{entry.message}'
-        return text, color
-
-    def _append_entries(entries):
-        with log_area:
-            for entry in entries:
-                if getattr(logging, entry.level) >= state['filter_level']:
-                    text, color = _make_line_text(entry)
-                    ui.label(text).classes('log-line w-full').style(
-                        f'color: {color}; white-space: pre-wrap;'
-                    )
-        if state['auto_scroll']:
-            _scroll_to_bottom()
-
-    def _scroll_to_bottom():
-        ui.run_javascript(f'''
-            var el = document.getElementById("c{log_area.id}");
-            if (el) {{ el.scrollTop = el.scrollHeight; }}
-        ''')
-
-    def _full_refresh():
-        log_area.clear()
-        buf = get_log_buffer()
-        if not buf:
-            return
-        _, all_entries = buf.get_entries_since(0)
-        _append_entries(all_entries)
-        state['auto_scroll'] = True
-        _scroll_to_bottom()
-
-    def _poll_log():
-        buf = get_log_buffer()
-        if not buf:
-            return
-        try:
-            new_cursor, entries = buf.get_entries_since(state['cursor'])
-            if entries:
-                state['cursor'] = new_cursor
-                _append_entries(entries)
-        except RuntimeError:
-            pass
-
-    t = ui.timer(POLL_INTERVAL, _poll_log)
-    timers.append(t)
-
-    # Track scroll position to disable auto-scroll when user scrolls up
-    log_area.on('scroll', lambda: ui.run_javascript(f'''
-        var el = document.getElementById("c{log_area.id}");
-        if (el) {{
-            var atBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 30;
-            emitEvent("log_scroll", {{atBottom: atBottom}});
-        }}
-    '''))
-    ui.on('log_scroll', lambda e: state.update({'auto_scroll': e.args.get('atBottom', True)}))
-
-    # Drag-to-resize: mousedown on handle starts tracking, mousemove adjusts height
-    ui.run_javascript(f'''
-        (function() {{
-            var handle = document.getElementById("c{drag_handle.id}");
-            var drawer = document.getElementById("c{drawer.id}");
-            if (!handle || !drawer) return;
-            var startY = 0, startH = 0, dragging = false;
-            handle.addEventListener("mousedown", function(e) {{
-                dragging = true; startY = e.clientY;
-                startH = drawer.offsetHeight;
-                e.preventDefault();
-            }});
-            document.addEventListener("mousemove", function(e) {{
-                if (!dragging) return;
-                var newH = startH + (startY - e.clientY);
-                newH = Math.max(100, Math.min(window.innerHeight - 60, newH));
-                drawer.style.height = newH + "px";
-            }});
-            document.addEventListener("mouseup", function() {{ dragging = false; }});
-        }})();
-    ''')
-
-    # Toggle function
-    visible = {'v': False}
-
-    def _toggle():
-        visible['v'] = not visible['v']
-        drawer.set_visibility(visible['v'])
-        if visible['v']:
-            _full_refresh()
-
-    toggle_holder.append(_toggle)
-
-    return drawer, _toggle

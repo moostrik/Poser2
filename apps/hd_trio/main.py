@@ -269,6 +269,8 @@ class HDTrioMain:
             return
         self.is_running = False
 
+        self.settings_server.stop()
+
         self.render.window_manager.stop()
 
         if self.player:
@@ -295,7 +297,5 @@ class HDTrioMain:
 
         for camera in self.cameras:
             camera.join(timeout=10)
-
-        self.settings_server.stop()
 
         self.is_finished = True

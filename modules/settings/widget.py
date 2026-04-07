@@ -19,8 +19,10 @@ if TYPE_CHECKING:
     from modules.settings.field import Field
 
 # Lazy import to avoid circular dependency at module level.
-# Color is only needed at runtime inside accepts() / resolve().
+# Special types are only needed at runtime inside accepts() / resolve().
 _Color = None
+_Point2f = None
+_Rect = None
 
 def _get_color():
     global _Color
@@ -30,12 +32,28 @@ def _get_color():
     return _Color
 
 
+def _get_point2f():
+    global _Point2f
+    if _Point2f is None:
+        from modules.utils.PointsAndRects import Point2f
+        _Point2f = Point2f
+    return _Point2f
+
+
+def _get_rect():
+    global _Rect
+    if _Rect is None:
+        from modules.utils.PointsAndRects import Rect
+        _Rect = Rect
+    return _Rect
+
+
 class Widget(Enum):
     """GUI hint for how a Setting should be rendered in the panel.
 
     Each member carries a ``types`` tuple declaring compatible Setting
     value types, or ``None`` meaning *any type* (used by ``default``,
-    ``color``, ``color_alpha``).
+    ``color``, ``color_alpha``, ``point2f``, ``rect``).
 
     The ``resolve(field)`` class method maps ``Widget.default`` to a concrete
     widget based on the field's ``type_``, ``min``, and ``max``.
@@ -80,6 +98,8 @@ class Widget(Enum):
     # color widgets (accepts() uses lazy Color import)
     color       = None
     color_alpha = None
+    point2f     = None
+    rect        = None
     # list widgets
     checklist   = (list,)
     order       = (list,)
@@ -95,9 +115,13 @@ class Widget(Enum):
         """Return True if this widget is compatible with *field_type*."""
         types = self._types
         if types is None:
-            # Widget.default accepts anything; color/color_alpha need special handling
+            # Widget.default accepts anything; special widgets need exact type matches.
             if self.name in ("color", "color_alpha"):
                 return field_type is _get_color()
+            if self.name == "point2f":
+                return field_type is _get_point2f()
+            if self.name == "rect":
+                return field_type is _get_rect()
             return True  # Widget.default accepts anything
         origin = get_origin(field_type)
         if origin is not None:
@@ -127,6 +151,8 @@ class Widget(Enum):
 
         ft = field.type_
         Color = _get_color()
+        Point2f = _get_point2f()
+        Rect = _get_rect()
 
         # Generic list → checklist
         if get_origin(ft) is list:
@@ -153,6 +179,12 @@ class Widget(Enum):
         # Color → color (no alpha)
         if ft is Color:
             return cls.color
+
+        if ft is Point2f:
+            return cls.point2f
+
+        if ft is Rect:
+            return cls.rect
 
         # Fallback — return default (panel renders a read-only label)
         return cls.default

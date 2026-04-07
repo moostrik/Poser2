@@ -1,5 +1,7 @@
 {
   "num_players": 3,
+  "input_fps": 30.0,
+  "render_fps": 60.0,
   "camera": {
     "fps": 23.0,
     "yolo": true,
