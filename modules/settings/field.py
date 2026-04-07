@@ -188,6 +188,11 @@ class Field(Generic[T]):
 
     def set(self, obj, value):
         """Set value. Only enforces Access.INIT after initialization."""
+        incoming_owner = getattr(obj, '_incoming_shared', {}).get(self.name)
+        if incoming_owner is not None and not getattr(obj, '_is_propagating_shared', False):
+            raise AttributeError(
+                f"Field '{self.name}' is shared from parent field '{incoming_owner}' and cannot be set on {type(obj).__name__}"
+            )
         if self.access is Access.INIT and obj._initialized:
             raise AttributeError(
                 f"Field '{self.name}' can only be set during initialization"
@@ -199,11 +204,16 @@ class Field(Generic[T]):
         value = self._coerce(value)
         lock = obj._locks[self.name]
         callbacks_to_fire = []
+        changed = False
 
         with lock:
             if obj._values[self.name] != value:
                 obj._values[self.name] = value
                 callbacks_to_fire = list(obj._callbacks[self.name])
+                changed = True
+
+        if changed:
+            obj._propagate_shared_field(self.name)
 
         # Fire callbacks outside the lock
         for cb in callbacks_to_fire:
@@ -377,6 +387,8 @@ class Field(Generic[T]):
 
         Callers (``update_from_dict``) decide whether INIT fields should
         be written; this method just applies the value unconditionally.
+        Shared child fields may appear in JSON, but parent re-propagation is
+        still the source of truth after the load completes.
         """
         self._apply(obj, raw)
 

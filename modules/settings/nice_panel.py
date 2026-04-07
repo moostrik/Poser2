@@ -110,6 +110,16 @@ def _attach_description_tooltip(element, description: str | None):
     return element
 
 
+def _is_field_read_only(settings, name: str, field: Field) -> bool:
+    """Return True when a field should render read-only in this settings instance."""
+    return field.access is Access.READ or settings.is_incoming_shared(name)
+
+
+def _field_needs_poll(settings, name: str, field: Field) -> bool:
+    """Return True when UI should poll external updates for this field."""
+    return field.access is not Access.WRITE or settings.is_incoming_shared(name)
+
+
 def _build_field_header(
     label: str,
     description: str | None,
@@ -239,7 +249,7 @@ def _build_switch(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
 
     sw = _attach_description_tooltip(ui.switch(label, value=value).props(
         "dense" + (" disable" if is_disabled else "")
@@ -250,7 +260,7 @@ def _build_switch(settings, name, field, polls):
             setattr(settings, name, e.value)
         sw.on_value_change(on_switch_change)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, sw=sw: sw.set_value(v)))
 
 
@@ -259,7 +269,7 @@ def _build_toggle(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
 
     tg = _attach_description_tooltip(ui.toggle({True: label, False: label}, value=value).props(
         "dense" + (" disable" if is_disabled else "")
@@ -270,7 +280,7 @@ def _build_toggle(settings, name, field, polls):
             setattr(settings, name, e.value)
         tg.on_value_change(on_toggle_change)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, tg=tg: tg.set_value(v)))
 
 
@@ -283,7 +293,7 @@ def _build_slider(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
     color = getattr(field, "color", "primary")
 
@@ -301,7 +311,7 @@ def _build_slider(settings, name, field, polls):
             setattr(settings, name, field.type_(e.value))
         sl.on_value_change(on_slider_change)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, sl=sl: sl.set_value(v)))
 
 
@@ -310,7 +320,7 @@ def _build_number(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
 
     num = _attach_description_tooltip(ui.number(
         label=label,
@@ -325,7 +335,7 @@ def _build_number(settings, name, field, polls):
                 setattr(settings, name, field.type_(e.value))
         num.on_value_change(on_num_change)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, num=num: num.set_value(v)))
 
 
@@ -334,7 +344,7 @@ def _build_knob(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
     min_val = field.min if field.min is not None else 0
     max_val = field.max if field.max is not None else 100
@@ -353,7 +363,7 @@ def _build_knob(settings, name, field, polls):
             setattr(settings, name, field.type_(e.value))
         kn.on_value_change(on_knob_change)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, kn=kn: kn.set_value(v)))
 
 
@@ -364,7 +374,7 @@ def _build_select(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
 
     options = {m: generate_label(m.name) for m in field.type_}
     sel = _attach_description_tooltip(ui.select(
@@ -378,7 +388,7 @@ def _build_select(settings, name, field, polls):
             setattr(settings, name, e.value)
         sel.on_value_change(on_select_change)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v)))
 
 
@@ -387,7 +397,7 @@ def _build_text_select(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
 
     # Resolve the options Field → current list[str] value
     options_field = field.options
@@ -415,7 +425,7 @@ def _build_radio(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
 
     options = {m: generate_label(m.name) for m in field.type_}
     with ui.column().classes("gap-1 py-1"):
@@ -429,7 +439,7 @@ def _build_radio(settings, name, field, polls):
             setattr(settings, name, e.value)
         rg.on_value_change(on_radio_change)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, rg=rg: rg.set_value(v)))
 
 
@@ -440,7 +450,7 @@ def _build_input(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
 
     inp = _attach_description_tooltip(ui.input(label=label, value=value).props(
         "dense outlined" + (" disable" if is_disabled else "")
@@ -451,7 +461,7 @@ def _build_input(settings, name, field, polls):
             setattr(settings, name, e.value)
         inp.on_value_change(on_input_change)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
 
 
@@ -460,7 +470,7 @@ def _build_ip(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
 
     def is_valid_ip(v: str) -> bool:
         parts = v.split(".")
@@ -479,7 +489,7 @@ def _build_ip(settings, name, field, polls):
                 setattr(settings, name, e.value)
         inp.on_value_change(on_ip_change)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
 
 
@@ -488,7 +498,7 @@ def _build_number_input(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
     lo = field.min
     hi = field.max
     ft = field.type_
@@ -517,7 +527,7 @@ def _build_number_input(settings, name, field, polls):
                 setattr(settings, name, ft(e.value))
         inp.on_value_change(on_change)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(str(v))))
 
 
@@ -526,7 +536,7 @@ def _build_textarea(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
 
     ta = _attach_description_tooltip(ui.textarea(label=label, value=value).props(
         "dense outlined" + (" disable" if is_disabled else "")
@@ -537,7 +547,7 @@ def _build_textarea(settings, name, field, polls):
             setattr(settings, name, e.value)
         ta.on_value_change(on_ta_change)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, ta=ta: ta.set_value(v)))
 
 
@@ -548,7 +558,7 @@ def _build_color(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
 
     def _color_style(hex_val: str) -> str:
         c = Color.from_hex(hex_val)
@@ -572,7 +582,7 @@ def _build_color(settings, name, field, polls):
                 ci.style(_color_style(e.value))
         ci.on_value_change(on_color_change)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         def _poll_color(v, _ci=ci):
             h = v.to_hex() if isinstance(v, Color) else '#000000'
             _ci.set_value(h)
@@ -584,7 +594,7 @@ def _build_color(settings, name, field, polls):
 def _build_color_alpha(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
 
     hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
     alpha = value.a if isinstance(value, Color) else 1.0
@@ -621,7 +631,7 @@ def _build_color_alpha(settings, name, field, polls):
             _ci.set_value(v.to_hex())
             _an.set_value(v.a)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], _color_alpha_setter))
 
 
@@ -763,7 +773,7 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
             _st["order"] = list(v)
         _rebuild(_cont, _st)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [list(value)], _list_setter))
 
 
@@ -781,7 +791,7 @@ def _build_order(settings, name, field, polls):
 def _build_point2f(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
 
     with ui.column().classes("w-full gap-1 py-1"):
         _build_field_title(label, field.description)
@@ -813,7 +823,7 @@ def _build_point2f(settings, name, field, polls):
             _x.set_value(v.x)
             _y.set_value(v.y)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], _point_setter))
 
 
@@ -821,7 +831,7 @@ def _build_point2f(settings, name, field, polls):
 def _build_rect(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
 
     with ui.column().classes("w-full gap-1 py-1"):
         _build_field_title(label, field.description)
@@ -875,7 +885,7 @@ def _build_rect(settings, name, field, polls):
             _rw.set_value(v.width)
             _rh.set_value(v.height)
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], _rect_setter))
 
 
@@ -885,14 +895,14 @@ def _build_fallback(settings, name, field, polls):
     """Build a control for types without a registered Widget builder."""
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.access is Access.READ
+    is_disabled = _is_field_read_only(settings, name, field)
 
     # -- Generic fallback: read-only label -----------------------------------
     with ui.row().classes("items-center gap-2"):
         ui.label(label).classes("text-sm")
         lbl = ui.label(str(value)).classes("text-sm text-secondary")
 
-    if field.access is not Access.WRITE:
+    if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, lbl=lbl: lbl.set_text(str(v))))
 
 

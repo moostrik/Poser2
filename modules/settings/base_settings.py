@@ -42,6 +42,9 @@ class BaseSettings:
     def __init__(self, **kwargs):
         object.__setattr__(self, "_initialized", False)
         object.__setattr__(self, "_parent", None)
+        object.__setattr__(self, "_incoming_shared", {})
+        object.__setattr__(self, "_shared_targets", {})
+        object.__setattr__(self, "_is_propagating_shared", False)
         object.__setattr__(self, "_fields", {})
         object.__setattr__(self, "_values", {})
         object.__setattr__(self, "_callbacks", {})
@@ -80,6 +83,9 @@ class BaseSettings:
             share_kwargs = group_desc.build_share_kwargs(self)
             child = group_desc.settings_type(**share_kwargs)
             object.__setattr__(child, "_parent", self)
+            for parent_name, child_name in group_desc.share_map.items():
+                child._incoming_shared[child_name] = parent_name
+                self._shared_targets.setdefault(parent_name, []).append((child, child_name))
             self._children[attr_name] = child
 
     # -- Attribute access guard ----------------------------------------------
@@ -142,6 +148,14 @@ class BaseSettings:
     def children(self):
         """Read-only view of all child instances, keyed by name."""
         return dict(self._children)
+
+    def is_incoming_shared(self, name: str) -> bool:
+        """Return True if *name* is owned by the parent and shared into this instance."""
+        return name in self._incoming_shared
+
+    def incoming_shared_source(self, name: str) -> str | None:
+        """Return the parent field name that owns *name*, or None if local."""
+        return self._incoming_shared.get(name)
 
     # -- Callback registration -----------------------------------------------
 
@@ -264,18 +278,31 @@ class BaseSettings:
         INIT fields are skipped when the child is already initialized — they
         were frozen by ``initialize()`` and cannot be changed at runtime.
         """
-        for name, child in self._children.items():
-            desc = self._get_group_descriptor(name)
-            if desc is None or not desc.share_map:
+        for parent_name in self._shared_targets:
+            self._propagate_shared_field(parent_name)
+
+    def _propagate_shared_field(self, parent_name: str) -> None:
+        """Push one parent field to all directly shared child fields.
+
+        This is called after construction, after ``update_from_dict()``, and
+        after normal runtime assignment so shared values stay reactive.
+        Propagation is strictly downstream: parent → child.
+        """
+        if parent_name not in self._shared_targets or parent_name not in self._fields:
+            return
+        value = self._values[parent_name]
+        for child, child_name in self._shared_targets[parent_name]:
+            if child_name not in child._fields:
                 continue
-            share_kwargs = desc.build_share_kwargs(self)
-            for field_name, value in share_kwargs.items():
-                if field_name not in child._fields:
-                    continue
-                child_field = child._fields[field_name]
-                if child_field.access is Access.INIT and child._initialized:
-                    continue  # frozen — skip silently
+            child_field = child._fields[child_name]
+            if child_field.access is Access.INIT and child._initialized:
+                continue
+            previous = child._is_propagating_shared
+            object.__setattr__(child, '_is_propagating_shared', True)
+            try:
                 child_field.set(child, value)
+            finally:
+                object.__setattr__(child, '_is_propagating_shared', previous)
 
     # -- Helpers -------------------------------------------------------------
 

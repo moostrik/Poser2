@@ -30,7 +30,7 @@ from modules.settings import BaseSettings, Field
 class InterpolatorSettingsBase(BaseSettings):
     """Base config for interpolators with input/output frequency settings."""
     input_frequency:  Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency: Field[float] = Field(60.0, access=Field.INIT)
+    output_frequency: Field[float] = Field(60.0)
 
 
 # Generic type variable for config

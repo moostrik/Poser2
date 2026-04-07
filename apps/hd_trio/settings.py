@@ -109,7 +109,7 @@ class InOutGroup(BaseSettings):
 
 class BboxFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
+    output_frequency:   Field[float] = Field(60.0)
 
     smoother     = Group(nodes.EuroSmootherSettings, share=[frequency])
     prediction   = Group(nodes.PredictorSettings, share=[frequency])
@@ -117,7 +117,7 @@ class BboxFeature(BaseSettings):
 
 class PointFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
+    output_frequency:   Field[float] = Field(60.0)
 
     confidence_filter = Group(nodes.DualConfFilterSettings)
     smoother     = Group(nodes.EuroSmootherSettings, share=[frequency])
@@ -126,7 +126,7 @@ class PointFeature(BaseSettings):
 
 class AngleFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
+    output_frequency:   Field[float] = Field(60.0)
 
     smoother     = Group(nodes.EuroSmootherSettings, share=[frequency])
     prediction   = Group(nodes.PredictorSettings, share=[frequency])
@@ -135,7 +135,7 @@ class AngleFeature(BaseSettings):
 
 class VelocityFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
+    output_frequency:   Field[float] = Field(60.0)
 
     extractor     = Group(nodes.AngleVelExtractorSettings, share=[frequency])
     smoother         = Group(nodes.EuroSmootherSettings, share=[frequency])
@@ -149,7 +149,7 @@ class MotionFeature(BaseSettings):
 
 class SimilarityFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
+    output_frequency:   Field[float] = Field(60.0)
     max_poses:          Field[int]   = Field(3, min=1, max=16, access=Field.INIT)
 
     window_similarity     = Group(batch.WindowSimilaritySettings, share=[max_poses])
@@ -172,7 +172,7 @@ class PoseGroup(BaseSettings):
     model_path:         Field[str]          = Field("models", access=Field.INIT, visible=False)
     verbose:            Field[bool]         = Field(False, access=Field.INIT)
     frequency:          Field[float]        = Field(30.0, access=Field.INIT)
-    output_frequency:   Field[float]        = Field(60.0, access=Field.INIT)
+    output_frequency:   Field[float]        = Field(60.0)
 
     _batch_share = [max_poses, model_type, model_path, verbose]
     _feature_share = [frequency, output_frequency]
@@ -241,11 +241,11 @@ class RenderGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class HDTrioSettings(BaseSettings):
-    num_players:    Field[int]   = Field(3, access=Field.INIT, pinned=True)
-    input_fps:      Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, pinned=True)
-    render_fps:     Field[float] = Field(60.0, min=1.0, max=120.0, access=Field.READ, pinned=True)
+    num_players: Field[int] =       Field(3, access=Field.INIT, pinned=True)
+    input_fps: Field[float] =       Field(30.0, min=1.0, max=120.0, access=Field.INIT, pinned=True)
+    render_fps: Field[float] =      Field(60.0)
 
-    camera  = Group(OakGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
+    camera: Group[OakGroup] =       Group(OakGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
     tt      = Group(TTGroup)
     pose    = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     render  = Group(RenderGroup)

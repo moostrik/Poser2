@@ -1584,7 +1584,7 @@ class TestWidgetClass(unittest.TestCase):
     def test_iteration(self):
         members = list(Widget)
         self.assertIn(Widget.button, members)
-        self.assertEqual(len(members), 18)
+        self.assertEqual(len(members), len(Widget.__members__))
 
     def test_match_statement(self):
         """Widget members work in match/case."""
@@ -2283,6 +2283,59 @@ class TestGroupShare(unittest.TestCase):
         s.update_from_dict({"fps": 90.0})
         for core in s.cores:
             self.assertEqual(core.fps, 90.0)
+
+    def test_runtime_assignment_propagates_downstream(self):
+        class SharedValue(BaseSettings):
+            value = Field(0)
+
+        class LiveParent(BaseSettings):
+            level = Field(1)
+            child = Group(SharedValue, share=[level.as_('value')])
+
+        s = LiveParent()
+        s.level = 42
+        self.assertEqual(s.child.value, 42)
+
+    def test_runtime_assignment_propagates_to_grandchildren(self):
+        class SharedLeaf(BaseSettings):
+            value = Field(0)
+
+        class SharedBranch(BaseSettings):
+            value = Field(0)
+            leaf = Group(SharedLeaf, share=[value])
+
+        class LiveParent(BaseSettings):
+            level = Field(1)
+            child = Group(SharedBranch, share=[level.as_('value')])
+
+        s = LiveParent()
+        s.level = 7
+        self.assertEqual(s.child.value, 7)
+        self.assertEqual(s.child.leaf.value, 7)
+
+    def test_child_side_write_blocked_for_incoming_shared_field(self):
+        class SharedValue(BaseSettings):
+            value = Field(0)
+
+        class LiveParent(BaseSettings):
+            level = Field(1)
+            child = Group(SharedValue, share=[level.as_('value')])
+
+        s = LiveParent()
+        with self.assertRaises(AttributeError):
+            s.child.value = 9
+
+    def test_incoming_shared_metadata_records_parent_source(self):
+        class SharedValue(BaseSettings):
+            value = Field(0)
+
+        class LiveParent(BaseSettings):
+            level = Field(1)
+            child = Group(SharedValue, share=[level.as_('value')])
+
+        s = LiveParent()
+        self.assertTrue(s.child.is_incoming_shared('value'))
+        self.assertEqual(s.child.incoming_shared_source('value'), 'level')
 
     def test_round_trip(self):
         s1 = ParentWithChild(fps=45.0, color=False)

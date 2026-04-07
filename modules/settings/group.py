@@ -12,8 +12,9 @@
     pose.bbox.smoother.frequency   # accesses the child's field
 
 Shared fields are passed as constructor kwargs to the child.  The parent
-is the source of truth — shared fields are excluded from child serialization
-and re-propagated on ``update_from_dict``.
+is the source of truth — shared fields are excluded from child serialization,
+re-propagated on ``update_from_dict``, and pushed downstream on normal parent
+assignment.
 
 Name-mapped sharing allows a parent field to arrive under a different name
 in the child::
@@ -41,7 +42,7 @@ class Group(Generic[T]):
         The Settings subclass to instantiate as the child.
     share : list of Field or FieldAlias, optional
         Parent fields whose values are pushed to the child at construction
-        and after ``update_from_dict``.
+        time, after ``update_from_dict``, and on normal runtime assignment.
     """
 
     def __init__(

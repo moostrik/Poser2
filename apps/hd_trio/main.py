@@ -11,6 +11,7 @@ from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers
 from modules.pose.features import configure_features
 from modules.utils import Timer
+from modules.gl.WindowManager import WindowSettings
 
 from .settings import HDTrioSettings
 from .render import HDTrioRender
@@ -167,6 +168,12 @@ class HDTrioMain:
     def start(self) -> None:
 
         self.settings_server.start()
+
+        def _update_render_fps(fps: int) -> None:
+            if fps > 0:
+                self.settings.render_fps = float(fps)
+
+        self.settings.render.window.bind(WindowSettings.avg_fps, _update_render_fps)
 
         for camera in self.cameras:
             camera.add_preview_callback(self.data_hub.set_cam_frame)
