@@ -3,11 +3,19 @@ from modules.settings import BaseSettings, Field, Widget
 
 
 class SimulatorSettings(BaseSettings):
+    video_path:     Field[str]              = Field("recordings", access=Field.INIT, description="Video recordings directory")
+    video_format:   Field[CoderFormat]      = Field(CoderFormat.H264, access=Field.INIT, description="Video format")
+    video_frame_types: Field[list[FrameType]] = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record")
+    num_cameras:    Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
+    color:          Field[bool]             = Field(True, access=Field.INIT, description="Enable color capture")
+    square:         Field[bool]             = Field(True, access=Field.INIT, description="Use square aspect ratio")
+    stereo:         Field[bool]             = Field(False, access=Field.INIT, description="Enable stereo mode")
+
     available_folders: Field[list[str]] = Field(["–"], access=Field.READ, visible=False, description="Available recording folders")
-    folder:         Field[str]  = Field("", widget=Widget.text_select, options=available_folders, description="Recording folder")
+    folder:         Field[str]  = Field("", widget=Widget.text_select, options=available_folders, description="Recording folder", newline=True)
     start:          Field[bool] = Field(False, widget=Widget.button, description="Start playback")
     stop:           Field[bool] = Field(False, widget=Widget.button, description="Stop playback")
-    current_chunk:  Field[int]  = Field(0, access=Field.READ, description="Current chunk")
+    current_chunk:  Field[int]  = Field(0, access=Field.READ, description="Current chunk", newline=True)
     max_chunks:     Field[int]  = Field(0, access=Field.READ, description="Total chunks")
     range_start:    Field[int]  = Field(0, widget=Widget.number_field, description="Chunk range start")
     range_end:      Field[int]  = Field(0, widget=Widget.number_field, description="Chunk range end")

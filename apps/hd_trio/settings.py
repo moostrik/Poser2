@@ -241,8 +241,8 @@ class RenderGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class HDTrioSettings(BaseSettings):
-    num_players: Field[int] =       Field(3, access=Field.INIT, pinned=True)
-    input_fps: Field[float] =       Field(30.0, min=1.0, max=120.0, access=Field.INIT, pinned=True)
+    num_players: Field[int] =       Field(3, access=Field.INIT)
+    input_fps: Field[float] =       Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     render_fps: Field[float] =      Field(60.0)
 
     camera: Group[OakGroup] =       Group(OakGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])

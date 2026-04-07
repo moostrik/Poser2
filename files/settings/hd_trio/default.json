@@ -30,7 +30,7 @@
       "color_brightness": 0,
       "color_contrast": 0,
       "color_saturation": 0,
-      "color_luma_denoise": 0,
+      "color_denoise": 0,
       "color_sharpness": 0,
       "mono_auto_exposure": true,
       "mono_exposure": 1000,
@@ -39,8 +39,8 @@
       "ir_flood_light": 0.0,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
-      "stereo_brightness_min": 0,
-      "stereo_brightness_max": 255,
+      "stereo_bright_min": 0,
+      "stereo_bright_max": 255,
       "stereo_median_filter": "OFF"
     },
     "cam_1": {
@@ -57,7 +57,7 @@
       "color_brightness": 0,
       "color_contrast": 0,
       "color_saturation": 0,
-      "color_luma_denoise": 0,
+      "color_denoise": 0,
       "color_sharpness": 0,
       "mono_auto_exposure": true,
       "mono_exposure": 1000,
@@ -66,8 +66,8 @@
       "ir_flood_light": 0.0,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
-      "stereo_brightness_min": 0,
-      "stereo_brightness_max": 255,
+      "stereo_bright_min": 0,
+      "stereo_bright_max": 255,
       "stereo_median_filter": "OFF"
     },
     "cam_2": {
@@ -84,7 +84,7 @@
       "color_brightness": 0,
       "color_contrast": 0,
       "color_saturation": 0,
-      "color_luma_denoise": 0,
+      "color_denoise": 0,
       "color_sharpness": 0,
       "mono_auto_exposure": true,
       "mono_exposure": 1000,
@@ -93,8 +93,8 @@
       "ir_flood_light": 0.0,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
-      "stereo_brightness_min": 0,
-      "stereo_brightness_max": 255,
+      "stereo_bright_min": 0,
+      "stereo_bright_max": 255,
       "stereo_median_filter": "OFF"
     },
     "simulator": {

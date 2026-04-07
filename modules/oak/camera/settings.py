@@ -13,13 +13,13 @@ from modules.settings import BaseSettings, Field, Widget
 class CameraSettings(BaseSettings):
     """Per-camera runtime settings. Instantiated N times via Child(count=num_cameras)."""
 
-    video_fps: Field[float] =       Field(0.0, access=Field.READ, description="Video FPS")
-    tracker_fps: Field[float] =     Field(0.0, access=Field.READ, description="Tracker updates/s")
-    tracklets: Field[int] =         Field(0, access=Field.READ, description="Active tracklets")
-    device_id:      Field[str]   = Field("", access=Field.INIT, description="Camera device ID (MxID)")
-    fps:            Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera FPS")
+    video_fps:      Field[float] = Field(0.0, access=Field.READ, description="Video FPS", pinned=True)
+    tracker_fps:    Field[float] = Field(0.0, access=Field.READ, description="Tracker updates/s")
+    tracklets:      Field[int]   = Field(0, access=Field.READ, description="Active tracklets")
 
     # Initial settings
+    device_id:      Field[str]   = Field("", access=Field.INIT, description="Camera device ID (MxID)")
+    fps:            Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera FPS")
     color:          Field[bool]  = Field(True, access=Field.INIT, newline=True)
     mono:           Field[bool]  = Field(False, access=Field.INIT)
     square:         Field[bool]  = Field(True, access=Field.INIT)
@@ -42,20 +42,20 @@ class CameraSettings(BaseSettings):
     color_brightness:   Field[int]  = Field(0, min=BRIGHTNESS_RANGE[0], max=BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Brightness", newline=True)
     color_contrast:     Field[int]  = Field(0, min=CONTRAST_RANGE[0], max=CONTRAST_RANGE[1], widget=Widget.slider, description="Contrast")
     color_saturation:   Field[int]  = Field(0, min=SATURATION_RANGE[0], max=SATURATION_RANGE[1], widget=Widget.slider, description="Saturation")
-    color_luma_denoise: Field[int]  = Field(0, min=LUMA_DENOISE_RANGE[0], max=LUMA_DENOISE_RANGE[1], widget=Widget.slider, description="Luma denoise")
+    color_denoise:      Field[int]  = Field(0, min=LUMA_DENOISE_RANGE[0], max=LUMA_DENOISE_RANGE[1], widget=Widget.slider, description="Luma denoise")
     color_sharpness:    Field[int]  = Field(0, min=SHARPNESS_RANGE[0], max=SHARPNESS_RANGE[1], widget=Widget.slider, description="Sharpness")
 
     # --- Mono controls ---
     mono_auto_exposure: Field[bool] = Field(True, widget=Widget.switch, description="Mono auto exposure", newline=True)
     mono_exposure:      Field[int]  = Field(EXPOSURE_RANGE[0], min=EXPOSURE_RANGE[0], max=EXPOSURE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Mono exposure (µs)")
     mono_iso:           Field[int]  = Field(ISO_RANGE[0], min=ISO_RANGE[0], max=ISO_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Mono ISO")
-    ir_grid_light:  Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR grid projector")
-    ir_flood_light: Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
+    ir_grid_light:      Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR grid projector")
+    ir_flood_light:     Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
 
-    # --- Stereo controls (WRITE) ---
-    stereo_depth_min:       Field[int]  = Field(STEREO_DEPTH_RANGE[0], min=STEREO_DEPTH_RANGE[0], max=STEREO_DEPTH_RANGE[1], widget=Widget.slider, description="Depth min (mm)")
+    # --- Stereo controls ---
+    stereo_depth_min:       Field[int]  = Field(STEREO_DEPTH_RANGE[0], min=STEREO_DEPTH_RANGE[0], max=STEREO_DEPTH_RANGE[1], widget=Widget.slider, description="Depth min (mm)", newline=True)
     stereo_depth_max:       Field[int]  = Field(STEREO_DEPTH_RANGE[1], min=STEREO_DEPTH_RANGE[0], max=STEREO_DEPTH_RANGE[1], widget=Widget.slider, description="Depth max (mm)")
-    stereo_bright_min:      Field[int]  = Field(0, min=STEREO_BRIGHTNESS_RANGE[0], max=STEREO_BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Stereo brightness min")
+    stereo_bright_min:      Field[int]  = Field(0, min=STEREO_BRIGHTNESS_RANGE[0], max=STEREO_BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Stereo brightness min", newline=True)
     stereo_bright_max:      Field[int]  = Field(STEREO_BRIGHTNESS_RANGE[1], min=STEREO_BRIGHTNESS_RANGE[0], max=STEREO_BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Stereo brightness max")
     stereo_median_filter:   Field[StereoMedianFilterType] = Field(StereoMedianFilterType.OFF, widget=Widget.select, description="Stereo median filter")
 
@@ -86,7 +86,7 @@ class CameraSettings(BaseSettings):
         self.bind(CameraSettings.color_brightness, self._on_color_brightness)
         self.bind(CameraSettings.color_contrast, self._on_color_contrast)
         self.bind(CameraSettings.color_saturation, self._on_color_saturation)
-        self.bind(CameraSettings.color_luma_denoise, self._on_color_luma_denoise)
+        self.bind(CameraSettings.color_denoise, self._on_color_luma_denoise)
         self.bind(CameraSettings.color_sharpness, self._on_color_sharpness)
 
         # Mono controls
@@ -114,7 +114,7 @@ class CameraSettings(BaseSettings):
         self.unbind(CameraSettings.color_brightness, self._on_color_brightness)
         self.unbind(CameraSettings.color_contrast, self._on_color_contrast)
         self.unbind(CameraSettings.color_saturation, self._on_color_saturation)
-        self.unbind(CameraSettings.color_luma_denoise, self._on_color_luma_denoise)
+        self.unbind(CameraSettings.color_denoise, self._on_color_luma_denoise)
         self.unbind(CameraSettings.color_sharpness, self._on_color_sharpness)
         self.unbind(CameraSettings.mono_auto_exposure, self._on_mono_auto_exposure)
         self.unbind(CameraSettings.mono_exposure, self._on_mono_exposure)
@@ -138,7 +138,7 @@ class CameraSettings(BaseSettings):
         self._on_color_brightness(self.color_brightness)
         self._on_color_contrast(self.color_contrast)
         self._on_color_saturation(self.color_saturation)
-        self._on_color_luma_denoise(self.color_luma_denoise)
+        self._on_color_luma_denoise(self.color_denoise)
         self._on_color_sharpness(self.color_sharpness)
         self._on_mono_auto_exposure(self.mono_auto_exposure)
         if not self.mono_auto_exposure:
@@ -217,7 +217,7 @@ class CameraSettings(BaseSettings):
     def _on_color_luma_denoise(self, value: int = 0) -> None:
         if self._device is None: return
         ctrl = dai.CameraControl()
-        ctrl.setLumaDenoise(self.color_luma_denoise)
+        ctrl.setLumaDenoise(self.color_denoise)
         self._send_control(Input.COLOR_CONTROL, ctrl)
 
     def _on_color_sharpness(self, value: int = 0) -> None:
