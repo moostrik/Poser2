@@ -86,16 +86,16 @@ def validate_connection(ip_address: str, port: int, class_name: str) -> bool:
     """
     # Check network first - if no network, nothing else matters
     if not validate_network(ip_address, port):
-        logger.error(f"{class_name} ERROR: Network unreachable to {ip_address}:{port}. Stopping sender thread.")
+        logger.error(f"{class_name} Network unreachable to {ip_address}:{port}. Stopping sender thread.")
         return False
 
     # Check IP format
     if not validate_ip(ip_address):
-        logger.error(f"{class_name} ERROR: Invalid IP address format: {ip_address}")
+        logger.error(f"{class_name} Invalid IP address format: {ip_address}")
         return False
 
     # Ping is optional - warn but don't fail
     if not ping_ip(ip_address):
-        logger.error(f"{class_name} WARNING: IP {ip_address} is not reachable (ping failed). Device may appear later.")
+        logger.warning(f"{class_name} IP {ip_address} is not reachable (ping failed). Device may appear later.")
 
     return True

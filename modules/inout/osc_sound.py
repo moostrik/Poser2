@@ -39,7 +39,7 @@ class OscSound:
         self._client_lock: Lock = Lock()
         self._client: SimpleUDPClient = SimpleUDPClient(self._config.ip_addresses, self._config.port)
 
-        logger.info(f"SoundOSC: Initialized OSC client to {self._config.ip_addresses}:{self._config.port}")
+        logger.info(f"SoundOSC client initialized to {self._config.ip_addresses}:{self._config.port}")
 
         self._config.bind(OscSoundSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
         self._config.bind(OscSoundSettings.port, self._on_connection_change)          # type: ignore[arg-type]
@@ -99,11 +99,11 @@ class OscSound:
                 try:
                     self._send_data()
                 except socket.error as e:
-                    logger.error(f"ERROR: Socket error with exception: {e}")
+                    logger.error(f"SoundOSC Socket error with exception: {e}")
                     self._running = False
                     break
                 except Exception as e:
-                    logger.error(f"Error sending OSC data: {e}")
+                    logger.error(f"Error sending SoundOSC data: {e}")
 
     def _send_data(self) -> None:
         t = perf_counter()

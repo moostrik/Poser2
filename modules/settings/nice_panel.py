@@ -824,8 +824,18 @@ def _has_visible_content(settings):
     return False
 
 
+def _register_polls(polls, all_polls):
+    """Append local poll entries into the page-level poll list.
+
+    Each entry is ``(settings, name, [last_value], setter)``.
+    The actual timer is created once per page after all controls have been built.
+    """
+    if polls:
+        all_polls.extend(polls)
+
+
 def _make_poll_timer(polls, timers):
-    """Create a single ``ui.timer`` that polls all entries in *polls*.
+    """Create a single page-level ``ui.timer`` that polls all collected entries.
 
     Each entry is ``(settings, name, [last_value], setter)``.
     The timer runs on NiceGUI's event loop so UI calls are thread-safe.
@@ -856,7 +866,7 @@ def _make_poll_timer(polls, timers):
     timers.append(t)
 
 
-def _build_settings_body(settings, timers, *, depth=0, expansions=None, path=""):
+def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=""):
     """Emit the controls for a single Settings instance (no wrapper).
 
     Renders fields in **declaration order**, grouping consecutive runs
@@ -920,12 +930,12 @@ def _build_settings_body(settings, timers, *, depth=0, expansions=None, path="")
                 for _, field_name, field in run:
                     _build_field_control(settings, field_name, field, polls)
 
-    # Create one poll timer for all fields in this card
-    _make_poll_timer(polls, timers)
+    # Register this card's polls with the page-level timer.
+    _register_polls(polls, all_polls)
 
     # Children (recursive)
     for child_name, child in settings.children.items():
-        _build_settings_card(child_name, child, timers, depth=depth, expansions=expansions, path=path)
+        _build_settings_card(child_name, child, all_polls, depth=depth, expansions=expansions, path=path)
 
 
 # Depth-based layer icons: 1 line → 2 lines → 3 lines.
@@ -936,7 +946,7 @@ def _layer_icon_for_depth(depth: int) -> str:
     return _DEPTH_ICONS[min(depth, len(_DEPTH_ICONS) - 1)]
 
 
-def _build_settings_card(name, settings, timers, *, depth=0, expansions=None, path=""):
+def _build_settings_card(name, settings, all_polls, *, depth=0, expansions=None, path=""):
     """Build a card for one Settings instance.
 
     Always renders as a collapsible ``ui.expansion`` at any depth.
@@ -993,7 +1003,7 @@ def _build_settings_card(name, settings, timers, *, depth=0, expansions=None, pa
         child_expansions: list = []
 
         _build_settings_body(
-            settings, timers,
+            settings, all_polls,
             depth=depth + 1, expansions=child_expansions, path=key,
         )
 
@@ -1171,6 +1181,7 @@ def create_settings_panel(
 
     # Timers for this client session — self-cancel if parent slot is deleted.
     timers: list = []
+    all_polls: list[tuple] = []
 
     # -- Responsive CSS via @media (works on all browsers) -----------------
     ui.add_css('''
@@ -1239,30 +1250,40 @@ def create_settings_panel(
 
             # Log drawer toggle — drawer itself is built outside the header below
             _log_toggle_holder: list = []
-            _log_show_holder: list = []
             ui.button(icon="terminal", on_click=lambda: _log_toggle_holder[0]() if _log_toggle_holder else None).props(
                 "dense flat"
             ).tooltip("Log panel")
 
             if port is not None:
-                with ui.button(icon="lan").props("dense flat").tooltip("Connection info"):
+                local_ip_links_loaded = {"value": False}
+
+                connection_btn = ui.button(icon="lan").props("dense flat").tooltip("Connection info")
+                with connection_btn:
                     with ui.menu().props('anchor="bottom middle" self="top middle"'):
                         with ui.card().classes("gap-1").props("flat"):
                             ui.label("Connect").classes("text-base font-bold")
                             ui.separator()
-                            for _ip in _get_local_ips():
-                                _url = f"http://{_ip}:{port}"
-                                ui.link(_url, _url, new_tab=True).classes("text-sm")
+                            local_ip_links = ui.column().classes("gap-0")
                             _url_local = f"http://localhost:{port}"
                             ui.link(_url_local, _url_local, new_tab=True).classes("text-sm")
+
+                def _populate_local_ip_links() -> None:
+                    if local_ip_links_loaded["value"]:
+                        return
+                    local_ip_links_loaded["value"] = True
+                    with local_ip_links:
+                        for _ip in _get_local_ips():
+                            _url = f"http://{_ip}:{port}"
+                            ui.link(_url, _url, new_tab=True).classes("text-sm")
+
+                connection_btn.on("click", lambda: _populate_local_ip_links())
+
             with ui.row().classes("flex-1 items-center gap-1 flex-nowrap justify-center"):
                 _build_preset_controls(root)
 
             if on_exit:
                 async def _do_exit():
-                    if _log_show_holder:
-                        _log_show_holder[0]()
-                    await ui.run_javascript('window.showPoserLogDrawer?.(); showShutdownScreen()')
+                    await ui.run_javascript('showShutdownScreen()')
                     on_exit()
                 ui.button(icon="power_settings_new", on_click=_do_exit).props(
                     "dense flat color=negative"
@@ -1299,7 +1320,7 @@ def create_settings_panel(
                         _build_field_control(settings, field_name, field, pinned_polls)
                 for settings, action_name, action_field in pinned_actions:
                     _build_action_button(settings, action_name, action_field)
-            _make_poll_timer(pinned_polls, timers)
+            _register_polls(pinned_polls, all_polls)
 
         # Tabs inside the sticky header
         if not tab_entries:
@@ -1320,9 +1341,10 @@ def create_settings_panel(
     # -- end of sticky header --
 
     # Build log drawer outside the header so it's a top-level fixed element
-    _, _toggle_log_fn, _show_log_fn = _build_log_drawer(timers)
+    _, _toggle_log_fn = _build_log_drawer(timers)
     _log_toggle_holder.append(_toggle_log_fn)
-    _log_show_holder.append(_show_log_fn)
+
+    _make_poll_timer(all_polls, timers)
 
     if not tab_entries:
         return
@@ -1336,7 +1358,7 @@ def create_settings_panel(
                 toggle_row = ui.row().classes("w-full justify-end mb-1")
 
                 _build_settings_body(
-                    root_settings, timers,
+                    root_settings, all_polls,
                     depth=0, expansions=expansions, path=label,
                 )
 
@@ -1387,8 +1409,8 @@ _LOG_SOURCE_ICON = 'code'
 def _build_log_drawer(timers: list) -> tuple:
     """Build a slide-up log drawer anchored to the bottom of the page.
 
-    Returns (drawer_element, toggle_function, show_function) so the caller can
-    place a toggle button in the header and force the drawer open on shutdown.
+    Returns (drawer_element, toggle_function) so the caller can place
+    a toggle button in the header.
     """
     from modules.log_config import get_log_buffer
 
@@ -1599,36 +1621,8 @@ def _build_log_drawer(timers: list) -> tuple:
         }})();
     ''')
 
-    # Auto-show the drawer on disconnect so the last buffered log remains visible.
-    ui.run_javascript(f'''
-        (function() {{
-            var drawer = document.getElementById("c{drawer.id}");
-            if (!drawer) return;
-
-            window.__poserLogDrawer = drawer;
-
-            function showLogDrawerOnDisconnect() {{
-                if (!window.__poserLogDrawer) return;
-                window.__poserLogDrawer.style.display = 'flex';
-            }}
-
-            window.showPoserLogDrawer = showLogDrawerOnDisconnect;
-
-            var waitForSocket = setInterval(function() {{
-                if (!window.socket) return;
-                window.socket.on("disconnect", showLogDrawerOnDisconnect);
-                clearInterval(waitForSocket);
-            }}, 100);
-        }})();
-    ''')
-
     # Toggle function
     visible = {'v': False}
-
-    def _show():
-        visible['v'] = True
-        drawer.set_visibility(True)
-        _full_refresh()
 
     def _toggle():
         visible['v'] = not visible['v']
@@ -1638,4 +1632,4 @@ def _build_log_drawer(timers: list) -> tuple:
 
     toggle_holder.append(_toggle)
 
-    return drawer, _toggle, _show
+    return drawer, _toggle
