@@ -1,4 +1,31 @@
-"""NiceGUI settings panel — auto-generates a tabbed UI from a Settings root."""
+# Deferred: revisit Shift+Arrow 10x stepping after the panel layout structure settles.
+
+
+
+"""NiceGUI settings panel — auto-generates a tabbed UI from a Settings root.
+
+Design principles for settings widgets and layout:
+- Prefer vanilla NiceGUI and Quasar primitives over custom-composed pseudo-widgets.
+- Do not invent new visual widget types when an existing NiceGUI control can
+    express the behavior.
+- Keep builder logic thin: layout, labels, descriptions, and spacing should be
+    centralized instead of reimplemented inside each builder.
+- Controls should have one obvious title or label area when the control already
+    has one; descriptions belong to that existing title area only, and should
+    not cause a new title or label area to be introduced just to host a
+    description.
+- Avoid absolute positioning, magic offsets, and one-off spacing hacks for
+    field metadata.
+- Compound controls are allowed only when one vanilla control cannot express
+    the behavior cleanly; when used, they should still read like a standard
+    field, not a special gadget.
+- Reuse shared field structure for label, description, body, and optional
+    actions so widgets align consistently.
+- Prefer fewer nested rows and columns; use the smallest NiceGUI structure that
+    expresses the layout clearly.
+- Preserve declaration order and predictable placement.
+- Treat mobile collapse behavior as a first-class requirement.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +41,7 @@ from nicegui import ui
 from modules.settings.base_settings import BaseSettings
 from modules.settings import presets
 from modules.settings.field import Field, Access
-from modules.settings.widget import Widget, WidgetSize
+from modules.settings.widget import Widget
 from modules.utils import Color, Point2f, Rect
 
 # ---------------------------------------------------------------------------
@@ -68,43 +95,122 @@ def generate_label(name):
     return " ".join(result)
 
 
+def _build_field_title(label: str, description: str | None, *, classes: str = "text-xs text-caption"):
+    """Create a shared field title area with an optional hover description."""
+    title = ui.label(label).classes(classes)
+    if description:
+        with title:
+            ui.tooltip(description).props('delay=500')
+    return title
+
+
+def _build_field_header(
+    label: str,
+    description: str | None,
+    *,
+    title_classes: str = "text-xs text-caption",
+    row_classes: str = "w-full items-center justify-between gap-2",
+    actions: Callable[[], None] | None = None,
+    action_classes: str = "items-center gap-0",
+):
+    """Create a shared header row for compound fields with title and optional actions."""
+    with ui.row().classes(row_classes):
+        _build_field_title(label, description, classes=title_classes)
+        if actions is not None:
+            with ui.row().classes(action_classes):
+                actions()
+
+
+class _PanelLayout:
+    """Owns field classification and container placement for the settings panel."""
+
+    _WIDE_WIDGETS = {Widget.input, Widget.textarea}
+    _COMPOUND_WIDGETS = {
+        Widget.slider,
+        Widget.knob,
+        Widget.radio,
+        Widget.checklist,
+        Widget.order,
+        Widget.color_alpha,
+    }
+    _COMPOUND_TYPES = {Point2f, Rect}
+
+    @classmethod
+    def kind_for_field(cls, field: Field) -> str:
+        """Return the layout bucket for a field in the settings body."""
+        if field.widget == Widget.button:
+            return "button"
+        if field.access is Access.INIT:
+            return "init"
+
+        resolved = Widget.resolve(field)
+
+        if resolved in cls._WIDE_WIDGETS:
+            return "wide"
+
+        if resolved in cls._COMPOUND_WIDGETS or field.type_ in cls._COMPOUND_TYPES:
+            return "compound"
+
+        return "compact"
+
+    @staticmethod
+    def render_run(kind: str, run: list[tuple[str, str, Field]], settings, polls) -> None:
+        """Render one consecutive run of fields that share a layout bucket."""
+        if kind == "init":
+            with ui.row().classes("w-full gap-4 flex-wrap"):
+                for _, field_name, _field in run:
+                    with ui.row().classes("items-center gap-1"):
+                        ui.label(generate_label(field_name)).classes("text-xs text-caption")
+                        ui.label(str(getattr(settings, field_name))).classes(
+                            "text-sm text-secondary italic"
+                        )
+            return
+
+        if kind == "button":
+            with ui.row().classes("gap-2"):
+                for _, action_name, action_field in run:
+                    _build_action_button(settings, action_name, action_field)
+            return
+
+        if kind == "compact":
+            with ui.row().classes("w-full gap-4 flex-wrap items-end content-start"):
+                for _, field_name, field in run:
+                    _build_field_control(settings, field_name, field, polls)
+            return
+
+        if kind == "compound":
+            with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-3 poser-grid"):
+                for _, field_name, field in run:
+                    with ui.column().classes("w-full gap-0"):
+                        _build_field_control(settings, field_name, field, polls)
+            return
+
+        if kind == "wide":
+            with ui.column().classes("w-full gap-2"):
+                for _, field_name, field in run:
+                    _build_field_control(settings, field_name, field, polls)
+            return
+
+        raise ValueError(f"Unknown panel layout kind: {kind}")
+
+
 def _build_field_control(settings, name, field, polls):
     """Create a NiceGUI control for a single Setting field.
-
-    Returns a ``WidgetSize`` indicating the layout class:
-        WidgetSize.full  — needs a full row (slider, text input)
-        WidgetSize.small — compact inline control (switch, select, number)
 
     *polls* collects ``(settings, name, [last_value], setter)`` tuples.
     A timer created by the caller will poll these periodically to push
     external changes into the UI — thread-safe by construction.
-
-    If the field has a non-empty ``description``, the control is wrapped
-    in a container with a hover tooltip showing that description.
     """
-    desc = field.description
     resolved = Widget.resolve(field)
     builder = _BUILDERS.get(resolved)
-    if desc:
-        with ui.element('div').classes('relative'):
-            if builder is not None:
-                result = builder(settings, name, field, polls)
-            else:
-                result = _build_fallback(settings, name, field, polls)
-            with ui.icon('info_outline').classes(
-                'text-grey-6 cursor-help absolute'
-            ).style('font-size: 14px; bottom: -18px; right: -2px'):
-                ui.tooltip(desc).props('anchor="bottom left" self="top right" :offset="[2, -14]" delay=500')
-            return result
-    else:
-        if builder is not None:
-            return builder(settings, name, field, polls)
-        return _build_fallback(settings, name, field, polls)
+    if builder is not None:
+        return builder(settings, name, field, polls)
+    return _build_fallback(settings, name, field, polls)
 
 
 # ---------------------------------------------------------------------------
 # Builder registry — maps Widget constants to NiceGUI builder functions.
-# Each builder receives (settings, name, field, polls) and returns a WidgetSize.
+# Each builder receives (settings, name, field, polls) and emits its control.
 # Use @widget_builder(Widget.xxx) to register.
 # ---------------------------------------------------------------------------
 
@@ -138,7 +244,6 @@ def _build_switch(settings, name, field, polls):
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [value], lambda v, sw=sw: sw.set_value(v)))
-    return WidgetSize.small
 
 
 @widget_builder(Widget.toggle)
@@ -158,7 +263,6 @@ def _build_toggle(settings, name, field, polls):
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [value], lambda v, tg=tg: tg.set_value(v)))
-    return WidgetSize.small
 
 
 # -- numeric builders --------------------------------------------------------
@@ -169,60 +273,27 @@ def _build_toggle(settings, name, field, polls):
 def _build_slider(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
+    desc = field.description
     is_disabled = field.access is Access.READ
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
-    big_step = step * 10
     color = getattr(field, "color", "primary")
 
-    with ui.column().classes("w-full gap-0 pt-2 pb-1"):
-        with ui.row().classes("w-full items-center justify-between gap-0"):
-            ui.label(label).classes("text-xs text-caption")
-            if not is_disabled:
-                with ui.row().classes("gap-0 items-center"):
-                    btn_big_down = ui.button(
-                        icon="keyboard_double_arrow_left", on_click=lambda: None,
-                    ).props(f"flat dense round size=xs color={color}")
-                    btn_down = ui.button(
-                        icon="chevron_left", on_click=lambda: None,
-                    ).props(f"flat dense round size=xs color={color}")
-                    btn_up = ui.button(
-                        icon="chevron_right", on_click=lambda: None,
-                    ).props(f"flat dense round size=xs color={color}")
-                    btn_big_up = ui.button(
-                        icon="keyboard_double_arrow_right", on_click=lambda: None,
-                    ).props(f"flat dense round size=xs color={color}")
+    with ui.column().classes("w-full gap-1 py-1"):
+        _build_field_title(label, desc)
         sl = ui.slider(
             min=field.min, max=field.max, step=step, value=value
         ).props(
             f"dense label-always color={color}"
             + (" disable" if is_disabled else "")
-        )
-
-
-
-    # Number of decimal places to round to, derived from step size.
-    _decimals = max(0, -int(__import__('math').floor(__import__('math').log10(step)))) if step > 0 and field.type_ is not int else 0
+        ).classes("w-full")
 
     if not is_disabled:
-        def nudge(delta):
-            cur = sl.value
-            new = round(cur + delta, _decimals) if _decimals else field.type_(cur + delta)
-            new = max(field.min, min(field.max, new))
-            sl.set_value(new)
-            setattr(settings, name, new)
-
-        btn_big_down.on_click(lambda: nudge(-big_step))
-        btn_down.on_click(lambda: nudge(-step))
-        btn_up.on_click(lambda: nudge(step))
-        btn_big_up.on_click(lambda: nudge(big_step))
-
         def on_slider_change(e):
             setattr(settings, name, field.type_(e.value))
         sl.on_value_change(on_slider_change)
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [value], lambda v, sl=sl: sl.set_value(v)))
-    return WidgetSize.full
 
 
 @widget_builder(Widget.number)
@@ -246,26 +317,26 @@ def _build_number(settings, name, field, polls):
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [value], lambda v, num=num: num.set_value(v)))
-    return WidgetSize.small
 
 
 @widget_builder(Widget.knob)
 def _build_knob(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
+    desc = field.description
     is_disabled = field.access is Access.READ
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
     min_val = field.min if field.min is not None else 0
     max_val = field.max if field.max is not None else 100
 
-    with ui.row().classes("items-center gap-2"):
+    with ui.column().classes("gap-1 py-1"):
+        _build_field_title(label, desc)
         kn = ui.knob(
             value=value, min=min_val, max=max_val, step=step,
             show_value=True, size="lg",
         ).props(
             "thickness=0.2" + (" disable" if is_disabled else "")
         )
-        ui.label(label).classes("text-xs text-caption")
 
     if not is_disabled:
         def on_knob_change(e):
@@ -274,7 +345,6 @@ def _build_knob(settings, name, field, polls):
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [value], lambda v, kn=kn: kn.set_value(v)))
-    return WidgetSize.small
 
 
 # -- enum builders -----------------------------------------------------------
@@ -299,7 +369,6 @@ def _build_select(settings, name, field, polls):
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v.name if isinstance(v, Enum) else v)))
-    return WidgetSize.small
 
 
 @widget_builder(Widget.text_select)
@@ -343,18 +412,17 @@ def _build_text_select(settings, name, field, polls):
         polls.append((settings, options_field.name, [list(option_list)],
                        lambda v, s=sel: (setattr(s, 'options', v), s.update())))
 
-    return WidgetSize.small
-
 
 @widget_builder(Widget.radio)
 def _build_radio(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
+    desc = field.description
     is_disabled = field.access is Access.READ
 
     options = {m: generate_label(m.name) for m in field.type_}
-    with ui.column().classes("gap-0 pt-1 pb-1"):
-        ui.label(label).classes("text-xs text-caption")
+    with ui.column().classes("gap-1 py-1"):
+        _build_field_title(label, desc)
         rg = ui.toggle(options=options, value=value).props(
             "dense" + (" disable" if is_disabled else "")
         )
@@ -366,7 +434,6 @@ def _build_radio(settings, name, field, polls):
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [value], lambda v, rg=rg: rg.set_value(v)))
-    return WidgetSize.small
 
 
 # -- string builders ---------------------------------------------------------
@@ -388,7 +455,6 @@ def _build_input(settings, name, field, polls):
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
-    return WidgetSize.full
 
 
 @widget_builder(Widget.ip_field)
@@ -416,7 +482,6 @@ def _build_ip(settings, name, field, polls):
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
-    return WidgetSize.small
 
 
 @widget_builder(Widget.number_field)
@@ -454,7 +519,6 @@ def _build_number_input(settings, name, field, polls):
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(str(v))))
-    return WidgetSize.small
 
 
 @widget_builder(Widget.textarea)
@@ -474,7 +538,6 @@ def _build_textarea(settings, name, field, polls):
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [value], lambda v, ta=ta: ta.set_value(v)))
-    return WidgetSize.full
 
 
 # -- color builders ----------------------------------------------------------
@@ -513,7 +576,6 @@ def _build_color(settings, name, field, polls):
             _ci.set_value(h)
             _ci.style(_color_style(h))
         polls.append((settings, name, [value], _poll_color))
-    return WidgetSize.small
 
 
 @widget_builder(Widget.color_alpha)
@@ -525,16 +587,18 @@ def _build_color_alpha(settings, name, field, polls):
     hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
     alpha = value.a if isinstance(value, Color) else 1.0
 
-    with ui.row().classes("items-end gap-2"):
-        ci = ui.color_input(
-            label=label, value=hex_val
-        ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-32")
+    with ui.column().classes("w-full gap-1 py-1"):
+        _build_field_title(label, field.description)
+        with ui.row().classes("items-end gap-2"):
+            ci = ui.color_input(
+                label="Color", value=hex_val
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-32")
 
-        alpha_num = ui.number(
-            label="A", value=alpha,
-            min=0.0, max=1.0, step=0.01,
-            format="%.2f",
-        ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-20")
+            alpha_num = ui.number(
+                label="A", value=alpha,
+                min=0.0, max=1.0, step=0.01,
+                format="%.2f",
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-20")
 
     if not is_disabled:
         def on_color_change(e):
@@ -557,7 +621,6 @@ def _build_color_alpha(settings, name, field, polls):
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [value], _color_alpha_setter))
-    return WidgetSize.small
 
 
 # -- list builders -----------------------------------------------------------
@@ -566,6 +629,7 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
     """Shared implementation for checklist (with checkboxes) and order (without)."""
     value = getattr(settings, name)
     label = generate_label(name)
+    desc = field.description
 
     elem_type = get_args(field.type_)[0] if get_args(field.type_) else None
     if elem_type is None or not (isinstance(elem_type, type) and issubclass(elem_type, Enum)):
@@ -575,13 +639,23 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
     all_members = list(elem_type)
     active_set = set(value)
 
-    with ui.column().classes("w-full gap-1 pt-2 pb-1"):
-        with ui.row().classes("w-full items-center gap-1"):
-            ui.label(label).classes("text-xs text-caption flex-1")
-            if with_checkboxes:
-                fold_btn = ui.button(icon="visibility_off", on_click=lambda: None).props(
-                    "dense flat round size=xs"
-                ).tooltip("Show/hide unchecked items")
+    fold_btn = None
+
+    def _build_sortable_actions() -> None:
+        nonlocal fold_btn
+        if with_checkboxes:
+            fold_btn = ui.button(icon="visibility_off", on_click=lambda: None).props(
+                "dense flat round size=xs"
+            ).tooltip("Show/hide unchecked items")
+
+    with ui.column().classes("w-full gap-1 py-1"):
+        _build_field_header(
+            label,
+            desc,
+            title_classes="text-xs text-caption flex-1",
+            row_classes="w-full items-center gap-1",
+            actions=_build_sortable_actions if with_checkboxes else None,
+        )
         container = ui.column().classes("w-full gap-0 border rounded p-1")
 
         if with_checkboxes:
@@ -666,14 +740,17 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
 
         # Wire up fold button
         if with_checkboxes:
+            assert fold_btn is not None
+            fold_button = fold_btn
+
             def _toggle_fold():
                 state["folded"] = not state["folded"]
-                fold_btn.props(
+                fold_button.props(
                     f'icon={"visibility_off" if state["folded"] else "visibility"}'
                 )
-                fold_btn.update()
+                fold_button.update()
                 _rebuild(container, state)
-            fold_btn.on_click(_toggle_fold)
+            fold_button.on_click(_toggle_fold)
 
     def _list_setter(v, _cont=container, _st=state, _elem=elem_type, _cb=with_checkboxes):
         active_set_inner = set(v)
@@ -686,7 +763,6 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [list(value)], _list_setter))
-    return WidgetSize.full
 
 
 @widget_builder(Widget.checklist)
@@ -709,16 +785,17 @@ def _build_fallback(settings, name, field, polls):
 
     # -- Point2f → x/y number row --------------------------------------------
     if field.type_ is Point2f:
-        with ui.row().classes("items-end gap-2"):
-            ui.label(label).classes("text-xs text-caption self-center")
-            x_num = ui.number(
-                label="X", value=value.x if isinstance(value, Point2f) else 0.0,
-                step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
-            y_num = ui.number(
-                label="Y", value=value.y if isinstance(value, Point2f) else 0.0,
-                step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+        with ui.column().classes("w-full gap-1 py-1"):
+            _build_field_title(label, field.description)
+            with ui.row().classes("items-end gap-2"):
+                x_num = ui.number(
+                    label="X", value=value.x if isinstance(value, Point2f) else 0.0,
+                    step=0.01, format="%.3f",
+                ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+                y_num = ui.number(
+                    label="Y", value=value.y if isinstance(value, Point2f) else 0.0,
+                    step=0.01, format="%.3f",
+                ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
 
         if not is_disabled:
             def on_x_change(e, _y=y_num):
@@ -739,28 +816,29 @@ def _build_fallback(settings, name, field, polls):
                 _y.set_value(v.y)
         if field.access is not Access.WRITE:
             polls.append((settings, name, [value], _point_setter))
-        return WidgetSize.full
+        return
 
     # -- Rect → x/y/w/h number row -------------------------------------------
     if field.type_ is Rect:
-        with ui.row().classes("items-end gap-2"):
-            ui.label(label).classes("text-xs text-caption self-center")
-            rx = ui.number(
-                label="X", value=value.x if isinstance(value, Rect) else 0.0,
-                step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
-            ry = ui.number(
-                label="Y", value=value.y if isinstance(value, Rect) else 0.0,
-                step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
-            rw = ui.number(
-                label="W", value=value.width if isinstance(value, Rect) else 0.0,
-                step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
-            rh = ui.number(
-                label="H", value=value.height if isinstance(value, Rect) else 0.0,
-                step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+        with ui.column().classes("w-full gap-1 py-1"):
+            _build_field_title(label, field.description)
+            with ui.row().classes("items-end gap-2 flex-wrap"):
+                rx = ui.number(
+                    label="X", value=value.x if isinstance(value, Rect) else 0.0,
+                    step=0.01, format="%.3f",
+                ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+                ry = ui.number(
+                    label="Y", value=value.y if isinstance(value, Rect) else 0.0,
+                    step=0.01, format="%.3f",
+                ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+                rw = ui.number(
+                    label="W", value=value.width if isinstance(value, Rect) else 0.0,
+                    step=0.01, format="%.3f",
+                ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+                rh = ui.number(
+                    label="H", value=value.height if isinstance(value, Rect) else 0.0,
+                    step=0.01, format="%.3f",
+                ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
 
         if not is_disabled:
             def on_rx(e, _ry=ry, _rw=rw, _rh=rh):
@@ -795,7 +873,7 @@ def _build_fallback(settings, name, field, polls):
                 _rh.set_value(v.height)
         if field.access is not Access.WRITE:
             polls.append((settings, name, [value], _rect_setter))
-        return WidgetSize.full
+        return
 
     # -- Generic fallback: read-only label -----------------------------------
     with ui.row().classes("items-center gap-2"):
@@ -804,7 +882,6 @@ def _build_fallback(settings, name, field, polls):
 
     if field.access is not Access.WRITE:
         polls.append((settings, name, [value], lambda v, lbl=lbl: lbl.set_text(str(v))))
-    return WidgetSize.small
 
 
 def _build_action_button(settings, name, field):
@@ -870,34 +947,24 @@ def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=
     """Emit the controls for a single Settings instance (no wrapper).
 
     Renders fields in **declaration order**, grouping consecutive runs
-    of same-size controls into appropriate containers:
-      - ``init``   → compact read-only label
-      - ``button`` → action button row
-      - ``small``  → wrapping inline row (switches, selects, numbers)
-      - ``full``   → 2-column grid (sliders, text inputs, lists)
+    into layout-specific containers:
+    - ``init``    → compact read-only label
+    - ``button``  → action button row
+      - ``compact`` → wrapping inline row for native compact controls
+      - ``compound`` → 2-column grid for titled compound fields
+    - ``wide``    → full-width stack for controls that naturally span a row
 
     *depth* tracks nesting level (0 = top, 1+ = child of child).
     *expansions* collects ``ui.expansion`` elements for expand/collapse-all.
     """
     polls: list[tuple] = []
 
-    _FULL_WIDGETS = {Widget.slider, Widget.input, Widget.textarea, Widget.checklist, Widget.order}
-
     # Classify each field into a kind while preserving declaration order.
     ordered: list[tuple[str, str, Field]] = []  # (kind, name, field)
     for field_name, field in settings.fields.items():
         if not field.visible:
             continue
-        if field.widget == Widget.button:
-            ordered.append(("button", field_name, field))
-        elif field.access is Access.INIT:
-            ordered.append(("init", field_name, field))
-        else:
-            resolved = Widget.resolve(field)
-            if resolved in _FULL_WIDGETS or field.type_ in (Point2f, Rect):
-                ordered.append(("full", field_name, field))
-            else:
-                ordered.append(("small", field_name, field))
+        ordered.append((_PanelLayout.kind_for_field(field), field_name, field))
 
     # Emit consecutive runs of the same kind in one container.
     i = 0
@@ -909,26 +976,7 @@ def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=
             run.append(ordered[i])
             i += 1
 
-        if kind == "init":
-            with ui.row().classes("w-full gap-4 flex-wrap"):
-                for _, field_name, field in run:
-                    with ui.row().classes("items-center gap-1"):
-                        ui.label(generate_label(field_name)).classes("text-xs text-caption")
-                        ui.label(str(getattr(settings, field_name))).classes(
-                            "text-sm text-secondary italic"
-                        )
-        elif kind == "button":
-            with ui.row().classes("gap-2"):
-                for _, action_name, action_field in run:
-                    _build_action_button(settings, action_name, action_field)
-        elif kind == "small":
-            with ui.row().classes("w-full gap-4 flex-wrap items-end"):
-                for _, field_name, field in run:
-                    _build_field_control(settings, field_name, field, polls)
-        elif kind == "full":
-            with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-2 poser-grid"):
-                for _, field_name, field in run:
-                    _build_field_control(settings, field_name, field, polls)
+        _PanelLayout.render_run(kind, run, settings, polls)
 
     # Register this card's polls with the page-level timer.
     _register_polls(polls, all_polls)
