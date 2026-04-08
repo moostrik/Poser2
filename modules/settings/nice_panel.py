@@ -258,7 +258,7 @@ def _build_slider(settings, name, field, polls):
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
     color = getattr(field, "color", "primary")
 
-    with ui.column().classes("w-[12rem] max-w-full gap-1"):
+    with ui.column().classes("w-48 max-w-full gap-1"):
         with ui.row().classes("w-full items-center justify-between flex-nowrap"):
             _build_field_title(label, desc, classes="flex-1 truncate")
             fmt = "%.0f" if field.type_ is int else "%.2f"
@@ -472,7 +472,7 @@ def _build_ip(settings, name, field, polls):
         validation={"": is_valid_ip},
     ).props(
         'dense outlined hide-bottom-space' + (" disable" if is_disabled else "")
-    ).classes("w-40"), desc)
+    ).classes("w-36"), desc)
 
     if not is_disabled:
         def on_ip_change(e):
@@ -510,7 +510,7 @@ def _build_number_input(settings, name, field, polls):
         validation={"": is_valid},
     ).props(
         'dense outlined hide-bottom-space' + (" disable" if is_disabled else "")
-    ).classes("w-28"), desc)
+    ).classes("w-24"), desc)
 
     if not is_disabled:
         def on_change(e, inp=inp):
@@ -595,13 +595,13 @@ def _build_color_alpha(settings, name, field, polls):
         with ui.row().classes("items-end gap-2"):
             ci = ui.color_input(
                 label="Color", value=hex_val
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-32")
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-36")
 
             alpha_num = ui.number(
                 label="A", value=alpha,
                 min=0.0, max=1.0, step=0.01,
                 format="%.2f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-20")
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
 
     if not is_disabled:
         def on_color_change(e):
@@ -651,7 +651,7 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
                 "dense flat round size=xs"
             ).tooltip("Show/hide unchecked items")
 
-    with ui.column().classes("w-[18rem] max-w-full gap-1"):
+    with ui.column().classes("w-72 max-w-full gap-1"):
         _build_field_header(
             label,
             desc,
@@ -1025,12 +1025,8 @@ def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=
             _build_settings_card(child_name, child, all_polls, depth=depth, expansions=expansions, path=path)
 
 
-# Depth-based layer icons: 1 line → 2 lines → 3 lines.
-_DEPTH_ICONS = ["remove", "drag_handle", "menu"]
-
-def _layer_icon_for_depth(depth: int) -> str:
-    """Return an icon with increasing horizontal lines for deeper nesting."""
-    return _DEPTH_ICONS[min(depth, len(_DEPTH_ICONS) - 1)]
+# Depth-based Quasar background classes (dark mode: increasingly lighter).
+_DEPTH_BG = ["bg-grey-10", "bg-grey-9", "bg-grey-8"]
 
 
 def _build_settings_card(name, settings, all_polls, *, depth=0, expansions=None, path=""):
@@ -1042,17 +1038,17 @@ def _build_settings_card(name, settings, all_polls, *, depth=0, expansions=None,
     otherwise so the layout stays uniform).
     """
     has_children = bool(settings.children)
-    icon = _layer_icon_for_depth(depth)
     key = f"{path}.{name}" if path else name
     is_open: bool = _expansion_state.get(key) is True
 
     # Tag expansion with the access types it contains so it hides when
     # all its types are toggled off.
     _access_cls = _ACCESS_CLASS_MAP.get(_content_access_types(settings), "")
+    bg = _DEPTH_BG[min(depth, len(_DEPTH_BG) - 1)]
     exp = ui.expansion(
         generate_label(name),
         value=is_open,
-    ).props("duration=0 dense").classes("w-full" + (f" {_access_cls}" if _access_cls else ""))
+    ).props("duration=0 dense dense-toggle").classes(f"w-full {bg}" + (f" {_access_cls}" if _access_cls else ""))
     exp.on("show", lambda: (_expansion_state.update({key: True}), _save_expansion_state()))
     exp.on("hide", lambda: (_expansion_state.update({key: False}), _save_expansion_state()))
 
@@ -1074,7 +1070,6 @@ def _build_settings_card(name, settings, all_polls, *, depth=0, expansions=None,
 
     with exp.add_slot("header"):
         with ui.row().classes("w-full items-center gap-1"):
-            ui.icon(icon).classes("text-lg")
             ui.label(generate_label(name).upper()).classes("flex-1")
             if has_children:
                 unfold_btn = ui.button(
@@ -1275,11 +1270,6 @@ def create_settings_panel(
 
     # -- Responsive CSS via @media (works on all browsers) -----------------
     ui.add_css('''
-    @media (max-width: 639px) {
-        .poser-grid { grid-template-columns: 1fr !important; }
-    }
-    .q-slider__pin { opacity: 0.65 !important; }
-    .q-tooltip { z-index: 10050 !important; }
     #popup.nicegui-error-popup { display: none !important; }
     .hide-init .poser-init { display: none !important; }
     .hide-feedback .poser-feedback { display: none !important; }
@@ -1341,9 +1331,7 @@ def create_settings_panel(
         if _has_visible_content(child):
             tab_entries.append((child_name, child))
 
-    with ui.column().classes("w-full sticky top-0 z-50 bg-dark text-white").style(
-        "background: #1d1d1d !important; padding: 16px 12px 8px 12px !important; border-bottom: 2px solid #555; gap: 16px"
-    ):
+    with ui.column().classes("w-full sticky top-0 z-50 bg-dark text-white gap-4 px-3 pt-4 pb-2 border-b border-grey-8"):
         with ui.row().classes("w-full items-center flex-wrap gap-1"):
             if title:
                 ui.label(title).classes("text-2xl font-bold")
@@ -1426,18 +1414,99 @@ def create_settings_panel(
         if not tab_entries:
             ui.label("No settings registered.")
 
+        # Visibility toggle definitions: (icon, state_suffix, css_class, tooltip, default_hidden)
+        _TOGGLES = [
+            ("construction",   "__hide_init__",     "hide-init",     "Init fields",     True),
+            ("monitor_heart",  "__hide_feedback__", "hide-feedback", "Feedback fields",  False),
+            ("tune",           "__hide_input__",    "hide-input",    "Input fields",     False),
+        ]
+
+        # Forward-populated by tab panel loop below.
+        _tab_data: dict[str, dict] = {}   # label -> {"panel": ..., "expansions": [...]}
+        _active = {"label": ""}
+
         if tab_entries:
             saved_tab = _expansion_state.get("__active_tab__")
             initial_tab_label = saved_tab if saved_tab in dict(tab_entries) else tab_entries[0][0]
-            with ui.tabs().classes("w-full") as tabs:
+            _active["label"] = initial_tab_label
+
+            with ui.tabs().classes("w-full").props("dense active-color=primary switch-indicator") as tabs:
                 tab_map = {}
                 for label, _ in tab_entries:
                     t = ui.tab(generate_label(label))
                     def _on_tab_click(l=label):
                         _expansion_state["__active_tab__"] = l
                         _save_expansion_state()
+                        _active["label"] = l
+                        _sync_toolbar_to_tab()
                     t.on("click", _on_tab_click)
                     tab_map[label] = t
+
+            # Toolbar row: visibility toggles (left) + expand/collapse-all (right)
+            _toggle_btns: list[tuple] = []   # [(btn, suffix, css, default), ...]
+            _expand_btn_ref: list = [None]
+
+            def _sync_toolbar_to_tab():
+                """Update toggle button appearance for the active tab."""
+                lbl = _active["label"]
+                for btn, suffix, css, default in _toggle_btns:
+                    is_hidden = _expansion_state.get(f"{lbl}.{suffix}", default)
+                    if is_hidden:
+                        btn.classes(add="text-grey-7")
+                    else:
+                        btn.classes(remove="text-grey-7")
+
+            with ui.row().classes("w-full items-center"):
+                for icon, suffix, css, tip, default in _TOGGLES:
+                    btn_ref: list = [None]
+
+                    def _make_toggle(sf=suffix, cc=css, dh=default, br=btn_ref):
+                        def _toggle():
+                            lbl = _active["label"]
+                            td = _tab_data.get(lbl)
+                            if not td:
+                                return
+                            state_key = f"{lbl}.{sf}"
+                            is_hidden = not _expansion_state.get(state_key, dh)
+                            _expansion_state[state_key] = is_hidden
+                            _save_expansion_state()
+                            if is_hidden:
+                                td["panel"].classes(add=cc)
+                                br[0].classes(add="text-grey-7")
+                            else:
+                                td["panel"].classes(remove=cc)
+                                br[0].classes(remove="text-grey-7")
+                        return _toggle
+
+                    btn = ui.button(
+                        icon=icon, on_click=_make_toggle(),
+                    ).props("dense flat size=sm").tooltip(tip)
+                    is_hidden = _expansion_state.get(f"{initial_tab_label}.{suffix}", default)
+                    if is_hidden:
+                        btn.classes(add="text-grey-7")
+                    btn_ref[0] = btn
+                    _toggle_btns.append((btn, suffix, css, default))
+
+                # Spacer pushes expand/collapse to the right
+                ui.element("div").classes("flex-1")
+
+                def _toggle_all_expansions():
+                    td = _tab_data.get(_active["label"])
+                    if not td or not td["expansions"]:
+                        return
+                    _expand_state = td.setdefault("_expanded", False)
+                    td["_expanded"] = not _expand_state
+                    for e in td["expansions"]:
+                        if td["_expanded"]:
+                            e.open()
+                        else:
+                            e.close()
+
+                ui.button(
+                    icon="unfold_more",
+                    on_click=_toggle_all_expansions,
+                ).props("dense flat size=sm").tooltip("Expand / Collapse All")
+
     # -- end of sticky header --
 
     # Build log drawer outside the header so it's a top-level fixed element
@@ -1453,86 +1522,16 @@ def create_settings_panel(
         for label, root_settings in tab_entries:
             with ui.tab_panel(tab_map[label]) as panel:
                 # Apply persisted visibility classes to this panel
-                _hide_init = _expansion_state.get(f"{label}.__hide_init__", True)
-                _hide_fb = _expansion_state.get(f"{label}.__hide_feedback__", False)
-                _hide_in = _expansion_state.get(f"{label}.__hide_input__", False)
-                if _hide_init:
-                    panel.classes(add="hide-init")
-                if _hide_fb:
-                    panel.classes(add="hide-feedback")
-                if _hide_in:
-                    panel.classes(add="hide-input")
+                for _, suffix, css, _, default in _TOGGLES:
+                    if _expansion_state.get(f"{label}.{suffix}", default):
+                        panel.classes(add=css)
 
                 expansions: list = []
-
-                # Toolbar row: visibility toggles (left) + expand/collapse-all (right)
-                toggle_row = ui.row().classes("w-full items-center mb-1")
 
                 _build_settings_body(
                     root_settings, all_polls,
                     depth=0, expansions=expansions, path=label,
                 )
 
-                def _make_visibility_toggle(state_key, css_class, default_hidden, btn_ref, panel_ref):
-                    """Create a toggle callback for a panel CSS class."""
-                    def _toggle(state={"hidden": _expansion_state.get(state_key, default_hidden)}):
-                        state["hidden"] = not state["hidden"]
-                        _expansion_state[state_key] = state["hidden"]
-                        _save_expansion_state()
-                        if state["hidden"]:
-                            panel_ref.classes(add=css_class)
-                            btn_ref[0].classes(add="text-grey-7")
-                        else:
-                            panel_ref.classes(remove=css_class)
-                            btn_ref[0].classes(remove="text-grey-7")
-                    return _toggle
-
-                with toggle_row:
-                    # Init fields toggle (hidden by default)
-                    _init_ref: list = [None]
-                    _init_btn = ui.button(
-                        icon="construction",
-                        on_click=_make_visibility_toggle(f"{label}.__hide_init__", "hide-init", True, _init_ref, panel),
-                    ).props("dense flat size=sm").tooltip("Init fields")
-                    if _hide_init:
-                        _init_btn.classes(add="text-grey-7")
-                    _init_ref[0] = _init_btn
-
-                    # Feedback (READ) fields toggle (shown by default)
-                    _fb_ref: list = [None]
-                    _fb_btn = ui.button(
-                        icon="monitor_heart",
-                        on_click=_make_visibility_toggle(f"{label}.__hide_feedback__", "hide-feedback", False, _fb_ref, panel),
-                    ).props("dense flat size=sm").tooltip("Feedback fields")
-                    if _hide_fb:
-                        _fb_btn.classes(add="text-grey-7")
-                    _fb_ref[0] = _fb_btn
-
-                    # Input (WRITE / READWRITE) fields toggle (shown by default)
-                    _in_ref: list = [None]
-                    _in_btn = ui.button(
-                        icon="tune",
-                        on_click=_make_visibility_toggle(f"{label}.__hide_input__", "hide-input", False, _in_ref, panel),
-                    ).props("dense flat size=sm").tooltip("Input fields")
-                    if _hide_in:
-                        _in_btn.classes(add="text-grey-7")
-                    _in_ref[0] = _in_btn
-
-                    # Spacer pushes expand/collapse to the right
-                    ui.element("div").classes("flex-1")
-
-                    if expansions:
-                        _expanded = {"all": False}
-                        def _toggle_all(exps=expansions, state=_expanded):
-                            state["all"] = not state["all"]
-                            for e in exps:
-                                if state["all"]:
-                                    e.open()
-                                else:
-                                    e.close()
-                        ui.button(
-                            "Expand / Collapse All",
-                            icon="unfold_more",
-                            on_click=_toggle_all,
-                        ).props("dense flat size=sm")
+                _tab_data[label] = {"panel": panel, "expansions": expansions}
 

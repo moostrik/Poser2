@@ -65,6 +65,7 @@ class OakGroup(BaseSettings):
     fps               : Field[float]           = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
     yolo              : Field[bool]            = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color             : Field[bool]            = Field(True, access=Field.INIT, description="Enable color capture")
+    mono              : Field[bool]            = Field(False, access=Field.INIT, description="Enable mono capture")
     square            : Field[bool]            = Field(True, access=Field.INIT, description="Use square aspect ratio")
     stereo            : Field[bool]            = Field(False, access=Field.INIT, description="Enable stereo mode")
     hd_ready          : Field[bool]            = Field(False, access=Field.INIT, description="Use HD resolution")
@@ -75,7 +76,7 @@ class OakGroup(BaseSettings):
     video_format      : Field[CoderFormat]     = Field(CoderFormat.H264, access=Field.INIT, description="Video format")
     video_frame_types : Field[list[FrameType]] = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record")
 
-    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, sim_enabled, model_path]
+    _cam_share: list = [fps, color, mono, square, stereo, yolo, hd_ready, sim_enabled, model_path]
 
     cam_0        : Group[CameraSettings]    = Group(CameraSettings, share=_cam_share)
     cam_1        : Group[CameraSettings]    = Group(CameraSettings, share=_cam_share)
