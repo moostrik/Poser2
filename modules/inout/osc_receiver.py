@@ -24,43 +24,43 @@ class OscReceiverSettings(BaseSettings):
 class OscReceiver:
 
     def __init__(self, settings: OscReceiverSettings) -> None:
-
         self.settings: OscReceiverSettings = settings
-        self._bindings: dict[str, Callable] = {}
-
-        self.osc_receive: Dispatcher = Dispatcher()
-        self.osc_receive.set_default_handler(self._osc_handler, needs_reply_address=True)
-        self.server = ThreadingOSCUDPServer(('0.0.0.0', settings.port_in), self.osc_receive)
-        self.server_thread: Thread = Thread(target=self.server.serve_forever, daemon=True)
-        self.server_thread.start()
-
-        self.osc_return_client = SimpleUDPClient(settings.ip_address_out, settings.port_out)
+        self._bindings: dict[str, list[Callable]] = {}
         self.client_lock = Lock()
+        self.osc_return_client = SimpleUDPClient(settings.ip_address_out, settings.port_out)
+        self.server = self._start_server(settings.port_in)
 
         settings.bind(OscReceiverSettings.ip_address_out, self._on_out_change)
         settings.bind(OscReceiverSettings.port_out,       self._on_out_change)
         settings.bind(OscReceiverSettings.port_in,        self._on_in_change)
 
     def bind(self, address: str, callback: Callable) -> None:
-        self._bindings[address] = callback
+        if address not in self._bindings:
+            self._bindings[address] = []
+            self.server.dispatcher.map(address, self._handle)
+        self._bindings[address].append(callback)
 
-    def _osc_handler(self, client_address, address, *args) -> None:
+    def _handle(self, address: str, *args) -> None:
         if self.settings.verbose:
-            logger.info(f"From {client_address}: {address} {args}")
-
+            logger.info(f"{address} {args}")
         if self.settings.return_messages:
             with self.client_lock:
                 self.osc_return_client.send_message(address, args)
-
         self.settings.counter = (self.settings.counter + 1) % 100000
-
-        if address in self._bindings:
+        for callback in self._bindings.get(address, []):
             try:
-                self._bindings[address](*args)
+                callback(*args)
             except TypeError as e:
                 logger.warning(f"Argument mismatch for '{address}': {e}")
-        else:
-            logger.debug(f"Unbound address: {address}")
+
+    def _start_server(self, port: int) -> ThreadingOSCUDPServer:
+        dispatcher = Dispatcher()
+        for address in self._bindings:
+            dispatcher.map(address, self._handle)
+        server = ThreadingOSCUDPServer(('0.0.0.0', port), dispatcher)
+        Thread(target=server.serve_forever, daemon=True).start()
+        logger.info(f"Listening on port {port}")
+        return server
 
     def _on_out_change(self, _=None) -> None:
         with self.client_lock:
@@ -68,12 +68,8 @@ class OscReceiver:
         logger.info(f"Return address updated to {self.settings.ip_address_out}:{self.settings.port_out}")
 
     def _on_in_change(self, _=None) -> None:
+        old_server = self.server
         def _restart() -> None:
-            self.server.shutdown()
-            self.osc_receive = Dispatcher()
-            self.osc_receive.set_default_handler(self._osc_handler, needs_reply_address=True)
-            self.server = ThreadingOSCUDPServer(('0.0.0.0', self.settings.port_in), self.osc_receive)
-            self.server_thread = Thread(target=self.server.serve_forever, daemon=True)
-            self.server_thread.start()
-            logger.info(f"Listening on port {self.settings.port_in}")
+            old_server.shutdown()
+            self.server = self._start_server(self.settings.port_in)
         Thread(target=_restart, daemon=True).start()

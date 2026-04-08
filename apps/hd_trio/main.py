@@ -6,7 +6,7 @@ from functools import partial
 from modules.oak import Camera, Simulator, Player, Recorder, Sync
 from modules.settings import presets, NiceServer
 from modules.data_hub import DataHub, Stage
-from modules.inout import OscSound, ArtNetBars, OscReceiver, ControlMessage
+from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers
 from modules.pose.features import configure_features
@@ -55,8 +55,6 @@ class HDTrioMain:
             for i in range(num_players):
                 camera = Camera(self.settings.camera.cameras[i])
                 self.cameras.append(camera)
-            self.session_osc: Optional[OscReceiver] = OscReceiver(self.settings.inout.session_receiver)
-            self.session_osc.register_message_callback(self._on_session_osc)
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
 
         # TRACKER
@@ -65,6 +63,12 @@ class HDTrioMain:
 
         # TIMER
         self.timer = Timer(self.settings.tt.timer)
+
+        # SESSION OSC
+        self.session_osc = OscReceiver(self.settings.inout.osc_receiver)
+        self.session_osc.bind('/start/recording', self._on_osc_start_recording)
+        self.session_osc.bind('/stop/recording',  self._on_osc_stop_recording)
+        self.session_osc.bind('/group/id',        self._on_osc_group_id)
 
         # RENDER
         self.render = HDTrioRender(self.data_hub, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
@@ -167,6 +171,22 @@ class HDTrioMain:
                 lambda: nodes.AngleMotionMovingAverageSmoother(self.settings.pose.motion.moving_average),
             ]
         )
+
+    def _on_osc_start_recording(self, *_) -> None:
+        if self.recorder:
+            self.recorder.settings.start = True
+            self.recorder.settings.start = False
+        self.timer.config.run = True
+
+    def _on_osc_stop_recording(self, *_) -> None:
+        if self.recorder:
+            self.recorder.settings.stop = True
+            self.recorder.settings.stop = False
+        self.timer.config.run = False
+
+    def _on_osc_group_id(self, gid: str, *_) -> None:
+        if self.recorder:
+            self.recorder.settings.group_id = gid
 
     def start(self) -> None:
 
@@ -273,20 +293,6 @@ class HDTrioMain:
 
         self.render.window_manager.add_exit_callback(self.stop)
         self.render.window_manager.start()
-
-    def _on_session_osc(self, msg: ControlMessage) -> None:
-        if msg.address == '/start/recording':
-            if self.recorder:
-                self.recorder.record(True)
-            self.timer.config.run = True
-        elif msg.address == '/stop/recording':
-            if self.recorder:
-                self.recorder.record(False)
-            self.timer.config.run = False
-        elif msg.address == '/group/id' and msg.arguments:
-            if self.recorder:
-                self.recorder.set_group_id(msg.arguments[0])
-                self.recorder.settings.group_id = msg.arguments[0]
 
     def stop(self) -> None:
         if not self.is_running:

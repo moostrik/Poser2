@@ -1,7 +1,7 @@
 {
   "num_players": 3,
   "input_fps": 23.0,
-  "render_fps": 85.0,
+  "render_fps": 161.0,
   "camera": {
     "yolo": true,
     "color": true,
@@ -23,10 +23,10 @@
       "flip_h": false,
       "flip_v": true,
       "perspective": -0.22,
-      "color_exposure": 9992,
-      "color_iso": 117,
+      "color_exposure": 30001,
+      "color_iso": 1599,
       "color_auto_exposure": true,
-      "color_balance": 3400,
+      "color_balance": 4650,
       "color_auto_balance": true,
       "color_brightness": 0,
       "color_contrast": 0,
@@ -50,10 +50,10 @@
       "flip_h": false,
       "flip_v": true,
       "perspective": -0.22,
-      "color_exposure": 9105,
-      "color_iso": 100,
+      "color_exposure": 30001,
+      "color_iso": 1599,
       "color_auto_exposure": true,
-      "color_balance": 3400,
+      "color_balance": 4650,
       "color_auto_balance": true,
       "color_brightness": 0,
       "color_contrast": 0,
@@ -552,6 +552,13 @@
       "ip_addresses": "127.0.0.1",
       "port": 9000,
       "stage": "LERP"
+    },
+    "osc_receiver": {
+      "port_in": 9001,
+      "return_messages": true,
+      "port_out": 9002,
+      "ip_address_out": "127.0.0.1",
+      "verbose": true
     },
     "artnet_0": {
       "enabled": true,

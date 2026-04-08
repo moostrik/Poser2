@@ -116,7 +116,7 @@ class Field(Generic[T]):
         max: T | None = None,   # UI hint only — not enforced by the descriptor
         step: T | None = None,  # UI hint only — not enforced by the descriptor
         description: str = "",
-        access: Access = Access.WRITE,
+        access: Access = Access.READWRITE,
         visible: bool = True,
         pinned: bool = False,
         newline: bool = False,

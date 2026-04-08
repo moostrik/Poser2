@@ -96,8 +96,8 @@ class OakGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class InOutGroup(BaseSettings):
+    osc_receiver:     Group[OscReceiverSettings] = Group(OscReceiverSettings)
     osc_sound:        Group[OscSoundSettings]    = Group(OscSoundSettings)
-    session_receiver: Group[OscReceiverSettings]  = Group(OscReceiverSettings)
     artnet_0 :        Group[ArtNetBarsSettings]  = Group(ArtNetBarsSettings)
     artnet_1 :        Group[ArtNetBarsSettings]  = Group(ArtNetBarsSettings)
     artnet_2 :        Group[ArtNetBarsSettings]  = Group(ArtNetBarsSettings)

@@ -5,7 +5,7 @@ import threading
 from enum import IntEnum, auto
 from typing import Callable, Set
 
-from modules.settings import BaseSettings, Field
+from modules.settings import BaseSettings, Field, Widget
 
 import logging
 logger = logging.getLogger(__name__)
@@ -24,8 +24,9 @@ class TimerSettings(BaseSettings):
     run:        Field[bool]  = Field(False)
     duration:   Field[float] = Field(10.0)
     intermezzo: Field[float] = Field(0.0)
-    auto:       Field[bool]  = Field(False, visible=False)
-    verbose:    Field[bool]  = Field(False, visible=False)
+    auto:       Field[bool]  = Field(False)
+    verbose:    Field[bool]  = Field(False)
+    elapsed:    Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Timer progress")
 
 
 class Timer(threading.Thread):
@@ -196,17 +197,26 @@ class Timer(threading.Thread):
                         self._set_state(TimerState.RUNNING)
                     else:
                         # No auto-restart: go to idle
+                        self.config.elapsed = 0.0
                         self._set_state(TimerState.IDLE)
 
             # Handle running timer
             elif self._state == TimerState.RUNNING:
                 self._notify_time_callbacks(elapsed)
+                self.config.elapsed = min(elapsed / self.config.duration, 1.0)
 
                 # Check if duration reached
                 if elapsed >= self.config.duration:
                     # Duration reached - enter intermezzo
                     self._intermezzo_start = time.time()
                     self._set_state(TimerState.INTERMEZZO)
+
+            # Sync run field to GUI from timer thread
+            is_running = (self._state == TimerState.RUNNING)
+            if self.config.run != is_running:
+                self._updating_run = True
+                self.config.run = is_running
+                self._updating_run = False
 
             # Frame-accurate timing
             next_time += interval
