@@ -9,10 +9,6 @@ from ..camera.definitions import CoderType, CoderFormat, FrameType, FRAME_TYPE_L
 from .settings import RecorderSettings
 from .stream_writer import StreamWriter
 
-from pythonosc.udp_client import SimpleUDPClient
-from pythonosc.osc_server import ThreadingOSCUDPServer
-from pythonosc.dispatcher import Dispatcher
-
 import logging
 logger = logging.getLogger(__name__)
 
@@ -92,14 +88,6 @@ class Recorder(Thread):
         self.settings.bind(RecorderSettings.start, self._on_start)
         self.settings.bind(RecorderSettings.stop, self._on_stop)
         self.settings.bind(RecorderSettings.group_id, self.set_group_id)
-
-        # OSC bridge (moved from SyncRecorderGui)
-        self.osc_client = SimpleUDPClient("10.0.0.148", 8600)
-        self.osc_receive: Dispatcher = Dispatcher()
-        self.osc_receive.set_default_handler(self._receive_osc)
-        self.osc_server = ThreadingOSCUDPServer(('0.0.0.0', 8601), self.osc_receive)
-        self.osc_server_thread: Thread = Thread(target=self.osc_server.serve_forever, daemon=True)
-        self.osc_server_thread.start()
 
     def stop(self) -> None:
         self.stop_event.set()
@@ -216,14 +204,4 @@ class Recorder(Thread):
     def _on_stop(self, _=None) -> None:
         self.record(False)
 
-    # OSC BRIDGE
-    def _receive_osc(self, address, *args) -> None:
-        logger.info(address, args)
-        if address == '/group/id':
-            self.set_group_id(args[0])
-            self.settings.group_id = args[0]
-        if address == '/start/recording':
-            self.record(True)
-        if address == '/stop/recording':
-            self.record(False)
-        self.osc_client.send_message(address, args)
+

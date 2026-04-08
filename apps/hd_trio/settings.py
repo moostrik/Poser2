@@ -7,7 +7,7 @@ from modules.settings import BaseSettings, NiceSettings, Field, Group
 from modules.oak import CameraSettings, FrameType, CoderFormat, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render.color_settings import ColorSettings
 from modules.render import layers
-from modules.inout import OscSoundSettings, ArtNetBarsSettings
+from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings
 from modules.pose import batch, nodes, trackers
 from modules.pose.batch.model_types import ModelType
@@ -96,10 +96,11 @@ class OakGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class InOutGroup(BaseSettings):
-    osc_sound: Group[OscSoundSettings]   = Group(OscSoundSettings)
-    artnet_0 : Group[ArtNetBarsSettings] = Group(ArtNetBarsSettings)
-    artnet_1 : Group[ArtNetBarsSettings] = Group(ArtNetBarsSettings)
-    artnet_2 : Group[ArtNetBarsSettings] = Group(ArtNetBarsSettings)
+    osc_sound:        Group[OscSoundSettings]    = Group(OscSoundSettings)
+    session_receiver: Group[OscReceiverSettings]  = Group(OscReceiverSettings)
+    artnet_0 :        Group[ArtNetBarsSettings]  = Group(ArtNetBarsSettings)
+    artnet_1 :        Group[ArtNetBarsSettings]  = Group(ArtNetBarsSettings)
+    artnet_2 :        Group[ArtNetBarsSettings]  = Group(ArtNetBarsSettings)
 
     @property
     def artnets(self) -> list[ArtNetBarsSettings]:

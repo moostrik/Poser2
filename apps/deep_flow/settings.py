@@ -6,7 +6,7 @@ from modules.settings import BaseSettings, NiceSettings, Field, Group
 from modules.oak import CameraSettings, FrameType, CoderFormat, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render.color_settings import ColorSettings
 from modules.render import layers
-from modules.inout import OscSoundSettings, OscControlSettings
+from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings
 from modules.pose import batch, nodes, trackers
 from modules.pose.batch.model_types import ModelType
@@ -93,7 +93,7 @@ class OakGroup(BaseSettings):
 
 class InOutGroup(BaseSettings):
     osc_sound   = Group(OscSoundSettings)
-    osc_control = Group(OscControlSettings)
+    osc_control = Group(OscReceiverSettings)
 
 
 # ---------------------------------------------------------------------------

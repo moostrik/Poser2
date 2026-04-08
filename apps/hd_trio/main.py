@@ -6,7 +6,7 @@ from functools import partial
 from modules.oak import Camera, Simulator, Player, Recorder, Sync
 from modules.settings import presets, NiceServer
 from modules.data_hub import DataHub, Stage
-from modules.inout import OscSound, ArtNetBars
+from modules.inout import OscSound, ArtNetBars, OscReceiver, ControlMessage
 from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers
 from modules.pose.features import configure_features
@@ -45,6 +45,7 @@ class HDTrioMain:
         self.cameras: list[Camera | Simulator] = []
         self.recorder: Optional[Recorder] = None
         self.player: Optional[Player] = None
+        self.session_osc: Optional[OscReceiver] = None
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator)
             for i in range(num_players):
@@ -54,6 +55,8 @@ class HDTrioMain:
             for i in range(num_players):
                 camera = Camera(self.settings.camera.cameras[i])
                 self.cameras.append(camera)
+            self.session_osc: Optional[OscReceiver] = OscReceiver(self.settings.inout.session_receiver)
+            self.session_osc.register_message_callback(self._on_session_osc)
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
 
         # TRACKER
@@ -271,6 +274,20 @@ class HDTrioMain:
         self.render.window_manager.add_exit_callback(self.stop)
         self.render.window_manager.start()
 
+    def _on_session_osc(self, msg: ControlMessage) -> None:
+        if msg.address == '/start/recording':
+            if self.recorder:
+                self.recorder.record(True)
+            self.timer.config.run = True
+        elif msg.address == '/stop/recording':
+            if self.recorder:
+                self.recorder.record(False)
+            self.timer.config.run = False
+        elif msg.address == '/group/id' and msg.arguments:
+            if self.recorder:
+                self.recorder.set_group_id(msg.arguments[0])
+                self.recorder.settings.group_id = msg.arguments[0]
+
     def stop(self) -> None:
         if not self.is_running:
             return
@@ -294,6 +311,9 @@ class HDTrioMain:
             artnet.stop()
 
         self.timer.stop()
+
+        if self.session_osc:
+            self.session_osc.server.shutdown()
 
         self.point_extractor.stop()
         self.mask_extractor.stop()
