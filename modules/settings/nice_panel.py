@@ -1026,7 +1026,8 @@ def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=
 
 
 # Depth-based Quasar background classes (dark mode: increasingly lighter).
-_DEPTH_BG = ["bg-grey-10", "bg-grey-9", "bg-grey-8"]
+# _DEPTH_BG = ["bg-grey-10", "bg-grey-9", "bg-grey-8"]
+_DEPTH_BG = ["bg-grey-9", "bg-grey-8", "bg-grey-7", "bg-grey-6", "bg-grey-5"]  # extended for deeper nesting
 
 
 def _build_settings_card(name, settings, all_polls, *, depth=0, expansions=None, path=""):
@@ -1331,8 +1332,8 @@ def create_settings_panel(
         if _has_visible_content(child):
             tab_entries.append((child_name, child))
 
-    with ui.column().classes("w-full sticky top-0 z-50 bg-dark text-white gap-4 px-3 pt-4 pb-2 border-b border-grey-8"):
-        with ui.row().classes("w-full items-center flex-wrap gap-1"):
+    with ui.column().classes("w-full sticky top-0 z-50 bg-dark text-white gap-2 px-3 pt-3 pb-2 border-b-4 border-[#121212]"):
+        with ui.row().classes("w-full items-center flex-wrap gap-1 bg-grey-9 rounded px-3 py-2"):
             if title:
                 ui.label(title).classes("text-2xl font-bold")
 
@@ -1396,7 +1397,7 @@ def create_settings_panel(
         # Render pinned fields and actions in a compact row above the tabs
         if pinned_fields or pinned_actions:
             pinned_polls: list[tuple] = []
-            with ui.row().classes("w-full gap-4 flex-wrap items-end"):
+            with ui.row().classes("w-full gap-4 flex-wrap items-end bg-grey-9 rounded px-3 py-2"):
                 for settings, field_name, field in pinned_fields:
                     if field.access is Access.INIT:
                         with ui.row().classes("items-center gap-1"):
@@ -1430,7 +1431,7 @@ def create_settings_panel(
             initial_tab_label = saved_tab if saved_tab in dict(tab_entries) else tab_entries[0][0]
             _active["label"] = initial_tab_label
 
-            with ui.tabs().classes("w-full").props("dense active-color=primary switch-indicator") as tabs:
+            with ui.tabs().classes("w-full").props("dense active-color=primary no-indicator") as tabs:
                 tab_map = {}
                 for label, _ in tab_entries:
                     t = ui.tab(generate_label(label))
