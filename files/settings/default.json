@@ -107,7 +107,6 @@
       "folder": "20251212-130516_3_square_color_no_id",
       "range_start": 3,
       "range_end": 3,
-      "sim_fps": 30.0,
       "sim_passthrough": false,
       "video_decoder": "iGPU"
     }

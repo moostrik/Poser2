@@ -19,12 +19,12 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class OnePerCamTrackerSettings(BaseSettings):
     """Configuration for OnePerCamTracker."""
     tracklet_min_age:         Field[int]   = Field(3,    min=0,   max=9,   step=1)
-    timeout:                  Field[float] = Field(2.0,  min=1.0, max=5.0, step=0.1)
     add_centre_threshold:     Field[float] = Field(0.15, min=0.0, max=1.0, step=0.05)
-    add_height_threshold:     Field[float] = Field(0.5,  min=0.0, max=1.0, step=0.05)
-    add_bottom_threshold:     Field[float] = Field(0.2,  min=0.0, max=1.0, step=0.05)
     update_centre_threshold:  Field[float] = Field(0.3,  min=0.0, max=1.0, step=0.05)
+    timeout:                  Field[float] = Field(2.0,  min=1.0, max=5.0, step=0.1)
+    add_height_threshold:     Field[float] = Field(0.5,  min=0.0, max=1.0, step=0.05)
     update_height_threshold:  Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05)
+    add_bottom_threshold:     Field[float] = Field(0.2,  min=0.0, max=1.0, step=0.05)
 
 
 @dataclass (frozen=True)

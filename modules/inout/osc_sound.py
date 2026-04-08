@@ -22,10 +22,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 class OscSoundSettings(BaseSettings):
+    max_players: Field[int]  = Field(4,    min=1,    max=16,    access=Field.INIT,         description="Max number of player poses to send (IDs 0 to N-1)")
     ip_addresses: Field[str] = Field("127.0.0.1",               widget=Widget.ip_field,     description="Target OSC IP address")
     port: Field[int]         = Field(9000, min=1024, max=65535, widget=Widget.number_field, description="Target OSC port")
     stage: Field[Stage]      = Field(Stage.LERP,                                            description="Pipeline stage to read poses from")
-    max_players: Field[int]  = Field(4,    min=1,    max=16,    widget=Widget.knob,         description="Max number of player poses to send (IDs 0 to N-1)")
 
 
 class OscSound:

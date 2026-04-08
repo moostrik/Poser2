@@ -78,7 +78,7 @@ class OakGroup(BaseSettings):
     cam_0       = Group(CameraSettings, share=_cam_share)
     cam_1       = Group(CameraSettings, share=_cam_share)
     cam_2       = Group(CameraSettings, share=_cam_share)
-    simulator   = Group(SimulatorSettings, share=[video_path, video_format, video_frame_types, num_cameras, color, square, stereo])
+    simulator   = Group(SimulatorSettings, share=[video_path, video_format, video_frame_types, num_cameras, fps, color, square, stereo])
     recorder    = Group(RecorderSettings, share=[video_path, temp_path, video_format, video_frame_types, color, square, stereo, num_cameras, fps])
     frame_sync  = Group(SyncSettings, share=[num_cameras, fps])
     tracklet_sync = Group(SyncSettings, share=[num_cameras, fps])

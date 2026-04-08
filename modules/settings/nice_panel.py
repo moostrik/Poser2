@@ -261,8 +261,8 @@ def _build_slider(settings, name, field, polls):
     color = getattr(field, "color", "primary")
 
     with ui.column().classes("w-[12rem] max-w-full gap-1"):
-        with ui.row().classes("w-full items-center justify-between"):
-            _build_field_title(label, desc)
+        with ui.row().classes("w-full items-center justify-between flex-nowrap"):
+            _build_field_title(label, desc, classes="flex-1 truncate")
             fmt = "%.0f" if field.type_ is int else "%.2f"
             val_input = ui.number(
                 value=value,
@@ -906,12 +906,12 @@ def _build_action_button(settings, name, field):
 
 
 def _has_visible_content(settings):
-    """Return True if settings has any visible fields, actions, or children."""
+    """Return True if settings has any visible fields, actions, or children with visible content."""
     if any(f.visible for f in settings.fields.values()):
         return True
     if settings.actions:
         return True
-    if settings.children:
+    if any(_has_visible_content(c) for c in settings.children.values()):
         return True
     return False
 
@@ -992,7 +992,8 @@ def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=
 
     # Children (recursive)
     for child_name, child in settings.children.items():
-        _build_settings_card(child_name, child, all_polls, depth=depth, expansions=expansions, path=path)
+        if _has_visible_content(child):
+            _build_settings_card(child_name, child, all_polls, depth=depth, expansions=expansions, path=path)
 
 
 # Depth-based layer icons: 1 line → 2 lines → 3 lines.
