@@ -25,6 +25,10 @@ Design principles for settings widgets and layout:
     expresses the layout clearly.
 - Preserve declaration order and predictable placement.
 - Treat mobile collapse behavior as a first-class requirement.
+- Prefer simple CSS-based solutions (parent-class toggling, cascading
+    selectors) over client-side JavaScript for show/hide and styling changes.
+    Resort to ``ui.run_javascript`` only when no CSS or NiceGUI API equivalent
+    exists.
 """
 
 from __future__ import annotations
@@ -139,20 +143,32 @@ def _build_field_header(
 
 def _build_init_field(settings, name: str) -> None:
     """Render a single init-only field without forcing it into a separate section."""
-    with ui.row().classes("items-center gap-2"):
+    with ui.row().classes("items-center gap-2 poser-init"):
         ui.label(generate_label(name))
         ui.label(str(getattr(settings, name))).classes("text-secondary italic")
 
 
+def _access_css_class(field: Field) -> str:
+    """Return a CSS marker class for the field's access level."""
+    if field.access is Access.INIT:
+        return "poser-init"
+    if field.access is Access.READ:
+        return "poser-feedback"
+    return "poser-input"  # WRITE or READWRITE
+
+
 def _build_settings_entry(settings, name: str, field: Field, polls) -> None:
     """Render one visible field in declaration order."""
+    css = _access_css_class(field)
     if field.widget == Widget.button:
-        _build_action_button(settings, name, field)
+        with ui.element("div").classes(css):
+            _build_action_button(settings, name, field)
         return
     if field.access is Access.INIT:
         _build_init_field(settings, name)
         return
-    _build_field_control(settings, name, field, polls)
+    with ui.element("div").classes(css):
+        _build_field_control(settings, name, field, polls)
 
 
 
@@ -916,6 +932,38 @@ def _has_visible_content(settings):
     return False
 
 
+def _content_access_types(settings) -> frozenset:
+    """Return the set of Access types present in visible fields (recursive).
+
+    Actions are not counted — groups with actions are never auto-hidden.
+    """
+    if settings.actions:
+        return frozenset({Access.WRITE, Access.READ, Access.INIT})  # mixed — never hide
+    types: set = set()
+    for f in settings.fields.values():
+        if f.visible:
+            if f.access in (Access.WRITE, Access.READWRITE):
+                types.add(Access.WRITE)  # normalize READWRITE → WRITE bucket
+            else:
+                types.add(f.access)
+    for child in settings.children.values():
+        if _has_visible_content(child):
+            types |= _content_access_types(child)
+    return frozenset(types)
+
+
+# Map access-type combinations to CSS class names for group hiding.
+_ACCESS_CLASS_MAP: dict[frozenset, str] = {
+    frozenset({Access.INIT}):                          "poser-only-init",
+    frozenset({Access.READ}):                          "poser-only-feedback",
+    frozenset({Access.WRITE}):                         "poser-only-input",
+    frozenset({Access.INIT, Access.READ}):              "poser-only-init-feedback",
+    frozenset({Access.INIT, Access.WRITE}):             "poser-only-init-input",
+    frozenset({Access.READ, Access.WRITE}):             "poser-only-feedback-input",
+    frozenset({Access.INIT, Access.READ, Access.WRITE}): "poser-only-all",
+}
+
+
 def _register_polls(polls, all_polls):
     """Append local poll entries into the page-level poll list.
 
@@ -1017,10 +1065,13 @@ def _build_settings_card(name, settings, all_polls, *, depth=0, expansions=None,
     key = f"{path}.{name}" if path else name
     is_open: bool = _expansion_state.get(key) is True
 
+    # Tag expansion with the access types it contains so it hides when
+    # all its types are toggled off.
+    _access_cls = _ACCESS_CLASS_MAP.get(_content_access_types(settings), "")
     exp = ui.expansion(
         generate_label(name),
         value=is_open,
-    ).props("duration=0 dense").classes("w-full")
+    ).props("duration=0 dense").classes("w-full" + (f" {_access_cls}" if _access_cls else ""))
     exp.on("show", lambda: (_expansion_state.update({key: True}), _save_expansion_state()))
     exp.on("hide", lambda: (_expansion_state.update({key: False}), _save_expansion_state()))
 
@@ -1249,6 +1300,16 @@ def create_settings_panel(
     .q-slider__pin { opacity: 0.65 !important; }
     .q-tooltip { z-index: 10050 !important; }
     #popup.nicegui-error-popup { display: none !important; }
+    .hide-init .poser-init { display: none !important; }
+    .hide-feedback .poser-feedback { display: none !important; }
+    .hide-input .poser-input { display: none !important; }
+    .hide-init .poser-only-init { display: none !important; }
+    .hide-feedback .poser-only-feedback { display: none !important; }
+    .hide-input .poser-only-input { display: none !important; }
+    .hide-init.hide-feedback .poser-only-init-feedback { display: none !important; }
+    .hide-init.hide-input .poser-only-init-input { display: none !important; }
+    .hide-feedback.hide-input .poser-only-feedback-input { display: none !important; }
+    .hide-init.hide-feedback.hide-input .poser-only-all { display: none !important; }
     ''')
 
     # -- Shutdown overlay (client-side JS) ---------------------------------
@@ -1409,33 +1470,88 @@ def create_settings_panel(
 
     with ui.tab_panels(tabs, value=tab_map[initial_tab_label]).classes("w-full").style("padding-bottom: 320px;"):
         for label, root_settings in tab_entries:
-            with ui.tab_panel(tab_map[label]):
+            with ui.tab_panel(tab_map[label]) as panel:
+                # Apply persisted visibility classes to this panel
+                _hide_init = _expansion_state.get(f"{label}.__hide_init__", True)
+                _hide_fb = _expansion_state.get(f"{label}.__hide_feedback__", False)
+                _hide_in = _expansion_state.get(f"{label}.__hide_input__", False)
+                if _hide_init:
+                    panel.classes(add="hide-init")
+                if _hide_fb:
+                    panel.classes(add="hide-feedback")
+                if _hide_in:
+                    panel.classes(add="hide-input")
+
                 expansions: list = []
 
-                # Expand / Collapse-all placeholder — filled after body build
-                toggle_row = ui.row().classes("w-full justify-end mb-1")
+                # Toolbar row: visibility toggles (left) + expand/collapse-all (right)
+                toggle_row = ui.row().classes("w-full items-center mb-1")
 
                 _build_settings_body(
                     root_settings, all_polls,
                     depth=0, expansions=expansions, path=label,
                 )
 
-                # Expand / Collapse-all toggle (only if there are expansions)
-                if expansions:
-                    _expanded = {"all": False}
-                    def _toggle_all(exps=expansions, state=_expanded):
-                        state["all"] = not state["all"]
-                        for e in exps:
-                            if state["all"]:
-                                e.open()
-                            else:
-                                e.close()
-                    with toggle_row:
+                def _make_visibility_toggle(state_key, css_class, default_hidden, btn_ref, panel_ref):
+                    """Create a toggle callback for a panel CSS class."""
+                    def _toggle(state={"hidden": _expansion_state.get(state_key, default_hidden)}):
+                        state["hidden"] = not state["hidden"]
+                        _expansion_state[state_key] = state["hidden"]
+                        _save_expansion_state()
+                        if state["hidden"]:
+                            panel_ref.classes(add=css_class)
+                            btn_ref[0].classes(add="text-grey-7")
+                        else:
+                            panel_ref.classes(remove=css_class)
+                            btn_ref[0].classes(remove="text-grey-7")
+                    return _toggle
+
+                with toggle_row:
+                    # Init fields toggle (hidden by default)
+                    _init_ref: list = [None]
+                    _init_btn = ui.button(
+                        icon="construction",
+                        on_click=_make_visibility_toggle(f"{label}.__hide_init__", "hide-init", True, _init_ref, panel),
+                    ).props("dense flat size=sm").tooltip("Init fields")
+                    if _hide_init:
+                        _init_btn.classes(add="text-grey-7")
+                    _init_ref[0] = _init_btn
+
+                    # Feedback (READ) fields toggle (shown by default)
+                    _fb_ref: list = [None]
+                    _fb_btn = ui.button(
+                        icon="monitor_heart",
+                        on_click=_make_visibility_toggle(f"{label}.__hide_feedback__", "hide-feedback", False, _fb_ref, panel),
+                    ).props("dense flat size=sm").tooltip("Feedback fields")
+                    if _hide_fb:
+                        _fb_btn.classes(add="text-grey-7")
+                    _fb_ref[0] = _fb_btn
+
+                    # Input (WRITE / READWRITE) fields toggle (shown by default)
+                    _in_ref: list = [None]
+                    _in_btn = ui.button(
+                        icon="tune",
+                        on_click=_make_visibility_toggle(f"{label}.__hide_input__", "hide-input", False, _in_ref, panel),
+                    ).props("dense flat size=sm").tooltip("Input fields")
+                    if _hide_in:
+                        _in_btn.classes(add="text-grey-7")
+                    _in_ref[0] = _in_btn
+
+                    # Spacer pushes expand/collapse to the right
+                    ui.element("div").classes("flex-1")
+
+                    if expansions:
+                        _expanded = {"all": False}
+                        def _toggle_all(exps=expansions, state=_expanded):
+                            state["all"] = not state["all"]
+                            for e in exps:
+                                if state["all"]:
+                                    e.open()
+                                else:
+                                    e.close()
                         ui.button(
                             "Expand / Collapse All",
                             icon="unfold_more",
                             on_click=_toggle_all,
                         ).props("dense flat size=sm")
-                else:
-                    toggle_row.delete()
 
