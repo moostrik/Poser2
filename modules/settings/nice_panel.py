@@ -172,24 +172,6 @@ def _build_settings_entry(settings, name: str, field: Field, polls) -> None:
 
 
 
-def _split_fields_into_rows(fields: list[tuple[str, Field]]) -> list[list[tuple[str, Field]]]:
-    """Split visible fields into rows, breaking only on explicit ``field.newline``."""
-    rows: list[list[tuple[str, Field]]] = []
-    current_row: list[tuple[str, Field]] = []
-
-    for item in fields:
-        _name, field = item
-        if field.newline and current_row:
-            rows.append(current_row)
-            current_row = []
-        current_row.append(item)
-
-    if current_row:
-        rows.append(current_row)
-
-    return rows
-
-
 def _build_field_control(settings, name, field, polls):
     """Create a NiceGUI control for a single Setting field.
 
@@ -669,7 +651,7 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
                 "dense flat round size=xs"
             ).tooltip("Show/hide unchecked items")
 
-    with ui.column().classes("w-[20rem] max-w-full gap-1"):
+    with ui.column().classes("w-[18rem] max-w-full gap-1"):
         _build_field_header(
             label,
             desc,
@@ -1009,11 +991,9 @@ def _make_poll_timer(polls, timers):
 def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=""):
     """Emit the controls for a single Settings instance (no wrapper).
 
-    Renders fields strictly in **declaration order**.
-    The only layout hint respected here is ``field.newline``, which adds
-    a bit of top padding before the field. Widget builders control the
-    shape of their own controls; the body renderer does not regroup fields
-    by type or access mode.
+    Renders fields strictly in **declaration order** inside a single flex-wrap
+    container.  ``field.newline`` inserts a full-width zero-height break element
+    that carries the field's access CSS class so it hides with the field.
 
     *depth* tracks nesting level (0 = top, 1+ = child of child).
     *expansions* collects ``ui.expansion`` elements for expand/collapse-all.
@@ -1026,22 +1006,15 @@ def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=
         if field.visible
     ]
 
-    with ui.column().classes("w-full gap-1"):
-        rows = _split_fields_into_rows(visible_fields)
-        last = len(rows) - 1
-        for index, row in enumerate(rows):
-            # Last row uses justify-start unless it has as many items as the
-            # previous row (meaning it's roughly full width).
-            if index == last and (last == 0 or len(row) < len(rows[index - 1])):
-                justify = "justify-start"
-            else:
-                justify = "justify-between"
-            row_classes = f"w-full gap-4 flex-wrap items-center content-start {justify}"
-            if index > 0:
-                row_classes += " pt-2"
-            with ui.row().classes(row_classes):
-                for field_name, field in row:
-                    _build_settings_entry(settings, field_name, field, polls)
+    with ui.row().classes("w-full gap-4 flex-wrap items-center content-start"):
+        for field_name, field in visible_fields:
+            if field.newline:
+                # Full-width break element with the field's access class so it
+                # hides together with the field when that access type is toggled off.
+                ui.element("div").classes(
+                    f"{_access_css_class(field)} pt-2"
+                ).style("flex-basis: 100%; height: 0")
+            _build_settings_entry(settings, field_name, field, polls)
 
     # Register this card's polls with the page-level timer.
     _register_polls(polls, all_polls)
