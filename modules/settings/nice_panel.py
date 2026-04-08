@@ -1027,8 +1027,16 @@ def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=
     ]
 
     with ui.column().classes("w-full gap-1"):
-        for index, row in enumerate(_split_fields_into_rows(visible_fields)):
-            row_classes = "w-full gap-4 flex-wrap items-center content-start justify-between"
+        rows = _split_fields_into_rows(visible_fields)
+        last = len(rows) - 1
+        for index, row in enumerate(rows):
+            # Last row uses justify-start unless it has as many items as the
+            # previous row (meaning it's roughly full width).
+            if index == last and (last == 0 or len(row) < len(rows[index - 1])):
+                justify = "justify-start"
+            else:
+                justify = "justify-between"
+            row_classes = f"w-full gap-4 flex-wrap items-center content-start {justify}"
             if index > 0:
                 row_classes += " pt-2"
             with ui.row().classes(row_classes):

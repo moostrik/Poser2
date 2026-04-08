@@ -197,8 +197,8 @@ class PoseGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class TTGroup(BaseSettings):
-    timer   = Group(TimerSettings)
-    tracker = Group(OnePerCamTrackerSettings)
+    timer: Group[TimerSettings] =                   Group(TimerSettings)
+    tracker: Group[OnePerCamTrackerSettings] =      Group(OnePerCamTrackerSettings)
 
 
 # ---------------------------------------------------------------------------
@@ -206,34 +206,34 @@ class TTGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class LayerGroup(BaseSettings):
-    select = Group(LayerSettings)
-    lut    = Group(layers.CompositeLayerSettings)
+    select: Group[LayerSettings] =                  Group(LayerSettings)
+    lut: Group[layers.CompositeLayerSettings] =     Group(layers.CompositeLayerSettings)
 
 class DataGroup(BaseSettings):
-    a = Group(layers.DataLayerSettings)
-    b = Group(layers.DataLayerSettings)
+    a: Group[layers.DataLayerSettings] =            Group(layers.DataLayerSettings)
+    b: Group[layers.DataLayerSettings] =            Group(layers.DataLayerSettings)
 
 class PreviewGroup(BaseSettings):
-    tracker = Group(layers.TrackerCompSettings)
-    poser   = Group(layers.PoseCompSettings)
+    tracker: Group[layers.TrackerCompSettings] =    Group(layers.TrackerCompSettings)
+    poser: Group[layers.PoseCompSettings] =         Group(layers.PoseCompSettings)
 
 class CentreGroup(BaseSettings):
-    geometry = Group(layers.CentreGeomSettings)
-    mask     = Group(layers.CentreMaskSettings)
-    cam      = Group(layers.CentreCamSettings)
-    frg      = Group(layers.CentreFrgSettings)
-    pose     = Group(layers.CentrePoseSettings)
-    color    = Group(layers.ColorMaskLayerSettings)
+    geometry: Group[layers.CentreGeomSettings] =    Group(layers.CentreGeomSettings)
+    mask: Group[layers.CentreMaskSettings] =        Group(layers.CentreMaskSettings)
+    cam: Group[layers.CentreCamSettings] =          Group(layers.CentreCamSettings)
+    frg: Group[layers.CentreFrgSettings] =          Group(layers.CentreFrgSettings)
+    pose: Group[layers.CentrePoseSettings] =        Group(layers.CentrePoseSettings)
+    color: Group[layers.ColorMaskLayerSettings] =   Group(layers.ColorMaskLayerSettings)
 
 class RenderGroup(BaseSettings):
-    layer   = Group(LayerGroup)
-    data    = Group(DataGroup)
-    preview = Group(PreviewGroup)
-    centre  = Group(CentreGroup)
-    flow    = Group(layers.FlowLayerSettings)
-    fluid   = Group(layers.FluidLayerSettings)
-    colors  = Group(ColorSettings)
-    window  = Group(WindowSettings)
+    layer: Group[LayerGroup] =                      Group(LayerGroup)
+    data: Group[DataGroup] =                        Group(DataGroup)
+    preview: Group[PreviewGroup] =                  Group(PreviewGroup)
+    centre: Group[CentreGroup] =                    Group(CentreGroup)
+    flow: Group[layers.FlowLayerSettings] =         Group(layers.FlowLayerSettings)
+    fluid: Group[layers.FluidLayerSettings] =       Group(layers.FluidLayerSettings)
+    colors: Group[ColorSettings] =                  Group(ColorSettings)
+    window: Group[WindowSettings] =                 Group(WindowSettings)
 
 
 # ---------------------------------------------------------------------------
@@ -246,8 +246,8 @@ class HDTrioSettings(BaseSettings):
     render_fps: Field[float] =      Field(60.0)
 
     camera: Group[OakGroup] =       Group(OakGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
-    tt      = Group(TTGroup)
-    pose    = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
-    render  = Group(RenderGroup)
-    inout   = Group(InOutGroup)
-    server  = Group(NiceSettings)
+    tt: Group[TTGroup] =            Group(TTGroup)
+    pose: Group[PoseGroup] =        Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
+    render: Group[RenderGroup] =    Group(RenderGroup)
+    inout: Group[InOutGroup] =      Group(InOutGroup)
+    server: Group[NiceSettings] =   Group(NiceSettings)
