@@ -1049,7 +1049,7 @@ def _build_settings_card(name, settings, all_polls, *, depth=0, expansions=None,
     exp = ui.expansion(
         generate_label(name),
         value=is_open,
-    ).props("duration=0 dense dense-toggle").classes(f"w-full {bg}" + (f" {_access_cls}" if _access_cls else ""))
+    ).props("duration=0 dense dense-toggle").classes(f"w-full rounded {bg}" + (f" {_access_cls}" if _access_cls else ""))
     exp.on("show", lambda: (_expansion_state.update({key: True}), _save_expansion_state()))
     exp.on("hide", lambda: (_expansion_state.update({key: False}), _save_expansion_state()))
 
@@ -1271,6 +1271,7 @@ def create_settings_panel(
 
     # -- Responsive CSS via @media (works on all browsers) -----------------
     ui.add_css('''
+    html { overflow-y: scroll; }
     #popup.nicegui-error-popup { display: none !important; }
     .hide-init .poser-init { display: none !important; }
     .hide-feedback .poser-feedback { display: none !important; }
@@ -1332,8 +1333,8 @@ def create_settings_panel(
         if _has_visible_content(child):
             tab_entries.append((child_name, child))
 
-    with ui.column().classes("w-full sticky top-0 z-50 bg-dark text-white gap-2 px-3 pt-3 pb-2 border-b-4 border-[#121212]"):
-        with ui.row().classes("w-full items-center flex-wrap gap-1 bg-grey-9 rounded px-3 py-2"):
+    with ui.column().classes("w-full sticky top-0 z-50 bg-[#121212] text-white gap-2 px-3 pt-3 pb-2"):
+        with ui.row().classes("w-full items-center flex-wrap gap-1"):
             if title:
                 ui.label(title).classes("text-2xl font-bold")
 
@@ -1397,7 +1398,7 @@ def create_settings_panel(
         # Render pinned fields and actions in a compact row above the tabs
         if pinned_fields or pinned_actions:
             pinned_polls: list[tuple] = []
-            with ui.row().classes("w-full gap-4 flex-wrap items-end bg-grey-9 rounded px-3 py-2"):
+            with ui.row().classes("w-full gap-4 flex-wrap items-end bg-grey-9 rounded px-3 py-2 mt-2"):
                 for settings, field_name, field in pinned_fields:
                     if field.access is Access.INIT:
                         with ui.row().classes("items-center gap-1"):
@@ -1431,7 +1432,7 @@ def create_settings_panel(
             initial_tab_label = saved_tab if saved_tab in dict(tab_entries) else tab_entries[0][0]
             _active["label"] = initial_tab_label
 
-            with ui.tabs().classes("w-full").props("dense active-color=primary no-indicator") as tabs:
+            with ui.tabs().classes("w-full bg-[#121212] rounded").props("dense active-color=primary no-indicator") as tabs:
                 tab_map = {}
                 for label, _ in tab_entries:
                     t = ui.tab(generate_label(label))
@@ -1519,7 +1520,7 @@ def create_settings_panel(
     if not tab_entries:
         return
 
-    with ui.tab_panels(tabs, value=tab_map[initial_tab_label]).classes("w-full").style("padding-bottom: 320px;"):
+    with ui.tab_panels(tabs, value=tab_map[initial_tab_label]).classes("w-full bg-grey-10 rounded ").style("padding-bottom: 320px;"):
         for label, root_settings in tab_entries:
             with ui.tab_panel(tab_map[label]) as panel:
                 # Apply persisted visibility classes to this panel
