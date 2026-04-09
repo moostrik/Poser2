@@ -232,17 +232,31 @@ def _build_toggle(settings, name, field, polls):
     desc = field.description
     is_disabled = _is_field_read_only(settings, name, field)
 
-    tg = _attach_description_tooltip(ui.toggle({True: label, False: label}, value=value).props(
+    def _apply_style(btn, active: bool):
+        if active:
+            btn.props(remove="outline")
+            btn._props["color"] = "primary"
+        else:
+            btn.props(add="outline")
+            btn._props["color"] = "grey"
+        btn.update()
+
+    btn = _attach_description_tooltip(ui.button(label).props(
         "dense" + (" disable" if is_disabled else "")
     ), desc)
+    _apply_style(btn, value)
 
     if not is_disabled:
-        def on_toggle_change(e):
-            setattr(settings, name, e.value)
-        tg.on_value_change(on_toggle_change)
+        def on_click(b=btn):
+            new_val = not getattr(settings, name)
+            setattr(settings, name, new_val)
+            _apply_style(b, new_val)
+        btn.on_click(on_click)
 
     if _field_needs_poll(settings, name, field):
-        polls.append((settings, name, [value], lambda v, tg=tg: tg.set_value(v)))
+        def _poll_toggle(v, b=btn):
+            _apply_style(b, v)
+        polls.append((settings, name, [value], _poll_toggle))
 
 
 # -- numeric builders --------------------------------------------------------

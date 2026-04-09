@@ -10,6 +10,7 @@ from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers
 from modules.pose.features import configure_features
+from modules.pose.recorder import Recorder as PoseRecorder
 from modules.utils import Timer
 from modules.gl.WindowManager import WindowSettings
 
@@ -56,6 +57,13 @@ class HDTrioMain:
                 camera = Camera(self.settings.camera.cameras[i])
                 self.cameras.append(camera)
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
+
+        # POSE RECORDER
+        self.pose_recorder = PoseRecorder(self.settings.pose.recording)
+        if self.recorder:
+            self.recorder.add_recording_start_callback(self.pose_recorder.start)
+            self.recorder.add_recording_split_callback(self.pose_recorder.split)
+            self.recorder.add_recording_stop_callback(self.pose_recorder.stop)
 
         # TRACKER
         self.tracker = OnePerCamTracker(self.settings.tt.tracker, num_players)
@@ -215,6 +223,7 @@ class HDTrioMain:
 
         # POSE RAW
         self.point_extractor.add_frames_callback(self.pose_raw_filters.process)
+        self.point_extractor.add_frames_callback(self.pose_recorder.on_frame_dict)
         self.pose_raw_filters.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.RAW))
         self.pose_raw_filters.add_frames_callback(self.window_tracker_R.process)
         self.window_tracker_R.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.RAW))

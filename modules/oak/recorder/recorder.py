@@ -84,6 +84,11 @@ class Recorder(Thread):
 
         self.group_id: str = 'no_id'
 
+        # Lifecycle callbacks (add_recording_*_callback)
+        self._recording_start_callbacks: list = []
+        self._recording_split_callbacks: list = []
+        self._recording_stop_callbacks:  list = []
+
         # Bind recorder settings callbacks
         self.settings.bind(RecorderSettings.start, self._on_start)
         self.settings.bind(RecorderSettings.stop, self._on_stop)
@@ -127,13 +132,31 @@ class Recorder(Thread):
         self.start_time = time.time()
         self.recording = True
 
+        for fn in self._recording_start_callbacks:
+            try:
+                fn(self.folder_path, self.start_time)
+            except Exception:
+                logger.exception("Error in recording start callback")
+
     def _stop_recording(self) -> None:
+        for fn in self._recording_stop_callbacks:
+            try:
+                fn()
+            except Exception:
+                logger.exception("Error in recording stop callback")
+
         for c in range(self.settings.num_cameras):
             for t in self.settings.video_frame_types:
                 self.recorders[c][t].stop()
 
     def _update_recording(self) -> None:
         if time.time() - self.start_time > self.settings.video_chunk_length:
+            for fn in self._recording_split_callbacks:
+                try:
+                    fn()
+                except Exception:
+                    logger.exception("Error in recording split callback")
+
             self.chunk_index += 1
 
             for c in range(self.settings.num_cameras):
@@ -196,6 +219,18 @@ class Recorder(Thread):
             return self.group_id
 
     # SETTINGS CALLBACKS
+    def add_recording_start_callback(self, fn) -> None:
+        """Register a callback fired when recording starts: fn(folder: Path, start_time: float)"""
+        self._recording_start_callbacks.append(fn)
+
+    def add_recording_split_callback(self, fn) -> None:
+        """Register a callback fired at each chunk boundary: fn()"""
+        self._recording_split_callbacks.append(fn)
+
+    def add_recording_stop_callback(self, fn) -> None:
+        """Register a callback fired when recording stops: fn()"""
+        self._recording_stop_callbacks.append(fn)
+
     def _on_start(self, _=None) -> None:
         self.set_group_id('no_id')
         self.settings.group_id = 'no_id'

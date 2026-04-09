@@ -11,6 +11,7 @@ from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSetti
 from modules.tracker import OnePerCamTrackerSettings
 from modules.pose import batch, nodes, trackers
 from modules.pose.batch.model_types import ModelType
+from modules.pose.recorder.settings import RecorderSettings as PoseRecorderSettings
 from modules.utils import TimerSettings
 from modules.gl.WindowManager import WindowSettings
 
@@ -81,10 +82,10 @@ class OakGroup(BaseSettings):
     cam_0        : Group[CameraSettings]    = Group(CameraSettings, share=_cam_share)
     cam_1        : Group[CameraSettings]    = Group(CameraSettings, share=_cam_share)
     cam_2        : Group[CameraSettings]    = Group(CameraSettings, share=_cam_share)
-    simulator    : Group[SimulatorSettings] = Group(SimulatorSettings, share=[video_path, video_format, video_frame_types, num_cameras, fps, color, square, stereo])
-    recorder     : Group[RecorderSettings]  = Group(RecorderSettings, share=[video_path, temp_path, video_format, video_frame_types, color, square, stereo, num_cameras, fps])
-    frame_sync   : Group[SyncSettings]      = Group(SyncSettings, share=[num_cameras, fps])
-    tracklet_sync: Group[SyncSettings]      = Group(SyncSettings, share=[num_cameras, fps])
+    simulator    : Group[SimulatorSettings]    = Group(SimulatorSettings, share=[video_path, video_format, video_frame_types, num_cameras, fps, color, square, stereo])
+    recorder     : Group[RecorderSettings]     = Group(RecorderSettings, share=[video_path, temp_path, video_format, video_frame_types, color, square, stereo, num_cameras, fps])
+    frame_sync   : Group[SyncSettings]         = Group(SyncSettings, share=[num_cameras, fps])
+    tracklet_sync: Group[SyncSettings]         = Group(SyncSettings, share=[num_cameras, fps])
 
     @property
     def cameras(self) -> list[CameraSettings]:
@@ -194,6 +195,7 @@ class PoseGroup(BaseSettings):
     window_raw   : Group[nodes.WindowNodeSettings]   = Group(trackers.WindowNodeSettings)
     window_smooth: Group[nodes.WindowNodeSettings]   = Group(trackers.WindowNodeSettings)
     window_lerp  : Group[nodes.WindowNodeSettings]   = Group(trackers.WindowNodeSettings)
+    recording    : Group[PoseRecorderSettings]        = Group(PoseRecorderSettings)
 
 
 # ---------------------------------------------------------------------------

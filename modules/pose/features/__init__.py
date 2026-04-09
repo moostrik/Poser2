@@ -1,3 +1,5 @@
+from enum import IntEnum
+
 from .base import           BaseFeature, BaseScalarFeature, BaseVectorFeature, NormalizedScalarFeature, AggregationMethod, NormalizedSingleValue, SingleValue
 from .BBox import           BBox, BBoxElement
 from .Points2D import       Points2D, PointLandmark
@@ -12,24 +14,16 @@ from .MotionTime import     MotionTime
 from .Age import            Age
 
 
-def _collect_concrete(cls: type) -> list[type[BaseFeature]]:
-    """Recursively collect all concrete (non-abstract, non-private, non-base)
-    subclasses of *cls*."""
-    result: list[type[BaseFeature]] = []
-    for sub in cls.__subclasses__():
-        result.extend(_collect_concrete(sub))
-        if getattr(sub, '__abstractmethods__', frozenset()):
-            continue
-        if sub.__name__.startswith('_'):
-            continue
-        if 'features.base' in sub.__module__:
-            continue
-        result.append(sub)
-    result.sort(key=lambda c: c.__name__)
-    return result
+FEATURES: list[type[BaseFeature]] = [
+    Age, AngleMotion, Angles, AngleSymmetry, AngleVelocity,
+    BBox, LeaderScore, MotionGate, MotionTime, Points2D, Similarity,
+]
 
+Feature: type[IntEnum] = IntEnum('Feature', {cls.__name__: i for i, cls in enumerate(FEATURES, 1)})  # type: ignore[misc]
+"""Enum with one member per concrete feature class, auto-generated from FEATURES."""
 
-FEATURES: list[type[BaseFeature]] = _collect_concrete(BaseFeature)
+FEATURE_CLASS: dict = dict(zip(Feature, FEATURES))  # type: ignore[arg-type]
+"""Map Feature enum member → concrete feature class."""
 
 SCALAR_FEATURES: list[type[BaseScalarFeature]] = [
     f for f in FEATURES if issubclass(f, BaseScalarFeature)
