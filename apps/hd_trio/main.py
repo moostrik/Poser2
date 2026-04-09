@@ -44,36 +44,34 @@ class HDTrioMain:
 
         # CAMERA
         self.cameras: list[Camera | Simulator] = []
-        self.recorder: Optional[Recorder] = None
         self.player: Optional[Player] = None
         self.session_osc: Optional[OscReceiver] = None
+        self.recorder = Recorder(self.settings.session.video)
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator)
             for i in range(num_players):
                 self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
-            self.recorder = Recorder(self.settings.camera.recorder)
             for i in range(num_players):
                 camera = Camera(self.settings.camera.cameras[i])
                 self.cameras.append(camera)
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
 
         # POSE RECORDER
-        self.pose_recorder = PoseRecorder(self.settings.pose.recording)
-        if self.recorder:
-            self.recorder.add_recording_start_callback(self.pose_recorder.start)
-            self.recorder.add_recording_split_callback(self.pose_recorder.split)
-            self.recorder.add_recording_stop_callback(self.pose_recorder.stop)
+        self.pose_recorder = PoseRecorder(self.settings.session.pose)
+        self.recorder.add_recording_start_callback(self.pose_recorder.start)
+        self.recorder.add_recording_split_callback(self.pose_recorder.split)
+        self.recorder.add_recording_stop_callback(self.pose_recorder.stop)
 
         # TRACKER
-        self.tracker = OnePerCamTracker(self.settings.tt.tracker, num_players)
+        self.tracker = OnePerCamTracker(self.settings.camera.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
 
         # TIMER
-        self.timer = Timer(self.settings.tt.timer)
+        self.timer = Timer(self.settings.session.timer)
 
         # SESSION OSC
-        self.session_osc = OscReceiver(self.settings.inout.osc_receiver)
+        self.session_osc = OscReceiver(self.settings.session.osc)
         self.session_osc.bind('/start/recording', self._on_osc_start_recording)
         self.session_osc.bind('/stop/recording',  self._on_osc_stop_recording)
         self.session_osc.bind('/group/id',        self._on_osc_group_id)
@@ -181,20 +179,17 @@ class HDTrioMain:
         )
 
     def _on_osc_start_recording(self, *_) -> None:
-        if self.recorder:
-            self.recorder.settings.start = True
-            self.recorder.settings.start = False
+        self.recorder.settings.start = True
+        self.recorder.settings.start = False
         self.timer.config.run = True
 
     def _on_osc_stop_recording(self, *_) -> None:
-        if self.recorder:
-            self.recorder.settings.stop = True
-            self.recorder.settings.stop = False
+        self.recorder.settings.stop = True
+        self.recorder.settings.stop = False
         self.timer.config.run = False
 
     def _on_osc_group_id(self, gid: str, *_) -> None:
-        if self.recorder:
-            self.recorder.settings.group_id = gid
+        self.recorder.settings.group_id = gid
 
     def start(self) -> None:
 
@@ -208,7 +203,7 @@ class HDTrioMain:
 
         for camera in self.cameras:
             camera.add_preview_callback(self.data_hub.set_cam_frame)
-            if self.recorder:
+            if not self.settings.camera.sim_enabled:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.image_crop_processor.set_image)
             camera.add_frame_callback(self.frame_sync_bang.add_frame)
@@ -295,8 +290,7 @@ class HDTrioMain:
 
         if self.player:
             self.player.start()
-        if self.recorder:
-            self.recorder.start()
+        self.recorder.start()
 
         self.is_running = True
 
@@ -316,8 +310,7 @@ class HDTrioMain:
             self.player.stop()
         for camera in self.cameras:
             camera.stop()
-        if self.recorder:
-            self.recorder.stop()
+        self.recorder.stop()
 
         self.tracker.stop()
         self.sound_osc.stop()

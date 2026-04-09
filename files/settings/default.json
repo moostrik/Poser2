@@ -11,16 +11,14 @@
     "hd_ready": true,
     "sim_enabled": false,
     "model_path": "models",
-    "video_path": "recordings",
-    "temp_path": "temp",
-    "video_format": "H264",
-    "video_frame_types": [
-      "VIDEO"
-    ],
-    "recorder": {
-      "group_id": "no_id",
-      "video_encoder": "iGPU",
-      "video_chunk_length": 10.0
+    "tracker": {
+      "tracklet_min_age": 3,
+      "timeout": 2.0,
+      "add_centre_threshold": 0.25,
+      "add_height_threshold": 0.25,
+      "add_bottom_threshold": 0.25,
+      "update_centre_threshold": 0.35,
+      "update_height_threshold": 0.2
     },
     "cam_0": {
         "device_id": "14442C101136D1D200",
@@ -104,6 +102,9 @@
         "stereo_median_filter": "OFF"
     },
     "simulator": {
+      "video_path": "recordings",
+      "video_format": "H264",
+      "video_frame_types": ["VIDEO"],
       "folder": "20251212-130516_3_square_color_no_id",
       "range_start": 3,
       "range_end": 3,
@@ -111,7 +112,14 @@
       "video_decoder": "iGPU"
     }
   },
-  "tt": {
+  "session": {
+    "osc": {
+      "port_in": 9000,
+      "return_messages": false,
+      "port_out": 9001,
+      "ip_address_out": "127.0.0.1",
+      "verbose": false
+    },
     "timer": {
       "fps": 60.0,
       "run": false,
@@ -120,14 +128,19 @@
       "auto": false,
       "verbose": false
     },
-    "tracker": {
-      "tracklet_min_age": 3,
-      "timeout": 2.0,
-      "add_centre_threshold": 0.25,
-      "add_height_threshold": 0.25,
-      "add_bottom_threshold": 0.25,
-      "update_centre_threshold": 0.35,
-      "update_height_threshold": 0.2
+    "video": {
+      "num_cameras": 3,
+      "fps": 30.0,
+      "video_path": "recordings",
+      "temp_path": "temp",
+      "video_format": "H264",
+      "video_frame_types": ["VIDEO"],
+      "group_id": "no_id",
+      "video_encoder": "iGPU",
+      "video_chunk_length": 10.0
+    },
+    "pose": {
+      "recordings_path": "recordings"
     }
   },
   "pose": {

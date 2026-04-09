@@ -9,7 +9,7 @@ from time import sleep
 from ..camera.definitions import CoderType, CoderFormat, FrameType, FrameCallback
 from .settings import SimulatorSettings
 from .stream_reader import StreamReader
-from ..recorder.recorder import make_file_name, is_folder_for_settings
+from ..recorder.recorder import make_file_name
 
 import logging
 logger = logging.getLogger(__name__)
@@ -57,7 +57,6 @@ class Player(Thread):
     def __init__(self, settings: SimulatorSettings) -> None:
         super().__init__()
         self.settings: SimulatorSettings = settings
-        self.input_path: Path = Path(settings.video_path)
         self.num_cams: int = settings.num_cameras
         self.types: list[FrameType] = settings.video_frame_types
         self.fps: float = settings.fps
@@ -387,10 +386,10 @@ class Player(Thread):
     def _get_video_folders(settings: SimulatorSettings) -> FolderDict :
         folders: FolderDict = {}
         video_path: Path = Path(settings.video_path)
+        if not video_path.is_dir():
+            return folders
         for folder in video_path.iterdir():
             if folder.is_dir():
-                if not is_folder_for_settings(str(folder), settings.num_cameras, settings.square, settings.color, settings.stereo):
-                    continue
                 max_chunk: int = -1
                 for file in folder.iterdir():
                     if file.is_file() and (file.name.endswith(CoderFormat.H264.value) or file.name.endswith(CoderFormat.H265.value)):

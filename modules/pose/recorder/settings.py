@@ -5,7 +5,7 @@ from modules.pose.features import Feature
 class RecorderSettings(BaseSettings):
 
     # ── Paths ─────────────────────────────────────────────────────────
-    recordings_path: Field[str] = Field("recordings", access=Field.INIT, visible=False, description="Directory for standalone pose recordings")
+    recordings_path: Field[str] = Field("recordings", access=Field.INIT, description="Directory for standalone pose recordings")
 
     # ── Controls ──────────────────────────────────────────────────────
 

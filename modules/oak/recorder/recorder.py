@@ -1,5 +1,6 @@
 from threading import Thread, Lock, Event
 from pathlib import Path
+import shutil
 import time
 from enum import Enum, auto
 from numpy import ndarray
@@ -15,22 +16,11 @@ logger = logging.getLogger(__name__)
 def make_file_name(c: int, t: FrameType, chunk: int, format: str) -> str:
     return f"{c}_{FRAME_TYPE_LABEL_DICT[t]}_{chunk:03d}{format}"
 
-def make_folder_name(num_cams: int, square: bool, color: bool, stereo: bool, group_id: str ="") -> str:
-    return time.strftime("%Y%m%d-%H%M%S") + '_' + str(num_cams) + ('_square' if square else '_wide') + ('_color' if color else '_mono') + ('_stereo' if stereo else '') + '_' + group_id
-
-def is_folder_for_settings(name: str, num_cameras: int, square: bool, color: bool, stereo: bool) -> bool:
-    parts: list[str] = name.split('_')
-    if len(parts) < 2:
-        return False
-    if not parts[1].isdigit() or not  ('wide' in parts or 'square' in parts) or not ('color' in parts or 'mono' in parts):
-        return False
-    num_cams = int(parts[1])
-    sq: bool = 'square' in parts
-    col: bool = 'color' in parts
-    st: bool = 'stereo' in parts
-    if num_cams >= num_cameras and sq == square and col == color and st == stereo:
-        return True
-    return False
+def make_folder_name(group_id: str = "") -> str:
+    name = time.strftime("%Y%m%d-%H%M%S")
+    if group_id and group_id != 'no_id':
+        name += f"_{group_id}"
+    return name
 
 EncoderString: dict[CoderFormat, dict[CoderType, str]] = {
     CoderFormat.H264: {
@@ -54,7 +44,6 @@ class RecState(Enum):
 class Recorder(Thread):
     def __init__(self, settings: RecorderSettings) -> None:
         super().__init__()
-        self.output_path: Path = Path(settings.video_path)
         self.temp_path: Path = Path(settings.temp_path)
 
         self.settings: RecorderSettings = settings
@@ -73,7 +62,6 @@ class Recorder(Thread):
 
         self.start_time: float
         self.chunk_index = 0
-        self.rec_name: str
         self.suffix: str = settings.video_format.value
 
         self.state: RecState = RecState.IDLE
@@ -118,7 +106,8 @@ class Recorder(Thread):
 
     def _start_recording(self) -> None:
 
-        self.folder_path = self.output_path / make_folder_name(self.settings.num_cameras, self.settings.square, self.settings.color, self.settings.stereo, self.get_group_id())
+        self.folder_name = make_folder_name(self.get_group_id())
+        self.folder_path = self.temp_path / self.folder_name
         self.folder_path.mkdir(parents=True, exist_ok=True)
 
         self.chunk_index = 0
@@ -148,6 +137,16 @@ class Recorder(Thread):
         for c in range(self.settings.num_cameras):
             for t in self.settings.video_frame_types:
                 self.recorders[c][t].stop()
+
+        # Move completed recording from temp to final location
+        if hasattr(self, 'folder_name') and self.folder_path.exists():
+            output_path = Path(self.settings.video_path)
+            output_path.mkdir(parents=True, exist_ok=True)
+            destination = output_path / self.folder_name
+            try:
+                shutil.move(str(self.folder_path), str(destination))
+            except Exception:
+                logger.exception("Failed to move recording from %s to %s", self.folder_path, destination)
 
     def _update_recording(self) -> None:
         if time.time() - self.start_time > self.settings.video_chunk_length:

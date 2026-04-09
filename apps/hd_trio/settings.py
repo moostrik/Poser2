@@ -72,18 +72,14 @@ class OakGroup(BaseSettings):
     hd_ready          : Field[bool]            = Field(False, access=Field.INIT, description="Use HD resolution")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("models", access=Field.INIT, visible=False, description="Model files directory")
-    video_path        : Field[str]             = Field("recordings", access=Field.INIT, visible=False, description="Video recordings directory")
-    temp_path         : Field[str]             = Field("temp", access=Field.INIT, visible=False, description="Temporary files directory")
-    video_format      : Field[CoderFormat]     = Field(CoderFormat.H264, access=Field.INIT, description="Video format")
-    video_frame_types : Field[list[FrameType]] = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record")
 
     _cam_share: list = [fps, color, mono, square, stereo, yolo, hd_ready, sim_enabled, model_path]
 
     cam_0        : Group[CameraSettings]    = Group(CameraSettings, share=_cam_share)
     cam_1        : Group[CameraSettings]    = Group(CameraSettings, share=_cam_share)
     cam_2        : Group[CameraSettings]    = Group(CameraSettings, share=_cam_share)
-    simulator    : Group[SimulatorSettings]    = Group(SimulatorSettings, share=[video_path, video_format, video_frame_types, num_cameras, fps, color, square, stereo])
-    recorder     : Group[RecorderSettings]     = Group(RecorderSettings, share=[video_path, temp_path, video_format, video_frame_types, color, square, stereo, num_cameras, fps])
+    simulator    : Group[SimulatorSettings]    = Group(SimulatorSettings, share=[num_cameras, fps])
+    tracker      : Group[OnePerCamTrackerSettings] = Group(OnePerCamTrackerSettings)
     frame_sync   : Group[SyncSettings]         = Group(SyncSettings, share=[num_cameras, fps])
     tracklet_sync: Group[SyncSettings]         = Group(SyncSettings, share=[num_cameras, fps])
 
@@ -97,7 +93,6 @@ class OakGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class InOutGroup(BaseSettings):
-    osc_receiver:     Group[OscReceiverSettings] = Group(OscReceiverSettings)
     osc_sound:        Group[OscSoundSettings]    = Group(OscSoundSettings)
     artnet_0 :        Group[ArtNetBarsSettings]  = Group(ArtNetBarsSettings)
     artnet_1 :        Group[ArtNetBarsSettings]  = Group(ArtNetBarsSettings)
@@ -195,16 +190,17 @@ class PoseGroup(BaseSettings):
     window_raw   : Group[nodes.WindowNodeSettings]   = Group(trackers.WindowNodeSettings)
     window_smooth: Group[nodes.WindowNodeSettings]   = Group(trackers.WindowNodeSettings)
     window_lerp  : Group[nodes.WindowNodeSettings]   = Group(trackers.WindowNodeSettings)
-    recording    : Group[PoseRecorderSettings]        = Group(PoseRecorderSettings)
 
 
 # ---------------------------------------------------------------------------
-#  Tracker + Timer
+#  Session group (recording lifecycle: OSC, timer, video & pose recorders)
 # ---------------------------------------------------------------------------
 
-class TTGroup(BaseSettings):
-    timer  : Group[TimerSettings]            = Group(TimerSettings)
-    tracker: Group[OnePerCamTrackerSettings] = Group(OnePerCamTrackerSettings)
+class SessionGroup(BaseSettings):
+    osc  : Group[OscReceiverSettings]  = Group(OscReceiverSettings)
+    timer: Group[TimerSettings]        = Group(TimerSettings)
+    video: Group[RecorderSettings]     = Group(RecorderSettings)
+    pose : Group[PoseRecorderSettings] = Group(PoseRecorderSettings)
 
 
 # ---------------------------------------------------------------------------
@@ -251,9 +247,9 @@ class HDTrioSettings(BaseSettings):
     input_fps  : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     render_fps : Field[float] = Field(60.0)
 
-    camera: Group[OakGroup]     = Group(OakGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
-    tt    : Group[TTGroup]      = Group(TTGroup)
-    pose  : Group[PoseGroup]    = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
-    render: Group[RenderGroup]  = Group(RenderGroup)
-    inout : Group[InOutGroup]   = Group(InOutGroup)
-    server: Group[NiceSettings] = Group(NiceSettings)
+    camera : Group[OakGroup]     = Group(OakGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
+    session: Group[SessionGroup] = Group(SessionGroup)
+    pose   : Group[PoseGroup]    = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
+    render : Group[RenderGroup]  = Group(RenderGroup)
+    inout  : Group[InOutGroup]   = Group(InOutGroup)
+    server : Group[NiceSettings] = Group(NiceSettings)
