@@ -12,8 +12,40 @@ from modules.tracker import OnePerCamTrackerSettings
 from modules.pose import batch, nodes, trackers
 from modules.pose.batch.model_types import ModelType
 from modules.pose.recorder.settings import RecorderSettings as PoseRecorderSettings
-from modules.utils import TimerSettings
+from modules.utils import TimelineSettings
 from modules.gl.WindowManager import WindowSettings
+
+
+# ---------------------------------------------------------------------------
+#  Show stages & timeline settings
+# ---------------------------------------------------------------------------
+
+class ShowStage(IntEnum):
+    START =         0
+    INTRODUCTION =  auto()
+    PLAY =          auto()
+    CONCLUSION =    auto()
+    COOLDOWN =      auto()
+
+
+class ShowTimelineSettings(TimelineSettings):
+    """HD Trio show timeline with project-specific stages."""
+    stage:              Field[ShowStage] = Field(ShowStage.START, access=Field.READ, description="Current stage")
+    start_dur:          Field[float] = Field(3.0,  min=0.0, max=60.0,  description="Start duration")
+    introduction_dur:   Field[float] = Field(5.0,  min=0.0, max=120.0, description="Introduction duration")
+    play_dur:           Field[float] = Field(30.0, min=0.0, max=300.0, description="Play duration")
+    conclusion_dur:     Field[float] = Field(5.0,  min=0.0, max=120.0, description="Conclusion duration")
+    cooldown_dur:       Field[float] = Field(3.0,  min=0.0, max=60.0,  description="Cooldown duration")
+
+
+# Mapping from stage enum to duration field name on ShowTimelineSettings
+SHOW_STAGE_DURATIONS: dict[ShowStage, str] = {
+    ShowStage.START:         'start_dur',
+    ShowStage.INTRODUCTION:  'introduction_dur',
+    ShowStage.PLAY:          'play_dur',
+    ShowStage.CONCLUSION:    'conclusion_dur',
+    ShowStage.COOLDOWN:      'cooldown_dur',
+}
 
 
 # ---------------------------------------------------------------------------
@@ -197,10 +229,10 @@ class PoseGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class SessionGroup(BaseSettings):
-    osc  : Group[OscReceiverSettings]  = Group(OscReceiverSettings)
-    timer: Group[TimerSettings]        = Group(TimerSettings)
-    video: Group[RecorderSettings]     = Group(RecorderSettings)
-    pose : Group[PoseRecorderSettings] = Group(PoseRecorderSettings)
+    osc     : Group[OscReceiverSettings]     = Group(OscReceiverSettings)
+    timeline: Group[ShowTimelineSettings]    = Group(ShowTimelineSettings)
+    video   : Group[RecorderSettings]        = Group(RecorderSettings)
+    pose    : Group[PoseRecorderSettings]    = Group(PoseRecorderSettings)
 
 
 # ---------------------------------------------------------------------------

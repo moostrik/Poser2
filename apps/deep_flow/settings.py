@@ -10,7 +10,6 @@ from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings
 from modules.pose import batch, nodes, trackers
 from modules.pose.batch.model_types import ModelType
-from modules.utils import TimerSettings
 from modules.gl.WindowManager import WindowSettings
 
 
@@ -172,11 +171,10 @@ class PoseGroup(BaseSettings):
 
 
 # ---------------------------------------------------------------------------
-#  Tracker + Timer
+#  Tracker
 # ---------------------------------------------------------------------------
 
 class TTGroup(BaseSettings):
-    timer   = Group(TimerSettings)
     tracker = Group(OnePerCamTrackerSettings)
 
 

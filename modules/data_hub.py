@@ -13,7 +13,6 @@ from modules.oak.camera.definitions import Tracklet as DepthTracklet
 from modules.pose.frame import FrameDict, FeatureWindow, FrameWindowDict
 from modules.pose.features.base import BaseFeature
 from modules.tracker.Tracklet import TrackletDict
-from modules.utils.Timer import TimerState
 
 
 class Stage(IntEnum):
@@ -38,8 +37,9 @@ class DataHubType(IntEnum):
     pose_window_S =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow}
     pose_window_I =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow}
 
-    timer_state =       auto()   # TimerState int value (IDLE=0, RUNNING=1, INTERMEZZO=2)
-    timer_time =        auto()   # float, elapsed time in seconds
+    timeline_stage =          auto()   # int, project-defined stage enum value
+    timeline_stage_progress = auto()   # float 0-1, progress within current stage
+    timeline_progress =       auto()   # float 0-1, overall timeline progress
 
 
 # Stage → DataHubType lookup
@@ -176,14 +176,18 @@ class DataHub:
                 pivoted[track_id][field] = window
         self.set_dict(_WINDOW_TYPES[stage], pivoted)
 
-    # TIMER
-    def set_timer_state(self, state: TimerState) -> None:
-        """Store timer state as int value."""
-        self.set_item(DataHubType.timer_state, 0, state.value)
+    # TIMELINE
+    def set_timeline_stage(self, stage: int) -> None:
+        """Store current timeline stage (project-defined enum value)."""
+        self.set_item(DataHubType.timeline_stage, 0, stage)
 
-    def set_timer_time(self, time: float) -> None:
-        """Store timer elapsed time in seconds."""
-        self.set_item(DataHubType.timer_time, 0, time)
+    def set_timeline_stage_progress(self, progress: float) -> None:
+        """Store stage progress as float 0-1."""
+        self.set_item(DataHubType.timeline_stage_progress, 0, progress)
+
+    def set_timeline_progress(self, progress: float) -> None:
+        """Store overall timeline progress as float 0-1."""
+        self.set_item(DataHubType.timeline_progress, 0, progress)
 
     # UPDATE CALLBACK
     def notify_update(self) -> None:

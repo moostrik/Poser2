@@ -10,7 +10,6 @@ from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers
 from modules.pose.features import configure_features
-from modules.utils import Timer
 
 from .settings import DeepFlowSettings
 from .render import DeepFlowRender
@@ -58,9 +57,6 @@ class DeepFlowMain:
         # TRACKER
         self.tracker = OnePerCamTracker(self.settings.tt.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-
-        # TIMER
-        self.timer = Timer(self.settings.tt.timer)
 
         # RENDER
         self.render = DeepFlowRender(self.data_hub, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
@@ -220,11 +216,6 @@ class DeepFlowMain:
         self.sound_osc.start()
         self.data_hub.add_update_callback(self.sound_osc.notify_update)
 
-        # TIMER
-        self.timer.start()
-        self.timer.add_time_callback(lambda t: self.data_hub.set_timer_time(t))
-        self.timer.add_state_callback(lambda s: self.data_hub.set_timer_state(s))
-
         if self.player:
             self.player.start()
         if self.recorder:
@@ -251,8 +242,6 @@ class DeepFlowMain:
 
         self.tracker.stop()
         self.sound_osc.stop()
-
-        self.timer.stop()
 
         self.point_extractor.stop()
         self.mask_extractor.stop()

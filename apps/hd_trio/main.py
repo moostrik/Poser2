@@ -11,10 +11,10 @@ from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers
 from modules.pose.features import configure_features
 from modules.pose.recorder import Recorder as PoseRecorder
-from modules.utils import Timer
+from modules.utils import Timeline
 from modules.gl.WindowManager import WindowSettings
 
-from .settings import HDTrioSettings
+from .settings import HDTrioSettings, SHOW_STAGE_DURATIONS
 from .render import HDTrioRender
 
 APP_NAME = 'hd_trio'
@@ -67,8 +67,8 @@ class HDTrioMain:
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
 
-        # TIMER
-        self.timer = Timer(self.settings.session.timer)
+        # TIMELINE
+        self.timeline = Timeline(self.settings.session.timeline, SHOW_STAGE_DURATIONS)
 
         # SESSION OSC
         self.session_osc = OscReceiver(self.settings.session.osc)
@@ -181,12 +181,12 @@ class HDTrioMain:
     def _on_osc_start_recording(self, *_) -> None:
         self.recorder.settings.start = True
         self.recorder.settings.start = False
-        self.timer.config.run = True
+        self.timeline.config.run = True
 
     def _on_osc_stop_recording(self, *_) -> None:
         self.recorder.settings.stop = True
         self.recorder.settings.stop = False
-        self.timer.config.run = False
+        self.timeline.config.run = False
 
     def _on_osc_group_id(self, gid: str, *_) -> None:
         self.recorder.settings.group_id = gid
@@ -283,10 +283,11 @@ class HDTrioMain:
         for artnet in self.artnet_controllers:
             artnet.start()
 
-        # TIMER
-        self.timer.start()
-        self.timer.add_time_callback(lambda t: self.data_hub.set_timer_time(t))
-        self.timer.add_state_callback(lambda s: self.data_hub.set_timer_state(s))
+        # TIMELINE (ticked by render loop via data_hub.notify_update)
+        self.timeline.add_stage_callback(lambda s: self.data_hub.set_timeline_stage(s))
+        self.timeline.add_time_callback(lambda t: self.data_hub.set_timeline_stage_progress(self.settings.session.timeline.stage_progress))
+        self.timeline.add_time_callback(lambda t: self.data_hub.set_timeline_progress(self.settings.session.timeline.progress))
+        self.data_hub.add_update_callback(self.timeline.update)
 
         if self.player:
             self.player.start()
@@ -317,8 +318,6 @@ class HDTrioMain:
 
         for artnet in self.artnet_controllers:
             artnet.stop()
-
-        self.timer.stop()
 
         if self.session_osc:
             self.session_osc.server.shutdown()
