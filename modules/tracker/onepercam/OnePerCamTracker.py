@@ -1,4 +1,5 @@
 # Standard library imports
+import logging
 from dataclasses import dataclass
 from queue import Empty, Queue
 from threading import Lock, Thread, Event
@@ -13,6 +14,8 @@ from modules.tracker.onepercam.OnePerCamTrackletManager import OnePerCamTracklet
 from modules.settings import BaseSettings, Field
 
 from modules.utils.PointsAndRects import Rect, Point2f
+
+logger = logging.getLogger(__name__)
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
@@ -78,14 +81,17 @@ class OnePerCamTracker(Thread, BaseTracker):
             self._update_event.wait(timeout=0.1)
             self._update_event.clear()
 
-            while True:
-                try:
-                    tracklets: list[Tracklet] = self._input_queue.get(block=False)
-                    self._add_tracklet(tracklets)
-                except Empty:
-                    break
+            try:
+                while True:
+                    try:
+                        tracklets: list[Tracklet] = self._input_queue.get(block=False)
+                        self._add_tracklet(tracklets)
+                    except Empty:
+                        break
 
-            self._update_and_notify()
+                self._update_and_notify()
+            except Exception:
+                logger.exception("OnePerCamTracker error")
 
     def _add_tracklet(self, tracklets: list[Tracklet]) -> None:
 

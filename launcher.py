@@ -7,7 +7,7 @@ from threading import Event
 import psutil
 import torch
 
-from modules.log_config import setup_logging
+from modules.log_config import setup_logging, install_thread_excepthook
 from apps import APP_REGISTRY
 
 
@@ -23,6 +23,7 @@ if __name__ == '__main__':
     args: Namespace = parser.parse_args()
 
     log_file = setup_logging(verbose=args.verbose)
+    install_thread_excepthook()
     logging.info("Logging to: %s", log_file)
     logging.info("Process PID: %s", process_id)
     logging.info("App: %s", args.app)

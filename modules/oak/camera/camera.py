@@ -82,10 +82,13 @@ class Camera(Thread):
 
     def run(self) -> None:
         while not self.stop_event.is_set():
-            if not self._open():
-                return
-            self.stop_event.wait()
-            self._close()
+            try:
+                if not self._open():
+                    return
+                self.stop_event.wait()
+                self._close()
+            except Exception:
+                logger.exception("Camera error")
 
     def _open(self) -> bool:
         device_list: list[str] = get_device_list(verbose=False)

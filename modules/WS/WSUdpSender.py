@@ -138,6 +138,8 @@ class WSUdpSender(threading.Thread):
                                 logger.error(f"Error sending message to {ip}: {e}")
             except queue.Empty:
                 continue
+            except Exception:
+                logger.exception("WSUdpSender error")
 
     def send_message(self, av_output: WSOutput):
         """Queue a message to be sent."""

@@ -79,15 +79,17 @@ class Recorder(Thread):
         self._set_state(RecState.IDLE)
 
         while not self.stop_event.is_set():
-
-            if self._get_state() == RecState.STOP:
-                self._stop_recording()
-                self._set_state(RecState.IDLE)
-            if self._get_state() == RecState.REC:
-                self._update_recording()
-            if self._get_state() == RecState.START:
-                self._start_recording()
-                self._set_state(RecState.REC)
+            try:
+                if self._get_state() == RecState.STOP:
+                    self._stop_recording()
+                    self._set_state(RecState.IDLE)
+                if self._get_state() == RecState.REC:
+                    self._update_recording()
+                if self._get_state() == RecState.START:
+                    self._start_recording()
+                    self._set_state(RecState.REC)
+            except Exception:
+                logger.exception("Recorder error")
 
             time.sleep(0.01)
 

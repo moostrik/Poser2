@@ -125,40 +125,43 @@ class Player(Thread):
             self.play(True, folder)
 
         while self.running:
-            message: Message | None = None
             try:
-                message = self.state_messages.get(block=False)
-            except Exception as e:
-                message = None
+                message: Message | None = None
+                try:
+                    message = self.state_messages.get(block=False)
+                except Exception as e:
+                    message = None
 
-            if message and message.state == MessageType.START:
-                self._set_load_folder(message.value)
-                self._set_load_chunk(-1)
-                self._set_play_chunk(-1)
-                state = State.LOAD
-            if message and message.state == MessageType.STOP:
-                state = State.STOP
-            if state == State.LOAD:
-                self._stop()
-                self._load()
-                state = State.LOADING
-            if state == State.LOADING and self._finished_loading():
-                self._start()
-                sleep(0.1) # waiting a bit reduces drift
-                self._load()
-                state = State.PLAYING
-            if state == State.PLAYING and self._finished_playing() and self._finished_loading():
-                self._start()
-                self._load()
-            if state == State.STOP:
-                self._stop()
-                state = State.STOPPING
-            if state == State.STOPPING and self._finished_stopping():
-                state = State.IDLE
-            self._clean()
+                if message and message.state == MessageType.START:
+                    self._set_load_folder(message.value)
+                    self._set_load_chunk(-1)
+                    self._set_play_chunk(-1)
+                    state = State.LOAD
+                if message and message.state == MessageType.STOP:
+                    state = State.STOP
+                if state == State.LOAD:
+                    self._stop()
+                    self._load()
+                    state = State.LOADING
+                if state == State.LOADING and self._finished_loading():
+                    self._start()
+                    sleep(0.1) # waiting a bit reduces drift
+                    self._load()
+                    state = State.PLAYING
+                if state == State.PLAYING and self._finished_playing() and self._finished_loading():
+                    self._start()
+                    self._load()
+                if state == State.STOP:
+                    self._stop()
+                    state = State.STOPPING
+                if state == State.STOPPING and self._finished_stopping():
+                    state = State.IDLE
+                self._clean()
 
-            if self.stop_event.is_set() and state == State.IDLE:
-                self.running = False
+                if self.stop_event.is_set() and state == State.IDLE:
+                    self.running = False
+            except Exception:
+                logger.exception("Player error")
 
             sleep(0.01)
 

@@ -100,16 +100,19 @@ class PanoramicTracker(Thread, BaseTracker):
             self.update_event.wait(timeout=0.1)
             self.update_event.clear()
 
-            while True:
-                try:
-                    tracklet: Tracklet = self.input_queue.get(block=False)
-                    self._add_tracklet(tracklet)
-                except Empty:
-                    break
+            try:
+                while True:
+                    try:
+                        tracklet: Tracklet = self.input_queue.get(block=False)
+                        self._add_tracklet(tracklet)
+                    except Empty:
+                        break
 
-            self._update_tracklets()
-            self._notify_and_reset_changes()
-            self._remove_expired_tracklets()
+                self._update_tracklets()
+                self._notify_and_reset_changes()
+                self._remove_expired_tracklets()
+            except Exception:
+                logger.exception("PanoramicTracker error")
 
     def _add_tracklet(self, new_tracklet: Tracklet) -> None:
         # If tracklet is removed, retire it

@@ -1,5 +1,6 @@
 import logging
 import sys
+import threading
 from collections import deque, namedtuple
 from datetime import datetime
 from pathlib import Path
@@ -130,3 +131,21 @@ def setup_logging(verbose: bool = False) -> Path:
     root.addHandler(_log_buffer)
 
     return log_file
+
+
+def install_thread_excepthook() -> None:
+    """Route unhandled thread exceptions through the logging system."""
+    _logger = logging.getLogger('threading')
+
+    def _hook(args: threading.ExceptHookArgs) -> None:
+        if args.exc_type is SystemExit:
+            return
+        _logger.critical(
+            "Unhandled exception in thread '%s'",
+            args.thread.name if args.thread else '?',
+            exc_info=(args.exc_type, args.exc_value, args.exc_traceback)
+            if args.exc_value is not None
+            else True,
+        )
+
+    threading.excepthook = _hook
