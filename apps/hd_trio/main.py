@@ -3,13 +3,13 @@
 from typing import Optional
 from functools import partial
 
-from modules.oak import Camera, Simulator, Player, Recorder, Sync
+from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder
 from modules.settings import presets, NiceServer
 from modules.data_hub import DataHub, Stage
 from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker
-from modules.pose import batch, nodes, trackers
-from modules.pose.features import configure_features
+from modules.pose import batch, nodes, trackers, features
+# from modules.pose.features import configure_features
 from modules.pose.recorder import Recorder as PoseRecorder
 from modules.session import Session
 from modules.utils import Timeline
@@ -38,44 +38,33 @@ class HDTrioMain:
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
         num_players: int = self.settings.num_players
-        configure_features(num_players)
 
         # DATA_HUB
         self.data_hub = DataHub()
 
-        # SESSION
+        # SESSION (osc, timeline, video & pose recorders)
         self.session = Session(self.settings.session)
+        self.session_osc = OscReceiver(self.settings.session.osc)
+        self.session_osc.bind('/start/recording', self._on_osc_start_recording)
+        self.session_osc.bind('/stop/recording',  self._on_osc_stop_recording)
+        self.session_osc.bind('/group/id',        self._on_osc_group_id)
+        self.timeline = Timeline(self.settings.session.timeline, SHOW_STAGE_DURATIONS)
+        self.video_recorder = VideoRecorder(self.settings.session.video)
+        self.pose_recorder = PoseRecorder(self.settings.session.pose)
 
         # CAMERA
         self.cameras: list[Camera | Simulator] = []
         self.player: Optional[Player] = None
-        self.session_osc: Optional[OscReceiver] = None
-        self.recorder = Recorder(self.settings.session.video)
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator)
             for i in range(num_players):
                 self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
             for i in range(num_players):
-                camera = Camera(self.settings.camera.cameras[i])
-                self.cameras.append(camera)
+                self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
-
-        # POSE RECORDER
-        self.pose_recorder = PoseRecorder(self.settings.session.pose)
-
-        # TRACKER
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-
-        # TIMELINE
-        self.timeline = Timeline(self.settings.session.timeline, SHOW_STAGE_DURATIONS)
-
-        # SESSION OSC
-        self.session_osc = OscReceiver(self.settings.session.osc)
-        self.session_osc.bind('/start/recording', self._on_osc_start_recording)
-        self.session_osc.bind('/stop/recording',  self._on_osc_stop_recording)
-        self.session_osc.bind('/group/id',        self._on_osc_group_id)
 
         # RENDER
         self.render = HDTrioRender(self.data_hub, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
@@ -87,6 +76,8 @@ class HDTrioMain:
             self.artnet_controllers.append(ArtNetBars(self.settings.inout.artnets[i]))
 
         # POSE PROCESSING PIPELINES
+        features.configure_features(num_players)
+
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
 
         self.image_crop_processor = batch.ImageCropProcessor(self.settings.pose.image_crop)
@@ -181,11 +172,9 @@ class HDTrioMain:
 
     def _on_osc_start_recording(self, *_) -> None:
         self.settings.session.record = True
-        self.timeline.config.run = True
 
     def _on_osc_stop_recording(self, *_) -> None:
         self.settings.session.record = False
-        self.timeline.config.run = False
 
     def _on_osc_group_id(self, gid: str, *_) -> None:
         self.settings.session.group_id = gid
@@ -203,7 +192,7 @@ class HDTrioMain:
         for camera in self.cameras:
             camera.add_preview_callback(self.data_hub.set_cam_frame)
             if not self.settings.camera.sim_enabled:
-                camera.add_sync_callback(self.recorder.set_synced_frames)
+                camera.add_sync_callback(self.video_recorder.set_synced_frames)
             camera.add_frame_callback(self.image_crop_processor.set_image)
             camera.add_frame_callback(self.frame_sync_bang.add_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
@@ -290,7 +279,7 @@ class HDTrioMain:
 
         if self.player:
             self.player.start()
-        self.recorder.start()
+        self.video_recorder.start()
 
         self.is_running = True
 
@@ -310,7 +299,7 @@ class HDTrioMain:
             self.player.stop()
         for camera in self.cameras:
             camera.stop()
-        self.recorder.stop()
+        self.video_recorder.stop()
 
         self.tracker.stop()
         self.sound_osc.stop()

@@ -236,7 +236,7 @@ class SessionGroup(SessionSettings):
     _recorder_share: list = [SessionSettings.record, SessionSettings.split, SessionSettings.group_id.as_('name'), SessionSettings.output_path]
 
     osc     : Group[OscReceiverSettings]     = Group(OscReceiverSettings)
-    timeline: Group[ShowTimelineSettings]    = Group(ShowTimelineSettings)
+    timeline: Group[ShowTimelineSettings]    = Group(ShowTimelineSettings, share=[SessionSettings.record.as_('run')])
     video   : Group[RecorderSettings]        = Group(RecorderSettings, share=_recorder_share + [num_cameras, fps])
     pose    : Group[PoseRecorderSettings]    = Group(PoseRecorderSettings, share=_recorder_share)
 
