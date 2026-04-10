@@ -12,6 +12,7 @@ from modules.tracker import OnePerCamTrackerSettings
 from modules.pose import batch, nodes, trackers
 from modules.pose.batch.model_types import ModelType
 from modules.pose.recorder.settings import RecorderSettings as PoseRecorderSettings
+from modules.session import SessionSettings
 from modules.utils import TimelineSettings
 from modules.gl.WindowManager import WindowSettings
 
@@ -228,11 +229,16 @@ class PoseGroup(BaseSettings):
 #  Session group (recording lifecycle: OSC, timer, video & pose recorders)
 # ---------------------------------------------------------------------------
 
-class SessionGroup(BaseSettings):
+class SessionGroup(SessionSettings):
+    num_cameras: Field[int]   = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
+    fps:         Field[float] = Field(30.0, access=Field.INIT, visible=False, description="Camera frame rate")
+
+    _recorder_share: list = [SessionSettings.record, SessionSettings.split, SessionSettings.group_id.as_('name')]
+
     osc     : Group[OscReceiverSettings]     = Group(OscReceiverSettings)
     timeline: Group[ShowTimelineSettings]    = Group(ShowTimelineSettings)
-    video   : Group[RecorderSettings]        = Group(RecorderSettings)
-    pose    : Group[PoseRecorderSettings]    = Group(PoseRecorderSettings)
+    video   : Group[RecorderSettings]        = Group(RecorderSettings, share=_recorder_share + [num_cameras, fps])
+    pose    : Group[PoseRecorderSettings]    = Group(PoseRecorderSettings, share=_recorder_share)
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +286,7 @@ class HDTrioSettings(BaseSettings):
     render_fps : Field[float] = Field(60.0)
 
     camera : Group[OakGroup]     = Group(OakGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
-    session: Group[SessionGroup] = Group(SessionGroup)
+    session: Group[SessionGroup] = Group(SessionGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
     pose   : Group[PoseGroup]    = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     render : Group[RenderGroup]  = Group(RenderGroup)
     inout  : Group[InOutGroup]   = Group(InOutGroup)

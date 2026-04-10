@@ -2,14 +2,14 @@
 
 Two operating modes:
 
-  Linked (synced to video):
-    main.py wires the video Recorder's lifecycle callbacks to
-    ``recorder.start / split / stop``.  Chunks align with video chunks.
+  Under Session:
+    Session shares ``record``, ``split``, and ``name`` fields.
+    Chunks are driven by Session firing the shared ``split`` button.
 
   Standalone:
-    The user presses the Start button in the settings UI.  The recorder
-    creates its own timestamped folder and writes a single ``pose_000.h5``
-    (no splits since there is no external split signal).
+    The user toggles the ``record`` setting in the UI.  The recorder
+    creates its own timestamped folder.  If ``chunk_length > 0``, it
+    self-chunks via an internal timer; otherwise a single file is written.
 """
 from __future__ import annotations
 
@@ -30,7 +30,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# Sentinel objects placed in the queue by split() / stop()
+def make_folder_name(name: str = "") -> str:
+    folder = time.strftime("%Y%m%d-%H%M%S")
+    if name:
+        folder += f"_{name}"
+    return folder
+
+
+def make_file_name(prefix: str, chunk: int, suffix: str) -> str:
+    return f"{prefix}_{chunk:03d}{suffix}"
+
+
+# Sentinel objects placed in the queue by split / stop
 class _Split:
     pass
 
@@ -44,15 +55,10 @@ _STOP  = _Stop()
 class Recorder:
     """Records FrameDict updates to chunked HDF5 files.
 
-    Usage (linked to video recorder, wired in main.py):
-        video_recorder.add_recording_start_callback(recorder.start)
-        video_recorder.add_recording_split_callback(recorder.split)
-        video_recorder.add_recording_stop_callback(recorder.stop)
-        point_extractor.add_frames_callback(recorder.on_frame_dict)
-
-    Usage (standalone — driven by settings UI buttons):
-        point_extractor.add_frames_callback(recorder.on_frame_dict)
-        # Start / Stop via recording.start / Stop buttons in settings panel.
+    Controlled entirely through settings fields:
+      - ``record`` (toggle) — start / stop
+      - ``split`` (button) — chunk boundary
+      - ``name`` — appended to folder timestamp
     """
 
     def __init__(self, settings: RecorderSettings) -> None:
@@ -62,53 +68,48 @@ class Recorder:
         self._folder: Path | None = None
         self._recording_start: float = 0.0
 
-        settings.bind(RecorderSettings.start, self._on_settings_start)
-        settings.bind(RecorderSettings.stop,  self._on_settings_stop)
+        settings.bind(RecorderSettings.record, self._on_record)
+        settings.bind(RecorderSettings.split, self._on_split)
 
-    # ── Public API (called by video recorder callbacks or settings UI) ──
+    # ── Settings callbacks ───────────────────────────────────────────────
 
-    def start(self, folder: Path, recording_start_time: float) -> None:
-        """Begin recording to *folder*.  Safe to call while idle only."""
+    def _on_record(self, value: bool) -> None:
+        if value:
+            folder_name = make_folder_name(self.settings.name)
+            folder = Path(self.settings.output_path) / folder_name
+            folder.mkdir(parents=True, exist_ok=True)
+            self._start(folder, time.time())
+        else:
+            self._stop()
+
+    def _on_split(self, _=None) -> None:
         if self._thread is not None and self._thread.is_alive():
-            logger.warning("PoseRecorder.start() called while already recording — ignored")
+            self._queue.put(_SPLIT)
+
+    # ── Internal lifecycle ───────────────────────────────────────────────
+
+    def _start(self, folder: Path, recording_start_time: float) -> None:
+        if self._thread is not None and self._thread.is_alive():
+            logger.warning("PoseRecorder._start() called while already recording — ignored")
             return
         self._folder = folder
         self._recording_start = recording_start_time
         self._thread = threading.Thread(target=self._run, daemon=True, name="PoseRecorder")
         self._thread.start()
-        self.settings.recording = True
         logger.info("PoseRecorder started → %s", folder)
 
-    def stop(self) -> None:
-        """Stop recording; blocks until the background thread has flushed."""
+    def _stop(self) -> None:
         if self._thread is None or not self._thread.is_alive():
             return
         self._queue.put(_STOP)
         self._thread.join()
         self._thread = None
-        self.settings.recording = False
         logger.info("PoseRecorder stopped")
-
-    def split(self) -> None:
-        """Signal a chunk boundary.  The background thread flushes the current
-        buffer and starts a new chunk.  Non-blocking."""
-        if self._thread is not None and self._thread.is_alive():
-            self._queue.put(_SPLIT)
 
     def on_frame_dict(self, frame_dict: 'FrameDict') -> None:
         """Callback — enqueue a shallow copy of the FrameDict if recording."""
         if self._thread is not None and self._thread.is_alive():
             self._queue.put((time.time(), dict(frame_dict)))
-
-    # ── Settings UI handlers (standalone mode) ──────────────────────────
-
-    def _on_settings_start(self, _=None) -> None:
-        folder = Path(self.settings.recordings_path) / f"pose_{time.strftime('%Y%m%d-%H%M%S')}"
-        folder.mkdir(parents=True, exist_ok=True)
-        self.start(folder, time.time())
-
-    def _on_settings_stop(self, _=None) -> None:
-        self.stop()
 
     # ── Background thread ────────────────────────────────────────────────
 
@@ -150,7 +151,7 @@ class Recorder:
         feature_types = self._active_feature_types()
         if not feature_types:
             return
-        path = folder / f"pose_{chunk_index:03d}.h5"
+        path = folder / make_file_name("pose", chunk_index, ".h5")
         try:
             write_chunk(path, buffer, self._recording_start, chunk_start, chunk_index, feature_types)
             logger.debug("PoseRecorder wrote %s (%d frames)", path.name, len(buffer))

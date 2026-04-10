@@ -11,6 +11,7 @@ from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers
 from modules.pose.features import configure_features
 from modules.pose.recorder import Recorder as PoseRecorder
+from modules.session import Session
 from modules.utils import Timeline
 from modules.gl.WindowManager import WindowSettings
 
@@ -42,6 +43,9 @@ class HDTrioMain:
         # DATA_HUB
         self.data_hub = DataHub()
 
+        # SESSION
+        self.session = Session(self.settings.session)
+
         # CAMERA
         self.cameras: list[Camera | Simulator] = []
         self.player: Optional[Player] = None
@@ -59,9 +63,6 @@ class HDTrioMain:
 
         # POSE RECORDER
         self.pose_recorder = PoseRecorder(self.settings.session.pose)
-        self.recorder.add_recording_start_callback(self.pose_recorder.start)
-        self.recorder.add_recording_split_callback(self.pose_recorder.split)
-        self.recorder.add_recording_stop_callback(self.pose_recorder.stop)
 
         # TRACKER
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, num_players)
@@ -179,17 +180,15 @@ class HDTrioMain:
         )
 
     def _on_osc_start_recording(self, *_) -> None:
-        self.recorder.settings.start = True
-        self.recorder.settings.start = False
+        self.settings.session.record = True
         self.timeline.config.run = True
 
     def _on_osc_stop_recording(self, *_) -> None:
-        self.recorder.settings.stop = True
-        self.recorder.settings.stop = False
+        self.settings.session.record = False
         self.timeline.config.run = False
 
     def _on_osc_group_id(self, gid: str, *_) -> None:
-        self.recorder.settings.group_id = gid
+        self.settings.session.group_id = gid
 
     def start(self) -> None:
 

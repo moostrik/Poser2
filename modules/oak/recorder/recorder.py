@@ -13,14 +13,14 @@ from .stream_writer import StreamWriter
 import logging
 logger = logging.getLogger(__name__)
 
-def make_file_name(c: int, t: FrameType, chunk: int, format: str) -> str:
-    return f"{c}_{FRAME_TYPE_LABEL_DICT[t]}_{chunk:03d}{format}"
+def make_file_name(prefix: str, chunk: int, suffix: str) -> str:
+    return f"{prefix}_{chunk:03d}{suffix}"
 
-def make_folder_name(group_id: str = "") -> str:
-    name = time.strftime("%Y%m%d-%H%M%S")
-    if group_id and group_id != 'no_id':
-        name += f"_{group_id}"
-    return name
+def make_folder_name(name: str = "") -> str:
+    folder = time.strftime("%Y%m%d-%H%M%S")
+    if name:
+        folder += f"_{name}"
+    return folder
 
 EncoderString: dict[CoderFormat, dict[CoderType, str]] = {
     CoderFormat.H264: {
@@ -60,27 +60,17 @@ class Recorder(Thread):
             for t in self.settings.video_frame_types:
                 self.recorders[c][t] = StreamWriter(EncoderString[settings.video_format][settings.video_encoder])
 
-        self.start_time: float
+        self.start_time: float = 0.0
         self.chunk_index = 0
         self.suffix: str = settings.video_format.value
 
         self.state: RecState = RecState.IDLE
         self.state_lock = Lock()
         self.settings_lock = Lock()
-        self.group_id_lock = Lock()
         self.stop_event = Event()
 
-        self.group_id: str = 'no_id'
-
-        # Lifecycle callbacks (add_recording_*_callback)
-        self._recording_start_callbacks: list = []
-        self._recording_split_callbacks: list = []
-        self._recording_stop_callbacks:  list = []
-
-        # Bind recorder settings callbacks
-        self.settings.bind(RecorderSettings.start, self._on_start)
-        self.settings.bind(RecorderSettings.stop, self._on_stop)
-        self.settings.bind(RecorderSettings.group_id, self.set_group_id)
+        self.settings.bind(RecorderSettings.record, self._on_record)
+        self.settings.bind(RecorderSettings.split, self._on_split)
 
     def stop(self) -> None:
         self.stop_event.set()
@@ -106,7 +96,7 @@ class Recorder(Thread):
 
     def _start_recording(self) -> None:
 
-        self.folder_name = make_folder_name(self.get_group_id())
+        self.folder_name = make_folder_name(self.settings.name)
         self.folder_path = self.temp_path / self.folder_name
         self.folder_path.mkdir(parents=True, exist_ok=True)
 
@@ -115,32 +105,21 @@ class Recorder(Thread):
         for c in range(self.settings.num_cameras):
             fps: float = self.get_fps(c)
             for t in self.settings.video_frame_types:
-                path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
+                prefix = f"{c}_{FRAME_TYPE_LABEL_DICT[t]}"
+                path: Path = self.folder_path / make_file_name(prefix, self.chunk_index, self.suffix)
                 self.recorders[c][t].start(str(path), fps)
 
         self.start_time = time.time()
-        self.recording = True
-
-        for fn in self._recording_start_callbacks:
-            try:
-                fn(self.folder_path, self.start_time)
-            except Exception:
-                logger.exception("Error in recording start callback")
+        logger.info("VideoRecorder started → %s", self.folder_path)
 
     def _stop_recording(self) -> None:
-        for fn in self._recording_stop_callbacks:
-            try:
-                fn()
-            except Exception:
-                logger.exception("Error in recording stop callback")
-
         for c in range(self.settings.num_cameras):
             for t in self.settings.video_frame_types:
                 self.recorders[c][t].stop()
 
         # Move completed recording from temp to final location
         if hasattr(self, 'folder_name') and self.folder_path.exists():
-            output_path = Path(self.settings.video_path)
+            output_path = Path(self.settings.output_path)
             output_path.mkdir(parents=True, exist_ok=True)
             destination = output_path / self.folder_name
             try:
@@ -148,22 +127,22 @@ class Recorder(Thread):
             except Exception:
                 logger.exception("Failed to move recording from %s to %s", self.folder_path, destination)
 
+        logger.info("VideoRecorder stopped")
+
+    def _do_split(self) -> None:
+        self.chunk_index += 1
+        for c in range(self.settings.num_cameras):
+            fps: float = self.get_fps(c)
+            for t in self.settings.video_frame_types:
+                prefix = f"{c}_{FRAME_TYPE_LABEL_DICT[t]}"
+                path: Path = self.folder_path / make_file_name(prefix, self.chunk_index, self.suffix)
+                self.recorders[c][t].split(str(path), fps)
+        self.start_time += self.settings.chunk_length
+
     def _update_recording(self) -> None:
-        if time.time() - self.start_time > self.settings.video_chunk_length:
-            for fn in self._recording_split_callbacks:
-                try:
-                    fn()
-                except Exception:
-                    logger.exception("Error in recording split callback")
-
-            self.chunk_index += 1
-
-            for c in range(self.settings.num_cameras):
-                fps: float = self.get_fps(c)
-                for t in self.settings.video_frame_types:
-                    path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
-                    self.recorders[c][t].split(str(path), fps)
-            self.start_time += self.settings.video_chunk_length
+        # Self-chunk when chunk_length > 0 (standalone mode)
+        if self.settings.chunk_length > 0 and time.time() - self.start_time > self.settings.chunk_length:
+            self._do_split()
 
         for c in range(self.settings.num_cameras):
             try:
@@ -201,41 +180,15 @@ class Recorder(Thread):
         with self.settings_lock:
             return self.fps[cam_id]
 
-    def record(self, value: bool) -> None:
+    # SETTINGS CALLBACKS
+    def _on_record(self, value: bool) -> None:
         if value:
             self._set_state(RecState.START)
-            self.settings.recording = True
         else:
             self._set_state(RecState.STOP)
-            self.settings.recording = False
 
-    def set_group_id(self, value: str) -> None:
-        with self.group_id_lock:
-            self.group_id = value
-
-    def get_group_id(self) -> str:
-        with self.group_id_lock:
-            return self.group_id
-
-    # SETTINGS CALLBACKS
-    def add_recording_start_callback(self, fn) -> None:
-        """Register a callback fired when recording starts: fn(folder: Path, start_time: float)"""
-        self._recording_start_callbacks.append(fn)
-
-    def add_recording_split_callback(self, fn) -> None:
-        """Register a callback fired at each chunk boundary: fn()"""
-        self._recording_split_callbacks.append(fn)
-
-    def add_recording_stop_callback(self, fn) -> None:
-        """Register a callback fired when recording stops: fn()"""
-        self._recording_stop_callbacks.append(fn)
-
-    def _on_start(self, _=None) -> None:
-        self.set_group_id('no_id')
-        self.settings.group_id = 'no_id'
-        self.record(True)
-
-    def _on_stop(self, _=None) -> None:
-        self.record(False)
+    def _on_split(self, _=None) -> None:
+        if self._get_state() == RecState.REC:
+            self._do_split()
 
 
