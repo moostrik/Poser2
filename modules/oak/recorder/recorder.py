@@ -60,7 +60,6 @@ class Recorder(Thread):
             for t in self.settings.video_frame_types:
                 self.recorders[c][t] = StreamWriter(EncoderString[settings.video_format][settings.video_encoder])
 
-        self.start_time: float = 0.0
         self.chunk_index = 0
         self.suffix: str = settings.video_format.value
 
@@ -100,6 +99,9 @@ class Recorder(Thread):
         self.folder_path = self.temp_path / self.folder_name
         self.folder_path.mkdir(parents=True, exist_ok=True)
 
+        self.output_folder_path = Path(self.settings.output_path) / self.folder_name
+        self.output_folder_path.mkdir(parents=True, exist_ok=True)
+
         self.chunk_index = 0
 
         for c in range(self.settings.num_cameras):
@@ -108,40 +110,49 @@ class Recorder(Thread):
                 path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
                 self.recorders[c][t].start(str(path), fps)
 
-        self.start_time = time.time()
-        logger.info("VideoRecorder started → %s", self.folder_path)
+        logger.info("VideoRecorder started → %s", self.output_folder_path)
 
     def _stop_recording(self) -> None:
         for c in range(self.settings.num_cameras):
             for t in self.settings.video_frame_types:
                 self.recorders[c][t].stop()
 
-        # Move completed recording from temp to final location
-        if hasattr(self, 'folder_name') and self.folder_path.exists():
-            output_path = Path(self.settings.output_path)
-            output_path.mkdir(parents=True, exist_ok=True)
-            destination = output_path / self.folder_name
-            try:
-                shutil.move(str(self.folder_path), str(destination))
-            except Exception:
-                logger.exception("Failed to move recording from %s to %s", self.folder_path, destination)
-
+        self._move_chunk_files(self.chunk_index)
+        self._remove_temp_folder()
         logger.info("VideoRecorder stopped")
 
     def _do_split(self) -> None:
+        old_chunk = self.chunk_index
         self.chunk_index += 1
         for c in range(self.settings.num_cameras):
             fps: float = self.get_fps(c)
             for t in self.settings.video_frame_types:
                 path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
                 self.recorders[c][t].split(str(path), fps)
-        self.start_time += self.settings.chunk_length
+        self._move_chunk_files(old_chunk)
+
+    def _move_chunk_files(self, chunk_index: int) -> None:
+        if not hasattr(self, 'output_folder_path'):
+            return
+        for c in range(self.settings.num_cameras):
+            for t in self.settings.video_frame_types:
+                name = make_file_name(c, t, chunk_index, self.suffix)
+                src = self.folder_path / name
+                dst = self.output_folder_path / name
+                if src.exists():
+                    try:
+                        shutil.move(str(src), str(dst))
+                    except Exception:
+                        logger.exception("Failed to move %s → %s", src, dst)
+
+    def _remove_temp_folder(self) -> None:
+        if hasattr(self, 'folder_path') and self.folder_path.exists():
+            try:
+                self.folder_path.rmdir()
+            except OSError:
+                logger.warning("Temp folder not empty, leaving: %s", self.folder_path)
 
     def _update_recording(self) -> None:
-        # Self-chunk when chunk_length > 0 (standalone mode)
-        if self.settings.chunk_length > 0 and time.time() - self.start_time > self.settings.chunk_length:
-            self._do_split()
-
         for c in range(self.settings.num_cameras):
             try:
                 frames: dict[FrameType, ndarray] = self.frames[c].get(timeout=0.01)

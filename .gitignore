@@ -5,7 +5,8 @@ BACKUP/
 recordings/*
 logs/*
 files/audio/UMU*
-files/settings/.*
+files/settings/**/.*
+temp/*
 
 
 # files/lut/*

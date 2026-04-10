@@ -1,7 +1,7 @@
 {
   "num_players": 3,
   "input_fps": 23.0,
-  "render_fps": 89.0,
+  "render_fps": 101.0,
   "camera": {
     "yolo": true,
     "color": true,
@@ -18,9 +18,9 @@
       "flip_v": true,
       "perspective": -0.22,
       "color_exposure": 9992,
-      "color_iso": 161,
+      "color_iso": 147,
       "color_auto_exposure": true,
-      "color_balance": 3600,
+      "color_balance": 4570,
       "color_auto_balance": true,
       "color_brightness": 0,
       "color_contrast": 0,
@@ -45,9 +45,9 @@
       "flip_v": true,
       "perspective": -0.22,
       "color_exposure": 29992,
-      "color_iso": 116,
+      "color_iso": 142,
       "color_auto_exposure": true,
-      "color_balance": 3600,
+      "color_balance": 3800,
       "color_auto_balance": true,
       "color_brightness": 0,
       "color_contrast": 0,
@@ -144,7 +144,7 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "chunk_length": 10.0
+      "chunk_length": 0.0
     },
     "pose": {
       "output_path": "recordings",

@@ -1,15 +1,10 @@
 """Recorder — records FrameDict updates to chunked HDF5 files.
 
-Two operating modes:
-
-  Under Session:
-    Session shares ``record``, ``split``, and ``name`` fields.
-    Chunks are driven by Session firing the shared ``split`` button.
-
-  Standalone:
-    The user toggles the ``record`` setting in the UI.  The recorder
-    creates its own timestamped folder.  If ``chunk_length > 0``, it
-    self-chunks via an internal timer; otherwise a single file is written.
+Chunking is driven externally by firing the shared ``split`` button
+(e.g. from a Session timer or manually).  The recorder reacts to:
+  - ``record`` (toggle) — start / stop recording
+  - ``split`` (button) — flush current chunk and start a new one
+  - ``name`` — appended to the timestamped folder name
 """
 from __future__ import annotations
 
@@ -50,6 +45,8 @@ class _Stop:
 
 _SPLIT = _Split()
 _STOP  = _Stop()
+
+_MAX_BUFFER_FRAMES = 50_000
 
 
 class Recorder:
@@ -139,7 +136,10 @@ class Recorder:
                 buffer = []
 
             else:
-                buffer.append(item)
+                if len(buffer) >= _MAX_BUFFER_FRAMES:
+                    logger.warning("PoseRecorder buffer full (%d frames) — dropping incoming frames", _MAX_BUFFER_FRAMES)
+                else:
+                    buffer.append(item)
 
     def _flush(
         self,

@@ -233,7 +233,7 @@ class SessionGroup(SessionSettings):
     num_cameras: Field[int]   = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
     fps:         Field[float] = Field(30.0, access=Field.INIT, visible=False, description="Camera frame rate")
 
-    _recorder_share: list = [SessionSettings.record, SessionSettings.split, SessionSettings.group_id.as_('name')]
+    _recorder_share: list = [SessionSettings.record, SessionSettings.split, SessionSettings.group_id.as_('name'), SessionSettings.output_path]
 
     osc     : Group[OscReceiverSettings]     = Group(OscReceiverSettings)
     timeline: Group[ShowTimelineSettings]    = Group(ShowTimelineSettings)

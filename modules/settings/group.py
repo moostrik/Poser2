@@ -92,9 +92,8 @@ class Group(Generic[T]):
         - a parent field name is not found on the parent
         - a child field name is not found on the child
         - the field types don't match
-        - the parent field is ``INIT`` but the child field is not (shared INIT fields
-          must be INIT on the child too, otherwise ``_propagate_shared`` would attempt
-          to write a locked field after ``initialize()`` is called)
+        - the child field is ``INIT`` but the parent field is not (a non-INIT
+          parent would try to write a frozen INIT child after ``initialize()``)
         """
         child_fields = {
             name: f for cls in self.settings_type.__mro__
@@ -121,11 +120,11 @@ class Group(Generic[T]):
                     f"{type(owner).__name__}.{self.name}: type mismatch for shared field "
                     f"'{parent_name}' → '{child_name}' — parent {parent_type.__name__} != child {child_type.__name__}"
                 )
-            if parent_field.access is Access.INIT and child_field.access is not Access.INIT:
+            if child_field.access is Access.INIT and parent_field.access is not Access.INIT:
                 raise TypeError(
                     f"{type(owner).__name__}.{self.name}: access mismatch for shared field "
-                    f"'{parent_name}' → '{child_name}' — parent is INIT but child is {child_field.access.name}. "
-                    f"Shared INIT fields must be INIT on the child too."
+                    f"'{parent_name}' → '{child_name}' — child is INIT but parent is {parent_field.access.name}. "
+                    f"An INIT child field cannot receive runtime updates from a non-INIT parent."
                 )
 
     def build_share_kwargs(self, owner: 'BaseSettings') -> dict:

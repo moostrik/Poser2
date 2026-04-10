@@ -17,4 +17,3 @@ class RecorderSettings(BaseSettings):
     record:             Field[bool]             = Field(False, widget=Widget.toggle, description="Record", newline=True)
     split:              Field[bool]             = Field(False, widget=Widget.button, description="Split chunk")
     name:               Field[str]              = Field("", widget=Widget.input, description="Recording name")
-    chunk_length:       Field[float]            = Field(10.0, min=0.0, max=300.0, description="Chunk duration (seconds)")
