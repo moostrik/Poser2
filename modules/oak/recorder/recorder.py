@@ -13,8 +13,8 @@ from .stream_writer import StreamWriter
 import logging
 logger = logging.getLogger(__name__)
 
-def make_file_name(prefix: str, chunk: int, suffix: str) -> str:
-    return f"{prefix}_{chunk:03d}{suffix}"
+def make_file_name(cam_id: int, frame_type: FrameType, chunk: int, suffix: str) -> str:
+    return f"{cam_id}_{FRAME_TYPE_LABEL_DICT[frame_type]}_{chunk:03d}{suffix}"
 
 def make_folder_name(name: str = "") -> str:
     folder = time.strftime("%Y%m%d-%H%M%S")
@@ -105,8 +105,7 @@ class Recorder(Thread):
         for c in range(self.settings.num_cameras):
             fps: float = self.get_fps(c)
             for t in self.settings.video_frame_types:
-                prefix = f"{c}_{FRAME_TYPE_LABEL_DICT[t]}"
-                path: Path = self.folder_path / make_file_name(prefix, self.chunk_index, self.suffix)
+                path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
                 self.recorders[c][t].start(str(path), fps)
 
         self.start_time = time.time()
@@ -134,8 +133,7 @@ class Recorder(Thread):
         for c in range(self.settings.num_cameras):
             fps: float = self.get_fps(c)
             for t in self.settings.video_frame_types:
-                prefix = f"{c}_{FRAME_TYPE_LABEL_DICT[t]}"
-                path: Path = self.folder_path / make_file_name(prefix, self.chunk_index, self.suffix)
+                path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
                 self.recorders[c][t].split(str(path), fps)
         self.start_time += self.settings.chunk_length
 
