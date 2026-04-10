@@ -83,6 +83,20 @@ class Field(Generic[T]):
     - ``options`` — a Field holding a ``list[str]`` of options for
       ``Widget.text_select``.
 
+    **Action buttons (``widget=Widget.button``)**
+
+    A button is a stateless action trigger, declared as ``Field[bool]`` by
+    convention::
+
+        start = Field(False, widget=Widget.button, description="Start recording")
+
+    The stored ``bool`` value is never meaningful — it stays ``False``
+    forever.  Pressing the button calls ``field.fire(settings)``, which
+    invokes all registered callbacks with ``True`` without changing the
+    value.  Buttons are excluded from serialization (``to_dict``).
+    If the button field is shared to a child via ``Group(..., share=[])``,
+    ``fire()`` propagates downstream automatically.
+
     The one keyword parameter with a runtime effect is ``access``:
 
     - ``access=Field.INIT`` prevents writes after ``settings.initialize()``
@@ -344,6 +358,10 @@ class Field(Generic[T]):
                     "Action callback %r for '%s' raised an exception",
                     cb, self.name, exc_info=True,
                 )
+        # Propagate to shared children
+        for child, child_name in getattr(obj, '_shared_targets', {}).get(self.name, []):
+            if child_name in child._fields:
+                child._fields[child_name].fire(child)
 
     def bind(self, obj, callback):
         with obj._locks[self.name]:
