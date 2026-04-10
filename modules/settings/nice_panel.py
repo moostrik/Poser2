@@ -918,7 +918,11 @@ def _build_fallback(settings, name, field, polls):
 def _build_action_button(settings, name, field):
     """Create a NiceGUI button for a Widget.button Setting."""
     label = generate_label(name)
-    ui.button(label, on_click=lambda: field.fire(settings)).props("dense")
+    is_disabled = _is_field_read_only(settings, name, field)
+    props = "dense disable" if is_disabled else "dense"
+    btn = ui.button(label, on_click=lambda: field.fire(settings)).props(props)
+    if is_disabled:
+        btn.disable()
 
 
 def _has_visible_content(settings):

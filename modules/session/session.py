@@ -47,7 +47,7 @@ class Session:
     def _timer_loop(self) -> None:
         chunk_start = time.time()
         while not self._timer_stop.is_set():
-            chunk_length = self.settings.chunk_length
+            chunk_length = self.settings.split_seconds
             if chunk_length <= 0:
                 # No chunking — just idle until stopped
                 self._timer_stop.wait(0.1)

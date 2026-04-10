@@ -230,8 +230,8 @@ class PoseGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class SessionGroup(SessionSettings):
-    num_cameras: Field[int]   = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
-    fps:         Field[float] = Field(30.0, access=Field.INIT, visible=False, description="Camera frame rate")
+    num_cameras: Field[int]   = Field(1, access=Field.INIT, description="Number of cameras")
+    fps:         Field[float] = Field(30.0, access=Field.INIT, description="Camera frame rate")
 
     _recorder_share: list = [SessionSettings.record, SessionSettings.split, SessionSettings.group_id.as_('name'), SessionSettings.output_path]
 
