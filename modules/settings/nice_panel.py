@@ -58,25 +58,29 @@ POLL_INTERVAL = 0.25  # seconds
 # ---------------------------------------------------------------------------
 # Expansion state persistence — remembers which sections are open/closed.
 # ---------------------------------------------------------------------------
-_EXPANSION_STATE_FILE = Path("files/settings/.ui_state.json")
+_UI_STATE_FILE = ".ui_state.json"
 _expansion_state: dict[str, bool | str] = {}
+
+def _state_path() -> Path:
+    """Return the app-scoped UI state file path."""
+    return presets._app_dir() / _UI_STATE_FILE
 
 def _load_expansion_state() -> None:
     global _expansion_state
-    if _EXPANSION_STATE_FILE.exists():
+    p = _state_path()
+    if p.exists():
         try:
-            _expansion_state = json.loads(_EXPANSION_STATE_FILE.read_text())
+            _expansion_state = json.loads(p.read_text())
         except Exception:
             _expansion_state = {}
 
 def _save_expansion_state() -> None:
     try:
-        _EXPANSION_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        _EXPANSION_STATE_FILE.write_text(json.dumps(_expansion_state))
+        p = _state_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(_expansion_state))
     except Exception:
         pass
-
-_load_expansion_state()
 
 
 def generate_label(name):
@@ -1278,6 +1282,9 @@ def create_settings_panel(
 
     # Force dark mode for consistent styling
     ui.dark_mode(True)
+
+    # Load UI state (expansion, active tab) from app-scoped file
+    _load_expansion_state()
 
     # Timers for this client session — self-cancel if parent slot is deleted.
     timers: list = []
