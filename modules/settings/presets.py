@@ -44,12 +44,12 @@ def scan(app_name: str | None = None) -> list[str]:
 
 
 def get_startup(app_name: str | None = None) -> str:
-    """Return the preset name to load on startup (falls back to 'default')."""
+    """Return the preset name to load on startup (falls back to 'studio')."""
     try:
         data = json.loads((_app_dir(app_name) / ".ui_preset.json").read_text())
-        return data.get("startup_preset") or "default"
+        return data.get("startup_preset") or "studio"
     except (FileNotFoundError, json.JSONDecodeError):
-        return "default"
+        return "studio"
 
 
 def validate_name(name: str) -> None:

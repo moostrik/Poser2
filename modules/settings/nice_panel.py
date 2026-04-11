@@ -826,7 +826,10 @@ def _build_number_list(settings, name, field, polls):
                     if not is_disabled:
                         def on_click(e, idx=i, _lbl=lbl):
                             cur = getattr(settings, name)
-                            parent = _lbl.parent_slot.parent
+                            slot = _lbl.parent_slot
+                            if slot is None:
+                                return
+                            parent = slot.parent
 
                             parent.clear()
                             with parent:

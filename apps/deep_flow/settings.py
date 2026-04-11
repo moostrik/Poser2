@@ -1,4 +1,13 @@
-"""Deep Flow settings — single-camera 3D volumetric fluid installation."""
+"""Deep Flow settings — single-camera 3D volumetric fluid installation.
+
+PRESET MAINTENANCE
+------------------
+Preset JSON files live in ``files/settings/deep_flow/``.
+Each JSON mirrors this settings tree exactly.  When you rename, add,
+or remove a Field here, update every ``.json`` file in that directory
+to match — delete stale keys, add new keys with their Field default.
+The root class is ``DeepFlowSettings``.
+"""
 
 from enum import IntEnum, auto
 

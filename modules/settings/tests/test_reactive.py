@@ -2034,8 +2034,8 @@ class TestPresetsUtilities(unittest.TestCase):
             orig_dir = presets.SETTINGS_DIR
             presets.SETTINGS_DIR = Path(d)
             try:
-                # No _startup_preset.txt → should return "default"
-                self.assertEqual(presets.get_startup(), "default")
+                # No .ui_preset.json → should return "studio"
+                self.assertEqual(presets.get_startup(), "studio")
             finally:
                 presets.SETTINGS_DIR = orig_dir
 
