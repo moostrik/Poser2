@@ -13,7 +13,7 @@ from modules.pose.recorder import Recorder as PoseRecorder
 from modules.session import Session, Timeline
 from modules.gl.WindowManager import WindowSettings
 
-from .settings import HDTrioSettings, SHOW_STAGE_DURATIONS
+from .settings import HDTrioSettings
 from .render import HDTrioRender
 
 APP_NAME = 'hd_trio'
@@ -46,7 +46,7 @@ class HDTrioMain:
         self.session_osc.bind('/start/recording', self._on_osc_start_recording)
         self.session_osc.bind('/stop/recording',  self._on_osc_stop_recording)
         self.session_osc.bind('/group/id',        self._on_osc_group_id)
-        self.timeline = Timeline(self.settings.session.timeline, SHOW_STAGE_DURATIONS)
+        self.timeline = Timeline(self.settings.session.timeline)
         self.video_recorder = VideoRecorder(self.settings.session.video)
         self.pose_recorder = PoseRecorder(self.settings.session.pose)
 

@@ -30,22 +30,9 @@ class ShowStage(IntEnum):
 
 class ShowTimelineSettings(TimelineSettings):
     """HD Trio show timeline with project-specific stages."""
-    start_dur:          Field[float] = Field(3.0,  min=0.0, max=60.0,  widget=Widget.number, description="Start duration")
-    introduction_dur:   Field[float] = Field(6.0,  min=0.0, max=60.0,  widget=Widget.number, description="Introduction duration")
-    play_dur:           Field[float] = Field(60.0, min=0.0, max=600.0, widget=Widget.number, description="Play duration")
-    conclusion_dur:     Field[float] = Field(6.0,  min=0.0, max=60.0,  widget=Widget.number, description="Conclusion duration")
-    cooldown_dur:       Field[float] = Field(3.0,  min=0.0, max=60.0,  widget=Widget.number, description="Cooldown duration")
-    stage:              Field[ShowStage] = Field(ShowStage.START, access=Field.READ, description="Current stage", newline=True)
-
-
-# Mapping from stage enum to duration field name on ShowTimelineSettings
-SHOW_STAGE_DURATIONS: dict[ShowStage, str] = {
-    ShowStage.START:         'start_dur',
-    ShowStage.INTRODUCTION:  'introduction_dur',
-    ShowStage.PLAY:          'play_dur',
-    ShowStage.CONCLUSION:    'conclusion_dur',
-    ShowStage.COOLDOWN:      'cooldown_dur',
-}
+    stages:     Field[list[ShowStage]] = Field(list(ShowStage), widget=Widget.order, access=Field.READ, description="Show stages")
+    durations:  Field[list] = Field([3.0, 6.0, 60.0, 6.0, 3.0], min=0.0, max=600.0, step=0.1, description="Stage durations")
+    stage:      Field[ShowStage]   = Field(ShowStage.START, access=Field.READ, description="Current stage", newline=True)
 
 
 # ---------------------------------------------------------------------------

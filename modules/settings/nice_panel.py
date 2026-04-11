@@ -651,6 +651,7 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
+    is_disabled = _is_field_read_only(settings, name, field)
 
     elem_type = get_args(field.type_)[0] if get_args(field.type_) else None
     if elem_type is None or not (isinstance(elem_type, type) and issubclass(elem_type, Enum)):
@@ -690,7 +691,7 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
             "folded": True,
         }
 
-        def _rebuild(cont, st, _settings=settings, _name=name, _elem=elem_type, _cb=with_checkboxes):
+        def _rebuild(cont, st, _settings=settings, _name=name, _elem=elem_type, _cb=with_checkboxes, _ro=is_disabled):
             cont.clear()
             folded = st.get("folded", False)
             with cont:
@@ -701,37 +702,39 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
                 for idx, member in enumerate(visible_members):
                     is_active = member in st["active"]
                     with ui.row().classes(
-                        "w-full items-center gap-2 px-2 py-0.5 rounded cursor-move"
+                        "w-full items-center gap-2 px-2 py-0.5 rounded"
+                        + ("" if _ro else " cursor-move")
                         + ("" if is_active else " opacity-50")
                     ).style(
                         "background: color-mix(in srgb, var(--q-primary) 15%, transparent);"
                         if is_active else ""
                     ):
-                        if _cb:
+                        if _cb and not _ro:
                             cb_widget = ui.checkbox(
                                 value=is_active,
                             ).props("dense").classes("my-0")
 
                         ui.label(generate_label(member.name)).classes("flex-1")
 
-                        # Find the real index in st["order"] for move operations
-                        real_idx = st["order"].index(member)
+                        if not _ro:
+                            # Find the real index in st["order"] for move operations
+                            real_idx = st["order"].index(member)
 
-                        up_btn = ui.button(
-                            icon="arrow_upward",
-                            on_click=lambda _, ri=real_idx: _move(cont, st, ri, -1),
-                        ).props("dense flat size=xs").classes("my-0")
-                        down_btn = ui.button(
-                            icon="arrow_downward",
-                            on_click=lambda _, ri=real_idx: _move(cont, st, ri, 1),
-                        ).props("dense flat size=xs").classes("my-0")
+                            up_btn = ui.button(
+                                icon="arrow_upward",
+                                on_click=lambda _, ri=real_idx: _move(cont, st, ri, -1),
+                            ).props("dense flat size=xs").classes("my-0")
+                            down_btn = ui.button(
+                                icon="arrow_downward",
+                                on_click=lambda _, ri=real_idx: _move(cont, st, ri, 1),
+                            ).props("dense flat size=xs").classes("my-0")
 
-                        if idx == 0:
-                            up_btn.props("disable")
-                        if idx == len(visible_members) - 1:
-                            down_btn.props("disable")
+                            if idx == 0:
+                                up_btn.props("disable")
+                            if idx == len(visible_members) - 1:
+                                down_btn.props("disable")
 
-                        if _cb:
+                        if _cb and not _ro:
                             def _on_check(e, m=member):
                                 if e.value:
                                     st["active"].add(m)
@@ -794,6 +797,64 @@ def _build_checklist(settings, name, field, polls):
 @widget_builder(Widget.order)
 def _build_order(settings, name, field, polls):
     return _build_sortable_list(settings, name, field, polls, with_checkboxes=False)
+
+
+@widget_builder(Widget.number_list)
+def _build_number_list(settings, name, field, polls):
+    """Render a fixed-length list of numbers as styled rows (matches sortable list look)."""
+    value = getattr(settings, name)
+    label = generate_label(name)
+    desc = field.description
+    is_disabled = _is_field_read_only(settings, name, field)
+    elem_type = get_args(field.type_)[0] if get_args(field.type_) else float
+    step = field.step if field.step is not None else (1 if elem_type is int else 0.01)
+    fmt = "{:.0f}" if elem_type is int else "{:.2f}"
+
+    labels: list = []
+    with ui.column().classes("w-72 max-w-full gap-1"):
+        _build_field_title(label, desc)
+        with ui.column().classes("w-full gap-0 border rounded p-1"):
+            for i, v in enumerate(value):
+                with ui.row().classes(
+                    "w-full items-center gap-2 px-2 py-0.5 rounded"
+                ).style(
+                    "background: color-mix(in srgb, var(--q-primary) 15%, transparent);"
+                ):
+                    lbl = ui.label(fmt.format(v)).classes("flex-1")
+                    labels.append(lbl)
+
+                    if not is_disabled:
+                        def on_click(e, idx=i, _lbl=lbl):
+                            cur = getattr(settings, name)
+                            parent = _lbl.parent_slot.parent
+
+                            parent.clear()
+                            with parent:
+                                num = ui.number(
+                                    value=cur[idx], step=step,
+                                    min=field.min, max=field.max,
+                                ).props("dense autofocus borderless").classes("flex-1")
+
+                                def on_blur(_e, _idx=idx, _parent=parent, _num=num):
+                                    val = _num.value
+                                    if val is not None:
+                                        cur2 = getattr(settings, name)
+                                        cur2[_idx] = elem_type(val)
+                                        setattr(settings, name, cur2)
+                                    _parent.clear()
+                                    with _parent:
+                                        new_lbl = ui.label(fmt.format(getattr(settings, name)[_idx])).classes("flex-1")
+                                        new_lbl.on("click", lambda _e, _i=_idx, _nl=new_lbl: on_click(_e, _i, _nl))
+                                        labels[_idx] = new_lbl
+                                num.on("blur", on_blur)
+                        lbl.on("click", on_click)
+
+    if _field_needs_poll(settings, name, field):
+        def _poll_number_list(v, _labels=labels, _fmt=fmt):
+            for idx, lbl in enumerate(_labels):
+                if idx < len(v):
+                    lbl.set_text(_fmt.format(v[idx]))
+        polls.append((settings, name, [list(value)], _poll_number_list))
 
 
 @widget_builder(Widget.point2f)
@@ -1308,6 +1369,7 @@ def create_settings_panel(
     .hide-init.hide-input .poser-only-init-input { display: none !important; }
     .hide-feedback.hide-input .poser-only-feedback-input { display: none !important; }
     .hide-init.hide-feedback.hide-input .poser-only-all { display: none !important; }
+
     ''')
 
     # -- Shutdown overlay (client-side JS) ---------------------------------

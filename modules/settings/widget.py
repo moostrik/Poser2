@@ -13,7 +13,7 @@ Adding a new widget:
 from __future__ import annotations
 
 from enum import Enum
-from typing import TYPE_CHECKING, get_origin
+from typing import TYPE_CHECKING, get_origin, get_args
 
 if TYPE_CHECKING:
     from modules.settings.field import Field
@@ -103,6 +103,7 @@ class Widget(Enum):
     # list widgets
     checklist   = (list,)
     order       = (list,)
+    number_list = (list,)
 
     # -- Public API ----------------------------------------------------------
 
@@ -154,8 +155,11 @@ class Widget(Enum):
         Point2f = _get_point2f()
         Rect = _get_rect()
 
-        # Generic list → checklist
+        # Generic list → checklist (enum elements) or number_list (numeric elements)
         if get_origin(ft) is list:
+            args = get_args(ft)
+            if args and args[0] in (int, float):
+                return cls.number_list
             return cls.checklist
 
         # bool → toggle

@@ -126,9 +126,9 @@ class Field(Generic[T]):
         self,
         default: T,
         *,
-        min: T | None = None,   # UI hint only — not enforced by the descriptor
-        max: T | None = None,   # UI hint only — not enforced by the descriptor
-        step: T | None = None,  # UI hint only — not enforced by the descriptor
+        min: float | int | None = None,   # UI hint only — not enforced by the descriptor
+        max: float | int | None = None,   # UI hint only — not enforced by the descriptor
+        step: float | int | None = None,  # UI hint only — not enforced by the descriptor
         description: str = "",
         access: Access = Access.READWRITE,
         visible: bool = True,

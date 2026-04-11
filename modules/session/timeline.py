@@ -1,7 +1,6 @@
 """Timeline — stage-based sequencer with config-driven control, ticked by the render loop."""
 
 import time
-from enum import IntEnum
 from typing import Callable, Set
 
 from modules.settings import BaseSettings, Field, Widget
@@ -14,54 +13,44 @@ class TimelineSettings(BaseSettings):
     """Base configuration for Timeline.
 
     Subclass this per project and add:
-    - A ``stage`` Field with your stage enum (access=READ)
-    - Per-stage duration Fields (e.g. ``start_dur``, ``play_dur``)
+    - A ``durations`` override with your stage durations
+    - Optionally a ``stage`` Field with your stage enum (access=READ)
 
     Example::
 
-        class ShowStage(IntEnum):
-            START = 0
-            PLAY  = auto()
-
         class ShowTimelineSettings(TimelineSettings):
-            stage:     Field[ShowStage] = Field(ShowStage.START, access=Field.READ)
-            start_dur: Field[float]     = Field(3.0, min=0.0, max=60.0)
-            play_dur:  Field[float]     = Field(10.0, min=0.0, max=120.0)
+            durations: Field[list[float]] = Field([3.0, 10.0])
+            stage:     Field[ShowStage]   = Field(ShowStage.START, access=Field.READ)
     """
-    run:            Field[bool]  = Field(False, newline=True)
-    loop:           Field[bool]  = Field(False, widget= Widget.switch, description="Loop timeline when all stages complete")
-    skip:           Field[bool]  = Field(False, widget=Widget.button, description="Skip to next stage")
-    stage_progress: Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Stage progress")
-    progress:       Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Overall progress")
+    run:            Field[bool]        = Field(False, newline=True)
+    loop:           Field[bool]        = Field(False, widget=Widget.switch, description="Loop timeline when all stages complete")
+    skip:           Field[bool]        = Field(False, widget=Widget.button, description="Skip to next stage")
+    durations:      Field[list[float]] = Field([0.0], min=0.0, description="Duration per stage (seconds)")
+    stage_progress: Field[float]       = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Stage progress")
+    progress:       Field[float]       = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Overall progress")
 
 
 class Timeline:
     """Tick-based timeline that progresses through project-defined stages.
 
-    Each stage has a configurable duration read live from the config.
+    Stage count and durations are read from ``config.durations``.
     Call ``update()`` every frame (e.g. from ``data_hub.notify_update()``).
 
     Example::
 
         config = ShowTimelineSettings()
-        stages = {
-            ShowStage.START: 'start_dur',
-            ShowStage.PLAY:  'play_dur',
-        }
-        timeline = Timeline(config, stages)
-        timeline.add_stage_callback(lambda s: print(f"Stage: {s.name}"))
+        timeline = Timeline(config)
+        timeline.add_stage_callback(lambda s: print(f"Stage: {s}"))
         data_hub.add_update_callback(timeline.update)
         config.run = True      # Begin show
         config.run = False     # Stop show
     """
 
-    def __init__(self, config: TimelineSettings, stage_durations: dict) -> None:
+    def __init__(self, config: TimelineSettings) -> None:
         self.config = config
-        self._stage_order: list[IntEnum] = list(stage_durations.keys())
-        self._duration_fields: dict[IntEnum, str] = dict(stage_durations)
 
-        if not self._stage_order:
-            raise ValueError("stage_durations must contain at least one stage")
+        if not config.durations:
+            raise ValueError("config.durations must contain at least one entry")
 
         # Callbacks
         self._stage_callbacks: Set[Callable] = set()
@@ -105,16 +94,15 @@ class Timeline:
         self._sync_run(False)
 
     def _enter_stage(self) -> None:
-        stage = self._stage_order[self._stage_index]
         self._stage_start = time.time()
         self.config.stage_progress = 0.0
         if hasattr(self.config, 'stage'):
-            setattr(self.config, 'stage', stage)
-        self._notify_stage_callbacks(stage)
+            setattr(self.config, 'stage', self._stage_index)
+        self._notify_stage_callbacks(self._stage_index)
 
     def _advance_stage(self) -> None:
         next_index = self._stage_index + 1
-        if next_index < len(self._stage_order):
+        if next_index < len(self.config.durations):
             self._stage_index = next_index
             self._enter_stage()
         elif self.config.loop:
@@ -123,15 +111,14 @@ class Timeline:
         else:
             self._stop_show()
 
-    def _get_stage_duration(self, stage: IntEnum) -> float:
-        field_name = self._duration_fields[stage]
-        return float(getattr(self.config, field_name))
+    def _get_stage_duration(self, index: int) -> float:
+        return float(self.config.durations[index])
 
     def _get_total_duration(self) -> float:
-        return sum(self._get_stage_duration(s) for s in self._stage_order)
+        return sum(self.config.durations)
 
     def _get_elapsed_before_current(self) -> float:
-        return sum(self._get_stage_duration(self._stage_order[i]) for i in range(self._stage_index))
+        return sum(self.config.durations[i] for i in range(self._stage_index))
 
     # -- Callbacks -----------------------------------------------------------
 
@@ -141,7 +128,7 @@ class Timeline:
     def remove_stage_callback(self, callback: Callable) -> None:
         self._stage_callbacks.discard(callback)
 
-    def _notify_stage_callbacks(self, stage: IntEnum) -> None:
+    def _notify_stage_callbacks(self, stage: int) -> None:
         for cb in self._stage_callbacks:
             try:
                 cb(stage)
@@ -177,9 +164,8 @@ class Timeline:
             return
 
         now = time.time()
-        stage = self._stage_order[self._stage_index]
         stage_elapsed = now - self._stage_start
-        stage_duration = self._get_stage_duration(stage)
+        stage_duration = self._get_stage_duration(self._stage_index)
 
         # Stage progress (0-1)
         if stage_duration > 0:
