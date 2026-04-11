@@ -1,2 +1,2 @@
-from .session import Session
-from .settings import SessionSettings
+from .session import Session, SessionSettings
+from .timeline import Timeline, TimelineSettings

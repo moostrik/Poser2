@@ -9,10 +9,8 @@ from modules.data_hub import DataHub, Stage
 from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers, features
-# from modules.pose.features import configure_features
 from modules.pose.recorder import Recorder as PoseRecorder
-from modules.session import Session
-from modules.utils import Timeline
+from modules.session import Session, Timeline
 from modules.gl.WindowManager import WindowSettings
 
 from .settings import HDTrioSettings, SHOW_STAGE_DURATIONS

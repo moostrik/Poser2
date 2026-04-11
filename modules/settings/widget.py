@@ -158,9 +158,9 @@ class Widget(Enum):
         if get_origin(ft) is list:
             return cls.checklist
 
-        # bool → switch
+        # bool → toggle
         if ft is bool:
-            return cls.switch
+            return cls.toggle
 
         # int / float with min+max → slider, otherwise → number
         if ft in (int, float):

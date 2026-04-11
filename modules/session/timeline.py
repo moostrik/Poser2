@@ -28,8 +28,8 @@ class TimelineSettings(BaseSettings):
             start_dur: Field[float]     = Field(3.0, min=0.0, max=60.0)
             play_dur:  Field[float]     = Field(10.0, min=0.0, max=120.0)
     """
-    run:            Field[bool]  = Field(False)
-    loop:           Field[bool]  = Field(False)
+    run:            Field[bool]  = Field(False, newline=True)
+    loop:           Field[bool]  = Field(False, widget= Widget.switch, description="Loop timeline when all stages complete")
     skip:           Field[bool]  = Field(False, widget=Widget.button, description="Skip to next stage")
     stage_progress: Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Stage progress")
     progress:       Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Overall progress")

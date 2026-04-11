@@ -65,8 +65,8 @@ class ArtNetBarsSettings(BaseSettings):
         enabled, white, color, bar
     """
 
-    enabled: Field[bool]            = Field(True, description="Enable ArtNet output")
-    verbose: Field[bool]            = Field(True, description="Enable detailed logging (warnings always shown)")
+    enabled: Field[bool]            = Field(True, widget=Widget.switch,  description="Enable ArtNet output")
+    verbose: Field[bool]            = Field(True, widget=Widget.switch,  description="Enable detailed logging (warnings always shown)")
 
     ip_address: Field[str]          = Field("192.168.1.100", widget=Widget.ip_field,     description="Controller IP address")
     base_universe: Field[int]       = Field(0, min=0, max=14, description="First ArtNet universe (second bar uses +1)", visible=False)

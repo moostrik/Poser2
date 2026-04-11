@@ -1,4 +1,3 @@
-from .Timeline import Timeline, TimelineSettings
 from .FPS import FPS
 from .PerformanceTimer import PerformanceTimer
 from .HotReloadMethods import HotReloadMethods, MethodType, MethodInfo

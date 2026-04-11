@@ -3,7 +3,7 @@
 from enum import IntEnum, auto
 from typing import Any
 
-from modules.settings import BaseSettings, NiceSettings, Field, Group
+from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
 from modules.oak import CameraSettings, FrameType, CoderFormat, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render.color_settings import ColorSettings
 from modules.render import layers
@@ -12,8 +12,7 @@ from modules.tracker import OnePerCamTrackerSettings
 from modules.pose import batch, nodes, trackers
 from modules.pose.batch.model_types import ModelType
 from modules.pose.recorder.settings import RecorderSettings as PoseRecorderSettings
-from modules.session import SessionSettings
-from modules.utils import TimelineSettings
+from modules.session import SessionSettings, TimelineSettings
 from modules.gl.WindowManager import WindowSettings
 
 
@@ -31,12 +30,12 @@ class ShowStage(IntEnum):
 
 class ShowTimelineSettings(TimelineSettings):
     """HD Trio show timeline with project-specific stages."""
-    stage:              Field[ShowStage] = Field(ShowStage.START, access=Field.READ, description="Current stage")
-    start_dur:          Field[float] = Field(3.0,  min=0.0, max=60.0,  description="Start duration")
-    introduction_dur:   Field[float] = Field(5.0,  min=0.0, max=120.0, description="Introduction duration")
-    play_dur:           Field[float] = Field(30.0, min=0.0, max=300.0, description="Play duration")
-    conclusion_dur:     Field[float] = Field(5.0,  min=0.0, max=120.0, description="Conclusion duration")
-    cooldown_dur:       Field[float] = Field(3.0,  min=0.0, max=60.0,  description="Cooldown duration")
+    start_dur:          Field[float] = Field(3.0,  min=0.0, max=60.0,  widget=Widget.number, description="Start duration")
+    introduction_dur:   Field[float] = Field(6.0,  min=0.0, max=60.0,  widget=Widget.number, description="Introduction duration")
+    play_dur:           Field[float] = Field(60.0, min=0.0, max=600.0, widget=Widget.number, description="Play duration")
+    conclusion_dur:     Field[float] = Field(6.0,  min=0.0, max=60.0,  widget=Widget.number, description="Conclusion duration")
+    cooldown_dur:       Field[float] = Field(3.0,  min=0.0, max=60.0,  widget=Widget.number, description="Cooldown duration")
+    stage:              Field[ShowStage] = Field(ShowStage.START, access=Field.READ, description="Current stage", newline=True)
 
 
 # Mapping from stage enum to duration field name on ShowTimelineSettings
@@ -286,8 +285,8 @@ class HDTrioSettings(BaseSettings):
     render_fps : Field[float] = Field(60.0)
 
     camera : Group[OakGroup]     = Group(OakGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
-    session: Group[SessionGroup] = Group(SessionGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
+    inout  : Group[InOutGroup]   = Group(InOutGroup)
     pose   : Group[PoseGroup]    = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     render : Group[RenderGroup]  = Group(RenderGroup)
-    inout  : Group[InOutGroup]   = Group(InOutGroup)
     server : Group[NiceSettings] = Group(NiceSettings)
+    session: Group[SessionGroup] = Group(SessionGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
