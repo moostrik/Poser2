@@ -1,0 +1,36 @@
+---
+description: "Use when editing app composition, startup/shutdown flow, or app-level callback wiring."
+applyTo: "apps/*/main.py, apps/*/render.py, apps/*/settings.py"
+---
+# App Lifecycle Guidelines
+
+## App responsibilities
+
+- `main.py` composes the app from reusable modules
+- App code wires inter-module callbacks and lifecycle orchestration
+- App code should not leak app-specific policy into shared modules
+
+## Startup pattern
+
+- Load and initialize settings early
+- Construct core components from settings
+- Wire inter-module callbacks in `start()`
+- Start workers/services only after wiring is complete
+
+## Shutdown pattern
+
+- Stop external inputs and background workers cleanly
+- Release resources in deterministic order
+- Prefer explicit stop/teardown paths over implicit garbage-collection cleanup
+
+## Settings boundaries
+
+- `apps/*/settings.py` defines data only (Fields/Groups/Child)
+- No runtime side effects in settings definitions
+- Keep settings schema synchronized with preset JSON files
+
+## Data flow
+
+- Treat `DataHub` as a thread-safe exchange point between runtime stages
+- Keep stage semantics clear: RAW -> SMOOTH -> LERP
+- Avoid bypass paths that make stage ownership ambiguous
