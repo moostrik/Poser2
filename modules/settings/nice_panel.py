@@ -120,33 +120,21 @@ def _attach_description_tooltip(element, description: str | None):
 
 def _is_field_read_only(settings, name: str, field: Field) -> bool:
     """Return True when a field should render read-only in this settings instance."""
-    if field.access is Access.READ:
-        return True
-    if settings.is_incoming_shared(name):
-        return True
-    if settings.is_incoming_pulled(name):
-        return True
-    return False
+    return field.access is Access.READ
 
 
 def _field_needs_poll(settings, name: str, field: Field) -> bool:
     """Return True when UI should poll external updates for this field."""
-    if settings.is_incoming_shared(name) or settings.is_incoming_pulled(name):
-        return True
-    if settings.is_bidirectional(name):
+    if settings.is_shared(name):
         return True
     return field.access is not Access.WRITE
 
 
 def _wiring_css_class(settings, name: str) -> str:
     """Return a CSS class for the field's wiring state, or empty string."""
-    if settings.is_incoming_shared(name):
-        return "poser-linked"
-    if settings.is_incoming_pulled(name):
-        return "poser-linked"
-    if settings.is_bidirectional(name):
+    if settings.is_shared(name):
         return "poser-synced"
-    if settings.is_push_source(name):
+    if settings.is_share_source(name):
         return "poser-source"
     return ""
 
@@ -1394,7 +1382,6 @@ def create_settings_panel(
     .hide-init.hide-feedback.hide-input .poser-only-all { display: none !important; }
 
     .poser-source { border-left: 2px solid #26a69a; padding-left: 6px; }
-    .poser-linked { border-left: 2px solid #ef5350; padding-left: 6px; }
     .poser-synced { border-left: 2px solid #ffa726; padding-left: 6px; }
     ''')
 

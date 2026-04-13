@@ -104,13 +104,13 @@ class OakGroup(BaseSettings):
 
     _cam_share: list = [fps, color, mono, square, stereo, yolo, hd_ready, sim_enabled, model_path]
 
-    cam_0        : Group[CameraSettings]    = Group(CameraSettings, push=_cam_share)
-    cam_1        : Group[CameraSettings]    = Group(CameraSettings, push=_cam_share)
-    cam_2        : Group[CameraSettings]    = Group(CameraSettings, push=_cam_share)
-    simulator    : Group[SimulatorSettings]    = Group(SimulatorSettings, push=[num_cameras, fps])
+    cam_0        : Group[CameraSettings]    = Group(CameraSettings, share=_cam_share)
+    cam_1        : Group[CameraSettings]    = Group(CameraSettings, share=_cam_share)
+    cam_2        : Group[CameraSettings]    = Group(CameraSettings, share=_cam_share)
+    simulator    : Group[SimulatorSettings]    = Group(SimulatorSettings, share=[num_cameras, fps])
     tracker      : Group[OnePerCamTrackerSettings] = Group(OnePerCamTrackerSettings)
-    frame_sync   : Group[SyncSettings]         = Group(SyncSettings, push=[num_cameras, fps])
-    tracklet_sync: Group[SyncSettings]         = Group(SyncSettings, push=[num_cameras, fps])
+    frame_sync   : Group[SyncSettings]         = Group(SyncSettings, share=[num_cameras, fps])
+    tracklet_sync: Group[SyncSettings]         = Group(SyncSettings, share=[num_cameras, fps])
 
     @property
     def cameras(self) -> list[CameraSettings]:
@@ -140,36 +140,36 @@ class BboxFeature(BaseSettings):
     frequency        : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency : Field[float] = Field(60.0)
 
-    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, push=[frequency])
-    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, push=[frequency])
-    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, push=[frequency.as_('input_frequency'), output_frequency])
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
+    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
+    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 class PointFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(60.0)
 
     confidence_filter: Group[nodes.DualConfFilterSettings]    = Group(nodes.DualConfFilterSettings)
-    smoother         : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, push=[frequency])
-    prediction       : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, push=[frequency])
-    interpolator     : Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, push=[frequency.as_('input_frequency'), output_frequency])
+    smoother         : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
+    prediction       : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
+    interpolator     : Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 class AngleFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(60.0)
 
-    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, push=[frequency])
-    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, push=[frequency])
-    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, push=[frequency.as_('input_frequency'), output_frequency])
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
+    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
+    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     sticky      : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
 
 class VelocityFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(60.0)
 
-    extractor   : Group[nodes.AngleVelExtractorSettings] = Group(nodes.AngleVelExtractorSettings, push=[frequency])
-    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, push=[frequency])
-    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, push=[frequency])
-    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, push=[frequency.as_('input_frequency'), output_frequency])
+    extractor   : Group[nodes.AngleVelExtractorSettings] = Group(nodes.AngleVelExtractorSettings, share=[frequency])
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
+    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
+    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     sticky      : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
 
 class MotionFeature(BaseSettings):
@@ -181,14 +181,14 @@ class SimilarityFeature(BaseSettings):
     output_frequency: Field[float] = Field(60.0)
     max_poses       : Field[int]   = Field(3, min=1, max=16, access=Field.INIT)
 
-    window_similarity    : Group[batch.WindowSimilaritySettings]      = Group(batch.WindowSimilaritySettings, push=[max_poses])
-    window_correlation   : Group[batch.WindowCorrelationSettings]     = Group(batch.WindowCorrelationSettings, push=[max_poses])
-    similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, push=[max_poses])
-    leader_applicator    : Group[nodes.LeaderScoreApplicatorSettings] = Group(nodes.LeaderScoreApplicatorSettings, push=[max_poses])
-    smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, push=[frequency])
-    interpolator         : Group[nodes.ChaseInterpolatorSettings]     = Group(nodes.ChaseInterpolatorSettings, push=[frequency.as_('input_frequency'), output_frequency])
+    window_similarity    : Group[batch.WindowSimilaritySettings]      = Group(batch.WindowSimilaritySettings, share=[max_poses])
+    window_correlation   : Group[batch.WindowCorrelationSettings]     = Group(batch.WindowCorrelationSettings, share=[max_poses])
+    similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_poses])
+    leader_applicator    : Group[nodes.LeaderScoreApplicatorSettings] = Group(nodes.LeaderScoreApplicatorSettings, share=[max_poses])
+    smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])
+    interpolator         : Group[nodes.ChaseInterpolatorSettings]     = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     sticky               : Group[nodes.StickyFillerSettings]          = Group(nodes.StickyFillerSettings)
-    motion_gate          : Group[nodes.MotionGateApplicatorSettings]  = Group(nodes.MotionGateApplicatorSettings, push=[max_poses])
+    motion_gate          : Group[nodes.MotionGateApplicatorSettings]  = Group(nodes.MotionGateApplicatorSettings, share=[max_poses])
 
 
 # ---------------------------------------------------------------------------
@@ -206,16 +206,16 @@ class PoseGroup(BaseSettings):
     _batch_share  : list = [max_poses, model_type, model_path, verbose]
     _feature_share: list = [frequency, output_frequency]
 
-    detection    : Group[batch.DetectionSettings]    = Group(batch.DetectionSettings, push=_batch_share)
-    segmentation : Group[batch.SegmentationSettings] = Group(batch.SegmentationSettings, push=_batch_share)
-    flow         : Group[batch.FlowSettings]         = Group(batch.FlowSettings, push=_batch_share)
-    image_crop   : Group[batch.ImageCropSettings]    = Group(batch.ImageCropSettings, push=[max_poses])
-    bbox         : Group[BboxFeature]                = Group(BboxFeature, push=_feature_share)
-    point        : Group[PointFeature]               = Group(PointFeature, push=_feature_share)
-    angle        : Group[AngleFeature]               = Group(AngleFeature, push=_feature_share)
-    velocity     : Group[VelocityFeature]            = Group(VelocityFeature, push=_feature_share)
+    detection    : Group[batch.DetectionSettings]    = Group(batch.DetectionSettings, share=_batch_share)
+    segmentation : Group[batch.SegmentationSettings] = Group(batch.SegmentationSettings, share=_batch_share)
+    flow         : Group[batch.FlowSettings]         = Group(batch.FlowSettings, share=_batch_share)
+    image_crop   : Group[batch.ImageCropSettings]    = Group(batch.ImageCropSettings, share=[max_poses])
+    bbox         : Group[BboxFeature]                = Group(BboxFeature, share=_feature_share)
+    point        : Group[PointFeature]               = Group(PointFeature, share=_feature_share)
+    angle        : Group[AngleFeature]               = Group(AngleFeature, share=_feature_share)
+    velocity     : Group[VelocityFeature]            = Group(VelocityFeature, share=_feature_share)
     motion       : Group[MotionFeature]              = Group(MotionFeature)
-    similarity   : Group[SimilarityFeature]          = Group(SimilarityFeature, push=[frequency, output_frequency, max_poses])
+    similarity   : Group[SimilarityFeature]          = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
     window_raw   : Group[nodes.WindowNodeSettings]   = Group(trackers.WindowNodeSettings)
     window_smooth: Group[nodes.WindowNodeSettings]   = Group(trackers.WindowNodeSettings)
     window_lerp  : Group[nodes.WindowNodeSettings]   = Group(trackers.WindowNodeSettings)
@@ -230,9 +230,9 @@ class SessionGroup(BaseSettings):
     num_cameras:   Field[int]   = Field(1, access=Field.INIT, description="Number of cameras")
     fps:           Field[float] = Field(30.0, access=Field.INIT, description="Camera frame rate")
 
-    run:        Field[bool]  = Field(False, widget=Widget.toggle, description="Record")
-    output_path:   Field[str]   = Field("recordings", description="Recordings output directory", access=Field.INIT)
-    name:      Field[str]   = Field("", widget=Widget.input, description="Recording group ID")
+    run:           Field[bool]  = Field(False, widget=Widget.toggle, description="Record")
+    output_path:   Field[str]   = Field("recordings", access=Field.INIT, description="Recordings output directory")
+    name:          Field[str]   = Field("", widget=Widget.input, description="Recording group ID")
     split:         Field[bool]  = Field(False, widget=Widget.button, description="Split chunk", visible=False)
     split_seconds: Field[float] = Field(10, min=1, max=60, widget=Widget.number, description="Split recording into chunks of this length (seconds)")
 
@@ -240,10 +240,10 @@ class SessionGroup(BaseSettings):
     _recorder_share: list = [run.as_('record'), split, name, output_path]
 
     osc     : Group[OscReceiverSettings]     = Group(OscReceiverSettings)
-    core    : Group[SessionSettings]         = Group(SessionSettings, push=_session_share)
-    timeline: Group[ShowTimelineSettings]    = Group(ShowTimelineSettings, push=[run], pull=[run])
-    video   : Group[RecorderSettings]        = Group(RecorderSettings, push=_recorder_share + [num_cameras, fps])
-    pose    : Group[PoseRecorderSettings]    = Group(PoseRecorderSettings, push=_recorder_share)
+    core    : Group[SessionSettings]         = Group(SessionSettings, share=_session_share)
+    timeline: Group[ShowTimelineSettings]    = Group(ShowTimelineSettings, share=[run])
+    video   : Group[RecorderSettings]        = Group(RecorderSettings, share=_recorder_share + [num_cameras, fps])
+    pose    : Group[PoseRecorderSettings]    = Group(PoseRecorderSettings, share=_recorder_share)
 
 
 # ---------------------------------------------------------------------------
@@ -290,9 +290,9 @@ class HDTrioSettings(BaseSettings):
     input_fps  : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     render_fps : Field[float] = Field(60.0)
 
-    camera : Group[OakGroup]     = Group(OakGroup, push=[num_players.as_('num_cameras'), input_fps.as_('fps')])
+    camera : Group[OakGroup]     = Group(OakGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
     inout  : Group[InOutGroup]   = Group(InOutGroup)
-    pose   : Group[PoseGroup]    = Group(PoseGroup, push=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
+    pose   : Group[PoseGroup]    = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     render : Group[RenderGroup]  = Group(RenderGroup)
     server : Group[NiceSettings] = Group(NiceSettings)
-    session: Group[SessionGroup] = Group(SessionGroup, push=[num_players.as_('num_cameras'), input_fps.as_('fps')])
+    session: Group[SessionGroup] = Group(SessionGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])

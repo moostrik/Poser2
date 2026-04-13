@@ -14,7 +14,7 @@ Maintain the settings engine contract and reactive behavior in `modules/settings
 - Keep `initialize()`, `update_from_dict()`, and `to_dict()` semantics stable and documented
 - Maintain thread-safety guarantees around locks and callback dispatch
 - Keep callback fan-out fault-tolerant so one failure does not stop other callbacks
-- Preserve shared field propagation behavior: push (parent→child), pull (child→parent), bidirectional (both push and pull)
+- Preserve shared field propagation behavior: bidirectional sharing via `share=` (parent↔child)
 - Preserve `.as_()` alias mapping behavior for child constructor names while serialization stays parent-keyed
 - Keep JSON serialization/deserialization deterministic and backward-compatible with existing presets
 - Treat GUI metadata as hint-only data; backend logic must never depend on GUI frameworks

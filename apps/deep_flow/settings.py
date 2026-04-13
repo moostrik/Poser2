@@ -84,11 +84,11 @@ class OakGroup(BaseSettings):
     video_frame_types:  Field[list[FrameType]]   = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record")
 
     _cam_share = [fps, color, square, stereo, yolo, hd_ready, sim_enabled, model_path]
-    cam_0       = Group(CameraSettings, push=_cam_share)
-    simulator   = Group(SimulatorSettings, push=[video_path, video_format, video_frame_types, num_cameras, fps, color, square, stereo])
-    recorder    = Group(RecorderSettings, push=[video_path, temp_path, video_format, video_frame_types, color, square, stereo, num_cameras, fps])
-    frame_sync  = Group(SyncSettings, push=[num_cameras, fps])
-    tracklet_sync = Group(SyncSettings, push=[num_cameras, fps])
+    cam_0       = Group(CameraSettings, share=_cam_share)
+    simulator   = Group(SimulatorSettings, share=[video_path, video_format, video_frame_types, num_cameras, fps, color, square, stereo])
+    recorder    = Group(RecorderSettings, share=[video_path, temp_path, video_format, video_frame_types, color, square, stereo, num_cameras, fps])
+    frame_sync  = Group(SyncSettings, share=[num_cameras, fps])
+    tracklet_sync = Group(SyncSettings, share=[num_cameras, fps])
 
     @property
     def cameras(self) -> list[CameraSettings]:
@@ -112,36 +112,36 @@ class BboxFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
 
-    smoother     = Group(nodes.EuroSmootherSettings, push=[frequency])
-    prediction   = Group(nodes.PredictorSettings, push=[frequency])
-    interpolator = Group(nodes.ChaseInterpolatorSettings, push=[frequency.as_('input_frequency'), output_frequency])
+    smoother     = Group(nodes.EuroSmootherSettings, share=[frequency])
+    prediction   = Group(nodes.PredictorSettings, share=[frequency])
+    interpolator = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 class PointFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
 
     confidence_filter = Group(nodes.DualConfFilterSettings)
-    smoother     = Group(nodes.EuroSmootherSettings, push=[frequency])
-    prediction   = Group(nodes.PredictorSettings, push=[frequency])
-    interpolator = Group(nodes.ChaseInterpolatorSettings, push=[frequency.as_('input_frequency'), output_frequency])
+    smoother     = Group(nodes.EuroSmootherSettings, share=[frequency])
+    prediction   = Group(nodes.PredictorSettings, share=[frequency])
+    interpolator = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 class AngleFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
 
-    smoother     = Group(nodes.EuroSmootherSettings, push=[frequency])
-    prediction   = Group(nodes.PredictorSettings, push=[frequency])
-    interpolator = Group(nodes.ChaseInterpolatorSettings, push=[frequency.as_('input_frequency'), output_frequency])
+    smoother     = Group(nodes.EuroSmootherSettings, share=[frequency])
+    prediction   = Group(nodes.PredictorSettings, share=[frequency])
+    interpolator = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     sticky       = Group(nodes.StickyFillerSettings)
 
 class VelocityFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
 
-    extractor     = Group(nodes.AngleVelExtractorSettings, push=[frequency])
-    smoother         = Group(nodes.EuroSmootherSettings, push=[frequency])
-    prediction          = Group(nodes.PredictorSettings, push=[frequency])
-    interpolator  = Group(nodes.ChaseInterpolatorSettings, push=[frequency.as_('input_frequency'), output_frequency])
+    extractor     = Group(nodes.AngleVelExtractorSettings, share=[frequency])
+    smoother         = Group(nodes.EuroSmootherSettings, share=[frequency])
+    prediction          = Group(nodes.PredictorSettings, share=[frequency])
+    interpolator  = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     sticky           = Group(nodes.StickyFillerSettings)
 
 class MotionFeature(BaseSettings):
@@ -164,16 +164,16 @@ class PoseGroup(BaseSettings):
     _batch_share = [max_poses, model_type, model_path, verbose]
     _feature_share = [frequency, output_frequency]
 
-    detection    = Group(batch.DetectionSettings, push=_batch_share)
-    segmentation = Group(batch.SegmentationSettings, push=_batch_share)
-    flow         = Group(batch.FlowSettings, push=_batch_share)
-    image_crop   = Group(batch.ImageCropSettings, push=[max_poses])
-    bbox         = Group(BboxFeature, push=_feature_share)
-    point        = Group(PointFeature, push=_feature_share)
-    angle        = Group(AngleFeature, push=_feature_share)
-    velocity     = Group(VelocityFeature, push=_feature_share)
+    detection    = Group(batch.DetectionSettings, share=_batch_share)
+    segmentation = Group(batch.SegmentationSettings, share=_batch_share)
+    flow         = Group(batch.FlowSettings, share=_batch_share)
+    image_crop   = Group(batch.ImageCropSettings, share=[max_poses])
+    bbox         = Group(BboxFeature, share=_feature_share)
+    point        = Group(PointFeature, share=_feature_share)
+    angle        = Group(AngleFeature, share=_feature_share)
+    velocity     = Group(VelocityFeature, share=_feature_share)
     motion       = Group(MotionFeature)
-    motion_gate  = Group(nodes.MotionGateApplicatorSettings, push=[max_poses])
+    motion_gate  = Group(nodes.MotionGateApplicatorSettings, share=[max_poses])
     window_raw   = Group(trackers.WindowNodeSettings)
     window_smooth = Group(trackers.WindowNodeSettings)
     window_lerp  = Group(trackers.WindowNodeSettings)
@@ -230,9 +230,9 @@ class DeepFlowSettings(BaseSettings):
     num_players:        Field[int]   = Field(1, access=Field.INIT, visible=False)
     fps:                Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
 
-    camera  = Group(OakGroup, push=[num_players.as_('num_cameras'), fps])
+    camera  = Group(OakGroup, share=[num_players.as_('num_cameras'), fps])
     tt      = Group(TTGroup)
-    pose    = Group(PoseGroup, push=[num_players.as_('max_poses'), fps.as_('frequency')])
+    pose    = Group(PoseGroup, share=[num_players.as_('max_poses'), fps.as_('frequency')])
     render  = Group(RenderGroup)
     inout   = Group(InOutGroup)
     server  = Group(NiceSettings)

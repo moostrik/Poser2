@@ -22,16 +22,14 @@ After renaming, adding, or removing a `Field`, `Group`, or `Child`:
 
 ## Composition over inheritance
 
-- Do not subclass a module's Settings class in app code — use `Group(ModuleSettings, push=[...])` instead
-- To propagate fields to multiple children, declare them on the parent group and `push` to each child Group
-- To propagate a field from child to parent, use `Group(ModuleSettings, pull=[...])`
-- A field in both `push` and `pull` is bidirectional — either side can write
+- Do not subclass a module's Settings class in app code — use `Group(ModuleSettings, share=[...])` instead
+- To propagate fields to multiple children, declare them on the parent group and `share` to each child Group
+- All sharing is bidirectional: parent writes propagate to children, child writes propagate upward to the parent (and fan out to siblings)
 
 ## Key rules
 
 - JSON keys must match Python field names exactly (after `share` aliasing)
 - `access=Field.INIT` fields are in the JSON but skipped by `update_from_dict()` — still keep them for documentation
-- Pushed fields (`push=[...]`) appear in the **parent** JSON, not the child — the parent propagates values to children at construction
-- Pulled fields (`pull=[...]`) appear in the **child** JSON, not the parent — the child propagates values to the parent after deserialization
+- Shared fields (`share=[...]`) appear in the **parent** JSON, not the child — the parent is the serialization source of truth
 - Fields using `.as_('child_name')` are serialized under the **parent's** field name, not the alias
 - `Group` and `Child` entries become nested JSON objects; the key is the Python attribute name

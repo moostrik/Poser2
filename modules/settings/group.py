@@ -5,30 +5,26 @@
     class PoseGroup(Settings):
         frequency = Field(30.0, access=Field.INIT)
 
-        bbox  = Group(BboxFeature, push=[frequency])
-        point = Group(PointFeature, push=[frequency])
+        bbox  = Group(BboxFeature, share=[frequency])
+        point = Group(PointFeature, share=[frequency])
 
     pose = PoseGroup()
     pose.bbox.smoother.frequency   # accesses the child's field
 
-Push fields are passed as constructor kwargs to the child.  The parent
-is the source of truth — pushed fields are excluded from child serialization,
-re-propagated on ``update_from_dict``, and pushed downstream on normal parent
-assignment.
+Shared fields are passed as constructor kwargs to the child.  The parent
+is the serialization source of truth — shared fields are excluded from
+child serialization, re-propagated on ``update_from_dict``, and pushed
+downstream on normal parent assignment.
 
-Pull fields propagate in the opposite direction: the child is the source
-of truth and changes flow upward to the parent.  Pull-only parent fields
-are excluded from parent serialization and cannot be written directly.
-
-A field appearing in both ``push`` and ``pull`` is bidirectional — either
-side can write and changes propagate both ways.  The parent remains the
-serialization source of truth for bidirectional fields.
+All sharing is bidirectional: changes on the parent propagate to children,
+and changes on a child propagate upward to the parent (and fan out to
+sibling children wired to the same field).
 
 Name-mapped sharing allows a parent field to arrive under a different name
 in the child::
 
     frequency = Field(30.0)
-    interp = Group(InterpolatorSettings, push=[frequency.as_('input_frequency')])
+    interp = Group(InterpolatorSettings, share=[frequency.as_('input_frequency')])
 """
 
 from typing import TYPE_CHECKING, Generic, TypeVar, overload, Sequence
@@ -48,47 +44,33 @@ class Group(Generic[T]):
     ----------
     settings_type : type[T]
         The Settings subclass to instantiate as the child.
-    push : list of Field or FieldAlias, optional
-        Parent fields whose values are pushed to the child at construction
-        time, after ``update_from_dict``, and on normal runtime assignment.
-    pull : list of Field or FieldAlias, optional
-        Child fields whose values are pulled up to the parent.  Changes on
-        the child propagate upward; pull-only parent fields cannot be
-        written directly.
+    share : list of Field or FieldAlias, optional
+        Parent fields whose values are shared with the child.  Sharing is
+        bidirectional: parent writes propagate to the child, and child
+        writes propagate upward to the parent (and fan out to siblings).
     """
 
     def __init__(
         self,
         settings_type: type[T],
         *,
-        push: Sequence[Field | FieldAlias] | None = None,
-        pull: Sequence[Field | FieldAlias] | None = None,
+        share: Sequence[Field | FieldAlias] | None = None,
     ):
         self.settings_type = settings_type
-        self._push_refs: list[Field | FieldAlias] = list(push) if push else []
-        self._pull_refs: list[Field | FieldAlias] = list(pull) if pull else []
-        self.push_map: dict[str, str] = {}  # parent_name → child_name
-        self.pull_map: dict[str, str] = {}  # parent_name → child_name
+        self._share_refs: list[Field | FieldAlias] = list(share) if share else []
+        self.share_map: dict[str, str] = {}  # parent_name → child_name
         self.name = ""
 
     def __set_name__(self, owner: type, name: str):
         self.name = name
-        for ref in self._push_refs:
+        for ref in self._share_refs:
             if isinstance(ref, FieldAlias):
                 parent_name = ref.field.name
                 child_name = ref.child_name
             else:
                 parent_name = ref.name
                 child_name = ref.name
-            self.push_map[parent_name] = child_name
-        for ref in self._pull_refs:
-            if isinstance(ref, FieldAlias):
-                parent_name = ref.field.name
-                child_name = ref.child_name
-            else:
-                parent_name = ref.name
-                child_name = ref.name
-            self.pull_map[parent_name] = child_name
+            self.share_map[parent_name] = child_name
 
     @overload
     def __get__(self, obj: None, objtype: type) -> 'Group[T]': ...
@@ -108,15 +90,15 @@ class Group(Generic[T]):
     # -- Helpers used by Settings.__init__ -----------------------------------
 
     def validate_wiring(self, owner: 'BaseSettings') -> None:
-        """Check that every push/pull field exists on both parent and child with matching types and access modes.
+        """Check that every shared field exists on both parent and child
+        with matching types and compatible access levels.
 
         Raises ``TypeError`` if:
 
         - a parent field name is not found on the parent
         - a child field name is not found on the child
         - the field types don't match
-        - push: the child field is ``INIT`` but the parent field is not
-        - pull: the parent field is ``INIT`` but the child field is not
+        - one side is ``INIT`` and the other is not (INIT must be symmetric)
         """
         child_fields = {
             name: f for cls in self.settings_type.__mro__
@@ -124,50 +106,39 @@ class Group(Generic[T]):
             if isinstance(f, Field)
         }
 
-        def _check(label: str, mapping: dict[str, str], *, check_push: bool) -> None:
-            for parent_name, child_name in mapping.items():
-                if parent_name not in owner._fields:
-                    raise TypeError(
-                        f"{type(owner).__name__}.{self.name}: {label} field '{parent_name}' "
-                        f"not found on parent {type(owner).__name__}"
-                    )
-                if child_name not in child_fields:
-                    raise TypeError(
-                        f"{type(owner).__name__}.{self.name}: {label} field '{child_name}' "
-                        f"not found on child {self.settings_type.__name__}"
-                    )
-                parent_field = owner._fields[parent_name]
-                child_field = child_fields[child_name]
-                if parent_field.type_ != child_field.type_:
-                    raise TypeError(
-                        f"{type(owner).__name__}.{self.name}: type mismatch for {label} field "
-                        f"'{parent_name}' → '{child_name}' — parent {parent_field.type_.__name__} "
-                        f"!= child {child_field.type_.__name__}"
-                    )
-                if check_push:
-                    if child_field.access is Access.INIT and parent_field.access is not Access.INIT:
-                        raise TypeError(
-                            f"{type(owner).__name__}.{self.name}: access mismatch for push field "
-                            f"'{parent_name}' → '{child_name}' — child is INIT but parent is "
-                            f"{parent_field.access.name}. An INIT child field cannot receive "
-                            f"runtime updates from a non-INIT parent."
-                        )
-                else:
-                    if parent_field.access is Access.INIT and child_field.access is not Access.INIT:
-                        raise TypeError(
-                            f"{type(owner).__name__}.{self.name}: access mismatch for pull field "
-                            f"'{parent_name}' → '{child_name}' — parent is INIT but child is "
-                            f"{child_field.access.name}. An INIT parent field cannot receive "
-                            f"runtime updates from a non-INIT child."
-                        )
+        for parent_name, child_name in self.share_map.items():
+            if parent_name not in owner._fields:
+                raise TypeError(
+                    f"{type(owner).__name__}.{self.name}: share field '{parent_name}' "
+                    f"not found on parent {type(owner).__name__}"
+                )
+            if child_name not in child_fields:
+                raise TypeError(
+                    f"{type(owner).__name__}.{self.name}: share field '{child_name}' "
+                    f"not found on child {self.settings_type.__name__}"
+                )
+            parent_field = owner._fields[parent_name]
+            child_field = child_fields[child_name]
+            if parent_field.type_ != child_field.type_:
+                raise TypeError(
+                    f"{type(owner).__name__}.{self.name}: type mismatch for share field "
+                    f"'{parent_name}' → '{child_name}' — parent {parent_field.type_.__name__} "
+                    f"!= child {child_field.type_.__name__}"
+                )
+            p_init = parent_field.access is Access.INIT
+            c_init = child_field.access is Access.INIT
+            if p_init != c_init:
+                raise TypeError(
+                    f"{type(owner).__name__}.{self.name}: access mismatch for share field "
+                    f"'{parent_name}' → '{child_name}' — parent is "
+                    f"{parent_field.access.name} but child is {child_field.access.name}. "
+                    f"Shared fields must both be INIT or both be non-INIT."
+                )
 
-        _check("push", self.push_map, check_push=True)
-        _check("pull", self.pull_map, check_push=False)
-
-    def build_push_kwargs(self, owner: 'BaseSettings') -> dict:
-        """Build constructor kwargs from the parent's pushed field values."""
+    def build_share_kwargs(self, owner: 'BaseSettings') -> dict:
+        """Build constructor kwargs from the parent's shared field values."""
         kwargs = {}
-        for parent_name, child_name in self.push_map.items():
+        for parent_name, child_name in self.share_map.items():
             if parent_name in owner._fields:
                 kwargs[child_name] = owner._values[parent_name]
         return kwargs
