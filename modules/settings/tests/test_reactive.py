@@ -2169,9 +2169,9 @@ class ParentWithChild(BaseSettings):
     fps    = Field(30.0, access=Field.INIT)
     color  = Field(True, access=Field.INIT)
     player = Group(PlayerSettings)
-    core_0 = Group(CoreSettings, share=[fps, color])
-    core_1 = Group(CoreSettings, share=[fps, color])
-    core_2 = Group(CoreSettings, share=[fps, color])
+    core_0 = Group(CoreSettings, push=[fps, color])
+    core_1 = Group(CoreSettings, push=[fps, color])
+    core_2 = Group(CoreSettings, push=[fps, color])
 
     @property
     def cores(self) -> list[CoreSettings]:
@@ -2251,7 +2251,7 @@ class TestGroupMulti(unittest.TestCase):
 
 
 class TestGroupShare(unittest.TestCase):
-    """Tests for share=[fps, color] — parent pushes values to children."""
+    """Tests for push=[fps, color] — parent pushes values to children."""
 
     def test_shared_values_propagated(self):
         s = ParentWithChild()
@@ -2296,7 +2296,7 @@ class TestGroupShare(unittest.TestCase):
 
         class LiveParent(BaseSettings):
             level = Field(1)
-            child = Group(SharedValue, share=[level.as_('value')])
+            child = Group(SharedValue, push=[level.as_('value')])
 
         s = LiveParent()
         s.level = 42
@@ -2308,11 +2308,11 @@ class TestGroupShare(unittest.TestCase):
 
         class SharedBranch(BaseSettings):
             value = Field(0)
-            leaf = Group(SharedLeaf, share=[value])
+            leaf = Group(SharedLeaf, push=[value])
 
         class LiveParent(BaseSettings):
             level = Field(1)
-            child = Group(SharedBranch, share=[level.as_('value')])
+            child = Group(SharedBranch, push=[level.as_('value')])
 
         s = LiveParent()
         s.level = 7
@@ -2325,7 +2325,7 @@ class TestGroupShare(unittest.TestCase):
 
         class LiveParent(BaseSettings):
             level = Field(1)
-            child = Group(SharedValue, share=[level.as_('value')])
+            child = Group(SharedValue, push=[level.as_('value')])
 
         s = LiveParent()
         with self.assertRaises(AttributeError):
@@ -2337,7 +2337,7 @@ class TestGroupShare(unittest.TestCase):
 
         class LiveParent(BaseSettings):
             level = Field(1)
-            child = Group(SharedValue, share=[level.as_('value')])
+            child = Group(SharedValue, push=[level.as_('value')])
 
         s = LiveParent()
         self.assertTrue(s.child.is_incoming_shared('value'))
@@ -2427,7 +2427,7 @@ class TestValidateShare(unittest.TestCase):
     def test_share_field_missing_from_parent(self):
         with self.assertRaises(TypeError) as ctx:
             class BadParent(BaseSettings):
-                core = Group(CoreSettings, share=[CoreSettings.exposure])
+                core = Group(CoreSettings, push=[CoreSettings.exposure])
             BadParent()
         self.assertIn("not found on parent", str(ctx.exception))
 
@@ -2438,7 +2438,7 @@ class TestValidateShare(unittest.TestCase):
 
             class BadParent2(BaseSettings):
                 fps = Field(30.0, access=Field.INIT)
-                item = Group(ChildWithoutFps, share=[fps])
+                item = Group(ChildWithoutFps, push=[fps])
             BadParent2()
         self.assertIn("not found on child", str(ctx.exception))
 
@@ -2449,7 +2449,7 @@ class TestValidateShare(unittest.TestCase):
 
             class BadParent3(BaseSettings):
                 fps = Field(30.0)  # float
-                item = Group(ChildIntFps, share=[fps])
+                item = Group(ChildIntFps, push=[fps])
             BadParent3()
         self.assertIn("type mismatch", str(ctx.exception))
 
@@ -2459,14 +2459,14 @@ class TestValidateShare(unittest.TestCase):
         self.assertEqual(len(s.cores), 3)
 
     def test_share_access_mismatch_raises(self):
-        """INIT parent field shared to non-INIT child field must raise at construction."""
+        """Non-INIT parent field pushed to INIT child field must raise at construction."""
         with self.assertRaises(TypeError) as ctx:
-            class ChildWithWriteFps(BaseSettings):
-                fps = Field(30.0)  # WRITE, not INIT
+            class ChildWithInitFps(BaseSettings):
+                fps = Field(30.0, access=Field.INIT)
 
             class BadAccessParent(BaseSettings):
-                fps = Field(30.0, access=Field.INIT)
-                item = Group(ChildWithWriteFps, share=[fps])
+                fps = Field(30.0)  # WRITE, not INIT
+                item = Group(ChildWithInitFps, push=[fps])
 
             BadAccessParent()
         self.assertIn("access mismatch", str(ctx.exception))
@@ -2503,7 +2503,7 @@ class TestPropagatSharedAfterInitialize(unittest.TestCase):
         """Non-INIT shared fields must still propagate after initialize()."""
         class LiveParent(BaseSettings):
             level = Field(1)  # WRITE — not INIT
-            child = Group(MinimalSettings, share=[level.as_('value')])
+            child = Group(MinimalSettings, push=[level.as_('value')])
 
         s = LiveParent()
         s.initialize()
@@ -2511,6 +2511,199 @@ class TestPropagatSharedAfterInitialize(unittest.TestCase):
         # level is WRITE so update_from_dict updates it, then propagates to child
         self.assertEqual(s.level, 42)
         self.assertEqual(s.child.value, 42)
+
+
+# ── Pull tests ────────────────────────────────────────────────────────────
+
+
+class PullChild(BaseSettings):
+    status = Field(0)
+
+
+class PullParent(BaseSettings):
+    status = Field(0)
+    child = Group(PullChild, pull=[status])
+
+
+class TestGroupPull(unittest.TestCase):
+    """Tests for pull=[...] — child pushes values to parent."""
+
+    def test_pull_child_write_propagates_to_parent(self):
+        s = PullParent()
+        s.child.status = 42
+        self.assertEqual(s.status, 42)
+
+    def test_pull_parent_direct_write_blocked(self):
+        s = PullParent()
+        with self.assertRaises(AttributeError):
+            s.status = 99
+
+    def test_pull_initial_value_from_child_default(self):
+        s = PullParent()
+        self.assertEqual(s.status, 0)
+        self.assertEqual(s.child.status, 0)
+
+    def test_pull_with_alias(self):
+        class AliasChild(BaseSettings):
+            output = Field(0)
+
+        class AliasParent(BaseSettings):
+            result = Field(0)
+            child = Group(AliasChild, pull=[result.as_('output')])
+
+        s = AliasParent()
+        s.child.output = 7
+        self.assertEqual(s.result, 7)
+
+    def test_pull_excluded_from_parent_serialization(self):
+        s = PullParent()
+        s.child.status = 5
+        d = s.to_dict()
+        self.assertNotIn("status", d)
+        self.assertIn("status", d["child"])
+
+    def test_pull_present_on_child_serialization(self):
+        s = PullParent()
+        s.child.status = 5
+        d = s.to_dict()
+        self.assertEqual(d["child"]["status"], 5)
+
+    def test_pull_deserialization_propagates_to_parent(self):
+        s = PullParent()
+        s.update_from_dict({"child": {"status": 99}})
+        self.assertEqual(s.status, 99)
+
+    def test_pull_callback_on_parent(self):
+        s = PullParent()
+        captured = []
+        s.bind(PullParent.status, lambda v: captured.append(v))
+        s.child.status = 10
+        self.assertEqual(captured, [10])
+
+    def test_pull_callback_on_child(self):
+        s = PullParent()
+        captured = []
+        s.child.bind(PullChild.status, lambda v: captured.append(v))
+        s.child.status = 10
+        self.assertEqual(captured, [10])
+
+    def test_pull_round_trip(self):
+        s1 = PullParent()
+        s1.child.status = 42
+        data = s1.to_dict()
+        s2 = PullParent()
+        s2.update_from_dict(data)
+        self.assertEqual(s2.child.status, 42)
+        self.assertEqual(s2.status, 42)
+
+    def test_pull_access_mismatch_raises(self):
+        """INIT parent field pulled from non-INIT child must raise."""
+        with self.assertRaises(TypeError) as ctx:
+            class PullChildNonInit(BaseSettings):
+                val = Field(0)  # WRITE
+
+            class PullParentInit(BaseSettings):
+                val = Field(0, access=Field.INIT)
+                child = Group(PullChildNonInit, pull=[val])
+
+            PullParentInit()
+        self.assertIn("access mismatch", str(ctx.exception))
+
+
+# ── Bidirectional (push + pull) tests ─────────────────────────────────────
+
+
+class BidiChild(BaseSettings):
+    level = Field(0)
+
+
+class BidiParent(BaseSettings):
+    level = Field(0)
+    child = Group(BidiChild, push=[level], pull=[level])
+
+
+class TestGroupBidirectional(unittest.TestCase):
+    """Tests for fields in both push and pull — bidirectional propagation."""
+
+    def test_bidi_parent_write_propagates_to_child(self):
+        s = BidiParent()
+        s.level = 10
+        self.assertEqual(s.child.level, 10)
+
+    def test_bidi_child_write_propagates_to_parent(self):
+        s = BidiParent()
+        s.child.level = 20
+        self.assertEqual(s.level, 20)
+
+    def test_bidi_no_infinite_loop(self):
+        s = BidiParent()
+        s.level = 5
+        self.assertEqual(s.level, 5)
+        self.assertEqual(s.child.level, 5)
+        s.child.level = 7
+        self.assertEqual(s.level, 7)
+        self.assertEqual(s.child.level, 7)
+
+    def test_bidi_parent_writable(self):
+        """Bidirectional field should be writable on parent (not pull-guarded)."""
+        s = BidiParent()
+        s.level = 100  # should not raise
+        self.assertEqual(s.level, 100)
+
+    def test_bidi_child_writable(self):
+        """Bidirectional field should be writable on child (not push-guarded)."""
+        s = BidiParent()
+        s.child.level = 200  # should not raise
+        self.assertEqual(s.child.level, 200)
+
+    def test_bidi_serialization_in_parent(self):
+        """Bidirectional fields serialize in parent dict, excluded from child."""
+        s = BidiParent()
+        s.level = 42
+        d = s.to_dict()
+        self.assertIn("level", d)
+        self.assertNotIn("level", d["child"])
+
+    def test_bidi_deserialization(self):
+        s = BidiParent()
+        s.update_from_dict({"level": 99})
+        self.assertEqual(s.level, 99)
+        self.assertEqual(s.child.level, 99)
+
+    def test_bidi_fan_out_to_other_children(self):
+        """Child write fans out via parent to other push-only children."""
+        class OtherChild(BaseSettings):
+            level = Field(0)
+
+        class FanOutParent(BaseSettings):
+            level = Field(0)
+            writer = Group(BidiChild, push=[level], pull=[level])
+            reader = Group(OtherChild, push=[level])
+
+        s = FanOutParent()
+        s.writer.level = 50
+        self.assertEqual(s.level, 50)
+        self.assertEqual(s.reader.level, 50)
+
+    def test_bidi_callback_fires_once_per_direction(self):
+        s = BidiParent()
+        parent_calls = []
+        child_calls = []
+        s.bind(BidiParent.level, lambda v: parent_calls.append(v))
+        s.child.bind(BidiChild.level, lambda v: child_calls.append(v))
+        s.child.level = 33
+        # Child callback fires from direct set, parent from upward propagation
+        self.assertEqual(child_calls, [33])
+        self.assertEqual(parent_calls, [33])
+
+    def test_bidi_round_trip(self):
+        s1 = BidiParent()
+        s1.child.level = 77
+        data = s1.to_dict()
+        s2 = BidiParent()
+        s2.update_from_dict(data)
+        self.assertEqual(s2.level, 77)
+        self.assertEqual(s2.child.level, 77)
 
 
 class TestValidateName(unittest.TestCase):

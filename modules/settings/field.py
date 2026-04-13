@@ -16,12 +16,12 @@ logger = logging.getLogger(__name__)
 class FieldAlias:
     """A Field reference with an alternate name for sharing to a child.
 
-    Created via ``Field.as_('child_name')`` and used in share lists::
+    Created via ``Field.as_('child_name')`` and used in push/pull lists::
 
         frequency = Field(30.0)
-        interpolator = InterpolatorSettings(share=[frequency.as_('input_frequency')])
+        interpolator = InterpolatorSettings(push=[frequency.as_('input_frequency')])
 
-    The parent field ``frequency`` is shared to the child as ``input_frequency``.
+    The parent field ``frequency`` is pushed to the child as ``input_frequency``.
     """
     field: 'Field'
     child_name: str
@@ -94,7 +94,7 @@ class Field(Generic[T]):
     forever.  Pressing the button calls ``field.fire(settings)``, which
     invokes all registered callbacks with ``True`` without changing the
     value.  Buttons are excluded from serialization (``to_dict``).
-    If the button field is shared to a child via ``Group(..., share=[])``,
+    If the button field is pushed to a child via ``Group(..., push=[])``,
     ``fire()`` propagates downstream automatically.
 
     The one keyword parameter with a runtime effect is ``access``:
@@ -206,9 +206,14 @@ class Field(Generic[T]):
     def set(self, obj, value):
         """Set value. Only enforces Access.INIT after initialization."""
         incoming_owner = getattr(obj, '_incoming_shared', {}).get(self.name)
-        if incoming_owner is not None and not getattr(obj, '_is_propagating_shared', False):
+        if incoming_owner is not None and not getattr(obj, '_is_propagating', False):
             raise AttributeError(
-                f"Field '{self.name}' is shared from parent field '{incoming_owner}' and cannot be set on {type(obj).__name__}"
+                f"Field '{self.name}' is pushed from parent field '{incoming_owner}' and cannot be set on {type(obj).__name__}"
+            )
+        pulled_child = getattr(obj, '_incoming_pulled', {}).get(self.name)
+        if pulled_child is not None and not getattr(obj, '_is_propagating', False):
+            raise AttributeError(
+                f"Field '{self.name}' is pulled from a child field and cannot be set directly on {type(obj).__name__}"
             )
         if self.access is Access.INIT and obj._initialized:
             raise AttributeError(
@@ -230,7 +235,10 @@ class Field(Generic[T]):
                 changed = True
 
         if changed:
-            obj._propagate_shared_field(self.name)
+            obj._propagate_pushed_field(self.name)
+            # Upward propagation: child → parent (only when not already propagating)
+            if not obj._is_propagating:
+                obj._propagate_upward_field(self.name)
 
         # Fire callbacks outside the lock
         for cb in callbacks_to_fire:
@@ -358,10 +366,16 @@ class Field(Generic[T]):
                     "Action callback %r for '%s' raised an exception",
                     cb, self.name, exc_info=True,
                 )
-        # Propagate to shared children
+        # Propagate to pushed children
         for child, child_name in getattr(obj, '_shared_targets', {}).get(self.name, []):
             if child_name in child._fields:
                 child._fields[child_name].fire(child)
+        # Propagate upward to parent
+        upward = getattr(obj, '_upward_targets', {}).get(self.name)
+        if upward is not None:
+            parent, parent_name = upward
+            if parent_name in parent._fields:
+                parent._fields[parent_name].fire(parent)
 
     def bind(self, obj, callback):
         with obj._locks[self.name]:
@@ -439,8 +453,8 @@ class Field(Generic[T]):
         Usage::
 
             frequency = Field(30.0)
-            interp = InterpolatorSettings(share=[frequency.as_('input_frequency')])
+            interp = InterpolatorSettings(push=[frequency.as_('input_frequency')])
 
-        The parent's ``frequency`` value is shared to the child as ``input_frequency``.
+        The parent's ``frequency`` value is pushed to the child as ``input_frequency``.
         """
         return FieldAlias(self, child_name)

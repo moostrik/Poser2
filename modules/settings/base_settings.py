@@ -21,8 +21,8 @@ Group children nest related fields into scopes::
 
     class PoseGroup(Settings):
         frequency = Field(30.0, access=Field.INIT)
-        bbox      = Group(BboxFeature, share=[frequency])
-        point     = Group(PointFeature, share=[frequency])
+        bbox      = Group(BboxFeature, push=[frequency])
+        point     = Group(PointFeature, push=[frequency])
 """
 
 import copy
@@ -42,9 +42,11 @@ class BaseSettings:
     def __init__(self, **kwargs):
         object.__setattr__(self, "_initialized", False)
         object.__setattr__(self, "_parent", None)
-        object.__setattr__(self, "_incoming_shared", {})
-        object.__setattr__(self, "_shared_targets", {})
-        object.__setattr__(self, "_is_propagating_shared", False)
+        object.__setattr__(self, "_incoming_shared", {})   # child_name → parent_name (push-locked on child)
+        object.__setattr__(self, "_incoming_pulled", {})    # parent_name → child_name (pull-locked on parent)
+        object.__setattr__(self, "_shared_targets", {})     # parent_name → [(child, child_name), ...]
+        object.__setattr__(self, "_upward_targets", {})     # child_name → (parent, parent_name)
+        object.__setattr__(self, "_is_propagating", False)
         object.__setattr__(self, "_fields", {})
         object.__setattr__(self, "_values", {})
         object.__setattr__(self, "_callbacks", {})
@@ -74,18 +76,29 @@ class BaseSettings:
                 )
             self._fields[name].set(self, value)
 
-        # Create children from Group descriptors (after kwargs so shared fields have updated values)
+        # Create children from Group descriptors (after kwargs so pushed fields have updated values)
         for attr_name in group_names:
             group_desc = self._get_group_descriptor(attr_name)
             if group_desc is None:
                 continue
-            group_desc.validate_share(self)
-            share_kwargs = group_desc.build_share_kwargs(self)
-            child = group_desc.settings_type(**share_kwargs)
+            group_desc.validate_wiring(self)
+            push_kwargs = group_desc.build_push_kwargs(self)
+            child = group_desc.settings_type(**push_kwargs)
             object.__setattr__(child, "_parent", self)
-            for parent_name, child_name in group_desc.share_map.items():
+            # Wire push: parent → child
+            for parent_name, child_name in group_desc.push_map.items():
                 child._incoming_shared[child_name] = parent_name
                 self._shared_targets.setdefault(parent_name, []).append((child, child_name))
+            # Wire pull: child → parent
+            for parent_name, child_name in group_desc.pull_map.items():
+                child._upward_targets[child_name] = (self, parent_name)
+                # Guard parent field only if pull-only (not also pushed)
+                if parent_name not in group_desc.push_map:
+                    self._incoming_pulled[parent_name] = child_name
+                # Bidirectional fields also need push wiring (child → parent already handles upward)
+                # Remove the incoming_shared guard on child for bidi fields (child must be writable)
+                if parent_name in group_desc.push_map and child_name in child._incoming_shared:
+                    del child._incoming_shared[child_name]
             self._children[attr_name] = child
 
     # -- Attribute access guard ----------------------------------------------
@@ -150,12 +163,58 @@ class BaseSettings:
         return dict(self._children)
 
     def is_incoming_shared(self, name: str) -> bool:
-        """Return True if *name* is owned by the parent and shared into this instance."""
+        """Return True if *name* is pushed from the parent into this instance."""
         return name in self._incoming_shared
 
     def incoming_shared_source(self, name: str) -> str | None:
-        """Return the parent field name that owns *name*, or None if local."""
+        """Return the parent field name that pushes *name*, or None if local."""
         return self._incoming_shared.get(name)
+
+    def is_incoming_pulled(self, name: str) -> bool:
+        """Return True if *name* is pull-locked on this parent (child owns the value)."""
+        return name in self._incoming_pulled
+
+    def is_bidirectional(self, name: str) -> bool:
+        """Return True if *name* is a bidirectional field on this child instance.
+
+        Bidirectional means the field has upward wiring (child→parent) but
+        is NOT push-locked (the shared guard was removed so the child can write).
+        """
+        return name in self._upward_targets and name not in self._incoming_shared
+
+    def is_push_source(self, name: str) -> bool:
+        """Return True if *name* pushes its value to one or more children."""
+        return name in self._shared_targets
+
+    def wiring_label(self, name: str) -> str | None:
+        """Return a short human-readable label describing the wiring of *name*.
+
+        Returns ``None`` for locally-owned fields with no wiring.
+        """
+        if name in self._incoming_shared:
+            parent_name = self._incoming_shared[name]
+            parent_type = type(self._parent).__name__ if self._parent else "parent"
+            return f"Pushed from {parent_type}.{parent_name}"
+        if name in self._incoming_pulled:
+            child_name = self._incoming_pulled[name]
+            for attr, child in self._children.items():
+                if child_name in child._upward_targets:
+                    return f"Pulled from {attr}.{child_name}"
+            return f"Pulled from child.{child_name}"
+        if name in self._upward_targets:
+            parent, parent_name = self._upward_targets[name]
+            parent_type = type(parent).__name__
+            return f"Synced with {parent_type}.{parent_name}"
+        if name in self._shared_targets:
+            targets = self._shared_targets[name]
+            # Find the group attr name for each child
+            child_to_attr = {id(c): a for a, c in self._children.items()}
+            parts = []
+            for child, child_name in targets:
+                attr = child_to_attr.get(id(child), "?")
+                parts.append(f"{attr}.{child_name}")
+            return f"Pushes to {', '.join(parts)}"
+        return None
 
     # -- Callback registration -----------------------------------------------
 
@@ -196,23 +255,24 @@ class BaseSettings:
         ``Access.INIT`` fields **are** included (they are editable in JSON but
         cannot be changed at runtime after construction).
 
-        Children are serialized as nested dicts.  Shared fields (declared
-        via ``Group(..., share=[...])``) are excluded from child dicts —
-        the parent is the single source of truth.  When name-mapped sharing
-        is used (``field.as_('child_name')``), the child name is excluded.
+        Push/bidirectional fields are excluded from child dicts (parent is
+        source of truth).  Pull-only parent fields are excluded from the
+        parent dict (child is source of truth).
         """
         result = {}
         exclude = _exclude or set()
+        pulled = set(self._incoming_pulled)  # pull-only parent fields
         for name, field in self._fields.items():
-            if name in exclude:
+            if name in exclude or name in pulled:
                 continue
             if field.access is Access.READ or field.widget == Widget.button:
                 continue
             result[name] = field.to_json_value(self)
         for name, child in self._children.items():
             desc = self._get_group_descriptor(name)
-            shared = set(desc.share_map.values()) if desc is not None else set()
-            result[name] = child.to_dict(_exclude=shared)
+            # Exclude pushed and bidirectional child fields (parent owns them)
+            pushed = set(desc.push_map.values()) if desc is not None else set()
+            result[name] = child.to_dict(_exclude=pushed)
         return result
 
     def initialize(self):
@@ -267,25 +327,27 @@ class BaseSettings:
                     "%s.update_from_dict: expected dict for child '%s' — skipping",
                     type(self).__name__, name,
                 )
-        # Re-propagate shared fields to children after own fields are updated
-        self._propagate_shared()
+        # Re-propagate push fields to children after own fields are updated
+        self._propagate_pushed()
+        # Re-propagate pull fields from children to parent
+        self._propagate_pulled()
 
-    # -- Share propagation ---------------------------------------------------
+    # -- Push/pull propagation -----------------------------------------------
 
-    def _propagate_shared(self):
-        """Copy shared field values from this parent into its children.
+    def _propagate_pushed(self):
+        """Copy pushed field values from this parent into its children.
 
         INIT fields are skipped when the child is already initialized — they
         were frozen by ``initialize()`` and cannot be changed at runtime.
         """
         for parent_name in self._shared_targets:
-            self._propagate_shared_field(parent_name)
+            self._propagate_pushed_field(parent_name)
 
-    def _propagate_shared_field(self, parent_name: str) -> None:
+    def _propagate_pushed_field(self, parent_name: str) -> None:
         """Push one parent field to all directly shared child fields.
 
         This is called after construction, after ``update_from_dict()``, and
-        after normal runtime assignment so shared values stay reactive.
+        after normal runtime assignment so pushed values stay reactive.
         Propagation is strictly downstream: parent → child.
         """
         if parent_name not in self._shared_targets or parent_name not in self._fields:
@@ -297,12 +359,60 @@ class BaseSettings:
             child_field = child._fields[child_name]
             if child_field.access is Access.INIT and child._initialized:
                 continue
-            previous = child._is_propagating_shared
-            object.__setattr__(child, '_is_propagating_shared', True)
+            previous = child._is_propagating
+            object.__setattr__(child, '_is_propagating', True)
             try:
                 child_field.set(child, value)
             finally:
-                object.__setattr__(child, '_is_propagating_shared', previous)
+                object.__setattr__(child, '_is_propagating', previous)
+
+    def _propagate_pulled(self) -> None:
+        """Copy pull field values from children up into this parent.
+
+        Called after ``update_from_dict()`` so the parent reflects
+        child-owned values after deserialization.
+        """
+        for attr_name, child in self._children.items():
+            desc = self._get_group_descriptor(attr_name)
+            if desc is None:
+                continue
+            for parent_name, child_name in desc.pull_map.items():
+                if child_name not in child._fields or parent_name not in self._fields:
+                    continue
+                parent_field = self._fields[parent_name]
+                if parent_field.access is Access.INIT and self._initialized:
+                    continue
+                value = child._values[child_name]
+                previous = self._is_propagating
+                object.__setattr__(self, '_is_propagating', True)
+                try:
+                    parent_field.set(self, value)
+                finally:
+                    object.__setattr__(self, '_is_propagating', previous)
+
+    def _propagate_upward_field(self, child_name: str) -> None:
+        """Pull one child field value up to the parent.
+
+        Called from ``Field._apply()`` on the child when a pull-wired field changes.
+        After writing the parent, pushes the value to any other children that
+        are wired to the same parent field (fan-out).
+        """
+        upward = self._upward_targets.get(child_name)
+        if upward is None:
+            return
+        parent, parent_name = upward
+        if parent_name not in parent._fields:
+            return
+        parent_field = parent._fields[parent_name]
+        if parent_field.access is Access.INIT and parent._initialized:
+            return
+        value = self._values[child_name]
+        previous = parent._is_propagating
+        object.__setattr__(parent, '_is_propagating', True)
+        try:
+            parent_field._apply(parent, value)
+        finally:
+            object.__setattr__(parent, '_is_propagating', previous)
 
     # -- Helpers -------------------------------------------------------------
 

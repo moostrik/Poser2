@@ -120,12 +120,45 @@ def _attach_description_tooltip(element, description: str | None):
 
 def _is_field_read_only(settings, name: str, field: Field) -> bool:
     """Return True when a field should render read-only in this settings instance."""
-    return field.access is Access.READ or settings.is_incoming_shared(name)
+    if field.access is Access.READ:
+        return True
+    if settings.is_incoming_shared(name):
+        return True
+    if settings.is_incoming_pulled(name):
+        return True
+    return False
 
 
 def _field_needs_poll(settings, name: str, field: Field) -> bool:
     """Return True when UI should poll external updates for this field."""
-    return field.access is not Access.WRITE or settings.is_incoming_shared(name)
+    if settings.is_incoming_shared(name) or settings.is_incoming_pulled(name):
+        return True
+    if settings.is_bidirectional(name):
+        return True
+    return field.access is not Access.WRITE
+
+
+def _wiring_css_class(settings, name: str) -> str:
+    """Return a CSS class for the field's wiring state, or empty string."""
+    if settings.is_incoming_shared(name):
+        return "poser-linked"
+    if settings.is_incoming_pulled(name):
+        return "poser-linked"
+    if settings.is_bidirectional(name):
+        return "poser-synced"
+    if settings.is_push_source(name):
+        return "poser-source"
+    return ""
+
+
+def _wiring_tooltip(settings, name: str, description: str) -> str:
+    """Append wiring info to a field's description for the tooltip."""
+    label = settings.wiring_label(name)
+    if label is None:
+        return description
+    if description:
+        return f"{description}\n({label})"
+    return label
 
 
 def _build_field_header(
@@ -164,6 +197,9 @@ def _access_css_class(field: Field) -> str:
 def _build_settings_entry(settings, name: str, field: Field, polls) -> None:
     """Render one visible field in declaration order."""
     css = _access_css_class(field)
+    wiring = _wiring_css_class(settings, name)
+    if wiring:
+        css = f"{css} {wiring}"
     if field.widget == Widget.button:
         with ui.element("div").classes(css):
             _build_action_button(settings, name, field)
@@ -213,7 +249,7 @@ def widget_builder(widget: Widget):
 def _build_switch(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     sw = _attach_description_tooltip(ui.switch(label, value=value).props(
@@ -233,7 +269,7 @@ def _build_switch(settings, name, field, polls):
 def _build_toggle(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     def _apply_style(btn, active: bool):
@@ -271,7 +307,7 @@ def _build_toggle(settings, name, field, polls):
 def _build_slider(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
     color = getattr(field, "color", "primary")
@@ -328,7 +364,7 @@ def _build_slider(settings, name, field, polls):
 def _build_number(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     num = _attach_description_tooltip(ui.number(
@@ -352,7 +388,7 @@ def _build_number(settings, name, field, polls):
 def _build_knob(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
     min_val = field.min if field.min is not None else 0
@@ -382,7 +418,7 @@ def _build_knob(settings, name, field, polls):
 def _build_select(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     options = {m: generate_label(m.name) for m in field.type_}
@@ -405,7 +441,7 @@ def _build_select(settings, name, field, polls):
 def _build_text_select(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     # Resolve the options Field → current list[str] value
@@ -433,7 +469,7 @@ def _build_text_select(settings, name, field, polls):
 def _build_radio(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     options = {m: generate_label(m.name) for m in field.type_}
@@ -458,7 +494,7 @@ def _build_radio(settings, name, field, polls):
 def _build_input(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     inp = _attach_description_tooltip(ui.input(label=label, value=value).props(
@@ -478,7 +514,7 @@ def _build_input(settings, name, field, polls):
 def _build_ip(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     def is_valid_ip(v: str) -> bool:
@@ -506,7 +542,7 @@ def _build_ip(settings, name, field, polls):
 def _build_number_input(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     lo = field.min
     hi = field.max
@@ -544,7 +580,7 @@ def _build_number_input(settings, name, field, polls):
 def _build_textarea(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     ta = _attach_description_tooltip(ui.textarea(label=label, value=value).props(
@@ -566,7 +602,7 @@ def _build_textarea(settings, name, field, polls):
 def _build_color(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     def _color_style(hex_val: str) -> str:
@@ -609,7 +645,7 @@ def _build_color_alpha(settings, name, field, polls):
     alpha = value.a if isinstance(value, Color) else 1.0
 
     with ui.column().classes("w-full gap-1"):
-        _build_field_title(label, field.description)
+        _build_field_title(label, _wiring_tooltip(settings, name, field.description))
         with ui.row().classes("items-end gap-2"):
             ci = ui.color_input(
                 label="Color", value=hex_val
@@ -650,7 +686,7 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool,
     """Shared implementation for checklist, playlist, and order widgets."""
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     elem_type = get_args(field.type_)[0] if get_args(field.type_) else None
@@ -788,7 +824,7 @@ def _build_number_list(settings, name, field, polls):
     """Render a fixed-length list of numbers as styled rows (matches sortable list look)."""
     value = getattr(settings, name)
     label = generate_label(name)
-    desc = field.description
+    desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     elem_type = get_args(field.type_)[0] if get_args(field.type_) else float
     step = field.step if field.step is not None else (1 if elem_type is int else 0.01)
@@ -851,7 +887,7 @@ def _build_point2f(settings, name, field, polls):
     is_disabled = _is_field_read_only(settings, name, field)
 
     with ui.column().classes("w-full gap-1"):
-        _build_field_title(label, field.description)
+        _build_field_title(label, _wiring_tooltip(settings, name, field.description))
         with ui.row().classes("items-end gap-2"):
             x_num = ui.number(
                 label="X", value=value.x if isinstance(value, Point2f) else 0.0,
@@ -891,7 +927,7 @@ def _build_rect(settings, name, field, polls):
     is_disabled = _is_field_read_only(settings, name, field)
 
     with ui.column().classes("w-full gap-1"):
-        _build_field_title(label, field.description)
+        _build_field_title(label, _wiring_tooltip(settings, name, field.description))
         with ui.row().classes("items-end gap-2 flex-wrap"):
             rx = ui.number(
                 label="X", value=value.x if isinstance(value, Rect) else 0.0,
@@ -1357,6 +1393,9 @@ def create_settings_panel(
     .hide-feedback.hide-input .poser-only-feedback-input { display: none !important; }
     .hide-init.hide-feedback.hide-input .poser-only-all { display: none !important; }
 
+    .poser-source { border-left: 2px solid #26a69a; padding-left: 6px; }
+    .poser-linked { border-left: 2px solid #ef5350; padding-left: 6px; }
+    .poser-synced { border-left: 2px solid #ffa726; padding-left: 6px; }
     ''')
 
     # -- Shutdown overlay (client-side JS) ---------------------------------
