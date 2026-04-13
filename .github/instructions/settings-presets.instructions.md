@@ -1,25 +1,16 @@
 ---
-description: "Use when modifying settings schema classes and when schema changes require preset JSON updates."
-applyTo: "apps/**/settings.py, modules/**/settings.py, files/settings/**/*.json"
+description: "Use when modifying, adding, or removing Field, Group, or Child definitions in any app settings file (apps/*/settings.py), or when editing preset JSON files in files/settings/."
+applyTo: "apps/*/settings.py, files/settings/**/*.json"
 ---
-# Settings Schema & Preset Workflow
+# Settings & Preset Maintenance
 
-## Intent
+## Architecture
 
-Keep preset JSON files synchronized with settings schema changes.
+Each app has a **settings tree** defined in `apps/<app>/settings.py` using `BaseSettings` subclasses with `Field`, `Group`, and `Child` descriptors. The root class is named `<App>Settings` (e.g. `HDTrioSettings`, `DeepFlowSettings`).
 
-## GUI independence
+Preset JSON files in `files/settings/<app>/` mirror the settings tree exactly. The startup preset (default: `studio.json`) is loaded via `presets.load()` which calls `update_from_dict()`.
 
-The settings model must remain GUI-independent.
-
-Rules:
-- Field metadata (`description`, `widget`, `options`, `regex`, etc.) are optional hints for GUI clients, not behavioral contracts
-- Settings code is GUI-agnostic; all GUI-specific behavior and rendering logic belongs in GUI adapter implementations
-- Multiple independent GUI implementations must be able to coexist without changes to settings or consuming code
-- Changing Field metadata should never cause runtime behavior changes or require preset updates
-- Serialization and deserialization completely ignore GUI metadata; JSON presets are GUI-independent
-
-## Preset update workflow
+## When changing settings Python code
 
 After renaming, adding, or removing a `Field`, `Group`, or `Child`:
 
@@ -36,9 +27,3 @@ After renaming, adding, or removing a `Field`, `Group`, or `Child`:
 - Shared fields (`share=[...]`) appear in the **parent** JSON, not the child — the parent propagates values to children at construction
 - Fields using `.as_('child_name')` are serialized under the **parent's** field name, not the alias
 - `Group` and `Child` entries become nested JSON objects; the key is the Python attribute name
-
-## Scope note
-
-This file governs settings schema and preset JSON maintenance.
-Settings backend internals in `modules/settings/` are governed by
-`.github/instructions/settings-backend.instructions.md`.

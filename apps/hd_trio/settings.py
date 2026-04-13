@@ -35,11 +35,12 @@ class ShowStage(IntEnum):
     PLAY =          auto()
     CONCLUSION =    auto()
     COOLDOWN =      auto()
+    FREEROAM =      auto()
 
 
 class ShowTimelineSettings(TimelineSettings):
     """HD Trio show timeline with project-specific stages."""
-    stages:     Field[list[ShowStage]] = Field(list(ShowStage), widget=Widget.order, access=Field.READ, description="Show stages")
+    stages:     Field[list[ShowStage]] = Field(list(ShowStage), widget=Widget.checklist, description="Stages to play")
     durations:  Field[list] = Field([3.0, 6.0, 60.0, 6.0, 3.0], min=0.0, max=600.0, step=0.1, description="Stage durations")
     stage:      Field[ShowStage]   = Field(ShowStage.START, access=Field.READ, description="Current stage", newline=True)
 
@@ -81,8 +82,8 @@ class Layers(IntEnum):
 # ---------------------------------------------------------------------------
 
 class LayerSettings(BaseSettings):
-    preview: Field[list[Layers]] = Field([Layers.composite], description="Layers drawn in the preview viewports")
-    final:   Field[list[Layers]] = Field([Layers.composite], description="Layers drawn on the output monitors")
+    preview: Field[list[Layers]] = Field([Layers.composite], description="Layers drawn in the preview viewports", widget=Widget.playlist)
+    final:   Field[list[Layers]] = Field([Layers.composite], description="Layers drawn on the output monitors", widget=Widget.playlist)
 
 
 # ---------------------------------------------------------------------------
@@ -231,7 +232,7 @@ class SessionGroup(SessionSettings):
     _recorder_share: list = [SessionSettings.record, SessionSettings.split, SessionSettings.group_id.as_('name'), SessionSettings.output_path]
 
     osc     : Group[OscReceiverSettings]     = Group(OscReceiverSettings)
-    timeline: Group[ShowTimelineSettings]    = Group(ShowTimelineSettings, share=[SessionSettings.record.as_('run')])
+    timeline: Group[ShowTimelineSettings]    = Group(ShowTimelineSettings) #, share=[SessionSettings.record.as_('run')])
     video   : Group[RecorderSettings]        = Group(RecorderSettings, share=_recorder_share + [num_cameras, fps])
     pose    : Group[PoseRecorderSettings]    = Group(PoseRecorderSettings, share=_recorder_share)
 

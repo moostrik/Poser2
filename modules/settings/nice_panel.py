@@ -646,8 +646,8 @@ def _build_color_alpha(settings, name, field, polls):
 
 # -- list builders -----------------------------------------------------------
 
-def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool):
-    """Shared implementation for checklist (with checkboxes) and order (without)."""
+def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool, with_order: bool = True):
+    """Shared implementation for checklist, playlist, and order widgets."""
     value = getattr(settings, name)
     label = generate_label(name)
     desc = field.description
@@ -661,44 +661,33 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
     all_members = list(elem_type)
     active_set = set(value)
 
-    fold_btn = None
-
-    def _build_sortable_actions() -> None:
-        nonlocal fold_btn
-        if with_checkboxes:
-            fold_btn = ui.button(icon="visibility_off", on_click=lambda: None).props(
-                "dense flat round size=xs"
-            ).tooltip("Show/hide unchecked items")
-
     with ui.column().classes("w-72 max-w-full gap-1"):
         _build_field_header(
             label,
             desc,
             title_classes="flex-1",
             row_classes="w-full items-center gap-1",
-            actions=_build_sortable_actions if with_checkboxes else None,
         )
         container = ui.column().classes("w-full gap-0 border rounded p-1")
 
-        if with_checkboxes:
+        if with_checkboxes and with_order:
+            # Playlist: active first, then inactive
             ordered = list(value) + [m for m in all_members if m not in active_set]
+        elif with_checkboxes:
+            # Checklist: stable enum order, no reordering
+            ordered = list(all_members)
         else:
             # Order-only: all members always active, ordered as in value
             ordered = list(value)
         state = {
             "order": ordered,
             "active": set(value) if with_checkboxes else set(all_members),
-            "folded": True,
         }
 
-        def _rebuild(cont, st, _settings=settings, _name=name, _elem=elem_type, _cb=with_checkboxes, _ro=is_disabled):
+        def _rebuild(cont, st, _settings=settings, _name=name, _elem=elem_type, _cb=with_checkboxes, _ord=with_order, _ro=is_disabled):
             cont.clear()
-            folded = st.get("folded", False)
             with cont:
-                visible_members = [
-                    m for m in st["order"]
-                    if not (folded and _cb and m not in st["active"])
-                ]
+                visible_members = list(st["order"])
                 for idx, member in enumerate(visible_members):
                     is_active = member in st["active"]
                     with ui.row().classes(
@@ -716,7 +705,7 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
 
                         ui.label(generate_label(member.name)).classes("flex-1")
 
-                        if not _ro:
+                        if _ord and not _ro:
                             # Find the real index in st["order"] for move operations
                             real_idx = st["order"].index(member)
 
@@ -750,8 +739,8 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
                 _apply(cont, st)
 
         def _apply(cont, st):
-            # Reorder: active items first, then inactive (preserving relative order)
-            if with_checkboxes:
+            # Playlist: active items first, then inactive (preserving relative order)
+            if with_checkboxes and with_order:
                 st["order"] = (
                     [m for m in st["order"] if m in st["active"]]
                     + [m for m in st["order"] if m not in st["active"]]
@@ -762,25 +751,15 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
 
         _rebuild(container, state)
 
-        # Wire up fold button
-        if with_checkboxes:
-            assert fold_btn is not None
-            fold_button = fold_btn
-
-            def _toggle_fold():
-                state["folded"] = not state["folded"]
-                fold_button.props(
-                    f'icon={"visibility_off" if state["folded"] else "visibility"}'
-                )
-                fold_button.update()
-                _rebuild(container, state)
-            fold_button.on_click(_toggle_fold)
-
-    def _list_setter(v, _cont=container, _st=state, _elem=elem_type, _cb=with_checkboxes):
+    def _list_setter(v, _cont=container, _st=state, _elem=elem_type, _cb=with_checkboxes, _ord=with_order):
         active_set_inner = set(v)
         _st["active"] = active_set_inner
-        if _cb:
+        if _cb and _ord:
+            # Playlist: active first, then inactive
             _st["order"] = list(v) + [m for m in list(_elem) if m not in active_set_inner]
+        elif _cb:
+            # Checklist: keep stable enum order
+            _st["order"] = list(_elem)
         else:
             _st["order"] = list(v)
         _rebuild(_cont, _st)
@@ -791,12 +770,17 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
 
 @widget_builder(Widget.checklist)
 def _build_checklist(settings, name, field, polls):
-    return _build_sortable_list(settings, name, field, polls, with_checkboxes=True)
+    return _build_sortable_list(settings, name, field, polls, with_checkboxes=True, with_order=False)
+
+
+@widget_builder(Widget.playlist)
+def _build_playlist(settings, name, field, polls):
+    return _build_sortable_list(settings, name, field, polls, with_checkboxes=True, with_order=True)
 
 
 @widget_builder(Widget.order)
 def _build_order(settings, name, field, polls):
-    return _build_sortable_list(settings, name, field, polls, with_checkboxes=False)
+    return _build_sortable_list(settings, name, field, polls, with_checkboxes=False, with_order=True)
 
 
 @widget_builder(Widget.number_list)

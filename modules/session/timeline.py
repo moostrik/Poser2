@@ -12,28 +12,33 @@ logger = logging.getLogger(__name__)
 class TimelineSettings(BaseSettings):
     """Base configuration for Timeline.
 
-    Subclass this per project and add:
-    - A ``durations`` override with your stage durations
-    - Optionally a ``stage`` Field with your stage enum (access=READ)
+    Subclass this per project and override:
+    - ``stages`` with your stage enum list (the playlist of stages to play)
+    - ``durations`` with your per-stage durations
+    - ``stage`` with your stage enum type (read-only output)
 
     Example::
 
         class ShowTimelineSettings(TimelineSettings):
-            durations: Field[list[float]] = Field([3.0, 10.0])
-            stage:     Field[ShowStage]   = Field(ShowStage.START, access=Field.READ)
+            stages:    Field[list[ShowStage]] = Field(list(ShowStage), widget=Widget.playlist)
+            durations: Field[list[float]]     = Field([3.0, 10.0, 5.0])
+            stage:     Field[ShowStage]       = Field(ShowStage.START, access=Field.READ)
     """
+    stages:         Field[list[int]]   = Field([0], description="Stages to play")
+    durations:      Field[list[float]] = Field([0.0], min=0.0, description="Duration per stage (seconds)")
     run:            Field[bool]        = Field(False, newline=True)
     loop:           Field[bool]        = Field(False, widget=Widget.switch, description="Loop timeline when all stages complete")
     skip:           Field[bool]        = Field(False, widget=Widget.button, description="Skip to next stage")
-    durations:      Field[list[float]] = Field([0.0], min=0.0, description="Duration per stage (seconds)")
+    stage:          Field[int]         = Field(0, access=Field.READ, description="Current stage")
     stage_progress: Field[float]       = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Stage progress")
     progress:       Field[float]       = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Overall progress")
 
 
 class Timeline:
-    """Tick-based timeline that progresses through project-defined stages.
+    """Tick-based timeline that progresses through a playlist of stages.
 
-    Stage count and durations are read from ``config.durations``.
+    The ``stages`` list defines which stages to play and in what order.
+    Each entry indexes into ``durations`` for that stage's length.
     Call ``update()`` every frame (e.g. from ``data_hub.notify_update()``).
 
     Example::
@@ -42,8 +47,12 @@ class Timeline:
         timeline = Timeline(config)
         timeline.add_stage_callback(lambda s: print(f"Stage: {s}"))
         data_hub.add_update_callback(timeline.update)
-        config.run = True      # Begin show
-        config.run = False     # Stop show
+
+        config.stages = [0, 1, 2, 3, 4]   # Full show
+        config.run = True
+
+        config.stages = [2]                # Test single stage
+        config.run = True
     """
 
     def __init__(self, config: TimelineSettings) -> None:
@@ -58,9 +67,10 @@ class Timeline:
 
         # Runtime state
         self._active = False
-        self._stage_index: int = 0
+        self._playlist_pos: int = 0
         self._stage_start: float = 0.0
         self._updating_run = False
+        self._updating_stage = False
 
         self._setup_watchers()
 
@@ -80,11 +90,45 @@ class Timeline:
         if value and self._active:
             self._advance_stage()
 
+    # -- Playlist helpers ----------------------------------------------------
+
+    @property
+    def _playlist(self) -> list[int]:
+        return list(self.config.stages)
+
+    @property
+    def _current_stage_index(self) -> int:
+        """The actual stage index at the current playlist position."""
+        playlist = self._playlist
+        if not playlist or self._playlist_pos >= len(playlist):
+            return 0
+        return int(playlist[self._playlist_pos])
+
+    def _get_stage_duration(self, stage_index: int) -> float:
+        durations = self.config.durations
+        if 0 <= stage_index < len(durations):
+            return float(durations[stage_index])
+        return 0.0
+
+    def _get_playlist_total_duration(self) -> float:
+        return sum(self._get_stage_duration(int(s)) for s in self._playlist)
+
+    def _get_playlist_elapsed_before(self) -> float:
+        return sum(
+            self._get_stage_duration(int(self._playlist[i]))
+            for i in range(self._playlist_pos)
+        )
+
     # -- Show lifecycle ------------------------------------------------------
 
     def _start_show(self) -> None:
+        playlist = self._playlist
+        if not playlist:
+            logger.warning("Timeline: empty stages playlist, not starting")
+            self._sync_run(False)
+            return
         self._active = True
-        self._stage_index = 0
+        self._playlist_pos = 0
         self._enter_stage()
 
     def _stop_show(self) -> None:
@@ -96,29 +140,21 @@ class Timeline:
     def _enter_stage(self) -> None:
         self._stage_start = time.time()
         self.config.stage_progress = 0.0
-        if hasattr(self.config, 'stage'):
-            setattr(self.config, 'stage', self._stage_index)
-        self._notify_stage_callbacks(self._stage_index)
+        stage_index = self._current_stage_index
+        self._sync_stage(stage_index)
+        self._notify_stage_callbacks(stage_index)
 
     def _advance_stage(self) -> None:
-        next_index = self._stage_index + 1
-        if next_index < len(self.config.durations):
-            self._stage_index = next_index
+        next_pos = self._playlist_pos + 1
+        playlist = self._playlist
+        if next_pos < len(playlist):
+            self._playlist_pos = next_pos
             self._enter_stage()
         elif self.config.loop:
-            self._stage_index = 0
+            self._playlist_pos = 0
             self._enter_stage()
         else:
             self._stop_show()
-
-    def _get_stage_duration(self, index: int) -> float:
-        return float(self.config.durations[index])
-
-    def _get_total_duration(self) -> float:
-        return sum(self.config.durations)
-
-    def _get_elapsed_before_current(self) -> float:
-        return sum(self.config.durations[i] for i in range(self._stage_index))
 
     # -- Callbacks -----------------------------------------------------------
 
@@ -156,6 +192,12 @@ class Timeline:
             self.config.run = value
             self._updating_run = False
 
+    def _sync_stage(self, index: int) -> None:
+        if int(self.config.stage) != index:
+            self._updating_stage = True
+            self.config.stage = index
+            self._updating_stage = False
+
     # -- Tick (called every render frame) ------------------------------------
 
     def update(self) -> None:
@@ -165,7 +207,8 @@ class Timeline:
 
         now = time.time()
         stage_elapsed = now - self._stage_start
-        stage_duration = self._get_stage_duration(self._stage_index)
+        stage_index = self._current_stage_index
+        stage_duration = self._get_stage_duration(stage_index)
 
         # Stage progress (0-1)
         if stage_duration > 0:
@@ -173,10 +216,12 @@ class Timeline:
         else:
             self.config.stage_progress = 1.0
 
-        # Overall progress (0-1)
-        total = self._get_total_duration()
+        # Overall progress across playlist (0-1)
+        total = self._get_playlist_total_duration()
         if total > 0:
-            self.config.progress = min((self._get_elapsed_before_current() + stage_elapsed) / total, 1.0)
+            self.config.progress = min(
+                (self._get_playlist_elapsed_before() + stage_elapsed) / total, 1.0
+            )
         else:
             self.config.progress = 1.0
 

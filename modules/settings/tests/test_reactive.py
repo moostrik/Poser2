@@ -1583,6 +1583,8 @@ class TestWidgetClass(unittest.TestCase):
         self.assertIsNot(Widget.slider, Widget.number)
         self.assertIsNot(Widget.select, Widget.radio)
         self.assertIsNot(Widget.checklist, Widget.order)
+        self.assertIsNot(Widget.checklist, Widget.playlist)
+        self.assertIsNot(Widget.playlist, Widget.order)
         self.assertIsNot(Widget.default, Widget.color)
 
     def test_iteration(self):
@@ -1656,10 +1658,10 @@ class TestWidgetAccepts(unittest.TestCase):
 class TestWidgetResolve(unittest.TestCase):
     """Widget.resolve() maps Widget.default to a concrete widget."""
 
-    def test_bool_resolves_to_switch(self):
+    def test_bool_resolves_to_toggle(self):
         field = Field(True)
         field.__set_name__(None, "test")
-        self.assertEqual(Widget.resolve(field), Widget.switch)
+        self.assertEqual(Widget.resolve(field), Widget.toggle)
 
     def test_int_with_range_resolves_to_slider(self):
         field = Field(50, min=0, max=100)

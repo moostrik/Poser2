@@ -55,6 +55,11 @@ class Widget(Enum):
     value types, or ``None`` meaning *any type* (used by ``default``,
     ``color``, ``color_alpha``, ``point2f``, ``rect``).
 
+    List widgets:
+        - ``checklist`` — checkboxes only (pick items, no reorder)
+        - ``playlist``  — checkboxes + reorder arrows (pick and arrange)
+        - ``order``     — reorder arrows only (arrange, no selection)
+
     The ``resolve(field)`` class method maps ``Widget.default`` to a concrete
     widget based on the field's ``type_``, ``min``, and ``max``.
     """
@@ -102,6 +107,7 @@ class Widget(Enum):
     rect        = None
     # list widgets
     checklist   = (list,)
+    playlist    = (list,)
     order       = (list,)
     number_list = (list,)
 

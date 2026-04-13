@@ -609,6 +609,7 @@
       "verbose": true
     },
     "timeline": {
+      "stages": [0, 1, 2, 3, 4],
       "durations": [
         3.0,
         5.0,
