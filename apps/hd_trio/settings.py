@@ -35,13 +35,13 @@ class ShowStage(IntEnum):
     PLAY =          auto()
     CONCLUSION =    auto()
     COOLDOWN =      auto()
-    FREEROAM =      auto()
+    IDLE =          auto()
 
 
 class ShowTimelineSettings(TimelineSettings):
     """HD Trio show timeline with project-specific stages."""
     stages:     Field[list[ShowStage]] = Field(list(ShowStage), widget=Widget.checklist, description="Stages to play")
-    durations:  Field[list] = Field([3.0, 6.0, 60.0, 6.0, 3.0], min=0.0, max=600.0, step=0.1, description="Stage durations")
+    durations:  Field[list] = Field([3.0, 6.0, 60.0, 6.0, 3.0, 1.0], min=0.0, max=600.0, step=0.1, description="Stage durations")
     stage:      Field[ShowStage]   = Field(ShowStage.START, access=Field.READ, description="Current stage", newline=True)
 
 

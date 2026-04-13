@@ -1,7 +1,7 @@
 {
   "num_players": 3,
   "input_fps": 23.0,
-  "render_fps": 100.0,
+  "render_fps": 63.0,
   "camera": {
     "yolo": true,
     "color": true,
@@ -506,7 +506,7 @@
         "density": {
           "input_strength": 10.0,
           "speed_offset": 0.0,
-          "fade_time": 4.0000000000000036,
+          "fade_time": 18.0,
           "dampen_threshold": 1.47,
           "dampen_time": 3.63
         },
@@ -601,7 +601,6 @@
     "output_path": "recordings",
     "name": "no_id",
     "split_seconds": 10,
-    "core": {},
     "osc": {
       "port_in": 9001,
       "return_messages": true,
@@ -609,14 +608,19 @@
       "ip_address_out": "127.0.0.1",
       "verbose": true
     },
+    "core": {},
     "timeline": {
-      "stages": [0, 1, 2, 3, 4],
+      "stages": [
+        "START",
+        "IDLE"
+      ],
       "durations": [
         3.0,
         5.0,
         30.0,
         5.0,
-        3.0
+        3.0,
+        1.0
       ]
     },
     "video": {
@@ -625,9 +629,11 @@
       "video_format": "H264",
       "video_frame_types": [
         "VIDEO"
-      ]
+      ],
+      "enabled": true
     },
     "pose": {
+      "enabled": true,
       "features": [
         "BBox",
         "Points2D"

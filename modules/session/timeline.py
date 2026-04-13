@@ -1,7 +1,7 @@
 """Timeline — stage-based sequencer with config-driven control, ticked by the render loop."""
 
 import time
-from typing import Callable, Set
+from typing import Callable
 
 from modules.settings import BaseSettings, Field, Widget
 
@@ -60,26 +60,26 @@ class Timeline:
         if not config.durations:
             raise ValueError("config.durations must contain at least one entry")
 
-        # Callbacks
-        self._stage_callbacks: Set[Callable] = set()
-        self._time_callbacks: Set[Callable[[float], None]] = set()
+        self._stage_callbacks: set[Callable] = set()
+        self._time_callbacks: set[Callable[[float], None]] = set()
 
-        # Runtime state
         self._active = False
-        self._playlist_pos: int = 0
+        self._pos: int = 0
         self._stage_start: float = 0.0
-        self._updating_run = False
-        self._updating_stage = False
 
-        self._setup_watchers()
+        # Cached playlist data (rebuilt in _start_show)
+        self._playlist: list[int] = []
+        self._stage_durations: list[float] = []
+        self._cumulative: list[float] = []
+        self._total_duration: float = 0.0
 
-    def _setup_watchers(self) -> None:
-        self.config.bind(TimelineSettings.run, self._on_run_change)
-        self.config.bind(TimelineSettings.skip, self._on_skip)
+        config.bind(TimelineSettings.run, self._on_run_change)
+        config.bind(TimelineSettings.skip, self._on_skip)
+        self._set_idle_state()
+
+    # -- Settings callbacks --------------------------------------------------
 
     def _on_run_change(self, value: bool) -> None:
-        if self._updating_run:
-            return
         if value and not self._active:
             self._start_show()
         elif not value and self._active:
@@ -89,65 +89,60 @@ class Timeline:
         if value and self._active:
             self._advance_stage()
 
-    # -- Playlist helpers ----------------------------------------------------
+    # -- Playlist cache ------------------------------------------------------
 
-    @property
-    def _playlist(self) -> list[int]:
-        return list(self.config.stages)
-
-    @property
-    def _current_stage_index(self) -> int:
-        """The actual stage index at the current playlist position."""
-        playlist = self._playlist
-        if not playlist or self._playlist_pos >= len(playlist):
-            return 0
-        return int(playlist[self._playlist_pos])
-
-    def _get_stage_duration(self, stage_index: int) -> float:
+    def _build_playlist(self) -> None:
+        """Snapshot the playlist and precompute duration data."""
         durations = self.config.durations
-        if 0 <= stage_index < len(durations):
-            return float(durations[stage_index])
-        return 0.0
-
-    def _get_playlist_total_duration(self) -> float:
-        return sum(self._get_stage_duration(int(s)) for s in self._playlist)
-
-    def _get_playlist_elapsed_before(self) -> float:
-        return sum(
-            self._get_stage_duration(int(self._playlist[i]))
-            for i in range(self._playlist_pos)
-        )
+        self._playlist = [int(s) for s in self.config.stages]
+        self._stage_durations = [
+            float(durations[s]) if 0 <= s < len(durations) else 0.0
+            for s in self._playlist
+        ]
+        cumulative = []
+        total = 0.0
+        for d in self._stage_durations:
+            cumulative.append(total)
+            total += d
+        self._cumulative = cumulative
+        self._total_duration = total
 
     # -- Show lifecycle ------------------------------------------------------
 
+    def _set_idle_state(self) -> None:
+        """Set outputs to end-of-show: last playlist stage, full progress."""
+        self._build_playlist()
+        if self._playlist:
+            self.config.stage = self._playlist[-1]
+        self.config.stage_progress = 1.0
+        self.config.progress = 1.0
+
     def _start_show(self) -> None:
-        playlist = self._playlist
-        if not playlist:
+        self._build_playlist()
+        if not self._playlist:
             logger.warning("Timeline: empty stages playlist, not starting")
-            self._sync_run(False)
+            self.config.run = False
             return
         self._active = True
-        self._playlist_pos = 0
+        self._pos = 0
         self._enter_stage()
 
     def _stop_show(self) -> None:
         self._active = False
-        self.config.stage_progress = 0.0
-        self.config.progress = 0.0
-        self._sync_run(False)
+        self._set_idle_state()
+        self.config.run = False
 
     def _enter_stage(self) -> None:
         self._stage_start = time.time()
         self.config.stage_progress = 0.0
-        stage_index = self._current_stage_index
-        self._sync_stage(stage_index)
-        self._notify_stage_callbacks(stage_index)
+        stage = self._playlist[self._pos]
+        self.config.stage = stage
+        self._notify_stage_callbacks(stage)
 
     def _advance_stage(self) -> None:
-        next_pos = self._playlist_pos + 1
-        playlist = self._playlist
-        if next_pos < len(playlist):
-            self._playlist_pos = next_pos
+        next_pos = self._pos + 1
+        if next_pos < len(self._playlist):
+            self._pos = next_pos
             self._enter_stage()
         else:
             self._stop_show()
@@ -165,7 +160,7 @@ class Timeline:
             try:
                 cb(stage)
             except Exception as e:
-                logger.error(f"Timeline: Error in stage callback: {e}")
+                logger.error(f"Timeline stage callback error: {e}")
 
     def add_time_callback(self, callback: Callable[[float], None]) -> None:
         self._time_callbacks.add(callback)
@@ -178,21 +173,7 @@ class Timeline:
             try:
                 cb(elapsed)
             except Exception as e:
-                logger.error(f"Timeline: Error in time callback: {e}")
-
-    # -- Sync helpers --------------------------------------------------------
-
-    def _sync_run(self, value: bool) -> None:
-        if self.config.run != value:
-            self._updating_run = True
-            self.config.run = value
-            self._updating_run = False
-
-    def _sync_stage(self, index: int) -> None:
-        if int(self.config.stage) != index:
-            self._updating_stage = True
-            self.config.stage = index
-            self._updating_stage = False
+                logger.error(f"Timeline time callback error: {e}")
 
     # -- Tick (called every render frame) ------------------------------------
 
@@ -201,29 +182,23 @@ class Timeline:
         if not self._active:
             return
 
-        now = time.time()
-        stage_elapsed = now - self._stage_start
-        stage_index = self._current_stage_index
-        stage_duration = self._get_stage_duration(stage_index)
+        elapsed = time.time() - self._stage_start
+        duration = self._stage_durations[self._pos]
 
-        # Stage progress (0-1)
-        if stage_duration > 0:
-            self.config.stage_progress = min(stage_elapsed / stage_duration, 1.0)
-        else:
-            self.config.stage_progress = 1.0
+        # Stage progress
+        self.config.stage_progress = min(elapsed / duration, 1.0) if duration > 0 else 1.0
 
-        # Overall progress across playlist (0-1)
-        total = self._get_playlist_total_duration()
-        if total > 0:
+        # Overall progress
+        if self._total_duration > 0:
             self.config.progress = min(
-                (self._get_playlist_elapsed_before() + stage_elapsed) / total, 1.0
+                (self._cumulative[self._pos] + elapsed) / self._total_duration, 1.0
             )
         else:
             self.config.progress = 1.0
 
         # Time callbacks
-        self._notify_time_callbacks(stage_elapsed)
+        self._notify_time_callbacks(elapsed)
 
-        # Auto-advance when duration reached
-        if stage_duration > 0 and stage_elapsed >= stage_duration:
+        # Auto-advance
+        if duration > 0 and elapsed >= duration:
             self._advance_stage()
