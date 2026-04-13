@@ -70,6 +70,7 @@ class Recorder(Thread):
 
         self.settings.bind(RecorderSettings.record, self._on_record)
         self.settings.bind(RecorderSettings.split, self._on_split)
+        self.settings.bind(RecorderSettings.enabled, self._on_enabled)
 
     def stop(self) -> None:
         self.stop_event.set()
@@ -192,6 +193,10 @@ class Recorder(Thread):
             return self.fps[cam_id]
 
     # SETTINGS CALLBACKS
+    def _on_enabled(self, value: bool) -> None:
+        if not value and self.settings.record:
+            self.settings.record = False
+
     def _on_record(self, value: bool) -> None:
         if value and self.settings.enabled:
             self._set_state(RecState.START)

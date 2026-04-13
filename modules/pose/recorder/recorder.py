@@ -67,8 +67,13 @@ class Recorder:
 
         settings.bind(RecorderSettings.record, self._on_record)
         settings.bind(RecorderSettings.split, self._on_split)
+        settings.bind(RecorderSettings.enabled, self._on_enabled)
 
     # ── Settings callbacks ───────────────────────────────────────────────
+
+    def _on_enabled(self, value: bool) -> None:
+        if not value and self.settings.record:
+            self.settings.record = False
 
     def _on_record(self, value: bool) -> None:
         if value and self.settings.enabled:
