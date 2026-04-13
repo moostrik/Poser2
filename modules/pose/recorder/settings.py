@@ -6,7 +6,9 @@ class RecorderSettings(BaseSettings):
 
     # ── Controls ──────────────────────────────────────────────────────
     enabled:      Field[bool]  = Field(True, widget=Widget.switch, description="Enable pose recording")
-    record:       Field[bool]  = Field(False, widget=Widget.toggle, description="Record")
+    start:        Field[bool]  = Field(False, widget=Widget.button, description="Start recording")
+    stop:         Field[bool]  = Field(False, widget=Widget.button, description="Stop recording")
+    recording:    Field[bool]  = Field(False, access=Field.READ, description="Recording")
     split:        Field[bool]  = Field(False, widget=Widget.button, description="Split chunk")
     output_path:  Field[str]   = Field("recordings", access=Field.INIT, description="Pose recordings directory")
     name:         Field[str]   = Field("", widget=Widget.input, description="Recording name")

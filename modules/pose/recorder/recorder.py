@@ -2,7 +2,8 @@
 
 Chunking is driven externally by firing the shared ``split`` button
 (e.g. from a Session timer or manually).  The recorder reacts to:
-  - ``record`` (toggle) — start / stop recording
+  - ``start`` (button) — start recording
+  - ``stop`` (button) — stop recording
   - ``split`` (button) — flush current chunk and start a new one
   - ``name`` — appended to the timestamped folder name
 """
@@ -53,7 +54,8 @@ class Recorder:
     """Records FrameDict updates to chunked HDF5 files.
 
     Controlled entirely through settings fields:
-      - ``record`` (toggle) — start / stop
+      - ``start`` (button) — start recording
+      - ``stop`` (button) — stop recording
       - ``split`` (button) — chunk boundary
       - ``name`` — appended to folder timestamp
     """
@@ -65,24 +67,33 @@ class Recorder:
         self._folder: Path | None = None
         self._recording_start: float = 0.0
 
-        settings.bind(RecorderSettings.record, self._on_record)
+        settings.bind(RecorderSettings.start, self._on_start)
+        settings.bind(RecorderSettings.stop, self._on_stop)
         settings.bind(RecorderSettings.split, self._on_split)
         settings.bind(RecorderSettings.enabled, self._on_enabled)
 
     # ── Settings callbacks ───────────────────────────────────────────────
 
     def _on_enabled(self, value: bool) -> None:
-        if not value and self.settings.record:
-            self.settings.record = False
+        if not value:
+            self._on_stop()
 
-    def _on_record(self, value: bool) -> None:
-        if value and self.settings.enabled:
-            folder_name = make_folder_name(self.settings.name)
-            folder = Path(self.settings.output_path) / folder_name
-            folder.mkdir(parents=True, exist_ok=True)
-            self._start(folder, time.time())
-        else:
-            self._stop()
+    def _on_start(self, _=None) -> None:
+        if not self.settings.enabled:
+            return
+        if self._thread is not None and self._thread.is_alive():
+            return
+        folder_name = make_folder_name(self.settings.name)
+        folder = Path(self.settings.output_path) / folder_name
+        folder.mkdir(parents=True, exist_ok=True)
+        self._start(folder, time.time())
+        self.settings.recording = True
+
+    def _on_stop(self, _=None) -> None:
+        if self._thread is None or not self._thread.is_alive():
+            return
+        self._stop()
+        self.settings.recording = False
 
     def _on_split(self, _=None) -> None:
         if self._thread is not None and self._thread.is_alive():

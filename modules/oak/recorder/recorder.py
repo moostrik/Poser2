@@ -68,7 +68,8 @@ class Recorder(Thread):
         self.settings_lock = Lock()
         self.stop_event = Event()
 
-        self.settings.bind(RecorderSettings.record, self._on_record)
+        self.settings.bind(RecorderSettings.start, self._on_start)
+        self.settings.bind(RecorderSettings.stop, self._on_stop)
         self.settings.bind(RecorderSettings.split, self._on_split)
         self.settings.bind(RecorderSettings.enabled, self._on_enabled)
 
@@ -194,14 +195,18 @@ class Recorder(Thread):
 
     # SETTINGS CALLBACKS
     def _on_enabled(self, value: bool) -> None:
-        if not value and self.settings.record:
-            self.settings.record = False
+        if not value:
+            self._on_stop()
 
-    def _on_record(self, value: bool) -> None:
-        if value and self.settings.enabled:
+    def _on_start(self, _=None) -> None:
+        if self.settings.enabled and self._get_state() == RecState.IDLE:
             self._set_state(RecState.START)
-        else:
+            self.settings.recording = True
+
+    def _on_stop(self, _=None) -> None:
+        if self._get_state() in (RecState.START, RecState.REC):
             self._set_state(RecState.STOP)
+            self.settings.recording = False
 
     def _on_split(self, _=None) -> None:
         if self._get_state() == RecState.REC:

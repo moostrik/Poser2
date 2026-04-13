@@ -26,7 +26,9 @@ class TimelineSettings(BaseSettings):
     """
     stages:         Field[list[int]]   = Field([0], description="Stages to play")
     durations:      Field[list[float]] = Field([0.0], min=0.0, description="Duration per stage (seconds)")
-    run:            Field[bool]        = Field(False, newline=True)
+    start:          Field[bool]        = Field(False, widget=Widget.button, newline=True, description="Start show")
+    stop:           Field[bool]        = Field(False, widget=Widget.button, description="Stop show")
+    running:        Field[bool]        = Field(False, access=Field.READ, description="Show running")
     skip:           Field[bool]        = Field(False, widget=Widget.button, description="Skip to next stage")
     stage:          Field[int]         = Field(0, access=Field.READ, description="Current stage")
     stage_progress: Field[float]       = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Stage progress")
@@ -48,10 +50,10 @@ class Timeline:
         data_hub.add_update_callback(timeline.update)
 
         config.stages = [0, 1, 2, 3, 4]   # Full show
-        config.run = True
+        TimelineSettings.start.fire(config)
 
         config.stages = [2]                # Test single stage
-        config.run = True
+        TimelineSettings.start.fire(config)
     """
 
     def __init__(self, config: TimelineSettings) -> None:
@@ -73,16 +75,19 @@ class Timeline:
         self._cumulative: list[float] = []
         self._total_duration: float = 0.0
 
-        config.bind(TimelineSettings.run, self._on_run_change)
+        config.bind(TimelineSettings.start, self._on_start)
+        config.bind(TimelineSettings.stop, self._on_stop)
         config.bind(TimelineSettings.skip, self._on_skip)
         self._set_idle_state()
 
     # -- Settings callbacks --------------------------------------------------
 
-    def _on_run_change(self, value: bool) -> None:
-        if value and not self._active:
+    def _on_start(self, _=None) -> None:
+        if not self._active:
             self._start_show()
-        elif not value and self._active:
+
+    def _on_stop(self, _=None) -> None:
+        if self._active:
             self._stop_show()
 
     def _on_skip(self, value: bool) -> None:
@@ -121,16 +126,16 @@ class Timeline:
         self._build_playlist()
         if not self._playlist:
             logger.warning("Timeline: empty stages playlist, not starting")
-            self.config.run = False
             return
         self._active = True
+        self.config.running = True
         self._pos = 0
         self._enter_stage()
 
     def _stop_show(self) -> None:
         self._active = False
+        self.config.running = False
         self._set_idle_state()
-        self.config.run = False
 
     def _enter_stage(self) -> None:
         self._stage_start = time.time()
@@ -145,7 +150,7 @@ class Timeline:
             self._pos = next_pos
             self._enter_stage()
         else:
-            self._stop_show()
+            TimelineSettings.stop.fire(self.config)
 
     # -- Callbacks -----------------------------------------------------------
 

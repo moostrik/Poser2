@@ -1,8 +1,9 @@
 """Session — recording lifecycle coordinator.
 
-Owns the chunk timer.  When ``settings.record`` goes True the timer starts;
-at each ``chunk_length`` boundary it fires the shared ``split`` button which
+Owns the chunk timer.  When ``start`` is pressed the timer starts;
+at each ``split_seconds`` boundary it fires the shared ``split`` button which
 propagates to all child recorders via the settings share mechanism.
+``stop`` halts the timer.  The ``running`` field reflects current state.
 """
 import threading
 import time
@@ -15,10 +16,12 @@ logger = logging.getLogger(__name__)
 
 class SessionSettings(BaseSettings):
 
-    run:       Field[bool]  = Field(False, widget=Widget.toggle, description="Record")
-    output_path:  Field[str]   = Field("recordings", description="Recordings output directory", access=Field.INIT)
-    name:     Field[str]   = Field("", widget=Widget.input, description="Recording name")
-    split:        Field[bool]  = Field(False, widget=Widget.button, description="Split chunk", visible=False)
+    start:         Field[bool]  = Field(False, widget=Widget.button, description="Start session")
+    stop:          Field[bool]  = Field(False, widget=Widget.button, description="Stop session")
+    running:       Field[bool]  = Field(False, access=Field.READ, description="Session running")
+    output_path:   Field[str]   = Field("recordings", description="Recordings output directory", access=Field.INIT)
+    name:          Field[str]   = Field("", widget=Widget.input, description="Recording name")
+    split:         Field[bool]  = Field(False, widget=Widget.button, description="Split chunk", visible=False)
     split_seconds: Field[float] = Field(10, min=1, max=60, widget=Widget.number, description="Split recording into chunks of this length (seconds)")
 
 
@@ -29,13 +32,20 @@ class Session:
         self._timer_thread: threading.Thread | None = None
         self._timer_stop = threading.Event()
 
-        settings.bind(SessionSettings.run, self._on_record)
+        settings.bind(SessionSettings.start, self._on_start)
+        settings.bind(SessionSettings.stop, self._on_stop)
 
-    def _on_record(self, value: bool) -> None:
-        if value:
-            self._start_timer()
-        else:
-            self._stop_timer()
+    def _on_start(self, _=None) -> None:
+        if self.settings.running:
+            return
+        self.settings.running = True
+        self._start_timer()
+
+    def _on_stop(self, _=None) -> None:
+        if not self.settings.running:
+            return
+        self._stop_timer()
+        self.settings.running = False
 
     # ── Chunk timer ──────────────────────────────────────────────────────
 

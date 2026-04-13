@@ -169,10 +169,10 @@ class HDTrioMain:
         )
 
     def _on_osc_start_recording(self, *_) -> None:
-        self.settings.session.run = True
+        self.settings.session.start = True
 
     def _on_osc_stop_recording(self, *_) -> None:
-        self.settings.session.run = False
+        self.settings.session.stop = True
 
     def _on_osc_group_id(self, gid: str, *_) -> None:
         self.settings.session.name = gid

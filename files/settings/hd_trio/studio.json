@@ -597,7 +597,6 @@
     "port": 666
   },
   "session": {
-    "run": false,
     "output_path": "recordings",
     "name": "no_id",
     "split_seconds": 10,
