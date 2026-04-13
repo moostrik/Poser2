@@ -5,6 +5,7 @@ from modules.pose.features import Feature
 class RecorderSettings(BaseSettings):
 
     # ── Controls ──────────────────────────────────────────────────────
+    enabled:      Field[bool]  = Field(True, widget=Widget.switch, description="Enable pose recording")
     record:       Field[bool]  = Field(False, widget=Widget.toggle, description="Record")
     split:        Field[bool]  = Field(False, widget=Widget.button, description="Split chunk")
     output_path: Field[str] = Field("recordings", description="Pose recordings directory")

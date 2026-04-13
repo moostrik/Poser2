@@ -225,14 +225,23 @@ class PoseGroup(BaseSettings):
 #  Session group (recording lifecycle: OSC, timer, video & pose recorders)
 # ---------------------------------------------------------------------------
 
-class SessionGroup(SessionSettings):
-    num_cameras: Field[int]   = Field(1, access=Field.INIT, description="Number of cameras")
-    fps:         Field[float] = Field(30.0, access=Field.INIT, description="Camera frame rate")
+class SessionGroup(BaseSettings):
+    """App session group — composes SessionSettings with app-specific recorders."""
+    num_cameras:   Field[int]   = Field(1, access=Field.INIT, description="Number of cameras")
+    fps:           Field[float] = Field(30.0, access=Field.INIT, description="Camera frame rate")
 
-    _recorder_share: list = [SessionSettings.record, SessionSettings.split, SessionSettings.group_id.as_('name'), SessionSettings.output_path]
+    run:        Field[bool]  = Field(False, widget=Widget.toggle, description="Record")
+    output_path:   Field[str]   = Field("recordings", description="Recordings output directory", access=Field.INIT)
+    name:      Field[str]   = Field("", widget=Widget.input, description="Recording group ID")
+    split:         Field[bool]  = Field(False, widget=Widget.button, description="Split chunk", visible=False)
+    split_seconds: Field[float] = Field(10, min=1, max=60, widget=Widget.number, description="Split recording into chunks of this length (seconds)")
+
+    _session_share:  list = [output_path, name, run, split, split_seconds]
+    _recorder_share: list = [run.as_('record'), split, name, output_path]
 
     osc     : Group[OscReceiverSettings]     = Group(OscReceiverSettings)
-    timeline: Group[ShowTimelineSettings]    = Group(ShowTimelineSettings) #, share=[SessionSettings.record.as_('run')])
+    core    : Group[SessionSettings]         = Group(SessionSettings, share=_session_share)
+    timeline: Group[ShowTimelineSettings]    = Group(ShowTimelineSettings, share=[run])
     video   : Group[RecorderSettings]        = Group(RecorderSettings, share=_recorder_share + [num_cameras, fps])
     pose    : Group[PoseRecorderSettings]    = Group(PoseRecorderSettings, share=_recorder_share)
 

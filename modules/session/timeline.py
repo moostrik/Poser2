@@ -27,7 +27,6 @@ class TimelineSettings(BaseSettings):
     stages:         Field[list[int]]   = Field([0], description="Stages to play")
     durations:      Field[list[float]] = Field([0.0], min=0.0, description="Duration per stage (seconds)")
     run:            Field[bool]        = Field(False, newline=True)
-    loop:           Field[bool]        = Field(False, widget=Widget.switch, description="Loop timeline when all stages complete")
     skip:           Field[bool]        = Field(False, widget=Widget.button, description="Skip to next stage")
     stage:          Field[int]         = Field(0, access=Field.READ, description="Current stage")
     stage_progress: Field[float]       = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Stage progress")
@@ -149,9 +148,6 @@ class Timeline:
         playlist = self._playlist
         if next_pos < len(playlist):
             self._playlist_pos = next_pos
-            self._enter_stage()
-        elif self.config.loop:
-            self._playlist_pos = 0
             self._enter_stage()
         else:
             self._stop_show()

@@ -41,7 +41,7 @@ class HDTrioMain:
         self.data_hub = DataHub()
 
         # SESSION (osc, timeline, video & pose recorders)
-        self.session = Session(self.settings.session)
+        self.session = Session(self.settings.session.core)
         self.session_osc = OscReceiver(self.settings.session.osc)
         self.session_osc.bind('/start/recording', self._on_osc_start_recording)
         self.session_osc.bind('/stop/recording',  self._on_osc_stop_recording)
@@ -169,13 +169,13 @@ class HDTrioMain:
         )
 
     def _on_osc_start_recording(self, *_) -> None:
-        self.settings.session.record = True
+        self.settings.session.run = True
 
     def _on_osc_stop_recording(self, *_) -> None:
-        self.settings.session.record = False
+        self.settings.session.run = False
 
     def _on_osc_group_id(self, gid: str, *_) -> None:
-        self.settings.session.group_id = gid
+        self.settings.session.name = gid
 
     def start(self) -> None:
 

@@ -597,10 +597,11 @@
     "port": 666
   },
   "session": {
+    "run": false,
     "output_path": "recordings",
-    "group_id": "no_id",
-    "record": false,
+    "name": "no_id",
     "split_seconds": 10,
+    "core": {},
     "osc": {
       "port_in": 9001,
       "return_messages": true,
@@ -616,8 +617,7 @@
         30.0,
         5.0,
         3.0
-      ],
-      "loop": false
+      ]
     },
     "video": {
       "temp_path": "temp",

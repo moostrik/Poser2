@@ -20,6 +20,11 @@ After renaming, adding, or removing a `Field`, `Group`, or `Child`:
 4. For **removed** fields: delete the key from each JSON
 5. For **restructured** groups (moved/renamed): restructure the corresponding JSON object
 
+## Composition over inheritance
+
+- Do not subclass a module's Settings class in app code — use `Group(ModuleSettings, share=[...])` instead
+- To propagate fields to multiple children, declare them on the parent group and `share` to each child Group
+
 ## Key rules
 
 - JSON keys must match Python field names exactly (after `share` aliasing)

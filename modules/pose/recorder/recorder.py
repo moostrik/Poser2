@@ -71,7 +71,7 @@ class Recorder:
     # ── Settings callbacks ───────────────────────────────────────────────
 
     def _on_record(self, value: bool) -> None:
-        if value:
+        if value and self.settings.enabled:
             folder_name = make_folder_name(self.settings.name)
             folder = Path(self.settings.output_path) / folder_name
             folder.mkdir(parents=True, exist_ok=True)

@@ -15,9 +15,9 @@ logger = logging.getLogger(__name__)
 
 class SessionSettings(BaseSettings):
 
+    run:       Field[bool]  = Field(False, widget=Widget.toggle, description="Record")
     output_path:  Field[str]   = Field("recordings", description="Recordings output directory", access=Field.INIT)
-    group_id:     Field[str]   = Field("", widget=Widget.input, description="Recording group ID")
-    record:       Field[bool]  = Field(False, widget=Widget.toggle, description="Record")
+    name:     Field[str]   = Field("", widget=Widget.input, description="Recording name")
     split:        Field[bool]  = Field(False, widget=Widget.button, description="Split chunk", visible=False)
     split_seconds: Field[float] = Field(10, min=1, max=60, widget=Widget.number, description="Split recording into chunks of this length (seconds)")
 
@@ -29,7 +29,7 @@ class Session:
         self._timer_thread: threading.Thread | None = None
         self._timer_stop = threading.Event()
 
-        settings.bind(SessionSettings.record, self._on_record)
+        settings.bind(SessionSettings.run, self._on_record)
 
     def _on_record(self, value: bool) -> None:
         if value:

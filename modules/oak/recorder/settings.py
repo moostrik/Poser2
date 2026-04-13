@@ -13,7 +13,8 @@ class RecorderSettings(BaseSettings):
     video_frame_types:  Field[list[FrameType]]  = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record", visible=False)
 
     # ── Recording controls ────────────────────────────────────────────
-    record:             Field[bool]             = Field(False, widget=Widget.toggle, description="Record", newline=True)
+    enabled:            Field[bool]             = Field(True, widget=Widget.switch, description="Enable video recording")
+    record:             Field[bool]             = Field(False, widget=Widget.toggle, description="Record")
     split:              Field[bool]             = Field(False, widget=Widget.button, description="Split chunk")
     output_path:        Field[str]              = Field("recordings", description="Video recordings directory")
     name:               Field[str]              = Field("", widget=Widget.input, description="Recording name")

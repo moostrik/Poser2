@@ -193,7 +193,7 @@ class Recorder(Thread):
 
     # SETTINGS CALLBACKS
     def _on_record(self, value: bool) -> None:
-        if value:
+        if value and self.settings.enabled:
             self._set_state(RecState.START)
         else:
             self._set_state(RecState.STOP)
