@@ -14,6 +14,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 from .settings import Layers, RenderSettings, ShowStage, ShowTimelineSettings
 from . import stages
 from .stages import STAGES, StageLayer
+from .intro_sequence import IntroSequencePlayer, SequenceDataProxy, FixedColorProxy
 
 
 UPDATE_LAYERS: list[Layers] = [
@@ -121,6 +122,15 @@ class HDTrioRender(RenderBase):
         self._prev_stage: ShowStage | None = None
         self._active_stage: StageLayer | None = None
 
+        # intro sequence overlay
+        self._intro_proxy = SequenceDataProxy()
+        self._intro_player = IntroSequencePlayer(settings.intro_sequence, self.num_cams)
+        self._intro_color_proxy = FixedColorProxy(settings.intro_sequence)
+        self._intro_geoms: dict[int, ls.CentreGeometry] = {}
+        for i in range(self.num_cams):
+            self._intro_geoms[i] = ls.CentreGeometry(i, self._intro_proxy, settings.centre.geometry)  # type: ignore[arg-type]
+            self.L[Layers.intro_pose][i] = ls.CentrePoseLayer(i, self._intro_geoms[i], settings.intro_sequence.pose, self._intro_color_proxy)  # type: ignore[arg-type]
+
     def _rebuild_stages(self) -> None:
         """Re-instantiate stage objects after hot-reload of stages.py."""
         self._stages = {
@@ -181,6 +191,21 @@ class HDTrioRender(RenderBase):
                 seen.add(layer_type)
                 for layer in self.L[layer_type].values():
                     layer.update()
+
+        # Intro sequence overlay — tick player during INTRO stages
+        _INTRO_STAGES = (ShowStage.INTRO_IN, ShowStage.INTRO, ShowStage.INTRO_OUT)
+        if stage in _INTRO_STAGES:
+            if not self._intro_player.active:
+                self._intro_player.start()
+            frames = self._intro_player.update()
+            self._intro_proxy.update(frames)
+            for i in range(self.num_cams):
+                self._intro_geoms[i].update()
+                self.L[Layers.intro_pose][i].update()
+        else:
+            if self._intro_player.active:
+                self._intro_player.stop()
+            self._intro_proxy.clear()
 
         # Stage composition — after layer updates so textures are fresh
         if self._active_stage is not None:

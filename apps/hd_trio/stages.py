@@ -91,6 +91,7 @@ class IntroInStage(StageLayer):
     def update(self, progress: float) -> None:
         self.compose([
             (Layers.centre_pose, _fade_out(progress, 0.0, 0.5)),
+            (Layers.intro_pose, _fade_in(progress)),
             (Layers.fluid, _fade_in(progress)),
             (Layers.color_mask, _fade_in(progress, 0.5, 1.0)),
         ])
@@ -99,14 +100,17 @@ class IntroInStage(StageLayer):
 class IntroStage(StageLayer):
     def update(self, progress: float) -> None:
         self.compose([
-            (Layers.fluid, 1.0),
-            (Layers.color_mask, 1.0),
+            (Layers.centre_pose, 1.0),
+            (Layers.intro_pose, 1.0),
+            # (Layers.fluid, 1.0),
+            # (Layers.color_mask, 1.0),
         ])
 
 
 class IntroOutStage(StageLayer):
     def update(self, progress: float) -> None:
         self.compose([
+            (Layers.intro_pose, 1.0 - _clamp(progress)),
             (Layers.fluid, 1.0 - _clamp(progress)),
             (Layers.color_mask, 1.0 - _clamp(progress)),
         ])

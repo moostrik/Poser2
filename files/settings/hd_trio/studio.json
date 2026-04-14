@@ -442,6 +442,23 @@
         "layered": 1.0
       }
     },
+    "intro_sequence": {
+      "verbose": false,
+      "recording_path": "recordings/intro",
+      "source_track": 0,
+      "color": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "pose": {
+        "line_width": 3.0,
+        "line_smooth": 0.0,
+        "use_scores": false,
+        "draw_anchors": false
+      }
+    },
     "flow": {
       "fps": 60.0,
       "draw_mode": "SMOOTH_VELOCITY_OUTPUT",

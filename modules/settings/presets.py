@@ -40,6 +40,7 @@ def scan(app_name: str | None = None) -> list[str]:
     return sorted(
         p.name.removesuffix(PRESET_SUFFIX)
         for p in d.glob(f"*{PRESET_SUFFIX}")
+        if not p.name.startswith(".")
     )
 
 

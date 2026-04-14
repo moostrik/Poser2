@@ -16,7 +16,9 @@ from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
 from modules.oak import CameraSettings, FrameType, CoderFormat, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render.color_settings import ColorSettings
 from modules.render import layers
+from modules.render.layers.centre.CentrePoseLayer import CentrePoseSettings
 from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
+from modules.utils import Color
 from modules.tracker import OnePerCamTrackerSettings
 from modules.pose import batch, nodes, trackers
 from modules.pose.batch.model_types import ModelType
@@ -66,6 +68,8 @@ class Layers(IntEnum):
     centre_mask =   auto()
     centre_frg =    auto()
     centre_pose =   auto()
+    # intro overlay
+    intro_pose =    auto()
     # data layers
     data_B_W =      auto()
     data_B_F =      auto()
@@ -273,6 +277,15 @@ class CentreGroup(BaseSettings):
     pose    : Group[layers.CentrePoseSettings]     = Group(layers.CentrePoseSettings)
     color   : Group[layers.ColorMaskLayerSettings] = Group(layers.ColorMaskLayerSettings)
 
+class IntroSequenceSettings(BaseSettings):
+    """Settings for prerecorded pose overlay during INTRO stages."""
+    verbose:        Field[bool]  = Field(False, description="Log start/stop events")
+    recording_path: Field[str]   = Field("recordings/intro", access=Field.INIT, description="Path to recorded pose folder")
+    source_track:   Field[int]   = Field(0, min=0, max=16, access=Field.INIT, description="Track ID to use from recording")
+    color:          Field[Color] = Field(Color(1.0, 1.0, 1.0), description="Skeleton color for intro overlay")
+    pose:           Group[CentrePoseSettings]  = Group(CentrePoseSettings)
+
+
 class RenderSettings(BaseSettings):
     num_cams:    Field[int] = Field(3, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int] = Field(3, access=Field.INIT, visible=False, description="Number of players")
@@ -280,6 +293,7 @@ class RenderSettings(BaseSettings):
     data   : Group[DataGroup]                 = Group(DataGroup)
     preview: Group[PreviewGroup]              = Group(PreviewGroup)
     centre : Group[CentreGroup]               = Group(CentreGroup)
+    intro_sequence: Group[IntroSequenceSettings] = Group(IntroSequenceSettings)
     flow   : Group[layers.FlowLayerSettings]  = Group(layers.FlowLayerSettings)
     fluid  : Group[layers.FluidLayerSettings] = Group(layers.FluidLayerSettings)
     colors : Group[ColorSettings]             = Group(ColorSettings)
