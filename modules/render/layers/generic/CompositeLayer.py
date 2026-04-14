@@ -142,8 +142,12 @@ class CompositeLayer(LayerBase):
             if lut_path:
                 self._lut_shader.load_cube(lut_path)
 
-    def update(self) -> None:
-        """Composite all layer textures to internal FBO."""
+    def compose(self, entries: list[tuple[Texture, float]]) -> None:
+        """Composite textures with per-entry opacity to internal FBO.
+
+        Args:
+            entries: List of (texture, opacity) pairs to composite.
+        """
         if not self._composite_fbo.allocated:
             return
 
@@ -155,23 +159,20 @@ class CompositeLayer(LayerBase):
         glClearColor(0.0, 0.0, 0.0, 0.0)
         glClear(GL_COLOR_BUFFER_BIT)
 
-        # Set blend mode
-        # Style.reset_state()
         Style.push_style()
         Style.set_blend_mode(self.config.blend_mode)
 
-        # Draw all layer textures
-        for layer in self._layers:
-            try:
-                tex = layer.texture
-                if tex.allocated:
-                    self._blit.use(tex)
-            except NotImplementedError:
-                # Layer doesn't produce texture output
-                continue
+        for tex, opacity in entries:
+            if tex.allocated and opacity > 0:
+                self._blit.use(tex, opacity)
 
         self._composite_fbo.end()
         Style.pop_style()
+
+    def update(self) -> None:
+        """Composite all layer textures to internal FBO."""
+        self.compose([(layer.texture, 1.0) for layer in self._layers
+                      if hasattr(layer, 'texture') and layer.texture.allocated])
 
     def draw(self) -> None:
         """Draw the composited result with LUT applied."""

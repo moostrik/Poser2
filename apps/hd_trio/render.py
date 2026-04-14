@@ -1,5 +1,7 @@
 """HD Trio render — layer graph for 3-camera fluid installation."""
 
+from dataclasses import dataclass
+from typing import cast
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, WindowManager, Shader, Style, clear_color, Texture
@@ -11,7 +13,7 @@ from modules.render.composition_subdivider import make_subdivision, SubdivisionR
 from modules.render import layers as ls
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-from .settings import Layers, RenderGroup
+from .settings import Layers, RenderGroup, ShowStage, ShowTimelineSettings
 
 
 UPDATE_LAYERS: list[Layers] = [
@@ -42,11 +44,58 @@ LARGE_LAYERS: list[Layers] = [
 ]
 
 
+# ---------------------------------------------------------------------------
+#  Stage-based visual definitions
+# ---------------------------------------------------------------------------
+
+def _clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
+    return max(lo, min(hi, x))
+
+
+@dataclass
+class LayerEntry:
+    """A layer with optional fade-in / fade-out ranges.
+
+    fade_in:  (start, end) as fraction of stage_progress → opacity ramps 0→1.
+    fade_out: (start, end) as fraction of stage_progress → opacity ramps 1→0.
+    Both can coexist. None means always fully visible.
+    """
+    layer: Layers
+    fade_in: tuple[float, float] | None = None
+    fade_out: tuple[float, float] | None = None
+
+    def alpha(self, progress: float) -> float:
+        a = 1.0
+        if self.fade_in is not None:
+            s, e = self.fade_in
+            a = min(a, _clamp((progress - s) / (e - s))) if e != s else (1.0 if progress >= s else 0.0)
+        if self.fade_out is not None:
+            s, e = self.fade_out
+            a = min(a, 1.0 - _clamp((progress - s) / (e - s))) if e != s else (0.0 if progress >= s else a)
+        return a
+
+
+STAGE_VISUALS: dict[ShowStage, list[LayerEntry]] = {
+    ShowStage.START:        [LayerEntry(Layers.centre_pose),],
+    ShowStage.INTRO_IN: [LayerEntry(Layers.fluid, fade_in=(0.0, 1.0)),
+                             LayerEntry(Layers.color_mask, fade_in=(0.5, 1.0))],
+    ShowStage.INTRO:         [LayerEntry(Layers.fluid),
+                             LayerEntry(Layers.color_mask)],
+    ShowStage.INTRO_OUT:   [LayerEntry(Layers.fluid, fade_out=(0.0, 1.0)),
+                             LayerEntry(Layers.color_mask, fade_out=(0.0, 1.0))],
+    ShowStage.PLAY_IN:     [],
+    ShowStage.IDLE:         [LayerEntry(Layers.fluid),
+                             LayerEntry(Layers.color_mask)],
+}
+
+
 class HDTrioRender(RenderBase):
-    def __init__(self, data_hub: DataHub, settings: RenderGroup, num_cams: int = 3, num_players: int = 3) -> None:
+    def __init__(self, data_hub: DataHub, settings: RenderGroup, timeline: ShowTimelineSettings,
+                 num_cams: int = 3, num_players: int = 3) -> None:
         self.num_players: int = num_players
         self.num_cams: int = num_cams
         self.settings: RenderGroup = settings
+        self._timeline: ShowTimelineSettings = timeline
 
         self.data_hub: DataHub = data_hub
 
@@ -147,6 +196,20 @@ class HDTrioRender(RenderBase):
                 seen.add(layer_type)
                 for layer in self.L[layer_type].values():
                     layer.update()
+
+        # Stage-based composition
+        stage = ShowStage(self._timeline.stage)
+        progress = self._timeline.stage_progress
+        entries = STAGE_VISUALS.get(stage, STAGE_VISUALS[ShowStage.IDLE])
+
+        for i in range(self.num_cams):
+            composite = cast(ls.CompositeLayer, self.L[Layers.composite][i])
+            tex_alpha_pairs = [
+                (self.L[entry.layer][i].texture, entry.alpha(progress))
+                for entry in entries
+                if i in self.L[entry.layer]
+            ]
+            composite.compose(tex_alpha_pairs)
 
     def draw_main(self, width: int, height: int) -> None:
         clear_color()
