@@ -189,8 +189,7 @@ class HDTrioMain:
 
         for camera in self.cameras:
             camera.add_preview_callback(self.data_hub.set_cam_frame)
-            if not self.settings.camera.sim_enabled:
-                camera.add_sync_callback(self.video_recorder.set_synced_frames)
+            camera.add_sync_callback(self.video_recorder.set_synced_frames)
             camera.add_frame_callback(self.image_crop_processor.set_image)
             camera.add_frame_callback(self.frame_sync_bang.add_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)

@@ -102,6 +102,8 @@ class Player(Thread):
         self.settings.bind(SimulatorSettings.folder, self._on_folder_changed)
         self.settings.bind(SimulatorSettings.range_start, self._on_range_changed)
         self.settings.bind(SimulatorSettings.range_end, self._on_range_changed)
+        self.settings.bind(SimulatorSettings.refresh_path, self._on_refresh_path)
+        self.settings.bind(SimulatorSettings.video_path, self._on_refresh_path)
 
     def stop(self) -> None:
         self._set_play_chunk(-1)
@@ -418,6 +420,10 @@ class Player(Thread):
             self.settings.max_chunks = num_chunks
             self.set_chunk_range(0, num_chunks)
             self.play(True, folder)
+
+    def _on_refresh_path(self, _=None) -> None:
+        self.folders = self._get_video_folders(self.settings)
+        self.settings.available_folders = list(self.folders.keys())
 
     def _on_range_changed(self, _=None) -> None:
         r0: int = self.settings.range_start

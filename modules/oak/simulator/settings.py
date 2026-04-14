@@ -8,6 +8,7 @@ class SimulatorSettings(BaseSettings):
     num_cameras:        Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
     fps:                Field[float]            = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Simulation FPS")
     video_path:         Field[str]              = Field("recordings", description="Video recordings directory")
+    refresh_path:       Field[bool]             = Field(False, widget=Widget.button, description="Refresh recording folders")
     video_decoder:      Field[CoderType]        = Field(CoderType.iGPU, access=Field.INIT, description="Video decoder type")
     video_format:       Field[CoderFormat]      = Field(CoderFormat.H264, access=Field.INIT, description="Video format")
     video_frame_types:  Field[list[FrameType]]  = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record", visible=False)
