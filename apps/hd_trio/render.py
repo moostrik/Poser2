@@ -60,6 +60,7 @@ class HDTrioRender(RenderBase):
         self._draw_layers: list[Layers] = settings.layer.select.final
 
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
+        self._stages: dict[ShowStage, list[StageLayer]] = {stage: [] for stage in STAGES}
 
         # Set data.b overrides
         settings.data.b.line_width = 6.0
@@ -96,6 +97,10 @@ class HDTrioRender(RenderBase):
             self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, settings.data.b, settings.colors)
             self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.data_hub)
 
+            cam_layers = {layer: cam_dict[i] for layer, cam_dict in self.L.items() if i in cam_dict}
+            for stage, cls in STAGES.items():
+                self._stages[stage].append(cls(i, data_hub, settings, cam_layers))
+
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name='track',        columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
@@ -114,13 +119,8 @@ class HDTrioRender(RenderBase):
         self.stage_reloader = HotReloadMethods(StageLayer, True, True)
         self.stage_reloader.add_file_changed_callback(self._rebuild_stages)
 
-        # stage system
-        self._stages: dict[ShowStage, StageLayer] = {
-            stage: cls(settings, self.L, self.num_cams)
-            for stage, cls in STAGES.items()
-        }
         self._prev_stage: ShowStage | None = None
-        self._active_stage: StageLayer | None = None
+        self._active_stages: list[StageLayer] = []
 
         # intro sequence overlay
         self._intro_proxy = SequenceDataProxy()
@@ -134,11 +134,14 @@ class HDTrioRender(RenderBase):
     def _rebuild_stages(self) -> None:
         """Re-instantiate stage objects after hot-reload of stages.py."""
         self._stages = {
-            stage: cls(self.settings, self.L, self.num_cams)
+            stage: [
+                cls(i, self.data_hub, self.settings, {layer: cam_dict[i] for layer, cam_dict in self.L.items() if i in cam_dict})
+                for i in range(self.num_cams)
+            ]
             for stage, cls in stages.STAGES.items()
         }
         self._prev_stage = None
-        self._active_stage = None
+        self._active_stages = []
 
     def on_main_window_resize(self, width: int, height: int) -> None:
         self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)
@@ -175,11 +178,11 @@ class HDTrioRender(RenderBase):
         stage = ShowStage(self._timeline.stage)
         progress = self._timeline.stage_progress
         if stage != self._prev_stage:
-            if self._active_stage is not None:
-                self._active_stage.exit()
-            self._active_stage = self._stages.get(stage)
-            if self._active_stage is not None:
-                self._active_stage.enter()
+            for s in self._active_stages:
+                s.exit()
+            self._active_stages = self._stages.get(stage, [])
+            for s in self._active_stages:
+                s.enter()
             self._prev_stage = stage
 
         # Layer updates
@@ -208,8 +211,8 @@ class HDTrioRender(RenderBase):
             self._intro_proxy.clear()
 
         # Stage composition — after layer updates so textures are fresh
-        if self._active_stage is not None:
-            self._active_stage.update(progress)
+        for s in self._active_stages:
+            s.update(progress)
 
     def draw_main(self, width: int, height: int) -> None:
         clear_color()

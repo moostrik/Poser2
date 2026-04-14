@@ -110,13 +110,13 @@ class OakGroup(BaseSettings):
 
     _cam_share: list = [fps, color, mono, square, stereo, yolo, hd_ready, sim_enabled, model_path]
 
-    cam_0        : Group[CameraSettings]    = Group(CameraSettings, share=_cam_share)
-    cam_1        : Group[CameraSettings]    = Group(CameraSettings, share=_cam_share)
-    cam_2        : Group[CameraSettings]    = Group(CameraSettings, share=_cam_share)
-    simulator    : Group[SimulatorSettings]    = Group(SimulatorSettings, share=[num_cameras, fps])
-    tracker      : Group[OnePerCamTrackerSettings] = Group(OnePerCamTrackerSettings)
-    frame_sync   : Group[SyncSettings]         = Group(SyncSettings, share=[num_cameras, fps])
-    tracklet_sync: Group[SyncSettings]         = Group(SyncSettings, share=[num_cameras, fps])
+    cam_0        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
+    cam_1        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
+    cam_2        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
+    simulator    : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cameras, fps])
+    tracker      : Group[OnePerCamTrackerSettings]  = Group(OnePerCamTrackerSettings)
+    frame_sync   : Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
+    tracklet_sync: Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
 
     @property
     def cameras(self) -> list[CameraSettings]:
