@@ -84,18 +84,10 @@ class StageLayer:
 # ---------------------------------------------------------------------------
 
 class StartStage(StageLayer):
-    def _get_motion_time(self) -> float:
-        pose = self.data_hub.get_pose(Stage.LERP, self.cam_id)
-        if pose is None:
-            return 0.0
-        v = pose[MotionTime].value
-        return v if not math.isnan(v) else 0.0
 
     def enter(self) -> None:
         self._start_mt = self._get_motion_time()
-
-    def _motion_alpha(self, threshold: float) -> float:
-        return _clamp((self._get_motion_time() - self._start_mt) / threshold)
+        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.LERP
 
     def update(self, progress: float) -> None:
         motion_time_duration = 6.0  # movement threshold before centre pose fully visible
@@ -103,8 +95,21 @@ class StartStage(StageLayer):
         eased_alpha: float = easeInOutSine(max(progress_alpha, self._motion_alpha(motion_time_duration)))
         self.compose([(Layers.centre_pose, eased_alpha)])
 
+    def _motion_alpha(self, threshold: float) -> float:
+        return _clamp((self._get_motion_time() - self._start_mt) / threshold)
+
+    def _get_motion_time(self) -> float:
+        pose = self.data_hub.get_pose(Stage.LERP, self.cam_id)
+        if pose is None:
+            return 0.0
+        v = pose[MotionTime].value
+        return v if not math.isnan(v) else 0.0
+
 
 class IntroInStage(StageLayer):
+    def enter(self) -> None:
+        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.LERP
+
     def update(self, progress: float) -> None:
         self.compose([
             (Layers.centre_pose, 1.0),
@@ -113,6 +118,9 @@ class IntroInStage(StageLayer):
 
 
 class IntroStage(StageLayer):
+    def enter(self) -> None:
+        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.LERP
+
     def update(self, progress: float) -> None:
         self.compose([
             (Layers.centre_pose, 1.0),
@@ -121,6 +129,9 @@ class IntroStage(StageLayer):
 
 
 class IntroOutStage(StageLayer):
+    def enter(self) -> None:
+        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.LERP
+
     def update(self, progress: float) -> None:
         self.compose([
             (Layers.centre_pose, 1.0),
@@ -129,16 +140,37 @@ class IntroOutStage(StageLayer):
 
 
 class PlayInStage(StageLayer):
+    def enter(self) -> None:
+        self._start_mt = self._get_motion_time()
+        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.SMOOTH
+        cast(ls.FluidLayer, self.layers[Layers.fluid]).reset()
+
     def update(self, progress: float) -> None:
+        motion_time_duration = 2.0  # movement threshold before centre pose fully visible
+        progress_alpha: float = _fade_in(progress, 0.0, 1.0)
+        eased_alpha: float = easeInOutSine(max(progress_alpha, self._motion_alpha(motion_time_duration)))
         # can we store the movement time of the last stage and use it here to fade out the centre pose?
         self.compose([
-            (Layers.centre_pose, 1.0),
-            (Layers.fluid, 1.0 - _clamp(progress)),
-            (Layers.color_mask, 1.0 - _clamp(progress)),
+            (Layers.centre_pose, 1.0 - eased_alpha),
+            (Layers.fluid, eased_alpha),
+            (Layers.color_mask, eased_alpha),
         ])
+
+    def _motion_alpha(self, threshold: float) -> float:
+        return _clamp((self._get_motion_time() - self._start_mt) / threshold)
+
+    def _get_motion_time(self) -> float:
+        pose = self.data_hub.get_pose(Stage.LERP, self.cam_id)
+        if pose is None:
+            return 0.0
+        v = pose[MotionTime].value
+        return v if not math.isnan(v) else 0.0
 
 
 class PlayStage(StageLayer):
+    def enter(self) -> None:
+        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.SMOOTH
+
     def update(self, progress: float) -> None:
         self.compose([
             (Layers.fluid, 1.0),
@@ -147,6 +179,9 @@ class PlayStage(StageLayer):
 
 
 class ConclusionStage(StageLayer):
+    def enter(self) -> None:
+        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.SMOOTH
+
     def update(self, progress: float) -> None:
         self.compose([
             (Layers.fluid, 1.0),
@@ -155,10 +190,12 @@ class ConclusionStage(StageLayer):
 
 
 class IdleStage(StageLayer):
+    def enter(self) -> None:
+        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.SMOOTH
+
     def update(self, progress: float) -> None:
         self.compose([
             (Layers.fluid, 1.0),
-            (Layers.color_mask, 1.0),
         ])
 
 
