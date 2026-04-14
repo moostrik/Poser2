@@ -111,7 +111,7 @@ class OscSound:
 
         # Timeline data
         timeline_stage = self._data_hub.get_item(DataHubType.timeline_stage, 0)
-        timeline_progress = self._data_hub.get_item(DataHubType.timeline_progress, 0)
+        timeline_progress = self._data_hub.get_item(DataHubType.timeline_total_progress, 0)
 
         stage_msg = OscMessageBuilder(address="/global/state")
         stage_msg.add_arg(timeline_stage if timeline_stage is not None else 0, arg_type=OscMessageBuilder.ARG_TYPE_INT)

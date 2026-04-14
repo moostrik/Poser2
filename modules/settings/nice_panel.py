@@ -990,9 +990,11 @@ def _build_fallback(settings, name, field, polls):
 def _build_action_button(settings, name, field):
     """Create a NiceGUI button for a Widget.button Setting."""
     label = generate_label(name)
+    description = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     props = "dense disable" if is_disabled else "dense"
     btn = ui.button(label, on_click=lambda: field.fire(settings)).props(props)
+    _attach_description_tooltip(btn, description or None)
     if is_disabled:
         btn.disable()
 

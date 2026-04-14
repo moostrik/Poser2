@@ -39,7 +39,7 @@ class DataHubType(IntEnum):
 
     timeline_stage =          auto()   # int, project-defined stage enum value
     timeline_stage_progress = auto()   # float 0-1, progress within current stage
-    timeline_progress =       auto()   # float 0-1, overall timeline progress
+    timeline_total_progress = auto()   # float 0-1, overall timeline progress
 
 
 # Stage → DataHubType lookup
@@ -187,7 +187,7 @@ class DataHub:
 
     def set_timeline_progress(self, progress: float) -> None:
         """Store overall timeline progress as float 0-1."""
-        self.set_item(DataHubType.timeline_progress, 0, progress)
+        self.set_item(DataHubType.timeline_total_progress, 0, progress)
 
     # UPDATE CALLBACK
     def notify_update(self) -> None:
