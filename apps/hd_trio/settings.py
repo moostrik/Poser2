@@ -273,7 +273,9 @@ class CentreGroup(BaseSettings):
     pose    : Group[layers.CentrePoseSettings]     = Group(layers.CentrePoseSettings)
     color   : Group[layers.ColorMaskLayerSettings] = Group(layers.ColorMaskLayerSettings)
 
-class RenderGroup(BaseSettings):
+class RenderSettings(BaseSettings):
+    num_cams:    Field[int] = Field(3, access=Field.INIT, visible=False, description="Number of cameras")
+    num_players: Field[int] = Field(3, access=Field.INIT, visible=False, description="Number of players")
     layer  : Group[LayerGroup]                = Group(LayerGroup)
     data   : Group[DataGroup]                 = Group(DataGroup)
     preview: Group[PreviewGroup]              = Group(PreviewGroup)
@@ -296,6 +298,6 @@ class HDTrioSettings(BaseSettings):
     camera : Group[OakGroup]     = Group(OakGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
     inout  : Group[InOutGroup]   = Group(InOutGroup)
     pose   : Group[PoseGroup]    = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
-    render : Group[RenderGroup]  = Group(RenderGroup)
+    render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_players.as_('num_cams')])
     server : Group[NiceSettings] = Group(NiceSettings)
     session: Group[SessionGroup] = Group(SessionGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])

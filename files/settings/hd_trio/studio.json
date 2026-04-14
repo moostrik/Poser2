@@ -1,7 +1,7 @@
 {
   "num_players": 3,
   "input_fps": 23.0,
-  "render_fps": 63.0,
+  "render_fps": 61.0,
   "camera": {
     "yolo": true,
     "color": true,
@@ -341,13 +341,14 @@
     }
   },
   "render": {
+    "num_players": 3,
     "layer": {
       "select": {
         "preview": [
           "flow"
         ],
         "final": [
-          "cam_image"
+          "composite"
         ]
       },
       "lut": {
@@ -631,10 +632,10 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "enabled": true
+      "enabled": false
     },
     "pose": {
-      "enabled": true,
+      "enabled": false,
       "features": [
         "BBox",
         "Points2D"

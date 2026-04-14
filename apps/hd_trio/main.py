@@ -65,8 +65,7 @@ class HDTrioMain:
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
 
         # RENDER
-        self.render = HDTrioRender(self.data_hub, self.settings.render, self.settings.session.timeline,
-                                   num_cams=len(self.cameras), num_players=num_players)
+        self.render = HDTrioRender(self.data_hub, self.settings.render, self.settings.session.timeline)
 
         # IN_OUT
         self.sound_osc = OscSound(self.data_hub, self.settings.inout.osc_sound)
