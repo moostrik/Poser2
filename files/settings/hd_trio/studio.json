@@ -1,7 +1,7 @@
 {
   "num_players": 3,
   "input_fps": 23.0,
-  "render_fps": 61.0,
+  "render_fps": 64.0,
   "camera": {
     "yolo": true,
     "color": true,
@@ -629,6 +629,10 @@
     "timeline": {
       "stages": [
         "START",
+        "INTRO_IN",
+        "INTRO",
+        "INTRO_OUT",
+        "PLAY_IN",
         "IDLE"
       ],
       "durations": [
@@ -636,7 +640,7 @@
         3.0,
         30.0,
         3.0,
-        3.0,
+        20.0,
         60.0,
         10.0,
         3.0
@@ -653,6 +657,7 @@
     },
     "pose": {
       "enabled": false,
+      "stage": "RAW",
       "features": [
         "BBox",
         "Points2D"

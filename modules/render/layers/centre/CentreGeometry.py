@@ -64,7 +64,6 @@ class CentreGeometry(LayerBase):
 
         # Configuration
         self.config: CentreGeomSettings = config or CentreGeomSettings()
-        self._stage: Stage = self.config.stage
         self._cam_aspect: float = self.config.cam_aspect
 
         # Geometry results
@@ -115,7 +114,7 @@ class CentreGeometry(LayerBase):
     def update(self) -> None:
         """Calculate anchor points and derived geometry from current pose."""
         # Get pose data
-        pose: Frame | None = self._data_hub.get_pose(self._stage, self._cam_id)
+        pose: Frame | None = self._data_hub.get_pose(self.config.stage, self._cam_id)
         self._data_cache.update(pose)
         if self._data_cache.idle:
             return
