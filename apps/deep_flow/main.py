@@ -167,9 +167,10 @@ class DeepFlowMain:
 
         # POSE RAW
         self.point_extractor.add_frames_callback(self.pose_raw_filters.process)
-        self.pose_raw_filters.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.RAW))
+        self.point_extractor.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.RAW))
+        self.pose_raw_filters.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.CLEAN))
         self.pose_raw_filters.add_frames_callback(self.window_tracker_R.process)
-        self.window_tracker_R.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.RAW))
+        self.window_tracker_R.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.CLEAN))
 
         # POSE SMOOTH & PREDICT
         self.pose_raw_filters.add_frames_callback(self.pose_smooth_filters.process)

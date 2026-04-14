@@ -203,15 +203,18 @@ class HDTrioMain:
 
         # POSE RAW
         self.point_extractor.add_frames_callback(self.pose_raw_filters.process)
-        self.point_extractor.add_frames_callback(self.pose_recorder.on_frame_dict)
-        self.pose_raw_filters.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.RAW))
+        self.point_extractor.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.RAW))
+        self.point_extractor.add_frames_callback(partial(self.pose_recorder.on_frame_dict, Stage.RAW))
+        self.pose_raw_filters.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.CLEAN))
+        self.pose_raw_filters.add_frames_callback(partial(self.pose_recorder.on_frame_dict, Stage.CLEAN))
         self.pose_raw_filters.add_frames_callback(self.window_tracker_R.process)
-        self.window_tracker_R.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.RAW))
+        self.window_tracker_R.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.CLEAN))
 
         # POSE SMOOTH & PREDICT
         self.pose_raw_filters.add_frames_callback(self.pose_smooth_filters.process)
         self.pose_smooth_filters.add_frames_callback(self.pose_prediction_filters.process)
         self.pose_prediction_filters.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.SMOOTH))
+        self.pose_prediction_filters.add_frames_callback(partial(self.pose_recorder.on_frame_dict, Stage.SMOOTH))
         self.pose_smooth_filters.add_frames_callback(self.window_tracker_S.process)
         self.window_tracker_S.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.SMOOTH))
 
@@ -224,6 +227,7 @@ class HDTrioMain:
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_applicator.submit)
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_tracker.process)
         self.motion_gate_tracker.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.LERP))
+        self.motion_gate_tracker.add_frames_callback(partial(self.pose_recorder.on_frame_dict, Stage.LERP))
         self.motion_gate_tracker.add_frames_callback(self.window_tracker_I.process)
         self.window_tracker_I.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.LERP))
 

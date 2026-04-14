@@ -17,6 +17,7 @@ from modules.tracker.Tracklet import TrackletDict
 
 class Stage(IntEnum):
     RAW =       0
+    CLEAN =     auto()
     SMOOTH =    auto()
     LERP =      auto()
 
@@ -29,13 +30,15 @@ class DataHubType(IntEnum):
     gpu_frames =        auto()   # sorted by track_id, GPU frames with crops
     flow_tensor =       auto()   # sorted by track_id, GPU tensors (H, W, 2) FP16
 
-    pose_frame_R =      auto()   # sorted by track_id, has cam_id
-    pose_frame_S =      auto()   # sorted by track_id, has cam_id
-    pose_frame_I =      auto()   # sorted by track_id, has cam_id
+    pose_frame_R =      auto()   # sorted by track_id, has cam_id (RAW detection)
+    pose_frame_C =      auto()   # sorted by track_id, has cam_id (CLEAN)
+    pose_frame_S =      auto()   # sorted by track_id, has cam_id (SMOOTH)
+    pose_frame_I =      auto()   # sorted by track_id, has cam_id (LERP)
 
-    pose_window_R =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow}
-    pose_window_S =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow}
-    pose_window_I =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow}
+    pose_window_R =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (RAW detection)
+    pose_window_C =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (CLEAN)
+    pose_window_S =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (SMOOTH)
+    pose_window_I =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (LERP)
 
     timeline_stage =          auto()   # int, project-defined stage enum value
     timeline_stage_progress = auto()   # float 0-1, progress within current stage
@@ -45,11 +48,13 @@ class DataHubType(IntEnum):
 # Stage → DataHubType lookup
 _FRAME_TYPES: dict[Stage, DataHubType] = {
     Stage.RAW:      DataHubType.pose_frame_R,
+    Stage.CLEAN:    DataHubType.pose_frame_C,
     Stage.SMOOTH:   DataHubType.pose_frame_S,
     Stage.LERP:     DataHubType.pose_frame_I,
 }
 _WINDOW_TYPES: dict[Stage, DataHubType] = {
     Stage.RAW:      DataHubType.pose_window_R,
+    Stage.CLEAN:    DataHubType.pose_window_C,
     Stage.SMOOTH:   DataHubType.pose_window_S,
     Stage.LERP:     DataHubType.pose_window_I,
 }
@@ -57,6 +62,7 @@ _WINDOW_TYPES: dict[Stage, DataHubType] = {
 # DEPRECATED: Use PipelineStage instead
 class PoseDataHubTypes(IntEnum):
     pose_R =      DataHubType.pose_frame_R.value
+    pose_C =      DataHubType.pose_frame_C.value
     pose_S =      DataHubType.pose_frame_S.value
     pose_I =      DataHubType.pose_frame_I.value
 

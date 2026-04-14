@@ -1,5 +1,6 @@
 from modules.settings import BaseSettings, Field, Widget
 from modules.pose.features import Feature
+from modules.data_hub import Stage
 
 
 class RecorderSettings(BaseSettings):
@@ -13,5 +14,6 @@ class RecorderSettings(BaseSettings):
     output_path:  Field[str]   = Field("recordings", access=Field.INIT, description="Pose recordings directory")
     name:         Field[str]   = Field("", widget=Widget.input, description="Recording name")
 
-    # ── Feature selection ─────────────────────────────────────────────
-    features: Field[list] = Field([Feature["BBox"], Feature["Points2D"]], description="Features to include in recording", newline=True)
+    # ── Recording options ─────────────────────────────────────────────
+    stage:    Field[Stage] = Field(Stage.RAW, description="Pipeline stage to record")
+    features: Field[list]  = Field([Feature["BBox"], Feature["Points2D"]], description="Features to include in recording", newline=True)

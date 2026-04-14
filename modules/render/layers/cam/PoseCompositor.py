@@ -39,7 +39,7 @@ class PoseCompositor(LayerBase):
         # Pose line layers - RAW (black, thickest), SMOOTH (white, medium), LERP (color, thin)
         # RAW = 3x thickness, drawn first (back layer)
         pose_raw_config: PoseLineSettings = PoseLineSettings(
-            stage=Stage.RAW,
+            stage=Stage.CLEAN,
             line_width=self.settings.line_width * 3.0,
             line_smooth=self.settings.line_smooth * 3.0,
             use_scores=True,

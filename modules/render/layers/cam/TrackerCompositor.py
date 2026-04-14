@@ -29,7 +29,7 @@ class TrackerCompositor(LayerBase):
         self._cam_texture: Texture = cam_texture
         self._depth_track_renderer: TrackletRenderer = TrackletRenderer(cam_id, data)
 
-        bbox_config_A: BBoxRendererSettings = BBoxRendererSettings(stage=Stage.RAW, line_width=self.settings.bbox_line_width * 2.0, color=color_settings.history)
+        bbox_config_A: BBoxRendererSettings = BBoxRendererSettings(stage=Stage.CLEAN, line_width=self.settings.bbox_line_width * 2.0, color=color_settings.history)
         self._bbox_renderer_A: BBoxRenderer = BBoxRenderer(cam_id, data, bbox_config_A)
 
         bbox_config_B: BBoxRendererSettings = BBoxRendererSettings(stage=Stage.LERP, line_width=self.settings.bbox_line_width, color=color_settings.track_colors[cam_id])
