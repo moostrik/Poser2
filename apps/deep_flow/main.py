@@ -72,79 +72,88 @@ class DeepFlowMain:
         self.mask_extractor =       batch.MaskBatchExtractor(self.settings.pose.segmentation)
         self.flow_extractor =       batch.FlowBatchExtractor(self.settings.pose.flow)
 
-        self.motion_gate_applicator =   nodes.MotionGateApplicator(self.settings.pose.motion_gate)
-        self.motion_gate_tracker =      trackers.FilterTracker(num_players, [lambda: self.motion_gate_applicator])
+        # Feature applicator (shared across all pipelines)
+        self.motion_gate_applicator = nodes.MotionGateApplicator(self.settings.pose.motion_gate)
 
         # WINDOW TRACKERS
         self.window_tracker_R =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_raw)
         self.window_tracker_S =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_smooth)
         self.window_tracker_I =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_lerp)
 
-        self.bbox_filters = trackers.FilterTracker(
-            num_players,
-            [
-                lambda: nodes.BBoxEuroSmoother(self.settings.pose.bbox.smoother),
-                lambda: nodes.BBoxPredictor(self.settings.pose.bbox.prediction),
-            ]
-        )
+        # Reused config
+        angle_extractor_config = nodes.AngleExtractorSettings(aspect_ratio=self.settings.pose.detection.aspect_ratio)
+        p = self.settings.pose
 
-        self.pose_raw_filters = trackers.FilterTracker(
-            num_players,
-            [
-                lambda: nodes.PointDualConfFilter(self.settings.pose.point.confidence_filter),
-                lambda: nodes.AngleExtractor(nodes.AngleExtractorSettings(aspect_ratio=self.settings.pose.detection.aspect_ratio)),
-                lambda: nodes.AngleVelExtractor(self.settings.pose.velocity.extractor),
-            ]
-        )
+        self.motion_gate_tracker = trackers.FilterTracker({
+            i: trackers.FilterPipeline([self.motion_gate_applicator])
+            for i in range(num_players)
+        })
 
-        self.pose_smooth_filters = trackers.FilterTracker(
-            num_players,
-            [
-                lambda: nodes.PointEuroSmoother(self.settings.pose.point.smoother),
-                lambda: nodes.AngleExtractor(nodes.AngleExtractorSettings(aspect_ratio=self.settings.pose.detection.aspect_ratio)),
-                lambda: nodes.AngleVelExtractor(self.settings.pose.velocity.extractor),
-                lambda: nodes.AngleVelEuroSmoother(self.settings.pose.velocity.smoother),
-                lambda: nodes.AngleEuroSmoother(self.settings.pose.angle.smoother),
-                lambda: nodes.AngleMotionExtractor(self.settings.pose.motion.extractor),
-                lambda: nodes.AngleMotionMovingAverageSmoother(self.settings.pose.motion.moving_average),
-                nodes.AngleSymExtractor,
-                nodes.MotionTimeExtractor,
-                nodes.AgeExtractor,
-            ]
-        )
+        self.bbox_filters = trackers.FilterTracker({
+            i: trackers.FilterPipeline([
+                nodes.BBoxEuroSmoother(p.bbox.smoother),
+                nodes.BBoxPredictor(p.bbox.prediction),
+            ])
+            for i in range(num_players)
+        })
 
-        self.pose_prediction_filters = trackers.FilterTracker(
-            num_players,
-            [
-                lambda: nodes.PointPredictor(self.settings.pose.point.prediction),
-                lambda: nodes.AnglePredictor(self.settings.pose.angle.prediction),
-                lambda: nodes.AngleVelPredictor(self.settings.pose.velocity.prediction),
-                lambda: nodes.AngleStickyFiller(self.settings.pose.angle.sticky),
-            ]
-        )
+        self.pose_raw_filters = trackers.FilterTracker({
+            i: trackers.FilterPipeline([
+                nodes.PointDualConfFilter(p.point.confidence_filter),
+                nodes.AngleExtractor(angle_extractor_config),
+                nodes.AngleVelExtractor(p.velocity.extractor),
+            ])
+            for i in range(num_players)
+        })
 
-        self.interpolators = trackers.InterpolatorTracker(
-            num_players,
-            [
-                lambda: nodes.BBoxChaseInterpolator(self.settings.pose.bbox.interpolator),
-                lambda: nodes.PointChaseInterpolator(self.settings.pose.point.interpolator),
-                lambda: nodes.AngleChaseInterpolator(self.settings.pose.angle.interpolator),
-                lambda: nodes.AngleVelChaseInterpolator(self.settings.pose.velocity.interpolator),
-            ]
-        )
+        self.pose_smooth_filters = trackers.FilterTracker({
+            i: trackers.FilterPipeline([
+                nodes.PointEuroSmoother(p.point.smoother),
+                nodes.AngleExtractor(angle_extractor_config),
+                nodes.AngleVelExtractor(p.velocity.extractor),
+                nodes.AngleVelEuroSmoother(p.velocity.smoother),
+                nodes.AngleEuroSmoother(p.angle.smoother),
+                nodes.AngleMotionExtractor(p.motion.extractor),
+                nodes.AngleMotionMovingAverageSmoother(p.motion.moving_average),
+                nodes.AngleSymExtractor(),
+                nodes.MotionTimeExtractor(),
+                nodes.AgeExtractor(),
+            ])
+            for i in range(num_players)
+        })
 
-        self.pose_interpolation_filters = trackers.FilterTracker(
-            num_players,
-            [
-                nodes.AngleSymExtractor,
-                nodes.MotionTimeExtractor,
-                nodes.AgeExtractor,
-                lambda: nodes.AngleVelStickyFiller(self.settings.pose.velocity.sticky),
-                lambda: nodes.AngleVelEuroSmoother(self.settings.pose.velocity.smoother),
-                lambda: nodes.AngleMotionExtractor(self.settings.pose.motion.extractor),
-                lambda: nodes.AngleMotionMovingAverageSmoother(self.settings.pose.motion.moving_average),
-            ]
-        )
+        self.pose_prediction_filters = trackers.FilterTracker({
+            i: trackers.FilterPipeline([
+                nodes.PointPredictor(p.point.prediction),
+                nodes.AnglePredictor(p.angle.prediction),
+                nodes.AngleVelPredictor(p.velocity.prediction),
+                nodes.AngleStickyFiller(p.angle.sticky),
+            ])
+            for i in range(num_players)
+        })
+
+        self.interpolators = trackers.InterpolatorTracker({
+            i: trackers.InterpolatorPipeline([
+                nodes.BBoxChaseInterpolator(p.bbox.interpolator),
+                nodes.PointChaseInterpolator(p.point.interpolator),
+                nodes.AngleChaseInterpolator(p.angle.interpolator),
+                nodes.AngleVelChaseInterpolator(p.velocity.interpolator),
+            ])
+            for i in range(num_players)
+        })
+
+        self.pose_interpolation_filters = trackers.FilterTracker({
+            i: trackers.FilterPipeline([
+                nodes.AngleSymExtractor(),
+                nodes.MotionTimeExtractor(),
+                nodes.AgeExtractor(),
+                nodes.AngleVelStickyFiller(p.velocity.sticky),
+                nodes.AngleVelEuroSmoother(p.velocity.smoother),
+                nodes.AngleMotionExtractor(p.motion.extractor),
+                nodes.AngleMotionMovingAverageSmoother(p.motion.moving_average),
+            ])
+            for i in range(num_players)
+        })
 
     def start(self) -> None:
 

@@ -1,9 +1,7 @@
 """Tracks and filters multiple poses independently."""
 
-from typing import Any, Callable
-
 from .TrackerBase import TrackerBase
-from modules.pose.nodes.Nodes import FilterNode
+from .FilterPipeline import FilterPipeline
 from modules.pose.frame import Frame, FrameDict
 
 import logging
@@ -11,34 +9,24 @@ logger = logging.getLogger(__name__)
 
 
 class FilterTracker(TrackerBase):
-    """Tracks multiple poses, maintaining a separate filter or filter pipeline for each.
+    """Multiplexes a FrameDict across per-track FilterPipelines.
 
-    Each pose_id gets its own FilterNode or chain of FilterNodes which maintains
-    independent state. Filters are automatically reset when their pose is lost.
+    Handles dispatch, result collection, lifecycle reset on track
+    disappearance, and callback fan-out. Pipeline construction is
+    the caller's responsibility.
     """
 
-    def __init__(self, num_tracks: int, filter_factory: Callable[[], FilterNode] | list[Callable[[], FilterNode]]) -> None:
-        """Initialize tracker with filter(s) per pose."""
-        super().__init__()  # Initialize PoseDictCallbackMixin
-
-        # Convert single factory to list for uniform handling
-        if callable(filter_factory):
-            self._filter_factories = [filter_factory]
-        else:
-            if not filter_factory:
-                raise ValueError("FilterTracker: filter_factory list must not be empty.")
-            self._filter_factories = filter_factory
-
-        self._filter_pipelines: dict[int, list[FilterNode]] = {
-            id: [factory() for factory in self._filter_factories]
-            for id in range(num_tracks)
-        }
+    def __init__(self, pipelines: dict[int, FilterPipeline]) -> None:
+        super().__init__()
+        if not pipelines:
+            raise ValueError("FilterTracker: pipelines dict must not be empty.")
+        self._pipelines = pipelines
 
     def process(self, poses: FrameDict) -> FrameDict:
-        """Process poses through filters and emit callbacks."""
+        """Process poses through per-track pipelines and emit callbacks."""
 
-        # Reset filters for poses that are no longer present
-        for id in self._filter_pipelines:
+        # Reset pipelines for tracks that are no longer present
+        for id in self._pipelines:
             if id not in poses:
                 self.reset_at(id)
 
@@ -46,10 +34,7 @@ class FilterTracker(TrackerBase):
 
         for id, pose in poses.items():
             try:
-                filtered_pose: Frame = pose
-                for filter_node in self._filter_pipelines[id]:
-                    filtered_pose = filter_node.process(filtered_pose)
-                filtered_poses[id] = filtered_pose
+                filtered_poses[id] = self._pipelines[id].process(pose)
             except Exception as e:
                 logger.error(f"FilterTracker: Error processing pose {id}: {e}")
                 filtered_poses[id] = pose
@@ -59,12 +44,10 @@ class FilterTracker(TrackerBase):
         return filtered_poses
 
     def reset(self) -> None:
-        """Reset all pose filter pipelines."""
-        for pipeline in self._filter_pipelines.values():
-            for filter_node in pipeline:
-                filter_node.reset()
+        """Reset all pipelines."""
+        for pipeline in self._pipelines.values():
+            pipeline.reset()
 
     def reset_at(self, id: int) -> None:
-        """Reset filters in pipeline for a specific pose."""
-        for filter_node in self._filter_pipelines[id]:
-            filter_node.reset()
+        """Reset pipeline for a specific track."""
+        self._pipelines[id].reset()

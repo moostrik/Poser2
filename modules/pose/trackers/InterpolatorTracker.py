@@ -1,89 +1,64 @@
 """Tracks and interpolates multiple poses independently."""
 
-from typing import Callable
-
-from modules.pose.frame import Frame, FrameDict, replace
-from modules.pose.nodes.Nodes import InterpolatorNode
+from modules.pose.frame import FrameDict
+from .InterpolatorPipeline import InterpolatorPipeline
 from .TrackerBase import TrackerBase
 
 import logging
 logger = logging.getLogger(__name__)
 
-# MAKE AVAILABLE FOR FACTORY LISTS (like filter trackers)
+
 class InterpolatorTracker(TrackerBase):
-    """Tracks multiple poses, maintaining a separate interpolator for each."""
+    """Multiplexes a FrameDict across per-track InterpolatorPipelines.
 
-    def __init__(self, num_tracks: int, interpolator_factory: Callable[[], InterpolatorNode] | list[Callable[[], InterpolatorNode]]) -> None:
-        """Initialize tracker with interpolators for fixed number of poses."""
-        super().__init__() # Initialize PoseDictCallbackMixin
+    Handles dispatch, result collection, lifecycle reset on track
+    disappearance, and callback fan-out. Pipeline construction is
+    the caller's responsibility.
+    """
 
-        # Convert single factory to list for uniform handling
-        if callable(interpolator_factory):
-            _interpolator_factory = [interpolator_factory]
-        else:
-            if not interpolator_factory:
-                raise ValueError("FilterTracker: filter_factory list must not be empty.")
-            _interpolator_factory = interpolator_factory
-
-        self._interpolator_pipeline: dict[int, list[InterpolatorNode]] = {
-            id: [factory() for factory in _interpolator_factory]
-            for id in range(num_tracks)
-        }
+    def __init__(self, pipelines: dict[int, InterpolatorPipeline]) -> None:
+        super().__init__()
+        if not pipelines:
+            raise ValueError("InterpolatorTracker: pipelines dict must not be empty.")
+        self._pipelines = pipelines
 
     def submit(self, poses: FrameDict) -> None:
         """Submit target poses for interpolation."""
 
-        # Reset interpolators for poses that are no longer present
-        for id in self._interpolator_pipeline:
+        # Reset pipelines for tracks that are no longer present
+        for id in self._pipelines:
             if id not in poses:
                 self.reset_at(id)
 
-        # Submit poses that are present
         try:
             for id, pose in poses.items():
-                for node in self._interpolator_pipeline[id]:
-                    node.submit(pose)
+                self._pipelines[id].submit(pose)
         except Exception as e:
             logger.error(f"InterpolatorTracker: Error submitting pose {id}: {e}")
+
     def update(self) -> FrameDict:
-        """Get interpolated poses using configured output frequency."""
+        """Get interpolated poses from all pipelines."""
 
         interpolated_poses: FrameDict = {}
 
         try:
-            for id, pipeline in self._interpolator_pipeline.items():
-                # If there are multiple interpolators per track, you may want to combine their outputs.
-                # Here, we just use the first interpolator's output.
-                pose: Frame | None = None
-                for node in pipeline:
-                    interpolated_pose: Frame | None = node.update()
-                    if interpolated_pose is not None:
-                        if pose is None:
-                            # Use first interpolator's pose as base
-                            pose = interpolated_pose
-                        else:
-                            # Merge subsequent interpolator's feature into combined pose
-                            ft = node.feature_type
-                            pose = replace(pose, {ft: interpolated_pose[ft]})
-
+            for id, pipeline in self._pipelines.items():
+                pose = pipeline.update()
                 if pose is not None:
                     interpolated_poses[id] = pose
-
         except Exception as e:
             logger.error(f"InterpolatorTracker: Error updating pose {id}: {e}")
-        # Emit callbacks with interpolated poses
+
         self._notify_frames_callbacks(interpolated_poses)
 
         return interpolated_poses
 
     def reset(self) -> None:
-        """Reset all interpolators."""
-        for pipeline in self._interpolator_pipeline.values():
-            for node in pipeline:
-                node.reset()
+        """Reset all pipelines."""
+        for pipeline in self._pipelines.values():
+            pipeline.reset()
 
     def reset_at(self, id: int) -> None:
-        """Reset interpolator for a specific pose ID."""
-        if id in self._interpolator_pipeline:
-            for node in self._interpolator_pipeline[id]:
-                node.reset()
+        """Reset pipeline for a specific track."""
+        if id in self._pipelines:
+            self._pipelines[id].reset()
