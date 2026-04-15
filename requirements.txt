@@ -18,7 +18,7 @@ Pillow==11.3.0                      # Redundant?
 psutil==7.0.0
 python-osc==1.9.3
 pytweening==1.2.0
-stupidArtnet==1.6.8
+stupidArtnet==1.6.0
 tensorrt-cu12==10.14.1.48.post1
 typing-extensions==4.15.0           # latest version for torch, where is torch in here?
 watchdog==6.0.0

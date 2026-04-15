@@ -12,8 +12,8 @@ from modules.render import layers as ls
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from .settings import Layers, RenderSettings, ShowStage, ShowTimelineSettings
-from . import stages
-from .stages import STAGES, StageLayer
+from . import render_stages
+from .render_stages import STAGES, StageLayer
 from .intro_sequence import IntroSequencePlayer, SequenceDataProxy, FixedColorProxy
 
 
@@ -138,7 +138,7 @@ class HDTrioRender(RenderBase):
                 cls(i, self.data_hub, self.settings, {layer: cam_dict[i] for layer, cam_dict in self.L.items() if i in cam_dict})
                 for i in range(self.num_cams)
             ]
-            for stage, cls in stages.STAGES.items()
+            for stage, cls in render_stages.STAGES.items()
         }
         self._prev_stage = None
         self._active_stages = []

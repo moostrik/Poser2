@@ -49,7 +49,6 @@ Rules:
 - Use callback pipelines for data flow between components
 - Inter-module callback wiring belongs in app `start()`
 - Module-internal callback wiring is fine within the module itself
-- Use lambda-deferred creation where startup ordering or runtime settings values require it
 
 ## Concurrency model
 
