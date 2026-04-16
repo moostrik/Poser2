@@ -1,7 +1,7 @@
 {
   "num_players": 3,
   "input_fps": 23.0,
-  "render_fps": 92.0,
+  "render_fps": 80.0,
   "camera": {
     "yolo": true,
     "color": true,
@@ -20,7 +20,7 @@
       "color_exposure": 30001,
       "color_iso": 1599,
       "color_auto_exposure": true,
-      "color_balance": 4292,
+      "color_balance": 4337,
       "color_auto_balance": true,
       "color_brightness": 0,
       "color_contrast": 0,
@@ -47,7 +47,7 @@
       "color_exposure": 30001,
       "color_iso": 1599,
       "color_auto_exposure": true,
-      "color_balance": 4467,
+      "color_balance": 4183,
       "color_auto_balance": true,
       "color_brightness": 0,
       "color_contrast": 0,
@@ -74,7 +74,7 @@
       "color_exposure": 30001,
       "color_iso": 1599,
       "color_auto_exposure": true,
-      "color_balance": 4389,
+      "color_balance": 4282,
       "color_auto_balance": true,
       "color_brightness": 0,
       "color_contrast": 0,
@@ -119,7 +119,7 @@
   "inout": {
     "osc_sound": {
       "max_players": 3,
-      "ip_addresses": "10.0.0.65",
+      "ip_addresses": "127.0.0.1",
       "port": 8000,
       "stage": "LERP"
     },
@@ -394,7 +394,7 @@
     },
     "centre": {
       "geometry": {
-        "stage": "LERP",
+        "stage": "SMOOTH",
         "cam_aspect": 1.7778,
         "target_top_x": 0.5,
         "target_top_y": 0.33,
