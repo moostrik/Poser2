@@ -1,0 +1,678 @@
+{
+  "num_players": 3,
+  "input_fps": 23.0,
+  "render_fps": 92.0,
+  "camera": {
+    "yolo": true,
+    "color": true,
+    "mono": false,
+    "square": true,
+    "stereo": false,
+    "hd_ready": true,
+    "sim_enabled": false,
+    "model_path": "models",
+    "cam_0": {
+      "device_id": "19443010D153874800",
+      "show_stereo": false,
+      "flip_h": false,
+      "flip_v": true,
+      "perspective": -0.22,
+      "color_exposure": 30001,
+      "color_iso": 1599,
+      "color_auto_exposure": true,
+      "color_balance": 4292,
+      "color_auto_balance": true,
+      "color_brightness": 0,
+      "color_contrast": 0,
+      "color_saturation": 0,
+      "color_denoise": 0,
+      "color_sharpness": 0,
+      "mono_exposure": 1000,
+      "mono_iso": 100,
+      "mono_auto_exposure": true,
+      "ir_grid_light": 0.0,
+      "ir_flood_light": 0.0,
+      "stereo_depth_min": 500,
+      "stereo_depth_max": 15000,
+      "stereo_median_filter": "OFF",
+      "stereo_bright_min": 0,
+      "stereo_bright_max": 255
+    },
+    "cam_1": {
+      "device_id": "19443010D1E4974800",
+      "show_stereo": false,
+      "flip_h": false,
+      "flip_v": true,
+      "perspective": -0.22,
+      "color_exposure": 30001,
+      "color_iso": 1599,
+      "color_auto_exposure": true,
+      "color_balance": 4467,
+      "color_auto_balance": true,
+      "color_brightness": 0,
+      "color_contrast": 0,
+      "color_saturation": 0,
+      "color_denoise": 0,
+      "color_sharpness": 0,
+      "mono_exposure": 1000,
+      "mono_iso": 100,
+      "mono_auto_exposure": true,
+      "ir_grid_light": 0.0,
+      "ir_flood_light": 0.0,
+      "stereo_depth_min": 500,
+      "stereo_depth_max": 15000,
+      "stereo_median_filter": "OFF",
+      "stereo_bright_min": 0,
+      "stereo_bright_max": 255
+    },
+    "cam_2": {
+      "device_id": "19443010D14C874800",
+      "show_stereo": false,
+      "flip_h": false,
+      "flip_v": true,
+      "perspective": -0.22,
+      "color_exposure": 30001,
+      "color_iso": 1599,
+      "color_auto_exposure": true,
+      "color_balance": 4389,
+      "color_auto_balance": true,
+      "color_brightness": 0,
+      "color_contrast": 0,
+      "color_saturation": 0,
+      "color_denoise": 0,
+      "color_sharpness": 0,
+      "mono_exposure": 1000,
+      "mono_iso": 100,
+      "mono_auto_exposure": true,
+      "ir_grid_light": 0.0,
+      "ir_flood_light": 0.0,
+      "stereo_depth_min": 500,
+      "stereo_depth_max": 15000,
+      "stereo_median_filter": "OFF",
+      "stereo_bright_min": 0,
+      "stereo_bright_max": 255
+    },
+    "simulator": {
+      "video_path": "recordings",
+      "video_decoder": "iGPU",
+      "video_format": "H264",
+      "video_frame_types": [
+        "VIDEO"
+      ],
+      "folder": "20251212-130516_3_square_color_no_id",
+      "sim_passthrough": false,
+      "range_start": 3,
+      "range_end": 3
+    },
+    "tracker": {
+      "tracklet_min_age": 3,
+      "add_centre_threshold": 0.25,
+      "update_centre_threshold": 0.35,
+      "timeout": 2.0,
+      "add_height_threshold": 0.25,
+      "update_height_threshold": 0.2,
+      "add_bottom_threshold": 0.25
+    },
+    "frame_sync": {},
+    "tracklet_sync": {}
+  },
+  "inout": {
+    "osc_sound": {
+      "max_players": 3,
+      "ip_addresses": "10.0.0.65",
+      "port": 8000,
+      "stage": "LERP"
+    },
+    "artnet_0": {
+      "enabled": true,
+      "verbose": false,
+      "ip_address": "10.0.0.4",
+      "base_universe": 0,
+      "channel_order": "GRBW",
+      "fps": 40,
+      "pixels": 94,
+      "color": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "white_strength": 0.66,
+      "color_strength": 1.0,
+      "bar": 1.0
+    },
+    "artnet_1": {
+      "enabled": true,
+      "verbose": false,
+      "ip_address": "10.0.0.5",
+      "base_universe": 0,
+      "channel_order": "GRBW",
+      "fps": 40,
+      "pixels": 94,
+      "color": {
+        "r": 0.0,
+        "g": 0.32,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "white_strength": 0.66,
+      "color_strength": 1.0,
+      "bar": 1.0
+    },
+    "artnet_2": {
+      "enabled": true,
+      "verbose": false,
+      "ip_address": "10.0.0.6",
+      "base_universe": 0,
+      "channel_order": "GRBW",
+      "fps": 40,
+      "pixels": 94,
+      "color": {
+        "r": 0.68,
+        "g": 0.34,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "white_strength": 0.66,
+      "color_strength": 1.0,
+      "bar": 1.0
+    }
+  },
+  "pose": {
+    "model_type": "TRT",
+    "model_path": "models",
+    "verbose": false,
+    "detection": {
+      "resolution": "STANDARD"
+    },
+    "segmentation": {
+      "resolution": "EXTREME",
+      "enabled": true,
+      "reset_interval": 240
+    },
+    "flow": {
+      "resolution": "EXTREME",
+      "enabled": false
+    },
+    "image_crop": {
+      "expansion_width": 0.1,
+      "expansion_height": 0.1,
+      "output_width": 768,
+      "output_height": 1024,
+      "enable_prev_crop": false,
+      "verbose": false
+    },
+    "bbox": {
+      "smoother": {
+        "min_cutoff": 0.01,
+        "beta": 0.2,
+        "d_cutoff": 1.0
+      },
+      "prediction": {
+        "method": "QUADRATIC"
+      },
+      "interpolator": {
+        "responsiveness": 0.16,
+        "friction": 0.05
+      }
+    },
+    "point": {
+      "confidence_filter": {
+        "threshold_low": 0.5,
+        "threshold_high": 0.6,
+        "rescale_scores": true
+      },
+      "smoother": {
+        "min_cutoff": 1.5,
+        "beta": 5.0,
+        "d_cutoff": 1.0
+      },
+      "prediction": {
+        "method": "QUADRATIC"
+      },
+      "interpolator": {
+        "responsiveness": 0.5,
+        "friction": 0.05
+      }
+    },
+    "angle": {
+      "smoother": {
+        "min_cutoff": 0.1,
+        "beta": 0.7,
+        "d_cutoff": 1.0
+      },
+      "prediction": {
+        "method": "QUADRATIC"
+      },
+      "interpolator": {
+        "responsiveness": 0.33,
+        "friction": 0.05
+      },
+      "sticky": {
+        "init_to_zero": false,
+        "hold_scores": true
+      }
+    },
+    "velocity": {
+      "extractor": {},
+      "smoother": {
+        "min_cutoff": 0.5,
+        "beta": 2.5,
+        "d_cutoff": 1.0
+      },
+      "prediction": {
+        "method": "QUADRATIC"
+      },
+      "interpolator": {
+        "responsiveness": 0.33,
+        "friction": 0.05
+      },
+      "sticky": {
+        "init_to_zero": true,
+        "hold_scores": false
+      }
+    },
+    "motion": {
+      "extractor": {
+        "noise_threshold": 0.1,
+        "max_threshold": 0.5,
+        "n_top_motions": 1
+      },
+      "moving_average": {
+        "window_size": 23,
+        "window_type": "UNIFORM"
+      }
+    },
+    "similarity": {
+      "window_similarity": {
+        "window_length": 11,
+        "method": "HARMONIC_MEAN",
+        "use_angle_similarity": true,
+        "angle_scale": 0.8,
+        "use_velocity_similarity": true,
+        "vel_scale": 1.0,
+        "use_motion_weighting": true,
+        "use_time_penalty": false,
+        "time_decay_exp": 2.5,
+        "remap_low": 0.0,
+        "remap_high": 0.75,
+        "enabled": false,
+        "verbose": false
+      },
+      "window_correlation": {
+        "window_length": 7,
+        "method": "HARMONIC_MEAN",
+        "max_lag": 7,
+        "min_variance": 0.01,
+        "use_motion_weighting": true,
+        "remap_low": 0.0,
+        "remap_high": 0.75,
+        "enabled": true,
+        "verbose": false
+      },
+      "similarity_applicator": {},
+      "leader_applicator": {},
+      "smoother": {
+        "min_cutoff": 0.01,
+        "beta": 0.4,
+        "d_cutoff": 1.0
+      },
+      "interpolator": {
+        "responsiveness": 0.33,
+        "friction": 0.05
+      },
+      "sticky": {
+        "init_to_zero": true,
+        "hold_scores": false
+      },
+      "motion_gate": {}
+    },
+    "window_raw": {
+      "window_size": 180,
+      "emit_partial": true
+    },
+    "window_smooth": {
+      "window_size": 180,
+      "emit_partial": true
+    },
+    "window_lerp": {
+      "window_size": 360,
+      "emit_partial": true
+    }
+  },
+  "render": {
+    "num_players": 3,
+    "layer": {
+      "select": {
+        "preview": [
+          "composite"
+        ],
+        "final": [
+          "composite"
+        ]
+      },
+      "lut": {
+        "blend_mode": "ALPHA",
+        "lut": "NONE",
+        "lut_strength": 1.0
+      }
+    },
+    "data": {
+      "a": {
+        "mode": "WINDOW",
+        "feature_field": "AngleMotion",
+        "stage": "SMOOTH",
+        "line_width": 3.0,
+        "line_smooth": 1.0,
+        "use_scores": false,
+        "render_labels": true,
+        "use_history_color": false
+      },
+      "b": {
+        "mode": "WINDOW",
+        "feature_field": "AngleMotion",
+        "stage": "SMOOTH",
+        "line_width": 6.0,
+        "line_smooth": 6.0,
+        "use_scores": false,
+        "render_labels": true,
+        "use_history_color": true
+      }
+    },
+    "preview": {
+      "tracker": {
+        "stage": "LERP",
+        "pose_line_width": 2.0,
+        "bbox_line_width": 2
+      },
+      "poser": {
+        "stage": "LERP",
+        "line_width": 2.0,
+        "line_smooth": 0.0,
+        "use_gpu_crop": true
+      }
+    },
+    "centre": {
+      "geometry": {
+        "stage": "LERP",
+        "cam_aspect": 1.7778,
+        "target_top_x": 0.5,
+        "target_top_y": 0.33,
+        "target_bottom_x": 0.5,
+        "target_bottom_y": 0.6,
+        "dst_aspectratio": 0.5625
+      },
+      "mask": {
+        "blend_factor": 0.2,
+        "dilation_steps": 0,
+        "blur_steps": 0,
+        "blur_radius": 1.0
+      },
+      "cam": {
+        "blend_factor": 0.2,
+        "mask_opacity": 1.0,
+        "use_mask": true
+      },
+      "frg": {
+        "blend_factor": 0.2,
+        "exposure": 1.2,
+        "gamma": 1.0,
+        "offset": 0.0,
+        "contrast": 1.1,
+        "saturation": 2.0,
+        "levels": 9,
+        "smoothness": 0.33,
+        "colorize": 0.96,
+        "sharpen": 0.0,
+        "use_mask": true
+      },
+      "pose": {
+        "line_width": 3.0,
+        "line_smooth": 0.0,
+        "use_scores": false,
+        "draw_anchors": false
+      },
+      "color": {
+        "num_players": 3,
+        "blend_mode": "ALPHA",
+        "similarity_threshold": 0.33,
+        "motion_exponent": 1.5,
+        "add_curve": 2.0,
+        "dodge_curve": 1.5,
+        "layered": 1.0
+      }
+    },
+    "intro_sequence": {
+      "verbose": true,
+      "recording_path": "recordings/intro",
+      "source_track": 0,
+      "color": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "pose": {
+        "line_width": 10.0,
+        "line_smooth": 1.77,
+        "use_scores": false,
+        "draw_anchors": true
+      }
+    },
+    "flow": {
+      "fps": 60.0,
+      "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
+      "blend_mode": "ADD",
+      "width": 512,
+      "height": 288,
+      "visualisation": {
+        "toggle_scalar": false,
+        "scale": 1.0,
+        "spacing": 20.0,
+        "element_length": 40.0,
+        "element_width": 1.0
+      },
+      "optical_flow": {
+        "offset": 3,
+        "threshold": 0.0,
+        "strength_x": 3.3,
+        "strength_y": 3.3,
+        "boost": 0.0
+      },
+      "velocity_trail": {
+        "scale": 1.54,
+        "trail_weight": 0.9,
+        "blur_radius": 8.0,
+        "blur_steps": 4
+      },
+      "density_bridge": {
+        "saturation": 1.2,
+        "brightness": 2.0
+      },
+      "temperature_bridge": {
+        "scale": 0.5
+      }
+    },
+    "fluid": {
+      "num_players": 3,
+      "draw_mode": "DENSITY",
+      "blend_mode": "ADD",
+      "fluid_flow": {
+        "width": 1088,
+        "height": 1920,
+        "speed": 1.0,
+        "depth": {
+          "depth": 4,
+          "scale": 1.0,
+          "composite_mode": 3,
+          "ray_steps": 32,
+          "absorption": 4.0,
+          "injection_layer": 1.0,
+          "injection_spread": 0.001
+        },
+        "velocity": {
+          "input_strength": 0.73,
+          "self_advection": 0.01,
+          "fade_time": 31.77,
+          "dampen_threshold": 14.91,
+          "dampen_time": 3.0,
+          "vorticity": 0.0,
+          "vorticity_radius": 8.98,
+          "viscosity": 0.0,
+          "viscosity_iter": 20
+        },
+        "density": {
+          "input_strength": 10.0,
+          "speed_offset": 0.0,
+          "fade_time": 18.0,
+          "dampen_threshold": 1.47,
+          "dampen_time": 3.63
+        },
+        "temperature": {
+          "input_strength": 0.0,
+          "speed_offset": 0.0,
+          "fade_time": 3.0,
+          "buoyancy": 0.0,
+          "weight": -10.0,
+          "ambient": 0.2
+        },
+        "pressure": {
+          "speed": 0.0,
+          "fade_time": 8.0,
+          "iterations": 40
+        }
+      },
+      "visualisation": {
+        "toggle_scalar": false,
+        "scale": 1.0,
+        "spacing": 20.0,
+        "element_length": 40.0,
+        "element_width": 1.0
+      }
+    },
+    "colors": {
+      "player_0": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_1": {
+        "r": 0.0,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_2": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "pose_left": {
+        "r": 1.0,
+        "g": 0.5,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "pose_right": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "pose_center": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "history": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      }
+    },
+    "window": {
+      "title": "Poser",
+      "v_sync": false,
+      "fullscreen": false,
+      "monitor": 0,
+      "x": 273,
+      "y": 48,
+      "width": 1080,
+      "height": 1000,
+      "secondary_list": [
+        "M1",
+        "M2",
+        "M3"
+      ]
+    }
+  },
+  "server": {
+    "title": "POSER",
+    "port": 666
+  },
+  "session": {
+    "output_path": "recordings",
+    "name": "no_id",
+    "split_seconds": 10,
+    "osc": {
+      "port_in": 9001,
+      "return_messages": true,
+      "port_out": 9002,
+      "ip_address_out": "127.0.0.1",
+      "verbose": true
+    },
+    "core": {},
+    "timeline": {
+      "stages": [
+        "START",
+        "INTRO_IN",
+        "INTRO",
+        "INTRO_OUT",
+        "PLAY_IN",
+        "PLAY",
+        "CONCLUSION",
+        "IDLE"
+      ],
+      "durations": [
+        5.0,
+        3.0,
+        30.0,
+        3.0,
+        20.0,
+        60.0,
+        10.0,
+        3.0
+      ]
+    },
+    "video": {
+      "temp_path": "temp",
+      "video_encoder": "iGPU",
+      "video_format": "H264",
+      "video_frame_types": [
+        "VIDEO"
+      ],
+      "enabled": false
+    },
+    "pose": {
+      "enabled": false,
+      "stage": "RAW",
+      "features": [
+        "Age",
+        "AngleMotion",
+        "Angles",
+        "AngleSymmetry",
+        "AngleVelocity",
+        "BBox",
+        "LeaderScore",
+        "MotionGate",
+        "MotionTime",
+        "Points2D",
+        "Similarity"
+      ]
+    }
+  }
+}
