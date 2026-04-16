@@ -212,19 +212,21 @@ class PoseGroup(BaseSettings):
     _batch_share  : list = [max_poses, model_type, model_path, verbose]
     _feature_share: list = [frequency, output_frequency]
 
-    detection    : Group[batch.DetectionSettings]    = Group(batch.DetectionSettings, share=_batch_share)
-    segmentation : Group[batch.SegmentationSettings] = Group(batch.SegmentationSettings, share=_batch_share)
-    flow         : Group[batch.FlowSettings]         = Group(batch.FlowSettings, share=_batch_share)
-    image_crop   : Group[batch.ImageCropSettings]    = Group(batch.ImageCropSettings, share=[max_poses])
-    bbox         : Group[BboxFeature]                = Group(BboxFeature, share=_feature_share)
-    point        : Group[PointFeature]               = Group(PointFeature, share=_feature_share)
-    angle        : Group[AngleFeature]               = Group(AngleFeature, share=_feature_share)
-    velocity     : Group[VelocityFeature]            = Group(VelocityFeature, share=_feature_share)
-    motion       : Group[MotionFeature]              = Group(MotionFeature)
-    similarity   : Group[SimilarityFeature]          = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
-    window_raw   : Group[window.WindowNodeSettings]   = Group(window.WindowNodeSettings)
-    window_smooth: Group[window.WindowNodeSettings]   = Group(window.WindowNodeSettings)
-    window_lerp  : Group[window.WindowNodeSettings]   = Group(window.WindowNodeSettings)
+    detection       : Group[batch.DetectionSettings]          = Group(batch.DetectionSettings, share=_batch_share)
+    segmentation    : Group[batch.SegmentationSettings]       = Group(batch.SegmentationSettings, share=_batch_share)
+    flow            : Group[batch.FlowSettings]               = Group(batch.FlowSettings, share=_batch_share)
+    image_crop      : Group[batch.ImageCropSettings]          = Group(batch.ImageCropSettings, share=[max_poses])
+    angle_extractor : Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
+    bbox            : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)
+    point           : Group[PointFeature]                     = Group(PointFeature, share=_feature_share)
+    angle           : Group[AngleFeature]                     = Group(AngleFeature, share=_feature_share)
+    velocity        : Group[VelocityFeature]                  = Group(VelocityFeature, share=_feature_share)
+    motion          : Group[MotionFeature]                    = Group(MotionFeature)
+    similarity      : Group[SimilarityFeature]                = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
+    window_raw      : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
+    window_clean    : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
+    window_smooth   : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
+    window_lerp     : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
 
 
 # ---------------------------------------------------------------------------

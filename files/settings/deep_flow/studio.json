@@ -101,6 +101,7 @@
       "enable_prev_crop": false,
       "verbose": false
     },
+    "angle_extractor": {},
     "bbox": {
       "smoother": {
         "min_cutoff": 0.01,
@@ -182,6 +183,9 @@
       }
     },
     "window_raw": {
+      "window_size": 180
+    },
+    "window_clean": {
       "window_size": 180
     },
     "window_smooth": {

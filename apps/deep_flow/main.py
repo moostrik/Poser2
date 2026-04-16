@@ -34,12 +34,14 @@ class DeepFlowMain:
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
         num_players: int = self.settings.num_players
-        configure_features(num_players)
+        p = self.settings.pose
 
         # DATA_HUB
         self.data_hub = DataHub()
 
-        # CAMERA (single)
+        # CAMERA
+        configure_features(num_players)
+
         self.cameras: list[Camera | Simulator] = []
         self.recorder: Optional[Recorder] = None
         self.player: Optional[Player] = None
@@ -50,44 +52,27 @@ class DeepFlowMain:
         else:
             self.recorder = Recorder(self.settings.camera.recorder)
             for i in range(num_players):
-                camera = Camera(self.settings.camera.cameras[i])
-                self.cameras.append(camera)
+                self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
-
-        # TRACKER
         self.tracker = OnePerCamTracker(self.settings.tt.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
+        self.image_crop_processor = batch.ImageCropProcessor(p.image_crop)
 
-        # RENDER
-        self.render = DeepFlowRender(self.data_hub, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
+        for camera in self.cameras:
+            camera.add_preview_callback(self.data_hub.set_cam_frame)
+            if self.recorder:
+                camera.add_sync_callback(self.recorder.set_synced_frames)
+            camera.add_frame_callback(self.image_crop_processor.set_image)
+            camera.add_frame_callback(self.frame_sync_bang.add_frame)
+            camera.add_tracker_callback(self.tracker.add_cam_tracklets)
+            camera.add_tracker_callback(self.data_hub.set_depth_tracklets)
+            camera.add_tracker_callback(self.tracklet_sync_bang.add_frame)
 
-        # IN_OUT
-        self.sound_osc = OscSound(self.data_hub, self.settings.inout.osc_sound)
-
-        # POSE PROCESSING PIPELINES
+        # DETECTION
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
-
-        self.image_crop_processor = batch.ImageCropProcessor(self.settings.pose.image_crop)
-        self.point_extractor =      batch.PointBatchExtractor(self.settings.pose.detection)
-        self.mask_extractor =       batch.MaskBatchExtractor(self.settings.pose.segmentation)
-        self.flow_extractor =       batch.FlowBatchExtractor(self.settings.pose.flow)
-
-        # Feature applicator (shared across all pipelines)
-        self.motion_gate_applicator = nodes.MotionGateApplicator(self.settings.pose.motion_gate)
-
-        # WINDOW TRACKERS
-        self.window_tracker_R =     window.WindowTracker(num_players, self.settings.pose.window_raw)
-        self.window_tracker_S =     window.WindowTracker(num_players, self.settings.pose.window_smooth)
-        self.window_tracker_I =     window.WindowTracker(num_players, self.settings.pose.window_lerp)
-
-        # Reused config
-        angle_extractor_config = nodes.AngleExtractorSettings(aspect_ratio=self.settings.pose.detection.aspect_ratio)
-        p = self.settings.pose
-
-        self.motion_gate_tracker = trackers.FilterTracker({
-            i: trackers.FilterPipeline([self.motion_gate_applicator])
-            for i in range(num_players)
-        })
+        self.point_extractor = batch.PointBatchExtractor(p.detection)
+        self.mask_extractor  = batch.MaskBatchExtractor(p.segmentation)
+        self.flow_extractor  = batch.FlowBatchExtractor(p.flow)
 
         self.bbox_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
@@ -97,19 +82,47 @@ class DeepFlowMain:
             for i in range(num_players)
         })
 
+        self.tracker.add_tracklet_callback(self.poses_from_tracklets.submit_tracklets)
+        self.tracker.add_tracklet_callback(self.data_hub.set_tracklets)
+        self.tracklet_sync_bang.add_callback(self.tracker.notify_update)
+        self.frame_sync_bang.add_callback(self.poses_from_tracklets.generate)
+
+        self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
+        self.bbox_filters.add_frames_callback(self.image_crop_processor.process)
+        self.image_crop_processor.add_callback(self.point_extractor.process)
+        self.image_crop_processor.add_callback(self.mask_extractor.process)
+        self.image_crop_processor.add_callback(self.flow_extractor.process)
+        self.mask_extractor.add_callback(self.data_hub.set_gpu_frames)
+        self.flow_extractor.add_callback(self.data_hub.set_flow_tensors)
+
+        # STAGE RAW
+        self.window_tracker_R = window.WindowTracker(num_players, p.window_raw)
+
+        self.point_extractor.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.RAW))
+        self.point_extractor.add_frames_callback(self.window_tracker_R.process)
+        self.window_tracker_R.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.RAW))
+
+        # STAGE CLEAN
         self.pose_raw_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.PointDualConfFilter(p.point.confidence_filter),
-                nodes.AngleExtractor(angle_extractor_config),
+                nodes.AngleExtractor(p.angle_extractor),
                 nodes.AngleVelExtractor(p.velocity.extractor),
             ])
             for i in range(num_players)
         })
+        self.window_tracker_C = window.WindowTracker(num_players, p.window_clean)
 
+        self.point_extractor.add_frames_callback(self.pose_raw_filters.process)
+        self.pose_raw_filters.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.CLEAN))
+        self.pose_raw_filters.add_frames_callback(self.window_tracker_C.process)
+        self.window_tracker_C.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.CLEAN))
+
+        # STAGE SMOOTH
         self.pose_smooth_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.PointEuroSmoother(p.point.smoother),
-                nodes.AngleExtractor(angle_extractor_config),
+                nodes.AngleExtractor(p.angle_extractor),
                 nodes.AngleVelExtractor(p.velocity.extractor),
                 nodes.AngleVelEuroSmoother(p.velocity.smoother),
                 nodes.AngleEuroSmoother(p.angle.smoother),
@@ -121,7 +134,6 @@ class DeepFlowMain:
             ])
             for i in range(num_players)
         })
-
         self.pose_prediction_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.PointPredictor(p.point.prediction),
@@ -131,6 +143,16 @@ class DeepFlowMain:
             ])
             for i in range(num_players)
         })
+        self.window_tracker_S = window.WindowTracker(num_players, p.window_smooth)
+
+        self.pose_raw_filters.add_frames_callback(self.pose_smooth_filters.process)
+        self.pose_smooth_filters.add_frames_callback(self.pose_prediction_filters.process)
+        self.pose_prediction_filters.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.SMOOTH))
+        self.pose_smooth_filters.add_frames_callback(self.window_tracker_S.process)
+        self.window_tracker_S.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.SMOOTH))
+
+        # STAGE LERP
+        self.motion_gate_applicator = nodes.MotionGateApplicator(p.motion_gate)
 
         self.interpolators = trackers.InterpolatorTracker({
             i: trackers.InterpolatorPipeline([
@@ -141,7 +163,6 @@ class DeepFlowMain:
             ])
             for i in range(num_players)
         })
-
         self.pose_interpolation_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.AngleSymExtractor(),
@@ -154,77 +175,41 @@ class DeepFlowMain:
             ])
             for i in range(num_players)
         })
+        self.motion_gate_tracker = trackers.FilterTracker({
+            i: trackers.FilterPipeline([self.motion_gate_applicator])
+            for i in range(num_players)
+        })
+        self.window_tracker_I = window.WindowTracker(num_players, p.window_lerp)
 
-    def start(self) -> None:
-
-        self.settings_server.start()
-
-        for camera in self.cameras:
-            camera.add_preview_callback(self.data_hub.set_cam_frame)
-            if self.recorder:
-                camera.add_sync_callback(self.recorder.set_synced_frames)
-            camera.add_frame_callback(self.image_crop_processor.set_image)
-            camera.add_frame_callback(self.frame_sync_bang.add_frame)
-            camera.add_tracker_callback(self.tracker.add_cam_tracklets)
-            camera.add_tracker_callback(self.data_hub.set_depth_tracklets)
-            camera.add_tracker_callback(self.tracklet_sync_bang.add_frame)
-            camera.start()
-
-        # BBOX
-        self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
-        self.bbox_filters.add_frames_callback(self.image_crop_processor.process)
-
-        # POSE RAW
-        self.point_extractor.add_frames_callback(self.pose_raw_filters.process)
-        self.point_extractor.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.RAW))
-        self.pose_raw_filters.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.CLEAN))
-        self.pose_raw_filters.add_frames_callback(self.window_tracker_R.process)
-        self.window_tracker_R.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.CLEAN))
-
-        # POSE SMOOTH & PREDICT
-        self.pose_raw_filters.add_frames_callback(self.pose_smooth_filters.process)
-        self.pose_smooth_filters.add_frames_callback(self.pose_prediction_filters.process)
-        self.pose_prediction_filters.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.SMOOTH))
-        self.pose_smooth_filters.add_frames_callback(self.window_tracker_S.process)
-        self.window_tracker_S.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.SMOOTH))
-
-        # INTERPOLATION
         self.data_hub.add_update_callback(self.interpolators.update)
         self.pose_prediction_filters.add_frames_callback(self.interpolators.submit)
         self.interpolators.add_frames_callback(self.pose_interpolation_filters.process)
-
-        # MOTION GATE (after interpolation pipeline, before DataHub)
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_applicator.submit)
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_tracker.process)
         self.motion_gate_tracker.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.LERP))
         self.motion_gate_tracker.add_frames_callback(self.window_tracker_I.process)
         self.window_tracker_I.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.LERP))
 
-        # POSE ESTIMATION
-        self.image_crop_processor.add_callback(self.point_extractor.process)
+        # RENDER
+        self.render = DeepFlowRender(self.data_hub, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
+        self.render.window_manager.add_exit_callback(self.stop)
+
+        # IN/OUT
+        self.sound_osc = OscSound(self.data_hub, self.settings.inout.osc_sound)
+        self.data_hub.add_update_callback(self.sound_osc.notify_update)
+
+    def start(self) -> None:
+        self.settings_server.start()
+
+        for camera in self.cameras:
+            camera.start()
+
+        self.tracker.start()
         self.point_extractor.start()
-
-        # SEGMENTATION
-        self.image_crop_processor.add_callback(self.mask_extractor.process)
-        self.mask_extractor.add_callback(self.data_hub.set_gpu_frames)
         self.mask_extractor.start()
-
-        # FLOW
-        self.image_crop_processor.add_callback(self.flow_extractor.process)
-        self.flow_extractor.add_callback(self.data_hub.set_flow_tensors)
         self.flow_extractor.start()
 
-        # TRACKER
-        self.tracker.add_tracklet_callback(self.poses_from_tracklets.submit_tracklets)
-        self.tracker.add_tracklet_callback(self.data_hub.set_tracklets)
-        self.tracker.start()
-
-        self.tracklet_sync_bang.add_callback(self.tracker.notify_update)
-        self.frame_sync_bang.add_callback(self.poses_from_tracklets.generate)
-
-        # IN / OUT
         self.sound_osc.start()
-        self.data_hub.add_update_callback(self.sound_osc.notify_update)
 
         if self.player:
             self.player.start()
@@ -232,8 +217,6 @@ class DeepFlowMain:
             self.recorder.start()
 
         self.is_running = True
-
-        self.render.window_manager.add_exit_callback(self.stop)
         self.render.window_manager.start()
 
     def stop(self) -> None:

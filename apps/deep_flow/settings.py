@@ -168,6 +168,7 @@ class PoseGroup(BaseSettings):
     segmentation = Group(batch.SegmentationSettings, share=_batch_share)
     flow         = Group(batch.FlowSettings, share=_batch_share)
     image_crop   = Group(batch.ImageCropSettings, share=[max_poses])
+    angle_extractor = Group(nodes.AngleExtractorSettings)
     bbox         = Group(BboxFeature, share=_feature_share)
     point        = Group(PointFeature, share=_feature_share)
     angle        = Group(AngleFeature, share=_feature_share)
@@ -175,6 +176,7 @@ class PoseGroup(BaseSettings):
     motion       = Group(MotionFeature)
     motion_gate  = Group(nodes.MotionGateApplicatorSettings, share=[max_poses])
     window_raw   = Group(window.WindowNodeSettings)
+    window_clean = Group(window.WindowNodeSettings)
     window_smooth = Group(window.WindowNodeSettings)
     window_lerp  = Group(window.WindowNodeSettings)
 
