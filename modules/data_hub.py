@@ -12,6 +12,7 @@ from torch import Tensor
 from modules.oak.camera.definitions import Tracklet as DepthTracklet
 from modules.pose.frame import FrameDict, FeatureWindow, FrameWindowDict
 from modules.pose.features.base import BaseFeature
+from modules.session.sequencer import SequencerState
 from modules.tracker.Tracklet import TrackletDict
 
 
@@ -40,9 +41,7 @@ class DataHubType(IntEnum):
     pose_window_S =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (SMOOTH)
     pose_window_I =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (LERP)
 
-    timeline_stage =          auto()   # int, project-defined stage enum value
-    timeline_stage_progress = auto()   # float 0-1, progress within current stage
-    timeline_total_progress = auto()   # float 0-1, overall timeline progress
+    sequencer_state =   auto()   # SequencerState dataclass
 
 
 # Stage → DataHubType lookup
@@ -182,18 +181,10 @@ class DataHub:
                 pivoted[track_id][field] = window
         self.set_dict(_WINDOW_TYPES[stage], pivoted)
 
-    # TIMELINE
-    def set_timeline_stage(self, stage: int) -> None:
-        """Store current timeline stage (project-defined enum value)."""
-        self.set_item(DataHubType.timeline_stage, 0, stage)
-
-    def set_timeline_stage_progress(self, progress: float) -> None:
-        """Store stage progress as float 0-1."""
-        self.set_item(DataHubType.timeline_stage_progress, 0, progress)
-
-    def set_timeline_progress(self, progress: float) -> None:
-        """Store overall timeline progress as float 0-1."""
-        self.set_item(DataHubType.timeline_total_progress, 0, progress)
+    # SEQUENCER
+    def set_sequencer_state(self, state: SequencerState) -> None:
+        """Store sequencer state snapshot."""
+        self.set_item(DataHubType.sequencer_state, 0, state)
 
     # UPDATE CALLBACK
     def notify_update(self) -> None:

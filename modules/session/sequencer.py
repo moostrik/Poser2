@@ -1,6 +1,7 @@
-"""Timeline — stage-based sequencer with config-driven control, ticked by the render loop."""
+"""Sequencer — stage-based sequencer with config-driven control, ticked by the render loop."""
 
 import time
+from dataclasses import dataclass
 from typing import Callable
 
 from modules.settings import BaseSettings, Field, Widget
@@ -9,8 +10,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class TimelineSettings(BaseSettings):
-    """Base configuration for Timeline.
+@dataclass(frozen=True, slots=True)
+class SequencerState:
+    """Immutable snapshot of the sequencer's current state."""
+    stage: int
+    stage_progress: float
+    progress: float
+    elapsed: float
+    active: bool
+
+
+class SequencerSettings(BaseSettings):
+    """Base configuration for Sequencer.
 
     Subclass this per project and override:
     - ``stages`` with your stage enum list (the playlist of stages to play)
@@ -19,7 +30,7 @@ class TimelineSettings(BaseSettings):
 
     Example::
 
-        class ShowTimelineSettings(TimelineSettings):
+        class ShowSequencerSettings(SequencerSettings):
             stages:    Field[list[ShowStage]] = Field(list(ShowStage), widget=Widget.playlist)
             durations: Field[list[float]]     = Field([3.0, 10.0, 5.0])
             stage:     Field[ShowStage]       = Field(ShowStage.START, access=Field.READ)
@@ -35,8 +46,8 @@ class TimelineSettings(BaseSettings):
     progress:       Field[float]       = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Overall progress")
 
 
-class Timeline:
-    """Tick-based timeline that progresses through a playlist of stages.
+class Sequencer:
+    """Tick-based sequencer that progresses through a playlist of stages.
 
     The ``stages`` list defines which stages to play and in what order.
     Each entry indexes into ``durations`` for that stage's length.
@@ -44,26 +55,25 @@ class Timeline:
 
     Example::
 
-        config = ShowTimelineSettings()
-        timeline = Timeline(config)
-        timeline.add_stage_callback(lambda s: print(f"Stage: {s}"))
-        data_hub.add_update_callback(timeline.update)
+        config = ShowSequencerSettings()
+        sequencer = Sequencer(config)
+        sequencer.add_state_callback(on_state)
+        data_hub.add_update_callback(sequencer.update)
 
         config.stages = [0, 1, 2, 3, 4]   # Full show
-        TimelineSettings.start.fire(config)
+        SequencerSettings.start.fire(config)
 
         config.stages = [2]                # Test single stage
-        TimelineSettings.start.fire(config)
+        SequencerSettings.start.fire(config)
     """
 
-    def __init__(self, config: TimelineSettings) -> None:
+    def __init__(self, config: SequencerSettings) -> None:
         self.config = config
 
         if not config.durations:
             raise ValueError("config.durations must contain at least one entry")
 
-        self._stage_callbacks: set[Callable] = set()
-        self._time_callbacks: set[Callable[[float], None]] = set()
+        self._state_callbacks: set[Callable[[SequencerState], None]] = set()
 
         self._active = False
         self._pos: int = 0
@@ -75,9 +85,9 @@ class Timeline:
         self._cumulative: list[float] = []
         self._total_duration: float = 0.0
 
-        config.bind(TimelineSettings.start, self._on_start)
-        config.bind(TimelineSettings.stop, self._on_stop)
-        config.bind(TimelineSettings.skip, self._on_skip)
+        config.bind(SequencerSettings.start, self._on_start)
+        config.bind(SequencerSettings.stop, self._on_stop)
+        config.bind(SequencerSettings.skip, self._on_skip)
         self._set_idle_state()
 
     # -- Settings callbacks --------------------------------------------------
@@ -125,7 +135,7 @@ class Timeline:
     def _start_show(self) -> None:
         self._build_playlist()
         if not self._playlist:
-            logger.warning("Timeline: empty stages playlist, not starting")
+            logger.warning("Sequencer: empty stages playlist, not starting")
             return
         self._active = True
         self.config.running = True
@@ -142,7 +152,7 @@ class Timeline:
         self.config.stage_progress = 0.0
         stage = self._playlist[self._pos]
         self.config.stage = stage
-        self._notify_stage_callbacks(stage)
+        self._notify_state(0.0)
 
     def _advance_stage(self) -> None:
         next_pos = self._pos + 1
@@ -150,40 +160,34 @@ class Timeline:
             self._pos = next_pos
             self._enter_stage()
         else:
-            TimelineSettings.stop.fire(self.config)
+            SequencerSettings.stop.fire(self.config)
 
     # -- Callbacks -----------------------------------------------------------
 
-    def add_stage_callback(self, callback: Callable) -> None:
-        self._stage_callbacks.add(callback)
+    def add_state_callback(self, callback: Callable[[SequencerState], None]) -> None:
+        self._state_callbacks.add(callback)
 
-    def remove_stage_callback(self, callback: Callable) -> None:
-        self._stage_callbacks.discard(callback)
+    def remove_state_callback(self, callback: Callable[[SequencerState], None]) -> None:
+        self._state_callbacks.discard(callback)
 
-    def _notify_stage_callbacks(self, stage: int) -> None:
-        for cb in self._stage_callbacks:
+    def _notify_state(self, elapsed: float) -> None:
+        state = SequencerState(
+            stage=self.config.stage,
+            stage_progress=self.config.stage_progress,
+            progress=self.config.progress,
+            elapsed=elapsed,
+            active=self._active,
+        )
+        for cb in self._state_callbacks:
             try:
-                cb(stage)
+                cb(state)
             except Exception as e:
-                logger.error(f"Timeline stage callback error: {e}")
-
-    def add_time_callback(self, callback: Callable[[float], None]) -> None:
-        self._time_callbacks.add(callback)
-
-    def remove_time_callback(self, callback: Callable[[float], None]) -> None:
-        self._time_callbacks.discard(callback)
-
-    def _notify_time_callbacks(self, elapsed: float) -> None:
-        for cb in self._time_callbacks:
-            try:
-                cb(elapsed)
-            except Exception as e:
-                logger.error(f"Timeline time callback error: {e}")
+                logger.error(f"Sequencer state callback error: {e}")
 
     # -- Tick (called every render frame) ------------------------------------
 
     def update(self) -> None:
-        """Advance timeline state. Call once per frame."""
+        """Advance sequencer state. Call once per frame."""
         if not self._active:
             return
 
@@ -201,8 +205,8 @@ class Timeline:
         else:
             self.config.progress = 1.0
 
-        # Time callbacks
-        self._notify_time_callbacks(elapsed)
+        # State callbacks
+        self._notify_state(elapsed)
 
         # Auto-advance
         if duration > 0 and elapsed >= duration:

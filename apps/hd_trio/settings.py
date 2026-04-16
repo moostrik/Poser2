@@ -23,12 +23,12 @@ from modules.tracker import OnePerCamTrackerSettings
 from modules.pose import batch, nodes, trackers, window
 from modules.pose.batch.model_types import ModelType
 from modules.pose.recorder.settings import RecorderSettings as PoseRecorderSettings
-from modules.session import SessionSettings, TimelineSettings
+from modules.session import SessionSettings, SequencerSettings
 from modules.gl.WindowManager import WindowSettings
 
 
 # ---------------------------------------------------------------------------
-#  Show stages & timeline settings
+#  Show stages & sequencer settings
 # ---------------------------------------------------------------------------
 
 class ShowStage(IntEnum):
@@ -42,8 +42,8 @@ class ShowStage(IntEnum):
     IDLE =          auto()
 
 
-class ShowTimelineSettings(TimelineSettings):
-    """HD Trio show timeline with project-specific stages."""
+class ShowSequencerSettings(SequencerSettings):
+    """HD Trio show sequencer with project-specific stages."""
     stages:     Field[list[ShowStage]] = Field(list(ShowStage), widget=Widget.checklist, description="Stages to play")
     durations:  Field[list] = Field([10.0, 3.0, 30.0, 3.0, 3.0, 60.0, 10.0, 3.0], min=0.0, max=600.0, step=0.1, description="Stage durations")
     stage:      Field[ShowStage]   = Field(ShowStage.START, access=Field.READ, description="Current stage", newline=True)
@@ -250,7 +250,7 @@ class SessionGroup(BaseSettings):
 
     osc     : Group[OscReceiverSettings]     = Group(OscReceiverSettings)
     core    : Group[SessionSettings]         = Group(SessionSettings, share=_session_share)
-    timeline: Group[ShowTimelineSettings]    = Group(ShowTimelineSettings, share=[start, stop])
+    sequencer: Group[ShowSequencerSettings]   = Group(ShowSequencerSettings, share=[start, stop])
     video   : Group[RecorderSettings]        = Group(RecorderSettings, share=_recorder_share + [num_cameras, fps])
     pose    : Group[PoseRecorderSettings]    = Group(PoseRecorderSettings, share=_recorder_share)
 

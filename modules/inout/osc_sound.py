@@ -109,16 +109,15 @@ class OscSound:
 
         bundle_builder: OscBundleBuilder = OscBundleBuilder(IMMEDIATELY)  # type: ignore
 
-        # Timeline data
-        timeline_stage = self._data_hub.get_item(DataHubType.timeline_stage, 0)
-        timeline_progress = self._data_hub.get_item(DataHubType.timeline_total_progress, 0)
+        # Sequencer data
+        seq_state = self._data_hub.get_item(DataHubType.sequencer_state, 0)
 
         stage_msg = OscMessageBuilder(address="/global/state")
-        stage_msg.add_arg(timeline_stage if timeline_stage is not None else 0, arg_type=OscMessageBuilder.ARG_TYPE_INT)
+        stage_msg.add_arg(seq_state.stage if seq_state is not None else 0, arg_type=OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(stage_msg.build()) # type: ignore
 
         progress_msg = OscMessageBuilder(address="/global/time")
-        progress_msg.add_arg(timeline_progress if timeline_progress is not None else 0.0, arg_type=OscMessageBuilder.ARG_TYPE_FLOAT)
+        progress_msg.add_arg(seq_state.progress if seq_state is not None else 0.0, arg_type=OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(progress_msg.build()) # type: ignore
 
         poses: dict[int, Frame] = self._data_hub.get_poses(self._config.stage)

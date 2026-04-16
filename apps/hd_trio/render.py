@@ -11,7 +11,7 @@ from modules.render.composition_subdivider import make_subdivision, SubdivisionR
 from modules.render import layers as ls
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-from .settings import Layers, RenderSettings, ShowStage, ShowTimelineSettings
+from .settings import Layers, RenderSettings, ShowStage, ShowSequencerSettings
 from . import render_stages
 from .render_stages import STAGES, StageLayer
 from .intro_sequence import IntroSequencePlayer, SequenceDataProxy, FixedColorProxy
@@ -46,11 +46,11 @@ LARGE_LAYERS: list[Layers] = [
 
 
 class HDTrioRender(RenderBase):
-    def __init__(self, data_hub: DataHub, settings: RenderSettings, timeline: ShowTimelineSettings) -> None:
+    def __init__(self, data_hub: DataHub, settings: RenderSettings, sequencer: ShowSequencerSettings) -> None:
         self.num_players: int = settings.num_players
         self.num_cams: int = settings.num_cams
         self.settings: RenderSettings = settings
-        self._timeline: ShowTimelineSettings = timeline
+        self._sequencer: ShowSequencerSettings = sequencer
 
         self.data_hub: DataHub = data_hub
 
@@ -175,8 +175,8 @@ class HDTrioRender(RenderBase):
         self._preview_layers = self.settings.layer.select.preview
 
         # Stage transitions — enter/exit before layer updates so settings writes take effect
-        stage = ShowStage(self._timeline.stage)
-        progress = self._timeline.stage_progress
+        stage = ShowStage(self._sequencer.stage)
+        progress = self._sequencer.stage_progress
         if stage != self._prev_stage:
             for s in self._active_stages:
                 s.exit()

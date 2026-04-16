@@ -631,7 +631,7 @@
       "verbose": true
     },
     "core": {},
-    "timeline": {
+    "sequencer": {
       "stages": [
         "START",
         "INTRO_IN",

@@ -1,2 +1,2 @@
 from .session import Session, SessionSettings
-from .timeline import Timeline, TimelineSettings
+from .sequencer import Sequencer, SequencerSettings, SequencerState
