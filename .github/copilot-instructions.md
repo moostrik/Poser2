@@ -45,6 +45,11 @@ Use modern Python typing (`list[T]`, `dict[K, V]`, `X | Y`).
 - Public methods should include return type hints
 - Use `Protocol` or `ABC` as appropriate; be consistent
 
+## Imports
+
+Import subpackages as namespaces and use qualified access (`from modules.pose import window`; use `window.WindowTracker`).
+- Keep `__init__.py` exports limited to the package's own public symbols
+
 ## Error handling
 
 - Define module loggers as `logger = logging.getLogger(__name__)`
