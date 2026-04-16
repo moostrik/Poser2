@@ -4,7 +4,6 @@ BACKUP/
 .venv/
 recordings/*
 logs/*
-files/audio/UMU*
 files/settings/**/.*
 temp/*
 
