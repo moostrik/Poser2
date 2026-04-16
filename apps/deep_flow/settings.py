@@ -17,7 +17,7 @@ from modules.render.color_settings import ColorSettings
 from modules.render import layers
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings
-from modules.pose import batch, nodes, trackers
+from modules.pose import batch, nodes, trackers, window
 from modules.pose.batch.model_types import ModelType
 from modules.gl.WindowManager import WindowSettings
 
@@ -174,9 +174,9 @@ class PoseGroup(BaseSettings):
     velocity     = Group(VelocityFeature, share=_feature_share)
     motion       = Group(MotionFeature)
     motion_gate  = Group(nodes.MotionGateApplicatorSettings, share=[max_poses])
-    window_raw   = Group(trackers.WindowNodeSettings)
-    window_smooth = Group(trackers.WindowNodeSettings)
-    window_lerp  = Group(trackers.WindowNodeSettings)
+    window_raw   = Group(window.WindowNodeSettings)
+    window_smooth = Group(window.WindowNodeSettings)
+    window_lerp  = Group(window.WindowNodeSettings)
 
 
 # ---------------------------------------------------------------------------

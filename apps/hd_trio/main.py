@@ -8,7 +8,7 @@ from modules.settings import presets, NiceServer
 from modules.data_hub import DataHub, Stage
 from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker
-from modules.pose import batch, nodes, trackers, features
+from modules.pose import batch, nodes, trackers, features, window
 from modules.pose.recorder import Recorder as PoseRecorder
 from modules.session import Session, Timeline
 from modules.gl.WindowManager import WindowSettings
@@ -92,9 +92,9 @@ class HDTrioMain:
         self.motion_gate_applicator =   nodes.MotionGateApplicator(self.settings.pose.similarity.motion_gate)
 
         # WINDOW TRACKERS
-        self.window_tracker_R =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_raw)
-        self.window_tracker_S =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_smooth)
-        self.window_tracker_I =     trackers.FrameWindowTracker(num_players, self.settings.pose.window_lerp)
+        self.window_tracker_R =     window.WindowTracker(num_players, self.settings.pose.window_raw)
+        self.window_tracker_S =     window.WindowTracker(num_players, self.settings.pose.window_smooth)
+        self.window_tracker_I =     window.WindowTracker(num_players, self.settings.pose.window_lerp)
 
         # Reused config
         angle_extractor_config = nodes.AngleExtractorSettings(aspect_ratio=self.settings.pose.detection.aspect_ratio)

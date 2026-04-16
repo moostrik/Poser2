@@ -6,5 +6,3 @@ from .FilterPipeline import         FilterPipeline
 from .FilterTracker import          FilterTracker
 from .InterpolatorPipeline import   InterpolatorPipeline
 from .InterpolatorTracker import    InterpolatorTracker
-
-from .convenience.WindowTrackers import         WindowNodeSettings, FrameWindowTracker

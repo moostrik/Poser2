@@ -20,7 +20,7 @@ from modules.render.layers.centre.CentrePoseLayer import CentrePoseSettings
 from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
 from modules.utils import Color
 from modules.tracker import OnePerCamTrackerSettings
-from modules.pose import batch, nodes, trackers
+from modules.pose import batch, nodes, trackers, window
 from modules.pose.batch.model_types import ModelType
 from modules.pose.recorder.settings import RecorderSettings as PoseRecorderSettings
 from modules.session import SessionSettings, TimelineSettings
@@ -222,9 +222,9 @@ class PoseGroup(BaseSettings):
     velocity     : Group[VelocityFeature]            = Group(VelocityFeature, share=_feature_share)
     motion       : Group[MotionFeature]              = Group(MotionFeature)
     similarity   : Group[SimilarityFeature]          = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
-    window_raw   : Group[nodes.WindowNodeSettings]   = Group(trackers.WindowNodeSettings)
-    window_smooth: Group[nodes.WindowNodeSettings]   = Group(trackers.WindowNodeSettings)
-    window_lerp  : Group[nodes.WindowNodeSettings]   = Group(trackers.WindowNodeSettings)
+    window_raw   : Group[window.WindowNodeSettings]   = Group(window.WindowNodeSettings)
+    window_smooth: Group[window.WindowNodeSettings]   = Group(window.WindowNodeSettings)
+    window_lerp  : Group[window.WindowNodeSettings]   = Group(window.WindowNodeSettings)
 
 
 # ---------------------------------------------------------------------------

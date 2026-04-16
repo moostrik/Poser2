@@ -62,7 +62,6 @@ class FeatureWindow(Generic[TEnum]):
 
 # {track_id: FeatureWindow}
 FeatureWindowDict: TypeAlias =          dict[int, FeatureWindow]
-FeatureWindowDictCallback: TypeAlias =  Callable[[FeatureWindowDict], None]
 
 # {type[BaseFeature]: FeatureWindowDict}  (field-first: each field maps to its per-track windows)
 FrameWindowDict: TypeAlias =            dict[type['BaseFeature'], FeatureWindowDict]

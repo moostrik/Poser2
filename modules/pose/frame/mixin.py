@@ -3,7 +3,7 @@
 from threading import Lock
 
 from .frame import Frame, FrameCallback, FrameDict, FrameDictCallback
-from .window import FeatureWindowDict, FeatureWindowDictCallback, FrameWindowDict, FrameWindowDictCallback
+from .window import FrameWindowDict, FrameWindowDictCallback
 
 import logging
 logger = logging.getLogger(__name__)
@@ -118,33 +118,6 @@ class FrameDictCallbackMixin:
         """
         with self._frames_callback_lock:
             self._frames_callbacks.discard(callback)
-
-
-class FeatureWindowDictCallbackMixin:
-    """Mixin providing callback management for feature window dict broadcasting.
-
-    Provides thread-safe callback registration and emission for components
-    that broadcast FeatureWindowDict updates (single-field windows per track).
-    """
-
-    def __init__(self) -> None:
-        self._feature_window_callbacks: set[FeatureWindowDictCallback] = set()
-        self._feature_window_callback_lock: Lock = Lock()
-
-    def _notify_window_callbacks(self, windows: FeatureWindowDict) -> None:
-        with self._feature_window_callback_lock:
-            for callback in self._feature_window_callbacks:
-                try:
-                    callback(windows)
-                except Exception as e:
-                    logger.exception("Error in callback")
-    def add_windows_callback(self, callback: FeatureWindowDictCallback) -> None:
-        with self._feature_window_callback_lock:
-            self._feature_window_callbacks.add(callback)
-
-    def remove_windows_callback(self, callback: FeatureWindowDictCallback) -> None:
-        with self._feature_window_callback_lock:
-            self._feature_window_callbacks.discard(callback)
 
 
 class FrameWindowDictCallbackMixin:

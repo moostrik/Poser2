@@ -1,12 +1,12 @@
+"""Ring buffer for accumulating feature windows from pose frames."""
+
 from enum import IntEnum
 from threading import Lock
 import numpy as np
 
 from modules.pose.frame import Frame
 from modules.pose.frame.window import FeatureWindow
-from modules.pose.features import BaseScalarFeature, Angles, AngleMotion, AngleSymmetry, AngleVelocity, BBox, Similarity
-from modules.pose.features.base import BaseFeature
-from modules.pose.nodes.Nodes import NodeBase
+from modules.pose.features import BaseScalarFeature
 from modules.settings import BaseSettings, Field
 
 
@@ -16,8 +16,8 @@ class WindowNodeSettings(BaseSettings):
     emit_partial: Field[bool] = Field(True)
 
 
-class WindowNode(NodeBase):
-    """Base class for nodes that buffer poses and output feature windows.
+class WindowNode:
+    """Buffers pose frames and outputs feature windows.
 
     Uses a preallocated numpy ring buffer for performance.
     Always returns full window_size buffer with oldest samples first.
@@ -145,29 +145,3 @@ class WindowNode(NodeBase):
     def config(self) -> WindowNodeSettings:
         """Access the node configuration."""
         return self._config
-
-
-    # CONVIENCE CLASSES
-def AngleWindowNode(config: WindowNodeSettings | None = None) -> WindowNode:
-    """Angle trajectories - shape (time, 9) for 9 angles."""
-    return WindowNode(Angles, config)
-
-def AngleVelocityWindowNode(config: WindowNodeSettings | None = None) -> WindowNode:
-    """Angular velocity trajectories - shape (time, 9)."""
-    return WindowNode(AngleVelocity, config)
-
-def AngleMotionWindowNode(config: WindowNodeSettings | None = None) -> WindowNode:
-    """Angular motion magnitude - shape (time, 9)."""
-    return WindowNode(AngleMotion, config)
-
-def AngleSymmetryWindowNode(config: WindowNodeSettings | None = None) -> WindowNode:
-    """Angular symmetry metrics - shape (time, 9)."""
-    return WindowNode(AngleSymmetry, config)
-
-def BBoxWindowNode(config: WindowNodeSettings | None = None) -> WindowNode:
-    """Bounding box trajectory - shape (time, 4) for [x, y, w, h]."""
-    return WindowNode(BBox, config)
-
-def SimilarityWindowNode(config: WindowNodeSettings | None = None) -> WindowNode:
-    """Similarity trajectory - shape (time, 1)."""
-    return WindowNode(Similarity, config)
