@@ -40,9 +40,9 @@ class DataHubType(IntEnum):
     pose_window_S =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (SMOOTH)
     pose_window_I =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (LERP)
 
-    timeline_stage =          auto()   # int, project-defined stage enum value
-    timeline_stage_progress = auto()   # float 0-1, progress within current stage
-    timeline_total_progress = auto()   # float 0-1, overall timeline progress
+    session_stage =          auto()   # int, project-defined stage enum value
+    session_stage_progress = auto()   # float 0-1, progress within current stage
+    session_total_progress = auto()   # float 0-1, overall timeline progress
 
 
 # Stage → DataHubType lookup
@@ -185,15 +185,15 @@ class DataHub:
     # TIMELINE
     def set_timeline_stage(self, stage: int) -> None:
         """Store current timeline stage (project-defined enum value)."""
-        self.set_item(DataHubType.timeline_stage, 0, stage)
+        self.set_item(DataHubType.session_stage, 0, stage)
 
     def set_timeline_stage_progress(self, progress: float) -> None:
         """Store stage progress as float 0-1."""
-        self.set_item(DataHubType.timeline_stage_progress, 0, progress)
+        self.set_item(DataHubType.session_stage_progress, 0, progress)
 
     def set_timeline_progress(self, progress: float) -> None:
         """Store overall timeline progress as float 0-1."""
-        self.set_item(DataHubType.timeline_total_progress, 0, progress)
+        self.set_item(DataHubType.session_total_progress, 0, progress)
 
     # UPDATE CALLBACK
     def notify_update(self) -> None:
