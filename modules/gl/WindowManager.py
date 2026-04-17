@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 # Standard library imports
 import logging
 from enum import Enum, IntEnum
 from threading import Thread, Lock, current_thread
 from time import sleep, time_ns
-from typing import Callable, Optional
+from typing import Callable, Optional, TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,8 @@ import numpy as np
 import ctypes
 
 # Local application imports
-from modules.gl.RenderBase import RenderBase
+if TYPE_CHECKING:
+    from modules.gl.RenderBase import RenderBase
 from modules.gl.Utils import FpsCounter
 from modules.settings import Field, BaseSettings, Widget
 
