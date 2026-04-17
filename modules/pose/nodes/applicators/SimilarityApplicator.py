@@ -4,6 +4,7 @@ from threading import Lock
 import numpy as np
 
 from modules.pose.features.Similarity import Similarity
+from modules.pose.batch.WindowSimilarity import SimilarityResult
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
 from modules.settings import BaseSettings, Field
@@ -44,6 +45,9 @@ class SimilarityApplicator(FilterNode):
         """
         with self._lock:
             self._similarity_dict = similarity_dict
+
+    def submit_result(self, result: SimilarityResult) -> None:
+        self.submit(result.similarity)
 
     def process(self, pose: Frame) -> Frame:
         """Apply pre-computed similarity to this pose.

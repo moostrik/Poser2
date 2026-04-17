@@ -14,7 +14,6 @@ applyTo: "apps/*/main.py, apps/*/render.py, apps/*/settings.py"
 
 - Load and initialize settings early
 - Construct core components from settings
-- Wire inter-module callbacks in `start()`
 - Start workers/services only after wiring is complete
 
 ## Shutdown pattern
@@ -32,5 +31,4 @@ applyTo: "apps/*/main.py, apps/*/render.py, apps/*/settings.py"
 ## Data flow
 
 - Treat `DataHub` as a thread-safe exchange point between runtime stages
-- Keep stage semantics clear: RAW -> SMOOTH -> LERP
 - Avoid bypass paths that make stage ownership ambiguous

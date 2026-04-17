@@ -2,6 +2,7 @@
 from threading import Lock
 
 from modules.pose.features.LeaderScore import LeaderScore
+from modules.pose.batch.WindowSimilarity import SimilarityResult
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
 from modules.settings import BaseSettings, Field
@@ -36,6 +37,9 @@ class LeaderScoreApplicator(FilterNode):
         """
         with self._lock:
             self._leader_dict = leader_dict
+
+    def submit_result(self, result: SimilarityResult) -> None:
+        self.submit(result.leader_score)
 
     def process(self, pose: Frame) -> Frame:
         """Apply pre-computed leader scores to this pose.

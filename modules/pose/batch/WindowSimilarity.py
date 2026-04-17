@@ -2,8 +2,9 @@
 from enum import IntEnum
 import threading
 import time
-from typing import Optional, TYPE_CHECKING, cast
+from typing import Callable, Optional, TYPE_CHECKING, cast
 import warnings
+from dataclasses import dataclass
 
 # Third-party imports
 import numpy as np
@@ -22,6 +23,13 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class SimilarityResult:
+    """Output of WindowSimilarity / WindowCorrelation."""
+    similarity: dict[int, Similarity]
+    leader_score: dict[int, LeaderScore]
 
 
 class _JointAggregator(NormalizedScalarFeature):
@@ -64,7 +72,7 @@ class WindowSimilaritySettings(BaseSettings):
     verbose:                Field[bool]               = Field(False, description="Enable verbose logging")
 
 
-class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int, LeaderScore]]]):
+class WindowSimilarity(TypedCallbackMixin[SimilarityResult]):
     """Computes pairwise window similarities in a background thread.
 
     Processes FeatureWindow data from active tracklets and computes similarity metrics
@@ -73,11 +81,6 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
     Unlike FrameSimilarity which compares single frames, WindowSimilarity compares
     temporal sequences (windows) using time-series similarity algorithms like DTW,
     cross-correlation, or other sequence matching methods.
-
-    Returns:
-        Tuple of (similarity_dict, leader_dict) where:
-        - similarity_dict: Maps track_id -> Similarity (magnitude of synchrony)
-        - leader_dict: Maps track_id -> LeaderScore (temporal offset/who leads)
     """
 
     def __init__(self, config: WindowSimilaritySettings | None = None) -> None:
@@ -97,7 +100,9 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
 
         # OUTPUT
         self._output_lock = threading.Lock()
-        self._output_data: Optional[tuple[dict[int, 'Similarity'], dict[int, 'LeaderScore']]] = None
+        self._output_data: SimilarityResult | None = None
+        self._similarity_callbacks: set[Callable[[dict[int, Similarity]], None]] = set()
+        self._leader_callbacks: set[Callable[[dict[int, LeaderScore]], None]] = set()
 
         self.Timer: PerformanceTimer = PerformanceTimer(name="similarity  ", sample_count=200, report_interval=100, color="red", omit_init=0)
 
@@ -112,6 +117,12 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
         """Stop the similarity processing thread and clear callbacks."""
         self._stop_event.set()
         self._update_event.set()  # Wake the thread so it can see stop_event
+
+    def add_similarity_callback(self, callback: Callable[[dict[int, Similarity]], None]) -> None:
+        self._similarity_callbacks.add(callback)
+
+    def add_leader_callback(self, callback: Callable[[dict[int, LeaderScore]], None]) -> None:
+        self._leader_callbacks.add(callback)
 
     def submit(self, windows: FeatureWindowDict) -> None:
         """Update angle windows and trigger similarity processing.
@@ -165,16 +176,20 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
 
                 # Process similarity and leader scores
                 start_time: float = time.perf_counter()
-                result: tuple[dict[int, Similarity], dict[int, LeaderScore]] = self._process(
+                similarity_dict, leader_dict = self._process(
                     windows, motion_windows, velocity_windows
                 )
                 elapsed_time: float = (time.perf_counter() - start_time) * 1000.0
                 self.Timer.add_time(elapsed_time, self._config.verbose)
 
-                # Store and notify
+                result = SimilarityResult(similarity_dict, leader_dict)
                 with self._output_lock:
                     self._output_data = result
                 self._notify_callbacks(result)
+                for cb in self._similarity_callbacks:
+                    cb(result.similarity)
+                for cb in self._leader_callbacks:
+                    cb(result.leader_score)
 
             except Exception as e:
                 logger.error(f"WindowSimilarity: Processing error: {e}")

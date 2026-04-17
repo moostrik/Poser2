@@ -2,7 +2,7 @@
 from enum import IntEnum
 import threading
 import time
-from typing import Optional, cast
+from typing import Callable, Optional, cast
 import warnings
 
 # Third-party imports
@@ -16,6 +16,7 @@ from modules.pose.frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
 from modules.pose.features import Angles, AngleMotion
 from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod, NormalizedScalarFeature
 from modules.pose.features.Similarity import Similarity
+from modules.pose.batch.WindowSimilarity import SimilarityResult
 from modules.pose.features.LeaderScore import LeaderScore
 from modules.utils.PerformanceTimer import PerformanceTimer
 
@@ -56,17 +57,12 @@ class WindowCorrelationSettings(BaseSettings):
     verbose:                Field[bool]               = Field(False, description="Enable verbose logging")
 
 
-class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int, LeaderScore]]]):
+class WindowCorrelation(TypedCallbackMixin[SimilarityResult]):
     """Computes pairwise window correlations in a background thread.
 
     Uses normalized cross-correlation per joint over full windows to detect
     synchrony and temporal offset between poses. More robust to scale differences
     than similarity-based approaches.
-
-    Returns:
-        Tuple of (correlation_dict, leader_dict) where:
-        - correlation_dict: Maps track_id -> Similarity (peak correlation magnitude)
-        - leader_dict: Maps track_id -> LeaderScore (lag at peak, normalized)
     """
 
     def __init__(self, config: WindowCorrelationSettings | None = None) -> None:
@@ -85,7 +81,9 @@ class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int
 
         # OUTPUT
         self._output_lock = threading.Lock()
-        self._output_data: Optional[tuple[dict[int, 'Similarity'], dict[int, 'LeaderScore']]] = None
+        self._output_data: SimilarityResult | None = None
+        self._similarity_callbacks: set[Callable[[dict[int, Similarity]], None]] = set()
+        self._leader_callbacks: set[Callable[[dict[int, LeaderScore]], None]] = set()
 
         self.Timer: PerformanceTimer = PerformanceTimer(name="correlation ", sample_count=200, report_interval=100, color="cyan", omit_init=0)
 
@@ -99,6 +97,12 @@ class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int
         """Stop the correlation processing thread."""
         self._stop_event.set()
         self._update_event.set()
+
+    def add_similarity_callback(self, callback: Callable[[dict[int, Similarity]], None]) -> None:
+        self._similarity_callbacks.add(callback)
+
+    def add_leader_callback(self, callback: Callable[[dict[int, LeaderScore]], None]) -> None:
+        self._leader_callbacks.add(callback)
 
     def submit_all(self, all_windows: FrameWindowDict) -> None:
         """Update all window types and trigger correlation processing.
@@ -131,13 +135,18 @@ class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int
                     motion_windows: FeatureWindowDict = self._input_motion_windows
 
                 start_time: float = time.perf_counter()
-                result = self._process(windows, motion_windows)
+                similarity_dict, leader_dict = self._process(windows, motion_windows)
                 elapsed_time: float = (time.perf_counter() - start_time) * 1000.0
                 self.Timer.add_time(elapsed_time, self._config.verbose)
 
+                result = SimilarityResult(similarity_dict, leader_dict)
                 with self._output_lock:
                     self._output_data = result
                 self._notify_callbacks(result)
+                for cb in self._similarity_callbacks:
+                    cb(result.similarity)
+                for cb in self._leader_callbacks:
+                    cb(result.leader_score)
 
             except Exception as e:
                 logger.error(f"WindowCorrelation: Processing error: {e}")

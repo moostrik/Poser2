@@ -44,6 +44,7 @@ Latency is a first-order concern.
 Use modern Python typing (`list[T]`, `dict[K, V]`, `X | Y`).
 - Public methods should include return type hints
 - Use `Protocol` or `ABC` as appropriate; be consistent
+- Prefer `IntEnum` over string keys for dict lookups and identifiers
 
 ## Imports
 

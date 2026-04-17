@@ -219,10 +219,12 @@ class HDTrioMain:
         self.window_correlator = batch.WindowCorrelation(p.similarity.window_correlation)
 
         self.window_tracker_S.add_frame_windows_callback(self.window_similator.submit_all)
-        self.window_similator.add_callback(self._on_similarity_result)
+        self.window_similator.add_similarity_callback(self.similarity_applicator.submit)
+        self.window_similator.add_leader_callback(self.leader_applicator.submit)
 
         self.window_tracker_S.add_frame_windows_callback(self.window_correlator.submit_all)
-        self.window_correlator.add_callback(self._on_similarity_result)
+        self.window_correlator.add_similarity_callback(self.similarity_applicator.submit)
+        self.window_correlator.add_leader_callback(self.leader_applicator.submit)
 
         # RENDER
         self.render = HDTrioRender(self.data_hub, self.settings.render, self.settings.session.sequencer)
@@ -245,10 +247,6 @@ class HDTrioMain:
 
     def _on_osc_group_id(self, gid: str, *_) -> None:
         self.settings.session.name = gid
-
-    def _on_similarity_result(self, result: tuple) -> None:
-        self.similarity_applicator.submit(result[0])
-        self.leader_applicator.submit(result[1])
 
     def _on_render_fps(self, fps: int) -> None:
         if fps > 0:

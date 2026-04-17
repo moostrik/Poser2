@@ -23,6 +23,7 @@ Maintain the settings engine contract and reactive behavior in `modules/settings
 
 - Pass settings (or `Group`/`Child` subgroups) via constructor dependency injection, not globals
 - Bind reactive updates explicitly with callbacks and keep callback logic thread-safe
+- Use `bind()` only for reacting to configuration changes; do not use it as a runtime data relay between components
 - Cache `Field.INIT` values when useful; do not long-term cache mutable non-INIT values
 - Avoid circular updates where a callback writes the same field that triggered it
 - Treat READ-only values as snapshots; copy arrays before cross-thread handoff
