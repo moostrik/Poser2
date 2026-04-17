@@ -5,7 +5,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.data_hub import DataHub, Stage
+from modules.data_hub import DataHub, FRAME_TYPES, Stage
 from modules.pose.frame import Frame
 from modules.pose.features import Points2D, BBox
 from modules.render.layers.LayerBase import LayerBase, Rect
@@ -59,7 +59,7 @@ class PoseRenderer(LayerBase):
             self._shader.use(points, line_width, line_smooth, color=color, use_scores=self.settings.use_scores)
 
     def update(self) -> None:
-        self._cam_poses = self._data.get_poses_for_cam(self.settings.stage, self._cam_id)
+        self._cam_poses = {p for p in self._data.get_dict(FRAME_TYPES[self.settings.stage]).values() if p.cam_id == self._cam_id}
 
     @staticmethod
     def _transform_to_image_space(points: Points2D, bbox: Rect) -> Points2D:

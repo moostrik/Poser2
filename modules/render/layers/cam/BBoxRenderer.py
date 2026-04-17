@@ -3,7 +3,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.data_hub import DataHub, Stage
+from modules.data_hub import DataHub, FRAME_TYPES, Stage
 from modules.pose.frame import Frame
 from modules.pose.features import BBox
 from modules.render.layers.LayerBase import LayerBase, Rect
@@ -54,7 +54,7 @@ class BBoxRenderer(LayerBase):
             )
 
     def update(self) -> None:
-        cam_poses: set[Frame] = self._data.get_poses_for_cam(self.settings.stage, self._cam_id)
+        cam_poses = {p for p in self._data.get_dict(FRAME_TYPES[self.settings.stage]).values() if p.cam_id == self._cam_id}
         self._cam_bbox_rects = []
         for pose in cam_poses:
             self._cam_bbox_rects.append(pose[BBox].to_rect())

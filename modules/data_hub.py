@@ -2,7 +2,7 @@
 import logging
 from enum import IntEnum, auto
 from threading import Lock
-from typing import Callable, Any
+from typing import Any
 
 # Local application imports
 from modules.pose.frame import FeatureWindow, FrameWindowDict
@@ -37,7 +37,7 @@ class DataHubType(IntEnum):
 
 
 # Stage → DataHubType lookup
-_FRAME_TYPES: dict[Stage, DataHubType] = {
+FRAME_TYPES: dict[Stage, DataHubType] = {
     Stage.RAW:      DataHubType.frame_raw,
     Stage.CLEAN:    DataHubType.frame_clear,
     Stage.SMOOTH:   DataHubType.frame_smooth,
@@ -67,18 +67,10 @@ class DataHub:
         with self.mutex:
             return dict(self._data.get(data_type, {}))
 
-    def get_filtered(self, data_type: DataHubType, filter_fn: Callable[[Any], bool]) -> set[Any]:
-        with self.mutex:
-            return {v for v in self._data.get(data_type, {}).values() if filter_fn(v)}
-
-    def get_poses_for_cam(self, stage: Stage, cam_id: int) -> set[Any]:
-        """Get all pose frames for a specific stage that belong to a camera."""
-        return self.get_filtered(_FRAME_TYPES[stage], lambda v: hasattr(v, "cam_id") and v.cam_id == cam_id)
-
     # POSE GETTERS
     def get_pose(self, stage: Stage, track_id: int) -> Any | None:
         """Get a single pose frame for a specific stage and track."""
-        return self.get_item(_FRAME_TYPES[stage], track_id)
+        return self.get_item(FRAME_TYPES[stage], track_id)
 
     # FEATURE WINDOW GETTERS (stored as _data[pose_window_X] = {track_id: {type[BaseFeature]: FeatureWindow}})
     def get_feature_window(self, stage: Stage, feature_type: type[BaseFeature], track_id: int) -> Any | None:
