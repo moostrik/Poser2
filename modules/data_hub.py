@@ -75,9 +75,6 @@ class DataHub:
         self.mutex: Lock = Lock()
         self._data: dict[DataHubType, dict[int, Any]] = {}
 
-        self._update_callback_lock = Lock()
-        self._update_callbacks: set[Callable] = set()
-
     # GENERIC GETTERS
     def get_item(self, data_type: DataHubType, key: int = 0) -> Any | None:
         with self.mutex:
@@ -185,22 +182,3 @@ class DataHub:
     def set_sequencer_state(self, state: SequencerState) -> None:
         """Store sequencer state snapshot."""
         self.set_item(DataHubType.sequencer_state, 0, state)
-
-    # UPDATE CALLBACK
-    def notify_update(self) -> None:
-        with self._update_callback_lock:
-            for callback in self._update_callbacks:
-                try:
-                    callback()
-                except Exception as e:
-                    self._logger.exception("Error in callback")
-
-    def add_update_callback(self, callback: Callable) -> None:
-        """Register output callback."""
-        with self._update_callback_lock:
-            self._update_callbacks.add(callback)
-
-    def remove_update_callback(self, callback: Callable) -> None:
-        """Unregister output callback."""
-        with self._update_callback_lock:
-            self._update_callbacks.discard(callback)

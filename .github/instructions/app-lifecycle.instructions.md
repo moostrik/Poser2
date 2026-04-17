@@ -30,5 +30,6 @@ applyTo: "apps/*/main.py, apps/*/render.py, apps/*/settings.py"
 
 ## Data flow
 
-- Treat `DataHub` as a thread-safe exchange point between runtime stages
+- Treat `DataHub` as a thread-safe data store only
+- `RenderBase` owns the per-frame tick; register render-rate callbacks via `renderer.add_update_callback()`
 - Avoid bypass paths that make stage ownership ambiguous

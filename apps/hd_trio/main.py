@@ -36,7 +36,7 @@ class HDTrioMain:
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
         num_players: int = self.settings.num_players
-        p = self.settings.pose
+        ps = self.settings.pose
 
         # DATA_HUB
         self.data_hub = DataHub()
@@ -52,7 +52,6 @@ class HDTrioMain:
         self.pose_recorder = PoseRecorder(self.settings.session.pose)
 
         self.sequencer.add_state_callback(self.data_hub.set_sequencer_state)
-        self.data_hub.add_update_callback(self.sequencer.update)
 
         # CAMERA
         self.cameras: list[Camera | Simulator] = []
@@ -67,7 +66,7 @@ class HDTrioMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.image_crop_processor = batch.ImageCropProcessor(p.image_crop)
+        self.image_crop_processor = batch.ImageCropProcessor(ps.image_crop)
 
         for camera in self.cameras:
             camera.add_preview_callback(self.data_hub.set_cam_frame)
@@ -82,14 +81,14 @@ class HDTrioMain:
         features.configure_features(num_players)
 
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
-        self.point_extractor = batch.PointBatchExtractor(p.detection)
-        self.mask_extractor  = batch.MaskBatchExtractor(p.segmentation)
-        self.flow_extractor  = batch.FlowBatchExtractor(p.flow)
+        self.point_extractor = batch.PointBatchExtractor(ps.detection)
+        self.mask_extractor  = batch.MaskBatchExtractor(ps.segmentation)
+        self.flow_extractor  = batch.FlowBatchExtractor(ps.flow)
 
         self.bbox_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
-                nodes.BBoxEuroSmoother(p.bbox.smoother),
-                nodes.BBoxPredictor(p.bbox.prediction),
+                nodes.BBoxEuroSmoother(ps.bbox.smoother),
+                nodes.BBoxPredictor(ps.bbox.prediction),
             ])
             for i in range(num_players)
         })
@@ -108,7 +107,7 @@ class HDTrioMain:
         self.flow_extractor.add_callback(self.data_hub.set_flow_tensors)
 
         # STAGE RAW
-        self.window_tracker_R = window.WindowTracker(num_players, p.window_raw)
+        self.window_tracker_R = window.WindowTracker(num_players, ps.window_raw)
 
         self.point_extractor.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.RAW))
         self.point_extractor.add_frames_callback(partial(self.pose_recorder.on_frame_dict, Stage.RAW))
@@ -118,13 +117,13 @@ class HDTrioMain:
         # STAGE CLEAN
         self.pose_clean_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
-                nodes.PointDualConfFilter(p.point.confidence_filter),
-                nodes.AngleExtractor(p.angle_extractor),
-                nodes.AngleVelExtractor(p.velocity.extractor),
+                nodes.PointDualConfFilter(ps.point.confidence_filter),
+                nodes.AngleExtractor(ps.angle_extractor),
+                nodes.AngleVelExtractor(ps.velocity.extractor),
             ])
             for i in range(num_players)
         })
-        self.window_tracker_C = window.WindowTracker(num_players, p.window_clean)
+        self.window_tracker_C = window.WindowTracker(num_players, ps.window_clean)
 
         self.point_extractor.add_frames_callback(self.pose_clean_filters.process)
         self.pose_clean_filters.add_frames_callback(partial(self.data_hub.set_pose_frames, Stage.CLEAN))
@@ -133,38 +132,38 @@ class HDTrioMain:
         self.window_tracker_C.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.CLEAN))
 
         # STAGE SMOOTH
-        self.similarity_applicator = nodes.SimilarityApplicator(p.similarity.similarity_applicator)
-        self.leader_applicator     = nodes.LeaderScoreApplicator(p.similarity.leader_applicator)
+        self.similarity_applicator = nodes.SimilarityApplicator(ps.similarity.similarity_applicator)
+        self.leader_applicator     = nodes.LeaderScoreApplicator(ps.similarity.leader_applicator)
 
         self.pose_smooth_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
-                nodes.PointEuroSmoother(p.point.smoother),
-                nodes.AngleExtractor(p.angle_extractor),
-                nodes.AngleVelExtractor(p.velocity.extractor),
-                nodes.AngleVelEuroSmoother(p.velocity.smoother),
-                nodes.AngleEuroSmoother(p.angle.smoother),
-                nodes.AngleMotionExtractor(p.motion.extractor),
-                nodes.AngleMotionMovingAverageSmoother(p.motion.moving_average),
+                nodes.PointEuroSmoother(ps.point.smoother),
+                nodes.AngleExtractor(ps.angle_extractor),
+                nodes.AngleVelExtractor(ps.velocity.extractor),
+                nodes.AngleVelEuroSmoother(ps.velocity.smoother),
+                nodes.AngleEuroSmoother(ps.angle.smoother),
+                nodes.AngleMotionExtractor(ps.motion.extractor),
+                nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
                 nodes.AngleSymExtractor(),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
                 self.similarity_applicator,
                 self.leader_applicator,
-                nodes.SimilarityEuroSmoother(p.similarity.smoother),
+                nodes.SimilarityEuroSmoother(ps.similarity.smoother),
             ])
             for i in range(num_players)
         })
         self.pose_prediction_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
-                nodes.PointPredictor(p.point.prediction),
-                nodes.AnglePredictor(p.angle.prediction),
-                nodes.AngleVelPredictor(p.velocity.prediction),
-                nodes.AngleStickyFiller(p.angle.sticky),
-                nodes.SimilarityStickyFiller(p.similarity.sticky),
+                nodes.PointPredictor(ps.point.prediction),
+                nodes.AnglePredictor(ps.angle.prediction),
+                nodes.AngleVelPredictor(ps.velocity.prediction),
+                nodes.AngleStickyFiller(ps.angle.sticky),
+                nodes.SimilarityStickyFiller(ps.similarity.sticky),
             ])
             for i in range(num_players)
         })
-        self.window_tracker_S = window.WindowTracker(num_players, p.window_smooth)
+        self.window_tracker_S = window.WindowTracker(num_players, ps.window_smooth)
 
         self.pose_clean_filters.add_frames_callback(self.pose_smooth_filters.process)
         self.pose_smooth_filters.add_frames_callback(self.pose_prediction_filters.process)
@@ -174,15 +173,15 @@ class HDTrioMain:
         self.window_tracker_S.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.SMOOTH))
 
         # STAGE LERP
-        self.motion_gate_applicator = nodes.MotionGateApplicator(p.similarity.motion_gate)
+        self.motion_gate_applicator = nodes.MotionGateApplicator(ps.similarity.motion_gate)
 
         self.interpolators = trackers.InterpolatorTracker({
             i: trackers.InterpolatorPipeline([
-                nodes.BBoxChaseInterpolator(p.bbox.interpolator),
-                nodes.PointChaseInterpolator(p.point.interpolator),
-                nodes.AngleChaseInterpolator(p.angle.interpolator),
-                nodes.AngleVelChaseInterpolator(p.velocity.interpolator),
-                nodes.SimilarityChaseInterpolator(p.similarity.interpolator),
+                nodes.BBoxChaseInterpolator(ps.bbox.interpolator),
+                nodes.PointChaseInterpolator(ps.point.interpolator),
+                nodes.AngleChaseInterpolator(ps.angle.interpolator),
+                nodes.AngleVelChaseInterpolator(ps.velocity.interpolator),
+                nodes.SimilarityChaseInterpolator(ps.similarity.interpolator),
             ])
             for i in range(num_players)
         })
@@ -191,10 +190,10 @@ class HDTrioMain:
                 nodes.AngleSymExtractor(),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
-                nodes.AngleVelStickyFiller(p.velocity.sticky),
-                nodes.AngleVelEuroSmoother(p.velocity.smoother),
-                nodes.AngleMotionExtractor(p.motion.extractor),
-                nodes.AngleMotionMovingAverageSmoother(p.motion.moving_average),
+                nodes.AngleVelStickyFiller(ps.velocity.sticky),
+                nodes.AngleVelEuroSmoother(ps.velocity.smoother),
+                nodes.AngleMotionExtractor(ps.motion.extractor),
+                nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
             ])
             for i in range(num_players)
         })
@@ -202,9 +201,8 @@ class HDTrioMain:
             i: trackers.FilterPipeline([self.motion_gate_applicator])
             for i in range(num_players)
         })
-        self.window_tracker_I = window.WindowTracker(num_players, p.window_lerp)
+        self.window_tracker_I = window.WindowTracker(num_players, ps.window_lerp)
 
-        self.data_hub.add_update_callback(self.interpolators.update)
         self.pose_prediction_filters.add_frames_callback(self.interpolators.submit)
         self.interpolators.add_frames_callback(self.pose_interpolation_filters.process)
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_applicator.submit)
@@ -215,8 +213,8 @@ class HDTrioMain:
         self.window_tracker_I.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.LERP))
 
         # SIMILARITY
-        self.window_similator  = batch.WindowSimilarity(p.similarity.window_similarity)
-        self.window_correlator = batch.WindowCorrelation(p.similarity.window_correlation)
+        self.window_similator  = batch.WindowSimilarity(ps.similarity.window_similarity)
+        self.window_correlator = batch.WindowCorrelation(ps.similarity.window_correlation)
 
         self.window_tracker_S.add_frame_windows_callback(self.window_similator.submit_all)
         self.window_similator.add_similarity_callback(self.similarity_applicator.submit)
@@ -226,31 +224,19 @@ class HDTrioMain:
         self.window_correlator.add_similarity_callback(self.similarity_applicator.submit)
         self.window_correlator.add_leader_callback(self.leader_applicator.submit)
 
-        # RENDER
-        self.render = HDTrioRender(self.data_hub, self.settings.render, self.settings.session.sequencer)
-        self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
-        self.render.window_manager.add_exit_callback(self.stop)
-
         # IN/OUT
         self.sound_osc = OscSound(self.data_hub, self.settings.inout.osc_sound)
         self.artnet_controllers: list[ArtNetBars] = []
         for i in range(num_players):
             self.artnet_controllers.append(ArtNetBars(self.settings.inout.artnets[i]))
 
-        self.data_hub.add_update_callback(self.sound_osc.notify_update)
-
-    def _on_osc_start_recording(self, *_) -> None:
-        self.settings.session.start = True
-
-    def _on_osc_stop_recording(self, *_) -> None:
-        self.settings.session.stop = True
-
-    def _on_osc_group_id(self, gid: str, *_) -> None:
-        self.settings.session.name = gid
-
-    def _on_render_fps(self, fps: int) -> None:
-        if fps > 0:
-            self.settings.render_fps = float(fps)
+        # RENDER
+        self.render = HDTrioRender(self.data_hub, self.settings.render, self.settings.session.sequencer)
+        self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
+        self.render.add_update_callback(self.sequencer.update)
+        self.render.add_update_callback(self.interpolators.update)
+        self.render.add_update_callback(self.sound_osc.notify_update)
+        self.render.add_exit_callback(self.stop)
 
     def start(self) -> None:
         self.settings_server.start()
@@ -274,7 +260,7 @@ class HDTrioMain:
         self.video_recorder.start()
 
         self.is_running = True
-        self.render.window_manager.start()
+        self.render.start()
 
     def stop(self) -> None:
         if not self.is_running:
@@ -283,7 +269,7 @@ class HDTrioMain:
 
         self.settings_server.stop()
 
-        self.render.window_manager.stop()
+        self.render.stop()
 
         if self.player:
             self.player.stop()
@@ -297,8 +283,7 @@ class HDTrioMain:
         for artnet in self.artnet_controllers:
             artnet.stop()
 
-        if self.session_osc:
-            self.session_osc.server.shutdown()
+        self.session_osc.server.shutdown()
 
         self.point_extractor.stop()
         self.mask_extractor.stop()
@@ -311,3 +296,16 @@ class HDTrioMain:
             camera.join(timeout=10)
 
         self.is_finished = True
+
+    def _on_osc_start_recording(self, *_) -> None:
+        self.settings.session.start = True
+
+    def _on_osc_stop_recording(self, *_) -> None:
+        self.settings.session.stop = True
+
+    def _on_osc_group_id(self, gid: str, *_) -> None:
+        self.settings.session.name = gid
+
+    def _on_render_fps(self, fps: int) -> None:
+        if fps > 0:
+            self.settings.render_fps = float(fps)

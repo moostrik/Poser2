@@ -181,7 +181,6 @@ class DeepFlowMain:
         })
         self.window_tracker_I = window.WindowTracker(num_players, p.window_lerp)
 
-        self.data_hub.add_update_callback(self.interpolators.update)
         self.pose_prediction_filters.add_frames_callback(self.interpolators.submit)
         self.interpolators.add_frames_callback(self.pose_interpolation_filters.process)
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_applicator.submit)
@@ -192,11 +191,12 @@ class DeepFlowMain:
 
         # RENDER
         self.render = DeepFlowRender(self.data_hub, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
-        self.render.window_manager.add_exit_callback(self.stop)
+        self.render.add_exit_callback(self.stop)
 
         # IN/OUT
         self.sound_osc = OscSound(self.data_hub, self.settings.inout.osc_sound)
-        self.data_hub.add_update_callback(self.sound_osc.notify_update)
+        self.render.add_update_callback(self.interpolators.update)
+        self.render.add_update_callback(self.sound_osc.notify_update)
 
     def start(self) -> None:
         self.settings_server.start()
@@ -217,14 +217,14 @@ class DeepFlowMain:
             self.recorder.start()
 
         self.is_running = True
-        self.render.window_manager.start()
+        self.render.start()
 
     def stop(self) -> None:
         if not self.is_running:
             return
         self.is_running = False
 
-        self.render.window_manager.stop()
+        self.render.stop()
 
         if self.player:
             self.player.stop()

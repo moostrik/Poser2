@@ -2,7 +2,7 @@
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import RenderBase, WindowManager, Shader, Style, clear_color, Texture
+from modules.gl import RenderBase, Shader, Style, clear_color, Texture
 from modules.gl.WindowManager import MonitorId, WindowSettings
 from modules.render.layers import LayerBase
 from modules.data_hub import DataHub
@@ -47,6 +47,7 @@ LARGE_LAYERS: list[Layers] = [
 
 class HDTrioRender(RenderBase):
     def __init__(self, data_hub: DataHub, settings: RenderSettings, sequencer: ShowSequencerSettings) -> None:
+        super().__init__(settings.window)
         self.num_players: int = settings.num_players
         self.num_cams: int = settings.num_cams
         self.settings: RenderSettings = settings
@@ -107,7 +108,6 @@ class HDTrioRender(RenderBase):
             SubdivisionRow(name='preview',      columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, False)
-        self.window_manager: WindowManager = WindowManager(self, settings.window)
 
         # Propagate window fps to fluid simulation configs
         def _propagate_fps(fps: int) -> None:
@@ -168,7 +168,7 @@ class HDTrioRender(RenderBase):
                 layer.deallocate()
 
     def update(self) -> None:
-        self.data_hub.notify_update()
+        self._notify_update()
 
         self._update_layers = UPDATE_LAYERS
         self._draw_layers = self.settings.layer.select.final

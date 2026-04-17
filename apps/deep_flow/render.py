@@ -2,7 +2,7 @@
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import RenderBase, WindowManager, Shader, Style, clear_color, Texture
+from modules.gl import RenderBase, Shader, Style, clear_color, Texture
 from modules.gl.WindowManager import MonitorId, WindowSettings
 from modules.render.layers import LayerBase
 from modules.data_hub import DataHub
@@ -45,6 +45,7 @@ LARGE_LAYERS: list[Layers] = [
 
 class DeepFlowRender(RenderBase):
     def __init__(self, data_hub: DataHub, settings: RenderGroup, num_cams: int = 1, num_players: int = 1) -> None:
+        super().__init__(settings.window)
         self.num_players: int = num_players
         self.num_cams: int = num_cams
         self.settings: RenderGroup = settings
@@ -100,7 +101,6 @@ class DeepFlowRender(RenderBase):
             SubdivisionRow(name='right', columns=1, rows=1, src_aspect_ratio=1.0, padding=Point2f(1.0, 1.0)),
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, False)
-        self.window_manager: WindowManager = WindowManager(self, settings.window)
 
         # Propagate window fps to fluid simulation config
         def _propagate_fps(fps: int) -> None:
@@ -137,7 +137,7 @@ class DeepFlowRender(RenderBase):
                 layer.deallocate()
 
     def update(self) -> None:
-        self.data_hub.notify_update()
+        self._notify_update()
 
         self._left_layers = self.settings.layer.select.left
         self._right_layers = self.settings.layer.select.right

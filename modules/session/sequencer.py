@@ -51,14 +51,14 @@ class Sequencer:
 
     The ``stages`` list defines which stages to play and in what order.
     Each entry indexes into ``durations`` for that stage's length.
-    Call ``update()`` every frame (e.g. from ``data_hub.notify_update()``).
+    Call ``update()`` every frame (e.g. from the renderer's update callback).
 
     Example::
 
         config = ShowSequencerSettings()
         sequencer = Sequencer(config)
         sequencer.add_state_callback(on_state)
-        data_hub.add_update_callback(sequencer.update)
+        renderer.add_update_callback(sequencer.update)
 
         config.stages = [0, 1, 2, 3, 4]   # Full show
         SequencerSettings.start.fire(config)
