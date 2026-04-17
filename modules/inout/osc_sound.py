@@ -8,11 +8,11 @@ from pythonosc.osc_bundle import OscBundle
 from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
-from modules.pose.frame import Frame
+from modules.pose.frame import Frame, FrameDict
 from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, Similarity, MotionGate, LeaderScore, MotionTime, Age
 from modules.pose.features.Angles import AngleLandmark
 
-from modules.data_hub import DataHub, DataHubType, Stage
+from modules.session.sequencer import SequencerState
 from modules.settings import BaseSettings, Field, Widget
 from modules.utils.HotReloadMethods import HotReloadMethods
 from modules.inout.network_validation import validate_connection
@@ -24,17 +24,18 @@ class OscSoundSettings(BaseSettings):
     max_players: Field[int]  = Field(4,    min=1,    max=16,    access=Field.INIT,         description="Max number of player poses to send (IDs 0 to N-1)")
     ip_addresses: Field[str] = Field("127.0.0.1",               widget=Widget.ip_field,     description="Target OSC IP address")
     port: Field[int]         = Field(9000, min=1024, max=65535, widget=Widget.number_field, description="Target OSC port")
-    stage: Field[Stage]      = Field(Stage.LERP,                                            description="Pipeline stage to read poses from")
 
 
 class OscSound:
     """
     Sends smooth pose data over OSC at a configurable frame rate in its own thread.
     """
-    def __init__(self, data_hub: DataHub, settings: OscSoundSettings) -> None:
+    def __init__(self, settings: OscSoundSettings) -> None:
 
         self._config: OscSoundSettings = settings
-        self._data_hub: DataHub = data_hub
+        self._poses: FrameDict = {}
+        self._seq_state: SequencerState | None = None
+        self._input_lock: Lock = Lock()
         self._client_lock: Lock = Lock()
         self._client: SimpleUDPClient = SimpleUDPClient(self._config.ip_addresses, self._config.port)
 
@@ -62,6 +63,17 @@ class OscSound:
     def running(self) -> bool:
         return self._running
 
+    def set_poses(self, poses: FrameDict) -> None:
+        """Push new pose data and trigger a send."""
+        with self._input_lock:
+            self._poses = dict(poses)
+        self._update_event.set()
+
+    def set_sequencer_state(self, state: SequencerState) -> None:
+        """Push new sequencer state."""
+        with self._input_lock:
+            self._seq_state = state
+
     def start(self) -> None:
         """Start the OSC sender thread"""
         if self._thread is not None and self._thread.is_alive():
@@ -78,10 +90,6 @@ class OscSound:
         if self._thread is not None:
             self._thread.join(timeout=1.0)  # Wait up to 1 second for thread to exit
             self._thread = None
-
-    def notify_update(self) -> None:
-        """Notify the sender thread that new data is available"""
-        self._update_event.set()
 
     def _run(self) -> None:
         """Main loop for sending OSC data at regular intervals"""
@@ -109,8 +117,10 @@ class OscSound:
 
         bundle_builder: OscBundleBuilder = OscBundleBuilder(IMMEDIATELY)  # type: ignore
 
-        # Sequencer data
-        seq_state = self._data_hub.get_item(DataHubType.sequence, 0)
+        # Snapshot current data
+        with self._input_lock:
+            poses = self._poses
+            seq_state = self._seq_state
 
         stage_msg = OscMessageBuilder(address="/global/state")
         stage_msg.add_arg(seq_state.stage if seq_state is not None else 0, arg_type=OscMessageBuilder.ARG_TYPE_INT)
@@ -120,7 +130,6 @@ class OscSound:
         progress_msg.add_arg(seq_state.progress if seq_state is not None else 0.0, arg_type=OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(progress_msg.build()) # type: ignore
 
-        poses: dict[int, Frame] = self._data_hub.get_poses(self._config.stage)
         num_players = self._config.max_players
 
         for id in range(num_players):

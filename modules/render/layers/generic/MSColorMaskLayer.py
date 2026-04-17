@@ -10,7 +10,7 @@ import math
 # Local application imports
 from modules.gl import Fbo, SwapFbo, Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Blit
-from modules.data_hub import DataHub, Stage
+from modules.data_hub import DataHub, DataHubType, Stage
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 from modules.pose.frame import Frame
 from modules.settings import Field, BaseSettings
@@ -110,7 +110,7 @@ class MSColorMaskLayer(LayerBase):
         """
         # Get pose data for this camera
         pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
-        active_poses = self._data_hub.get_pose_count(Stage.LERP)
+        active_poses = len(self._data_hub.get_dict(DataHubType.frame_lerp))
 
         # Extract similarity and motion data
         num_players = self.config.num_players

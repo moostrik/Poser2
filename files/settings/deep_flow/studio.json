@@ -450,7 +450,6 @@
     "osc_sound": {
       "ip_addresses": "127.0.0.1",
       "port": 9000,
-      "stage": "LERP",
       "max_players": 1
     }
   },

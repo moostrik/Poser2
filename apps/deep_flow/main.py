@@ -98,7 +98,7 @@ class DeepFlowMain:
         # STAGE RAW
         self.window_tracker_R = window.WindowTracker(num_players, p.window_raw)
 
-        self.point_extractor.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.pose_frame_R))
+        self.point_extractor.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.frame_raw))
         self.point_extractor.add_frames_callback(self.window_tracker_R.process)
         self.window_tracker_R.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.RAW))
 
@@ -114,7 +114,7 @@ class DeepFlowMain:
         self.window_tracker_C = window.WindowTracker(num_players, p.window_clean)
 
         self.point_extractor.add_frames_callback(self.pose_raw_filters.process)
-        self.pose_raw_filters.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.pose_frame_C))
+        self.pose_raw_filters.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.frame_clear))
         self.pose_raw_filters.add_frames_callback(self.window_tracker_C.process)
         self.window_tracker_C.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.CLEAN))
 
@@ -147,7 +147,7 @@ class DeepFlowMain:
 
         self.pose_raw_filters.add_frames_callback(self.pose_smooth_filters.process)
         self.pose_smooth_filters.add_frames_callback(self.pose_prediction_filters.process)
-        self.pose_prediction_filters.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.pose_frame_S))
+        self.pose_prediction_filters.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.frame_smooth))
         self.pose_smooth_filters.add_frames_callback(self.window_tracker_S.process)
         self.window_tracker_S.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.SMOOTH))
 
@@ -185,7 +185,7 @@ class DeepFlowMain:
         self.interpolators.add_frames_callback(self.pose_interpolation_filters.process)
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_applicator.submit)
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_tracker.process)
-        self.motion_gate_tracker.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.pose_frame_I))
+        self.motion_gate_tracker.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.frame_lerp))
         self.motion_gate_tracker.add_frames_callback(self.window_tracker_I.process)
         self.window_tracker_I.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.LERP))
 
@@ -194,9 +194,9 @@ class DeepFlowMain:
         self.render.add_exit_callback(self.stop)
 
         # IN/OUT
-        self.sound_osc = OscSound(self.data_hub, self.settings.inout.osc_sound)
+        self.sound_osc = OscSound(self.settings.inout.osc_sound)
+        self.motion_gate_tracker.add_frames_callback(self.sound_osc.set_poses)
         self.render.add_update_callback(self.interpolators.update)
-        self.render.add_update_callback(self.sound_osc.notify_update)
 
     def start(self) -> None:
         self.settings_server.start()

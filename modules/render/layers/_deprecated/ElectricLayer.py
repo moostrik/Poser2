@@ -7,7 +7,7 @@ from dataclasses import replace
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.data_hub import DataHub, DataHubType, PoseDataHubTypes
+from modules.data_hub import DataHub, DataHubType
 from modules.gl import Fbo, Texture, Blit, Style, clear_color
 from modules.pose.features import Points2D
 from modules.pose.frame import Frame
@@ -19,7 +19,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class ElectricLayer(LayerBase):
 
-    def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes,
+    def __init__(self, track_id: int, data: DataHub, data_type: DataHubType,
                  line_width: float = 4.0, line_smooth: float = 2.0, use_scores: bool = True, use_bbox: bool = False,
                  color: tuple[float, float, float, float] | None = None) -> None:
         self._track_id: int = track_id
@@ -29,7 +29,7 @@ class ElectricLayer(LayerBase):
         # self._p_pose: Frame | None = None
         self._points: Points2D = Points2D.create_dummy()
 
-        self.data_type: PoseDataHubTypes = data_type
+        self.data_type: DataHubType = data_type
         self.line_width: float = line_width
         self.line_smooth: float = line_smooth
         self.use_scores: bool = use_scores
@@ -59,7 +59,7 @@ class ElectricLayer(LayerBase):
             Blit.use(self._fbo)
 
     def update(self) -> None:
-        pose: Frame | None = self._data.get_item(DataHubType(self.data_type), self._track_id)
+        pose: Frame | None = self._data.get_item(self.data_type, self._track_id)
         self._data_cache.update(pose)
         if self._data_cache.lost:
             self._fbo.clear()

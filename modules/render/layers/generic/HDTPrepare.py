@@ -8,7 +8,7 @@ from pytweening import *    # type: ignore
 
 
 # Local application imports
-from modules.data_hub import DataHub, DataHubType, PoseDataHubTypes
+from modules.data_hub import DataHub, DataHubType
 
 from modules.gl import Fbo, Texture, Blit, Style, clear_color
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
@@ -22,7 +22,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class HDTPrepare(LayerBase):
 
-    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, centre_mask: Texture) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, data_type: DataHubType, centre_mask: Texture) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._centre_mask: Texture = centre_mask
@@ -35,7 +35,7 @@ class HDTPrepare(LayerBase):
         self._shader: shader = shader()
         self._tint_shader: Tint = Tint()
 
-        self.data_type: PoseDataHubTypes = data_type
+        self.data_type: DataHubType = data_type
 
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
@@ -75,7 +75,7 @@ class HDTPrepare(LayerBase):
             Blit().use(self._mask_fbo)
 
     def update(self) -> None:
-        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
+        pose: Frame | None = self._data_hub.get_item(self.data_type, self._cam_id)
         self._data_cache.update(pose)
 
         if self._data_cache.lost:

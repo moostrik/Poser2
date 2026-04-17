@@ -23,42 +23,33 @@ class DataHubType(IntEnum):
     tracklet =          auto()   # sorted by track_id, has cam_id
     gpu_frames =        auto()   # sorted by track_id, GPU frames with crops
 
-    pose_frame_R =      auto()   # sorted by track_id, has cam_id (RAW detection)
-    pose_frame_C =      auto()   # sorted by track_id, has cam_id (CLEAN)
-    pose_frame_S =      auto()   # sorted by track_id, has cam_id (SMOOTH)
-    pose_frame_I =      auto()   # sorted by track_id, has cam_id (LERP)
+    frame_raw =         auto()   # sorted by track_id, has cam_id (RAW detection)
+    frame_clear =       auto()   # sorted by track_id, has cam_id (CLEAN)
+    frame_smooth =      auto()   # sorted by track_id, has cam_id (SMOOTH)
+    frame_lerp =        auto()   # sorted by track_id, has cam_id (LERP)
 
-    pose_window_R =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (RAW detection)
-    pose_window_C =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (CLEAN)
-    pose_window_S =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (SMOOTH)
-    pose_window_I =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (LERP)
+    window_raw =        auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (RAW detection)
+    window_clear =      auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (CLEAN)
+    window_smooth =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (SMOOTH)
+    window_lerp =       auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (LERP)
 
     sequence =          auto()   # SequencerState dataclass
 
 
 # Stage → DataHubType lookup
 _FRAME_TYPES: dict[Stage, DataHubType] = {
-    Stage.RAW:      DataHubType.pose_frame_R,
-    Stage.CLEAN:    DataHubType.pose_frame_C,
-    Stage.SMOOTH:   DataHubType.pose_frame_S,
-    Stage.LERP:     DataHubType.pose_frame_I,
+    Stage.RAW:      DataHubType.frame_raw,
+    Stage.CLEAN:    DataHubType.frame_clear,
+    Stage.SMOOTH:   DataHubType.frame_smooth,
+    Stage.LERP:     DataHubType.frame_lerp,
 }
 _WINDOW_TYPES: dict[Stage, DataHubType] = {
-    Stage.RAW:      DataHubType.pose_window_R,
-    Stage.CLEAN:    DataHubType.pose_window_C,
-    Stage.SMOOTH:   DataHubType.pose_window_S,
-    Stage.LERP:     DataHubType.pose_window_I,
+    Stage.RAW:      DataHubType.window_raw,
+    Stage.CLEAN:    DataHubType.window_clear,
+    Stage.SMOOTH:   DataHubType.window_smooth,
+    Stage.LERP:     DataHubType.window_lerp,
 }
 
-# DEPRECATED: Use PipelineStage instead
-class PoseDataHubTypes(IntEnum):
-    pose_R =      DataHubType.pose_frame_R.value
-    pose_C =      DataHubType.pose_frame_C.value
-    pose_S =      DataHubType.pose_frame_S.value
-    pose_I =      DataHubType.pose_frame_I.value
-
-# POSE_ENUMS: set[DataType] = {DataType.pose_R, DataType.pose_S, DataType.pose_I}
-# SIMILARITY_ENUMS: set[DataType] = {DataType.sim_P, DataType.sim_M}
 
 class DataHub:
     _logger = logging.getLogger(__name__)
@@ -80,36 +71,14 @@ class DataHub:
         with self.mutex:
             return {v for v in self._data.get(data_type, {}).values() if filter_fn(v)}
 
-    def has_item(self, data_type: DataHubType, key: int = 0) -> bool:
-        with self.mutex:
-            return key in self._data.get(data_type, {})
-
-    # CONVENIENCE GETTERS
-    def get_items_for_cam(self, data_type: DataHubType, cam_id: int) -> set[Any]:
-        """ this works on tracklets and poses """
-        return self.get_filtered(data_type, lambda v: hasattr(v, "cam_id") and v.cam_id == cam_id)
-
-    def has_items_for_cam(self, data_type: DataHubType, cam_id: int) -> bool:
-        """ this works on tracklets and poses """
-        return any(self.get_filtered(data_type, lambda v: hasattr(v, "cam_id") and v.cam_id == cam_id))
-
     def get_poses_for_cam(self, stage: Stage, cam_id: int) -> set[Any]:
         """Get all pose frames for a specific stage that belong to a camera."""
-        return self.get_items_for_cam(_FRAME_TYPES[stage], cam_id)
+        return self.get_filtered(_FRAME_TYPES[stage], lambda v: hasattr(v, "cam_id") and v.cam_id == cam_id)
 
     # POSE GETTERS
-    def get_poses(self, stage: Stage) -> dict[int, Any]:
-        """Get all pose frames for a specific stage."""
-        return self.get_dict(_FRAME_TYPES[stage])
-
     def get_pose(self, stage: Stage, track_id: int) -> Any | None:
         """Get a single pose frame for a specific stage and track."""
         return self.get_item(_FRAME_TYPES[stage], track_id)
-
-    def get_pose_count(self, stage: Stage) -> int:
-        """Get the number of active poses for a specific stage."""
-        with self.mutex:
-            return len(self._data.get(_FRAME_TYPES[stage], {}))
 
     # FEATURE WINDOW GETTERS (stored as _data[pose_window_X] = {track_id: {type[BaseFeature]: FeatureWindow}})
     def get_feature_window(self, stage: Stage, feature_type: type[BaseFeature], track_id: int) -> Any | None:
@@ -119,11 +88,6 @@ class DataHub:
             if track_windows is None:
                 return None
             return track_windows.get(feature_type)
-
-    def get_feature_windows_for_track(self, stage: Stage, track_id: int) -> dict[type[BaseFeature], FeatureWindow]:
-        """Get all feature windows for a specific stage and track."""
-        with self.mutex:
-            return dict(self._data.get(_WINDOW_TYPES[stage], {}).get(track_id, {}))
 
     # GENERIC SETTERS
     def set_item(self, data_type: DataHubType, key: int, value: object) -> None:

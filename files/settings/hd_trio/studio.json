@@ -120,8 +120,7 @@
     "osc_sound": {
       "max_players": 3,
       "ip_addresses": "127.0.0.1",
-      "port": 9000,
-      "stage": "LERP"
+      "port": 9000
     },
     "artnet_0": {
       "enabled": true,
