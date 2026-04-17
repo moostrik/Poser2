@@ -4,16 +4,9 @@ from enum import IntEnum, auto
 from threading import Lock
 from typing import Callable, Any
 
-# Third party imports
-import numpy as np
-from torch import Tensor
-
-# Local application imports for setter types
-from modules.oak.camera.definitions import Tracklet as DepthTracklet
-from modules.pose.frame import FrameDict, FeatureWindow, FrameWindowDict
+# Local application imports
+from modules.pose.frame import FeatureWindow, FrameWindowDict
 from modules.pose.features.base import BaseFeature
-from modules.session.sequencer import SequencerState
-from modules.tracker.Tracklet import TrackletDict
 
 
 class Stage(IntEnum):
@@ -26,10 +19,9 @@ class Stage(IntEnum):
 class DataHubType(IntEnum):
     cam_image =         auto()   # sorted by cam_id, raw camera images
     depth_tracklet =    auto()   # sorted by cam_id
-    tracklet =          auto()   # sorted by track_id, has cam_id
 
+    tracklet =          auto()   # sorted by track_id, has cam_id
     gpu_frames =        auto()   # sorted by track_id, GPU frames with crops
-    flow_tensor =       auto()   # sorted by track_id, GPU tensors (H, W, 2) FP16
 
     pose_frame_R =      auto()   # sorted by track_id, has cam_id (RAW detection)
     pose_frame_C =      auto()   # sorted by track_id, has cam_id (CLEAN)
@@ -41,7 +33,7 @@ class DataHubType(IntEnum):
     pose_window_S =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (SMOOTH)
     pose_window_I =     auto()   # sorted by track_id, {type[BaseFeature]: FeatureWindow} (LERP)
 
-    sequencer_state =   auto()   # SequencerState dataclass
+    sequence =          auto()   # SequencerState dataclass
 
 
 # Stage → DataHubType lookup
@@ -146,28 +138,7 @@ class DataHub:
         with self.mutex:
             self._data[data_type] = dict(values)
 
-    # TYPE-SPECIFIC SETTERS WITH CAM_ID KEY
-    def set_cam_frame(self, key: int, frame_type, value: np.ndarray) -> None:
-        self.set_item(DataHubType.cam_image, key, value)
-
-    def set_depth_tracklets(self, key: int, value: list[DepthTracklet]) -> None:
-        self.set_item(DataHubType.depth_tracklet, key, value)
-
-    # TYPE-SPECIFIC SETTERS WITH TRACK_ID KEY
-    def set_tracklets(self, tracklets: TrackletDict) -> None:
-        self.set_dict(DataHubType.tracklet, tracklets)
-
-    def set_flow_tensors(self, flows: dict[int, Tensor]) -> None:
-        self.set_dict(DataHubType.flow_tensor, flows)
-
-    def set_gpu_frames(self, _: FrameDict, gpu_frames) -> None:
-        """Store GPU frame data. Expects GPUFrameDict from GPUCropProcessor."""
-        self.set_dict(DataHubType.gpu_frames, gpu_frames)
-
     # POSE SETTERS
-    def set_pose_frames(self, stage: Stage, poses: FrameDict) -> None:
-        self.set_dict(_FRAME_TYPES[stage], poses)
-
     def set_pose_windows(self, stage: Stage, windows: FrameWindowDict) -> None:
         """Store feature windows. Pivots {type[BaseFeature]: {track_id: FeatureWindow}} to track-first for storage."""
         pivoted: dict[int, Any] = {}
@@ -178,7 +149,3 @@ class DataHub:
                 pivoted[track_id][field] = window
         self.set_dict(_WINDOW_TYPES[stage], pivoted)
 
-    # SEQUENCER
-    def set_sequencer_state(self, state: SequencerState) -> None:
-        """Store sequencer state snapshot."""
-        self.set_item(DataHubType.sequencer_state, 0, state)

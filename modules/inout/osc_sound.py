@@ -110,7 +110,7 @@ class OscSound:
         bundle_builder: OscBundleBuilder = OscBundleBuilder(IMMEDIATELY)  # type: ignore
 
         # Sequencer data
-        seq_state = self._data_hub.get_item(DataHubType.sequencer_state, 0)
+        seq_state = self._data_hub.get_item(DataHubType.sequence, 0)
 
         stage_msg = OscMessageBuilder(address="/global/state")
         stage_msg.add_arg(seq_state.stage if seq_state is not None else 0, arg_type=OscMessageBuilder.ARG_TYPE_INT)
