@@ -10,7 +10,7 @@ from modules.render.composition_subdivider import make_subdivision, SubdivisionR
 from modules.render import layers as ls
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-from .blackboard import Blackboard
+from .render_board import RenderBoard
 from .settings import Layers, RenderSettings
 
 
@@ -44,13 +44,13 @@ LARGE_LAYERS: list[Layers] = [
 
 
 class DeepFlowRender(RenderBase):
-    def __init__(self, board: Blackboard, settings: RenderSettings, num_cams: int = 1, num_players: int = 1) -> None:
+    def __init__(self, board: RenderBoard, settings: RenderSettings, num_cams: int = 1, num_players: int = 1) -> None:
         super().__init__(settings.window)
         self.num_players: int = num_players
         self.num_cams: int = num_cams
         self.settings: RenderSettings = settings
 
-        self.board: Blackboard = board
+        self.board: RenderBoard = board
 
         self._update_layers: list[Layers] = UPDATE_LAYERS
         self._interface_layers: list[Layers] = INTERFACE_LAYERS

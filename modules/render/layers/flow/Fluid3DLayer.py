@@ -17,7 +17,7 @@ import numpy as np
 # Local application imports
 from modules.gl import Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Blit
-from modules.whiteboard import HasFrames
+from modules.board import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 
@@ -106,7 +106,7 @@ class Fluid3DLayer(LayerBase):
 
         Args:
             cam_id: Camera ID for this layer's output
-            board: Whiteboard for pose data
+            board: Board for pose data
             flow_layers: Dict of all FlowLayers (cam_id -> FlowLayer)
             settings: Layer configuration
             color_settings: Per-camera colors for density colorization

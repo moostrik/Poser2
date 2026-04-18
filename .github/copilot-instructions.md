@@ -25,9 +25,9 @@ Prefer composition over inheritance for runtime assembly.
 - Pass dependencies through constructors
 - Use callback pipelines for data flow between components
 
-## Whiteboard
+## Board
 
-`modules/whiteboard/` defines protocol + mixin pairs for shared runtime data. Each app composes its own `Whiteboard` from the mixins it needs.
+`modules/board/` defines protocol + mixin pairs for shared runtime data. Each app composes its own `RenderBoard` from the mixins it needs.
 - Detailed rules: `.github/instructions/whiteboard.instructions.md`
 
 ## Concurrency

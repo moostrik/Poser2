@@ -1,12 +1,12 @@
-"""HD Trio blackboard — thread-safe shared data store for the HD Trio app."""
+"""HD Trio render board — thread-safe shared data store for the HD Trio app."""
 
-from modules.whiteboard import (
+from modules.board import (
     FrameStoreMixin, WindowStoreMixin, ImageStoreMixin,
     DepthTrackletStoreMixin, SequenceStoreMixin,
 )
 
 
-class Blackboard(FrameStoreMixin, WindowStoreMixin, ImageStoreMixin,
+class RenderBoard(FrameStoreMixin, WindowStoreMixin, ImageStoreMixin,
                  DepthTrackletStoreMixin, SequenceStoreMixin):
 
     def __init__(self) -> None:

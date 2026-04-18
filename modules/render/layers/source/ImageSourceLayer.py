@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.gl import Tensor, Texture
 
-from modules.whiteboard import HasImages
+from modules.board import HasImages
 from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.pose.batch.ImageFrame import ImageFrame
 

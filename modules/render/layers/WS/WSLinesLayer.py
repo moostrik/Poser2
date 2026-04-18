@@ -10,7 +10,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.WS.WSOutput import WSOutput
 from modules.pose.similarity.features.SimilarityStream import SimilarityStreamData
-from modules.whiteboard import DataHub
+from modules.board import DataHub
 from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.gl.shaders.WS_Lines import WS_Lines

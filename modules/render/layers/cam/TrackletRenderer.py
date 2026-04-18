@@ -10,7 +10,7 @@ from modules.render.shaders import DrawColoredRectangle
 
 from modules.oak.camera.definitions import Tracklet as DepthTracklet
 
-from modules.whiteboard import HasDepthTracklets
+from modules.board import HasDepthTracklets
 from modules.render.layers.LayerBase import LayerBase
 
 

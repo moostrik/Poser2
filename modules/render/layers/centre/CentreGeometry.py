@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.whiteboard import HasFrames
+from modules.board import HasFrames
 from modules.settings import Field, BaseSettings
 from modules.pose.frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark

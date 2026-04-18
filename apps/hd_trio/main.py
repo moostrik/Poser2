@@ -12,7 +12,7 @@ from modules.pose.recorder import Recorder as PoseRecorder
 from modules.session import Session, Sequencer
 from modules.gl.WindowManager import WindowSettings
 
-from .blackboard import Blackboard
+from .render_board import RenderBoard
 from .settings import Settings, Stage
 from .render import HDTrioRender
 
@@ -39,7 +39,7 @@ class HDTrioMain:
         ps = self.settings.pose
 
         # BLACKBOARD
-        self.board = Blackboard()
+        self.board = RenderBoard()
 
         # SESSION
         self.session = Session(self.settings.session.core)

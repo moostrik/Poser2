@@ -1,12 +1,12 @@
-"""Deep Flow blackboard — thread-safe shared data store for the Deep Flow app."""
+"""Deep Flow render board — thread-safe shared data store for the Deep Flow app."""
 
-from modules.whiteboard import (
+from modules.board import (
     FrameStoreMixin, WindowStoreMixin, ImageStoreMixin,
     DepthTrackletStoreMixin,
 )
 
 
-class Blackboard(FrameStoreMixin, WindowStoreMixin, ImageStoreMixin,
+class RenderBoard(FrameStoreMixin, WindowStoreMixin, ImageStoreMixin,
                  DepthTrackletStoreMixin):
 
     def __init__(self) -> None:

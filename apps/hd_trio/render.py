@@ -10,7 +10,7 @@ from modules.render.composition_subdivider import make_subdivision, SubdivisionR
 from modules.render import layers as ls
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-from .blackboard import Blackboard
+from .render_board import RenderBoard
 from .settings import Layers, RenderSettings, ShowStage, Stage
 from . import render_stages
 from .render_stages import STAGES, StageLayer
@@ -46,13 +46,13 @@ LARGE_LAYERS: list[Layers] = [
 
 
 class HDTrioRender(RenderBase):
-    def __init__(self, board: Blackboard, settings: RenderSettings) -> None:
+    def __init__(self, board: RenderBoard, settings: RenderSettings) -> None:
         super().__init__(settings.window)
         self.num_players: int = settings.num_players
         self.num_cams: int = settings.num_cams
         self.settings: RenderSettings = settings
 
-        self.board: Blackboard = board
+        self.board: RenderBoard = board
 
         self._update_layers: list[Layers] = UPDATE_LAYERS
         self._interface_layers: list[Layers] = INTERFACE_LAYERS

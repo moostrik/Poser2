@@ -10,7 +10,7 @@ from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers, window
 from modules.pose.features import configure_features
 
-from .blackboard import Blackboard
+from .render_board import RenderBoard
 from .settings import Settings, Stage
 from .render import DeepFlowRender
 
@@ -37,7 +37,7 @@ class DeepFlowMain:
         p = self.settings.pose
 
         # BLACKBOARD
-        self.board = Blackboard()
+        self.board = RenderBoard()
 
         # CAMERA
         configure_features(num_players)

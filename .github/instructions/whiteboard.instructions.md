@@ -1,12 +1,12 @@
 ---
-description: "Use when editing whiteboard protocols, mixins, or app whiteboard composition."
-applyTo: "modules/whiteboard/**, apps/*/whiteboard.py"
+description: "Use when editing board protocols, mixins, or app render board composition."
+applyTo: "modules/board/**, apps/*/render_board.py"
 ---
-# Whiteboard Guidelines
+# Board Guidelines
 
 ## Package structure
 
-`modules/whiteboard/` is a package. Each file contains one protocol + one mixin pair.
+`modules/board/` is a package. Each file contains one protocol + one mixin pair.
 
 - `frames.py` — `HasFrames` + `FrameStoreMixin`
 - `windows.py` — `HasWindows` + `WindowStoreMixin`
@@ -20,13 +20,13 @@ applyTo: "modules/whiteboard/**, apps/*/whiteboard.py"
 1. Create a new file with the protocol and mixin
 2. The mixin owns its own `Lock` — never share locks between mixins
 3. Add re-exports to `__init__.py`
-4. Add the mixin to whichever app `Whiteboard` classes need it
+4. Add the mixin to whichever app `RenderBoard` classes need it
 
 ## Protocol rules
 
 - Protocols define the public read/write contract only (method signatures)
 - Use `from __future__ import annotations` and `TYPE_CHECKING` for annotation-only imports
-- Protocols live in `modules/whiteboard/` so module layers can import them without depending on app code
+- Protocols live in `modules/board/` so module layers can import them without depending on app code
 
 ## Mixin rules
 
@@ -35,15 +35,15 @@ applyTo: "modules/whiteboard/**, apps/*/whiteboard.py"
 - Prefix lock and storage attributes with the capability name (`_frame_lock`, `_frames`) to avoid collisions
 - Keep method bodies minimal — get/set with lock, plus any storage-layout transformation (e.g. the window pivot)
 
-## App whiteboard
+## App render board
 
-- `apps/*/whiteboard.py` defines `class Whiteboard(Mixin1, Mixin2, ...):`
+- `apps/*/render_board.py` defines `class RenderBoard(Mixin1, Mixin2, ...):`
 - `__init__` calls each mixin's `__init__` explicitly
-- App whiteboards have no additional methods — they are pure mixin composition
-- App renders and main type-hint the concrete `Whiteboard`; module layers type-hint the protocol they need
+- App render boards have no additional methods — they are pure mixin composition
+- App renders and main type-hint the concrete `RenderBoard`; module layers type-hint the protocol they need
 
 ## Consumer typing
 
 - Module layers import and type-hint the narrowest protocol: `HasFrames`, `HasWindows`, etc.
-- Never type-hint the concrete `Whiteboard` in module code — that would couple modules to apps
-- Compositors that only pass the whiteboard through to children without calling methods on it may use `Any`
+- Never type-hint the concrete `RenderBoard` in module code — that would couple modules to apps
+- Compositors that only pass the board through to children without calling methods on it may use `Any`

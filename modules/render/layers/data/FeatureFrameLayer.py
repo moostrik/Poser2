@@ -6,7 +6,7 @@ from typing import Tuple
 from OpenGL.GL import *  # type: ignore
 
 # Local application imports
-from modules.whiteboard import HasFrames
+from modules.board import HasFrames
 from modules.gl import Fbo, Texture, Blit, clear_color, Text
 from modules.pose.features import AngleVelocity
 from modules.pose.frame import Frame
