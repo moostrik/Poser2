@@ -6,7 +6,7 @@ applyTo: "apps/*/settings.py, files/settings/**/*.json"
 
 ## Architecture
 
-Each app has a **settings tree** defined in `apps/<app>/settings.py` using `BaseSettings` subclasses with `Field`, `Group`, and `Child` descriptors. The root class is named `<App>Settings` (e.g. `HDTrioSettings`, `DeepFlowSettings`).
+Each app has a **settings tree** defined in `apps/<app>/settings.py` using `BaseSettings` subclasses with `Field`, `Group`, and `Child` descriptors. The root class is named `Settings`.
 
 Preset JSON files in `files/settings/<app>/` mirror the settings tree exactly. The startup preset (default: `studio.json`) is loaded via `presets.load()` which calls `update_from_dict()`.
 

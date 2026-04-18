@@ -11,7 +11,7 @@ from modules.pose import batch, nodes, trackers, window
 from modules.pose.features import configure_features
 
 from .blackboard import Blackboard
-from .settings import DeepFlowSettings, Stage
+from .settings import Settings, Stage
 from .render import DeepFlowRender
 
 APP_NAME = 'deep_flow'
@@ -25,7 +25,7 @@ class DeepFlowMain:
 
         # SETTINGS
         presets.set_app(APP_NAME)
-        self.settings = DeepFlowSettings()
+        self.settings = Settings()
         preset_file = presets.startup_path()
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")

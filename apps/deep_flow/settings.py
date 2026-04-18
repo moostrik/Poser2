@@ -6,7 +6,7 @@ Preset JSON files live in ``files/settings/deep_flow/``.
 Each JSON mirrors this settings tree exactly.  When you rename, add,
 or remove a Field here, update every ``.json`` file in that directory
 to match — delete stale keys, add new keys with their Field default.
-The root class is ``DeepFlowSettings``.
+The root class is ``Settings``.
 """
 
 from enum import IntEnum, auto
@@ -238,7 +238,7 @@ class CentreGroup(BaseSettings):
     pose     = Group(layers.CentrePoseSettings)
     color    = Group(layers.ColorMaskLayerSettings)
 
-class RenderGroup(BaseSettings):
+class RenderSettings(BaseSettings):
     stage   = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
     layer   = Group(LayerGroup)
     data    = Group(DataGroup)
@@ -254,13 +254,13 @@ class RenderGroup(BaseSettings):
 #  Root settings
 # ---------------------------------------------------------------------------
 
-class DeepFlowSettings(BaseSettings):
+class Settings(BaseSettings):
     num_players:        Field[int]   = Field(1, access=Field.INIT, visible=False)
     fps:                Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
 
     camera  = Group(OakGroup, share=[num_players.as_('num_cameras'), fps])
     tt      = Group(TTGroup)
     pose    = Group(PoseGroup, share=[num_players.as_('max_poses'), fps.as_('frequency')])
-    render  = Group(RenderGroup)
+    render  = Group(RenderSettings)
     inout   = Group(InOutGroup)
     server  = Group(NiceSettings)

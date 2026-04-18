@@ -13,7 +13,7 @@ from modules.session import Session, Sequencer
 from modules.gl.WindowManager import WindowSettings
 
 from .blackboard import Blackboard
-from .settings import HDTrioSettings, Stage
+from .settings import Settings, Stage
 from .render import HDTrioRender
 
 APP_NAME = 'hd_trio'
@@ -27,7 +27,7 @@ class HDTrioMain:
 
         # SETTINGS
         presets.set_app(APP_NAME)
-        self.settings = HDTrioSettings()
+        self.settings = Settings()
         preset_file = presets.startup_path()
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")

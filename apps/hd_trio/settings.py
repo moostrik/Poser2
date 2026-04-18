@@ -6,7 +6,7 @@ Preset JSON files live in ``files/settings/hd_trio/``.
 Each JSON mirrors this settings tree exactly.  When you rename, add,
 or remove a Field here, update every ``.json`` file in that directory
 to match — delete stale keys, add new keys with their Field default.
-The root class is ``HDTrioSettings``.
+The root class is ``Settings``.
 """
 
 from enum import IntEnum, auto
@@ -332,7 +332,7 @@ class RenderSettings(BaseSettings):
 #  Root settings
 # ---------------------------------------------------------------------------
 
-class HDTrioSettings(BaseSettings):
+class Settings(BaseSettings):
     num_players: Field[int]   = Field(3, access=Field.INIT)
     input_fps  : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     render_fps : Field[float] = Field(60.0)
