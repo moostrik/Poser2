@@ -119,11 +119,12 @@ class Group(Generic[T]):
                 )
             parent_field = owner._fields[parent_name]
             child_field = child_fields[child_name]
-            if parent_field.type_ != child_field.type_:
+            pt, ct = parent_field.type_, child_field.type_
+            if not (issubclass(pt, ct) or issubclass(ct, pt)):
                 raise TypeError(
                     f"{type(owner).__name__}.{self.name}: type mismatch for share field "
-                    f"'{parent_name}' → '{child_name}' — parent {parent_field.type_.__name__} "
-                    f"!= child {child_field.type_.__name__}"
+                    f"'{parent_name}' → '{child_name}' — parent {pt.__name__} "
+                    f"!= child {ct.__name__}"
                 )
             p_init = parent_field.access is Access.INIT
             c_init = child_field.access is Access.INIT

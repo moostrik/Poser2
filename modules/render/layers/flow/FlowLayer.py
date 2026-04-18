@@ -55,6 +55,7 @@ class FlowDrawMode(IntEnum):
 
 class FlowLayerSettings(BaseSettings):
     """Configuration for FlowLayer (optical flow + bridges)."""
+    stage: Field[int] =                     Field(3, description="Pipeline stage for pose data")
     fps: Field[float] =                     Field(60.0, min=1.0, max=240.0)
     draw_mode: Field[FlowDrawMode] =        Field(FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
@@ -94,7 +95,7 @@ class FlowLayer(LayerBase):
         fluid.add_temperature(flow.temperature)
     """
 
-    def __init__(self, cam_id: int, board: HasFrames, mask_source: MaskSourceLayer, mask: Texture, image: Texture, settings: FlowLayerSettings | None = None, stage: int = 3) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, mask_source: MaskSourceLayer, mask: Texture, image: Texture, settings: FlowLayerSettings | None = None) -> None:
         """Initialize flow layer.
 
         Args:
@@ -103,11 +104,9 @@ class FlowLayer(LayerBase):
             mask_source: Mask source layer for optical flow update
             mask: Mask texture for optical flow input
             config: Layer configuration
-            stage: Pipeline stage for pose data
         """
         self._cam_id: int = cam_id
         self._board: HasFrames = board
-        self._stage: int = stage
         self._mask_source: MaskSourceLayer = mask_source
         self._mask: Texture = mask
         self._image: Texture = image
@@ -193,7 +192,7 @@ class FlowLayer(LayerBase):
     def update(self) -> None:
         """Update optical flow and bridges."""
         # Get motion data from pose
-        pose: Frame | None = self._board.get_frame(self._stage, self._cam_id)
+        pose: Frame | None = self._board.get_frame(self.config.stage, self._cam_id)
         motion = pose[AngleMotion].value if pose is not None and AngleMotion in pose else 0.0
 
         Style.push_style()

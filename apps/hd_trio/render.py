@@ -75,19 +75,19 @@ class HDTrioRender(RenderBase):
             cam_frg =       self.L[Layers.cam_frg][i]=      ls.FrgSourceLayer(      i, self.board)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.board)
 
-            cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
-            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.board,   cam_image.texture,          settings.preview.poser,     settings.colors)
+            cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.board,      cam_image.texture,          settings.preview.tracker,   settings.colors)
+            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.board,      cam_image.texture,          settings.preview.poser,     settings.colors)
 
-            centre_gmtry=   self.L[Layers.centre_geom][i] = ls.CentreGeometry(      i, self.board,                               settings.centre.geometry)
+            centre_gmtry=   self.L[Layers.centre_geom][i] = ls.CentreGeometry(      i, self.board,                                  settings.centre.geometry)
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(     i, centre_gmtry,    cam_mask.texture,           settings.centre.mask)
             cmt[i] = centre_mask.texture
             centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(      i, centre_gmtry,    cam_image.texture,  cmt[i], settings.centre.cam)
             centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(      i, centre_gmtry,    cam_frg.texture,    cmt[i], settings.centre.frg,        settings.colors)
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(     i, centre_gmtry,                                settings.centre.pose,       settings.colors)
 
-            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   centre_frg.texture, cmt,    settings.centre.color,      settings.colors,    stage=Stage.LERP)
-            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,   cam_mask,  centre_mask.texture, centre_frg.texture,     settings.flow,                          stage=Stage.LERP)
-            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.board,   flows,                      settings.fluid,             settings.colors,    stage=Stage.LERP)
+            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,      centre_frg.texture, cmt,    settings.centre.color,      settings.colors)
+            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,      cam_mask,  centre_mask.texture, centre_frg.texture,     settings.flow)
+            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.board,      flows,                      settings.fluid,             settings.colors)
 
             lut =           self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid, ms_mask],           settings.layer.lut)
 

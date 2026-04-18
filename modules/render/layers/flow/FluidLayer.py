@@ -51,6 +51,7 @@ class FluidDrawMode(IntEnum):
 
 class FluidLayerSettings(BaseSettings):
     """Configuration for FluidLayer (fluid simulation)."""
+    stage: Field[int] =                     Field(3, description="Pipeline stage for pose data")
     num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
     draw_mode: Field[FluidDrawMode] =       Field(FluidDrawMode.DENSITY)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
@@ -84,7 +85,7 @@ class FluidLayer(LayerBase):
         density_texture = fluid.density
     """
 
-    def __init__(self, cam_id: int, board: HasFrames, flow_layers: dict[int, FlowLayer], settings: FluidLayerSettings, color_settings: ColorSettings, stage: int = 3) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, flow_layers: dict[int, FlowLayer], settings: FluidLayerSettings, color_settings: ColorSettings) -> None:
         """Initialize fluid layer.
 
         Args:
@@ -93,11 +94,9 @@ class FluidLayer(LayerBase):
             flow_layers: Dict of all FlowLayers (cam_id -> FlowLayer)
             color_settings: Shared color settings for density colorization
             config: Layer configuration
-            stage: Pipeline stage for pose data
         """
         self._cam_id: int = cam_id
         self._board: HasFrames = board
-        self._stage: int = stage
         self._flow_layers: dict[int, FlowLayer] = flow_layers
         self.settings: FluidLayerSettings = settings
         self._color_settings: ColorSettings = color_settings
@@ -191,7 +190,7 @@ class FluidLayer(LayerBase):
     def update(self) -> None:
         """Update fluid simulation with inputs from all flow layers."""
         # Get motion data from pose
-        pose: Frame | None = self._board.get_frame(self._stage, self._cam_id)
+        pose: Frame | None = self._board.get_frame(self.settings.stage, self._cam_id)
         similarities: np.ndarray = pose[Similarity].values if pose is not None and Similarity in pose else np.full((self.settings.num_players,), 0.0)
         motion_gates: np.ndarray = pose[MotionGate].values if pose is not None and MotionGate in pose else np.full((self.settings.num_players,), 0.0)
         motion: float = pose[AngleMotion].value if pose is not None and AngleMotion in pose else 0.0

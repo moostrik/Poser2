@@ -26,6 +26,7 @@ from modules.render.color_settings import ColorSettings
 
 class ColorMaskLayerSettings(BaseSettings):
     """Configuration for MSColorMaskLayer."""
+    stage:                  Field[int]   = Field(3, description="Pipeline stage for pose data")
     num_players:            Field[int]   = Field(3, access=Field.INIT)
     blend_mode:             Field[Style.BlendMode] = Field(Style.BlendMode.ALPHA)
     similarity_threshold:   Field[float] = Field(0.33, min=0.0, max=1.0)
@@ -48,10 +49,9 @@ class MSColorMaskLayer(LayerBase):
     Each camera's contribution is colored exactly once.
     """
 
-    def __init__(self, cam_id: int, board: HasFrames, frg_texture: Texture, mask_textures: dict[int, Texture], settings: ColorMaskLayerSettings, color_settings: ColorSettings, stage: int = 3) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, frg_texture: Texture, mask_textures: dict[int, Texture], settings: ColorMaskLayerSettings, color_settings: ColorSettings) -> None:
         self._cam_id: int = cam_id
         self._board: HasFrames = board
-        self._stage: int = stage
         self._mask_textures: dict[int, Texture] = mask_textures
         self._frg_texture: Texture = frg_texture
         self.config: ColorMaskLayerSettings = settings
@@ -110,8 +110,8 @@ class MSColorMaskLayer(LayerBase):
             Step 3: MSColorMask(own styled, other masks, colors, weights) → _fbo
         """
         # Get pose data for this camera
-        pose: Frame | None = self._board.get_frame(self._stage, self._cam_id)
-        active_poses = len(self._board.get_frames(self._stage))
+        pose: Frame | None = self._board.get_frame(self.config.stage, self._cam_id)
+        active_poses = len(self._board.get_frames(self.config.stage))
 
         # Extract similarity and motion data
         num_players = self.config.num_players

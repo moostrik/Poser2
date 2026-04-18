@@ -61,6 +61,7 @@ class UnifiedFluidDrawMode(IntEnum):
 
 class UnifiedFluidLayerSettings(BaseSettings):
     """Configuration for UnifiedFluidLayer."""
+    stage = Field(3, description="Pipeline stage for pose data")
     num_players = Field(3, min=1, max=8)
     gap_ratio = Field(0.5, min=0.0, max=2.0, description="Gap = ratio * slot width")
     draw_mode = Field(UnifiedFluidDrawMode.DENSITY)
@@ -73,9 +74,8 @@ class UnifiedFluidLayerSettings(BaseSettings):
 class UnifiedFluidLayer(LayerBase):
     """Unified fluid simulation for all players on a single wide grid."""
 
-    def __init__(self, board: HasFrames, flow_layers: dict[int, FlowLayer], colors: list[tuple[float, float, float, float]], config: UnifiedFluidLayerSettings | None = None, stage: int = 3) -> None:
+    def __init__(self, board: HasFrames, flow_layers: dict[int, FlowLayer], colors: list[tuple[float, float, float, float]], config: UnifiedFluidLayerSettings | None = None) -> None:
         self._board: HasFrames = board
-        self._stage: int = stage
         self._flow_layers: dict[int, FlowLayer] = flow_layers
         self.config: UnifiedFluidLayerSettings = config or UnifiedFluidLayerSettings()
 
@@ -221,7 +221,7 @@ class UnifiedFluidLayer(LayerBase):
         motion_gates: dict[int, np.ndarray] = {}
 
         for cam_id in self._flow_layers.keys():
-            pose: Frame | None = self._board.get_frame(self._stage, cam_id)
+            pose: Frame | None = self._board.get_frame(self.config.stage, cam_id)
             motions[cam_id] = pose[AngleMotion].value if pose and AngleMotion in pose else 0.0
             similarities[cam_id] = pose[Similarity].values if pose and Similarity in pose else np.full((self._num_slots,), 0.0)
             motion_gates[cam_id] = pose[MotionGate].values if pose and MotionGate in pose else np.full((self._num_slots,), 0.0)

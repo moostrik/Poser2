@@ -239,12 +239,13 @@ class CentreGroup(BaseSettings):
     color    = Group(layers.ColorMaskLayerSettings)
 
 class RenderGroup(BaseSettings):
+    stage   = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
     layer   = Group(LayerGroup)
     data    = Group(DataGroup)
     preview = Group(PreviewGroup)
     centre  = Group(CentreGroup)
-    flow    = Group(layers.FlowLayerSettings)
-    fluid3d = Group(layers.Fluid3DLayerSettings)
+    flow    = Group(layers.FlowLayerSettings, share=[stage])
+    fluid3d = Group(layers.Fluid3DLayerSettings, share=[stage])
     colors  = Group(ColorSettings)
     window  = Group(WindowSettings)
 

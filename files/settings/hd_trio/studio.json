@@ -345,6 +345,7 @@
     }
   },
   "render": {
+    "stage": "LERP",
     "num_players": 3,
     "layer": {
       "select": {
@@ -437,6 +438,7 @@
         "draw_anchors": false
       },
       "color": {
+        "stage": 3,
         "num_players": 3,
         "blend_mode": "ALPHA",
         "similarity_threshold": 0.33,

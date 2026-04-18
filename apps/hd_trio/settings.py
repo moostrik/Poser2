@@ -297,12 +297,12 @@ class PreviewGroup(BaseSettings):
     poser  : Group[_PoseCompSettings]    = Group(_PoseCompSettings)
 
 class CentreGroup(BaseSettings):
-    geometry: Group[_CentreGeomSettings]       = Group(_CentreGeomSettings)
-    mask    : Group[layers.CentreMaskSettings]     = Group(layers.CentreMaskSettings)
-    cam     : Group[layers.CentreCamSettings]      = Group(layers.CentreCamSettings)
-    frg     : Group[layers.CentreFrgSettings]      = Group(layers.CentreFrgSettings)
-    pose    : Group[layers.CentrePoseSettings]     = Group(layers.CentrePoseSettings)
-    color   : Group[layers.ColorMaskLayerSettings] = Group(layers.ColorMaskLayerSettings)
+    geometry: Group[_CentreGeomSettings]            = Group(_CentreGeomSettings)
+    mask    : Group[layers.CentreMaskSettings]      = Group(layers.CentreMaskSettings)
+    cam     : Group[layers.CentreCamSettings]       = Group(layers.CentreCamSettings)
+    frg     : Group[layers.CentreFrgSettings]       = Group(layers.CentreFrgSettings)
+    pose    : Group[layers.CentrePoseSettings]      = Group(layers.CentrePoseSettings)
+    color   : Group[layers.ColorMaskLayerSettings]  = Group(layers.ColorMaskLayerSettings)
 
 class IntroSequenceSettings(BaseSettings):
     """Settings for prerecorded pose overlay during INTRO stages."""
@@ -314,15 +314,16 @@ class IntroSequenceSettings(BaseSettings):
 
 
 class RenderSettings(BaseSettings):
-    num_cams:    Field[int] = Field(3, access=Field.INIT, visible=False, description="Number of cameras")
-    num_players: Field[int] = Field(3, access=Field.INIT, visible=False, description="Number of players")
+    stage:       Field[Stage] = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
+    num_cams:    Field[int]   = Field(3, access=Field.INIT, visible=False, description="Number of cameras")
+    num_players: Field[int]   = Field(3, access=Field.INIT, visible=False, description="Number of players")
     layer  : Group[LayerGroup]                = Group(LayerGroup)
     data   : Group[DataGroup]                 = Group(DataGroup)
     preview: Group[PreviewGroup]              = Group(PreviewGroup)
     centre : Group[CentreGroup]               = Group(CentreGroup)
     intro_sequence: Group[IntroSequenceSettings] = Group(IntroSequenceSettings)
-    flow   : Group[layers.FlowLayerSettings]  = Group(layers.FlowLayerSettings)
-    fluid  : Group[layers.FluidLayerSettings] = Group(layers.FluidLayerSettings)
+    flow   : Group[layers.FlowLayerSettings]  = Group(layers.FlowLayerSettings, share=[stage])
+    fluid  : Group[layers.FluidLayerSettings] = Group(layers.FluidLayerSettings, share=[stage])
     colors : Group[ColorSettings]             = Group(ColorSettings)
     window : Group[WindowSettings]            = Group(WindowSettings)
 

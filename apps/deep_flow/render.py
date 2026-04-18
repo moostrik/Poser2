@@ -11,7 +11,7 @@ from modules.render import layers as ls
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from .blackboard import Blackboard
-from .settings import Layers, RenderGroup, Stage
+from .settings import Layers, RenderGroup
 
 
 UPDATE_LAYERS: list[Layers] = [
@@ -83,9 +83,9 @@ class DeepFlowRender(RenderBase):
             centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(      i, centre_gmtry,    cam_frg.texture,    cmt[i], settings.centre.frg,        settings.colors)
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(     i, centre_gmtry,                                settings.centre.pose,       settings.colors)
 
-            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   centre_frg.texture, cmt,    settings.centre.color,      settings.colors,    stage=Stage.LERP)
-            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,   cam_mask,  centre_mask.texture, centre_frg.texture,     settings.flow,                          stage=Stage.LERP)
-            fluid3d =       self.L[Layers.fluid3d][i] =     ls.Fluid3DLayer(        i, self.board,   flows,                      settings.fluid3d,           settings.colors,    stage=Stage.LERP)
+            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   centre_frg.texture, cmt,    settings.centre.color,      settings.colors)
+            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,   cam_mask,  centre_mask.texture, centre_frg.texture,     settings.flow)
+            fluid3d =       self.L[Layers.fluid3d][i] =     ls.Fluid3DLayer(        i, self.board,   flows,                      settings.fluid3d,           settings.colors)
 
             lut =           self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid3d, ms_mask],         settings.layer.lut)
 

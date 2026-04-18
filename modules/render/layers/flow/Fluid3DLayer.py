@@ -62,6 +62,7 @@ class Fluid3DDrawMode(IntEnum):
 
 class Fluid3DLayerSettings(BaseSettings):
     """Configuration for Fluid3DLayer (3D fluid simulation)."""
+    stage: Field[int] =                     Field(3, description="Pipeline stage for pose data")
     num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
     sim_engine: Field[FluidSimEngine] =     Field(FluidSimEngine.FLUID_3D_ARRAY)
     draw_mode: Field[Fluid3DDrawMode] =     Field(Fluid3DDrawMode.DENSITY)
@@ -100,7 +101,7 @@ class Fluid3DLayer(LayerBase):
         density_texture = fluid3d.density
     """
 
-    def __init__(self, cam_id: int, board: HasFrames, flow_layers: dict[int, FlowLayer], settings: Fluid3DLayerSettings, color_settings: ColorSettings, stage: int = 3) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, flow_layers: dict[int, FlowLayer], settings: Fluid3DLayerSettings, color_settings: ColorSettings) -> None:
         """Initialize 3D fluid layer.
 
         Args:
@@ -109,11 +110,9 @@ class Fluid3DLayer(LayerBase):
             flow_layers: Dict of all FlowLayers (cam_id -> FlowLayer)
             settings: Layer configuration
             color_settings: Per-camera colors for density colorization
-            stage: Pipeline stage for pose data
         """
         self._cam_id: int = cam_id
         self._board: HasFrames = board
-        self._stage: int = stage
         self._flow_layers: dict[int, FlowLayer] = flow_layers
         self.config: Fluid3DLayerSettings = settings or Fluid3DLayerSettings()
         self._color_settings: ColorSettings = color_settings
@@ -198,7 +197,7 @@ class Fluid3DLayer(LayerBase):
             self._swap_engine()
 
         # Get motion data from pose
-        pose: Frame | None = self._board.get_frame(self._stage, self._cam_id)
+        pose: Frame | None = self._board.get_frame(self.config.stage, self._cam_id)
         similarities: np.ndarray = (
             pose[Similarity].values if pose is not None and Similarity in pose
             else np.full((self.config.num_players,), 0.0)
