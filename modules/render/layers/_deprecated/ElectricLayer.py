@@ -7,7 +7,7 @@ from dataclasses import replace
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.blackboard import HasFrames
+from modules.whiteboard import HasFrames
 from modules.gl import Fbo, Texture, Blit, Style, clear_color
 from modules.pose.features import Points2D
 from modules.pose.frame import Frame

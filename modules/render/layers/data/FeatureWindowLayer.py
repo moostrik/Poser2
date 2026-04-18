@@ -7,7 +7,7 @@ import numpy as np
 from OpenGL.GL import *  # type: ignore
 
 # Local application imports
-from modules.blackboard import HasWindows
+from modules.whiteboard import HasWindows
 from modules.gl import Fbo, Texture, Blit, Image, clear_color, Text
 from modules.pose.frame import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect

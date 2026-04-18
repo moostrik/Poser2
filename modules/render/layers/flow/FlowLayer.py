@@ -9,7 +9,7 @@ from OpenGL.GL import *  # type: ignore
 # Local application imports
 from modules.gl import Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Blit
-from modules.blackboard import HasFrames
+from modules.whiteboard import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import AngleMotion
 
@@ -100,7 +100,7 @@ class FlowLayer(LayerBase):
 
         Args:
             cam_id: Camera ID
-            board: Blackboard for pose data
+            board: Whiteboard for pose data
             mask_source: Mask source layer for optical flow update
             mask: Mask texture for optical flow input
             config: Layer configuration

@@ -1,6 +1,6 @@
 """Deep Flow blackboard — thread-safe shared data store for the Deep Flow app."""
 
-from modules.blackboard import (
+from modules.whiteboard import (
     FrameStoreMixin, WindowStoreMixin, ImageStoreMixin,
     DepthTrackletStoreMixin,
 )

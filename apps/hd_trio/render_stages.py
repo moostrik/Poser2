@@ -6,7 +6,7 @@ from typing import cast
 
 from pytweening import *  # type: ignore
 
-from modules.blackboard import HasFrames
+from modules.whiteboard import HasFrames
 from modules.pose.features import MotionTime
 from modules.render.layers import LayerBase
 from modules.render import layers as ls

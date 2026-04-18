@@ -5,7 +5,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.blackboard import HasFrames
+from modules.whiteboard import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import Points2D, BBox
 from modules.render.layers.LayerBase import LayerBase, Rect

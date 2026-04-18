@@ -1,6 +1,6 @@
 """HD Trio blackboard — thread-safe shared data store for the HD Trio app."""
 
-from modules.blackboard import (
+from modules.whiteboard import (
     FrameStoreMixin, WindowStoreMixin, ImageStoreMixin,
     DepthTrackletStoreMixin, SequenceStoreMixin,
 )

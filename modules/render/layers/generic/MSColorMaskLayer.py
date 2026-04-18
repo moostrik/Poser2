@@ -10,7 +10,7 @@ import math
 # Local application imports
 from modules.gl import Fbo, SwapFbo, Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Blit
-from modules.blackboard import HasFrames
+from modules.whiteboard import HasFrames
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 from modules.pose.frame import Frame
 from modules.settings import Field, BaseSettings

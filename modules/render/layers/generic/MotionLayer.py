@@ -5,7 +5,7 @@ from OpenGL.GL import * # type: ignore
 from pytweening import *    # type: ignore
 
 # Local application imports
-from modules.blackboard import HasFrames
+from modules.whiteboard import HasFrames
 
 from modules.gl import Fbo, Texture, Style
 from modules.render.layers.LayerBase import LayerBase, DataCache

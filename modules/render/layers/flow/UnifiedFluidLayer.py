@@ -17,7 +17,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture, Style, Fbo
 from modules.gl.shaders import Blit, BlitRegion
 from modules.render.layers.LayerBase import LayerBase
-from modules.blackboard import HasFrames
+from modules.whiteboard import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 

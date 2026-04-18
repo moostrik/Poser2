@@ -8,7 +8,7 @@ from pytweening import *    # type: ignore
 
 
 # Local application imports
-from modules.blackboard import HasFrames
+from modules.whiteboard import HasFrames
 
 from modules.gl import Fbo, Texture, Blit, Style, clear_color
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect

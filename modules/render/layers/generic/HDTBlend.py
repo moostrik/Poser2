@@ -6,7 +6,7 @@ from OpenGL.GL import GL_R16F
 from pytweening import *    # type: ignore
 
 # Local application imports
-from modules.blackboard import HasFrames
+from modules.whiteboard import HasFrames
 from modules.gl import Fbo, Texture, Style, clear_color
 from modules.pose.frame import Frame
 from modules.pose.features import Similarity

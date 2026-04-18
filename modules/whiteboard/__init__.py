@@ -1,0 +1,22 @@
+"""Whiteboard — thread-safe shared-state store for the render subsystem.
+
+The pipeline (pose, segmentation, cameras) produces data at input FPS.
+The render loop consumes it at output FPS.  The whiteboard decouples
+these cadences: producers push latest state via callbacks wired in
+main.py, render layers pull current snapshots on each draw call.
+
+Each capability (frames, windows, images, …) is a protocol + mixin pair.
+Apps compose a concrete ``Whiteboard`` class from only the mixins they
+need.  Render layers declare the protocol slice they require (e.g.
+``HasFrames``), keeping module code independent of any specific app.
+
+Not a classical blackboard — there is no control shell or opportunistic
+scheduling.  The pipeline drives control flow via fixed callback chains;
+the whiteboard is passive storage, not an orchestration mechanism.
+"""
+
+from modules.whiteboard.frames import HasFrames, FrameStoreMixin
+from modules.whiteboard.windows import HasWindows, WindowStoreMixin
+from modules.whiteboard.images import HasImages, ImageStoreMixin
+from modules.whiteboard.depth_tracklets import HasDepthTracklets, DepthTrackletStoreMixin
+from modules.whiteboard.sequence import HasSequence, SequenceStoreMixin

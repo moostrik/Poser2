@@ -5,7 +5,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.blackboard import HasFrames
+from modules.whiteboard import HasFrames
 from modules.gl import Fbo, Texture, clear_color
 from modules.pose.frame import Frame
 from modules.pose.features import BBox
