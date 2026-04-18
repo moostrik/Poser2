@@ -28,7 +28,7 @@ Prefer composition over inheritance for runtime assembly.
 ## Board
 
 `modules/board/` defines protocol + mixin pairs for shared runtime data. Each app composes its own `RenderBoard` from the mixins it needs.
-- Detailed rules: `.github/instructions/whiteboard.instructions.md`
+- Detailed rules: `.github/instructions/board.instructions.md`
 
 ## Concurrency
 

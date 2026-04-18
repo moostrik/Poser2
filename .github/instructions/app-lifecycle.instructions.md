@@ -31,6 +31,5 @@ applyTo: "apps/*/main.py, apps/*/render.py, apps/*/settings.py"
 ## Data flow
 
 - Wire producers to board setters via callbacks; consumers read via protocol-typed references
-- Board references: param `board`, attribute `self.board`
 - `RenderBase` owns the per-frame tick; register render-rate callbacks via `renderer.add_update_callback()`
 - Avoid bypass paths that make stage ownership ambiguous

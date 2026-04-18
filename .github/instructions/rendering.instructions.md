@@ -26,7 +26,6 @@ applyTo: "modules/gl/**, modules/render/**, modules/flow/**"
 - Preserve layer boundaries and data ownership
 - Keep layer interfaces narrow and explicit
 - Prefer composition of layers over monolithic render passes
-- Board references: constructor param `board`, private field `self._board`
 
 ## Performance focus
 

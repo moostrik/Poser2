@@ -7,13 +7,7 @@ applyTo: "modules/board/**, apps/*/render_board.py"
 ## Package structure
 
 `modules/board/` is a package. Each file contains one protocol + one mixin pair.
-
-- `frames.py` — `HasFrames` + `FrameStoreMixin`
-- `windows.py` — `HasWindows` + `WindowStoreMixin`
-- `gpu_frames.py` — `HasGpuFrames` + `GpuFrameStoreMixin`
-- `depth_tracklets.py` — `HasDepthTracklets` + `DepthTrackletStoreMixin`
-- `sequence.py` — `HasSequence` + `SequenceStoreMixin`
-- `__init__.py` — re-exports all protocols and mixins
+`__init__.py` re-exports all protocols and mixins.
 
 ## Adding a new capability
 
