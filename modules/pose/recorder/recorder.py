@@ -19,7 +19,6 @@ from .frame_io import write_chunk
 from .settings import RecorderSettings
 
 if TYPE_CHECKING:
-    from modules.data_hub import Stage
     from modules.pose.frame.frame import FrameDict
     from modules.pose.features.base import BaseFeature
 
@@ -120,7 +119,7 @@ class Recorder:
         self._thread = None
         logger.info("PoseRecorder stopped")
 
-    def on_frame_dict(self, stage: 'Stage', frame_dict: 'FrameDict') -> None:
+    def on_frame_dict(self, stage: int, frame_dict: 'FrameDict') -> None:
         """Callback — enqueue a shallow copy of the FrameDict if recording and stage matches."""
         if stage != self.settings.stage:
             return

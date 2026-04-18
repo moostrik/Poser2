@@ -30,6 +30,7 @@ applyTo: "apps/*/main.py, apps/*/render.py, apps/*/settings.py"
 
 ## Data flow
 
-- Treat `DataHub` as a thread-safe data store only
+- Wire producers to blackboard setters via callbacks; consumers read via protocol-typed references
+- Blackboard references: param `board`, attribute `self.board`
 - `RenderBase` owns the per-frame tick; register render-rate callbacks via `renderer.add_update_callback()`
 - Avoid bypass paths that make stage ownership ambiguous

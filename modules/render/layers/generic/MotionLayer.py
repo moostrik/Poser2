@@ -5,7 +5,7 @@ from OpenGL.GL import * # type: ignore
 from pytweening import *    # type: ignore
 
 # Local application imports
-from modules.data_hub import DataHub, Stage
+from modules.blackboard import HasFrames
 
 from modules.gl import Fbo, Texture, Style
 from modules.render.layers.LayerBase import LayerBase, DataCache
@@ -20,9 +20,10 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class MotionLayer(LayerBase):
 
-    def __init__(self, cam_id: int, data_hub: DataHub, centre_mask: Texture, color_settings: ColorSettings) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, centre_mask: Texture, color_settings: ColorSettings, stage: int = 3) -> None:
         self._cam_id: int = cam_id
-        self._data_hub: DataHub = data_hub
+        self._board: HasFrames = board
+        self._stage: int = stage
         self._centre_mask: Texture = centre_mask
         self._color_settings: ColorSettings = color_settings
         self._fbo: Fbo = Fbo()
@@ -46,7 +47,7 @@ class MotionLayer(LayerBase):
         self._shader.deallocate()
 
     def update(self) -> None:
-        pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
+        pose: Frame | None = self._board.get_frame(self._stage, self._cam_id)
         self._data_cache.update(pose)
 
         if self._data_cache.lost:

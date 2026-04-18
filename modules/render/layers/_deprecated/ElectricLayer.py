@@ -7,7 +7,7 @@ from dataclasses import replace
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.data_hub import DataHub, DataHubType
+from modules.blackboard import HasFrames
 from modules.gl import Fbo, Texture, Blit, Style, clear_color
 from modules.pose.features import Points2D
 from modules.pose.frame import Frame
@@ -19,17 +19,17 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class ElectricLayer(LayerBase):
 
-    def __init__(self, track_id: int, data: DataHub, data_type: DataHubType,
+    def __init__(self, track_id: int, board: HasFrames, stage: int,
                  line_width: float = 4.0, line_smooth: float = 2.0, use_scores: bool = True, use_bbox: bool = False,
                  color: tuple[float, float, float, float] | None = None) -> None:
         self._track_id: int = track_id
-        self._data: DataHub = data
+        self._board: HasFrames = board
         self._fbo: Fbo = Fbo()
         self._data_cache: DataCache[Frame] = DataCache[Frame]()
         # self._p_pose: Frame | None = None
         self._points: Points2D = Points2D.create_dummy()
 
-        self.data_type: DataHubType = data_type
+        self._stage: int = stage
         self.line_width: float = line_width
         self.line_smooth: float = line_smooth
         self.use_scores: bool = use_scores
@@ -59,7 +59,7 @@ class ElectricLayer(LayerBase):
             Blit.use(self._fbo)
 
     def update(self) -> None:
-        pose: Frame | None = self._data.get_item(self.data_type, self._track_id)
+        pose: Frame | None = self._board.get_frame(self._stage, self._track_id)
         self._data_cache.update(pose)
         if self._data_cache.lost:
             self._fbo.clear()

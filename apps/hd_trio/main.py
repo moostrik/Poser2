@@ -5,7 +5,6 @@ from functools import partial
 
 from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder
 from modules.settings import presets, NiceServer
-from modules.data_hub import DataHub, DataHubType, Stage
 from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers, features, window
@@ -13,7 +12,8 @@ from modules.pose.recorder import Recorder as PoseRecorder
 from modules.session import Session, Sequencer
 from modules.gl.WindowManager import WindowSettings
 
-from .settings import HDTrioSettings
+from .blackboard import Blackboard
+from .settings import HDTrioSettings, Stage
 from .render import HDTrioRender
 
 APP_NAME = 'hd_trio'
@@ -38,8 +38,8 @@ class HDTrioMain:
         num_players: int = self.settings.num_players
         ps = self.settings.pose
 
-        # DATA_HUB
-        self.data_hub = DataHub()
+        # BLACKBOARD
+        self.board = Blackboard()
 
         # SESSION
         self.session = Session(self.settings.session.core)
@@ -48,10 +48,9 @@ class HDTrioMain:
         self.session_osc.bind('/stop/recording',  self._on_osc_stop_recording)
         self.session_osc.bind('/group/id',        self._on_osc_group_id)
         self.sequencer = Sequencer(self.settings.session.sequencer)
+        self.sequencer.add_state_callback(self.board.set_sequence)
         self.video_recorder = VideoRecorder(self.settings.session.video)
         self.pose_recorder = PoseRecorder(self.settings.session.pose)
-
-        self.sequencer.add_state_callback(partial(self.data_hub.set_item, DataHubType.sequence, 0))
 
         # CAMERA
         self.cameras: list[Camera | Simulator] = []
@@ -69,12 +68,11 @@ class HDTrioMain:
         self.image_crop_processor = batch.ImageCropProcessor(ps.image_crop)
 
         for camera in self.cameras:
-            camera.add_preview_callback(lambda k, _ft, v: self.data_hub.set_item(DataHubType.cam_image, k, v))
             camera.add_sync_callback(self.video_recorder.set_synced_frames)
             camera.add_frame_callback(self.image_crop_processor.set_image)
             camera.add_frame_callback(self.frame_sync_bang.add_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
-            camera.add_tracker_callback(partial(self.data_hub.set_item, DataHubType.depth_tracklet))
+            camera.add_tracker_callback(self.board.set_depth_tracklets)
             camera.add_tracker_callback(self.tracklet_sync_bang.add_frame)
 
         # DETECTION
@@ -93,7 +91,6 @@ class HDTrioMain:
         })
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.submit_tracklets)
-        self.tracker.add_tracklet_callback(partial(self.data_hub.set_dict, DataHubType.tracklet))
         self.tracklet_sync_bang.add_callback(self.tracker.notify_update)
         self.frame_sync_bang.add_callback(self.poses_from_tracklets.generate)
 
@@ -101,15 +98,15 @@ class HDTrioMain:
         self.bbox_filters.add_frames_callback(self.image_crop_processor.process)
         self.image_crop_processor.add_callback(self.point_extractor.process)
         self.image_crop_processor.add_callback(self.mask_extractor.process)
-        self.mask_extractor.add_callback(lambda _f, gpu: self.data_hub.set_dict(DataHubType.gpu_frames, gpu))
+        self.mask_extractor.add_callback(lambda _f, gpu: self.board.set_images(gpu))
 
         # STAGE RAW
         self.window_tracker_R = window.WindowTracker(num_players, ps.window_raw)
 
-        self.point_extractor.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.frame_raw))
+        self.point_extractor.add_frames_callback(partial(self.board.set_frames, Stage.RAW))
         self.point_extractor.add_frames_callback(partial(self.pose_recorder.on_frame_dict, Stage.RAW))
         self.point_extractor.add_frames_callback(self.window_tracker_R.process)
-        self.window_tracker_R.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.RAW))
+        self.window_tracker_R.add_frame_windows_callback(partial(self.board.set_windows, Stage.RAW))
 
         # STAGE CLEAN
         self.pose_clean_filters = trackers.FilterTracker({
@@ -123,10 +120,10 @@ class HDTrioMain:
         self.window_tracker_C = window.WindowTracker(num_players, ps.window_clean)
 
         self.point_extractor.add_frames_callback(self.pose_clean_filters.process)
-        self.pose_clean_filters.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.frame_clear))
+        self.pose_clean_filters.add_frames_callback(partial(self.board.set_frames, Stage.CLEAN))
         self.pose_clean_filters.add_frames_callback(partial(self.pose_recorder.on_frame_dict, Stage.CLEAN))
         self.pose_clean_filters.add_frames_callback(self.window_tracker_C.process)
-        self.window_tracker_C.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.CLEAN))
+        self.window_tracker_C.add_frame_windows_callback(partial(self.board.set_windows, Stage.CLEAN))
 
         # STAGE SMOOTH
         self.similarity_applicator = nodes.SimilarityApplicator(ps.similarity.similarity_applicator)
@@ -164,10 +161,10 @@ class HDTrioMain:
 
         self.pose_clean_filters.add_frames_callback(self.pose_smooth_filters.process)
         self.pose_smooth_filters.add_frames_callback(self.pose_prediction_filters.process)
-        self.pose_prediction_filters.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.frame_smooth))
+        self.pose_prediction_filters.add_frames_callback(partial(self.board.set_frames, Stage.SMOOTH))
         self.pose_prediction_filters.add_frames_callback(partial(self.pose_recorder.on_frame_dict, Stage.SMOOTH))
         self.pose_smooth_filters.add_frames_callback(self.window_tracker_S.process)
-        self.window_tracker_S.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.SMOOTH))
+        self.window_tracker_S.add_frame_windows_callback(partial(self.board.set_windows, Stage.SMOOTH))
 
         # STAGE LERP
         self.motion_gate_applicator = nodes.MotionGateApplicator(ps.similarity.motion_gate)
@@ -204,10 +201,10 @@ class HDTrioMain:
         self.interpolators.add_frames_callback(self.pose_interpolation_filters.process)
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_applicator.submit)
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_tracker.process)
-        self.motion_gate_tracker.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.frame_lerp))
+        self.motion_gate_tracker.add_frames_callback(partial(self.board.set_frames, Stage.LERP))
         self.motion_gate_tracker.add_frames_callback(partial(self.pose_recorder.on_frame_dict, Stage.LERP))
         self.motion_gate_tracker.add_frames_callback(self.window_tracker_I.process)
-        self.window_tracker_I.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.LERP))
+        self.window_tracker_I.add_frame_windows_callback(partial(self.board.set_windows, Stage.LERP))
 
         # SIMILARITY
         self.window_similator  = batch.WindowSimilarity(ps.similarity.window_similarity)
@@ -230,7 +227,7 @@ class HDTrioMain:
             self.artnet_controllers.append(ArtNetBars(self.settings.inout.artnets[i]))
 
         # RENDER
-        self.render = HDTrioRender(self.data_hub, self.settings.render, self.settings.session.sequencer)
+        self.render = HDTrioRender(self.board, self.settings.render)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
         self.render.add_update_callback(self.sequencer.update)
         self.render.add_update_callback(self.interpolators.update)

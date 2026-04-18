@@ -5,7 +5,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.data_hub import DataHub, Stage
+from modules.blackboard import HasFrames
 from modules.gl import Fbo, Texture, clear_color
 from modules.pose.frame import Frame
 from modules.pose.features import Points2D
@@ -17,16 +17,16 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class PoseDotSettings(BaseSettings):
-    stage:      Field[Stage] = Field(Stage.LERP, access=Field.INIT, description="Pipeline stage for pose data")
+    stage:      Field[int] = Field(3, access=Field.INIT, description="Pipeline stage for pose data")
     dot_size:   Field[float] = Field(4.0, min=1.0, max=20.0, description="Dot size in pixels")
     dot_smooth: Field[float] = Field(2.0, min=0.0, max=10.0, description="Dot smoothing/antialiasing width")
 
 
 class PoseDotLayer(LayerBase):
-    def __init__(self, track_id: int, data: DataHub, color: tuple[float, float, float, float] | None = None, config: PoseDotSettings | None = None) -> None:
+    def __init__(self, track_id: int, board: HasFrames, color: tuple[float, float, float, float] | None = None, config: PoseDotSettings | None = None) -> None:
         self._config: PoseDotSettings = config or PoseDotSettings()
         self._track_id: int = track_id
-        self._data_hub: DataHub = data
+        self._board: HasFrames = board
         self._fbo: Fbo = Fbo()
         self._data_cache: DataCache[Frame]= DataCache[Frame]()
 
@@ -49,7 +49,7 @@ class PoseDotLayer(LayerBase):
         self._shader.deallocate()
 
     def update(self) -> None:
-        pose: Frame | None = self._data_hub.get_pose(self._config.stage, self._track_id)
+        pose: Frame | None = self._board.get_frame(self._config.stage, self._track_id)
         self._data_cache.update(pose)
 
         if self._data_cache.lost:

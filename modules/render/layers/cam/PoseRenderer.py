@@ -5,7 +5,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.data_hub import DataHub, FRAME_TYPES, Stage
+from modules.blackboard import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import Points2D, BBox
 from modules.render.layers.LayerBase import LayerBase, Rect
@@ -14,7 +14,7 @@ from modules.render.color_settings import ColorSettings
 
 
 class PoseRendererSettings(BaseSettings):
-    stage:      Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
+    stage:      Field[int] = Field(3, description="Pipeline stage for pose data")
     line_width: Field[float] = Field(1.0, min=0.5, max=10.0, description="Pose line width")
     line_smooth:Field[float] = Field(0.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
     use_scores: Field[bool]  = Field(False, description="Use confidence scores for line opacity")
@@ -22,9 +22,9 @@ class PoseRendererSettings(BaseSettings):
 
 
 class PoseRenderer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, color_settings: ColorSettings | None = None, settings: PoseRendererSettings | None = None) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, color_settings: ColorSettings | None = None, settings: PoseRendererSettings | None = None) -> None:
         self.settings: PoseRendererSettings = settings or PoseRendererSettings()
-        self._data: DataHub = data
+        self._board: HasFrames = board
         self._cam_id: int = cam_id
         self._color_settings: ColorSettings | None = color_settings
         self._cam_poses: set[Frame] = set()
@@ -59,7 +59,7 @@ class PoseRenderer(LayerBase):
             self._shader.use(points, line_width, line_smooth, color=color, use_scores=self.settings.use_scores)
 
     def update(self) -> None:
-        self._cam_poses = {p for p in self._data.get_dict(FRAME_TYPES[self.settings.stage]).values() if p.cam_id == self._cam_id}
+        self._cam_poses = {p for p in self._board.get_frames(self.settings.stage).values() if p.cam_id == self._cam_id}
 
     @staticmethod
     def _transform_to_image_space(points: Points2D, bbox: Rect) -> Points2D:

@@ -6,7 +6,7 @@ from OpenGL.GL import GL_R16F
 from pytweening import *    # type: ignore
 
 # Local application imports
-from modules.data_hub import DataHub, DataHubType
+from modules.blackboard import HasFrames
 from modules.gl import Fbo, Texture, Style, clear_color
 from modules.pose.frame import Frame
 from modules.pose.features import Similarity
@@ -19,9 +19,9 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class HDTBlend(LayerBase):
 
-    def __init__(self, cam_id: int, data_hub: DataHub, data_type: DataHubType, layers: dict[int, HDTPrepare]) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, stage: int, layers: dict[int, HDTPrepare]) -> None:
         self._cam_id: int = cam_id
-        self._data_hub: DataHub = data_hub
+        self._board: HasFrames = board
         self._layers: dict[int, HDTPrepare] = layers
         self._fbo: Fbo = Fbo()
 
@@ -39,7 +39,7 @@ class HDTBlend(LayerBase):
 
         self._data_cache: DataCache[Frame]= DataCache[Frame]()
 
-        self.data_type: DataHubType = data_type
+        self._stage: int = stage
 
         # Hysteresis for motion visibility
         self._is_visible: bool = False
@@ -78,7 +78,7 @@ class HDTBlend(LayerBase):
         self._blend_shader.deallocate()
 
     def update(self) -> None:
-        pose: Frame | None = self._data_hub.get_item(self.data_type, self._cam_id)
+        pose: Frame | None = self._board.get_frame(self._stage, self._cam_id)
         self._data_cache.update(pose)
 
         if self._data_cache.lost:

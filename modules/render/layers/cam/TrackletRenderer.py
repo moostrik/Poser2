@@ -10,14 +10,14 @@ from modules.render.shaders import DrawColoredRectangle
 
 from modules.oak.camera.definitions import Tracklet as DepthTracklet
 
-from modules.data_hub import DataHub, DataHubType
+from modules.blackboard import HasDepthTracklets
 from modules.render.layers.LayerBase import LayerBase
 
 
 
 class TrackletRenderer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub) -> None:
-        self._data: DataHub = data
+    def __init__(self, cam_id: int, board: HasDepthTracklets) -> None:
+        self._board: HasDepthTracklets = board
         self._cam_id: int = cam_id
         self._tracklets: list[DepthTracklet] = []
         self._shader: DrawColoredRectangle = DrawColoredRectangle()
@@ -38,7 +38,7 @@ class TrackletRenderer(LayerBase):
             self.draw_depth_tracklet(depth_tracklet, self._shader, self._text_renderer, self._width, self._height)
 
     def update(self) -> None:
-        tracklets: list[DepthTracklet] | None = self._data.get_item(DataHubType.depth_tracklet, self._cam_id)
+        tracklets: list[DepthTracklet] | None = self._board.get_depth_tracklets(self._cam_id)
         if tracklets is None:
             self._tracklets = []
         else:

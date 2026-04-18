@@ -17,7 +17,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture, Style, Fbo
 from modules.gl.shaders import Blit, BlitRegion
 from modules.render.layers.LayerBase import LayerBase
-from modules.data_hub import DataHub, Stage
+from modules.blackboard import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 
@@ -73,8 +73,9 @@ class UnifiedFluidLayerSettings(BaseSettings):
 class UnifiedFluidLayer(LayerBase):
     """Unified fluid simulation for all players on a single wide grid."""
 
-    def __init__(self, data_hub: DataHub, flow_layers: dict[int, FlowLayer], colors: list[tuple[float, float, float, float]], config: UnifiedFluidLayerSettings | None = None) -> None:
-        self._data_hub: DataHub = data_hub
+    def __init__(self, board: HasFrames, flow_layers: dict[int, FlowLayer], colors: list[tuple[float, float, float, float]], config: UnifiedFluidLayerSettings | None = None, stage: int = 3) -> None:
+        self._board: HasFrames = board
+        self._stage: int = stage
         self._flow_layers: dict[int, FlowLayer] = flow_layers
         self.config: UnifiedFluidLayerSettings = config or UnifiedFluidLayerSettings()
 
@@ -220,7 +221,7 @@ class UnifiedFluidLayer(LayerBase):
         motion_gates: dict[int, np.ndarray] = {}
 
         for cam_id in self._flow_layers.keys():
-            pose: Frame | None = self._data_hub.get_pose(Stage.LERP, cam_id)
+            pose: Frame | None = self._board.get_frame(self._stage, cam_id)
             motions[cam_id] = pose[AngleMotion].value if pose and AngleMotion in pose else 0.0
             similarities[cam_id] = pose[Similarity].values if pose and Similarity in pose else np.full((self._num_slots,), 0.0)
             motion_gates[cam_id] = pose[MotionGate].values if pose and MotionGate in pose else np.full((self._num_slots,), 0.0)

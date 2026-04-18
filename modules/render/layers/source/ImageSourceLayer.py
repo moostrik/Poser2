@@ -8,15 +8,15 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.gl import Tensor, Texture
 
-from modules.data_hub import DataHub, DataHubType
+from modules.blackboard import HasImages
 from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.pose.batch.ImageFrame import ImageFrame
 
 
 class ImageSourceLayer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub) -> None:
+    def __init__(self, cam_id: int, board: HasImages) -> None:
         self._cam_id: int = cam_id
-        self._data_hub: DataHub = data
+        self._board: HasImages = board
         self._cuda_image: Tensor = Tensor()
         self._data_cache: DataCache[ImageFrame]= DataCache[ImageFrame]()
         self._dirty: bool = False
@@ -35,7 +35,7 @@ class ImageSourceLayer(LayerBase):
 
     def update(self) -> None:
         self._dirty = False
-        gpu_frame: ImageFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._cam_id)
+        gpu_frame: ImageFrame | None = self._board.get_image(self._cam_id)
         self._data_cache.update(gpu_frame)
 
         if self._data_cache.lost:

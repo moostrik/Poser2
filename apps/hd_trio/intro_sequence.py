@@ -11,7 +11,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from modules.data_hub import Stage
 from modules.pose.frame import Frame, FrameDict
 from modules.pose.recorder.player import Player
 from modules.utils import Color
@@ -22,10 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 class SequenceDataProxy:
-    """Minimal duck-typed stand-in for :class:`DataHub`.
+    """Minimal duck-typed stand-in for the blackboard.
 
-    Only implements :meth:`get_pose`, which is the sole method
-    :class:`CentreGeometry` calls on its ``data_hub`` reference.
+    Only implements :meth:`get_frame`, which is the sole method
+    :class:`CentreGeometry` calls on its ``board`` reference.
     """
 
     def __init__(self) -> None:
@@ -39,7 +38,7 @@ class SequenceDataProxy:
         """Remove all stored frames."""
         self._frames = {}
 
-    def get_pose(self, stage: Stage, track_id: int) -> Any | None:
+    def get_frame(self, stage: int, track_id: int) -> Any | None:
         """Return the frame for *track_id*, ignoring *stage*."""
         return self._frames.get(track_id)
 

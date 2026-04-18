@@ -23,6 +23,17 @@ from modules.gl.WindowManager import WindowSettings
 
 
 # ---------------------------------------------------------------------------
+#  Pipeline stages
+# ---------------------------------------------------------------------------
+
+class Stage(IntEnum):
+    RAW =       0
+    CLEAN =     auto()
+    SMOOTH =    auto()
+    LERP =      auto()
+
+
+# ---------------------------------------------------------------------------
 #  Layers enum
 # ---------------------------------------------------------------------------
 
@@ -193,20 +204,34 @@ class TTGroup(BaseSettings):
 #  Render settings
 # ---------------------------------------------------------------------------
 
+# Stage-aware subclasses — override Field[int] with Field[Stage] for dropdown UI
+class _DataLayerSettings(layers.DataLayerSettings):
+    stage: Field[Stage] = Field(Stage.SMOOTH)
+
+class _TrackerCompSettings(layers.TrackerCompSettings):
+    stage: Field[Stage] = Field(Stage.LERP)
+
+class _PoseCompSettings(layers.PoseCompSettings):
+    stage: Field[Stage] = Field(Stage.LERP)
+
+class _CentreGeomSettings(layers.CentreGeomSettings):
+    stage: Field[Stage] = Field(Stage.SMOOTH)
+
+
 class LayerGroup(BaseSettings):
     select = Group(LayerSettings)
     lut    = Group(layers.CompositeLayerSettings)
 
 class DataGroup(BaseSettings):
-    a = Group(layers.DataLayerSettings)
-    b = Group(layers.DataLayerSettings)
+    a = Group(_DataLayerSettings)
+    b = Group(_DataLayerSettings)
 
 class PreviewGroup(BaseSettings):
-    tracker = Group(layers.TrackerCompSettings)
-    poser   = Group(layers.PoseCompSettings)
+    tracker = Group(_TrackerCompSettings)
+    poser   = Group(_PoseCompSettings)
 
 class CentreGroup(BaseSettings):
-    geometry = Group(layers.CentreGeomSettings)
+    geometry = Group(_CentreGeomSettings)
     mask     = Group(layers.CentreMaskSettings)
     cam      = Group(layers.CentreCamSettings)
     frg      = Group(layers.CentreFrgSettings)

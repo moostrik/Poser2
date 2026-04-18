@@ -4,7 +4,6 @@ from enum import IntEnum, auto
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.data_hub import Stage
 from modules.pose.features import SCALAR_FEATURES, TRACK_FEATURES
 from modules.pose.features.base import BaseScalarFeature
 
@@ -50,7 +49,7 @@ class DataLayerSettings(BaseSettings):
     """Unified configuration for data visualization layers."""
     mode:           Field[LayerMode]            = Field(LayerMode.WINDOW)
     feature_field:  Field[ScalarFeatureSelect]  = Field(ScalarFeatureSelect.AngleMotion)  # type: ignore[attr-defined]
-    stage:          Field[Stage]                = Field(Stage.SMOOTH)
+    stage:          Field[int]                  = Field(2)
 
     line_width:     Field[float] = Field(3.0)
     line_smooth:    Field[float] = Field(1.0)

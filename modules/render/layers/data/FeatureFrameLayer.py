@@ -6,7 +6,7 @@ from typing import Tuple
 from OpenGL.GL import *  # type: ignore
 
 # Local application imports
-from modules.data_hub import DataHub, Stage
+from modules.blackboard import HasFrames
 from modules.gl import Fbo, Texture, Blit, clear_color, Text
 from modules.pose.features import AngleVelocity
 from modules.pose.frame import Frame
@@ -24,9 +24,9 @@ class FeatureFrameLayer(LayerBase):
     """
     LAYER_MODE: LayerMode = LayerMode.FRAME
 
-    def __init__(self, track_id: int, data_hub: DataHub, config: DataLayerSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, track_id: int, board: HasFrames, config: DataLayerSettings, color_settings: ColorSettings) -> None:
         self._track_id: int = track_id
-        self._data_hub: DataHub = data_hub
+        self._board: HasFrames = board
         self._config: DataLayerSettings = config
         self._color_settings: ColorSettings = color_settings
         self._was_active: bool = False
@@ -82,7 +82,7 @@ class FeatureFrameLayer(LayerBase):
         self._was_active = active
         if not active:
             return
-        pose: Frame | None = self._data_hub.get_pose(self._config.stage, self._track_id)
+        pose: Frame | None = self._board.get_frame(self._config.stage, self._track_id)
         self._data_cache.update(pose)
 
         if self._data_cache.lost:

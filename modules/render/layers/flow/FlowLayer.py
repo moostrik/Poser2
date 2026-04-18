@@ -9,7 +9,7 @@ from OpenGL.GL import *  # type: ignore
 # Local application imports
 from modules.gl import Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Blit
-from modules.data_hub import DataHub, Stage
+from modules.blackboard import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import AngleMotion
 
@@ -86,7 +86,7 @@ class FlowLayer(LayerBase):
         - temperature: Temperature field (R16F)
 
     Usage:
-        flow = FlowLayer(cam_id, data_hub, mask, motion, colors, config)
+        flow = FlowLayer(cam_id, board, mask, motion, colors, config)
         flow.update()
         # Access outputs for fluid simulation:
         fluid.add_velocity(flow.velocity)
@@ -94,18 +94,20 @@ class FlowLayer(LayerBase):
         fluid.add_temperature(flow.temperature)
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, mask_source: MaskSourceLayer, mask: Texture, image: Texture, settings: FlowLayerSettings | None = None) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, mask_source: MaskSourceLayer, mask: Texture, image: Texture, settings: FlowLayerSettings | None = None, stage: int = 3) -> None:
         """Initialize flow layer.
 
         Args:
             cam_id: Camera ID
-            data_hub: Data hub for pose data
+            board: Blackboard for pose data
             mask_source: Mask source layer for optical flow update
             mask: Mask texture for optical flow input
             config: Layer configuration
+            stage: Pipeline stage for pose data
         """
         self._cam_id: int = cam_id
-        self._data_hub: DataHub = data_hub
+        self._board: HasFrames = board
+        self._stage: int = stage
         self._mask_source: MaskSourceLayer = mask_source
         self._mask: Texture = mask
         self._image: Texture = image
@@ -191,7 +193,7 @@ class FlowLayer(LayerBase):
     def update(self) -> None:
         """Update optical flow and bridges."""
         # Get motion data from pose
-        pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
+        pose: Frame | None = self._board.get_frame(self._stage, self._cam_id)
         motion = pose[AngleMotion].value if pose is not None and AngleMotion in pose else 0.0
 
         Style.push_style()

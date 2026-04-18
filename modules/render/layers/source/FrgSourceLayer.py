@@ -5,7 +5,7 @@ import torch
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.data_hub import DataHub, DataHubType
+from modules.blackboard import HasImages
 from modules.gl import Tensor, Texture
 from modules.pose.batch.ImageFrame import ImageFrame
 from modules.render.layers.LayerBase import LayerBase, DataCache
@@ -13,9 +13,9 @@ from modules.render.layers.LayerBase import LayerBase, DataCache
 
 class FrgSourceLayer(LayerBase):
 
-    def __init__(self, track_id: int, data_hub: DataHub) -> None:
+    def __init__(self, track_id: int, board: HasImages) -> None:
         self._track_id: int = track_id
-        self._data_hub: DataHub = data_hub
+        self._board: HasImages = board
         self._cuda_image: Tensor = Tensor()
         self._data_cache: DataCache[torch.Tensor]= DataCache[torch.Tensor]()
         self._dirty: bool = False
@@ -33,7 +33,7 @@ class FrgSourceLayer(LayerBase):
 
     def update(self) -> None:
         self._dirty = False
-        gpu_frame: ImageFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._track_id)
+        gpu_frame: ImageFrame | None = self._board.get_image(self._track_id)
         foreground: torch.Tensor | None = gpu_frame.foreground if gpu_frame else None
         self._data_cache.update(foreground)
 

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.data_hub import DataHub, DataHubType, Stage
+from modules.blackboard import HasFrames
 from modules.settings import Field, BaseSettings
 from modules.pose.frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
@@ -23,7 +23,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class CentreGeomSettings(BaseSettings):
     """Configuration for CentreGeometry anchor point positioning."""
-    stage:              Field[Stage] = Field(Stage.SMOOTH, description="Pose data pipeline stage")
+    stage:              Field[int] = Field(2, description="Pose data pipeline stage")
     cam_aspect:         Field[float] = Field(1.7778, access=Field.INIT, description="Camera aspect ratio (16/9 = 1.7778)")
     target_top_x:       Field[float] = Field(0.5, min=0.0, max=1.0, description="Top anchor X position (normalized)")
     target_top_y:       Field[float] = Field(0.33, min=0.0, max=1.0, description="Top anchor Y position (normalized)")
@@ -57,9 +57,9 @@ class CentreGeometry(LayerBase):
     pose points to crop space.
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, config: CentreGeomSettings | None = None) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, config: CentreGeomSettings | None = None) -> None:
         self._cam_id: int = cam_id
-        self._data_hub: DataHub = data_hub
+        self._board: HasFrames = board
         self._data_cache: DataCache[Frame] = DataCache[Frame]()
 
         # Configuration
@@ -114,7 +114,7 @@ class CentreGeometry(LayerBase):
     def update(self) -> None:
         """Calculate anchor points and derived geometry from current pose."""
         # Get pose data
-        pose: Frame | None = self._data_hub.get_pose(self.config.stage, self._cam_id)
+        pose: Frame | None = self._board.get_frame(self.config.stage, self._cam_id)
         self._data_cache.update(pose)
         if self._data_cache.idle:
             return

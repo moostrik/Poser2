@@ -1,6 +1,5 @@
 from modules.settings import BaseSettings, Field, Widget
 from modules.pose.features import Feature
-from modules.data_hub import Stage
 
 
 class RecorderSettings(BaseSettings):
@@ -15,5 +14,5 @@ class RecorderSettings(BaseSettings):
     name:         Field[str]   = Field("", widget=Widget.input, description="Recording name")
 
     # ── Recording options ─────────────────────────────────────────────
-    stage:    Field[Stage] = Field(Stage.RAW, description="Pipeline stage to record")
+    stage:    Field[int] = Field(0, description="Pipeline stage to record")
     features: Field[list]  = Field([Feature["BBox"], Feature["Points2D"]], description="Features to include in recording", newline=True)

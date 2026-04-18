@@ -5,7 +5,6 @@ import torch
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.data_hub import DataHub, DataHubType
 from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.gl import Tensor, SwapFbo, Texture, Blit
 
@@ -19,9 +18,9 @@ class DFlowSourceLayer(LayerBase):
     for visualization. Flow data is 2-channel (x, y displacement).
     """
 
-    def __init__(self, track_id: int, data_hub: DataHub) -> None:
+    def __init__(self, track_id: int) -> None:
         self._track_id: int = track_id
-        self._data_hub: DataHub = data_hub
+        self.flow_tensors: dict[int, torch.Tensor] = {}
         self._flow_texture: Tensor = Tensor()
         self._data_cache: DataCache[torch.Tensor]= DataCache[torch.Tensor]()
         self._fbo: SwapFbo = SwapFbo()
@@ -60,7 +59,7 @@ class DFlowSourceLayer(LayerBase):
     def update(self) -> None:
         """Update flow texture from DataHub."""
         self._dirty = False
-        flow_tensor: torch.Tensor | None = self._data_hub.get_item(DataHubType.flow_tensor, self._track_id)
+        flow_tensor: torch.Tensor | None = self.flow_tensors.get(self._track_id)
 
         self._data_cache.update(flow_tensor)
 

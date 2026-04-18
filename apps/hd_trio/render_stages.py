@@ -6,12 +6,12 @@ from typing import cast
 
 from pytweening import *  # type: ignore
 
-from modules.data_hub import DataHub, Stage
+from modules.blackboard import HasFrames
 from modules.pose.features import MotionTime
 from modules.render.layers import LayerBase
 from modules.render import layers as ls
 
-from .settings import Layers, RenderSettings, ShowStage
+from .settings import Layers, RenderSettings, ShowStage, Stage
 
 
 # ---------------------------------------------------------------------------
@@ -47,10 +47,10 @@ def _fade_out(progress: float, start: float = 0.0, end: float = 1.0,
 class StageLayer:
     """Base for per-stage orchestration — settings control + composition."""
 
-    def __init__(self, cam_id: int, data_hub: DataHub, settings: RenderSettings,
+    def __init__(self, cam_id: int, board: HasFrames, settings: RenderSettings,
                  layers: dict[Layers, LayerBase]) -> None:
         self.cam_id = cam_id
-        self.data_hub = data_hub
+        self.board: HasFrames = board
         self.settings = settings
         self.layers = layers
 
@@ -99,7 +99,7 @@ class StartStage(StageLayer):
         return _clamp((self._get_motion_time() - self._start_mt) / threshold)
 
     def _get_motion_time(self) -> float:
-        pose = self.data_hub.get_pose(Stage.LERP, self.cam_id)
+        pose = self.board.get_frame(Stage.LERP, self.cam_id)
         if pose is None:
             return 0.0
         v = pose[MotionTime].value
@@ -160,7 +160,7 @@ class PlayInStage(StageLayer):
         return _clamp((self._get_motion_time() - self._start_mt) / threshold)
 
     def _get_motion_time(self) -> float:
-        pose = self.data_hub.get_pose(Stage.LERP, self.cam_id)
+        pose = self.board.get_frame(Stage.LERP, self.cam_id)
         if pose is None:
             return 0.0
         v = pose[MotionTime].value

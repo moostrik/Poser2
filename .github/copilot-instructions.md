@@ -25,6 +25,11 @@ Prefer composition over inheritance for runtime assembly.
 - Pass dependencies through constructors
 - Use callback pipelines for data flow between components
 
+## Blackboard
+
+`modules/blackboard/` defines protocol + mixin pairs for shared runtime data. Each app composes its own `Blackboard` from the mixins it needs.
+- Detailed rules: `.github/instructions/blackboard.instructions.md`
+
 ## Concurrency
 
 The runtime uses threads and explicit synchronization, not async/await.

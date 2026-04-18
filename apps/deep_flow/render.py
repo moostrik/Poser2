@@ -5,13 +5,13 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture
 from modules.gl.WindowManager import MonitorId, WindowSettings
 from modules.render.layers import LayerBase
-from modules.data_hub import DataHub
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render import layers as ls
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-from .settings import Layers, RenderGroup
+from .blackboard import Blackboard
+from .settings import Layers, RenderGroup, Stage
 
 
 UPDATE_LAYERS: list[Layers] = [
@@ -44,13 +44,13 @@ LARGE_LAYERS: list[Layers] = [
 
 
 class DeepFlowRender(RenderBase):
-    def __init__(self, data_hub: DataHub, settings: RenderGroup, num_cams: int = 1, num_players: int = 1) -> None:
+    def __init__(self, board: Blackboard, settings: RenderGroup, num_cams: int = 1, num_players: int = 1) -> None:
         super().__init__(settings.window)
         self.num_players: int = num_players
         self.num_cams: int = num_cams
         self.settings: RenderGroup = settings
 
-        self.data_hub: DataHub = data_hub
+        self.board: Blackboard = board
 
         self._update_layers: list[Layers] = UPDATE_LAYERS
         self._interface_layers: list[Layers] = INTERFACE_LAYERS
@@ -68,32 +68,32 @@ class DeepFlowRender(RenderBase):
         flows: dict[int, ls.FlowLayer] = {}
         cmt: dict[int, Texture] = {}
         for i in range(self.num_cams):
-            cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
-            cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.data_hub)
-            cam_frg =       self.L[Layers.cam_frg][i] =     ls.FrgSourceLayer(      i, self.data_hub)
-            cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
+            cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.board)
+            cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.board)
+            cam_frg =       self.L[Layers.cam_frg][i] =     ls.FrgSourceLayer(      i, self.board)
+            cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.board)
 
-            cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.data_hub,   cam_image.texture,          settings.preview.tracker,   settings.colors)
-            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.data_hub,   cam_image.texture,          settings.preview.poser,     settings.colors)
+            cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
+            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.board,   cam_image.texture,          settings.preview.poser,     settings.colors)
 
-            centre_gmtry =  self.L[Layers.centre_geom][i] = ls.CentreGeometry(      i, self.data_hub,                               settings.centre.geometry)
+            centre_gmtry =  self.L[Layers.centre_geom][i] = ls.CentreGeometry(      i, self.board,                               settings.centre.geometry)
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(     i, centre_gmtry,    cam_mask.texture,           settings.centre.mask)
             cmt[i] = centre_mask.texture
             centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(      i, centre_gmtry,    cam_image.texture,  cmt[i], settings.centre.cam)
             centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(      i, centre_gmtry,    cam_frg.texture,    cmt[i], settings.centre.frg,        settings.colors)
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(     i, centre_gmtry,                                settings.centre.pose,       settings.colors)
 
-            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.data_hub,   centre_frg.texture, cmt,    settings.centre.color,      settings.colors)
-            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask,  centre_mask.texture, centre_frg.texture,     settings.flow)
-            fluid3d =       self.L[Layers.fluid3d][i] =     ls.Fluid3DLayer(        i, self.data_hub,   flows,                      settings.fluid3d,           settings.colors)
+            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   centre_frg.texture, cmt,    settings.centre.color,      settings.colors,    stage=Stage.LERP)
+            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,   cam_mask,  centre_mask.texture, centre_frg.texture,     settings.flow,                          stage=Stage.LERP)
+            fluid3d =       self.L[Layers.fluid3d][i] =     ls.Fluid3DLayer(        i, self.board,   flows,                      settings.fluid3d,           settings.colors,    stage=Stage.LERP)
 
             lut =           self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid3d, ms_mask],         settings.layer.lut)
 
-            self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, settings.data.a, settings.colors)
-            self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, settings.data.a, settings.colors)
-            self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, settings.data.b, settings.colors)
-            self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, settings.data.b, settings.colors)
-            self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.data_hub)
+            self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.board, settings.data.a, settings.colors)
+            self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.a, settings.colors)
+            self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.board, settings.data.b, settings.colors)
+            self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.b, settings.colors)
+            self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.board)
 
         # Split-view composition: left panel + right panel
         self.subdivision_rows: list[SubdivisionRow] = [

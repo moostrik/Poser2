@@ -10,7 +10,7 @@ import math
 # Local application imports
 from modules.gl import Fbo, SwapFbo, Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Blit
-from modules.data_hub import DataHub, DataHubType, Stage
+from modules.blackboard import HasFrames
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 from modules.pose.frame import Frame
 from modules.settings import Field, BaseSettings
@@ -48,9 +48,10 @@ class MSColorMaskLayer(LayerBase):
     Each camera's contribution is colored exactly once.
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, frg_texture: Texture, mask_textures: dict[int, Texture], settings: ColorMaskLayerSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, frg_texture: Texture, mask_textures: dict[int, Texture], settings: ColorMaskLayerSettings, color_settings: ColorSettings, stage: int = 3) -> None:
         self._cam_id: int = cam_id
-        self._data_hub: DataHub = data_hub
+        self._board: HasFrames = board
+        self._stage: int = stage
         self._mask_textures: dict[int, Texture] = mask_textures
         self._frg_texture: Texture = frg_texture
         self.config: ColorMaskLayerSettings = settings
@@ -109,8 +110,8 @@ class MSColorMaskLayer(LayerBase):
             Step 3: MSColorMask(own styled, other masks, colors, weights) → _fbo
         """
         # Get pose data for this camera
-        pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
-        active_poses = len(self._data_hub.get_dict(DataHubType.frame_lerp))
+        pose: Frame | None = self._board.get_frame(self._stage, self._cam_id)
+        active_poses = len(self._board.get_frames(self._stage))
 
         # Extract similarity and motion data
         num_players = self.config.num_players

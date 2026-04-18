@@ -7,7 +7,7 @@ import numpy as np
 from OpenGL.GL import *  # type: ignore
 
 # Local application imports
-from modules.data_hub import DataHub, Stage
+from modules.blackboard import HasWindows
 from modules.gl import Fbo, Texture, Blit, Image, clear_color, Text
 from modules.pose.frame import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
@@ -25,9 +25,9 @@ class FeatureWindowLayer(LayerBase):
     """
     LAYER_MODE: LayerMode = LayerMode.WINDOW
 
-    def __init__(self, track_id: int, data_hub: DataHub, config: DataLayerSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, track_id: int, board: HasWindows, config: DataLayerSettings, color_settings: ColorSettings) -> None:
         self._track_id: int = track_id
-        self._data_hub: DataHub = data_hub
+        self._board: HasWindows = board
         self._config: DataLayerSettings = config
         self._color_settings: ColorSettings = color_settings
         self._was_active: bool = False
@@ -95,8 +95,8 @@ class FeatureWindowLayer(LayerBase):
             return
         # ScalarFeatureSelect maps to feature type for DataHub lookup
         feature_type = FEATURE_MAP[self._config.feature_field]
-        window: FeatureWindow | None = self._data_hub.get_feature_window(
-            self._config.stage, feature_type, self._track_id
+        window: FeatureWindow | None = self._board.get_window(
+            self._config.stage, self._track_id, feature_type
         )
         self._data_cache.update(window)
 

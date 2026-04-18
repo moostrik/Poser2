@@ -4,7 +4,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.data_hub import DataHub, Stage
+from modules.blackboard import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import MotionTime
 from modules.render.layers.LayerBase import LayerBase
@@ -12,13 +12,13 @@ from modules.gl import Text
 
 
 class MTimeRendererSettings(BaseSettings):
-    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
+    stage: Field[int] = Field(3, description="Pipeline stage for pose data")
 
 
 class MTimeRenderer(LayerBase):
-    def __init__(self, track_id: int, data: DataHub, config: MTimeRendererSettings | None = None) -> None:
+    def __init__(self, track_id: int, board: HasFrames, config: MTimeRendererSettings | None = None) -> None:
         self._config: MTimeRendererSettings = config or MTimeRendererSettings()
-        self._data: DataHub = data
+        self._board: HasFrames = board
         self._track_id: int = track_id
         self._motion_time: str | None = None
 
@@ -54,7 +54,7 @@ class MTimeRenderer(LayerBase):
         )
 
     def update(self) -> None:
-        pose: Frame | None = self._data.get_pose(self._config.stage, self._track_id)
+        pose: Frame | None = self._board.get_frame(self._config.stage, self._track_id)
 
         if pose is None:
             self._motion_time = None

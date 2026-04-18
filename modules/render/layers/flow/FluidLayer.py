@@ -10,7 +10,7 @@ import numpy as np
 # Local application imports
 from modules.gl import Texture, Style, Fbo
 from modules.render.layers.LayerBase import LayerBase, Blit
-from modules.data_hub import DataHub, Stage
+from modules.blackboard import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 
@@ -77,25 +77,27 @@ class FluidLayer(LayerBase):
     Usage:
         # In RenderManager:
         flow_layers = {i: FlowLayer(...) for i in range(num_cams)}
-        fluid = FluidLayer(cam_id, data_hub, flow_layers, colors, config)
+        fluid = FluidLayer(cam_id, board, flow_layers, colors, config)
 
         # Each frame:
         fluid.update()
         density_texture = fluid.density
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, flow_layers: dict[int, FlowLayer], settings: FluidLayerSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, flow_layers: dict[int, FlowLayer], settings: FluidLayerSettings, color_settings: ColorSettings, stage: int = 3) -> None:
         """Initialize fluid layer.
 
         Args:
             cam_id: Camera ID for this layer's output
-            data_hub: Data hub for pose data
+            board: Blackboard for pose data
             flow_layers: Dict of all FlowLayers (cam_id -> FlowLayer)
             color_settings: Shared color settings for density colorization
             config: Layer configuration
+            stage: Pipeline stage for pose data
         """
         self._cam_id: int = cam_id
-        self._data_hub: DataHub = data_hub
+        self._board: HasFrames = board
+        self._stage: int = stage
         self._flow_layers: dict[int, FlowLayer] = flow_layers
         self.settings: FluidLayerSettings = settings
         self._color_settings: ColorSettings = color_settings
@@ -189,7 +191,7 @@ class FluidLayer(LayerBase):
     def update(self) -> None:
         """Update fluid simulation with inputs from all flow layers."""
         # Get motion data from pose
-        pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
+        pose: Frame | None = self._board.get_frame(self._stage, self._cam_id)
         similarities: np.ndarray = pose[Similarity].values if pose is not None and Similarity in pose else np.full((self.settings.num_players,), 0.0)
         motion_gates: np.ndarray = pose[MotionGate].values if pose is not None and MotionGate in pose else np.full((self.settings.num_players,), 0.0)
         motion: float = pose[AngleMotion].value if pose is not None and AngleMotion in pose else 0.0

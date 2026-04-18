@@ -5,13 +5,13 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture
 from modules.gl.WindowManager import MonitorId, WindowSettings
 from modules.render.layers import LayerBase
-from modules.data_hub import DataHub
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render import layers as ls
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-from .settings import Layers, RenderSettings, ShowStage, ShowSequencerSettings
+from .blackboard import Blackboard
+from .settings import Layers, RenderSettings, ShowStage, Stage
 from . import render_stages
 from .render_stages import STAGES, StageLayer
 from .intro_sequence import IntroSequencePlayer, SequenceDataProxy, FixedColorProxy
@@ -46,14 +46,13 @@ LARGE_LAYERS: list[Layers] = [
 
 
 class HDTrioRender(RenderBase):
-    def __init__(self, data_hub: DataHub, settings: RenderSettings, sequencer: ShowSequencerSettings) -> None:
+    def __init__(self, board: Blackboard, settings: RenderSettings) -> None:
         super().__init__(settings.window)
         self.num_players: int = settings.num_players
         self.num_cams: int = settings.num_cams
         self.settings: RenderSettings = settings
-        self._sequencer: ShowSequencerSettings = sequencer
 
-        self.data_hub: DataHub = data_hub
+        self.board: Blackboard = board
 
         self._update_layers: list[Layers] = UPDATE_LAYERS
         self._interface_layers: list[Layers] = INTERFACE_LAYERS
@@ -71,36 +70,36 @@ class HDTrioRender(RenderBase):
         flows: dict[int, ls.FlowLayer] = {}
         cmt: dict[int, Texture] = {}
         for i in range(self.num_cams):
-            cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
-            cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.data_hub)
-            cam_frg =       self.L[Layers.cam_frg][i]=      ls.FrgSourceLayer(      i, self.data_hub)
-            cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
+            cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.board)
+            cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.board)
+            cam_frg =       self.L[Layers.cam_frg][i]=      ls.FrgSourceLayer(      i, self.board)
+            cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.board)
 
-            cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.data_hub,   cam_image.texture,          settings.preview.tracker,   settings.colors)
-            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.data_hub,   cam_image.texture,          settings.preview.poser,     settings.colors)
+            cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
+            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.board,   cam_image.texture,          settings.preview.poser,     settings.colors)
 
-            centre_gmtry=   self.L[Layers.centre_geom][i] = ls.CentreGeometry(      i, self.data_hub,                               settings.centre.geometry)
+            centre_gmtry=   self.L[Layers.centre_geom][i] = ls.CentreGeometry(      i, self.board,                               settings.centre.geometry)
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(     i, centre_gmtry,    cam_mask.texture,           settings.centre.mask)
             cmt[i] = centre_mask.texture
             centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(      i, centre_gmtry,    cam_image.texture,  cmt[i], settings.centre.cam)
             centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(      i, centre_gmtry,    cam_frg.texture,    cmt[i], settings.centre.frg,        settings.colors)
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(     i, centre_gmtry,                                settings.centre.pose,       settings.colors)
 
-            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.data_hub,   centre_frg.texture, cmt,    settings.centre.color,      settings.colors)
-            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask,  centre_mask.texture, centre_frg.texture,     settings.flow)
-            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows,                      settings.fluid,             settings.colors)
+            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   centre_frg.texture, cmt,    settings.centre.color,      settings.colors,    stage=Stage.LERP)
+            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,   cam_mask,  centre_mask.texture, centre_frg.texture,     settings.flow,                          stage=Stage.LERP)
+            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.board,   flows,                      settings.fluid,             settings.colors,    stage=Stage.LERP)
 
             lut =           self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid, ms_mask],           settings.layer.lut)
 
-            self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, settings.data.a, settings.colors)
-            self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, settings.data.a, settings.colors)
-            self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, settings.data.b, settings.colors)
-            self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, settings.data.b, settings.colors)
-            self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.data_hub)
+            self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.board, settings.data.a, settings.colors)
+            self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.a, settings.colors)
+            self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.board, settings.data.b, settings.colors)
+            self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.b, settings.colors)
+            self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.board)
 
             cam_layers = {layer: cam_dict[i] for layer, cam_dict in self.L.items() if i in cam_dict}
             for stage, cls in STAGES.items():
-                self._stages[stage].append(cls(i, data_hub, settings, cam_layers))
+                self._stages[stage].append(cls(i, board, settings, cam_layers))
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
@@ -135,7 +134,7 @@ class HDTrioRender(RenderBase):
         """Re-instantiate stage objects after hot-reload of stages.py."""
         self._stages = {
             stage: [
-                cls(i, self.data_hub, self.settings, {layer: cam_dict[i] for layer, cam_dict in self.L.items() if i in cam_dict})
+                cls(i, self.board, self.settings, {layer: cam_dict[i] for layer, cam_dict in self.L.items() if i in cam_dict})
                 for i in range(self.num_cams)
             ]
             for stage, cls in render_stages.STAGES.items()
@@ -175,8 +174,9 @@ class HDTrioRender(RenderBase):
         self._preview_layers = self.settings.layer.select.preview
 
         # Stage transitions — enter/exit before layer updates so settings writes take effect
-        stage = ShowStage(self._sequencer.stage)
-        progress = self._sequencer.stage_progress
+        seq = self.board.get_sequence()
+        stage = ShowStage(seq.stage)
+        progress = seq.stage_progress
         if stage != self._prev_stage:
             for s in self._active_stages:
                 s.exit()

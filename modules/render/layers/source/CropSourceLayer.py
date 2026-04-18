@@ -5,7 +5,7 @@ import torch
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.data_hub import DataHub, DataHubType
+from modules.blackboard import HasImages
 from modules.gl import Tensor, Texture
 from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.pose.batch.ImageFrame import ImageFrame
@@ -17,9 +17,9 @@ class CropSourceLayer(LayerBase):
     Displays the 384x512 (or configured size) crop that will be sent to TRT models.
     """
 
-    def __init__(self, track_id: int, data_hub: DataHub) -> None:
+    def __init__(self, track_id: int, board: HasImages) -> None:
         self._track_id: int = track_id
-        self._data_hub: DataHub = data_hub
+        self._board: HasImages = board
         self._cuda_image: Tensor = Tensor()
         self._data_cache: DataCache[ImageFrame] = DataCache[ImageFrame]()
         self._dirty: bool = False
@@ -40,7 +40,7 @@ class CropSourceLayer(LayerBase):
 
     def update(self) -> None:
         self._dirty = False
-        gpu_frame: ImageFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._track_id)
+        gpu_frame: ImageFrame | None = self._board.get_image(self._track_id)
         self._data_cache.update(gpu_frame)
 
         if self._data_cache.lost:

@@ -3,7 +3,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.data_hub import DataHub, FRAME_TYPES, Stage
+from modules.blackboard import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import BBox
 from modules.render.layers.LayerBase import LayerBase, Rect
@@ -12,15 +12,15 @@ from modules.utils import Color
 
 
 class BBoxRendererSettings(BaseSettings):
-    stage:      Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
+    stage:      Field[int] = Field(3, description="Pipeline stage for pose data")
     line_width: Field[float] = Field(2.0, min=1.0, max=10.0, description="Bounding box line width in pixels")
     color:      Field[Color] = Field(Color(1.0, 1.0, 1.0), description="Bounding box color")
 
 
 class BBoxRenderer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, settings: BBoxRendererSettings | None = None) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, settings: BBoxRendererSettings | None = None) -> None:
         self.settings: BBoxRendererSettings = settings or BBoxRendererSettings()
-        self._data: DataHub = data
+        self._board: HasFrames = board
         self._cam_id: int = cam_id
         self._cam_bbox_rects: list[Rect] = []
         self._width: int = 0
@@ -54,7 +54,7 @@ class BBoxRenderer(LayerBase):
             )
 
     def update(self) -> None:
-        cam_poses = {p for p in self._data.get_dict(FRAME_TYPES[self.settings.stage]).values() if p.cam_id == self._cam_id}
+        cam_poses = {p for p in self._board.get_frames(self.settings.stage).values() if p.cam_id == self._cam_id}
         self._cam_bbox_rects = []
         for pose in cam_poses:
             self._cam_bbox_rects.append(pose[BBox].to_rect())

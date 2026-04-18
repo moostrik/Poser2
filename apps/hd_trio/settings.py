@@ -31,6 +31,13 @@ from modules.gl.WindowManager import WindowSettings
 #  Show stages & sequencer settings
 # ---------------------------------------------------------------------------
 
+class Stage(IntEnum):
+    RAW =       0
+    CLEAN =     auto()
+    SMOOTH =    auto()
+    LERP =      auto()
+
+
 class ShowStage(IntEnum):
     START =         0
     INTRO_IN =      auto()
@@ -229,6 +236,10 @@ class PoseGroup(BaseSettings):
     window_lerp     : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
 
 
+class _PoseRecorderSettings(PoseRecorderSettings):
+    stage: Field[Stage] = Field(Stage.RAW)
+
+
 # ---------------------------------------------------------------------------
 #  Session group (recording lifecycle: OSC, timer, video & pose recorders)
 # ---------------------------------------------------------------------------
@@ -252,27 +263,41 @@ class SessionGroup(BaseSettings):
     core    : Group[SessionSettings]         = Group(SessionSettings, share=_session_share)
     sequencer: Group[ShowSequencerSettings]   = Group(ShowSequencerSettings, share=[start, stop])
     video   : Group[RecorderSettings]        = Group(RecorderSettings, share=_recorder_share + [num_cameras, fps])
-    pose    : Group[PoseRecorderSettings]    = Group(PoseRecorderSettings, share=_recorder_share)
+    pose    : Group[_PoseRecorderSettings]   = Group(_PoseRecorderSettings, share=_recorder_share)
 
 
 # ---------------------------------------------------------------------------
 #  Render settings (layer configs, centre, flow, fluid, colors, window)
 # ---------------------------------------------------------------------------
 
+# Stage-aware subclasses — override Field[int] with Field[Stage] for dropdown UI
+class _DataLayerSettings(layers.DataLayerSettings):
+    stage: Field[Stage] = Field(Stage.SMOOTH)
+
+class _TrackerCompSettings(layers.TrackerCompSettings):
+    stage: Field[Stage] = Field(Stage.LERP)
+
+class _PoseCompSettings(layers.PoseCompSettings):
+    stage: Field[Stage] = Field(Stage.LERP)
+
+class _CentreGeomSettings(layers.CentreGeomSettings):
+    stage: Field[Stage] = Field(Stage.SMOOTH)
+
+
 class LayerGroup(BaseSettings):
     select: Group[LayerSettings]                 = Group(LayerSettings)
     lut   : Group[layers.CompositeLayerSettings] = Group(layers.CompositeLayerSettings)
 
 class DataGroup(BaseSettings):
-    a: Group[layers.DataLayerSettings] = Group(layers.DataLayerSettings)
-    b: Group[layers.DataLayerSettings] = Group(layers.DataLayerSettings)
+    a: Group[_DataLayerSettings] = Group(_DataLayerSettings)
+    b: Group[_DataLayerSettings] = Group(_DataLayerSettings)
 
 class PreviewGroup(BaseSettings):
-    tracker: Group[layers.TrackerCompSettings] = Group(layers.TrackerCompSettings)
-    poser  : Group[layers.PoseCompSettings]    = Group(layers.PoseCompSettings)
+    tracker: Group[_TrackerCompSettings] = Group(_TrackerCompSettings)
+    poser  : Group[_PoseCompSettings]    = Group(_PoseCompSettings)
 
 class CentreGroup(BaseSettings):
-    geometry: Group[layers.CentreGeomSettings]     = Group(layers.CentreGeomSettings)
+    geometry: Group[_CentreGeomSettings]       = Group(_CentreGeomSettings)
     mask    : Group[layers.CentreMaskSettings]     = Group(layers.CentreMaskSettings)
     cam     : Group[layers.CentreCamSettings]      = Group(layers.CentreCamSettings)
     frg     : Group[layers.CentreFrgSettings]      = Group(layers.CentreFrgSettings)

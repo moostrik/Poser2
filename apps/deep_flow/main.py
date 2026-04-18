@@ -5,13 +5,13 @@ from functools import partial
 
 from modules.oak import Camera, Simulator, Player, Recorder, Sync
 from modules.settings import presets, NiceServer
-from modules.data_hub import DataHub, DataHubType, Stage
 from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker
 from modules.pose import batch, nodes, trackers, window
 from modules.pose.features import configure_features
 
-from .settings import DeepFlowSettings
+from .blackboard import Blackboard
+from .settings import DeepFlowSettings, Stage
 from .render import DeepFlowRender
 
 APP_NAME = 'deep_flow'
@@ -36,8 +36,8 @@ class DeepFlowMain:
         num_players: int = self.settings.num_players
         p = self.settings.pose
 
-        # DATA_HUB
-        self.data_hub = DataHub()
+        # BLACKBOARD
+        self.board = Blackboard()
 
         # CAMERA
         configure_features(num_players)
@@ -59,13 +59,12 @@ class DeepFlowMain:
         self.image_crop_processor = batch.ImageCropProcessor(p.image_crop)
 
         for camera in self.cameras:
-            camera.add_preview_callback(lambda k, _ft, v: self.data_hub.set_item(DataHubType.cam_image, k, v))
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.image_crop_processor.set_image)
             camera.add_frame_callback(self.frame_sync_bang.add_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
-            camera.add_tracker_callback(partial(self.data_hub.set_item, DataHubType.depth_tracklet))
+            camera.add_tracker_callback(self.board.set_depth_tracklets)
             camera.add_tracker_callback(self.tracklet_sync_bang.add_frame)
 
         # DETECTION
@@ -83,7 +82,6 @@ class DeepFlowMain:
         })
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.submit_tracklets)
-        self.tracker.add_tracklet_callback(partial(self.data_hub.set_dict, DataHubType.tracklet))
         self.tracklet_sync_bang.add_callback(self.tracker.notify_update)
         self.frame_sync_bang.add_callback(self.poses_from_tracklets.generate)
 
@@ -92,15 +90,14 @@ class DeepFlowMain:
         self.image_crop_processor.add_callback(self.point_extractor.process)
         self.image_crop_processor.add_callback(self.mask_extractor.process)
         self.image_crop_processor.add_callback(self.flow_extractor.process)
-        self.mask_extractor.add_callback(lambda _f, gpu: self.data_hub.set_dict(DataHubType.gpu_frames, gpu))
-        self.flow_extractor.add_callback(partial(self.data_hub.set_dict, DataHubType.flow_tensor))
+        self.mask_extractor.add_callback(lambda _f, gpu: self.board.set_images(gpu))
 
         # STAGE RAW
         self.window_tracker_R = window.WindowTracker(num_players, p.window_raw)
 
-        self.point_extractor.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.frame_raw))
+        self.point_extractor.add_frames_callback(partial(self.board.set_frames, Stage.RAW))
         self.point_extractor.add_frames_callback(self.window_tracker_R.process)
-        self.window_tracker_R.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.RAW))
+        self.window_tracker_R.add_frame_windows_callback(partial(self.board.set_windows, Stage.RAW))
 
         # STAGE CLEAN
         self.pose_raw_filters = trackers.FilterTracker({
@@ -114,9 +111,9 @@ class DeepFlowMain:
         self.window_tracker_C = window.WindowTracker(num_players, p.window_clean)
 
         self.point_extractor.add_frames_callback(self.pose_raw_filters.process)
-        self.pose_raw_filters.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.frame_clear))
+        self.pose_raw_filters.add_frames_callback(partial(self.board.set_frames, Stage.CLEAN))
         self.pose_raw_filters.add_frames_callback(self.window_tracker_C.process)
-        self.window_tracker_C.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.CLEAN))
+        self.window_tracker_C.add_frame_windows_callback(partial(self.board.set_windows, Stage.CLEAN))
 
         # STAGE SMOOTH
         self.pose_smooth_filters = trackers.FilterTracker({
@@ -147,9 +144,9 @@ class DeepFlowMain:
 
         self.pose_raw_filters.add_frames_callback(self.pose_smooth_filters.process)
         self.pose_smooth_filters.add_frames_callback(self.pose_prediction_filters.process)
-        self.pose_prediction_filters.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.frame_smooth))
+        self.pose_prediction_filters.add_frames_callback(partial(self.board.set_frames, Stage.SMOOTH))
         self.pose_smooth_filters.add_frames_callback(self.window_tracker_S.process)
-        self.window_tracker_S.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.SMOOTH))
+        self.window_tracker_S.add_frame_windows_callback(partial(self.board.set_windows, Stage.SMOOTH))
 
         # STAGE LERP
         self.motion_gate_applicator = nodes.MotionGateApplicator(p.motion_gate)
@@ -185,12 +182,12 @@ class DeepFlowMain:
         self.interpolators.add_frames_callback(self.pose_interpolation_filters.process)
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_applicator.submit)
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_tracker.process)
-        self.motion_gate_tracker.add_frames_callback(partial(self.data_hub.set_dict, DataHubType.frame_lerp))
+        self.motion_gate_tracker.add_frames_callback(partial(self.board.set_frames, Stage.LERP))
         self.motion_gate_tracker.add_frames_callback(self.window_tracker_I.process)
-        self.window_tracker_I.add_frame_windows_callback(partial(self.data_hub.set_pose_windows, Stage.LERP))
+        self.window_tracker_I.add_frame_windows_callback(partial(self.board.set_windows, Stage.LERP))
 
         # RENDER
-        self.render = DeepFlowRender(self.data_hub, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
+        self.render = DeepFlowRender(self.board, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
         self.render.add_exit_callback(self.stop)
 
         # IN/OUT
