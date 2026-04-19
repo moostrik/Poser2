@@ -38,6 +38,7 @@ class DeepFlowMain:
 
         # BLACKBOARD
         self.board = RenderBoard()
+        self.sound_osc = OscSound(self.settings.inout.osc_sound)
 
         # CAMERA
         configure_features(num_players)
@@ -96,6 +97,7 @@ class DeepFlowMain:
         self.window_tracker_R = window.WindowTracker(num_players, p.window_raw)
 
         self.point_extractor.add_frames_callback(partial(self.board.set_frames, Stage.RAW))
+        self.point_extractor.add_frames_callback(partial(self.sound_osc.set_poses, Stage.RAW))
         self.point_extractor.add_frames_callback(self.window_tracker_R.process)
         self.window_tracker_R.add_frame_windows_callback(partial(self.board.set_windows, Stage.RAW))
 
@@ -112,6 +114,7 @@ class DeepFlowMain:
 
         self.point_extractor.add_frames_callback(self.pose_raw_filters.process)
         self.pose_raw_filters.add_frames_callback(partial(self.board.set_frames, Stage.CLEAN))
+        self.pose_raw_filters.add_frames_callback(partial(self.sound_osc.set_poses, Stage.CLEAN))
         self.pose_raw_filters.add_frames_callback(self.window_tracker_C.process)
         self.window_tracker_C.add_frame_windows_callback(partial(self.board.set_windows, Stage.CLEAN))
 
@@ -145,6 +148,7 @@ class DeepFlowMain:
         self.pose_raw_filters.add_frames_callback(self.pose_smooth_filters.process)
         self.pose_smooth_filters.add_frames_callback(self.pose_prediction_filters.process)
         self.pose_prediction_filters.add_frames_callback(partial(self.board.set_frames, Stage.SMOOTH))
+        self.pose_prediction_filters.add_frames_callback(partial(self.sound_osc.set_poses, Stage.SMOOTH))
         self.pose_smooth_filters.add_frames_callback(self.window_tracker_S.process)
         self.window_tracker_S.add_frame_windows_callback(partial(self.board.set_windows, Stage.SMOOTH))
 
@@ -183,6 +187,7 @@ class DeepFlowMain:
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_applicator.submit)
         self.pose_interpolation_filters.add_frames_callback(self.motion_gate_tracker.process)
         self.motion_gate_tracker.add_frames_callback(partial(self.board.set_frames, Stage.LERP))
+        self.motion_gate_tracker.add_frames_callback(partial(self.sound_osc.set_poses, Stage.LERP))
         self.motion_gate_tracker.add_frames_callback(self.window_tracker_I.process)
         self.window_tracker_I.add_frame_windows_callback(partial(self.board.set_windows, Stage.LERP))
 
@@ -191,8 +196,6 @@ class DeepFlowMain:
         self.render.add_exit_callback(self.stop)
 
         # IN/OUT
-        self.sound_osc = OscSound(self.settings.inout.osc_sound)
-        self.motion_gate_tracker.add_frames_callback(self.sound_osc.set_poses)
         self.render.add_update_callback(self.interpolators.update)
 
     def start(self) -> None:

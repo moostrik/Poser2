@@ -110,8 +110,12 @@ class OakGroup(BaseSettings):
 #  InOut group (OSC sound + OSC control)
 # ---------------------------------------------------------------------------
 
+class _OscSoundSettings(OscSoundSettings):
+    stage: Field[Stage] = Field(Stage.LERP)
+
+
 class InOutGroup(BaseSettings):
-    osc_sound   = Group(OscSoundSettings)
+    osc_sound   = Group(_OscSoundSettings)
     osc_control = Group(OscReceiverSettings)
 
 

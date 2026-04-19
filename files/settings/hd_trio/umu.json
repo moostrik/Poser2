@@ -1,7 +1,7 @@
 {
   "num_players": 3,
   "input_fps": 23.0,
-  "render_fps": 64.0,
+  "render_fps": 80.0,
   "camera": {
     "yolo": true,
     "color": true,
@@ -9,18 +9,18 @@
     "square": true,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "models",
     "cam_0": {
-      "device_id": "14442C101136D1D200",
+      "device_id": "19443010D153874800",
       "show_stereo": false,
       "flip_h": false,
       "flip_v": true,
       "perspective": -0.22,
-      "color_exposure": 0,
-      "color_iso": 0,
+      "color_exposure": 30001,
+      "color_iso": 1599,
       "color_auto_exposure": true,
-      "color_balance": 0,
+      "color_balance": 4337,
       "color_auto_balance": true,
       "color_brightness": 0,
       "color_contrast": 0,
@@ -39,15 +39,15 @@
       "stereo_bright_max": 255
     },
     "cam_1": {
-      "device_id": "14442C10F124D9D600",
+      "device_id": "19443010D1E4974800",
       "show_stereo": false,
       "flip_h": false,
       "flip_v": true,
       "perspective": -0.22,
-      "color_exposure": 0,
-      "color_iso": 0,
+      "color_exposure": 30001,
+      "color_iso": 1599,
       "color_auto_exposure": true,
-      "color_balance": 0,
+      "color_balance": 4183,
       "color_auto_balance": true,
       "color_brightness": 0,
       "color_contrast": 0,
@@ -66,15 +66,15 @@
       "stereo_bright_max": 255
     },
     "cam_2": {
-      "device_id": "14442C10110AD3D200",
+      "device_id": "19443010D14C874800",
       "show_stereo": false,
       "flip_h": false,
       "flip_v": true,
       "perspective": -0.22,
-      "color_exposure": 1000,
-      "color_iso": 100,
+      "color_exposure": 30001,
+      "color_iso": 1599,
       "color_auto_exposure": true,
-      "color_balance": 1000,
+      "color_balance": 4282,
       "color_auto_balance": true,
       "color_brightness": 0,
       "color_contrast": 0,
@@ -120,7 +120,7 @@
     "osc_sound": {
       "max_players": 3,
       "ip_addresses": "127.0.0.1",
-      "port": 9000,
+      "port": 8000,
       "stage": "LERP"
     },
     "artnet_0": {
@@ -202,7 +202,6 @@
       "enable_prev_crop": false,
       "verbose": false
     },
-    "angle_extractor": {},
     "bbox": {
       "smoother": {
         "min_cutoff": 0.01,
@@ -332,10 +331,6 @@
       "window_size": 180,
       "emit_partial": true
     },
-    "window_clean": {
-      "window_size": 180,
-      "emit_partial": true
-    },
     "window_smooth": {
       "window_size": 180,
       "emit_partial": true
@@ -346,12 +341,11 @@
     }
   },
   "render": {
-    "stage": "LERP",
     "num_players": 3,
     "layer": {
       "select": {
         "preview": [
-          "flow"
+          "composite"
         ],
         "final": [
           "composite"
@@ -439,7 +433,6 @@
         "draw_anchors": false
       },
       "color": {
-        "stage": 3,
         "num_players": 3,
         "blend_mode": "ALPHA",
         "similarity_threshold": 0.33,
@@ -450,7 +443,7 @@
       }
     },
     "intro_sequence": {
-      "verbose": false,
+      "verbose": true,
       "recording_path": "recordings/intro",
       "source_track": 0,
       "color": {
@@ -460,10 +453,10 @@
         "a": 1.0
       },
       "pose": {
-        "line_width": 3.0,
-        "line_smooth": 0.0,
+        "line_width": 10.0,
+        "line_smooth": 1.77,
         "use_scores": false,
-        "draw_anchors": false
+        "draw_anchors": true
       }
     },
     "flow": {
@@ -606,8 +599,8 @@
       "v_sync": false,
       "fullscreen": false,
       "monitor": 0,
-      "x": 883,
-      "y": 102,
+      "x": 273,
+      "y": 48,
       "width": 1080,
       "height": 1000,
       "secondary_list": [
@@ -633,17 +626,19 @@
       "verbose": true
     },
     "core": {},
-    "sequencer": {
+    "timeline": {
       "stages": [
         "START",
         "INTRO_IN",
         "INTRO",
         "INTRO_OUT",
         "PLAY_IN",
+        "PLAY",
+        "CONCLUSION",
         "IDLE"
       ],
       "durations": [
-        10.0,
+        5.0,
         3.0,
         30.0,
         3.0,
@@ -666,8 +661,17 @@
       "enabled": false,
       "stage": "RAW",
       "features": [
+        "Age",
+        "AngleMotion",
+        "Angles",
+        "AngleSymmetry",
+        "AngleVelocity",
         "BBox",
-        "Points2D"
+        "LeaderScore",
+        "MotionGate",
+        "MotionTime",
+        "Points2D",
+        "Similarity"
       ]
     }
   }

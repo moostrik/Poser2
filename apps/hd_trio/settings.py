@@ -134,8 +134,12 @@ class OakGroup(BaseSettings):
 #  InOut group (OSC + 3 ArtNet controllers)
 # ---------------------------------------------------------------------------
 
+class _OscSoundSettings(OscSoundSettings):
+    stage: Field[Stage] = Field(Stage.LERP)
+
+
 class InOutGroup(BaseSettings):
-    osc_sound:        Group[OscSoundSettings]    = Group(OscSoundSettings)
+    osc_sound:        Group[_OscSoundSettings]   = Group(_OscSoundSettings)
     artnet_0 :        Group[ArtNetBarsSettings]  = Group(ArtNetBarsSettings)
     artnet_1 :        Group[ArtNetBarsSettings]  = Group(ArtNetBarsSettings)
     artnet_2 :        Group[ArtNetBarsSettings]  = Group(ArtNetBarsSettings)

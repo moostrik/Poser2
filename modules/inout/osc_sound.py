@@ -24,6 +24,7 @@ class OscSoundSettings(BaseSettings):
     max_players: Field[int]  = Field(4,    min=1,    max=16,    access=Field.INIT,         description="Max number of player poses to send (IDs 0 to N-1)")
     ip_addresses: Field[str] = Field("127.0.0.1",               widget=Widget.ip_field,     description="Target OSC IP address")
     port: Field[int]         = Field(9000, min=1024, max=65535, widget=Widget.number_field, description="Target OSC port")
+    stage: Field[int]        = Field(0,                                                     description="Pipeline stage to read poses from")
 
 
 class OscSound:
@@ -63,8 +64,10 @@ class OscSound:
     def running(self) -> bool:
         return self._running
 
-    def set_poses(self, poses: FrameDict) -> None:
-        """Push new pose data and trigger a send."""
+    def set_poses(self, stage: int, poses: FrameDict) -> None:
+        """Push new pose data and trigger a send if stage matches."""
+        if stage != self._config.stage:
+            return
         with self._input_lock:
             self._poses = dict(poses)
         self._update_event.set()
@@ -126,7 +129,11 @@ class OscSound:
         stage_msg.add_arg(seq_state.stage if seq_state is not None else 0, arg_type=OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(stage_msg.build()) # type: ignore
 
-        progress_msg = OscMessageBuilder(address="/global/time")
+        stage_msg = OscMessageBuilder(address="/global/state/progress")
+        stage_msg.add_arg(seq_state.stage_progress if seq_state is not None else 0.0, arg_type=OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(stage_msg.build()) # type: ignore
+
+        progress_msg = OscMessageBuilder(address="/global/progress")
         progress_msg.add_arg(seq_state.progress if seq_state is not None else 0.0, arg_type=OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(progress_msg.build()) # type: ignore
 

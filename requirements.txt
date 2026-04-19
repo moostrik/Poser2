@@ -5,6 +5,7 @@ ffmpeg-python==0.2.0
 freetype-py==2.5.1
 glfw==2.9.0                         # Redundant, now i dont draw text the old way
 h5py==3.16.0
+nicegui==3.10.0
 numba==0.61.2
 numpy<2.0.0                         # needed for torch?
 OneEuroFilter==0.2.1
