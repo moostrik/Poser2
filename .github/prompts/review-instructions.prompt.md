@@ -14,7 +14,12 @@ Also flag quality issues in the instruction files themselves:
 - Rules in the **wrong file** (exists but `applyTo` doesn't reach the files that were edited)
 - **Negative rules** that restate a positive rule already present
 
-Do not flag rules that worked correctly. Do not suggest additions for edge cases
-that didn't actually cause problems. Proposed rules must be generalizable patterns
-applicable across the project, not one-off facts about specific modules. Keep
-instructions brief — every line costs context budget on every future request.
+Keep instructions brief — every line costs context budget on every future request.
+
+Before proposing any new rule, apply this filter:
+- Did the absence of this rule cause a mistake that would plausibly recur?
+  If not, skip it — do not suggest rules for one-off errors or hypothetical edge cases.
+- Does the rule apply across multiple modules or situations? If it only
+  prevents one specific bug in one specific place, it is too narrow.
+- Could the rule be inferred from an existing rule? If yes, the existing
+  rule is sufficient — do not add a restatement.

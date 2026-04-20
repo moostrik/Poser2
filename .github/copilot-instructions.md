@@ -24,6 +24,8 @@ Use `BaseSettings` for reactive configuration, `@dataclass` for plain value obje
 Prefer composition over inheritance for runtime assembly.
 - Pass dependencies through constructors
 - Use callback pipelines for data flow between components
+- Method names signal execution timing: `set` (store for polling), `submit` (enqueue for deferred work), `process` (synchronous transform-and-emit), `update` (tick-driven advance/pull)
+- One output channel → bare verb (`submit`, `add_callback`); multiple channels → verb + noun (`submit_frames`, `add_frames_callback`)
 
 ## Board
 

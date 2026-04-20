@@ -119,7 +119,7 @@ class Recorder:
         self._thread = None
         logger.info("PoseRecorder stopped")
 
-    def on_frame_dict(self, stage: int, frame_dict: 'FrameDict') -> None:
+    def submit_frames(self, stage: int, frame_dict: 'FrameDict') -> None:
         """Callback — enqueue a shallow copy of the FrameDict if recording and stage matches."""
         if stage != self.settings.stage:
             return

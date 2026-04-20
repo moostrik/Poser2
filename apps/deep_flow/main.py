@@ -83,7 +83,7 @@ class DeepFlowMain:
             for i in range(num_players)
         })
 
-        self.tracker.add_tracklet_callback(self.poses_from_tracklets.submit_tracklets)
+        self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracklet_sync_bang.add_callback(self.tracker.notify_update)
         self.frame_sync_bang.add_callback(self.poses_from_tracklets.generate)
 
@@ -99,11 +99,11 @@ class DeepFlowMain:
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
             wt = window.WindowTracker(num_players, getattr(p, f'window_{stage.name.lower()}'))
-            wt.add_frame_windows_callback(partial(self.board.set_windows, stage))
+            wt.add_windows_callback(partial(self.board.set_windows, stage))
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),
-                partial(self.sound_osc.set_poses, stage),
+                partial(self.sound_osc.set_frames, stage),
                 wt.process,
             ])
 

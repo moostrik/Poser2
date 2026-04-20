@@ -22,7 +22,7 @@ class PosesFromTracklets(FrameDictCallbackMixin):
         self._lock = Lock()
         self._batch_id_counter = 0
 
-    def submit_tracklets(self, tracklet_dict: dict[int, Tracklet]) -> None:
+    def set_tracklets(self, tracklet_dict: dict[int, Tracklet]) -> None:
         """Set tracklets for pose generation.
 
         Args:

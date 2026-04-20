@@ -51,7 +51,7 @@ class WindowTracker(FrameWindowDictCallbackMixin):
                     logger.error(f"WindowTracker: Error processing track {track_id} feature {ft.__name__}: {e}")
             result[ft] = windows
 
-        self._notify_frame_window_callbacks(result)
+        self._notify_windows_callbacks(result)
 
     def reset(self) -> None:
         """Reset all window buffers."""

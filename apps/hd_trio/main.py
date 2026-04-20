@@ -96,7 +96,7 @@ class HDTrioMain:
             for i in range(num_players)
         })
 
-        self.tracker.add_tracklet_callback(self.poses_from_tracklets.submit_tracklets)
+        self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracklet_sync_bang.add_callback(self.tracker.notify_update)
         self.frame_sync_bang.add_callback(self.poses_from_tracklets.generate)
 
@@ -111,12 +111,12 @@ class HDTrioMain:
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
             wt = window.WindowTracker(num_players, getattr(ps, f'window_{stage.name.lower()}'))
-            wt.add_frame_windows_callback(partial(self.board.set_windows, stage))
+            wt.add_windows_callback(partial(self.board.set_windows, stage))
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),
-                partial(self.pose_recorder.on_frame_dict, stage),
-                partial(self.sound_osc.set_poses, stage),
+                partial(self.pose_recorder.submit_frames, stage),
+                partial(self.sound_osc.set_frames, stage),
                 wt.process,
             ])
 
@@ -163,11 +163,11 @@ class HDTrioMain:
         self.window_similator  = batch.WindowSimilarity(ps.similarity.window_similarity)
         self.window_correlator = batch.WindowCorrelation(ps.similarity.window_correlation)
 
-        self.window_trackers[Stage.SMOOTH].add_frame_windows_callback(self.window_similator.submit_all)
+        self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similator.submit_all)
         self.window_similator.add_similarity_callback(self.similarity_applicator.submit)
         self.window_similator.add_leader_callback(self.leader_applicator.submit)
 
-        self.window_trackers[Stage.SMOOTH].add_frame_windows_callback(self.window_correlator.submit_all)
+        self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_correlator.submit_all)
         self.window_correlator.add_similarity_callback(self.similarity_applicator.submit)
         self.window_correlator.add_leader_callback(self.leader_applicator.submit)
 

@@ -24,12 +24,6 @@ applyTo: "modules/pose/nodes/**, modules/pose/trackers/**, modules/pose/window/*
 - One track failing should not break processing for other tracks
 - Keep callback fan-out explicit and isolated from tracker state transitions
 
-## Stage semantics
-
-- Keep stage responsibilities clear: RAW -> SMOOTH -> LERP
-- Stage transitions must preserve pose frame and feature semantics
-- Do not introduce stage-specific shape or meaning drift without updating all downstream consumers
-
 ## Windowing
 
 - Feature windows must stay consistent with frame and feature contracts
@@ -41,9 +35,3 @@ applyTo: "modules/pose/nodes/**, modules/pose/trackers/**, modules/pose/window/*
 - Batch code should serve pose pipeline throughput without hiding data ownership rules
 - Keep queueing and buffering decisions aligned with low-latency priorities
 - Prefer predictable data flow over opaque background processing
-
-## Concurrency and failure handling
-
-- Treat callbacks, tracker state, and temporal buffers as thread-sensitive
-- Keep shared mutable state small and explicit
-- Log processing failures with context and degrade gracefully where possible

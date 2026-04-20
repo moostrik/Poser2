@@ -131,17 +131,17 @@ class FrameWindowDictCallbackMixin:
         self._frame_window_callbacks: set[FrameWindowDictCallback] = set()
         self._frame_window_callback_lock: Lock = Lock()
 
-    def _notify_frame_window_callbacks(self, windows: FrameWindowDict) -> None:
+    def _notify_windows_callbacks(self, windows: FrameWindowDict) -> None:
         with self._frame_window_callback_lock:
             for callback in self._frame_window_callbacks:
                 try:
                     callback(windows)
                 except Exception as e:
                     logger.exception("Error in callback")
-    def add_frame_windows_callback(self, callback: FrameWindowDictCallback) -> None:
+    def add_windows_callback(self, callback: FrameWindowDictCallback) -> None:
         with self._frame_window_callback_lock:
             self._frame_window_callbacks.add(callback)
 
-    def remove_frame_windows_callback(self, callback: FrameWindowDictCallback) -> None:
+    def remove_windows_callback(self, callback: FrameWindowDictCallback) -> None:
         with self._frame_window_callback_lock:
             self._frame_window_callbacks.discard(callback)
