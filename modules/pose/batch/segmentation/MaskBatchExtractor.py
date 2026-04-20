@@ -155,12 +155,12 @@ class MaskBatchExtractor:
                     callback(poses, gpu_frames)
                 except Exception as e:
                     logger.exception("Error in callback")
-    def add_callback(self, callback: ImageFrameCallback) -> None:
+    def add_image_callback(self, callback: ImageFrameCallback) -> None:
         """Register callback to receive poses and GPU frames with masks."""
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def remove_callback(self, callback: ImageFrameCallback) -> None:
+    def remove_image_callback(self, callback: ImageFrameCallback) -> None:
         """Unregister callback."""
         with self._callback_lock:
             self._callbacks.discard(callback)

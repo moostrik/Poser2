@@ -56,11 +56,11 @@ class FlowBatchExtractor:
 
         self._optical_flow.register_callback(self._on_optical_flow_result)
 
-    def add_callback(self, callback: FlowCallback) -> None:
+    def add_flow_callback(self, callback: FlowCallback) -> None:
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def remove_callback(self, callback: FlowCallback) -> None:
+    def remove_flow_callback(self, callback: FlowCallback) -> None:
         with self._callback_lock:
             self._callbacks.discard(callback)
 

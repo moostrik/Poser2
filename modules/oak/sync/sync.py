@@ -24,7 +24,7 @@ class Sync:
         self._callbacks: set[Callable[[], None]] = set()
         self._lock = Lock()
 
-    def add_frame(self, *args) -> None:
+    def submit_frame(self, *args) -> None:
         cam_id: int = args[0]
         timestamp: float = time.time()
 

@@ -164,7 +164,7 @@ class Recorder(Thread):
                 continue
             for t in self.settings.video_frame_types:
                 if t in frames:
-                    self.recorders[c][t].add_frame(frames[t])
+                    self.recorders[c][t].submit_frame(frames[t])
 
     def _get_state(self) -> RecState:
         with self.state_lock:

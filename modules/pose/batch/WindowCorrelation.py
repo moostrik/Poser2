@@ -95,7 +95,7 @@ class WindowCorrelation:
         self._stop_event.set()
         self._update_event.set()
 
-    def add_callback(self, callback: Callable[[SimilarityResult], None]) -> None:
+    def add_similarity_callback(self, callback: Callable[[SimilarityResult], None]) -> None:
         self._callbacks.add(callback)
 
     def submit(self, all_windows: FrameWindowDict) -> None:

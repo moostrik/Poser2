@@ -64,10 +64,10 @@ class DeepFlowMain:
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.image_crop_processor.set_image)
-            camera.add_frame_callback(self.frame_sync_bang.add_frame)
+            camera.add_frame_callback(self.frame_sync_bang.submit_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
             camera.add_tracker_callback(self.board.set_depth_tracklets)
-            camera.add_tracker_callback(self.tracklet_sync_bang.add_frame)
+            camera.add_tracker_callback(self.tracklet_sync_bang.submit_frame)
 
         # DETECTION
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
@@ -89,10 +89,10 @@ class DeepFlowMain:
 
         self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
         self.bbox_filters.add_frames_callback(self.image_crop_processor.process)
-        self.image_crop_processor.add_callback(self.point_extractor.process)
-        self.image_crop_processor.add_callback(self.mask_extractor.process)
-        self.image_crop_processor.add_callback(self.flow_extractor.process)
-        self.mask_extractor.add_callback(lambda _f, gpu: self.board.set_images(gpu))
+        self.image_crop_processor.add_image_callback(self.point_extractor.process)
+        self.image_crop_processor.add_image_callback(self.mask_extractor.process)
+        self.image_crop_processor.add_image_callback(self.flow_extractor.process)
+        self.mask_extractor.add_image_callback(lambda _f, gpu: self.board.set_images(gpu))
 
         # STAGE WINDOW TRACKERS & BROADCASTS
         self.window_trackers: dict[Stage, window.WindowTracker] = {}

@@ -267,11 +267,11 @@ class ImageCropProcessor:
         # Keep CHW format (deep learning standard)
         return crop_chw
 
-    def add_callback(self, callback: ImageFrameCallback) -> None:
+    def add_image_callback(self, callback: ImageFrameCallback) -> None:
         """Register callback to receive cropped poses and GPU frames."""
         self._callbacks.add(callback)
 
-    def remove_callback(self, callback: ImageFrameCallback) -> None:
+    def remove_image_callback(self, callback: ImageFrameCallback) -> None:
         """Unregister callback."""
         self._callbacks.discard(callback)
 

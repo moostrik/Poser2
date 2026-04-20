@@ -46,7 +46,7 @@ class StreamWriter:
 
         self.start(output_file, fps)
 
-    def add_frame(self, frame) -> None:
+    def submit_frame(self, frame) -> None:
         if self.is_receiving:
             self.frames.put(frame)
 
