@@ -36,7 +36,7 @@ class PosesFromTracklets(FrameDictCallbackMixin):
                 else:
                     self._tracklets[track_id] = None
 
-    def generate(self) -> FrameDict:
+    def process(self) -> FrameDict:
         """Generate poses from all ready tracklets.
 
         Returns:

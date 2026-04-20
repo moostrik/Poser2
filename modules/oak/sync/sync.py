@@ -138,7 +138,7 @@ class Sync:
             cameras.add(cam_id)
         return cameras
 
-    def add_callback(self, callback: Callable[[], Any]) -> None:
+    def add_sync_callback(self, callback: Callable[[], Any]) -> None:
         with self._lock:
             self._callbacks.add(callback)
 

@@ -274,7 +274,7 @@ class PanoramicTracker(Thread, BaseTracker):
         with self.callback_lock:
             self.tracklet_callbacks.add(callback)
 
-    def add_cam_tracklets(self, cam_id: int, cam_tracklets: list[DepthTracklet]) -> None :
+    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[DepthTracklet]) -> None :
         for t in cam_tracklets:
             tracklet: Optional[Tracklet] = Tracklet.from_depthcam(cam_id, t)
             if tracklet is None:

@@ -178,7 +178,7 @@ class OnePerCamTracker(Thread, BaseTracker):
         with self._callback_lock:
             self._tracklet_callbacks.add(callback)
 
-    def add_cam_tracklets(self, cam_id: int, cam_tracklets: List[DepthTracklet]) -> None:
+    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: List[DepthTracklet]) -> None:
         tracklet_list: List[Tracklet] = []
         for t in cam_tracklets:
             tracklet: Optional[Tracklet] = Tracklet.from_depthcam(cam_id, t)

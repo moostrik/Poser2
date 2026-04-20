@@ -74,10 +74,10 @@ class HDTrioMain:
         self.image_crop_processor = batch.ImageCropProcessor(ps.image_crop)
 
         for camera in self.cameras:
-            camera.add_sync_callback(self.video_recorder.set_synced_frames)
+            camera.add_sync_callback(self.video_recorder.submit_synced_frames)
             camera.add_frame_callback(self.image_crop_processor.set_image)
             camera.add_frame_callback(self.frame_sync_bang.submit_frame)
-            camera.add_tracker_callback(self.tracker.add_cam_tracklets)
+            camera.add_tracker_callback(self.tracker.submit_cam_tracklets)
             camera.add_tracker_callback(self.board.set_depth_tracklets)
             camera.add_tracker_callback(self.tracklet_sync_bang.submit_frame)
 
@@ -97,8 +97,8 @@ class HDTrioMain:
         })
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
-        self.tracklet_sync_bang.add_callback(self.tracker.notify_update)
-        self.frame_sync_bang.add_callback(self.poses_from_tracklets.generate)
+        self.tracklet_sync_bang.add_sync_callback(self.tracker.notify_update)
+        self.frame_sync_bang.add_sync_callback(self.poses_from_tracklets.process)
 
         self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
         self.bbox_filters.add_frames_callback(self.image_crop_processor.process)

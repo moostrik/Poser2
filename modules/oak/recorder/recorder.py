@@ -180,7 +180,7 @@ class Recorder(Thread):
             self.state = state
 
     # EXTERNAL METHODS
-    def set_synced_frames(self, cam_id: int, frames: dict[FrameType, ndarray], fps: float) -> None:
+    def submit_synced_frames(self, cam_id: int, frames: dict[FrameType, ndarray], fps: float) -> None:
         self.set_fps(cam_id, fps)
         if self._get_state() == RecState.REC:
             self.frames[cam_id].put(frames)
