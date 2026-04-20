@@ -11,7 +11,6 @@ from numpy.fft import rfft, irfft
 
 # Pose imports
 from modules.settings import BaseSettings, Field
-from modules.utils.TypedCallbackMixin import TypedCallbackMixin
 from modules.pose.frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
 from modules.pose.features import Angles, AngleMotion
 from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod, NormalizedScalarFeature
@@ -57,7 +56,7 @@ class WindowCorrelationSettings(BaseSettings):
     verbose:                Field[bool]               = Field(False, description="Enable verbose logging")
 
 
-class WindowCorrelation(TypedCallbackMixin[SimilarityResult]):
+class WindowCorrelation:
     """Computes pairwise window correlations in a background thread.
 
     Uses normalized cross-correlation per joint over full windows to detect
@@ -66,7 +65,6 @@ class WindowCorrelation(TypedCallbackMixin[SimilarityResult]):
     """
 
     def __init__(self, config: WindowCorrelationSettings | None = None) -> None:
-        super().__init__()
 
         self._config = config if config is not None else WindowCorrelationSettings()
 
@@ -142,7 +140,6 @@ class WindowCorrelation(TypedCallbackMixin[SimilarityResult]):
                 result = SimilarityResult(similarity_dict, leader_dict)
                 with self._output_lock:
                     self._output_data = result
-                self._notify_callbacks(result)
                 for cb in self._similarity_callbacks:
                     cb(result.similarity)
                 for cb in self._leader_callbacks:

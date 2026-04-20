@@ -1,12 +1,14 @@
 from collections import deque
 from threading import Lock
-from typing import Union
+from typing import Callable, Union
 
 import torch
 
-from modules.utils.TypedCallbackMixin import TypedCallbackMixin
 from modules.pose.batch.ImageFrame import ImageFrameDict
 from modules.pose.frame import FrameDict
+
+import logging
+logger = logging.getLogger(__name__)
 from ..model_types import ModelType
 from .FlowSettings import FlowSettings
 from modules.utils.PerformanceTimer import PerformanceTimer
@@ -18,7 +20,10 @@ from .TRTOpticalFlow import TRTOpticalFlow
 OpticalFlow = Union[ONNXOpticalFlow, TRTOpticalFlow]
 
 
-class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
+FlowCallback = Callable[[dict[int, torch.Tensor]], None]
+
+
+class FlowBatchExtractor:
     """GPU-based batch extractor for optical flow using RAFT.
 
     Computes dense optical flow between consecutive frames for each tracked person.
@@ -33,7 +38,6 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
     """
 
     def __init__(self, settings: FlowSettings):
-        super().__init__()
         self._optical_flow: OpticalFlow = ONNXOpticalFlow(settings)
         if settings.model_type is ModelType.ONNX:
             self._optical_flow = ONNXOpticalFlow(settings)
@@ -47,8 +51,26 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         self._process_timer =   PerformanceTimer(name="RAFT Optical Flow", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
         self._wait_timer =      PerformanceTimer(name="RAFT Wait        ", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
 
+        self._callbacks: set[FlowCallback] = set()
+        self._callback_lock = Lock()
 
         self._optical_flow.register_callback(self._on_optical_flow_result)
+
+    def add_callback(self, callback: FlowCallback) -> None:
+        with self._callback_lock:
+            self._callbacks.add(callback)
+
+    def remove_callback(self, callback: FlowCallback) -> None:
+        with self._callback_lock:
+            self._callbacks.discard(callback)
+
+    def _notify_callbacks(self, flow_dict: dict[int, torch.Tensor]) -> None:
+        with self._callback_lock:
+            for callback in self._callbacks:
+                try:
+                    callback(flow_dict)
+                except Exception:
+                    logger.exception("Error in callback")
 
     def start(self) -> None:
         """Start the optical flow processing thread."""

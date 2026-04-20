@@ -26,7 +26,7 @@ from modules.render.color_settings import ColorSettings
 
 class ColorMaskLayerSettings(BaseSettings):
     """Configuration for MSColorMaskLayer."""
-    stage:                  Field[int]   = Field(3, description="Pipeline stage for pose data")
+    stage:                  Field[int]   = Field(0, description="Pipeline stage for pose data")
     num_players:            Field[int]   = Field(3, access=Field.INIT)
     blend_mode:             Field[Style.BlendMode] = Field(Style.BlendMode.ALPHA)
     similarity_threshold:   Field[float] = Field(0.33, min=0.0, max=1.0)

@@ -3,6 +3,7 @@
 from typing import Optional
 from functools import partial
 
+from modules.utils.Broadcast import Broadcast
 from modules.oak import Camera, Simulator, Player, Recorder, Sync
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound
@@ -93,16 +94,24 @@ class DeepFlowMain:
         self.image_crop_processor.add_callback(self.flow_extractor.process)
         self.mask_extractor.add_callback(lambda _f, gpu: self.board.set_images(gpu))
 
-        # STAGE RAW
-        self.window_tracker_R = window.WindowTracker(num_players, p.window_raw)
+        # STAGE WINDOW TRACKERS & BROADCASTS
+        self.window_trackers: dict[Stage, window.WindowTracker] = {}
+        self.stages: dict[Stage, Broadcast] = {}
+        for stage in Stage:
+            wt = window.WindowTracker(num_players, getattr(p, f'window_{stage.name.lower()}'))
+            wt.add_frame_windows_callback(partial(self.board.set_windows, stage))
+            self.window_trackers[stage] = wt
+            self.stages[stage] = Broadcast([
+                partial(self.board.set_frames, stage),
+                partial(self.sound_osc.set_poses, stage),
+                wt.process,
+            ])
 
-        self.point_extractor.add_frames_callback(partial(self.board.set_frames, Stage.RAW))
-        self.point_extractor.add_frames_callback(partial(self.sound_osc.set_poses, Stage.RAW))
-        self.point_extractor.add_frames_callback(self.window_tracker_R.process)
-        self.window_tracker_R.add_frame_windows_callback(partial(self.board.set_windows, Stage.RAW))
+        # STAGE RAW
+        self.point_extractor.add_frames_callback(self.stages[Stage.RAW])
 
         # STAGE CLEAN
-        self.pose_raw_filters = trackers.FilterTracker({
+        self.filters_clean = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.PointDualConfFilter(p.point.confidence_filter),
                 nodes.AngleExtractor(p.angle_extractor),
@@ -110,16 +119,11 @@ class DeepFlowMain:
             ])
             for i in range(num_players)
         })
-        self.window_tracker_C = window.WindowTracker(num_players, p.window_clean)
-
-        self.point_extractor.add_frames_callback(self.pose_raw_filters.process)
-        self.pose_raw_filters.add_frames_callback(partial(self.board.set_frames, Stage.CLEAN))
-        self.pose_raw_filters.add_frames_callback(partial(self.sound_osc.set_poses, Stage.CLEAN))
-        self.pose_raw_filters.add_frames_callback(self.window_tracker_C.process)
-        self.window_tracker_C.add_frame_windows_callback(partial(self.board.set_windows, Stage.CLEAN))
+        self.stages[Stage.RAW].add_callback(self.filters_clean.process)
+        self.filters_clean.add_frames_callback(self.stages[Stage.CLEAN])
 
         # STAGE SMOOTH
-        self.pose_smooth_filters = trackers.FilterTracker({
+        self.filters_smooth = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.PointEuroSmoother(p.point.smoother),
                 nodes.AngleExtractor(p.angle_extractor),
@@ -134,7 +138,11 @@ class DeepFlowMain:
             ])
             for i in range(num_players)
         })
-        self.pose_prediction_filters = trackers.FilterTracker({
+        self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
+        self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
+
+        # STAGE PREDICT
+        self.filters_predict = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.PointPredictor(p.point.prediction),
                 nodes.AnglePredictor(p.angle.prediction),
@@ -143,19 +151,13 @@ class DeepFlowMain:
             ])
             for i in range(num_players)
         })
-        self.window_tracker_S = window.WindowTracker(num_players, p.window_smooth)
-
-        self.pose_raw_filters.add_frames_callback(self.pose_smooth_filters.process)
-        self.pose_smooth_filters.add_frames_callback(self.pose_prediction_filters.process)
-        self.pose_prediction_filters.add_frames_callback(partial(self.board.set_frames, Stage.SMOOTH))
-        self.pose_prediction_filters.add_frames_callback(partial(self.sound_osc.set_poses, Stage.SMOOTH))
-        self.pose_smooth_filters.add_frames_callback(self.window_tracker_S.process)
-        self.window_tracker_S.add_frame_windows_callback(partial(self.board.set_windows, Stage.SMOOTH))
+        self.stages[Stage.SMOOTH].add_callback(self.filters_predict.process)
+        self.filters_predict.add_frames_callback(self.stages[Stage.PREDICT])
 
         # STAGE LERP
         self.motion_gate_applicator = nodes.MotionGateApplicator(p.motion_gate)
 
-        self.interpolators = trackers.InterpolatorTracker({
+        self.interpolators_lerp = trackers.InterpolatorTracker({
             i: trackers.InterpolatorPipeline([
                 nodes.BBoxChaseInterpolator(p.bbox.interpolator),
                 nodes.PointChaseInterpolator(p.point.interpolator),
@@ -164,7 +166,7 @@ class DeepFlowMain:
             ])
             for i in range(num_players)
         })
-        self.pose_interpolation_filters = trackers.FilterTracker({
+        self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.AngleSymExtractor(),
                 nodes.MotionTimeExtractor(),
@@ -176,27 +178,22 @@ class DeepFlowMain:
             ])
             for i in range(num_players)
         })
-        self.motion_gate_tracker = trackers.FilterTracker({
+        self.gate_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([self.motion_gate_applicator])
             for i in range(num_players)
         })
-        self.window_tracker_I = window.WindowTracker(num_players, p.window_lerp)
-
-        self.pose_prediction_filters.add_frames_callback(self.interpolators.submit)
-        self.interpolators.add_frames_callback(self.pose_interpolation_filters.process)
-        self.pose_interpolation_filters.add_frames_callback(self.motion_gate_applicator.submit)
-        self.pose_interpolation_filters.add_frames_callback(self.motion_gate_tracker.process)
-        self.motion_gate_tracker.add_frames_callback(partial(self.board.set_frames, Stage.LERP))
-        self.motion_gate_tracker.add_frames_callback(partial(self.sound_osc.set_poses, Stage.LERP))
-        self.motion_gate_tracker.add_frames_callback(self.window_tracker_I.process)
-        self.window_tracker_I.add_frame_windows_callback(partial(self.board.set_windows, Stage.LERP))
+        self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.submit)
+        self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
+        self.filters_lerp.add_frames_callback(self.motion_gate_applicator.submit)
+        self.filters_lerp.add_frames_callback(self.gate_lerp.process)
+        self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
 
         # RENDER
         self.render = DeepFlowRender(self.board, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
         self.render.add_exit_callback(self.stop)
 
         # IN/OUT
-        self.render.add_update_callback(self.interpolators.update)
+        self.render.add_update_callback(self.interpolators_lerp.update)
 
     def start(self) -> None:
         self.settings_server.start()

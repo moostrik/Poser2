@@ -14,7 +14,7 @@ from modules.render.color_settings import ColorSettings
 
 
 class PoseRendererSettings(BaseSettings):
-    stage:      Field[int] = Field(3, description="Pipeline stage for pose data")
+    stage:      Field[int] = Field(0, description="Pipeline stage for pose data")
     line_width: Field[float] = Field(1.0, min=0.5, max=10.0, description="Pose line width")
     line_smooth:Field[float] = Field(0.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
     use_scores: Field[bool]  = Field(False, description="Use confidence scores for line opacity")

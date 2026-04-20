@@ -35,6 +35,7 @@ class Stage(IntEnum):
     RAW =       0
     CLEAN =     auto()
     SMOOTH =    auto()
+    PREDICT =   auto()
     LERP =      auto()
 
 
@@ -237,6 +238,7 @@ class PoseGroup(BaseSettings):
     window_raw      : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
     window_clean    : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
     window_smooth   : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
+    window_predict  : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
     window_lerp     : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
 
 

@@ -3,6 +3,7 @@
 from typing import Optional
 from functools import partial
 
+from modules.utils import Broadcast
 from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
@@ -105,17 +106,25 @@ class HDTrioMain:
         self.image_crop_processor.add_callback(self.mask_extractor.process)
         self.mask_extractor.add_callback(lambda _f, gpu: self.board.set_images(gpu))
 
-        # POSE STAGE RAW
-        self.window_tracker_R = window.WindowTracker(num_players, ps.window_raw)
+        # STAGE WINDOW TRACKERS & BROADCASTS
+        self.window_trackers: dict[Stage, window.WindowTracker] = {}
+        self.stages: dict[Stage, Broadcast] = {}
+        for stage in Stage:
+            wt = window.WindowTracker(num_players, getattr(ps, f'window_{stage.name.lower()}'))
+            wt.add_frame_windows_callback(partial(self.board.set_windows, stage))
+            self.window_trackers[stage] = wt
+            self.stages[stage] = Broadcast([
+                partial(self.board.set_frames, stage),
+                partial(self.pose_recorder.on_frame_dict, stage),
+                partial(self.sound_osc.set_poses, stage),
+                wt.process,
+            ])
 
-        self.point_extractor.add_frames_callback(partial(self.board.set_frames, Stage.RAW))
-        self.point_extractor.add_frames_callback(partial(self.pose_recorder.on_frame_dict, Stage.RAW))
-        self.point_extractor.add_frames_callback(partial(self.sound_osc.set_poses, Stage.RAW))
-        self.point_extractor.add_frames_callback(self.window_tracker_R.process)
-        self.window_tracker_R.add_frame_windows_callback(partial(self.board.set_windows, Stage.RAW))
+        # POSE STAGE RAW
+        self.point_extractor.add_frames_callback(self.stages[Stage.RAW])
 
         # POSE STAGE CLEAN
-        self.pose_clean_filters = trackers.FilterTracker({
+        self.filters_clean = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.PointDualConfFilter(ps.point.confidence_filter),
                 nodes.AngleExtractor(ps.angle_extractor),
@@ -123,20 +132,14 @@ class HDTrioMain:
             ])
             for i in range(num_players)
         })
-        self.window_tracker_C = window.WindowTracker(num_players, ps.window_clean)
-
-        self.point_extractor.add_frames_callback(self.pose_clean_filters.process)
-        self.pose_clean_filters.add_frames_callback(partial(self.board.set_frames, Stage.CLEAN))
-        self.pose_clean_filters.add_frames_callback(partial(self.pose_recorder.on_frame_dict, Stage.CLEAN))
-        self.pose_clean_filters.add_frames_callback(partial(self.sound_osc.set_poses, Stage.CLEAN))
-        self.pose_clean_filters.add_frames_callback(self.window_tracker_C.process)
-        self.window_tracker_C.add_frame_windows_callback(partial(self.board.set_windows, Stage.CLEAN))
+        self.stages[Stage.RAW].add_callback(self.filters_clean.process)
+        self.filters_clean.add_frames_callback(self.stages[Stage.CLEAN])
 
         # POSE STAGE SMOOTH
         self.similarity_applicator = nodes.SimilarityApplicator(ps.similarity.similarity_applicator)
         self.leader_applicator     = nodes.LeaderScoreApplicator(ps.similarity.leader_applicator)
 
-        self.pose_smooth_filters = trackers.FilterTracker({
+        self.filters_smooth = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.PointEuroSmoother(ps.point.smoother),
                 nodes.AngleExtractor(ps.angle_extractor),
@@ -154,7 +157,22 @@ class HDTrioMain:
             ])
             for i in range(num_players)
         })
-        self.pose_prediction_filters = trackers.FilterTracker({
+        self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
+        self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
+
+        self.window_similator  = batch.WindowSimilarity(ps.similarity.window_similarity)
+        self.window_correlator = batch.WindowCorrelation(ps.similarity.window_correlation)
+
+        self.window_trackers[Stage.SMOOTH].add_frame_windows_callback(self.window_similator.submit_all)
+        self.window_similator.add_similarity_callback(self.similarity_applicator.submit)
+        self.window_similator.add_leader_callback(self.leader_applicator.submit)
+
+        self.window_trackers[Stage.SMOOTH].add_frame_windows_callback(self.window_correlator.submit_all)
+        self.window_correlator.add_similarity_callback(self.similarity_applicator.submit)
+        self.window_correlator.add_leader_callback(self.leader_applicator.submit)
+
+        # POSE STAGE PREDICT
+        self.filters_predict = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.PointPredictor(ps.point.prediction),
                 nodes.AnglePredictor(ps.angle.prediction),
@@ -164,20 +182,13 @@ class HDTrioMain:
             ])
             for i in range(num_players)
         })
-        self.window_tracker_S = window.WindowTracker(num_players, ps.window_smooth)
-
-        self.pose_clean_filters.add_frames_callback(self.pose_smooth_filters.process)
-        self.pose_smooth_filters.add_frames_callback(self.pose_prediction_filters.process)
-        self.pose_prediction_filters.add_frames_callback(partial(self.board.set_frames, Stage.SMOOTH))
-        self.pose_prediction_filters.add_frames_callback(partial(self.pose_recorder.on_frame_dict, Stage.SMOOTH))
-        self.pose_prediction_filters.add_frames_callback(partial(self.sound_osc.set_poses, Stage.SMOOTH))
-        self.pose_smooth_filters.add_frames_callback(self.window_tracker_S.process)
-        self.window_tracker_S.add_frame_windows_callback(partial(self.board.set_windows, Stage.SMOOTH))
+        self.stages[Stage.SMOOTH].add_callback(self.filters_predict.process)
+        self.filters_predict.add_frames_callback(self.stages[Stage.PREDICT])
 
         # POSE STAGE LERP
         self.motion_gate_applicator = nodes.MotionGateApplicator(ps.similarity.motion_gate)
 
-        self.interpolators = trackers.InterpolatorTracker({
+        self.interpolators_lerp = trackers.InterpolatorTracker({
             i: trackers.InterpolatorPipeline([
                 nodes.BBoxChaseInterpolator(ps.bbox.interpolator),
                 nodes.PointChaseInterpolator(ps.point.interpolator),
@@ -187,7 +198,7 @@ class HDTrioMain:
             ])
             for i in range(num_players)
         })
-        self.pose_interpolation_filters = trackers.FilterTracker({
+        self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.AngleSymExtractor(),
                 nodes.MotionTimeExtractor(),
@@ -199,39 +210,21 @@ class HDTrioMain:
             ])
             for i in range(num_players)
         })
-        self.motion_gate_tracker = trackers.FilterTracker({
+        self.gate_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([self.motion_gate_applicator])
             for i in range(num_players)
         })
-        self.window_tracker_I = window.WindowTracker(num_players, ps.window_lerp)
-
-        self.pose_prediction_filters.add_frames_callback(self.interpolators.submit)
-        self.interpolators.add_frames_callback(self.pose_interpolation_filters.process)
-        self.pose_interpolation_filters.add_frames_callback(self.motion_gate_applicator.submit)
-        self.pose_interpolation_filters.add_frames_callback(self.motion_gate_tracker.process)
-        self.motion_gate_tracker.add_frames_callback(partial(self.board.set_frames, Stage.LERP))
-        self.motion_gate_tracker.add_frames_callback(partial(self.pose_recorder.on_frame_dict, Stage.LERP))
-        self.motion_gate_tracker.add_frames_callback(partial(self.sound_osc.set_poses, Stage.LERP))
-        self.motion_gate_tracker.add_frames_callback(self.window_tracker_I.process)
-        self.window_tracker_I.add_frame_windows_callback(partial(self.board.set_windows, Stage.LERP))
-
-        # SIMILARITY
-        self.window_similator  = batch.WindowSimilarity(ps.similarity.window_similarity)
-        self.window_correlator = batch.WindowCorrelation(ps.similarity.window_correlation)
-
-        self.window_tracker_S.add_frame_windows_callback(self.window_similator.submit_all)
-        self.window_similator.add_similarity_callback(self.similarity_applicator.submit)
-        self.window_similator.add_leader_callback(self.leader_applicator.submit)
-
-        self.window_tracker_S.add_frame_windows_callback(self.window_correlator.submit_all)
-        self.window_correlator.add_similarity_callback(self.similarity_applicator.submit)
-        self.window_correlator.add_leader_callback(self.leader_applicator.submit)
+        self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.submit)
+        self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
+        self.filters_lerp.add_frames_callback(self.motion_gate_applicator.submit)
+        self.filters_lerp.add_frames_callback(self.gate_lerp.process)
+        self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
 
         # RENDER
         self.render = HDTrioRender(self.board, self.settings.render)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
         self.render.add_update_callback(self.sequencer.update)
-        self.render.add_update_callback(self.interpolators.update)
+        self.render.add_update_callback(self.interpolators_lerp.update)
         self.render.add_exit_callback(self.stop)
 
     def start(self) -> None:

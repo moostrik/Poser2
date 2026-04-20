@@ -11,7 +11,6 @@ import numpy as np
 
 # Pose imports
 from modules.settings import BaseSettings, Field
-from modules.utils.TypedCallbackMixin import TypedCallbackMixin
 from modules.pose.frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
 from modules.pose.features import Angles, AngleMotion, AngleVelocity
 from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod, NormalizedScalarFeature
@@ -72,7 +71,7 @@ class WindowSimilaritySettings(BaseSettings):
     verbose:                Field[bool]               = Field(False, description="Enable verbose logging")
 
 
-class WindowSimilarity(TypedCallbackMixin[SimilarityResult]):
+class WindowSimilarity:
     """Computes pairwise window similarities in a background thread.
 
     Processes FeatureWindow data from active tracklets and computes similarity metrics
@@ -84,7 +83,6 @@ class WindowSimilarity(TypedCallbackMixin[SimilarityResult]):
     """
 
     def __init__(self, config: WindowSimilaritySettings | None = None) -> None:
-        super().__init__()
 
         self._config = config if config is not None else WindowSimilaritySettings()
 
@@ -185,7 +183,6 @@ class WindowSimilarity(TypedCallbackMixin[SimilarityResult]):
                 result = SimilarityResult(similarity_dict, leader_dict)
                 with self._output_lock:
                     self._output_data = result
-                self._notify_callbacks(result)
                 for cb in self._similarity_callbacks:
                     cb(result.similarity)
                 for cb in self._leader_callbacks:

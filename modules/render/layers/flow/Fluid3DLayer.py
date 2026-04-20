@@ -62,7 +62,7 @@ class Fluid3DDrawMode(IntEnum):
 
 class Fluid3DLayerSettings(BaseSettings):
     """Configuration for Fluid3DLayer (3D fluid simulation)."""
-    stage: Field[int] =                     Field(3, description="Pipeline stage for pose data")
+    stage: Field[int] =                     Field(0, description="Pipeline stage for pose data")
     num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
     sim_engine: Field[FluidSimEngine] =     Field(FluidSimEngine.FLUID_3D_ARRAY)
     draw_mode: Field[Fluid3DDrawMode] =     Field(Fluid3DDrawMode.DENSITY)

@@ -49,7 +49,7 @@ class DataLayerSettings(BaseSettings):
     """Unified configuration for data visualization layers."""
     mode:           Field[LayerMode]            = Field(LayerMode.WINDOW)
     feature_field:  Field[ScalarFeatureSelect]  = Field(ScalarFeatureSelect.AngleMotion)  # type: ignore[attr-defined]
-    stage:          Field[int]                  = Field(2)
+    stage:          Field[int]                  = Field(0)
 
     line_width:     Field[float] = Field(3.0)
     line_smooth:    Field[float] = Field(1.0)

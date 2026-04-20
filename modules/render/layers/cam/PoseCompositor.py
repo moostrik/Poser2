@@ -20,7 +20,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class PoseCompSettings(BaseSettings):
-    stage:      Field[int] = Field(3, description="Pipeline stage for camera crop")
+    stage:      Field[int] = Field(0, description="Pipeline stage for camera crop")
     line_width: Field[float] = Field(2.0, min=0.5, max=20.0, description="Base line width (multiplied per stage)")
     line_smooth:Field[float] = Field(0.0, min=0.0, max=10.0, description="Base line smoothing (multiplied per stage)")
     use_gpu_crop:Field[bool] = Field(True, description="Use GPU crop source (model input) instead of camera crop")

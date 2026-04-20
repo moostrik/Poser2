@@ -12,7 +12,7 @@ from modules.gl import Text
 
 
 class MTimeRendererSettings(BaseSettings):
-    stage: Field[int] = Field(3, description="Pipeline stage for pose data")
+    stage: Field[int] = Field(0, description="Pipeline stage for pose data")
 
 
 class MTimeRenderer(LayerBase):

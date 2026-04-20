@@ -55,7 +55,7 @@ class FlowDrawMode(IntEnum):
 
 class FlowLayerSettings(BaseSettings):
     """Configuration for FlowLayer (optical flow + bridges)."""
-    stage: Field[int] =                     Field(3, description="Pipeline stage for pose data")
+    stage: Field[int] =                     Field(0, description="Pipeline stage for pose data")
     fps: Field[float] =                     Field(60.0, min=1.0, max=240.0)
     draw_mode: Field[FlowDrawMode] =        Field(FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)

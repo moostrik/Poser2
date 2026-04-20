@@ -17,7 +17,7 @@ Use `BaseSettings` for reactive configuration, `@dataclass` for plain value obje
 ## Pose Frame contract
 
 `frame[FeatureType]` never raises; missing data is NaN with score `0.0`.
-- Detailed rules: `.github/instructions/frame-features.instructions.md`
+- Detailed rules: `.github/instructions/pose-data.instructions.md`
 
 ## Composition and wiring
 

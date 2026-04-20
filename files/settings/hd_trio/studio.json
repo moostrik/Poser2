@@ -340,6 +340,10 @@
       "window_size": 180,
       "emit_partial": true
     },
+    "window_predict": {
+      "window_size": 180,
+      "emit_partial": true
+    },
     "window_lerp": {
       "window_size": 360,
       "emit_partial": true

@@ -17,7 +17,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class PoseDotSettings(BaseSettings):
-    stage:      Field[int] = Field(3, access=Field.INIT, description="Pipeline stage for pose data")
+    stage:      Field[int] = Field(0, access=Field.INIT, description="Pipeline stage for pose data")
     dot_size:   Field[float] = Field(4.0, min=1.0, max=20.0, description="Dot size in pixels")
     dot_smooth: Field[float] = Field(2.0, min=0.0, max=10.0, description="Dot smoothing/antialiasing width")
 

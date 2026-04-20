@@ -191,6 +191,9 @@
     "window_smooth": {
       "window_size": 180
     },
+    "window_predict": {
+      "window_size": 180
+    },
     "window_lerp": {
       "window_size": 360
     }

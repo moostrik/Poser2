@@ -14,7 +14,7 @@ from modules.render.shaders import DrawRoi
 
 
 class CropSettings(BaseSettings):
-    stage: Field[int] = Field(3, description="Pipeline stage for pose data")
+    stage: Field[int] = Field(0, description="Pipeline stage for pose data")
 
 
 class CropLayer(LayerBase):

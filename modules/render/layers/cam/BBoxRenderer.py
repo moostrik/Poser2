@@ -12,7 +12,7 @@ from modules.utils import Color
 
 
 class BBoxRendererSettings(BaseSettings):
-    stage:      Field[int] = Field(3, description="Pipeline stage for pose data")
+    stage:      Field[int] = Field(0, description="Pipeline stage for pose data")
     line_width: Field[float] = Field(2.0, min=1.0, max=10.0, description="Bounding box line width in pixels")
     color:      Field[Color] = Field(Color(1.0, 1.0, 1.0), description="Bounding box color")
 

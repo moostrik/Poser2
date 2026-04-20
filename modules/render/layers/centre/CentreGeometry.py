@@ -23,7 +23,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class CentreGeomSettings(BaseSettings):
     """Configuration for CentreGeometry anchor point positioning."""
-    stage:              Field[int] = Field(2, description="Pose data pipeline stage")
+    stage:              Field[int] = Field(0, description="Pose data pipeline stage")
     cam_aspect:         Field[float] = Field(1.7778, access=Field.INIT, description="Camera aspect ratio (16/9 = 1.7778)")
     target_top_x:       Field[float] = Field(0.5, min=0.0, max=1.0, description="Top anchor X position (normalized)")
     target_top_y:       Field[float] = Field(0.33, min=0.0, max=1.0, description="Top anchor Y position (normalized)")

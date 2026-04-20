@@ -51,7 +51,7 @@ class FluidDrawMode(IntEnum):
 
 class FluidLayerSettings(BaseSettings):
     """Configuration for FluidLayer (fluid simulation)."""
-    stage: Field[int] =                     Field(3, description="Pipeline stage for pose data")
+    stage: Field[int] =                     Field(0, description="Pipeline stage for pose data")
     num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
     draw_mode: Field[FluidDrawMode] =       Field(FluidDrawMode.DENSITY)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
