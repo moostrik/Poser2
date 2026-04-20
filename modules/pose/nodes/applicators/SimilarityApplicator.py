@@ -37,17 +37,10 @@ class SimilarityApplicator(FilterNode):
         scores = np.ones(max_poses, dtype=np.float32)
         self._zero_similarity: Similarity = Similarity(values, scores)
 
-    def set(self, similarity_dict: dict[int, Similarity]) -> None:
-        """Store the per-pose similarity dict for processing.
-
-        Args:
-            similarity_dict: Maps track_id -> Similarity object
-        """
+    def set(self, result: SimilarityResult) -> None:
+        """Store the per-pose similarity from a SimilarityResult."""
         with self._lock:
-            self._similarity_dict = similarity_dict
-
-    def set_result(self, result: SimilarityResult) -> None:
-        self.set(result.similarity)
+            self._similarity_dict = result.similarity
 
     def process(self, pose: Frame) -> Frame:
         """Apply pre-computed similarity to this pose.

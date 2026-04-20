@@ -29,17 +29,10 @@ class LeaderScoreApplicator(FilterNode):
         self._leader_dict: dict[int, LeaderScore] = {}
         self._lock: Lock = Lock()
 
-    def set(self, leader_dict: dict[int, LeaderScore]) -> None:
-        """Store the per-pose leader score dict for processing.
-
-        Args:
-            leader_dict: Maps track_id -> LeaderScore object
-        """
+    def set(self, result: SimilarityResult) -> None:
+        """Store the per-pose leader scores from a SimilarityResult."""
         with self._lock:
-            self._leader_dict = leader_dict
-
-    def set_result(self, result: SimilarityResult) -> None:
-        self.set(result.leader_score)
+            self._leader_dict = result.leader_score
 
     def process(self, pose: Frame) -> Frame:
         """Apply pre-computed leader scores to this pose.

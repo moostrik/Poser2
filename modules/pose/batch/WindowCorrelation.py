@@ -80,8 +80,7 @@ class WindowCorrelation:
         # OUTPUT
         self._output_lock = threading.Lock()
         self._output_data: SimilarityResult | None = None
-        self._similarity_callbacks: set[Callable[[dict[int, Similarity]], None]] = set()
-        self._leader_callbacks: set[Callable[[dict[int, LeaderScore]], None]] = set()
+        self._callbacks: set[Callable[[SimilarityResult], None]] = set()
 
         self.Timer: PerformanceTimer = PerformanceTimer(name="correlation ", sample_count=200, report_interval=100, color="cyan", omit_init=0)
 
@@ -96,11 +95,8 @@ class WindowCorrelation:
         self._stop_event.set()
         self._update_event.set()
 
-    def add_similarity_callback(self, callback: Callable[[dict[int, Similarity]], None]) -> None:
-        self._similarity_callbacks.add(callback)
-
-    def add_leader_callback(self, callback: Callable[[dict[int, LeaderScore]], None]) -> None:
-        self._leader_callbacks.add(callback)
+    def add_callback(self, callback: Callable[[SimilarityResult], None]) -> None:
+        self._callbacks.add(callback)
 
     def submit(self, all_windows: FrameWindowDict) -> None:
         """Submit all window types for correlation processing.
@@ -140,10 +136,8 @@ class WindowCorrelation:
                 result = SimilarityResult(similarity_dict, leader_dict)
                 with self._output_lock:
                     self._output_data = result
-                for cb in self._similarity_callbacks:
-                    cb(result.similarity)
-                for cb in self._leader_callbacks:
-                    cb(result.leader_score)
+                for cb in self._callbacks:
+                    cb(result)
 
             except Exception as e:
                 logger.error(f"WindowCorrelation: Processing error: {e}")
