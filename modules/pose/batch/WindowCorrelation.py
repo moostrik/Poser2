@@ -102,8 +102,8 @@ class WindowCorrelation:
     def add_leader_callback(self, callback: Callable[[dict[int, LeaderScore]], None]) -> None:
         self._leader_callbacks.add(callback)
 
-    def submit_all(self, all_windows: FrameWindowDict) -> None:
-        """Update all window types and trigger correlation processing.
+    def submit(self, all_windows: FrameWindowDict) -> None:
+        """Submit all window types for correlation processing.
 
         Args:
              all_windows: Combined dict {type[BaseFeature]: {track_id: FeatureWindow}}

@@ -163,13 +163,13 @@ class HDTrioMain:
         self.window_similator  = batch.WindowSimilarity(ps.similarity.window_similarity)
         self.window_correlator = batch.WindowCorrelation(ps.similarity.window_correlation)
 
-        self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similator.submit_all)
-        self.window_similator.add_similarity_callback(self.similarity_applicator.submit)
-        self.window_similator.add_leader_callback(self.leader_applicator.submit)
+        self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similator.submit)
+        self.window_similator.add_similarity_callback(self.similarity_applicator.set)
+        self.window_similator.add_leader_callback(self.leader_applicator.set)
 
-        self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_correlator.submit_all)
-        self.window_correlator.add_similarity_callback(self.similarity_applicator.submit)
-        self.window_correlator.add_leader_callback(self.leader_applicator.submit)
+        self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_correlator.submit)
+        self.window_correlator.add_similarity_callback(self.similarity_applicator.set)
+        self.window_correlator.add_leader_callback(self.leader_applicator.set)
 
         # POSE STAGE PREDICT
         self.filters_predict = trackers.FilterTracker({
@@ -214,9 +214,9 @@ class HDTrioMain:
             i: trackers.FilterPipeline([self.motion_gate_applicator])
             for i in range(num_players)
         })
-        self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.submit)
+        self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.set)
         self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
-        self.filters_lerp.add_frames_callback(self.motion_gate_applicator.submit)
+        self.filters_lerp.add_frames_callback(self.motion_gate_applicator.set)
         self.filters_lerp.add_frames_callback(self.gate_lerp.process)
         self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
 

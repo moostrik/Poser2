@@ -37,7 +37,7 @@ class SimilarityApplicator(FilterNode):
         scores = np.ones(max_poses, dtype=np.float32)
         self._zero_similarity: Similarity = Similarity(values, scores)
 
-    def submit(self, similarity_dict: dict[int, Similarity]) -> None:
+    def set(self, similarity_dict: dict[int, Similarity]) -> None:
         """Store the per-pose similarity dict for processing.
 
         Args:
@@ -46,8 +46,8 @@ class SimilarityApplicator(FilterNode):
         with self._lock:
             self._similarity_dict = similarity_dict
 
-    def submit_result(self, result: SimilarityResult) -> None:
-        self.submit(result.similarity)
+    def set_result(self, result: SimilarityResult) -> None:
+        self.set(result.similarity)
 
     def process(self, pose: Frame) -> Frame:
         """Apply pre-computed similarity to this pose.

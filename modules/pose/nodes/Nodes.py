@@ -29,8 +29,8 @@ class FilterNode(NodeBase):
         """Process a pose and return the result immediately."""
         pass
 
-    def submit(self, context: Any) -> None:
-        """Optional method to submit external context data. Override if filter needs context."""
+    def set(self, context: Any) -> None:
+        """Optional method to set external context data. Override if filter needs context."""
         pass
 
     def reset(self) -> None:
@@ -46,7 +46,7 @@ class InterpolatorNode(NodeBase):
     """Base class for interpolator nodes that smooth/blend poses."""
 
     @abstractmethod
-    def submit(self, pose: Frame | None) -> None:
+    def set(self, pose: Frame | None) -> None:
         """Set interpolation target from input pose. Called at input frequency (~30 FPS)."""
         pass
 

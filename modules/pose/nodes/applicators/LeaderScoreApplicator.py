@@ -29,7 +29,7 @@ class LeaderScoreApplicator(FilterNode):
         self._leader_dict: dict[int, LeaderScore] = {}
         self._lock: Lock = Lock()
 
-    def submit(self, leader_dict: dict[int, LeaderScore]) -> None:
+    def set(self, leader_dict: dict[int, LeaderScore]) -> None:
         """Store the per-pose leader score dict for processing.
 
         Args:
@@ -38,8 +38,8 @@ class LeaderScoreApplicator(FilterNode):
         with self._lock:
             self._leader_dict = leader_dict
 
-    def submit_result(self, result: SimilarityResult) -> None:
-        self.submit(result.leader_score)
+    def set_result(self, result: SimilarityResult) -> None:
+        self.set(result.leader_score)
 
     def process(self, pose: Frame) -> Frame:
         """Apply pre-computed leader scores to this pose.

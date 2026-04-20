@@ -11,7 +11,7 @@ class InterpolatorPipeline:
     """Runs a sequence of InterpolatorNodes for a single track.
 
     Each node interpolates a different feature at its own rate.
-    submit() sets targets from the input clock; update() produces
+    set() stores targets from the input clock; update() produces
     merged interpolated frames at the output (render) clock.
     """
 
@@ -22,10 +22,10 @@ class InterpolatorPipeline:
             raise ValueError("InterpolatorPipeline: node list must not be empty.")
         self._nodes = nodes
 
-    def submit(self, pose: Frame | None) -> None:
+    def set(self, pose: Frame | None) -> None:
         """Forward target pose to all interpolator nodes."""
         for node in self._nodes:
-            node.submit(pose)
+            node.set(pose)
 
     def update(self) -> Frame | None:
         """Collect and merge interpolated features from all nodes."""

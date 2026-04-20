@@ -122,20 +122,8 @@ class WindowSimilarity:
     def add_leader_callback(self, callback: Callable[[dict[int, LeaderScore]], None]) -> None:
         self._leader_callbacks.add(callback)
 
-    def submit(self, windows: FeatureWindowDict) -> None:
-        """Update angle windows and trigger similarity processing.
-
-        DEPRECATED: Use submit_all() for motion gate and velocity weighting.
-
-        Args:
-            windows: Dictionary mapping track IDs to angle FeatureWindow objects
-        """
-        with self._input_lock:
-            self._input_windows = windows
-            self._update_event.set()
-
-    def submit_all(self, all_windows: FrameWindowDict) -> None:
-        """Update all window types and trigger similarity processing.
+    def submit(self, all_windows: FrameWindowDict) -> None:
+        """Submit all window types for similarity processing.
 
         Extracts angle, motion, and velocity windows from the combined
         WindowTracker output format.

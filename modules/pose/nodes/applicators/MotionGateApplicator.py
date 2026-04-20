@@ -33,7 +33,7 @@ class MotionGateApplicator(FilterNode):
         self._motion_gate_dict: dict[int, MotionGate] = {}
         self._lock: Lock = Lock()
 
-    def submit(self, frames: FrameDict) -> None:
+    def set(self, frames: FrameDict) -> None:
         """Compute motion gates from all current frames.
 
         Args:

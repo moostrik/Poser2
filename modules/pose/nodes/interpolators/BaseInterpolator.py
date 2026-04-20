@@ -106,7 +106,7 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
         """Return the feature type this interpolator processes."""
         return self._feature_type
 
-    def submit(self, pose: Frame) -> None:
+    def set(self, pose: Frame) -> None:
         """Set target from pose. Call at input frequency (e.g., 30 FPS)."""
         feature_data = pose[self._feature_type]
 

@@ -22,8 +22,8 @@ class InterpolatorTracker(TrackerBase):
             raise ValueError("InterpolatorTracker: pipelines dict must not be empty.")
         self._pipelines = pipelines
 
-    def submit(self, poses: FrameDict) -> None:
-        """Submit target poses for interpolation."""
+    def set(self, poses: FrameDict) -> None:
+        """Set target poses for interpolation."""
 
         # Reset pipelines for tracks that are no longer present
         for id in self._pipelines:
@@ -32,9 +32,9 @@ class InterpolatorTracker(TrackerBase):
 
         try:
             for id, pose in poses.items():
-                self._pipelines[id].submit(pose)
+                self._pipelines[id].set(pose)
         except Exception as e:
-            logger.error(f"InterpolatorTracker: Error submitting pose {id}: {e}")
+            logger.error(f"InterpolatorTracker: Error setting pose {id}: {e}")
 
     def update(self) -> FrameDict:
         """Get interpolated poses from all pipelines."""
