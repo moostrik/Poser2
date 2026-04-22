@@ -13,28 +13,9 @@ from modules.render.layers.WS.WSLinesLayer import WSLinesLayer
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.utils.HotReloadMethods import HotReloadMethods
-from modules.gl.WindowManager import WindowSettings
 
 from .render_board import RenderBoard
-from .settings import Layers, RenderSettings, ShowStage
-
-
-UPDATE_LAYERS: list[Layers] = [
-    Layers.cam_image,
-    Layers.cam_mask,
-    Layers.cam_crop,
-    Layers.ws_light,
-    Layers.ws_lines,
-    Layers.ws_tracker,
-    Layers.data_W,
-    Layers.data_F,
-    Layers.data_time,
-]
-
-INTERFACE_LAYERS: list[Layers] = [
-    Layers.tracker,
-    Layers.poser,
-]
+from .settings import Layers, RenderSettings
 
 
 class WhiteSpaceRender(RenderBase):
@@ -45,44 +26,46 @@ class WhiteSpaceRender(RenderBase):
         self.settings: RenderSettings = settings
         self.board: RenderBoard = board
 
-        self._update_layers: list[Layers] = UPDATE_LAYERS
-        self._interface_layers: list[Layers] = INTERFACE_LAYERS
-        self._preview_layers: list[Layers] = settings.layers_select.preview
-        self._draw_layers: list[Layers] = settings.layers_select.final
-
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
 
-        # WS panoramic layers — shared (not per-cam)
-        self.L[Layers.ws_tracker][0] = TrackerPanoramicLayer(board, self.num_cams)
-        self.L[Layers.ws_light][0]   = WSLightLayer(board)
-        self.L[Layers.ws_lines][0]   = WSLinesLayer(board)
-
+        # Row 1 — per-camera: source layers + tracker compositor
         for i in range(self.num_cams):
             self.L[Layers.cam_image][i] = ImageSourceLayer(i, board)
             self.L[Layers.cam_mask][i]  = MaskSourceLayer(i, board)
             self.L[Layers.cam_crop][i]  = CropSourceLayer(i, board)
-
-            self.L[Layers.tracker][i] = TrackerCompositor(
+            self.L[Layers.tracker][i]   = TrackerCompositor(
                 i, board,
                 self.L[Layers.cam_image][i].texture,
                 settings.preview.tracker,
                 settings.colors,
             )
-            self.L[Layers.poser][i] = PoseCompositor(
+
+        # Row 5 — per-player: pose compositor + data overlays
+        # cam_image[0] texture used as fallback for non-GPU crop path (GPU crop is default)
+        fallback_cam_texture = self.L[Layers.cam_image][0].texture
+        for i in range(self.num_players):
+            self.L[Layers.poser][i]     = PoseCompositor(
                 i, board,
-                self.L[Layers.cam_image][i].texture,
+                fallback_cam_texture,
                 settings.preview.poser,
                 settings.colors,
             )
-
             self.L[Layers.data_W][i]    = FeatureWindowLayer(i, board, settings.data, settings.colors)
             self.L[Layers.data_F][i]    = FeatureFrameLayer( i, board, settings.data, settings.colors)
             self.L[Layers.data_time][i] = MTimeRenderer(     i, board)
 
-        # Subdivision: top row = camera strips (square aspect), bottom row = WS output
+        # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready
+        cam_textures = {i: self.L[Layers.cam_image][i].texture for i in range(self.num_cams)}
+        self.L[Layers.ws_tracker][0] = TrackerPanoramicLayer(board, self.num_cams, cam_textures)
+        self.L[Layers.ws_light][0]   = WSLightLayer(board)
+        self.L[Layers.ws_lines][0]   = WSLinesLayer(board)
+
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name='track',   columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name='preview', columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name='track',      columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name='panoramic',  columns=1,                rows=1, src_aspect_ratio=12.0, padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name='ws_light',   columns=1,                rows=1, src_aspect_ratio=40.0, padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name='ws_lines',   columns=1,                rows=1, src_aspect_ratio=20.0, padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name='pose',       columns=self.num_players, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0)),
         ]
         self.subdivision: Subdivision = make_subdivision(
             self.subdivision_rows, settings.window.width, settings.window.height, False
@@ -102,9 +85,15 @@ class WhiteSpaceRender(RenderBase):
 
     def allocate_window_renders(self) -> None:
         for i in range(self.num_cams):
-            if i in self.L[Layers.tracker]:
-                w, h = self.subdivision.get_allocation_size('track', i)
-                self.L[Layers.tracker][i].allocate(w, h, GL_RGBA)
+            w, h = self.subdivision.get_allocation_size('track', i)
+            self.L[Layers.tracker][i].allocate(w, h, GL_RGBA)
+
+        w, h = self.subdivision.get_allocation_size('panoramic', 0)
+        self.L[Layers.ws_tracker][0].allocate(w, h, GL_RGBA)
+
+        for i in range(self.num_players):
+            w, h = self.subdivision.get_allocation_size('pose', i)
+            self.L[Layers.poser][i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
         for cam_dict in self.L.values():
@@ -114,51 +103,53 @@ class WhiteSpaceRender(RenderBase):
     def update(self) -> None:
         self._notify_update()
 
-        self._draw_layers    = self.settings.layers_select.final
-        self._preview_layers = self.settings.layers_select.preview
-
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
-        seen: set[Layers] = set()
-        for layer_type in self._update_layers + self._interface_layers + self._draw_layers + self._preview_layers:
-            if layer_type not in seen:
-                seen.add(layer_type)
-                for layer in self.L[layer_type].values():
-                    layer.update()
+        for cam_dict in self.L.values():
+            for layer in cam_dict.values():
+                layer.update()
+
+    def _viewport(self, height: int, rect: Rect) -> None:
+        glViewport(
+            int(rect.x),
+            int(height - rect.y - rect.height),
+            int(rect.width),
+            int(rect.height),
+        )
 
     def draw_main(self, width: int, height: int) -> None:
         clear_color()
-
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
+        # Row 1 — tracker compositor, one viewport per camera
         for i in range(self.num_cams):
-            track_rect: Rect = self.subdivision.get_rect('track', i)
-            glViewport(
-                int(track_rect.x),
-                int(height - track_rect.y - track_rect.height),
-                int(track_rect.width),
-                int(track_rect.height),
-            )
-            for layer_type in self._interface_layers:
-                if i in self.L[layer_type]:
-                    self.L[layer_type][i].draw()
+            self._viewport(height, self.subdivision.get_rect('track', i))
+            self.L[Layers.tracker][i].draw()
+            # self.L[Layers.cam_image][i].draw()
 
+        # Row 2 — panoramic tracker standin (single wide viewport)
+        self._viewport(height, self.subdivision.get_rect('panoramic', 0))
+        self.L[Layers.ws_tracker][0].draw()
+
+        # Row 3 — WS light strip
+        self._viewport(height, self.subdivision.get_rect('ws_light', 0))
+        self.L[Layers.ws_light][0].draw()
+
+        # Row 4 — WS lines strip
+        self._viewport(height, self.subdivision.get_rect('ws_lines', 0))
+        self.L[Layers.ws_lines][0].draw()
+
+        # Row 5 — pose cutouts with data overlays, one viewport per player
         for i in range(self.num_players):
-            preview_rect: Rect = self.subdivision.get_rect('preview', i)
-            glViewport(
-                int(preview_rect.x),
-                int(height - preview_rect.y - preview_rect.height),
-                int(preview_rect.width),
-                int(preview_rect.height),
-            )
-            for layer_type in self._preview_layers:
-                if i in self.L[layer_type]:
-                    self.L[layer_type][i].draw()
-                elif 0 in self.L[layer_type]:
-                    # Shared layers (ws_light, ws_lines, ws_tracker) stored at index 0
-                    self.L[layer_type][0].draw()
+            self._viewport(height, self.subdivision.get_rect('pose', i))
+            self.L[Layers.poser][i].draw()
+            self.L[Layers.data_W][i].draw()
+            self.L[Layers.data_F][i].draw()
+            self.L[Layers.data_time][i].draw()
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         pass
+
+

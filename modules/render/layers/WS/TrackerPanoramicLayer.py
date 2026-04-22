@@ -7,6 +7,8 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Fbo import Fbo
 from modules.gl.Texture import Texture
 from modules.gl.Text import Text
+from modules.gl import Blit
+from modules.render.shaders.cam.DrawColoredRectangle import DrawColoredRectangle
 
 from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
@@ -17,13 +19,15 @@ from modules.render.layers.LayerBase import LayerBase
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 class TrackerPanoramicLayer(LayerBase):
-    def __init__(self, board: HasTracklets, num_cams: int) -> None:
+    def __init__(self, board: HasTracklets, num_cams: int, cam_textures: dict[int, Texture] | None = None) -> None:
         self.board: HasTracklets = board
         self.num_cams: int = num_cams
+        self._cam_textures: dict[int, Texture] = cam_textures or {}
         self.fbo: Fbo = Fbo()
         self._text: Text = Text()
+        self._rect_shader: DrawColoredRectangle = DrawColoredRectangle()
 
-        hot_reload = HotReloadMethods(self.__class__, True, True)
+        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:
@@ -32,20 +36,32 @@ class TrackerPanoramicLayer(LayerBase):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
         self._text.allocate()
+        self._rect_shader.allocate()
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
         self._text.deallocate()
+        self._rect_shader.deallocate()
 
     def update(self) -> None:
-        tracklets: dict[int, Tracklet] = self.board.get_tracklets()
-        if tracklets is None:
-            return
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
         self.fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
+
+        # Draw per-camera strips as panoramic background
+        strip_w = max(1, self.fbo.width // self.num_cams)
+        for i in range(self.num_cams):
+            if i in self._cam_textures and self._cam_textures[i].allocated:
+                glViewport(i * strip_w, 0, strip_w, self.fbo.height)
+                Blit.use(self._cam_textures[i])
+
+        # Reset to full FBO viewport for tracklet overlay
+        glViewport(0, 0, self.fbo.width, self.fbo.height)
+
+        tracklets: dict[int, Tracklet] = self.board.get_tracklets()
+        if not tracklets:
+            self.fbo.end()
+            return
 
         for tracklet in tracklets.values():
             if tracklet is None:
@@ -61,29 +77,23 @@ class TrackerPanoramicLayer(LayerBase):
             local_angle: float = getattr(tracklet.metadata, "local_angle", 0.0)
             overlap: bool = getattr(tracklet.metadata, "overlap", False)
 
-            roi_width: float = tracklet.roi.width * self.fbo.width / self.num_cams
-            roi_height: float = tracklet.roi.height * self.fbo.height
-            roi_x: float = world_angle / 360.0 * self.fbo.width - roi_width / 2.0
-            roi_y: float = tracklet.roi.y * self.fbo.height
+            roi_width: float = tracklet.roi.width / self.num_cams
+            roi_height: float = tracklet.roi.height
+            roi_x: float = world_angle / 360.0 - roi_width / 2.0
+            roi_y: float = tracklet.roi.y
 
             color: list[float] = TrackletIdColor(tracklet.id, aplha=0.9)
-            if overlap == True:
+            if overlap:
                 color[3] = 0.3
             if tracklet.status == TrackingStatus.NEW:
                 color = [1.0, 1.0, 1.0, 1.0]
 
-            glColor4f(*color)
-            glBegin(GL_QUADS)       # Start drawing a quad
-            glVertex2f(roi_x, roi_y)        # Bottom left
-            glVertex2f(roi_x, roi_y + roi_height)    # Bottom right
-            glVertex2f(roi_x + roi_width, roi_y + roi_height)# Top right
-            glVertex2f(roi_x + roi_width, roi_y)    # Top left
-            glEnd()                 # End drawing
+            self._rect_shader.use(roi_x, roi_y, roi_width, roi_height, *color)
 
-            roi_x += 9
-            roi_y += 22
-            self._text.draw_box_text(roi_x, roi_y, f'W: {world_angle:.1f}', (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 0.6), self.fbo.width, self.fbo.height)
-            roi_y += 22
-            self._text.draw_box_text(roi_x, roi_y, f'L: {local_angle:.1f}', (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 0.6), self.fbo.width, self.fbo.height)
+            text_x: float = (roi_x * self.fbo.width) + 9
+            text_y: float = (roi_y * self.fbo.height) + 22
+            self._text.draw_box_text(text_x, text_y, f'W: {world_angle:.1f}', (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 0.6), self.fbo.width, self.fbo.height)
+            text_y += 22
+            self._text.draw_box_text(text_x, text_y, f'L: {local_angle:.1f}', (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 0.6), self.fbo.width, self.fbo.height)
         self.fbo.end()
 

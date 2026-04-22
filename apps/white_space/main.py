@@ -102,6 +102,7 @@ class WhiteSpaceMain:
         self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
         self.bbox_filters.add_frames_callback(self.image_crop_processor.process)
         self.image_crop_processor.add_image_callback(self.point_extractor.process)
+        self.image_crop_processor.add_image_callback(lambda _f, gpu: self.board.set_images(gpu))
         if self.mask_extractor is not None:
             self.image_crop_processor.add_image_callback(self.mask_extractor.process)
             self.mask_extractor.add_image_callback(lambda _f, gpu: self.board.set_images(gpu))
@@ -255,7 +256,7 @@ class WhiteSpaceMain:
         self.video_recorder.start()
 
         self.is_running = True
-        # self.render.start()
+        self.render.start()
 
     def stop(self) -> None:
         if not self.is_running:

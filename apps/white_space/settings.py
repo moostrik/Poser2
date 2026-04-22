@@ -71,17 +71,6 @@ class Layers(IntEnum):
     data_W       = auto()
     data_F       = auto()
     data_time    = auto()
-    # final
-    composite    = auto()
-
-
-# ---------------------------------------------------------------------------
-#  Layer selection settings
-# ---------------------------------------------------------------------------
-
-class LayerSettings(BaseSettings):
-    preview: Field[list[Layers]] = Field([Layers.ws_light], description="Layers drawn in preview viewports", widget=Widget.playlist)
-    final:   Field[list[Layers]] = Field([Layers.ws_light], description="Layers drawn on output monitors",  widget=Widget.playlist)
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +262,6 @@ class PreviewGroup(BaseSettings):
 class RenderSettings(BaseSettings):
     num_cams:    Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of players")
-    layers_select: Group[LayerSettings]  = Group(LayerSettings)
     preview:     Group[PreviewGroup]     = Group(PreviewGroup)
     data:        Group[DataLayerSettings] = Group(DataLayerSettings)
     colors:      Group[ColorSettings]    = Group(ColorSettings)

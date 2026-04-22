@@ -2,15 +2,15 @@
   "num_players": 8,
   "num_cameras": 4,
   "input_fps": 30.0,
-  "render_fps": 120.0,
+  "render_fps": 60.0,
   "camera": {
     "yolo": true,
     "color": true,
     "mono": false,
     "square": true,
     "stereo": false,
-    "hd_ready": false,
-    "sim_enabled": true,
+    "hd_ready": true,
+    "sim_enabled": false,
     "model_path": "models",
     "cam_0": {
       "device_id": "14442C101136D1D200",
@@ -18,10 +18,10 @@
       "flip_h": false,
       "flip_v": true,
       "perspective": -0.22,
-      "color_exposure": 0,
-      "color_iso": 0,
+      "color_exposure": 30001,
+      "color_iso": 1599,
       "color_auto_exposure": true,
-      "color_balance": 0,
+      "color_balance": 5500,
       "color_auto_balance": true,
       "color_brightness": 0,
       "color_contrast": 0,
@@ -45,10 +45,10 @@
       "flip_h": false,
       "flip_v": true,
       "perspective": -0.22,
-      "color_exposure": 0,
-      "color_iso": 0,
+      "color_exposure": 30001,
+      "color_iso": 1599,
       "color_auto_exposure": true,
-      "color_balance": 0,
+      "color_balance": 5500,
       "color_auto_balance": true,
       "color_brightness": 0,
       "color_contrast": 0,
@@ -67,7 +67,7 @@
       "stereo_bright_max": 255
     },
     "cam_2": {
-      "device_id": "14442C101136D1D200",
+      "device_id": "14442C101136D1D201",
       "show_stereo": false,
       "flip_h": false,
       "flip_v": true,
@@ -94,7 +94,7 @@
       "stereo_bright_max": 255
     },
     "cam_3": {
-      "device_id": "14442C101136D1D200",
+      "device_id": "14442C101136D1D202",
       "show_stereo": false,
       "flip_h": false,
       "flip_v": true,
@@ -162,14 +162,14 @@
     "model_type": "TRT",
     "model_path": "models",
     "verbose": false,
-    "use_segmentation": false,
+    "use_segmentation": true,
     "ws_input_stage": "LERP",
     "detection": {
       "resolution": "STANDARD"
     },
     "segmentation": {
       "resolution": "STANDARD",
-      "enabled": false,
+      "enabled": true,
       "reset_interval": 240
     },
     "image_crop": {
@@ -350,14 +350,6 @@
     "line_amount": 20.0
   },
   "render": {
-    "layers_select": {
-      "preview": [
-        "ws_light"
-      ],
-      "final": [
-        "ws_light"
-      ]
-    },
     "preview": {
       "tracker": {
         "stage": "LERP",
@@ -459,9 +451,9 @@
       "title": "Poser",
       "v_sync": true,
       "fullscreen": false,
-      "monitor": 0,
-      "x": 0,
-      "y": 80,
+      "monitor": 1,
+      "x": 10,
+      "y": 2600,
       "width": 1920,
       "height": 1000,
       "secondary_list": []
@@ -506,7 +498,7 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "enabled": true
+      "enabled": false
     }
   }
 }
