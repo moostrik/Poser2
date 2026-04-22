@@ -9,7 +9,7 @@ for /f %%a in ('copy /z "%~f0" nul') do set "CR=%%a"
 
 tasklist /FI "IMAGENAME eq python.exe" 2>NUL | find /I /N "python.exe">NUL
 if "%ERRORLEVEL%"=="0" (
-    echo Python is running - please shut it down now...
+    echo Harmonic Dissonance is still running, please shut it down...
     set "PY_CLOSED="
     for /L %%I in (1,1,30) do (
         if not defined PY_CLOSED (

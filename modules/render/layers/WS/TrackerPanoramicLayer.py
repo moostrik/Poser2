@@ -5,41 +5,42 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl.Fbo import Fbo
-from modules.gl.Text import draw_box_string, text_init
+from modules.gl.Texture import Texture
+from modules.gl.Text import Text
 
 from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
-from modules.board import DataHub
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.board import HasTracklets
+from modules.render.layers.LayerBase import LayerBase
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 class TrackerPanoramicLayer(LayerBase):
-    def __init__(self, data: DataHub, num_cams: int) -> None:
-        self.data: DataHub = data
-        self.data_consumer_key: str = data.get_unique_consumer_key()
+    def __init__(self, board: HasTracklets, num_cams: int) -> None:
+        self.board: HasTracklets = board
         self.num_cams: int = num_cams
         self.fbo: Fbo = Fbo()
-        text_init()
+        self._text: Text = Text()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
+    @property
+    def texture(self) -> Texture:
+        return self.fbo
+
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
+        self._text.allocate()
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
-
-    def draw(self, rect: Rect) -> None:
-        self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        self._text.deallocate()
 
     def update(self) -> None:
-        tracklets: dict[int, Tracklet] = self.data.get_tracklets()
+        tracklets: dict[int, Tracklet] = self.board.get_tracklets()
         if tracklets is None:
             return
-        # print(f"PanoramicTrackerRender: Updating with {len(tracklets)} tracklets")
-        LayerBase.setView(self.fbo.width, self.fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self.fbo.begin()
@@ -71,6 +72,7 @@ class TrackerPanoramicLayer(LayerBase):
             if tracklet.status == TrackingStatus.NEW:
                 color = [1.0, 1.0, 1.0, 1.0]
 
+            glColor4f(*color)
             glBegin(GL_QUADS)       # Start drawing a quad
             glVertex2f(roi_x, roi_y)        # Bottom left
             glVertex2f(roi_x, roi_y + roi_height)    # Bottom right
@@ -78,13 +80,10 @@ class TrackerPanoramicLayer(LayerBase):
             glVertex2f(roi_x + roi_width, roi_y)    # Top left
             glEnd()                 # End drawing
 
-            string: str
             roi_x += 9
             roi_y += 22
-            string = f'W: {world_angle:.1f}'
-            draw_box_string(roi_x, roi_y, string)
+            self._text.draw_box_text(roi_x, roi_y, f'W: {world_angle:.1f}', (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 0.6), self.fbo.width, self.fbo.height)
             roi_y += 22
-            string = f'L: {local_angle:.1f}'
-            draw_box_string(roi_x, roi_y, string)
+            self._text.draw_box_text(roi_x, roi_y, f'L: {local_angle:.1f}', (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 0.6), self.fbo.width, self.fbo.height)
         self.fbo.end()
 

@@ -14,6 +14,11 @@ class ColorSettings(BaseSettings):
     player_0:    Field[Color] = Field(Color(1.0, 0.0, 0.0))  # Red
     player_1:    Field[Color] = Field(Color(0.0, 0.0, 1.0))  # Blue
     player_2:    Field[Color] = Field(Color(0.0, 1.0, 0.0))  # Green
+    player_3:    Field[Color] = Field(Color(1.0, 1.0, 0.0))  # Yellow
+    player_4:    Field[Color] = Field(Color(1.0, 0.0, 1.0))  # Magenta
+    player_5:    Field[Color] = Field(Color(0.0, 1.0, 1.0))  # Cyan
+    player_6:    Field[Color] = Field(Color(1.0, 0.5, 0.0))  # Orange
+    player_7:    Field[Color] = Field(Color(0.5, 0.0, 1.0))  # Purple
     pose_left:   Field[Color] = Field(Color(1.0, 0.5, 0.0))  # Orange
     pose_right:  Field[Color] = Field(Color(0.0, 1.0, 1.0))  # Cyan
     pose_center: Field[Color] = Field(Color(1.0, 1.0, 1.0))  # White

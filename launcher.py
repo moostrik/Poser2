@@ -17,7 +17,7 @@ if __name__ == '__main__':
     torch.backends.cuda.matmul.allow_tf32 = True  # Use TF32 tensor cores for faster matmul on Ampere+ GPUs
 
     parser: ArgumentParser = ArgumentParser()
-    parser.add_argument('-app',     '--app',            type=str,   default='hd_trio', choices=list(APP_REGISTRY.keys()), help='app to launch (default: hd_trio)')
+    parser.add_argument('-app',     '--app',            type=str,   default='white_space', choices=list(APP_REGISTRY.keys()), help='app to launch (default: hd_trio)')
     parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecorded video with camera')
     parser.add_argument('-v',       '--verbose',        action='store_true',        help='enable verbose (DEBUG) console output')
     args: Namespace = parser.parse_args()

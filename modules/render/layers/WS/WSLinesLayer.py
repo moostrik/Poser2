@@ -4,53 +4,45 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Fbo import Fbo
-from modules.gl.Image import Image
-from modules.gl.Text import draw_box_string, text_init
+from modules.gl import Fbo, Texture, Image
 
 from modules.WS.WSOutput import WSOutput
-from modules.pose.similarity.features.SimilarityStream import SimilarityStreamData
-from modules.board import DataHub
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.board import HasWSOutput
+from modules.render.layers.LayerBase import LayerBase
 
-from modules.gl.shaders.WS_Lines import WS_Lines
+from modules.render.shaders.ws.WS_Lines import WS_Lines
 
 class WSLinesLayer(LayerBase):
-    lines_shader = WS_Lines()
 
-    def __init__(self, data: DataHub) -> None:
-        self.data: DataHub = data
-        self.data_consumer_key: str = data.get_unique_consumer_key()
+    def __init__(self, board: HasWSOutput) -> None:
+        self.board: HasWSOutput = board
         self.fbo_lines: Fbo = Fbo()
         self.image: Image = Image()
-        text_init()
+        self._shader: WS_Lines = WS_Lines()
+
+    @property
+    def texture(self) -> Texture:
+        return self.fbo_lines
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo_lines.allocate(width, height, internal_format)
-        if not WSLinesLayer.lines_shader.allocated:
-            WSLinesLayer.lines_shader.allocate(monitor_file=True)
+        self._shader.allocate()
 
     def deallocate(self) -> None:
         self.fbo_lines.deallocate()
         self.image.deallocate()
-        if WSLinesLayer.lines_shader.allocated:
-            WSLinesLayer.lines_shader.deallocate()
-
-    def draw(self, rect: Rect) -> None:
-        x, y, width, height = rect.x, rect.y, rect.width, rect.height
-        self.fbo_lines.draw(x, y, width, height)
+        self._shader.deallocate()
 
     def update(self) -> None:
-        light_image: WSOutput | None = self.data.get_light_image(True, self.data_consumer_key)
+        light_image: WSOutput | None = self.board.get_ws_output()
         if light_image is None:
             return
 
         self.image.set_image(light_image.infos_img)
         self.image.update()
 
-        self.setView(self.fbo_lines.width, self.fbo_lines.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self.fbo_lines.begin()
-        self.lines_shader.use(self.fbo_lines, self.image.texture)
+        self._shader.use(self.fbo_lines, self.image.texture)
         self.fbo_lines.end()

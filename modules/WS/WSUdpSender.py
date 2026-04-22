@@ -23,7 +23,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-
 OscMessageList = list[Union[OscMessage, OscBundle]]  # Type alias for OSC messages or bundles
 
 @dataclass
