@@ -5,15 +5,14 @@
   "render_fps": 60.0,
   "camera": {
     "yolo": true,
-    "color": true,
-    "mono": false,
-    "square": true,
+    "color": false,
+    "square": false,
     "stereo": false,
     "hd_ready": true,
     "sim_enabled": false,
     "model_path": "models",
     "cam_0": {
-      "device_id": "14442C101136D1D200",
+      "device_id": "14442C10110AD3D200",
       "show_stereo": false,
       "flip_h": false,
       "flip_v": true,
@@ -67,7 +66,7 @@
       "stereo_bright_max": 255
     },
     "cam_2": {
-      "device_id": "14442C101136D1D201",
+      "device_id": "14442C1031DDD2D200",
       "show_stereo": false,
       "flip_h": false,
       "flip_v": true,
@@ -94,7 +93,7 @@
       "stereo_bright_max": 255
     },
     "cam_3": {
-      "device_id": "14442C101136D1D202",
+      "device_id": "14442C101136D1D200",
       "show_stereo": false,
       "flip_h": false,
       "flip_v": true,

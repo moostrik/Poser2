@@ -71,12 +71,13 @@ class ImageCropProcessor:
         """Upload image from a specific camera to GPU. Only VIDEO frames are stored.
 
         Shifts current GPU image to previous before uploading new current.
-        Stores as float16 RGB CHW [0,1] - BGR→RGB conversion and HWC→CHW done at upload.
+        Stores as float16 RGB CHW [0,1] - conversion done at upload.
+        Accepts BGR color (H,W,3) or grayscale (H,W); grayscale is expanded to 3 channels.
 
         Args:
             cam_id: Camera identifier (used as tracklet ID in single-camera setups)
             frame_type: Type of frame (only VIDEO frames are processed)
-            image: BGR uint8 image (H, W, 3) on CPU
+            image: BGR uint8 (H, W, 3) or grayscale uint8 (H, W) on CPU
         """
         from modules.oak.camera.definitions import FrameType
 
@@ -90,10 +91,13 @@ class ImageCropProcessor:
             if cam_id in self._gpu_images:
                 self._prev_gpu_images[cam_id] = self._gpu_images[cam_id]
 
-            # Upload BGR frame to GPU, convert to CHW RGB format
             gpu_img = torch.from_numpy(image).cuda(non_blocking=True)
-            # HWC -> CHW, BGR -> RGB, normalize to [0,1]
-            self._gpu_images[cam_id] = gpu_img.permute(2, 0, 1).flip(0).to(dtype=torch.float16).mul_(1.0/255.0)
+            if image.ndim == 2:
+                # Grayscale (H,W) -> (1,H,W) -> normalize -> expand to (3,H,W)
+                self._gpu_images[cam_id] = gpu_img.unsqueeze(0).to(dtype=torch.float16).mul_(1.0/255.0).expand(3, -1, -1).contiguous()
+            else:
+                # Color HWC BGR -> CHW RGB, normalize to [0,1]
+                self._gpu_images[cam_id] = gpu_img.permute(2, 0, 1).flip(0).to(dtype=torch.float16).mul_(1.0/255.0)
 
         elapsed_ms = (time.perf_counter() - start) * 1000.0
         self._accumulated_upload_ms += elapsed_ms

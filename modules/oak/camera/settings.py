@@ -20,8 +20,7 @@ class CameraSettings(BaseSettings):
     # Initial settings
     device_id:      Field[str]   = Field("", access=Field.INIT, description="Camera device ID (MxID)")
     fps:            Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera FPS")
-    color:          Field[bool]  = Field(True, access=Field.INIT, newline=True)
-    mono:           Field[bool]  = Field(False, access=Field.INIT)
+    color:          Field[bool]  = Field(True, access=Field.INIT, newline=True, description="Color camera (False = mono)")
     square:         Field[bool]  = Field(True, access=Field.INIT)
     stereo:         Field[bool]  = Field(False, access=Field.INIT)
     yolo:           Field[bool]  = Field(True, access=Field.INIT)

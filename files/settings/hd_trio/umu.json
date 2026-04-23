@@ -5,7 +5,6 @@
   "camera": {
     "yolo": true,
     "color": true,
-    "mono": false,
     "square": true,
     "stereo": false,
     "hd_ready": true,
