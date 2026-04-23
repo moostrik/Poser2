@@ -4,16 +4,16 @@ from modules.gl import Fbo, Texture, Image
 from modules.board import HasCompositionOutput
 from modules.render.layers.LayerBase import LayerBase
 
-from apps.white_space.render.shaders.WS_Angles import WS_Angles
+from apps.white_space.render.shaders.light_simulation import LightSimulation
 
 
-class CompositorOutputLayer(LayerBase):
+class LightSimulationLayer(LayerBase):
 
     def __init__(self, board: HasCompositionOutput) -> None:
         self.board: HasCompositionOutput = board
         self.fbo_angles: Fbo = Fbo()
         self.image: Image = Image()
-        self._shader: WS_Angles = WS_Angles()
+        self._shader: LightSimulation = LightSimulation()
 
     @property
     def texture(self) -> Texture:

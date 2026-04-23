@@ -2,7 +2,7 @@
   "num_players": 8,
   "num_cameras": 4,
   "input_fps": 30.0,
-  "render_fps": 39.0,
+  "render_fps": 57.0,
   "camera": {
     "yolo": true,
     "color": false,
@@ -327,6 +327,40 @@
       "emit_partial": true
     }
   },
+  "composition": {
+    "light_resolution": 300,
+    "udp_port": 8000,
+    "udp_ips": [
+      "127.0.0.1"
+    ],
+    "fov_degrees": 110.0,
+    "void_width": 0.05,
+    "void_edge": 0.01,
+    "use_void": true,
+    "pattern_width": 0.2,
+    "pattern_edge": 0.2,
+    "line_sharpness": 1.5,
+    "line_speed": 1.5,
+    "line_width": 0.1,
+    "line_amount": 20.0,
+    "test": {
+      "pattern": "CHASE",
+      "white": {
+        "strength": 0.5,
+        "speed": 0.11,
+        "phase": 0.0,
+        "width": 0.2,
+        "amount": 93
+      },
+      "blue": {
+        "strength": 0.5,
+        "speed": 0.5,
+        "phase": 0.5,
+        "width": 0.5,
+        "amount": 36
+      }
+    }
+  },
   "render": {
     "preview": {
       "tracker": {
@@ -477,28 +511,6 @@
         "VIDEO"
       ],
       "enabled": false
-    }
-  },
-  "composition": {
-    "light_resolution": 300,
-    "udp_port": 8000,
-    "udp_ips": [
-      "127.0.0.1"
-    ],
-    "fov_degrees": 110.0,
-    "void_width": 0.05,
-    "void_edge": 0.01,
-    "use_void": true,
-    "pattern_width": 0.2,
-    "pattern_edge": 0.2,
-    "line_sharpness": 1.5,
-    "line_speed": 1.5,
-    "line_width": 0.1,
-    "line_amount": 20.0,
-    "test": {
-      "pattern": 0,
-      "white": {"strength": 0.5, "speed": 0.5, "phase": 0.0, "width": 0.5, "amount": 36},
-      "blue":  {"strength": 0.5, "speed": 0.5, "phase": 0.5, "width": 0.5, "amount": 36}
     }
   }
 }

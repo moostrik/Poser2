@@ -24,6 +24,7 @@ void main() {
     int maxIdx = int(ceil(lineIdx + angle / degreesPerLine));
 
     // Calculate the intensity by sampling the texture lines within the beam angle
+    // light_img layout: .r = white (channel 0), .g = blue (channel 1)
     float white = 0.0;
     float blue = 0.0;
     for (int j = minIdx; j <= maxIdx; ++j) {
@@ -31,11 +32,11 @@ void main() {
         int i = int(mod(float(j + int(texWidth)), texWidth));
         float lineAngle = float(i) * degreesPerLine;
         float delta = abs(xAngle - lineAngle);
-        delta = min(delta, 360.0 - delta); // <-- wrap angular distance
+        delta = min(delta, 360.0 - delta); // wrap angular distance
 
         if (delta < halfAngle) {
             float falloff = smoothstep(halfAngle, 0.0, delta);
-            float whiteValue = texture(tex0, vec2(float(i) / (texWidth - 1.0), 0.5)).b * 0.8;
+            float whiteValue = texture(tex0, vec2(float(i) / (texWidth - 1.0), 0.5)).r * 0.8;
             white += whiteValue * falloff;
             float blueValue = texture(tex0, vec2(float(i) / (texWidth - 1.0), 0.5)).g;
             blue += blueValue * falloff;

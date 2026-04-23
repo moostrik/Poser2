@@ -15,7 +15,7 @@ from modules.gl.WindowManager import WindowSettings
 
 from .composition import Compositor
 
-from .render.render_board import RenderBoard
+from .render.board import RenderBoard
 from .settings import Settings, Stage
 from .render.render import WhiteSpaceRender
 

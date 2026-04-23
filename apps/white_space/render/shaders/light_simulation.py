@@ -2,7 +2,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Fbo, Texture
 
-class WS_Angles(Shader):
+class LightSimulation(Shader):
     def use(self, fbo: Fbo, tex0: Texture, width: float) -> None:
         if not self.allocated or not self.shader_program: return
         if not fbo.allocated or not tex0.allocated: return

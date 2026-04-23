@@ -1,2 +1,2 @@
-from .compositor_output_layer import CompositorOutputLayer
+from .light_simulation_layer import LightSimulationLayer
 from .composition_debug_layer import CompositionDebugLayer
