@@ -8,6 +8,7 @@ from modules.pose.frame import Frame
 from modules.pose.features import BBox
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import DrawRectangleOutline
+from modules.render.color_settings import ColorSettings
 from modules.utils import Color
 
 
@@ -18,11 +19,12 @@ class BBoxRendererSettings(BaseSettings):
 
 
 class BBoxRenderer(LayerBase):
-    def __init__(self, cam_id: int, board: HasFrames, settings: BBoxRendererSettings | None = None) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, settings: BBoxRendererSettings | None = None, color_settings: ColorSettings | None = None) -> None:
         self.settings: BBoxRendererSettings = settings or BBoxRendererSettings()
         self._board: HasFrames = board
         self._cam_id: int = cam_id
-        self._cam_bbox_rects: list[Rect] = []
+        self._color_settings: ColorSettings | None = color_settings
+        self._cam_bbox_rects: list[tuple[Rect, int]] = []
         self._width: int = 0
         self._height: int = 0
 
@@ -39,8 +41,9 @@ class BBoxRenderer(LayerBase):
         self._shader.deallocate()
 
     def draw(self) -> None:
-        color = self.settings.color.to_tuple()
-        for bbox_rect in self._cam_bbox_rects:
+        track_colors = self._color_settings.track_color_tuples if self._color_settings else None
+        for bbox_rect, track_id in self._cam_bbox_rects:
+            color = track_colors[track_id % len(track_colors)] if track_colors else self.settings.color.to_tuple()
             # Convert pixel line width to normalized coordinates relative to the rectangle
             rect_w_pixels = bbox_rect.width * self._width
             rect_h_pixels = bbox_rect.height * self._height
@@ -54,7 +57,7 @@ class BBoxRenderer(LayerBase):
             )
 
     def update(self) -> None:
-        cam_poses = {p for p in self._board.get_frames(self.settings.stage).values() if p.cam_id == self._cam_id}
         self._cam_bbox_rects = []
-        for pose in cam_poses:
-            self._cam_bbox_rects.append(pose[BBox].to_rect())
+        for track_id, pose in self._board.get_frames(self.settings.stage).items():
+            if pose.cam_id == self._cam_id:
+                self._cam_bbox_rects.append((pose[BBox].to_rect(), track_id))

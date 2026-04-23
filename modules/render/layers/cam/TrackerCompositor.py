@@ -32,8 +32,8 @@ class TrackerCompositor(LayerBase):
         bbox_config_A: BBoxRendererSettings = BBoxRendererSettings(stage=0, line_width=self.settings.bbox_line_width * 2.0, color=color_settings.history)
         self._bbox_renderer_A: BBoxRenderer = BBoxRenderer(cam_id, board, bbox_config_A)
 
-        bbox_config_B: BBoxRendererSettings = BBoxRendererSettings(stage=0, line_width=self.settings.bbox_line_width, color=color_settings.track_colors[cam_id])
-        self._bbox_renderer_B: BBoxRenderer = BBoxRenderer(cam_id, board, bbox_config_B)
+        bbox_config_B: BBoxRendererSettings = BBoxRendererSettings(stage=0, line_width=self.settings.bbox_line_width)
+        self._bbox_renderer_B: BBoxRenderer = BBoxRenderer(cam_id, board, bbox_config_B, color_settings=color_settings)
 
         pose_config: PoseRendererSettings = PoseRendererSettings(stage=self.settings.stage, line_width=self.settings.pose_line_width, line_smooth=0.0, use_scores=False, use_bbox=True)
         self._pose_renderer: PoseRenderer = PoseRenderer(cam_id, board, color_settings=None, settings=pose_config)
@@ -69,7 +69,6 @@ class TrackerCompositor(LayerBase):
         self._depth_track_renderer.draw()
         self._bbox_renderer_A.settings.color = self._color_settings.history
         self._bbox_renderer_A.draw()
-        self._bbox_renderer_B.settings.color = self._color_settings.track_colors[self._cam_id]
         self._bbox_renderer_B.draw()
         self._pose_renderer.draw()
         self._fbo.end()
