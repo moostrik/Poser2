@@ -198,8 +198,7 @@
       "expansion_height": 0.1,
       "output_width": 768,
       "output_height": 1024,
-      "enable_prev_crop": false,
-      "verbose": false
+      "enable_prev_crop": false
     },
     "angle_extractor": {},
     "bbox": {

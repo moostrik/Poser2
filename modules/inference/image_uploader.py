@@ -94,7 +94,7 @@ class ImageUploader:
         """
         self._stream.synchronize()
 
-        self._timer.add_time(self._accumulated_upload_ms)
+        self._timer.add_time(self._accumulated_upload_ms, report=False)
         self._accumulated_upload_ms = 0.0
 
         current: FullImageDict = {
