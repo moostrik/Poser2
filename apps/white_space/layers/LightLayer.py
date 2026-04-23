@@ -1,21 +1,16 @@
-# Standard library imports
-
-# Third-party imports
 from OpenGL.GL import * # type: ignore
 
-# Local application imports
 from modules.gl import Fbo, Texture, Image
-
-from modules.WS.WSOutput import WSOutput
-from modules.board import HasWSOutput
+from modules.board import HasLightOutput
 from modules.render.layers.LayerBase import LayerBase
 
 from apps.white_space.shaders.WS_Angles import WS_Angles
 
-class WSLightLayer(LayerBase):
 
-    def __init__(self, board: HasWSOutput) -> None:
-        self.board: HasWSOutput = board
+class LightLayer(LayerBase):
+
+    def __init__(self, board: HasLightOutput) -> None:
+        self.board: HasLightOutput = board
         self.fbo_angles: Fbo = Fbo()
         self.image: Image = Image()
         self._shader: WS_Angles = WS_Angles()
@@ -34,11 +29,11 @@ class WSLightLayer(LayerBase):
         self._shader.deallocate()
 
     def update(self) -> None:
-        light_image: WSOutput | None = self.board.get_ws_output()
-        if light_image is None:
+        output = self.board.get_light_output()
+        if output is None:
             return
 
-        self.image.set_image(light_image.light_img)
+        self.image.set_image(output.light_img)
         self.image.update()
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)

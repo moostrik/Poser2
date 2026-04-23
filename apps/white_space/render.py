@@ -8,8 +8,8 @@ from modules.render.layers import ImageSourceLayer, MaskSourceLayer, CropSourceL
 from modules.render.layers import TrackerCompositor, PoseCompositor
 from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer
 from modules.render.layers.generic.PanoramicTrackerLayer import PanoramicTrackerLayer
-from apps.white_space.layers.WSLightLayer import WSLightLayer
-from apps.white_space.layers.WSLinesLayer import WSLinesLayer
+from apps.white_space.layers.LightLayer import LightLayer
+from apps.white_space.layers.LightDebugLayer import LightDebugLayer
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -56,8 +56,8 @@ class WhiteSpaceRender(RenderBase):
 
         # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready
         self.L[Layers.ws_tracker][0] = PanoramicTrackerLayer(board, self.num_cams, settings.colors)
-        self.L[Layers.ws_light][0]   = WSLightLayer(board)
-        self.L[Layers.ws_lines][0]   = WSLinesLayer(board)
+        self.L[Layers.ws_light][0]   = LightLayer(board)
+        self.L[Layers.ws_lines][0]   = LightDebugLayer(board)
 
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name='track',      columns=self.num_cams,    rows=1, src_aspect_ratio=16/9,  padding=Point2f(1.0, 1.0)),

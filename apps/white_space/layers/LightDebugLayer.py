@@ -1,21 +1,16 @@
-# Standard library imports
-
-# Third-party imports
 from OpenGL.GL import * # type: ignore
 
-# Local application imports
 from modules.gl import Fbo, Texture, Image
-
-from modules.WS.WSOutput import WSOutput
-from modules.board import HasWSOutput
+from modules.board import HasLightDebug
 from modules.render.layers.LayerBase import LayerBase
 
 from apps.white_space.shaders.WS_Lines import WS_Lines
 
-class WSLinesLayer(LayerBase):
 
-    def __init__(self, board: HasWSOutput) -> None:
-        self.board: HasWSOutput = board
+class LightDebugLayer(LayerBase):
+
+    def __init__(self, board: HasLightDebug) -> None:
+        self.board: HasLightDebug = board
         self.fbo_lines: Fbo = Fbo()
         self.image: Image = Image()
         self._shader: WS_Lines = WS_Lines()
@@ -34,11 +29,11 @@ class WSLinesLayer(LayerBase):
         self._shader.deallocate()
 
     def update(self) -> None:
-        light_image: WSOutput | None = self.board.get_ws_output()
-        if light_image is None:
+        debug = self.board.get_light_debug()
+        if debug is None:
             return
 
-        self.image.set_image(light_image.infos_img)
+        self.image.set_image(debug.debug_img)
         self.image.update()
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)

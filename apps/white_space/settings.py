@@ -22,7 +22,7 @@ from modules import inference
 from modules.inference import ModelType
 from modules.session import SessionSettings, SequencerSettings
 from modules.gl.WindowManager import WindowSettings
-from modules.WS.WSSettings import WSSettings
+from apps.white_space.light.LightSettings import LightSettings
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +280,7 @@ class Settings(BaseSettings):
     camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])
     inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players')])
     pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
-    ws     : Group[WSSettings]      = Group(WSSettings, share=[num_players.as_('max_poses'), input_fps.as_('light_rate')])
+    light  : Group[LightSettings]   = Group(LightSettings, share=[num_players.as_('max_poses'), input_fps.as_('light_rate')])
     render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams')])
     server : Group[NiceSettings]    = Group(NiceSettings)
     session: Group[SessionGroup]    = Group(SessionGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])

@@ -327,26 +327,6 @@
       "emit_partial": true
     }
   },
-  "ws": {
-    "light_resolution": 300,
-    "udp_port": 8000,
-    "udp_ip_light": [
-      "127.0.0.1"
-    ],
-    "udp_ip_sound": [
-      "127.0.0.1"
-    ],
-    "mode": "VISUALS",
-    "void_width": 0.05,
-    "void_edge": 0.01,
-    "use_void": true,
-    "pattern_width": 0.2,
-    "pattern_edge": 0.2,
-    "line_sharpness": 1.5,
-    "line_speed": 1.5,
-    "line_width": 0.1,
-    "line_amount": 20.0
-  },
   "render": {
     "preview": {
       "tracker": {
@@ -498,5 +478,22 @@
       ],
       "enabled": false
     }
+  },
+  "light": {
+    "light_resolution": 300,
+    "udp_port": 8000,
+    "udp_ips": [
+      "127.0.0.1"
+    ],
+    "fov_degrees": 110.0,
+    "void_width": 0.05,
+    "void_edge": 0.01,
+    "use_void": true,
+    "pattern_width": 0.2,
+    "pattern_edge": 0.2,
+    "line_sharpness": 1.5,
+    "line_speed": 1.5,
+    "line_width": 0.1,
+    "line_amount": 20.0
   }
 }

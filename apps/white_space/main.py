@@ -13,7 +13,7 @@ from modules import inference
 from modules.session import Session, Sequencer
 from modules.gl.WindowManager import WindowSettings
 
-from modules.WS.WSDraw import WSDraw
+from .light import LightCompositor
 
 from .render_board import RenderBoard
 from .settings import Settings, Stage
@@ -122,12 +122,13 @@ class WhiteSpaceMain:
                 wt.process,
             ])
 
-        # WS PIPELINE — light/sound output
-        self.ws_draw = WSDraw(self.settings.ws)
-        self.tracker.add_tracklet_callback(self.ws_draw.set_tracklets)
+        # WS PIPELINE — light output
+        self.light_compositor = LightCompositor(self.settings.light)
+        self.tracker.add_tracklet_callback(self.light_compositor.set_tracklets)
         ws_input: Stage = Stage(int(ps.ws_input_stage))
-        self.stages[ws_input].add_callback(self.ws_draw.add_poses)
-        self.ws_draw.add_output_callback(self.board.set_ws_output)
+        self.stages[ws_input].add_callback(self.light_compositor.add_poses)
+        self.light_compositor.add_output_callback(self.board.set_light_output)
+        self.light_compositor.add_debug_callback(self.board.set_light_debug)
 
         # POSE STAGE RAW
         self.point_extractor.add_frames_callback(self.stages[Stage.RAW])
@@ -249,7 +250,7 @@ class WhiteSpaceMain:
             self.mask_extractor.start()
         self.window_similator.start()
         self.window_correlator.start()
-        self.ws_draw.start()
+        self.light_compositor.start()
 
         self.sound_osc.start()
 
@@ -277,7 +278,7 @@ class WhiteSpaceMain:
 
         self.tracker.stop()
         self.sound_osc.stop()
-        self.ws_draw.stop()
+        self.light_compositor.stop()
 
         self.point_extractor.stop()
         if self.mask_extractor is not None:
