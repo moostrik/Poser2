@@ -9,10 +9,10 @@ _MODELS = {
         Resolution.EXTREME: "rtmpose-l_384x288.onnx",      # Fallback
     },
     'tensorrt': {
-        Resolution.STANDARD: "rtmpose-l_256x192_b3.trt",
-        Resolution.HIGH: "rtmpose-l_384x288_b3.trt",
-        Resolution.ULTRA: "rtmpose-l_384x288_b3.trt",      # Fallback
-        Resolution.EXTREME: "rtmpose-l_384x288_b3.trt",    # Fallback
+        Resolution.STANDARD: "rtmpose-l_256x192",
+        Resolution.HIGH:     "rtmpose-l_384x288",
+        Resolution.ULTRA:    "rtmpose-l_384x288",           # Fallback
+        Resolution.EXTREME:  "rtmpose-l_384x288",           # Fallback
     }
 }
 
@@ -43,5 +43,5 @@ class DetectionSettings(BaseSettings):
         if self.model_type == ModelType.ONNX:
             return _MODELS['onnx'][self.resolution]
         elif self.model_type == ModelType.TRT:
-            return _MODELS['tensorrt'][self.resolution]
+            return f"{_MODELS['tensorrt'][self.resolution]}_b{self.max_poses}.trt"
         return ""

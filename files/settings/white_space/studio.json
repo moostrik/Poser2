@@ -2,7 +2,7 @@
   "num_players": 8,
   "num_cameras": 4,
   "input_fps": 30.0,
-  "render_fps": 60.0,
+  "render_fps": 39.0,
   "camera": {
     "yolo": true,
     "color": false,
@@ -126,7 +126,7 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "folder": "20250514-131138_4_wide_mono",
+      "folder": "20250514-130512_4_wide_mono",
       "sim_passthrough": false,
       "range_start": 0,
       "range_end": 7

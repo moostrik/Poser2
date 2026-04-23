@@ -68,8 +68,8 @@ class PanoramicTracker(Thread, BaseTracker):
         # Wire fov changes to geometry
         PanoramicTrackerSettings.fov.bind(config, lambda v: self.geometry.set_fov(v))
 
-        self.callback_lock = Lock()
-        self.tracklet_callbacks: set[TrackletDictCallback] = set()
+        self._callback_lock = Lock()
+        self._tracklet_callbacks: set[TrackletDictCallback] = set()
 
         # hot_reload = HotReloadMethods(self.__class__)
 
@@ -86,8 +86,8 @@ class PanoramicTracker(Thread, BaseTracker):
     def stop(self) -> None:
         self.running = False
 
-        with self.callback_lock:
-            self.tracklet_callbacks.clear()
+        with self._callback_lock:
+            self._tracklet_callbacks.clear()
 
         self.join()  # Wait for the thread to finish
 
@@ -108,9 +108,7 @@ class PanoramicTracker(Thread, BaseTracker):
                     except Empty:
                         break
 
-                self._update_tracklets()
-                self._notify_and_reset_changes()
-                self._remove_expired_tracklets()
+                self._update_and_notify()
             except Exception:
                 logger.exception("PanoramicTracker error")
 
@@ -150,27 +148,26 @@ class PanoramicTracker(Thread, BaseTracker):
         elif new_tracklet.is_active:
             self.tracklet_manager.add_tracklet(new_tracklet)
 
-    def _update_tracklets(self) -> None:
-        # retire expired tracklets
+    def _update_and_notify(self) -> None:
+        # expire timed-out tracklets
         for tracklet in self.tracklet_manager.all_tracklets():
             if tracklet.is_expired(self.config.timeout):
-                self.tracklet_manager.retire_tracklet(tracklet.id)
+                self.tracklet_manager.lose_tracklet(tracklet.id)
 
         # merge overlapping tracklets
         overlaps: set[PanoramicOverlapInfo] = self._find_overlapping_tracklets(self.tracklet_manager.all_tracklets())
         for overlap in overlaps:
             self.tracklet_manager.merge_tracklets(overlap.keep_id, overlap.remove_id)
 
-    def _notify_and_reset_changes(self) -> None:
+        # notify all active tracklets + any REMOVED ones (so downstream clears their slots)
         callback_tracklets: TrackletDict = {}
         for tracklet in self.tracklet_manager.all_tracklets():
-            if tracklet.needs_notification:
-                callback_tracklets[tracklet.id] = tracklet
+            callback_tracklets[tracklet.id] = tracklet
         self._notify_callback(callback_tracklets)
 
         self.tracklet_manager.mark_all_as_notified()
 
-    def _remove_expired_tracklets(self) -> None:
+        # remove REMOVED tracklets after notification
         for tracklet in self.tracklet_manager.all_tracklets():
             if tracklet.status == TrackingStatus.REMOVED:
                 self.tracklet_manager.remove_tracklet(tracklet.id)
@@ -236,48 +233,18 @@ class PanoramicTracker(Thread, BaseTracker):
 
     # CALLBACKS
     def _notify_callback(self, tracklets: TrackletDict) -> None:
-        # self._notify_callback_multi_sim(tracklet)
-        # return
-
-        with self.callback_lock:
-            for c in self.tracklet_callbacks:
+        with self._callback_lock:
+            for c in self._tracklet_callbacks:
                 c(tracklets)
 
-    def _notify_callback_multi_sim(self, tracklet: Tracklet) -> None:
-        pass
-        # with self.callback_lock:
-        #     if tracklet.id < 2:
-        #         for c in self.tracklet_callbacks:
-        #             c(tracklet)
-
-        #     if tracklet.id == 0:
-        #         addtracklets = []
-        #         for i in range(2, 5):
-        #             # Create a new tracklet with a different ID
-        #             another_tracklet: Tracklet = replace(tracklet, id=i)
-        #             addtracklets.append(another_tracklet)
-        #         for at in addtracklets:
-        #             for c in self.tracklet_callbacks:
-        #                 c(at)
-
-        #     if tracklet.id == 1:
-        #         addtracklets = []
-        #         for i in range(5, 8):
-        #             # Create a new tracklet with a different ID
-        #             another_tracklet: Tracklet = replace(tracklet, id=i)
-        #             addtracklets.append(another_tracklet)
-        #         for at in addtracklets:
-        #             for c in self.tracklet_callbacks:
-        #                 c(at)
-
     def add_tracklet_callback(self, callback: TrackletDictCallback) -> None:
-        with self.callback_lock:
-            self.tracklet_callbacks.add(callback)
+        with self._callback_lock:
+            self._tracklet_callbacks.add(callback)
 
-    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[DepthTracklet]) -> None :
+    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[DepthTracklet]) -> None:
         for t in cam_tracklets:
             tracklet: Optional[Tracklet] = Tracklet.from_depthcam(cam_id, t)
             if tracklet is None:
                 logger.warning(f"PanoramicTracker: Invalid tracklet from camera {cam_id}, skipping.")
-                return
+                continue
             self.input_queue.put(tracklet)

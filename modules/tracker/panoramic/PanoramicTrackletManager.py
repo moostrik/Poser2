@@ -50,6 +50,9 @@ class PanoramicTrackletManager:
 
         # hot_reload = HotReloadMethods(self.__class__, True)
 
+    def __contains__(self, tracklet: Tracklet) -> bool:
+        return self.get_id_by_cam_and_external_id(tracklet.cam_id, tracklet.external_id) is not None
+
     def add_tracklet(self, tracklet: Tracklet) -> Optional[int]:
         with self._lock:
             try:
@@ -181,6 +184,33 @@ class PanoramicTrackletManager:
                 needs_notification=True
             )
             self._tracklets[id] = removed_tracklet
+
+    def lose_tracklet(self, id: int) -> None:
+        with self._lock:
+            tracklet: Tracklet | None = self._tracklets.get(id)
+            if tracklet is None:
+                logger.warning(f"TrackletManager: Attempted to lose non-existent tracklet with ID {id}.")
+                return
+
+            lost_tracklet: Tracklet = replace(
+                tracklet,
+                status=TrackingStatus.LOST,
+                needs_notification=True
+            )
+            self._tracklets[id] = lost_tracklet
+
+    def set_metadata(self, id: int, metadata) -> None:
+        with self._lock:
+            tracklet: Tracklet | None = self._tracklets.get(id)
+            if tracklet is None:
+                logger.warning(f"TrackletManager: Attempted to set metadata for non-existent tracklet with ID {id}.")
+                return
+
+            updated_tracklet: Tracklet = replace(
+                tracklet,
+                metadata=metadata
+            )
+            self._tracklets[id] = updated_tracklet
 
     def mark_all_as_notified(self) -> None:
         with self._lock:
