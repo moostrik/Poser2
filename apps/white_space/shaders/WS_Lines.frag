@@ -33,7 +33,4 @@ void main() {
     color = mix(color, voidColor, voidBar); // keep your void blending
 
     fragColor = vec4(color, 1.0);
-
-
-
 }

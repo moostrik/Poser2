@@ -26,8 +26,4 @@ from .data.WindowShader import          WindowShader
 from .data.PosePointDots import         PosePointDots
 from .data.PosePointLines import        PosePointLines
 
-
 from .hdt.HDTTripleBlend import         HDTTripleBlend
-
-from .ws.WS_Angles import               WS_Angles
-from .ws.WS_Lines import                WS_Lines

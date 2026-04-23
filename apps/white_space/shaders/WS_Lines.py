@@ -24,4 +24,3 @@ class WS_Lines(Shader):
 
         # Render
         draw_quad()
-

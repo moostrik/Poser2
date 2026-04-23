@@ -10,26 +10,26 @@ from modules.WS.WSOutput import WSOutput
 from modules.board import HasWSOutput
 from modules.render.layers.LayerBase import LayerBase
 
-from modules.render.shaders.ws.WS_Lines import WS_Lines
+from apps.white_space.shaders.WS_Angles import WS_Angles
 
-class WSLinesLayer(LayerBase):
+class WSLightLayer(LayerBase):
 
     def __init__(self, board: HasWSOutput) -> None:
         self.board: HasWSOutput = board
-        self.fbo_lines: Fbo = Fbo()
+        self.fbo_angles: Fbo = Fbo()
         self.image: Image = Image()
-        self._shader: WS_Lines = WS_Lines()
+        self._shader: WS_Angles = WS_Angles()
 
     @property
     def texture(self) -> Texture:
-        return self.fbo_lines
+        return self.fbo_angles
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
-        self.fbo_lines.allocate(width, height, internal_format)
+        self.fbo_angles.allocate(width, height, internal_format)
         self._shader.allocate()
 
     def deallocate(self) -> None:
-        self.fbo_lines.deallocate()
+        self.fbo_angles.deallocate()
         self.image.deallocate()
         self._shader.deallocate()
 
@@ -38,11 +38,11 @@ class WSLinesLayer(LayerBase):
         if light_image is None:
             return
 
-        self.image.set_image(light_image.infos_img)
+        self.image.set_image(light_image.light_img)
         self.image.update()
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        self.fbo_lines.begin()
-        self._shader.use(self.fbo_lines, self.image.texture)
-        self.fbo_lines.end()
+        self.fbo_angles.begin()
+        self._shader.use(self.fbo_angles, self.image.texture, self.fbo_angles.width)
+        self.fbo_angles.end()

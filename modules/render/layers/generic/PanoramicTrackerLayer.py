@@ -4,25 +4,24 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Fbo import Fbo
-from modules.gl.Texture import Texture
+from modules.gl import Fbo, Texture
 from modules.gl.Text import Text
-from modules.gl import Blit
 from modules.render.shaders.cam.DrawColoredRectangle import DrawColoredRectangle
+from modules.render.color_settings import ColorSettings
 
 from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
-from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
+from modules.tracker.Tracklet import Tracklet, TrackingStatus
 
 from modules.board import HasTracklets
 from modules.render.layers.LayerBase import LayerBase
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class TrackerPanoramicLayer(LayerBase):
-    def __init__(self, board: HasTracklets, num_cams: int, cam_textures: dict[int, Texture] | None = None) -> None:
+class PanoramicTrackerLayer(LayerBase):
+    def __init__(self, board: HasTracklets, num_cams: int, color_settings: ColorSettings) -> None:
         self.board: HasTracklets = board
         self.num_cams: int = num_cams
-        self._cam_textures: dict[int, Texture] = cam_textures or {}
+        self._color_settings: ColorSettings = color_settings
         self.fbo: Fbo = Fbo()
         self._text: Text = Text()
         self._rect_shader: DrawColoredRectangle = DrawColoredRectangle()
@@ -48,16 +47,6 @@ class TrackerPanoramicLayer(LayerBase):
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
 
-        # Draw per-camera strips as panoramic background
-        strip_w = max(1, self.fbo.width // self.num_cams)
-        for i in range(self.num_cams):
-            if i in self._cam_textures and self._cam_textures[i].allocated:
-                glViewport(i * strip_w, 0, strip_w, self.fbo.height)
-                Blit.use(self._cam_textures[i])
-
-        # Reset to full FBO viewport for tracklet overlay
-        glViewport(0, 0, self.fbo.width, self.fbo.height)
-
         tracklets: dict[int, Tracklet] = self.board.get_tracklets()
         if not tracklets:
             self.fbo.end()
@@ -82,11 +71,11 @@ class TrackerPanoramicLayer(LayerBase):
             roi_x: float = world_angle / 360.0 - roi_width / 2.0
             roi_y: float = tracklet.roi.y
 
-            color: list[float] = TrackletIdColor(tracklet.id, aplha=0.9)
+            colors = self._color_settings.track_color_tuples
+            r, g, b, a = colors[tracklet.id % len(colors)]
             if overlap:
-                color[3] = 0.3
-            if tracklet.status == TrackingStatus.NEW:
-                color = [1.0, 1.0, 1.0, 1.0]
+                a = 0.3
+            color = (r, g, b, a)
 
             self._rect_shader.use(roi_x, roi_y, roi_width, roi_height, *color)
 

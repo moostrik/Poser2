@@ -7,9 +7,9 @@ from modules.render.layers import LayerBase
 from modules.render.layers import ImageSourceLayer, MaskSourceLayer, CropSourceLayer
 from modules.render.layers import TrackerCompositor, PoseCompositor
 from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer
-from modules.render.layers.WS.TrackerPanoramicLayer import TrackerPanoramicLayer
-from modules.render.layers.WS.WSLightLayer import WSLightLayer
-from modules.render.layers.WS.WSLinesLayer import WSLinesLayer
+from modules.render.layers.generic.PanoramicTrackerLayer import PanoramicTrackerLayer
+from apps.white_space.layers.WSLightLayer import WSLightLayer
+from apps.white_space.layers.WSLinesLayer import WSLinesLayer
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -55,15 +55,14 @@ class WhiteSpaceRender(RenderBase):
             self.L[Layers.data_time][i] = MTimeRenderer(     i, board)
 
         # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready
-        cam_textures = {i: self.L[Layers.cam_image][i].texture for i in range(self.num_cams)}
-        self.L[Layers.ws_tracker][0] = TrackerPanoramicLayer(board, self.num_cams, cam_textures)
+        self.L[Layers.ws_tracker][0] = PanoramicTrackerLayer(board, self.num_cams, settings.colors)
         self.L[Layers.ws_light][0]   = WSLightLayer(board)
         self.L[Layers.ws_lines][0]   = WSLinesLayer(board)
 
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name='track',      columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name='panoramic',  columns=1,                rows=1, src_aspect_ratio=12.0, padding=Point2f(0.0, 1.0)),
-            SubdivisionRow(name='ws_light',   columns=1,                rows=1, src_aspect_ratio=40.0, padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name='track',      columns=self.num_cams,    rows=1, src_aspect_ratio=16/9,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name='panoramic',  columns=1,                rows=1, src_aspect_ratio=10.0, padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name='ws_light',   columns=1,                rows=1, src_aspect_ratio=20.0, padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name='ws_lines',   columns=1,                rows=1, src_aspect_ratio=20.0, padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name='pose',       columns=self.num_players, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0)),
         ]

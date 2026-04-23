@@ -25,4 +25,3 @@ class WS_Angles(Shader):
 
         # Render
         draw_quad()
-
