@@ -1,10 +1,10 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, TYPE_CHECKING
-from modules.pose.frame import Frame
+from ..frame import Frame
 
 if TYPE_CHECKING:
-    from modules.pose.features.base import BaseFeature
+    from ..features import BaseFeature
 
 
 class NodeBase(ABC):

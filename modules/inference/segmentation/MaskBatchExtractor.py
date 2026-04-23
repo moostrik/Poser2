@@ -3,12 +3,12 @@ from typing import Union
 
 import torch
 
-from modules.inference.crop_extractor import CropImage, CropImageDict
-from modules.inference.segmentation.segmentation_image import SegmentationImage, SegmentationImageDict, SegmentationImageCallback
+from ..crop_extractor import CropImage, CropImageDict
+from .segmentation_image import SegmentationImage, SegmentationImageDict, SegmentationImageCallback
 from modules.pose.frame import FrameDict
 from ..model_types import ModelType
 from .SegmentationSettings import SegmentationSettings
-from modules.utils.PerformanceTimer import PerformanceTimer
+from modules.utils import PerformanceTimer
 
 
 from .InOut import SegmentationInput, SegmentationOutput

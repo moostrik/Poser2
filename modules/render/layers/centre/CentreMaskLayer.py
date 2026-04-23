@@ -5,9 +5,9 @@ from OpenGL.GL import GL_R16F
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.render.layers.LayerBase import LayerBase
-from modules.render.layers.centre.CentreGeometry import CentreGeometry
-from modules.render.shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur, MaskDilate
+from ..LayerBase import LayerBase
+from .CentreGeometry import CentreGeometry
+from ...shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur, MaskDilate
 from modules.gl import Fbo, SwapFbo, Texture, Style
 
 

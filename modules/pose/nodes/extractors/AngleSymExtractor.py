@@ -1,8 +1,8 @@
 # Pose imports
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.features import Angles, AngleSymmetry
-from modules.pose.nodes._utils.SymmetryUtils import SymmetryUtils
-from modules.pose.frame import Frame, replace
+from ..Nodes import FilterNode
+from ...features import Angles, AngleSymmetry
+from .._utils.SymmetryUtils import SymmetryUtils
+from ...frame import Frame, replace
 
 
 class AngleSymExtractor(FilterNode):

@@ -11,14 +11,13 @@ import numpy as np
 
 # Pose imports
 from modules.settings import BaseSettings, Field
-from modules.pose.frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
-from modules.pose.features import Angles, AngleMotion, AngleVelocity
-from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod, NormalizedScalarFeature
-from modules.pose.features.Similarity import Similarity
-from modules.pose.features.LeaderScore import LeaderScore
-from modules.utils.PerformanceTimer import PerformanceTimer
+from ..frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
+from ..features import Angles, AngleMotion, AngleVelocity
+from ..features import AggregationMethod, NormalizedScalarFeature
+from ..features import Similarity, LeaderScore
+from modules.utils import PerformanceTimer
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 import logging
 logger = logging.getLogger(__name__)
@@ -357,7 +356,6 @@ class WindowSimilarity:
         Returns:
             Dict mapping track_id -> Similarity object
         """
-        from modules.pose.features.Similarity import Similarity
 
         N = len(track_ids)
         max_poses = self._config.max_poses
@@ -421,7 +419,6 @@ class WindowSimilarity:
         Returns:
             Dict mapping track_id -> LeaderScore object
         """
-        from modules.pose.features.LeaderScore import LeaderScore
 
         N = len(track_ids)
         max_poses = self._config.max_poses

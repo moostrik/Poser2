@@ -3,10 +3,10 @@ from threading import Lock
 
 import numpy as np
 
-from modules.pose.features.Similarity import Similarity
-from modules.pose.analytics.window_similarity import SimilarityResult
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, replace
+from ...features import Similarity
+from ...analytics import SimilarityResult
+from ..Nodes import FilterNode
+from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
 

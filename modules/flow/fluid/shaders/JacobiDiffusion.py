@@ -1,8 +1,7 @@
 ﻿"""JacobiDiffusion shader - Iterative diffusion solver for velocity viscosity."""
 
 from OpenGL.GL import *  # type: ignore
-from modules.gl.Shader import Shader, draw_quad
-from modules.gl import Texture
+from modules.gl import Shader, draw_quad, Texture
 
 
 class JacobiDiffusion(Shader):

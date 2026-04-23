@@ -7,8 +7,7 @@ from pathlib import Path
 
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl.Texture import Texture
-from modules.gl.Texture2DArray import Texture2DArray
+from modules.gl import Texture, Texture2DArray
 from ...fluid3d.shaders.Inject3D import Inject3D
 
 

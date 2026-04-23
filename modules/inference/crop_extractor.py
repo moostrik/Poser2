@@ -7,8 +7,8 @@ import torch.nn.functional as F
 
 from modules.pose.features import BBox
 from modules.pose.frame import FrameDict, replace
-from modules.inference.image_uploader import FullImageDict
-from modules.utils.PointsAndRects import Rect, Point2f
+from .image_uploader import FullImageDict
+from modules.utils import Rect, Point2f
 from modules.settings import BaseSettings, Field
 
 logger = logging.getLogger(__name__)

@@ -9,8 +9,8 @@ from modules.board import HasFrames
 from modules.gl import Fbo, Texture, clear_color
 from modules.pose.frame import Frame
 from modules.pose.features import Points2D
-from modules.render.layers.LayerBase import LayerBase, DataCache
-from modules.render.shaders import PosePointDots as shader
+from ..LayerBase import LayerBase, DataCache
+from ...shaders import PosePointDots as shader
 
 
 class PoseDotSettings(BaseSettings):

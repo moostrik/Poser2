@@ -8,12 +8,12 @@ from OpenGL.GL import *  # type: ignore
 
 # Local application imports
 from modules.gl import Texture, Style
-from modules.render.layers.LayerBase import LayerBase, Blit
+from ..LayerBase import LayerBase, Blit
 from modules.board import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import AngleMotion
 
-from modules.render.layers.source.MaskSourceLayer import MaskSourceLayer
+from ..source import MaskSourceLayer
 
 from modules.settings import Field, BaseSettings, Group
 from modules.flow import (
@@ -25,7 +25,7 @@ from modules.flow import (
     Visualizer, VisualisationFieldSettings
 )
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 
 class FlowDrawMode(IntEnum):

@@ -22,8 +22,8 @@ import ctypes
 
 # Local application imports
 if TYPE_CHECKING:
-    from modules.gl.RenderBase import RenderBase
-from modules.gl.Utils import FpsCounter
+    from .RenderBase import RenderBase
+from .Utils import FpsCounter
 from modules.settings import Field, BaseSettings, Widget
 
 

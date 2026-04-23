@@ -5,7 +5,7 @@ from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from modules.pose.frame import FeatureWindow, FrameWindowDict
-    from modules.pose.features.base import BaseFeature
+    from modules.pose.features import BaseFeature
 
 
 class HasWindows(Protocol):

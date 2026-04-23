@@ -101,7 +101,7 @@ class Blit:
     def use(texture) -> None:
         """Draw texture fullscreen to current viewport/FBO."""
         if Blit._shader is None:
-            from modules.gl.shaders.Blit import Blit as BlitShader
+            from .shaders.Blit import Blit as BlitShader
             Blit._shader = BlitShader()
             Blit._shader.allocate()
         Blit._shader.use(texture)
@@ -113,7 +113,7 @@ class BlitRect:
     @staticmethod
     def use(texture, rect_x: float, rect_y: float, rect_w: float, rect_h: float) -> None:
         if BlitRect._shader is None:
-            from modules.gl.shaders.BlitRect import BlitRect as BlitRectShader
+            from .shaders.BlitRect import BlitRect as BlitRectShader
             BlitRect._shader = BlitRectShader()
             BlitRect._shader.allocate()
         BlitRect._shader.use(texture, rect_x, rect_y, rect_w, rect_h)
@@ -125,7 +125,7 @@ class BlitRegion:
     @staticmethod
     def use(texture, x: float, y: float, w: float, h: float) -> None:
         if BlitRegion._shader is None:
-            from modules.gl.shaders.BlitRegion import BlitRegion as BlitRegionShader
+            from .shaders.BlitRegion import BlitRegion as BlitRegionShader
             BlitRegion._shader = BlitRegionShader()
             BlitRegion._shader.allocate()
         BlitRegion._shader.use(texture, x, y, w, h)
@@ -138,7 +138,7 @@ class BlitFlip:
     def use(texture, flip_x: bool = False, flip_y: bool = False) -> None:
         """Draw texture fullscreen with optional X/Y flip."""
         if BlitFlip._shader is None:
-            from modules.gl.shaders.BlitFlip import BlitFlip as BlitFlipShader
+            from .shaders.BlitFlip import BlitFlip as BlitFlipShader
             BlitFlip._shader = BlitFlipShader()
             BlitFlip._shader.allocate()
         BlitFlip._shader.use(texture, flip_x, flip_y)

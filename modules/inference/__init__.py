@@ -5,7 +5,4 @@ from .crop_extractor import CropExtractor, CropSettings, CropImage, CropImageDic
 
 from .detection import DetectionSettings, PointBatchExtractor
 from .flow import FlowSettings, FlowBatchExtractor, FlowImage, FlowImageDict, FlowImageCallback
-from .segmentation import (
-    SegmentationSettings, MaskBatchExtractor,
-    SegmentationImage, SegmentationImageDict, SegmentationImageCallback,
-)
+from .segmentation import SegmentationSettings, MaskBatchExtractor, SegmentationImage, SegmentationImageDict, SegmentationImageCallback

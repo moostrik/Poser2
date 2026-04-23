@@ -4,7 +4,7 @@ Clamps all texture channels to a specified min/max range.
 """
 
 from OpenGL.GL import *  # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl import Shader, draw_quad
 from modules.gl import Texture
 
 import logging

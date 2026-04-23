@@ -6,7 +6,7 @@ import logging
 
 from OpenGL.GL import * # type: ignore
 
-from modules.gl.WindowManager import WindowManager, WindowSettings
+from .WindowManager import WindowManager, WindowSettings
 
 logger = logging.getLogger(__name__)
 

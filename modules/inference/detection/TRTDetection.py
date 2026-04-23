@@ -9,7 +9,7 @@ import torch
 import tensorrt as trt
 
 # Reuse dataclasses from MMDetection
-from modules.inference.detection.InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
+from .InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
 
 from .DetectionSettings import DetectionSettings
 from ..tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock

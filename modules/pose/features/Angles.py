@@ -160,8 +160,8 @@ from enum import IntEnum
 
 import numpy as np
 
-from modules.pose.features.base.BaseFeature import SYMMETRIC_PI_RANGE
-from modules.pose.features.base.BaseScalarFeature import BaseScalarFeature
+from .base.BaseFeature import SYMMETRIC_PI_RANGE
+from .base.BaseScalarFeature import BaseScalarFeature
 
 
 class AngleLandmark(IntEnum):

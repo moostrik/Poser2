@@ -4,7 +4,7 @@ from threading import Lock
 from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from modules.tracker.Tracklet import Tracklet
+    from modules.tracker import Tracklet
 
 
 class HasTracklets(Protocol):

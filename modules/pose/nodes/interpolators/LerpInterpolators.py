@@ -16,11 +16,10 @@ serializes all access using a lock to prevent concurrent set_target() and update
 from collections import defaultdict
 
 # Pose imports
-from modules.pose.features import Angles, BBox, Points2D, AngleVelocity, AngleSymmetry
-from modules.pose.features.base import BaseFeature
-from modules.pose.nodes._utils.ArrayLerp import AngleLerp, PointLerp, Lerp
-from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase, InterpolatorSettingsBase
-from modules.pose.frame import Frame
+from ...features import Angles, BBox, Points2D, AngleVelocity, AngleSymmetry, BaseFeature
+from .._utils.ArrayLerp import AngleLerp, PointLerp, Lerp
+from .BaseInterpolator import FeatureInterpolatorBase, InterpolatorSettingsBase
+from ...frame import Frame
 from typing import cast
 
 

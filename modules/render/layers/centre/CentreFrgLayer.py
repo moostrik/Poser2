@@ -2,13 +2,12 @@
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.render.layers.LayerBase import LayerBase
-from modules.render.layers.centre.CentreGeometry import CentreGeometry
-from modules.render.shaders import DrawRoi, Blend, MaskApply, CelShade, HueShift
-from modules.gl import Fbo, SwapFbo, Texture
+from ..LayerBase import LayerBase
+from .CentreGeometry import CentreGeometry
+from ...shaders import DrawRoi, Blend, MaskApply, CelShade, HueShift
+from modules.gl import Fbo, SwapFbo, Texture, Style
 from modules.gl.shaders import Sharpen
-from modules.gl import Style
-from modules.render.color_settings import ColorSettings
+from ...color_settings import ColorSettings
 
 
 class CentreFrgSettings(BaseSettings):

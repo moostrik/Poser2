@@ -4,7 +4,7 @@ from threading import Lock
 from typing import Optional
 
 # Local application imports
-from modules.tracker.Tracklet import Tracklet, TrackingStatus
+from ..Tracklet import Tracklet, TrackingStatus
 
 import logging
 logger = logging.getLogger(__name__)

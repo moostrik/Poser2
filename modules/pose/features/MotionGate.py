@@ -34,7 +34,7 @@ from typing import cast
 
 import numpy as np
 
-from modules.pose.features.base.NormalizedScalarFeature import NormalizedScalarFeature, AggregationMethod
+from .base.NormalizedScalarFeature import NormalizedScalarFeature, AggregationMethod
 
 
 # Module-level configuration (set once at app startup)

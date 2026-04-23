@@ -8,8 +8,7 @@ from pathlib import Path
 
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl.Texture3D import Texture3D
-from modules.gl.Texture2DArray import Texture2DArray
+from modules.gl import Texture3D, Texture2DArray
 from ...fluid3d.shaders.Buoyancy3D import Buoyancy3D
 
 

@@ -8,10 +8,10 @@ from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Fbo, Texture, Style
 from modules.gl.shaders import Blit, Lut
-from modules.render.layers.LayerBase import LayerBase
+from ..LayerBase import LayerBase
 from modules.settings import Field, BaseSettings
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 
 # ============================================================================

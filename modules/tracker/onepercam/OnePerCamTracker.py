@@ -7,13 +7,13 @@ from time import sleep, time
 from typing import List, Optional
 
 # Local application imports
-from modules.oak.camera.definitions import Tracklet as DepthTracklet
-from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback
-from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
-from modules.tracker.onepercam.OnePerCamTrackletManager import OnePerCamTrackletManager as TrackletManager
+from modules.oak.camera import DepthTracklet
+from ..Tracklet import Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback
+from ..TrackerBase import BaseTracker, TrackerType, TrackerMetadata
+from .OnePerCamTrackletManager import OnePerCamTrackletManager as TrackletManager
 from modules.settings import BaseSettings, Field
 
-from modules.utils.PointsAndRects import Rect
+from modules.utils import Rect
 
 logger = logging.getLogger(__name__)
 

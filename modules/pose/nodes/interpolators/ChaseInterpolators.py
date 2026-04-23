@@ -23,11 +23,10 @@ from typing import cast
 import numpy as np
 
 # Pose imports
-from modules.pose.features import Angles, BBox, Points2D, AngleVelocity, AngleSymmetry, Similarity
-from modules.pose.features.base import BaseFeature
-from modules.pose.nodes._utils.ArrayChase import AngleChase, PointChase, Chase
-from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase, InterpolatorSettingsBase
-from modules.pose.frame import Frame
+from ...features import Angles, BBox, Points2D, AngleVelocity, AngleSymmetry, Similarity, BaseFeature
+from .._utils.ArrayChase import AngleChase, PointChase, Chase
+from .BaseInterpolator import FeatureInterpolatorBase, InterpolatorSettingsBase
+from ...frame import Frame
 from modules.settings import Field
 
 

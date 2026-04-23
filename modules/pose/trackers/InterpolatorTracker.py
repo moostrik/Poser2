@@ -1,6 +1,6 @@
 """Tracks and interpolates multiple poses independently."""
 
-from modules.pose.frame import FrameDict
+from ..frame import FrameDict
 from .InterpolatorPipeline import InterpolatorPipeline
 from .TrackerBase import TrackerBase
 

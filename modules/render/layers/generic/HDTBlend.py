@@ -10,11 +10,11 @@ from modules.board import HasFrames
 from modules.gl import Fbo, Texture, Style, clear_color
 from modules.pose.frame import Frame
 from modules.pose.features import Similarity
-from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.layers.generic.HDTPrepare import HDTPrepare
-from modules.render.shaders import MaskApply, MaskMultiply, HDTTripleBlend
+from ..LayerBase import LayerBase, DataCache, Rect
+from .HDTPrepare import HDTPrepare
+from ...shaders import MaskApply, MaskMultiply, HDTTripleBlend
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 
 class HDTBlend(LayerBase):

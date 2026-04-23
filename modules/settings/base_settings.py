@@ -29,9 +29,9 @@ import copy
 import logging
 import threading
 
-from modules.settings.field import Field, Access
-from modules.settings.group import Group
-from modules.settings.widget import Widget
+from .field import Field, Access
+from .group import Group
+from .widget import Widget
 
 logger = logging.getLogger(__name__)
 

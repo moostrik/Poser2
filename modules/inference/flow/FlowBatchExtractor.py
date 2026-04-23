@@ -4,15 +4,15 @@ from typing import Union
 
 import torch
 
-from modules.inference.crop_extractor import CropImageDict
-from modules.inference.flow.flow_image import FlowImage, FlowImageDict, FlowImageCallback
+from ..crop_extractor import CropImageDict
+from .flow_image import FlowImage, FlowImageDict, FlowImageCallback
 from modules.pose.frame import FrameDict
 
 import logging
 logger = logging.getLogger(__name__)
 from ..model_types import ModelType
 from .FlowSettings import FlowSettings
-from modules.utils.PerformanceTimer import PerformanceTimer
+from modules.utils import PerformanceTimer
 
 from .InOut import OpticalFlowInput, OpticalFlowOutput
 from .ONNXOpticalFlow import ONNXOpticalFlow, OpticalFlowInput, OpticalFlowOutput

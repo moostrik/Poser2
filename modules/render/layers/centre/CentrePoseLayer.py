@@ -9,10 +9,10 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture, clear_color
-from modules.render.layers.LayerBase import LayerBase
-from modules.render.layers.centre.CentreGeometry import CentreGeometry
-from modules.render.shaders import PosePointLines, DrawCircles
-from modules.render.color_settings import ColorSettings
+from ..LayerBase import LayerBase
+from .CentreGeometry import CentreGeometry
+from ...shaders import PosePointLines, DrawCircles
+from ...color_settings import ColorSettings
 
 
 class CentrePoseSettings(BaseSettings):

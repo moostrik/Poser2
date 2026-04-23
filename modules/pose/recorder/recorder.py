@@ -19,8 +19,8 @@ from .frame_io import write_chunk
 from .settings import RecorderSettings
 
 if TYPE_CHECKING:
-    from modules.pose.frame.frame import FrameDict
-    from modules.pose.features.base import BaseFeature
+    from ..frame import FrameDict
+    from ..features import BaseFeature
 
 import logging
 logger = logging.getLogger(__name__)
@@ -129,7 +129,7 @@ class Recorder:
     # ── Background thread ────────────────────────────────────────────────
 
     def _active_feature_types(self) -> list[type['BaseFeature']]:
-        from modules.pose.features import FEATURE_CLASS
+        from ..features import FEATURE_CLASS
         return [FEATURE_CLASS[f] for f in self.settings.features]
 
     def _run(self) -> None:

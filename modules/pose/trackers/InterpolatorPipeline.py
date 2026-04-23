@@ -1,7 +1,7 @@
 """A sequence of InterpolatorNodes for processing a single track."""
 
-from modules.pose.nodes.Nodes import InterpolatorNode
-from modules.pose.frame import Frame, replace
+from ..nodes import InterpolatorNode
+from ..frame import Frame, replace
 
 import logging
 logger = logging.getLogger(__name__)

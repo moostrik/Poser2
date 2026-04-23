@@ -1,5 +1,5 @@
-from modules.pose.features.Angles import AngleLandmark
-from modules.pose.features.base.NormalizedSingleValue import NormalizedSingleValue
+from .Angles import AngleLandmark
+from .base.NormalizedSingleValue import NormalizedSingleValue
 
 
 # Joint-specific normalization weights (higher = more sensitive)

@@ -29,10 +29,10 @@ in the child::
 
 from typing import TYPE_CHECKING, Generic, TypeVar, overload, Sequence
 
-from modules.settings.field import Field, FieldAlias, Access
+from .field import Field, FieldAlias, Access
 
 if TYPE_CHECKING:
-    from modules.settings.base_settings import BaseSettings
+    from .base_settings import BaseSettings
 
 T = TypeVar("T")
 

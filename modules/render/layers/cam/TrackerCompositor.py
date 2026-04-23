@@ -5,12 +5,12 @@ from typing import Any
 
 from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture, Blit
-from modules.render.layers.LayerBase import LayerBase, Rect
+from ..LayerBase import LayerBase, Rect
 
-from modules.render.layers.cam.BBoxRenderer import BBoxRenderer, BBoxRendererSettings
-from modules.render.layers.cam.TrackletRenderer import TrackletRenderer
-from modules.render.layers.cam.PoseRenderer import PoseRenderer, PoseRendererSettings
-from modules.render.color_settings import ColorSettings
+from .BBoxRenderer import BBoxRenderer, BBoxRendererSettings
+from .TrackletRenderer import TrackletRenderer
+from .PoseRenderer import PoseRenderer, PoseRendererSettings
+from ...color_settings import ColorSettings
 
 
 class TrackerCompSettings(BaseSettings):

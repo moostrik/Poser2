@@ -5,7 +5,7 @@ Source is stretched to fill the target region.
 """
 
 from OpenGL.GL import *  # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl import Shader, draw_quad
 from modules.gl import Texture
 
 import logging

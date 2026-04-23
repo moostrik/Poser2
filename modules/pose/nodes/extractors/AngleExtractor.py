@@ -1,8 +1,8 @@
 # Pose imports
-from modules.pose.features import Angles, Points2D
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.nodes._utils.AngleUtils import AngleUtils
-from modules.pose.frame import Frame, replace
+from ...features import Angles, Points2D
+from ..Nodes import FilterNode
+from .._utils.AngleUtils import AngleUtils
+from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
 

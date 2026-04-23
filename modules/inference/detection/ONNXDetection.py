@@ -8,7 +8,7 @@ import numpy as np
 import onnxruntime as ort
 import torch
 
-from modules.inference.detection.InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
+from .InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
 
 from .DetectionSettings import DetectionSettings
 

@@ -4,7 +4,7 @@ Renders textured quads for font glyphs using a font atlas texture.
 """
 
 from OpenGL.GL import *  # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from ..Shader import Shader, draw_quad
 
 
 class TextShader(Shader):

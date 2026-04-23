@@ -2,7 +2,7 @@
 
 from .TrackerBase import TrackerBase
 from .FilterPipeline import FilterPipeline
-from modules.pose.frame import Frame, FrameDict
+from ..frame import Frame, FrameDict
 
 import logging
 logger = logging.getLogger(__name__)

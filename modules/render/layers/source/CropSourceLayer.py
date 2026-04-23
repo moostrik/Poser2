@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.board import HasCropImages
 from modules.gl import Tensor, Texture
-from modules.render.layers.LayerBase import LayerBase, DataCache
+from ..LayerBase import LayerBase, DataCache
 from modules.inference import CropImage
 
 

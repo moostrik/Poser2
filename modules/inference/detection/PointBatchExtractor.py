@@ -1,12 +1,12 @@
 from threading import Lock
 from typing import Union
-from modules.inference.crop_extractor import CropImageDict
+from ..crop_extractor import CropImageDict
 from modules.pose.features import Points2D
 from modules.pose.frame import FrameDictCallbackMixin, replace
 from modules.pose.frame import FrameDict
 from ..model_types import ModelType
 from .DetectionSettings import DetectionSettings
-from modules.utils.PerformanceTimer import PerformanceTimer
+from modules.utils import PerformanceTimer
 
 from .InOut import DetectionInput, DetectionOutput
 from .ONNXDetection import ONNXDetection

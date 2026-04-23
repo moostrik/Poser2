@@ -11,7 +11,7 @@ from threading import Thread, Event
 from .pipeline import setup_pipeline, get_frame_types, PerspectiveConfig
 from .definitions import *
 from .settings import CameraSettings
-from modules.utils.FPS import FPS
+from modules.utils import FPS
 
 import logging
 logger = logging.getLogger(__name__)

@@ -5,10 +5,10 @@ import torch
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.render.layers.LayerBase import LayerBase, DataCache
+from ..LayerBase import LayerBase, DataCache
 from modules.gl import Tensor, SwapFbo, Texture, Blit
 
-from modules.render.shaders import DenseFlowFilter as shader
+from ...shaders import DenseFlowFilter as shader
 
 
 class DFlowSourceLayer(LayerBase):

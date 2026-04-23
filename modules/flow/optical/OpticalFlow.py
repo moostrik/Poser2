@@ -5,14 +5,13 @@ Ported from ofxFlowTools ftOpticalFlow.h
 """
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl.Fbo import Fbo
-from modules.gl import Texture, Blit
+from modules.gl import Fbo, Texture, Blit
 
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
 from .shaders import Luminance, MergeRGB, OpticalFlow as OpticalFlowShader, OpticalFlowMM as OpticalFlowMMShader
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 
 class OpticalFlowSettings(BaseSettings):

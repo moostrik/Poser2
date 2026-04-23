@@ -16,18 +16,18 @@ from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, Style, Fbo
 from modules.gl.shaders import Blit, BlitRegion
-from modules.render.layers.LayerBase import LayerBase
+from ..LayerBase import LayerBase
 from modules.board import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 
 from modules.settings import Field, BaseSettings, Group
 from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlowSettings
-from modules.render.shaders import DensityColorize
+from ...shaders import DensityColorize
 
 from .FlowLayer import FlowLayer
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 
 class UnifiedFluidSlot(LayerBase):

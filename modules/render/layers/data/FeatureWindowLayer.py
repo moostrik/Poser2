@@ -10,10 +10,10 @@ from OpenGL.GL import *  # type: ignore
 from modules.board import HasWindows
 from modules.gl import Fbo, Texture, Blit, Image, clear_color, Text
 from modules.pose.frame import FeatureWindow
-from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.shaders import WindowShader
-from modules.render.layers.data.DataLayerSettings import DataLayerSettings, LayerMode, ScalarFeatureSelect, FEATURE_MAP, TRACK_COLOR_FEATURES
-from modules.render.color_settings import ColorSettings
+from ..LayerBase import LayerBase, DataCache, Rect
+from ...shaders import WindowShader
+from .DataLayerSettings import DataLayerSettings, LayerMode, ScalarFeatureSelect, FEATURE_MAP, TRACK_COLOR_FEATURES
+from ...color_settings import ColorSettings
 
 
 class FeatureWindowLayer(LayerBase):

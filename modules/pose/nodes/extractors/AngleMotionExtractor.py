@@ -1,11 +1,10 @@
 import numpy as np
 
 # Pose imports
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.features import AngleVelocity, AngleMotion
-from modules.pose.features.Angles import AngleLandmark
-from modules.pose.features.AngleMotion import ANGLE_MOTION_NORMALISATION
-from modules.pose.frame import Frame, replace
+from ..Nodes import FilterNode
+from ...features import AngleVelocity, AngleMotion, AngleLandmark
+from ...features.AngleMotion import ANGLE_MOTION_NORMALISATION
+from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
 

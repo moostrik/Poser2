@@ -6,7 +6,7 @@ from typing import TypeVar, Generic
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.utils.PointsAndRects import Rect
+from modules.utils import Rect
 from modules.gl import Texture, Blit
 
 

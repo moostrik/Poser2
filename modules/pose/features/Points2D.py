@@ -165,9 +165,9 @@ from enum import IntEnum
 import numpy as np
 from typing_extensions import Self
 
-from modules.pose.features.base.BaseFeature import NORMALIZED_RANGE
-from modules.pose.features.base.BaseVectorFeature import BaseVectorFeature
-from modules.utils.PointsAndRects import Point2f
+from .base.BaseFeature import NORMALIZED_RANGE
+from .base.BaseVectorFeature import BaseVectorFeature
+from modules.utils import Point2f
 
 
 class PointLandmark(IntEnum):

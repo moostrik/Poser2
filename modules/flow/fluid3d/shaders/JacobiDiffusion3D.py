@@ -5,8 +5,7 @@ import math
 
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl.Texture3D import Texture3D
-from modules.gl.ComputeShader import ComputeShader
+from modules.gl import Texture3D, ComputeShader
 
 
 class JacobiDiffusion3D(ComputeShader):

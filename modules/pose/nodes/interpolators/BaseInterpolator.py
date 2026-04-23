@@ -21,9 +21,9 @@ from collections import defaultdict
 import numpy as np
 
 # Pose imports
-from modules.pose.features.base import BaseFeature
-from modules.pose.nodes.Nodes import InterpolatorNode
-from modules.pose.frame import Frame, replace
+from ...features import BaseFeature
+from ..Nodes import InterpolatorNode
+from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
 

@@ -5,9 +5,9 @@ from typing import Optional
 import time
 
 # Local application imports
-from modules.tracker.Tracklet import Tracklet, TrackingStatus
+from ..Tracklet import Tracklet, TrackingStatus
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 import logging
 logger = logging.getLogger(__name__)

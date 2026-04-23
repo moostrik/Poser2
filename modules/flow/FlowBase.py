@@ -8,7 +8,7 @@ from OpenGL.GL import *  # type: ignore
 
 from modules.gl import SwapFbo, Texture, Blit
 from .FlowUtil import FlowUtil
-from modules.utils.PointsAndRects import Rect
+from modules.utils import Rect
 
 
 class FlowBase(ABC):

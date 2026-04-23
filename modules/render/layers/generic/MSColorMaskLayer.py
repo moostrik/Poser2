@@ -9,19 +9,17 @@ import math
 
 # Local application imports
 from modules.gl import Fbo, SwapFbo, Texture, Style
-from modules.render.layers.LayerBase import LayerBase, Blit
+from ..LayerBase import LayerBase, Blit
 from modules.board import HasFrames
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 from modules.pose.frame import Frame
 from modules.settings import Field, BaseSettings
 
-from modules.render.shaders.hdt.MSColorMask import MSColorMask
-from modules.render.shaders.hdt.AddDodgeBlend import AddDodgeBlend
-from modules.render.shaders.generic.Tint import Tint
+from ...shaders import MSColorMask, AddDodgeBlend, Tint
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
-from modules.render.color_settings import ColorSettings
+from ...color_settings import ColorSettings
 
 
 class ColorMaskLayerSettings(BaseSettings):

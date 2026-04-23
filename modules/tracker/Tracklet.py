@@ -9,9 +9,9 @@ from typing import Callable, Optional, TypeAlias
 import time
 
 # Local application imports
-from modules.oak.camera.definitions import Tracklet as ExternalTracklet
-from modules.tracker.TrackerBase import TrackerMetadata
-from modules.utils.PointsAndRects import Rect, Point2f
+from modules.oak.camera import DepthTracklet
+from .TrackerBase import TrackerMetadata
+from modules.utils import Rect, Point2f
 
 class TrackingStatus(Enum):
     NEW =       0
@@ -20,11 +20,11 @@ class TrackingStatus(Enum):
     REMOVED =   3
     NONE =      4 #?
 
-DEPTHAI_TO_TRACKINGSTATUS: dict[ExternalTracklet.TrackingStatus, TrackingStatus] = {
-    ExternalTracklet.TrackingStatus.NEW: TrackingStatus.NEW,
-    ExternalTracklet.TrackingStatus.TRACKED: TrackingStatus.TRACKED,
-    ExternalTracklet.TrackingStatus.LOST: TrackingStatus.LOST,
-    ExternalTracklet.TrackingStatus.REMOVED: TrackingStatus.REMOVED,
+DEPTHAI_TO_TRACKINGSTATUS: dict[DepthTracklet.TrackingStatus, TrackingStatus] = {
+    DepthTracklet.TrackingStatus.NEW: TrackingStatus.NEW,
+    DepthTracklet.TrackingStatus.TRACKED: TrackingStatus.TRACKED,
+    DepthTracklet.TrackingStatus.LOST: TrackingStatus.LOST,
+    DepthTracklet.TrackingStatus.REMOVED: TrackingStatus.REMOVED,
 }
 
 @dataclass (frozen=True)
@@ -40,7 +40,7 @@ class Tracklet:
     roi: Rect =                 field(default=Rect())
 
     metadata: Optional[TrackerMetadata] = field(default = None)
-    _external_tracklet: Optional[ExternalTracklet] = field(default=None, repr=False)
+    _external_tracklet: Optional[DepthTracklet] = field(default=None, repr=False)
     needs_notification: bool =  field(default=True, repr=False)
 
     @property
@@ -93,7 +93,7 @@ class Tracklet:
         return 0
 
     @classmethod
-    def from_depthcam(cls, cam_id: int, dct: 'ExternalTracklet') -> Optional['Tracklet']:
+    def from_depthcam(cls, cam_id: int, dct: 'DepthTracklet') -> Optional['Tracklet']:
         """
         Initialize a Tracklet from a DepthCamTracklet instance.
         """

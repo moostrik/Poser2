@@ -11,15 +11,14 @@ from numpy.fft import rfft, irfft
 
 # Pose imports
 from modules.settings import BaseSettings, Field
-from modules.pose.frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
-from modules.pose.features import Angles, AngleMotion
-from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod, NormalizedScalarFeature
-from modules.pose.features.Similarity import Similarity
-from modules.pose.analytics.window_similarity import SimilarityResult
-from modules.pose.features.LeaderScore import LeaderScore
-from modules.utils.PerformanceTimer import PerformanceTimer
+from ..frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
+from ..features import Angles, AngleMotion
+from ..features import AggregationMethod, NormalizedScalarFeature
+from ..features import Similarity, LeaderScore
+from .window_similarity import SimilarityResult
+from modules.utils import PerformanceTimer
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 import logging
 logger = logging.getLogger(__name__)
@@ -293,7 +292,6 @@ class WindowCorrelation:
         confidence_matrix: np.ndarray
     ) -> dict[int, Similarity]:
         """Build per-pose Similarity dict from correlation matrix."""
-        from modules.pose.features.Similarity import Similarity
 
         N = len(track_ids)
         max_poses = self._config.max_poses
@@ -340,7 +338,6 @@ class WindowCorrelation:
         lag_matrix: np.ndarray
     ) -> dict[int, LeaderScore]:
         """Build per-pose LeaderScore dict from lag matrix."""
-        from modules.pose.features.LeaderScore import LeaderScore
 
         N = len(track_ids)
         max_poses = self._config.max_poses

@@ -11,7 +11,7 @@ from .. import FlowUtil
 from .BaseField import VisualisationFieldSettings
 from .VelocityField import VelocityField
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 
 class Visualizer:

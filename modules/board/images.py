@@ -4,9 +4,7 @@ from threading import Lock
 from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from modules.inference.image_uploader import FullImage, FullImageDict
-    from modules.inference.crop_extractor import CropImage, CropImageDict
-    from modules.inference.segmentation.segmentation_image import SegmentationImage, SegmentationImageDict
+    from modules.inference import FullImage, FullImageDict, CropImage, CropImageDict, SegmentationImage, SegmentationImageDict
 
 
 class HasCameraImages(Protocol):

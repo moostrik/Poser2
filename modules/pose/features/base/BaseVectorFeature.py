@@ -109,7 +109,7 @@ from typing import Optional
 import numpy as np
 from typing_extensions import Self
 
-from modules.pose.features.base.BaseFeature import BaseFeature, FeatureEnum
+from .BaseFeature import BaseFeature, FeatureEnum
 
 import logging
 logger = logging.getLogger(__name__)

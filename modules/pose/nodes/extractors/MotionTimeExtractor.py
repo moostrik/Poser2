@@ -2,9 +2,9 @@
 import numpy as np
 
 # Pose imports
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.features import AngleVelocity, MotionTime
-from modules.pose.frame import Frame, replace
+from ..Nodes import FilterNode
+from ...features import AngleVelocity, MotionTime
+from ...frame import Frame, replace
 
 
 class MotionTimeExtractor(FilterNode):

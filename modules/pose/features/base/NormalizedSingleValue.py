@@ -3,7 +3,7 @@ from enum import IntEnum
 from typing import TYPE_CHECKING
 
 import numpy as np
-from modules.pose.features.base.NormalizedScalarFeature import NormalizedScalarFeature
+from .NormalizedScalarFeature import NormalizedScalarFeature
 
 if TYPE_CHECKING:
     from typing_extensions import Self

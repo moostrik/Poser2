@@ -1,7 +1,6 @@
 import numpy as np
 
-from modules.pose.features.Angles import Angles, AngleLandmark
-from modules.pose.features.Points2D import Points2D, PointLandmark
+from ...features import Angles, AngleLandmark, Points2D, PointLandmark
 
 """Maps angle joints to the point landmarks needed to compute them"""
 ANGLE_KEYPOINTS: dict[AngleLandmark, tuple[PointLandmark, ...]] = {

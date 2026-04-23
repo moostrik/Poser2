@@ -8,9 +8,9 @@ from modules.settings import Field, BaseSettings
 from modules.board import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import Points2D, BBox
-from modules.render.layers.LayerBase import LayerBase, Rect
-from modules.render.shaders import PosePointLines
-from modules.render.color_settings import ColorSettings
+from ..LayerBase import LayerBase, Rect
+from ...shaders import PosePointLines
+from ...color_settings import ColorSettings
 
 
 class PoseRendererSettings(BaseSettings):

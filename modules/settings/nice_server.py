@@ -8,9 +8,9 @@ from typing import Callable, Optional
 
 from nicegui import ui, app as nicegui_app
 
-from modules.settings.base_settings import BaseSettings
-from modules.settings.field import Field
-from modules.settings import nice_panel as nice_panel_module
+from .base_settings import BaseSettings
+from .field import Field
+from . import nice_panel as nice_panel_module
 
 logger = logging.getLogger(__name__)
 

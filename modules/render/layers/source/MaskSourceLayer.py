@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 from modules.board import HasSegmentationImages
 from modules.gl import Tensor, Texture
 from modules.inference import SegmentationImage
-from modules.render.layers.LayerBase import LayerBase, DataCache
+from ..LayerBase import LayerBase, DataCache
 
 
 class MaskSourceLayer(LayerBase):

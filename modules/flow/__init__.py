@@ -13,12 +13,9 @@ from .FlowUtil import FlowUtil
 from .optical import OpticalFlow, OpticalFlowSettings
 
 # Bridge layers
-from .bridge import (
-    DensityBridge, DensityBridgeSettings,
-    Magnitude, VelocityMagnitude,
-    SmoothTrail, VelocitySmoothTrail, SmoothTrailSettings,
-    TemperatureBridge, TemperatureBridgeSettings,
-)
+from .bridge import     DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
+                        SmoothTrail, VelocitySmoothTrail, SmoothTrailSettings, \
+                        TemperatureBridge, TemperatureBridgeSettings
 
 # Visualization
 from .visualization import VisualisationFieldSettings, Visualizer, VelocityField

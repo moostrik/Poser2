@@ -4,7 +4,7 @@ import json
 import logging
 from pathlib import Path
 
-from modules.settings.base_settings import BaseSettings
+from .base_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
 

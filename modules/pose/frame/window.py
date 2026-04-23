@@ -8,7 +8,7 @@ from typing import Callable, Generic, TypeVar, TypeAlias, TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from modules.pose.features.base import BaseFeature
+    from ..features import BaseFeature
 
 TEnum = TypeVar('TEnum', bound=IntEnum)
 

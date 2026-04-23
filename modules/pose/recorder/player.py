@@ -20,8 +20,8 @@ from pathlib import Path
 
 import numpy as np
 
-from modules.pose.frame.frame import Frame, FrameDict
-from modules.pose.features import FEATURES
+from ..frame import Frame, FrameDict
+from ..features import FEATURES
 from .frame_io import read_chunk
 
 import logging

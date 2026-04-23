@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Fbo, Texture, Blit
-from modules.utils.PointsAndRects import Rect
+from modules.utils import Rect
 
 from modules.settings import Field, BaseSettings
 

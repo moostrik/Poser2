@@ -6,8 +6,8 @@ from typing import TypeAlias
 import numpy as np
 import torch
 
-from modules.oak.camera.definitions import FrameType
-from modules.utils.PerformanceTimer import PerformanceTimer
+from modules.oak import FrameType
+from modules.utils import PerformanceTimer
 
 logger = logging.getLogger(__name__)
 

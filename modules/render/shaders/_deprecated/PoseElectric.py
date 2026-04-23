@@ -2,7 +2,7 @@ import numpy as np
 import time as pytime
 
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl import Shader, draw_quad
 
 from modules.pose.frame import Frame
 from modules.pose.features import Points2D

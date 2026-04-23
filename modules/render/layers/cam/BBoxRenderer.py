@@ -6,9 +6,9 @@ from modules.settings import Field, BaseSettings
 from modules.board import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import BBox
-from modules.render.layers.LayerBase import LayerBase, Rect
-from modules.render.shaders import DrawRectangleOutline
-from modules.render.color_settings import ColorSettings
+from ..LayerBase import LayerBase, Rect
+from ...shaders import DrawRectangleOutline
+from ...color_settings import ColorSettings
 from modules.utils import Color
 
 

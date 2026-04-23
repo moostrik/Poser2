@@ -27,8 +27,8 @@ import h5py
 import numpy as np
 
 if TYPE_CHECKING:
-    from modules.pose.frame.frame import FrameDict
-    from modules.pose.features.base import BaseFeature
+    from ..frame import FrameDict
+    from ..features import BaseFeature
 
 import logging
 logger = logging.getLogger(__name__)

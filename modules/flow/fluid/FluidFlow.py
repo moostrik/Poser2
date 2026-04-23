@@ -31,7 +31,7 @@ from .shaders import (
     VorticityCurl, VorticityForce, Buoyancy, AddBoolean
 )
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 
 # ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@ from enum import IntEnum
 import math
 from dataclasses import dataclass, field, replace
 
-from modules.utils.PointsAndRects import Rect, Point2f
+from modules.utils import Rect, Point2f
 
 class SubdivisionType(IntEnum):
     TOT = 0

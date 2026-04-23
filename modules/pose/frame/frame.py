@@ -61,7 +61,7 @@ from typing import Callable, Any, TypeAlias, TypeVar, TYPE_CHECKING
 import time
 
 if TYPE_CHECKING:
-    from modules.pose.features.base import BaseFeature
+    from ..features import BaseFeature
 
 T = TypeVar('T')
 

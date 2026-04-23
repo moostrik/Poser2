@@ -7,7 +7,7 @@ from modules.settings import Field, BaseSettings
 from modules.board import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import MotionTime
-from modules.render.layers.LayerBase import LayerBase
+from ..LayerBase import LayerBase
 from modules.gl import Text
 
 

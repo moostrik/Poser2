@@ -7,11 +7,7 @@ import threading
 import unittest
 from enum import Enum
 
-from modules.settings.field import Field
-from modules.settings.widget import Widget
-from modules.settings.base_settings import BaseSettings
-from modules.settings.group import Group
-from modules.settings import presets
+from modules.settings import Field, Widget, BaseSettings, Group, presets
 from modules.utils import Color, Point2f, Rect
 
 
@@ -2149,8 +2145,6 @@ class TestListCopyOnRead(unittest.TestCase):
 
 
 # ── Group descriptor tests ────────────────────────────────────────────────
-
-from modules.settings.group import Group
 
 
 class CoreSettings(BaseSettings):

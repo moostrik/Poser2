@@ -4,9 +4,8 @@ from enum import IntEnum
 from threading import Lock
 import numpy as np
 
-from modules.pose.frame import Frame
-from modules.pose.frame.window import FeatureWindow
-from modules.pose.features import BaseScalarFeature
+from ..frame import Frame, FeatureWindow
+from ..features import BaseScalarFeature
 from modules.settings import BaseSettings, Field
 
 

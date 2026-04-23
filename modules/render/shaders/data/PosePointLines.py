@@ -1,7 +1,7 @@
 import numpy as np
 
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl import Shader, draw_quad
 from modules.pose.features import Points2D
 
 import logging

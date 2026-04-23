@@ -1,9 +1,9 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl import Shader, draw_quad
 
 import numpy as np
 
-from modules.pose.features.base import BaseFeature
+from modules.pose.features import BaseFeature
 
 import logging
 logger = logging.getLogger(__name__)

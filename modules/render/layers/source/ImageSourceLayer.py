@@ -9,7 +9,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl import Tensor, Texture
 
 from modules.board import HasCameraImages
-from modules.render.layers.LayerBase import LayerBase, DataCache
+from ..LayerBase import LayerBase, DataCache
 from modules.inference import FullImage
 
 

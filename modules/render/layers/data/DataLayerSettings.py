@@ -4,8 +4,7 @@ from enum import IntEnum, auto
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.pose.features import SCALAR_FEATURES, TRACK_FEATURES
-from modules.pose.features.base import BaseScalarFeature
+from modules.pose.features import SCALAR_FEATURES, TRACK_FEATURES, BaseScalarFeature
 
 
 # ---------------------------------------------------------------------------

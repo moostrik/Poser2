@@ -1,11 +1,10 @@
 """Pose validators for data integrity checks."""
 
 from threading import Lock
-from modules.pose.features import BBox, Points2D, Angles, AngleVelocity, AngleSymmetry
-from modules.pose.features.base import BaseFeature
+from ...features import BBox, Points2D, Angles, AngleVelocity, AngleSymmetry, BaseFeature
 
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame
+from ..Nodes import FilterNode
+from ...frame import Frame
 from modules.settings import BaseSettings, Field
 
 import logging

@@ -22,8 +22,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
-from modules.pose.features.base.BaseScalarFeature import BaseScalarFeature
-from modules.pose.features.base.NormalizedSingleValue import SingleElement
+from .BaseScalarFeature import BaseScalarFeature
+from .NormalizedSingleValue import SingleElement
 
 if TYPE_CHECKING:
     from typing_extensions import Self

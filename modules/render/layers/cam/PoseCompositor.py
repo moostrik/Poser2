@@ -8,12 +8,12 @@ from typing import Any
 # Local application imports
 from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture, Blit
-from modules.render.layers.LayerBase import LayerBase
+from ..LayerBase import LayerBase
 
-from modules.render.layers.cam.CropLayer import CropLayer, CropSettings
-from modules.render.layers.source.CropSourceLayer import CropSourceLayer
-from modules.render.layers.data.PoseLineLayer import PoseLineLayer, PoseLineSettings
-from modules.render.color_settings import ColorSettings
+from .CropLayer import CropLayer, CropSettings
+from ..source import CropSourceLayer
+from ..data import PoseLineLayer, PoseLineSettings
+from ...color_settings import ColorSettings
 from modules.utils import Color
 
 

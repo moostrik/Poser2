@@ -11,11 +11,10 @@ from collections import defaultdict
 import numpy as np
 
 # Pose imports
-from modules.pose.nodes._utils.ArrayEmaSmooth import EMASmooth, AngleEMASmooth, PointEMASmooth
-from modules.pose.features import Angles, Points2D, AngleVelocity, AngleMotion, AngleSymmetry, BBox, Similarity
-from modules.pose.features.base import BaseFeature
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, replace
+from .._utils.ArrayEmaSmooth import EMASmooth, AngleEMASmooth, PointEMASmooth
+from ...features import Angles, Points2D, AngleVelocity, AngleMotion, AngleSymmetry, BBox, Similarity, BaseFeature
+from ..Nodes import FilterNode
+from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
 

@@ -11,13 +11,13 @@ from pytweening import *    # type: ignore
 from modules.board import HasFrames
 
 from modules.gl import Fbo, Texture, Blit, Style, clear_color
-from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.shaders import MaskApply as shader, Tint
+from ..LayerBase import LayerBase, DataCache, Rect
+from ...shaders import MaskApply as shader, Tint
 
 from modules.pose.frame import Frame
 from modules.pose.features import AngleMotion
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 
 class HDTPrepare(LayerBase):

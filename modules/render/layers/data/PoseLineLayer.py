@@ -9,8 +9,8 @@ from modules.board import HasFrames
 from modules.gl import Fbo, Texture, Blit, clear_color
 from modules.pose.frame import Frame
 from modules.pose.features import Points2D, BBox
-from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.shaders import PosePointLines as shader
+from ..LayerBase import LayerBase, DataCache, Rect
+from ...shaders import PosePointLines as shader
 from modules.utils import Color
 
 

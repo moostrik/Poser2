@@ -4,7 +4,7 @@ Copies a single-channel texture to a specific channel of an RGBA destination.
 """
 
 from OpenGL.GL import *  # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl import Shader, draw_quad
 from modules.gl import Texture
 
 import logging

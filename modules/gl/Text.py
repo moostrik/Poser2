@@ -9,9 +9,9 @@ from typing import Tuple
 
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl.FontAtlas import FontAtlas
-from modules.gl.shaders.TextShader import TextShader
-from modules.gl.shaders.BoxShader import BoxShader
+from .FontAtlas import FontAtlas
+from .shaders.TextShader import TextShader
+from .shaders.BoxShader import BoxShader
 
 
 # Default font path

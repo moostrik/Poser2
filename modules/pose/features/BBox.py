@@ -160,8 +160,8 @@ from enum import IntEnum
 
 import numpy as np
 
-from modules.pose.features.base.BaseScalarFeature import BaseScalarFeature
-from modules.utils.PointsAndRects import Rect
+from .base.BaseScalarFeature import BaseScalarFeature
+from modules.utils import Rect
 
 
 class BBoxElement(IntEnum):

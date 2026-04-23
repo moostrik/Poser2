@@ -1,9 +1,8 @@
 """Tracks feature windows for all scalar features across multiple tracks."""
 
 from .WindowNode import WindowNode, WindowNodeSettings
-from modules.pose.features import SCALAR_FEATURES
-from modules.pose.features.base import BaseFeature
-from modules.pose.frame import FrameDict, FrameWindowDict, FrameWindowDictCallbackMixin
+from ..features import SCALAR_FEATURES, BaseFeature
+from ..frame import FrameDict, FrameWindowDict, FrameWindowDictCallbackMixin
 
 import logging
 logger = logging.getLogger(__name__)

@@ -1,8 +1,7 @@
 """Blit shader with optional horizontal and vertical flip."""
 
 from OpenGL.GL import *  # type: ignore
-from modules.gl.Shader import Shader, draw_quad
-from modules.gl import Texture
+from .. import Shader, draw_quad, Texture
 
 import logging
 logger = logging.getLogger(__name__)

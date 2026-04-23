@@ -3,7 +3,7 @@ from __future__ import annotations
 from threading import Lock
 from typing import Protocol
 
-from modules.session.sequencer import SequencerState
+from modules.session import SequencerState
 
 
 class HasSequence(Protocol):

@@ -2,10 +2,10 @@
 import time
 
 # Pose imports
-from modules.pose.nodes.Nodes import NodeBase
-from modules.pose.features import BBox
-from modules.pose.frame import Frame
-from modules.tracker.Tracklet import Tracklet
+from ..Nodes import NodeBase
+from ...features import BBox
+from ...frame import Frame
+from modules.tracker import Tracklet
 
 
 class TrackletExtractor(NodeBase):

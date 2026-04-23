@@ -5,8 +5,8 @@ stretched to fill the entire current viewport.
 """
 
 from OpenGL.GL import *  # type: ignore
-from modules.gl.Shader import Shader, draw_quad
-from modules.gl import Texture
+from .. import Shader, draw_quad
+from .. import Texture
 
 import logging
 logger = logging.getLogger(__name__)

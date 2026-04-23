@@ -173,7 +173,7 @@ from enum import Enum
 
 import numpy as np
 
-from modules.pose.features.base.BaseScalarFeature import BaseScalarFeature, FeatureEnum
+from .BaseScalarFeature import BaseScalarFeature, FeatureEnum
 
 
 class AggregationMethod(Enum):

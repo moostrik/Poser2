@@ -11,12 +11,11 @@ from collections import defaultdict
 import numpy as np
 
 # Pose imports
-from modules.pose.features import Angles, BBox, Points2D, AngleVelocity, AngleSymmetry
-from modules.pose.features.base import BaseFeature
-from modules.pose.nodes._utils.ArrayPredict import AnglePredict, PointPredict, Predict, PredictionMethod
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, replace
-from modules.pose.nodes.filters.RateLimiters import RateLimiterSettings
+from ...features import Angles, BBox, Points2D, AngleVelocity, AngleSymmetry, BaseFeature
+from .._utils.ArrayPredict import AnglePredict, PointPredict, Predict, PredictionMethod
+from ..Nodes import FilterNode
+from ...frame import Frame, replace
+from .RateLimiters import RateLimiterSettings
 from modules.settings import BaseSettings, Field
 
 

@@ -3,10 +3,9 @@ from threading import Lock
 
 import numpy as np
 
-from modules.pose.features import AngleMotion
-from modules.pose.features.MotionGate import MotionGate
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, FrameDict, replace
+from ...features import AngleMotion, MotionGate
+from ..Nodes import FilterNode
+from ...frame import Frame, FrameDict, replace
 from modules.settings import BaseSettings, Field
 
 

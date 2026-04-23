@@ -8,14 +8,14 @@ from pytweening import *    # type: ignore
 from modules.board import HasFrames
 
 from modules.gl import Fbo, Texture, Style
-from modules.render.layers.LayerBase import LayerBase, DataCache
-from modules.render.shaders import Tint as shader
+from ..LayerBase import LayerBase, DataCache
+from ...shaders import Tint as shader
 
 from modules.pose.frame import Frame
 from modules.pose.features import AngleMotion
-from modules.render.color_settings import ColorSettings
+from ...color_settings import ColorSettings
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 
 class MotionLayer(LayerBase):

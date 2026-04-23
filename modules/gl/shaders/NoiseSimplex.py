@@ -1,5 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from .. import Shader, draw_quad
  # ...existing code...
 from time import time
 

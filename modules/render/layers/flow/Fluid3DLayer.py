@@ -16,7 +16,7 @@ import numpy as np
 
 # Local application imports
 from modules.gl import Texture, Style
-from modules.render.layers.LayerBase import LayerBase, Blit
+from ..LayerBase import LayerBase, Blit
 from modules.board import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import Similarity, MotionGate, AngleMotion
@@ -24,10 +24,10 @@ from modules.pose.features import Similarity, MotionGate, AngleMotion
 from modules.settings import Field, BaseSettings, Group
 from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlow3D, FluidFlow3DArray, FluidFlowSettings
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 from .FlowLayer import FlowLayer
-from modules.render.color_settings import ColorSettings
+from ...color_settings import ColorSettings
 
 class FluidSimEngine(IntEnum):
     """Simulation engine selection.

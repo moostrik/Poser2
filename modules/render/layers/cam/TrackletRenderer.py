@@ -6,12 +6,12 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl import Text
-from modules.render.shaders import DrawColoredRectangle
+from ...shaders import DrawColoredRectangle
 
-from modules.oak.camera.definitions import Tracklet as DepthTracklet
+from modules.oak.camera import DepthTracklet
 
 from modules.board import HasDepthTracklets
-from modules.render.layers.LayerBase import LayerBase
+from ..LayerBase import LayerBase
 
 
 

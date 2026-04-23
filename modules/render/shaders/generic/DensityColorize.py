@@ -1,8 +1,7 @@
 """DensityColorize shader - Map density channels to track colors."""
 
 from OpenGL.GL import *  # type: ignore
-from modules.gl.Shader import Shader, draw_quad
-from modules.gl import Texture
+from modules.gl import Shader, draw_quad, Texture
 
 
 class DensityColorize(Shader):

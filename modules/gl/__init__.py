@@ -1,6 +1,6 @@
 
 from .RenderBase import RenderBase
-from .Shader import Shader
+from .Shader import Shader, draw_quad
 from .ComputeShader import ComputeShader
 from .WindowManager import WindowManager, WindowSettings
 from . import Style

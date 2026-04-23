@@ -1,7 +1,7 @@
 """A sequence of FilterNodes for processing a single track."""
 
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame
+from ..nodes import FilterNode
+from ..frame import Frame
 
 import logging
 logger = logging.getLogger(__name__)

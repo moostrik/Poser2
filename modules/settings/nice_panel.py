@@ -41,11 +41,11 @@ from typing import Callable, get_origin, get_args
 
 from nicegui import ui
 
-from modules.settings.base_settings import BaseSettings
-from modules.settings.nice_log import LOG_DRAWER_DEFAULT_HEIGHT, build_log_drawer
-from modules.settings import presets
-from modules.settings.field import Field, Access
-from modules.settings.widget import Widget
+from .base_settings import BaseSettings
+from .nice_log import LOG_DRAWER_DEFAULT_HEIGHT, build_log_drawer
+from . import presets
+from .field import Field, Access
+from .widget import Widget
 from modules.utils import Color, Point2f, Rect
 
 # ---------------------------------------------------------------------------

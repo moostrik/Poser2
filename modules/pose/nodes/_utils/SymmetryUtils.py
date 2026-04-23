@@ -1,7 +1,6 @@
 import numpy as np
 
-from modules.pose.features.Angles import Angles, AngleLandmark
-from modules.pose.features.AngleSymmetry import AngleSymmetry, SymmetryElement
+from ...features import Angles, AngleLandmark, AngleSymmetry, SymmetryElement
 
 # Maps each symmetric joint type to its left/right AngleLandmark pair
 _SYMMETRY_PAIRS: dict[SymmetryElement, tuple[AngleLandmark, AngleLandmark]] = {

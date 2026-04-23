@@ -12,8 +12,8 @@ import time
 from stupidArtnet import StupidArtnet
 
 from modules.settings import BaseSettings, Field, Widget, Access
-from modules.utils.Color import Color
-from modules.inout.network_validation import validate_connection
+from modules.utils import Color
+from .network_validation import validate_connection
 
 import logging
 logger = logging.getLogger(__name__)

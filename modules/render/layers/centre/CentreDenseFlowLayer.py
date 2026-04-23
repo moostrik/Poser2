@@ -2,9 +2,9 @@
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.render.layers.LayerBase import LayerBase
-from modules.render.layers.centre.CentreGeometry import CentreGeometry
-from modules.render.shaders import DrawRoi, MaskApply
+from ..LayerBase import LayerBase
+from .CentreGeometry import CentreGeometry
+from ...shaders import DrawRoi, MaskApply
 from modules.gl import Fbo, Texture, Style
 
 

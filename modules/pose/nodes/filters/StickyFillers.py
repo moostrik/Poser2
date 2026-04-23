@@ -9,10 +9,9 @@ when pose detection temporarily fails.
 import numpy as np
 
 # Pose imports
-from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, BBox, Points2D, Similarity
-from modules.pose.features.base import BaseFeature
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, replace
+from ...features import Angles, AngleVelocity, AngleSymmetry, BBox, Points2D, Similarity, BaseFeature
+from ..Nodes import FilterNode
+from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
 

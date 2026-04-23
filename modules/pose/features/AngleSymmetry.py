@@ -205,9 +205,9 @@ Notes:
 
 from enum import IntEnum
 
-from modules.pose.features.base.BaseFeature import NORMALIZED_RANGE
-from modules.pose.features.base.NormalizedScalarFeature import NormalizedScalarFeature, AggregationMethod
-from modules.pose.features.Angles import AngleLandmark
+from .base.BaseFeature import NORMALIZED_RANGE
+from .base.NormalizedScalarFeature import NormalizedScalarFeature, AggregationMethod
+from .Angles import AngleLandmark
 
 
 class SymmetryElement(IntEnum):

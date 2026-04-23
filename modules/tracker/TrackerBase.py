@@ -6,11 +6,11 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 # Local application imports
-from modules.oak.camera.definitions import Tracklet as DepthTracklet
+from modules.oak.camera import DepthTracklet
 
 # Forward declaration to avoid circular import
 if TYPE_CHECKING:
-    from modules.tracker.Tracklet import TrackletDictCallback
+    from .Tracklet import TrackletDictCallback
 
 class TrackerType(Enum):
     UNKNOWN = "unknown"

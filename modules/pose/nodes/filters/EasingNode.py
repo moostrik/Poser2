@@ -7,11 +7,9 @@ from typing import Callable
 import pytweening  # type: ignore
 
 # Pose imports
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.features import AngleMotion
-from modules.pose.features.base import BaseFeature
-from modules.pose.features.base.NormalizedSingleValue import NormalizedSingleValue
-from modules.pose.frame import Frame, replace
+from ..Nodes import FilterNode
+from ...features import AngleMotion, BaseFeature, NormalizedSingleValue
+from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
 

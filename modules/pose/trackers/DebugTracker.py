@@ -1,7 +1,7 @@
 """Tracker that logs pose lifecycle events (new, reset, updated)."""
 
 from .TrackerBase import TrackerBase
-from modules.pose.frame import FrameDict
+from ..frame import FrameDict
 
 import logging
 logger = logging.getLogger(__name__)

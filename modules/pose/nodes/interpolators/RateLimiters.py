@@ -13,11 +13,10 @@ from collections import defaultdict
 import numpy as np
 
 # Pose imports
-from modules.pose.features import Angles, BBox, Points2D, AngleVelocity, AngleSymmetry
-from modules.pose.features.base import BaseFeature
-from modules.pose.nodes._utils.ArrayRateLimit import RateLimit, AngleRateLimit, PointRateLimit
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, replace
+from ...features import Angles, BBox, Points2D, AngleVelocity, AngleSymmetry, BaseFeature
+from .._utils.ArrayRateLimit import RateLimit, AngleRateLimit, PointRateLimit
+from ..Nodes import FilterNode
+from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
 

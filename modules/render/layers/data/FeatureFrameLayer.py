@@ -10,10 +10,10 @@ from modules.board import HasFrames
 from modules.gl import Fbo, Texture, Blit, clear_color, Text
 from modules.pose.features import AngleVelocity
 from modules.pose.frame import Frame
-from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.shaders import FeatureShader
-from modules.render.layers.data.DataLayerSettings import DataLayerSettings, LayerMode, ScalarFeatureSelect, FEATURE_MAP, TRACK_COLOR_FEATURES
-from modules.render.color_settings import ColorSettings
+from ..LayerBase import LayerBase, DataCache, Rect
+from ...shaders import FeatureShader
+from .DataLayerSettings import DataLayerSettings, LayerMode, ScalarFeatureSelect, FEATURE_MAP, TRACK_COLOR_FEATURES
+from ...color_settings import ColorSettings
 
 
 class FeatureFrameLayer(LayerBase):

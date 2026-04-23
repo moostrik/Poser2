@@ -1,5 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Texture import Texture
+from .Texture import Texture
 
 _current_viewport: tuple[int, int, int, int] = (0, 0, 0, 0)
 

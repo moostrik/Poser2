@@ -10,8 +10,7 @@ from __future__ import annotations
 
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl import Texture
-from modules.gl.ComputeShader import ComputeShader
+from modules.gl import Texture, ComputeShader
 
 import logging
 logger = logging.getLogger(__name__)

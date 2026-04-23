@@ -10,7 +10,7 @@ from modules.gl import Texture
 from .BaseField import FieldBase, VisualisationFieldSettings
 from .shaders import VelocityDirectionMap, VelocityArrowField
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 
 class VelocityField(FieldBase):

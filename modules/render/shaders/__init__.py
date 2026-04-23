@@ -1,29 +1,6 @@
-from .cam.DrawColoredRectangle import   DrawColoredRectangle
-from .cam.DrawRectangleOutline import   DrawRectangleOutline
-
-from .generic.Blend import              Blend
-from .generic.Tint import               Tint
-from .generic.DrawRoi import            DrawRoi
-from .generic.DrawCircles import        DrawCircles
-from .generic.DenseFlowFilter import    DenseFlowFilter
-from .generic.DensityColorize import    DensityColorize
-from .generic.EdgeSketch import         EdgeSketch
-from .generic.DetailThreshold import    DetailThreshold
-from .generic.CelShade import           CelShade
-from .generic.HueShift import           HueShift
-
-from .mask.MaskAA import                MaskAA
-from .mask.MaskApply import             MaskApply
-from .mask.MaskBlend import             MaskBlend
-from .mask.MaskBlur import              MaskBlur
-from .mask.MaskDilate import            MaskDilate
-from .mask.MaskHardStep import          MaskHardStep
-from .mask.MaskMultiply import          MaskMultiply
-from .hdt.MSColorMask import            MSColorMask
-
-from .data.FeatureShader import         FeatureShader
-from .data.WindowShader import          WindowShader
-from .data.PosePointDots import         PosePointDots
-from .data.PosePointLines import        PosePointLines
-
-from .hdt.HDTTripleBlend import         HDTTripleBlend
+from .cam import      DrawColoredRectangle, DrawRectangleOutline
+from .generic import  Blend, Tint, DrawRoi, DrawCircles, DenseFlowFilter, DensityColorize, \
+                      EdgeSketch, DetailThreshold, CelShade, HueShift
+from .mask import     MaskAA, MaskApply, MaskBlend, MaskBlur, MaskDilate, MaskHardStep, MaskMultiply
+from .hdt import      MSColorMask, HDTTripleBlend, AddDodgeBlend
+from .data import     FeatureShader, WindowShader, PosePointDots, PosePointLines

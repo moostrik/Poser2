@@ -1,8 +1,8 @@
 from OpenGL.GL import * # type: ignore
 import logging
-from modules.gl.Fbo import Fbo
-from modules.gl.Texture import Texture, get_data_type
-from modules.gl.Utils import BlitFlip
+from .Fbo import Fbo
+from .Texture import Texture, get_data_type
+from .Utils import BlitFlip
 import numpy as np
 from threading import Lock
 from typing import Literal

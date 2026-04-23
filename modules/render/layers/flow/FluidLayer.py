@@ -9,19 +9,19 @@ import numpy as np
 
 # Local application imports
 from modules.gl import Texture, Style, Fbo
-from modules.render.layers.LayerBase import LayerBase, Blit
+from ..LayerBase import LayerBase, Blit
 from modules.board import HasFrames
 from modules.pose.frame import Frame
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 
 from modules.settings import Field, BaseSettings, Group
 from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlowSettings
-from modules.render.shaders import DensityColorize
+from ...shaders import DensityColorize
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 from .FlowLayer import FlowLayer
-from modules.render.color_settings import ColorSettings
+from ...color_settings import ColorSettings
 
 
 class FluidDrawMode(IntEnum):

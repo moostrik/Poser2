@@ -1,9 +1,9 @@
 from numpy import pi
 
 # Pose imports
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.features import Angles, AngleVelocity
-from modules.pose.frame import Frame, replace
+from ..Nodes import FilterNode
+from ...features import Angles, AngleVelocity
+from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
 

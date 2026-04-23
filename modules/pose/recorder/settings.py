@@ -1,5 +1,5 @@
 from modules.settings import BaseSettings, Field, Widget
-from modules.pose.features import Feature
+from ..features import Feature
 
 
 class RecorderSettings(BaseSettings):

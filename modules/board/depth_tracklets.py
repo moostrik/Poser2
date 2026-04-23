@@ -4,7 +4,7 @@ from threading import Lock
 from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from modules.oak.camera.definitions import Tracklet
+    from modules.oak.camera import DepthTracklet as Tracklet
 
 
 class HasDepthTracklets(Protocol):

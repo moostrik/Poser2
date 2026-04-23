@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Generic, TypeVar, overload, Any, cast, get_origin, get_args
 
-from modules.settings.widget import Widget
+from .widget import Widget
 
 logger = logging.getLogger(__name__)
 

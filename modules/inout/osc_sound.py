@@ -9,12 +9,11 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from modules.pose.frame import Frame, FrameDict
-from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, Similarity, MotionGate, LeaderScore, MotionTime, Age
-from modules.pose.features.Angles import AngleLandmark
+from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, Similarity, MotionGate, LeaderScore, MotionTime, Age, AngleLandmark
 
-from modules.session.sequencer import SequencerState
+from modules.session import SequencerState
 from modules.settings import BaseSettings, Field, Widget
-from modules.inout.network_validation import validate_connection
+from .network_validation import validate_connection
 
 import logging
 logger = logging.getLogger(__name__)

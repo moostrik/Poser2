@@ -4,18 +4,17 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl import Fbo, Texture
-from modules.gl.Text import Text
-from modules.render.shaders.cam.DrawColoredRectangle import DrawColoredRectangle
-from modules.render.color_settings import ColorSettings
+from modules.gl import Fbo, Texture, Text
+from ...shaders import DrawColoredRectangle
+from ...color_settings import ColorSettings
 
-from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
-from modules.tracker.Tracklet import Tracklet, TrackingStatus
+from modules.tracker import TrackerType, TrackerMetadata
+from modules.tracker import Tracklet, TrackingStatus
 
 from modules.board import HasTracklets
-from modules.render.layers.LayerBase import LayerBase
+from ..LayerBase import LayerBase
 
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.utils import HotReloadMethods
 
 class PanoramicTrackerLayer(LayerBase):
     def __init__(self, board: HasTracklets, num_cams: int, color_settings: ColorSettings) -> None:

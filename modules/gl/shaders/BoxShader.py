@@ -4,7 +4,7 @@ Renders solid-color rectangles for text backgrounds.
 """
 
 from OpenGL.GL import *  # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from .. import Shader, draw_quad
 
 
 class BoxShader(Shader):

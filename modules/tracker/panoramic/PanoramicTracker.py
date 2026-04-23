@@ -7,12 +7,12 @@ from time import sleep, time
 from typing import Optional
 
 # Local application imports
-from modules.oak.camera.definitions import Tracklet as DepthTracklet
-from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
-from modules.tracker.Tracklet import Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback
-from modules.tracker.panoramic.PanoramicTrackletManager import PanoramicTrackletManager
-from modules.tracker.panoramic.PanoramicGeometry import PanoramicGeometry
-from modules.tracker.panoramic.PanoramicDefinitions import *
+from modules.oak.camera import DepthTracklet
+from ..TrackerBase import BaseTracker, TrackerType, TrackerMetadata
+from ..Tracklet import Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback
+from .PanoramicTrackletManager import PanoramicTrackletManager
+from .PanoramicGeometry import PanoramicGeometry
+from .PanoramicDefinitions import *
 from modules.settings import BaseSettings, Field
 
 import logging

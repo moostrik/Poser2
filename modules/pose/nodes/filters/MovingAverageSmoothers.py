@@ -11,11 +11,10 @@ from collections import defaultdict
 import numpy as np
 
 # Pose imports
-from modules.pose.nodes._utils.ArrayMovingAverage import MovingAverage, WindowType
-from modules.pose.features import Angles, AngleVelocity, AngleMotion, BBox, Points2D, Similarity
-from modules.pose.features.base import BaseFeature
-from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.frame import Frame, replace
+from .._utils.ArrayMovingAverage import MovingAverage, WindowType
+from ...features import Angles, AngleVelocity, AngleMotion, BBox, Points2D, Similarity, BaseFeature
+from ..Nodes import FilterNode
+from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
 

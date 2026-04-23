@@ -1,9 +1,8 @@
 from threading import Lock
 
-from modules.pose.frame import FrameDictCallbackMixin
-from modules.pose.frame import Frame, FrameDict
+from modules.pose.frame import Frame, FrameDict, FrameDictCallbackMixin
 from modules.pose.features import BBox
-from modules.tracker.Tracklet import Tracklet
+from .Tracklet import Tracklet
 
 import logging
 logger = logging.getLogger(__name__)

@@ -3,9 +3,7 @@ from __future__ import annotations
 
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl.Texture import Texture
-from modules.gl.Texture3D import Texture3D
-from modules.gl.ComputeShader import ComputeShader
+from modules.gl import Texture, Texture3D, ComputeShader
 
 
 class Composite3D(ComputeShader):
