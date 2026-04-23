@@ -11,14 +11,14 @@ need.  Render layers declare the protocol slice they require (e.g.
 ``HasFrames``), keeping module code independent of any specific app.
 """
 
-from modules.board.frames import HasFrames, FrameStoreMixin
-from modules.board.windows import HasWindows, WindowStoreMixin
-from modules.board.images import (
+from .frames import HasFrames, FrameStoreMixin
+from .windows import HasWindows, WindowStoreMixin
+from .images import (
     HasCameraImages, CameraImageStoreMixin,
     HasCropImages, CropImageStoreMixin,
     HasSegmentationImages, SegmentationImageStoreMixin,
 )
-from modules.board.depth_tracklets import HasDepthTracklets, DepthTrackletStoreMixin
-from modules.board.sequence import HasSequence, SequenceStoreMixin
-from modules.board.tracklets import HasTracklets, TrackletStoreMixin
-from modules.board.composition_output import HasCompositionOutput, CompositionOutputStoreMixin, HasCompositionDebug, CompositionDebugStoreMixin
+from .depth_tracklets import HasDepthTracklets, DepthTrackletStoreMixin
+from .sequence import HasSequence, SequenceStoreMixin
+from .tracklets import HasTracklets, TrackletStoreMixin
+from .composition_output import HasCompositionOutput, CompositionOutputStoreMixin, HasCompositionDebug, CompositionDebugStoreMixin

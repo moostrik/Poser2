@@ -2,26 +2,27 @@
 
 ## Project shape
 
-Poser2 is a real-time, low-latency system with app-specific orchestration in `apps/` and reusable infrastructure in `modules/`. Follow PEP 8.
+Poser2 is a real-time, low-latency system with app-specific orchestration in `apps/` and reusable infrastructure in `modules/`.
 
+- Follow PEP 8.
 - `apps/` can import `modules/`; `modules/` must not depend on app code
 - Prefer module independence; keep cross-module coupling minimal
 - `modules/settings/` is shared infrastructure by design
 
 ## Settings are pure data
 
-`BaseSettings` subclasses are pure data containers with no runtime side effects.
-Use `BaseSettings` for reactive configuration, `@dataclass` for plain value objects.
+- `BaseSettings` subclasses are pure data containers with no runtime side effects.
+- Use `BaseSettings` for reactive configuration, `@dataclass` for plain value objects.
 - Detailed rules: `.github/instructions/settings-presets.instructions.md`
 
 ## Pose Frame contract
 
-`frame[FeatureType]` never raises; missing data is NaN with score `0.0`.
+- `frame[FeatureType]` never raises; missing data is NaN with score `0.0`.
 - Detailed rules: `.github/instructions/pose-data.instructions.md`
 
 ## Composition and wiring
 
-Prefer composition over inheritance for runtime assembly.
+- Prefer composition over inheritance for runtime assembly.
 - Pass dependencies through constructors
 - Use callback pipelines for data flow between components
 - Public data-flow methods signal execution timing: set (store for polling), submit (enqueue for deferred work), process (synchronous transform-and-emit), update (tick-driven advance/pull)
@@ -34,7 +35,7 @@ Prefer composition over inheritance for runtime assembly.
 
 ## Concurrency
 
-The runtime uses threads and explicit synchronization, not async/await.
+- The runtime uses threads and explicit synchronization, not async/await.
 - Use `Lock` and `Event` for shared mutable state and lifecycle signals
 - Keep shared critical sections small
 - Treat callback registration and dispatch as thread-sensitive
@@ -48,16 +49,19 @@ Latency is a first-order concern.
 
 ## Types
 
-Use modern Python typing (`list[T]`, `dict[K, V]`, `X | Y`).
+- Use modern Python typing (`list[T]`, `dict[K, V]`, `X | Y`).
 - Public methods should include return type hints
 - Use `Protocol` or `ABC` as appropriate; be consistent
 - Prefer `IntEnum` over string keys for dict lookups and identifiers
 
 ## Imports
 
-Import subpackages as namespaces and use qualified access (`from modules.pose import window`; use `window.WindowTracker`).
+- Import subpackages as namespaces and use qualified access (`from modules.pose import window`; use `window.WindowTracker`).
 - Consolidate all imports from the same package onto one line; never split a single package across multiple `from x import` statements
+- Import types through the package `__init__`, not by direct leaf path (`from modules.inference import CropImage`, not `from modules.inference.crop_extractor import CropImage`)
 - Keep `__init__.py` exports limited to the package's own public symbols
+- Inside a package's own `__init__.py` or sub-modules, always use relative imports (`from .X import`, `from ..X import`). Never use the full `modules.X.Y` path to import from within the same package.
+- Do not define `__all__` in `__init__.py`; explicit named re-exports are sufficient.
 
 ## Error handling
 
@@ -73,7 +77,7 @@ Poser2 is tested heavily by running the real-time system.
 
 ## API evolution
 
-Prefer clean breaks over long deprecation windows.
+- Prefer clean breaks over long deprecation windows.
 - Update all affected call sites in one change
 - Keep presets/settings schemas in sync with code changes
 - Remove obsolete pathways instead of leaving parallel legacy patterns

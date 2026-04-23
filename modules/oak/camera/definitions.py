@@ -2,7 +2,7 @@
 
 import numpy as np
 from enum import Enum, IntEnum, auto
-from typing import Callable
+from typing import Callable, TypeAlias
 from depthai import Tracklet, TrackerType, ImgDetection, Rect, Point3f, Device, SpatialLocationCalculatorAlgorithm
 
 import logging
@@ -74,11 +74,11 @@ class CoderFormat(Enum):
     H264 = '.mp4'
     H265 = '.hevc'
 
-FrameCallback = Callable[[int, FrameType, np.ndarray], None]
-SyncCallback = Callable[[int, dict[FrameType, np.ndarray], float], None]
-DetectionCallback = Callable[[int, ImgDetection], None]
-TrackerCallback = Callable[[int, list[Tracklet]], None]
-FPSCallback = Callable[[int, float], None]
+FrameCallback: TypeAlias = Callable[[int, FrameType, np.ndarray], None]
+SyncCallback: TypeAlias = Callable[[int, dict[FrameType, np.ndarray], float], None]
+DetectionCallback: TypeAlias = Callable[[int, ImgDetection], None]
+TrackerCallback: TypeAlias = Callable[[int, list[Tracklet]], None]
+FPSCallback: TypeAlias = Callable[[int, float], None]
 
 class Input(IntEnum):
     COLOR_CONTROL = auto()
