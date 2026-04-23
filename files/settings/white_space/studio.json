@@ -9,7 +9,7 @@
     "square": false,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "models",
     "cam_0": {
       "device_id": "14442C10110AD3D200",
@@ -27,8 +27,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 1000,
-      "mono_iso": 100,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -54,8 +54,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 1000,
-      "mono_iso": 100,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -81,8 +81,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 1000,
-      "mono_iso": 100,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -108,8 +108,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 1000,
-      "mono_iso": 100,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -128,8 +128,8 @@
       ],
       "folder": "20250514-131138_4_wide_mono",
       "sim_passthrough": false,
-      "range_start": 3,
-      "range_end": 3
+      "range_start": 0,
+      "range_end": 7
     },
     "tracker": {
       "fov": 110.0,
@@ -161,14 +161,13 @@
     "model_type": "TRT",
     "model_path": "models",
     "verbose": false,
-    "use_segmentation": true,
+    "use_segmentation": false,
     "ws_input_stage": "LERP",
     "detection": {
       "resolution": "STANDARD"
     },
     "segmentation": {
       "resolution": "STANDARD",
-      "enabled": true,
       "reset_interval": 240
     },
     "image_crop": {
