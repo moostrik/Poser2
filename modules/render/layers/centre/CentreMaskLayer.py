@@ -9,7 +9,6 @@ from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur, MaskDilate
 from modules.gl import Fbo, SwapFbo, Texture, Style
-from modules.utils import HotReloadMethods
 
 
 class CentreMaskSettings(BaseSettings):
@@ -42,8 +41,6 @@ class CentreMaskLayer(LayerBase):
         self._mask_AA_shader = MaskAA()
         self._mask_dilate_shader = MaskDilate()
         self._mask_blur_shader = MaskBlur()
-
-        # self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

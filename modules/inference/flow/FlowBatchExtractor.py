@@ -4,7 +4,7 @@ from typing import Union
 
 import torch
 
-from modules.inference.crop_image import CropImageDict
+from modules.inference.crop_extractor import CropImageDict
 from modules.inference.flow.flow_image import FlowImage, FlowImageDict, FlowImageCallback
 from modules.pose.frame import FrameDict
 

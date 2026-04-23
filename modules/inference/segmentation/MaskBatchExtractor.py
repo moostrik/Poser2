@@ -3,7 +3,7 @@ from typing import Union
 
 import torch
 
-from modules.inference.crop_image import CropImage, CropImageDict
+from modules.inference.crop_extractor import CropImage, CropImageDict
 from modules.inference.segmentation.segmentation_image import SegmentationImage, SegmentationImageDict, SegmentationImageCallback
 from modules.pose.frame import FrameDict
 from ..model_types import ModelType

@@ -16,8 +16,6 @@ from modules.render.layers.data.PoseLineLayer import PoseLineLayer, PoseLineSett
 from modules.render.color_settings import ColorSettings
 from modules.utils import Color
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 
 class PoseCompSettings(BaseSettings):
     stage:      Field[int] = Field(0, description="Pipeline stage for camera crop")
@@ -70,8 +68,6 @@ class PoseCompositor(LayerBase):
             color=color_settings.track_colors[track_id]
         )
         self._pose_lerp_layer: PoseLineLayer = PoseLineLayer(track_id, board, pose_lerp_config)
-
-        # self.hot_reload = HotReloadMethods(self.__class__)
 
     @property
     def texture(self) -> Texture:

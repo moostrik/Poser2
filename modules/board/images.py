@@ -4,15 +4,15 @@ from threading import Lock
 from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from modules.inference.camera_image import CameraImage, CameraImageDict
-    from modules.inference.crop_image import CropImage, CropImageDict
+    from modules.inference.image_uploader import FullImage, FullImageDict
+    from modules.inference.crop_extractor import CropImage, CropImageDict
     from modules.inference.segmentation.segmentation_image import SegmentationImage, SegmentationImageDict
 
 
 class HasCameraImages(Protocol):
     """Full camera image access keyed by cam_id."""
-    def get_camera_image(self, cam_id: int) -> CameraImage | None: ...
-    def set_camera_images(self, images: CameraImageDict) -> None: ...
+    def get_camera_image(self, cam_id: int) -> FullImage | None: ...
+    def set_camera_images(self, images: FullImageDict) -> None: ...
 
 
 class CameraImageStoreMixin:
@@ -20,13 +20,13 @@ class CameraImageStoreMixin:
 
     def __init__(self) -> None:
         self._cam_image_lock = Lock()
-        self._cam_images: dict[int, CameraImage] = {}
+        self._cam_images: dict[int, FullImage] = {}
 
-    def get_camera_image(self, cam_id: int) -> CameraImage | None:
+    def get_camera_image(self, cam_id: int) -> FullImage | None:
         with self._cam_image_lock:
             return self._cam_images.get(cam_id)
 
-    def set_camera_images(self, images: CameraImageDict) -> None:
+    def set_camera_images(self, images: FullImageDict) -> None:
         with self._cam_image_lock:
             self._cam_images = images
 

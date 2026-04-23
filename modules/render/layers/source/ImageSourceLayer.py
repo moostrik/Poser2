@@ -10,7 +10,7 @@ from modules.gl import Tensor, Texture
 
 from modules.board import HasCameraImages
 from modules.render.layers.LayerBase import LayerBase, DataCache
-from modules.inference.camera_image import CameraImage
+from modules.inference import FullImage
 
 
 class ImageSourceLayer(LayerBase):
@@ -18,7 +18,7 @@ class ImageSourceLayer(LayerBase):
         self._cam_id: int = cam_id
         self._board: HasCameraImages = board
         self._cuda_image: Tensor = Tensor()
-        self._data_cache: DataCache[CameraImage]= DataCache[CameraImage]()
+        self._data_cache: DataCache[FullImage]= DataCache[FullImage]()
         self._dirty: bool = False
 
     @property
@@ -35,7 +35,7 @@ class ImageSourceLayer(LayerBase):
 
     def update(self) -> None:
         self._dirty = False
-        gpu_frame: CameraImage | None = self._board.get_camera_image(self._cam_id)
+        gpu_frame: FullImage | None = self._board.get_camera_image(self._cam_id)
         self._data_cache.update(gpu_frame)
 
         if self._data_cache.lost:

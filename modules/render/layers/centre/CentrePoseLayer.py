@@ -13,7 +13,6 @@ from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import PosePointLines, DrawCircles
 from modules.render.color_settings import ColorSettings
-from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class CentrePoseSettings(BaseSettings):
@@ -37,8 +36,6 @@ class CentrePoseLayer(LayerBase):
         # Configuration
         self.settings: CentrePoseSettings = settings or CentrePoseSettings()
         self._color_settings: ColorSettings = color_settings
-
-        # HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

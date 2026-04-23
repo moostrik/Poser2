@@ -5,7 +5,7 @@
 import warnings
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, Optional
+from typing import Callable, Optional, TypeAlias
 import time
 
 # Local application imports
@@ -125,9 +125,9 @@ class Tracklet:
 
 
 # Type Aliases
-TrackletCallback = Callable[[Tracklet], None]
-TrackletDict = dict[int, Tracklet]
-TrackletDictCallback = Callable[[TrackletDict], None]
+TrackletCallback: TypeAlias = Callable[[Tracklet], None]
+TrackletDict: TypeAlias = dict[int, Tracklet]
+TrackletDictCallback: TypeAlias = Callable[[TrackletDict], None]
 
 TrackletIdColorDict: dict[int, str] = {
     0: '#006400',   # darkgreen

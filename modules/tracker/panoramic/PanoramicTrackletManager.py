@@ -6,8 +6,6 @@ from typing import Optional
 # Local application imports
 from modules.tracker.Tracklet import Tracklet, TrackingStatus
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 import logging
 logger = logging.getLogger(__name__)
 
@@ -47,8 +45,6 @@ class PanoramicTrackletManager:
         self._tracklets: dict[int, Tracklet] = {}
         self._id_pool = TrackletIdPool(max_players)
         self._lock = Lock()
-
-        # hot_reload = HotReloadMethods(self.__class__, True)
 
     def __contains__(self, tracklet: Tracklet) -> bool:
         return self.get_id_by_cam_and_external_id(tracklet.cam_id, tracklet.external_id) is not None

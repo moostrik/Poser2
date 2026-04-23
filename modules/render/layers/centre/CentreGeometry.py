@@ -18,8 +18,6 @@ from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.gl import Texture
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 
 class CentreGeomSettings(BaseSettings):
     """Configuration for CentreGeometry anchor point positioning."""
@@ -74,8 +72,6 @@ class CentreGeometry(LayerBase):
             Rect(0.0, 0.0, 1.0, 1.0), 0.0, Point2f(0.5, 0.5), 1.0
         )
         self._transformed_points: Points2D | None = None
-
-        # self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def present(self) -> bool:

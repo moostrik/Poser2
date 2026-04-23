@@ -14,7 +14,6 @@ from modules.pose.features.Angles import AngleLandmark
 
 from modules.session.sequencer import SequencerState
 from modules.settings import BaseSettings, Field, Widget
-from modules.utils.HotReloadMethods import HotReloadMethods
 from modules.inout.network_validation import validate_connection
 
 import logging
@@ -57,8 +56,6 @@ class OscSound:
             bundle_builder = OscBundleBuilder(IMMEDIATELY)  # type: ignore
             OscSound._build_inactive_message(id, bundle_builder, self._config.max_players)
             self._inactive_messages[id] = bundle_builder._contents
-
-        # hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def running(self) -> bool:

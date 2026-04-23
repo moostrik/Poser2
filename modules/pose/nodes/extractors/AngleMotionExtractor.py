@@ -8,8 +8,6 @@ from modules.pose.features.AngleMotion import ANGLE_MOTION_NORMALISATION
 from modules.pose.frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 
 class AngleMotionExtractorSettings(BaseSettings):
     """Configuration for motion extraction with tunable thresholds."""
@@ -32,7 +30,6 @@ class AngleMotionExtractor(FilterNode):
             [ANGLE_MOTION_NORMALISATION[landmark] for landmark in AngleLandmark],
             dtype=np.float32
         )
-        # hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def process(self, pose: Frame) -> Frame:
         # Get absolute angular velocities

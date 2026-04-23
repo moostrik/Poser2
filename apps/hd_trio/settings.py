@@ -227,7 +227,7 @@ class PoseGroup(BaseSettings):
     detection       : Group[inference.DetectionSettings]          = Group(inference.DetectionSettings, share=_batch_share)
     segmentation    : Group[inference.SegmentationSettings]       = Group(inference.SegmentationSettings, share=_batch_share)
     flow            : Group[inference.FlowSettings]               = Group(inference.FlowSettings, share=_batch_share)
-    image_crop      : Group[inference.ImageCropSettings]          = Group(inference.ImageCropSettings, share=[max_poses])
+    image_crop      : Group[inference.CropSettings]          = Group(inference.CropSettings, share=[max_poses])
     angle_extractor : Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
     bbox            : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                     = Group(PointFeature, share=_feature_share)

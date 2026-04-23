@@ -9,13 +9,11 @@ from typing import Optional
 # Local application imports
 from modules.oak.camera.definitions import Tracklet as DepthTracklet
 from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
-from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback
+from modules.tracker.Tracklet import Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback
 from modules.tracker.panoramic.PanoramicTrackletManager import PanoramicTrackletManager
 from modules.tracker.panoramic.PanoramicGeometry import PanoramicGeometry
 from modules.tracker.panoramic.PanoramicDefinitions import *
 from modules.settings import BaseSettings, Field
-
-from modules.utils.HotReloadMethods import HotReloadMethods
 
 import logging
 logger = logging.getLogger(__name__)
@@ -70,8 +68,6 @@ class PanoramicTracker(Thread, BaseTracker):
 
         self._callback_lock = Lock()
         self._tracklet_callbacks: set[TrackletDictCallback] = set()
-
-        # hot_reload = HotReloadMethods(self.__class__)
 
     @property
     def tracker_type(self) -> TrackerType:

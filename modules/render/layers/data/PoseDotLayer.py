@@ -9,11 +9,8 @@ from modules.board import HasFrames
 from modules.gl import Fbo, Texture, clear_color
 from modules.pose.frame import Frame
 from modules.pose.features import Points2D
-from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
+from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.render.shaders import PosePointDots as shader
-from modules.utils.PointsAndRects import Rect
-
-from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class PoseDotSettings(BaseSettings):
@@ -33,8 +30,6 @@ class PoseDotLayer(LayerBase):
         self.color: tuple[float, float, float, float] | None = color
 
         self._shader: shader = shader()
-
-        # hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

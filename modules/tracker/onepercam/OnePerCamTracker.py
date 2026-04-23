@@ -13,10 +13,9 @@ from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadat
 from modules.tracker.onepercam.OnePerCamTrackletManager import OnePerCamTrackletManager as TrackletManager
 from modules.settings import BaseSettings, Field
 
-from modules.utils.PointsAndRects import Rect, Point2f
+from modules.utils.PointsAndRects import Rect
 
 logger = logging.getLogger(__name__)
-from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class OnePerCamTrackerSettings(BaseSettings):
@@ -52,8 +51,6 @@ class OnePerCamTracker(Thread, BaseTracker):
         self.config: OnePerCamTrackerSettings = config
 
         self.tracklet_manager: TrackletManager = TrackletManager(self._num_cams)
-
-        # hot_reload = HotReloadMethods(self.__class__)
 
     @property
     def tracker_type(self) -> TrackerType:

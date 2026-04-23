@@ -1,6 +1,6 @@
 ---
 description: "Use when editing board protocols, mixins, or app render board composition."
-applyTo: "modules/board/**, apps/*/render_board.py, modules/render/layers/**"
+applyTo: "modules/board/**, apps/*/render_board.py, apps/*/render/render_board.py, modules/render/layers/**"
 ---
 # Board Guidelines
 
