@@ -1,16 +1,16 @@
 from OpenGL.GL import * # type: ignore
 
 from modules.gl import Fbo, Texture, Image
-from modules.board import HasLightOutput
+from modules.board import HasCompositionOutput
 from modules.render.layers.LayerBase import LayerBase
 
-from apps.white_space.shaders.WS_Angles import WS_Angles
+from apps.white_space.render.shaders.WS_Angles import WS_Angles
 
 
-class LightLayer(LayerBase):
+class CompositorOutputLayer(LayerBase):
 
-    def __init__(self, board: HasLightOutput) -> None:
-        self.board: HasLightOutput = board
+    def __init__(self, board: HasCompositionOutput) -> None:
+        self.board: HasCompositionOutput = board
         self.fbo_angles: Fbo = Fbo()
         self.image: Image = Image()
         self._shader: WS_Angles = WS_Angles()
@@ -29,7 +29,7 @@ class LightLayer(LayerBase):
         self._shader.deallocate()
 
     def update(self) -> None:
-        output = self.board.get_light_output()
+        output = self.board.get_composition_output()
         if output is None:
             return
 

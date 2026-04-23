@@ -21,4 +21,4 @@ from modules.board.images import (
 from modules.board.depth_tracklets import HasDepthTracklets, DepthTrackletStoreMixin
 from modules.board.sequence import HasSequence, SequenceStoreMixin
 from modules.board.tracklets import HasTracklets, TrackletStoreMixin
-from modules.board.light_output import HasLightOutput, LightOutputStoreMixin, HasLightDebug, LightDebugStoreMixin
+from modules.board.composition_output import HasCompositionOutput, CompositionOutputStoreMixin, HasCompositionDebug, CompositionDebugStoreMixin

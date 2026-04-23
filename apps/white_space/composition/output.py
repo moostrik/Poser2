@@ -2,18 +2,18 @@ import numpy as np
 from typing import Callable
 from dataclasses import dataclass, field
 
-WS_IMG_TYPE = np.float32
+COMP_DTYPE = np.float32
 
 
 @dataclass
-class LightOutput:
+class CompositionOutput:
     """LED strip output — white and blue channels sent to the installation over UDP."""
     resolution: int
     light_img: np.ndarray = field(init=False)
 
     def __post_init__(self) -> None:
         # Shape (1, R, 3): channel 0 = white, channel 1 = blue, channel 2 = reserved
-        self.light_img = np.zeros((1, self.resolution, 3), dtype=WS_IMG_TYPE)
+        self.light_img = np.zeros((1, self.resolution, 3), dtype=COMP_DTYPE)
 
     @property
     def light_0(self) -> np.ndarray:
@@ -35,7 +35,7 @@ class LightOutput:
 
 
 @dataclass
-class LightDebug:
+class CompositionDebug:
     """Intermediate composition channels for on-screen visualisation only — never sent over UDP.
 
     Channel layout (matches WS_Lines.frag RGBA access):
@@ -48,7 +48,7 @@ class LightDebug:
     debug_img: np.ndarray = field(init=False)
 
     def __post_init__(self) -> None:
-        self.debug_img = np.zeros((1, self.resolution, 4), dtype=WS_IMG_TYPE)
+        self.debug_img = np.zeros((1, self.resolution, 4), dtype=COMP_DTYPE)
 
 
-LightOutputCallback = Callable[[LightOutput], None]
+CompositionOutputCallback = Callable[[CompositionOutput], None]

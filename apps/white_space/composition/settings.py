@@ -1,8 +1,9 @@
-from modules.settings import BaseSettings, Field
+from modules.settings import BaseSettings, Field, Group
+from apps.white_space.composition.test_composition import TestCompositionSettings
 
 
-class LightSettings(BaseSettings):
-    """Settings for the LED light compositor thread."""
+class CompositorSettings(BaseSettings):
+    """Settings for the LED composition thread."""
 
     # Construction / wiring (INIT — requires restart to take effect)
     max_poses:        Field[int]   = Field(3,     min=1,   max=16,    access=Field.INIT, description="Max tracked poses")
@@ -25,3 +26,6 @@ class LightSettings(BaseSettings):
     line_speed:     Field[float] = Field(1.5,  min=0.0, max=10.0,  step=0.1,  description="Line speed")
     line_width:     Field[float] = Field(0.1,  min=0.0, max=1.0,   step=0.01, description="Line width (normalised)")
     line_amount:    Field[float] = Field(20.0, min=0.0, max=100.0, step=1.0,  description="Number of lines")
+
+    # Test composition
+    test: Group[TestCompositionSettings] = Group(TestCompositionSettings)

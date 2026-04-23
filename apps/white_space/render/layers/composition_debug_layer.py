@@ -1,16 +1,16 @@
 from OpenGL.GL import * # type: ignore
 
 from modules.gl import Fbo, Texture, Image
-from modules.board import HasLightDebug
+from modules.board import HasCompositionDebug
 from modules.render.layers.LayerBase import LayerBase
 
-from apps.white_space.shaders.WS_Lines import WS_Lines
+from apps.white_space.render.shaders.WS_Lines import WS_Lines
 
 
-class LightDebugLayer(LayerBase):
+class CompositionDebugLayer(LayerBase):
 
-    def __init__(self, board: HasLightDebug) -> None:
-        self.board: HasLightDebug = board
+    def __init__(self, board: HasCompositionDebug) -> None:
+        self.board: HasCompositionDebug = board
         self.fbo_lines: Fbo = Fbo()
         self.image: Image = Image()
         self._shader: WS_Lines = WS_Lines()
@@ -29,7 +29,7 @@ class LightDebugLayer(LayerBase):
         self._shader.deallocate()
 
     def update(self) -> None:
-        debug = self.board.get_light_debug()
+        debug = self.board.get_composition_debug()
         if debug is None:
             return
 

@@ -13,11 +13,11 @@ from modules import inference
 from modules.session import Session, Sequencer
 from modules.gl.WindowManager import WindowSettings
 
-from .light import LightCompositor
+from .composition import Compositor
 
-from .render_board import RenderBoard
+from .render.render_board import RenderBoard
 from .settings import Settings, Stage
-from .render import WhiteSpaceRender
+from .render.render import WhiteSpaceRender
 
 APP_NAME = 'white_space'
 
@@ -122,13 +122,13 @@ class WhiteSpaceMain:
                 wt.process,
             ])
 
-        # WS PIPELINE — light output
-        self.light_compositor = LightCompositor(self.settings.light)
-        self.tracker.add_tracklet_callback(self.light_compositor.set_tracklets)
+        # WS PIPELINE — composition output
+        self.compositor = Compositor(self.settings.composition)
+        self.tracker.add_tracklet_callback(self.compositor.set_tracklets)
         ws_input: Stage = Stage(int(ps.ws_input_stage))
-        self.stages[ws_input].add_callback(self.light_compositor.add_poses)
-        self.light_compositor.add_output_callback(self.board.set_light_output)
-        self.light_compositor.add_debug_callback(self.board.set_light_debug)
+        self.stages[ws_input].add_callback(self.compositor.add_poses)
+        self.compositor.add_output_callback(self.board.set_composition_output)
+        self.compositor.add_debug_callback(self.board.set_composition_debug)
 
         # POSE STAGE RAW
         self.point_extractor.add_frames_callback(self.stages[Stage.RAW])
@@ -250,7 +250,7 @@ class WhiteSpaceMain:
             self.mask_extractor.start()
         self.window_similator.start()
         self.window_correlator.start()
-        self.light_compositor.start()
+        self.compositor.start()
 
         self.sound_osc.start()
 
@@ -278,7 +278,7 @@ class WhiteSpaceMain:
 
         self.tracker.stop()
         self.sound_osc.stop()
-        self.light_compositor.stop()
+        self.compositor.stop()
 
         self.point_extractor.stop()
         if self.mask_extractor is not None:

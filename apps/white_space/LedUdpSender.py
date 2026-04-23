@@ -13,7 +13,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle import OscBundle
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
-from apps.white_space.light.LightOutput import LightOutput, WS_IMG_TYPE
+from apps.white_space.composition.output import CompositionOutput
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 import logging
@@ -24,7 +24,7 @@ OscMessageList = list[Union[OscMessage, OscBundle]]
 
 
 @dataclass
-class LightUdpSenderSettings:
+class LedUdpSenderSettings:
     resolution: int
     port: int
     ip_addresses: list[str]
@@ -63,12 +63,14 @@ class LightUdpSenderSettings:
         return max_chunk_size, min_chunks
 
 
-class LightUdpSender(threading.Thread):
-    def __init__(self, settings: LightUdpSenderSettings) -> None:
+class LedUdpSender(threading.Thread):
+    """Sends LED strip data over OSC/UDP to the installation hardware."""
+
+    def __init__(self, settings: LedUdpSenderSettings) -> None:
         super().__init__()
-        self.settings: LightUdpSenderSettings = settings
+        self.settings: LedUdpSenderSettings = settings
         self.running = False
-        self.message_queue: queue.Queue[LightOutput] = queue.Queue()
+        self.message_queue: queue.Queue[CompositionOutput] = queue.Queue()
         self.osc_clients: dict[str, UDPClient] = {}
         self.HotReloadStaticMethods = HotReloadMethods(self.__class__, True)
 
@@ -81,12 +83,12 @@ class LightUdpSender(threading.Thread):
     def run(self) -> None:
         valid_ips: list[str] = [ip for ip in self.settings.ip_addresses if self._check_ip_adress_availability(ip)]
         if not valid_ips:
-            logger.info("No valid IP addresses found. Exiting LightUdpSender thread.")
+            logger.info("No valid IP addresses found. Exiting LedUdpSender thread.")
             return
         for ip in valid_ips:
             self.osc_clients[ip] = UDPClient(ip, self.settings.port)
         logger.info(
-            f"LIGHT UDP SENDER: port {self.settings.port}, addresses {valid_ips}, "
+            f"LED UDP SENDER: port {self.settings.port}, addresses {valid_ips}, "
             f"{self.settings._num_chunks} chunks of {self.settings._chunk_size} bytes each."
         )
         info_message: OscBundle = self._build_info_message(self.settings)
@@ -95,8 +97,8 @@ class LightUdpSender(threading.Thread):
         self.running = True
         while self.running:
             try:
-                av_output: LightOutput = self.message_queue.get(block=True, timeout=0.1)
-                message_list: Optional[OscMessageList] = self._build_data_message(av_output, self.settings)
+                output: CompositionOutput = self.message_queue.get(block=True, timeout=0.1)
+                message_list: Optional[OscMessageList] = self._build_data_message(output, self.settings)
                 if message_list:
                     for ip in self.osc_clients:
                         for message in message_list:
@@ -107,21 +109,13 @@ class LightUdpSender(threading.Thread):
             except queue.Empty:
                 continue
             except Exception:
-                logger.exception("LightUdpSender error")
+                logger.exception("LedUdpSender error")
 
-    def send_message(self, output: LightOutput) -> None:
+    def send_message(self, output: CompositionOutput) -> None:
         self.message_queue.put(output)
 
     @staticmethod
-    def _check_ip_adress_availability(ip: str) -> bool:
-        try:
-            socket.inet_aton(ip)
-            return True
-        except socket.error:
-            return False
-
-    @staticmethod
-    def _build_info_message(settings: LightUdpSenderSettings) -> OscBundle:
+    def _build_info_message(settings: LedUdpSenderSettings) -> OscBundle:
         bundle = OscBundleBuilder(IMMEDIATELY)
         r_msgb = OscMessageBuilder("/WS/resolution")
         r_msgb.add_arg(settings.resolution)
@@ -135,18 +129,18 @@ class LightUdpSender(threading.Thread):
         return bundle.build()
 
     @staticmethod
-    def _build_data_message(output: LightOutput, settings: LightUdpSenderSettings) -> Optional[OscMessageList]:
+    def _build_data_message(output: CompositionOutput, settings: LedUdpSenderSettings) -> Optional[OscMessageList]:
         try:
             if output.resolution != settings.resolution:
                 raise ValueError(f"Resolution mismatch: expected {settings.resolution}, got {output.resolution}")
 
             message_list: OscMessageList = []
             if settings.use_signed:
-                white_channel: np.ndarray = LightUdpSender.float_to_int8(output.light_0)
-                blue_channel: np.ndarray  = LightUdpSender.float_to_int8(output.light_1)
+                white_channel: np.ndarray = LedUdpSender.float_to_int8(output.light_0)
+                blue_channel: np.ndarray  = LedUdpSender.float_to_int8(output.light_1)
             else:
-                white_channel = LightUdpSender.float_to_uint8(output.light_0)
-                blue_channel  = LightUdpSender.float_to_uint8(output.light_1)
+                white_channel = LedUdpSender.float_to_uint8(output.light_0)
+                blue_channel  = LedUdpSender.float_to_uint8(output.light_1)
 
             for i in range(settings.num_chunks):
                 start_idx = i * settings.chunk_size

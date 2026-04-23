@@ -1,4 +1,3 @@
-from queue import Empty
 from threading import Event, Thread, Lock
 from time import time, sleep
 from typing import Callable
@@ -13,10 +12,10 @@ from modules.pose.features.Angles import Angles, AngleLandmark
 from modules.pose.features.BBox import BBox, BBoxElement
 from modules.pose.features.Points2D import Points2D, PointLandmark
 
-from apps.white_space.light.LightSettings import LightSettings
-from apps.white_space.light.LightOutput import LightOutput, LightDebug, WS_IMG_TYPE, LightOutputCallback
-from apps.white_space.light.LightUdpSender import LightUdpSender, LightUdpSenderSettings
-from apps.white_space.light.TestComposition import TestComposition, TestPattern
+from apps.white_space.composition.settings import CompositorSettings
+from apps.white_space.composition.output import CompositionOutput, CompositionDebug, COMP_DTYPE, CompositionOutputCallback
+from apps.white_space.LedUdpSender import LedUdpSender, LedUdpSenderSettings
+from apps.white_space.composition.test_composition import TestComposition, TestPattern
 
 from modules.gl.Utils import FpsCounter
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -84,22 +83,22 @@ class PlayerState:
 
 
 # ---------------------------------------------------------------------------
-# LightCompositor — threaded LED compositor running at a fixed light rate
+# Compositor — threaded LED composition loop running at a fixed rate
 # ---------------------------------------------------------------------------
 
-LightDebugCallback = Callable[[LightDebug], None]
+CompositionDebugCallback = Callable[[CompositionDebug], None]
 
 
-class LightCompositor(Thread):
+class Compositor(Thread):
     """Runs the LED composition loop at a fixed rate (light_rate Hz) and sends
     the result over UDP to the installation hardware.
 
     Input:  pose frames (latest snapshot per player) + tracklets (locked snapshot)
-    Output: LightOutput via UDP + board callbacks; LightDebug via board callbacks
+    Output: CompositionOutput via UDP + board callbacks; CompositionDebug via board callbacks
     """
 
-    def __init__(self, config: LightSettings) -> None:
-        super().__init__(daemon=True, name="LightCompositor")
+    def __init__(self, config: CompositorSettings) -> None:
+        super().__init__(daemon=True, name="Compositor")
 
         self._stop_event = Event()
         self._tracklet_lock = Lock()
@@ -114,13 +113,13 @@ class LightCompositor(Thread):
         num_players: int     = config.max_poses
 
         # LED work arrays
-        self.Wh_L_array: np.ndarray = np.ones(resolution, dtype=WS_IMG_TYPE)
-        self.Wh_R_array: np.ndarray = np.ones(resolution, dtype=WS_IMG_TYPE)
-        self.blue_array: np.ndarray = np.ones(resolution, dtype=WS_IMG_TYPE)
-        self.void_array: np.ndarray = np.zeros(resolution, dtype=WS_IMG_TYPE)
+        self.Wh_L_array: np.ndarray = np.ones(resolution, dtype=COMP_DTYPE)
+        self.Wh_R_array: np.ndarray = np.ones(resolution, dtype=COMP_DTYPE)
+        self.blue_array: np.ndarray = np.ones(resolution, dtype=COMP_DTYPE)
+        self.void_array: np.ndarray = np.zeros(resolution, dtype=COMP_DTYPE)
 
-        self.output: LightOutput = LightOutput(resolution)
-        self.debug:  LightDebug  = LightDebug(resolution)
+        self.output: CompositionOutput = CompositionOutput(resolution)
+        self.debug:  CompositionDebug  = CompositionDebug(resolution)
 
         self._player_states: dict[int, PlayerState] = {i: PlayerState() for i in range(num_players)}
         self._num_active_smoother: OneEuroFilter = OneEuroFilter(
@@ -128,21 +127,20 @@ class LightCompositor(Thread):
         )
 
         # Test pattern override (active only when pattern != NONE)
-        self.comp_test = TestComposition(resolution)
+        self.comp_test = TestComposition(resolution, config.test)
 
-        # UDP sender (one sender; separate IP lists can be passed if multiple targets are needed)
-        sender_settings = LightUdpSenderSettings(
+        sender_settings = LedUdpSenderSettings(
             resolution=resolution,
             port=config.udp_port,
             ip_addresses=list(config.udp_ips),
             send_info=True,
             use_signed=False,
         )
-        self.light_sender = LightUdpSender(sender_settings)
+        self.led_sender = LedUdpSender(sender_settings)
 
         self.fps_counter = FpsCounter()
-        self._output_callbacks: list[LightOutputCallback]  = []
-        self._debug_callbacks:  list[LightDebugCallback]   = []
+        self._output_callbacks: list[CompositionOutputCallback]  = []
+        self._debug_callbacks:  list[CompositionDebugCallback]   = []
 
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
@@ -151,11 +149,11 @@ class LightCompositor(Thread):
     # ------------------------------------------------------------------
 
     def start(self) -> None:
-        self.light_sender.start()
+        self.led_sender.start()
         super().start()
 
     def stop(self) -> None:
-        self.light_sender.stop()
+        self.led_sender.stop()
         self._stop_event.set()
         if self.is_alive():
             self.join()
@@ -166,7 +164,7 @@ class LightCompositor(Thread):
             try:
                 self._tick()
             except Exception:
-                logger.exception("Error in LightCompositor tick")
+                logger.exception("Error in Compositor tick")
             next_time += self.interval
             sleep_time: float = next_time - time()
             if sleep_time > 0:
@@ -186,11 +184,11 @@ class LightCompositor(Thread):
         self._draw(frames, tracklets)
 
         # Test pattern overrides the composition output when active
-        if self.comp_test.pattern != TestPattern.NONE:
+        if self._config.test.pattern != TestPattern.NONE:
             self.comp_test.update()
             self.output.light_img = self.comp_test.output_img
 
-        self.light_sender.send_message(self.output)
+        self.led_sender.send_message(self.output)
         self._notify_output(self.output)
         self._notify_debug(self.debug)
         self.fps_counter.tick()
@@ -220,25 +218,25 @@ class LightCompositor(Thread):
     # Output callbacks
     # ------------------------------------------------------------------
 
-    def add_output_callback(self, callback: LightOutputCallback) -> None:
+    def add_output_callback(self, callback: CompositionOutputCallback) -> None:
         self._output_callbacks.append(callback)
 
-    def add_debug_callback(self, callback: LightDebugCallback) -> None:
+    def add_debug_callback(self, callback: CompositionDebugCallback) -> None:
         self._debug_callbacks.append(callback)
 
-    def _notify_output(self, output: LightOutput) -> None:
+    def _notify_output(self, output: CompositionOutput) -> None:
         for cb in self._output_callbacks:
             try:
                 cb(output)
             except Exception:
-                logger.exception("Error in LightCompositor output callback")
+                logger.exception("Error in Compositor output callback")
 
-    def _notify_debug(self, debug: LightDebug) -> None:
+    def _notify_debug(self, debug: CompositionDebug) -> None:
         for cb in self._debug_callbacks:
             try:
                 cb(debug)
             except Exception:
-                logger.exception("Error in LightCompositor debug callback")
+                logger.exception("Error in Compositor debug callback")
 
     # ------------------------------------------------------------------
     # Diagnostics
@@ -249,7 +247,7 @@ class LightCompositor(Thread):
         return self.fps_counter.get_fps()
 
     # ------------------------------------------------------------------
-    # LED draw entry point
+    # Composition draw entry point
     # ------------------------------------------------------------------
 
     def _draw(self, frames: list[Frame], tracklets: dict[int, Tracklet]) -> None:
@@ -294,8 +292,8 @@ class LightCompositor(Thread):
         smooth_active: float = self._num_active_smoother(float(num_active)) or 1.0
 
         P = self._config
-        LightCompositor.make_voids(self.void_array, self._player_states, P, self.interval)
-        LightCompositor.make_patterns(
+        Compositor.make_voids(self.void_array, self._player_states, P, self.interval)
+        Compositor.make_patterns(
             self.Wh_L_array, self.Wh_R_array, self.blue_array,
             self._player_states, smooth_active, P, self.interval,
         )
@@ -309,10 +307,10 @@ class LightCompositor(Thread):
         if P.use_void:
             self.debug.debug_img[0, :, 3] = self.void_array[:]
             inverted_void = 1.0 - self.void_array
-            LightCompositor.blend_values(self.Wh_L_array, inverted_void, 0, BlendType.MULTIPLY)
-            LightCompositor.blend_values(self.Wh_R_array, inverted_void, 0, BlendType.MULTIPLY)
-            LightCompositor.blend_values(self.blue_array,  inverted_void, 0, BlendType.MULTIPLY)
-            LightCompositor.blend_values(self.blue_array,  self.void_array * 0.5, 0, BlendType.ADD)
+            Compositor.blend_values(self.Wh_L_array, inverted_void, 0, BlendType.MULTIPLY)
+            Compositor.blend_values(self.Wh_R_array, inverted_void, 0, BlendType.MULTIPLY)
+            Compositor.blend_values(self.blue_array,  inverted_void, 0, BlendType.MULTIPLY)
+            Compositor.blend_values(self.blue_array,  self.void_array * 0.5, 0, BlendType.ADD)
 
         self.output.light_0 = self.Wh_L_array[:] + self.Wh_R_array[:]
         self.output.light_1 = self.blue_array[:]
@@ -329,7 +327,7 @@ class LightCompositor(Thread):
     def make_voids(
         array: np.ndarray,
         player_states: dict[int, PlayerState],
-        P: LightSettings,
+        P: CompositorSettings,
         interval: float,
     ) -> None:
         array -= interval * 4.0
@@ -345,14 +343,14 @@ class LightCompositor(Thread):
             void_width: float = P.void_width * 0.5
             width: float     = void_width + length * void_width
             edge: int        = int(P.void_edge * len(array))
-            LightCompositor.draw_field(array, centre, width, strength, edge, BlendType.MAX)
+            Compositor.draw_field(array, centre, width, strength, edge, BlendType.MAX)
 
     @staticmethod
     def make_patterns(
         W_L: np.ndarray, W_R: np.ndarray, blues: np.ndarray,
         player_states: dict[int, PlayerState],
         smooth_num_active: float,
-        P: LightSettings,
+        P: CompositorSettings,
         interval: float,
     ) -> None:
         resolution: int = len(W_L)
@@ -394,10 +392,10 @@ class LightCompositor(Thread):
 
             blend: BlendType = BlendType.MAX
 
-            LightCompositor.draw_waves(W_L, centre,  patt_width, left_count, left_width, sharpness, left_time, 0,   inner_edge, outer_edge, blend)
-            LightCompositor.draw_waves(W_L, centre, -patt_width, left_count, left_width, sharpness, left_time, 0,   outer_edge, inner_edge, blend)
-            LightCompositor.draw_waves(W_R, centre,  patt_width, rigt_count, rigt_width, sharpness, rigt_time, 0.5, inner_edge, outer_edge, blend)
-            LightCompositor.draw_waves(W_R, centre, -patt_width, rigt_count, rigt_width, sharpness, rigt_time, 0.5, outer_edge, inner_edge, blend)
+            Compositor.draw_waves(W_L, centre,  patt_width, left_count, left_width, sharpness, left_time, 0,   inner_edge, outer_edge, blend)
+            Compositor.draw_waves(W_L, centre, -patt_width, left_count, left_width, sharpness, left_time, 0,   outer_edge, inner_edge, blend)
+            Compositor.draw_waves(W_R, centre,  patt_width, rigt_count, rigt_width, sharpness, rigt_time, 0.5, inner_edge, outer_edge, blend)
+            Compositor.draw_waves(W_R, centre, -patt_width, rigt_count, rigt_width, sharpness, rigt_time, 0.5, outer_edge, inner_edge, blend)
 
     @staticmethod
     def draw_waves(
@@ -440,9 +438,9 @@ class LightCompositor(Thread):
             intensities = intensities[::-1]
             pixel_start = (pixel_start - pixel_span) % resolution
 
-        LightCompositor.draw_edge(intensities, edge_left, 1.5, EdgeSide.LEFT)
-        LightCompositor.draw_edge(intensities, edge_right, 1.5, EdgeSide.RIGHT)
-        LightCompositor.apply_circular(array, intensities, pixel_start, blend)
+        Compositor.draw_edge(intensities, edge_left, 1.5, EdgeSide.LEFT)
+        Compositor.draw_edge(intensities, edge_right, 1.5, EdgeSide.RIGHT)
+        Compositor.apply_circular(array, intensities, pixel_start, blend)
 
     @staticmethod
     def draw_field(
@@ -457,8 +455,8 @@ class LightCompositor(Thread):
         values = np.full(field_width, strength, dtype=array.dtype)
         edge_width: int = int(min(edge, field_width // 2))
         if edge_width > 0:
-            LightCompositor.draw_edge(values, edge_width, 1.5, EdgeSide.BOTH)
-        LightCompositor.apply_circular(array, values, idx_start, blend)
+            Compositor.draw_edge(values, edge_width, 1.5, EdgeSide.BOTH)
+        Compositor.apply_circular(array, values, idx_start, blend)
 
     @staticmethod
     def draw_edge(array: np.ndarray, edge: int, curve: float, edge_side: EdgeSide) -> None:
@@ -481,10 +479,10 @@ class LightCompositor(Thread):
         start_idx = start_idx % resolution
         end_idx: int = (start_idx + len(values)) % resolution
         if start_idx < end_idx:
-            LightCompositor.blend_values(array, values, start_idx, blend)
+            Compositor.blend_values(array, values, start_idx, blend)
         else:
-            LightCompositor.blend_values(array, values[:resolution - start_idx], start_idx, blend)
-            LightCompositor.blend_values(array, values[resolution - start_idx:], 0, blend)
+            Compositor.blend_values(array, values[:resolution - start_idx], start_idx, blend)
+            Compositor.blend_values(array, values[resolution - start_idx:], 0, blend)
 
     @staticmethod
     def blend_values(

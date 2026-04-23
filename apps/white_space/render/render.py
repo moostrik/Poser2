@@ -8,14 +8,14 @@ from modules.render.layers import ImageSourceLayer, MaskSourceLayer, CropSourceL
 from modules.render.layers import TrackerCompositor, PoseCompositor
 from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer
 from modules.render.layers.generic.PanoramicTrackerLayer import PanoramicTrackerLayer
-from apps.white_space.layers.LightLayer import LightLayer
-from apps.white_space.layers.LightDebugLayer import LightDebugLayer
+from apps.white_space.render.layers.compositor_output_layer import CompositorOutputLayer
+from apps.white_space.render.layers.composition_debug_layer import CompositionDebugLayer
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from .render_board import RenderBoard
-from .settings import Layers, RenderSettings
+from ..settings import Layers, RenderSettings
 
 
 class WhiteSpaceRender(RenderBase):
@@ -56,11 +56,11 @@ class WhiteSpaceRender(RenderBase):
 
         # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready
         self.L[Layers.ws_tracker][0] = PanoramicTrackerLayer(board, self.num_cams, settings.colors)
-        self.L[Layers.ws_light][0]   = LightLayer(board)
-        self.L[Layers.ws_lines][0]   = LightDebugLayer(board)
+        self.L[Layers.ws_light][0]   = CompositorOutputLayer(board)
+        self.L[Layers.ws_lines][0]   = CompositionDebugLayer(board)
 
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name='track',      columns=self.num_cams,    rows=1, src_aspect_ratio=16/9,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name='track',      columns=self.num_cams,    rows=1, src_aspect_ratio=16/9, padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name='panoramic',  columns=1,                rows=1, src_aspect_ratio=10.0, padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name='ws_light',   columns=1,                rows=1, src_aspect_ratio=20.0, padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name='ws_lines',   columns=1,                rows=1, src_aspect_ratio=20.0, padding=Point2f(0.0, 1.0)),
@@ -126,7 +126,6 @@ class WhiteSpaceRender(RenderBase):
         for i in range(self.num_cams):
             self._viewport(height, self.subdivision.get_rect('track', i))
             self.L[Layers.tracker][i].draw()
-            # self.L[Layers.cam_image][i].draw()
 
         # Row 2 — panoramic tracker standin (single wide viewport)
         self._viewport(height, self.subdivision.get_rect('panoramic', 0))
@@ -150,5 +149,3 @@ class WhiteSpaceRender(RenderBase):
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         pass
-
-
