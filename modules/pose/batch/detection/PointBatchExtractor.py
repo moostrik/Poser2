@@ -1,6 +1,6 @@
 from threading import Lock
 from typing import Union
-from modules.pose.batch.ImageFrame import ImageFrameDict
+from modules.pose.batch.CropImage import CropImageDict
 from modules.pose.features import Points2D
 from modules.pose.frame import FrameDictCallbackMixin, replace
 from modules.pose.frame import FrameDict
@@ -55,12 +55,12 @@ class PointBatchExtractor(FrameDictCallbackMixin):
         """Stop the detection processing thread."""
         self._detection.stop()
 
-    def process(self, poses: FrameDict, gpu_frames: ImageFrameDict) -> None:
+    def process(self, poses: FrameDict, crop_frames: CropImageDict) -> None:
         """Submit poses with GPU images for async processing. Results broadcast via callbacks.
 
         Args:
             poses: Dictionary of poses keyed by tracklet ID
-            gpu_frames: GPU frames with crops already on GPU, keyed by tracklet ID
+            crop_frames: Crop frames with crops already on GPU, keyed by tracklet ID
         """
         if not self._detection.is_ready:
             return
@@ -69,9 +69,9 @@ class PointBatchExtractor(FrameDictCallbackMixin):
         gpu_image_list: list = []  # list[cp.ndarray]
 
         for tracklet_id in poses.keys():
-            if tracklet_id in gpu_frames and gpu_frames[tracklet_id].crop is not None:
+            if tracklet_id in crop_frames:
                 tracklet_ids.append(tracklet_id)
-                gpu_image_list.append(gpu_frames[tracklet_id].crop)
+                gpu_image_list.append(crop_frames[tracklet_id].crop)
 
         with self._lock:
             self._batch_counter += 1

@@ -13,7 +13,11 @@ need.  Render layers declare the protocol slice they require (e.g.
 
 from modules.board.frames import HasFrames, FrameStoreMixin
 from modules.board.windows import HasWindows, WindowStoreMixin
-from modules.board.images import HasImages, ImageStoreMixin
+from modules.board.images import (
+    HasCameraImages, CameraImageStoreMixin,
+    HasCropImages, CropImageStoreMixin,
+    HasMaskImages, MaskImageStoreMixin,
+)
 from modules.board.depth_tracklets import HasDepthTracklets, DepthTrackletStoreMixin
 from modules.board.sequence import HasSequence, SequenceStoreMixin
 from modules.board.tracklets import HasTracklets, TrackletStoreMixin

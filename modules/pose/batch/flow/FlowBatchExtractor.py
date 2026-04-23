@@ -4,7 +4,7 @@ from typing import Callable, Union
 
 import torch
 
-from modules.pose.batch.ImageFrame import ImageFrameDict
+from modules.pose.batch.CropImage import CropImageDict
 from modules.pose.frame import FrameDict
 
 import logging
@@ -80,12 +80,12 @@ class FlowBatchExtractor:
         """Stop the optical flow processing thread."""
         self._optical_flow.stop()
 
-    def process(self, poses: FrameDict, gpu_frames: ImageFrameDict) -> None:
+    def process(self, poses: FrameDict, crop_frames: CropImageDict) -> None:
         """Submit batch for async processing. Results broadcast via callbacks.
 
         Args:
             poses: Dictionary of poses keyed by tracklet ID
-            gpu_frames: GPU frames with crop and prev_crop tensors, keyed by tracklet ID
+            crop_frames: Crop frames with crop and prev_crop tensors, keyed by tracklet ID
         """
         if not self._optical_flow.is_ready:
             return
@@ -94,12 +94,12 @@ class FlowBatchExtractor:
         pair_list: list[tuple[torch.Tensor, torch.Tensor]] = []
 
         for tracklet_id in poses.keys():
-            if tracklet_id in gpu_frames:
-                gpu_frame = gpu_frames[tracklet_id]
+            if tracklet_id in crop_frames:
+                crop_frame = crop_frames[tracklet_id]
                 # Only add if prev_crop and crop exist (need both frames for optical flow)
-                if gpu_frame.prev_crop is not None and gpu_frame.crop is not None:
+                if crop_frame.prev_crop is not None:
                     tracklet_id_list.append(tracklet_id)
-                    pair_list.append((gpu_frame.prev_crop, gpu_frame.crop))
+                    pair_list.append((crop_frame.prev_crop, crop_frame.crop))
 
         # If no pairs available, emit empty flow dict to maintain data flow
         if not pair_list:

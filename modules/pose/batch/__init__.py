@@ -7,7 +7,9 @@ from .segmentation.SegmentationSettings import  SegmentationSettings
 from .segmentation.MaskBatchExtractor import    MaskBatchExtractor
 from .PosesFromTracklets import                 PosesFromTracklets
 from .ImageCropProcessor import                 ImageCropProcessor, ImageCropSettings
-from .ImageFrame import                         ImageFrame, ImageFrameDict
+from .CameraImage import                        CameraImage, CameraImageDict, CameraImageCallback
+from .CropImage import                          CropImage, CropImageDict, CropImageCallback
+from .MaskImage import                          MaskImage, MaskImageDict, MaskImageCallback
 from .WindowSimilarity import                   WindowSimilarity, WindowSimilaritySettings, SimilarityResult
 from .WindowCorrelation import                  WindowCorrelation, WindowCorrelationSettings
 from .model_types import                        ModelType, Resolution, RESOLUTION_DIMS

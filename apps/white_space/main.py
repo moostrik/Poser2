@@ -102,10 +102,11 @@ class WhiteSpaceMain:
         self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
         self.bbox_filters.add_frames_callback(self.image_crop_processor.process)
         self.image_crop_processor.add_image_callback(self.point_extractor.process)
-        self.image_crop_processor.add_image_callback(lambda _f, gpu: self.board.set_images(gpu))
+        self.image_crop_processor.add_camera_image_callback(lambda gpu: self.board.set_camera_images(gpu))
+        self.image_crop_processor.add_image_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
         if self.mask_extractor is not None:
             self.image_crop_processor.add_image_callback(self.mask_extractor.process)
-            self.mask_extractor.add_image_callback(lambda _f, gpu: self.board.set_images(gpu))
+            self.mask_extractor.add_mask_image_callback(lambda _f, masks: self.board.set_mask_images(masks))
 
         # STAGE WINDOW TRACKERS & BROADCASTS
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
@@ -119,6 +120,13 @@ class WhiteSpaceMain:
                 partial(self.sound_osc.set_frames, stage),
                 wt.process,
             ])
+
+        # WS PIPELINE — light/sound output
+        self.ws_draw = WSDraw(self.settings.ws)
+        self.tracker.add_tracklet_callback(self.ws_draw.set_tracklets)
+        ws_input: Stage = Stage(int(ps.ws_input_stage))
+        self.stages[ws_input].add_callback(self.ws_draw.add_poses)
+        self.ws_draw.add_output_callback(self.board.set_ws_output)
 
         # POSE STAGE RAW
         self.point_extractor.add_frames_callback(self.stages[Stage.RAW])
@@ -220,13 +228,6 @@ class WhiteSpaceMain:
         self.filters_lerp.add_frames_callback(self.motion_gate_applicator.set)
         self.filters_lerp.add_frames_callback(self.gate_lerp.process)
         self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
-
-        # WS PIPELINE — light/sound output
-        self.ws_draw = WSDraw(self.settings.ws)
-        self.tracker.add_tracklet_callback(self.ws_draw.set_tracklets)
-        ws_input: Stage = Stage(int(ps.ws_input_stage))
-        self.stages[ws_input].add_callback(self.ws_draw.add_poses)
-        self.ws_draw.add_output_callback(self.board.set_ws_output)
 
         # RENDER
         self.render = WhiteSpaceRender(self.board, self.settings.render)

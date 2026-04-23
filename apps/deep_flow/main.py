@@ -92,7 +92,8 @@ class DeepFlowMain:
         self.image_crop_processor.add_image_callback(self.point_extractor.process)
         self.image_crop_processor.add_image_callback(self.mask_extractor.process)
         self.image_crop_processor.add_image_callback(self.flow_extractor.process)
-        self.mask_extractor.add_image_callback(lambda _f, gpu: self.board.set_images(gpu))
+        self.image_crop_processor.add_camera_image_callback(lambda gpu: self.board.set_camera_images(gpu))
+        self.mask_extractor.add_mask_image_callback(lambda _f, masks: self.board.set_mask_images(masks))
 
         # STAGE WINDOW TRACKERS & BROADCASTS
         self.window_trackers: dict[Stage, window.WindowTracker] = {}

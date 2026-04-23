@@ -11,7 +11,8 @@ import torch.nn.functional as F
 # Local application imports
 from modules.pose.features import BBox
 from modules.pose.frame import FrameDict, replace
-from modules.pose.batch.ImageFrame import ImageFrame, ImageFrameDict, ImageFrameCallback
+from modules.pose.batch.CameraImage import CameraImage, CameraImageDict, CameraImageCallback
+from modules.pose.batch.CropImage import CropImage, CropImageDict, CropImageCallback
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.PerformanceTimer import PerformanceTimer
 
@@ -58,7 +59,8 @@ class ImageCropProcessor:
         self._prev_gpu_images: dict[int, torch.Tensor] = {}  # cam_id -> previous frame on GPU
 
         # Callbacks
-        self._callbacks: set[ImageFrameCallback] = set()
+        self._callbacks: set[CropImageCallback] = set()
+        self._camera_callbacks: set[CameraImageCallback] = set()
 
         # Create dedicated CUDA stream for crop operations
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
@@ -116,10 +118,11 @@ class ImageCropProcessor:
         start = time.perf_counter()
 
         cropped_poses: FrameDict = {}
-        gpu_frames: ImageFrameDict = {}
+        pose_frames: CropImageDict = {}
+        cam_frames: CameraImageDict = {}
 
         # Clean up previous images for lost tracks
-        lost_ids = set(self._prev_gpu_images.keys()) - set(poses.keys())
+        lost_ids = set(self._prev_gpu_images.keys()) - {pose.cam_id for pose in poses.values()}
         for lost_id in lost_ids:
             if lost_id in self._prev_gpu_images:
                 del self._prev_gpu_images[lost_id]
@@ -128,7 +131,8 @@ class ImageCropProcessor:
 
         with torch.cuda.stream(self._stream):
             for pose_id, pose in poses.items():
-                if pose_id not in self._gpu_images:
+                cam_id = pose.cam_id
+                if cam_id not in self._gpu_images:
                     continue
 
                 if pose_count >= self._config.max_poses:
@@ -136,7 +140,7 @@ class ImageCropProcessor:
                     continue
 
                 try:
-                    gpu_image = self._gpu_images[pose_id]
+                    gpu_image = self._gpu_images[cam_id]
                     # CHW format: (3, H, W)
                     img_height, img_width = gpu_image.shape[1:3]
                     bbox_rect = pose[BBox].to_rect().zoom(Point2f(1.0 + self._config.expansion_width, 1.0 + self._config.expansion_height))
@@ -149,8 +153,8 @@ class ImageCropProcessor:
 
                     # Crop previous frame at CURRENT bbox location (for optical flow)
                     prev_crop: torch.Tensor | None = None
-                    if self._config.enable_prev_crop and pose_id in self._prev_gpu_images:
-                        prev_img = self._prev_gpu_images[pose_id]
+                    if self._config.enable_prev_crop and cam_id in self._prev_gpu_images:
+                        prev_img = self._prev_gpu_images[cam_id]
                         # CHW format: (3, H, W)
                         prev_h, prev_w = prev_img.shape[1:3]
                         prev_crop = self._gpu_crop_resize(prev_img, crop_roi, prev_w, prev_h)
@@ -159,12 +163,11 @@ class ImageCropProcessor:
                     normalized_roi = crop_roi.scale(Point2f(1.0 / img_width, 1.0 / img_height))
                     cropped_poses[pose_id] = replace(pose, {BBox: BBox.from_rect(normalized_roi)})
 
-                    # Build GPUFrame with PyTorch tensors
-                    gpu_frames[pose_id] = ImageFrame(
+                    # Build CropImage with PyTorch tensors
+                    pose_frames[pose_id] = CropImage(
                         track_id=pose_id,
-                        full_image=gpu_image,  # float16 RGB CHW [0,1]
-                        crop=crop_tensor,       # float16 RGB CHW [0,1]
-                        prev_crop=prev_crop     # float16 RGB CHW [0,1] or None
+                        crop=crop_tensor,   # float16 RGB CHW [0,1]
+                        prev_crop=prev_crop # float16 RGB CHW [0,1] or None
                     )
 
                     pose_count += 1
@@ -172,16 +175,12 @@ class ImageCropProcessor:
                 except Exception as e:
                     logger.error(f"GPUCropProcessor: Error processing pose {pose_id}: {e}")
 
-            # Emit camera-only frames for cameras without poses
-            # This ensures camera feeds remain visible even when no tracklets exist for that camera
-            pose_cam_ids = {pose.cam_id if hasattr(pose, 'cam_id') else pose_id for pose_id, pose in poses.items()}
+            # Build camera frames — one entry per camera, always, keyed by cam_id
             for cam_id, gpu_image in self._gpu_images.items():
-                if cam_id not in pose_cam_ids and cam_id not in gpu_frames:
-                    gpu_frames[cam_id] = ImageFrame(
-                        track_id=cam_id,
-                        full_image=gpu_image,
-                        crop=None  # No crop without bbox
-                    )
+                cam_frames[cam_id] = CameraImage(
+                    cam_id=cam_id,
+                    image=gpu_image,
+                )
 
         # Sync before callbacks access the data
         self._stream.synchronize()
@@ -192,9 +191,15 @@ class ImageCropProcessor:
         self._accumulated_upload_ms = 0.0
 
         # Always notify callbacks to maintain data flow (even with empty dicts)
+        for callback in self._camera_callbacks:
+            try:
+                callback(cam_frames)
+            except Exception as e:
+                logger.exception("Error in camera callback")
+
         for callback in self._callbacks:
             try:
-                callback(cropped_poses, gpu_frames)
+                callback(cropped_poses, pose_frames)
             except Exception as e:
                 logger.exception("Error in callback")
 
@@ -271,13 +276,21 @@ class ImageCropProcessor:
         # Keep CHW format (deep learning standard)
         return crop_chw
 
-    def add_image_callback(self, callback: ImageFrameCallback) -> None:
-        """Register callback to receive cropped poses and GPU frames."""
+    def add_image_callback(self, callback: CropImageCallback) -> None:
+        """Register callback to receive cropped poses and pose GPU frames."""
         self._callbacks.add(callback)
 
-    def remove_image_callback(self, callback: ImageFrameCallback) -> None:
+    def remove_image_callback(self, callback: CropImageCallback) -> None:
         """Unregister callback."""
         self._callbacks.discard(callback)
+
+    def add_camera_image_callback(self, callback: CameraImageCallback) -> None:
+        """Register callback to receive full camera frames keyed by cam_id."""
+        self._camera_callbacks.add(callback)
+
+    def remove_camera_image_callback(self, callback: CameraImageCallback) -> None:
+        """Unregister camera callback."""
+        self._camera_callbacks.discard(callback)
 
     def reset(self) -> None:
         """Clear all stored GPU images."""

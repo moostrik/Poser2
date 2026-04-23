@@ -5,10 +5,10 @@ import torch
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.board import HasImages
+from modules.board import HasCropImages
 from modules.gl import Tensor, Texture
 from modules.render.layers.LayerBase import LayerBase, DataCache
-from modules.pose.batch.ImageFrame import ImageFrame
+from modules.pose.batch.CropImage import CropImage
 
 
 class CropSourceLayer(LayerBase):
@@ -17,11 +17,11 @@ class CropSourceLayer(LayerBase):
     Displays the 384x512 (or configured size) crop that will be sent to TRT models.
     """
 
-    def __init__(self, track_id: int, board: HasImages) -> None:
+    def __init__(self, track_id: int, board: HasCropImages) -> None:
         self._track_id: int = track_id
-        self._board: HasImages = board
+        self._board: HasCropImages = board
         self._cuda_image: Tensor = Tensor()
-        self._data_cache: DataCache[ImageFrame] = DataCache[ImageFrame]()
+        self._data_cache: DataCache[CropImage] = DataCache[CropImage]()
         self._dirty: bool = False
 
     @property
@@ -40,13 +40,13 @@ class CropSourceLayer(LayerBase):
 
     def update(self) -> None:
         self._dirty = False
-        gpu_frame: ImageFrame | None = self._board.get_image(self._track_id)
+        gpu_frame: CropImage | None = self._board.get_crop_image(self._track_id)
         self._data_cache.update(gpu_frame)
 
         if self._data_cache.lost:
             self._cuda_image.clear()
 
-        if self._data_cache.idle or gpu_frame is None or gpu_frame.crop is None:
+        if self._data_cache.idle or gpu_frame is None:
             return
 
         self._cuda_image.set_tensor(gpu_frame.crop)

@@ -1,10 +1,10 @@
-from dataclasses import replace
 from threading import Lock
 from typing import Union
 
 import torch
 
-from modules.pose.batch.ImageFrame import ImageFrame, ImageFrameDict, ImageFrameCallback
+from modules.pose.batch.CropImage import CropImage, CropImageDict
+from modules.pose.batch.MaskImage import MaskImage, MaskImageDict, MaskImageCallback
 from modules.pose.frame import FrameDict
 from ..model_types import ModelType
 from .SegmentationSettings import SegmentationSettings
@@ -47,11 +47,11 @@ class MaskBatchExtractor:
         self._verbose: bool = settings.verbose
 
         # Callbacks
-        self._callbacks: set[ImageFrameCallback] = set()
+        self._callbacks: set[MaskImageCallback] = set()
         self._callback_lock: Lock = Lock()
 
         # Pending frames awaiting segmentation results, keyed by batch_id
-        self._pending_frames: dict[int, tuple[FrameDict, ImageFrameDict]] = {}
+        self._pending_frames: dict[int, tuple[FrameDict, CropImageDict]] = {}
 
         # Track active tracklet IDs for detecting removed tracklets
         self._previous_tracklet_ids: set[int] = set()
@@ -70,12 +70,12 @@ class MaskBatchExtractor:
         """Stop the segmentation processing thread."""
         self._segmentation.stop()
 
-    def process(self, poses: FrameDict, gpu_frames: ImageFrameDict) -> None:
+    def process(self, poses: FrameDict, crop_frames: CropImageDict) -> None:
         """Submit poses with GPU images for async processing. Results broadcast via callbacks.
 
         Args:
             poses: Dictionary of poses keyed by tracklet ID
-            gpu_frames: GPU frames with crops already on GPU, keyed by tracklet ID
+            crop_frames: Crop frames with crops already on GPU, keyed by tracklet ID
         """
         if not self._segmentation.is_ready:
             return
@@ -84,19 +84,19 @@ class MaskBatchExtractor:
         gpu_image_list: list = []  # list[cp.ndarray]
 
         for tracklet_id in poses.keys():
-            if tracklet_id in gpu_frames and gpu_frames[tracklet_id].crop is not None:
+            if tracklet_id in crop_frames:
                 tracklet_ids.append(tracklet_id)
-                gpu_image_list.append(gpu_frames[tracklet_id].crop)
+                gpu_image_list.append(crop_frames[tracklet_id].crop)
 
         # If no crops available, forward frames without segmentation to maintain data flow
         if not gpu_image_list:
-            self._notify_callbacks(poses, gpu_frames)
+            self._notify_callbacks(poses, {})
             return
 
         with self._lock:
             self._batch_counter += 1
             batch_id: int = self._batch_counter
-            self._pending_frames[batch_id] = (poses, gpu_frames)
+            self._pending_frames[batch_id] = (poses, crop_frames)
 
         self._segmentation.submit(SegmentationInput(
             batch_id=batch_id,
@@ -117,50 +117,45 @@ class MaskBatchExtractor:
         if pending is None:
             return
 
-        poses, gpu_frames = pending
+        poses, crop_frames = pending
 
-        # If batch was dropped or no masks, forward original frames without masks
+        # If batch was dropped or no masks, forward empty dict to maintain data flow
         if not output.processed or output.mask_tensor is None or output.fgr_tensor is None:
-            self._notify_callbacks(poses, gpu_frames)
+            self._notify_callbacks(poses, {})
             return
 
         # Track inference time
         self._process_timer.add_time(output.inference_time_ms, report=self._verbose)
 
-        # Create updated GPUFrameDict with masks attached
-        result_frames: ImageFrameDict = {}
+        # Build MaskFrameDict from segmentation results
+        result_frames: MaskImageDict = {}
         for idx, tracklet_id in enumerate(output.tracklet_ids):
-            if tracklet_id in gpu_frames and idx < output.mask_tensor.shape[0]:
+            if idx < output.mask_tensor.shape[0]:
                 mask = output.mask_tensor[idx]  # (H, W) tensor on GPU
                 foreground = output.fgr_tensor[idx]
-                # foreground = foreground * mask.unsqueeze(0) # Do in visualisation if needed
-                result_frames[tracklet_id] = replace(gpu_frames[tracklet_id], mask=mask, foreground=foreground)
-            elif tracklet_id in gpu_frames:
-                # No mask for this tracklet, forward original
-                result_frames[tracklet_id] = gpu_frames[tracklet_id]
-
-        # Include any frames that weren't in the output (shouldn't happen, but safety)
-        for tracklet_id, frame in gpu_frames.items():
-            if tracklet_id not in result_frames:
-                result_frames[tracklet_id] = frame
+                result_frames[tracklet_id] = MaskImage(
+                    track_id=tracklet_id,
+                    mask=mask,
+                    foreground=foreground,
+                )
 
         # Broadcast to callbacks
         self._notify_callbacks(poses, result_frames)
 
-    def _notify_callbacks(self, poses: FrameDict, gpu_frames: ImageFrameDict) -> None:
-        """Emit callbacks with poses and GPU frames."""
+    def _notify_callbacks(self, poses: FrameDict, mask_frames: MaskImageDict) -> None:
+        """Emit callbacks with poses and mask frames."""
         with self._callback_lock:
             for callback in self._callbacks:
                 try:
-                    callback(poses, gpu_frames)
+                    callback(poses, mask_frames)
                 except Exception as e:
                     logger.exception("Error in callback")
-    def add_image_callback(self, callback: ImageFrameCallback) -> None:
-        """Register callback to receive poses and GPU frames with masks."""
+    def add_mask_image_callback(self, callback: MaskImageCallback) -> None:
+        """Register callback to receive poses and mask images."""
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def remove_image_callback(self, callback: ImageFrameCallback) -> None:
+    def remove_mask_image_callback(self, callback: MaskImageCallback) -> None:
         """Unregister callback."""
         with self._callback_lock:
             self._callbacks.discard(callback)
