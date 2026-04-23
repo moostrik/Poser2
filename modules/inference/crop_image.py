@@ -10,7 +10,7 @@ from modules.pose.frame import FrameDict
 class CropImage:
     """GPU-resident cropped region for a single tracked pose.
 
-    Produced by ImageCropProcessor once per tracked pose per frame.
+    Produced by CropProcessor once per tracked pose per frame.
     Format: CHW float16 RGB [0,1].
 
     Attributes:

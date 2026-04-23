@@ -4,7 +4,7 @@ from threading import Lock
 import numpy as np
 
 from modules.pose.features.Similarity import Similarity
-from modules.pose.batch.WindowSimilarity import SimilarityResult
+from modules.pose.analytics.window_similarity import SimilarityResult
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
 from modules.settings import BaseSettings, Field

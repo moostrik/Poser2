@@ -16,7 +16,7 @@ from modules.board.windows import HasWindows, WindowStoreMixin
 from modules.board.images import (
     HasCameraImages, CameraImageStoreMixin,
     HasCropImages, CropImageStoreMixin,
-    HasMaskImages, MaskImageStoreMixin,
+    HasSegmentationImages, SegmentationImageStoreMixin,
 )
 from modules.board.depth_tracklets import HasDepthTracklets, DepthTrackletStoreMixin
 from modules.board.sequence import HasSequence, SequenceStoreMixin

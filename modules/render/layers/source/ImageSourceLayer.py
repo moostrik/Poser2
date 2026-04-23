@@ -10,7 +10,7 @@ from modules.gl import Tensor, Texture
 
 from modules.board import HasCameraImages
 from modules.render.layers.LayerBase import LayerBase, DataCache
-from modules.pose.batch.CameraImage import CameraImage
+from modules.inference.camera_image import CameraImage
 
 
 class ImageSourceLayer(LayerBase):

@@ -3,8 +3,8 @@ from typing import Union
 
 import torch
 
-from modules.pose.batch.CropImage import CropImage, CropImageDict
-from modules.pose.batch.MaskImage import MaskImage, MaskImageDict, MaskImageCallback
+from modules.inference.crop_image import CropImage, CropImageDict
+from modules.inference.segmentation.segmentation_image import SegmentationImage, SegmentationImageDict, SegmentationImageCallback
 from modules.pose.frame import FrameDict
 from ..model_types import ModelType
 from .SegmentationSettings import SegmentationSettings
@@ -47,7 +47,7 @@ class MaskBatchExtractor:
         self._verbose: bool = settings.verbose
 
         # Callbacks
-        self._callbacks: set[MaskImageCallback] = set()
+        self._callbacks: set[SegmentationImageCallback] = set()
         self._callback_lock: Lock = Lock()
 
         # Pending frames awaiting segmentation results, keyed by batch_id
@@ -127,13 +127,13 @@ class MaskBatchExtractor:
         # Track inference time
         self._process_timer.add_time(output.inference_time_ms, report=self._verbose)
 
-        # Build MaskFrameDict from segmentation results
-        result_frames: MaskImageDict = {}
+        # Build SegmentationImageDict from segmentation results
+        result_frames: SegmentationImageDict = {}
         for idx, tracklet_id in enumerate(output.tracklet_ids):
             if idx < output.mask_tensor.shape[0]:
                 mask = output.mask_tensor[idx]  # (H, W) tensor on GPU
                 foreground = output.fgr_tensor[idx]
-                result_frames[tracklet_id] = MaskImage(
+                result_frames[tracklet_id] = SegmentationImage(
                     track_id=tracklet_id,
                     mask=mask,
                     foreground=foreground,
@@ -142,20 +142,20 @@ class MaskBatchExtractor:
         # Broadcast to callbacks
         self._notify_callbacks(poses, result_frames)
 
-    def _notify_callbacks(self, poses: FrameDict, mask_frames: MaskImageDict) -> None:
-        """Emit callbacks with poses and mask frames."""
+    def _notify_callbacks(self, poses: FrameDict, mask_frames: SegmentationImageDict) -> None:
+        """Emit callbacks with poses and segmentation frames."""
         with self._callback_lock:
             for callback in self._callbacks:
                 try:
                     callback(poses, mask_frames)
                 except Exception as e:
                     logger.exception("Error in callback")
-    def add_mask_image_callback(self, callback: MaskImageCallback) -> None:
-        """Register callback to receive poses and mask images."""
+    def add_segmentation_image_callback(self, callback: SegmentationImageCallback) -> None:
+        """Register callback to receive poses and segmentation images."""
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def remove_mask_image_callback(self, callback: MaskImageCallback) -> None:
+    def remove_segmentation_image_callback(self, callback: SegmentationImageCallback) -> None:
         """Unregister callback."""
         with self._callback_lock:
             self._callbacks.discard(callback)

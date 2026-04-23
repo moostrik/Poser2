@@ -56,6 +56,7 @@ Use modern Python typing (`list[T]`, `dict[K, V]`, `X | Y`).
 ## Imports
 
 Import subpackages as namespaces and use qualified access (`from modules.pose import window`; use `window.WindowTracker`).
+- Consolidate all imports from the same package onto one line; never split a single package across multiple `from x import` statements
 - Keep `__init__.py` exports limited to the package's own public symbols
 
 ## Error handling

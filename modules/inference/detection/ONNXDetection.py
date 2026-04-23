@@ -5,14 +5,12 @@ import time
 
 # Third-party imports
 import numpy as np
+import onnxruntime as ort
 import torch
-import tensorrt as trt
 
-# Reuse dataclasses from MMDetection
-from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
+from modules.inference.detection.InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
 
 from .DetectionSettings import DetectionSettings
-from ..tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 
 import logging
 logger = logging.getLogger(__name__)
@@ -22,18 +20,11 @@ IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(1,
 IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32).view(1, 3, 1, 1)
 
 
-class TRTDetection(Thread):
-    """Asynchronous GPU pose detection using RTMPose with TensorRT.
+class ONNXDetection(Thread):
+    """Asynchronous GPU pose detection using ONNX Runtime.
 
-    TensorRT-optimized inference for maximum performance. Drop-in replacement for ONNXDetection.
-
-    Uses preallocated buffers and dedicated CUDA stream for ultra-low latency.
-    All preprocessing and inference runs on the same dedicated stream to avoid sync overhead.
-
-    Single-slot queue: only the most recent batch waits processing; older pending batches dropped.
-    Batches already processing cannot be cancelled.
-
-    All results delivered via callbacks in notification order.
+    Faster alternative to MMDetection using exported ONNX models.
+    Architecture identical to MMDetection for drop-in replacement.
     """
 
     def __init__(self, settings: 'DetectionSettings') -> None:
@@ -42,13 +33,14 @@ class TRTDetection(Thread):
         self.model_file: str = settings.model_path + '/' + settings.model
         self.model_width: int = settings.width
         self.model_height: int = settings.height
+        self.model_num_warmups: int = settings.max_poses
         self.num_keypoints: int = 17  # RTMPose COCO format
         self.simcc_split_ratio: float = 2.0  # From RTMPose config
 
         self.verbose: bool = settings.verbose
         self.resolution_name: str = settings.resolution.name
 
-        # Thread coordination
+        # Thread coordination (identical to MMDetection)
         self._shutdown_event: Event = Event()
         self._notify_update_event: Event = Event()
         self._model_ready: Event = Event()
@@ -65,23 +57,13 @@ class TRTDetection(Thread):
         self._callback_queue: Queue[DetectionOutput | None] = Queue(maxsize=2)
         self._callback_thread: Thread = Thread(target=self._dispatch_callbacks, daemon=True)
 
-        # TensorRT engine and context (initialized in run())
-        self.engine: trt.ICudaEngine  # type: ignore
-        self.context: trt.IExecutionContext  # type: ignore
-        self.stream: torch.cuda.Stream
-        self.input_name: str
-        self.output_names: list[str]
+        # ONNX session (initialized in run thread)
+        self._session: ort.InferenceSession | None = None
+        self._model_dtype = np.float32  # Default, determined in setup
+        self.model_precision: str = "UNKNOWN"
 
-        # Model configuration (initialized in _setup())
-        self._max_batch: int = 8
-        self._torch_dtype: torch.dtype
-        self._mean_gpu: torch.Tensor  # ImageNet mean on GPU
-        self._std_gpu: torch.Tensor  # ImageNet std on GPU
-
-        # Preallocated INPUT buffers (initialized in _setup())
-        # Note: Output buffers allocated fresh each call
-        self._input_buffer: torch.Tensor  # (max_batch, 3, H, W) normalized input
-        self._resize_buffer: torch.Tensor  # (max_batch, 3, H, W) for resize output
+        # Batch inference settings
+        self._max_batch: int = min(settings.max_poses, 8)
 
     @property
     def is_ready(self) -> bool:
@@ -98,7 +80,7 @@ class TRTDetection(Thread):
         self.join(timeout=2.0)
 
         if self.is_alive():
-            logger.warning("Warning: TensorRT inference thread did not stop cleanly")
+            logger.warning("Warning: ONNX inference thread did not stop cleanly")
 
         try:
             self._callback_queue.put_nowait(None)
@@ -107,7 +89,7 @@ class TRTDetection(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            logger.warning("Warning: TensorRT callback thread did not stop cleanly")
+            logger.warning("Warning: ONNX callback thread did not stop cleanly")
 
     def run(self) -> None:
         self._setup()
@@ -123,12 +105,9 @@ class TRTDetection(Thread):
             try:
                 self._process()
             except Exception as e:
-                logger.error(f"TensorRT Detection Error: {str(e)}")
+                logger.error(f"ONNX Detection Error: {str(e)}")
     def submit(self, input_batch: DetectionInput) -> None:
-        """Submit batch for processing. Replaces pending batch if not yet started.
-
-        Dropped batches receive callbacks with processed=False.
-        """
+        """Submit batch for processing. Identical to MMDetection."""
         if self._shutdown_event.is_set():
             return
 
@@ -137,7 +116,7 @@ class TRTDetection(Thread):
 
         # Validate batch size
         if len(input_batch.gpu_images) > self._max_batch:
-            logger.warning(f"TensorRT Detection Warning: Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
+            logger.warning(f"ONNX Detection Warning: Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: DetectionInput | None = None
 
@@ -146,7 +125,7 @@ class TRTDetection(Thread):
                 dropped_batch = self._pending_batch
                 if self.verbose:
                     lag = int((time.time() - self._input_timestamp) * 1000)
-                    logger.info(f"TensorRT Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms")
+                    logger.info(f"ONNX Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -162,72 +141,72 @@ class TRTDetection(Thread):
         self._notify_update_event.set()
 
     def _setup(self) -> None:
-        """Initialize TensorRT engine, context, and preallocated buffers. Called from run()."""
+        """Initialize ONNX session and warmup. Called from run()."""
         try:
-            # Acquire global lock to prevent concurrent Myelin graph loading
-            with get_init_lock():
-                runtime = get_tensorrt_runtime()
+            # Create ONNX Runtime session with CUDA
+            providers = [
+                ('CUDAExecutionProvider', {
+                    'device_id': 0,
+                    'arena_extend_strategy': 'kNextPowerOfTwo',
+                    'gpu_mem_limit': 2 * 1024 * 1024 * 1024,
+                    'cudnn_conv_algo_search': 'EXHAUSTIVE',
+                    'do_copy_in_default_stream': True,
+                }),
+                'CPUExecutionProvider',
+            ]
 
-                with open(self.model_file, 'rb') as f:
-                    engine_data = f.read()
+            sess_options = ort.SessionOptions()
+            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            sess_options.intra_op_num_threads = 1
+            sess_options.log_severity_level = 3  # 0=verbose, 1=info, 2=warning, 3=error
 
-                self.engine = runtime.deserialize_cuda_engine(engine_data)
-                if self.engine is None:
-                    logger.error("TensorRT Detection ERROR: Failed to load engine")
-                    return
+            self._session = ort.InferenceSession(self.model_file, sess_options, providers=providers)
 
-                self.context = self.engine.create_execution_context()
+            # Verify CUDA provider is active
+            providers_used = self._session.get_providers()
+            if 'CUDAExecutionProvider' not in providers_used:
+                logger.warning("ONNX Detection WARNING: CUDA provider not available, using CPU")
 
-            # Lock released - continue with setup
+            # Determine model precision from 'input' tensor
+            input_tensor = self._session.get_inputs()[0]  # First input is 'input'
+            input_type = input_tensor.type
 
-            # Get input/output names
-            self.output_names = []
-
-            for i in range(self.engine.num_io_tensors):
-                name = self.engine.get_tensor_name(i)
-                mode = self.engine.get_tensor_mode(name)
-
-                if mode == trt.TensorIOMode.INPUT:  # type: ignore
-                    self.input_name = name
-                else:
-                    self.output_names.append(name)
-
-            # Validate expected tensor counts
-            if len(self.output_names) != 2:
-                logger.error(f"TensorRT Detection ERROR: Expected 2 outputs, got {len(self.output_names)}")
-                return
-
-            # Determine model precision from input tensor
-            input_dtype = self.engine.get_tensor_dtype(self.input_name)
+            # Parse ONNX type string (e.g., 'tensor(float)', 'tensor(float16)')
             precision_map = {
-                trt.DataType.FLOAT: "FP32",  # type: ignore
-                trt.DataType.HALF: "FP16",   # type: ignore
-                trt.DataType.INT8: "INT8",   # type: ignore
+                'tensor(float)': 'FP32',
+                'tensor(float16)': 'FP16',
+                'tensor(double)': 'FP64',
+                'tensor(int8)': 'INT8',
             }
-            self.model_precision = precision_map.get(input_dtype, "UNKNOWN")
+            self.model_precision = precision_map.get(input_type, f"UNKNOWN({input_type})")
 
-            # Map TensorRT dtype to PyTorch dtype
-            dtype_to_torch = {
-                trt.DataType.FLOAT: torch.float32,  # type: ignore
-                trt.DataType.HALF: torch.float16,   # type: ignore
+            # Map ONNX type to numpy dtype for preprocessing
+            dtype_map = {
+                'tensor(float)': np.float32,
+                'tensor(float16)': np.float16,
+                'tensor(double)': np.float64,
+                'tensor(int8)': np.int8,
             }
-            self._torch_dtype = dtype_to_torch.get(input_dtype, torch.float32)
+            self._model_dtype = dtype_map.get(input_type, np.float32)
 
-            # SimCC output dimensions
-            self._simcc_x_width = self.model_width * 2
-            self._simcc_y_height = self.model_height * 2
+            # Map numpy dtype to torch dtype for preprocessing
+            torch_dtype_map = {
+                np.float32: torch.float32,
+                np.float16: torch.float16,
+            }
+            self._torch_dtype = torch_dtype_map.get(self._model_dtype, torch.float32)
 
             # Dedicated CUDA stream for all GPU operations (preprocessing + inference)
             self.stream = torch.cuda.Stream()
 
-            # Preallocate INPUT buffers on the dedicated stream for optimal memory placement
-            # Note: Output buffers allocated fresh each call (no clone needed)
+            # Preallocate INPUT buffers on the dedicated stream
             with torch.cuda.stream(self.stream):
                 # GPU constants for ImageNet normalization
                 self._mean_gpu = IMAGENET_MEAN.to(device='cuda', dtype=self._torch_dtype)
                 self._std_gpu = IMAGENET_STD.to(device='cuda', dtype=self._torch_dtype)
 
-                # Input buffer: normalized CHW format ready for TRT
+                # Input buffer: normalized CHW format ready for ONNX Runtime
                 self._input_buffer = torch.empty(
                     (self._max_batch, 3, self.model_height, self.model_width),
                     dtype=self._torch_dtype, device='cuda'
@@ -241,17 +220,14 @@ class TRTDetection(Thread):
 
             self.stream.synchronize()
 
-            # Set persistent tensor address for INPUT buffer (base pointer doesn't change when slicing)
-            # Output addresses must be set per-call since they're allocated fresh each inference
-            self.context.set_tensor_address(self.input_name, self._input_buffer.data_ptr())
+            # Warmup model
+            self._warmup()
 
             self._model_ready.set()
-            logger.info(f"TensorRT Detection: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
+            logger.info(f"ONNX Detection: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
 
         except Exception as e:
-            logger.error(f"TensorRT Detection Error: Failed to load model - {str(e)}")
-            return
-
+            logger.error(f"ONNX Detection Error: Failed to load model - {str(e)}")
     def _claim(self) -> DetectionInput | None:
         """Atomically get and clear pending batch."""
         with self._input_lock:
@@ -270,12 +246,13 @@ class TRTDetection(Thread):
         if not gpu_images:
             output = DetectionOutput(batch_id=batch.batch_id, processed=True)
         else:
-            keypoints, scores, process_time_ms, lock_wait_ms = self._infer(gpu_images)
+            batch_start = time.perf_counter()
+            keypoints, scores = self._infer(gpu_images)
 
-            # Normalize coordinates to [0, 1]
             keypoints[:, :, 0] /= self.model_width
             keypoints[:, :, 1] /= self.model_height
 
+            inference_time_ms = (time.perf_counter() - batch_start) * 1000.0
             point_list = [keypoints[i] for i in range(len(keypoints))]
             score_list = [scores[i] for i in range(len(scores))]
 
@@ -284,46 +261,37 @@ class TRTDetection(Thread):
                 point_batch=point_list,
                 score_batch=score_list,
                 processed=True,
-                inference_time_ms=process_time_ms,
-                lock_time_ms=lock_wait_ms
+                inference_time_ms=inference_time_ms
             )
 
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            logger.warning("TensorRT Detection Warning: Callback queue full")
+            logger.warning("ONNX Detection Warning: Callback queue full")
 
-    def _infer(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray, float, float]:
-        """Run TensorRT inference on batch of GPU images.
+    def _infer(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray]:
+        """Run inference on GPU images using IOBinding for zero-copy.
 
-        All preprocessing and inference runs on the dedicated stream for zero sync overhead.
+        All preprocessing runs on the dedicated stream for zero sync overhead.
         Uses preallocated buffers for zero allocation latency.
 
         Args:
-            gpu_imgs: List of RGB float32 tensors on GPU (3, H, W) CHW [0,1]
+            gpu_imgs: List of RGB float32 tensors on GPU (H, W, 3) in [0,1] range
 
         Returns:
-            (keypoints, scores, process_time_ms, lock_wait_ms)
+            (keypoints, scores)
         """
         batch_size = len(gpu_imgs)
-        method_start: float = time.perf_counter()
+
+        if batch_size == 0 or self._session is None:
+            return np.empty((0, 17, 2)), np.empty((0, 17))
 
         # Get input dimensions from first image (CHW format: 3, H, W)
         input_h, input_w = gpu_imgs[0].shape[1], gpu_imgs[0].shape[2]
         needs_resize = (input_h != self.model_height or input_w != self.model_width)
 
         # Get preallocated INPUT buffer slice for current batch
-        input_buffer = self._input_buffer[:batch_size]
-
-        # Allocate OUTPUT buffers fresh each call (no clone needed)
-        simcc_x_out = torch.empty(
-            (batch_size, self.num_keypoints, self._simcc_x_width),
-            dtype=self._torch_dtype, device='cuda'
-        )
-        simcc_y_out = torch.empty(
-            (batch_size, self.num_keypoints, self._simcc_y_height),
-            dtype=self._torch_dtype, device='cuda'
-        )
+        input_buffer = self._input_buffer[:self._max_batch]
 
         # All preprocessing on dedicated stream (no cross-stream sync needed)
         with torch.cuda.stream(self.stream):
@@ -333,44 +301,82 @@ class TRTDetection(Thread):
             # Resize if needed (crop size != model size)
             if needs_resize:
                 batch_chw = torch.nn.functional.interpolate(
-                    batch_chw, size=(self.model_height, self.model_width), mode='bilinear', align_corners=False
+                    batch_chw, size=(self.model_height, self.model_width),
+                    mode='bilinear', align_corners=False
                 )
 
+            # Pad batch to max_batch size for consistent tensor shapes
+            if batch_size < self._max_batch:
+                pad_size = self._max_batch - batch_size
+                padding = torch.zeros(
+                    (pad_size, 3, self.model_height, self.model_width),
+                    dtype=self._torch_dtype, device='cuda'
+                )
+                batch_chw = torch.cat([batch_chw, padding], dim=0)
+
             # ImageNet normalization directly into preallocated input buffer
-            torch.sub(batch_chw, self._mean_gpu, out=self._resize_buffer[:batch_size])
-            torch.div(self._resize_buffer[:batch_size], self._std_gpu, out=input_buffer)
+            torch.sub(batch_chw, self._mean_gpu, out=self._resize_buffer)
+            torch.div(self._resize_buffer, self._std_gpu, out=input_buffer)
 
-        # TensorRT inference - acquire global lock (still on same stream)
-        lock_wait_start: float = time.perf_counter()
-        with get_exec_lock():
-            lock_acquired: float = time.perf_counter()
+        # CRITICAL: Synchronize stream before IOBinding to ensure all preprocessing is complete
+        self.stream.synchronize()
 
-            # Only set_input_shape per-call (input address is persistent from _setup)
-            self.context.set_input_shape(self.input_name, tuple(input_buffer.shape))
+        # Use preprocessed tensor directly for ONNX Runtime
+        torch_input = input_buffer
 
-            # Output addresses must be set per-call (fresh allocation each inference)
-            self.context.set_tensor_address(self.output_names[0], simcc_x_out.data_ptr())
-            self.context.set_tensor_address(self.output_names[1], simcc_y_out.data_ptr())
+        # Get input/output names
+        input_name = self._session.get_inputs()[0].name
+        output_names = [o.name for o in self._session.get_outputs()]
 
-            # Execute on dedicated CUDA stream (preprocessing already complete on this stream)
-            self.context.execute_async_v3(stream_handle=self.stream.cuda_stream)
-            self.stream.synchronize() # .cpu() below syncs anyway
+        # Use IOBinding for GPU input/output
+        io_binding = self._session.io_binding()
 
-        # Transfer to CPU (no clone needed - output buffers are fresh each call)
-        simcc_x_cpu = simcc_x_out.cpu().numpy()
-        simcc_y_cpu = simcc_y_out.cpu().numpy()
+        # Bind input from PyTorch tensor
+        io_binding.bind_input(
+            name=input_name,
+            device_type='cuda',
+            device_id=0,
+            element_type=self._model_dtype,
+            shape=tuple(torch_input.shape),
+            buffer_ptr=torch_input.data_ptr()
+        )
 
-        # Decode on CPU (outside lock - no GPU resource needed)
-        keypoints, scores = TRTDetection._decode_simcc_cpu(simcc_x_cpu, simcc_y_cpu, self.simcc_split_ratio)
+        # Bind outputs to GPU
+        io_binding.bind_output(output_names[0], device_type='cuda', device_id=0)
+        io_binding.bind_output(output_names[1], device_type='cuda', device_id=0)
 
-        method_end = time.perf_counter()
+        # Run inference on the same stream
+        self._session.run_with_iobinding(io_binding)
 
-        lock_wait_ms = (lock_acquired - lock_wait_start) * 1000.0
-        total_time_ms = (method_end - method_start) * 1000.0
-        process_time_ms = total_time_ms - lock_wait_ms
+        # Synchronize stream to ensure outputs are ready
+        self.stream.synchronize()
 
-        return keypoints, scores, process_time_ms, lock_wait_ms
+        # Get outputs as numpy (copies from GPU)
+        outputs = io_binding.copy_outputs_to_cpu()
+        simcc_x = outputs[0][:batch_size]
+        simcc_y = outputs[1][:batch_size]
 
+        # Decode SimCC outputs
+        keypoints, scores = ONNXDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)
+
+        return keypoints, scores
+
+    def _warmup(self) -> None:
+        """Initialize CUDA kernels for fixed batch size to prevent runtime recompilation."""
+        if self._session is None:
+            return
+
+        try:
+            # Create realistic dummy input on GPU (float32 RGB [0,1])
+            dummy_img = torch.zeros((self.model_height, self.model_width, 3), dtype=torch.float32, device='cuda')
+
+            # Warmup with max_batch size (all inference runs with this size)
+            dummy_images = [dummy_img] * self._max_batch
+
+            keypoints, scores = self._infer(dummy_images)
+
+        except Exception as e:
+            logger.info(f"ONNX Detection: Warmup failed (non-critical) - {str(e)}")
     # CALLBACK METHODS
     def register_callback(self, callback: PoseDetectionOutputCallback) -> None:
         """Register callback to receive results."""
@@ -383,7 +389,7 @@ class TRTDetection(Thread):
             self._callbacks.discard(callback)
 
     def _dispatch_callbacks(self) -> None:
-        """Dispatch results to callbacks."""
+        """Dispatch results to callbacks. Identical to MMDetection."""
         while not self._shutdown_event.is_set():
             try:
                 output: DetectionOutput | None = self._callback_queue.get(timeout=0.5)
@@ -405,8 +411,8 @@ class TRTDetection(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def _decode_simcc_cpu(simcc_x: np.ndarray, simcc_y: np.ndarray, split_ratio: float, apply_softmax: bool = False) -> tuple[np.ndarray, np.ndarray]:
-        """Decode SimCC on CPU using NumPy. Kept as fallback.
+    def _decode_simcc(simcc_x: np.ndarray, simcc_y: np.ndarray, split_ratio: float, apply_softmax: bool = False) -> tuple[np.ndarray, np.ndarray]:
+        """Decode SimCC using MMPose's exact method from get_simcc_maximum.
 
         Reference: mmpose/codecs/utils/post_processing.py::get_simcc_maximum
         """

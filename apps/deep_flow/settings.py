@@ -17,8 +17,9 @@ from modules.render.color_settings import ColorSettings
 from modules.render import layers
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings
-from modules.pose import batch, nodes, trackers, window
-from modules.pose.batch.model_types import ModelType
+from modules.pose import nodes, trackers, window
+from modules import inference
+from modules.inference import ModelType
 from modules.gl.WindowManager import WindowSettings
 
 
@@ -180,10 +181,10 @@ class PoseGroup(BaseSettings):
     _batch_share = [max_poses, model_type, model_path, verbose]
     _feature_share = [frequency, output_frequency]
 
-    detection    = Group(batch.DetectionSettings, share=_batch_share)
-    segmentation = Group(batch.SegmentationSettings, share=_batch_share)
-    flow         = Group(batch.FlowSettings, share=_batch_share)
-    image_crop   = Group(batch.ImageCropSettings, share=[max_poses])
+    detection    = Group(inference.DetectionSettings, share=_batch_share)
+    segmentation = Group(inference.SegmentationSettings, share=_batch_share)
+    flow         = Group(inference.FlowSettings, share=_batch_share)
+    image_crop   = Group(inference.ImageCropSettings, share=[max_poses])
     angle_extractor = Group(nodes.AngleExtractorSettings)
     bbox         = Group(BboxFeature, share=_feature_share)
     point        = Group(PointFeature, share=_feature_share)

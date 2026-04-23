@@ -1,6 +1,6 @@
 from threading import Lock
 from typing import Union
-from modules.pose.batch.CropImage import CropImageDict
+from modules.inference.crop_image import CropImageDict
 from modules.pose.features import Points2D
 from modules.pose.frame import FrameDictCallbackMixin, replace
 from modules.pose.frame import FrameDict

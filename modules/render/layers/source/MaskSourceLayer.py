@@ -5,9 +5,9 @@ import torch
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.board import HasMaskImages
+from modules.board import HasSegmentationImages
 from modules.gl import Tensor, Texture
-from modules.pose.batch.MaskImage import MaskImage
+from modules.inference.segmentation.segmentation_image import SegmentationImage
 from modules.render.layers.LayerBase import LayerBase, DataCache
 
 
@@ -18,9 +18,9 @@ class MaskSourceLayer(LayerBase):
     No processing - dilation now handled by CentreMaskLayer.
     """
 
-    def __init__(self, track_id: int, board: HasMaskImages) -> None:
+    def __init__(self, track_id: int, board: HasSegmentationImages) -> None:
         self._track_id: int = track_id
-        self._board: HasMaskImages = board
+        self._board: HasSegmentationImages = board
         self._cuda_image: Tensor = Tensor(wrap=GL_CLAMP_TO_BORDER)
         self._data_cache: DataCache[torch.Tensor] = DataCache[torch.Tensor]()
         self._dirty: bool = False
@@ -41,8 +41,8 @@ class MaskSourceLayer(LayerBase):
 
     def update(self) -> None:
         self._dirty = False
-        mask_image: MaskImage | None = self._board.get_mask_image(self._track_id)
-        mask_tensor: torch.Tensor | None = mask_image.mask if mask_image else None
+        seg_image: SegmentationImage | None = self._board.get_segmentation_image(self._track_id)
+        mask_tensor: torch.Tensor | None = seg_image.mask if seg_image else None
         self._data_cache.update(mask_tensor)
 
         if self._data_cache.lost:

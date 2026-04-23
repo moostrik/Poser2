@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 from modules.board import HasCropImages
 from modules.gl import Tensor, Texture
 from modules.render.layers.LayerBase import LayerBase, DataCache
-from modules.pose.batch.CropImage import CropImage
+from modules.inference.crop_image import CropImage
 
 
 class CropSourceLayer(LayerBase):

@@ -4,9 +4,9 @@ from threading import Lock
 from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from modules.pose.batch.CameraImage import CameraImage, CameraImageDict
-    from modules.pose.batch.CropImage import CropImage, CropImageDict
-    from modules.pose.batch.MaskImage import MaskImage, MaskImageDict
+    from modules.inference.camera_image import CameraImage, CameraImageDict
+    from modules.inference.crop_image import CropImage, CropImageDict
+    from modules.inference.segmentation.segmentation_image import SegmentationImage, SegmentationImageDict
 
 
 class HasCameraImages(Protocol):
@@ -53,23 +53,23 @@ class CropImageStoreMixin:
             self._crop_images = images
 
 
-class HasMaskImages(Protocol):
-    """Mask image access keyed by track_id."""
-    def get_mask_image(self, track_id: int) -> MaskImage | None: ...
-    def set_mask_images(self, images: MaskImageDict) -> None: ...
+class HasSegmentationImages(Protocol):
+    """Segmentation image access keyed by track_id."""
+    def get_segmentation_image(self, track_id: int) -> SegmentationImage | None: ...
+    def set_segmentation_images(self, images: SegmentationImageDict) -> None: ...
 
 
-class MaskImageStoreMixin:
-    """Thread-safe mask image storage, keyed by track_id."""
+class SegmentationImageStoreMixin:
+    """Thread-safe segmentation image storage, keyed by track_id."""
 
     def __init__(self) -> None:
-        self._mask_image_lock = Lock()
-        self._mask_images: dict[int, MaskImage] = {}
+        self._segmentation_image_lock = Lock()
+        self._segmentation_images: dict[int, SegmentationImage] = {}
 
-    def get_mask_image(self, track_id: int) -> MaskImage | None:
-        with self._mask_image_lock:
-            return self._mask_images.get(track_id)
+    def get_segmentation_image(self, track_id: int) -> SegmentationImage | None:
+        with self._segmentation_image_lock:
+            return self._segmentation_images.get(track_id)
 
-    def set_mask_images(self, images: MaskImageDict) -> None:
-        with self._mask_image_lock:
-            self._mask_images = images
+    def set_segmentation_images(self, images: SegmentationImageDict) -> None:
+        with self._segmentation_image_lock:
+            self._segmentation_images = images

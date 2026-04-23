@@ -5,17 +5,17 @@ import torch
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.board import HasMaskImages
+from modules.board import HasSegmentationImages
 from modules.gl import Tensor, Texture
-from modules.pose.batch.MaskImage import MaskImage
+from modules.inference.segmentation.segmentation_image import SegmentationImage
 from modules.render.layers.LayerBase import LayerBase, DataCache
 
 
 class FrgSourceLayer(LayerBase):
 
-    def __init__(self, track_id: int, board: HasMaskImages) -> None:
+    def __init__(self, track_id: int, board: HasSegmentationImages) -> None:
         self._track_id: int = track_id
-        self._board: HasMaskImages = board
+        self._board: HasSegmentationImages = board
         self._cuda_image: Tensor = Tensor()
         self._data_cache: DataCache[torch.Tensor]= DataCache[torch.Tensor]()
         self._dirty: bool = False
@@ -33,8 +33,8 @@ class FrgSourceLayer(LayerBase):
 
     def update(self) -> None:
         self._dirty = False
-        mask_image: MaskImage | None = self._board.get_mask_image(self._track_id)
-        foreground: torch.Tensor | None = mask_image.foreground if mask_image else None
+        seg_image: SegmentationImage | None = self._board.get_segmentation_image(self._track_id)
+        foreground: torch.Tensor | None = seg_image.foreground if seg_image else None
         self._data_cache.update(foreground)
 
         if self._data_cache.lost:

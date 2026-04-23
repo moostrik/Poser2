@@ -1,0 +1,2 @@
+from .window_similarity import WindowSimilarity, WindowSimilaritySettings, SimilarityResult
+from .window_correlation import WindowCorrelation, WindowCorrelationSettings

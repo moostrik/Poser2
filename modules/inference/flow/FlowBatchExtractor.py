@@ -1,10 +1,11 @@
 from collections import deque
 from threading import Lock
-from typing import Callable, Union
+from typing import Union
 
 import torch
 
-from modules.pose.batch.CropImage import CropImageDict
+from modules.inference.crop_image import CropImageDict
+from modules.inference.flow.flow_image import FlowImage, FlowImageDict, FlowImageCallback
 from modules.pose.frame import FrameDict
 
 import logging
@@ -20,7 +21,7 @@ from .TRTOpticalFlow import TRTOpticalFlow
 OpticalFlow = Union[ONNXOpticalFlow, TRTOpticalFlow]
 
 
-FlowCallback = Callable[[dict[int, torch.Tensor]], None]
+FlowCallback = FlowImageCallback
 
 
 class FlowBatchExtractor:
@@ -64,7 +65,7 @@ class FlowBatchExtractor:
         with self._callback_lock:
             self._callbacks.discard(callback)
 
-    def _notify_callbacks(self, flow_dict: dict[int, torch.Tensor]) -> None:
+    def _notify_callbacks(self, flow_dict: FlowImageDict) -> None:
         with self._callback_lock:
             for callback in self._callbacks:
                 try:
@@ -128,12 +129,15 @@ class FlowBatchExtractor:
         self._process_timer.add_time(output.inference_time_ms, report=self._verbose)
         self._wait_timer.add_time(output.lock_time_ms, report=self._verbose)
 
-        # Create dict mapping tracklet_id -> GPU tensor (2, H, W)
+        # Create FlowImageDict mapping tracklet_id -> FlowImage
         # Flow tensor format: [0] = x-displacement, [1] = y-displacement
-        flow_dict: dict[int, torch.Tensor] = {}
+        flow_dict: FlowImageDict = {}
         for idx, tracklet_id in enumerate(output.tracklet_ids):
             if idx < output.flow_tensor.shape[0]:
-                flow_dict[tracklet_id] = output.flow_tensor[idx]  # (2, H, W) tensor on GPU
+                flow_dict[tracklet_id] = FlowImage(
+                    track_id=tracklet_id,
+                    flow=output.flow_tensor[idx],  # (2, H, W) tensor on GPU
+                )
 
         # Broadcast to callbacks
         self._notify_callbacks(flow_dict)

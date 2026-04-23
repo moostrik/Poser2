@@ -7,8 +7,9 @@ from modules.utils.Broadcast import Broadcast
 from modules.oak import Camera, Simulator, Player, Recorder, Sync
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound
-from modules.tracker import OnePerCamTracker
-from modules.pose import batch, nodes, trackers, window
+from modules.tracker import OnePerCamTracker, PosesFromTracklets
+from modules.pose import nodes, trackers, window
+from modules import inference
 from modules.pose.features import configure_features
 
 from .render_board import RenderBoard
@@ -58,7 +59,7 @@ class DeepFlowMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.tt.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.image_crop_processor = batch.ImageCropProcessor(p.image_crop)
+        self.image_crop_processor = inference.ImageCropProcessor(p.image_crop)
 
         for camera in self.cameras:
             if self.recorder:
@@ -70,10 +71,10 @@ class DeepFlowMain:
             camera.add_tracker_callback(self.tracklet_sync_bang.submit_frame)
 
         # DETECTION
-        self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
-        self.point_extractor = batch.PointBatchExtractor(p.detection)
-        self.mask_extractor  = batch.MaskBatchExtractor(p.segmentation)
-        self.flow_extractor  = batch.FlowBatchExtractor(p.flow)
+        self.poses_from_tracklets = PosesFromTracklets(num_players)
+        self.point_extractor = inference.PointBatchExtractor(p.detection)
+        self.mask_extractor  = inference.MaskBatchExtractor(p.segmentation)
+        self.flow_extractor  = inference.FlowBatchExtractor(p.flow)
 
         self.bbox_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
@@ -93,7 +94,7 @@ class DeepFlowMain:
         self.image_crop_processor.add_image_callback(self.mask_extractor.process)
         self.image_crop_processor.add_image_callback(self.flow_extractor.process)
         self.image_crop_processor.add_camera_image_callback(lambda gpu: self.board.set_camera_images(gpu))
-        self.mask_extractor.add_mask_image_callback(lambda _f, masks: self.board.set_mask_images(masks))
+        self.mask_extractor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
         # STAGE WINDOW TRACKERS & BROADCASTS
         self.window_trackers: dict[Stage, window.WindowTracker] = {}

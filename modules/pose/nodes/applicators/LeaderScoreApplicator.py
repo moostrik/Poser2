@@ -2,7 +2,7 @@
 from threading import Lock
 
 from modules.pose.features.LeaderScore import LeaderScore
-from modules.pose.batch.WindowSimilarity import SimilarityResult
+from modules.pose.analytics.window_similarity import SimilarityResult
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.frame import Frame, replace
 from modules.settings import BaseSettings, Field

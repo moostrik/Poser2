@@ -17,8 +17,9 @@ from modules.render import layers, ColorSettings
 from modules.render.layers import DataLayerSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import PanoramicTrackerSettings
-from modules.pose import batch, nodes, trackers, window
-from modules.pose.batch.model_types import ModelType
+from modules.pose import nodes, trackers, window, analytics
+from modules import inference
+from modules.inference import ModelType
 from modules.session import SessionSettings, SequencerSettings
 from modules.gl.WindowManager import WindowSettings
 from modules.WS.WSSettings import WSSettings
@@ -173,8 +174,8 @@ class SimilarityFeature(BaseSettings):
     max_poses       : Field[int]   = Field(3, min=1, max=16, access=Field.INIT)
 
     # pose similarity (WindowSimilarity) enabled; movement correlation disabled by default
-    window_similarity    : Group[batch.WindowSimilaritySettings]      = Group(batch.WindowSimilaritySettings, share=[max_poses])
-    window_correlation   : Group[batch.WindowCorrelationSettings]     = Group(batch.WindowCorrelationSettings, share=[max_poses])
+    window_similarity    : Group[analytics.WindowSimilaritySettings]      = Group(analytics.WindowSimilaritySettings, share=[max_poses])
+    window_correlation   : Group[analytics.WindowCorrelationSettings]     = Group(analytics.WindowCorrelationSettings, share=[max_poses])
     similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_poses])
     leader_applicator    : Group[nodes.LeaderScoreApplicatorSettings] = Group(nodes.LeaderScoreApplicatorSettings, share=[max_poses])
     smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])
@@ -199,9 +200,9 @@ class PoseGroup(BaseSettings):
 
     _feature_share: list = [frequency, output_frequency]
 
-    detection       : Group[batch.DetectionSettings]          = Group(batch.DetectionSettings, share=[max_poses, model_type, model_path, verbose])
-    segmentation    : Group[batch.SegmentationSettings]       = Group(batch.SegmentationSettings, share=[max_poses, model_type, model_path, verbose, use_segmentation.as_('enabled')])
-    image_crop      : Group[batch.ImageCropSettings]          = Group(batch.ImageCropSettings, share=[max_poses])
+    detection       : Group[inference.DetectionSettings]          = Group(inference.DetectionSettings, share=[max_poses, model_type, model_path, verbose])
+    segmentation    : Group[inference.SegmentationSettings]       = Group(inference.SegmentationSettings, share=[max_poses, model_type, model_path, verbose, use_segmentation.as_('enabled')])
+    image_crop      : Group[inference.ImageCropSettings]          = Group(inference.ImageCropSettings, share=[max_poses])
     angle_extractor : Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
     bbox            : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                     = Group(PointFeature, share=_feature_share)

@@ -15,7 +15,7 @@ from modules.pose.frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
 from modules.pose.features import Angles, AngleMotion
 from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod, NormalizedScalarFeature
 from modules.pose.features.Similarity import Similarity
-from modules.pose.batch.WindowSimilarity import SimilarityResult
+from modules.pose.analytics.window_similarity import SimilarityResult
 from modules.pose.features.LeaderScore import LeaderScore
 from modules.utils.PerformanceTimer import PerformanceTimer
 

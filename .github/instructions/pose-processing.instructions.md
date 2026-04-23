@@ -1,6 +1,6 @@
 ---
-description: "Use when editing pose nodes, trackers, windows, or batch processing."
-applyTo: "modules/pose/nodes/**, modules/pose/trackers/**, modules/pose/window/**, modules/pose/batch/**"
+description: "Use when editing pose nodes, trackers, windows, or analytics"
+applyTo: "modules/pose/**, modules/pose/trackers/**, modules/pose/window/**, modules/pose/analytics/**"
 ---
 # Pose Processing Guidelines
 

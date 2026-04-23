@@ -8,7 +8,7 @@ import torch
 class CameraImage:
     """GPU-resident full camera image for a single camera.
 
-    Produced by ImageCropProcessor once per camera per frame.
+    Produced by CropProcessor once per camera per frame.
     Format: CHW float16 RGB [0,1].
 
     Attributes:

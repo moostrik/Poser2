@@ -11,8 +11,8 @@ import torch.nn.functional as F
 # Local application imports
 from modules.pose.features import BBox
 from modules.pose.frame import FrameDict, replace
-from modules.pose.batch.CameraImage import CameraImage, CameraImageDict, CameraImageCallback
-from modules.pose.batch.CropImage import CropImage, CropImageDict, CropImageCallback
+from modules.inference.camera_image import CameraImage, CameraImageDict, CameraImageCallback
+from modules.inference.crop_image import CropImage, CropImageDict, CropImageCallback
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.PerformanceTimer import PerformanceTimer
 

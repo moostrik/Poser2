@@ -7,8 +7,9 @@ from modules.utils import Broadcast
 from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
-from modules.tracker import OnePerCamTracker
-from modules.pose import batch, nodes, trackers, features, window
+from modules.tracker import OnePerCamTracker, PosesFromTracklets
+from modules.pose import nodes, trackers, features, window, analytics
+from modules import inference
 from modules.pose.recorder import Recorder as PoseRecorder
 from modules.session import Session, Sequencer
 from modules.gl.WindowManager import WindowSettings
@@ -71,7 +72,7 @@ class HDTrioMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.image_crop_processor = batch.ImageCropProcessor(ps.image_crop)
+        self.image_crop_processor = inference.ImageCropProcessor(ps.image_crop)
 
         for camera in self.cameras:
             camera.add_sync_callback(self.video_recorder.submit_synced_frames)
@@ -84,9 +85,9 @@ class HDTrioMain:
         # DETECTION
         features.configure_features(num_players)
 
-        self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
-        self.point_extractor = batch.PointBatchExtractor(ps.detection)
-        self.mask_extractor  = batch.MaskBatchExtractor(ps.segmentation)
+        self.poses_from_tracklets = PosesFromTracklets(num_players)
+        self.point_extractor = inference.PointBatchExtractor(ps.detection)
+        self.mask_extractor  = inference.MaskBatchExtractor(ps.segmentation)
 
         self.bbox_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
@@ -105,7 +106,7 @@ class HDTrioMain:
         self.image_crop_processor.add_image_callback(self.point_extractor.process)
         self.image_crop_processor.add_image_callback(self.mask_extractor.process)
         self.image_crop_processor.add_camera_image_callback(lambda gpu: self.board.set_camera_images(gpu))
-        self.mask_extractor.add_mask_image_callback(lambda _f, masks: self.board.set_mask_images(masks))
+        self.mask_extractor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
         # STAGE WINDOW TRACKERS & BROADCASTS
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
@@ -161,8 +162,8 @@ class HDTrioMain:
         self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
         self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
 
-        self.window_similator  = batch.WindowSimilarity(ps.similarity.window_similarity)
-        self.window_correlator = batch.WindowCorrelation(ps.similarity.window_correlation)
+        self.window_similator  = analytics.WindowSimilarity(ps.similarity.window_similarity)
+        self.window_correlator = analytics.WindowCorrelation(ps.similarity.window_correlation)
 
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similator.submit)
         self.window_similator.add_similarity_callback(self.similarity_applicator.set)

@@ -7,7 +7,7 @@ from modules.pose.frame import FrameDict
 
 
 @dataclass(frozen=True)
-class MaskImage:
+class SegmentationImage:
     """GPU-resident segmentation result for a single tracked pose.
 
     Produced by MaskBatchExtractor after RVM inference.
@@ -23,5 +23,5 @@ class MaskImage:
     foreground: torch.Tensor
 
 
-MaskImageDict: TypeAlias = dict[int, MaskImage]
-MaskImageCallback: TypeAlias = Callable[[FrameDict, MaskImageDict], None]
+SegmentationImageDict: TypeAlias = dict[int, SegmentationImage]
+SegmentationImageCallback: TypeAlias = Callable[[FrameDict, SegmentationImageDict], None]

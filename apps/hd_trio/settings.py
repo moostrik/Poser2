@@ -20,8 +20,9 @@ from modules.render.layers.centre.CentrePoseLayer import CentrePoseSettings
 from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
 from modules.utils import Color
 from modules.tracker import OnePerCamTrackerSettings
-from modules.pose import batch, nodes, trackers, window
-from modules.pose.batch.model_types import ModelType
+from modules.pose import nodes, trackers, window, analytics
+from modules import inference
+from modules.inference import ModelType
 from modules.pose.recorder.settings import RecorderSettings as PoseRecorderSettings
 from modules.session import SessionSettings, SequencerSettings
 from modules.gl.WindowManager import WindowSettings
@@ -198,8 +199,8 @@ class SimilarityFeature(BaseSettings):
     output_frequency: Field[float] = Field(60.0)
     max_poses       : Field[int]   = Field(3, min=1, max=16, access=Field.INIT)
 
-    window_similarity    : Group[batch.WindowSimilaritySettings]      = Group(batch.WindowSimilaritySettings, share=[max_poses])
-    window_correlation   : Group[batch.WindowCorrelationSettings]     = Group(batch.WindowCorrelationSettings, share=[max_poses])
+    window_similarity    : Group[analytics.WindowSimilaritySettings]      = Group(analytics.WindowSimilaritySettings, share=[max_poses])
+    window_correlation   : Group[analytics.WindowCorrelationSettings]     = Group(analytics.WindowCorrelationSettings, share=[max_poses])
     similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_poses])
     leader_applicator    : Group[nodes.LeaderScoreApplicatorSettings] = Group(nodes.LeaderScoreApplicatorSettings, share=[max_poses])
     smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])
@@ -223,10 +224,10 @@ class PoseGroup(BaseSettings):
     _batch_share  : list = [max_poses, model_type, model_path, verbose]
     _feature_share: list = [frequency, output_frequency]
 
-    detection       : Group[batch.DetectionSettings]          = Group(batch.DetectionSettings, share=_batch_share)
-    segmentation    : Group[batch.SegmentationSettings]       = Group(batch.SegmentationSettings, share=_batch_share)
-    flow            : Group[batch.FlowSettings]               = Group(batch.FlowSettings, share=_batch_share)
-    image_crop      : Group[batch.ImageCropSettings]          = Group(batch.ImageCropSettings, share=[max_poses])
+    detection       : Group[inference.DetectionSettings]          = Group(inference.DetectionSettings, share=_batch_share)
+    segmentation    : Group[inference.SegmentationSettings]       = Group(inference.SegmentationSettings, share=_batch_share)
+    flow            : Group[inference.FlowSettings]               = Group(inference.FlowSettings, share=_batch_share)
+    image_crop      : Group[inference.ImageCropSettings]          = Group(inference.ImageCropSettings, share=[max_poses])
     angle_extractor : Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
     bbox            : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                     = Group(PointFeature, share=_feature_share)
