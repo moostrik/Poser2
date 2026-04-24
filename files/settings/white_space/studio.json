@@ -2,14 +2,15 @@
   "num_players": 8,
   "num_cameras": 4,
   "input_fps": 30.0,
-  "render_fps": 57.0,
+  "render_fps": 60.0,
+  "light_resolution": 3600,
   "camera": {
     "yolo": true,
     "color": false,
     "square": false,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "models",
     "cam_0": {
       "device_id": "14442C10110AD3D200",
@@ -27,8 +28,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 29992,
+      "mono_iso": 256,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -54,8 +55,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 29992,
+      "mono_iso": 317,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -81,8 +82,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 29992,
+      "mono_iso": 343,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -108,8 +109,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 29992,
+      "mono_iso": 412,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -155,6 +156,12 @@
       "port_out": 9001,
       "ip_address_out": "127.0.0.1",
       "verbose": false
+    },
+    "osc_light": {
+      "ip_addresses": "127.0.0.1",
+      "port": 8000,
+      "use_signed": false,
+      "mtu": 1500
     }
   },
   "pose": {
@@ -327,11 +334,6 @@
     }
   },
   "composition": {
-    "light_resolution": 300,
-    "udp_port": 8000,
-    "udp_ips": [
-      "127.0.0.1"
-    ],
     "fov_degrees": 110.0,
     "void_width": 0.05,
     "void_edge": 0.01,
@@ -462,9 +464,9 @@
       "title": "Poser",
       "v_sync": true,
       "fullscreen": false,
-      "monitor": 1,
+      "monitor": 0,
       "x": 10,
-      "y": 2600,
+      "y": 10,
       "width": 1920,
       "height": 1000,
       "secondary_list": []

@@ -22,7 +22,8 @@ from modules import inference
 from modules.inference import ModelType
 from modules.session import SessionSettings, SequencerSettings
 from modules.gl.WindowManager import WindowSettings
-from apps.white_space.composition.settings import CompositorSettings
+from .composition.settings import CompositorSettings
+from .osc_light import OscLightSettings
 
 
 # ---------------------------------------------------------------------------
@@ -114,9 +115,11 @@ class _OscSoundSettings(OscSoundSettings):
 
 
 class InOutGroup(BaseSettings):
-    num_players: Field[int]          = Field(8, access=Field.INIT, visible=False)
-    osc_sound: Group[_OscSoundSettings] = Group(_OscSoundSettings, share=[num_players.as_('max_players')])
-    osc_recv  : Group[OscReceiverSettings] = Group(OscReceiverSettings)
+    num_players: Field[int] = Field(8,   access=Field.INIT, visible=False)
+    resolution:  Field[int] = Field(3600, access=Field.INIT, visible=False)
+    osc_sound  : Group[_OscSoundSettings]   = Group(_OscSoundSettings, share=[num_players.as_('max_players')])
+    osc_recv   : Group[OscReceiverSettings] = Group(OscReceiverSettings)
+    osc_light  : Group[OscLightSettings]    = Group(OscLightSettings, share=[resolution])
 
 
 # ---------------------------------------------------------------------------
@@ -272,15 +275,16 @@ class RenderSettings(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class Settings(BaseSettings):
-    num_players: Field[int]   = Field(8, access=Field.INIT)
-    num_cameras: Field[int]   = Field(4, access=Field.INIT)
-    input_fps  : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
-    render_fps : Field[float] = Field(30.0)
+    num_players     : Field[int]   = Field(8, access=Field.INIT)
+    num_cameras     : Field[int]   = Field(4, access=Field.INIT)
+    input_fps       : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
+    render_fps      : Field[float] = Field(30.0)
+    light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="LED strip resolution (pixels)")
 
     camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])
-    inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players')])
+    inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players'), light_resolution.as_('resolution')])
     pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
-    composition: Group[CompositorSettings] = Group(CompositorSettings, share=[num_players.as_('max_poses'), input_fps.as_('light_rate')])
+    composition: Group[CompositorSettings] = Group(CompositorSettings, share=[num_players.as_('max_poses'), input_fps.as_('light_rate'), light_resolution.as_('light_resolution')])
     render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams')])
     server : Group[NiceSettings]    = Group(NiceSettings)
     session: Group[SessionGroup]    = Group(SessionGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])

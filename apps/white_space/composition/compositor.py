@@ -14,7 +14,6 @@ from modules.pose.features.Points2D import Points2D, PointLandmark
 
 from apps.white_space.composition.settings import CompositorSettings
 from apps.white_space.composition.output import CompositionOutput, CompositionDebug, COMP_DTYPE, CompositionOutputCallback
-from apps.white_space.LedUdpSender import LedUdpSender, LedUdpSenderSettings
 from apps.white_space.composition.test_composition import TestComposition, TestPattern
 
 from modules.gl.Utils import FpsCounter
@@ -129,15 +128,6 @@ class Compositor(Thread):
         # Test pattern override (active only when pattern != NONE)
         self.comp_test = TestComposition(resolution, config.test)
 
-        sender_settings = LedUdpSenderSettings(
-            resolution=resolution,
-            port=config.udp_port,
-            ip_addresses=list(config.udp_ips),
-            send_info=True,
-            use_signed=False,
-        )
-        self.led_sender = LedUdpSender(sender_settings)
-
         self.fps_counter = FpsCounter()
         self._output_callbacks: list[CompositionOutputCallback]  = []
         self._debug_callbacks:  list[CompositionDebugCallback]   = []
@@ -149,11 +139,9 @@ class Compositor(Thread):
     # ------------------------------------------------------------------
 
     def start(self) -> None:
-        self.led_sender.start()
         super().start()
 
     def stop(self) -> None:
-        self.led_sender.stop()
         self._stop_event.set()
         if self.is_alive():
             self.join()
@@ -188,7 +176,6 @@ class Compositor(Thread):
             self.comp_test.update()
             self.output.light_img = self.comp_test.output_img
 
-        self.led_sender.send_message(self.output)
         self._notify_output(self.output)
         self._notify_debug(self.debug)
         self.fps_counter.tick()

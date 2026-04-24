@@ -8,9 +8,7 @@ class CompositorSettings(BaseSettings):
     # Construction / wiring (INIT — requires restart to take effect)
     max_poses:        Field[int]   = Field(3,     min=1,   max=16,    access=Field.INIT, description="Max tracked poses")
     light_rate:       Field[float] = Field(30.0,  min=1,   max=120,   access=Field.INIT, description="Light output frame rate (fps)")
-    light_resolution: Field[int]   = Field(300,   min=10,  max=1000,  access=Field.INIT, description="Light strip resolution (pixels)")
-    udp_port:         Field[int]   = Field(8000,  min=1,   max=65535, access=Field.INIT, description="UDP output port")
-    udp_ips:          Field[list]  = Field(["127.0.0.1"], access=Field.INIT, description="LED receiver IP addresses")
+    light_resolution: Field[int]   = Field(300,   min=10,  max=1000,  access=Field.INIT, visible=False, description="LED strip resolution (pixels)")
     fov_degrees:      Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, access=Field.INIT,
                                           description="Camera horizontal FOV in degrees — must match PanoramicTracker.fov")
 

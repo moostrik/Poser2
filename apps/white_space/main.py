@@ -15,6 +15,7 @@ from modules.session import Session, Sequencer
 from modules.gl.WindowManager import WindowSettings
 
 from .composition import Compositor
+from .osc_light import OscLight
 
 from .render.board import RenderBoard
 from .settings import Settings, Stage
@@ -126,9 +127,11 @@ class WhiteSpaceMain:
 
         # WS PIPELINE — composition output
         self.compositor = Compositor(self.settings.composition)
+        self.osc_light = OscLight(self.settings.inout.osc_light)
         self.tracker.add_tracklet_callback(self.compositor.set_tracklets)
         ws_input: Stage = Stage(int(ps.ws_input_stage))
         self.stages[ws_input].add_callback(self.compositor.add_poses)
+        self.compositor.add_output_callback(self.osc_light.send_message)
         self.compositor.add_output_callback(self.board.set_composition_output)
         self.compositor.add_debug_callback(self.board.set_composition_debug)
 
@@ -253,6 +256,7 @@ class WhiteSpaceMain:
         self.window_similator.start()
         self.window_correlator.start()
         self.compositor.start()
+        self.osc_light.start()
 
         self.sound_osc.start()
 
@@ -285,6 +289,7 @@ class WhiteSpaceMain:
 
         self.tracker.stop()
         self.sound_osc.stop()
+        self.osc_light.stop()
         self.compositor.stop()
 
         self.point_extractor.stop()
