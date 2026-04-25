@@ -41,7 +41,7 @@ echo [90mSkipping rtmpose-l_256x192_b3.trt (already exists)[0m
 goto after_rtmpose_l_256x192
 
 :build_rtmpose_l_256x192
-python modules\pose\batch\detection\export_rtm_onnx_to_trt.py --onnx models\rtmpose-l_256x192.onnx --output models\rtmpose-l_256x192_b3.trt
+python modules\inference\detection\export_rtm_onnx_to_trt.py --onnx models\rtmpose-l_256x192.onnx --output models\rtmpose-l_256x192_b3.trt
 if %errorlevel% neq 0 echo [91mFailed to convert rtmpose-l_256x192.onnx[0m
 if %errorlevel% neq 0 echo.
 if %errorlevel%==0 echo [92mBuilt rtmpose-l_256x192_b3.trt[0m
@@ -59,7 +59,7 @@ echo [90mSkipping rvm_mobilenetv3_256x192_b3.trt (already exists)[0m
 goto after_rvm_256x192
 
 :build_rvm_256x192
-python modules\pose\batch\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_256x192.onnx --output models\rvm_mobilenetv3_256x192_b3.trt
+python modules\inference\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_256x192.onnx --output models\rvm_mobilenetv3_256x192_b3.trt
 if %errorlevel% neq 0 echo [91mFailed to convert rvm_mobilenetv3_256x192.onnx[0m
 if %errorlevel% neq 0 echo.
 if %errorlevel%==0 echo [92mBuilt rvm_mobilenetv3_256x192_b3.trt[0m
@@ -72,7 +72,7 @@ echo [90mSkipping rvm_mobilenetv3_384x288_b3.trt (already exists)[0m
 goto after_rvm_384x288
 
 :build_rvm_384x288
-python modules\pose\batch\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_384x288.onnx --output models\rvm_mobilenetv3_384x288_b3.trt
+python modules\inference\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_384x288.onnx --output models\rvm_mobilenetv3_384x288_b3.trt
 if %errorlevel% neq 0 echo [91mFailed to convert rvm_mobilenetv3_384x288.onnx[0m
 if %errorlevel% neq 0 echo.
 if %errorlevel%==0 echo [92mBuilt rvm_mobilenetv3_384x288_b3.trt[0m
@@ -85,7 +85,7 @@ echo [90mSkipping rvm_mobilenetv3_512x384_b3.trt (already exists)[0m
 goto after_rvm_512x384
 
 :build_rvm_512x384
-python modules\pose\batch\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_512x384.onnx --output models\rvm_mobilenetv3_512x384_b3.trt
+python modules\inference\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_512x384.onnx --output models\rvm_mobilenetv3_512x384_b3.trt
 if %errorlevel% neq 0 echo [91mFailed to convert rvm_mobilenetv3_512x384.onnx[0m
 if %errorlevel% neq 0 echo.
 if %errorlevel%==0 echo [92mBuilt rvm_mobilenetv3_512x384_b3.trt[0m
@@ -98,7 +98,7 @@ echo [90mSkipping rvm_mobilenetv3_1024x768_b4.trt (already exists)[0m
 goto after_rvm_1024x768
 
 :build_rvm_1024x768
-python modules\pose\batch\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_1024x768.onnx --output models\rvm_mobilenetv3_1024x768_b3.trt
+python modules\inference\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_1024x768.onnx --output models\rvm_mobilenetv3_1024x768_b3.trt
 if %errorlevel% neq 0 echo [91mFailed to convert rvm_mobilenetv3_1024x768.onnx[0m
 if %errorlevel% neq 0 echo.
 if %errorlevel%==0 echo [92mBuilt rvm_mobilenetv3_1024x768_b3.trt[0m
@@ -116,7 +116,7 @@ echo [90mSkipping raft-sintel_256x192_i12_b3.trt (already exists)[0m
 goto after_raft_256x192
 
 :build_raft_256x192
-python modules\pose\batch\flow\export_raft_onnx_to_trt.py --onnx models\raft-sintel_256x192_i12.onnx --output models\raft-sintel_256x192_i12_b3.trt
+python modules\inference\flow\export_raft_onnx_to_trt.py --onnx models\raft-sintel_256x192_i12.onnx --output models\raft-sintel_256x192_i12_b3.trt
 if %errorlevel% neq 0 echo [91mFailed to convert raft-sintel_256x192_i12.onnx[0m
 if %errorlevel% neq 0 echo.
 if %errorlevel%==0 echo [92mBuilt raft-sintel_256x192_i12_b3.trt[0m
@@ -129,7 +129,7 @@ echo [90mSkipping raft-sintel_384x288_i12_b3.trt (already exists)[0m
 goto after_raft_384x288
 
 :build_raft_384x288
-python modules\pose\batch\flow\export_raft_onnx_to_trt.py --onnx models\raft-sintel_384x288_i12.onnx --output models\raft-sintel_384x288_i12_b3.trt
+python modules\inference\flow\export_raft_onnx_to_trt.py --onnx models\raft-sintel_384x288_i12.onnx --output models\raft-sintel_384x288_i12_b3.trt
 if %errorlevel% neq 0 echo [91mFailed to convert raft-sintel_384x288_i12.onnx[0m
 if %errorlevel% neq 0 echo.
 if %errorlevel%==0 echo [92mBuilt raft-sintel_384x288_i12_b3.trt[0m
@@ -142,7 +142,7 @@ echo [90mSkipping raft-sintel_512x384_i12_b3.trt (already exists)[0m
 goto after_raft_512x384
 
 :build_raft_512x384
-python modules\pose\batch\flow\export_raft_onnx_to_trt.py --onnx models\raft-sintel_512x384_i12.onnx --output models\raft-sintel_512x384_i12_b3.trt
+python modules\inference\flow\export_raft_onnx_to_trt.py --onnx models\raft-sintel_512x384_i12.onnx --output models\raft-sintel_512x384_i12_b3.trt
 if %errorlevel% neq 0 echo [91mFailed to convert raft-sintel_512x384_i12.onnx[0m
 if %errorlevel% neq 0 echo.
 if %errorlevel%==0 echo [92mBuilt raft-sintel_512x384_i12_b3.trt[0m
