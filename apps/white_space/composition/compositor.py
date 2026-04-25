@@ -169,12 +169,15 @@ class Compositor(Thread):
         with self._tracklet_lock:
             tracklets = dict(self._latest_tracklets)
 
+        self.output = CompositionOutput(self._config.light_resolution)
+        self.debug  = CompositionDebug(self._config.light_resolution)
+
         self._draw(frames, tracklets)
 
         # Test pattern overrides the composition output when active
         if self._config.test.pattern != TestPattern.NONE:
             self.comp_test.update()
-            self.output.light_img = self.comp_test.output_img
+            np.copyto(self.output.light_img, self.comp_test.output_img)
 
         self._notify_output(self.output)
         self._notify_debug(self.debug)

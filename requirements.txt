@@ -1,12 +1,12 @@
 cuda-python==13.1.0
-cupy-cuda12x==13.6.0                # not used / Redundant?
+# cupy-cuda12x==13.6.0                # not used / Redundant?
 depthai==2.30.0
 ffmpeg-python==0.2.0
 freetype-py==2.5.1
 glfw==2.9.0                         # Redundant, now i dont draw text the old way
 h5py==3.16.0
 nicegui==3.10.0
-numba==0.61.2
+# numba==0.61.2
 numpy<2.0.0                         # needed for torch?
 OneEuroFilter==0.2.1
 onnx==1.20.0                        # Redundant?
@@ -14,7 +14,7 @@ onnx_simplifier==0.4.36             # Redundant?
 onnxruntime-gpu==1.23.2             # Redundant?
 opencv-python==4.11.0.86            # highest version with numpy<2.0.0, Redundant?
 opencv-contrib-python==4.11.0.86    # highest version with numpy<2.0.0, Redundant?
-pandas==2.3.2                       # Redundant when i remove old pd_stream
+# pandas==2.3.2                       # Redundant when i remove old pd_stream
 Pillow==11.3.0                      # Redundant?
 psutil==7.0.0
 python-osc==1.9.3
