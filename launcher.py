@@ -5,7 +5,6 @@ from signal import signal, SIGINT
 from threading import Event
 
 import psutil
-import torch
 
 from modules.log_config import setup_logging, install_thread_excepthook
 from apps import APP_REGISTRY
@@ -14,7 +13,11 @@ from apps import APP_REGISTRY
 if __name__ == '__main__':
     process_id = os.getpid()
     psutil.Process(process_id).nice(psutil.HIGH_PRIORITY_CLASS)  # Prioritize over normal apps, below system processes
-    torch.backends.cuda.matmul.allow_tf32 = True  # Use TF32 tensor cores for faster matmul on Ampere+ GPUs
+    try:
+        import torch
+        torch.backends.cuda.matmul.allow_tf32 = True  # Use TF32 tensor cores for faster matmul on Ampere+ GPUs
+    except ImportError:
+        pass
 
     parser: ArgumentParser = ArgumentParser()
     parser.add_argument('-app',     '--app',            type=str,   default='white_space', choices=list(APP_REGISTRY.keys()), help='app to launch (default: hd_trio)')

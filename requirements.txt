@@ -1,28 +1,21 @@
-cuda-python==13.1.0
-# cupy-cuda12x==13.6.0                # not used / Redundant?
 depthai==2.30.0
 ffmpeg-python==0.2.0
 freetype-py==2.5.1
-glfw==2.9.0                         # Redundant, now i dont draw text the old way
+glfw==2.9.0
 h5py==3.16.0
 nicegui==3.10.0
-# numba==0.61.2
-numpy<2.0.0                         # needed for torch?
+numpy<2.0.0
 OneEuroFilter==0.2.1
-onnx==1.20.0                        # Redundant?
-onnx_simplifier==0.4.36             # Redundant?
-onnxruntime-gpu==1.23.2             # Redundant?
 opencv-python==4.11.0.86            # highest version with numpy<2.0.0, Redundant?
 opencv-contrib-python==4.11.0.86    # highest version with numpy<2.0.0, Redundant?
-# pandas==2.3.2                       # Redundant when i remove old pd_stream
-Pillow==11.3.0                      # Redundant?
 psutil==7.0.0
 python-osc==1.9.3
 pytweening==1.2.0
 stupidArtnet==1.6.0
-tensorrt-cu12==10.14.1.48.post1
-typing-extensions==4.15.0           # latest version for torch, where is torch in here?
+typing-extensions==4.15.0           # Self type used in pose features (stdlib typing.Self requires 3.11+)
 watchdog==6.0.0
 
 
+# GPU packages (cuda-python, onnxruntime-gpu, tensorrt-cu12, torch, onnx, Pillow) are in
+# requirements_gpu.txt and installed separately by install.bat.
 # Check for updates with:   pip list --outdated

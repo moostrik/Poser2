@@ -1,13 +1,22 @@
 # Standard library imports
 import logging
 from threading import Lock
+from typing import TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
 
 # Third-party imports
 import numpy as np
-import torch
-from cuda.bindings import runtime # type: ignore
+try:
+    import torch
+    from cuda.bindings import runtime  # type: ignore
+    _GPU_OK = True
+except ImportError:
+    _GPU_OK = False
+
+if TYPE_CHECKING:
+    import torch
+
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
@@ -65,7 +74,7 @@ def get_gl_type_from_format(internal_format) -> int:
         return GL_HALF_FLOAT
     return GL_FLOAT
 
-def infer_internal_format(tensor: torch.Tensor) -> int:
+def infer_internal_format(tensor: "torch.Tensor") -> int:
     """Infer OpenGL internal format from tensor shape and dtype.
 
     Args:
@@ -127,7 +136,7 @@ class Tensor(Texture):
         # CUDA-OpenGL interop
         self._cuda_gl_resource = None
 
-    def set_tensor(self, tensor: torch.Tensor) -> None:
+    def set_tensor(self, tensor: "torch.Tensor") -> None:
         """Set a new CUDA tensor to be uploaded to the texture.
 
         Args:
@@ -135,6 +144,8 @@ class Tensor(Texture):
                    Shape: (H, W) for 1-channel, (C, H, W) or (H, W, C) for multi-channel.
                    Supported dtypes: float16, float32, uint8.
         """
+        if not _GPU_OK:
+            return
         with self._mutex:
             self._tensor = tensor
             self._needs_update = True
@@ -164,17 +175,18 @@ class Tensor(Texture):
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
 
         # Register PBO with CUDA for interop
-        try:
-            err, self._cuda_gl_resource = runtime.cudaGraphicsGLRegisterBuffer(
-                self._pbo,
-                runtime.cudaGraphicsRegisterFlags.cudaGraphicsRegisterFlagsWriteDiscard
-            )
-            if err != runtime.cudaError_t.cudaSuccess:
-                logger.warning("CUDA-GL interop registration failed (error %s), using CPU fallback", err)
+        if _GPU_OK:
+            try:
+                err, self._cuda_gl_resource = runtime.cudaGraphicsGLRegisterBuffer(
+                    self._pbo,
+                    runtime.cudaGraphicsRegisterFlags.cudaGraphicsRegisterFlagsWriteDiscard
+                )
+                if err != runtime.cudaError_t.cudaSuccess:
+                    logger.warning("CUDA-GL interop registration failed (error %s), using CPU fallback", err)
+                    self._cuda_gl_resource = None
+            except Exception as e:
+                logger.warning("CUDA-GL interop registration failed (%s), using CPU fallback", e)
                 self._cuda_gl_resource = None
-        except Exception as e:
-            logger.warning("CUDA-GL interop registration failed (%s), using CPU fallback", e)
-            self._cuda_gl_resource = None
 
     def deallocate(self) -> None:
         """Deallocate texture and PBO resources."""
@@ -185,7 +197,7 @@ class Tensor(Texture):
             self._pbo_size = 0
 
         # Unregister CUDA resource
-        if self._cuda_gl_resource is not None:
+        if _GPU_OK and self._cuda_gl_resource is not None:
             runtime.cudaGraphicsUnregisterResource(self._cuda_gl_resource)
             self._cuda_gl_resource = None
 
@@ -198,6 +210,8 @@ class Tensor(Texture):
         Uses CUDA-OpenGL interop for GPU-to-GPU transfer when available,
         falls back to CPU transfer otherwise.
         """
+        if not _GPU_OK:
+            return
         tensor: torch.Tensor | None = None
         needs_update: bool = False
 
@@ -242,7 +256,7 @@ class Tensor(Texture):
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
             glBindTexture(GL_TEXTURE_2D, 0)
 
-    def _update_with_pbo(self, tensor: torch.Tensor) -> None:
+    def _update_with_pbo(self, tensor: "torch.Tensor") -> None:
         """GPU-to-GPU copy using CUDA-OpenGL interop.
 
         PyTorch CUDA tensor → PBO (device-to-device) → GL texture (all on GPU).
@@ -334,7 +348,7 @@ class Tensor(Texture):
         self.unbind()
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
 
-    def _update_with_cpu(self, tensor: torch.Tensor) -> None:
+    def _update_with_cpu(self, tensor: "torch.Tensor") -> None:
         """Fallback: CPU transfer (GPU → CPU → GPU).
 
         Preserves uint8, FP16, or FP32 precision based on internal format.

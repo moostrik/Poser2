@@ -4,12 +4,14 @@ echo.
 
 set INSTALL_MMCV=0
 set FORCE_RECREATE=0
+set INSTALL_CPU=0
 :parse_args
 if "%~1"=="" goto args_done
 if /I "%~1"=="--mmcv" set INSTALL_MMCV=1
 if /I "%~1"=="--force" set FORCE_RECREATE=1
+if /I "%~1"=="--cpu" set INSTALL_CPU=1
 if /I "%~1"=="--help" (
-    echo Usage: %~nx0 [--mmcv] [--force]
+    echo Usage: %~nx0 [--mmcv] [--force] [--cpu]
     goto endofscript
 )
 shift
@@ -17,15 +19,17 @@ goto parse_args
 :args_done
 
 
-echo [44m CUDA 12.9 [0m
+if "%INSTALL_CPU%"=="1" goto skip_cuda_check
+echo [44m CUDA 12.9 [0m
 echo %PATH% | find /I "CUDA\v12.9\bin" >nul
 if %errorlevel%==0 (
-    echo [92mCUDA 12.9 bin directory found in PATH.[0m
+    echo [92mCUDA 12.9 bin directory found in PATH.[0m
 ) else (
-    echo [91mCUDA 12.9 bin directory NOT found in PATH![0m
+    echo [91mCUDA 12.9 bin directory NOT found in PATH![0m
     echo Please add "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\bin" to your PATH.
     goto endofscript
 )
+:skip_cuda_check
 echo.
 
 echo [44m Git LFS [0m
@@ -93,10 +97,16 @@ echo.
 echo [44m General Requirements [0m
 pip install -r requirements.txt
 
+if "%INSTALL_CPU%"=="1" goto skip_gpu_packages
 echo.
-echo [44m Torch for CUDA 12.9 [0m
-pip install torch==2.8.0+cu129 torchvision==0.23.0+cu129 --index-url https://download.pytorch.org/whl/cu129
+echo [44m GPU Packages [0m
+pip install -r requirements_gpu.txt
+goto gpu_packages_done
 
+:skip_gpu_packages
+echo [33mSkipping GPU packages and torch (CPU-only install)[0m
+
+:gpu_packages_done
 echo.
 echo [44m mmcv [0m
 if "%INSTALL_MMCV%"=="1" goto install_mmcv
@@ -117,6 +127,7 @@ echo [33mSkipping mmcv installation (use --mmcv to enable)[0m
 call "%VENV_DIR%\Scripts\deactivate"
 
 :makemodels
+if "%INSTALL_CPU%"=="1" goto success
 echo.
 call makemodels.bat
 if %errorlevel% neq 0 (
