@@ -104,7 +104,9 @@ pip install -r requirements_gpu.txt
 goto gpu_packages_done
 
 :skip_gpu_packages
-echo [33mSkipping GPU packages and torch (CPU-only install)[0m
+echo [33mSkipping GPU packages, mmcv and models (CPU-only install)[0m
+call "%VENV_DIR%\Scripts\deactivate"
+goto success
 
 :gpu_packages_done
 echo.
@@ -127,7 +129,6 @@ echo [33mSkipping mmcv installation (use --mmcv to enable)[0m
 call "%VENV_DIR%\Scripts\deactivate"
 
 :makemodels
-if "%INSTALL_CPU%"=="1" goto success
 echo.
 call makemodels.bat
 if %errorlevel% neq 0 (
