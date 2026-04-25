@@ -2,7 +2,7 @@
   "num_players": 8,
   "num_cameras": 4,
   "input_fps": 30.0,
-  "render_fps": 60.0,
+  "render_fps": 83.0,
   "light_resolution": 3600,
   "camera": {
     "yolo": true,
@@ -10,7 +10,7 @@
     "square": false,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "models",
     "cam_0": {
       "device_id": "14442C10110AD3D200",
@@ -28,8 +28,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 1367,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -55,8 +55,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 30001,
-      "mono_iso": 1549,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -82,8 +82,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 30001,
-      "mono_iso": 1549,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -109,8 +109,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 30001,
-      "mono_iso": 1549,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -145,25 +145,18 @@
     "tracklet_sync": {}
   },
   "inout": {
-    "osc_sound": {
-      "stage": "LERP",
-      "ip_addresses": "127.0.0.1",
-      "port": 9000
-    },
-    "osc_recv": {
-      "port_in": 9000,
-      "return_messages": true,
-      "port_out": 9001,
-      "ip_address_out": "127.0.0.1",
-      "verbose": false
-    },
     "osc_light": {
       "ip_addresses": "127.0.0.1",
       "port": 8000,
       "use_signed": false,
+      "mtu": 1500,
       "offset": 0,
-      "rpm": 0,
-      "mtu": 1500
+      "rpm": 0
+    },
+    "osc_sound": {
+      "stage": "LERP",
+      "ip_addresses": "127.0.0.1",
+      "port": 9000
     }
   },
   "pose": {
@@ -468,10 +461,10 @@
       "title": "Poser",
       "v_sync": true,
       "fullscreen": false,
-      "monitor": 1,
-      "x": 100,
-      "y": 2800,
-      "width": 1920,
+      "monitor": 0,
+      "x": 20,
+      "y": 40,
+      "width": 1260,
       "height": 1000,
       "secondary_list": []
     }
