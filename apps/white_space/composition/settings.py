@@ -2,6 +2,23 @@ from modules.settings import BaseSettings, Field, Group
 from apps.white_space.composition.test_composition import TestCompositionSettings
 
 
+class CompositionParams(BaseSettings):
+    """Live-tweakable void and wave pattern parameters."""
+
+    # Void zones
+    void_width:    Field[float] = Field(0.05,  min=0.0, max=1.0,   step=0.01,  description="Void width (normalised)")
+    void_edge:     Field[float] = Field(0.01,  min=0.0, max=1.0,   step=0.005, description="Void edge softness")
+    use_void:      Field[bool]  = Field(True,                                   description="Enable void zones")
+
+    # Wave pattern
+    pattern_width:  Field[float] = Field(0.2,  min=0.0, max=1.0,   step=0.01, description="Pattern width (normalised)")
+    pattern_edge:   Field[float] = Field(0.2,  min=0.0, max=1.0,   step=0.01, description="Pattern edge softness")
+    line_sharpness: Field[float] = Field(1.5,  min=0.0, max=10.0,  step=0.1,  description="Line sharpness")
+    line_speed:     Field[float] = Field(1.5,  min=0.0, max=10.0,  step=0.1,  description="Line speed")
+    line_width:     Field[float] = Field(0.1,  min=0.0, max=1.0,   step=0.01, description="Line width (normalised)")
+    line_amount:    Field[float] = Field(20.0, min=0.0, max=100.0, step=1.0,  description="Number of lines")
+
+
 class CompositorSettings(BaseSettings):
     """Settings for the LED composition thread."""
 
@@ -12,18 +29,5 @@ class CompositorSettings(BaseSettings):
     fov_degrees:      Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, access=Field.INIT,
                                           description="Camera horizontal FOV in degrees — must match PanoramicTracker.fov")
 
-    # Composition — void zones
-    void_width:    Field[float] = Field(0.05,  min=0.0, max=1.0,   step=0.01,  description="Void width (normalised)")
-    void_edge:     Field[float] = Field(0.01,  min=0.0, max=1.0,   step=0.005, description="Void edge softness")
-    use_void:      Field[bool]  = Field(True,                                   description="Enable void zones")
-
-    # Composition — wave pattern
-    pattern_width:  Field[float] = Field(0.2,  min=0.0, max=1.0,   step=0.01, description="Pattern width (normalised)")
-    pattern_edge:   Field[float] = Field(0.2,  min=0.0, max=1.0,   step=0.01, description="Pattern edge softness")
-    line_sharpness: Field[float] = Field(1.5,  min=0.0, max=10.0,  step=0.1,  description="Line sharpness")
-    line_speed:     Field[float] = Field(1.5,  min=0.0, max=10.0,  step=0.1,  description="Line speed")
-    line_width:     Field[float] = Field(0.1,  min=0.0, max=1.0,   step=0.01, description="Line width (normalised)")
-    line_amount:    Field[float] = Field(20.0, min=0.0, max=100.0, step=1.0,  description="Number of lines")
-
-    # Test composition
-    test: Group[TestCompositionSettings] = Group(TestCompositionSettings)
+    params: Group[CompositionParams]     = Group(CompositionParams)
+    test:   Group[TestCompositionSettings] = Group(TestCompositionSettings)

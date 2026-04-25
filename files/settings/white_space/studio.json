@@ -337,15 +337,17 @@
   },
   "composition": {
     "fov_degrees": 110.0,
-    "void_width": 0.05,
-    "void_edge": 0.01,
-    "use_void": true,
-    "pattern_width": 0.2,
-    "pattern_edge": 0.2,
-    "line_sharpness": 1.5,
-    "line_speed": 1.5,
-    "line_width": 0.1,
-    "line_amount": 20.0,
+    "params": {
+      "void_width": 0.05,
+      "void_edge": 0.01,
+      "use_void": true,
+      "pattern_width": 0.2,
+      "pattern_edge": 0.2,
+      "line_sharpness": 1.5,
+      "line_speed": 1.5,
+      "line_width": 0.1,
+      "line_amount": 20.0
+    },
     "test": {
       "pattern": "CHASE",
       "white": {

@@ -12,7 +12,7 @@ from modules.pose.features.Angles import Angles, AngleLandmark
 from modules.pose.features.BBox import BBox, BBoxElement
 from modules.pose.features.Points2D import Points2D, PointLandmark
 
-from apps.white_space.composition.settings import CompositorSettings
+from apps.white_space.composition.settings import CompositorSettings, CompositionParams
 from apps.white_space.composition.output import CompositionOutput, CompositionDebug, COMP_DTYPE, CompositionOutputCallback
 from apps.white_space.composition.test_composition import TestComposition, TestPattern
 
@@ -282,10 +282,10 @@ class Compositor(Thread):
         smooth_active: float = self._num_active_smoother(float(num_active)) or 1.0
 
         P = self._config
-        Compositor.make_voids(self.void_array, self._player_states, P, self.interval)
+        Compositor.make_voids(self.void_array, self._player_states, P.params, self.interval)
         Compositor.make_patterns(
             self.Wh_L_array, self.Wh_R_array, self.blue_array,
-            self._player_states, smooth_active, P, self.interval,
+            self._player_states, smooth_active, P.params, self.interval,
         )
 
         # Write debug snapshot (pre-void channels kept separate for WS_Lines.frag)
@@ -294,7 +294,7 @@ class Compositor(Thread):
         self.debug.debug_img[0, :, 2] = self.blue_array[:]
         self.debug.debug_img[0, :, 3] = 0.0
 
-        if P.use_void:
+        if P.params.use_void:
             self.debug.debug_img[0, :, 3] = self.void_array[:]
             inverted_void = 1.0 - self.void_array
             Compositor.blend_values(self.Wh_L_array, inverted_void, 0, BlendType.MULTIPLY)
@@ -317,7 +317,7 @@ class Compositor(Thread):
     def make_voids(
         array: np.ndarray,
         player_states: dict[int, PlayerState],
-        P: CompositorSettings,
+        P: CompositionParams,
         interval: float,
     ) -> None:
         array -= interval * 4.0
@@ -340,7 +340,7 @@ class Compositor(Thread):
         W_L: np.ndarray, W_R: np.ndarray, blues: np.ndarray,
         player_states: dict[int, PlayerState],
         smooth_num_active: float,
-        P: CompositorSettings,
+        P: CompositionParams,
         interval: float,
     ) -> None:
         resolution: int = len(W_L)
