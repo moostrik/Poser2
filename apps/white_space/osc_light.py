@@ -27,6 +27,8 @@ class OscLightSettings(BaseSettings):
     mtu:          Field[int]  = Field(1500, min=576, max=9000,  access=Field.INIT, description="Network MTU (affects chunk size)")
     chunk_size:   Field[int]  = Field(0,    access=Field.READ,  description="Computed chunk size (bytes)")
     num_chunks:   Field[int]  = Field(0,    access=Field.READ,  description="Computed number of chunks")
+    offset:       Field[int]  = Field(0, min=-10, max=10,   description="LED strip offset")
+    rpm:          Field[int]  = Field(0, min=0,   max=2400, description="LED rotation speed (RPM)")
 
 
 class OscLight:
@@ -156,6 +158,14 @@ class OscLight:
                 bc_msgb = OscMessageBuilder(f"/WS/blue{i}")
                 bc_msgb.add_arg(blue_channel[start_idx:end_idx].tobytes(), 'b')
                 message_list.append(bc_msgb.build())
+
+            offset_msgb = OscMessageBuilder("/WS/offset")
+            offset_msgb.add_arg(settings.offset)
+            message_list.append(offset_msgb.build())
+
+            rpm_msgb = OscMessageBuilder("/WS/rpm")
+            rpm_msgb.add_arg(settings.rpm)
+            message_list.append(rpm_msgb.build())
 
             return message_list
         except Exception as e:

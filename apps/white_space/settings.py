@@ -18,8 +18,7 @@ from modules.render.layers import DataLayerSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import PanoramicTrackerSettings
 from modules.pose import nodes, trackers, window, analytics
-from modules import inference
-from modules.inference import ModelType
+from modules.inference import DetectionSettings, SegmentationSettings, CropSettings, ModelType
 from modules.session import SessionSettings, SequencerSettings
 from modules.gl.WindowManager import WindowSettings
 from .composition.settings import CompositorSettings
@@ -117,9 +116,8 @@ class _OscSoundSettings(OscSoundSettings):
 class InOutGroup(BaseSettings):
     num_players: Field[int] = Field(8,   access=Field.INIT, visible=False)
     resolution:  Field[int] = Field(3600, access=Field.INIT, visible=False)
-    osc_sound  : Group[_OscSoundSettings]   = Group(_OscSoundSettings, share=[num_players.as_('max_players')])
-    osc_recv   : Group[OscReceiverSettings] = Group(OscReceiverSettings)
     osc_light  : Group[OscLightSettings]    = Group(OscLightSettings, share=[resolution])
+    osc_sound  : Group[_OscSoundSettings]   = Group(_OscSoundSettings, share=[num_players.as_('max_players')])
 
 
 # ---------------------------------------------------------------------------
@@ -203,21 +201,21 @@ class PoseGroup(BaseSettings):
 
     _feature_share: list = [frequency, output_frequency]
 
-    detection       : Group[inference.DetectionSettings]          = Group(inference.DetectionSettings, share=[max_poses, model_type, model_path, verbose])
-    segmentation    : Group[inference.SegmentationSettings]       = Group(inference.SegmentationSettings, share=[max_poses, model_type, model_path, verbose, use_segmentation.as_('enabled')])
-    image_crop      : Group[inference.CropSettings]          = Group(inference.CropSettings, share=[max_poses])
-    angle_extractor : Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
-    bbox            : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)
-    point           : Group[PointFeature]                     = Group(PointFeature, share=_feature_share)
-    angle           : Group[AngleFeature]                     = Group(AngleFeature, share=_feature_share)
-    velocity        : Group[VelocityFeature]                  = Group(VelocityFeature, share=_feature_share)
-    motion          : Group[MotionFeature]                    = Group(MotionFeature)
-    similarity      : Group[SimilarityFeature]                = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
-    window_raw      : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
-    window_clean    : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
-    window_smooth   : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
-    window_predict  : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
-    window_lerp     : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
+    detection       : Group[DetectionSettings]              = Group(DetectionSettings, share=[max_poses, model_type, model_path, verbose])
+    segmentation    : Group[SegmentationSettings]           = Group(SegmentationSettings, share=[max_poses, model_type, model_path, verbose, use_segmentation.as_('enabled')])
+    image_crop      : Group[CropSettings]                   = Group(CropSettings, share=[max_poses])
+    angle_extractor : Group[nodes.AngleExtractorSettings]   = Group(nodes.AngleExtractorSettings)
+    bbox            : Group[BboxFeature]                    = Group(BboxFeature, share=_feature_share)
+    point           : Group[PointFeature]                   = Group(PointFeature, share=_feature_share)
+    angle           : Group[AngleFeature]                   = Group(AngleFeature, share=_feature_share)
+    velocity        : Group[VelocityFeature]                = Group(VelocityFeature, share=_feature_share)
+    motion          : Group[MotionFeature]                  = Group(MotionFeature)
+    similarity      : Group[SimilarityFeature]              = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
+    window_raw      : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
+    window_clean    : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
+    window_smooth   : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
+    window_predict  : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
+    window_lerp     : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
 
 
 # ---------------------------------------------------------------------------
