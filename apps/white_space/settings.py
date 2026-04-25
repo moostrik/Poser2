@@ -17,8 +17,8 @@ from modules.render import layers, ColorSettings
 from modules.render.layers import DataLayerSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import PanoramicTrackerSettings
-from modules.pose import nodes, trackers, window, analytics
-from modules import inference
+from modules.pose import nodes, window, analytics
+# from modules import inference
 from modules.inference import ModelType
 from modules.session import SessionSettings, SequencerSettings
 from modules.gl.WindowManager import WindowSettings
@@ -203,9 +203,9 @@ class PoseGroup(BaseSettings):
 
     _feature_share: list = [frequency, output_frequency]
 
-    detection       : Group[inference.DetectionSettings]          = Group(inference.DetectionSettings, share=[max_poses, model_type, model_path, verbose])
-    segmentation    : Group[inference.SegmentationSettings]       = Group(inference.SegmentationSettings, share=[max_poses, model_type, model_path, verbose, use_segmentation.as_('enabled')])
-    image_crop      : Group[inference.CropSettings]          = Group(inference.CropSettings, share=[max_poses])
+    # detection       : Group[inference.DetectionSettings]          = Group(inference.DetectionSettings, share=[max_poses, model_type, model_path, verbose])
+    # segmentation    : Group[inference.SegmentationSettings]       = Group(inference.SegmentationSettings, share=[max_poses, model_type, model_path, verbose, use_segmentation.as_('enabled')])
+    # image_crop      : Group[inference.CropSettings]          = Group(inference.CropSettings, share=[max_poses])
     angle_extractor : Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
     bbox            : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                     = Group(PointFeature, share=_feature_share)
