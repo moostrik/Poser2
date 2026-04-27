@@ -1,2 +1,1 @@
 from .light_simulation_layer import LightSimulationLayer
-from .composition_debug_layer import CompositionDebugLayer

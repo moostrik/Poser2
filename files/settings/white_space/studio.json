@@ -2,7 +2,7 @@
   "num_players": 8,
   "num_cameras": 4,
   "input_fps": 30.0,
-  "render_fps": 83.0,
+  "render_fps": 60.0,
   "light_resolution": 3600,
   "camera": {
     "yolo": true,
@@ -10,7 +10,7 @@
     "square": false,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "models",
     "cam_0": {
       "device_id": "14442C10110AD3D200",
@@ -28,8 +28,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 29992,
+      "mono_iso": 978,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -55,8 +55,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 30001,
+      "mono_iso": 1549,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -82,8 +82,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 29992,
+      "mono_iso": 1131,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -109,8 +109,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 30001,
+      "mono_iso": 1549,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
@@ -329,8 +329,13 @@
     }
   },
   "composition": {
-    "fov_degrees": 110.0,
-    "params": {
+    "transport": {
+      "bpm": 20.0
+    },
+    "pose_waves": {
+      "enabled": true,
+      "gain": 1.0,
+      "fov_degrees": 110.0,
       "void_width": 0.05,
       "void_edge": 0.01,
       "use_void": true,
@@ -341,14 +346,15 @@
       "line_width": 0.1,
       "line_amount": 20.0
     },
-    "test": {
-      "pattern": "CHASE",
+    "fill": {
+      "enabled": false,
+      "gain": 1.0,
       "white": {
         "strength": 0.5,
-        "speed": 0.11,
+        "speed": 0.5,
         "phase": 0.0,
-        "width": 0.2,
-        "amount": 93
+        "width": 0.5,
+        "amount": 36
       },
       "blue": {
         "strength": 0.5,
@@ -356,6 +362,112 @@
         "phase": 0.5,
         "width": 0.5,
         "amount": 36
+      }
+    },
+    "pulse": {
+      "enabled": false,
+      "gain": 1.0,
+      "white": {
+        "strength": 0.5,
+        "speed": 0.5,
+        "phase": 0.0,
+        "width": 0.5,
+        "amount": 36
+      },
+      "blue": {
+        "strength": 0.5,
+        "speed": 0.5,
+        "phase": 0.5,
+        "width": 0.5,
+        "amount": 36
+      }
+    },
+    "chase": {
+      "enabled": false,
+      "gain": 2.0,
+      "white": {
+        "strength": 1.0,
+        "speed": 0.25,
+        "phase": 0.0,
+        "width": 0.2,
+        "amount": 22
+      },
+      "blue": {
+        "strength": 0.5,
+        "speed": 0.5,
+        "phase": 0.5,
+        "width": 0.5,
+        "amount": 36
+      }
+    },
+    "lines": {
+      "enabled": true,
+      "gain": 1.0,
+      "white": {
+        "strength": 0.5,
+        "speed": 0.94,
+        "phase": 0.0,
+        "width": 0.19,
+        "amount": 59
+      },
+      "blue": {
+        "strength": 0.5,
+        "speed": 0.5,
+        "phase": 0.5,
+        "width": 0.5,
+        "amount": 36
+      }
+    },
+    "random": {
+      "enabled": false,
+      "gain": 1.0,
+      "white": {
+        "strength": 0.5, "speed": 0.5, "scale": 4.0,
+        "octaves": 3, "persistence": 0.5, "threshold": 0.0
+      },
+      "blue": {
+        "strength": 0.5, "speed": 0.5, "scale": 4.0,
+        "octaves": 3, "persistence": 0.5, "threshold": 0.0
+      }
+    },
+    "harmonic": {
+      "enabled": false,
+      "gain": 1.0,
+      "source_0": {
+        "enabled": true,
+        "bpm_multiplier": 1.0,
+        "spatial_cycles": 3.0,
+        "phase_offset": 0.0,
+        "spatial_phase": 0.0,
+        "amplitude_white": 0.5,
+        "amplitude_blue": 0.0
+      },
+      "source_1": {
+        "enabled": true,
+        "bpm_multiplier": 2.0,
+        "spatial_cycles": 5.0,
+        "phase_offset": 0.25,
+        "spatial_phase": 0.0,
+        "amplitude_white": 0.0,
+        "amplitude_blue": 0.5
+      },
+      "source_2": {
+        "enabled": false,
+        "bpm_multiplier": 3.0,
+        "spatial_cycles": 7.0,
+        "phase_offset": 0.5,
+        "spatial_phase": 0.0,
+        "amplitude_white": 0.3,
+        "amplitude_blue": 0.0
+      },
+      "source_3": {
+        "enabled": false,
+        "bpm_multiplier": 4.0,
+        "spatial_cycles": 9.0,
+        "phase_offset": 0.75,
+        "spatial_phase": 0.0,
+        "amplitude_white": 0.0,
+        "amplitude_blue": 0.3
       }
     }
   },

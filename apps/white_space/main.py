@@ -133,7 +133,6 @@ class WhiteSpaceMain:
         self.stages[ws_input].add_callback(self.compositor.add_poses)
         self.compositor.add_output_callback(self.osc_light.send_message)
         self.compositor.add_output_callback(self.board.set_composition_output)
-        self.compositor.add_debug_callback(self.board.set_composition_debug)
 
         # POSE STAGE RAW
         self.point_extractor.add_frames_callback(self.stages[Stage.RAW])

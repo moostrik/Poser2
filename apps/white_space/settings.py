@@ -67,7 +67,6 @@ class Layers(IntEnum):
     # WS visualization
     ws_tracker   = auto()
     ws_light     = auto()
-    ws_lines     = auto()
     # data
     data_W       = auto()
     data_F       = auto()

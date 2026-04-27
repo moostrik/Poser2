@@ -1,15 +1,15 @@
-"""White Space render board — thread-safe shared data store for the White Space app."""
+"""White Space render board - thread-safe shared data store for the White Space app."""
 
 from modules.board import (
     FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
     SegmentationImageStoreMixin, DepthTrackletStoreMixin, SequenceStoreMixin,
-    TrackletStoreMixin, CompositionOutputStoreMixin, CompositionDebugStoreMixin,
+    TrackletStoreMixin, CompositionOutputStoreMixin,
 )
 
 
 class RenderBoard(FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
                  SegmentationImageStoreMixin, DepthTrackletStoreMixin, TrackletStoreMixin,
-                 CompositionOutputStoreMixin, CompositionDebugStoreMixin, SequenceStoreMixin):
+                 CompositionOutputStoreMixin, SequenceStoreMixin):
 
     def __init__(self) -> None:
         FrameStoreMixin.__init__(self)
@@ -20,5 +20,4 @@ class RenderBoard(FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, Crop
         DepthTrackletStoreMixin.__init__(self)
         TrackletStoreMixin.__init__(self)
         CompositionOutputStoreMixin.__init__(self)
-        CompositionDebugStoreMixin.__init__(self)
         SequenceStoreMixin.__init__(self)
