@@ -14,8 +14,9 @@ from modules.pose.frame import Frame, FrameDict
 from .transport import TransportClock
 from .base import Composition
 from .output import CompositionOutput, COMP_DTYPE, CompositionOutputCallback
-from .settings import CompositorSettings
+from .settings import CompositorSettings, CompositionId
 from .comps import PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic
+from .draw import blend_values
 
 import logging
 logger = logging.getLogger(__name__)
@@ -46,21 +47,22 @@ class Compositor(Thread):
 
         # Host-owned mix buffers â€” zeroed before each composition round
         self._white: np.ndarray = np.zeros(resolution, dtype=COMP_DTYPE)
-        self._blue:  np.ndarray = np.zeros(resolution, dtype=COMP_DTYPE)
+        self._blue:  np.ndarray = np.zeros(resolution, dtype=COMP_DTYPE)        # Per-comp temp buffers — reused each render call
+        self._temp_white: np.ndarray = np.zeros(resolution, dtype=COMP_DTYPE)
+        self._temp_blue:  np.ndarray = np.zeros(resolution, dtype=COMP_DTYPE)
+        # Master transport clock — reads bpm, writes time/phase back as READ fields
+        self._transport = TransportClock(config)
 
-        # Master transport clock
-        self._transport = TransportClock(config.transport)
-
-        # Fixed composition registry
+        # Fixed composition registry — ordered list of (id, instance) pairs
         self._pose_waves = PoseWaves(resolution, num_players, config.pose_waves, self.interval)
-        self._compositions: list[Composition] = [
-            self._pose_waves,
-            Fill     (resolution, config.fill),
-            Pulse    (resolution, config.pulse),
-            Chase    (resolution, config.chase),
-            Lines    (resolution, config.lines),
-            Random   (resolution, config.random),
-            Harmonic (resolution, config.harmonic),
+        self._compositions: list[tuple[CompositionId, Composition]] = [
+            (CompositionId.pose_waves, self._pose_waves),
+            (CompositionId.fill,       Fill     (resolution, config.fill)),
+            (CompositionId.pulse,      Pulse    (resolution, config.pulse)),
+            (CompositionId.chase,      Chase    (resolution, config.chase)),
+            (CompositionId.lines,      Lines    (resolution, config.lines)),
+            (CompositionId.random,     Random   (resolution, config.random)),
+            (CompositionId.harmonic,   Harmonic (resolution, config.harmonic)),
         ]
 
         self.fps_counter = FpsCounter()
@@ -106,30 +108,54 @@ class Compositor(Thread):
         transport = self._transport.tick()
 
         # Forward latest pose data to compositions that need it
-        for comp in self._compositions:
+        for comp_id, comp in self._compositions:
             comp.set_pose_inputs(frames, tracklets)
 
         # Zero shared mix buffers
         self._white.fill(0.0)
         self._blue.fill(0.0)
 
-        # Render all enabled compositions additively
-        for comp in self._compositions:
+        active = set(self._config.active)
+        blend  = self._config.blend
+
+        # Render each active composition into a temp buffer, then blend into master
+        for comp_id, comp in self._compositions:
+            if comp_id not in active:
+                continue
+            self._temp_white.fill(0.0)
+            self._temp_blue.fill(0.0)
             try:
-                comp.render(transport, self._white, self._blue)
+                comp.render(transport, self._temp_white, self._temp_blue)
             except Exception:
                 logger.exception("Error in %s.render", comp.__class__.__name__)
+                continue
+            blend_values(self._white, self._temp_white, 0, blend)
+            blend_values(self._blue,  self._temp_blue,  0, blend)
 
-        # Clamp to valid output range
-        np.clip(self._white, 0.0, 1.0, out=self._white)
-        np.clip(self._blue,  0.0, 1.0, out=self._blue)
+        # Master output: contrast (hardness) then brightness (master)
+        white = self._master_process(self._white)
+        blue  = self._master_process(self._blue)
 
         # Build output and dispatch
         output = CompositionOutput(self._config.light_resolution)
-        output.light_0 = self._white
-        output.light_1 = self._blue
+        output.light_0 = white
+        output.light_1 = blue
         self._notify_output(output)
         self.fps_counter.tick()
+
+    def _master_process(self, arr: np.ndarray) -> np.ndarray:
+        """Apply contrast hardness then master brightness to a mix buffer."""
+        cfg = self._config
+        x = np.clip(arr, 0.0, 1.0)
+        h = cfg.hardness
+        if h > 0.0:
+            k = 20.0 * h
+            sigmoid = 1.0 / (1.0 + np.exp(-k * (x - cfg.threshold)))
+            x = (1.0 - h) * x + h * sigmoid
+        m = cfg.master
+        if m != 1.0:
+            x = x * m
+        return x
 
     # ------------------------------------------------------------------
     # Inputs
@@ -175,5 +201,5 @@ class Compositor(Thread):
         return self.fps_counter.get_fps()
 
     def reset(self) -> None:
-        for comp in self._compositions:
+        for _, comp in self._compositions:
             comp.reset()

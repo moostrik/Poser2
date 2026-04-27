@@ -15,7 +15,7 @@ _MASK       = _TABLE_SIZE - 1
 
 
 class RandomChannelSettings(BaseSettings):
-    strength:    Field[float] = Field(0.5, min=0.0, max=1.0,  step=0.01, description="Output amplitude")
+    level:       Field[float] = Field(0.5, min=0.0, max=1.0,  step=0.01, description="Output amplitude")
     speed:       Field[float] = Field(0.5, min=0.0, max=16.0, step=0.01, description="Temporal evolution rate (beats per noise period)")
     scale:       Field[float] = Field(4.0, min=0.5, max=32.0, step=0.1,  description="Spatial feature size (low=large blobs, high=fine grain)")
     octaves:     Field[int]   = Field(3,   min=1,   max=6,               description="fBm octave count (1=smooth, 6=detailed)")
@@ -24,10 +24,8 @@ class RandomChannelSettings(BaseSettings):
 
 
 class RandomSettings(BaseSettings):
-    enabled: Field[bool]  = Field(False, description="Enable Random composition")
-    gain:    Field[float] = Field(1.0,   min=0.0, max=2.0, step=0.01, description="Output gain")
-    white:   Group[RandomChannelSettings] = Group(RandomChannelSettings)
-    blue:    Group[RandomChannelSettings] = Group(RandomChannelSettings)
+    white: Group[RandomChannelSettings] = Group(RandomChannelSettings)
+    blue:  Group[RandomChannelSettings] = Group(RandomChannelSettings)
 
 
 class Random(Composition):
@@ -47,20 +45,16 @@ class Random(Composition):
         self._vals_b: np.ndarray = rng.random(_TABLE_SIZE)
 
     def render(self, transport: Transport, white: np.ndarray, blue: np.ndarray) -> None:
-        if not self._config.enabled:
-            return
-
         beat_time = transport.beat + transport.phase
         W = self._config.white
         B = self._config.blue
-        g = self._config.gain
 
         white += self._fbm(self._perm_w, self._vals_w, self._positions,
                            beat_time, W.scale, W.speed, W.octaves,
-                           W.persistence, W.threshold, W.strength * g)
+                           W.persistence, W.threshold, W.level)
         blue  += self._fbm(self._perm_b, self._vals_b, self._positions,
                            beat_time, B.scale, B.speed, B.octaves,
-                           B.persistence, B.threshold, B.strength * g)
+                           B.persistence, B.threshold, B.level)
 
     @staticmethod
     def _fbm(

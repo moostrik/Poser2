@@ -29,8 +29,6 @@ class HarmonicSourceSettings(BaseSettings):
 
 class HarmonicSettings(BaseSettings):
     """Settings for the LFO/harmonic-interference composition."""
-    enabled: Field[bool]  = Field(False, description="Enable Harmonic composition")
-    gain:    Field[float] = Field(1.0,   min=0.0, max=2.0, step=0.01, description="Output gain")
     source_0: Group[HarmonicSourceSettings] = Group(HarmonicSourceSettings)
     source_1: Group[HarmonicSourceSettings] = Group(HarmonicSourceSettings)
     source_2: Group[HarmonicSourceSettings] = Group(HarmonicSourceSettings)
@@ -55,9 +53,6 @@ class Harmonic(Composition):
         self._x: np.ndarray = np.linspace(0.0, 1.0, resolution, endpoint=False, dtype=np.float32)
 
     def render(self, transport: Transport, white: np.ndarray, blue: np.ndarray) -> None:
-        if not self._config.enabled:
-            return
-        g       = self._config.gain
         sources = (
             self._config.source_0,
             self._config.source_1,
@@ -76,6 +71,6 @@ class Harmonic(Composition):
             ) * math.tau
             wave = (np.sin(arg) * 0.5 + 0.5).astype(np.float32)
             if src.amplitude_white > 0.0:
-                white += wave * (src.amplitude_white * g)
+                white += wave * src.amplitude_white
             if src.amplitude_blue > 0.0:
-                blue  += wave * (src.amplitude_blue  * g)
+                blue  += wave * src.amplitude_blue

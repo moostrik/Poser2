@@ -2,17 +2,15 @@
 
 import numpy as np
 
-from modules.settings import BaseSettings, Field, Group
+from modules.settings import BaseSettings, Group
 
 from ..base import Composition, ChannelSettings
 from ..transport import Transport
 
 
 class FillSettings(BaseSettings):
-    enabled: Field[bool]  = Field(False, description="Enable Fill composition")
-    gain:    Field[float] = Field(1.0,   min=0.0, max=2.0, step=0.01, description="Output gain")
-    white:   Group[ChannelSettings] = Group(ChannelSettings)
-    blue:    Group[ChannelSettings] = Group(ChannelSettings)
+    white: Group[ChannelSettings] = Group(ChannelSettings)
+    blue:  Group[ChannelSettings] = Group(ChannelSettings)
 
 
 class Fill(Composition):
@@ -23,8 +21,5 @@ class Fill(Composition):
         self._config = config
 
     def render(self, transport: Transport, white: np.ndarray, blue: np.ndarray) -> None:
-        if not self._config.enabled:
-            return
-        g = self._config.gain
-        white += self._config.white.strength * g
-        blue  += self._config.blue.strength  * g
+        white += self._config.white.level
+        blue  += self._config.blue.level

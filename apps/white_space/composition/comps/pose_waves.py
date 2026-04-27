@@ -20,8 +20,6 @@ logger = logging.getLogger(__name__)
 
 class PoseWavesSettings(BaseSettings):
     """Settings for the pose-driven void and wave pattern composition."""
-    enabled: Field[bool]  = Field(True,  description="Enable PoseWaves composition")
-    gain:    Field[float] = Field(1.0,   min=0.0, max=2.0, step=0.01, description="Output gain")
     fov_degrees: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5,
                                       description="Camera horizontal FOV — must match PanoramicTracker.fov")
 
@@ -116,9 +114,6 @@ class PoseWaves(Composition):
 
     def render(self, transport: Transport, white: np.ndarray, blue: np.ndarray) -> None:
         P = self._config
-        if not P.enabled:
-            return
-
         fov_degrees: float = P.fov_degrees
         dt:          float = transport.dt
 
@@ -177,9 +172,8 @@ class PoseWaves(Composition):
             np.multiply(self._blue, inverted_void, out=self._blue)
             self._blue += self._void * 0.5
 
-        g = P.gain
-        white += (self._Wh_L + self._Wh_R) * g
-        blue  += self._blue * g
+        white += (self._Wh_L + self._Wh_R)
+        blue  += self._blue
 
     # ------------------------------------------------------------------
     # Internal draw helpers

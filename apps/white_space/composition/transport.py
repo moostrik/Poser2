@@ -2,8 +2,9 @@
 
 from dataclasses import dataclass
 from time import time
+from typing import Protocol
 
-from modules.settings import BaseSettings, Field
+from modules.settings import Field
 
 
 @dataclass
@@ -16,17 +17,17 @@ class Transport:
     beat:  int    # monotonic beat counter (increments each time phase wraps)
 
 
-class TransportSettings(BaseSettings):
-    """Master clock settings."""
-    bpm:   Field[float] = Field(120.0, min=20.0, max=480.0, step=0.5, description="Master tempo (BPM)")
-    time:  Field[float] = Field(0.0,  access=Field.READ, description="Elapsed wall-clock time (s)")
-    phase: Field[float] = Field(0.0,  access=Field.READ, description="Beat phase (0–1)")
+class _TransportHost(Protocol):
+    """Minimal interface TransportClock needs from its settings object."""
+    bpm:   Field[float]
+    time:  Field[float]
+    phase: Field[float]
 
 
 class TransportClock:
     """Advances the master transport state once per compositor tick."""
 
-    def __init__(self, settings: TransportSettings) -> None:
+    def __init__(self, settings: _TransportHost) -> None:
         self._settings   = settings
         self._start_time: float = time()
         self._last_time:  float = self._start_time
