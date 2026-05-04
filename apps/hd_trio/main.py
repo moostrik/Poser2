@@ -89,7 +89,7 @@ class HDTrioMain:
 
         self.poses_from_tracklets = PosesFromTracklets(num_players)
         self.pose_predictor = inference.pose.Predictor(ps.pose)
-        self.mask_predictor  = inference.segmentation.Predictor(ps.segmentation)
+        self.segmentation_predictor  = inference.segmentation.Predictor(ps.segmentation)
 
         self.bbox_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
@@ -104,12 +104,12 @@ class HDTrioMain:
         self.frame_sync_bang.add_sync_callback(self.poses_from_tracklets.process)
 
         self.crop_extractor.add_image_callback(self.pose_predictor.process)
-        self.crop_extractor.add_image_callback(self.mask_predictor.process)
+        self.crop_extractor.add_image_callback(self.segmentation_predictor.process)
         self.crop_extractor.add_image_callback(lambda _f, crops: self.board.set_crop_images(crops))
 
         self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
         self.bbox_filters.add_frames_callback(self._process_poses)
-        self.mask_predictor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
+        self.segmentation_predictor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
         # STAGE WINDOW TRACKERS & BROADCASTS
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
@@ -240,7 +240,7 @@ class HDTrioMain:
 
         self.tracker.start()
         self.pose_predictor.start()
-        self.mask_predictor.start()
+        self.segmentation_predictor.start()
         self.window_similator.start()
         self.window_correlator.start()
 
@@ -284,7 +284,7 @@ class HDTrioMain:
         self.session_osc.server.shutdown()
 
         self.pose_predictor.stop()
-        self.mask_predictor.stop()
+        self.segmentation_predictor.stop()
         self.window_similator.stop()
         self.window_correlator.stop()
 
