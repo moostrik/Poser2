@@ -1,6 +1,5 @@
 import time
 import logging
-from dataclasses import dataclass
 from typing import TypeAlias
 
 import numpy as np
@@ -12,24 +11,10 @@ from modules.utils import PerformanceTimer
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class FullImage:
-    """GPU-resident full camera frame.
-
-    Format: float16 RGB CHW [0, 1].
-
-    Attributes:
-        cam_id: Camera identifier
-        image:  Full source frame on GPU (3, H, W) float16 RGB CHW [0, 1]
-    """
-    cam_id: int
-    image: torch.Tensor
+ImageDict: TypeAlias = dict[int, torch.Tensor]
 
 
-FullImageDict: TypeAlias = dict[int, FullImage]
-
-
-class ImageUploader:
+class Uploader:
     """Uploads CPU numpy frames to GPU float16 CHW tensors.
 
     Maintains a previous-frame buffer per camera for use by downstream
@@ -85,30 +70,25 @@ class ImageUploader:
 
         self._accumulated_upload_ms += (time.perf_counter() - start) * 1000.0
 
-    def snapshot(self) -> tuple[FullImageDict, dict[int, torch.Tensor]]:
+    def snapshot(self) -> tuple[ImageDict, ImageDict]:
         """Synchronize the upload stream and return current and previous GPU images.
 
         Returns:
-            (current, previous) where current is a FullImageDict keyed by cam_id
-            and previous is a dict[int, torch.Tensor] keyed by cam_id.
+            (current, previous) both as ImageDict keyed by cam_id.
         """
         # Copy references BEFORE synchronizing to avoid a race with concurrent set_image
         # calls. A set_image arriving after the copy updates _gpu_images but those new
         # tensors are not included here; synchronize() then guarantees the captured
         # tensors are fully uploaded and safe to read.
-        images_snapshot = dict(self._gpu_images)
-        prev_snapshot = dict(self._prev_gpu_images)
+        images_snapshot: ImageDict = dict(self._gpu_images)
+        prev_snapshot: ImageDict = dict(self._prev_gpu_images)
 
         self._stream.synchronize()
 
         self._timer.add_time(self._accumulated_upload_ms, report=False)
         self._accumulated_upload_ms = 0.0
 
-        current: FullImageDict = {
-            cam_id: FullImage(cam_id=cam_id, image=tensor)
-            for cam_id, tensor in images_snapshot.items()
-        }
-        return current, prev_snapshot
+        return images_snapshot, prev_snapshot
 
     def reset(self) -> None:
         """Clear all stored GPU images."""

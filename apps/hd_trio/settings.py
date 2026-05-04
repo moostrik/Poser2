@@ -224,10 +224,10 @@ class PoseGroup(BaseSettings):
     _batch_share  : list = [max_poses, model_type, model_path, verbose]
     _feature_share: list = [frequency, output_frequency]
 
-    detection       : Group[inference.DetectionSettings]          = Group(inference.DetectionSettings, share=_batch_share)
-    segmentation    : Group[inference.SegmentationSettings]       = Group(inference.SegmentationSettings, share=_batch_share)
-    flow            : Group[inference.FlowSettings]               = Group(inference.FlowSettings, share=_batch_share)
-    image_crop      : Group[inference.CropSettings]          = Group(inference.CropSettings, share=[max_poses])
+    pose            : Group[inference.pose.Settings]              = Group(inference.pose.Settings, share=_batch_share)
+    segmentation    : Group[inference.segmentation.Settings]      = Group(inference.segmentation.Settings, share=_batch_share)
+    optical_flow    : Group[inference.optical_flow.Settings]      = Group(inference.optical_flow.Settings, share=_batch_share)
+    image_crop      : Group[inference.crop.Settings]          = Group(inference.crop.Settings, share=[max_poses])
     angle_extractor : Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
     bbox            : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                     = Group(PointFeature, share=_feature_share)

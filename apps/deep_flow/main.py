@@ -60,8 +60,8 @@ class DeepFlowMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.tt.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.image_uploader = inference.ImageUploader()
-        self.crop_extractor = inference.CropExtractor(p.image_crop)
+        self.image_uploader = inference.source.Uploader()
+        self.crop_extractor = inference.crop.Extractor(p.image_crop)
 
         for camera in self.cameras:
             if self.recorder:
@@ -74,9 +74,9 @@ class DeepFlowMain:
 
         # DETECTION
         self.poses_from_tracklets = PosesFromTracklets(num_players)
-        self.point_extractor = inference.PointBatchExtractor(p.detection)
-        self.mask_extractor  = inference.MaskBatchExtractor(p.segmentation)
-        self.flow_extractor  = inference.FlowBatchExtractor(p.flow)
+        self.point_extractor = inference.pose.Predictor(p.pose)
+        self.mask_extractor  = inference.segmentation.Predictor(p.segmentation)
+        self.flow_extractor  = inference.optical_flow.Predictor(p.optical_flow)
 
         self.bbox_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([

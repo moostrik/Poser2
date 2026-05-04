@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 from modules.board import HasCropImages
 from modules.gl import Tensor, Texture
 from ..LayerBase import LayerBase, DataCache
-from modules.inference import CropImage
+from modules.inference import crop
 
 
 class CropSourceLayer(LayerBase):
@@ -21,7 +21,7 @@ class CropSourceLayer(LayerBase):
         self._track_id: int = track_id
         self._board: HasCropImages = board
         self._cuda_image: Tensor = Tensor()
-        self._data_cache: DataCache[CropImage] = DataCache[CropImage]()
+        self._data_cache: DataCache[crop.Image] = DataCache[crop.Image]()
         self._dirty: bool = False
 
     @property
@@ -40,7 +40,7 @@ class CropSourceLayer(LayerBase):
 
     def update(self) -> None:
         self._dirty = False
-        gpu_frame: CropImage | None = self._board.get_crop_image(self._track_id)
+        gpu_frame: crop.Image | None = self._board.get_crop_image(self._track_id)
         self._data_cache.update(gpu_frame)
 
         if self._data_cache.lost:

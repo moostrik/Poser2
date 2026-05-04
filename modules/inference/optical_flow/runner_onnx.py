@@ -11,15 +11,15 @@ import onnxruntime as ort
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .FlowSettings import FlowSettings
+    from .settings import Settings
 
-from .InOut import OpticalFlowInput, OpticalFlowOutput, OpticalFlowOutputCallback
+from .io import OpticalFlowInput, OpticalFlowOutput, OpticalFlowOutputCallback
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class ONNXOpticalFlow(Thread):
+class RunnerONNX(Thread):
     """Asynchronous GPU optical flow computation using RAFT with ONNX Runtime.
 
     RAFT (Recurrent All-Pairs Field Transforms) computes dense optical flow between
@@ -31,7 +31,7 @@ class ONNXOpticalFlow(Thread):
     All results (success and dropped) are delivered via callbacks in notification order.
     """
 
-    def __init__(self, settings: 'FlowSettings') -> None:
+    def __init__(self, settings: 'Settings') -> None:
         super().__init__()
 
 

@@ -81,7 +81,7 @@
     "verbose": false,
     "frequency": 30.0,
     "output_frequency": 60.0,
-    "detection": {
+    "pose": {
       "enabled": true,
       "resolution": "STANDARD"
     },
@@ -90,7 +90,7 @@
       "enabled": true,
       "reset_interval": 240
     },
-    "flow": {
+    "optical_flow": {
       "resolution": "EXTREME",
       "enabled": false
     },

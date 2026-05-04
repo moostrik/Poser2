@@ -1,23 +1,22 @@
 from threading import Lock
 from typing import Union
-from ..crop_extractor import CropImageDict
+from .. import crop, ModelType
 from modules.pose.features import Points2D
 from modules.pose.frame import FrameDictCallbackMixin, replace
 from modules.pose.frame import FrameDict
-from ..model_types import ModelType
-from .DetectionSettings import DetectionSettings
+from .settings import Settings
 from modules.utils import PerformanceTimer
 
-from .InOut import DetectionInput, DetectionOutput
-from .ONNXDetection import ONNXDetection
-from .TRTDetection import TRTDetection
+from .io import DetectionInput, DetectionOutput
+from .runner_onnx import RunnerONNX
+from .runner_trt import RunnerTRT
 
 import logging
 logger = logging.getLogger(__name__)
 
-Detection = Union[ONNXDetection, TRTDetection]
+Detection = Union[RunnerONNX, RunnerTRT]
 
-class PointBatchExtractor(FrameDictCallbackMixin):
+class Predictor(FrameDictCallbackMixin):
     """GPU-based batch extractor for 2D pose points using RTMPose detection.
 
     Batches are processed asynchronously on GPU. Under load, pending batches may
@@ -28,13 +27,13 @@ class PointBatchExtractor(FrameDictCallbackMixin):
     for real-time visualization where recent data is more valuable than old data.
     """
 
-    def __init__(self, settings: DetectionSettings):
+    def __init__(self, settings: Settings):
         super().__init__()
-        self._detection: Detection = TRTDetection(settings)
+        self._detection: Detection = RunnerTRT(settings)
         if settings.model_type is ModelType.ONNX:
-            self._detection = ONNXDetection(settings)
+            self._detection = RunnerONNX(settings)
         elif settings.model_type is ModelType.TRT:
-            self._detection = TRTDetection(settings)
+            self._detection = RunnerTRT(settings)
 
         self._lock = Lock()
         self._batch_counter: int = 0
@@ -44,7 +43,7 @@ class PointBatchExtractor(FrameDictCallbackMixin):
         self._wait_timer =      PerformanceTimer(name="RTM Pose Wait     ", sample_count=1000, report_interval=100, color='yellow', omit_init=25)
 
         self._verbose: bool = settings.verbose
-        self._settings: DetectionSettings = settings
+        self._settings: Settings = settings
 
         self._detection.register_callback(self._on_detection_result)
 
@@ -56,7 +55,7 @@ class PointBatchExtractor(FrameDictCallbackMixin):
         """Stop the detection processing thread."""
         self._detection.stop()
 
-    def process(self, poses: FrameDict, crop_frames: CropImageDict) -> None:
+    def process(self, poses: FrameDict, crop_frames: crop.ImageDict) -> None:
         """Submit poses with GPU images for async processing. Results broadcast via callbacks.
 
         Args:

@@ -181,7 +181,7 @@
     "model_type": "TRT",
     "model_path": "models",
     "verbose": false,
-    "detection": {
+    "pose": {
       "resolution": "STANDARD"
     },
     "segmentation": {
@@ -189,7 +189,7 @@
       "enabled": true,
       "reset_interval": 240
     },
-    "flow": {
+    "optical_flow": {
       "resolution": "EXTREME",
       "enabled": false
     },

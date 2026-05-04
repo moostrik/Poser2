@@ -19,7 +19,6 @@ from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings
 from modules.pose import nodes, trackers, window
 from modules import inference
-from modules.inference import ModelType
 from modules.gl.WindowManager import WindowSettings
 
 
@@ -171,20 +170,20 @@ class MotionFeature(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class PoseGroup(BaseSettings):
-    max_poses:          Field[int]          = Field(1, min=1, max=16, access=Field.INIT)
-    model_type:         Field[ModelType]    = Field(ModelType.TRT, access=Field.INIT)
-    model_path:         Field[str]          = Field("models", access=Field.INIT, visible=False)
-    verbose:            Field[bool]         = Field(False, access=Field.INIT)
-    frequency:          Field[float]        = Field(30.0, access=Field.INIT)
-    output_frequency:   Field[float]        = Field(60.0, access=Field.INIT)
+    max_poses:          Field[int]                  = Field(1, min=1, max=16, access=Field.INIT)
+    model_type:         Field[inference.ModelType]  = Field(inference.ModelType.TRT, access=Field.INIT)
+    model_path:         Field[str]                  = Field("models", access=Field.INIT, visible=False)
+    verbose:            Field[bool]                 = Field(False, access=Field.INIT)
+    frequency:          Field[float]                = Field(30.0, access=Field.INIT)
+    output_frequency:   Field[float]                = Field(60.0, access=Field.INIT)
 
     _batch_share = [max_poses, model_type, model_path, verbose]
     _feature_share = [frequency, output_frequency]
 
-    detection    = Group(inference.DetectionSettings, share=_batch_share)
-    segmentation = Group(inference.SegmentationSettings, share=_batch_share)
-    flow         = Group(inference.FlowSettings, share=_batch_share)
-    image_crop   = Group(inference.CropSettings, share=[max_poses])
+    pose         = Group(inference.pose.Settings, share=_batch_share)
+    segmentation = Group(inference.segmentation.Settings, share=_batch_share)
+    optical_flow = Group(inference.optical_flow.Settings, share=_batch_share)
+    image_crop   = Group(inference.crop.Settings, share=[max_poses])
     angle_extractor = Group(nodes.AngleExtractorSettings)
     bbox         = Group(BboxFeature, share=_feature_share)
     point        = Group(PointFeature, share=_feature_share)

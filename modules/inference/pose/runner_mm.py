@@ -18,7 +18,7 @@ import torch
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
 
-from .DetectionSettings import DetectionSettings
+from .settings import Settings
 
 import logging
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class DetectionOutput:
 
 PoseDetectionOutputCallback = Callable[[DetectionOutput], None]
 
-class MMDetection(Thread):
+class RunnerMM(Thread):
     """Asynchronous GPU pose detection using RTMPose.
 
     Uses a single-slot queue: only the most recent submitted batch waits to be processed.
@@ -56,7 +56,7 @@ class MMDetection(Thread):
     which may differ from batch_id order due to async processing.
     """
 
-    def __init__(self, settings: 'DetectionSettings') -> None:
+    def __init__(self, settings: 'Settings') -> None:
         super().__init__()
 
         # Hardcoded RTMPose-L model paths (MMPose framework requirement)
@@ -209,8 +209,8 @@ class MMDetection(Thread):
             batch_start = time.perf_counter()
 
             with torch.cuda.stream(stream):
-                data_samples: list[list[PoseDataSample]] = MMDetection._infer_batch(model, pipeline, batch.images)
-                point_list, score_list = MMDetection._extract_pose_points(data_samples, self.model_width, self.model_height)
+                data_samples: list[list[PoseDataSample]] = RunnerMM._infer_batch(model, pipeline, batch.images)
+                point_list, score_list = RunnerMM._extract_pose_points(data_samples, self.model_width, self.model_height)
                 stream.synchronize()
 
             inference_time_ms: float = (time.perf_counter() - batch_start) * 1000.0
@@ -275,7 +275,7 @@ class MMDetection(Thread):
         for batch_size in dummy_sizes:
             # Create batch of dummy images
             dummy_imgs: list[np.ndarray] = [np.zeros((height, width, 3), dtype=np.uint8) for _ in range(batch_size)]
-            _: list[list[PoseDataSample]] = MMDetection._infer_batch(model, pipeline, dummy_imgs)
+            _: list[list[PoseDataSample]] = RunnerMM._infer_batch(model, pipeline, dummy_imgs)
 
             # Ensure GPU operations are complete
             torch.cuda.synchronize()

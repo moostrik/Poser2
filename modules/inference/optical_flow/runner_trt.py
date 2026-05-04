@@ -7,23 +7,23 @@ import time
 import torch
 import tensorrt as trt
 
-from .InOut import OpticalFlowInput, OpticalFlowOutput, OpticalFlowOutputCallback
+from .io import OpticalFlowInput, OpticalFlowOutput, OpticalFlowOutputCallback
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .FlowSettings import FlowSettings
+    from .settings import Settings
 
-from ..tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
+from ..trt_runtime import get_tensorrt_runtime, get_init_lock, get_exec_lock
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class TRTOpticalFlow(Thread):
+class RunnerTRT(Thread):
     """Asynchronous GPU optical flow computation using RAFT with TensorRT.
 
-    TensorRT-optimized inference for maximum performance. Drop-in replacement for ONNXOpticalFlow.
+    TensorRT-optimized inference for maximum performance. Drop-in replacement for PredictorONNX.
 
     Uses preallocated buffers and dedicated CUDA stream for ultra-low latency.
     All preprocessing and inference runs on the same dedicated stream to avoid sync overhead.
@@ -34,7 +34,7 @@ class TRTOpticalFlow(Thread):
     All results (success and dropped) are delivered via callbacks in notification order.
     """
 
-    def __init__(self, settings: 'FlowSettings') -> None:
+    def __init__(self, settings: 'Settings') -> None:
         super().__init__()
 
         self.model_path: str = settings.model_path

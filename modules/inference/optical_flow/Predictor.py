@@ -1,30 +1,28 @@
 from collections import deque
 from threading import Lock
-from typing import Union
+from typing import Callable, TypeAlias, Union
 
 import torch
 
-from ..crop_extractor import CropImageDict
-from .flow_image import FlowImage, FlowImageDict, FlowImageCallback
+from .. import crop, ModelType
 from modules.pose.frame import FrameDict
 
 import logging
 logger = logging.getLogger(__name__)
-from ..model_types import ModelType
-from .FlowSettings import FlowSettings
+from .settings import Settings
 from modules.utils import PerformanceTimer
 
-from .InOut import OpticalFlowInput, OpticalFlowOutput
-from .ONNXOpticalFlow import ONNXOpticalFlow, OpticalFlowInput, OpticalFlowOutput
-from .TRTOpticalFlow import TRTOpticalFlow
+from .io import OpticalFlowInput, OpticalFlowOutput
+from .runner_onnx import RunnerONNX, OpticalFlowInput, OpticalFlowOutput
+from .runner_trt import RunnerTRT
 
-OpticalFlow = Union[ONNXOpticalFlow, TRTOpticalFlow]
+OpticalFlow = Union[RunnerONNX, RunnerTRT]
+
+FlowDict: TypeAlias = dict[int, torch.Tensor]
+FlowCallback: TypeAlias = Callable[[FlowDict], None]
 
 
-FlowCallback = FlowImageCallback
-
-
-class FlowBatchExtractor:
+class Predictor:
     """GPU-based batch extractor for optical flow using RAFT.
 
     Computes dense optical flow between consecutive frames for each tracked person.
@@ -38,12 +36,12 @@ class FlowBatchExtractor:
     for real-time fluid simulation where recent data is more valuable than old data.
     """
 
-    def __init__(self, settings: FlowSettings):
-        self._optical_flow: OpticalFlow = ONNXOpticalFlow(settings)
+    def __init__(self, settings: Settings):
+        self._optical_flow: OpticalFlow = RunnerONNX(settings)
         if settings.model_type is ModelType.ONNX:
-            self._optical_flow = ONNXOpticalFlow(settings)
+            self._optical_flow = RunnerONNX(settings)
         elif settings.model_type is ModelType.TRT:
-            self._optical_flow = TRTOpticalFlow(settings)
+            self._optical_flow = RunnerTRT(settings)
         self._lock = Lock()
         self._batch_counter: int = 0
         self._verbose: bool = settings.verbose
@@ -54,7 +52,7 @@ class FlowBatchExtractor:
 
         self._callbacks: set[FlowCallback] = set()
         self._callback_lock = Lock()
-        self._settings: FlowSettings = settings
+        self._settings: Settings = settings
 
         self._optical_flow.register_callback(self._on_optical_flow_result)
 
@@ -66,7 +64,7 @@ class FlowBatchExtractor:
         with self._callback_lock:
             self._callbacks.discard(callback)
 
-    def _notify_callbacks(self, flow_dict: FlowImageDict) -> None:
+    def _notify_callbacks(self, flow_dict: FlowDict) -> None:
         with self._callback_lock:
             for callback in self._callbacks:
                 try:
@@ -82,7 +80,7 @@ class FlowBatchExtractor:
         """Stop the optical flow processing thread."""
         self._optical_flow.stop()
 
-    def process(self, poses: FrameDict, crop_frames: CropImageDict) -> None:
+    def process(self, poses: FrameDict, crop_frames: crop.ImageDict) -> None:
         """Submit batch for async processing. Results broadcast via callbacks.
 
         Args:
@@ -132,15 +130,11 @@ class FlowBatchExtractor:
         self._process_timer.add_time(output.inference_time_ms, report=self._verbose)
         self._wait_timer.add_time(output.lock_time_ms, report=self._verbose)
 
-        # Create FlowImageDict mapping tracklet_id -> FlowImage
-        # Flow tensor format: [0] = x-displacement, [1] = y-displacement
-        flow_dict: FlowImageDict = {}
+        # Create FlowDict mapping tracklet_id -> flow tensor (2, H, W)
+        flow_dict: FlowDict = {}
         for idx, tracklet_id in enumerate(output.tracklet_ids):
             if idx < output.flow_tensor.shape[0]:
-                flow_dict[tracklet_id] = FlowImage(
-                    track_id=tracklet_id,
-                    flow=output.flow_tensor[idx],  # (2, H, W) tensor on GPU
-                )
+                flow_dict[tracklet_id] = output.flow_tensor[idx]
 
         # Broadcast to callbacks
         self._notify_callbacks(flow_dict)

@@ -13,7 +13,7 @@ need.  Render layers declare the protocol slice they require (e.g.
 
 from .frames import                 HasFrames, FrameStoreMixin
 from .windows import                HasWindows, WindowStoreMixin
-from .images import                 HasCameraImages, CameraImageStoreMixin, HasCropImages, CropImageStoreMixin, \
+from .inference import                 HasCameraImages, CameraImageStoreMixin, HasCropImages, CropImageStoreMixin, \
                                     HasSegmentationImages, SegmentationImageStoreMixin
 from .depth_tracklets import        HasDepthTracklets, DepthTrackletStoreMixin
 from .sequence import               HasSequence, SequenceStoreMixin

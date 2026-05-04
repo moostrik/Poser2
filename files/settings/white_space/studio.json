@@ -164,7 +164,7 @@
     "model_path": "models",
     "verbose": false,
     "ws_input_stage": "LERP",
-    "detection": {
+    "pose": {
       "enabled": true,
       "resolution": "STANDARD"
     },

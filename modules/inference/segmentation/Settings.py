@@ -17,7 +17,7 @@ _MODELS = {
 }
 
 
-class SegmentationSettings(BaseSettings):
+class Settings(BaseSettings):
     """Settings for person segmentation (RVM)."""
 
     max_poses:      Field[int]        = Field(1, min=1, max=16, access=Field.INIT)

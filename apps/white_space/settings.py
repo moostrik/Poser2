@@ -18,7 +18,7 @@ from modules.render.layers import DataLayerSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import PanoramicTrackerSettings
 from modules.pose import nodes, trackers, window, analytics
-from modules.inference import DetectionSettings, SegmentationSettings, CropSettings, ModelType
+from modules import inference
 from modules.session import SessionSettings, SequencerSettings
 from modules.gl.WindowManager import WindowSettings
 from .composition.settings import CompositorSettings
@@ -189,7 +189,7 @@ class SimilarityFeature(BaseSettings):
 
 class PoseGroup(BaseSettings):
     max_poses        : Field[int]       = Field(3, min=1, max=16, access=Field.INIT)
-    model_type       : Field[ModelType] = Field(ModelType.TRT, access=Field.INIT)
+    model_type       : Field[inference.ModelType] = Field(inference.ModelType.TRT, access=Field.INIT)
     model_path       : Field[str]       = Field("models", access=Field.INIT, visible=False)
     verbose          : Field[bool]      = Field(False, access=Field.INIT)
     frequency        : Field[float]     = Field(30.0, access=Field.INIT)
@@ -198,9 +198,9 @@ class PoseGroup(BaseSettings):
 
     _feature_share: list = [frequency, output_frequency]
 
-    detection       : Group[DetectionSettings]              = Group(DetectionSettings, share=[max_poses, model_type, model_path, verbose])
-    segmentation    : Group[SegmentationSettings]           = Group(SegmentationSettings, share=[max_poses, model_type, model_path, verbose])
-    image_crop      : Group[CropSettings]                   = Group(CropSettings, share=[max_poses])
+    pose            : Group[inference.pose.Settings]           = Group(inference.pose.Settings, share=[max_poses, model_type, model_path, verbose])
+    segmentation    : Group[inference.segmentation.Settings]   = Group(inference.segmentation.Settings, share=[max_poses, model_type, model_path, verbose])
+    image_crop      : Group[inference.crop.Settings]         = Group(inference.crop.Settings, share=[max_poses])
     angle_extractor : Group[nodes.AngleExtractorSettings]   = Group(nodes.AngleExtractorSettings)
     bbox            : Group[BboxFeature]                    = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                   = Group(PointFeature, share=_feature_share)

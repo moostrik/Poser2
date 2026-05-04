@@ -7,7 +7,7 @@ import torch.nn.functional as F
 
 from modules.pose.features import BBox
 from modules.pose.frame import FrameDict, replace
-from .image_uploader import FullImageDict
+from .source import ImageDict as SourceImageDict
 from modules.utils import Rect, Point2f
 from modules.settings import BaseSettings, Field
 
@@ -15,27 +15,25 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class CropImage:
+class Image:
     """GPU-resident cropped region for a single tracked pose.
 
     Format: float16 RGB CHW [0, 1].
 
     Attributes:
-        track_id:  Tracklet identifier
         crop:      Resized crop on GPU (3, H, W) float16 RGB CHW [0, 1]
         prev_crop: Previous frame cropped at current bbox for optical flow,
                    or None if no previous frame is available.
     """
-    track_id: int
     crop: torch.Tensor
     prev_crop: torch.Tensor | None = None
 
 
-CropImageDict: TypeAlias = dict[int, CropImage]
-CropImageCallback: TypeAlias = Callable[[FrameDict, CropImageDict], None]
+ImageDict: TypeAlias = dict[int, Image]
+ImageCallback: TypeAlias = Callable[[FrameDict, ImageDict], None]
 
 
-class CropSettings(BaseSettings):
+class Settings(BaseSettings):
     """Configuration for GPU-based image cropping."""
     expansion_width:  Field[float] = Field(0.0, min=0.0, max=1.0, access=Field.INIT)
     expansion_height: Field[float] = Field(0.0, min=0.0, max=1.0, access=Field.INIT)
@@ -45,36 +43,36 @@ class CropSettings(BaseSettings):
     enable_prev_crop: Field[bool]  = Field(True, access=Field.INIT)
 
 
-class CropExtractor:
-    """Crops GPU images at pose bounding-box locations and emits CropImageDict.
+class Extractor:
+    """Crops GPU images at pose bounding-box locations and emits ImageDict.
 
-    Receives FullImageDict and prev-images from ImageUploader, plus a FrameDict
+    Receives SourceImageDict and prev-images from source.Uploader, plus a FrameDict
     with BBox features. For each pose, crops the current image and optionally
     the previous image at the same bbox for optical-flow use.
 
     All tensors are float16 RGB CHW [0, 1] at a fixed output resolution.
     """
 
-    def __init__(self, config: CropSettings) -> None:
+    def __init__(self, config: Settings) -> None:
         self._config = config
-        self._callbacks: set[CropImageCallback] = set()
+        self._callbacks: set[ImageCallback] = set()
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
 
     def process(
         self,
         poses: FrameDict,
-        images: FullImageDict,
-        prev_images: dict[int, torch.Tensor],
+        images: SourceImageDict,
+        prev_images: SourceImageDict,
     ) -> None:
         """Crop images for each pose and notify callbacks.
 
         Args:
             poses:       FrameDict with BBox features, keyed by track_id
-            images:      Current GPU images (from ImageUploader.snapshot)
-            prev_images: Previous GPU images (from ImageUploader.snapshot)
+            images:      Current GPU images (from source.Uploader.snapshot)
+            prev_images: Previous GPU images (from source.Uploader.snapshot)
         """
         cropped_poses: FrameDict = {}
-        crop_images: CropImageDict = {}
+        crop_images: ImageDict = {}
         pose_count = 0
 
         with torch.cuda.stream(self._stream):
@@ -85,12 +83,12 @@ class CropExtractor:
 
                 if pose_count >= self._config.max_poses:
                     logger.warning(
-                        f"CropExtractor: Exceeded max poses ({self._config.max_poses}), skipping {pose_id}"
+                        f"Extractor: Exceeded max poses ({self._config.max_poses}), skipping {pose_id}"
                     )
                     continue
 
                 try:
-                    gpu_image = images[cam_id].image
+                    gpu_image = images[cam_id]
                     img_height, img_width = gpu_image.shape[1:3]
                     bbox_rect = pose[BBox].to_rect().zoom(
                         Point2f(1.0 + self._config.expansion_width, 1.0 + self._config.expansion_height)
@@ -106,15 +104,14 @@ class CropExtractor:
 
                     normalized_roi = crop_roi.scale(Point2f(1.0 / img_width, 1.0 / img_height))
                     cropped_poses[pose_id] = replace(pose, {BBox: BBox.from_rect(normalized_roi)})
-                    crop_images[pose_id] = CropImage(
-                        track_id=pose_id,
+                    crop_images[pose_id] = Image(
                         crop=crop_tensor,
                         prev_crop=prev_crop,
                     )
                     pose_count += 1
 
                 except Exception:
-                    logger.exception(f"CropExtractor: Error processing pose {pose_id}")
+                    logger.exception(f"Extractor: Error processing pose {pose_id}")
 
         self._stream.synchronize()
 
@@ -163,11 +160,5 @@ class CropExtractor:
 
         return crop_chw
 
-    def add_image_callback(self, callback: CropImageCallback) -> None:
+    def add_image_callback(self, callback: ImageCallback) -> None:
         self._callbacks.add(callback)
-
-    def remove_image_callback(self, callback: CropImageCallback) -> None:
-        self._callbacks.discard(callback)
-
-    def reset(self) -> None:
-        pass

@@ -7,10 +7,10 @@ import time
 import torch
 import tensorrt as trt
 
-from ..tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
-from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
+from ..trt_runtime import get_tensorrt_runtime, get_init_lock, get_exec_lock
+from .io import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
 
-from .SegmentationSettings import SegmentationSettings
+from .settings import Settings
 
 import logging
 logger = logging.getLogger(__name__)
@@ -23,10 +23,10 @@ class RecurrentState:
         self.r3 = r3
         self.r4 = r4
 
-class TRTSegmentation(Thread):
+class RunnerTRT(Thread):
     """Asynchronous GPU person segmentation using Robust Video Matting (RVM) with TensorRT.
 
-    TensorRT-optimized inference for maximum performance. Drop-in replacement for ONNXSegmentation.
+    TensorRT-optimized inference for maximum performance. Drop-in replacement for PredictorONNX.
 
     Uses preallocated buffers and dedicated CUDA stream for ultra-low latency.
     All preprocessing and inference runs on the same dedicated stream to avoid sync overhead.
@@ -39,7 +39,7 @@ class TRTSegmentation(Thread):
     All results delivered via callbacks in notification order.
     """
 
-    def __init__(self, settings: 'SegmentationSettings') -> None:
+    def __init__(self, settings: 'Settings') -> None:
         super().__init__()
 
         self.model_path: str = settings.model_path

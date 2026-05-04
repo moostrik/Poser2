@@ -73,8 +73,8 @@ class HDTrioMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.image_uploader = inference.ImageUploader()
-        self.crop_extractor = inference.CropExtractor(ps.image_crop)
+        self.image_uploader = inference.source.Uploader()
+        self.crop_extractor = inference.crop.Extractor(ps.image_crop)
 
         for camera in self.cameras:
             camera.add_sync_callback(self.video_recorder.submit_synced_frames)
@@ -88,8 +88,8 @@ class HDTrioMain:
         features.configure_features(num_players)
 
         self.poses_from_tracklets = PosesFromTracklets(num_players)
-        self.point_extractor = inference.PointBatchExtractor(ps.detection)
-        self.mask_extractor  = inference.MaskBatchExtractor(ps.segmentation)
+        self.pose_predictor = inference.pose.Predictor(ps.pose)
+        self.mask_predictor  = inference.segmentation.Predictor(ps.segmentation)
 
         self.bbox_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
@@ -103,13 +103,13 @@ class HDTrioMain:
         self.tracklet_sync_bang.add_sync_callback(self.tracker.notify_update)
         self.frame_sync_bang.add_sync_callback(self.poses_from_tracklets.process)
 
-        self.crop_extractor.add_image_callback(self.point_extractor.process)
-        self.crop_extractor.add_image_callback(self.mask_extractor.process)
+        self.crop_extractor.add_image_callback(self.pose_predictor.process)
+        self.crop_extractor.add_image_callback(self.mask_predictor.process)
         self.crop_extractor.add_image_callback(lambda _f, crops: self.board.set_crop_images(crops))
 
         self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
         self.bbox_filters.add_frames_callback(self._process_poses)
-        self.mask_extractor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
+        self.mask_predictor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
         # STAGE WINDOW TRACKERS & BROADCASTS
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
@@ -126,7 +126,7 @@ class HDTrioMain:
             ])
 
         # POSE STAGE RAW
-        self.point_extractor.add_frames_callback(self.stages[Stage.RAW])
+        self.pose_predictor.add_frames_callback(self.stages[Stage.RAW])
 
         # POSE STAGE CLEAN
         self.filters_clean = trackers.FilterTracker({
@@ -239,8 +239,8 @@ class HDTrioMain:
             camera.start()
 
         self.tracker.start()
-        self.point_extractor.start()
-        self.mask_extractor.start()
+        self.pose_predictor.start()
+        self.mask_predictor.start()
         self.window_similator.start()
         self.window_correlator.start()
 
@@ -283,8 +283,8 @@ class HDTrioMain:
 
         self.session_osc.server.shutdown()
 
-        self.point_extractor.stop()
-        self.mask_extractor.stop()
+        self.pose_predictor.stop()
+        self.mask_predictor.stop()
         self.window_similator.stop()
         self.window_correlator.stop()
 

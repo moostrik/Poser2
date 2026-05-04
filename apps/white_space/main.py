@@ -69,8 +69,8 @@ class WhiteSpaceMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = PanoramicTracker(self.settings.camera.tracker, num_players, num_cameras)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.image_uploader = inference.ImageUploader()
-        self.crop_extractor = inference.CropExtractor(ps.image_crop)
+        self.image_uploader = inference.source.Uploader()
+        self.crop_extractor = inference.crop.Extractor(ps.image_crop)
 
         for camera in self.cameras:
             camera.add_sync_callback(self.video_recorder.submit_synced_frames)
@@ -85,8 +85,8 @@ class WhiteSpaceMain:
 
         self.poses_from_tracklets = PosesFromTracklets(num_players)
 
-        self.point_extractor = inference.PointBatchExtractor(ps.detection)
-        self.mask_extractor = inference.MaskBatchExtractor(ps.segmentation)
+        self.point_extractor = inference.pose.Predictor(ps.pose)
+        self.mask_extractor  = inference.segmentation.Predictor(ps.segmentation)
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracker.add_tracklet_callback(self.board.set_tracklets)

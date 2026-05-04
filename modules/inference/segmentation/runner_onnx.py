@@ -8,12 +8,12 @@ import numpy as np
 import torch
 import onnxruntime as ort
 
-from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
+from .io import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .SegmentationSettings import SegmentationSettings
+    from .settings import Settings
 
 import logging
 logger = logging.getLogger(__name__)
@@ -28,10 +28,10 @@ class RecurrentState:
         self.r4 = r4
 
 
-class ONNXSegmentation(Thread):
+class RunnerONNX(Thread):
     """Asynchronous GPU person segmentation using Robust Video Matting (RVM) with ONNX Runtime.
 
-    ONNX Runtime implementation for testing/validation. Use TRTSegmentation for production.
+    ONNX Runtime implementation for testing/validation. Use PredictorTRT for production.
 
     Uses recurrent states for temporal coherence, eliminating flickering artifacts.
     Single-slot queue: only the most recent batch waits processing; older pending batches dropped.
@@ -41,7 +41,7 @@ class ONNXSegmentation(Thread):
     All results delivered via callbacks in notification order.
     """
 
-    def __init__(self, settings: 'SegmentationSettings') -> None:
+    def __init__(self, settings: 'Settings') -> None:
         super().__init__()
 
 

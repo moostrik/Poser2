@@ -3,26 +3,25 @@ from typing import Union
 
 import torch
 
-from ..crop_extractor import CropImage, CropImageDict
-from .segmentation_image import SegmentationImage, SegmentationImageDict, SegmentationImageCallback
+from .. import crop, ModelType
+from .image import Image, ImageDict, ImageCallback
 from modules.pose.frame import FrameDict
-from ..model_types import ModelType
-from .SegmentationSettings import SegmentationSettings
+from .settings import Settings
 from modules.utils import PerformanceTimer
 
 
-from .InOut import SegmentationInput, SegmentationOutput
-from .ONNXSegmentation import ONNXSegmentation
-from .TRTSegmentation import TRTSegmentation
+from .io import SegmentationInput, SegmentationOutput
+from .runner_onnx import RunnerONNX
+from .runner_trt import RunnerTRT
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-Segmentation = Union[ONNXSegmentation, TRTSegmentation]
+Segmentation = Union[RunnerONNX, RunnerTRT]
 
 
-class MaskBatchExtractor:
+class Predictor:
     """GPU-based batch extractor for person segmentation masks using RVM.
 
     Batches are processed asynchronously on GPU. Under load, pending batches may
@@ -36,22 +35,22 @@ class MaskBatchExtractor:
     for real-time visualization where recent data is more valuable than old data.
     """
 
-    def __init__(self, settings: SegmentationSettings):
-        self._segmentation: Segmentation = ONNXSegmentation(settings)
+    def __init__(self, settings: Settings):
+        self._segmentation: Segmentation = RunnerONNX(settings)
         if settings.model_type is ModelType.ONNX:
-            self._segmentation = ONNXSegmentation(settings)
+            self._segmentation = RunnerONNX(settings)
         elif settings.model_type is ModelType.TRT:
-            self._segmentation = TRTSegmentation(settings)
+            self._segmentation = RunnerTRT(settings)
         self._lock: Lock = Lock()
         self._batch_counter: int = 0
         self._verbose: bool = settings.verbose
 
         # Callbacks
-        self._callbacks: set[SegmentationImageCallback] = set()
+        self._callbacks: set[ImageCallback] = set()
         self._callback_lock: Lock = Lock()
 
         # Pending frames awaiting segmentation results, keyed by batch_id
-        self._pending_frames: dict[int, tuple[FrameDict, CropImageDict]] = {}
+        self._pending_frames: dict[int, tuple[FrameDict, crop.ImageDict]] = {}
 
         # Track active tracklet IDs for detecting removed tracklets
         self._previous_tracklet_ids: set[int] = set()
@@ -59,7 +58,7 @@ class MaskBatchExtractor:
         # Track inference times
         self._process_timer =   PerformanceTimer(name="RVM Segmentation  ", sample_count=1000, report_interval=100, color='cyan', omit_init=25)
         self._wait_timer =      PerformanceTimer(name="RVM Wait        ", sample_count=1000, report_interval=100, color='cyan', omit_init=25)
-        self._settings: SegmentationSettings = settings
+        self._settings: Settings = settings
 
         self._segmentation.register_callback(self._on_segmentation_result)
 
@@ -71,7 +70,7 @@ class MaskBatchExtractor:
         """Stop the segmentation processing thread."""
         self._segmentation.stop()
 
-    def process(self, poses: FrameDict, crop_frames: CropImageDict) -> None:
+    def process(self, poses: FrameDict, crop_frames: crop.ImageDict) -> None:
         """Submit poses with GPU images for async processing. Results broadcast via callbacks.
 
         Args:
@@ -130,14 +129,13 @@ class MaskBatchExtractor:
         # Track inference time
         self._process_timer.add_time(output.inference_time_ms, report=self._verbose)
 
-        # Build SegmentationImageDict from segmentation results
-        result_frames: SegmentationImageDict = {}
+        # Build ImageDict from segmentation results
+        result_frames: ImageDict = {}
         for idx, tracklet_id in enumerate(output.tracklet_ids):
             if idx < output.mask_tensor.shape[0]:
                 mask = output.mask_tensor[idx]  # (H, W) tensor on GPU
                 foreground = output.fgr_tensor[idx]
-                result_frames[tracklet_id] = SegmentationImage(
-                    track_id=tracklet_id,
+                result_frames[tracklet_id] = Image(
                     mask=mask,
                     foreground=foreground,
                 )
@@ -145,7 +143,7 @@ class MaskBatchExtractor:
         # Broadcast to callbacks
         self._notify_callbacks(poses, result_frames)
 
-    def _notify_callbacks(self, poses: FrameDict, mask_frames: SegmentationImageDict) -> None:
+    def _notify_callbacks(self, poses: FrameDict, mask_frames: ImageDict) -> None:
         """Emit callbacks with poses and segmentation frames."""
         with self._callback_lock:
             for callback in self._callbacks:
@@ -153,12 +151,12 @@ class MaskBatchExtractor:
                     callback(poses, mask_frames)
                 except Exception as e:
                     logger.exception("Error in callback")
-    def add_segmentation_image_callback(self, callback: SegmentationImageCallback) -> None:
+    def add_segmentation_image_callback(self, callback: ImageCallback) -> None:
         """Register callback to receive poses and segmentation images."""
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def remove_segmentation_image_callback(self, callback: SegmentationImageCallback) -> None:
+    def remove_segmentation_image_callback(self, callback: ImageCallback) -> None:
         """Unregister callback."""
         with self._callback_lock:
             self._callbacks.discard(callback)
