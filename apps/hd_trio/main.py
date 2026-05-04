@@ -8,12 +8,11 @@ from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecord
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
-from modules.pose import nodes, trackers, features, window, analytics
-from modules.pose.frame import FrameDict
-from modules import inference
-from modules.pose.recorder import Recorder as PoseRecorder
+from modules.pose import nodes, trackers, features, window, analytics, FrameDict
+from modules.pose import Recorder as PoseRecorder
+from modules.inference import source, crop, pose, segmentation
 from modules.session import Session, Sequencer
-from modules.gl.WindowManager import WindowSettings
+from modules.gl import WindowSettings
 
 from .render_board import RenderBoard
 from .settings import Settings, Stage
@@ -73,8 +72,8 @@ class HDTrioMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.image_uploader = inference.source.Uploader()
-        self.crop_extractor = inference.crop.Extractor(ps.image_crop)
+        self.image_uploader = source.Uploader()
+        self.crop_extractor = crop.Extractor(ps.image_crop)
 
         for camera in self.cameras:
             camera.add_sync_callback(self.video_recorder.submit_synced_frames)
@@ -88,8 +87,8 @@ class HDTrioMain:
         features.configure_features(num_players)
 
         self.poses_from_tracklets = PosesFromTracklets(num_players)
-        self.pose_predictor = inference.pose.Predictor(ps.pose)
-        self.segmentation_predictor  = inference.segmentation.Predictor(ps.segmentation)
+        self.pose_predictor = pose.Predictor(ps.pose)
+        self.segmentation_predictor  = segmentation.Predictor(ps.segmentation)
 
         self.bbox_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([

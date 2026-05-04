@@ -8,7 +8,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle import OscBundle
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
-from apps.white_space.composition.output import CompositionOutput
+from .composition import CompositionOutput
 from modules.settings import BaseSettings, Field, Widget
 from modules.inout.network_validation import validate_connection
 

@@ -2,13 +2,10 @@
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import RenderBase, Shader, Style, clear_color, Texture
-from modules.gl.WindowManager import MonitorId, WindowSettings
+from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, WindowSettings
 from modules.render.layers import LayerBase
-from modules.utils.PointsAndRects import Rect, Point2f
-from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
-from modules.render import layers as ls
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.render import layers as ls, make_subdivision, SubdivisionRow, Subdivision
+from modules.utils import Rect, Point2f, HotReloadMethods
 
 from .render_board import RenderBoard
 from .settings import Layers, RenderSettings, ShowStage, Stage

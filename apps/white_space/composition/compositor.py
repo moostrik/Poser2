@@ -6,8 +6,8 @@ from typing import Callable
 
 import numpy as np
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-from modules.gl.Utils import FpsCounter
+from modules.utils import HotReloadMethods
+from modules.gl import FpsCounter
 from modules.tracker import Tracklet
 from modules.pose.frame import Frame, FrameDict
 

@@ -13,19 +13,16 @@ from enum import IntEnum, auto
 from typing import Any
 
 from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
-from modules.oak import CameraSettings, FrameType, CoderFormat, SimulatorSettings, RecorderSettings, SyncSettings
-from modules.render.color_settings import ColorSettings
-from modules.render import layers
-from modules.render.layers.centre.CentrePoseLayer import CentrePoseSettings
+from modules.oak import CameraSettings, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
 from modules.utils import Color
 from modules.tracker import OnePerCamTrackerSettings
 from modules.pose import nodes, trackers, window, analytics
 from modules import inference
-from modules.inference import ModelType
-from modules.pose.recorder.settings import RecorderSettings as PoseRecorderSettings
+from modules.pose.recorder import RecorderSettings as PoseRecorderSettings
 from modules.session import SessionSettings, SequencerSettings
-from modules.gl.WindowManager import WindowSettings
+from modules.gl import WindowSettings
 
 
 # ---------------------------------------------------------------------------
@@ -215,7 +212,7 @@ class SimilarityFeature(BaseSettings):
 
 class PoseGroup(BaseSettings):
     max_poses       : Field[int]       = Field(3, min=1, max=16, access=Field.INIT)
-    model_type      : Field[ModelType] = Field(ModelType.TRT, access=Field.INIT)
+    model_type      : Field[inference.ModelType] = Field(inference.ModelType.TRT, access=Field.INIT)
     model_path      : Field[str]       = Field("models", access=Field.INIT, visible=False)
     verbose         : Field[bool]      = Field(False, access=Field.INIT)
     frequency       : Field[float]     = Field(30.0, access=Field.INIT)
@@ -224,9 +221,9 @@ class PoseGroup(BaseSettings):
     _batch_share  : list = [max_poses, model_type, model_path, verbose]
     _feature_share: list = [frequency, output_frequency]
 
-    pose            : Group[inference.pose.Settings]              = Group(inference.pose.Settings, share=_batch_share)
-    segmentation    : Group[inference.segmentation.Settings]      = Group(inference.segmentation.Settings, share=_batch_share)
-    optical_flow    : Group[inference.optical_flow.Settings]      = Group(inference.optical_flow.Settings, share=_batch_share)
+    pose            : Group[inference.pose.Settings]          = Group(inference.pose.Settings, share=_batch_share)
+    segmentation    : Group[inference.segmentation.Settings]  = Group(inference.segmentation.Settings, share=_batch_share)
+    optical_flow    : Group[inference.optical_flow.Settings]  = Group(inference.optical_flow.Settings, share=_batch_share)
     image_crop      : Group[inference.crop.Settings]          = Group(inference.crop.Settings, share=[max_poses])
     angle_extractor : Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
     bbox            : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)
@@ -316,7 +313,7 @@ class IntroSequenceSettings(BaseSettings):
     recording_path: Field[str]   = Field("recordings/intro", access=Field.INIT, description="Path to recorded pose folder")
     source_track:   Field[int]   = Field(0, min=0, max=16, access=Field.INIT, description="Track ID to use from recording")
     color:          Field[Color] = Field(Color(1.0, 1.0, 1.0), description="Skeleton color for intro overlay")
-    pose:           Group[CentrePoseSettings]  = Group(CentrePoseSettings)
+    pose:           Group[layers.CentrePoseSettings]  = Group(layers.CentrePoseSettings)
 
 
 class RenderSettings(BaseSettings):

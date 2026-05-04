@@ -2,10 +2,10 @@
 from .RenderBase import RenderBase
 from .Shader import Shader, draw_quad
 from .ComputeShader import ComputeShader
-from .WindowManager import WindowManager, WindowSettings
+from .WindowManager import WindowManager, WindowSettings, MonitorId
 from . import Style
 from . import shaders
-from .Utils import Blit, clear_color
+from .Utils import Blit, clear_color, FpsCounter
 
 # TEXTURE CLASSES
 from .Texture import Texture

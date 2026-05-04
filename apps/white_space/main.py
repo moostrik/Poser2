@@ -8,18 +8,17 @@ from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecord
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound
 from modules.tracker import PanoramicTracker, PosesFromTracklets
-from modules.pose import nodes, trackers, features, window, analytics
-from modules.pose.frame import FrameDict
-from modules import inference
+from modules.pose import nodes, trackers, features, window, analytics, FrameDict
+from modules.inference import source, crop, pose, segmentation
 from modules.session import Session, Sequencer
-from modules.gl.WindowManager import WindowSettings
+from modules.gl import WindowSettings
 
 from .composition import Compositor
 from .osc_light import OscLight
 
 from .render.board import RenderBoard
 from .settings import Settings, Stage
-from .render.render import WhiteSpaceRender
+from .render import WhiteSpaceRender
 
 APP_NAME = 'white_space'
 
@@ -69,8 +68,8 @@ class WhiteSpaceMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = PanoramicTracker(self.settings.camera.tracker, num_players, num_cameras)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.source_uploader = inference.source.Uploader()
-        self.crop_extractor = inference.crop.Extractor(ps.image_crop)
+        self.source_uploader = source.Uploader()
+        self.crop_extractor = crop.Extractor(ps.image_crop)
 
         for camera in self.cameras:
             camera.add_sync_callback(self.video_recorder.submit_synced_frames)
@@ -85,8 +84,8 @@ class WhiteSpaceMain:
 
         self.poses_from_tracklets = PosesFromTracklets(num_players)
 
-        self.pose_predictor = inference.pose.Predictor(ps.pose)
-        self.segmentation_predictor  = inference.segmentation.Predictor(ps.segmentation)
+        self.pose_predictor = pose.Predictor(ps.pose)
+        self.segmentation_predictor  = segmentation.Predictor(ps.segmentation)
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracker.add_tracklet_callback(self.board.set_tracklets)

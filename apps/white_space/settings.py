@@ -12,16 +12,15 @@ The root class is ``Settings``.
 from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
-from modules.oak import CameraSettings, FrameType, CoderFormat, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.oak import CameraSettings, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
-from modules.render.layers import DataLayerSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import PanoramicTrackerSettings
 from modules.pose import nodes, trackers, window, analytics
 from modules import inference
 from modules.session import SessionSettings, SequencerSettings
-from modules.gl.WindowManager import WindowSettings
-from .composition.settings import CompositorSettings
+from modules.gl import WindowSettings
+from .composition import CompositorSettings
 from .osc_light import OscLightSettings
 
 
@@ -198,21 +197,21 @@ class PoseGroup(BaseSettings):
 
     _feature_share: list = [frequency, output_frequency]
 
-    pose            : Group[inference.pose.Settings]           = Group(inference.pose.Settings, share=[max_poses, model_type, model_path, verbose])
-    segmentation    : Group[inference.segmentation.Settings]   = Group(inference.segmentation.Settings, share=[max_poses, model_type, model_path, verbose])
+    pose            : Group[inference.pose.Settings]         = Group(inference.pose.Settings, share=[max_poses, model_type, model_path, verbose])
+    segmentation    : Group[inference.segmentation.Settings] = Group(inference.segmentation.Settings, share=[max_poses, model_type, model_path, verbose])
     image_crop      : Group[inference.crop.Settings]         = Group(inference.crop.Settings, share=[max_poses])
-    angle_extractor : Group[nodes.AngleExtractorSettings]   = Group(nodes.AngleExtractorSettings)
-    bbox            : Group[BboxFeature]                    = Group(BboxFeature, share=_feature_share)
-    point           : Group[PointFeature]                   = Group(PointFeature, share=_feature_share)
-    angle           : Group[AngleFeature]                   = Group(AngleFeature, share=_feature_share)
-    velocity        : Group[VelocityFeature]                = Group(VelocityFeature, share=_feature_share)
-    motion          : Group[MotionFeature]                  = Group(MotionFeature)
-    similarity      : Group[SimilarityFeature]              = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
-    window_raw      : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
-    window_clean    : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
-    window_smooth   : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
-    window_predict  : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
-    window_lerp     : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
+    angle_extractor : Group[nodes.AngleExtractorSettings]    = Group(nodes.AngleExtractorSettings)
+    bbox            : Group[BboxFeature]                     = Group(BboxFeature, share=_feature_share)
+    point           : Group[PointFeature]                    = Group(PointFeature, share=_feature_share)
+    angle           : Group[AngleFeature]                    = Group(AngleFeature, share=_feature_share)
+    velocity        : Group[VelocityFeature]                 = Group(VelocityFeature, share=_feature_share)
+    motion          : Group[MotionFeature]                   = Group(MotionFeature)
+    similarity      : Group[SimilarityFeature]               = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
+    window_raw      : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
+    window_clean    : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
+    window_smooth   : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
+    window_predict  : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
+    window_lerp     : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
 
 
 # ---------------------------------------------------------------------------
@@ -260,7 +259,7 @@ class RenderSettings(BaseSettings):
     num_cams:    Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of players")
     preview:     Group[PreviewGroup]     = Group(PreviewGroup)
-    data:        Group[DataLayerSettings] = Group(DataLayerSettings)
+    data:        Group[layers.DataLayerSettings] = Group(layers.DataLayerSettings)
     colors:      Group[ColorSettings]    = Group(ColorSettings)
     window:      Group[WindowSettings]   = Group(WindowSettings)
 

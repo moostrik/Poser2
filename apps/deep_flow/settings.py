@@ -13,13 +13,12 @@ from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, NiceSettings, Field, Group
 from modules.oak import CameraSettings, FrameType, CoderFormat, SimulatorSettings, RecorderSettings, SyncSettings
-from modules.render.color_settings import ColorSettings
-from modules.render import layers
+from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings
 from modules.pose import nodes, trackers, window
 from modules import inference
-from modules.gl.WindowManager import WindowSettings
+from modules.gl import WindowSettings
 
 
 # ---------------------------------------------------------------------------

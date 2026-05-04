@@ -3,14 +3,13 @@
 from typing import Optional
 from functools import partial
 
-from modules.utils.Broadcast import Broadcast
+from modules.utils import Broadcast
 from modules.oak import Camera, Simulator, Player, Recorder, Sync
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
-from modules.pose import nodes, trackers, window
-from modules.pose.frame import FrameDict
-from modules import inference
+from modules.pose import nodes, trackers, window, FrameDict
+from modules.inference import source, crop, pose, segmentation, optical_flow
 from modules.pose.features import configure_features
 
 from .render_board import RenderBoard
@@ -60,8 +59,8 @@ class DeepFlowMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.tt.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.image_uploader = inference.source.Uploader()
-        self.crop_extractor = inference.crop.Extractor(p.image_crop)
+        self.image_uploader = source.Uploader()
+        self.crop_extractor = crop.Extractor(p.image_crop)
 
         for camera in self.cameras:
             if self.recorder:
@@ -74,9 +73,9 @@ class DeepFlowMain:
 
         # DETECTION
         self.poses_from_tracklets = PosesFromTracklets(num_players)
-        self.pose_predictor = inference.pose.Predictor(p.pose)
-        self.segmentation_predictor  = inference.segmentation.Predictor(p.segmentation)
-        self.optical_flow_predictor  = inference.optical_flow.Predictor(p.optical_flow)
+        self.pose_predictor = pose.Predictor(p.pose)
+        self.segmentation_predictor  = segmentation.Predictor(p.segmentation)
+        self.optical_flow_predictor  = optical_flow.Predictor(p.optical_flow)
 
         self.bbox_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
