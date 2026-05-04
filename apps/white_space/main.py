@@ -90,14 +90,6 @@ class WhiteSpaceMain:
         if ps.use_segmentation:
             self.mask_extractor = inference.MaskBatchExtractor(ps.segmentation)
 
-        # self.bbox_filters = trackers.FilterTracker({
-        #     i: trackers.FilterPipeline([
-        #         nodes.BBoxEuroSmoother(ps.bbox.smoother),
-        #         nodes.BBoxPredictor(ps.bbox.prediction),
-        #     ])
-        #     for i in range(num_players)
-        # })
-
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracker.add_tracklet_callback(self.board.set_tracklets)
         self.tracklet_sync_bang.add_sync_callback(self.tracker.notify_update)
