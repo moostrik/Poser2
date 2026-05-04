@@ -86,9 +86,7 @@ class WhiteSpaceMain:
         self.poses_from_tracklets = PosesFromTracklets(num_players)
 
         self.point_extractor = inference.PointBatchExtractor(ps.detection)
-        self.mask_extractor: Optional[inference.MaskBatchExtractor] = None
-        if ps.use_segmentation:
-            self.mask_extractor = inference.MaskBatchExtractor(ps.segmentation)
+        self.mask_extractor = inference.MaskBatchExtractor(ps.segmentation)
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracker.add_tracklet_callback(self.board.set_tracklets)
@@ -97,9 +95,8 @@ class WhiteSpaceMain:
 
         self.crop_extractor.add_image_callback(self.point_extractor.process)
         self.crop_extractor.add_image_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
-        if self.mask_extractor is not None:
-            self.crop_extractor.add_image_callback(self.mask_extractor.process)
-            self.mask_extractor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
+        self.crop_extractor.add_image_callback(self.mask_extractor.process)
+        self.mask_extractor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
         # self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
         # self.bbox_filters.add_frames_callback(self._process_poses)
@@ -243,8 +240,7 @@ class WhiteSpaceMain:
 
         self.tracker.start()
         self.point_extractor.start()
-        if self.mask_extractor is not None:
-            self.mask_extractor.start()
+        self.mask_extractor.start()
         self.window_similator.start()
         self.window_correlator.start()
         self.compositor.start()
@@ -285,8 +281,7 @@ class WhiteSpaceMain:
         self.compositor.stop()
 
         self.point_extractor.stop()
-        if self.mask_extractor is not None:
-            self.mask_extractor.stop()
+        self.mask_extractor.stop()
         self.window_similator.stop()
         self.window_correlator.stop()
 

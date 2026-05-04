@@ -37,10 +37,6 @@ class TRTOpticalFlow(Thread):
     def __init__(self, settings: 'FlowSettings') -> None:
         super().__init__()
 
-        self.enabled: bool = settings.enabled
-        if not self.enabled:
-            logger.warning('TensorRT Optical Flow WARNING: Optical flow is disabled')
-
         self.model_path: str = settings.model_path
         self.model_name: str = settings.model
         self.model_file: str = f"{self.model_path}/{self.model_name}"
@@ -89,16 +85,11 @@ class TRTOpticalFlow(Thread):
         return self._model_ready.is_set() and not self._shutdown_event.is_set() and self.is_alive()
 
     def start(self) -> None:
-        if not self.enabled:
-            return
         self._callback_thread.start()
         super().start()
 
     def stop(self) -> None:
         """Stop both inference and callback threads gracefully."""
-        if not self.enabled:
-            return
-
         self._shutdown_event.set()
 
         # Wake up inference thread

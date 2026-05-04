@@ -182,6 +182,7 @@
     "model_path": "models",
     "verbose": false,
     "detection": {
+      "enabled": true,
       "resolution": "STANDARD"
     },
     "segmentation": {

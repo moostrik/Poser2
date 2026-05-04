@@ -25,7 +25,7 @@ class SegmentationSettings(BaseSettings):
     resolution:     Field[Resolution] = Field(Resolution.STANDARD, access=Field.INIT)
     model_path:     Field[str]        = Field("models", access=Field.INIT, visible=False)
     verbose:        Field[bool]       = Field(False, access=Field.INIT)
-    enabled:        Field[bool]       = Field(True, access=Field.INIT)
+    enabled:        Field[bool]       = Field(True)
     reset_interval: Field[int]        = Field(60, min=1, access=Field.INIT)
 
     @property

@@ -82,6 +82,7 @@
     "frequency": 30.0,
     "output_frequency": 60.0,
     "detection": {
+      "enabled": true,
       "resolution": "STANDARD"
     },
     "segmentation": {

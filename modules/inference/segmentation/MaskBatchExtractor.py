@@ -59,6 +59,7 @@ class MaskBatchExtractor:
         # Track inference times
         self._process_timer =   PerformanceTimer(name="RVM Segmentation  ", sample_count=1000, report_interval=100, color='cyan', omit_init=25)
         self._wait_timer =      PerformanceTimer(name="RVM Wait        ", sample_count=1000, report_interval=100, color='cyan', omit_init=25)
+        self._settings: SegmentationSettings = settings
 
         self._segmentation.register_callback(self._on_segmentation_result)
 
@@ -78,6 +79,8 @@ class MaskBatchExtractor:
             crop_frames: Crop frames with crops already on GPU, keyed by tracklet ID
         """
         if not self._segmentation.is_ready:
+            return
+        if not self._settings.enabled:
             return
 
         tracklet_ids: list[int] = []

@@ -54,6 +54,7 @@ class FlowBatchExtractor:
 
         self._callbacks: set[FlowCallback] = set()
         self._callback_lock = Lock()
+        self._settings: FlowSettings = settings
 
         self._optical_flow.register_callback(self._on_optical_flow_result)
 
@@ -89,6 +90,8 @@ class FlowBatchExtractor:
             crop_frames: Crop frames with crop and prev_crop tensors, keyed by tracklet ID
         """
         if not self._optical_flow.is_ready:
+            return
+        if not self._settings.enabled:
             return
 
         tracklet_id_list: list[int] = []

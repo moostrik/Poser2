@@ -44,6 +44,7 @@ class PointBatchExtractor(FrameDictCallbackMixin):
         self._wait_timer =      PerformanceTimer(name="RTM Pose Wait     ", sample_count=1000, report_interval=100, color='yellow', omit_init=25)
 
         self._verbose: bool = settings.verbose
+        self._settings: DetectionSettings = settings
 
         self._detection.register_callback(self._on_detection_result)
 
@@ -63,6 +64,8 @@ class PointBatchExtractor(FrameDictCallbackMixin):
             crop_frames: Crop frames with crops already on GPU, keyed by tracklet ID
         """
         if not self._detection.is_ready:
+            return
+        if not self._settings.enabled:
             return
 
         tracklet_ids: list[int] = []

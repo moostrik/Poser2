@@ -25,7 +25,7 @@ class FlowSettings(BaseSettings):
     resolution: Field[Resolution] = Field(Resolution.STANDARD, access=Field.INIT)
     model_path: Field[str]        = Field("models", access=Field.INIT, visible=False)
     verbose:    Field[bool]       = Field(False, access=Field.INIT)
-    enabled:    Field[bool]       = Field(True, access=Field.INIT)
+    enabled:    Field[bool]       = Field(True)
 
     @property
     def width(self) -> int:

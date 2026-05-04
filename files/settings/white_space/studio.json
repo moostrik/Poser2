@@ -130,7 +130,7 @@
       "folder": "20250514-130512_4_wide_mono",
       "sim_passthrough": false,
       "range_start": 0,
-      "range_end": 0
+      "range_end": 10
     },
     "tracker": {
       "fov": 110.0,
@@ -163,13 +163,14 @@
     "model_type": "TRT",
     "model_path": "models",
     "verbose": false,
-    "use_segmentation": false,
     "ws_input_stage": "LERP",
     "detection": {
+      "enabled": true,
       "resolution": "STANDARD"
     },
     "segmentation": {
       "resolution": "STANDARD",
+      "enabled": false,
       "reset_interval": 240
     },
     "image_crop": {
@@ -190,6 +191,7 @@
         "rescale_scores": true
       },
       "sticky": {
+        "enabled": true,
         "init_to_zero": false,
         "hold_scores": false
       },
@@ -220,6 +222,7 @@
         "friction": 0.05
       },
       "sticky": {
+        "enabled": true,
         "init_to_zero": false,
         "hold_scores": true
       }
@@ -239,6 +242,7 @@
         "friction": 0.05
       },
       "sticky": {
+        "enabled": true,
         "init_to_zero": true,
         "hold_scores": false
       }
@@ -293,6 +297,7 @@
         "friction": 0.05
       },
       "sticky": {
+        "enabled": true,
         "init_to_zero": true,
         "hold_scores": false
       },
@@ -322,7 +327,6 @@
   "composition": {
     "bpm": 20.0,
     "active": [
-      "pose_waves",
       "lines"
     ],
     "blend": "ADD",

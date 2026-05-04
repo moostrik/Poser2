@@ -194,13 +194,12 @@ class PoseGroup(BaseSettings):
     verbose          : Field[bool]      = Field(False, access=Field.INIT)
     frequency        : Field[float]     = Field(30.0, access=Field.INIT)
     output_frequency : Field[float]     = Field(30.0)
-    use_segmentation : Field[bool]      = Field(False, access=Field.INIT, description="Enable mask/segmentation extraction")
     ws_input_stage   : Field[Stage]     = Field(Stage.LERP, description="Pipeline stage that feeds the WS light pipeline")
 
     _feature_share: list = [frequency, output_frequency]
 
     detection       : Group[DetectionSettings]              = Group(DetectionSettings, share=[max_poses, model_type, model_path, verbose])
-    segmentation    : Group[SegmentationSettings]           = Group(SegmentationSettings, share=[max_poses, model_type, model_path, verbose, use_segmentation.as_('enabled')])
+    segmentation    : Group[SegmentationSettings]           = Group(SegmentationSettings, share=[max_poses, model_type, model_path, verbose])
     image_crop      : Group[CropSettings]                   = Group(CropSettings, share=[max_poses])
     angle_extractor : Group[nodes.AngleExtractorSettings]   = Group(nodes.AngleExtractorSettings)
     bbox            : Group[BboxFeature]                    = Group(BboxFeature, share=_feature_share)
