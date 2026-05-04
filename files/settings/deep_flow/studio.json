@@ -391,7 +391,8 @@
       "height": 1000,
       "secondary_list": [
         "M0"
-      ]
+      ],
+      "secondary_fullscreen": true
     },
     "fluid3d": {
       "num_players": 1,

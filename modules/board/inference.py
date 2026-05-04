@@ -6,7 +6,6 @@ from typing import Protocol, TYPE_CHECKING
 if TYPE_CHECKING:
     import torch
     from modules.inference import source, crop, segmentation
-    # from modules.inference.segmentation import Image as SegmentationImage, ImageDict as SegmentationImageDict
 
 
 class HasCameraImages(Protocol):

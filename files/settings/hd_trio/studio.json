@@ -617,7 +617,8 @@
         "M1",
         "M2",
         "M3"
-      ]
+      ],
+      "secondary_fullscreen": true
     }
   },
   "server": {

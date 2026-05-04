@@ -573,7 +573,8 @@
       "y": 2120,
       "width": 2059,
       "height": 1651,
-      "secondary_list": []
+      "secondary_list": [],
+      "secondary_fullscreen": true
     }
   },
   "server": {
