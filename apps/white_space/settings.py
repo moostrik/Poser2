@@ -127,16 +127,15 @@ class BboxFeature(BaseSettings):
     frequency        : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency : Field[float] = Field(30.0)
 
-    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
-    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
-    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
-
 
 class PointFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(30.0)
 
-    confidence_filter: Group[nodes.DualConfFilterSettings]    = Group(nodes.DualConfFilterSettings)
+    confidence      : Group[nodes.DualConfFilterSettings]    = Group(nodes.DualConfFilterSettings)
+    sticky          : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
+
+
     smoother         : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
     prediction       : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
     interpolator     : Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])

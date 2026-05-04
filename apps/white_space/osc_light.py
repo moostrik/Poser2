@@ -140,6 +140,15 @@ class OscLight:
     ) -> Optional[OscMessageList]:
         try:
             message_list: OscMessageList = []
+
+            offset_msgb = OscMessageBuilder("/WS/offset")
+            offset_msgb.add_arg(settings.offset)
+            message_list.append(offset_msgb.build())
+
+            rpm_msgb = OscMessageBuilder("/WS/rpm")
+            rpm_msgb.add_arg(settings.rpm)
+            message_list.append(rpm_msgb.build())
+
             if settings.use_signed:
                 white_channel: np.ndarray = OscLight.float_to_int8(output.light_0)
                 blue_channel:  np.ndarray = OscLight.float_to_int8(output.light_1)
@@ -158,14 +167,6 @@ class OscLight:
                 bc_msgb = OscMessageBuilder(f"/WS/blue{i}")
                 bc_msgb.add_arg(blue_channel[start_idx:end_idx].tobytes(), 'b')
                 message_list.append(bc_msgb.build())
-
-            offset_msgb = OscMessageBuilder("/WS/offset")
-            offset_msgb.add_arg(settings.offset)
-            message_list.append(offset_msgb.build())
-
-            rpm_msgb = OscMessageBuilder("/WS/rpm")
-            rpm_msgb.add_arg(settings.rpm)
-            message_list.append(rpm_msgb.build())
 
             return message_list
         except Exception as e:

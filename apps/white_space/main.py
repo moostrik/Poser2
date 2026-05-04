@@ -90,13 +90,13 @@ class WhiteSpaceMain:
         if ps.use_segmentation:
             self.mask_extractor = inference.MaskBatchExtractor(ps.segmentation)
 
-        self.bbox_filters = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.BBoxEuroSmoother(ps.bbox.smoother),
-                nodes.BBoxPredictor(ps.bbox.prediction),
-            ])
-            for i in range(num_players)
-        })
+        # self.bbox_filters = trackers.FilterTracker({
+        #     i: trackers.FilterPipeline([
+        #         nodes.BBoxEuroSmoother(ps.bbox.smoother),
+        #         nodes.BBoxPredictor(ps.bbox.prediction),
+        #     ])
+        #     for i in range(num_players)
+        # })
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracker.add_tracklet_callback(self.board.set_tracklets)
@@ -109,8 +109,9 @@ class WhiteSpaceMain:
             self.crop_extractor.add_image_callback(self.mask_extractor.process)
             self.mask_extractor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
-        self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
-        self.bbox_filters.add_frames_callback(self._process_poses)
+        # self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
+        # self.bbox_filters.add_frames_callback(self._process_poses)
+        self.poses_from_tracklets.add_frames_callback(self._process_poses)
 
         # STAGE WINDOW TRACKERS & BROADCASTS
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
@@ -140,7 +141,8 @@ class WhiteSpaceMain:
         # POSE STAGE CLEAN
         self.filters_clean = trackers.FilterTracker({
             i: trackers.FilterPipeline([
-                nodes.PointDualConfFilter(ps.point.confidence_filter),
+                nodes.PointDualConfFilter(ps.point.confidence),
+                nodes.PointStickyFiller(ps.point.sticky),
                 nodes.AngleExtractor(ps.angle_extractor),
                 nodes.AngleVelExtractor(ps.velocity.extractor),
             ])
@@ -205,7 +207,6 @@ class WhiteSpaceMain:
 
         self.interpolators_lerp = trackers.InterpolatorTracker({
             i: trackers.InterpolatorPipeline([
-                nodes.BBoxChaseInterpolator(ps.bbox.interpolator),
                 nodes.PointChaseInterpolator(ps.point.interpolator),
                 nodes.AngleChaseInterpolator(ps.angle.interpolator),
                 nodes.AngleVelChaseInterpolator(ps.velocity.interpolator),
