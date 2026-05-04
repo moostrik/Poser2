@@ -105,6 +105,7 @@ class HDTrioMain:
 
         self.crop_extractor.add_image_callback(self.point_extractor.process)
         self.crop_extractor.add_image_callback(self.mask_extractor.process)
+        self.crop_extractor.add_image_callback(lambda _f, crops: self.board.set_crop_images(crops))
 
         self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
         self.bbox_filters.add_frames_callback(self._process_poses)
