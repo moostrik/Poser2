@@ -88,7 +88,7 @@ class OakGroup(BaseSettings):
     stereo:             Field[bool]              = Field(False, access=Field.INIT, description="Enable stereo mode")
     hd_ready:           Field[bool]              = Field(False, access=Field.INIT, description="Use HD resolution")
     sim_enabled:        Field[bool]              = Field(False, access=Field.INIT, description="Enable simulation mode")
-    model_path:         Field[str]               = Field("models", access=Field.INIT, visible=False, description="Model files directory")
+    model_path:         Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
     video_path:         Field[str]               = Field("recordings", access=Field.INIT, visible=False, description="Video recordings directory")
     temp_path:          Field[str]               = Field("temp", access=Field.INIT, visible=False, description="Temporary files directory")
     video_format:       Field[CoderFormat]       = Field(CoderFormat.H264, access=Field.INIT, description="Video format")
@@ -171,7 +171,7 @@ class MotionFeature(BaseSettings):
 class PoseGroup(BaseSettings):
     max_poses:          Field[int]                  = Field(1, min=1, max=16, access=Field.INIT)
     model_type:         Field[inference.ModelType]  = Field(inference.ModelType.TRT, access=Field.INIT)
-    model_path:         Field[str]                  = Field("models", access=Field.INIT, visible=False)
+    model_path:         Field[str]                  = Field("data/models", access=Field.INIT, visible=False)
     verbose:            Field[bool]                 = Field(False, access=Field.INIT)
     frequency:          Field[float]                = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float]                = Field(60.0, access=Field.INIT)

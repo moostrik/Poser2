@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 # Add model directory to path (rvm must be imported as package to support relative imports)
-sys.path.insert(0, 'models/base')
+sys.path.insert(0, 'data/models/base')
 from rvm.model import MattingNetwork
 
 

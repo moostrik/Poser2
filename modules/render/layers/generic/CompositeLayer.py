@@ -15,14 +15,13 @@ from modules.utils import HotReloadMethods
 
 
 # ============================================================================
-# LUT Selection Enum - Dynamically generated from files/lut/*.cube
+# LUT Selection Enum - Dynamically generated from data/lut/*.cube
 # ============================================================================
 
 def _discover_luts() -> type[IntEnum]:
-    """Scan files/lut/ for .cube files and create an IntEnum."""
-    lut_dir = Path(__file__).parents[4] / "files" / "lut"
+    """Scan data/lut/ for .cube files and create an IntEnum."""
+    lut_dir = Path(__file__).parents[4] / "data" / "lut"
     luts = {"NONE": 0}
-
     if lut_dir.exists():
         for i, cube_file in enumerate(sorted(lut_dir.glob("*.cube")), start=1):
             # Convert filename to enum-safe name: "My LUT" -> "MY_LUT"
@@ -37,7 +36,7 @@ def _get_lut_path(selection: IntEnum) -> str | None:
     if selection.value == 0:  # NONE
         return None
 
-    lut_dir = Path(__file__).parents[4] / "files" / "lut"
+    lut_dir = Path(__file__).parents[4] / "data" / "lut"
     if not lut_dir.exists():
         return None
 

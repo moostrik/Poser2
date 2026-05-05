@@ -85,7 +85,7 @@ class OakGroup(BaseSettings):
     stereo            : Field[bool]            = Field(False, access=Field.INIT, description="Enable stereo mode")
     hd_ready          : Field[bool]            = Field(False, access=Field.INIT, description="Use HD resolution")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
-    model_path        : Field[str]             = Field("models", access=Field.INIT, visible=False, description="Model files directory")
+    model_path        : Field[str]             = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
 
     _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, sim_enabled, model_path]
 
@@ -189,7 +189,7 @@ class SimilarityFeature(BaseSettings):
 class PoseGroup(BaseSettings):
     max_poses        : Field[int]       = Field(3, min=1, max=16, access=Field.INIT)
     model_type       : Field[inference.ModelType] = Field(inference.ModelType.TRT, access=Field.INIT)
-    model_path       : Field[str]       = Field("models", access=Field.INIT, visible=False)
+    model_path       : Field[str]       = Field("data/models", access=Field.INIT, visible=False)
     verbose          : Field[bool]      = Field(False, access=Field.INIT)
     frequency        : Field[float]     = Field(30.0, access=Field.INIT)
     output_frequency : Field[float]     = Field(30.0)
@@ -225,7 +225,7 @@ class SessionGroup(BaseSettings):
 
     start:         Field[bool]  = Field(False, widget=Widget.button, description="Start session")
     stop:          Field[bool]  = Field(False, widget=Widget.button, description="Stop session")
-    output_path:   Field[str]   = Field("recordings", access=Field.INIT, description="Recordings output directory")
+    output_path:   Field[str]   = Field("apps/white_space/data/recordings", access=Field.INIT, description="Recordings output directory")
     name:          Field[str]   = Field("", widget=Widget.input, description="Recording group ID")
     split:         Field[bool]  = Field(False, widget=Widget.button, description="Split chunk", visible=False)
     split_seconds: Field[float] = Field(10, min=1, max=60, widget=Widget.number, description="Split recording into chunks (seconds)")

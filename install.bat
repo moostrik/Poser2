@@ -90,8 +90,8 @@ call "%VENV_DIR%\Scripts\activate"
 
 echo.
 echo [44m PyOpenGL [0m
-pip install files\PyOpenGL-3.1.6-cp310-cp310-win_amd64.whl
-pip install files\PyOpenGL_accelerate-3.1.6-cp310-cp310-win_amd64.whl
+pip install data\PyOpenGL-3.1.6-cp310-cp310-win_amd64.whl
+pip install data\PyOpenGL_accelerate-3.1.6-cp310-cp310-win_amd64.whl
 
 echo.
 echo [44m General Requirements [0m

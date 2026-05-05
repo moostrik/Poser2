@@ -9,7 +9,7 @@
     "stereo": false,
     "hd_ready": true,
     "sim_enabled": false,
-    "model_path": "models",
+    "model_path": "data/models",
     "cam_0": {
       "device_id": "19443010D153874800",
       "show_stereo": false,
@@ -179,7 +179,7 @@
   },
   "pose": {
     "model_type": "TRT",
-    "model_path": "models",
+    "model_path": "data/models",
     "verbose": false,
     "pose": {
       "resolution": "STANDARD"

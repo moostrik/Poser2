@@ -11,7 +11,7 @@
     "stereo": false,
     "hd_ready": true,
     "sim_enabled": true,
-    "model_path": "models",
+    "model_path": "data/models",
     "cam_0": {
       "device_id": "14442C10110AD3D200",
       "show_stereo": false,
@@ -121,7 +121,7 @@
       "stereo_bright_max": 255
     },
     "simulator": {
-      "video_path": "recordings",
+      "video_path": "apps/white_space/data/recordings",
       "video_decoder": "iGPU",
       "video_format": "H264",
       "video_frame_types": [
@@ -161,7 +161,7 @@
   },
   "pose": {
     "model_type": "TRT",
-    "model_path": "models",
+    "model_path": "data/models",
     "verbose": false,
     "ws_input_stage": "LERP",
     "pose": {
@@ -582,7 +582,7 @@
     "port": 666
   },
   "session": {
-    "output_path": "recordings",
+    "output_path": "apps/white_space/data/recordings",
     "name": "",
     "split_seconds": 10,
     "osc": {

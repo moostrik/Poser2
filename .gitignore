@@ -5,17 +5,19 @@ BACKUP/
 recordings/*
 logs/*
 apps/**/data/settings/.*
+apps/**/data/recordings/*
+!apps/**/data/recordings/.gitkeep
 temp/*
 
 
-# files/lut/*
+# data/lut/*
 RobustVideoMatting/*
 ofxFlowTools_new/*
 openFrameworks/*
 
 # models
-models/*.trt
-models/archive/
+data/models/*.trt
+data/models/archive/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

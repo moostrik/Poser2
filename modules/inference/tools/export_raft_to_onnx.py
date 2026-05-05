@@ -25,7 +25,7 @@ import sys
 import time
 
 # Add RAFT to path (must be imported as package to support relative imports)
-sys.path.insert(0, 'models/base/raft')
+sys.path.insert(0, 'data/models/base/raft')
 try:
     from core.raft import RAFT
 except ImportError:

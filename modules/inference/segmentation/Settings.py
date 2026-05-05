@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     max_poses:      Field[int]        = Field(1, min=1, max=16, access=Field.INIT)
     model_type:     Field[ModelType]  = Field(ModelType.TRT, access=Field.INIT)
     resolution:     Field[Resolution] = Field(Resolution.STANDARD, access=Field.INIT)
-    model_path:     Field[str]        = Field("models", access=Field.INIT, visible=False)
+    model_path:     Field[str]        = Field("data/models", access=Field.INIT, visible=False)
     verbose:        Field[bool]       = Field(False, access=Field.INIT)
     enabled:        Field[bool]       = Field(True)
     reset_interval: Field[int]        = Field(60, min=1, access=Field.INIT)

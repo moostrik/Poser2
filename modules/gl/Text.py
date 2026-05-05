@@ -15,7 +15,7 @@ from .shaders.BoxShader import BoxShader
 
 
 # Default font path
-DEFAULT_FONT = "files/RobotoMono-Regular.ttf"
+DEFAULT_FONT = "data/RobotoMono-Regular.ttf"
 
 
 class Text:
