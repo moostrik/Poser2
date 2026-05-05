@@ -4,7 +4,7 @@ BACKUP/
 .venv/
 recordings/*
 logs/*
-files/settings/**/.*
+apps/**/data/settings/.*
 temp/*
 
 

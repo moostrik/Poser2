@@ -8,7 +8,6 @@ from .base_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
 
-SETTINGS_DIR = Path("files/settings")
 PRESET_SUFFIX = ".json"
 
 _current_app: str | None = None
@@ -21,11 +20,11 @@ def set_app(app_name: str | None) -> None:
 
 
 def _app_dir(app_name: str | None = None) -> Path:
-    """Return the settings directory, optionally scoped to an app."""
+    """Return the data directory for the given (or current) app."""
     name = app_name if app_name is not None else _current_app
     if name:
-        return SETTINGS_DIR / name
-    return SETTINGS_DIR
+        return Path("apps") / name / "data" / "settings"
+    raise RuntimeError("No app name set — call presets.set_app() before using presets.")
 
 
 def path(name: str, app_name: str | None = None) -> Path:

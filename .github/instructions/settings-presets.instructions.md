@@ -1,6 +1,6 @@
 ---
-description: "Use when modifying, adding, or removing Field, Group, or Child definitions in any app settings file (apps/*/settings.py), or when editing preset JSON files in files/settings/."
-applyTo: "apps/*/settings.py, files/settings/**/*.json"
+description: "Use when modifying, adding, or removing Field, Group, or Child definitions in any app settings file (apps/*/settings.py), or when editing preset JSON files in apps/*/data/settings/."
+applyTo: "apps/*/settings.py, apps/*/data/settings/*.json"
 ---
 # Settings & Preset Maintenance
 
@@ -8,13 +8,13 @@ applyTo: "apps/*/settings.py, files/settings/**/*.json"
 
 Each app has a **settings tree** defined in `apps/<app>/settings.py` using `BaseSettings` subclasses with `Field`, `Group`, and `Child` descriptors. The root class is named `Settings`.
 
-Preset JSON files in `files/settings/<app>/` mirror the settings tree exactly. The startup preset (default: `studio.json`) is loaded via `presets.load()` which calls `update_from_dict()`.
+Preset JSON files in `apps/<app>/data/settings/` mirror the settings tree exactly. The startup preset (default: `studio.json`) is loaded via `presets.load()` which calls `update_from_dict()`.
 
 ## When changing settings Python code
 
 After renaming, adding, or removing a `Field`, `Group`, or `Child`:
 
-1. Find all `.json` files in `files/settings/<app>/`
+1. Find all `.json` files in `apps/<app>/data/settings/`
 2. For **renamed** fields: find the old key in each JSON and rename it to the new key, preserving the value
 3. For **added** fields: add the key with the Python `Field` default value
 4. For **removed** fields: delete the key from each JSON

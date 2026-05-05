@@ -2,7 +2,7 @@
 
 PRESET MAINTENANCE
 ------------------
-Preset JSON files live in ``files/settings/hd_trio/``.
+Preset JSON files live in ``apps/hd_trio/data/settings/``.
 Each JSON mirrors this settings tree exactly.  When you rename, add,
 or remove a Field here, update every ``.json`` file in that directory
 to match — delete stale keys, add new keys with their Field default.
