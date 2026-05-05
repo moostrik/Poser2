@@ -6,7 +6,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 # Local application imports
-from modules.oak.camera import DepthTracklet
+from modules.oak import DepthTracklet
 
 # Forward declaration to avoid circular import
 if TYPE_CHECKING:

@@ -2,8 +2,7 @@ from threading import Lock
 from typing import Union
 from .. import crop, ModelType
 from modules.pose.features import Points2D
-from modules.pose.frame import FrameDictCallbackMixin, replace
-from modules.pose.frame import FrameDict
+from modules.pose.frame import FrameDictCallbackMixin, replace, FrameDict
 from .settings import Settings
 from modules.utils import PerformanceTimer
 

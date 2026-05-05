@@ -16,7 +16,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, get_origin, get_args
 
 if TYPE_CHECKING:
-    from modules.settings.field import Field
+    from .field import Field
 
 # Lazy import to avoid circular dependency at module level.
 # Special types are only needed at runtime inside accepts() / resolve().
@@ -27,7 +27,7 @@ _Rect = None
 def _get_color():
     global _Color
     if _Color is None:
-        from modules.utils.Color import Color
+        from modules.utils import Color
         _Color = Color
     return _Color
 
@@ -35,7 +35,7 @@ def _get_color():
 def _get_point2f():
     global _Point2f
     if _Point2f is None:
-        from modules.utils.PointsAndRects import Point2f
+        from modules.utils import Point2f
         _Point2f = Point2f
     return _Point2f
 
@@ -43,7 +43,7 @@ def _get_point2f():
 def _get_rect():
     global _Rect
     if _Rect is None:
-        from modules.utils.PointsAndRects import Rect
+        from modules.utils import Rect
         _Rect = Rect
     return _Rect
 

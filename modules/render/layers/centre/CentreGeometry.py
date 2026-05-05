@@ -12,8 +12,7 @@ from OpenGL.GL import * # type: ignore
 from modules.board import HasFrames
 from modules.settings import Field, BaseSettings
 from modules.pose.frame import Frame
-from modules.pose.features import Points2D, PointLandmark
-from modules.pose.features import BBox
+from modules.pose.features import Points2D, PointLandmark, BBox
 from ..LayerBase import LayerBase, DataCache
 from modules.utils import Rect, Point2f
 from modules.gl import Texture

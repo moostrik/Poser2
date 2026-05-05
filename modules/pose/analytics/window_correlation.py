@@ -16,9 +16,7 @@ from ..features import Angles, AngleMotion
 from ..features import AggregationMethod, NormalizedScalarFeature
 from ..features import Similarity, LeaderScore
 from .window_similarity import SimilarityResult
-from modules.utils import PerformanceTimer
-
-from modules.utils import HotReloadMethods
+from modules.utils import PerformanceTimer, HotReloadMethods
 
 import logging
 logger = logging.getLogger(__name__)
