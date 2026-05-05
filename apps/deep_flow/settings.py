@@ -225,7 +225,7 @@ class _CentreGeomSettings(layers.CentreGeomSettings):
 
 class LayerGroup(BaseSettings):
     select = Group(LayerSettings)
-    lut    = Group(layers.CompositeLayerSettings)
+    composite = Group(layers.CompositeLayerSettings)
 
 class DataGroup(BaseSettings):
     a = Group(_DataLayerSettings)

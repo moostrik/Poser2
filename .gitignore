@@ -10,7 +10,7 @@ apps/**/data/recordings/*
 temp/*
 
 
-# data/lut/*
+# data/luts/*
 RobustVideoMatting/*
 ofxFlowTools_new/*
 openFrameworks/*

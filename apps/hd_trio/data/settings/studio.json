@@ -360,10 +360,13 @@
           "composite"
         ]
       },
-      "lut": {
+      "composite": {
         "blend_mode": "ALPHA",
-        "lut": "NONE",
-        "lut_strength": 1.0
+        "lut": {
+          "folder": "data/luts",
+          "file": "",
+          "strength": 1.0
+        }
       }
     },
     "data": {

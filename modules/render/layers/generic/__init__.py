@@ -1,4 +1,4 @@
-from .CompositeLayer import         CompositeLayer, CompositeLayerSettings, LutSelection
+from .CompositeLayer import         CompositeLayer, CompositeLayerSettings, LutSettings
 from .HDTPrepare import             HDTPrepare
 from .HDTBlend import               HDTBlend
 from .MotionLayer import            MotionLayer
