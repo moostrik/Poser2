@@ -146,11 +146,16 @@
   },
   "inout": {
     "osc_light": {
-      "ip_addresses": "127.0.0.1",
-      "port": 8000,
-      "use_signed": false,
+      "ip_addresses": "192.168.1.177",
+      "port": 6454,
+      "use_signed": true,
       "mtu": 1500,
-      "offset": 0,
+      "offsets": {
+        "white_0": 0,
+        "white_1": 0,
+        "blue_0": 0,
+        "blue_1": 0
+      },
       "rpm": 0
     },
     "osc_sound": {
@@ -568,11 +573,11 @@
       "title": "Poser",
       "v_sync": true,
       "fullscreen": false,
-      "monitor": 1,
-      "x": 71,
-      "y": 2120,
-      "width": 2059,
-      "height": 1651,
+      "monitor": 0,
+      "x": 1,
+      "y": 31,
+      "width": 1278,
+      "height": 1000,
       "secondary_list": [],
       "secondary_fullscreen": true
     }
