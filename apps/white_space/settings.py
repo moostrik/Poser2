@@ -2,7 +2,7 @@
 
 PRESET MAINTENANCE
 ------------------
-Preset JSON files live in ``files/settings/white_space/``.
+Preset JSON files live in ``apps/white_space/data/settings/``.
 Each JSON mirrors this settings tree exactly.  When you rename, add,
 or remove a Field here, update every ``.json`` file in that directory
 to match — delete stale keys, add new keys with their Field default.
@@ -12,16 +12,15 @@ The root class is ``Settings``.
 from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
-from modules.oak import CameraSettings, FrameType, CoderFormat, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.oak import CameraSettings, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
-from modules.render.layers import DataLayerSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import PanoramicTrackerSettings
 from modules.pose import nodes, trackers, window, analytics
-from modules.inference import DetectionSettings, SegmentationSettings, CropSettings, ModelType
+from modules import inference
 from modules.session import SessionSettings, SequencerSettings
-from modules.gl.WindowManager import WindowSettings
-from .composition.settings import CompositorSettings
+from modules.gl import WindowSettings
+from .composition import CompositorSettings
 from .osc_light import OscLightSettings
 
 
@@ -67,7 +66,6 @@ class Layers(IntEnum):
     # WS visualization
     ws_tracker   = auto()
     ws_light     = auto()
-    ws_lines     = auto()
     # data
     data_W       = auto()
     data_F       = auto()
@@ -87,7 +85,7 @@ class OakGroup(BaseSettings):
     stereo            : Field[bool]            = Field(False, access=Field.INIT, description="Enable stereo mode")
     hd_ready          : Field[bool]            = Field(False, access=Field.INIT, description="Use HD resolution")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
-    model_path        : Field[str]             = Field("models", access=Field.INIT, visible=False, description="Model files directory")
+    model_path        : Field[str]             = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
 
     _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, sim_enabled, model_path]
 
@@ -128,16 +126,15 @@ class BboxFeature(BaseSettings):
     frequency        : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency : Field[float] = Field(30.0)
 
-    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
-    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
-    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
-
 
 class PointFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(30.0)
 
-    confidence_filter: Group[nodes.DualConfFilterSettings]    = Group(nodes.DualConfFilterSettings)
+    confidence      : Group[nodes.DualConfFilterSettings]    = Group(nodes.DualConfFilterSettings)
+    sticky          : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
+
+
     smoother         : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
     prediction       : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
     interpolator     : Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
@@ -191,31 +188,30 @@ class SimilarityFeature(BaseSettings):
 
 class PoseGroup(BaseSettings):
     max_poses        : Field[int]       = Field(3, min=1, max=16, access=Field.INIT)
-    model_type       : Field[ModelType] = Field(ModelType.TRT, access=Field.INIT)
-    model_path       : Field[str]       = Field("models", access=Field.INIT, visible=False)
+    model_type       : Field[inference.ModelType] = Field(inference.ModelType.TRT, access=Field.INIT)
+    model_path       : Field[str]       = Field("data/models", access=Field.INIT, visible=False)
     verbose          : Field[bool]      = Field(False, access=Field.INIT)
     frequency        : Field[float]     = Field(30.0, access=Field.INIT)
     output_frequency : Field[float]     = Field(30.0)
-    use_segmentation : Field[bool]      = Field(False, access=Field.INIT, description="Enable mask/segmentation extraction")
     ws_input_stage   : Field[Stage]     = Field(Stage.LERP, description="Pipeline stage that feeds the WS light pipeline")
 
     _feature_share: list = [frequency, output_frequency]
 
-    detection       : Group[DetectionSettings]              = Group(DetectionSettings, share=[max_poses, model_type, model_path, verbose])
-    segmentation    : Group[SegmentationSettings]           = Group(SegmentationSettings, share=[max_poses, model_type, model_path, verbose, use_segmentation.as_('enabled')])
-    image_crop      : Group[CropSettings]                   = Group(CropSettings, share=[max_poses])
-    angle_extractor : Group[nodes.AngleExtractorSettings]   = Group(nodes.AngleExtractorSettings)
-    bbox            : Group[BboxFeature]                    = Group(BboxFeature, share=_feature_share)
-    point           : Group[PointFeature]                   = Group(PointFeature, share=_feature_share)
-    angle           : Group[AngleFeature]                   = Group(AngleFeature, share=_feature_share)
-    velocity        : Group[VelocityFeature]                = Group(VelocityFeature, share=_feature_share)
-    motion          : Group[MotionFeature]                  = Group(MotionFeature)
-    similarity      : Group[SimilarityFeature]              = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
-    window_raw      : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
-    window_clean    : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
-    window_smooth   : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
-    window_predict  : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
-    window_lerp     : Group[window.WindowNodeSettings]      = Group(window.WindowNodeSettings)
+    pose            : Group[inference.pose.Settings]         = Group(inference.pose.Settings, share=[max_poses, model_type, model_path, verbose])
+    segmentation    : Group[inference.segmentation.Settings] = Group(inference.segmentation.Settings, share=[max_poses, model_type, model_path, verbose])
+    image_crop      : Group[inference.crop.Settings]         = Group(inference.crop.Settings, share=[max_poses])
+    angle_extractor : Group[nodes.AngleExtractorSettings]    = Group(nodes.AngleExtractorSettings)
+    bbox            : Group[BboxFeature]                     = Group(BboxFeature, share=_feature_share)
+    point           : Group[PointFeature]                    = Group(PointFeature, share=_feature_share)
+    angle           : Group[AngleFeature]                    = Group(AngleFeature, share=_feature_share)
+    velocity        : Group[VelocityFeature]                 = Group(VelocityFeature, share=_feature_share)
+    motion          : Group[MotionFeature]                   = Group(MotionFeature)
+    similarity      : Group[SimilarityFeature]               = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
+    window_raw      : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
+    window_clean    : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
+    window_smooth   : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
+    window_predict  : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
+    window_lerp     : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
 
 
 # ---------------------------------------------------------------------------
@@ -229,7 +225,7 @@ class SessionGroup(BaseSettings):
 
     start:         Field[bool]  = Field(False, widget=Widget.button, description="Start session")
     stop:          Field[bool]  = Field(False, widget=Widget.button, description="Stop session")
-    output_path:   Field[str]   = Field("recordings", access=Field.INIT, description="Recordings output directory")
+    output_path:   Field[str]   = Field("apps/white_space/data/recordings", access=Field.INIT, description="Recordings output directory")
     name:          Field[str]   = Field("", widget=Widget.input, description="Recording group ID")
     split:         Field[bool]  = Field(False, widget=Widget.button, description="Split chunk", visible=False)
     split_seconds: Field[float] = Field(10, min=1, max=60, widget=Widget.number, description="Split recording into chunks (seconds)")
@@ -263,7 +259,7 @@ class RenderSettings(BaseSettings):
     num_cams:    Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of players")
     preview:     Group[PreviewGroup]     = Group(PreviewGroup)
-    data:        Group[DataLayerSettings] = Group(DataLayerSettings)
+    data:        Group[layers.DataLayerSettings] = Group(layers.DataLayerSettings)
     colors:      Group[ColorSettings]    = Group(ColorSettings)
     window:      Group[WindowSettings]   = Group(WindowSettings)
 

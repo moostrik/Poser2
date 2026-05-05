@@ -1,3 +1,3 @@
-from .SegmentationSettings import SegmentationSettings
-from .MaskBatchExtractor import MaskBatchExtractor
-from .segmentation_image import SegmentationImage, SegmentationImageDict, SegmentationImageCallback
+from .settings import Settings
+from .predictor import Predictor
+from .image import Image, ImageDict, ImageCallback

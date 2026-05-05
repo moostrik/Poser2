@@ -9,7 +9,7 @@ from typing import Callable, Optional, TypeAlias
 import time
 
 # Local application imports
-from modules.oak.camera import DepthTracklet
+from modules.oak import DepthTracklet
 from .TrackerBase import TrackerMetadata
 from modules.utils import Rect, Point2f
 

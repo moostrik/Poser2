@@ -7,7 +7,7 @@ from time import sleep, time
 from typing import Optional
 
 # Local application imports
-from modules.oak.camera import DepthTracklet
+from modules.oak import DepthTracklet
 from ..TrackerBase import BaseTracker, TrackerType, TrackerMetadata
 from ..Tracklet import Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback
 from .PanoramicTrackletManager import PanoramicTrackletManager
@@ -85,7 +85,7 @@ class PanoramicTracker(Thread, BaseTracker):
         with self._callback_lock:
             self._tracklet_callbacks.clear()
 
-        self.join()  # Wait for the thread to finish
+        self.join(timeout=1.0)  # Wait for the thread to finish
 
     def notify_update(self) -> None:
         if self.running:
@@ -109,16 +109,11 @@ class PanoramicTracker(Thread, BaseTracker):
                 logger.exception("PanoramicTracker error")
 
     def _add_tracklet(self, new_tracklet: Tracklet) -> None:
-        # If tracklet is removed, retire it
-        if new_tracklet.is_removed:
+        # If tracklet is lost or removed, lose it — let timeout + merge logic handle actual removal
+        if new_tracklet.is_lost or new_tracklet.is_removed:
             existing_tracklet_id: Optional[int] = self.tracklet_manager.get_id_by_cam_and_external_id(new_tracklet.cam_id, new_tracklet.external_id)
             if existing_tracklet_id is not None:
-                self.tracklet_manager.retire_tracklet(existing_tracklet_id)
-            return
-        if new_tracklet.is_lost:
-            existing_tracklet_id: Optional[int] = self.tracklet_manager.get_id_by_cam_and_external_id(new_tracklet.cam_id, new_tracklet.external_id)
-            if existing_tracklet_id is not None:
-                self.tracklet_manager.replace_tracklet(existing_tracklet_id, new_tracklet)
+                self.tracklet_manager.lose_tracklet(existing_tracklet_id)
             return
 
         # filter out tracklets that are too young or too small
@@ -148,7 +143,7 @@ class PanoramicTracker(Thread, BaseTracker):
         # expire timed-out tracklets
         for tracklet in self.tracklet_manager.all_tracklets():
             if tracklet.is_expired(self.config.timeout):
-                self.tracklet_manager.lose_tracklet(tracklet.id)
+                self.tracklet_manager.retire_tracklet(tracklet.id)
 
         # merge overlapping tracklets
         overlaps: set[PanoramicOverlapInfo] = self._find_overlapping_tracklets(self.tracklet_manager.all_tracklets())

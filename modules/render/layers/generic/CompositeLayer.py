@@ -1,7 +1,7 @@
 """CompositeLayer - Composites multiple layer textures with optional LUT color grading."""
 
 from __future__ import annotations
-from enum import IntEnum
+import logging
 from pathlib import Path
 
 from OpenGL.GL import *  # type: ignore
@@ -9,59 +9,30 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Fbo, Texture, Style
 from modules.gl.shaders import Blit, Lut
 from ..LayerBase import LayerBase
-from modules.settings import Field, BaseSettings
+from modules.settings import Field, BaseSettings, Widget, Group
 
 from modules.utils import HotReloadMethods
 
-
-# ============================================================================
-# LUT Selection Enum - Dynamically generated from files/lut/*.cube
-# ============================================================================
-
-def _discover_luts() -> type[IntEnum]:
-    """Scan files/lut/ for .cube files and create an IntEnum."""
-    lut_dir = Path(__file__).parents[4] / "files" / "lut"
-    luts = {"NONE": 0}
-
-    if lut_dir.exists():
-        for i, cube_file in enumerate(sorted(lut_dir.glob("*.cube")), start=1):
-            # Convert filename to enum-safe name: "My LUT" -> "MY_LUT"
-            name = cube_file.stem.upper().replace(" ", "_").replace("-", "_")
-            luts[name] = i
-
-    return IntEnum("LutSelection", luts)
-
-
-def _get_lut_path(selection: IntEnum) -> str | None:
-    """Get the file path for a LUT selection."""
-    if selection.value == 0:  # NONE
-        return None
-
-    lut_dir = Path(__file__).parents[4] / "files" / "lut"
-    if not lut_dir.exists():
-        return None
-
-    # Find matching .cube file by index
-    cube_files = sorted(lut_dir.glob("*.cube"))
-    idx = selection.value - 1
-    if 0 <= idx < len(cube_files):
-        return str(cube_files[idx])
-    return None
-
-
-# Generate the enum at module load time
-LutSelection = _discover_luts()
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
 # Configuration
 # ============================================================================
 
+class LutSettings(BaseSettings):
+    """LUT color grading configuration."""
+    folder:   Field[str]       = Field("data/luts", access=Field.INIT, description="LUT folder")
+    files:    Field[list[str]] = Field([""], visible=False)
+    file:     Field[str]       = Field("", widget=Widget.text_select, options=files, description="LUT file")
+    rescan:   Field[bool]      = Field(False, widget=Widget.button, description="Rescan LUTs")
+    strength: Field[float]     = Field(1.0, min=0.0, max=1.0)
+
+
 class CompositeLayerSettings(BaseSettings):
     """Configuration for CompositeLayer."""
-    blend_mode:     Field[Style.BlendMode] = Field(Style.BlendMode.ALPHA)
-    lut:            Field[LutSelection]    = Field(LutSelection.NONE)  # type: ignore
-    lut_strength:   Field[float]           = Field(1.0, min=0.0, max=1.0)
+    blend_mode: Field[Style.BlendMode] = Field(Style.BlendMode.ALPHA)
+    lut:        Group[LutSettings]     = Group(LutSettings)
 
 
 # ============================================================================
@@ -103,12 +74,17 @@ class CompositeLayer(LayerBase):
 
         # LUT shader
         self._lut_shader: Lut = Lut()
-        self._current_lut: LutSelection = LutSelection.NONE  # type: ignore
+        self._current_lut: str = ""
 
         # Blit shader for passthrough when no LUT
         self._blit: Blit = Blit()
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
+
+        # Scan LUTs now and whenever folder changes or rescan is pressed
+        self._scan_luts()
+        self.config.lut.bind(LutSettings.folder, lambda _: self._scan_luts())
+        self.config.lut.bind(LutSettings.rescan, lambda v: self._scan_luts() if v else None)
 
     @property
     def texture(self) -> Texture:
@@ -134,13 +110,25 @@ class CompositeLayer(LayerBase):
         self._lut_shader.deallocate()
         self._blit.deallocate()
 
+    def _scan_luts(self) -> None:
+        """Scan lut folder for .cube files and update files list. Resets selection if no longer valid."""
+        lut_dir = Path(self.config.lut.folder)
+        if lut_dir.exists():
+            filenames = [f.name for f in sorted(lut_dir.glob("*.cube"))]
+        else:
+            logger.warning("LUT directory not found: %s", lut_dir)
+            filenames = []
+        self.config.lut.files = filenames
+        if self.config.lut.file and self.config.lut.file not in filenames:
+            self.config.lut.file = ""
+
     def _load_lut_if_changed(self) -> None:
         """Load LUT file if selection changed."""
-        if self.config.lut != self._current_lut:
-            self._current_lut = self.config.lut
-            lut_path = _get_lut_path(self.config.lut)
-            if lut_path:
-                self._lut_shader.load_cube(lut_path)
+        if self.config.lut.file != self._current_lut:
+            self._current_lut = self.config.lut.file
+            if self.config.lut.file:
+                lut_path = Path(self.config.lut.folder) / self.config.lut.file
+                self._lut_shader.load_cube(str(lut_path))
 
     def compose(self, entries: list[tuple[Texture, float]]) -> None:
         """Composite textures with per-entry opacity to internal FBO.
@@ -180,7 +168,7 @@ class CompositeLayer(LayerBase):
             return
 
         # Apply LUT if loaded, otherwise just blit
-        if self._lut_shader.lut_loaded and self.config.lut_strength > 0:
-            self._lut_shader.use(self._composite_fbo.texture, self.config.lut_strength)
+        if self._lut_shader.lut_loaded and self.config.lut.file and self.config.lut.strength > 0:
+            self._lut_shader.use(self._composite_fbo.texture, self.config.lut.strength)
         else:
             self._blit.use(self._composite_fbo.texture)

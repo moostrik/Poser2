@@ -38,16 +38,17 @@ class MonitorId(IntEnum):
 class WindowSettings(BaseSettings):
     """Window / init configuration — set once before RenderManager starts."""
     title: Field[str] =           Field("Poser", access=Field.INIT, visible=False)
-    avg_fps: Field[int] =             Field(60, access=Field.READ, pinned=True, description="Average Camera FPS")
+    avg_fps: Field[int] =         Field(60, access=Field.READ, pinned=True, description="Average Camera FPS")
     min_fps: Field[int] =         Field(60, access=Field.READ, pinned=True, description="Minimum Camera FPS")
     v_sync: Field[bool] =         Field(True)
     fullscreen: Field[bool] =     Field(False)
-    monitor: Field[int] =         Field(0)
+    monitor: Field[int] =         Field(0, newline=True)
     x: Field[int] =               Field(0)
     y: Field[int] =               Field(80)
     width: Field[int] =           Field(1920)
     height: Field[int] =          Field(1000)
-    secondary_list: Field[list[MonitorId]] = Field([MonitorId.M0], widget=Widget.order)
+    secondary_list: Field[list[MonitorId]] = Field([MonitorId.M0], widget=Widget.order, newline=True)
+    secondary_fullscreen: Field[bool] =  Field(True)
 
 
 class Button(Enum):
@@ -90,7 +91,6 @@ class WindowManager():
 
         self.main_window: Optional[glfw._GLFWwindow] = None
         self.secondary_windows: list[glfw._GLFWwindow] = []
-        self.secondary_fullscreen = True
         self._quad_vaos: dict[int, int] = {}  # id(window) -> VAO (not shared between contexts)
 
         # Reactive bindings: settings → window manager
@@ -101,6 +101,7 @@ class WindowManager():
         s.bind(WindowSettings.y,         lambda _: self.set_position(s.x, s.y))
         s.bind(WindowSettings.width,     lambda _: self.set_size(s.width, s.height))
         s.bind(WindowSettings.height,    lambda _: self.set_size(s.width, s.height))
+        s.bind(WindowSettings.secondary_fullscreen, lambda v: self.set_secondary_fullscreen(v))
 
         # FPS feedback: push measured FPS into the readonly settings
         def _push_fps(fps: int) -> None:
@@ -379,8 +380,7 @@ class WindowManager():
             logger.error("Failed to create secondary window")
             return None
 
-        glfw.set_mouse_button_callback(win, self._invoke_secondary_callbacks)
-        self._setup_secondary_window(win, monitor_id, True)
+        self._setup_secondary_window(win, monitor_id, self.settings.secondary_fullscreen)
 
         return win
 
@@ -388,13 +388,6 @@ class WindowManager():
         for win in self.secondary_windows:
             glfw.destroy_window(win)
         self.secondary_windows.clear()
-
-    def _invoke_secondary_callbacks(self, window, button, action, mods) -> None:
-        # Notify the appropriate callbacks for the secondary window
-        # only on mouse_down
-        if action == glfw.PRESS:
-            self.secondary_fullscreen: bool = not self.secondary_fullscreen
-            self.set_secondary_fullscreen(self.secondary_fullscreen)
 
     def _setup_secondary_window(self, window: glfw._GLFWwindow, monitor_id: int, fullscreen: bool) -> None:
         """Setup a secondary window with the given monitor ID and fullscreen mode"""

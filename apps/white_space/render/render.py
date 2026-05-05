@@ -9,7 +9,6 @@ from modules.render.layers import TrackerCompositor, PoseCompositor
 from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer
 from modules.render.layers.generic.PanoramicTrackerLayer import PanoramicTrackerLayer
 from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
-from apps.white_space.render.layers.composition_debug_layer import CompositionDebugLayer
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -57,13 +56,11 @@ class WhiteSpaceRender(RenderBase):
         # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready
         self.L[Layers.ws_tracker][0] = PanoramicTrackerLayer(board, self.num_cams, settings.colors)
         self.L[Layers.ws_light][0]   = LightSimulationLayer(board)
-        self.L[Layers.ws_lines][0]   = CompositionDebugLayer(board)
 
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name='track',      columns=self.num_cams,    rows=1, src_aspect_ratio=16/9, padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name='panoramic',  columns=1,                rows=1, src_aspect_ratio=10.0, padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name='ws_light',   columns=1,                rows=1, src_aspect_ratio=3.0, padding=Point2f(0.0, 1.0)),
-            SubdivisionRow(name='ws_lines',   columns=1,                rows=1, src_aspect_ratio=20.0, padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name='pose',       columns=self.num_players, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0)),
         ]
         self.subdivision: Subdivision = make_subdivision(
@@ -131,15 +128,11 @@ class WhiteSpaceRender(RenderBase):
         self._viewport(height, self.subdivision.get_rect('panoramic', 0))
         self.L[Layers.ws_tracker][0].draw()
 
-        # Row 3 — WS light strip
+        # Row 3 - WS light strip
         self._viewport(height, self.subdivision.get_rect('ws_light', 0))
         self.L[Layers.ws_light][0].draw()
 
-        # Row 4 — WS lines strip
-        self._viewport(height, self.subdivision.get_rect('ws_lines', 0))
-        self.L[Layers.ws_lines][0].draw()
-
-        # Row 5 — pose cutouts with data overlays, one viewport per player
+        # Row 4 - pose cutouts with data overlays, one viewport per player
         for i in range(self.num_players):
             self._viewport(height, self.subdivision.get_rect('pose', i))
             self.L[Layers.poser][i].draw()

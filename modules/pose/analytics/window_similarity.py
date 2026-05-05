@@ -15,9 +15,7 @@ from ..frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
 from ..features import Angles, AngleMotion, AngleVelocity
 from ..features import AggregationMethod, NormalizedScalarFeature
 from ..features import Similarity, LeaderScore
-from modules.utils import PerformanceTimer
-
-from modules.utils import HotReloadMethods
+from modules.utils import PerformanceTimer, HotReloadMethods
 
 import logging
 logger = logging.getLogger(__name__)

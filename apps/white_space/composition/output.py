@@ -34,21 +34,4 @@ class CompositionOutput:
         self.light_img[0, :, 1] = value
 
 
-@dataclass
-class CompositionDebug:
-    """Intermediate composition channels for on-screen visualisation only — never sent over UDP.
-
-    Channel layout (matches WS_Lines.frag RGBA access):
-      0 (.r) = white_l  — left-side wave pattern (rendered as orange bars)
-      1 (.g) = white_r  — right-side wave pattern (rendered as cyan bars)
-      2 (.b) = blue     — blue wave pattern (rendered as blue bars)
-      3 (.a) = void     — void field (rendered as grey overlay)
-    """
-    resolution: int
-    debug_img: np.ndarray = field(init=False)
-
-    def __post_init__(self) -> None:
-        self.debug_img = np.zeros((1, self.resolution, 4), dtype=COMP_DTYPE)
-
-
 CompositionOutputCallback = Callable[[CompositionOutput], None]

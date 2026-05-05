@@ -8,18 +8,17 @@ from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecord
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound
 from modules.tracker import PanoramicTracker, PosesFromTracklets
-from modules.pose import nodes, trackers, features, window, analytics
-from modules.pose.frame import FrameDict
-from modules import inference
+from modules.pose import nodes, trackers, features, window, analytics, FrameDict
+from modules.inference import source, crop, pose, segmentation
 from modules.session import Session, Sequencer
-from modules.gl.WindowManager import WindowSettings
+from modules.gl import WindowSettings
 
 from .composition import Compositor
 from .osc_light import OscLight
 
 from .render.board import RenderBoard
 from .settings import Settings, Stage
-from .render.render import WhiteSpaceRender
+from .render import WhiteSpaceRender
 
 APP_NAME = 'white_space'
 
@@ -69,12 +68,12 @@ class WhiteSpaceMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = PanoramicTracker(self.settings.camera.tracker, num_players, num_cameras)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.image_uploader = inference.ImageUploader()
-        self.crop_extractor = inference.CropExtractor(ps.image_crop)
+        self.source_uploader = source.Uploader()
+        self.crop_extractor = crop.Extractor(ps.image_crop)
 
         for camera in self.cameras:
             camera.add_sync_callback(self.video_recorder.submit_synced_frames)
-            camera.add_frame_callback(self.image_uploader.set_image)
+            camera.add_frame_callback(self.source_uploader.set_image)
             camera.add_frame_callback(self.frame_sync_bang.submit_frame)
             camera.add_tracker_callback(self.tracker.submit_cam_tracklets)
             camera.add_tracker_callback(self.board.set_depth_tracklets)
@@ -85,32 +84,20 @@ class WhiteSpaceMain:
 
         self.poses_from_tracklets = PosesFromTracklets(num_players)
 
-        self.point_extractor = inference.PointBatchExtractor(ps.detection)
-        self.mask_extractor: Optional[inference.MaskBatchExtractor] = None
-        if ps.use_segmentation:
-            self.mask_extractor = inference.MaskBatchExtractor(ps.segmentation)
-
-        self.bbox_filters = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.BBoxEuroSmoother(ps.bbox.smoother),
-                nodes.BBoxPredictor(ps.bbox.prediction),
-            ])
-            for i in range(num_players)
-        })
+        self.pose_predictor = pose.Predictor(ps.pose)
+        self.segmentation_predictor  = segmentation.Predictor(ps.segmentation)
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracker.add_tracklet_callback(self.board.set_tracklets)
         self.tracklet_sync_bang.add_sync_callback(self.tracker.notify_update)
         self.frame_sync_bang.add_sync_callback(self.poses_from_tracklets.process)
 
-        self.crop_extractor.add_image_callback(self.point_extractor.process)
+        self.crop_extractor.add_image_callback(self.pose_predictor.process)
         self.crop_extractor.add_image_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
-        if self.mask_extractor is not None:
-            self.crop_extractor.add_image_callback(self.mask_extractor.process)
-            self.mask_extractor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
+        self.crop_extractor.add_image_callback(self.segmentation_predictor.process)
+        self.segmentation_predictor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
-        self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
-        self.bbox_filters.add_frames_callback(self._process_poses)
+        self.poses_from_tracklets.add_frames_callback(self._process_poses)
 
         # STAGE WINDOW TRACKERS & BROADCASTS
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
@@ -133,15 +120,15 @@ class WhiteSpaceMain:
         self.stages[ws_input].add_callback(self.compositor.add_poses)
         self.compositor.add_output_callback(self.osc_light.send_message)
         self.compositor.add_output_callback(self.board.set_composition_output)
-        self.compositor.add_debug_callback(self.board.set_composition_debug)
 
         # POSE STAGE RAW
-        self.point_extractor.add_frames_callback(self.stages[Stage.RAW])
+        self.pose_predictor.add_frames_callback(self.stages[Stage.RAW])
 
         # POSE STAGE CLEAN
         self.filters_clean = trackers.FilterTracker({
             i: trackers.FilterPipeline([
-                nodes.PointDualConfFilter(ps.point.confidence_filter),
+                nodes.PointDualConfFilter(ps.point.confidence),
+                nodes.PointStickyFiller(ps.point.sticky),
                 nodes.AngleExtractor(ps.angle_extractor),
                 nodes.AngleVelExtractor(ps.velocity.extractor),
             ])
@@ -206,7 +193,6 @@ class WhiteSpaceMain:
 
         self.interpolators_lerp = trackers.InterpolatorTracker({
             i: trackers.InterpolatorPipeline([
-                nodes.BBoxChaseInterpolator(ps.bbox.interpolator),
                 nodes.PointChaseInterpolator(ps.point.interpolator),
                 nodes.AngleChaseInterpolator(ps.angle.interpolator),
                 nodes.AngleVelChaseInterpolator(ps.velocity.interpolator),
@@ -250,9 +236,8 @@ class WhiteSpaceMain:
             camera.start()
 
         self.tracker.start()
-        self.point_extractor.start()
-        if self.mask_extractor is not None:
-            self.mask_extractor.start()
+        self.pose_predictor.start()
+        self.segmentation_predictor.start()
         self.window_similator.start()
         self.window_correlator.start()
         self.compositor.start()
@@ -268,7 +253,7 @@ class WhiteSpaceMain:
         self.render.start()
 
     def _process_poses(self, poses: FrameDict) -> None:
-        images, prev_images = self.image_uploader.snapshot()
+        images, prev_images = self.source_uploader.snapshot()
         self.board.set_camera_images(images)
         self.crop_extractor.process(poses, images, prev_images)
 
@@ -292,9 +277,8 @@ class WhiteSpaceMain:
         self.osc_light.stop()
         self.compositor.stop()
 
-        self.point_extractor.stop()
-        if self.mask_extractor is not None:
-            self.mask_extractor.stop()
+        self.pose_predictor.stop()
+        self.segmentation_predictor.stop()
         self.window_similator.stop()
         self.window_correlator.stop()
 

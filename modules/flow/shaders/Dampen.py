@@ -6,8 +6,7 @@ smoothly pulled back toward the threshold each frame.
 """
 
 from OpenGL.GL import *  # type: ignore
-from modules.gl import Shader, draw_quad
-from modules.gl import Texture
+from modules.gl import Shader, draw_quad, Texture
 
 
 class Dampen(Shader):

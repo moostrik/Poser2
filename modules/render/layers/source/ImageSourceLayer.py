@@ -8,9 +8,9 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.gl import Tensor, Texture
 
+import torch
 from modules.board import HasCameraImages
 from ..LayerBase import LayerBase, DataCache
-from modules.inference import FullImage
 
 
 class ImageSourceLayer(LayerBase):
@@ -18,7 +18,7 @@ class ImageSourceLayer(LayerBase):
         self._cam_id: int = cam_id
         self._board: HasCameraImages = board
         self._cuda_image: Tensor = Tensor()
-        self._data_cache: DataCache[FullImage]= DataCache[FullImage]()
+        self._data_cache: DataCache[torch.Tensor] = DataCache[torch.Tensor]()
         self._dirty: bool = False
 
     @property
@@ -35,7 +35,7 @@ class ImageSourceLayer(LayerBase):
 
     def update(self) -> None:
         self._dirty = False
-        gpu_frame: FullImage | None = self._board.get_camera_image(self._cam_id)
+        gpu_frame: torch.Tensor | None = self._board.get_camera_image(self._cam_id)
         self._data_cache.update(gpu_frame)
 
         if self._data_cache.lost:
@@ -44,6 +44,6 @@ class ImageSourceLayer(LayerBase):
         if self._data_cache.idle or gpu_frame is None:
             return
 
-        self._cuda_image.set_tensor(gpu_frame.image)
+        self._cuda_image.set_tensor(gpu_frame)
         self._cuda_image.update()
         self._dirty = True

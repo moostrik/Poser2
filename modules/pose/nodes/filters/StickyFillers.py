@@ -17,6 +17,7 @@ from modules.settings import BaseSettings, Field
 
 class StickyFillerSettings(BaseSettings):
     """Configuration for pose hold filter."""
+    enabled:      Field[bool] = Field(True)
     init_to_zero: Field[bool] = Field(False)
     hold_scores:  Field[bool] = Field(False)
 
@@ -50,6 +51,9 @@ class FeatureStickyFiller(FilterNode):
 
     def process(self, pose: Frame) -> Frame:
         """Replace invalid values with last valid, update state with new valid values."""
+        if not self._config.enabled:
+            return pose
+
         feature_data = pose[self._feature_type]
         valid_mask = feature_data.valid_mask
         invalid_mask = ~valid_mask

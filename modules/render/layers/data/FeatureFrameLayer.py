@@ -53,7 +53,7 @@ class FeatureFrameLayer(LayerBase):
         self._fbo.allocate(width, height, internal_format)
         self._label_fbo.allocate(width, height, internal_format)
         self._shader.allocate()
-        self._text_renderer.allocate("files/RobotoMono-Regular.ttf", font_size=14)
+        self._text_renderer.allocate("data/RobotoMono-Regular.ttf", font_size=14)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()

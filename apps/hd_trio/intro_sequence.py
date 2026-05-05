@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from modules.pose.frame import Frame, FrameDict
-from modules.pose.recorder.player import Player
+from modules.pose.recorder import Player
 from modules.utils import Color
 
 from .settings import IntroSequenceSettings

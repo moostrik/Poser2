@@ -1,0 +1,627 @@
+{
+  "num_players": 8,
+  "num_cameras": 4,
+  "input_fps": 30.0,
+  "render_fps": 60.0,
+  "light_resolution": 3600,
+  "camera": {
+    "yolo": true,
+    "color": false,
+    "square": false,
+    "stereo": false,
+    "hd_ready": true,
+    "sim_enabled": true,
+    "model_path": "data/models",
+    "cam_0": {
+      "device_id": "14442C10110AD3D200",
+      "show_stereo": false,
+      "flip_h": false,
+      "flip_v": true,
+      "perspective": -0.22,
+      "color_exposure": 30001,
+      "color_iso": 1599,
+      "color_auto_exposure": true,
+      "color_balance": 5500,
+      "color_auto_balance": true,
+      "color_brightness": 0,
+      "color_contrast": 0,
+      "color_saturation": 0,
+      "color_denoise": 0,
+      "color_sharpness": 0,
+      "mono_exposure": 0,
+      "mono_iso": 0,
+      "mono_auto_exposure": true,
+      "ir_grid_light": 0.0,
+      "ir_flood_light": 0.0,
+      "stereo_depth_min": 500,
+      "stereo_depth_max": 15000,
+      "stereo_median_filter": "OFF",
+      "stereo_bright_min": 0,
+      "stereo_bright_max": 255
+    },
+    "cam_1": {
+      "device_id": "14442C10F124D9D600",
+      "show_stereo": false,
+      "flip_h": false,
+      "flip_v": true,
+      "perspective": -0.22,
+      "color_exposure": 30001,
+      "color_iso": 1599,
+      "color_auto_exposure": true,
+      "color_balance": 5500,
+      "color_auto_balance": true,
+      "color_brightness": 0,
+      "color_contrast": 0,
+      "color_saturation": 0,
+      "color_denoise": 0,
+      "color_sharpness": 0,
+      "mono_exposure": 0,
+      "mono_iso": 0,
+      "mono_auto_exposure": true,
+      "ir_grid_light": 0.0,
+      "ir_flood_light": 0.0,
+      "stereo_depth_min": 500,
+      "stereo_depth_max": 15000,
+      "stereo_median_filter": "OFF",
+      "stereo_bright_min": 0,
+      "stereo_bright_max": 255
+    },
+    "cam_2": {
+      "device_id": "14442C1031DDD2D200",
+      "show_stereo": false,
+      "flip_h": false,
+      "flip_v": true,
+      "perspective": -0.22,
+      "color_exposure": 0,
+      "color_iso": 0,
+      "color_auto_exposure": true,
+      "color_balance": 0,
+      "color_auto_balance": true,
+      "color_brightness": 0,
+      "color_contrast": 0,
+      "color_saturation": 0,
+      "color_denoise": 0,
+      "color_sharpness": 0,
+      "mono_exposure": 0,
+      "mono_iso": 0,
+      "mono_auto_exposure": true,
+      "ir_grid_light": 0.0,
+      "ir_flood_light": 0.0,
+      "stereo_depth_min": 500,
+      "stereo_depth_max": 15000,
+      "stereo_median_filter": "OFF",
+      "stereo_bright_min": 0,
+      "stereo_bright_max": 255
+    },
+    "cam_3": {
+      "device_id": "14442C101136D1D200",
+      "show_stereo": false,
+      "flip_h": false,
+      "flip_v": true,
+      "perspective": -0.22,
+      "color_exposure": 0,
+      "color_iso": 0,
+      "color_auto_exposure": true,
+      "color_balance": 0,
+      "color_auto_balance": true,
+      "color_brightness": 0,
+      "color_contrast": 0,
+      "color_saturation": 0,
+      "color_denoise": 0,
+      "color_sharpness": 0,
+      "mono_exposure": 0,
+      "mono_iso": 0,
+      "mono_auto_exposure": true,
+      "ir_grid_light": 0.0,
+      "ir_flood_light": 0.0,
+      "stereo_depth_min": 500,
+      "stereo_depth_max": 15000,
+      "stereo_median_filter": "OFF",
+      "stereo_bright_min": 0,
+      "stereo_bright_max": 255
+    },
+    "simulator": {
+      "video_path": "apps/white_space/data/recordings",
+      "video_decoder": "iGPU",
+      "video_format": "H264",
+      "video_frame_types": [
+        "VIDEO"
+      ],
+      "folder": "20250514-130512_4_wide_mono",
+      "sim_passthrough": false,
+      "range_start": 0,
+      "range_end": 10
+    },
+    "tracker": {
+      "fov": 110.0,
+      "tracklet_min_age": 5,
+      "tracklet_min_height": 0.25,
+      "timeout": 2.0,
+      "cam_360_edge_threshold": 0.5,
+      "cam_360_overlap_expansion": 0.3,
+      "cam_360_hysteresis_factor": 0.9
+    },
+    "frame_sync": {},
+    "tracklet_sync": {}
+  },
+  "inout": {
+    "osc_light": {
+      "ip_addresses": "192.168.1.177",
+      "port": 6454,
+      "use_signed": true,
+      "mtu": 1500,
+      "offsets": {
+        "white_0": 0,
+        "white_1": 0,
+        "blue_0": 0,
+        "blue_1": 0
+      },
+      "rpm": 0
+    },
+    "osc_sound": {
+      "stage": "LERP",
+      "ip_addresses": "127.0.0.1",
+      "port": 9000
+    }
+  },
+  "pose": {
+    "model_type": "TRT",
+    "model_path": "data/models",
+    "verbose": false,
+    "ws_input_stage": "LERP",
+    "pose": {
+      "enabled": true,
+      "resolution": "STANDARD"
+    },
+    "segmentation": {
+      "resolution": "STANDARD",
+      "enabled": false,
+      "reset_interval": 240
+    },
+    "image_crop": {
+      "expansion_width": 0.1,
+      "expansion_height": 0.1,
+      "output_width": 768,
+      "output_height": 1024,
+      "enable_prev_crop": false
+    },
+    "angle_extractor": {
+      "aspect_ratio": 0.75
+    },
+    "bbox": {},
+    "point": {
+      "confidence": {
+        "threshold_low": 0.3,
+        "threshold_high": 0.5,
+        "rescale_scores": true
+      },
+      "sticky": {
+        "enabled": true,
+        "init_to_zero": false,
+        "hold_scores": false
+      },
+      "smoother": {
+        "min_cutoff": 1.5,
+        "beta": 5.0,
+        "d_cutoff": 1.0
+      },
+      "prediction": {
+        "method": "QUADRATIC"
+      },
+      "interpolator": {
+        "responsiveness": 0.5,
+        "friction": 0.05
+      }
+    },
+    "angle": {
+      "smoother": {
+        "min_cutoff": 0.1,
+        "beta": 0.7,
+        "d_cutoff": 1.0
+      },
+      "prediction": {
+        "method": "QUADRATIC"
+      },
+      "interpolator": {
+        "responsiveness": 0.33,
+        "friction": 0.05
+      },
+      "sticky": {
+        "enabled": true,
+        "init_to_zero": false,
+        "hold_scores": true
+      }
+    },
+    "velocity": {
+      "extractor": {},
+      "smoother": {
+        "min_cutoff": 0.5,
+        "beta": 2.5,
+        "d_cutoff": 1.0
+      },
+      "prediction": {
+        "method": "QUADRATIC"
+      },
+      "interpolator": {
+        "responsiveness": 0.33,
+        "friction": 0.05
+      },
+      "sticky": {
+        "enabled": true,
+        "init_to_zero": true,
+        "hold_scores": false
+      }
+    },
+    "motion": {
+      "extractor": {
+        "noise_threshold": 0.1,
+        "max_threshold": 0.5,
+        "n_top_motions": 1
+      },
+      "moving_average": {
+        "window_size": 30,
+        "window_type": "UNIFORM"
+      }
+    },
+    "similarity": {
+      "window_similarity": {
+        "window_length": 11,
+        "method": "HARMONIC_MEAN",
+        "use_angle_similarity": true,
+        "angle_scale": 0.8,
+        "use_velocity_similarity": true,
+        "vel_scale": 1.0,
+        "use_motion_weighting": true,
+        "use_time_penalty": false,
+        "time_decay_exp": 2.5,
+        "remap_low": 0.0,
+        "remap_high": 0.75,
+        "enabled": true,
+        "verbose": false
+      },
+      "window_correlation": {
+        "window_length": 7,
+        "method": "HARMONIC_MEAN",
+        "max_lag": 7,
+        "min_variance": 0.01,
+        "use_motion_weighting": true,
+        "remap_low": 0.0,
+        "remap_high": 0.75,
+        "enabled": false,
+        "verbose": false
+      },
+      "similarity_applicator": {},
+      "leader_applicator": {},
+      "smoother": {
+        "min_cutoff": 0.01,
+        "beta": 0.4,
+        "d_cutoff": 1.0
+      },
+      "interpolator": {
+        "responsiveness": 0.33,
+        "friction": 0.05
+      },
+      "sticky": {
+        "enabled": true,
+        "init_to_zero": true,
+        "hold_scores": false
+      },
+      "motion_gate": {}
+    },
+    "window_raw": {
+      "window_size": 180,
+      "emit_partial": true
+    },
+    "window_clean": {
+      "window_size": 180,
+      "emit_partial": true
+    },
+    "window_smooth": {
+      "window_size": 180,
+      "emit_partial": true
+    },
+    "window_predict": {
+      "window_size": 180,
+      "emit_partial": true
+    },
+    "window_lerp": {
+      "window_size": 360,
+      "emit_partial": true
+    }
+  },
+  "composition": {
+    "bpm": 20.0,
+    "active": [
+      "lines"
+    ],
+    "blend": "ADD",
+    "master": 1.0,
+    "hardness": 0.0,
+    "threshold": 0.5,
+    "pose_waves": {
+      "fov_degrees": 110.0,
+      "void_width": 0.05,
+      "void_edge": 0.01,
+      "use_void": true,
+      "pattern_width": 0.2,
+      "pattern_edge": 0.2,
+      "line_sharpness": 1.5,
+      "line_speed": 1.5,
+      "line_width": 0.1,
+      "line_amount": 20.0
+    },
+    "fill": {
+      "white": {
+        "level": 0.5,
+        "speed": 0.5,
+        "phase": 0.0,
+        "width": 0.5,
+        "amount": 36
+      },
+      "blue": {
+        "level": 0.5,
+        "speed": 0.5,
+        "phase": 0.5,
+        "width": 0.5,
+        "amount": 36
+      }
+    },
+    "pulse": {
+      "white": {
+        "level": 0.5,
+        "speed": 0.5,
+        "phase": 0.0,
+        "width": 0.5,
+        "amount": 36
+      },
+      "blue": {
+        "level": 0.5,
+        "speed": 0.5,
+        "phase": 0.5,
+        "width": 0.5,
+        "amount": 36
+      }
+    },
+    "chase": {
+      "white": {
+        "level": 1.0,
+        "speed": 0.25,
+        "phase": 0.0,
+        "width": 0.2,
+        "amount": 22
+      },
+      "blue": {
+        "level": 0.5,
+        "speed": 0.5,
+        "phase": 0.5,
+        "width": 0.5,
+        "amount": 36
+      }
+    },
+    "lines": {
+      "white": {
+        "level": 0.5,
+        "speed": 0.94,
+        "phase": 0.0,
+        "width": 0.19,
+        "amount": 59
+      },
+      "blue": {
+        "level": 0.5,
+        "speed": 0.5,
+        "phase": 0.5,
+        "width": 0.5,
+        "amount": 36
+      }
+    },
+    "random": {
+      "white": {
+        "level": 0.5,
+        "speed": 0.5,
+        "scale": 4.0,
+        "octaves": 3,
+        "persistence": 0.5,
+        "threshold": 0.0
+      },
+      "blue": {
+        "level": 0.5,
+        "speed": 0.5,
+        "scale": 4.0,
+        "octaves": 3,
+        "persistence": 0.5,
+        "threshold": 0.0
+      }
+    },
+    "harmonic": {
+      "source_0": {
+        "enabled": true,
+        "bpm_multiplier": 1.0,
+        "spatial_cycles": 3.0,
+        "phase_offset": 0.0,
+        "spatial_phase": 0.0,
+        "amplitude_white": 0.5,
+        "amplitude_blue": 0.0
+      },
+      "source_1": {
+        "enabled": true,
+        "bpm_multiplier": 2.0,
+        "spatial_cycles": 5.0,
+        "phase_offset": 0.25,
+        "spatial_phase": 0.0,
+        "amplitude_white": 0.0,
+        "amplitude_blue": 0.5
+      },
+      "source_2": {
+        "enabled": false,
+        "bpm_multiplier": 3.0,
+        "spatial_cycles": 7.0,
+        "phase_offset": 0.5,
+        "spatial_phase": 0.0,
+        "amplitude_white": 0.3,
+        "amplitude_blue": 0.0
+      },
+      "source_3": {
+        "enabled": false,
+        "bpm_multiplier": 4.0,
+        "spatial_cycles": 9.0,
+        "phase_offset": 0.75,
+        "spatial_phase": 0.0,
+        "amplitude_white": 0.0,
+        "amplitude_blue": 0.3
+      }
+    }
+  },
+  "render": {
+    "preview": {
+      "tracker": {
+        "stage": "LERP",
+        "pose_line_width": 2.0,
+        "bbox_line_width": 2
+      },
+      "poser": {
+        "stage": "LERP",
+        "line_width": 2.0,
+        "line_smooth": 0.0,
+        "use_gpu_crop": true
+      }
+    },
+    "data": {
+      "mode": "WINDOW",
+      "feature_field": "AngleMotion",
+      "stage": 0,
+      "line_width": 3.0,
+      "line_smooth": 1.0,
+      "use_scores": false,
+      "render_labels": true,
+      "use_history_color": false
+    },
+    "colors": {
+      "player_0": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_1": {
+        "r": 0.0,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_2": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_3": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_4": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_5": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_6": {
+        "r": 1.0,
+        "g": 0.5,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_7": {
+        "r": 0.5,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "pose_left": {
+        "r": 1.0,
+        "g": 0.5,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "pose_right": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "pose_center": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "history": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      }
+    },
+    "window": {
+      "title": "Poser",
+      "v_sync": true,
+      "fullscreen": false,
+      "monitor": 0,
+      "x": 1,
+      "y": 31,
+      "width": 1278,
+      "height": 1000,
+      "secondary_list": [],
+      "secondary_fullscreen": true
+    }
+  },
+  "server": {
+    "title": "White Space",
+    "port": 666
+  },
+  "session": {
+    "output_path": "apps/white_space/data/recordings",
+    "name": "",
+    "split_seconds": 10,
+    "osc": {
+      "port_in": 9000,
+      "return_messages": true,
+      "port_out": 9001,
+      "ip_address_out": "127.0.0.1",
+      "verbose": false
+    },
+    "core": {},
+    "sequencer": {
+      "stages": [
+        "START",
+        "PLAY_IN",
+        "PLAY",
+        "CONCLUSION",
+        "IDLE"
+      ],
+      "durations": [
+        10.0,
+        3.0,
+        120.0,
+        10.0,
+        5.0
+      ]
+    },
+    "video": {
+      "temp_path": "temp",
+      "video_encoder": "iGPU",
+      "video_format": "H264",
+      "video_frame_types": [
+        "VIDEO"
+      ],
+      "enabled": false
+    }
+  }
+}

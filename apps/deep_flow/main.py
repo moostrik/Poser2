@@ -3,14 +3,13 @@
 from typing import Optional
 from functools import partial
 
-from modules.utils.Broadcast import Broadcast
+from modules.utils import Broadcast
 from modules.oak import Camera, Simulator, Player, Recorder, Sync
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
-from modules.pose import nodes, trackers, window
-from modules.pose.frame import FrameDict
-from modules import inference
+from modules.pose import nodes, trackers, window, FrameDict
+from modules.inference import source, crop, pose, segmentation, optical_flow
 from modules.pose.features import configure_features
 
 from .render_board import RenderBoard
@@ -60,8 +59,8 @@ class DeepFlowMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.tt.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.image_uploader = inference.ImageUploader()
-        self.crop_extractor = inference.CropExtractor(p.image_crop)
+        self.image_uploader = source.Uploader()
+        self.crop_extractor = crop.Extractor(p.image_crop)
 
         for camera in self.cameras:
             if self.recorder:
@@ -74,9 +73,9 @@ class DeepFlowMain:
 
         # DETECTION
         self.poses_from_tracklets = PosesFromTracklets(num_players)
-        self.point_extractor = inference.PointBatchExtractor(p.detection)
-        self.mask_extractor  = inference.MaskBatchExtractor(p.segmentation)
-        self.flow_extractor  = inference.FlowBatchExtractor(p.flow)
+        self.pose_predictor = pose.Predictor(p.pose)
+        self.segmentation_predictor  = segmentation.Predictor(p.segmentation)
+        self.optical_flow_predictor  = optical_flow.Predictor(p.optical_flow)
 
         self.bbox_filters = trackers.FilterTracker({
             i: trackers.FilterPipeline([
@@ -90,13 +89,13 @@ class DeepFlowMain:
         self.tracklet_sync_bang.add_sync_callback(self.tracker.notify_update)
         self.frame_sync_bang.add_sync_callback(self.poses_from_tracklets.process)
 
-        self.crop_extractor.add_image_callback(self.point_extractor.process)
-        self.crop_extractor.add_image_callback(self.mask_extractor.process)
-        self.crop_extractor.add_image_callback(self.flow_extractor.process)
+        self.crop_extractor.add_image_callback(self.pose_predictor.process)
+        self.crop_extractor.add_image_callback(self.segmentation_predictor.process)
+        self.crop_extractor.add_image_callback(self.optical_flow_predictor.process)
 
         self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
         self.bbox_filters.add_frames_callback(self._process_poses)
-        self.mask_extractor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
+        self.segmentation_predictor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
         # STAGE WINDOW TRACKERS & BROADCASTS
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
@@ -112,7 +111,7 @@ class DeepFlowMain:
             ])
 
         # STAGE RAW
-        self.point_extractor.add_frames_callback(self.stages[Stage.RAW])
+        self.pose_predictor.add_frames_callback(self.stages[Stage.RAW])
 
         # STAGE CLEAN
         self.filters_clean = trackers.FilterTracker({
@@ -206,9 +205,9 @@ class DeepFlowMain:
             camera.start()
 
         self.tracker.start()
-        self.point_extractor.start()
-        self.mask_extractor.start()
-        self.flow_extractor.start()
+        self.pose_predictor.start()
+        self.segmentation_predictor.start()
+        self.optical_flow_predictor.start()
 
         self.sound_osc.start()
 
@@ -242,9 +241,9 @@ class DeepFlowMain:
         self.tracker.stop()
         self.sound_osc.stop()
 
-        self.point_extractor.stop()
-        self.mask_extractor.stop()
-        self.flow_extractor.stop()
+        self.pose_predictor.stop()
+        self.segmentation_predictor.stop()
+        self.optical_flow_predictor.stop()
 
         self.settings_server.stop()
 

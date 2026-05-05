@@ -12,7 +12,7 @@ from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, FEATURE
 from .flow import     FlowLayer, FlowLayerSettings, FlowSettings, FlowDrawMode, \
                       FluidLayer, FluidLayerSettings, FluidDrawMode, \
                       Fluid3DLayer, Fluid3DLayerSettings, Fluid3DDrawMode, UnifiedFluidLayer
-from .generic import  CompositeLayer, CompositeLayerSettings, LutSelection, \
+from .generic import  CompositeLayer, CompositeLayerSettings, LutSettings, \
                       HDTPrepare, HDTBlend, MotionLayer, \
                       MSColorMaskLayer, ColorMaskLayerSettings, PanoramicTrackerLayer
 from .source import   CropSourceLayer, DFlowSourceLayer, FrgSourceLayer, ImageSourceLayer, MaskSourceLayer

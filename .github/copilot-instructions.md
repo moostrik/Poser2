@@ -56,9 +56,10 @@ Latency is a first-order concern.
 
 ## Imports
 
-- Import subpackages as namespaces and use qualified access (`from modules.pose import window`; use `window.WindowTracker`).
+`modules/` is the namespace root; each direct subdirectory is an independent package with its own `__init__.py` as its public boundary.
+- Use whichever import style keeps use sites unambiguous: import the package as a namespace (`from modules import X`; use `X.Y`) when the qualifier adds clarity, or import names directly (`from modules.X import A, B`) when they are unambiguous on their own.
 - Consolidate all imports from the same package onto one line; never split a single package across multiple `from x import` statements
-- Import types through the package `__init__`, not by direct leaf path (`from modules.inference import CropImage`, not `from modules.inference.crop_extractor import CropImage`)
+- Import from a package's `__init__.py` boundary, not from internal implementation files inside it.
 - Keep `__init__.py` exports limited to the package's own public symbols
 - Inside a package's own `__init__.py` or sub-modules, always use relative imports (`from .X import`, `from ..X import`). Never use the full `modules.X.Y` path to import from within the same package.
 - Do not define `__all__` in `__init__.py`; explicit named re-exports are sufficient.

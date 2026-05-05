@@ -2,13 +2,10 @@
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import RenderBase, Shader, Style, clear_color, Texture
-from modules.gl.WindowManager import MonitorId, WindowSettings
+from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, WindowSettings
 from modules.render.layers import LayerBase
-from modules.utils.PointsAndRects import Rect, Point2f
-from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
-from modules.render import layers as ls
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.render import layers as ls, make_subdivision, SubdivisionRow, Subdivision
+from modules.utils import Rect, Point2f, HotReloadMethods
 
 from .render_board import RenderBoard
 from .settings import Layers, RenderSettings
@@ -87,7 +84,7 @@ class DeepFlowRender(RenderBase):
             flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,   cam_mask,  centre_mask.texture, centre_frg.texture,     settings.flow)
             fluid3d =       self.L[Layers.fluid3d][i] =     ls.Fluid3DLayer(        i, self.board,   flows,                      settings.fluid3d,           settings.colors)
 
-            lut =           self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid3d, ms_mask],         settings.layer.lut)
+            lut =           self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid3d, ms_mask],         settings.layer.composite)
 
             self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.board, settings.data.a, settings.colors)
             self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.a, settings.colors)

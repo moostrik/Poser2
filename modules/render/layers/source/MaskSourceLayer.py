@@ -1,5 +1,6 @@
 # Standard library imports
 import torch
+from typing import TYPE_CHECKING
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -7,8 +8,10 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.board import HasSegmentationImages
 from modules.gl import Tensor, Texture
-from modules.inference import SegmentationImage
 from ..LayerBase import LayerBase, DataCache
+
+if TYPE_CHECKING:
+    from modules.inference import segmentation
 
 
 class MaskSourceLayer(LayerBase):
@@ -41,7 +44,7 @@ class MaskSourceLayer(LayerBase):
 
     def update(self) -> None:
         self._dirty = False
-        seg_image: SegmentationImage | None = self._board.get_segmentation_image(self._track_id)
+        seg_image: segmentation.Image | None = self._board.get_segmentation_image(self._track_id)
         mask_tensor: torch.Tensor | None = seg_image.mask if seg_image else None
         self._data_cache.update(mask_tensor)
 
