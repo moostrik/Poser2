@@ -4,6 +4,7 @@
 
 Poser2 is a real-time, low-latency system with app-specific orchestration in `apps/` and reusable infrastructure in `modules/`.
 
+- Using Python 3.12
 - Follow PEP 8.
 - `apps/` can import `modules/`; `modules/` must not depend on app code
 - Prefer module independence; keep cross-module coupling minimal
