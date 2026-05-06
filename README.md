@@ -5,7 +5,7 @@ depth cam pose synchony detection
 
 ### Visual C++ Redistributable and Visual Studio
 * Maybe it is necessary to instal visual studio with python and c++ modules (investigate on next clean install)
-* install latest Visual C++ Redistributable [download](https://aka.ms/vs/17/release/vc_redist.x86.exe) and RESTART
+* install latest Visual C++ Redistributable [download](https://aka.ms/vs/17/release/vc_redist.x86.exe) or [site](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version) and RESTART
 
 ### Python
 * ~~Install python 3.10 from Microsoft Store (or find a better method)~~
@@ -43,7 +43,7 @@ depth cam pose synchony detection
 * And add its 'bin' to path
 
 ### Clone Project
-* ```https://github.com/moostrik/Poser2.git```
+* ```git clone https://github.com/moostrik/Poser2.git```
 
 ### Install Script
 * in the terminal run ```scripts\install.bat```
