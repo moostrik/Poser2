@@ -1,7 +1,7 @@
-## Poser2
+# Poser2
 depth cam pose synchony detection
 
-# INSTALLATION
+## INSTALLATION
 
 ### Visual C++ Redistributable and Visual Studio
 * Maybe it is necessary to instal visual studio with python and c++ modules (investigate on next clean install)
@@ -35,12 +35,12 @@ depth cam pose synchony detection
 ### ExecutionPolicy
 * open powershell as administrator and type ```Set-ExecutionPolicy -ExecutionPolicy RemoteSigned```
 
+### Cuda
+* for now use CUDA 12.9 [site](https://developer.nvidia.com/cuda-12-9-0-download-archive)
+
 ### FFmpeg
 * Download from [site](https://ffmpeg.org/download.html#build-windows)
 * And add its 'bin' to path
-
-### Cuda
-* for now use CUDA 12.9 [site](https://developer.nvidia.com/cuda-12-9-0-download-archive)
 
 ### Clone Project
 * ```https://github.com/moostrik/Poser2.git```
@@ -52,10 +52,10 @@ depth cam pose synchony detection
 * activate venv and run ```python launcher.py```
 
 ### Startup
-* make a shortcut to scripts\start\<app>.bat
+* make a shortcut to `scripts\start\<app>.bat`
 * Press Windows+R to open the Run dialog, type shell:Common Startup
 * move shortcut to startup folder
 
 
-# HINTS
+## HINTS
 * je moeder
