@@ -3,7 +3,7 @@ depth cam pose synchony detection
 
 ## INSTALLATION
 
-# Visual C++ Redistributable and Visual Studio
+### Visual C++ Redistributable and Visual Studio
 * Maybe it is necessary to instal visual studio with python and c++ modules (investigate on next clean install)
 * install Visual C++ Redistributable [Download](https://aka.ms/vs/17/release/vc_redist.x86.exe) and RESTART
 
