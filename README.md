@@ -1,17 +1,17 @@
-# Poser2
+## Poser2
 depth cam pose synchony detection
 
-## INSTALLATION
+# INSTALLATION
 
 ### Visual C++ Redistributable and Visual Studio
 * Maybe it is necessary to instal visual studio with python and c++ modules (investigate on next clean install)
 * install Visual C++ Redistributable [Download](https://aka.ms/vs/17/release/vc_redist.x86.exe) and RESTART
 
-#### Python
+### Python
 * ~~Install python 3.10 from Microsoft Store (or find a better method)~~
 * Download python 3.12 Windows Installer (64 bit) from [site](https://www.python.org/downloads/release/python-31210/)
 
-##### Git for Windows
+### Git for Windows
 * Download from [site](https://git-scm.com/download/win)
 * Configure Global User Name and Email
 ```git config --global user.name "M.Oostrik"```
@@ -19,7 +19,7 @@ depth cam pose synchony detection
 * Initialize Git LFS
 ```git lfs install```
 
-###### VSCode
+### VSCode
 * Download from [site](https://code.visualstudio.com/Download)
 * install extentions
     * Error Lens
@@ -32,30 +32,30 @@ depth cam pose synchony detection
     * Python Indent
     * Shader languages support for VS Code
 
-# Set-ExecutionPolicy
+### ExecutionPolicy
 * open powershell as administrator and type ```Set-ExecutionPolicy -ExecutionPolicy RemoteSigned```
 
-# FFmpeg
+### FFmpeg
 * Download from [site](https://ffmpeg.org/download.html#build-windows)
 * And add its 'bin' to path
 
-# Cuda
+### Cuda
 * for now use CUDA 12.9 [site](https://developer.nvidia.com/cuda-12-9-0-download-archive)
 
-# Clone Project
+### Clone Project
 * ```https://github.com/moostrik/Poser2.git```
 
-# Install Project
+### Install Script
 * in the terminal run ```scripts\install.bat```
 
-# Run Project
+### Run Project
 * activate venv and run ```python launcher.py```
 
-# Startup
+### Startup
 * make a shortcut to scripts\start\<app>.bat
 * Press Windows+R to open the Run dialog, type shell:Common Startup
 * move shortcut to startup folder
 
 
-## HINTS
+# HINTS
 * je moeder
