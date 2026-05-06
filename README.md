@@ -7,11 +7,11 @@ depth cam pose synchony detection
 * Maybe it is necessary to instal visual studio with python and c++ modules (investigate on next clean install)
 * install Visual C++ Redistributable [Download](https://aka.ms/vs/17/release/vc_redist.x86.exe) and RESTART
 
-# Python
+#### Python
 * ~~Install python 3.10 from Microsoft Store (or find a better method)~~
 * Download python 3.12 Windows Installer (64 bit) from [site](https://www.python.org/downloads/release/python-31210/)
 
-# Git for Windows
+##### Git for Windows
 * Download from [site](https://git-scm.com/download/win)
 * Configure Global User Name and Email
 ```git config --global user.name "M.Oostrik"```
@@ -19,7 +19,7 @@ depth cam pose synchony detection
 * Initialize Git LFS
 ```git lfs install```
 
-# VSCode
+###### VSCode
 * Download from [site](https://code.visualstudio.com/Download)
 * install extentions
     * Error Lens
