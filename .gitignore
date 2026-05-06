@@ -1,8 +1,9 @@
 # project
 .venv/
+.cache/
 recordings/*
 logs/*
-data/models/*.trt
+*.trt
 data/models/archive/
 apps/**/data/settings/.*
 apps/**/data/recordings/*

@@ -104,7 +104,7 @@ from abc import abstractmethod
 from typing import Optional
 
 import numpy as np
-from typing_extensions import Self
+from typing import Self
 
 from .BaseFeature import BaseFeature, FeatureEnum
 

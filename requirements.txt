@@ -1,21 +1,36 @@
-depthai==2.30.0
+--extra-index-url https://download.pytorch.org/whl/cu129
+
+# Fixed versions
+depthai==2.30.0                 # 2.30.0 seems to be more stable as 2.32.0
+torch==2.8.0+cu129
+torchvision==0.23.0+cu129
+
+# Latest versions as of may 2026
 ffmpeg-python==0.2.0
 freetype-py==2.5.1
-glfw==2.9.0
+glfw==2.10.0
 h5py==3.16.0
-nicegui==3.10.0
-numpy<2.0.0
+nicegui==3.11.1
+numpy==2.4.4
 OneEuroFilter==0.2.1
-opencv-python==4.11.0.86            # highest version with numpy<2.0.0, Redundant?
-opencv-contrib-python==4.11.0.86    # highest version with numpy<2.0.0, Redundant?
-psutil==7.0.0
-python-osc==1.9.3
+opencv-python==4.13.0.92
+Pillow==12.2.0
+psutil==7.2.2
+python-osc==1.10.2
+PyOpenGL==3.1.10
+PyOpenGL-accelerate==3.1.10
 pytweening==1.2.0
 stupidArtnet==1.6.0
-typing-extensions==4.15.0           # Self type used in pose features (stdlib typing.Self requires 3.11+)
 watchdog==6.0.0
 
+# GPU / CUDA packages
+cuda-python==13.2.0
+onnx==1.21.0
+onnx_simplifier==0.5.0
+onnxruntime-gpu==1.25.1
+tensorrt-cu12==10.16.1.11
 
-# GPU packages (cuda-python, onnxruntime-gpu, tensorrt-cu12, torch, onnx, Pillow) are in
-# requirements_gpu.txt and installed separately by install.bat.
+
+
+
 # Check for updates with:   pip list --outdated

@@ -163,7 +163,7 @@ Notes:
 from enum import IntEnum
 
 import numpy as np
-from typing_extensions import Self
+from typing import Self
 
 from .base.BaseFeature import NORMALIZED_RANGE
 from .base.BaseVectorFeature import BaseVectorFeature

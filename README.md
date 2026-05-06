@@ -22,7 +22,8 @@ depth cam pose synchony detection
 * test
 
 # Python
-* Install python 3.10 from Microsoft Store (or find a better method)
+* ~~Install python 3.10 from Microsoft Store (or find a better method)~~
+* Download python 3.12 Windows Installer (64 bit) from [site](https://www.python.org/downloads/release/python-31210/)
 
 # VSCode
 * Download from [site](https://code.visualstudio.com/Download)

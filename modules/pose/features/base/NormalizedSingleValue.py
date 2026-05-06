@@ -6,7 +6,7 @@ import numpy as np
 from .NormalizedScalarFeature import NormalizedScalarFeature
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 
 class SingleElement(IntEnum):

@@ -37,7 +37,7 @@ class Tracklet:
     last_active: float =        field(default_factory=time.time)  # Last time person was actually detected (NEW/TRACKED)
 
     status: TrackingStatus =    field(default=TrackingStatus.NEW)
-    roi: Rect =                 field(default=Rect())
+    roi: Rect =                 field(default_factory=Rect)
 
     metadata: Optional[TrackerMetadata] = field(default = None)
     _external_tracklet: Optional[DepthTracklet] = field(default=None, repr=False)

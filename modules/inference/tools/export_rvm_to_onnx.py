@@ -3,16 +3,16 @@
 
 Usage:
     # Export RVM mobilenetv3 model at 256x192 (STANDARD)
-    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_256x192.onnx
+    python modules/inference/tools/export_rvm_to_onnx.py --checkpoint data/models/base/rvm_mobilenetv3.pth --output data/models/rvm_mobilenetv3_256x192.onnx
 
     # Export at custom resolution 384x288 (HIGH)
-    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_384x288.onnx --height 384 --width 288
+    python modules/inference/tools/export_rvm_to_onnx.py --checkpoint data/models/base/rvm_mobilenetv3.pth --output data/models/rvm_mobilenetv3_384x288.onnx --height 384 --width 288
 
     # Export at custom resolution 512x384 (ULTRA)
-    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_512x384.onnx --height 512 --width 384
+    python modules/inference/tools/export_rvm_to_onnx.py --checkpoint data/models/base/rvm_mobilenetv3.pth --output data/models/rvm_mobilenetv3_512x384.onnx --height 512 --width 384
 
     # Export at custom resolution 1024x768 (EXTREME)
-    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_1024x768.onnx --height 1024 --width 768
+    python modules/inference/tools/export_rvm_to_onnx.py --checkpoint data/models/base/rvm_mobilenetv3.pth --output data/models/rvm_mobilenetv3_1024x768.onnx --height 1024 --width 768
 """
 import torch
 import sys

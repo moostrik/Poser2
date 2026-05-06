@@ -64,7 +64,7 @@ set "CURRENT_DIR=%~dp0"
 @REM timeout /t 5 /nobreak >nul
 
 echo Opening Main App
-start "" "%CURRENT_DIR%.venv\Scripts\python.exe" launcher.py
+start "" "%CURRENT_DIR%.venv\Scripts\python.exe" launcher.py -app white_space
 timeout /t 2 /nobreak >nul
 
 @REM echo Press any key to continue . . .

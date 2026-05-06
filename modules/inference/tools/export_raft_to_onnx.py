@@ -6,16 +6,16 @@ Set PYTHONPATH to include RAFT directory before running.
 
 Usage:
     # Export RAFT Sintel model at 256x192 (default resolution)
-    python modules/pose/batch/flow/export_raft_to_onnx.py --checkpoint models/base/raft-sintel.pth --output models/raft-sintel_256x192_i12.onnx
+    python modules/inference/tools/export_raft_to_onnx.py --checkpoint data/models/base/raft-sintel.pth --output data/models/raft-sintel_256x192_i12.onnx
 
     # Export RAFT Sintel model at 384x288
-    python modules/pose/batch/flow/export_raft_to_onnx.py --checkpoint models/base/raft-sintel.pth --output models/raft-sintel_384x288_i12.onnx --height 384 --width 288
+    python modules/inference/tools/export_raft_to_onnx.py --checkpoint data/models/base/raft-sintel.pth --output data/models/raft-sintel_384x288_i12.onnx --height 384 --width 288
 
     # Export at 512x384
-    python modules/pose/batch/flow/export_raft_to_onnx.py --checkpoint models/base/raft-sintel.pth --output models/raft-sintel_512x384_i12.onnx --height 512 --width 384
+    python modules/inference/tools/export_raft_to_onnx.py --checkpoint data/models/base/raft-sintel.pth --output data/models/raft-sintel_512x384_i12.onnx --height 512 --width 384
 
     # Export at 512x384 with 6 iterations
-    python modules/pose/batch/flow/export_raft_to_onnx.py --checkpoint models/base/raft-sintel.pth --output models/raft-sintel_512x384_i6.onnx --height 512 --width 384 --iters 6
+    python modules/inference/tools/export_raft_to_onnx.py --checkpoint data/models/base/raft-sintel.pth --output data/models/raft-sintel_512x384_i6.onnx --height 512 --width 384 --iters 6
 """
 
 import torch

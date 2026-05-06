@@ -3,10 +3,11 @@
 
 Usage:
     # Convert RTMPose-L 256x192 (auto-detects dimensions and precision)
-    python modules/pose/batch/detection/export_rtm_onnx_to_trt.py --onnx models/rtmpose-l_256x192.onnx --output models/rtmpose-l_256x192_b3.trt
+    python modules/inference/tools/export_rtm_onnx_to_trt.py --onnx data/models/rtmpose-l_256x192.onnx --output data/models/rtmpose-l_256x192_b3.trt
+    python modules/inference/tools/export_rtm_onnx_to_trt.py --onnx data/models/rtmpose-l_256x192.onnx --output data/models/rtmpose-l_256x192_b8.trt --opt-batch 6 --max-batch 8
 
     # Convert 384x288 model
-    python modules/pose/batch/detection/export_rtm_onnx_to_trt.py --onnx models/rtmpose-l_384x288.onnx --output models/rtmpose-l_384x288_b3.trt
+    python modules/inference/tools/export_rtm_onnx_to_trt.py --onnx data/models/rtmpose-l_384x288.onnx --output data/models/rtmpose-l_384x288_b3.trt
 """
 
 import tensorrt as trt
@@ -117,20 +118,20 @@ def convert_rtmpose_to_tensorrt(
 
     # Print layer precision information
     print(f"\n🔍 Layer Precision Analysis ({network.num_layers} layers):")
-    
+
     # Count layers by type and precision
     layer_types = {}
     precision_stats = {"FLOAT": 0, "HALF": 0, "INT32": 0, "INT64": 0, "INT8": 0, "UINT8": 0, "BOOL": 0, "UNKNOWN": 0}
-    
+
     for i in range(network.num_layers):
         layer = network.get_layer(i)
         layer_type = str(layer.type).split('.')[-1]
-        
+
         # Track layer types
         if layer_type not in layer_types:
             layer_types[layer_type] = 0
         layer_types[layer_type] += 1
-        
+
         # Get output precision
         output_dtypes = []
         if layer.num_outputs > 0:
@@ -138,39 +139,39 @@ def convert_rtmpose_to_tensorrt(
                 output_tensor = layer.get_output(j)
                 dtype_str = str(output_tensor.dtype).split('.')[-1]
                 output_dtypes.append(dtype_str)
-                
+
                 # Count precision
                 if dtype_str in precision_stats:
                     precision_stats[dtype_str] += 1
                 else:
                     precision_stats["UNKNOWN"] += 1
-    
+
     # Print summary
     print(f"\n  Layer Type Distribution:")
     for layer_type, count in sorted(layer_types.items(), key=lambda x: x[1], reverse=True):
         print(f"    {layer_type:20s}: {count:3d}")
-    
+
     print(f"\n  Output Precision Distribution:")
     for precision, count in sorted(precision_stats.items(), key=lambda x: x[1], reverse=True):
         if count > 0:
             print(f"    {precision:10s}: {count:3d}")
-    
+
     # Optional: Print detailed layer-by-layer info (commented out by default for brevity)
     # Uncomment this section if you want to see every single layer
     print(f"\n  Detailed Layer Information (first 20 layers):")
     for i in range(min(20, network.num_layers)):
         layer = network.get_layer(i)
         layer_type = str(layer.type).split('.')[-1]
-        
+
         output_info = []
         if layer.num_outputs > 0:
             for j in range(layer.num_outputs):
                 output_tensor = layer.get_output(j)
                 dtype_str = str(output_tensor.dtype).split('.')[-1]
                 output_info.append(f"{output_tensor.name}:{dtype_str}")
-        
+
         print(f"    Layer {i:3d}: {layer_type:20s} → {', '.join(output_info) if output_info else 'no outputs'}")
-    
+
     if network.num_layers > 20:
         print(f"    ... ({network.num_layers - 20} more layers)")
 
