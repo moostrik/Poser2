@@ -3,9 +3,13 @@ depth cam pose synchony detection
 
 ## INSTALLATION
 
-# Visual Studio
-* Maybe it is necessary to instal visual studio with python and c++ modules
-* investigate on next install
+# Visual C++ Redistributable and Visual Studio
+* Maybe it is necessary to instal visual studio with python and c++ modules (investigate on next clean install)
+* install Visual C++ Redistributable [Download](https://aka.ms/vs/17/release/vc_redist.x86.exe) and RESTART
+
+# Python
+* ~~Install python 3.10 from Microsoft Store (or find a better method)~~
+* Download python 3.12 Windows Installer (64 bit) from [site](https://www.python.org/downloads/release/python-31210/)
 
 # Git for Windows
 * Download from [site](https://git-scm.com/download/win)
@@ -15,27 +19,18 @@ depth cam pose synchony detection
 * Initialize Git LFS
 ```git lfs install```
 
-# SSH Github
-* create ssh key
-```ssh-keygen -t ed25519 -C "m.oostrik@gmail.com"```
-* copy key and add to github
-* test
-
-# Python
-* ~~Install python 3.10 from Microsoft Store (or find a better method)~~
-* Download python 3.12 Windows Installer (64 bit) from [site](https://www.python.org/downloads/release/python-31210/)
-
 # VSCode
 * Download from [site](https://code.visualstudio.com/Download)
 * install extentions
+    * Error Lens
+    * GLSL Lint
     * Pylance
     * Python
     * Python Debugger
-    * Python Environment Manager (deprecated) or Python Environments
+    * ~~Python Environment Manager (deprecated)~~
+    * Python Environments
     * Python Indent
-
-# Visual C++ Redistributable
-* install and RESTART [Download](https://aka.ms/vs/17/release/vc_redist.x86.exe)
+    * Shader languages support for VS Code
 
 # Set-ExecutionPolicy
 * open powershell as administrator and type ```Set-ExecutionPolicy -ExecutionPolicy RemoteSigned```
@@ -48,54 +43,19 @@ depth cam pose synchony detection
 * for now use CUDA 12.9 [site](https://developer.nvidia.com/cuda-12-9-0-download-archive)
 
 # Clone Project
-* ```git clone git@github.com:moostrik/DepthPose.git```
+* ```https://github.com/moostrik/Poser2.git```
 
 # Install Project
-* in powershell run ```.\install.bat```
+* in the terminal run ```scripts\install.bat```
 
 # Run Project
-* activate venv and run ```python .\launcher.py```
-* or in powershell run ```.\start.bat```
+* activate venv and run ```python launcher.py```
 
 # Startup
-* make a shortcut of start.bat
+* make a shortcut to scripts\start\<app>.bat
 * Press Windows+R to open the Run dialog, type shell:Common Startup
 * move shortcut to startup folder
 
 
 ## HINTS
-
-# shotcut vscode
-* ctrl+shift+p
-* Tasks:Open User Tasks
-```json
-{
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "Copy Python Command",
-      "type": "shell",
-      "command": "echo python launcher.py -s studio -sim | clip",
-      "presentation": {
-        "reveal": "never",
-        "panel": "dedicated",
-      },
-      "problemMatcher": []
-    }
-  ]
-}
-```
-* Preferences:Open Keyboard Shortcuts (JSON)
-```json
-[
-    {
-        "key": "ctrl+alt+d",
-        "command": "workbench.action.toggleLightDarkThemes"
-    },
-    {
-      "key": "ctrl+1",
-      "command": "workbench.action.tasks.runTask",
-      "args": "Copy Python Command"
-    }
-]
-```
+* je moeder

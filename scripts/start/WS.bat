@@ -57,7 +57,8 @@ if "%ERRORLEVEL%"=="0" (
     )
 )
 
-set "CURRENT_DIR=%~dp0"
+set "CURRENT_DIR=%~dp0..\..\"
+cd /d "%CURRENT_DIR%"
 
 @REM echo Opening umu MAIN in Max MSP
 @REM cmd /c start "" "%CURRENT_DIR%files\audio\umu MAIN.maxpat"

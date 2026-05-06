@@ -57,14 +57,15 @@ if "%ERRORLEVEL%"=="0" (
     )
 )
 
-set "CURRENT_DIR=%~dp0"
+set "CURRENT_DIR=%~dp0..\..\"
+cd /d "%CURRENT_DIR%"
 
 echo Opening umu MAIN in Max MSP
-cmd /c start "" "%CURRENT_DIR%data\audio\umu MAIN.maxpat"
+cmd /c start "" "%CURRENT_DIR%apps\hd_trio\data\audio\umu MAIN.maxpat"
 timeout /t 5 /nobreak >nul
 
 echo Opening Main App
-start "" "%CURRENT_DIR%.venv\Scripts\python.exe" launcher.py
+start "" "%CURRENT_DIR%.venv\Scripts\python.exe" launcher.py -app hd_trio
 timeout /t 2 /nobreak >nul
 
 @REM echo Press any key to continue . . .

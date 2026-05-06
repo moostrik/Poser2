@@ -3,25 +3,16 @@ echo.
 echo  TensorRT Model Conversion
 
 set APP=%1
-set FORCE_REBUILD=0
-if /I "%2"=="--force" set FORCE_REBUILD=1
-if /I "%1"=="--force" set FORCE_REBUILD=1
+set "VENV_DIR=%~dp0..\.venv"
 
 if "%APP%"=="" (
-    echo Usage: %~nx0 APP [--force]
+    echo Usage: %~nx0 APP
     echo   APP    hd_trio, white_space, deep_flow, all
     goto endofscript
 )
 
-if /I "%APP%"=="--force" (
-    echo Usage: %~nx0 APP [--force]
-    echo   APP    hd_trio, white_space, deep_flow, all
-    goto endofscript
-)
-
-set "VENV_DIR=%~dp0.venv"
 if not exist "%VENV_DIR%\Scripts\activate.bat" (
-    echo Virtual environment not found! Run install.bat first.
+    echo Virtual environment not found! Run scripts/install.bat first.
     goto endofscript
 )
 call "%VENV_DIR%\Scripts\activate"
@@ -78,7 +69,7 @@ for %%A in (!_ARGS!) do (
     if "!_PREV!"=="--output" set "_OUT=%%A"
     set "_PREV=%%A"
 )
-if not "%FORCE_REBUILD%"=="1" if exist "!_OUT!" (
+if exist "!_OUT!" (
     echo Skipping !_OUT! - already exists
     endlocal & exit /b 0
 )

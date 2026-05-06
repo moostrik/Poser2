@@ -1,5 +1,6 @@
 @echo off
 set PYTHON=py -3.12
+set "VENV_DIR=%~dp0..\.venv"
 echo.
 
 echo [44m CUDA 12.9 [0m
@@ -42,10 +43,9 @@ if %errorlevel% neq 0 (
 echo.
 
 echo [44m Virtual Environment [0m
-set "VENV_DIR=%~dp0.venv"
 
 if exist "%VENV_DIR%" (
-    echo [33mvirtual environment already exists at %VENV_DIR%[0m
+    echo [91mvirtual environment already exists at %VENV_DIR%[0m
     goto endofscript
 )
 
@@ -67,13 +67,14 @@ echo.
 echo [92mInstall complete.[0m
 echo.
 echo Run makemodels.bat to build TensorRT engines:
-echo   makemodels.bat <app_name> or "all"
+echo   makemodels.bat ^<app_name^>
+echo or
+echo   makemodels.bat all
 echo.
 pause
-exit
 
 :endofscript
 echo.
-echo [91mLaunch not successful[0m
-echo Exiting.
+echo [91mInstall not successful[0m
+echo.
 pause
