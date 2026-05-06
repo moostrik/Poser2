@@ -55,27 +55,20 @@ echo [33mCreating and activating virtual environment %VENV_DIR%[0m
 call "%VENV_DIR%\Scripts\activate"
 echo.
 
-python -m pip install --upgrade pip
-echo.
-
 echo [44m Requirements [0m
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 
 call "%VENV_DIR%\Scripts\deactivate"
 
-:makemodels
-echo.
-call makemodels.bat
-if %errorlevel% neq 0 (
-    echo [91mModel conversion failed[0m
-    goto endofscript
-)
-
 
 :success
 echo.
-echo [92mLaunch successful[0m
-echo Exiting.
+echo [92mInstall complete.[0m
+echo.
+echo Run makemodels.bat to build TensorRT engines:
+echo   makemodels.bat <app_name> or "all"
+echo.
 pause
 exit
 

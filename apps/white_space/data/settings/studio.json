@@ -166,7 +166,7 @@
   },
   "pose": {
     "model_type": "TRT",
-    "model_path": "data/models",
+    "model_path": "apps/white_space/data/models",
     "verbose": false,
     "ws_input_stage": "LERP",
     "pose": {

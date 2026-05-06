@@ -9,10 +9,10 @@ _MODELS = {
         Resolution.EXTREME: "rvm_mobilenetv3_1024x768.onnx",
     },
     'tensorrt': {
-        Resolution.STANDARD: "rvm_mobilenetv3_256x192_b3.trt",
-        Resolution.HIGH: "rvm_mobilenetv3_384x288_b3.trt",
-        Resolution.ULTRA: "rvm_mobilenetv3_512x384_b3.trt",
-        Resolution.EXTREME: "rvm_mobilenetv3_1024x768_b3.trt",
+        Resolution.STANDARD: "rvm_mobilenetv3_256x192.trt",
+        Resolution.HIGH: "rvm_mobilenetv3_384x288.trt",
+        Resolution.ULTRA: "rvm_mobilenetv3_512x384.trt",
+        Resolution.EXTREME: "rvm_mobilenetv3_1024x768.trt",
     }
 }
 
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     @property
     def model(self) -> str:
         if self.model_type == ModelType.ONNX:
-            return _MODELS['onnx'][self.resolution]
+            return f"data/models/{_MODELS['onnx'][self.resolution]}"
         elif self.model_type == ModelType.TRT:
             return _MODELS['tensorrt'][self.resolution]
         return ""

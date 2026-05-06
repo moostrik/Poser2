@@ -171,7 +171,7 @@ class MotionFeature(BaseSettings):
 class PoseGroup(BaseSettings):
     max_poses:          Field[int]                  = Field(1, min=1, max=16, access=Field.INIT)
     model_type:         Field[inference.ModelType]  = Field(inference.ModelType.TRT, access=Field.INIT)
-    model_path:         Field[str]                  = Field("data/models", access=Field.INIT, visible=False)
+    model_path:         Field[str]                  = Field("", access=Field.INIT, visible=False)
     verbose:            Field[bool]                 = Field(False, access=Field.INIT)
     frequency:          Field[float]                = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float]                = Field(60.0, access=Field.INIT)

@@ -179,7 +179,7 @@
   },
   "pose": {
     "model_type": "TRT",
-    "model_path": "data/models",
+    "model_path": "apps/hd_trio/data/models",
     "verbose": false,
     "pose": {
       "resolution": "STANDARD"

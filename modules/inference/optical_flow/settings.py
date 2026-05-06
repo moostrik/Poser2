@@ -9,10 +9,10 @@ _MODELS = {
         Resolution.EXTREME: "raft-sintel_1024x768_i12.onnx",
     },
     'tensorrt': {
-        Resolution.STANDARD: "raft-sintel_256x192_i12_b3.trt",
-        Resolution.HIGH: "raft-sintel_384x288_i12_b3.trt",
-        Resolution.ULTRA: "raft-sintel_512x384_i12_b3.trt",
-        Resolution.EXTREME: "raft-sintel_1024x768_i12_b3.trt",
+        Resolution.STANDARD: "raft-sintel_256x192_i12.trt",
+        Resolution.HIGH: "raft-sintel_384x288_i12.trt",
+        Resolution.ULTRA: "raft-sintel_512x384_i12.trt",
+        Resolution.EXTREME: "raft-sintel_1024x768_i12.trt",
     }
 }
 
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     @property
     def model(self) -> str:
         if self.model_type == ModelType.ONNX:
-            return _MODELS['onnx'][self.resolution]
+            return f"data/models/{_MODELS['onnx'][self.resolution]}"
         elif self.model_type == ModelType.TRT:
             return _MODELS['tensorrt'][self.resolution]
         return ""

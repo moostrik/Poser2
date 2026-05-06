@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     @property
     def model(self) -> str:
         if self.model_type == ModelType.ONNX:
-            return _MODELS['onnx'][self.resolution]
+            return f"data/models/{_MODELS['onnx'][self.resolution]}"
         elif self.model_type == ModelType.TRT:
-            return f"{_MODELS['tensorrt'][self.resolution]}_b{self.max_poses}.trt"
+            return f"{_MODELS['tensorrt'][self.resolution]}.trt"
         return ""

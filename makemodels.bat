@@ -1,77 +1,92 @@
 @echo off
 echo.
-echo [44m TensorRT Model Conversion [0m
+echo  TensorRT Model Conversion
 
+set APP=%1
 set FORCE_REBUILD=0
-:parse_args
-if "%~1"=="" goto args_done
-if /I "%~1"=="--force" set FORCE_REBUILD=1
-if /I "%~1"=="--help" (
-    echo Usage: %~nx0 [--force]
-    echo   --force    Rebuild all models even if they exist
+if /I "%2"=="--force" set FORCE_REBUILD=1
+if /I "%1"=="--force" set FORCE_REBUILD=1
+
+if "%APP%"=="" (
+    echo Usage: %~nx0 APP [--force]
+    echo   APP    hd_trio, white_space, deep_flow, all
     goto endofscript
 )
-shift
-goto parse_args
-:args_done
 
-if "%FORCE_REBUILD%"=="1" (
-    echo [33mForce rebuild enabled - will recreate all models[0m
-    echo.
+if /I "%APP%"=="--force" (
+    echo Usage: %~nx0 APP [--force]
+    echo   APP    hd_trio, white_space, deep_flow, all
+    goto endofscript
 )
 
-REM Check if virtual environment exists
 set "VENV_DIR=%~dp0.venv"
 if not exist "%VENV_DIR%\Scripts\activate.bat" (
-    echo [91mVirtual environment not found![0m
-    echo Please run install.bat first.
-    goto fail
+    echo Virtual environment not found! Run install.bat first.
+    goto endofscript
 )
-
-REM Activate virtual environment
 call "%VENV_DIR%\Scripts\activate"
 
-echo.
-echo [33mRTM pose estimation[0m
-call :build "data\models\rtmpose-l_256x192_b3.trt"  "python modules\inference\tools\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output data\models\rtmpose-l_256x192_b3.trt"
-call :build "data\models\rtmpose-l_256x192_b8.trt"  "python modules\inference\tools\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output data\models\rtmpose-l_256x192_b8.trt --opt-batch 6 --max-batch 8"
+if /I "%APP%"=="hd_trio"      call :section_hd_trio
+if /I "%APP%"=="white_space"  call :section_white_space
+if /I "%APP%"=="deep_flow"    call :section_deep_flow
+if /I "%APP%"=="all"          call :section_hd_trio
+if /I "%APP%"=="all"          call :section_white_space
+if /I "%APP%"=="all"          call :section_deep_flow
 
 echo.
-echo [33mRVM matting / segmentation[0m
-call :build "data\models\rvm_mobilenetv3_256x192_b3.trt"  "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192.onnx --output data\models\rvm_mobilenetv3_256x192_b3.trt"
-call :build "data\models\rvm_mobilenetv3_256x192_b8.trt"  "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192.onnx --output data\models\rvm_mobilenetv3_256x192_b8.trt --opt-batch 6 --max-batch 8"
-call :build "data\models\rvm_mobilenetv3_384x288_b3.trt"  "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_384x288.onnx --output data\models\rvm_mobilenetv3_384x288_b3.trt"
-call :build "data\models\rvm_mobilenetv3_512x384_b3.trt"  "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_512x384.onnx --output data\models\rvm_mobilenetv3_512x384_b3.trt"
-call :build "data\models\rvm_mobilenetv3_1024x768_b3.trt" "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_1024x768.onnx --output data\models\rvm_mobilenetv3_1024x768_b3.trt"
-
-@REM echo.
-@REM echo [33mRAFT optical flow[0m
-@REM call :build "data\models\raft-sintel_256x192_i12_b3.trt" "python modules\inference\tools\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_256x192_i12.onnx --output data\models\raft-sintel_256x192_i12_b3.trt"
-@REM call :build "data\models\raft-sintel_384x288_i12_b3.trt" "python modules\inference\tools\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_384x288_i12.onnx --output data\models\raft-sintel_384x288_i12_b3.trt"
-@REM call :build "data\models\raft-sintel_512x384_i12_b3.trt" "python modules\inference\tools\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_512x384_i12.onnx --output data\models\raft-sintel_512x384_i12_b3.trt"
-
-echo.
-echo [92mTensorRT conversion complete[0m
+echo TensorRT conversion complete
 goto endofscript
 
-:fail
+:section_hd_trio
 echo.
-echo [91mConversion failed[0m
+echo hd_trio
+call :build "python modules\inference\tools\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output apps\hd_trio\data\models\rtmpose-l_256x192.trt --opt-batch 3 --max-batch 3"
+call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_256x192.trt --opt-batch 3 --max-batch 3"
+call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_384x288.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_384x288.trt --opt-batch 3 --max-batch 3"
+call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_512x384.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_512x384.trt --opt-batch 3 --max-batch 3"
+call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_1024x768.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_1024x768.trt --opt-batch 3 --max-batch 3"
+exit /b 0
 
-:endofscript
-pause
+:section_white_space
+echo.
+echo white_space
+call :build "python modules\inference\tools\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output apps\white_space\data\models\rtmpose-l_256x192.trt --opt-batch 6 --max-batch 8"
+call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192.onnx --output apps\white_space\data\models\rvm_mobilenetv3_256x192.trt --opt-batch 6 --max-batch 8"
+exit /b 0
+
+:section_deep_flow
+echo.
+echo deep_flow
+call :build "python modules\inference\tools\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output apps\deep_flow\data\models\rtmpose-l_256x192.trt --opt-batch 1 --max-batch 1"
+
+call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_256x192.trt --opt-batch 1 --max-batch 1"
+call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_384x288.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_384x288.trt --opt-batch 1 --max-batch 1"
+call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_512x384.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_512x384.trt --opt-batch 1 --max-batch 1"
+call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_1024x768.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_1024x768.trt --opt-batch 1 --max-batch 1"
+
+call :build "python modules\inference\tools\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_256x192_i12.onnx --output apps\deep_flow\data\models\raft-sintel_256x192_i12.trt --opt-batch 1 --max-batch 1"
+call :build "python modules\inference\tools\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_384x288_i12.onnx --output apps\deep_flow\data\models\raft-sintel_384x288_i12.trt --opt-batch 1 --max-batch 1"
+call :build "python modules\inference\tools\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_512x384_i12.onnx --output apps\deep_flow\data\models\raft-sintel_512x384_i12.trt --opt-batch 1 --max-batch 1"
 exit /b 0
 
 :build
-if not exist "%~1" goto do_build
-if "%FORCE_REBUILD%"=="1" goto do_build
-echo [90mSkipping %~nx1 - already exists[0m
-exit /b 0
-:do_build
-%~2
-if errorlevel 1 (
-    echo [91mFailed: %~nx1[0m
-) else (
-    echo [92mBuilt %~nx1[0m
+setlocal enabledelayedexpansion
+set _ARGS=%~1
+set _OUT=
+set _PREV=
+for %%A in (!_ARGS!) do (
+    if "!_PREV!"=="--output" set "_OUT=%%A"
+    set "_PREV=%%A"
 )
+if not "%FORCE_REBUILD%"=="1" if exist "!_OUT!" (
+    echo Skipping !_OUT! - already exists
+    endlocal & exit /b 0
+)
+%~1
+if errorlevel 1 (echo Failed: !_OUT!) else (echo Built !_OUT!)
+endlocal
+exit /b 0
+
+:endofscript
+pause
 exit /b 0
