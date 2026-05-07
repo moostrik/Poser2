@@ -61,7 +61,7 @@ set "CURRENT_DIR=%~dp0"
 
 echo Opening umu MAIN in Max MSP
 cmd /c start "" "C:\Developer\UMUv4\files\audio\umu MAIN.maxpat"
-timeout /t 5 /nobreak >nul
+timeout /t 10 /nobreak >nul
 
 echo Opening Main App
 start "" "%CURRENT_DIR%.venv\Scripts\python.exe" launcher.py
