@@ -40,6 +40,8 @@ class CompositorSettings(BaseSettings):
     hardness:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Contrast hardness (0=off, 1=hard step)")
     threshold: Field[float] = Field(0.5, min=0.0, max=1.0, step=0.01, description="Hardness pivot point")
 
+    fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV (shared from root)", newline=True)
+
     pose_waves:   Group[PoseWavesSettings]   = Group(PoseWavesSettings)
     fill:         Group[FillSettings]         = Group(FillSettings)
     pulse:        Group[PulseSettings]        = Group(PulseSettings)
@@ -47,4 +49,4 @@ class CompositorSettings(BaseSettings):
     lines:        Group[LinesSettings]        = Group(LinesSettings)
     random:       Group[RandomSettings]       = Group(RandomSettings)
     harmonic:     Group[HarmonicSettings]     = Group(HarmonicSettings)
-    player_lines: Group[PlayerLinesSettings]  = Group(PlayerLinesSettings)
+    player_lines: Group[PlayerLinesSettings]  = Group(PlayerLinesSettings, share=[fov.as_('fov')])

@@ -77,6 +77,7 @@ class Layers(IntEnum):
 # ---------------------------------------------------------------------------
 
 class OakGroup(BaseSettings):
+    fov               : Field[float]           = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV")
     num_cameras       : Field[int]             = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     fps               : Field[float]           = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
     yolo              : Field[bool]            = Field(True, access=Field.INIT, description="Enable YOLO person detection")
@@ -85,7 +86,7 @@ class OakGroup(BaseSettings):
     stereo            : Field[bool]            = Field(False, access=Field.INIT, description="Enable stereo mode")
     hd_ready          : Field[bool]            = Field(False, access=Field.INIT, description="Use HD resolution")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
-    model_path        : Field[str]             = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
+    model_path        : Field[str]             = Field("data/models", access=Field.INIT, description="Model files directory")
 
     _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, sim_enabled, model_path]
 
@@ -94,7 +95,7 @@ class OakGroup(BaseSettings):
     cam_2     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_3     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     simulator : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cameras, fps])
-    tracker   : Group[PanoramicTrackerSettings]  = Group(PanoramicTrackerSettings)
+    tracker   : Group[PanoramicTrackerSettings]  = Group(PanoramicTrackerSettings, share=[fov])
     frame_sync: Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
     tracklet_sync: Group[SyncSettings]           = Group(SyncSettings, share=[num_cameras, fps])
 
@@ -274,11 +275,12 @@ class Settings(BaseSettings):
     input_fps       : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     render_fps      : Field[float] = Field(30.0)
     light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="LED strip resolution (pixels)")
+    fov             : Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV — shared with tracker and composition")
 
-    camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])
+    camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov])
     inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players'), light_resolution.as_('resolution')])
     pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
-    composition: Group[CompositorSettings] = Group(CompositorSettings, share=[num_players.as_('max_poses'), input_fps.as_('light_rate'), light_resolution.as_('light_resolution')])
+    composition: Group[CompositorSettings] = Group(CompositorSettings, share=[num_players.as_('max_poses'), input_fps.as_('light_rate'), light_resolution.as_('light_resolution'), fov])
     render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams')])
     server : Group[NiceSettings]    = Group(NiceSettings)
     session: Group[SessionGroup]    = Group(SessionGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])

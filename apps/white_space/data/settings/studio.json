@@ -4,6 +4,7 @@
   "input_fps": 30.0,
   "render_fps": 60.0,
   "light_resolution": 3600,
+  "fov": 110.0,
   "camera": {
     "yolo": true,
     "color": false,
@@ -133,7 +134,6 @@
       "range_end": 10
     },
     "tracker": {
-      "fov": 110.0,
       "tracklet_min_age": 5,
       "tracklet_min_height": 0.25,
       "timeout": 2.0,
@@ -474,12 +474,13 @@
       }
     },
     "player_lines": {
-      "invert": false,
       "center_width": 0.06,
       "flank_width": 0.03,
       "depth_scale": 2.0,
+      "invert": false,
       "level_center": 1.0,
-      "level_flank": 0.8
+      "level_flank": 0.8,
+      "anchor_nose": true
     }
   },
   "render": {

@@ -18,6 +18,7 @@ from modules.utils import HotReloadMethods
 from modules.tracker import Tracklet
 from modules.pose.frame import Frame
 from modules.pose import features
+from modules.pose.features import PointLandmark
 
 from ..base import Composition
 from ..transport import Transport
@@ -25,12 +26,14 @@ from ..draw import BlendType, apply_circular
 
 
 class PlayerLinesSettings(BaseSettings):
-    center_width:  Field[float] = Field(0.02,  min=0.0, max=0.2, step=0.01, description="Centre line width (strip fraction)")
-    flank_width:   Field[float] = Field(0.03,  min=0.0, max=0.2, step=0.01, description="Flank line width (strip fraction)")
-    depth_scale:   Field[float] = Field(0.0,   min=0.0, max=1.0, step=0.01, description="Depth scaling: 0=flat, 1=far player vanishes (centre_width is max)")
-    invert:        Field[bool]  = Field(False,                              description="Swap centre/flank colours", newline=True)
-    level_center:  Field[float] = Field(1.0,   min=0.0, max=1.0, step=0.01, description="Centre line level")
-    level_flank:   Field[float] = Field(1.0,   min=0.0, max=1.0, step=0.01, description="Flank line level")
+    center_width:  Field[float] = Field(0.02,  min=0.0, max=0.2,   step=0.01, description="Centre line width (strip fraction)")
+    flank_width:   Field[float] = Field(0.03,  min=0.0, max=0.2,   step=0.01, description="Flank line width (strip fraction)")
+    depth_scale:   Field[float] = Field(0.0,   min=0.0, max=1.0,   step=0.01, description="Depth scaling: 0=flat, 1=far player vanishes (centre_width is max)")
+    invert:        Field[bool]  = Field(False,                                 description="Swap centre/flank colours", newline=True)
+    level_center:  Field[float] = Field(1.0,   min=0.0, max=1.0,   step=0.01, description="Centre line level")
+    level_flank:   Field[float] = Field(1.0,   min=0.0, max=1.0,   step=0.01, description="Flank line level")
+    anchor_nose:   Field[bool]  = Field(False,                                 description="Anchor centre line to nose instead of bbox centre", newline=True)
+    fov:           Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5,  description="Camera horizontal FOV (shared from compositor)", access=Field.READ)
 
 
 @dataclass
@@ -67,6 +70,15 @@ class PlayerLines(Composition):
                 continue
 
             world_angle: float = getattr(tracklet.metadata, "world_angle", 0.0)
+
+            if self._config.anchor_nose:
+                points   = frame[features.Points2D]
+                nose_xy  = points[features.PointLandmark.nose]
+                nose_conf: float = points.get_score(features.PointLandmark.nose)
+                bbox_rect = frame[features.BBox].to_rect()
+                if nose_conf > 0.3 and not np.isnan(nose_xy[0]) and not np.isnan(bbox_rect.width):
+                    world_angle += (float(nose_xy[0]) - 0.5) * bbox_rect.width * self._config.fov
+
             strip_pos: float = world_angle % 360.0 / 360.0
 
             bottom_y: float = frame[features.BBox].to_rect().bottom
