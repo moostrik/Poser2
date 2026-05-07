@@ -11,7 +11,7 @@ from modules.oak import DepthTracklet
 from ..TrackerBase import BaseTracker, TrackerType, TrackerMetadata
 from ..Tracklet import Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback
 from .PanoramicTrackletManager import PanoramicTrackletManager
-from .PanoramicGeometry import PanoramicGeometry
+from .PanoramicGeometry import PanoramicGeometry, DistortAlgorithm
 from .PanoramicDefinitions import *
 from modules.settings import BaseSettings, Field
 
@@ -21,13 +21,16 @@ logger = logging.getLogger(__name__)
 
 class PanoramicTrackerSettings(BaseSettings):
     """Configuration for PanoramicTracker."""
-    fov:                      Field[float] = Field(CAM_360_FOV,              min=90.0, max=130.0, step=0.5)
-    tracklet_min_age:         Field[int]   = Field(5,                        min=0,    max=9,     step=1)
-    tracklet_min_height:      Field[float] = Field(0.25,                     min=0.0,  max=1.0,   step=0.05)
-    timeout:                  Field[float] = Field(2.0,                      min=1.0,  max=5.0,   step=0.1)
-    cam_360_edge_threshold:   Field[float] = Field(CAM_360_EDGE_THRESHOLD,   min=0.0,  max=0.6,   step=0.1)
-    cam_360_overlap_expansion:Field[float] = Field(CAM_360_OVERLAP_EXPANSION,min=0.0,  max=1.0,   step=0.1)
-    cam_360_hysteresis_factor:Field[float] = Field(CAM_360_HYSTERESIS_FACTOR)
+    fov:                      Field[float]           = Field(CAM_360_FOV,              min=90.0, max=130.0, step=0.5)
+    tracklet_min_age:         Field[int]             = Field(5,                        min=0,    max=9,     step=1)
+    tracklet_min_height:      Field[float]           = Field(0.25,                     min=0.0,  max=1.0,   step=0.05)
+    timeout:                  Field[float]           = Field(2.0,                      min=1.0,  max=5.0,   step=0.1)
+    cam_360_edge_threshold:   Field[float]           = Field(CAM_360_EDGE_THRESHOLD,   min=0.0,  max=0.6,   step=0.1)
+    cam_360_overlap_expansion:Field[float]           = Field(CAM_360_OVERLAP_EXPANSION,min=0.0,  max=1.0,   step=0.1)
+    cam_360_hysteresis_factor:Field[float]           = Field(CAM_360_HYSTERESIS_FACTOR)
+    distortion:               Field[DistortAlgorithm] = Field(DistortAlgorithm.none,  description="Lens distortion correction algorithm")
+    distortion_k1:            Field[float]           = Field(0.0, min=-2.0, max=2.0,  step=0.01, description="Distortion coefficient k1")
+    distortion_k2:            Field[float]           = Field(0.0, min=-2.0, max=2.0,  step=0.01, description="Distortion coefficient k2")
 
 
 @dataclass (frozen=True)
@@ -65,6 +68,9 @@ class PanoramicTracker(Thread, BaseTracker):
 
         # Wire fov changes to geometry
         PanoramicTrackerSettings.fov.bind(config, lambda v: self.geometry.set_fov(v))
+        PanoramicTrackerSettings.distortion.bind(config,    lambda v: self.geometry.set_algorithm(v))
+        PanoramicTrackerSettings.distortion_k1.bind(config, lambda v: self.geometry.set_k1(v))
+        PanoramicTrackerSettings.distortion_k2.bind(config, lambda v: self.geometry.set_k2(v))
 
         self._callback_lock = Lock()
         self._tracklet_callbacks: set[TrackletDictCallback] = set()

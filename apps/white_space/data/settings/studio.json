@@ -139,7 +139,10 @@
       "timeout": 2.0,
       "cam_360_edge_threshold": 0.5,
       "cam_360_overlap_expansion": 0.3,
-      "cam_360_hysteresis_factor": 0.9
+      "cam_360_hysteresis_factor": 0.9,
+      "distortion": "none",
+      "distortion_k1": 0.0,
+      "distortion_k2": 0.0
     },
     "frame_sync": {},
     "tracklet_sync": {}
@@ -150,13 +153,13 @@
       "port": 6454,
       "use_signed": true,
       "mtu": 1500,
+      "rpm": 0,
       "offsets": {
         "white_0": 0,
         "white_1": 0,
         "blue_0": 0,
         "blue_1": 0
-      },
-      "rpm": 0
+      }
     },
     "osc_sound": {
       "stage": "LERP",
@@ -332,7 +335,7 @@
   "composition": {
     "bpm": 20.0,
     "active": [
-      "lines"
+      "player_lines"
     ],
     "blend": "ADD",
     "master": 1.0,
@@ -469,6 +472,14 @@
         "amplitude_white": 0.0,
         "amplitude_blue": 0.3
       }
+    },
+    "player_lines": {
+      "invert": false,
+      "center_width": 0.06,
+      "flank_width": 0.03,
+      "depth_scale": 2.0,
+      "level_center": 1.0,
+      "level_flank": 0.8
     }
   },
   "render": {
@@ -574,8 +585,8 @@
       "v_sync": true,
       "fullscreen": false,
       "monitor": 0,
-      "x": 1,
-      "y": 31,
+      "x": 1110,
+      "y": -1364,
       "width": 1278,
       "height": 1000,
       "secondary_list": [],

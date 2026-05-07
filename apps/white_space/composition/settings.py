@@ -6,17 +6,19 @@ from .draw import BlendType
 from .comps import (
     PoseWavesSettings, FillSettings, PulseSettings,
     ChaseSettings, LinesSettings, RandomSettings, HarmonicSettings,
+    PlayerLinesSettings,
 )
 
 
 class CompositionId(IntEnum):
-    pose_waves = auto()
-    fill       = auto()
-    pulse      = auto()
-    chase      = auto()
-    lines      = auto()
-    random     = auto()
-    harmonic   = auto()
+    pose_waves   = auto()
+    fill         = auto()
+    pulse        = auto()
+    chase        = auto()
+    lines        = auto()
+    random       = auto()
+    harmonic     = auto()
+    player_lines = auto()
 
 
 class CompositorSettings(BaseSettings):
@@ -38,10 +40,11 @@ class CompositorSettings(BaseSettings):
     hardness:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Contrast hardness (0=off, 1=hard step)")
     threshold: Field[float] = Field(0.5, min=0.0, max=1.0, step=0.01, description="Hardness pivot point")
 
-    pose_waves: Group[PoseWavesSettings]  = Group(PoseWavesSettings)
-    fill:       Group[FillSettings]       = Group(FillSettings)
-    pulse:      Group[PulseSettings]      = Group(PulseSettings)
-    chase:      Group[ChaseSettings]      = Group(ChaseSettings)
-    lines:      Group[LinesSettings]      = Group(LinesSettings)
-    random:     Group[RandomSettings]     = Group(RandomSettings)
-    harmonic:   Group[HarmonicSettings]   = Group(HarmonicSettings)
+    pose_waves:   Group[PoseWavesSettings]   = Group(PoseWavesSettings)
+    fill:         Group[FillSettings]         = Group(FillSettings)
+    pulse:        Group[PulseSettings]        = Group(PulseSettings)
+    chase:        Group[ChaseSettings]        = Group(ChaseSettings)
+    lines:        Group[LinesSettings]        = Group(LinesSettings)
+    random:       Group[RandomSettings]       = Group(RandomSettings)
+    harmonic:     Group[HarmonicSettings]     = Group(HarmonicSettings)
+    player_lines: Group[PlayerLinesSettings]  = Group(PlayerLinesSettings)

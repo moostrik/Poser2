@@ -1,6 +1,15 @@
 
+from enum import IntEnum
+
 from ..Tracklet import Tracklet, Rect
 import numpy as np
+
+
+class DistortAlgorithm(IntEnum):
+    none = 0   # identity — no distortion correction
+    tanh = 1   # S-curve:  0.5 * (1 + tanh(k1*(2x-1) + k2*(2x-1)^3))
+    poly = 2   # polynomial: x + k1*(x-0.5) + k2*(x-0.5)^3
+
 
 class PanoramicGeometry():
     def __init__(self, num_cameras: int, cam_fov: float, target_fov:float) -> None:
@@ -9,8 +18,9 @@ class PanoramicGeometry():
         self.target_fov: float  = target_fov
         self.fov_overlap: float = (self.cam_fov - self.target_fov) / 2.0
 
-        self.k1: float = 0.05  # Distortion coefficient k1
-        self.k2: float = 0.0  # Distortion coefficient k2
+        self.k1: float = 0.0
+        self.k2: float = 0.0
+        self.algorithm: DistortAlgorithm = DistortAlgorithm.none
 
     def get_angles_and_overlap(self, roi: Rect, cam_id: int, expansion: float) -> tuple[float, float, bool]:
         local_angle, world_angle = self.calc_angle(roi, cam_id)
@@ -24,8 +34,9 @@ class PanoramicGeometry():
         return local_angle, world_angle
 
     def _calc_local_angle(self, roi: Rect) -> float:
-        normalized_x: float     = roi.x + roi.width / 2.0
-        local_angle: float      = normalized_x * self.cam_fov
+        normalized_x: float = roi.x + roi.width / 2.0
+        normalized_x        = self.undistort_x(normalized_x)
+        local_angle: float  = normalized_x * self.cam_fov
         return local_angle
 
     def _calc_world_angle(self, local_angle: float, cam_id: int) -> float:
@@ -60,12 +71,25 @@ class PanoramicGeometry():
             diff = 360.0 - diff
         return diff
 
-    @staticmethod
-    def undistort_x(x: float, k1: float, k2: float) -> float:
-        return x
-        return 0.5 * (1 + np.tanh(k1 * (2*x - 1) + k2 * (2*x - 1)**3))
+    def undistort_x(self, x: float) -> float:
+        if self.algorithm == DistortAlgorithm.none:
+            return x
+        elif self.algorithm == DistortAlgorithm.tanh:
+            return 0.5 * (1.0 + np.tanh(self.k1 * (2*x - 1) + self.k2 * (2*x - 1)**3))
+        else:  # poly
+            d = x - 0.5
+            return x + self.k1 * d + self.k2 * d**3
 
     # SET
     def set_fov(self, cam_fov: float) -> None:
         self.cam_fov = cam_fov
         self.fov_overlap = (self.cam_fov - self.target_fov) / 2.0
+
+    def set_k1(self, k1: float) -> None:
+        self.k1 = k1
+
+    def set_k2(self, k2: float) -> None:
+        self.k2 = k2
+
+    def set_algorithm(self, algorithm: DistortAlgorithm) -> None:
+        self.algorithm = algorithm

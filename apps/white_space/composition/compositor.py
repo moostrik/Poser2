@@ -15,7 +15,7 @@ from .transport import TransportClock
 from .base import Composition
 from .output import CompositionOutput, COMP_DTYPE, CompositionOutputCallback
 from .settings import CompositorSettings, CompositionId
-from .comps import PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic
+from .comps import PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines
 from .draw import blend_values
 
 import logging
@@ -56,13 +56,14 @@ class Compositor(Thread):
         # Fixed composition registry — ordered list of (id, instance) pairs
         self._pose_waves = PoseWaves(resolution, num_players, config.pose_waves, self.interval)
         self._compositions: list[tuple[CompositionId, Composition]] = [
-            (CompositionId.pose_waves, self._pose_waves),
-            (CompositionId.fill,       Fill     (resolution, config.fill)),
-            (CompositionId.pulse,      Pulse    (resolution, config.pulse)),
-            (CompositionId.chase,      Chase    (resolution, config.chase)),
-            (CompositionId.lines,      Lines    (resolution, config.lines)),
-            (CompositionId.random,     Random   (resolution, config.random)),
-            (CompositionId.harmonic,   Harmonic (resolution, config.harmonic)),
+            (CompositionId.pose_waves,   self._pose_waves),
+            (CompositionId.fill,         Fill        (resolution, config.fill)),
+            (CompositionId.pulse,        Pulse       (resolution, config.pulse)),
+            (CompositionId.chase,        Chase       (resolution, config.chase)),
+            (CompositionId.lines,        Lines       (resolution, config.lines)),
+            (CompositionId.random,       Random      (resolution, config.random)),
+            (CompositionId.harmonic,     Harmonic    (resolution, config.harmonic)),
+            (CompositionId.player_lines, PlayerLines (resolution, config.player_lines)),
         ]
 
         self.fps_counter = FpsCounter()
