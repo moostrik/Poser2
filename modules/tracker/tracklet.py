@@ -2,23 +2,25 @@
 # make sure that tracking removed from person is handled correctly
 
 # Standard library imports
+import time
 import warnings
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, Optional, TypeAlias
-import time
+from typing import Callable, TypeAlias
 
 # Local application imports
 from modules.oak import DepthTracklet
-from .TrackerBase import TrackerMetadata
-from modules.utils import Rect, Point2f
+from modules.utils import Rect
+from .tracker_base import TrackerMetadata
+
 
 class TrackingStatus(Enum):
-    NEW =       0
-    TRACKED =   1
-    LOST =      2
-    REMOVED =   3
-    NONE =      4 #?
+    NEW = 0
+    TRACKED = 1
+    LOST = 2
+    REMOVED = 3
+    NONE = 4  # ?
+
 
 DEPTHAI_TO_TRACKINGSTATUS: dict[DepthTracklet.TrackingStatus, TrackingStatus] = {
     DepthTracklet.TrackingStatus.NEW: TrackingStatus.NEW,
@@ -27,21 +29,22 @@ DEPTHAI_TO_TRACKINGSTATUS: dict[DepthTracklet.TrackingStatus, TrackingStatus] = 
     DepthTracklet.TrackingStatus.REMOVED: TrackingStatus.REMOVED,
 }
 
-@dataclass (frozen=True)
+
+@dataclass(frozen=True)
 class Tracklet:
     cam_id: int
-    id: int =                   field(default=-1)
+    id: int = field(default=-1)
 
-    time_stamp: float =         field(default_factory=time.time)
-    created_at: float =         field(default_factory=time.time)
-    last_active: float =        field(default_factory=time.time)  # Last time person was actually detected (NEW/TRACKED)
+    time_stamp: float = field(default_factory=time.time)
+    created_at: float = field(default_factory=time.time)
+    last_active: float = field(default_factory=time.time)  # Last time person was actually detected (NEW/TRACKED)
 
-    status: TrackingStatus =    field(default=TrackingStatus.NEW)
-    roi: Rect =                 field(default_factory=Rect)
+    status: TrackingStatus = field(default=TrackingStatus.NEW)
+    roi: Rect = field(default_factory=Rect)
 
-    metadata: Optional[TrackerMetadata] = field(default = None)
-    _external_tracklet: Optional[DepthTracklet] = field(default=None, repr=False)
-    needs_notification: bool =  field(default=True, repr=False)
+    metadata: TrackerMetadata | None = field(default=None)
+    _external_tracklet: DepthTracklet | None = field(default=None, repr=False)
+    needs_notification: bool = field(default=True, repr=False)
 
     @property
     def track_id(self) -> int:
@@ -87,13 +90,13 @@ class Tracklet:
         return -1
 
     @property
-    def external_age_in_frames(self)  -> int:
+    def external_age_in_frames(self) -> int:
         if self._external_tracklet:
             return self._external_tracklet.age
         return 0
 
     @classmethod
-    def from_depthcam(cls, cam_id: int, dct: 'DepthTracklet') -> Optional['Tracklet']:
+    def from_depthcam(cls, cam_id: int, dct: 'DepthTracklet') -> 'Tracklet | None':
         """
         Initialize a Tracklet from a DepthCamTracklet instance.
         """
@@ -104,7 +107,7 @@ class Tracklet:
             warnings.warn("Missing 'status' in DepthCamTracklet, defaulting to None.")
             return None
 
-        roi: Optional[Rect] = None
+        roi: Rect | None = None
         if hasattr(dct, 'roi'):
             roi = Rect(
                 x=dct.roi.x,
@@ -124,10 +127,12 @@ class Tracklet:
         )
 
 
+
 # Type Aliases
 TrackletCallback: TypeAlias = Callable[[Tracklet], None]
 TrackletDict: TypeAlias = dict[int, Tracklet]
 TrackletDictCallback: TypeAlias = Callable[[TrackletDict], None]
+
 
 TrackletIdColorDict: dict[int, str] = {
     0: '#006400',   # darkgreen
@@ -142,8 +147,9 @@ TrackletIdColorDict: dict[int, str] = {
     9: '#6495ed',   # cornflower
 }
 
-def TrackletIdColor(id: int, aplha: float = 0.5) -> list[float]:
-    hex_color: str = TrackletIdColorDict.get(id, '#000000')
-    rgb: list[float] =  [int(hex_color[i:i+2], 16) / 255.0 for i in (1, 3, 5)]
-    rgb.append(aplha)
+
+def tracklet_id_color(id_: int, alpha: float = 0.5) -> list[float]:
+    hex_color: str = TrackletIdColorDict.get(id_, '#000000')
+    rgb: list[float] = [int(hex_color[i:i+2], 16) / 255.0 for i in (1, 3, 5)]
+    rgb.append(alpha)
     return rgb

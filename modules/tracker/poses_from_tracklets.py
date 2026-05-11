@@ -1,10 +1,10 @@
+import logging
 from threading import Lock
 
 from modules.pose.frame import Frame, FrameDict, FrameDictCallbackMixin
 from modules.pose.features import BBox, Azimuth
-from .Tracklet import Tracklet
+from .tracklet import Tracklet
 
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -55,7 +55,9 @@ class PosesFromTracklets(FrameDictCallbackMixin):
 
             try:
                 bounding_box = BBox.from_rect(tracklet.roi)
-                world_angle = getattr(getattr(tracklet, 'metadata', None), 'world_angle', None)
+                world_angle = getattr(
+                    getattr(tracklet, 'metadata', None), 'world_angle', None
+                )
                 features: dict = {BBox: bounding_box}
                 if world_angle is not None:
                     features[Azimuth] = Azimuth.from_value(float(world_angle) % 360.0 / 360.0)
@@ -67,7 +69,10 @@ class PosesFromTracklets(FrameDictCallbackMixin):
                     features=features,
                 )
             except Exception as e:
-                logger.error(f"PoseFromTrackletGenerator: Error generating pose {track_id}: {e}")
+                logger.error(
+                    f"PoseFromTrackletGenerator: Error generating pose "
+                    f"{track_id}: {e}"
+                )
         self._notify_frames_callbacks(generated_poses)
 
         return generated_poses
@@ -83,12 +88,12 @@ class PosesFromTracklets(FrameDictCallbackMixin):
             for track_id in range(self._num_tracks):
                 self._tracklets[track_id] = None
 
-    def reset_at(self, id: int) -> None:
+    def reset_at(self, id_: int) -> None:
         """Reset tracklet for a specific track ID.
 
         Args:
-            id: Track ID to reset
+            id_: Track ID to reset
         """
         with self._lock:
-            if id in self._tracklets:
-                self._tracklets[id] = None
+            if id_ in self._tracklets:
+                self._tracklets[id_] = None

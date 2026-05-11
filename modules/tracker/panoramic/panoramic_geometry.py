@@ -1,32 +1,31 @@
-
 from enum import IntEnum
 
-from ..Tracklet import Tracklet, Rect
 import numpy as np
+
+from modules.utils import Rect
 
 
 class DistortAlgorithm(IntEnum):
-    none = 0   # identity — no distortion correction
-    tanh = 1   # S-curve:  0.5 * (1 + tanh(k1*(2x-1) + k2*(2x-1)^3))
-    poly = 2   # polynomial: x + k1*(x-0.5) + k2*(x-0.5)^3
+    NONE = 0   # identity — no distortion correction
+    TANH = 1   # S-curve:  0.5 * (1 + tanh(k1*(2x-1) + k2*(2x-1)^3))
+    POLY = 2   # polynomial: x + k1*(x-0.5) + k2*(x-0.5)^3
 
 
-class PanoramicGeometry():
-    def __init__(self, num_cameras: int, cam_fov: float, target_fov:float) -> None:
-        self.num_cameras: int   = num_cameras
-        self.cam_fov: float     = cam_fov
-        self.target_fov: float  = target_fov
+class PanoramicGeometry:
+    def __init__(self, num_cameras: int, cam_fov: float, target_fov: float) -> None:
+        self.num_cameras: int = num_cameras
+        self.cam_fov: float = cam_fov
+        self.target_fov: float = target_fov
         self.fov_overlap: float = (self.cam_fov - self.target_fov) / 2.0
 
         self.k1: float = 0.0
         self.k2: float = 0.0
-        self.algorithm: DistortAlgorithm = DistortAlgorithm.none
+        self.algorithm: DistortAlgorithm = DistortAlgorithm.NONE
 
     def get_angles_and_overlap(self, roi: Rect, cam_id: int, expansion: float) -> tuple[float, float, bool]:
         local_angle, world_angle = self.calc_angle(roi, cam_id)
         overlap: bool = self.angle_in_overlap(world_angle, expansion)
         return (local_angle, world_angle, overlap)
-
 
     def calc_angle(self, roi: Rect, cam_id: int) -> tuple[float, float]:
         local_angle: float = self._calc_local_angle(roi)
@@ -35,8 +34,8 @@ class PanoramicGeometry():
 
     def _calc_local_angle(self, roi: Rect) -> float:
         normalized_x: float = roi.x + roi.width / 2.0
-        normalized_x        = self.undistort_x(normalized_x)
-        local_angle: float  = normalized_x * self.cam_fov
+        normalized_x = self.undistort_x(normalized_x)
+        local_angle: float = normalized_x * self.cam_fov
         return local_angle
 
     def _calc_world_angle(self, local_angle: float, cam_id: int) -> float:
@@ -47,15 +46,15 @@ class PanoramicGeometry():
         return world_angle
 
     def angle_in_overlap(self, world_angle: float, expansion: float = 0.0) -> bool:
-        angle_overlap: float    = self.fov_overlap * (1.0 + expansion)
-        local_angle: float      = world_angle % self.target_fov
+        angle_overlap: float = self.fov_overlap * (1.0 + expansion)
+        local_angle: float = world_angle % self.target_fov
 
         if local_angle <= angle_overlap or local_angle >= self.cam_fov - angle_overlap:
             return True
         return False
 
-    def angle_in_edge(self, local_angle: float, range: float = 1.0) -> bool:
-        edge: float    = self.fov_overlap * range
+    def angle_in_edge(self, local_angle: float, range_: float = 1.0) -> bool:
+        edge: float = self.fov_overlap * range_
 
         if local_angle <= edge or local_angle >= self.cam_fov - edge:
             return True
@@ -72,9 +71,9 @@ class PanoramicGeometry():
         return diff
 
     def undistort_x(self, x: float) -> float:
-        if self.algorithm == DistortAlgorithm.none:
+        if self.algorithm == DistortAlgorithm.NONE:
             return x
-        elif self.algorithm == DistortAlgorithm.tanh:
+        elif self.algorithm == DistortAlgorithm.TANH:
             return 0.5 * (1.0 + np.tanh(self.k1 * (2*x - 1) + self.k2 * (2*x - 1)**3))
         else:  # poly
             d = x - 0.5

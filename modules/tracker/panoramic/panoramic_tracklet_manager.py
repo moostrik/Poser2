@@ -1,13 +1,13 @@
 # Standard library imports
+import logging
 from dataclasses import replace
 from threading import Lock
-from typing import Optional
 
 # Local application imports
-from ..Tracklet import Tracklet, TrackingStatus
+from .. import Tracklet, TrackingStatus
 
-import logging
 logger = logging.getLogger(__name__)
+
 
 class TrackletIdPool:
     def __init__(self, max_size: int) -> None:
@@ -25,7 +25,10 @@ class TrackletIdPool:
     def release(self, obj: int) -> None:
         with self._lock:
             if obj in self._available:
-                raise Exception(f"ID {obj} is not currently in use and cannot be released. in use: {self._available}")
+                raise Exception(
+                    f"ID {obj} is not currently in use and cannot be "
+                    f"released. in use: {self._available}"
+                )
             self._available.add(obj)
 
     def size(self) -> int:
@@ -49,22 +52,22 @@ class PanoramicTrackletManager:
     def __contains__(self, tracklet: Tracklet) -> bool:
         return self.get_id_by_cam_and_external_id(tracklet.cam_id, tracklet.external_id) is not None
 
-    def add_tracklet(self, tracklet: Tracklet) -> Optional[int]:
+    def add_tracklet(self, tracklet: Tracklet) -> int | None:
         with self._lock:
             try:
-                id = self._id_pool.acquire()
+                tracklet_id = self._id_pool.acquire()
             except Exception as e:
                 logger.info(f"TrackletManager: No more IDs available: {e}")
                 return None
 
             new_tracklet: Tracklet = replace(
                 tracklet,
-                id=id,
+                id=tracklet_id,
                 status=TrackingStatus.NEW,
                 needs_notification=True
             )
-            self._tracklets[id] = new_tracklet
-            return id
+            self._tracklets[tracklet_id] = new_tracklet
+            return tracklet_id
 
     def remove_tracklet(self, id: int) -> None:
         with self._lock:
@@ -78,7 +81,7 @@ class PanoramicTrackletManager:
         with self._lock:
             return list(self._tracklets.values())
 
-    def get_id_by_cam_and_external_id(self, cam_id: int, external_id: int) -> Optional[int]:
+    def get_id_by_cam_and_external_id(self, cam_id: int, external_id: int) -> int | None:
         with self._lock:
             for tracklet in self._tracklets.values():
                 if tracklet.cam_id == cam_id and tracklet.external_id == external_id:
@@ -122,8 +125,8 @@ class PanoramicTrackletManager:
                 logger.warning(f"TrackletManager: Invalid merge (keep.id={keep_id}, remove.id={remove_id})")
                 return -1, -1
 
-            keep: Optional[Tracklet] = self._tracklets.get(keep_id)
-            remove: Optional[Tracklet] = self._tracklets.get(remove_id)
+            keep: Tracklet | None = self._tracklets.get(keep_id)
+            remove: Tracklet | None = self._tracklets.get(remove_id)
 
             if keep is None or remove is None:
                 logger.warning(f"TrackletManager: One of the tracklets in the merge {keep_id} and {remove_id} is None. Skipping merge.")

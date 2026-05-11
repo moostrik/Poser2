@@ -1,16 +1,14 @@
 # Standard library imports
+import logging
+import time
 from dataclasses import replace
 from threading import Lock
-from typing import Optional
-import time
 
 # Local application imports
-from ..Tracklet import Tracklet, TrackingStatus
+from .. import Tracklet, TrackingStatus
 
-from modules.utils import HotReloadMethods
-
-import logging
 logger = logging.getLogger(__name__)
+
 
 class OnePerCamTrackletManager:
     def __init__(self, max_players: int) -> None:
@@ -23,26 +21,33 @@ class OnePerCamTrackletManager:
     def __contains__(self, tracklet: Tracklet) -> bool:
         return self.get_id_by_cam_and_external_id(tracklet.cam_id, tracklet.external_id) is not None
 
-    def add_tracklet(self, tracklet: Tracklet) -> Optional[int]:
+    def add_tracklet(self, tracklet: Tracklet) -> int | None:
         with self._lock:
-            id: int = tracklet.cam_id
+            tracklet_id: int = tracklet.cam_id
 
-            if id in self._tracklets:
-                logger.warning(f"ScreenBoundTrackletManager: Tracklet with cam_id {id} already exists. Skipping addition.")
+            if tracklet_id in self._tracklets:
+                logger.warning(
+                    f"ScreenBoundTrackletManager: Tracklet with cam_id "
+                    f"{tracklet_id} already exists. Skipping addition."
+                )
                 return None
 
-            if id >= self._max_size:
-                logger.warning(f"ScreenBoundTrackletManager: Tracklet with cam_id {id} exceeds max size {self._max_size}. Skipping addition.")
+            if tracklet_id >= self._max_size:
+                logger.warning(
+                    f"ScreenBoundTrackletManager: Tracklet with cam_id "
+                    f"{tracklet_id} exceeds max size {self._max_size}. "
+                    f"Skipping addition."
+                )
                 return None
 
             new_tracklet: Tracklet = replace(
                 tracklet,
-                id=id,
+                id=tracklet_id,
                 status=TrackingStatus.NEW,
                 needs_notification=True
             )
-            self._tracklets[id] = new_tracklet
-            return id
+            self._tracklets[tracklet_id] = new_tracklet
+            return tracklet_id
 
     def remove_tracklet(self, id: int) -> None:
         with self._lock:
@@ -50,7 +55,7 @@ class OnePerCamTrackletManager:
             if tracklet is None:
                 logger.warning(f"TrackletManager: Attempted to remove non-existent tracklet with ID {id}.")
 
-    def get_tracklet(self, id: int) -> Optional[Tracklet]:
+    def get_tracklet(self, id: int) -> Tracklet | None:
         with self._lock:
             return self._tracklets.get(id)
 
@@ -58,7 +63,7 @@ class OnePerCamTrackletManager:
         with self._lock:
             return list(self._tracklets.values())
 
-    def get_id_by_cam_and_external_id(self, cam_id: int, external_id: int) -> Optional[int]:
+    def get_id_by_cam_and_external_id(self, cam_id: int, external_id: int) -> int | None:
         with self._lock:
             for tracklet in self._tracklets.values():
                 if tracklet.cam_id == cam_id and tracklet.external_id == external_id:

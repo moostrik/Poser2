@@ -4,16 +4,16 @@ from dataclasses import dataclass
 from queue import Empty, Queue
 from threading import Lock, Thread, Event
 from time import sleep, time
-from typing import List, Optional
 
 # Local application imports
 from modules.oak import DepthTracklet
-from ..Tracklet import Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback
-from ..TrackerBase import BaseTracker, TrackerType, TrackerMetadata
-from .OnePerCamTrackletManager import OnePerCamTrackletManager as TrackletManager
 from modules.settings import BaseSettings, Field
-
 from modules.utils import Rect
+from .. import (
+    BaseTracker, TrackerType, TrackerMetadata,
+    Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback,
+)
+from .one_per_cam_tracklet_manager import OnePerCamTrackletManager as TrackletManager
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class OnePerCamTrackerSettings(BaseSettings):
     add_bottom_threshold:     Field[float] = Field(0.2,  min=0.0, max=1.0, step=0.05)
 
 
-@dataclass (frozen=True)
+@dataclass(frozen=True)
 class OnePerCamMetadata(TrackerMetadata):
     smooth_rect: Rect
 
@@ -37,13 +37,14 @@ class OnePerCamMetadata(TrackerMetadata):
     def tracker_type(self) -> TrackerType:
         return TrackerType.ONEPERCAM
 
+
 class OnePerCamTracker(Thread, BaseTracker):
     def __init__(self, config: OnePerCamTrackerSettings, num_trackers: int) -> None:
         super().__init__()
 
         self._running: bool = False
         self._update_event: Event = Event()
-        self._input_queue: Queue[List[Tracklet]] = Queue()
+        self._input_queue: Queue[list[Tracklet]] = Queue()
         self._callback_lock = Lock()
         self._tracklet_callbacks: set[TrackletDictCallback] = set()
 
@@ -73,7 +74,6 @@ class OnePerCamTracker(Thread, BaseTracker):
             self._update_event.set()
 
     def run(self) -> None:
-
         while self._running:
             self._update_event.wait(timeout=0.1)
             self._update_event.clear()
@@ -91,9 +91,8 @@ class OnePerCamTracker(Thread, BaseTracker):
                 logger.exception("OnePerCamTracker error")
 
     def _add_tracklet(self, tracklets: list[Tracklet]) -> None:
-
         # UPDATE EXISTING TRACKLET
-        update_tracklet: Optional[Tracklet] = None
+        update_tracklet: Tracklet | None = None
         for t in tracklets:
             if t in self.tracklet_manager:
                 update_tracklet = t
@@ -118,7 +117,7 @@ class OnePerCamTracker(Thread, BaseTracker):
             return
 
         # ADD TRACKLET
-        add_tracklets: List[Tracklet] = []
+        add_tracklets: list[Tracklet] = []
         for t in tracklets:
 
             if t.external_age_in_frames <= self.config.tracklet_min_age:
@@ -175,10 +174,10 @@ class OnePerCamTracker(Thread, BaseTracker):
         with self._callback_lock:
             self._tracklet_callbacks.add(callback)
 
-    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: List[DepthTracklet]) -> None:
-        tracklet_list: List[Tracklet] = []
+    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[DepthTracklet]) -> None:
+        tracklet_list: list[Tracklet] = []
         for t in cam_tracklets:
-            tracklet: Optional[Tracklet] = Tracklet.from_depthcam(cam_id, t)
+            tracklet: Tracklet | None = Tracklet.from_depthcam(cam_id, t)
             if tracklet is not None:
                 tracklet_list.append(tracklet)
 

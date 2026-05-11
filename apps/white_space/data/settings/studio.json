@@ -140,7 +140,7 @@
       "cam_360_edge_threshold": 0.5,
       "cam_360_overlap_expansion": 0.3,
       "cam_360_hysteresis_factor": 0.9,
-      "distortion": "none",
+      "distortion": "NONE",
       "distortion_k1": 0.0,
       "distortion_k2": 0.0
     },

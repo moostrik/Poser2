@@ -10,16 +10,19 @@ from modules.oak import DepthTracklet
 
 # Forward declaration to avoid circular import
 if TYPE_CHECKING:
-    from .Tracklet import TrackletDictCallback
+    from .tracklet import TrackletDictCallback
+
 
 class TrackerType(Enum):
     UNKNOWN = "unknown"
     PANORAMIC = "panoramic"
     ONEPERCAM = "onepercam"
 
+
 class TrackerMetadata(ABC):
     @abstractmethod
     def tracker_type(self) -> TrackerType: ...
+
 
 class BaseTracker(ABC):
     @abstractmethod
