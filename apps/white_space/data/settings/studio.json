@@ -11,14 +11,14 @@
     "square": false,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "cam_0": {
       "device_id": "14442C10110AD3D200",
       "show_stereo": false,
-      "flip_h": false,
-      "flip_v": true,
-      "perspective": -0.22,
+      "flip_h": true,
+      "flip_v": false,
+      "perspective": 0.0,
       "color_exposure": 30001,
       "color_iso": 1599,
       "color_auto_exposure": true,
@@ -29,11 +29,11 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 29992,
+      "mono_iso": 458,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.0,
+      "ir_flood_light": 0.8,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -43,9 +43,9 @@
     "cam_1": {
       "device_id": "14442C10F124D9D600",
       "show_stereo": false,
-      "flip_h": false,
-      "flip_v": true,
-      "perspective": -0.22,
+      "flip_h": true,
+      "flip_v": false,
+      "perspective": 0.0,
       "color_exposure": 30001,
       "color_iso": 1599,
       "color_auto_exposure": true,
@@ -56,11 +56,11 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 29992,
+      "mono_iso": 449,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.0,
+      "ir_flood_light": 0.8,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -68,11 +68,11 @@
       "stereo_bright_max": 255
     },
     "cam_2": {
-      "device_id": "14442C1031DDD2D200",
+      "device_id": "14442C101136D1D200",
       "show_stereo": false,
-      "flip_h": false,
-      "flip_v": true,
-      "perspective": -0.22,
+      "flip_h": true,
+      "flip_v": false,
+      "perspective": 0.0,
       "color_exposure": 0,
       "color_iso": 0,
       "color_auto_exposure": true,
@@ -83,11 +83,11 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 29992,
+      "mono_iso": 722,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.0,
+      "ir_flood_light": 0.8,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -95,11 +95,11 @@
       "stereo_bright_max": 255
     },
     "cam_3": {
-      "device_id": "14442C101136D1D200",
+      "device_id": "14442C1031DDD2D200",
       "show_stereo": false,
-      "flip_h": false,
-      "flip_v": true,
-      "perspective": -0.22,
+      "flip_h": true,
+      "flip_v": false,
+      "perspective": 0.0,
       "color_exposure": 0,
       "color_iso": 0,
       "color_auto_exposure": true,
@@ -110,11 +110,11 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 29992,
+      "mono_iso": 458,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.0,
+      "ir_flood_light": 0.8,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -151,9 +151,10 @@
     "osc_light": {
       "ip_addresses": "192.168.1.177",
       "port": 6454,
-      "use_signed": true,
+      "use_signed": false,
       "mtu": 1500,
       "rpm": 0,
+      "phase": 0.229,
       "offsets": {
         "white_0": 0,
         "white_1": 0,
@@ -163,8 +164,8 @@
     },
     "osc_sound": {
       "stage": "LERP",
-      "ip_addresses": "127.0.0.1",
-      "port": 9000
+      "ip_addresses": "192.168.1.41",
+      "port": 8000
     }
   },
   "pose": {
@@ -335,6 +336,7 @@
   "composition": {
     "bpm": 20.0,
     "active": [
+      "pulse",
       "player_lines"
     ],
     "blend": "ADD",
@@ -403,14 +405,14 @@
     },
     "lines": {
       "white": {
-        "level": 0.5,
+        "level": 0.76,
         "speed": 0.94,
         "phase": 0.0,
-        "width": 0.19,
-        "amount": 59
+        "width": 0.03,
+        "amount": 1
       },
       "blue": {
-        "level": 0.5,
+        "level": 0.0,
         "speed": 0.5,
         "phase": 0.5,
         "width": 0.5,
@@ -477,9 +479,9 @@
       "center_width": 0.06,
       "flank_width": 0.03,
       "depth_scale": 2.0,
-      "invert": false,
+      "invert": true,
       "level_center": 1.0,
-      "level_flank": 0.8,
+      "level_flank": 0.0,
       "anchor_nose": true
     }
   },
@@ -586,8 +588,8 @@
       "v_sync": true,
       "fullscreen": false,
       "monitor": 0,
-      "x": 1110,
-      "y": -1364,
+      "x": 0,
+      "y": 0,
       "width": 1278,
       "height": 1000,
       "secondary_list": [],
@@ -600,7 +602,7 @@
   },
   "session": {
     "output_path": "apps/white_space/data/recordings",
-    "name": "",
+    "name": "Yens_2",
     "split_seconds": 10,
     "osc": {
       "port_in": 9000,
@@ -633,7 +635,7 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "enabled": false
+      "enabled": true
     }
   }
 }

@@ -34,7 +34,8 @@ class OscLightSettings(BaseSettings):
     mtu:          Field[int]  = Field(1500, min=576, max=9000,  access=Field.INIT, description="Network MTU (affects chunk size)")
     chunk_size:    Field[int]  = Field(0,    access=Field.READ,  description="Computed chunk size (bytes)")
     num_chunks:   Field[int]  = Field(0,    access=Field.READ,  description="Computed number of chunks")
-    rpm:          Field[int]  = Field(0, min=0,   max=2400, description="LED rotation speed (RPM)")
+    rpm:          Field[int]   = Field(0,   min=0,   max=2400, description="LED rotation speed (RPM)")
+    phase:        Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.001, description="Circular phase shift of the LED ring (0–1 normalised)")
     offsets:      Group[OscLightOffsetSettings] = Group(OscLightOffsetSettings)
 
 
@@ -178,6 +179,11 @@ class OscLight:
             else:
                 white_channel = OscLight.float_to_uint8(output.light_0)
                 blue_channel  = OscLight.float_to_uint8(output.light_1)
+
+            if settings.phase != 0.0:
+                shift = int(settings.phase * len(white_channel))
+                white_channel = np.roll(white_channel, shift)
+                blue_channel  = np.roll(blue_channel,  shift)
 
             for i in range(num_chunks):
                 start_idx = i * chunk_size
