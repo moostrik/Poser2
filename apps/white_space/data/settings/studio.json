@@ -14,7 +14,7 @@
     "sim_enabled": false,
     "model_path": "data/models",
     "cam_0": {
-      "device_id": "14442C10110AD3D200",
+      "device_id": "14442C101136D1D200",
       "show_stereo": false,
       "flip_h": true,
       "flip_v": false,
@@ -68,7 +68,7 @@
       "stereo_bright_max": 255
     },
     "cam_2": {
-      "device_id": "14442C101136D1D200",
+      "device_id": "14442C10110AD3D200",
       "show_stereo": false,
       "flip_h": true,
       "flip_v": false,

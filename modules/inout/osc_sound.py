@@ -5,11 +5,12 @@ import socket
 import numpy as np
 from pythonosc.udp_client import SimpleUDPClient
 from pythonosc.osc_bundle import OscBundle
+from pythonosc.osc_message import OscMessage
 from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from modules.pose.frame import Frame, FrameDict
-from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, Similarity, MotionGate, LeaderScore, MotionTime, Age, AngleLandmark
+from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, Similarity, MotionGate, LeaderScore, MotionTime, Age, AngleLandmark, Azimuth
 
 from modules.session import SequencerState
 from modules.settings import BaseSettings, Field, Widget
@@ -23,6 +24,7 @@ class OscSoundSettings(BaseSettings):
     ip_addresses: Field[str] = Field("127.0.0.1",               widget=Widget.ip_field,     description="Target OSC IP address")
     port: Field[int]         = Field(9000, min=1024, max=65535, widget=Widget.number_field, description="Target OSC port")
     stage: Field[int]        = Field(0,                                                     description="Pipeline stage to read poses from")
+    active_players: Field[int] = Field(0, access=Field.READ,                                description="Current number of active players being sent")
 
 
 class OscSound:
@@ -50,7 +52,7 @@ class OscSound:
         self._inactive_message_counts: dict[int, int] = {id: 0 for id in range(self._config.max_players)}
 
         # Pre-build inactive messages for all players
-        self._inactive_messages: dict[int, list[OscBundle]] = {}
+        self._inactive_messages: dict[int, list[OscBundle | OscMessage]] = {}
         for id in range(self._config.max_players):
             bundle_builder = OscBundleBuilder(IMMEDIATELY)  # type: ignore
             OscSound._build_inactive_message(id, bundle_builder, self._config.max_players)
@@ -134,6 +136,7 @@ class OscSound:
         bundle_builder.add_content(progress_msg.build()) # type: ignore
 
         num_players = self._config.max_players
+        self._config.active_players = sum(1 for id in range(num_players) if id in poses)
 
         for id in range(num_players):
             if id not in poses:
@@ -166,6 +169,11 @@ class OscSound:
         msg_builder = OscMessageBuilder(address=f"/pose/{id}/active")
         msg_builder.add_arg(0, OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(msg_builder.build()) # type: ignore
+
+        # Reset position to 0
+        position_msg = OscMessageBuilder(address=f"/pose/{id}/position")
+        position_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(position_msg.build()) # type: ignore
 
         # Reset time/motion to 0
         motion_msg = OscMessageBuilder(address=f"/pose/{id}/time/motion")
@@ -230,6 +238,11 @@ class OscSound:
         active_msg = OscMessageBuilder(address=f"/pose/{id}/active")
         active_msg.add_arg(1, OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(active_msg.build()) # type: ignore
+
+        azimuth: float = pose[Azimuth].value if Azimuth in pose else np.nan
+        azimuth_msg = OscMessageBuilder(address=f"/pose/{id}/azimuth")
+        azimuth_msg.add_arg(azimuth, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(azimuth_msg.build()) # type: ignore
 
         # when there is normal motion, about 1 per second
         motion_time: float = pose[MotionTime].value if MotionTime in pose else 0.0

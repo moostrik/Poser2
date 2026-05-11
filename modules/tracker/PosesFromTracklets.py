@@ -1,7 +1,7 @@
 from threading import Lock
 
 from modules.pose.frame import Frame, FrameDict, FrameDictCallbackMixin
-from modules.pose.features import BBox
+from modules.pose.features import BBox, Azimuth
 from .Tracklet import Tracklet
 
 import logging
@@ -55,12 +55,16 @@ class PosesFromTracklets(FrameDictCallbackMixin):
 
             try:
                 bounding_box = BBox.from_rect(tracklet.roi)
+                world_angle = getattr(getattr(tracklet, 'metadata', None), 'world_angle', None)
+                features: dict = {BBox: bounding_box}
+                if world_angle is not None:
+                    features[Azimuth] = Azimuth.from_value(float(world_angle) % 360.0 / 360.0)
 
                 generated_poses[track_id] = Frame(
                     track_id=tracklet.id,
                     cam_id=tracklet.cam_id,
                     time_stamp=tracklet.time_stamp,
-                    features={BBox: bounding_box},
+                    features=features,
                 )
             except Exception as e:
                 logger.error(f"PoseFromTrackletGenerator: Error generating pose {track_id}: {e}")

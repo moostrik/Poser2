@@ -12,11 +12,12 @@ from .LeaderScore import    LeaderScore
 from .MotionGate import     MotionGate
 from .MotionTime import     MotionTime
 from .Age import            Age
+from .Azimuth import        Azimuth
 
 
 FEATURES: list[type[BaseFeature]] = [
     Age, AngleMotion, Angles, AngleSymmetry, AngleVelocity,
-    BBox, LeaderScore, MotionGate, MotionTime, Points2D, Similarity,
+    Azimuth, BBox, LeaderScore, MotionGate, MotionTime, Points2D, Similarity,
 ]
 
 Feature: type[IntEnum] = IntEnum('Feature', {cls.__name__: i for i, cls in enumerate(FEATURES, 1)})  # type: ignore[misc]

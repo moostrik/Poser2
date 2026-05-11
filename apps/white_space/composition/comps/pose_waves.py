@@ -130,7 +130,7 @@ class PoseWaves(Composition):
             if not state.present:
                 continue
 
-            world_angle: float = getattr(tracklet.metadata, "world_angle", 0.0)
+            azimuth: float = frame[features.Azimuth].value
             bbox    = frame[features.BBox]
             points  = frame[features.Points2D]
             nose_xy = points[features.PointLandmark.nose]
@@ -138,8 +138,8 @@ class PoseWaves(Composition):
             bbox_rect = bbox.to_rect()
             if nose_conf > 0.3 and not np.isnan(nose_xy[0]) and not np.isnan(bbox_rect.width):
                 nose_offset_x: float = float(nose_xy[0]) - 0.5
-                world_angle += nose_offset_x * bbox_rect.width * fov_degrees
-            state.world_position = float(np.deg2rad(world_angle - 180))
+                azimuth = (azimuth + nose_offset_x * bbox_rect.width * fov_degrees / 360.0) % 1.0
+            state.world_position = float((azimuth - 0.5) * 2 * np.pi)
 
             bbox_height: float = bbox[features.BBoxElement.height]
             state.pose_length = (

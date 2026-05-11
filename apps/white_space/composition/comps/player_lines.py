@@ -69,17 +69,15 @@ class PlayerLines(Composition):
             if tracklet is None or not tracklet.is_active:
                 continue
 
-            world_angle: float = getattr(tracklet.metadata, "world_angle", 0.0)
+            strip_pos: float = frame[features.Azimuth].value
 
             if self._config.anchor_nose:
-                points   = frame[features.Points2D]
-                nose_xy  = points[features.PointLandmark.nose]
+                points    = frame[features.Points2D]
+                nose_xy   = points[features.PointLandmark.nose]
                 nose_conf: float = points.get_score(features.PointLandmark.nose)
                 bbox_rect = frame[features.BBox].to_rect()
                 if nose_conf > 0.3 and not np.isnan(nose_xy[0]) and not np.isnan(bbox_rect.width):
-                    world_angle += (float(nose_xy[0]) - 0.5) * bbox_rect.width * self._config.fov
-
-            strip_pos: float = world_angle % 360.0 / 360.0
+                    strip_pos = (strip_pos + (float(nose_xy[0]) - 0.5) * bbox_rect.width * self._config.fov / 360.0) % 1.0
 
             bottom_y: float = frame[features.BBox].to_rect().bottom
             if np.isnan(bottom_y):
