@@ -2,14 +2,13 @@
 import logging
 from queue import Empty, Queue
 from threading import Lock, Thread, Event
-from time import sleep, time
 
 # Local application imports
 from modules.oak import DepthTracklet
 from modules.settings import BaseSettings, Field
 from .. import (
-    BaseTracker, TrackerType,
-    Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback,
+    BaseTracker,
+    Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback,
 )
 from .one_per_cam_tracklet_manager import OnePerCamTrackletManager as TrackletManager
 
@@ -41,10 +40,6 @@ class OnePerCamTracker(Thread, BaseTracker):
         self.config: OnePerCamTrackerSettings = config
 
         self.tracklet_manager: TrackletManager = TrackletManager(self._num_cams)
-
-    @property
-    def tracker_type(self) -> TrackerType:
-        return TrackerType.ONEPERCAM
 
     def start(self) -> None:
         if self._running:
@@ -143,7 +138,6 @@ class OnePerCamTracker(Thread, BaseTracker):
         # Notify callbacks
         callback_tracklets: TrackletDict = {}
         for tracklet in self.tracklet_manager.all_tracklets():
-            # if tracklet.needs_notification:
             callback_tracklets[tracklet.id] = tracklet
         self._notify_callback(callback_tracklets)
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 # Standard library imports
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import TYPE_CHECKING
 
 # Local application imports
@@ -11,12 +10,6 @@ from modules.oak import DepthTracklet
 # Forward declaration to avoid circular import
 if TYPE_CHECKING:
     from .tracklet import TrackletDictCallback
-
-
-class TrackerType(Enum):
-    UNKNOWN = "unknown"
-    PANORAMIC = "panoramic"
-    ONEPERCAM = "onepercam"
 
 
 class TrackerAnnotation:
@@ -38,7 +31,4 @@ class BaseTracker(ABC):
 
     @abstractmethod
     def add_tracklet_callback(self, callback: TrackletDictCallback) -> None: ...
-
-    @abstractmethod
-    def tracker_type(self) -> TrackerType: ...
 

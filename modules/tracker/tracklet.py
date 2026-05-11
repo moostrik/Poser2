@@ -1,6 +1,3 @@
-# TODO
-# make sure that tracking removed from person is handled correctly
-
 # Standard library imports
 import time
 import warnings

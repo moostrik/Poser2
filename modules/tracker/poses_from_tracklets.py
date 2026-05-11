@@ -4,7 +4,7 @@ from threading import Lock
 from modules.pose.frame import Frame, FrameDict, FrameDictCallbackMixin
 from modules.pose.features import BBox, Azimuth
 from .tracklet import Tracklet
-from .panoramic.panoramic_tracker import PanoramicAnnotation
+from . import PanoramicAnnotation
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,6 @@ class PosesFromTracklets(FrameDictCallbackMixin):
         # Copy tracklets under lock to avoid holding lock during processing
         with self._lock:
             tracklets_snapshot = self._tracklets.copy()
-            batch_id = self._batch_id_counter
             self._batch_id_counter += 1
 
         generated_poses: FrameDict = {}

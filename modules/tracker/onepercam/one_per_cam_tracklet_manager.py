@@ -1,6 +1,5 @@
 # Standard library imports
 import logging
-import time
 from dataclasses import replace
 from threading import Lock
 
@@ -27,14 +26,14 @@ class OnePerCamTrackletManager:
 
             if tracklet_id in self._tracklets:
                 logger.warning(
-                    f"ScreenBoundTrackletManager: Tracklet with cam_id "
+                    f"OnePerCamTrackletManager: Tracklet with cam_id "
                     f"{tracklet_id} already exists. Skipping addition."
                 )
                 return None
 
             if tracklet_id >= self._max_size:
                 logger.warning(
-                    f"ScreenBoundTrackletManager: Tracklet with cam_id "
+                    f"OnePerCamTrackletManager: Tracklet with cam_id "
                     f"{tracklet_id} exceeds max size {self._max_size}. "
                     f"Skipping addition."
                 )
@@ -112,24 +111,11 @@ class OnePerCamTrackletManager:
         with self._lock:
             tracklet: Tracklet | None = self._tracklets.get(id)
             if tracklet is None:
-                logger.warning(f"TrackletManager: Attempted to retire non-existent tracklet with ID {id}.")
+                logger.warning(f"TrackletManager: Attempted to lose non-existent tracklet with ID {id}.")
                 return
 
-            removed_tracklet: Tracklet = replace(
+            lost_tracklet: Tracklet = replace(
                 tracklet,
                 status=TrackingStatus.LOST,
             )
-            self._tracklets[id] = removed_tracklet
-
-    def set_annotation(self, id: int, annotation) -> None:
-        with self._lock:
-            tracklet: Tracklet | None = self._tracklets.get(id)
-            if tracklet is None:
-                logger.warning(f"TrackletManager: Attempted to update annotation for non-existent tracklet with ID {id}.")
-                return
-
-            updated_tracklet: Tracklet = replace(
-                tracklet,
-                annotation=annotation
-            )
-            self._tracklets[id] = updated_tracklet
+            self._tracklets[id] = lost_tracklet

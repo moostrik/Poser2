@@ -31,18 +31,6 @@ class TrackletIdPool:
                 )
             self._available.add(obj)
 
-    def size(self) -> int:
-        return len(self._available)
-
-    def is_available(self, obj: int) -> bool:
-        with self._lock:
-            return obj in self._available
-
-    @property
-    def available(self) -> list[int]:
-        with self._lock:
-            return sorted(self._available)
-
 class PanoramicTrackletManager:
     def __init__(self, max_players: int) -> None:
         self._tracklets: dict[int, Tracklet] = {}
@@ -94,9 +82,6 @@ class PanoramicTrackletManager:
                 logger.warning(f"TrackletManager: Attempted to replace non-existent tracklet with ID {id}.")
                 return -1
 
-            # if new_tracklet.time_stamp == old_tracklet.time_stamp:
-            #     print(f"TrackletManager: Attempted to replace tracklet with the same timestamp {new_tracklet.time_stamp}, old id and cam: {old_tracklet.external_id} - {old_tracklet.cam_id}, new_id: {new_tracklet.external_id} - {new_tracklet.cam_id}.")
-
             status: TrackingStatus = new_tracklet.status
             if status == TrackingStatus.NEW:
                 status = TrackingStatus.TRACKED  # A replaced tracklet can not be NEW
@@ -133,9 +118,6 @@ class PanoramicTrackletManager:
             if not keep.is_active:
                 logger.warning(f"TrackletManager: Cannot merge tracklet with status {keep.status} (keep.id={keep.id}, remove.id={remove.id})")
                 return -1, -1
-
-            # if keep.time_stamp == remove.time_stamp:
-            #     print(f"TrackletManager: Attempted to merge tracklet with the same timestamp {keep.time_stamp}, keep id and cam: {keep.external_id} - {keep.cam_id}, remove_id: {remove.external_id} - {remove.cam_id}.")
 
             # Determine which tracklet is oldest
             if keep.age_in_seconds >= remove.age_in_seconds:
@@ -187,19 +169,5 @@ class PanoramicTrackletManager:
                 status=TrackingStatus.LOST,
             )
             self._tracklets[id] = lost_tracklet
-
-    def set_annotation(self, id: int, annotation) -> None:
-        with self._lock:
-            tracklet: Tracklet | None = self._tracklets.get(id)
-            if tracklet is None:
-                logger.warning(f"TrackletManager: Attempted to set annotation for non-existent tracklet with ID {id}.")
-                return
-
-            updated_tracklet: Tracklet = replace(
-                tracklet,
-                annotation=annotation
-            )
-            self._tracklets[id] = updated_tracklet
-
 
 

@@ -24,7 +24,7 @@ class PanoramicGeometry:
 
     def get_angles_and_overlap(self, roi: Rect, cam_id: int, expansion: float) -> tuple[float, float, bool]:
         local_angle, world_angle = self.calc_angle(roi, cam_id)
-        overlap: bool = self.angle_in_overlap(world_angle, expansion)
+        overlap: bool = self.angle_in_overlap(local_angle, expansion)
         return (local_angle, world_angle, overlap)
 
     def calc_angle(self, roi: Rect, cam_id: int) -> tuple[float, float]:
@@ -45,9 +45,8 @@ class PanoramicGeometry:
             world_angle += 360.0
         return world_angle
 
-    def angle_in_overlap(self, world_angle: float, expansion: float = 0.0) -> bool:
+    def angle_in_overlap(self, local_angle: float, expansion: float = 0.0) -> bool:
         angle_overlap: float = self.fov_overlap * (1.0 + expansion)
-        local_angle: float = world_angle % self.target_fov
 
         if local_angle <= angle_overlap or local_angle >= self.cam_fov - angle_overlap:
             return True

@@ -4,13 +4,13 @@ from dataclasses import dataclass, replace
 from itertools import combinations
 from queue import Empty, Queue
 from threading import Lock, Thread, Event
-from time import sleep, time
+from time import time
 
 # Local application imports
 from modules.oak import DepthTracklet
 from modules.settings import BaseSettings, Field
 from .. import (
-    BaseTracker, TrackerType, TrackerAnnotation,
+    BaseTracker, TrackerAnnotation,
     Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback,
 )
 from .panoramic_tracklet_manager import PanoramicTrackletManager
@@ -78,10 +78,6 @@ class PanoramicTracker(Thread, BaseTracker):
 
         self._callback_lock = Lock()
         self._tracklet_callbacks: set[TrackletDictCallback] = set()
-
-    @property
-    def tracker_type(self) -> TrackerType:
-        return TrackerType.PANORAMIC
 
     def start(self) -> None:
         if self._running:
