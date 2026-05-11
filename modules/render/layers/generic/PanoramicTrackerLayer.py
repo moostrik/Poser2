@@ -8,8 +8,7 @@ from modules.gl import Fbo, Texture, Text
 from ...shaders import DrawColoredRectangle
 from ...color_settings import ColorSettings
 
-from modules.tracker import TrackerType, TrackerMetadata
-from modules.tracker import Tracklet, TrackingStatus
+from modules.tracker import Tracklet, TrackingStatus, PanoramicAnnotation
 
 from modules.board import HasTracklets
 from ..LayerBase import LayerBase
@@ -57,13 +56,12 @@ class PanoramicTrackerLayer(LayerBase):
             if tracklet.status != TrackingStatus.TRACKED and tracklet.status != TrackingStatus.NEW:
                 continue
 
-            tracklet_metadata: TrackerMetadata | None = tracklet.metadata
-            if tracklet_metadata is None or tracklet_metadata.tracker_type != TrackerType.PANORAMIC:
+            if not isinstance(tracklet.annotation, PanoramicAnnotation):
                 continue
 
-            world_angle: float = getattr(tracklet.metadata, "world_angle", 0.0)
-            local_angle: float = getattr(tracklet.metadata, "local_angle", 0.0)
-            overlap: bool = getattr(tracklet.metadata, "overlap", False)
+            world_angle: float = tracklet.annotation.world_angle
+            local_angle: float = tracklet.annotation.local_angle
+            overlap: bool = tracklet.annotation.overlap
 
             roi_width: float = tracklet.roi.width / self.num_cams
             roi_height: float = tracklet.roi.height

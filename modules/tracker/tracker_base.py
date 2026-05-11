@@ -19,9 +19,8 @@ class TrackerType(Enum):
     ONEPERCAM = "onepercam"
 
 
-class TrackerMetadata(ABC):
-    @abstractmethod
-    def tracker_type(self) -> TrackerType: ...
+class TrackerAnnotation:
+    pass
 
 
 class BaseTracker(ABC):

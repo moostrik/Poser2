@@ -64,7 +64,6 @@ class PanoramicTrackletManager:
                 tracklet,
                 id=tracklet_id,
                 status=TrackingStatus.NEW,
-                needs_notification=True
             )
             self._tracklets[tracklet_id] = new_tracklet
             return tracklet_id
@@ -113,7 +112,6 @@ class PanoramicTrackletManager:
                 created_at=old_tracklet.created_at,
                 last_active=last_active,
                 status=status,
-                needs_notification=True
             )
             self._tracklets[id] = updated_tracklet
             return id
@@ -151,20 +149,14 @@ class PanoramicTrackletManager:
                 id=merge.id,
                 created_at=merge.created_at,
                 status=TrackingStatus.TRACKED,
-                needs_notification=True
             )
             self._tracklets[merge.id] = merged_tracklet
-
-            needs_notification: bool = True
-            if other.status == TrackingStatus.NEW: # if a tracklet is just added and instantly merged, we don't want to mark it as updated
-                needs_notification = False
 
             other_tracklet: Tracklet = replace(
                 remove,
                 id=other.id,
                 created_at=other.created_at,
                 status=TrackingStatus.REMOVED,
-                needs_notification=needs_notification
             )
             self._tracklets[other.id] = other_tracklet
 
@@ -180,7 +172,6 @@ class PanoramicTrackletManager:
             removed_tracklet: Tracklet = replace(
                 tracklet,
                 status=TrackingStatus.REMOVED,
-                needs_notification=True
             )
             self._tracklets[id] = removed_tracklet
 
@@ -194,30 +185,21 @@ class PanoramicTrackletManager:
             lost_tracklet: Tracklet = replace(
                 tracklet,
                 status=TrackingStatus.LOST,
-                needs_notification=True
             )
             self._tracklets[id] = lost_tracklet
 
-    def set_metadata(self, id: int, metadata) -> None:
+    def set_annotation(self, id: int, annotation) -> None:
         with self._lock:
             tracklet: Tracklet | None = self._tracklets.get(id)
             if tracklet is None:
-                logger.warning(f"TrackletManager: Attempted to set metadata for non-existent tracklet with ID {id}.")
+                logger.warning(f"TrackletManager: Attempted to set annotation for non-existent tracklet with ID {id}.")
                 return
 
             updated_tracklet: Tracklet = replace(
                 tracklet,
-                metadata=metadata
+                annotation=annotation
             )
             self._tracklets[id] = updated_tracklet
 
-    def mark_all_as_notified(self) -> None:
-        with self._lock:
-            for id, tracklet in self._tracklets.items():
-                if tracklet.needs_notification:
-                    notified_tracklet: Tracklet = replace(
-                        tracklet,
-                        needs_notification=False
-                    )
-                    self._tracklets[id] = notified_tracklet
+
 

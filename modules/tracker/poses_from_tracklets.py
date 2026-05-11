@@ -4,6 +4,7 @@ from threading import Lock
 from modules.pose.frame import Frame, FrameDict, FrameDictCallbackMixin
 from modules.pose.features import BBox, Azimuth
 from .tracklet import Tracklet
+from .panoramic.panoramic_tracker import PanoramicAnnotation
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +56,7 @@ class PosesFromTracklets(FrameDictCallbackMixin):
 
             try:
                 bounding_box = BBox.from_rect(tracklet.roi)
-                world_angle = getattr(
-                    getattr(tracklet, 'metadata', None), 'world_angle', None
-                )
+                world_angle = tracklet.annotation.world_angle if isinstance(tracklet.annotation, PanoramicAnnotation) else None
                 features: dict = {BBox: bounding_box}
                 if world_angle is not None:
                     features[Azimuth] = Azimuth.from_value(float(world_angle) % 360.0 / 360.0)

@@ -11,7 +11,7 @@ from typing import Callable, TypeAlias
 # Local application imports
 from modules.oak import DepthTracklet
 from modules.utils import Rect
-from .tracker_base import TrackerMetadata
+from .tracker_base import TrackerAnnotation
 
 
 class TrackingStatus(Enum):
@@ -42,21 +42,9 @@ class Tracklet:
     status: TrackingStatus = field(default=TrackingStatus.NEW)
     roi: Rect = field(default_factory=Rect)
 
-    metadata: TrackerMetadata | None = field(default=None)
-    _external_tracklet: DepthTracklet | None = field(default=None, repr=False)
-    needs_notification: bool = field(default=True, repr=False)
-
-    @property
-    def track_id(self) -> int:
-        return self.id
-
-    @property
-    def is_new(self) -> bool:
-        return self.status == TrackingStatus.NEW
-
-    @property
-    def is_tracked(self) -> bool:
-        return self.status == TrackingStatus.TRACKED
+    annotation: TrackerAnnotation | None = field(default=None)
+    external_id: int = field(default=-1)
+    external_age_in_frames: int = field(default=0)
 
     @property
     def is_lost(self) -> bool:
@@ -71,10 +59,6 @@ class Tracklet:
         return self.status in (TrackingStatus.NEW, TrackingStatus.TRACKED)
 
     @property
-    def is_being_tracked(self) -> bool:
-        return self.status in (TrackingStatus.NEW, TrackingStatus.TRACKED, TrackingStatus.LOST)
-
-    @property
     def age_in_seconds(self) -> float:
         """Get how long this person has been tracked"""
         return self.last_active - self.created_at
@@ -82,18 +66,6 @@ class Tracklet:
     def is_expired(self, threshold: float) -> bool:
         """Check if person hasn't been updated recently"""
         return (time.time() - self.last_active) > threshold
-
-    @property
-    def external_id(self) -> int:
-        if self._external_tracklet:
-            return self._external_tracklet.id
-        return -1
-
-    @property
-    def external_age_in_frames(self) -> int:
-        if self._external_tracklet:
-            return self._external_tracklet.age
-        return 0
 
     @classmethod
     def from_depthcam(cls, cam_id: int, dct: 'DepthTracklet') -> 'Tracklet | None':
@@ -123,7 +95,8 @@ class Tracklet:
             cam_id=cam_id,
             status=status,
             roi=roi,
-            _external_tracklet=dct,
+            external_id=dct.id,
+            external_age_in_frames=dct.age,
         )
 
 
@@ -132,24 +105,3 @@ class Tracklet:
 TrackletCallback: TypeAlias = Callable[[Tracklet], None]
 TrackletDict: TypeAlias = dict[int, Tracklet]
 TrackletDictCallback: TypeAlias = Callable[[TrackletDict], None]
-
-
-TrackletIdColorDict: dict[int, str] = {
-    0: '#006400',   # darkgreen
-    1: '#00008b',   # darkblue
-    2: '#b03060',   # maroon3
-    3: '#ff0000',   # red
-    4: '#ffff00',   # yellow
-    5: '#deb887',   # burlywood
-    6: '#00ff00',   # lime
-    7: '#00ffff',   # aqua
-    8: '#ff00ff',   # fuchsia
-    9: '#6495ed',   # cornflower
-}
-
-
-def tracklet_id_color(id_: int, alpha: float = 0.5) -> list[float]:
-    hex_color: str = TrackletIdColorDict.get(id_, '#000000')
-    rgb: list[float] = [int(hex_color[i:i+2], 16) / 255.0 for i in (1, 3, 5)]
-    rgb.append(alpha)
-    return rgb

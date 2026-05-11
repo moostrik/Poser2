@@ -1,6 +1,5 @@
 # Standard library imports
 import logging
-from dataclasses import dataclass
 from queue import Empty, Queue
 from threading import Lock, Thread, Event
 from time import sleep, time
@@ -8,9 +7,8 @@ from time import sleep, time
 # Local application imports
 from modules.oak import DepthTracklet
 from modules.settings import BaseSettings, Field
-from modules.utils import Rect
 from .. import (
-    BaseTracker, TrackerType, TrackerMetadata,
+    BaseTracker, TrackerType,
     Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback,
 )
 from .one_per_cam_tracklet_manager import OnePerCamTrackletManager as TrackletManager
@@ -27,15 +25,6 @@ class OnePerCamTrackerSettings(BaseSettings):
     add_height_threshold:     Field[float] = Field(0.5,  min=0.0, max=1.0, step=0.05)
     update_height_threshold:  Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05)
     add_bottom_threshold:     Field[float] = Field(0.2,  min=0.0, max=1.0, step=0.05)
-
-
-@dataclass(frozen=True)
-class OnePerCamMetadata(TrackerMetadata):
-    smooth_rect: Rect
-
-    @property
-    def tracker_type(self) -> TrackerType:
-        return TrackerType.ONEPERCAM
 
 
 class OnePerCamTracker(Thread, BaseTracker):
@@ -157,8 +146,6 @@ class OnePerCamTracker(Thread, BaseTracker):
             # if tracklet.needs_notification:
             callback_tracklets[tracklet.id] = tracklet
         self._notify_callback(callback_tracklets)
-
-        self.tracklet_manager.mark_all_as_notified()
 
         # Remove expired tracklets
         for tracklet in self.tracklet_manager.all_tracklets():

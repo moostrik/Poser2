@@ -44,7 +44,6 @@ class OnePerCamTrackletManager:
                 tracklet,
                 id=tracklet_id,
                 status=TrackingStatus.NEW,
-                needs_notification=True
             )
             self._tracklets[tracklet_id] = new_tracklet
             return tracklet_id
@@ -92,7 +91,6 @@ class OnePerCamTrackletManager:
                 created_at=old_tracklet.created_at,
                 last_active=last_active,
                 status=status,
-                needs_notification=True
             )
             self._tracklets[id] = updated_tracklet
             return id
@@ -107,7 +105,6 @@ class OnePerCamTrackletManager:
             removed_tracklet: Tracklet = replace(
                 tracklet,
                 status=TrackingStatus.REMOVED,
-                needs_notification=True
             )
             self._tracklets[id] = removed_tracklet
 
@@ -121,29 +118,18 @@ class OnePerCamTrackletManager:
             removed_tracklet: Tracklet = replace(
                 tracklet,
                 status=TrackingStatus.LOST,
-                needs_notification=True
             )
             self._tracklets[id] = removed_tracklet
 
-    def mark_all_as_notified(self) -> None:
-        with self._lock:
-            for id, tracklet in self._tracklets.items():
-                if tracklet.needs_notification:
-                    notified_tracklet: Tracklet = replace(
-                        tracklet,
-                        needs_notification=False
-                    )
-                    self._tracklets[id] = notified_tracklet
-
-    def set_metadata(self, id: int, metadata) -> None:
+    def set_annotation(self, id: int, annotation) -> None:
         with self._lock:
             tracklet: Tracklet | None = self._tracklets.get(id)
             if tracklet is None:
-                logger.warning(f"TrackletManager: Attempted to update metadata for non-existent tracklet with ID {id}.")
+                logger.warning(f"TrackletManager: Attempted to update annotation for non-existent tracklet with ID {id}.")
                 return
 
             updated_tracklet: Tracklet = replace(
                 tracklet,
-                metadata=metadata
+                annotation=annotation
             )
             self._tracklets[id] = updated_tracklet
