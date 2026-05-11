@@ -81,7 +81,7 @@ class OnePerCamTrackletManager:
 
             last_active: float = new_tracklet.last_active
             if new_tracklet.status == TrackingStatus.LOST:
-                last_active = old_tracklet.last_active
+                last_active = max(old_tracklet.last_active, new_tracklet.last_active)
 
             # Create a new instance with updated fields
             updated_tracklet: Tracklet = replace(

@@ -31,6 +31,18 @@ class TrackletIdPool:
                 )
             self._available.add(obj)
 
+    def size(self) -> int:
+        return len(self._available)
+
+    def is_available(self, obj: int) -> bool:
+        with self._lock:
+            return obj in self._available
+
+    @property
+    def available(self) -> list[int]:
+        with self._lock:
+            return sorted(self._available)
+
 class PanoramicTrackletManager:
     def __init__(self, max_players: int) -> None:
         self._tracklets: dict[int, Tracklet] = {}
@@ -88,7 +100,7 @@ class PanoramicTrackletManager:
 
             last_active: float = new_tracklet.last_active
             if new_tracklet.status == TrackingStatus.LOST:
-                last_active = old_tracklet.last_active
+                last_active = max(old_tracklet.last_active, new_tracklet.last_active)
 
             # Create a new instance with updated fields
             updated_tracklet: Tracklet = replace(
