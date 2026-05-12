@@ -6,7 +6,7 @@ from .draw import BlendType
 from .comps import (
     PoseWavesSettings, FillSettings, PulseSettings,
     ChaseSettings, LinesSettings, RandomSettings, HarmonicSettings,
-    PlayerLinesSettings,
+    PlayerLinesSettings, CalibrationSettings,
 )
 
 
@@ -19,6 +19,7 @@ class CompositionId(IntEnum):
     random       = auto()
     harmonic     = auto()
     player_lines = auto()
+    calibration  = auto()
 
 
 class CompositorSettings(BaseSettings):
@@ -26,6 +27,7 @@ class CompositorSettings(BaseSettings):
 
     # Construction / wiring (INIT — requires restart to take effect)
     max_poses:        Field[int]   = Field(3,    min=1,   max=16,   access=Field.INIT, description="Max tracked poses")
+    num_cameras:      Field[int]   = Field(1,    min=1,   max=16,   access=Field.INIT, visible=False, description="Number of cameras")
     light_rate:       Field[float] = Field(30.0, min=1,   max=120,  access=Field.INIT, description="Light output frame rate (fps)")
     light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, visible=False, description="LED strip resolution (pixels)")
 
@@ -50,3 +52,4 @@ class CompositorSettings(BaseSettings):
     random:       Group[RandomSettings]       = Group(RandomSettings)
     harmonic:     Group[HarmonicSettings]     = Group(HarmonicSettings)
     player_lines: Group[PlayerLinesSettings]  = Group(PlayerLinesSettings, share=[fov.as_('fov')])
+    calibration:  Group[CalibrationSettings]  = Group(CalibrationSettings, share=[fov.as_('fov')])

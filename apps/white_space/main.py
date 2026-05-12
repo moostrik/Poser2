@@ -1,5 +1,7 @@
 """White Space — 3-camera panoramic installation with circular LED light output."""
 
+# TODO - should the compositor not use a board or even the renderboard?
+
 from typing import Optional
 from functools import partial
 
@@ -113,11 +115,16 @@ class WhiteSpaceMain:
             ])
 
         # WS PIPELINE — composition output
-        self.compositor = Compositor(self.settings.composition)
+        self.compositor = Compositor(
+            self.settings.composition,
+            distortion=self.settings.camera.tracker.distortion,
+        )
         self.osc_light = OscLight(self.settings.inout.osc_light)
         self.tracker.add_tracklet_callback(self.compositor.set_tracklets)
         ws_input: Stage = Stage(int(ps.ws_input_stage))
         self.stages[ws_input].add_callback(self.compositor.add_poses)
+        for camera in self.cameras:
+            camera.add_frame_callback(self.compositor.set_image)
         self.compositor.add_output_callback(self.osc_light.send_message)
         self.compositor.add_output_callback(self.board.set_composition_output)
 

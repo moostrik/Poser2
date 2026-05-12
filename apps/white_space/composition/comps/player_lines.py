@@ -76,6 +76,10 @@ class PlayerLines(Composition):
                 nose_xy   = points[features.PointLandmark.nose]
                 nose_conf: float = points.get_score(features.PointLandmark.nose)
                 bbox_rect = frame[features.BBox].to_rect()
+                # NOTE: nose_xy comes from the raw 2D pose keypoints and is NOT
+                # undistorted. The tracker's distortion correction is already baked
+                # into Azimuth (via Geometry.undistort_x on the bbox centre), so
+                # this offset carries a small residual error under heavy distortion.
                 if nose_conf > 0.3 and not np.isnan(nose_xy[0]) and not np.isnan(bbox_rect.width):
                     strip_pos = (strip_pos + (float(nose_xy[0]) - 0.5) * bbox_rect.width * self._config.fov / 360.0) % 1.0
 

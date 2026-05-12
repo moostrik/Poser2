@@ -42,7 +42,7 @@ if __name__ == '__main__':
     def _heartbeat() -> None:
         while not shutdown_event.wait(60):
             elapsed = int(time.monotonic() - start_time)
-            logging.info("Heartbeat — running for %d min %d s", elapsed // 60, elapsed % 60)
+            logging.debug("Heartbeat — running for %d min %d s", elapsed // 60, elapsed % 60)
 
     Thread(target=_heartbeat, daemon=True, name="heartbeat").start()
 

@@ -7,8 +7,8 @@ from modules.utils import Rect
 
 class DistortAlgorithm(IntEnum):
     NONE = 0   # identity — no distortion correction
-    TANH = 1   # S-curve:  0.5 * (1 + tanh(k1*(2x-1) + k2*(2x-1)^3))
-    POLY = 2   # polynomial: x + k1*(x-0.5) + k2*(x-0.5)^3
+    POLY = 1   # polynomial: x + k1*(x-0.5) + k2*(x-0.5)^3
+    TANH = 2   # S-curve:  0.5 * (1 + tanh(k1*(2x-1) + k2*(2x-1)^3))
 
 
 class Geometry:

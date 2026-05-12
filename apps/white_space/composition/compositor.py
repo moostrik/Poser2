@@ -9,13 +9,15 @@ import numpy as np
 from modules.utils import HotReloadMethods
 from modules.gl import FpsCounter
 from modules.tracker import Tracklet
+from modules.tracker.panoramic.settings import DistortionSettings
 from modules.pose.frame import Frame, FrameDict
+from modules.oak import FrameType
 
 from .transport import TransportClock
 from .base import Composition
 from .output import CompositionOutput, COMP_DTYPE, CompositionOutputCallback
 from .settings import CompositorSettings, CompositionId
-from .comps import PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines
+from .comps import PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, Calibration
 from .draw import blend_values
 
 import logging
@@ -30,7 +32,7 @@ class Compositor(Thread):
     Output: CompositionOutput via registered callbacks
     """
 
-    def __init__(self, config: CompositorSettings) -> None:
+    def __init__(self, config: CompositorSettings, distortion: DistortionSettings) -> None:
         super().__init__(daemon=True, name="Compositor")
 
         self._stop_event    = Event()
@@ -54,7 +56,8 @@ class Compositor(Thread):
         self._transport = TransportClock(config)
 
         # Fixed composition registry — ordered list of (id, instance) pairs
-        self._pose_waves = PoseWaves(resolution, num_players, config.pose_waves, self.interval)
+        self._pose_waves  = PoseWaves   (resolution, num_players, config.pose_waves, self.interval)
+        self._calibration = Calibration (resolution, config.calibration, distortion, config.num_cameras)
         self._compositions: list[tuple[CompositionId, Composition]] = [
             (CompositionId.pose_waves,   self._pose_waves),
             (CompositionId.fill,         Fill        (resolution, config.fill)),
@@ -64,6 +67,7 @@ class Compositor(Thread):
             (CompositionId.random,       Random      (resolution, config.random)),
             (CompositionId.harmonic,     Harmonic    (resolution, config.harmonic)),
             (CompositionId.player_lines, PlayerLines (resolution, config.player_lines)),
+            (CompositionId.calibration,  self._calibration),
         ]
 
         self.fps_counter = FpsCounter()
@@ -161,6 +165,11 @@ class Compositor(Thread):
     # ------------------------------------------------------------------
     # Inputs
     # ------------------------------------------------------------------
+
+    def set_image(self, cam_id: int, frame_type: FrameType, frame: np.ndarray) -> None:
+        """Camera frame callback — routes VIDEO frames to the calibration composition."""
+        if frame_type == FrameType.VIDEO:
+            self._calibration.set_camera_image(cam_id, frame)
 
     def add_poses(self, frames: FrameDict) -> None:
         """Store the latest frame per player; called from the pose pipeline thread."""

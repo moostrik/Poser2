@@ -72,7 +72,8 @@ class WindowManager():
         self._actual_height: int = settings.height
         self.windowed_fullscreen: bool = False
         self.frame_interval: None | int = None
-        logger.info("Initialized with width=%s, height=%s, fullscreen=%s, v_sync=%s, fps=%s, frame_interval=%sns", settings.width, settings.height, settings.fullscreen, settings.v_sync, settings.avg_fps, self.frame_interval)
+        frame_interval_str = f"{self.frame_interval}ns" if self.frame_interval is not None else "None"
+        logger.info("Initialized with width=%s, height=%s, fullscreen=%s, v_sync=%s, fps=%s, frame_interval=%s", settings.width, settings.height, settings.fullscreen, settings.v_sync, settings.avg_fps, frame_interval_str)
         self.fps = FpsCounter()
         self.mouse_x: float = 0.0
         self.mouse_y: float = 0.0

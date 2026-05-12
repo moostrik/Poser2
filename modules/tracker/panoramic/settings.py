@@ -42,7 +42,7 @@ class TanhSettings(BaseSettings):
 
 
 class PolySettings(BaseSettings):
-    """
+    D = """
     Polynomial undistortion.
 
     Maps the normalised x position through:
@@ -57,15 +57,15 @@ class PolySettings(BaseSettings):
     safe to leave active during tuning.
     """
     k1: Field[float] = Field(0.0, min=-0.5, max=0.5, step=0.01,
-                             description="Linear decentre coefficient.")
+                             description="Linear coefficient. Positive stretches edges outward, negative pulls inward.")
     k2: Field[float] = Field(0.0, min=-2.0, max=2.0, step=0.05,
-                             description="Cubic distortion coefficient.")
+                             description="Cubic coefficient. Refines correction at the frame extremes.")
 
 
 class DistortionSettings(BaseSettings):
     algorithm: Field[DistortAlgorithm] = Field(DistortAlgorithm.NONE)
-    tanh: Group[TanhSettings] = Group(TanhSettings)
     poly: Group[PolySettings] = Group(PolySettings)
+    tanh: Group[TanhSettings] = Group(TanhSettings)
 
 
 class TrackerSettings(BaseSettings):
