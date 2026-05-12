@@ -61,7 +61,7 @@ class Tracklet:
         return self.last_active - self.created_at
 
     def is_expired(self, threshold: float) -> bool:
-        """Check if person hasn't been updated recently"""
+        """Returns True if the tracklet has not been updated within threshold seconds."""
         return (time.time() - self.last_active) > threshold
 
     @classmethod
