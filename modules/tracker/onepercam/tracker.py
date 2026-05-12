@@ -10,13 +10,12 @@ from .. import (
     BaseTracker,
     Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback,
 )
-from .one_per_cam_tracklet_manager import OnePerCamTrackletManager as TrackletManager
+from .store import TrackletStore
 
 logger = logging.getLogger(__name__)
 
 
-class OnePerCamTrackerSettings(BaseSettings):
-    """Configuration for OnePerCamTracker."""
+class TrackerSettings(BaseSettings):
     tracklet_min_age:         Field[int]   = Field(3,    min=0,   max=9,   step=1)
     add_centre_threshold:     Field[float] = Field(0.15, min=0.0, max=1.0, step=0.05)
     update_centre_threshold:  Field[float] = Field(0.3,  min=0.0, max=1.0, step=0.05)
@@ -26,8 +25,8 @@ class OnePerCamTrackerSettings(BaseSettings):
     add_bottom_threshold:     Field[float] = Field(0.2,  min=0.0, max=1.0, step=0.05)
 
 
-class OnePerCamTracker(Thread, BaseTracker):
-    def __init__(self, config: OnePerCamTrackerSettings, num_trackers: int) -> None:
+class Tracker(Thread, BaseTracker):
+    def __init__(self, config: TrackerSettings, num_trackers: int) -> None:
         super().__init__()
 
         self._running: bool = False
@@ -37,9 +36,9 @@ class OnePerCamTracker(Thread, BaseTracker):
         self._tracklet_callbacks: set[TrackletDictCallback] = set()
 
         self._num_cams: int = num_trackers
-        self.config: OnePerCamTrackerSettings = config
+        self.config: TrackerSettings = config
 
-        self.tracklet_manager: TrackletManager = TrackletManager(self._num_cams)
+        self.store: TrackletStore = TrackletStore(self._num_cams)
 
     def start(self) -> None:
         if self._running:
@@ -78,13 +77,13 @@ class OnePerCamTracker(Thread, BaseTracker):
         # UPDATE EXISTING TRACKLET
         update_tracklet: Tracklet | None = None
         for t in tracklets:
-            if t in self.tracklet_manager:
+            if t in self.store:
                 update_tracklet = t
                 break
 
         if update_tracklet is not None:
             if update_tracklet.is_removed:
-                self.tracklet_manager.retire_tracklet(update_tracklet.cam_id)
+                self.store.retire_tracklet(update_tracklet.cam_id)
                 return
 
             # if tracklet is LOST, too small or too far from centre, lose it
@@ -93,11 +92,11 @@ class OnePerCamTracker(Thread, BaseTracker):
                 update_tracklet.roi.height < self.config.update_height_threshold or
                 abs(update_tracklet.roi.center.x - 0.5) > self.config.update_centre_threshold
             ):
-                self.tracklet_manager.lose_tracklet(update_tracklet.cam_id)
+                self.store.lose_tracklet(update_tracklet.cam_id)
                 return
 
             # else update the tracklet
-            self.tracklet_manager.replace_tracklet(update_tracklet.cam_id, update_tracklet)
+            self.store.replace_tracklet(update_tracklet.cam_id, update_tracklet)
             return
 
         # ADD TRACKLET
@@ -126,25 +125,24 @@ class OnePerCamTracker(Thread, BaseTracker):
 
         add_tracklets = sorted(add_tracklets, key=lambda x: x.external_age_in_frames, reverse=True)
         add_tracklet: Tracklet = add_tracklets[0]
-        self.tracklet_manager.add_tracklet(add_tracklet)
+        self.store.add_tracklet(add_tracklet)
 
     def _update_and_notify(self) -> None:
         # retire expired tracklets
-        for tracklet in self.tracklet_manager.all_tracklets():
+        for tracklet in self.store.all_tracklets():
             if tracklet.is_expired(self.config.timeout):
-                self.tracklet_manager.retire_tracklet(tracklet.id)
-                # print(f"Retiring expired tracklet {tracklet.id} at {time()}")
+                self.store.retire_tracklet(tracklet.id)
 
         # Notify callbacks
         callback_tracklets: TrackletDict = {}
-        for tracklet in self.tracklet_manager.all_tracklets():
+        for tracklet in self.store.all_tracklets():
             callback_tracklets[tracklet.id] = tracklet
         self._notify_callback(callback_tracklets)
 
         # Remove expired tracklets
-        for tracklet in self.tracklet_manager.all_tracklets():
+        for tracklet in self.store.all_tracklets():
             if tracklet.status == TrackingStatus.REMOVED:
-                self.tracklet_manager.remove_tracklet(tracklet.id)
+                self.store.remove_tracklet(tracklet.id)
 
     def _notify_callback(self, tracklets: TrackletDict) -> None:
         with self._callback_lock:

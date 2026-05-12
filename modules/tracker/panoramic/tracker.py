@@ -7,60 +7,25 @@ from threading import Lock, Thread, Event
 
 # Local application imports
 from modules.oak import DepthTracklet
-from modules.settings import BaseSettings, Field, Group
 from .. import (
     BaseTracker, TrackerAnnotation,
     Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback,
 )
-from .panoramic_tracklet_manager import PanoramicTrackletManager
-from .panoramic_geometry import PanoramicGeometry, DistortAlgorithm
+from .store import TrackletStore
+from .geometry import Geometry, DistortAlgorithm
+from .settings import SeamSettings, TanhSettings, PolySettings, DistortionSettings, TrackerSettings
 
 logger = logging.getLogger(__name__)
 
 
-class SeamAngles(BaseSettings):
-    fov: Field[float] = Field(0.0, access=Field.READ, description="Camera FOV (°)")
-    overlap: Field[float] = Field(0.0, access=Field.READ, description="Camera FOV overlap zone (°)")
-    reject: Field[float] = Field(0.0, access=Field.READ, description="Dead zone at camera edges (°)")
-    reach: Field[float] = Field(0.0, access=Field.READ, description="Cross-camera matching zone from camera edges (°)")
-
-
-class SeamSettings(BaseSettings):
-    reject: Field[float] = Field(0.5, min=0.0, max=0.75, step=0.05,
-                                 description="Dead zone size as a fraction of the overlap zone.")
-    reach: Field[float] = Field(1.3, min=1.0, max=1.5, step=0.05,
-                                description="Matching zone size as a fraction of the overlap zone.")
-    hysteresis: Field[float] = Field(0.9, min=0.1, max=1.0, step=0.05,
-                                     description="Lower values make active camera stickier.")
-    angles: Group[SeamAngles] = Group(SeamAngles)
-
-
-class DistortionSettings(BaseSettings):
-    algorithm: Field[DistortAlgorithm] = Field(DistortAlgorithm.NONE)
-    k1: Field[float] = Field(0.0, min=-2.0, max=2.0, step=0.01)
-    k2: Field[float] = Field(0.0, min=-2.0, max=2.0, step=0.01)
-
-
-class PanoramicTrackerSettings(BaseSettings):
-    fov: Field[float] = Field(110.0, min=90.0, max=130.0, step=0.5, visible=False)
-    min_age: Field[int] = Field(5, min=0, max=9, step=1,
-                              description="Minimum age in frames before a tracklet is considered.")
-    min_height: Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05,
-                                     description="Minimum ROI height to accept a tracklet.")
-    timeout: Field[float] = Field(2.0, min=1.0, max=5.0, step=0.1,
-                                  description="Seconds before an inactive tracklet is retired.")
-    seam: Group[SeamSettings] = Group(SeamSettings)
-    distortion: Group[DistortionSettings] = Group(DistortionSettings)
-
-
 @dataclass(frozen=True)
-class PanoramicAnnotation(TrackerAnnotation):
+class Annotation(TrackerAnnotation):
     local_angle: float
     world_angle: float
     overlap: bool
 
 
-class PanoramicTracker(Thread, BaseTracker):
+class Tracker(Thread, BaseTracker):
     """
     Tracks N people across a ring of cameras sharing a 360° field of view.
 
@@ -88,26 +53,26 @@ class PanoramicTracker(Thread, BaseTracker):
     ``submit_cam_tracklets`` and results are delivered via registered callbacks.
     """
 
-    def __init__(self, config: PanoramicTrackerSettings, num_players: int, num_cameras: int) -> None:
+    def __init__(self, config: TrackerSettings, num_players: int, num_cameras: int) -> None:
         super().__init__()
 
         self._running: bool = False
         self._update_event: Event = Event()
 
-        self._max_players: int = num_players
-
         self._input_queue: Queue[Tracklet] = Queue()
 
-        self.tracklet_manager: PanoramicTrackletManager = PanoramicTrackletManager(self._max_players)
+        self.store: TrackletStore = TrackletStore(num_players)
 
-        self.config: PanoramicTrackerSettings = config
-        self.geometry: PanoramicGeometry = PanoramicGeometry(num_cameras, config.fov, 90.0)
+        self.config: TrackerSettings = config
+        self.geometry: Geometry = Geometry(num_cameras, config.fov, 90.0)
 
         # Wire fov and distortion changes to geometry
-        PanoramicTrackerSettings.fov.bind(config, lambda v: (self.geometry.set_fov(v), self._update_seam_angles()))
+        TrackerSettings.fov.bind(config, lambda v: (self.geometry.set_fov(v), self._update_seam_angles()))
         DistortionSettings.algorithm.bind(config.distortion, lambda v: self.geometry.set_algorithm(v))
-        DistortionSettings.k1.bind(config.distortion, lambda v: self.geometry.set_k1(v))
-        DistortionSettings.k2.bind(config.distortion, lambda v: self.geometry.set_k2(v))
+        TanhSettings.slope.bind(config.distortion.tanh, lambda v: self.geometry.set_tanh_slope(v))
+        TanhSettings.cubic.bind(config.distortion.tanh, lambda v: self.geometry.set_tanh_cubic(v))
+        PolySettings.k1.bind(config.distortion.poly, lambda v: self.geometry.set_poly_k1(v))
+        PolySettings.k2.bind(config.distortion.poly, lambda v: self.geometry.set_poly_k2(v))
 
         # Wire seam ratio changes to the angles display
         SeamSettings.reject.bind(config.seam, lambda _: self._update_seam_angles())
@@ -168,8 +133,8 @@ class PanoramicTracker(Thread, BaseTracker):
 
         # LOST/REMOVED: mark the observation lost and let timeout + cleanup handle removal
         if new_tracklet.is_lost or new_tracklet.is_removed:
-            if self.tracklet_manager.get_world_id(cam_id, ext_id) is not None:
-                self.tracklet_manager.lose_tracklet(cam_id, ext_id)
+            if self.store.get_world_id(cam_id, ext_id) is not None:
+                self.store.lose_tracklet(cam_id, ext_id)
             return
 
         # Filter out tracklets that are too young or too small
@@ -180,15 +145,15 @@ class PanoramicTracker(Thread, BaseTracker):
 
         # Annotate with local/world angles and overlap flag
         local_angle, world_angle, _overlap = self.geometry.get_angles_and_overlap(new_tracklet.roi, cam_id, self.config.seam.reject)
-        new_tracklet = replace(new_tracklet, annotation=PanoramicAnnotation(local_angle, world_angle, _overlap))
+        new_tracklet = replace(new_tracklet, annotation=Annotation(local_angle, world_angle, _overlap))
 
         # Filter out tracklets too close to the FOV edge
         if self.geometry.angle_in_edge(local_angle, self.config.seam.reject):
             return
 
         # Existing observation — refresh in place
-        if self.tracklet_manager.get_world_id(cam_id, ext_id) is not None:
-            self.tracklet_manager.replace_tracklet(new_tracklet)
+        if self.store.get_world_id(cam_id, ext_id) is not None:
+            self.store.replace_tracklet(new_tracklet)
             return
 
         # Brand-new observation
@@ -197,16 +162,16 @@ class PanoramicTracker(Thread, BaseTracker):
         if _overlap:
             candidate_world: int | None = self._find_world_candidate(new_tracklet)
             if candidate_world is not None:
-                self.tracklet_manager.add_tracklet(new_tracklet, world_id=candidate_world)
+                self.store.add_tracklet(new_tracklet, world_id=candidate_world)
                 return
-        self.tracklet_manager.add_tracklet(new_tracklet)
+        self.store.add_tracklet(new_tracklet)
 
     def _observations_match(self, a: Tracklet, b: Tracklet) -> bool:
         """True if two observations from different cameras are close enough in
         world angle and height to be considered the same person."""
         if a.cam_id == b.cam_id:
             return False
-        if not isinstance(a.annotation, PanoramicAnnotation) or not isinstance(b.annotation, PanoramicAnnotation):
+        if not isinstance(a.annotation, Annotation) or not isinstance(b.annotation, Annotation):
             return False
         if self.geometry.angle_diff(a.annotation.world_angle, b.annotation.world_angle) > self.geometry.fov_overlap * self.config.seam.reach:
             return False
@@ -218,7 +183,7 @@ class PanoramicTracker(Thread, BaseTracker):
         """Return the unique world id whose other-camera observation matches
         ``new_tracklet`` in angle and height; None if zero or multiple match."""
         candidate_worlds: set[int] = set()
-        for t in self.tracklet_manager.all_tracklets():
+        for t in self.store.all_tracklets():
             if not t.is_active:
                 continue
             if self._observations_match(new_tracklet, t):
@@ -227,46 +192,46 @@ class PanoramicTracker(Thread, BaseTracker):
 
     def _update_and_notify(self) -> None:
         # Expire timed-out observations
-        for t in self.tracklet_manager.all_tracklets():
+        for t in self.store.all_tracklets():
             if t.is_expired(self.config.timeout):
-                self.tracklet_manager.retire_tracklet(t.cam_id, t.external_id)
+                self.store.retire_tracklet(t.cam_id, t.external_id)
 
         # Late safety net: collapse worlds whose observations match each other
         # (handles ambiguous simultaneous arrivals that each got their own world).
         for keep_id, drop_id in self._find_world_collapse_pairs():
-            if self.tracklet_manager.merge_worlds(keep_id, drop_id):
+            if self.store.merge_worlds(keep_id, drop_id):
                 self._primary_for_world.pop(drop_id, None)
 
         # Emit one primary per world
         emitted: TrackletDict = {}
-        for world_id in self.tracklet_manager.all_world_ids():
+        for world_id in self.store.all_world_ids():
             primary: Tracklet | None = self._pick_primary(world_id)
             if primary is not None:
                 emitted[world_id] = primary
         self._notify_callback(emitted)
 
         # Drop REMOVED observations and prune stale primary entries
-        for t in self.tracklet_manager.all_tracklets():
+        for t in self.store.all_tracklets():
             if t.status == TrackingStatus.REMOVED:
-                self.tracklet_manager.remove_tracklet(t.cam_id, t.external_id)
-        live_worlds: set[int] = set(self.tracklet_manager.all_world_ids())
+                self.store.remove_tracklet(t.cam_id, t.external_id)
+        live_worlds: set[int] = set(self.store.all_world_ids())
         for world_id in list(self._primary_for_world):
             if world_id not in live_worlds:
                 del self._primary_for_world[world_id]
 
     def _pick_primary(self, world_id: int) -> Tracklet | None:
         """Sticky primary selection with hysteresis to avoid per-tick flicker."""
-        members: list[Tracklet] = self.tracklet_manager.get_tracklets(world_id)
+        members: list[Tracklet] = self.store.get_tracklets(world_id)
         if not members:
             return None
-        active: list[Tracklet] = [t for t in members if t.is_active and isinstance(t.annotation, PanoramicAnnotation)]
+        active: list[Tracklet] = [t for t in members if t.is_active and isinstance(t.annotation, Annotation)]
         if not active:
             chosen: Tracklet = max(members, key=lambda t: t.last_active)
             self._primary_for_world[world_id] = (chosen.cam_id, chosen.external_id)
             return chosen
 
         def edge(t: Tracklet) -> float:
-            assert isinstance(t.annotation, PanoramicAnnotation)
+            assert isinstance(t.annotation, Annotation)
             return self.geometry.angle_from_edge(t.annotation.local_angle)
 
         current_key: tuple[int, int] | None = self._primary_for_world.get(world_id)
@@ -290,9 +255,9 @@ class PanoramicTracker(Thread, BaseTracker):
         Each world id appears in at most one pair to avoid collapsing into a
         world that is itself about to be dropped."""
         observations: list[Tracklet] = [
-            t for t in self.tracklet_manager.all_tracklets()
+            t for t in self.store.all_tracklets()
             if t.is_active
-            and isinstance(t.annotation, PanoramicAnnotation)
+            and isinstance(t.annotation, Annotation)
             and self.geometry.angle_in_overlap(t.annotation.local_angle, self.config.seam.reach - 1.0)
         ]
 
@@ -306,8 +271,8 @@ class PanoramicTracker(Thread, BaseTracker):
             if not self._observations_match(a, b):
                 continue
             # Older world wins
-            members_a: list[Tracklet] = self.tracklet_manager.get_tracklets(a.id)
-            members_b: list[Tracklet] = self.tracklet_manager.get_tracklets(b.id)
+            members_a: list[Tracklet] = self.store.get_tracklets(a.id)
+            members_b: list[Tracklet] = self.store.get_tracklets(b.id)
             oldest_a: float = min(t.created_at for t in members_a) if members_a else float('inf')
             oldest_b: float = min(t.created_at for t in members_b) if members_b else float('inf')
             keep_id, drop_id = (a.id, b.id) if oldest_a <= oldest_b else (b.id, a.id)

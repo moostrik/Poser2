@@ -144,8 +144,8 @@
       },
       "distortion": {
         "algorithm": "NONE",
-        "k1": 0.0,
-        "k2": 0.0
+        "tanh": { "slope": 0.0, "cubic": 0.0 },
+        "poly": { "k1": 0.0, "k2": 0.0 }
       }
     },
     "frame_sync": {},

@@ -11,15 +11,17 @@ class DistortAlgorithm(IntEnum):
     POLY = 2   # polynomial: x + k1*(x-0.5) + k2*(x-0.5)^3
 
 
-class PanoramicGeometry:
+class Geometry:
     def __init__(self, num_cameras: int, cam_fov: float, target_fov: float) -> None:
         self.num_cameras: int = num_cameras
         self.cam_fov: float = cam_fov
         self.target_fov: float = target_fov
         self.fov_overlap: float = (self.cam_fov - self.target_fov) / 2.0
 
-        self.k1: float = 0.0
-        self.k2: float = 0.0
+        self._tanh_slope: float = 0.0
+        self._tanh_cubic: float = 0.0
+        self._poly_k1: float = 0.0
+        self._poly_k2: float = 0.0
         self.algorithm: DistortAlgorithm = DistortAlgorithm.NONE
 
     def get_angles_and_overlap(self, roi: Rect, cam_id: int, expansion: float) -> tuple[float, float, bool]:
@@ -41,8 +43,6 @@ class PanoramicGeometry:
     def _calc_world_angle(self, local_angle: float, cam_id: int) -> float:
         world_angle: float = self.target_fov * cam_id + local_angle - self.fov_overlap
         world_angle = world_angle % 360.0  # Ensure the angle is within 0 to 360 degrees
-        if world_angle < 0:
-            world_angle += 360.0
         return world_angle
 
     def angle_in_overlap(self, local_angle: float, expansion: float = 0.0) -> bool:
@@ -73,21 +73,27 @@ class PanoramicGeometry:
         if self.algorithm == DistortAlgorithm.NONE:
             return x
         elif self.algorithm == DistortAlgorithm.TANH:
-            return 0.5 * (1.0 + np.tanh(self.k1 * (2*x - 1) + self.k2 * (2*x - 1)**3))
+            return 0.5 * (1.0 + np.tanh(self._tanh_slope * (2*x - 1) + self._tanh_cubic * (2*x - 1)**3))
         else:  # poly
             d = x - 0.5
-            return x + self.k1 * d + self.k2 * d**3
+            return x + self._poly_k1 * d + self._poly_k2 * d**3
 
     # SET
     def set_fov(self, cam_fov: float) -> None:
         self.cam_fov = cam_fov
         self.fov_overlap = (self.cam_fov - self.target_fov) / 2.0
 
-    def set_k1(self, k1: float) -> None:
-        self.k1 = k1
+    def set_tanh_slope(self, slope: float) -> None:
+        self._tanh_slope = slope
 
-    def set_k2(self, k2: float) -> None:
-        self.k2 = k2
+    def set_tanh_cubic(self, cubic: float) -> None:
+        self._tanh_cubic = cubic
+
+    def set_poly_k1(self, k1: float) -> None:
+        self._poly_k1 = k1
+
+    def set_poly_k2(self, k2: float) -> None:
+        self._poly_k2 = k2
 
     def set_algorithm(self, algorithm: DistortAlgorithm) -> None:
         self.algorithm = algorithm
