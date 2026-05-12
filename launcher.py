@@ -1,8 +1,9 @@
 import logging
 import os
+import time
 from argparse import ArgumentParser, Namespace
 from signal import signal, SIGINT
-from threading import Event
+from threading import Event, Thread
 
 import psutil
 
@@ -36,6 +37,14 @@ if __name__ == '__main__':
     app.start()
 
     shutdown_event = Event()
+    start_time = time.monotonic()
+
+    def _heartbeat() -> None:
+        while not shutdown_event.wait(60):
+            elapsed = int(time.monotonic() - start_time)
+            logging.info("Heartbeat — running for %d min %d s", elapsed // 60, elapsed % 60)
+
+    Thread(target=_heartbeat, daemon=True, name="heartbeat").start()
 
     def signal_handler_exit(sig, frame) -> None:
         logging.info("Received interrupt signal, shutting down...")
