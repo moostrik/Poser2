@@ -26,7 +26,7 @@ class AzimuthTrackerSettings(BaseSettings):
     simulate_rpm:         Field[float] = Field(0.0,   min=0.0, max=90.0,  step=0.1,  description="Motor speed used in simulate mode (RPM)")
     latency_ms:           Field[float] = Field(10.0,  min=0.0, max=100.0,  step=0.5,  description="Signal latency compensation (ms) — pre-advances phase on each fall", newline=True)
     phase_offset:         Field[float] = Field(0.0,   min=0.0, max=1.0,    step=0.001, description="Azimuth zero-point offset (0–1)")
-    low_speed_threshold:  Field[float] = Field(10.0,  min=1,   max=100.0,  step=0.1,  description="RPM below which motor is declared STOPPED (stall detection)", newline=True)
+    low_speed_threshold:  Field[float] = Field(1.0,   min=1,   max=100.0,  step=0.1,  description="RPM below which motor is declared STOPPED (stall detection)", newline=True)
     high_speed_threshold: Field[float] = Field(240.0, min=120, max=360.0,  step=1.0,  description="RPM above which motor mode switches to HIGH_SPEED")
     measured_rpm:         Field[float]     = Field(0.0,               min=0.0, max=2400.0, step=0.1,   access=Field.READ, description="Current measured RPM", newline=True)
     motor_mode:           Field[MotorMode] = Field(MotorMode.STOPPED,                                  access=Field.READ, description="Current motor speed regime")
@@ -48,7 +48,6 @@ class AzimuthTracker:
         self._fall_lock        = Lock()
         self._wakeup           = Event()
         self._running          = False
-        self._prev_simulate:   bool         = False
         self._sim_thread       = Thread(target=self._sim_loop, daemon=True, name="AzimuthSimulator")
 
     # ------------------------------------------------------------------
@@ -66,6 +65,7 @@ class AzimuthTracker:
         self._settings.unbind(AzimuthTrackerSettings.simulate,     self._on_sim_setting_changed)
         self._settings.unbind(AzimuthTrackerSettings.simulate_rpm, self._on_sim_setting_changed)
         self._wakeup.set()
+        self._sim_thread.join()
 
     # ------------------------------------------------------------------
     # Fall signal interface
@@ -90,7 +90,14 @@ class AzimuthTracker:
     # ------------------------------------------------------------------
 
     def _on_sim_setting_changed(self, _value) -> None:
-        """Callback: wakes the sim loop immediately on simulate/simulate_rpm change."""
+        """Callback: wakes the sim loop on simulate/simulate_rpm change.
+        Also clears fall history when simulate turns off so the first real
+        hardware fall gets a clean measurement.
+        """
+        if not self._settings.simulate:
+            with self._fall_lock:
+                self._last_fall_time  = None
+                self._measured_period = None
         self._wakeup.set()
 
     def _sim_loop(self) -> None:
@@ -108,7 +115,7 @@ class AzimuthTracker:
             rpm = self._settings.simulate_rpm if self._settings.simulate else 0.0
             if rpm <= 0.0:
                 last_fire = 0.0
-                self._wakeup.wait()
+                self._wakeup.wait(0.1)  # timeout guards against missed wakeup
                 continue
             remaining = last_fire + 60.0 / rpm - monotonic()
             if remaining > 0.0:
@@ -126,13 +133,6 @@ class AzimuthTracker:
         offset   = self._settings.phase_offset
         simulate = self._settings.simulate
 
-        # Flush sim state when transitioning back to real-hardware mode.
-        if self._prev_simulate and not simulate:
-            with self._fall_lock:
-                self._last_fall_time  = None
-                self._measured_period = None
-        self._prev_simulate = simulate
-
         low_speed_period = 60.0 / self._settings.low_speed_threshold
         latency_offset   = self._settings.latency_ms / 1000.0
         now              = monotonic()
@@ -143,7 +143,7 @@ class AzimuthTracker:
             # Stall check and reset are done under the same lock so a concurrent
             # fall arriving between snapshot and reset cannot be wiped.
             if last_fall_time is not None and measured_period is not None:
-                if now - last_fall_time + latency_offset > low_speed_period:
+                if now - last_fall_time > low_speed_period:
                     # No fall for longer than one low-speed revolution — motor has stalled.
                     self._last_fall_time  = None
                     self._measured_period = None
@@ -153,10 +153,10 @@ class AzimuthTracker:
         if last_fall_time is not None and measured_period is not None:
             # Sub-tick precision: elapsed uses now captured before the lock (error < lock hold time, ~μs).
             # latency_ms pre-advances phase to compensate for signal transmission delay.
-            elapsed = now - last_fall_time + latency_offset
+            elapsed = now - last_fall_time
             rpm     = 60.0 / measured_period
             raw     = elapsed / measured_period
-            azimuth = (min(raw, 1.0) + offset) % 1.0
+            azimuth = (min(raw, 1.0) + latency_offset / measured_period + offset) % 1.0
         else:
             rpm     = 0.0
             azimuth = 0.0
