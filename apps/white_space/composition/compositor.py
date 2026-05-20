@@ -83,9 +83,11 @@ class Compositor(Thread):
     # ------------------------------------------------------------------
 
     def start(self) -> None:
+        self._azimuth_tracker.start()
         super().start()
 
     def stop(self) -> None:
+        self._azimuth_tracker.stop()
         self._stop_event.set()
         if self.is_alive():
             self.join()
@@ -118,8 +120,8 @@ class Compositor(Thread):
             tracklets = dict(self._latest_tracklets)
 
         transport = self._transport.tick()
-        azimuth   = self._azimuth_tracker.tick(transport.dt)
-        transport = replace(transport, azimuth=azimuth)
+        azimuth, motor_mode = self._azimuth_tracker.tick()
+        transport = replace(transport, azimuth=azimuth, motor_mode=motor_mode)
 
         # Forward latest pose data to compositions that need it
         for comp_id, comp in self._compositions:

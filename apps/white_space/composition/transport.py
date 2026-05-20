@@ -1,21 +1,29 @@
 """Shared master clock injected into every Composition each tick."""
 
 from dataclasses import dataclass
+from enum import IntEnum, auto
 from time import time
 from typing import Protocol
 
 from modules.settings import Field
 
 
+class MotorMode(IntEnum):
+    STOPPED    = auto()  # motor not spinning; no fall signals
+    LOW_SPEED  = auto()  # azimuth tracking is meaningful
+    HIGH_SPEED = auto()  # spinning too fast; azimuth irrelevant, content switches
+
+
 @dataclass
 class Transport:
     """Immutable time snapshot passed to every Composition each tick."""
-    time:    float  # absolute wall-clock seconds (from time.time())
-    dt:      float  # seconds elapsed since the previous tick
-    bpm:     float  # current master tempo in beats per minute
-    phase:   float  # beat phase: 0.0 = beat start, approaching 1.0 = next beat
-    beat:    int    # monotonic beat counter (increments each time phase wraps)
-    azimuth: float = 0.0  # rotating light position (0.0–1.0, one revolution)
+    time:       float                          # absolute wall-clock seconds (from time.time())
+    dt:         float                          # seconds elapsed since the previous tick
+    bpm:        float                          # current master tempo in beats per minute
+    phase:      float                          # beat phase: 0.0 = beat start, approaching 1.0 = next beat
+    beat:       int                            # monotonic beat counter (increments each time phase wraps)
+    azimuth:    float     = 0.0               # rotating light position (0.0–1.0)
+    motor_mode: MotorMode = MotorMode.STOPPED    # speed regime
 
 
 class _TransportHost(Protocol):

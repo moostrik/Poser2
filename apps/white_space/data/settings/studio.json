@@ -2,7 +2,7 @@
   "num_players": 8,
   "num_cameras": 4,
   "input_fps": 30.0,
-  "render_fps": 52.0,
+  "render_fps": 157.0,
   "light_resolution": 3600,
   "fov": 120.5,
   "camera": {
@@ -364,10 +364,12 @@
     "threshold": 0.5,
     "target_rpm": 0.0,
     "azimuth": {
-      "simulate": false,
-      "simulation_rpm": 0.0,
-      "latency_ms": 0.0,
-      "phase_offset": 0.0
+      "simulate": true,
+      "simulate_rpm": 13.8,
+      "latency_ms": 10.0,
+      "phase_offset": 0.0,
+      "low_speed_threshold": 1.0,
+      "high_speed_threshold": 300.0
     },
     "pose_waves": {
       "fov_degrees": 110.0,
