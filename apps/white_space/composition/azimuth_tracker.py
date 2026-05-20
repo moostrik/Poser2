@@ -19,6 +19,7 @@ from modules.settings import BaseSettings, Field, Widget
 class AzimuthTrackerSettings(BaseSettings):
     simulate:       Field[bool]  = Field(False,                               description="Advance azimuth from rpm without hardware")
     simulation_rpm: Field[float] = Field(0.0, min=0.0, max=2400.0, step=0.1,  description="Motor speed used in simulate mode (RPM)")
+    latency_ms:     Field[float] = Field(0.0, min=0.0, max=200.0,  step=0.5,  description="Signal latency compensation (ms) — pre-advances phase on each fall")
     phase_offset:   Field[float] = Field(0.0, min=0.0, max=1.0,   step=0.001, description="Azimuth zero-point offset (0–1)", newline=True)
     azimuth:        Field[float] = Field(0.0, min=0.0, max=1.0,   step=0.001, access=Field.READ, widget=Widget.slider, description="Current light azimuth (0–1)")
 
@@ -42,7 +43,7 @@ class AzimuthTracker:
         if self._last_fall_time is not None:
             self._measured_period = now - self._last_fall_time
         self._last_fall_time  = now
-        self._time_since_fall = 0.0
+        self._time_since_fall = self._settings.latency_ms / 1000.0
 
     def tick(self, dt: float) -> float:
         """Advance internal state by dt seconds and return the current azimuth."""

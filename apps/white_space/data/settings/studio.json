@@ -2,7 +2,7 @@
   "num_players": 8,
   "num_cameras": 4,
   "input_fps": 30.0,
-  "render_fps": 110.0,
+  "render_fps": 52.0,
   "light_resolution": 3600,
   "fov": 120.5,
   "camera": {
@@ -363,6 +363,12 @@
     "hardness": 0.0,
     "threshold": 0.5,
     "target_rpm": 0.0,
+    "azimuth": {
+      "simulate": false,
+      "simulation_rpm": 0.0,
+      "latency_ms": 0.0,
+      "phase_offset": 0.0
+    },
     "pose_waves": {
       "fov_degrees": 110.0,
       "void_width": 0.05,
@@ -513,11 +519,6 @@
       "show_overlap": true,
       "show_centre": true,
       "white_markers": true
-    },
-    "azimuth_tracker": {
-      "rpm": 0.0,
-      "simulate": false,
-      "phase_offset": 0.0
     }
   },
   "render": {
