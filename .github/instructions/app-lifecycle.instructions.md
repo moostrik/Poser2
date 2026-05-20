@@ -1,6 +1,6 @@
 ---
 description: "Use when editing app composition, startup/shutdown flow, or app-level callback wiring."
-applyTo: "apps/*/main.py, apps/*/render.py, apps/*/settings.py"
+applyTo: "apps/**/*.py"
 ---
 # App Lifecycle Guidelines
 

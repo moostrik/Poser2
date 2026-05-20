@@ -17,7 +17,7 @@ from modules.oak import FrameType
 from .transport import TransportClock, Transport
 from .base import Composition
 from .output import CompositionOutput, COMP_DTYPE, CompositionOutputCallback
-from .azimuth_tracker import AzimuthTracker
+from .rotation_tracker import RotationTracker
 from .settings import CompositorSettings, CompositionId
 from .comps import PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, Calibration
 from .draw import blend_values
@@ -45,7 +45,7 @@ class Compositor(Thread):
         self._latest_frames:    dict[int, Frame]    = {}
 
         self._config          = config
-        self._azimuth_tracker = AzimuthTracker(config.azimuth)
+        self._rotation_tracker = RotationTracker(config.rotation)
         self.interval: float  = 1.0 / config.light_rate
         resolution: int      = config.light_resolution
         num_players: int     = config.max_poses
@@ -83,18 +83,18 @@ class Compositor(Thread):
     # ------------------------------------------------------------------
 
     def start(self) -> None:
-        self._azimuth_tracker.start()
+        self._rotation_tracker.start()
         super().start()
 
     def stop(self) -> None:
-        self._azimuth_tracker.stop()
+        self._rotation_tracker.stop()
         self._stop_event.set()
         if self.is_alive():
             self.join()
 
     def notify_fall(self) -> None:
         """Signal a revolution fall edge; forwarded to the azimuth tracker."""
-        self._azimuth_tracker.notify_fall()
+        self._rotation_tracker.notify_fall()
 
     def run(self) -> None:
         next_time: float = time()
@@ -120,7 +120,7 @@ class Compositor(Thread):
             tracklets = dict(self._latest_tracklets)
 
         transport = self._transport.tick()
-        azimuth, motor_mode = self._azimuth_tracker.tick()
+        azimuth, motor_mode = self._rotation_tracker.tick()
         transport = replace(transport, azimuth=azimuth, motor_mode=motor_mode)
 
         # Forward latest pose data to compositions that need it

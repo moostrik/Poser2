@@ -363,7 +363,7 @@
     "hardness": 0.0,
     "threshold": 0.5,
     "target_rpm": 0.0,
-    "azimuth": {
+    "rotation": {
       "simulate": true,
       "simulate_rpm": 13.8,
       "latency_ms": 10.0,

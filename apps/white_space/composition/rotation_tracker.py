@@ -1,4 +1,4 @@
-"""AzimuthTracker — derives the rotating light's azimuth from fall signals.
+"""RotationTracker — derives the rotating light's azimuth from fall signals.
 
 Real mode (simulate=False):
     Each "fall" signal marks one full revolution completing.  The period is
@@ -21,7 +21,7 @@ from modules.settings import BaseSettings, Field, Widget
 from .transport import MotorMode
 
 
-class AzimuthTrackerSettings(BaseSettings):
+class RotationTrackerSettings(BaseSettings):
     simulate:             Field[bool]  = Field(False,                                description="Advance azimuth using internal simulation thread")
     simulate_rpm:         Field[float] = Field(0.0,   min=0.0, max=90.0,  step=0.1,  description="Motor speed used in simulate mode (RPM)")
     latency_ms:           Field[float] = Field(10.0,  min=0.0, max=100.0,  step=0.5,  description="Signal latency compensation (ms) — pre-advances phase on each fall", newline=True)
@@ -33,7 +33,7 @@ class AzimuthTrackerSettings(BaseSettings):
     azimuth:              Field[float]     = Field(0.0,               min=0.0, max=1.0,    step=0.001, access=Field.READ, widget=Widget.slider, description="Current light azimuth (0–1)")
 
 
-class AzimuthTracker:
+class RotationTracker:
     """Tracks the rotating light's angular position (azimuth 0.0–1.0).
 
     Call start() / stop() to manage the internal simulation thread.
@@ -41,7 +41,7 @@ class AzimuthTracker:
     Call tick() once per compositor tick to advance and read azimuth.
     """
 
-    def __init__(self, settings: AzimuthTrackerSettings) -> None:
+    def __init__(self, settings: RotationTrackerSettings) -> None:
         self._settings         = settings
         self._measured_period: float | None = None
         self._last_fall_time:  float | None = None
@@ -56,14 +56,14 @@ class AzimuthTracker:
 
     def start(self) -> None:
         self._running = True
-        self._settings.bind(AzimuthTrackerSettings.simulate,     self._on_sim_setting_changed)
-        self._settings.bind(AzimuthTrackerSettings.simulate_rpm, self._on_sim_setting_changed)
+        self._settings.bind(RotationTrackerSettings.simulate,     self._on_sim_setting_changed)
+        self._settings.bind(RotationTrackerSettings.simulate_rpm, self._on_sim_setting_changed)
         self._sim_thread.start()
 
     def stop(self) -> None:
         self._running = False
-        self._settings.unbind(AzimuthTrackerSettings.simulate,     self._on_sim_setting_changed)
-        self._settings.unbind(AzimuthTrackerSettings.simulate_rpm, self._on_sim_setting_changed)
+        self._settings.unbind(RotationTrackerSettings.simulate,     self._on_sim_setting_changed)
+        self._settings.unbind(RotationTrackerSettings.simulate_rpm, self._on_sim_setting_changed)
         self._wakeup.set()
         self._sim_thread.join()
 

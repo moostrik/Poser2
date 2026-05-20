@@ -3,7 +3,7 @@ from modules.settings import BaseSettings, Field, Group
 from modules.settings.widget import Widget
 
 from .draw import BlendType
-from .azimuth_tracker import AzimuthTrackerSettings
+from .rotation_tracker import RotationTrackerSettings
 from .comps import (
     PoseWavesSettings, FillSettings, PulseSettings,
     ChaseSettings, LinesSettings, RandomSettings, HarmonicSettings,
@@ -47,7 +47,7 @@ class CompositorSettings(BaseSettings):
 
     fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV (shared from root)", newline=True)
 
-    azimuth:      Group[AzimuthTrackerSettings] = Group(AzimuthTrackerSettings)
+    rotation:     Group[RotationTrackerSettings] = Group(RotationTrackerSettings)
     pose_waves:   Group[PoseWavesSettings]   = Group(PoseWavesSettings)
     fill:         Group[FillSettings]         = Group(FillSettings)
     pulse:        Group[PulseSettings]        = Group(PulseSettings)
