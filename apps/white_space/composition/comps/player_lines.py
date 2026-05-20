@@ -43,8 +43,6 @@ class _PlayerState:
     active:    bool  = False
 
 
-
-
 class PlayerLines(Composition):
     """Draws a centre line + two flanking lines for each tracked player."""
 

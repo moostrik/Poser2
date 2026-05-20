@@ -19,7 +19,7 @@ from .base import Composition
 from .output import CompositionOutput, COMP_DTYPE, CompositionOutputCallback
 from .rotation_tracker import RotationTracker
 from .settings import CompositorSettings, CompositionId
-from .comps import PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, Calibration
+from .comps import PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, Calibration, PlayheadFlash
 from .draw import blend_values
 
 import logging
@@ -69,8 +69,9 @@ class Compositor(Thread):
             (CompositionId.lines,        Lines       (resolution, config.lines)),
             (CompositionId.random,       Random      (resolution, config.random)),
             (CompositionId.harmonic,     Harmonic    (resolution, config.harmonic)),
-            (CompositionId.player_lines, PlayerLines (resolution, config.player_lines)),
-            (CompositionId.calibration,  self._calibration),
+            (CompositionId.player_lines,  PlayerLines  (resolution, config.player_lines)),
+            (CompositionId.playhead_flash, PlayheadFlash(resolution, config.playhead_flash)),
+            (CompositionId.calibration,   self._calibration),
         ]
 
         self.fps_counter = FpsCounter()
@@ -93,7 +94,7 @@ class Compositor(Thread):
             self.join()
 
     def notify_fall(self) -> None:
-        """Signal a revolution fall edge; forwarded to the azimuth tracker."""
+        """Signal a revolution fall edge; forwarded to the rotation tracker."""
         self._rotation_tracker.notify_fall()
 
     def run(self) -> None:
@@ -120,8 +121,8 @@ class Compositor(Thread):
             tracklets = dict(self._latest_tracklets)
 
         transport = self._transport.tick()
-        azimuth, motor_mode = self._rotation_tracker.tick()
-        transport = replace(transport, azimuth=azimuth, motor_mode=motor_mode)
+        playhead, motor_mode = self._rotation_tracker.tick()
+        transport = replace(transport, playhead=playhead, motor_mode=motor_mode)
 
         # Forward latest pose data to compositions that need it
         for comp_id, comp in self._compositions:
@@ -164,6 +165,7 @@ class Compositor(Thread):
         output.light_0 = white
         output.light_1 = blue
         output.target_rpm = active_rpm
+        output.playhead = playhead
         self._notify_output(output)
         self.fps_counter.tick()
 

@@ -10,8 +10,8 @@ from modules.settings import Field
 
 class MotorMode(IntEnum):
     STOPPED    = auto()  # motor not spinning; no fall signals
-    LOW_SPEED  = auto()  # azimuth tracking is meaningful
-    HIGH_SPEED = auto()  # spinning too fast; azimuth irrelevant, content switches
+    LOW_SPEED  = auto()  # playhead tracking is meaningful
+    HIGH_SPEED = auto()  # spinning too fast; playhead irrelevant, content switches
 
 
 @dataclass
@@ -22,7 +22,7 @@ class Transport:
     bpm:        float                          # current master tempo in beats per minute
     phase:      float                          # beat phase: 0.0 = beat start, approaching 1.0 = next beat
     beat:       int                            # monotonic beat counter (increments each time phase wraps)
-    azimuth:    float     = 0.0               # rotating light position (0.0–1.0)
+    playhead:   float     = 0.0               # rotating light position (0.0–1.0)
     motor_mode: MotorMode = MotorMode.STOPPED    # speed regime
 
 

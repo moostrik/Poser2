@@ -1,11 +1,11 @@
-"""RotationTracker — derives the rotating light's azimuth from fall signals.
+"""RotationTracker — derives the rotating light's playhead from fall signals.
 
 Real mode (simulate=False):
     Each "fall" signal marks one full revolution completing.  The period is
-    measured as the wall-clock time between consecutive falls.  Azimuth is
+    measured as the wall-clock time between consecutive falls.  Playhead is
     computed with sub-tick precision directly from monotonic().  If no fall
     arrives within one low-speed revolution period, the motor is declared
-    STOPPED and azimuth resets to 0.
+    STOPPED and playhead resets to 0.
     External callers use notify_fall(); while simulate=True it is a no-op.
 
 Simulate mode (simulate=True):
@@ -22,23 +22,23 @@ from .transport import MotorMode
 
 
 class RotationTrackerSettings(BaseSettings):
-    simulate:             Field[bool]  = Field(False,                                description="Advance azimuth using internal simulation thread")
+    simulate:             Field[bool]  = Field(False,                                description="Advance playhead using internal simulation thread")
     simulate_rpm:         Field[float] = Field(0.0,   min=0.0, max=90.0,  step=0.1,  description="Motor speed used in simulate mode (RPM)")
     latency_ms:           Field[float] = Field(10.0,  min=0.0, max=100.0,  step=0.5,  description="Signal latency compensation (ms) — pre-advances phase on each fall", newline=True)
-    phase_offset:         Field[float] = Field(0.0,   min=0.0, max=1.0,    step=0.001, description="Azimuth zero-point offset (0–1)")
+    phase_offset:         Field[float] = Field(0.0,   min=0.0, max=1.0,    step=0.001, description="Playhead zero-point offset (0–1)")
     low_speed_threshold:  Field[float] = Field(1.0,   min=1,   max=100.0,  step=0.1,  description="RPM below which motor is declared STOPPED (stall detection)", newline=True)
     high_speed_threshold: Field[float] = Field(240.0, min=120, max=360.0,  step=1.0,  description="RPM above which motor mode switches to HIGH_SPEED")
     measured_rpm:         Field[float]     = Field(0.0,               min=0.0, max=2400.0, step=0.1,   access=Field.READ, description="Current measured RPM", newline=True)
     motor_mode:           Field[MotorMode] = Field(MotorMode.STOPPED,                                  access=Field.READ, description="Current motor speed regime")
-    azimuth:              Field[float]     = Field(0.0,               min=0.0, max=1.0,    step=0.001, access=Field.READ, widget=Widget.slider, description="Current light azimuth (0–1)")
+    playhead:             Field[float]     = Field(0.0,               min=0.0, max=1.0,    step=0.001, access=Field.READ, widget=Widget.slider, description="Current light playhead (0–1)")
 
 
 class RotationTracker:
-    """Tracks the rotating light's angular position (azimuth 0.0–1.0).
+    """Tracks the rotating light's angular position (playhead 0.0–1.0).
 
     Call start() / stop() to manage the internal simulation thread.
     Call notify_fall() from external hardware signals (OSC/UDP).
-    Call tick() once per compositor tick to advance and read azimuth.
+    Call tick() once per compositor tick to advance and read playhead.
     """
 
     def __init__(self, settings: RotationTrackerSettings) -> None:
@@ -48,7 +48,7 @@ class RotationTracker:
         self._fall_lock        = Lock()
         self._wakeup           = Event()
         self._running          = False
-        self._sim_thread       = Thread(target=self._sim_loop, daemon=True, name="AzimuthSimulator")
+        self._sim_thread       = Thread(target=self._sim_loop, daemon=True, name="RotationSimulator")
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -129,7 +129,7 @@ class RotationTracker:
     # ------------------------------------------------------------------
 
     def tick(self) -> tuple[float, MotorMode]:
-        """Return (azimuth, motor_mode) for the current moment."""
+        """Return (playhead, motor_mode) for the current moment."""
         offset   = self._settings.phase_offset
         simulate = self._settings.simulate
 
@@ -156,10 +156,10 @@ class RotationTracker:
             elapsed = now - last_fall_time
             rpm     = 60.0 / measured_period
             raw     = elapsed / measured_period
-            azimuth = (min(raw, 1.0) + latency_offset / measured_period + offset) % 1.0
+            playhead = (min(raw, 1.0) + latency_offset / measured_period + offset) % 1.0
         else:
-            rpm     = 0.0
-            azimuth = 0.0
+            rpm      = 0.0
+            playhead = 0.0
 
         if rpm == 0.0:
             motor_mode = MotorMode.STOPPED
@@ -170,5 +170,5 @@ class RotationTracker:
 
         self._settings.measured_rpm = rpm
         self._settings.motor_mode   = motor_mode
-        self._settings.azimuth      = azimuth
-        return azimuth, motor_mode
+        self._settings.playhead     = playhead
+        return playhead, motor_mode

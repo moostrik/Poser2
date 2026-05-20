@@ -8,7 +8,8 @@ from functools import partial
 from modules.utils import Broadcast
 from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder
 from modules.settings import presets, NiceServer
-from modules.inout import OscSound, OscReceiver
+from modules.inout import OscReceiver
+from .sound_osc import WhiteSpaceSoundOsc
 from modules.tracker import PanoramicTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
 from modules.inference import source, crop, pose, segmentation
@@ -55,7 +56,7 @@ class WhiteSpaceMain:
 
         # SESSION
         self.session = Session(self.settings.session.core)
-        self.sound_osc = OscSound(self.settings.inout.osc_sound)
+        self.sound_osc = WhiteSpaceSoundOsc(self.settings.inout.osc_sound)
         self.sequencer = Sequencer(self.settings.session.sequencer)
         self.sequencer.add_state_callback(self.board.set_sequence)
         self.sequencer.add_state_callback(self.sound_osc.set_sequencer_state)
@@ -134,6 +135,7 @@ class WhiteSpaceMain:
         for camera in self.cameras:
             camera.add_frame_callback(self.compositor.set_image)
         self.compositor.add_output_callback(self.osc_light.send_message)
+        self.compositor.add_output_callback(self.sound_osc.set_composition)
         self.compositor.add_output_callback(self.board.set_composition_output)
 
         # POSE STAGE RAW

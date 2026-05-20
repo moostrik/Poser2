@@ -170,10 +170,10 @@ class OscSound:
         msg_builder.add_arg(0, OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(msg_builder.build()) # type: ignore
 
-        # Reset position to 0
-        position_msg = OscMessageBuilder(address=f"/pose/{id}/position")
-        position_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(position_msg.build()) # type: ignore
+        # Reset azimuth to 0
+        azimuth_msg = OscMessageBuilder(address=f"/pose/{id}/azimuth")
+        azimuth_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(azimuth_msg.build()) # type: ignore
 
         # Reset time/motion to 0
         motion_msg = OscMessageBuilder(address=f"/pose/{id}/time/motion")

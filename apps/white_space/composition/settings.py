@@ -7,7 +7,7 @@ from .rotation_tracker import RotationTrackerSettings
 from .comps import (
     PoseWavesSettings, FillSettings, PulseSettings,
     ChaseSettings, LinesSettings, RandomSettings, HarmonicSettings,
-    PlayerLinesSettings, CalibrationSettings,
+    PlayerLinesSettings, CalibrationSettings, PlayheadFlashSettings,
 )
 
 
@@ -19,8 +19,9 @@ class CompositionId(IntEnum):
     lines        = auto()
     random       = auto()
     harmonic     = auto()
-    player_lines = auto()
-    calibration  = auto()
+    player_lines   = auto()
+    calibration    = auto()
+    playhead_flash = auto()
 
 
 class CompositorSettings(BaseSettings):
@@ -55,5 +56,6 @@ class CompositorSettings(BaseSettings):
     lines:        Group[LinesSettings]        = Group(LinesSettings)
     random:       Group[RandomSettings]       = Group(RandomSettings)
     harmonic:     Group[HarmonicSettings]     = Group(HarmonicSettings)
-    player_lines: Group[PlayerLinesSettings]    = Group(PlayerLinesSettings, share=[fov.as_('fov')])
-    calibration:  Group[CalibrationSettings]    = Group(CalibrationSettings, share=[fov.as_('fov')])
+    player_lines:   Group[PlayerLinesSettings]    = Group(PlayerLinesSettings,  share=[fov.as_('fov')])
+    calibration:    Group[CalibrationSettings]     = Group(CalibrationSettings,   share=[fov.as_('fov')])
+    playhead_flash: Group[PlayheadFlashSettings]   = Group(PlayheadFlashSettings)
