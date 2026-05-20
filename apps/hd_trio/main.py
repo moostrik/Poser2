@@ -244,6 +244,7 @@ class HDTrioMain:
         self.window_correlator.start()
 
         self.sound_osc.start()
+        self.session_osc.start()
         for artnet in self.artnet_controllers:
             artnet.start()
 
@@ -280,7 +281,7 @@ class HDTrioMain:
         for artnet in self.artnet_controllers:
             artnet.stop()
 
-        self.session_osc.server.shutdown()
+        self.session_osc.stop()
 
         self.pose_predictor.stop()
         self.segmentation_predictor.stop()
