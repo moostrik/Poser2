@@ -124,10 +124,10 @@ class WhiteSpaceMain:
             distortion=self.settings.camera.tracker.distortion,
         )
         self.osc_light    = OscLight(self.settings.inout.osc_light)
-        # self.osc_receiver = OscReceiver(self.settings.inout.osc_receiver)
-        # self.udp_receiver = UdpReceiver(self.settings.inout.udp_receiver)
-        # self.osc_receiver.bind("/WS/sensor/fall", lambda *_: self._on_light_bang())
-        # self.udp_receiver.bind("/WS/sensor/fall", lambda *_: self._on_light_bang())
+        self.osc_receiver = OscReceiver(self.settings.inout.osc_receiver)
+        self.udp_receiver = UdpReceiver(self.settings.inout.udp_receiver)
+        self.osc_receiver.bind("/WS/sensor/fall", lambda *_: self.compositor.notify_fall())
+        self.udp_receiver.bind("/WS/sensor/fall", lambda *_: self.compositor.notify_fall())
         self.tracker.add_tracklet_callback(self.compositor.set_tracklets)
         ws_input: Stage = Stage(int(ps.ws_input_stage))
         self.stages[ws_input].add_callback(self.compositor.add_poses)
@@ -257,8 +257,8 @@ class WhiteSpaceMain:
         self.window_correlator.start()
         self.compositor.start()
         self.osc_light.start()
-        # self.osc_receiver.start()
-        # self.udp_receiver.start()
+        self.osc_receiver.start()
+        self.udp_receiver.start()
 
         self.sound_osc.start()
 
@@ -268,9 +268,6 @@ class WhiteSpaceMain:
 
         self.is_running = True
         self.render.start()
-
-    def _on_light_bang(self) -> None:
-        logger.info("Light bang received: azimuth 0")
 
     def _process_poses(self, poses: FrameDict) -> None:
         images, prev_images = self.source_uploader.snapshot()
@@ -295,8 +292,8 @@ class WhiteSpaceMain:
         self.tracker.stop()
         self.sound_osc.stop()
         self.osc_light.stop()
-        # self.osc_receiver.stop()
-        # self.udp_receiver.stop()
+        self.osc_receiver.stop()
+        self.udp_receiver.stop()
         self.compositor.stop()
 
         self.pose_predictor.stop()

@@ -33,8 +33,9 @@ class Composition(ABC):
     """
 
     def __init__(self, resolution: int, settings: BaseSettings) -> None:
-        self.resolution: int      = resolution
+        self.resolution: int          = resolution
         self._settings:  BaseSettings = settings
+        self.target_rpm: float | None = None  # motor speed target — None means no opinion; 0.0 explicitly stops the motor
 
     @abstractmethod
     def render(self, transport: Transport, white: np.ndarray, blue: np.ndarray) -> None:

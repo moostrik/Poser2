@@ -1,5 +1,6 @@
 ﻿"""Compositor - threaded LED composition host running at a fixed rate."""
 
+from dataclasses import replace
 from threading import Event, Thread, Lock
 from time import time, sleep
 from typing import Callable
@@ -13,9 +14,10 @@ from modules.tracker.panoramic.settings import DistortionSettings
 from modules.pose.frame import Frame, FrameDict
 from modules.oak import FrameType
 
-from .transport import TransportClock
+from .transport import TransportClock, Transport
 from .base import Composition
 from .output import CompositionOutput, COMP_DTYPE, CompositionOutputCallback
+from .azimuth_tracker import AzimuthTracker
 from .settings import CompositorSettings, CompositionId
 from .comps import PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, Calibration
 from .draw import blend_values
@@ -42,8 +44,9 @@ class Compositor(Thread):
         self._latest_tracklets: dict[int, Tracklet] = {}
         self._latest_frames:    dict[int, Frame]    = {}
 
-        self._config   = config
-        self.interval: float = 1.0 / config.light_rate
+        self._config          = config
+        self._azimuth_tracker = AzimuthTracker(config.azimuth)
+        self.interval: float  = 1.0 / config.light_rate
         resolution: int      = config.light_resolution
         num_players: int     = config.max_poses
 
@@ -87,6 +90,10 @@ class Compositor(Thread):
         if self.is_alive():
             self.join()
 
+    def notify_fall(self) -> None:
+        """Signal a revolution fall edge; forwarded to the azimuth tracker."""
+        self._azimuth_tracker.notify_fall()
+
     def run(self) -> None:
         next_time: float = time()
         while not self._stop_event.is_set():
@@ -111,6 +118,8 @@ class Compositor(Thread):
             tracklets = dict(self._latest_tracklets)
 
         transport = self._transport.tick()
+        azimuth   = self._azimuth_tracker.tick(transport.dt)
+        transport = replace(transport, azimuth=azimuth)
 
         # Forward latest pose data to compositions that need it
         for comp_id, comp in self._compositions:
@@ -141,10 +150,18 @@ class Compositor(Thread):
         white = self._master_process(self._white)
         blue  = self._master_process(self._blue)
 
+        # Collect motor speed target: active compositions override the manual config value.
+        # None means "no opinion"; 0.0 is an explicit stop command.
+        active_rpm: float = self._config.target_rpm
+        for comp_id, comp in self._compositions:
+            if comp_id in active and comp.target_rpm is not None:
+                active_rpm = comp.target_rpm
+
         # Build output and dispatch
         output = CompositionOutput(self._config.light_resolution)
         output.light_0 = white
         output.light_1 = blue
+        output.target_rpm = active_rpm
         self._notify_output(output)
         self.fps_counter.tick()
 

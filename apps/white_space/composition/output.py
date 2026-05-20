@@ -8,7 +8,8 @@ COMP_DTYPE = np.float32
 @dataclass
 class CompositionOutput:
     """LED strip output — white and blue channels sent to the installation over UDP."""
-    resolution: int
+    resolution:  int
+    target_rpm: float = 0.0
     light_img: np.ndarray = field(init=False)
 
     def __post_init__(self) -> None:

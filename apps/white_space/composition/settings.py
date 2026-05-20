@@ -3,6 +3,7 @@ from modules.settings import BaseSettings, Field, Group
 from modules.settings.widget import Widget
 
 from .draw import BlendType
+from .azimuth_tracker import AzimuthTrackerSettings
 from .comps import (
     PoseWavesSettings, FillSettings, PulseSettings,
     ChaseSettings, LinesSettings, RandomSettings, HarmonicSettings,
@@ -42,8 +43,11 @@ class CompositorSettings(BaseSettings):
     hardness:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Contrast hardness (0=off, 1=hard step)")
     threshold: Field[float] = Field(0.5, min=0.0, max=1.0, step=0.01, description="Hardness pivot point")
 
+    target_rpm: Field[float] = Field(0.0, min=0.0, max=2400.0, step=1.0, description="Motor speed target (RPM); overridden by active composition", newline=True)
+
     fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV (shared from root)", newline=True)
 
+    azimuth:      Group[AzimuthTrackerSettings] = Group(AzimuthTrackerSettings)
     pose_waves:   Group[PoseWavesSettings]   = Group(PoseWavesSettings)
     fill:         Group[FillSettings]         = Group(FillSettings)
     pulse:        Group[PulseSettings]        = Group(PulseSettings)
@@ -51,5 +55,5 @@ class CompositorSettings(BaseSettings):
     lines:        Group[LinesSettings]        = Group(LinesSettings)
     random:       Group[RandomSettings]       = Group(RandomSettings)
     harmonic:     Group[HarmonicSettings]     = Group(HarmonicSettings)
-    player_lines: Group[PlayerLinesSettings]  = Group(PlayerLinesSettings, share=[fov.as_('fov')])
-    calibration:  Group[CalibrationSettings]  = Group(CalibrationSettings, share=[fov.as_('fov')])
+    player_lines: Group[PlayerLinesSettings]    = Group(PlayerLinesSettings, share=[fov.as_('fov')])
+    calibration:  Group[CalibrationSettings]    = Group(CalibrationSettings, share=[fov.as_('fov')])

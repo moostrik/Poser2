@@ -114,12 +114,12 @@ class _OscSoundSettings(OscSoundSettings):
 
 
 class InOutGroup(BaseSettings):
-    num_players:  Field[int] = Field(8,   access=Field.INIT, visible=False)
-    resolution:   Field[int] = Field(3600, access=Field.INIT, visible=False)
-    osc_light   : Group[OscLightSettings]    = Group(OscLightSettings, share=[resolution])
-    osc_sound   : Group[_OscSoundSettings]   = Group(_OscSoundSettings, share=[num_players.as_('max_players')])
-    osc_receiver: Group[OscReceiverSettings] = Group(OscReceiverSettings)
-    udp_receiver: Group[UdpReceiverSettings] = Group(UdpReceiverSettings)
+    num_players:     Field[int] = Field(8,   access=Field.INIT, visible=False)
+    resolution:      Field[int] = Field(3600, access=Field.INIT, visible=False)
+    osc_light      : Group[OscLightSettings]       = Group(OscLightSettings, share=[resolution])
+    osc_sound      : Group[_OscSoundSettings]      = Group(_OscSoundSettings, share=[num_players.as_('max_players')])
+    osc_receiver   : Group[OscReceiverSettings]    = Group(OscReceiverSettings)
+    udp_receiver   : Group[UdpReceiverSettings]    = Group(UdpReceiverSettings)
 
 
 # ---------------------------------------------------------------------------

@@ -34,7 +34,6 @@ class OscLightSettings(BaseSettings):
     mtu:          Field[int]  = Field(1500, min=576, max=9000,  access=Field.INIT, description="Network MTU (affects chunk size)")
     chunk_size:    Field[int]  = Field(0,    access=Field.READ,  description="Computed chunk size (bytes)")
     num_chunks:   Field[int]  = Field(0,    access=Field.READ,  description="Computed number of chunks")
-    rpm:          Field[int]   = Field(0,   min=0,   max=2400, description="LED rotation speed (RPM)")
     phase:        Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.001, description="Circular phase shift of the LED ring (0–1 normalised)")
     offsets:      Group[OscLightOffsetSettings] = Group(OscLightOffsetSettings)
 
@@ -170,7 +169,7 @@ class OscLight:
                 message_list.append(off_msgb.build())
 
             rpm_msgb = OscMessageBuilder("/WS/r/0")
-            rpm_msgb.add_arg(settings.rpm)
+            rpm_msgb.add_arg(int(output.target_rpm))
             message_list.append(rpm_msgb.build())
 
             if settings.use_signed:

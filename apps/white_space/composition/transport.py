@@ -10,11 +10,12 @@ from modules.settings import Field
 @dataclass
 class Transport:
     """Immutable time snapshot passed to every Composition each tick."""
-    time:  float  # absolute wall-clock seconds (from time.time())
-    dt:    float  # seconds elapsed since the previous tick
-    bpm:   float  # current master tempo in beats per minute
-    phase: float  # beat phase: 0.0 = beat start, approaching 1.0 = next beat
-    beat:  int    # monotonic beat counter (increments each time phase wraps)
+    time:    float  # absolute wall-clock seconds (from time.time())
+    dt:      float  # seconds elapsed since the previous tick
+    bpm:     float  # current master tempo in beats per minute
+    phase:   float  # beat phase: 0.0 = beat start, approaching 1.0 = next beat
+    beat:    int    # monotonic beat counter (increments each time phase wraps)
+    azimuth: float = 0.0  # rotating light position (0.0–1.0, one revolution)
 
 
 class _TransportHost(Protocol):

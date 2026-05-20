@@ -164,7 +164,6 @@
       "port": 6454,
       "use_signed": false,
       "mtu": 1500,
-      "rpm": 0,
       "phase": 0.229,
       "offsets": {
         "white_0": 0,
@@ -363,6 +362,7 @@
     "master": 1.0,
     "hardness": 0.0,
     "threshold": 0.5,
+    "target_rpm": 0.0,
     "pose_waves": {
       "fov_degrees": 110.0,
       "void_width": 0.05,
@@ -513,6 +513,11 @@
       "show_overlap": true,
       "show_centre": true,
       "white_markers": true
+    },
+    "azimuth_tracker": {
+      "rpm": 0.0,
+      "simulate": false,
+      "phase_offset": 0.0
     }
   },
   "render": {
