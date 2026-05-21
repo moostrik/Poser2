@@ -26,7 +26,9 @@ from ..transport import Transport, MotorMode
 class PlayheadFlashSettings(BaseSettings):
     base_white:   Field[float] = Field(0.1,  min=0.0,  max=1.0,  step=0.01, description="Base brightness for white channel (first half of strip)")
     base_blue:    Field[float] = Field(0.1,  min=0.0,  max=1.0,  step=0.01, description="Base brightness for blue channel (full strip)")
-    fadeout_time: Field[float] = Field(0.5,  min=0.01, max=10.0, step=0.01, description="Fade-out duration (seconds)")
+    flash_white:  Field[float] = Field(1.0,  min=0.0,  max=1.0,  step=0.01, description="Flash intensity for white channel", newline=True)
+    flash_blue:   Field[float] = Field(1.0,  min=0.0,  max=1.0,  step=0.01, description="Flash intensity for blue channel")
+    fadeout_time: Field[float] = Field(0.5,  min=0.01, max=10.0, step=0.01, description="Fade-out duration (seconds)", newline=True)
 
 
 def _sweep_contains(prev: float, curr: float, pos: float) -> bool:
@@ -98,9 +100,9 @@ class PlayheadFlash(Composition):
         if elapsed >= fadeout_time:
             return
 
-        level = float(np.clip(1.0 - elapsed / fadeout_time, 0.0, 1.0))
-        white[:half] += level
-        blue[:]      += level
+        level_w = float(np.clip(1.0 - elapsed / fadeout_time, 0.0, 1.0))
+        white[:half] += level_w * self._config.flash_white
+        blue[:]      += level_w * self._config.flash_blue
 
     def reset(self) -> None:
         self._flash_start   = float('-inf')

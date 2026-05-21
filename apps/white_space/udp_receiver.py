@@ -1,3 +1,4 @@
+import ctypes
 import socket
 from threading import Thread
 from time import time
@@ -11,9 +12,11 @@ logger = logging.getLogger(__name__)
 
 class UdpReceiverSettings(BaseSettings):
     port:         Field[int]   = Field(9001, min=1024, max=65535, widget=Widget.number_field, description="Incoming UDP port")
+    verbose:      Field[bool]  = Field(False,                                                 description="Log received messages")
     counter:      Field[int]   = Field(0,    min=0,    max=99999, access=Field.READ,          description="Message activity")
     last_address: Field[str]   = Field("",                        access=Field.READ,          description="Last received message")
     last_time:    Field[float] = Field(0.0,                       access=Field.READ,          description="Wall-clock time of last received message")
+    interval:     Field[float] = Field(0.0,                       access=Field.READ,          description="Interval between last two messages (s)")
 
 
 class UdpReceiver:
@@ -56,12 +59,19 @@ class UdpReceiver:
             self._thread = None
 
     def _run(self) -> None:
+        try:
+            handle = ctypes.windll.kernel32.GetCurrentThread()
+            ctypes.windll.kernel32.SetThreadPriority(handle, 15)  # THREAD_PRIORITY_TIME_CRITICAL
+        except Exception:
+            pass
+
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
             sock.bind(("0.0.0.0", self._config.port))
             sock.settimeout(0.5)
             logger.info(f"UdpReceiver: listening on port {self._config.port}")
 
+            prev_time: float = 0.0
             while self._running:
                 try:
                     data, _ = sock.recvfrom(4096)
@@ -69,13 +79,24 @@ class UdpReceiver:
                     continue
 
                 try:
-                    address = data.decode("utf-8").strip()
+                    address = data.split(b"\x00")[0].decode("utf-8").strip()
                 except UnicodeDecodeError:
+                    if self._config.verbose:
+                        logger.warning(f"UdpReceiver: non-UTF-8 data ({len(data)} bytes) from {_}")
                     continue
 
+                if self._config.verbose:
+                    bound = address in self._bindings
+                    logger.info(f"UdpReceiver: '{address}'"
+                                + ("" if bound else " (no binding)"))
+
+                now = time()
                 self._config.counter      = (self._config.counter + 1) % 100000
                 self._config.last_address = address
-                self._config.last_time    = time()
+                if prev_time:
+                    self._config.interval = now - prev_time
+                self._config.last_time    = now
+                prev_time = now
                 for callback in self._bindings.get(address, []):
                     try:
                         callback()
