@@ -23,7 +23,7 @@ from .transport import MotorMode
 
 class RotationTrackerSettings(BaseSettings):
     simulate:             Field[bool]  = Field(False,                                description="Advance playhead using internal simulation thread")
-    simulate_rpm:         Field[float] = Field(0.0,   min=0.0, max=90.0,  step=0.1,  description="Motor speed used in simulate mode (RPM)")
+    simulate_rpm:         Field[float] = Field(0.0,   min=0.0, max=120.0,  step=0.1,  description="Motor speed used in simulate mode (RPM)")
     latency_ms:           Field[float] = Field(10.0,  min=0.0, max=100.0,  step=0.5,  description="Signal latency compensation (ms) — pre-advances phase on each fall", newline=True)
     phase_offset:         Field[float] = Field(0.0,   min=0.0, max=1.0,    step=0.001, description="Playhead zero-point offset (0–1)")
     low_speed_threshold:  Field[float] = Field(1.0,   min=1,   max=100.0,  step=0.1,  description="RPM below which motor is declared STOPPED (stall detection)", newline=True)

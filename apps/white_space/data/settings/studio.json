@@ -4,7 +4,7 @@
   "input_fps": 30.0,
   "render_fps": 60.0,
   "light_resolution": 3600,
-  "fov": 120.5,
+  "fov": 120.0,
   "camera": {
     "yolo": true,
     "color": false,
@@ -30,7 +30,7 @@
       "color_denoise": 0,
       "color_sharpness": 0,
       "mono_exposure": 29992,
-      "mono_iso": 1132,
+      "mono_iso": 1029,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.8,
@@ -57,7 +57,7 @@
       "color_denoise": 0,
       "color_sharpness": 0,
       "mono_exposure": 29992,
-      "mono_iso": 515,
+      "mono_iso": 476,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.8,
@@ -84,7 +84,7 @@
       "color_denoise": 0,
       "color_sharpness": 0,
       "mono_exposure": 29992,
-      "mono_iso": 449,
+      "mono_iso": 823,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.8,
@@ -111,7 +111,7 @@
       "color_denoise": 0,
       "color_sharpness": 0,
       "mono_exposure": 29992,
-      "mono_iso": 614,
+      "mono_iso": 487,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.8,
@@ -164,7 +164,7 @@
       "port": 6454,
       "use_signed": false,
       "mtu": 1500,
-      "phase": 0.292,
+      "phase": 0.0,
       "offsets": {
         "white_0": 0,
         "white_1": 0,
@@ -357,20 +357,20 @@
   "composition": {
     "bpm": 20.0,
     "active": [
-      "playhead_flash"
+      "lines"
     ],
     "blend": "ADD",
     "master": 1.0,
     "hardness": 0.0,
     "threshold": 0.5,
-    "target_rpm": 60.0,
+    "target_rpm": 3.0,
     "rotation": {
       "simulate": false,
-      "simulate_rpm": 60.0,
-      "latency_ms": 10.0,
-      "phase_offset": 0.0,
-      "low_speed_threshold": 1.0,
-      "high_speed_threshold": 300.0
+      "simulate_rpm": 120.0,
+      "latency_ms": 5.0,
+      "phase_offset": 0.271,
+      "low_speed_threshold": 3.0,
+      "high_speed_threshold": 200.0
     },
     "pose_waves": {
       "fov_degrees": 110.0,
@@ -435,9 +435,9 @@
     "lines": {
       "white": {
         "level": 1.0,
-        "speed": 0.94,
-        "phase": 0.0,
-        "width": 0.03,
+        "speed": 0.0,
+        "phase": 0.95,
+        "width": 0.69,
         "amount": 1
       },
       "blue": {
@@ -528,7 +528,7 @@
       "base_blue": 0.0,
       "flash_white": 1.0,
       "flash_blue": 0.0,
-      "fadeout_time": 0.26
+      "fadeout_time": 0.08
     }
   },
   "render": {
