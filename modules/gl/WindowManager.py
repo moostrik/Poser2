@@ -71,9 +71,8 @@ class WindowManager():
         self._actual_width: int = settings.width
         self._actual_height: int = settings.height
         self.windowed_fullscreen: bool = False
-        self.frame_interval: None | int = None
-        frame_interval_str = f"{self.frame_interval}ns" if self.frame_interval is not None else "None"
-        logger.info("Initialized with width=%s, height=%s, fullscreen=%s, v_sync=%s, fps=%s, frame_interval=%s", settings.width, settings.height, settings.fullscreen, settings.v_sync, settings.avg_fps, frame_interval_str)
+        self.frame_interval: int | None = None
+        logger.info("Initialized with width=%s, height=%s, fullscreen=%s, v_sync=%s, fps=%s", settings.width, settings.height, settings.fullscreen, settings.v_sync, settings.avg_fps)
         self.fps = FpsCounter()
         self.mouse_x: float = 0.0
         self.mouse_y: float = 0.0
@@ -96,15 +95,20 @@ class WindowManager():
         self._monitor_cb = None  # strong ref to monitor callback (prevents GC)
         self._quad_vaos: dict[int, int] = {}  # id(window) -> VAO (not shared between contexts)
 
-        # Reactive bindings: settings → window manager
+        # Reactive bindings: settings → window manager (stored for unbind on teardown)
         s = self.settings
-        s.bind(WindowSettings.fullscreen, lambda v: self.set_main_fullscreen(v))
-        s.bind(WindowSettings.monitor,    lambda v: self.set_monitor(v))
-        s.bind(WindowSettings.x,         lambda _: self.set_position(s.x, s.y))
-        s.bind(WindowSettings.y,         lambda _: self.set_position(s.x, s.y))
-        s.bind(WindowSettings.width,     lambda _: self.set_size(s.width, s.height))
-        s.bind(WindowSettings.height,    lambda _: self.set_size(s.width, s.height))
-        s.bind(WindowSettings.secondary_fullscreen, lambda v: self.set_secondary_fullscreen(v))
+        self._cb_fullscreen = lambda v: self.set_main_fullscreen(v)
+        self._cb_monitor    = lambda v: self.set_monitor(v)
+        self._cb_xy         = lambda _: self.set_position(s.x, s.y)
+        self._cb_size       = lambda _: self.set_size(s.width, s.height)
+        self._cb_sec_fs     = lambda v: self.set_secondary_fullscreen(v)
+        s.bind(WindowSettings.fullscreen, self._cb_fullscreen)
+        s.bind(WindowSettings.monitor,    self._cb_monitor)
+        s.bind(WindowSettings.x,         self._cb_xy)
+        s.bind(WindowSettings.y,         self._cb_xy)
+        s.bind(WindowSettings.width,     self._cb_size)
+        s.bind(WindowSettings.height,    self._cb_size)
+        s.bind(WindowSettings.secondary_fullscreen, self._cb_sec_fs)
 
         # FPS feedback: push measured FPS into the readonly settings
         def _push_fps(fps: int) -> None:
@@ -224,7 +228,7 @@ class WindowManager():
         glfw.focus_window(self.main_window)
 
         if self.settings.fullscreen:
-            self.set_main_windowed_fullscreen(True)
+            self.set_main_fullscreen(True)
 
     def _create_quad_vao(self) -> int:
         """Create VAO/VBO for fullscreen quad. Call once after context is current."""
@@ -260,41 +264,32 @@ class WindowManager():
         glBindVertexArray(self._quad_vaos[key])
 
     def _render_loop(self) -> None:
-        """Main rendering loop with improved frame timing"""
+        """Main rendering loop"""
         assert self.main_window is not None
         self._bind_quad_vao(self.main_window)  # Bind VAO before allocate (shaders may use draw_quad)
         self.renderer.allocate()
 
-        next_frame_time = time_ns()
+        next_frame_time: int = time_ns()
         while not glfw.window_should_close(self.main_window):
-
             self._update()
-
             self._draw_main_window()
             for logical_id, win in self._secondary_windows.items():
                 self._draw_secondary_window(logical_id, win)
             glfw.poll_events()
 
-            # Frame timing control
+            # Frame timing control (active when v_sync is off and frame_interval is set)
             if not self.settings.v_sync and self.frame_interval:
                 next_frame_time += self.frame_interval
                 now: int = time_ns()
                 remaining: int = next_frame_time - now
-
                 if remaining > 0:
-                    # Sleep for most of the remaining time
-                    sleep_seconds: float = (remaining - 500_000) / 1_000_000_000  # leave 0.5ms for busy-wait
+                    sleep_seconds: float = (remaining - 500_000) / 1_000_000_000
                     if sleep_seconds > 0.002:
                         sleep(sleep_seconds)
-                    # Busy-wait for the final bit
                     while time_ns() < next_frame_time:
                         pass
-                else:
-                    if -remaining > self.frame_interval:
-                        # If we're behind, reset next_frame_time to now to avoid spiral of death
-                        # print("Warning: Frame time exceeded by ", -remaining / 1_000_000, "ms")
-                        next_frame_time: int = now
-
+                elif -remaining > self.frame_interval:
+                    next_frame_time = time_ns()  # reset on spiral of death
 
         self.renderer.deallocate()
 
@@ -312,6 +307,12 @@ class WindowManager():
 
     def _cleanup(self) -> None:
         """Clean up resources"""
+        s = self.settings
+        s.unbind_all(self._cb_fullscreen)
+        s.unbind_all(self._cb_monitor)
+        s.unbind_all(self._cb_xy)
+        s.unbind_all(self._cb_size)
+        s.unbind_all(self._cb_sec_fs)
 
         try:
             glfw.set_monitor_callback(None)
@@ -465,12 +466,12 @@ class WindowManager():
         if not monitors:
             return []
 
-        primary = 0
-        others: list[glfw._GLFWmonitor] = monitors[1:]
+        primary_monitor = glfw.get_primary_monitor()
+        primary_idx: int = next((i for i, m in enumerate(monitors) if m == primary_monitor), 0)
 
-        # Pair each monitor index with its (x, y) position
+        # Pair each non-primary monitor index with its (x, y) position
         others_with_pos: list[tuple[int, int, int]] = [
-            (i + 1, *glfw.get_monitor_pos(monitor)) for i, monitor in enumerate(others)
+            (i, *glfw.get_monitor_pos(m)) for i, m in enumerate(monitors) if i != primary_idx
         ]
         # Sort by x, then by y (negative y before positive y)
         others_sorted: list[tuple[int, int, int]] = sorted(
@@ -478,7 +479,7 @@ class WindowManager():
             key=lambda item: (item[1], item[2])
         )
 
-        return [primary] + [idx for idx, _, _ in others_sorted]
+        return [primary_idx] + [idx for idx, _, _ in others_sorted]
 
     # CALLBACKS
     def _notify_key_callback(self, window, key, scancode, action, mods) -> None:
@@ -503,8 +504,10 @@ class WindowManager():
                 key_byte = b'\x1b'
 
             if key_byte:
+                mx = self.mouse_x * self._actual_width if window is self.main_window else 0.0
+                my = self.mouse_y * self._actual_height if window is self.main_window else 0.0
                 for c in self.key_callbacks:
-                    c(key_byte, self.mouse_x * self._actual_width, self.mouse_y * self._actual_height)
+                    c(key_byte, mx, my)
 
     def _notify_cursor_pos_callback(self, window, xpos, ypos) -> None:
         self.mouse_x = xpos / self._actual_width
@@ -580,8 +583,9 @@ class WindowManager():
             glfw.set_input_mode(self.main_window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
         else:
             # Restore windowed mode from settings (preserved during fullscreen)
+            mon_x, mon_y = glfw.get_monitor_pos(self.monitor) if self.monitor else (0, 0)
             glfw.set_window_monitor(
-                self.main_window, None, self.settings.x, self.settings.y,
+                self.main_window, None, mon_x + self.settings.x, mon_y + self.settings.y,
                 self.settings.width, self.settings.height, 0
             )
             glfw.set_input_mode(self.main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
@@ -608,9 +612,10 @@ class WindowManager():
         else:
             # Restore windowed mode from settings (preserved during fullscreen)
             logger.info("Restoring windowed mode")
+            mon_x, mon_y = glfw.get_monitor_pos(self.monitor) if self.monitor else (0, 0)
             glfw.set_window_attrib(self.main_window, glfw.DECORATED, glfw.TRUE)
             glfw.set_window_monitor(
-                self.main_window, None, self.settings.x, self.settings.y,
+                self.main_window, None, mon_x + self.settings.x, mon_y + self.settings.y,
                 self.settings.width, self.settings.height, 0
             )
 
