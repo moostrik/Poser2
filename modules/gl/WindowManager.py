@@ -88,10 +88,12 @@ class WindowManager():
         self.key_callbacks: set[Callable] = set()
         self.fps_callback: Optional[Callable[[int], None]] = None
 
-        # List of secondary windows sharing the main context
+        # Secondary windows sharing the main context: logical_id → window
 
         self.main_window: Optional[glfw._GLFWwindow] = None
-        self.secondary_windows: list[glfw._GLFWwindow] = []
+        self._secondary_windows: dict[int, glfw._GLFWwindow] = {}
+        self._secondary_fallback: set[int] = set()
+        self._monitor_cb = None  # strong ref to monitor callback (prevents GC)
         self._quad_vaos: dict[int, int] = {}  # id(window) -> VAO (not shared between contexts)
 
         # Reactive bindings: settings → window manager
@@ -154,9 +156,6 @@ class WindowManager():
 
         self._ordered_monitor_ids = self._get_monitors_sorted_by_position()
 
-        # Get primary monitor for fullscreen
-        self.monitor: Optional[glfw._GLFWmonitor] = glfw.get_primary_monitor() if self.settings.fullscreen else None
-
         # Create window
         self.main_window = glfw.create_window(
             self.settings.width, self.settings.height,
@@ -168,7 +167,7 @@ class WindowManager():
             raise Exception("Failed to create GLFW window")
 
         monitor_id = self.settings.monitor
-        if monitor_id > len(self._ordered_monitor_ids):
+        if monitor_id >= len(self._ordered_monitor_ids):
             monitor_id = len(self._ordered_monitor_ids) - 1
 
         monitors = glfw.get_monitors()
@@ -179,9 +178,6 @@ class WindowManager():
 
         self.monitor = monitors[self._ordered_monitor_ids[monitor_id]]
 
-        mode: glfw._GLFWvidmode = glfw.get_video_mode(self.monitor)
-        width: int = mode.size.width
-        height: int = mode.size.height
         posX, posY = glfw.get_monitor_pos(self.monitor)
         glfw.set_window_pos(self.main_window, posX + self.settings.x, posY + self.settings.y)
 
@@ -209,16 +205,21 @@ class WindowManager():
 
         logger.info("Setting up secondary monitors: %s", self.settings.secondary_list)
 
-        for id in self.settings.secondary_list:
-            if id < 0 or id >= len(self._ordered_monitor_ids):
-                logger.warning("%s ID: %s out of range for available monitors: %s", type(self).__name__, id, self._ordered_monitor_ids)
+        for slot_index, logical_id in enumerate(self.settings.secondary_list):
+            win: glfw._GLFWwindow | None = self._create_secondary_window(f'{logical_id}')
+            if not win:
                 continue
+            self._secondary_windows[logical_id] = win
+            if logical_id < len(self._ordered_monitor_ids):
+                physical_id: int = self._ordered_monitor_ids[logical_id]
+                self._setup_secondary_window(win, physical_id, self.settings.secondary_fullscreen)
+            else:
+                logger.info("Monitor slot %s not available at startup, placing in fallback", logical_id)
+                self._setup_secondary_window_fallback(win, slot_index)
+                self._secondary_fallback.add(logical_id)
 
-            monitor_id: int = self._ordered_monitor_ids[id]
-            name: str = f'{id}'
-            win: glfw._GLFWwindow | None = self._create_secondary_window(name, monitor_id)
-            if win:
-                self.secondary_windows.append(win)
+        self._monitor_cb = self._on_monitor_change
+        glfw.set_monitor_callback(self._monitor_cb)
 
         glfw.focus_window(self.main_window)
 
@@ -270,8 +271,8 @@ class WindowManager():
             self._update()
 
             self._draw_main_window()
-            for win in self.secondary_windows:
-                self._draw_secondary_window(win)
+            for logical_id, win in self._secondary_windows.items():
+                self._draw_secondary_window(logical_id, win)
             glfw.poll_events()
 
             # Frame timing control
@@ -298,8 +299,8 @@ class WindowManager():
         self.renderer.deallocate()
 
     def _update(self) -> None:
-        self.fps.tick()
         """Update renderer state. Called once per frame."""
+        self.fps.tick()
         if self.fps_callback:
             self.fps_callback(self.fps.get_fps())
         try:
@@ -313,6 +314,8 @@ class WindowManager():
         """Clean up resources"""
 
         try:
+            glfw.set_monitor_callback(None)
+            self._monitor_cb = None
             self._destroy_secondary_windows()
             if self.main_window:
                 glfw.destroy_window(self.main_window)
@@ -364,35 +367,29 @@ class WindowManager():
         glfw.swap_buffers(self.main_window)
 
     # SECONDARY WINDOWS
-    def _create_secondary_window(self, name:str, monitor_id: int) -> Optional[glfw._GLFWwindow]:
+    def _create_secondary_window(self, name: str) -> Optional[glfw._GLFWwindow]:
         if self.main_window is None:
             logger.error("Main window must be created before secondary windows")
             return None
-
-        monitors: list[glfw._GLFWmonitor] = glfw.get_monitors()
-        if monitor_id < 0 or monitor_id >= len(monitors):
-            logger.warning("Monitor ID %s is out of range for available monitors: %s", monitor_id, len(monitors))
-            return None
-
-        monitor: glfw._GLFWmonitor = monitors[monitor_id]
 
         win: Optional[glfw._GLFWwindow] = glfw.create_window(100, 100, name, None, self.main_window)
         if not win:
             logger.error("Failed to create secondary window")
             return None
 
-        self._setup_secondary_window(win, monitor_id, self.settings.secondary_fullscreen)
-
+        glfw.set_window_close_callback(win, self._secondary_close_callback)
+        glfw.set_key_callback(win, self._notify_key_callback)
         return win
 
     def _destroy_secondary_windows(self) -> None:
-        for win in self.secondary_windows:
+        for win in self._secondary_windows.values():
             glfw.destroy_window(win)
-        self.secondary_windows.clear()
+        self._secondary_windows.clear()
 
     def _setup_secondary_window(self, window: glfw._GLFWwindow, monitor_id: int, fullscreen: bool) -> None:
         """Setup a secondary window with the given monitor ID and fullscreen mode"""
-        monitor: Optional[glfw._GLFWmonitor] = glfw.get_monitors()[monitor_id] if monitor_id < len(glfw.get_monitors()) else None
+        monitors: list[glfw._GLFWmonitor] = glfw.get_monitors()
+        monitor: Optional[glfw._GLFWmonitor] = monitors[monitor_id] if monitor_id < len(monitors) else None
         if not monitor:
             logger.warning("Monitor %s not found", monitor_id)
             return
@@ -413,12 +410,43 @@ class WindowManager():
             glfw.set_window_pos(window, posX + 100, posY + 100)
             glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_NORMAL)
 
-    def _draw_secondary_window(self, window: glfw._GLFWwindow) -> None:
-        title: Optional[str] | None = glfw.get_window_title(window)
-        monitor_id: int = 0
-        if title:
-            monitor_id = int(title)
+    def _setup_secondary_window_fallback(self, window: glfw._GLFWwindow, slot_index: int) -> None:
+        """Place a secondary window as a small windowed window on the primary monitor."""
+        primary: glfw._GLFWmonitor = glfw.get_primary_monitor()
+        posX, posY = glfw.get_monitor_pos(primary)
+        fw, fh = 200, 200
+        step: int = fh + 40  # content height + ~30px title bar + 10px gap
+        glfw.set_window_attrib(window, glfw.DECORATED, glfw.TRUE)
+        glfw.set_window_size(window, fw, fh)
+        glfw.set_window_pos(window, posX + 40, posY + 40 + slot_index * step)
+        glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_NORMAL)
 
+    def _on_monitor_change(self, monitor: glfw._GLFWmonitor, event: int) -> None:
+        """GLFW monitor connect/disconnect callback. Fires on render thread during poll_events()."""
+        self._ordered_monitor_ids = self._get_monitors_sorted_by_position()
+        secondary_list = list(self.settings.secondary_list)
+
+        for logical_id, win in self._secondary_windows.items():
+            logical_monitor_id = MonitorId(logical_id)
+            slot_index: int = secondary_list.index(logical_monitor_id) if logical_monitor_id in secondary_list else 0
+            target_available: bool = logical_id < len(self._ordered_monitor_ids)
+
+            if target_available and logical_id in self._secondary_fallback:
+                physical_id: int = self._ordered_monitor_ids[logical_id]
+                logger.info("Monitor slot %s now available, moving secondary window to screen", logical_id)
+                self._setup_secondary_window(win, physical_id, self.settings.secondary_fullscreen)
+                self._secondary_fallback.discard(logical_id)
+            elif not target_available and logical_id not in self._secondary_fallback:
+                logger.info("Monitor slot %s lost, moving secondary window to fallback", logical_id)
+                self._setup_secondary_window_fallback(win, slot_index)
+                self._secondary_fallback.add(logical_id)
+
+    def _secondary_close_callback(self, window: glfw._GLFWwindow) -> None:
+        """Close the whole app when any secondary window is closed."""
+        glfw.set_window_should_close(self.main_window, True)
+        glfw.post_empty_event()
+
+    def _draw_secondary_window(self, logical_id: int, window: glfw._GLFWwindow) -> None:
         glfw.make_context_current(window)  # <-- Make this window's context current
         glfw.swap_interval(0)
         self._bind_quad_vao(window)
@@ -426,7 +454,7 @@ class WindowManager():
         glViewport(0, 0, width, height)  # Set viewport for this window
 
         try:
-            self.renderer.draw_secondary(monitor_id, width, height)
+            self.renderer.draw_secondary(logical_id, width, height)
         except Exception as e:
             logger.exception("Error in draw_secondary")
         glfw.swap_buffers(window)
@@ -539,8 +567,9 @@ class WindowManager():
         if value:
             self.set_main_windowed_fullscreen(False)
 
+            ordered_ids = self._ordered_monitor_ids
             monitors = glfw.get_monitors()
-            monitor_index = self._ordered_monitor_ids[self.settings.monitor] if self.settings.monitor < len(self._ordered_monitor_ids) else 0
+            monitor_index = ordered_ids[self.settings.monitor] if self.settings.monitor < len(ordered_ids) else 0
             monitor = monitors[monitor_index]
             mode = glfw.get_video_mode(monitor)
 
@@ -589,9 +618,10 @@ class WindowManager():
         """Move the main window to the given monitor (by sorted index)."""
         if not self.main_window:
             return
-        if monitor_id < 0 or monitor_id >= len(self._ordered_monitor_ids):
+        ordered_ids = self._ordered_monitor_ids
+        if monitor_id < 0 or monitor_id >= len(ordered_ids):
             return
-        real_id = self._ordered_monitor_ids[monitor_id]
+        real_id = ordered_ids[monitor_id]
         monitors = glfw.get_monitors()
         if real_id >= len(monitors):
             return
@@ -615,16 +645,11 @@ class WindowManager():
     def set_secondary_fullscreen(self, value: bool) -> None:
         """Set all secondary windows to fullscreen or windowed mode"""
 
-        for win in self.secondary_windows:
-            title: Optional[str] | None = glfw.get_window_title(win)
-            if title is None:
+        ordered_ids = self._ordered_monitor_ids
+        for logical_id, win in self._secondary_windows.items():
+            if logical_id in self._secondary_fallback:
                 continue
-            id = int(title)
-            monitor_id: int = self._ordered_monitor_ids[id] if id < len(self._ordered_monitor_ids) else 0
-            monitor: Optional[glfw._GLFWmonitor] = glfw.get_monitors()[monitor_id] if monitor_id < len(glfw.get_monitors()) else None
-            if not monitor:
+            if logical_id >= len(ordered_ids):
                 continue
-            if value:
-                self._setup_secondary_window(win, monitor_id, True)
-            else:
-                self._setup_secondary_window(win, monitor_id, False)
+            physical_id: int = ordered_ids[logical_id]
+            self._setup_secondary_window(win, physical_id, value)
