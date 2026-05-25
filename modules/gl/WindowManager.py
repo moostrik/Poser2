@@ -258,6 +258,7 @@ class WindowManager():
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * 4, ctypes.c_void_p(2 * 4))
 
         glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
         return vao, vbo
 
     def _bind_quad_vao(self, window: glfw._GLFWwindow) -> None:
@@ -363,6 +364,15 @@ class WindowManager():
         if not window:
             return
         if not self.settings.fullscreen and not self.windowed_fullscreen:
+            # Track which monitor the window is on as it's dragged across screens
+            win_w, win_h = glfw.get_window_size(window)
+            cx, cy = x + win_w // 2, y + win_h // 2
+            for m in glfw.get_monitors():
+                mx, my = glfw.get_monitor_pos(m)
+                mode = glfw.get_video_mode(m)
+                if mx <= cx < mx + mode.size.width and my <= cy < my + mode.size.height:
+                    self.monitor = m
+                    break
             mon_x, mon_y = glfw.get_monitor_pos(self.monitor) if self.monitor else (0, 0)
             self.settings.x = x - mon_x
             self.settings.y = y - mon_y
@@ -505,9 +515,9 @@ class WindowManager():
     def _notify_key_callback(self, window, key, scancode, action, mods) -> None:
         if action == glfw.PRESS or action == glfw.REPEAT:
             if key == glfw.KEY_ESCAPE:
-
                 glfw.set_window_should_close(self.main_window, True)
                 glfw.post_empty_event()  # Wake up the event loop
+                return
 
             elif key == glfw.KEY_F:
                 self.settings.fullscreen = not self.settings.fullscreen
@@ -610,7 +620,7 @@ class WindowManager():
             glfw.set_input_mode(self.main_window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
         else:
             if self.windowed_fullscreen:
-                return  # set_main_windowed_fullscreen is driving the transition
+                return  # windowed_fullscreen is active; real fullscreen is not applicable
             # Restore windowed mode from settings (preserved during fullscreen)
             mon_x, mon_y = glfw.get_monitor_pos(self.monitor) if self.monitor else (0, 0)
             glfw.set_window_monitor(
@@ -622,12 +632,11 @@ class WindowManager():
     def set_main_windowed_fullscreen(self, value: bool) -> None:
         if not self.main_window: return
         if self.windowed_fullscreen is value: return
+        if value and self.settings.fullscreen: return  # mutually exclusive with real fullscreen
 
         self.windowed_fullscreen = value
 
         if self.windowed_fullscreen:
-            self.settings.fullscreen = False  # exit regular fullscreen if active
-
             # Get monitor and video mode
             monitor = self.monitor or glfw.get_primary_monitor()
             mode = glfw.get_video_mode(monitor)
