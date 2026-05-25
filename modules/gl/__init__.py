@@ -2,7 +2,7 @@
 from .RenderBase import RenderBase
 from .Shader import Shader, draw_quad
 from .ComputeShader import ComputeShader
-from .WindowManager import WindowManager, WindowSettings, MonitorId
+from .WindowManager import WindowManager, WindowSettings, MonitorId, FullscreenMode
 from . import Style
 from . import shaders
 from .Utils import Blit, clear_color, FpsCounter

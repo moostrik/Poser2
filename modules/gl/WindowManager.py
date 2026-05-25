@@ -36,21 +36,27 @@ class MonitorId(IntEnum):
     M3 = 3
 
 
+class FullscreenMode(IntEnum):
+    """Mutually exclusive window display modes."""
+    WINDOWED            = 0
+    WINDOWED_FULLSCREEN = 1  # borderless, monitor resolution
+    FULLSCREEN          = 2  # exclusive fullscreen
+
+
 class WindowSettings(BaseSettings):
     """Window / init configuration — set once before RenderManager starts."""
     title: Field[str] =           Field("Poser", access=Field.INIT, visible=False)
     avg_fps: Field[int] =         Field(60, access=Field.READ, pinned=True, description="Average Camera FPS")
     min_fps: Field[int] =         Field(60, access=Field.READ, pinned=True, description="Minimum Camera FPS")
     v_sync: Field[bool] =         Field(True)
-    fullscreen: Field[bool] =     Field(False)
     monitor: Field[int] =         Field(0, newline=True)
     x: Field[int] =               Field(0)
     y: Field[int] =               Field(80)
     width: Field[int] =           Field(1920)
     height: Field[int] =          Field(1000)
     secondary_list: Field[list[MonitorId]] = Field([MonitorId.M0], widget=Widget.order, newline=True)
-    secondary_fullscreen: Field[bool] =  Field(True)
-    windowed_fullscreen: Field[bool] =   Field(False)
+    secondary_fullscreen: Field[bool] =       Field(True)
+    fullscreen_mode: Field[FullscreenMode] = Field(FullscreenMode.WINDOWED)
 
 
 class Button(Enum):
@@ -79,10 +85,10 @@ class WindowManager():
         self._actual_height: int = settings.height
         self._window_width: int = settings.width
         self._window_height: int = settings.height
-        self._windowed_fullscreen: bool = False
+        self._fullscreen_mode: FullscreenMode = FullscreenMode.WINDOWED
         self.frame_interval: int | None = None
         self._current_vsync: bool | None = None
-        logger.info("Initialized with width=%s, height=%s, fullscreen=%s, v_sync=%s, fps=%s", settings.width, settings.height, settings.fullscreen, settings.v_sync, settings.avg_fps)
+        logger.info("Initialized with width=%s, height=%s, fullscreen_mode=%s, v_sync=%s, fps=%s", settings.width, settings.height, settings.fullscreen_mode, settings.v_sync, settings.avg_fps)
         self._fps = FpsCounter()
         self._mouse_px: float = 0.0
         self._mouse_py: float = 0.0
@@ -110,25 +116,23 @@ class WindowManager():
 
         # Reactive bindings: settings → window manager (stored for unbind on teardown)
         s = self.settings
-        self._cb_fullscreen = lambda v: self._deferred.put(lambda: self.set_main_fullscreen(v))
+        self._cb_fm         = lambda v: self._deferred.put(lambda: self.set_fullscreen_mode(v))
         self._cb_monitor    = lambda v: self._deferred.put(lambda: self.set_monitor(v))
         self._cb_xy         = lambda _: self._deferred.put(lambda: self.set_position(s.x, s.y))
         self._cb_size       = lambda _: self._deferred.put(lambda: self.set_size(s.width, s.height))
         self._cb_sec_fs     = lambda v: self._deferred.put(lambda: self.set_secondary_fullscreen(v))
-        self._cb_wf         = lambda v: self._deferred.put(lambda: self.set_main_windowed_fullscreen(v))
-        s.bind(WindowSettings.fullscreen, self._cb_fullscreen)
+        s.bind(WindowSettings.fullscreen_mode, self._cb_fm)
         s.bind(WindowSettings.monitor,    self._cb_monitor)
         s.bind(WindowSettings.x,         self._cb_xy)
         s.bind(WindowSettings.y,         self._cb_xy)
         s.bind(WindowSettings.width,     self._cb_size)
         s.bind(WindowSettings.height,    self._cb_size)
         s.bind(WindowSettings.secondary_fullscreen, self._cb_sec_fs)
-        s.bind(WindowSettings.windowed_fullscreen,  self._cb_wf)
 
 
     @property
-    def windowed_fullscreen(self) -> bool:
-        return self._windowed_fullscreen
+    def fullscreen_mode(self) -> FullscreenMode:
+        return self._fullscreen_mode
 
     def start(self) -> None:
         """Start the rendering thread"""
@@ -241,10 +245,8 @@ class WindowManager():
 
         glfw.focus_window(self._main_window)
 
-        if self.settings.fullscreen:
-            self.set_main_fullscreen(True)
-        elif self.settings.windowed_fullscreen:
-            self.set_main_windowed_fullscreen(True)
+        if self.settings.fullscreen_mode != FullscreenMode.WINDOWED:
+            self.set_fullscreen_mode(self.settings.fullscreen_mode)
 
     def _create_quad_vao(self) -> tuple[int, int]:
         """Create VAO/VBO for fullscreen quad. Returns (vao, vbo). Call once after context is current."""
@@ -329,12 +331,11 @@ class WindowManager():
     def _cleanup(self) -> None:
         """Clean up resources"""
         s = self.settings
-        s.unbind_all(self._cb_fullscreen)
+        s.unbind_all(self._cb_fm)
         s.unbind_all(self._cb_monitor)
         s.unbind_all(self._cb_xy)
         s.unbind_all(self._cb_size)
         s.unbind_all(self._cb_sec_fs)
-        s.unbind_all(self._cb_wf)
 
         try:
             glfw.set_monitor_callback(None)
@@ -369,7 +370,7 @@ class WindowManager():
             return
         self._window_width = width
         self._window_height = height
-        if not self.settings.fullscreen and not self.windowed_fullscreen:
+        if self._fullscreen_mode == FullscreenMode.WINDOWED:
             self.settings.width = width
             self.settings.height = height
 
@@ -377,7 +378,7 @@ class WindowManager():
         """Window move — write back to settings (relative to current monitor)."""
         if not window:
             return
-        if not self.settings.fullscreen and not self.windowed_fullscreen:
+        if self._fullscreen_mode == FullscreenMode.WINDOWED:
             # Track which monitor the window is on as it's dragged across screens
             win_w, win_h = glfw.get_window_size(window)
             cx, cy = x + win_w // 2, y + win_h // 2
@@ -535,9 +536,11 @@ class WindowManager():
                 glfw.post_empty_event()
                 return
             elif key == glfw.KEY_F:
-                self.settings.fullscreen = not self.settings.fullscreen
+                mode = FullscreenMode.WINDOWED if self._fullscreen_mode == FullscreenMode.FULLSCREEN else FullscreenMode.FULLSCREEN
+                self.settings.fullscreen_mode = mode
             elif key == glfw.KEY_W:
-                self.settings.windowed_fullscreen = not self.settings.windowed_fullscreen
+                mode = FullscreenMode.WINDOWED if self._fullscreen_mode == FullscreenMode.WINDOWED_FULLSCREEN else FullscreenMode.WINDOWED_FULLSCREEN
+                self.settings.fullscreen_mode = mode
 
         with self._callback_lock:
             cbs = list(self._key_callbacks)
@@ -616,59 +619,35 @@ class WindowManager():
             # exit_callbacks are intentionally preserved — they must fire on both natural and programmatic stop
 
     # SETTERS
-    def set_main_fullscreen(self, value: bool) -> None:
+    def set_fullscreen_mode(self, mode: FullscreenMode) -> None:
         if not self._main_window: return
+        if self._fullscreen_mode is mode: return
 
-        if value:
-            self.set_main_windowed_fullscreen(False)
+        self._fullscreen_mode = mode
 
+        if mode == FullscreenMode.FULLSCREEN:
             ordered_ids = self._ordered_monitor_ids
             monitors = glfw.get_monitors()
             monitor_index = ordered_ids[self.settings.monitor] if self.settings.monitor < len(ordered_ids) else ordered_ids[0] if ordered_ids else 0
             monitor = monitors[monitor_index]
-            mode = glfw.get_video_mode(monitor)
-
+            video_mode = glfw.get_video_mode(monitor)
+            glfw.set_window_attrib(self._main_window, glfw.DECORATED, glfw.TRUE)
             glfw.set_window_monitor(
                 self._main_window, monitor, 0, 0,
-                mode.size.width, mode.size.height, mode.refresh_rate
+                video_mode.size.width, video_mode.size.height, video_mode.refresh_rate
             )
             glfw.set_input_mode(self._main_window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
-        else:
-            if self.windowed_fullscreen:
-                return  # windowed_fullscreen is active; real fullscreen is not applicable
-            if self.settings.windowed_fullscreen:
-                self.set_main_windowed_fullscreen(True)
-                return
-            # Restore windowed mode from settings (preserved during fullscreen)
-            mon_x, mon_y = glfw.get_monitor_pos(self._monitor) if self._monitor else (0, 0)
-            glfw.set_window_monitor(
-                self._main_window, None, mon_x + self.settings.x, mon_y + self.settings.y,
-                self.settings.width, self.settings.height, 0
-            )
-            glfw.set_input_mode(self._main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
-
-    def set_main_windowed_fullscreen(self, value: bool) -> None:
-        if not self._main_window: return
-        if self.windowed_fullscreen is value: return
-        if value and self.settings.fullscreen: return  # mutually exclusive with real fullscreen
-
-        self._windowed_fullscreen = value
-
-        if self.windowed_fullscreen:
-            # Get monitor and video mode
+        elif mode == FullscreenMode.WINDOWED_FULLSCREEN:
             monitor = self._monitor or glfw.get_primary_monitor()
-            mode = glfw.get_video_mode(monitor)
+            video_mode = glfw.get_video_mode(monitor)
             posX, posY = glfw.get_monitor_pos(monitor)
-
-            # Set windowed fullscreen (borderless, monitor resolution)
             glfw.set_window_attrib(self._main_window, glfw.DECORATED, glfw.FALSE)
             glfw.set_window_monitor(
                 self._main_window, None, posX, posY,
-                mode.size.width, mode.size.height, 0
+                video_mode.size.width, video_mode.size.height, 0
             )
             glfw.set_input_mode(self._main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
-        else:
-            # Restore windowed mode from settings (preserved during fullscreen)
+        else:  # WINDOWED
             logger.info("Restoring windowed mode")
             mon_x, mon_y = glfw.get_monitor_pos(self._monitor) if self._monitor else (0, 0)
             glfw.set_window_attrib(self._main_window, glfw.DECORATED, glfw.TRUE)
@@ -676,6 +655,7 @@ class WindowManager():
                 self._main_window, None, mon_x + self.settings.x, mon_y + self.settings.y,
                 self.settings.width, self.settings.height, 0
             )
+            glfw.set_input_mode(self._main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
 
     def set_monitor(self, monitor_id: int) -> None:
         """Move the main window to the given monitor (by sorted index)."""

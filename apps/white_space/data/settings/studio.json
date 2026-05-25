@@ -632,7 +632,6 @@
     "window": {
       "title": "Poser",
       "v_sync": true,
-      "fullscreen": false,
       "monitor": 0,
       "x": 0,
       "y": 0,

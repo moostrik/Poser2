@@ -1,7 +1,7 @@
 {
   "num_players": 3,
   "input_fps": 23.0,
-  "render_fps": 64.0,
+  "render_fps": 57.0,
   "camera": {
     "yolo": true,
     "color": true,
@@ -70,10 +70,10 @@
       "flip_h": false,
       "flip_v": true,
       "perspective": -0.22,
-      "color_exposure": 1000,
-      "color_iso": 100,
+      "color_exposure": 0,
+      "color_iso": 0,
       "color_auto_exposure": true,
-      "color_balance": 1000,
+      "color_balance": 0,
       "color_auto_balance": true,
       "color_brightness": 0,
       "color_contrast": 0,
@@ -117,10 +117,10 @@
   },
   "inout": {
     "osc_sound": {
+      "stage": "LERP",
       "max_players": 3,
       "ip_addresses": "127.0.0.1",
-      "port": 9000,
-      "stage": "LERP"
+      "port": 9000
     },
     "artnet_0": {
       "enabled": true,
@@ -201,7 +201,9 @@
       "output_height": 1024,
       "enable_prev_crop": false
     },
-    "angle_extractor": {},
+    "angle_extractor": {
+      "aspect_ratio": 0.75
+    },
     "bbox": {
       "smoother": {
         "min_cutoff": 0.01,
@@ -249,6 +251,7 @@
         "friction": 0.05
       },
       "sticky": {
+        "enabled": true,
         "init_to_zero": false,
         "hold_scores": true
       }
@@ -268,6 +271,7 @@
         "friction": 0.05
       },
       "sticky": {
+        "enabled": true,
         "init_to_zero": true,
         "hold_scores": false
       }
@@ -322,6 +326,7 @@
         "friction": 0.05
       },
       "sticky": {
+        "enabled": true,
         "init_to_zero": true,
         "hold_scores": false
       },
@@ -364,6 +369,12 @@
         "blend_mode": "ALPHA",
         "lut": {
           "folder": "data/luts",
+          "files": [
+            "Blockbuster.cube",
+            "Cityscape.cube",
+            "Frosted.cube",
+            "Vibrance.cube"
+          ],
           "file": "",
           "strength": 1.0
         }
@@ -371,9 +382,9 @@
     },
     "data": {
       "a": {
+        "stage": "SMOOTH",
         "mode": "WINDOW",
         "feature_field": "AngleMotion",
-        "stage": "SMOOTH",
         "line_width": 3.0,
         "line_smooth": 1.0,
         "use_scores": false,
@@ -381,9 +392,9 @@
         "use_history_color": false
       },
       "b": {
+        "stage": "SMOOTH",
         "mode": "WINDOW",
         "feature_field": "AngleMotion",
-        "stage": "SMOOTH",
         "line_width": 6.0,
         "line_smooth": 6.0,
         "use_scores": false,
@@ -406,7 +417,7 @@
     },
     "centre": {
       "geometry": {
-        "stage": "SMOOTH",
+        "stage": "LERP",
         "cam_aspect": 1.7778,
         "target_top_x": 0.5,
         "target_top_y": 0.33,
@@ -582,6 +593,36 @@
         "b": 0.0,
         "a": 1.0
       },
+      "player_3": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_4": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_5": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_6": {
+        "r": 1.0,
+        "g": 0.5,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_7": {
+        "r": 0.5,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
       "pose_left": {
         "r": 1.0,
         "g": 0.5,
@@ -610,18 +651,18 @@
     "window": {
       "title": "Poser",
       "v_sync": false,
-      "fullscreen": false,
       "monitor": 0,
       "x": 883,
       "y": 102,
-      "width": 1080,
-      "height": 1000,
+      "width": 1920,
+      "height": 1061,
       "secondary_list": [
         "M1",
         "M2",
         "M3"
       ],
-      "secondary_fullscreen": true
+      "secondary_fullscreen": true,
+      "fullscreen_mode": "WINDOWED_FULLSCREEN"
     }
   },
   "server": {
@@ -670,8 +711,8 @@
       "enabled": false
     },
     "pose": {
-      "enabled": false,
       "stage": "RAW",
+      "enabled": false,
       "features": [
         "BBox",
         "Points2D"

@@ -602,7 +602,6 @@
     "window": {
       "title": "Poser",
       "v_sync": false,
-      "fullscreen": false,
       "monitor": 0,
       "x": 273,
       "y": 48,
