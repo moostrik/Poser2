@@ -49,7 +49,7 @@ class WindowSettings(BaseSettings):
     avg_fps: Field[int] =         Field(60, access=Field.READ, pinned=True, description="Average Camera FPS")
     min_fps: Field[int] =         Field(60, access=Field.READ, pinned=True, description="Minimum Camera FPS")
     v_sync: Field[bool] =         Field(True)
-    monitor: Field[int] =         Field(0, newline=True)
+    monitor: Field[MonitorId] =   Field(MonitorId.M0, newline=True)
     x: Field[int] =               Field(0)
     y: Field[int] =               Field(80)
     width: Field[int] =           Field(1920)
@@ -75,9 +75,6 @@ class Button(Enum):
 
 class WindowManager():
     def __init__(self, renderer: RenderBase, settings: WindowSettings) -> None:
-        if not glfw.init():
-            raise Exception("Failed to initialize GLFW")
-
         self.renderer = renderer
         self.settings: WindowSettings = settings
 
@@ -171,6 +168,9 @@ class WindowManager():
 
     def _setup(self) -> None:
         """Setup GLFW window and callbacks"""
+        if not glfw.init():
+            raise RuntimeError("Failed to initialize GLFW")
+
         # Configure GLFW
         glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 4)
         glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 6)
@@ -201,7 +201,6 @@ class WindowManager():
 
         posX, posY = glfw.get_monitor_pos(self._monitor)
         glfw.set_window_pos(self._main_window, posX + self.settings.x, posY + self.settings.y)
-
 
         # Make context current
         glfw.make_context_current(self._main_window)
@@ -535,7 +534,8 @@ class WindowManager():
                 glfw.set_window_should_close(self._main_window, True)
                 glfw.post_empty_event()
                 return
-            elif key == glfw.KEY_F:
+        if action == glfw.PRESS:
+            if key == glfw.KEY_F:
                 mode = FullscreenMode.WINDOWED if self._fullscreen_mode == FullscreenMode.FULLSCREEN else FullscreenMode.FULLSCREEN
                 self.settings.fullscreen_mode = mode
             elif key == glfw.KEY_W:
@@ -621,7 +621,7 @@ class WindowManager():
     # SETTERS
     def set_fullscreen_mode(self, mode: FullscreenMode) -> None:
         if not self._main_window: return
-        if self._fullscreen_mode is mode: return
+        if self._fullscreen_mode == mode: return
 
         self._fullscreen_mode = mode
 
@@ -631,7 +631,6 @@ class WindowManager():
             monitor_index = ordered_ids[self.settings.monitor] if self.settings.monitor < len(ordered_ids) else ordered_ids[0] if ordered_ids else 0
             monitor = monitors[monitor_index]
             video_mode = glfw.get_video_mode(monitor)
-            glfw.set_window_attrib(self._main_window, glfw.DECORATED, glfw.TRUE)
             glfw.set_window_monitor(
                 self._main_window, monitor, 0, 0,
                 video_mode.size.width, video_mode.size.height, video_mode.refresh_rate

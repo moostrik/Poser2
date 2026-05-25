@@ -651,18 +651,18 @@
     "window": {
       "title": "Poser",
       "v_sync": false,
-      "monitor": 0,
-      "x": 883,
-      "y": 102,
-      "width": 1920,
-      "height": 1061,
+      "monitor": "M0",
+      "x": 500,
+      "y": 60,
+      "width": 1000,
+      "height": 926,
       "secondary_list": [
         "M1",
         "M2",
         "M3"
       ],
       "secondary_fullscreen": true,
-      "fullscreen_mode": "WINDOWED_FULLSCREEN"
+      "fullscreen_mode": "WINDOWED"
     }
   },
   "server": {
