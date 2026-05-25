@@ -3,6 +3,7 @@ from __future__ import annotations
 # Standard library imports
 import logging
 from enum import Enum, IntEnum
+from queue import SimpleQueue
 from threading import Thread, Lock, current_thread
 from time import sleep, time_ns
 from typing import Callable, Optional, TYPE_CHECKING
@@ -49,6 +50,7 @@ class WindowSettings(BaseSettings):
     height: Field[int] =          Field(1000)
     secondary_list: Field[list[MonitorId]] = Field([MonitorId.M0], widget=Widget.order, newline=True)
     secondary_fullscreen: Field[bool] =  Field(True)
+    windowed_fullscreen: Field[bool] =   Field(False)
 
 
 class Button(Enum):
@@ -59,6 +61,11 @@ class Button(Enum):
     MIDDLE_DOWN =   4
     RIGHT_UP =      5
     RIGHT_DOWN =    6
+    BACK_UP =       7
+    BACK_DOWN =     8
+    FORWARD_UP =    9
+    FORWARD_DOWN =  10
+
 
 class WindowManager():
     def __init__(self, renderer: RenderBase, settings: WindowSettings) -> None:
@@ -97,13 +104,18 @@ class WindowManager():
         self._monitor_cb = None  # strong ref to monitor callback (prevents GC)
         self._quad_buffers: dict[int, tuple[int, int]] = {}  # id(window) -> (vao, vbo)
 
+        # Deferred call queue: settings callbacks enqueue GLFW calls here;
+        # the render loop drains it on its own thread (GLFW requires render-thread calls).
+        self._deferred: SimpleQueue[Callable[[], None]] = SimpleQueue()
+
         # Reactive bindings: settings → window manager (stored for unbind on teardown)
         s = self.settings
-        self._cb_fullscreen = lambda v: self.set_main_fullscreen(v)
-        self._cb_monitor    = lambda v: self.set_monitor(v)
-        self._cb_xy         = lambda _: self.set_position(s.x, s.y)
-        self._cb_size       = lambda _: self.set_size(s.width, s.height)
-        self._cb_sec_fs     = lambda v: self.set_secondary_fullscreen(v)
+        self._cb_fullscreen = lambda v: self._deferred.put(lambda: self.set_main_fullscreen(v))
+        self._cb_monitor    = lambda v: self._deferred.put(lambda: self.set_monitor(v))
+        self._cb_xy         = lambda _: self._deferred.put(lambda: self.set_position(s.x, s.y))
+        self._cb_size       = lambda _: self._deferred.put(lambda: self.set_size(s.width, s.height))
+        self._cb_sec_fs     = lambda v: self._deferred.put(lambda: self.set_secondary_fullscreen(v))
+        self._cb_wf         = lambda v: self._deferred.put(lambda: self.set_main_windowed_fullscreen(v))
         s.bind(WindowSettings.fullscreen, self._cb_fullscreen)
         s.bind(WindowSettings.monitor,    self._cb_monitor)
         s.bind(WindowSettings.x,         self._cb_xy)
@@ -111,6 +123,7 @@ class WindowManager():
         s.bind(WindowSettings.width,     self._cb_size)
         s.bind(WindowSettings.height,    self._cb_size)
         s.bind(WindowSettings.secondary_fullscreen, self._cb_sec_fs)
+        s.bind(WindowSettings.windowed_fullscreen,  self._cb_wf)
 
 
     @property
@@ -230,6 +243,8 @@ class WindowManager():
 
         if self.settings.fullscreen:
             self.set_main_fullscreen(True)
+        elif self.settings.windowed_fullscreen:
+            self.set_main_windowed_fullscreen(True)
 
     def _create_quad_vao(self) -> tuple[int, int]:
         """Create VAO/VBO for fullscreen quad. Returns (vao, vbo). Call once after context is current."""
@@ -274,6 +289,8 @@ class WindowManager():
         next_frame_time: int = time_ns()
         try:
             while not glfw.window_should_close(self._main_window):
+                while not self._deferred.empty():
+                    self._deferred.get_nowait()()
                 self._update()
                 self._draw_main_window()
                 for logical_id, win in self._secondary_windows.items():
@@ -302,7 +319,7 @@ class WindowManager():
         self._push_fps(self._fps.get_fps())
         try:
             self.renderer.update()
-        except Exception as e:
+        except Exception:
             logger.exception("Error in update")
 
     def _push_fps(self, fps: int) -> None:
@@ -317,6 +334,7 @@ class WindowManager():
         s.unbind_all(self._cb_xy)
         s.unbind_all(self._cb_size)
         s.unbind_all(self._cb_sec_fs)
+        s.unbind_all(self._cb_wf)
 
         try:
             glfw.set_monitor_callback(None)
@@ -387,7 +405,7 @@ class WindowManager():
         glViewport(0, 0, self._actual_width, self._actual_height)  # Set viewport here
         try:
             self.renderer.draw_main(self._actual_width, self._actual_height)
-        except Exception as e:
+        except Exception:
             logger.exception("Error in draw")
 
         glfw.swap_buffers(self._main_window)
@@ -484,7 +502,7 @@ class WindowManager():
 
         try:
             self.renderer.draw_secondary(logical_id, width, height)
-        except Exception as e:
+        except Exception:
             logger.exception("Error in draw_secondary")
         glfw.swap_buffers(window)
 
@@ -519,7 +537,7 @@ class WindowManager():
             elif key == glfw.KEY_F:
                 self.settings.fullscreen = not self.settings.fullscreen
             elif key == glfw.KEY_W:
-                self.set_main_windowed_fullscreen(not self.windowed_fullscreen)
+                self.settings.windowed_fullscreen = not self.settings.windowed_fullscreen
 
         with self._callback_lock:
             cbs = list(self._key_callbacks)
@@ -552,6 +570,18 @@ class WindowManager():
                 button_enum = Button.RIGHT_DOWN
             elif action == glfw.RELEASE:
                 button_enum = Button.RIGHT_UP
+        elif button == glfw.MOUSE_BUTTON_4:
+            if action == glfw.PRESS:
+                button_enum = Button.BACK_DOWN
+            elif action == glfw.RELEASE:
+                button_enum = Button.BACK_UP
+        elif button == glfw.MOUSE_BUTTON_5:
+            if action == glfw.PRESS:
+                button_enum = Button.FORWARD_DOWN
+            elif action == glfw.RELEASE:
+                button_enum = Button.FORWARD_UP
+        else:
+            return
 
         with self._callback_lock:
             cbs = list(self._mouse_callbacks)
@@ -564,7 +594,7 @@ class WindowManager():
         for callback in cbs:
             try:
                 callback()
-            except Exception as e:
+            except Exception:
                 logger.exception("Error in exit callback")
 
     def add_mouse_callback(self, callback) -> None:
@@ -606,6 +636,9 @@ class WindowManager():
         else:
             if self.windowed_fullscreen:
                 return  # windowed_fullscreen is active; real fullscreen is not applicable
+            if self.settings.windowed_fullscreen:
+                self.set_main_windowed_fullscreen(True)
+                return
             # Restore windowed mode from settings (preserved during fullscreen)
             mon_x, mon_y = glfw.get_monitor_pos(self._monitor) if self._monitor else (0, 0)
             glfw.set_window_monitor(
@@ -633,6 +666,7 @@ class WindowManager():
                 self._main_window, None, posX, posY,
                 mode.size.width, mode.size.height, 0
             )
+            glfw.set_input_mode(self._main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
         else:
             # Restore windowed mode from settings (preserved during fullscreen)
             logger.info("Restoring windowed mode")
@@ -660,15 +694,17 @@ class WindowManager():
 
     def set_position(self, x: int, y: int) -> None:
         """Move the main window to (x, y) relative to current monitor."""
-        if not self._main_window:
-            return
+        if not self._main_window: return
         mon_x, mon_y = glfw.get_monitor_pos(self._monitor) if self._monitor else (0, 0)
-        glfw.set_window_pos(self._main_window, mon_x + x, mon_y + y)
+        tx, ty = mon_x + x, mon_y + y
+        cx, cy = glfw.get_window_pos(self._main_window)
+        if cx == tx and cy == ty: return
+        glfw.set_window_pos(self._main_window, tx, ty)
 
     def set_size(self, width: int, height: int) -> None:
         """Resize the main window."""
-        if not self._main_window:
-            return
+        if not self._main_window: return
+        if self._window_width == width and self._window_height == height: return
         glfw.set_window_size(self._main_window, width, height)
 
     def set_secondary_fullscreen(self, value: bool) -> None:
