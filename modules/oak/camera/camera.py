@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 class Camera(Thread):
     _id_counter = 0
     _pipeline: dai.Pipeline | None = None
+    _MAX_CONSECUTIVE_FAILURES: int = 3
 
     def __init__(self, core_settings: CameraSettings) -> None:
         super().__init__()
@@ -81,14 +82,21 @@ class Camera(Thread):
         self.stop_event.set()
 
     def run(self) -> None:
+        consecutive_failures: int = 0
         while not self.stop_event.is_set():
             try:
                 if not self._open():
                     return
+                consecutive_failures = 0
                 self.stop_event.wait()
                 self._close()
             except Exception:
                 logger.exception("Camera error")
+                consecutive_failures += 1
+                if consecutive_failures >= Camera._MAX_CONSECUTIVE_FAILURES:
+                    logger.error(f'Camera {self.device_id}: {consecutive_failures} consecutive failures, stopping')
+                    return
+                self.stop_event.wait(timeout=1.0)
 
     def _open(self) -> bool:
         device_list: list[str] = get_device_list(verbose=False)
