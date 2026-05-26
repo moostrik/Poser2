@@ -2,7 +2,7 @@ from __future__ import annotations
 
 # Standard library imports
 import logging
-from enum import Enum, IntEnum
+from enum import IntEnum
 from queue import SimpleQueue
 from threading import Thread, Lock, current_thread
 from time import sleep, time_ns
@@ -59,21 +59,23 @@ class WindowSettings(BaseSettings):
     fullscreen_mode: Field[FullscreenMode] = Field(FullscreenMode.WINDOWED)
 
 
-class Button(Enum):
-    NONE =          0
-    LEFT_UP =       1
-    LEFT_DOWN =     2
-    MIDDLE_UP =     3
-    MIDDLE_DOWN =   4
-    RIGHT_UP =      5
-    RIGHT_DOWN =    6
-    BACK_UP =       7
-    BACK_DOWN =     8
-    FORWARD_UP =    9
-    FORWARD_DOWN =  10
+class MouseButton(IntEnum):
+    LEFT    = 0
+    RIGHT   = 1
+    MIDDLE  = 2
+    BACK    = 3
+    FORWARD = 4
 
 
 class WindowManager():
+    _GLFW_BUTTON_MAP: dict[int, MouseButton] = {
+        glfw.MOUSE_BUTTON_LEFT:   MouseButton.LEFT,
+        glfw.MOUSE_BUTTON_RIGHT:  MouseButton.RIGHT,
+        glfw.MOUSE_BUTTON_MIDDLE: MouseButton.MIDDLE,
+        glfw.MOUSE_BUTTON_4:      MouseButton.BACK,
+        glfw.MOUSE_BUTTON_5:      MouseButton.FORWARD,
+    }
+
     def __init__(self, renderer: RenderBase, settings: WindowSettings) -> None:
         self.renderer = renderer
         self.settings: WindowSettings = settings
@@ -96,7 +98,8 @@ class WindowManager():
         self._render_thread: Thread | None = None
         self._callback_lock = Lock()
         self._exit_callbacks: set[Callable[[], None]] = set()
-        self._mouse_callbacks: set[Callable] = set()
+        self._mouse_move_callbacks: set[Callable[[float, float], None]] = set()
+        self._mouse_button_callbacks: set[Callable[[float, float, MouseButton, bool], None]] = set()
         self._key_callbacks: set[Callable] = set()
 
         # Secondary windows sharing the main context: logical_id → window
@@ -188,7 +191,7 @@ class WindowManager():
 
         if not self._main_window:
             glfw.terminate()
-            raise Exception("Failed to create GLFW window")
+            raise RuntimeError("Failed to create GLFW window")
 
         monitor_id = self.settings.monitor
         monitors = glfw.get_monitors()
@@ -551,45 +554,21 @@ class WindowManager():
         self._mouse_px = xpos
         self._mouse_py = ypos
         with self._callback_lock:
-            cbs = list(self._mouse_callbacks)
+            cbs = list(self._mouse_move_callbacks)
         for c in cbs:
-            c(xpos / self._window_width, ypos / self._window_height, Button.NONE)
+            c(xpos / self._window_width, ypos / self._window_height)
 
     def _notify_mouse_button_callback(self, window, button, action, mods) -> None:
-        button_enum: Button = Button.NONE
-
-        if button == glfw.MOUSE_BUTTON_LEFT:
-            if action == glfw.PRESS:
-                button_enum = Button.LEFT_DOWN
-            elif action == glfw.RELEASE:
-                button_enum = Button.LEFT_UP
-        elif button == glfw.MOUSE_BUTTON_MIDDLE:
-            if action == glfw.PRESS:
-                button_enum = Button.MIDDLE_DOWN
-            elif action == glfw.RELEASE:
-                button_enum = Button.MIDDLE_UP
-        elif button == glfw.MOUSE_BUTTON_RIGHT:
-            if action == glfw.PRESS:
-                button_enum = Button.RIGHT_DOWN
-            elif action == glfw.RELEASE:
-                button_enum = Button.RIGHT_UP
-        elif button == glfw.MOUSE_BUTTON_4:
-            if action == glfw.PRESS:
-                button_enum = Button.BACK_DOWN
-            elif action == glfw.RELEASE:
-                button_enum = Button.BACK_UP
-        elif button == glfw.MOUSE_BUTTON_5:
-            if action == glfw.PRESS:
-                button_enum = Button.FORWARD_DOWN
-            elif action == glfw.RELEASE:
-                button_enum = Button.FORWARD_UP
-        else:
+        mb = self._GLFW_BUTTON_MAP.get(button)
+        if mb is None or action not in (glfw.PRESS, glfw.RELEASE):
             return
-
+        pressed = action == glfw.PRESS
+        x = self._mouse_px / self._window_width
+        y = self._mouse_py / self._window_height
         with self._callback_lock:
-            cbs = list(self._mouse_callbacks)
+            cbs = list(self._mouse_button_callbacks)
         for c in cbs:
-            c(self._mouse_px / self._window_width, self._mouse_py / self._window_height, button_enum)
+            c(x, y, mb, pressed)
 
     def _notify_exit_callbacks(self) -> None:
         with self._callback_lock:
@@ -600,11 +579,15 @@ class WindowManager():
             except Exception:
                 logger.exception("Error in exit callback")
 
-    def add_mouse_callback(self, callback) -> None:
+    def add_mouse_move_callback(self, callback: Callable[[float, float], None]) -> None:
         with self._callback_lock:
-            self._mouse_callbacks.add(callback)
+            self._mouse_move_callbacks.add(callback)
 
-    def add_keyboard_callback(self, callback) -> None:
+    def add_mouse_button_callback(self, callback: Callable[[float, float, MouseButton, bool], None]) -> None:
+        with self._callback_lock:
+            self._mouse_button_callbacks.add(callback)
+
+    def add_keyboard_callback(self, callback: Callable[[int, int, int], None]) -> None:
         with self._callback_lock:
             self._key_callbacks.add(callback)
 
@@ -614,7 +597,8 @@ class WindowManager():
 
     def clear_callbacks(self) -> None:
         with self._callback_lock:
-            self._mouse_callbacks.clear()
+            self._mouse_move_callbacks.clear()
+            self._mouse_button_callbacks.clear()
             self._key_callbacks.clear()
             # exit_callbacks are intentionally preserved — they must fire on both natural and programmatic stop
 
@@ -668,6 +652,16 @@ class WindowManager():
         if real_id >= len(monitors):
             return
         self._monitor = monitors[real_id]
+        if self._fullscreen_mode == FullscreenMode.FULLSCREEN:
+            return  # exclusive fullscreen ignores window position; re-apply via set_fullscreen_mode if needed
+        if self._fullscreen_mode == FullscreenMode.WINDOWED_FULLSCREEN:
+            video_mode = glfw.get_video_mode(self._monitor)
+            posX, posY = glfw.get_monitor_pos(self._monitor)
+            glfw.set_window_monitor(
+                self._main_window, None, posX, posY,
+                video_mode.size.width, video_mode.size.height, 0
+            )
+            return
         posX, posY = glfw.get_monitor_pos(self._monitor)
         glfw.set_window_pos(self._main_window, posX + self.settings.x, posY + self.settings.y)
 
