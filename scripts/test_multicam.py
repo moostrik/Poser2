@@ -14,9 +14,14 @@ Flags:
 
 import argparse
 import os
-import sys
 import time
-import threading
+
+# Disable depthai crash dump collection (DEPTHAI_CRASHDUMP=0).
+# Without this, closing any device triggers collectAndLogCrashDump →
+# archiveFilesCompressed, which crashes in depthai 3.6.1 on Windows.
+# The env var is read at call time by isCrashDumpCollectionEnabled(),
+# so setting it here (before any dai.Device is created) is sufficient.
+os.environ["DEPTHAI_CRASHDUMP"] = "0"
 from threading import Thread, Event, Lock
 from typing import Optional
 import cv2
@@ -136,12 +141,16 @@ def run(device_infos: dict[str, Optional[dai.DeviceInfo]], use_camb: bool) -> No
 
     display_loop(setups, use_camb)
 
-    # Do NOT call pipeline.stop() or drop references before os._exit.
-    # stop() causes USB disconnects which trigger depthai's C++ monitor thread
-    # (monitorCallback → collectAndLogCrashDump → archiveFilesCompressed) — a
-    # depthai 3.6.1 bug. os._exit(0) kills the process before the monitor fires.
+    print("Stopping all pipelines...")
+    stop_threads = [
+        Thread(target=lambda p=pipeline: p.stop(), daemon=True)
+        for _, pipeline, _ in setups
+    ]
+    for t in stop_threads:
+        t.start()
+    for t in stop_threads:
+        t.join(timeout=10.0)
     print("Done.")
-    os._exit(0)
 
 
 # ---------------------------------------------------------------------------
