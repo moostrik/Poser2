@@ -3,10 +3,8 @@ import depthai as dai
 from .definitions import (
     EXPOSURE_RANGE, ISO_RANGE, BALANCE_RANGE, CONTRAST_RANGE, BRIGHTNESS_RANGE,
     LUMA_DENOISE_RANGE, SATURATION_RANGE, SHARPNESS_RANGE,
-    STEREO_DEPTH_RANGE, STEREO_BRIGHTNESS_RANGE, StereoMedianFilterType,
     Input,
 )
-from .pipeline import get_stereo_config
 from modules.settings import BaseSettings, Field, Widget
 
 
@@ -22,12 +20,10 @@ class CameraSettings(BaseSettings):
     fps:            Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera FPS")
     color:          Field[bool]  = Field(True, access=Field.INIT, newline=True, description="Color camera (False = mono)")
     square:         Field[bool]  = Field(True, access=Field.INIT)
-    stereo:         Field[bool]  = Field(False, access=Field.INIT)
     yolo:           Field[bool]  = Field(True, access=Field.INIT)
     hd_ready:       Field[bool]  = Field(False, access=Field.INIT)
     sim_enabled:    Field[bool]  = Field(False, access=Field.INIT)
     model_path:     Field[str]   = Field("data/models", access=Field.INIT)
-    show_stereo:    Field[bool]  = Field(False, access=Field.INIT, description="Show stereo visualization")
     flip_h:         Field[bool]  = Field(False, access=Field.INIT, description="Flip horizontal")
     flip_v:         Field[bool]  = Field(False, access=Field.INIT, description="Flip vertical")
     perspective:    Field[float] = Field(0.0, min=-1.0, max=1.0, access=Field.INIT, description="Perspective correction")
@@ -51,13 +47,6 @@ class CameraSettings(BaseSettings):
     ir_grid_light:      Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR grid projector")
     ir_flood_light:     Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
 
-    # --- Stereo controls ---
-    stereo_depth_min:       Field[int]  = Field(STEREO_DEPTH_RANGE[0], min=STEREO_DEPTH_RANGE[0], max=STEREO_DEPTH_RANGE[1], widget=Widget.slider, description="Depth min (mm)", newline=True)
-    stereo_depth_max:       Field[int]  = Field(STEREO_DEPTH_RANGE[1], min=STEREO_DEPTH_RANGE[0], max=STEREO_DEPTH_RANGE[1], widget=Widget.slider, description="Depth max (mm)")
-    stereo_median_filter:   Field[StereoMedianFilterType] = Field(StereoMedianFilterType.OFF, widget=Widget.select, description="Stereo median filter")
-    stereo_bright_min:      Field[int]  = Field(0, min=STEREO_BRIGHTNESS_RANGE[0], max=STEREO_BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Stereo brightness min", newline=True)
-    stereo_bright_max:      Field[int]  = Field(STEREO_BRIGHTNESS_RANGE[1], min=STEREO_BRIGHTNESS_RANGE[0], max=STEREO_BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Stereo brightness max")
-
     # ── Hardware connection ────────────────────────────────────────────
 
     def connect(self, device: dai.Device, inputs: dict[Input, dai.DataInputQueue], do_color: bool) -> None:
@@ -65,7 +54,6 @@ class CameraSettings(BaseSettings):
         self._device = device
         self._inputs = inputs
         self._do_color = do_color
-        self._stereo_config: dai.RawStereoDepthConfig = get_stereo_config(do_color)
         self._bind()
         self._apply()
 
@@ -97,13 +85,6 @@ class CameraSettings(BaseSettings):
         self.bind(CameraSettings.ir_flood_light, self._on_ir_flood_light)
         self.bind(CameraSettings.ir_grid_light, self._on_ir_grid_light)
 
-        # Stereo controls
-        self.bind(CameraSettings.stereo_depth_min, self._on_stereo_config)
-        self.bind(CameraSettings.stereo_depth_max, self._on_stereo_config)
-        self.bind(CameraSettings.stereo_bright_min, self._on_stereo_config)
-        self.bind(CameraSettings.stereo_bright_max, self._on_stereo_config)
-        self.bind(CameraSettings.stereo_median_filter, self._on_stereo_config)
-
     def _unbind(self) -> None:
         self.unbind(CameraSettings.color_auto_exposure, self._on_color_auto_exposure)
         self.unbind(CameraSettings.color_exposure, self._on_color_exposure)
@@ -120,11 +101,6 @@ class CameraSettings(BaseSettings):
         self.unbind(CameraSettings.mono_iso, self._on_mono_iso)
         self.unbind(CameraSettings.ir_flood_light, self._on_ir_flood_light)
         self.unbind(CameraSettings.ir_grid_light, self._on_ir_grid_light)
-        self.unbind(CameraSettings.stereo_depth_min, self._on_stereo_config)
-        self.unbind(CameraSettings.stereo_depth_max, self._on_stereo_config)
-        self.unbind(CameraSettings.stereo_bright_min, self._on_stereo_config)
-        self.unbind(CameraSettings.stereo_bright_max, self._on_stereo_config)
-        self.unbind(CameraSettings.stereo_median_filter, self._on_stereo_config)
 
     def _apply(self) -> None:
         """Push all current field values to hardware (called once after open)."""
@@ -142,7 +118,6 @@ class CameraSettings(BaseSettings):
         self._on_mono_auto_exposure(self.mono_auto_exposure)
         if not self.mono_auto_exposure:
             self._send_mono_exposure_iso(self.mono_exposure, self.mono_iso)
-        self._on_stereo_config()
         if not self._do_color:
             self._on_ir_flood_light(self.ir_flood_light)
             self._on_ir_grid_light(self.ir_grid_light)
@@ -259,25 +234,6 @@ class CameraSettings(BaseSettings):
     def _on_ir_grid_light(self, value: float = 0.0) -> None:
         if self._device is None or self._do_color: return
         self._device.setIrLaserDotProjectorIntensity(self.ir_grid_light)
-
-    # ── Stereo callback ───────────────────────────────────────────────
-
-    def _on_stereo_config(self, value=None) -> None:
-        if self._device is None: return
-        self._stereo_config.postProcessing.thresholdFilter.minRange = self.stereo_depth_min
-        self._stereo_config.postProcessing.thresholdFilter.maxRange = self.stereo_depth_max
-        self._stereo_config.postProcessing.brightnessFilter.minBrightness = self.stereo_bright_min
-        self._stereo_config.postProcessing.brightnessFilter.maxBrightness = self.stereo_bright_max
-        mf = self.stereo_median_filter
-        if mf == StereoMedianFilterType.OFF:
-            self._stereo_config.postProcessing.median = dai.MedianFilter.MEDIAN_OFF
-        elif mf == StereoMedianFilterType.KERNEL_3x3:
-            self._stereo_config.postProcessing.median = dai.MedianFilter.KERNEL_3x3
-        elif mf == StereoMedianFilterType.KERNEL_5x5:
-            self._stereo_config.postProcessing.median = dai.MedianFilter.KERNEL_5x5
-        elif mf == StereoMedianFilterType.KERNEL_7x7:
-            self._stereo_config.postProcessing.median = dai.MedianFilter.KERNEL_7x7
-        self._send_control(Input.STEREO_CONTROL, self._stereo_config)
 
     # ── Readback (called by Core from camera frames) ──────────────────
 

@@ -3,12 +3,11 @@
 # https://docs.luxonis.com/software/depthai/examples/depth_post_processing/
 
 import depthai as dai
-from cv2 import applyColorMap, COLORMAP_JET
 from numpy import ndarray
 from typing import Set
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 
-from .pipeline import setup_pipeline, get_frame_types, PerspectiveConfig
+from .pipeline import build_pipeline, get_model_path, PipelineConfig, PipelineHandles, PerspectiveConfig
 from .definitions import *
 from .settings import CameraSettings
 from modules.utils import FPS
@@ -19,6 +18,8 @@ logger = logging.getLogger(__name__)
 class Camera(Thread):
     _id_counter = 0
     _pipeline: dai.Pipeline | None = None
+    _pipeline_handles: PipelineHandles | None = None
+    _pipeline_lock: Lock = Lock()
     _MAX_CONSECUTIVE_FAILURES: int = 3
 
     def __init__(self, core_settings: CameraSettings) -> None:
@@ -40,10 +41,8 @@ class Camera(Thread):
         self.fps: float =               core_settings.fps
         self.square: bool =             core_settings.square
         self.do_color: bool =           core_settings.color
-        self.do_stereo: bool =          core_settings.stereo
         self.do_yolo: bool =            core_settings.yolo
         self.do_720p: bool =            core_settings.hd_ready
-        self.show_stereo: bool =        core_settings.show_stereo
         self.simulation: bool =         core_settings.sim_enabled
 
         self.perspective: PerspectiveConfig = PerspectiveConfig(
@@ -57,14 +56,14 @@ class Camera(Thread):
         self.inputs: dict[Input, dai.DataInputQueue] = {}
         self.outputs: dict[Output, dai.DataOutputQueue] = {}
         self.num_tracklets: int =       0
+        self._pipeline_handles: PipelineHandles | None = None
 
         # FPS
         self.fps_counters: dict[FrameType, FPS] = {}
         self.tps_counter =              FPS(120)
 
         # FRAME TYPES
-        self.frame_types: list[FrameType] = get_frame_types(self.do_color, self.do_stereo, self.show_stereo, core_settings.sim_enabled)
-        self.frame_types.sort(key=lambda x: x.value)
+        self.frame_types: list[FrameType] = [FrameType.NONE_, FrameType.VIDEO]
 
         # CALLBACKS
         self.preview_callbacks: Set[FrameCallback] = set()
@@ -74,8 +73,6 @@ class Camera(Thread):
 
         # PREVIEW
         self.preview_type =             FrameType.VIDEO
-
-        self.cntr: int = 0
 
     def stop(self) -> None:
         self.running = False
@@ -105,9 +102,13 @@ class Camera(Thread):
             logger.warning(f'Camera: {self.device_id} NOT AVAILABLE in {device_list}')
             return False
 
-        if Camera._pipeline is None:
-            Camera._pipeline = dai.Pipeline()
-            self._setup_pipeline(Camera._pipeline)
+        with Camera._pipeline_lock:
+            if Camera._pipeline is None:
+                Camera._pipeline = dai.Pipeline()
+                self._setup_pipeline(Camera._pipeline)
+                Camera._pipeline_handles = self._pipeline_handles
+            else:
+                self._pipeline_handles = Camera._pipeline_handles
 
         try:
             self.device = self._try_device(self.device_id, Camera._pipeline, num_tries=1)
@@ -123,33 +124,36 @@ class Camera(Thread):
         return True
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
-            setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.do_720p, self.show_stereo, self.perspective, simulate=False)
+        config = PipelineConfig(
+            fps=self.fps,
+            square=self.square,
+            do_color=self.do_color,
+            do_yolo=self.do_yolo,
+            do_720p=self.do_720p,
+            perspective=self.perspective,
+            simulate=False,
+            nn_path=get_model_path(self.model_path, self.square, False) if self.do_yolo else None,
+        )
+        self._pipeline_handles = build_pipeline(pipeline, config)
 
     def _setup_queues(self) -> None:
-        if self.do_stereo:
-            if self.do_color:
-                self.inputs[Input.COLOR_CONTROL] =  self.device.getInputQueue('color_control')
-            self.inputs[Input.MONO_CONTROL] =       self.device.getInputQueue('mono_control')
-            self.inputs[Input.STEREO_CONTROL] =     self.device.getInputQueue('stereo_control')
-            self.outputs[Output.SYNC_FRAMES_OUT] =  self.device.getOutputQueue(name='sync', maxSize=1, blocking=False)
-            self.outputs[Output.SYNC_FRAMES_OUT].addCallback(self._sync_callback)
-            self.fps_counters[FrameType.VIDEO] = FPS(120)
-            self.fps_counters[FrameType.LEFT_] = FPS(120)
-            self.fps_counters[FrameType.RIGHT] = FPS(120)
-            if self.show_stereo:
-                self.fps_counters[FrameType.DEPTH] = FPS(120)
-        elif self.do_color:
-            self.inputs[Input.COLOR_CONTROL] =      self.device.getInputQueue('color_control')
-            self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False)
-            self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
-            self.fps_counters[FrameType.VIDEO] = FPS(120)
-        else: # only mono
-            self.inputs[Input.MONO_CONTROL] =       self.device.getInputQueue('mono_control')
-            self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False)
-            self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
-            self.fps_counters[FrameType.VIDEO] = FPS(120)
-        if self.do_yolo:
-            self.outputs[Output.TRACKLETS_OUT] = self.device.getOutputQueue(name='tracklets', maxSize=1, blocking=False)
+        assert self._pipeline_handles is not None
+        handles = self._pipeline_handles
+        if handles.do_color:
+            self.inputs[Input.COLOR_CONTROL] =     self.device.getInputQueue('color_control')
+        else:
+            self.inputs[Input.MONO_CONTROL] =      self.device.getInputQueue('mono_control')
+        video_q = self.device.getOutputQueue('video')
+        video_q.setMaxSize(1)
+        video_q.setBlocking(False)
+        self.outputs[Output.VIDEO_FRAME_OUT] = video_q
+        self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
+        self.fps_counters[FrameType.VIDEO] = FPS(120)
+        if handles.do_yolo:
+            tracklets_q = self.device.getOutputQueue('tracklets')
+            tracklets_q.setMaxSize(1)
+            tracklets_q.setBlocking(False)
+            self.outputs[Output.TRACKLETS_OUT] = tracklets_q
             self.outputs[Output.TRACKLETS_OUT].addCallback(self._tracker_callback)
 
     def _close(self) -> None:
@@ -172,52 +176,11 @@ class Camera(Thread):
         self._update_fps(FrameType.VIDEO)
         if self.do_color:
             self.settings.update_color_readback(msg)
-        if self.do_stereo or not self.do_color:
+        if not self.do_color:
             self.settings.update_mono_readback(msg)
 
         frame: ndarray = msg.getCvFrame()
         self._update_frame_callbacks(FrameType.VIDEO, frame)
-
-    def _left_callback(self, msg: dai.ImgFrame) -> None:
-        self._update_fps(FrameType.LEFT_)
-        frame: ndarray = msg.getCvFrame()
-        self._update_frame_callbacks(FrameType.LEFT_, frame)
-
-    def _right_callback(self, msg: dai.ImgFrame) -> None:
-        self._update_fps(FrameType.RIGHT)
-        frame: ndarray = msg.getCvFrame()
-        self._update_frame_callbacks(FrameType.RIGHT, frame)
-
-    def _stereo_callback(self, msg: dai.ImgFrame) -> None:
-        self._update_fps(FrameType.DEPTH)
-        frame: ndarray = msg.getCvFrame()
-        frame = applyColorMap(frame, COLORMAP_JET)
-        self._update_frame_callbacks(FrameType.DEPTH, frame)
-
-    def _sync_callback(self, message_group: dai.MessageGroup) -> None:
-        frames = dict[FrameType, ndarray]()
-        for name, msg in message_group:
-            if type(msg) == dai.ImgFrame:
-                if name == 'video':
-                    # print(name, msg.getTimestampDevice(), message_group.getTimestampDevice(), msg.getSequenceNum(), self.cntr)
-                    self._video_callback(msg)
-                    frames[FrameType.VIDEO] = msg.getCvFrame()
-                elif name == 'left':
-                    name = 'left_'
-                    # print(name, msg.getTimestampDevice(), message_group.getTimestampDevice(), msg.getSequenceNum(), self.cntr)
-                    self._left_callback(msg)
-                    frames[FrameType.LEFT_] = msg.getCvFrame()
-                elif name == 'right':
-                    # print(name, msg.getTimestampDevice(), message_group.getTimestampDevice(), msg.getSequenceNum(), self.cntr)
-                    self._right_callback(msg)
-                    frames[FrameType.RIGHT] = msg.getCvFrame()
-                elif name == 'stereo':
-                    self._stereo_callback(msg)
-                else:
-                    logger.info('unknown message', name)
-        self._update_sync_callbacks(frames, self.fps)
-
-        self.cntr = self.cntr + 1
 
     def _tracker_callback(self, msg: dai.RawTracklets) -> None:
         # print('RT', msg.getTimestamp()) # type: ignore
@@ -246,7 +209,7 @@ class Camera(Thread):
         if self.preview_type == frame_type:
             for c in self.preview_callbacks:
                 c(self.id, frame_type, frame)
-        if not self.do_stereo and frame_type == FrameType.VIDEO:
+        if frame_type == FrameType.VIDEO:
             frames: dict[FrameType, ndarray] = {}
             frames[frame_type] = frame
             self._update_sync_callbacks(frames, self.fps)

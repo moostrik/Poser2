@@ -1,6 +1,7 @@
 
 from depthai import Pipeline
 from ..camera.camera import *
+from ..camera.pipeline import build_pipeline, get_model_path, PipelineConfig
 from ..camera.settings import CameraSettings
 from .settings import SimulatorSettings
 from .player import Player
@@ -11,16 +12,10 @@ from datetime import timedelta
 class Simulator(Camera):
 
     def __init__(self, syncplayer: Player, core_settings: CameraSettings, player_settings: SimulatorSettings) -> None:
-
-        if core_settings.stereo and not core_settings.yolo:
-            core_settings.show_stereo = True  # stereo pipeline needs to be connected (in case of no person detection)
-
         super().__init__(core_settings)
 
         self.sync_player: Player = syncplayer
         self.ex_video:  dai.DataInputQueue
-        self.ex_left:   dai.DataInputQueue
-        self.ex_right:  dai.DataInputQueue
 
         self.passthrough: bool = player_settings.sim_passthrough
 
@@ -37,32 +32,33 @@ class Simulator(Camera):
         else:
             super().run()
 
-    def _setup_pipeline(self, pipeline: Pipeline) -> None: # override
-        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.do_720p, self.show_stereo, self.perspective, simulate=True)
+    def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:  # override
+        config = PipelineConfig(
+            fps=self.fps,
+            square=self.square,
+            do_color=self.do_color,
+            do_yolo=self.do_yolo,
+            do_720p=self.do_720p,
+            perspective=self.perspective,
+            simulate=True,
+            nn_path=get_model_path(self.model_path, self.square, True) if self.do_yolo else None,
+        )
+        self._pipeline_handles = build_pipeline(pipeline, config)
 
 
-    def _setup_queues(self) -> None: # override
-        self.inputs[Input.VIDEO_FRAME_IN] =     self.device.getInputQueue(name='ex_video', maxSize=1, blocking=False)
-        self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False)
+    def _setup_queues(self) -> None:  # override
+        self.inputs[Input.VIDEO_FRAME_IN] =    self.device.getInputQueue('ex_video')
+        video_q = self.device.getOutputQueue('video')
+        video_q.setMaxSize(1)
+        video_q.setBlocking(False)
+        self.outputs[Output.VIDEO_FRAME_OUT] = video_q
         self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
         self.fps_counters[FrameType.VIDEO] = FPS(120)
-        if self.do_stereo:
-            self.inputs[Input.STEREO_CONTROL] =     self.device.getInputQueue('stereo_control')
-            self.inputs[Input.LEFT_FRAME_IN] =      self.device.getInputQueue(name='ex_left', maxSize=1, blocking=False)
-            self.inputs[Input.RIGHT_FRAME_IN] =     self.device.getInputQueue(name='ex_right', maxSize=1, blocking=False)
-            if not self.do_yolo:
-                self.outputs[Output.LEFT_FRAME_OUT] =   self.device.getOutputQueue(name='left', maxSize=1, blocking=False)
-                self.outputs[Output.LEFT_FRAME_OUT].addCallback(self._left_callback)
-                self.outputs[Output.RIGHT_FRAME_OUT] =  self.device.getOutputQueue(name='right', maxSize=1, blocking=False)
-                self.outputs[Output.RIGHT_FRAME_OUT].addCallback(self._right_callback)
-            self.fps_counters[FrameType.LEFT_] = FPS(120)
-            self.fps_counters[FrameType.RIGHT] = FPS(120)
-            if self.show_stereo:
-                self.outputs[Output.STEREO_FRAME_OUT] = self.device.getOutputQueue(name='stereo', maxSize=1, blocking=False)
-                self.outputs[Output.STEREO_FRAME_OUT].addCallback(self._stereo_callback)
-                self.fps_counters[FrameType.DEPTH] = FPS(120)
         if self.do_yolo:
-            self.outputs[Output.TRACKLETS_OUT] = self.device.getOutputQueue(name='tracklets', maxSize=1, blocking=False)
+            tracklets_q = self.device.getOutputQueue('tracklets')
+            tracklets_q.setMaxSize(1)
+            tracklets_q.setBlocking(False)
+            self.outputs[Output.TRACKLETS_OUT] = tracklets_q
             self.outputs[Output.TRACKLETS_OUT].addCallback(self._tracker_callback)
 
     def _video_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray) -> None:
@@ -77,36 +73,16 @@ class Simulator(Camera):
                 # img.setInstanceNum(int(dai.CameraBoardSocket.CAM_A))
                 if self.do_color:
                     img.setType(dai.ImgFrame.Type.BGR888p)
-                    img.setData(self.to_planar(frame, (width, height)))
+                    img.setData(self.to_planar(frame, (width, height)).astype(np.uint8))  # type: ignore[arg-type]
                 else:
                     img.setType(dai.ImgFrame.Type.RAW8)
                     if frame.shape[2] == 3:
                         frame = cvtColor(frame, COLOR_RGB2GRAY)
-                    img.setData(frame.flatten())
+                    img.setData(frame.flatten().astype(np.uint8))  # type: ignore[arg-type]
                 img.setTimestamp(frame_time)
                 img.setWidth(width)
                 img.setHeight(height)
                 self.inputs[Input.VIDEO_FRAME_IN].send(img)
-
-            if frame_type == FrameType.LEFT_ and Input.LEFT_FRAME_IN in self.inputs:
-                img = dai.ImgFrame()
-                img.setType(dai.ImgFrame.Type.RAW8)
-                img.setInstanceNum(int(dai.CameraBoardSocket.CAM_B))
-                img.setData(frame.flatten())
-                img.setTimestamp(frame_time)
-                img.setWidth(width)
-                img.setHeight(height)
-                self.inputs[Input.LEFT_FRAME_IN].send(img)
-
-            if frame_type == FrameType.RIGHT and Input.RIGHT_FRAME_IN in self.inputs:
-                img = dai.ImgFrame()
-                img.setType(dai.ImgFrame.Type.RAW8)
-                img.setInstanceNum(int(dai.CameraBoardSocket.CAM_C))
-                img.setData(frame.flatten())
-                img.setTimestamp(frame_time)
-                img.setWidth(width)
-                img.setHeight(height)
-                self.inputs[Input.RIGHT_FRAME_IN].send(img)
 
     def _passthrough_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray) -> None:
         if id != self.id:

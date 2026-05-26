@@ -84,12 +84,11 @@ class OakGroup(BaseSettings):
     yolo              : Field[bool]            = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color             : Field[bool]            = Field(False, access=Field.INIT, description="Color camera (False = mono)")
     square            : Field[bool]            = Field(True, access=Field.INIT, description="Use square aspect ratio")
-    stereo            : Field[bool]            = Field(False, access=Field.INIT, description="Enable stereo mode")
     hd_ready          : Field[bool]            = Field(False, access=Field.INIT, description="Use HD resolution")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, description="Model files directory")
 
-    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, sim_enabled, model_path]
+    _cam_share: list = [fps, color, square, yolo, hd_ready, sim_enabled, model_path]
 
     cam_0     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_1     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)

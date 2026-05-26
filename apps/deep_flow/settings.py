@@ -85,7 +85,6 @@ class OakGroup(BaseSettings):
     yolo:               Field[bool]              = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color:              Field[bool]              = Field(True, access=Field.INIT, description="Enable color capture")
     square:             Field[bool]              = Field(True, access=Field.INIT, description="Use square aspect ratio")
-    stereo:             Field[bool]              = Field(False, access=Field.INIT, description="Enable stereo mode")
     hd_ready:           Field[bool]              = Field(False, access=Field.INIT, description="Use HD resolution")
     sim_enabled:        Field[bool]              = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path:         Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
@@ -94,10 +93,10 @@ class OakGroup(BaseSettings):
     video_format:       Field[CoderFormat]       = Field(CoderFormat.H264, access=Field.INIT, description="Video format")
     video_frame_types:  Field[list[FrameType]]   = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record")
 
-    _cam_share = [fps, color, square, stereo, yolo, hd_ready, sim_enabled, model_path]
+    _cam_share = [fps, color, square, yolo, hd_ready, sim_enabled, model_path]
     cam_0       = Group(CameraSettings, share=_cam_share)
-    simulator   = Group(SimulatorSettings, share=[video_path, video_format, video_frame_types, num_cameras, fps, color, square, stereo])
-    recorder    = Group(RecorderSettings, share=[video_path, temp_path, video_format, video_frame_types, color, square, stereo, num_cameras, fps])
+    simulator   = Group(SimulatorSettings, share=[video_path, video_format, video_frame_types, num_cameras, fps, color, square])
+    recorder    = Group(RecorderSettings, share=[video_path, temp_path, video_format, video_frame_types, color, square, num_cameras, fps])
     frame_sync  = Group(SyncSettings, share=[num_cameras, fps])
     tracklet_sync = Group(SyncSettings, share=[num_cameras, fps])
 

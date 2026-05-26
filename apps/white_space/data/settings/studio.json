@@ -9,13 +9,11 @@
     "yolo": true,
     "color": false,
     "square": false,
-    "stereo": false,
     "hd_ready": true,
     "sim_enabled": false,
     "model_path": "data/models",
     "cam_0": {
       "device_id": "14442C101136D1D200",
-      "show_stereo": false,
       "flip_h": true,
       "flip_v": false,
       "perspective": 0.0,
@@ -33,16 +31,10 @@
       "mono_iso": 1029,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.8,
-      "stereo_depth_min": 500,
-      "stereo_depth_max": 15000,
-      "stereo_median_filter": "OFF",
-      "stereo_bright_min": 0,
-      "stereo_bright_max": 255
+      "ir_flood_light": 0.8
     },
     "cam_1": {
       "device_id": "14442C10F124D9D600",
-      "show_stereo": false,
       "flip_h": true,
       "flip_v": false,
       "perspective": 0.0,
@@ -60,16 +52,10 @@
       "mono_iso": 476,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.8,
-      "stereo_depth_min": 500,
-      "stereo_depth_max": 15000,
-      "stereo_median_filter": "OFF",
-      "stereo_bright_min": 0,
-      "stereo_bright_max": 255
+      "ir_flood_light": 0.8
     },
     "cam_2": {
       "device_id": "14442C10110AD3D200",
-      "show_stereo": false,
       "flip_h": true,
       "flip_v": false,
       "perspective": 0.0,
@@ -87,16 +73,10 @@
       "mono_iso": 823,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.8,
-      "stereo_depth_min": 500,
-      "stereo_depth_max": 15000,
-      "stereo_median_filter": "OFF",
-      "stereo_bright_min": 0,
-      "stereo_bright_max": 255
+      "ir_flood_light": 0.8
     },
     "cam_3": {
       "device_id": "14442C1031DDD2D200",
-      "show_stereo": false,
       "flip_h": true,
       "flip_v": false,
       "perspective": 0.0,
@@ -114,12 +94,7 @@
       "mono_iso": 487,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.8,
-      "stereo_depth_min": 500,
-      "stereo_depth_max": 15000,
-      "stereo_median_filter": "OFF",
-      "stereo_bright_min": 0,
-      "stereo_bright_max": 255
+      "ir_flood_light": 0.8
     },
     "simulator": {
       "video_path": "apps/white_space/data/recordings",

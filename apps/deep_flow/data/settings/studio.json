@@ -5,7 +5,6 @@
     "yolo": true,
     "color": true,
     "square": true,
-    "stereo": false,
     "hd_ready": true,
     "sim_enabled": false,
     "model_path": "data/models",
@@ -22,7 +21,6 @@
     },
     "cam_0": {
       "device_id": "14442C101136D1D200",
-      "show_stereo": false,
       "flip_h": false,
       "flip_v": true,
       "perspective": -0.22,
@@ -40,12 +38,7 @@
       "mono_exposure": 1000,
       "mono_iso": 100,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.0,
-      "stereo_depth_min": 500,
-      "stereo_depth_max": 15000,
-      "stereo_brightness_min": 0,
-      "stereo_brightness_max": 255,
-      "stereo_median_filter": "OFF"
+      "ir_flood_light": 0.0
     },
     "simulator": {
       "folder": "20251212-130516_3_square_color_no_id",
