@@ -3,7 +3,7 @@
 import numpy as np
 from enum import Enum, IntEnum, auto
 from typing import Callable, TypeAlias
-from depthai import Tracklet, TrackerType, ImgDetection, Rect, Point3f, Device
+from depthai import Tracklet, TrackerType, ImgDetection, Rect, Point3f, Device, DeviceInfo
 
 import logging
 logger = logging.getLogger(__name__)
@@ -79,3 +79,9 @@ def get_device_list(verbose: bool = False) -> list[str]:
     if verbose:
         logger.info('-------------------------------------------------------------')
     return device_list
+
+def get_device_info(device_id: str) -> DeviceInfo | None:
+    for info in Device.getAllAvailableDevices():
+        if info.deviceId == device_id:
+            return info
+    return None

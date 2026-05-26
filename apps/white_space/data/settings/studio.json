@@ -6,8 +6,8 @@
   "light_resolution": 3600,
   "fov": 120.0,
   "camera": {
-    "yolo": true,
-    "color": false,
+    "yolo": false,
+    "color": true,
     "square": false,
     "hd_ready": true,
     "sim_enabled": false,

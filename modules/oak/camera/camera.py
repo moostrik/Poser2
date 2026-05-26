@@ -2,6 +2,7 @@
 # https://oak-web.readthedocs.io/
 # https://docs.luxonis.com/software/depthai/examples/depth_post_processing/
 
+import time
 import depthai as dai
 from numpy import ndarray
 from typing import Set
@@ -17,8 +18,19 @@ logger = logging.getLogger(__name__)
 
 class Camera(Thread):
     _id_counter: int = 0
-    _open_lock: Lock = Lock()
-    _MAX_CONSECUTIVE_FAILURES: int = 3
+
+    # Multi-device coordination (strategy 3 — proven by test_multicam.py):
+    # Phase A (concurrent, no lock): each camera boots its device, builds its pipeline,
+    # and creates queues independently. USB enumerations happen simultaneously so no
+    # camera is streaming when a peer enumerates.
+    # Phase B (barrier then sequential start_lock): all cameras must reach the barrier
+    # before any pipeline.start() is called, then starts are serialized so the USB
+    # host isn't hit by concurrent XLink stream setup.
+    _barrier_lock: Lock = Lock()
+    _total_instances: int = 0
+    _ready_count: int = 0
+    _start_streaming: Event = Event()
+    _start_lock: Lock = Lock()
 
     def __init__(self, core_settings: CameraSettings) -> None:
         super().__init__()
@@ -29,6 +41,10 @@ class Camera(Thread):
         self.id: int =                  Camera._id_counter
         Camera._id_counter +=           1
         self.id_string: str =           str(self.id)
+
+        # Register in the multi-device barrier
+        with Camera._barrier_lock:
+            Camera._total_instances += 1
 
         # SETTINGS (reactive)
         self.settings: CameraSettings =   core_settings
@@ -78,41 +94,90 @@ class Camera(Thread):
         self.stop_event.set()
 
     def run(self) -> None:
-        consecutive_failures: int = 0
+        try:
+            if self._open():
+                self._poll_loop()
+        except Exception:
+            logger.exception(f'Camera {self.device_id}: error')
+        finally:
+            self._close()
+
+    def _poll_loop(self) -> None:
+        """depthai v3 host-side XLink reader requires the queue to be actively
+        drained by the host. `addCallback` does not keep the stream alive
+        reliably under v3 — the probe uses blocking `q.get()` polling, which
+        works. Each Camera owns its own thread (this one) and drives its
+        queues here."""
+        video_q = self.outputs.get(Output.VIDEO_FRAME_OUT)
+        tracklets_q = self.outputs.get(Output.TRACKLETS_OUT)
         while not self.stop_event.is_set():
-            try:
-                if not self._open():
-                    return
-                consecutive_failures = 0
-                self.stop_event.wait()
-            except Exception:
-                logger.exception("Camera error")
-                consecutive_failures += 1
-                if consecutive_failures >= Camera._MAX_CONSECUTIVE_FAILURES:
-                    logger.error(f'Camera {self.device_id}: {consecutive_failures} consecutive failures, stopping')
-                    return
-                self.stop_event.wait(timeout=1.0)
-            finally:
-                self._close()
+            if video_q is not None:
+                msg = video_q.tryGet()
+                if msg is not None:
+                    self._video_callback(msg)
+            if tracklets_q is not None:
+                tmsg = tracklets_q.tryGet()
+                if tmsg is not None:
+                    self._tracker_callback(tmsg)
+            # Tiny sleep to avoid spinning at 100% CPU when no frame is ready.
+            # 1 ms is short enough not to bottleneck a 30 fps stream.
+            time.sleep(0.001)
 
     def _open(self) -> bool:
-        device_list: list[str] = get_device_list(verbose=False)
-
-        if self.device_id not in device_list:
-            logger.warning(f'Camera: {self.device_id} NOT AVAILABLE in {device_list}')
+        info = get_device_info(self.device_id)
+        if info is None:
+            logger.warning(f'Camera: {self.device_id} NOT AVAILABLE in {get_device_list()}')
+            self._signal_ready()  # don't deadlock peers at the barrier
             return False
 
-        with Camera._open_lock:
-            self._device = dai.Device(dai.DeviceInfo(self.device_id))
-            self._pipeline = dai.Pipeline(defaultDevice=self._device)
+        # Phase A — concurrent, single attempt, no sleep.
+        # Boot + build + queues for all cameras happen simultaneously so USB
+        # enumerations overlap. No camera is streaming while a peer enumerates.
+        # NO retries here: sleeping between attempts while a peer has a booted-but-idle
+        # device is the exact root cause of the XLink error. If boot fails, signal
+        # ready and return False; run() will retry after the barrier is already
+        # satisfied (safe — no idle peers at that point).
+        try:
+            device = dai.Device(info)
+        except RuntimeError as e:
+            logger.warning(f'Camera {self.device_id}: boot failed: {e}')
+            self._signal_ready()
+            return False
+        self._device = device
+        try:
+            self._pipeline = dai.Pipeline(device)
             self._setup_pipeline(self._pipeline)
             self._setup_queues()
-            self._pipeline.start()
+        except Exception:
+            logger.exception(f'Camera {self.device_id}: pipeline build failed')
+            self._signal_ready()
+            return False
+
+        # Barrier — wait for every Camera to finish Phase A before any start().
+        self._signal_ready()
+        if not Camera._start_streaming.wait(timeout=60.0):
+            logger.error(f'Camera {self.device_id}: timed out waiting for peers')
+            return False
+
+        # Phase B — sequential pipeline.start() under _start_lock.
+        with Camera._start_lock:
+            try:
+                self._pipeline.start()
+            except Exception:
+                logger.exception(f'Camera {self.device_id}: pipeline.start() failed')
+                return False
 
         logger.info(f'Camera: {self.device_id} OPEN')
         self.running = True
         self.settings.connect(self._device, self.inputs, self.do_color)
         return True
+
+    @classmethod
+    def _signal_ready(cls) -> None:
+        with cls._barrier_lock:
+            cls._ready_count += 1
+            if cls._ready_count >= cls._total_instances:
+                cls._start_streaming.set()
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
         config = PipelineConfig(
@@ -135,20 +200,24 @@ class Camera(Thread):
                 self.inputs[Input.COLOR_CONTROL] = handles.control_in.createInputQueue()
             else:
                 self.inputs[Input.MONO_CONTROL] = handles.control_in.createInputQueue()
-        video_q = handles.video_out.createOutputQueue(maxSize=1, blocking=False)
+        video_q = handles.video_out.createOutputQueue(maxSize=4, blocking=False)
         self.outputs[Output.VIDEO_FRAME_OUT] = video_q
-        video_q.addCallback(self._video_callback)
         self.fps_counters[FrameType.VIDEO] = FPS(120)
         if handles.do_yolo and handles.tracklets_out is not None:
-            tracklets_q = handles.tracklets_out.createOutputQueue(maxSize=1, blocking=False)
+            tracklets_q = handles.tracklets_out.createOutputQueue(maxSize=4, blocking=False)
             self.outputs[Output.TRACKLETS_OUT] = tracklets_q
-            tracklets_q.addCallback(self._tracker_callback)
 
     def _close(self) -> None:
         self.running = False
-        self.settings.disconnect()
+        try:
+            self.settings.disconnect()
+        except Exception:
+            logger.exception(f'Camera {self.device_id}: settings.disconnect failed')
         if self._pipeline is not None:
-            self._pipeline.stop()
+            try:
+                self._pipeline.stop()
+            except Exception:
+                logger.exception(f'Camera {self.device_id}: pipeline.stop failed')
             self._pipeline = None
         self._device = None
         self.inputs.clear()
