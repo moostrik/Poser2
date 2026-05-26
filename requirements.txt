@@ -1,11 +1,11 @@
 --extra-index-url https://download.pytorch.org/whl/cu129
 
 # Fixed versions
-depthai==2.30.0                 # 2.30.0 seems to be more stable as 2.32.0
 torch==2.8.0+cu129
 torchvision==0.23.0+cu129
 
 # Latest versions as of may 2026
+depthai==3.6.1
 ffmpeg-python==0.2.0
 freetype-py==2.5.1
 glfw==2.10.0

@@ -49,7 +49,7 @@ class CameraSettings(BaseSettings):
 
     # ── Hardware connection ────────────────────────────────────────────
 
-    def connect(self, device: dai.Device, inputs: dict[Input, dai.DataInputQueue], do_color: bool) -> None:
+    def connect(self, device: dai.Device, inputs: dict, do_color: bool) -> None:
         """Bind reactive WRITE fields to DAI hardware commands."""
         self._device = device
         self._inputs = inputs

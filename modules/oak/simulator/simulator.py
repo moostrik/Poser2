@@ -1,8 +1,10 @@
-
-from depthai import Pipeline
-from ..camera.camera import *
+import depthai as dai
+import numpy as np
+from ..camera.camera import Camera
+from ..camera.definitions import FrameType, Input, Output, Tracklet
 from ..camera.pipeline import build_pipeline, get_model_path, PipelineConfig
 from ..camera.settings import CameraSettings
+from modules.utils import FPS
 from .settings import SimulatorSettings
 from .player import Player
 from cv2 import resize, COLOR_RGB2GRAY, cvtColor
@@ -15,8 +17,6 @@ class Simulator(Camera):
         super().__init__(core_settings)
 
         self.sync_player: Player = syncplayer
-        self.ex_video:  dai.DataInputQueue
-
         self.passthrough: bool = player_settings.sim_passthrough
 
     def start(self) -> None: # override
@@ -47,19 +47,18 @@ class Simulator(Camera):
 
 
     def _setup_queues(self) -> None:  # override
-        self.inputs[Input.VIDEO_FRAME_IN] =    self.device.getInputQueue('ex_video')
-        video_q = self.device.getOutputQueue('video')
-        video_q.setMaxSize(1)
-        video_q.setBlocking(False)
+        assert self._pipeline_handles is not None
+        handles = self._pipeline_handles
+        if handles.video_frame_in is not None:
+            self.inputs[Input.VIDEO_FRAME_IN] = handles.video_frame_in.createInputQueue()
+        video_q = handles.video_out.createOutputQueue(maxSize=1, blocking=False)
         self.outputs[Output.VIDEO_FRAME_OUT] = video_q
-        self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
+        video_q.addCallback(self._video_callback)
         self.fps_counters[FrameType.VIDEO] = FPS(120)
-        if self.do_yolo:
-            tracklets_q = self.device.getOutputQueue('tracklets')
-            tracklets_q.setMaxSize(1)
-            tracklets_q.setBlocking(False)
+        if self.do_yolo and handles.tracklets_out is not None:
+            tracklets_q = handles.tracklets_out.createOutputQueue(maxSize=1, blocking=False)
             self.outputs[Output.TRACKLETS_OUT] = tracklets_q
-            self.outputs[Output.TRACKLETS_OUT].addCallback(self._tracker_callback)
+            tracklets_q.addCallback(self._tracker_callback)
 
     def _video_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray) -> None:
         if not self.running:

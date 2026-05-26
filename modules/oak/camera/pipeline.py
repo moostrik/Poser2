@@ -130,6 +130,10 @@ class PipelineConfig:
 class PipelineHandles:
     do_color: bool
     do_yolo: bool
+    video_out: dai.Node.Output
+    control_in: dai.Node.Input | None        # camera control input (None when simulate)
+    tracklets_out: dai.Node.Output | None    # tracker output (when do_yolo)
+    video_frame_in: dai.Node.Input | None    # frame injection point (when simulate)
 
 
 def build_pipeline(pipeline: dai.Pipeline, config: PipelineConfig) -> PipelineHandles:
@@ -140,10 +144,8 @@ def build_pipeline(pipeline: dai.Pipeline, config: PipelineConfig) -> PipelineHa
     if config.do_color:
         if config.do_720p:
             width, height = 1280, 720
-            resolution = dai.ColorCameraProperties.SensorResolution.THE_720_P
         else:
             width, height = 1920, 1072
-            resolution = dai.ColorCameraProperties.SensorResolution.THE_1080_P
     else:
         width, height = 1280, 720
 
@@ -175,78 +177,82 @@ def build_pipeline(pipeline: dai.Pipeline, config: PipelineConfig) -> PipelineHa
     ]
     logger.info("Pipeline: " + " ".join(filter(None, options)))
 
+    control_in: dai.Node.Input | None = None
+    video_frame_in: dai.Node.Input | None = None
+
     if config.simulate:
-        # XLinkIn replaces camera + warp
-        ex_video = pipeline.create(dai.node.XLinkIn)
-        ex_video.setStreamName("ex_video")
-        ex_video.setMaxDataSize(data_size)
-        frame_source = ex_video.out
+        # v3: inject frames via inputImage of a passthrough ImageManip
+        entry = pipeline.create(dai.node.ImageManip)
+        frame_type = dai.ImgFrame.Type.BGR888p if config.do_color else dai.ImgFrame.Type.GRAY8
+        entry.initialConfig.setOutputSize(out_w, out_h)
+        entry.initialConfig.setFrameType(frame_type)
+        video_frame_in = entry.inputImage
+        frame_source = entry.out
     else:
+        cam = pipeline.create(dai.node.Camera)
         if config.do_color:
-            cam = pipeline.create(dai.node.ColorCamera)
-            cam.setResolution(resolution)
-            cam.setFps(config.fps)
-            cam.setInterleaved(False)
-            cam.setPreviewSize(width, height)
-            cam_out = cam.preview
-
-            ctrl = pipeline.create(dai.node.XLinkIn)
-            ctrl.setStreamName("color_control")
-            ctrl.out.link(cam.inputControl)
+            cam.build(dai.CameraBoardSocket.CAM_A)
+            cam_out = cam.requestOutput((width, height), type=dai.ImgFrame.Type.BGR888p, fps=config.fps)
         else:
-            cam = pipeline.create(dai.node.MonoCamera)
-            cam.setCamera("left")
-            cam.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
-            cam.setFps(config.fps)
-            cam_out = cam.out
-
-            ctrl = pipeline.create(dai.node.XLinkIn)
-            ctrl.setStreamName("mono_control")
-            ctrl.out.link(cam.inputControl)
+            cam.build(dai.CameraBoardSocket.CAM_B)
+            cam_out = cam.requestOutput((1280, 720), type=dai.ImgFrame.Type.GRAY8, fps=config.fps)
+        control_in = cam.inputControl
 
         warp = pipeline.create(dai.node.Warp)
         warp.setMaxOutputFrameSize(data_size)
         warp.setOutputSize(out_w, out_h)
-        warp.setWarpMesh(warp_mesh, mesh_w, mesh_h)
+        warp.setWarpMesh([(p.x, p.y) for p in warp_mesh], mesh_w, mesh_h)
         cam_out.link(warp.inputImage)
         frame_source = warp.out
 
-    output_video = pipeline.create(dai.node.XLinkOut)
-    output_video.setStreamName("video")
-    frame_source.link(output_video.input)
+    # video_out default (no YOLO): host queue created directly on warp/sim output
+    video_out = frame_source
 
+    tracklets_out: dai.Node.Output | None = None
     if config.do_yolo:
+        yolo_w = 416 if square else 640
+        yolo_h = 416 if square else 352
+
         manip = pipeline.create(dai.node.ImageManip)
+        manip.initialConfig.setOutputSize(yolo_w, yolo_h)  # STRETCH mode is default (no aspect ratio)
         manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
-        if square:
-            manip.initialConfig.setResize(416, 416)
-            manip.initialConfig.setKeepAspectRatio(True)
-        else:
-            manip.initialConfig.setResize(640, 352)
-            manip.initialConfig.setKeepAspectRatio(False)
         frame_source.link(manip.inputImage)
 
-        network = pipeline.create(dai.node.YoloDetectionNetwork)
+        network = pipeline.create(dai.node.DetectionNetwork)
         assert config.nn_path is not None
         network.setBlobPath(config.nn_path)
         network.setNumInferenceThreads(2)
-        network.setNumClasses(80)
-        network.setCoordinateSize(4)
-        network.setConfidenceThreshold(YOLO_CONFIDENCE_THRESHOLD)
-        network.setIouThreshold(YOLO_OVERLAP_THRESHOLD)
         network.input.setBlocking(False)
+        network.detectionParser.setNNFamily(dai.DetectionNetworkType.YOLO)
+        network.detectionParser.setSubtype("yolov8n")
+        network.detectionParser.setNumClasses(80)
+        network.detectionParser.setCoordinateSize(4)
+        network.detectionParser.setConfidenceThreshold(YOLO_CONFIDENCE_THRESHOLD)
+        network.detectionParser.setIouThreshold(YOLO_OVERLAP_THRESHOLD)
+        network.detectionParser.setStrides([8, 16, 32])
         manip.out.link(network.input)
 
         tracker = pipeline.create(dai.node.ObjectTracker)
         tracker.setDetectionLabelsToTrack([TRACKER_PERSON_LABEL])
         tracker.setTrackerType(TRACKER_TYPE)
         tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
-        network.passthrough.link(tracker.inputTrackerFrame)
+        # Full-frame tracking: warp output → inputTrackerFrame (full res for rendering)
+        # network.passthrough (416x416) → inputDetectionFrame (frame detections were run on)
+        # This avoids mixing device-side link() and createOutputQueue() on the same output.
+        frame_source.link(tracker.inputTrackerFrame)
+        tracker.inputTrackerFrame.setBlocking(False)
+        tracker.inputTrackerFrame.setMaxSize(1)
         network.passthrough.link(tracker.inputDetectionFrame)
         network.out.link(tracker.inputDetections)
+        tracklets_out = tracker.out
+        # video host queue comes from tracker passthrough, not frame_source directly
+        video_out = tracker.passthroughTrackerFrame
 
-        output_tracklets = pipeline.create(dai.node.XLinkOut)
-        output_tracklets.setStreamName("tracklets")
-        tracker.out.link(output_tracklets.input)
-
-    return PipelineHandles(do_color=config.do_color, do_yolo=config.do_yolo)
+    return PipelineHandles(
+        do_color=config.do_color,
+        do_yolo=config.do_yolo,
+        video_out=video_out,
+        control_in=control_in,
+        tracklets_out=tracklets_out,
+        video_frame_in=video_frame_in,
+    )

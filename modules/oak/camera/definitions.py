@@ -73,9 +73,9 @@ def get_device_list(verbose: bool = False) -> list[str]:
     if verbose:
         logger.info('-- CAMERAS --------------------------------------------------')
     for device in Device.getAllAvailableDevices():
-        device_list.append(device.getMxId())
+        device_list.append(device.deviceId)
         if verbose:
-            logger.info(f"Camera: {device.getMxId()} {device.state}")
+            logger.info(f"Camera: {device.deviceId} {device.state}")
     if verbose:
         logger.info('-------------------------------------------------------------')
     return device_list

@@ -16,10 +16,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Camera(Thread):
-    _id_counter = 0
-    _pipeline: dai.Pipeline | None = None
-    _pipeline_handles: PipelineHandles | None = None
-    _pipeline_lock: Lock = Lock()
+    _id_counter: int = 0
+    _open_lock: Lock = Lock()
     _MAX_CONSECUTIVE_FAILURES: int = 3
 
     def __init__(self, core_settings: CameraSettings) -> None:
@@ -29,7 +27,7 @@ class Camera(Thread):
 
         # ID
         self.id: int =                  Camera._id_counter
-        Camera._id_counter +=             1
+        Camera._id_counter +=           1
         self.id_string: str =           str(self.id)
 
         # SETTINGS (reactive)
@@ -52,10 +50,11 @@ class Camera(Thread):
         )
 
         # DAI
-        self.device:                    dai.Device
-        self.inputs: dict[Input, dai.DataInputQueue] = {}
-        self.outputs: dict[Output, dai.DataOutputQueue] = {}
-        self.num_tracklets: int =       0
+        self._device: dai.Device | None =       None
+        self._pipeline: dai.Pipeline | None =   None
+        self.inputs: dict =                     {}
+        self.outputs: dict =                    {}
+        self.num_tracklets: int =               0
         self._pipeline_handles: PipelineHandles | None = None
 
         # FPS
@@ -86,7 +85,6 @@ class Camera(Thread):
                     return
                 consecutive_failures = 0
                 self.stop_event.wait()
-                self._close()
             except Exception:
                 logger.exception("Camera error")
                 consecutive_failures += 1
@@ -94,6 +92,8 @@ class Camera(Thread):
                     logger.error(f'Camera {self.device_id}: {consecutive_failures} consecutive failures, stopping')
                     return
                 self.stop_event.wait(timeout=1.0)
+            finally:
+                self._close()
 
     def _open(self) -> bool:
         device_list: list[str] = get_device_list(verbose=False)
@@ -102,25 +102,16 @@ class Camera(Thread):
             logger.warning(f'Camera: {self.device_id} NOT AVAILABLE in {device_list}')
             return False
 
-        with Camera._pipeline_lock:
-            if Camera._pipeline is None:
-                Camera._pipeline = dai.Pipeline()
-                self._setup_pipeline(Camera._pipeline)
-                Camera._pipeline_handles = self._pipeline_handles
-            else:
-                self._pipeline_handles = Camera._pipeline_handles
-
-        try:
-            self.device = self._try_device(self.device_id, Camera._pipeline, num_tries=1)
-        except Exception as e:
-            logger.error(f'Could not open device: {e}')
-            return False
-
-        self._setup_queues()
+        with Camera._open_lock:
+            self._device = dai.Device(dai.DeviceInfo(self.device_id))
+            self._pipeline = dai.Pipeline(defaultDevice=self._device)
+            self._setup_pipeline(self._pipeline)
+            self._setup_queues()
+            self._pipeline.start()
 
         logger.info(f'Camera: {self.device_id} OPEN')
         self.running = True
-        self.settings.connect(self.device, self.inputs, self.do_color)
+        self.settings.connect(self._device, self.inputs, self.do_color)
         return True
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
@@ -139,36 +130,33 @@ class Camera(Thread):
     def _setup_queues(self) -> None:
         assert self._pipeline_handles is not None
         handles = self._pipeline_handles
-        if handles.do_color:
-            self.inputs[Input.COLOR_CONTROL] =     self.device.getInputQueue('color_control')
-        else:
-            self.inputs[Input.MONO_CONTROL] =      self.device.getInputQueue('mono_control')
-        video_q = self.device.getOutputQueue('video')
-        video_q.setMaxSize(1)
-        video_q.setBlocking(False)
+        if handles.control_in is not None:
+            if handles.do_color:
+                self.inputs[Input.COLOR_CONTROL] = handles.control_in.createInputQueue()
+            else:
+                self.inputs[Input.MONO_CONTROL] = handles.control_in.createInputQueue()
+        video_q = handles.video_out.createOutputQueue(maxSize=1, blocking=False)
         self.outputs[Output.VIDEO_FRAME_OUT] = video_q
-        self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
+        video_q.addCallback(self._video_callback)
         self.fps_counters[FrameType.VIDEO] = FPS(120)
-        if handles.do_yolo:
-            tracklets_q = self.device.getOutputQueue('tracklets')
-            tracklets_q.setMaxSize(1)
-            tracklets_q.setBlocking(False)
+        if handles.do_yolo and handles.tracklets_out is not None:
+            tracklets_q = handles.tracklets_out.createOutputQueue(maxSize=1, blocking=False)
             self.outputs[Output.TRACKLETS_OUT] = tracklets_q
-            self.outputs[Output.TRACKLETS_OUT].addCallback(self._tracker_callback)
+            tracklets_q.addCallback(self._tracker_callback)
 
     def _close(self) -> None:
+        self.running = False
         self.settings.disconnect()
-        self.device.close()
-        for value in self.outputs.values():
-            value.close()
-        for value in self.inputs.values():
-            value.close()
-
+        if self._pipeline is not None:
+            self._pipeline.stop()
+            self._pipeline = None
+        self._device = None
+        self.inputs.clear()
+        self.outputs.clear()
         self.frame_callbacks.clear()
         self.preview_callbacks.clear()
         self.sync_callbacks.clear()
         self.tracker_callbacks.clear()
-
         logger.info(f'Camera: {self.device_id} CLOSED')
 
     def _video_callback(self, msg: dai.ImgFrame) -> None:
@@ -182,7 +170,7 @@ class Camera(Thread):
         frame: ndarray = msg.getCvFrame()
         self._update_frame_callbacks(FrameType.VIDEO, frame)
 
-    def _tracker_callback(self, msg: dai.RawTracklets) -> None:
+    def _tracker_callback(self, msg: dai.Tracklets) -> None:
         # print('RT', msg.getTimestamp()) # type: ignore
         self._update_tps()
         Ts: list[Tracklet] = msg.tracklets
@@ -250,17 +238,7 @@ class Camera(Thread):
             return
         self.tracker_callbacks.add(callback)
 
-    @staticmethod
-    def _try_device(device_id: str, pipeline: dai.Pipeline, num_tries: int) -> dai.Device:
-        device_info = dai.DeviceInfo(device_id)
-        for attempt in range(num_tries):
-            try:
-                device = dai.Device(pipeline, device_info)
-                return device
-            except Exception as e:
-                print (f'Attempt {attempt + 1}/{num_tries} - could not open camera: {e}')
-                continue
-        raise Exception('Failed to open device after multiple attempts')
+
 
 
 
