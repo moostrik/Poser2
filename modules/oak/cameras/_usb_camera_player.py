@@ -1,7 +1,8 @@
 import depthai as dai
 import numpy as np
+from threading import Barrier
 from ._usb_camera import UsbCamera
-from ._definitions import FrameType, Input, Output, Tracklet
+from ._definitions import FrameType, Input, Output, Tracklet, DeviceInfo
 from ._pipeline import build_pipeline, get_model_path, PipelineConfig
 from .settings import CameraSettings
 from modules.utils import FPS
@@ -14,8 +15,8 @@ from datetime import timedelta
 
 class UsbCameraPlayer(UsbCamera):
 
-    def __init__(self, syncplayer: Player, core_settings: CameraSettings, player_settings: SimulatorSettings) -> None:
-        super().__init__(core_settings)
+    def __init__(self, syncplayer: Player, core_settings: CameraSettings, player_settings: SimulatorSettings, barrier: Barrier | None = None, device_info: DeviceInfo | None = None) -> None:
+        super().__init__(core_settings, barrier, device_info)
 
         self.sync_player: Player = syncplayer
         self.passthrough: bool = player_settings.sim_passthrough

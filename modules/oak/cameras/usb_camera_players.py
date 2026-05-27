@@ -1,6 +1,8 @@
+from threading import Barrier
+
 from ._usb_camera import UsbCamera
 from ._usb_camera_player import UsbCameraPlayer
-from ._definitions import FrameCallback, SyncCallback, TrackerCallback
+from ._definitions import resolve_device_infos, FrameCallback, SyncCallback, TrackerCallback
 from .settings import CameraSettings
 from ..player.settings import SimulatorSettings
 from ..player import Player
@@ -17,8 +19,11 @@ class UsbCameraPlayers:
     """
 
     def __init__(self, player: Player, settings_list: list[CameraSettings], player_settings: SimulatorSettings) -> None:
+        n = len(settings_list)
+        barrier = Barrier(n)
+        infos = resolve_device_infos([s.device_id for s in settings_list])
         self._cameras: list[UsbCameraPlayer] = [
-            UsbCameraPlayer(player, s, player_settings)
+            UsbCameraPlayer(player, s, player_settings, barrier, infos[s.device_id])
             for s in settings_list
         ]
 

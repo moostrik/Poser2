@@ -2,7 +2,7 @@
 depthai v3 multi-camera test — mirrors the app's exact camera setup.
 
 4 camera IDs from apps/white_space/data/settings/studio.json.
-Two are not connected; two are real. DeviceInfo is resolved in the main
+Sometimes not all cameras are connected. DeviceInfo is resolved in the main
 thread before any camera thread starts (same fix applied to camera.py).
 
 Usage:
