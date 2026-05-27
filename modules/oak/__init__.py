@@ -1,4 +1,4 @@
-from .cameras import            Cameras, CameraSettings, FrameType, CoderFormat, DepthTracklet
+from .cameras import            Cameras, UsbCameras, UsbCameraPlayers, UsbCamera, UsbCameraPlayer, CameraSettings, FrameType, CoderFormat, DepthTracklet
 from .recorder import           Recorder, RecorderSettings
-from .simulator import          Simulator, Player, SimulatorSettings
+from .player import             Player, SimulatorSettings
 from .sync import               Sync, SyncSettings

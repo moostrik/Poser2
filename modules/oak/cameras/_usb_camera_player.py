@@ -1,17 +1,18 @@
 import depthai as dai
 import numpy as np
-from ..cameras._camera import Camera
-from ..cameras._definitions import FrameType, Input, Output, Tracklet
-from ..cameras._pipeline import build_pipeline, get_model_path, PipelineConfig
-from ..cameras.settings import CameraSettings
+from ._usb_camera import UsbCamera
+from ._definitions import FrameType, Input, Output, Tracklet
+from ._pipeline import build_pipeline, get_model_path, PipelineConfig
+from .settings import CameraSettings
 from modules.utils import FPS
-from .settings import SimulatorSettings
-from .player import Player
+from ..player.settings import SimulatorSettings
+from ..player import Player
 from cv2 import resize, COLOR_RGB2GRAY, cvtColor
 from time import process_time
 from datetime import timedelta
 
-class Simulator(Camera):
+
+class UsbCameraPlayer(UsbCamera):
 
     def __init__(self, syncplayer: Player, core_settings: CameraSettings, player_settings: SimulatorSettings) -> None:
         super().__init__(core_settings)
@@ -19,14 +20,14 @@ class Simulator(Camera):
         self.sync_player: Player = syncplayer
         self.passthrough: bool = player_settings.sim_passthrough
 
-    def start(self) -> None: # override
+    def start(self) -> None:  # override
         if self.passthrough:
             self.sync_player.addFrameCallback(self._passthrough_frame_callback)
         else:
             self.sync_player.addFrameCallback(self._video_frame_callback)
         super().start()
 
-    def run(self) -> None: # override
+    def run(self) -> None:  # override
         if self.passthrough:
             self.stop_event.wait()
         else:
@@ -44,7 +45,6 @@ class Simulator(Camera):
             nn_path=get_model_path(self.model_path, self.square, True) if self.do_yolo else None,
         )
         self._pipeline_handles = build_pipeline(pipeline, config)
-
 
     def _setup_queues(self) -> None:  # override
         assert self._pipeline_handles is not None
@@ -64,7 +64,7 @@ class Simulator(Camera):
         if not self.running:
             return
 
-        frame_time = timedelta(seconds = process_time())
+        frame_time = timedelta(seconds=process_time())
         height, width = frame.shape[:2]
         if id == self.id:
             if frame_type == FrameType.VIDEO and Input.VIDEO_FRAME_IN in self.inputs:

@@ -16,10 +16,10 @@ from modules.utils import FPS
 import logging
 logger = logging.getLogger(__name__)
 
-class Camera(Thread):
+class UsbCamera(Thread):
     _id_counter: int = 0
 
-    # Phase B lock: serialises pipeline.start() calls across all Camera threads so the
+    # Phase B lock: serialises pipeline.start() calls across all UsbCamera threads so the
     # USB host isn't hit by concurrent XLink stream setup. Shared across all instances.
     _start_lock: Lock = Lock()
 
@@ -29,8 +29,8 @@ class Camera(Thread):
         self.running: bool = False
 
         # ID
-        self.id: int =                  Camera._id_counter
-        Camera._id_counter +=           1
+        self.id: int =                  UsbCamera._id_counter
+        UsbCamera._id_counter +=        1
         self.id_string: str =           str(self.id)
 
         self._barrier = barrier
@@ -96,7 +96,7 @@ class Camera(Thread):
         """depthai v3 host-side XLink reader requires the queue to be actively
         drained by the host. `addCallback` does not keep the stream alive
         reliably under v3 — the probe uses blocking `q.get()` polling, which
-        works. Each Camera owns its own thread (this one) and drives its
+        works. Each UsbCamera owns its own thread (this one) and drives its
         queues here."""
         video_q = self.outputs.get(Output.VIDEO_FRAME_OUT)
         tracklets_q = self.outputs.get(Output.TRACKLETS_OUT)
@@ -155,7 +155,7 @@ class Camera(Thread):
                     pass
             return False
 
-        # Barrier — wait for every Camera to finish Phase A before any start().
+        # Barrier — wait for every UsbCamera to finish Phase A before any start().
         if self._barrier is not None:
             try:
                 self._barrier.wait(timeout=60.0)
@@ -163,8 +163,13 @@ class Camera(Thread):
                 logger.error(f'Camera {self.device_id}: timed out waiting for peers')
                 return False
 
+        # Settle delay — let USB bus quiesce after all cameras finish Phase A.
+        # Prevents "Device already closed" errors on pipeline.start() caused by
+        # the XLink connection dropping between boot and start.
+        time.sleep(0.5)
+
         # Phase B — sequential pipeline.start() under _start_lock.
-        with Camera._start_lock:
+        with UsbCamera._start_lock:
             try:
                 self._pipeline.start()
             except Exception:
@@ -303,16 +308,3 @@ class Camera(Thread):
             logger.warning('Camera: cannot add callback while camera is running')
             return
         self.tracker_callbacks.add(callback)
-
-
-
-
-
-
-
-
-
-
-
-
-

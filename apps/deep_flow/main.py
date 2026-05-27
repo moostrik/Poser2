@@ -4,7 +4,7 @@ from typing import Optional
 from functools import partial
 
 from modules.utils import Broadcast
-from modules.oak import Cameras, Simulator, Player, Recorder, Sync
+from modules.oak import Cameras, UsbCameras, UsbCameraPlayers, Player, Recorder, Sync
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
@@ -45,30 +45,27 @@ class DeepFlowMain:
         # CAMERA
         configure_features(num_players)
 
-        self.cameras: Cameras | list[Simulator] = []
         self.recorder: Optional[Recorder] = None
         self.player: Optional[Player] = None
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator)
-            for i in range(num_players):
-                self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
+            self.cameras: Cameras = UsbCameraPlayers(self.player, self.settings.camera.cameras[:num_players], self.settings.camera.simulator)
         else:
             self.recorder = Recorder(self.settings.camera.recorder)
-            self.cameras = Cameras(self.settings.camera.cameras[:num_players])
+            self.cameras: Cameras = UsbCameras(self.settings.camera.cameras[:num_players])
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.tt.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.image_uploader = source.Uploader()
         self.crop_extractor = crop.Extractor(p.image_crop)
 
-        for camera in self.cameras:
-            if self.recorder:
-                camera.add_sync_callback(self.recorder.submit_synced_frames)
-            camera.add_frame_callback(self.image_uploader.set_image)
-            camera.add_frame_callback(self.frame_sync_bang.submit_frame)
-            camera.add_tracker_callback(self.tracker.submit_cam_tracklets)
-            camera.add_tracker_callback(self.board.set_depth_tracklets)
-            camera.add_tracker_callback(self.tracklet_sync_bang.submit_frame)
+        if self.recorder:
+            self.cameras.add_sync_callback(self.recorder.submit_synced_frames)
+        self.cameras.add_frame_callback(self.image_uploader.set_image)
+        self.cameras.add_frame_callback(self.frame_sync_bang.submit_frame)
+        self.cameras.add_tracker_callback(self.tracker.submit_cam_tracklets)
+        self.cameras.add_tracker_callback(self.board.set_depth_tracklets)
+        self.cameras.add_tracker_callback(self.tracklet_sync_bang.submit_frame)
 
         # DETECTION
         self.poses_from_tracklets = PosesFromTracklets(num_players)
@@ -191,7 +188,7 @@ class DeepFlowMain:
         self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
 
         # RENDER
-        self.render = DeepFlowRender(self.board, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
+        self.render = DeepFlowRender(self.board, self.settings.render, num_cams=num_players, num_players=num_players)
         self.render.add_exit_callback(self.stop)
 
         # IN/OUT
@@ -200,8 +197,7 @@ class DeepFlowMain:
     def start(self) -> None:
         self.settings_server.start()
 
-        for camera in self.cameras:
-            camera.start()
+        self.cameras.start()
 
         self.tracker.start()
         self.pose_predictor.start()
@@ -232,8 +228,7 @@ class DeepFlowMain:
 
         if self.player:
             self.player.stop()
-        for camera in self.cameras:
-            camera.stop()
+        self.cameras.stop()
         if self.recorder:
             self.recorder.stop()
 
@@ -245,8 +240,5 @@ class DeepFlowMain:
         self.optical_flow_predictor.stop()
 
         self.settings_server.stop()
-
-        for camera in self.cameras:
-            camera.join(timeout=10)
 
         self.is_finished = True

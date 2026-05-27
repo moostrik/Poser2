@@ -85,3 +85,13 @@ def get_device_info(device_id: str) -> DeviceInfo | None:
         if info.deviceId == device_id:
             return info
     return None
+
+def resolve_device_infos(ids: list[str]) -> dict[str, DeviceInfo | None]:
+    """Single USB enumeration snapshot mapped to all requested IDs.
+
+    Calling getAllAvailableDevices() once per camera risks seeing a different
+    bus state for each call. This helper takes a single snapshot so every
+    camera in a batch receives a consistent view.
+    """
+    snapshot = {info.deviceId: info for info in Device.getAllAvailableDevices()}
+    return {device_id: snapshot.get(device_id) for device_id in ids}

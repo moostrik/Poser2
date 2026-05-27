@@ -6,7 +6,7 @@ from typing import Optional
 from functools import partial
 
 from modules.utils import Broadcast
-from modules.oak import Cameras, Simulator, Player, Sync, Recorder as VideoRecorder
+from modules.oak import Cameras, UsbCameras, UsbCameraPlayers, Player, Sync, Recorder as VideoRecorder
 from modules.settings import presets, NiceServer
 from modules.inout import OscReceiver
 from .sound_osc import WhiteSpaceSoundOsc
@@ -63,27 +63,24 @@ class WhiteSpaceMain:
         self.video_recorder = VideoRecorder(self.settings.session.video)
 
         # CAMERA
-        self.cameras: Cameras | list[Simulator] = []
         self.player: Optional[Player] = None
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator)
-            for i in range(num_cameras):
-                self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
+            self.cameras: Cameras = UsbCameraPlayers(self.player, self.settings.camera.cameras[:num_cameras], self.settings.camera.simulator)
         else:
-            self.cameras = Cameras(self.settings.camera.cameras[:num_cameras])
+            self.cameras: Cameras = UsbCameras(self.settings.camera.cameras[:num_cameras])
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = PanoramicTracker(self.settings.camera.tracker, num_players, num_cameras)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.source_uploader = source.Uploader()
         self.crop_extractor = crop.Extractor(ps.image_crop)
 
-        for camera in self.cameras:
-            camera.add_sync_callback(self.video_recorder.submit_synced_frames)
-            camera.add_frame_callback(self.source_uploader.set_image)
-            camera.add_frame_callback(self.frame_sync_bang.submit_frame)
-            camera.add_tracker_callback(self.tracker.submit_cam_tracklets)
-            camera.add_tracker_callback(self.board.set_depth_tracklets)
-            camera.add_tracker_callback(self.tracklet_sync_bang.submit_frame)
+        self.cameras.add_sync_callback(self.video_recorder.submit_synced_frames)
+        self.cameras.add_frame_callback(self.source_uploader.set_image)
+        self.cameras.add_frame_callback(self.frame_sync_bang.submit_frame)
+        self.cameras.add_tracker_callback(self.tracker.submit_cam_tracklets)
+        self.cameras.add_tracker_callback(self.board.set_depth_tracklets)
+        self.cameras.add_tracker_callback(self.tracklet_sync_bang.submit_frame)
 
         # DETECTION
         features.configure_features(num_players)
@@ -131,8 +128,7 @@ class WhiteSpaceMain:
         self.tracker.add_tracklet_callback(self.compositor.set_tracklets)
         ws_input: Stage = Stage(int(ps.ws_input_stage))
         self.stages[ws_input].add_callback(self.compositor.add_poses)
-        for camera in self.cameras:
-            camera.add_frame_callback(self.compositor.set_image)
+        self.cameras.add_frame_callback(self.compositor.set_image)
         self.compositor.add_output_callback(self.osc_light.send_message)
         self.compositor.add_output_callback(self.sound_osc.set_composition)
         self.compositor.add_output_callback(self.board.set_composition_output)
@@ -248,8 +244,7 @@ class WhiteSpaceMain:
     def start(self) -> None:
         self.settings_server.start()
 
-        for camera in self.cameras:
-            camera.start()
+        self.cameras.start()
 
         self.tracker.start()
         self.pose_predictor.start()
@@ -286,8 +281,7 @@ class WhiteSpaceMain:
 
         if self.player:
             self.player.stop()
-        for camera in self.cameras:
-            camera.stop()
+        self.cameras.stop()
         self.video_recorder.stop()
 
         self.tracker.stop()
@@ -301,9 +295,6 @@ class WhiteSpaceMain:
         self.segmentation_predictor.stop()
         self.window_similator.stop()
         self.window_correlator.stop()
-
-        for camera in self.cameras:
-            camera.join(timeout=10)
 
         self.is_finished = True
 
