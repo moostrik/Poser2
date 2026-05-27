@@ -47,7 +47,6 @@ class UsbCamera(Thread):
         self.do_color: bool =           core_settings.color
         self.do_yolo: bool =            core_settings.yolo
         self.do_720p: bool =            core_settings.hd_ready
-        self.simulation: bool =         core_settings.sim_enabled
 
         self.perspective: PerspectiveConfig = PerspectiveConfig(
             core_settings.flip_h,

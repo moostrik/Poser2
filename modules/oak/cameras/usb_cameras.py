@@ -22,6 +22,7 @@ class UsbCameras:
     """
 
     def __init__(self, settings_list: list[CameraSettings]) -> None:
+        UsbCamera._id_counter = 0
         n = len(settings_list)
         barrier = Barrier(n)
         infos = resolve_device_infos([s.device_id for s in settings_list])

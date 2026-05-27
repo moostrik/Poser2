@@ -1,8 +1,9 @@
+import time
 from threading import Barrier
 
 from ._usb_camera import UsbCamera
 from ._usb_camera_player import UsbCameraPlayer
-from ._definitions import resolve_device_infos, FrameCallback, SyncCallback, TrackerCallback
+from ._definitions import resolve_device_infos, get_device_list, FrameCallback, SyncCallback, TrackerCallback
 from .settings import CameraSettings
 from ..player.settings import SimulatorSettings
 from ..player import Player
@@ -22,6 +23,11 @@ class UsbCameraPlayers:
         n = len(settings_list)
         barrier = Barrier(n)
         infos = resolve_device_infos([s.device_id for s in settings_list])
+        # Only non-passthrough players open a real device and trigger a USB reset on stop.
+        self._opened_ids: set[str] = (
+            {s.device_id for s in settings_list if infos[s.device_id] is not None}
+            if not player_settings.sim_passthrough else set()
+        )
         self._cameras: list[UsbCameraPlayer] = [
             UsbCameraPlayer(player, s, player_settings, barrier, infos[s.device_id])
             for s in settings_list
@@ -38,6 +44,21 @@ class UsbCameraPlayers:
             camera.stop()
         for camera in self._cameras:
             camera.join(timeout=10.0)
+
+        if not self._opened_ids:
+            return
+
+        max_tries = 6
+        missing: set[str] = set()
+        for attempt in range(1, max_tries + 1):
+            available = set(get_device_list())
+            missing = self._opened_ids - available
+            if not missing:
+                logger.info(f'All cameras back on USB bus — safe to restart (attempt {attempt}).')
+                return
+            logger.warning(f'Cameras still resetting on USB bus (attempt {attempt}/{max_tries}): {missing}')
+            time.sleep(0.5)
+        logger.error(f'USB reset timed out — cameras may not be available on next run: {missing}')
 
     # --- Access ---
 

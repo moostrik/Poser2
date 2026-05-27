@@ -1,8 +1,8 @@
 {
   "num_players": 8,
   "num_cameras": 4,
-  "input_fps": 23.0,
-  "render_fps": 60.0,
+  "input_fps": 22.0,
+  "render_fps": 120.0,
   "light_resolution": 3600,
   "fov": 120.0,
   "camera": {
@@ -10,7 +10,7 @@
     "color": false,
     "square": false,
     "hd_ready": true,
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "cam_0": {
       "device_id": "14442C101136D1D200",
@@ -27,8 +27,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 1029,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.8
@@ -48,8 +48,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 476,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.8
@@ -69,8 +69,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 823,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.8
@@ -90,8 +90,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 487,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.8
@@ -607,13 +607,14 @@
     "window": {
       "title": "Poser",
       "v_sync": true,
-      "monitor": 0,
-      "x": 0,
-      "y": 0,
+      "monitor": "M0",
+      "x": 20,
+      "y": 60,
       "width": 1278,
       "height": 1000,
       "secondary_list": [],
-      "secondary_fullscreen": true
+      "secondary_fullscreen": true,
+      "fullscreen_mode": "WINDOWED"
     }
   },
   "server": {
