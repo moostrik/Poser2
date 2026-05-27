@@ -6,7 +6,7 @@ from enum import Enum, auto
 from numpy import ndarray
 from queue import Queue, Empty
 
-from ..camera.definitions import CoderType, CoderFormat, FrameType, FRAME_TYPE_LABEL_DICT
+from ..cameras._definitions import CoderType, CoderFormat, FrameType, FRAME_TYPE_LABEL_DICT
 from .settings import RecorderSettings
 from .stream_writer import StreamWriter
 

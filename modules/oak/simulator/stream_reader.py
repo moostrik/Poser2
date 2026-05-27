@@ -7,7 +7,7 @@ from cv2 import cvtColor, COLOR_RGB2BGR
 import time
 
 
-from ..camera.definitions import FrameType
+from ..cameras._definitions import FrameType
 
 import logging
 logger = logging.getLogger(__name__)

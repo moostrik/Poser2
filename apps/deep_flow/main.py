@@ -4,7 +4,7 @@ from typing import Optional
 from functools import partial
 
 from modules.utils import Broadcast
-from modules.oak import Camera, Simulator, Player, Recorder, Sync
+from modules.oak import Cameras, Simulator, Player, Recorder, Sync
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
@@ -45,7 +45,7 @@ class DeepFlowMain:
         # CAMERA
         configure_features(num_players)
 
-        self.cameras: list[Camera | Simulator] = []
+        self.cameras: Cameras | list[Simulator] = []
         self.recorder: Optional[Recorder] = None
         self.player: Optional[Player] = None
         if self.settings.camera.sim_enabled:
@@ -54,8 +54,7 @@ class DeepFlowMain:
                 self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
             self.recorder = Recorder(self.settings.camera.recorder)
-            for i in range(num_players):
-                self.cameras.append(Camera(self.settings.camera.cameras[i]))
+            self.cameras = Cameras(self.settings.camera.cameras[:num_players])
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.tt.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')

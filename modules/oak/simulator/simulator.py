@@ -1,9 +1,9 @@
 import depthai as dai
 import numpy as np
-from ..camera.camera import Camera
-from ..camera.definitions import FrameType, Input, Output, Tracklet
-from ..camera.pipeline import build_pipeline, get_model_path, PipelineConfig
-from ..camera.settings import CameraSettings
+from ..cameras._camera import Camera
+from ..cameras._definitions import FrameType, Input, Output, Tracklet
+from ..cameras._pipeline import build_pipeline, get_model_path, PipelineConfig
+from ..cameras.settings import CameraSettings
 from modules.utils import FPS
 from .settings import SimulatorSettings
 from .player import Player

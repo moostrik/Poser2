@@ -7,6 +7,8 @@ from threading import Event, Thread
 
 import psutil
 
+os.environ["DEPTHAI_CRASHDUMP"] = "0"  # prevents archiveFilesCompressed crash on device close (depthai 3.6.1)
+
 from modules.log_config import setup_logging, install_thread_excepthook
 from apps import APP_REGISTRY
 

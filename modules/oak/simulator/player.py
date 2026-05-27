@@ -6,7 +6,7 @@ from enum import Enum, auto
 from queue import Queue
 from time import sleep
 
-from ..camera.definitions import CoderType, CoderFormat, FrameType, FrameCallback
+from ..cameras._definitions import CoderType, CoderFormat, FrameType, FrameCallback
 from .settings import SimulatorSettings
 from .stream_reader import StreamReader
 from ..recorder.recorder import make_file_name

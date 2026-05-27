@@ -4,7 +4,7 @@ from typing import Optional
 from functools import partial
 
 from modules.utils import Broadcast
-from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder
+from modules.oak import Cameras, Simulator, Player, Sync, Recorder as VideoRecorder
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
@@ -60,15 +60,14 @@ class HDTrioMain:
             self.artnet_controllers.append(ArtNetBars(self.settings.inout.artnets[i]))
 
         # CAMERA
-        self.cameras: list[Camera | Simulator] = []
+        self.cameras: Cameras | list[Simulator] = []
         self.player: Optional[Player] = None
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator)
             for i in range(num_players):
                 self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
-            for i in range(num_players):
-                self.cameras.append(Camera(self.settings.camera.cameras[i]))
+            self.cameras = Cameras(self.settings.camera.cameras[:num_players])
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')

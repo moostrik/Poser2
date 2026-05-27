@@ -5,7 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from .definitions import (
+from ._definitions import (
     YOLOV8_SQUARE_6S, YOLOV8_SQUARE_7S, YOLOV8_WIDE_6S, YOLOV8_WIDE_7S,
     YOLO_CONFIDENCE_THRESHOLD, YOLO_OVERLAP_THRESHOLD,
     TRACKER_PERSON_LABEL, TRACKER_TYPE,

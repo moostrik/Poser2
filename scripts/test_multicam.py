@@ -22,7 +22,7 @@ import time
 # The env var is read at call time by isCrashDumpCollectionEnabled(),
 # so setting it here (before any dai.Device is created) is sufficient.
 os.environ["DEPTHAI_CRASHDUMP"] = "0"
-from threading import Thread, Event, Lock
+from threading import Thread, Barrier, BrokenBarrierError, Lock
 from typing import Optional
 import cv2
 import depthai as dai
@@ -33,10 +33,10 @@ import depthai as dai
 # ---------------------------------------------------------------------------
 
 CAMERA_IDS = [
-    '14442C101136D1D200',  # not connected
-    '14442C10F124D9D600',  # real
-    '14442C10110AD3D200',  # not connected
-    '14442C1031DDD2D200',  # real
+    '14442C101136D1D200',
+    '14442C10F124D9D600',
+    '14442C10110AD3D200',
+    '14442C1031DDD2D200',
 ]
 
 W, H = 640, 400
@@ -77,53 +77,55 @@ def build_pipeline(device: dai.Device, use_camb: bool) -> tuple[dai.Pipeline, da
 # Strategy 3: Boot-all-then-start-all (mirrors camera.py)
 #   DeviceInfo resolved in main thread before threads start.
 #   Phase A (concurrent, no lock): boot + build + queues.
-#   Barrier (Event + counter): wait for ALL cameras (including missing ones).
+#   Barrier: wait for ALL cameras (including missing ones) before starting.
 #   Phase B (sequential under lock): pipeline.start().
 # ---------------------------------------------------------------------------
 
 def run(device_infos: dict[str, Optional[dai.DeviceInfo]], use_camb: bool) -> None:
     n = len(device_infos)
-    barrier_lock = Lock()
-    ready_count = [0]
-    start_event = Event()
+    barrier = Barrier(n)
     start_lock = Lock()
     results: dict[str, Optional[tuple]] = {d: None for d in device_infos}
 
-    def signal_ready() -> None:
-        with barrier_lock:
-            ready_count[0] += 1
-            if ready_count[0] >= n:
-                start_event.set()
-
     def open_camera(device_id: str, info: Optional[dai.DeviceInfo]) -> None:
         if info is None:
-            print(f"  [A] {device_id}: NOT AVAILABLE")
-            signal_ready()
+            print(f"  {device_id}: NOT AVAILABLE")
+            try:
+                barrier.wait(timeout=30.0)
+            except BrokenBarrierError:
+                pass
             return
 
-        print(f"  [A] {device_id}: booting...")
+        print(f"  {device_id}: booting...")
         try:
             device = dai.Device(info)
         except RuntimeError as e:
-            print(f"  [A] {device_id}: boot FAILED: {e}")
-            signal_ready()
+            print(f"  {device_id}: boot FAILED: {e}")
+            try:
+                barrier.wait(timeout=30.0)
+            except BrokenBarrierError:
+                pass
             return
 
         pipeline, q = build_pipeline(device, use_camb)
-        print(f"  [A] {device_id}: built, waiting at barrier...")
-        signal_ready()
-
-        if not start_event.wait(timeout=30.0):
-            print(f"  [A] {device_id}: barrier timeout")
+        print(f"  {device_id}: built, waiting at barrier...")
+        try:
+            barrier.wait(timeout=30.0)
+        except BrokenBarrierError:
+            print(f"  {device_id}: barrier timeout")
             return
+
+        # Brief settle delay after the barrier: gives the USB host and device
+        # firmware time to stabilise after all concurrent Phase A boots complete.
+        time.sleep(0.5)
 
         with start_lock:
             try:
                 pipeline.start()
-                print(f"  [B] {device_id}: OPEN and streaming")
+                print(f"  {device_id}: OPEN and streaming")
                 results[device_id] = (device_id, pipeline, q)
             except Exception as e:
-                print(f"  [B] {device_id}: pipeline.start() FAILED: {e}")
+                print(f"  {device_id}: pipeline.start() FAILED: {e}")
 
     threads = [
         Thread(target=open_camera, args=(did, info), daemon=True)
@@ -143,14 +145,28 @@ def run(device_infos: dict[str, Optional[dai.DeviceInfo]], use_camb: bool) -> No
 
     print("Stopping all pipelines...")
     stop_threads = [
-        Thread(target=lambda p=pipeline: p.stop(), daemon=True)
-        for _, pipeline, _ in setups
+        Thread(target=lambda did=device_id, p=pipeline: (p.stop(), print(f"  [{did}]: closed")), daemon=True)
+        for device_id, pipeline, _ in setups
     ]
     for t in stop_threads:
         t.start()
     for t in stop_threads:
         t.join(timeout=10.0)
     print("Done.")
+
+    # Wait for all stopped cameras to re-enumerate on the USB bus.
+    stopped_ids = {device_id for device_id, _, _ in setups}
+    max_tries = 6
+    for attempt in range(1, max_tries + 1):
+        available_ids = {info.getDeviceId() for info in dai.Device.getAllAvailableDevices()}
+        missing = stopped_ids - available_ids
+        if not missing:
+            print(f"All cameras back on USB bus — safe to restart (attempt {attempt}).")
+            break
+        print(f"  Cameras still resetting on USB bus (attempt {attempt}/{max_tries}): {missing}")
+        time.sleep(0.5)
+    else:
+        print(f"  USB reset timed out — cameras may not be available on next run: {missing}")
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +228,9 @@ def main() -> None:
                         help="Use CAM_B + GRAY8 instead of CAM_A + BGR888p")
     args = parser.parse_args()
 
-    print(f"Camera IDs ({len(CAMERA_IDS)} configured):")
+    n_available = len(dai.Device.getAllAvailableDevices())
+    print(f"Available cameras: {n_available}")
+    print(f"\nConfigured camera IDs ({len(CAMERA_IDS)}):")
     device_infos = lookup_devices(CAMERA_IDS)
 
     cam_type = "CAM_B + GRAY8" if args.camb else "CAM_A + BGR888p"

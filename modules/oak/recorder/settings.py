@@ -1,4 +1,4 @@
-from ..camera.definitions import FrameType, CoderType, CoderFormat
+from ..cameras._definitions import FrameType, CoderType, CoderFormat
 from modules.settings import BaseSettings, Field, Widget
 
 

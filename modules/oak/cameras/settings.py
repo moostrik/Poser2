@@ -1,6 +1,6 @@
 import depthai as dai
 
-from .definitions import (
+from ._definitions import (
     EXPOSURE_RANGE, ISO_RANGE, BALANCE_RANGE, CONTRAST_RANGE, BRIGHTNESS_RANGE,
     LUMA_DENOISE_RANGE, SATURATION_RANGE, SHARPNESS_RANGE,
     Input,

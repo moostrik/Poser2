@@ -6,10 +6,10 @@ import time
 import depthai as dai
 from numpy import ndarray
 from typing import Set
-from threading import Thread, Event, Lock
+from threading import Thread, Event, Lock, Barrier, BrokenBarrierError
 
-from .pipeline import build_pipeline, get_model_path, PipelineConfig, PipelineHandles, PerspectiveConfig
-from .definitions import *
+from ._pipeline import build_pipeline, get_model_path, PipelineConfig, PipelineHandles, PerspectiveConfig
+from ._definitions import *
 from .settings import CameraSettings
 from modules.utils import FPS
 
@@ -19,20 +19,11 @@ logger = logging.getLogger(__name__)
 class Camera(Thread):
     _id_counter: int = 0
 
-    # Multi-device coordination (strategy 3 — proven by test_multicam.py):
-    # Phase A (concurrent, no lock): each camera boots its device, builds its pipeline,
-    # and creates queues independently. USB enumerations happen simultaneously so no
-    # camera is streaming when a peer enumerates.
-    # Phase B (barrier then sequential start_lock): all cameras must reach the barrier
-    # before any pipeline.start() is called, then starts are serialized so the USB
-    # host isn't hit by concurrent XLink stream setup.
-    _barrier_lock: Lock = Lock()
-    _total_instances: int = 0
-    _ready_count: int = 0
-    _start_streaming: Event = Event()
+    # Phase B lock: serialises pipeline.start() calls across all Camera threads so the
+    # USB host isn't hit by concurrent XLink stream setup. Shared across all instances.
     _start_lock: Lock = Lock()
 
-    def __init__(self, core_settings: CameraSettings) -> None:
+    def __init__(self, core_settings: CameraSettings, barrier: Barrier | None = None, device_info: DeviceInfo | None = None) -> None:
         super().__init__()
         self.stop_event = Event()
         self.running: bool = False
@@ -42,9 +33,8 @@ class Camera(Thread):
         Camera._id_counter +=           1
         self.id_string: str =           str(self.id)
 
-        # Register in the multi-device barrier
-        with Camera._barrier_lock:
-            Camera._total_instances += 1
+        self._barrier = barrier
+        self._device_info = device_info
 
         # SETTINGS (reactive)
         self.settings: CameraSettings =   core_settings
@@ -124,10 +114,14 @@ class Camera(Thread):
             time.sleep(0.001)
 
     def _open(self) -> bool:
-        info = get_device_info(self.device_id)
+        info = self._device_info
         if info is None:
             logger.warning(f'Camera: {self.device_id} NOT AVAILABLE in {get_device_list()}')
-            self._signal_ready()  # don't deadlock peers at the barrier
+            if self._barrier is not None:
+                try:
+                    self._barrier.wait(timeout=60.0)
+                except BrokenBarrierError:
+                    pass
             return False
 
         # Phase A — concurrent, single attempt, no sleep.
@@ -141,7 +135,11 @@ class Camera(Thread):
             device = dai.Device(info)
         except RuntimeError as e:
             logger.warning(f'Camera {self.device_id}: boot failed: {e}')
-            self._signal_ready()
+            if self._barrier is not None:
+                try:
+                    self._barrier.wait(timeout=60.0)
+                except BrokenBarrierError:
+                    pass
             return False
         self._device = device
         try:
@@ -150,14 +148,20 @@ class Camera(Thread):
             self._setup_queues()
         except Exception:
             logger.exception(f'Camera {self.device_id}: pipeline build failed')
-            self._signal_ready()
+            if self._barrier is not None:
+                try:
+                    self._barrier.wait(timeout=60.0)
+                except BrokenBarrierError:
+                    pass
             return False
 
         # Barrier — wait for every Camera to finish Phase A before any start().
-        self._signal_ready()
-        if not Camera._start_streaming.wait(timeout=60.0):
-            logger.error(f'Camera {self.device_id}: timed out waiting for peers')
-            return False
+        if self._barrier is not None:
+            try:
+                self._barrier.wait(timeout=60.0)
+            except BrokenBarrierError:
+                logger.error(f'Camera {self.device_id}: timed out waiting for peers')
+                return False
 
         # Phase B — sequential pipeline.start() under _start_lock.
         with Camera._start_lock:
@@ -171,13 +175,6 @@ class Camera(Thread):
         self.running = True
         self.settings.connect(self._device, self.inputs, self.do_color)
         return True
-
-    @classmethod
-    def _signal_ready(cls) -> None:
-        with cls._barrier_lock:
-            cls._ready_count += 1
-            if cls._ready_count >= cls._total_instances:
-                cls._start_streaming.set()
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
         config = PipelineConfig(
