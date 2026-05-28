@@ -33,7 +33,7 @@ class HDTrioMain:
         preset_file = presets.startup_path()
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
-        self.settings.camera.sim_enabled = simulation
+        self.settings.sim_enabled = simulation
         self.settings.initialize()
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
@@ -61,7 +61,7 @@ class HDTrioMain:
 
         # CAMERA
         self.player: Optional[Player] = None
-        if self.settings.camera.sim_enabled:
+        if self.settings.sim_enabled:
             self.player = Player(self.settings.camera.simulator)
             self.cameras: Cameras = UsbCameraPlayers(self.player, self.settings.camera.cameras[:num_players], self.settings.camera.simulator)
         else:

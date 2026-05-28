@@ -109,10 +109,9 @@ class OakGroup(BaseSettings):
     color             : Field[bool]            = Field(True, access=Field.INIT, description="Color camera (False = mono)")
     square            : Field[bool]            = Field(True, access=Field.INIT, description="Use square aspect ratio")
     hd_ready          : Field[bool]            = Field(False, access=Field.INIT, description="Use HD resolution")
-    sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
 
-    _cam_share: list = [fps, color, square, yolo, hd_ready, sim_enabled, model_path]
+    _cam_share: list = [fps, color, square, yolo, hd_ready, model_path]
 
     cam_0        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_1        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
@@ -338,6 +337,7 @@ class Settings(BaseSettings):
     num_players: Field[int]   = Field(3, access=Field.INIT)
     input_fps  : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     render_fps : Field[float] = Field(60.0)
+    sim_enabled: Field[bool]  = Field(False, access=Field.INIT, description="Enable simulation mode")
 
     camera : Group[OakGroup]     = Group(OakGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
     inout  : Group[InOutGroup]   = Group(InOutGroup)

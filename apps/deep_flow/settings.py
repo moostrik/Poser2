@@ -86,14 +86,13 @@ class OakGroup(BaseSettings):
     color:              Field[bool]              = Field(True, access=Field.INIT, description="Enable color capture")
     square:             Field[bool]              = Field(True, access=Field.INIT, description="Use square aspect ratio")
     hd_ready:           Field[bool]              = Field(False, access=Field.INIT, description="Use HD resolution")
-    sim_enabled:        Field[bool]              = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path:         Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
     video_path:         Field[str]               = Field("recordings", access=Field.INIT, visible=False, description="Video recordings directory")
     temp_path:          Field[str]               = Field("temp", access=Field.INIT, visible=False, description="Temporary files directory")
     video_format:       Field[CoderFormat]       = Field(CoderFormat.H264, access=Field.INIT, description="Video format")
     video_frame_types:  Field[list[FrameType]]   = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record")
 
-    _cam_share = [fps, color, square, yolo, hd_ready, sim_enabled, model_path]
+    _cam_share = [fps, color, square, yolo, hd_ready, model_path]
     cam_0       = Group(CameraSettings, share=_cam_share)
     simulator   = Group(SimulatorSettings, share=[video_path, video_format, video_frame_types, num_cameras, fps, color, square])
     recorder    = Group(RecorderSettings, share=[video_path, temp_path, video_format, video_frame_types, color, square, num_cameras, fps])
@@ -261,6 +260,7 @@ class RenderSettings(BaseSettings):
 class Settings(BaseSettings):
     num_players:        Field[int]   = Field(1, access=Field.INIT, visible=False)
     fps:                Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
+    sim_enabled:        Field[bool]  = Field(False, access=Field.INIT, description="Enable simulation mode")
 
     camera  = Group(OakGroup, share=[num_players.as_('num_cameras'), fps])
     tt      = Group(TTGroup)

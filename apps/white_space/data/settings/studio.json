@@ -5,12 +5,12 @@
   "render_fps": 120.0,
   "light_resolution": 3600,
   "fov": 120.0,
+  "sim_enabled": true,
   "camera": {
     "yolo": true,
     "color": false,
     "square": false,
     "hd_ready": true,
-    "sim_enabled": true,
     "model_path": "data/models",
     "cam_0": {
       "device_id": "14442C101136D1D200",

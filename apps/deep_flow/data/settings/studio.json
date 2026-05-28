@@ -1,12 +1,12 @@
 {
   "num_players": 1,
+  "sim_enabled": false,
   "camera": {
     "fps": 23.0,
     "yolo": true,
     "color": true,
     "square": true,
     "hd_ready": true,
-    "sim_enabled": false,
     "model_path": "data/models",
     "video_path": "recordings",
     "temp_path": "temp",

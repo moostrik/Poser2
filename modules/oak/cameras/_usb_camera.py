@@ -165,7 +165,7 @@ class UsbCamera(Thread):
         # Settle delay — let USB bus quiesce after all cameras finish Phase A.
         # Prevents "Device already closed" errors on pipeline.start() caused by
         # the XLink connection dropping between boot and start.
-        time.sleep(0.5)
+        time.sleep(1.0)
 
         # Phase B — sequential pipeline.start() under _start_lock.
         with UsbCamera._start_lock:

@@ -22,7 +22,6 @@ class CameraSettings(BaseSettings):
     square:         Field[bool]  = Field(True, access=Field.INIT)
     yolo:           Field[bool]  = Field(True, access=Field.INIT)
     hd_ready:       Field[bool]  = Field(False, access=Field.INIT)
-    sim_enabled:    Field[bool]  = Field(False, access=Field.INIT)
     model_path:     Field[str]   = Field("data/models", access=Field.INIT)
     flip_h:         Field[bool]  = Field(False, access=Field.INIT, description="Flip horizontal")
     flip_v:         Field[bool]  = Field(False, access=Field.INIT, description="Flip vertical")

@@ -2,12 +2,12 @@
   "num_players": 3,
   "input_fps": 23.0,
   "render_fps": 80.0,
+  "sim_enabled": false,
   "camera": {
     "yolo": true,
     "color": true,
     "square": true,
     "hd_ready": true,
-    "sim_enabled": false,
     "model_path": "data/models",
     "cam_0": {
       "device_id": "19443010D153874800",
