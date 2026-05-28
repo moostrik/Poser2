@@ -43,7 +43,6 @@ class Camera(Thread):
         self.do_yolo: bool =            core_settings.yolo
         self.do_720p: bool =            core_settings.hd_ready
         self.show_stereo: bool =        core_settings.show_stereo
-        self.simulation: bool =         core_settings.sim_enabled
 
         self.perspective: PerspectiveConfig = PerspectiveConfig(
             core_settings.flip_h,
@@ -62,7 +61,7 @@ class Camera(Thread):
         self.tps_counter =              FPS(120)
 
         # FRAME TYPES
-        self.frame_types: list[FrameType] = get_frame_types(self.do_color, self.do_stereo, self.show_stereo, core_settings.sim_enabled)
+        self.frame_types: list[FrameType] = get_frame_types(self.do_color, self.do_stereo, self.show_stereo, False)
         self.frame_types.sort(key=lambda x: x.value)
 
         # CALLBACKS

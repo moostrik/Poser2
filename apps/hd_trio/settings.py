@@ -113,7 +113,7 @@ class OakGroup(BaseSettings):
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
 
-    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, sim_enabled, model_path]
+    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path]
 
     cam_0        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_1        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)

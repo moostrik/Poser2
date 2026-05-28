@@ -94,7 +94,7 @@ class OakGroup(BaseSettings):
     video_format:       Field[CoderFormat]       = Field(CoderFormat.H264, access=Field.INIT, description="Video format")
     video_frame_types:  Field[list[FrameType]]   = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record")
 
-    _cam_share = [fps, color, square, stereo, yolo, hd_ready, sim_enabled, model_path]
+    _cam_share = [fps, color, square, stereo, yolo, hd_ready, model_path]
     cam_0       = Group(CameraSettings, share=_cam_share)
     simulator   = Group(SimulatorSettings, share=[video_path, video_format, video_frame_types, num_cameras, fps, color, square, stereo])
     recorder    = Group(RecorderSettings, share=[video_path, temp_path, video_format, video_frame_types, color, square, stereo, num_cameras, fps])
