@@ -481,12 +481,13 @@ class WindowManager():
             slot_index: int = secondary_list.index(logical_monitor_id) if logical_monitor_id in secondary_list else 0
             target_available: bool = logical_id < len(self._ordered_monitor_ids)
 
-            if target_available and logical_id in self._secondary_fallback:
+            if target_available:
                 physical_id: int = self._ordered_monitor_ids[logical_id]
-                logger.info("Monitor slot %s now available, moving secondary window to screen", logical_id)
+                if logical_id in self._secondary_fallback:
+                    logger.info("Monitor slot %s now available, moving secondary window to screen", logical_id)
+                    self._secondary_fallback.discard(logical_id)
                 self._setup_secondary_window(win, physical_id, self.settings.secondary_fullscreen)
-                self._secondary_fallback.discard(logical_id)
-            elif not target_available and logical_id not in self._secondary_fallback:
+            elif logical_id not in self._secondary_fallback:
                 logger.info("Monitor slot %s lost, moving secondary window to fallback", logical_id)
                 self._setup_secondary_window_fallback(win, slot_index)
                 self._secondary_fallback.add(logical_id)

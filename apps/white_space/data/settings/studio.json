@@ -1,7 +1,7 @@
 {
   "num_players": 8,
   "num_cameras": 4,
-  "input_fps": 30.0,
+  "input_fps": 23.0,
   "render_fps": 60.0,
   "light_resolution": 3600,
   "fov": 120.0,
