@@ -503,6 +503,7 @@
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",
       "fluid_flow": {
+        "profile": false,
         "width": 1088,
         "height": 1920,
         "speed": 1.0,

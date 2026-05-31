@@ -22,7 +22,7 @@ Boundary conditions via per-field wrap modes:
 """
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl import Texture, SwapFbo, Fbo
+from modules.gl import Texture, SwapFbo, Fbo, Profiler
 from .. import FlowUtil
 from .fluid_config import FluidFlowSettings, VelocitySettings, DensitySettings
 from .shaders import (
@@ -118,10 +118,19 @@ class FluidFlow:
         self._buoyancy_shader: Buoyancy = Buoyancy()
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
+        # ---- GPU profiling ----
+        self._profiler: Profiler = Profiler(
+            lambda: f"FluidFlow {self._simulation_width}x{self._simulation_height}",
+            names=["dampen_vel", "advect_vel", "viscosity", "vorticity",
+                   "advect_temp", "buoyancy", "advect_pres", "incompress",
+                   "advect_den", "dampen_den"],
+        )
+
         # Bind settings actions
         self.config.bind(FluidFlowSettings.reset_sim, lambda _: self._request_reset())
         self.config.bind(FluidFlowSettings.width, lambda _: self._request_reallocate())
         self.config.bind(FluidFlowSettings.height, lambda _: self._request_reallocate())
+        self.config.bind(FluidFlowSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -255,22 +264,50 @@ class FluidFlow:
 
         # Dampen velocity (clean input for all steps)
         vel: VelocitySettings = self.config.velocity
+        self._profiler.begin("dampen_vel")
         self._dampen(self._velocity_fbo, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
+        self._profiler.end("dampen_vel")
 
         # Simulation steps
+        self._profiler.begin("advect_vel")
         self._advect_velocity()
+        self._profiler.end("advect_vel")
+
+        self._profiler.begin("viscosity")
         self._apply_viscosity()
+        self._profiler.end("viscosity")
+
+        self._profiler.begin("vorticity")
         self._confine_vorticity()
+        self._profiler.end("vorticity")
+
+        self._profiler.begin("advect_temp")
         self._advect_temperature()
+        self._profiler.end("advect_temp")
+
+        self._profiler.begin("buoyancy")
         self._apply_buoyancy()
+        self._profiler.end("buoyancy")
+
+        self._profiler.begin("advect_pres")
         self._advect_pressure()
+        self._profiler.end("advect_pres")
+
+        self._profiler.begin("incompress")
         self._enforce_incompressibility()
+        self._profiler.end("incompress")
+
+        self._profiler.begin("advect_den")
         self._advect_density()
+        self._profiler.end("advect_den")
 
         # Dampen density (clean output)
         den: DensitySettings = self.config.density
+        self._profiler.begin("dampen_den")
         self._dampen(self._density_fbo, den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
+        self._profiler.end("dampen_den")
 
+        self._profiler.report()
 
     # ========== Pipeline Steps ==========
 

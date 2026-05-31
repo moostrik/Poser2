@@ -1,7 +1,7 @@
 {
   "num_players": 1,
+  "fps": 30.0,
   "camera": {
-    "fps": 23.0,
     "yolo": true,
     "color": true,
     "square": true,
@@ -9,77 +9,74 @@
     "hd_ready": true,
     "sim_enabled": false,
     "model_path": "data/models",
-    "video_path": "recordings",
-    "temp_path": "temp",
-    "video_format": "H264",
-    "video_frame_types": [
-      "VIDEO"
-    ],
-    "recorder": {
-      "group_id": "no_id",
-      "video_encoder": "iGPU",
-      "video_chunk_length": 10.0
-    },
     "cam_0": {
       "device_id": "14442C101136D1D200",
       "show_stereo": false,
-      "flip_h": false,
-      "flip_v": true,
+      "flip_h": true,
+      "flip_v": false,
       "perspective": -0.22,
+      "color_exposure": 9992,
+      "color_iso": 195,
       "color_auto_exposure": true,
-      "color_exposure": 1000,
-      "color_iso": 100,
+      "color_balance": 3600,
       "color_auto_balance": true,
-      "color_balance": 1000,
       "color_brightness": 0,
       "color_contrast": 0,
       "color_saturation": 0,
-      "color_luma_denoise": 0,
+      "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_auto_exposure": true,
       "mono_exposure": 1000,
       "mono_iso": 100,
+      "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.0,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
-      "stereo_brightness_min": 0,
-      "stereo_brightness_max": 255,
-      "stereo_median_filter": "OFF"
+      "stereo_median_filter": "OFF",
+      "stereo_bright_min": 0,
+      "stereo_bright_max": 255
     },
     "simulator": {
+      "video_path": "recordings",
+      "video_decoder": "iGPU",
+      "video_format": "H264",
+      "video_frame_types": [
+        "VIDEO"
+      ],
       "folder": "20251212-130516_3_square_color_no_id",
-      "range_start": 3,
-      "range_end": 3,
       "sim_passthrough": false,
-      "video_decoder": "iGPU"
-    }
+      "range_start": 3,
+      "range_end": 3
+    },
+    "recorder": {
+      "temp_path": "temp",
+      "video_encoder": "iGPU",
+      "video_format": "H264",
+      "video_frame_types": [
+        "VIDEO"
+      ],
+      "enabled": true,
+      "output_path": "recordings",
+      "name": ""
+    },
+    "frame_sync": {},
+    "tracklet_sync": {}
   },
   "tt": {
-    "timer": {
-      "fps": 60.0,
-      "run": false,
-      "duration": 30.0,
-      "intermezzo": 5.0,
-      "auto": false,
-      "verbose": false
-    },
     "tracker": {
       "tracklet_min_age": 3,
-      "timeout": 2.0,
       "add_centre_threshold": 0.25,
-      "add_height_threshold": 0.25,
-      "add_bottom_threshold": 0.25,
       "update_centre_threshold": 0.35,
-      "update_height_threshold": 0.2
+      "timeout": 2.0,
+      "add_height_threshold": 0.25,
+      "update_height_threshold": 0.2,
+      "add_bottom_threshold": 0.25
     }
   },
   "pose": {
-    "max_poses": 1,
     "model_type": "TRT",
     "model_path": "apps/deep_flow/data/models",
     "verbose": false,
-    "frequency": 30.0,
     "output_frequency": 60.0,
     "pose": {
       "enabled": true,
@@ -101,7 +98,9 @@
       "output_height": 1024,
       "enable_prev_crop": false
     },
-    "angle_extractor": {},
+    "angle_extractor": {
+      "aspect_ratio": 0.75
+    },
     "bbox": {
       "smoother": {
         "min_cutoff": 0.01,
@@ -149,11 +148,13 @@
         "friction": 0.05
       },
       "sticky": {
+        "enabled": true,
         "init_to_zero": false,
         "hold_scores": true
       }
     },
     "velocity": {
+      "extractor": {},
       "smoother": {
         "min_cutoff": 0.5,
         "beta": 2.5,
@@ -167,6 +168,7 @@
         "friction": 0.05
       },
       "sticky": {
+        "enabled": true,
         "init_to_zero": true,
         "hold_scores": false
       }
@@ -182,40 +184,52 @@
         "window_type": "UNIFORM"
       }
     },
+    "motion_gate": {},
     "window_raw": {
-      "window_size": 180
+      "window_size": 180,
+      "emit_partial": true
     },
     "window_clean": {
-      "window_size": 180
+      "window_size": 180,
+      "emit_partial": true
     },
     "window_smooth": {
-      "window_size": 180
+      "window_size": 180,
+      "emit_partial": true
     },
     "window_predict": {
-      "window_size": 180
+      "window_size": 180,
+      "emit_partial": true
     },
     "window_lerp": {
-      "window_size": 360
+      "window_size": 360,
+      "emit_partial": true
     }
   },
   "render": {
     "stage": "LERP",
     "layer": {
       "select": {
-        "final": [
-          "composite"
-        ],
         "left": [
           "composite"
         ],
         "right": [
           "tracker"
+        ],
+        "final": [
+          "composite"
         ]
       },
       "composite": {
         "blend_mode": "ALPHA",
         "lut": {
           "folder": "data/luts",
+          "files": [
+            "Blockbuster.cube",
+            "Cityscape.cube",
+            "Frosted.cube",
+            "Vibrance.cube"
+          ],
           "file": "",
           "strength": 1.0
         }
@@ -223,22 +237,24 @@
     },
     "data": {
       "a": {
+        "stage": "SMOOTH",
         "mode": "WINDOW",
         "feature_field": "AngleMotion",
-        "stage": "SMOOTH",
         "line_width": 3.0,
         "line_smooth": 1.0,
         "use_scores": false,
-        "render_labels": true
+        "render_labels": true,
+        "use_history_color": false
       },
       "b": {
+        "stage": "SMOOTH",
         "mode": "WINDOW",
         "feature_field": "AngleMotion",
-        "stage": "SMOOTH",
         "line_width": 6.0,
         "line_smooth": 6.0,
         "use_scores": false,
-        "render_labels": true
+        "render_labels": true,
+        "use_history_color": true
       }
     },
     "preview": {
@@ -339,68 +355,13 @@
         "scale": 0.5
       }
     },
-    "colors": {
-      "player_0": {
-        "r": 1.0,
-        "g": 0.0,
-        "b": 0.0,
-        "a": 1.0
-      },
-      "player_1": {
-        "r": 0.0,
-        "g": 0.0,
-        "b": 1.0,
-        "a": 1.0
-      },
-      "player_2": {
-        "r": 0.0,
-        "g": 1.0,
-        "b": 0.0,
-        "a": 1.0
-      },
-      "pose_left": {
-        "r": 1.0,
-        "g": 0.5,
-        "b": 0.0,
-        "a": 1.0
-      },
-      "pose_right": {
-        "r": 0.0,
-        "g": 1.0,
-        "b": 1.0,
-        "a": 1.0
-      },
-      "pose_center": {
-        "r": 1.0,
-        "g": 1.0,
-        "b": 1.0,
-        "a": 1.0
-      },
-      "history": {
-        "r": 0.5,
-        "g": 0.5,
-        "b": 0.5,
-        "a": 1.0
-      }
-    },
-    "window": {
-      "title": "Poser",
-      "v_sync": false,
-      "monitor": 0,
-      "x": 20,
-      "y": 80,
-      "width": 1080,
-      "height": 1000,
-      "secondary_list": [
-        "M0"
-      ],
-      "secondary_fullscreen": true
-    },
     "fluid3d": {
       "num_players": 1,
+      "sim_engine": "FLUID_3D_ARRAY",
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",
       "fluid_flow": {
+        "profile": false,
         "width": 1088,
         "height": 1920,
         "speed": 1.0,
@@ -452,14 +413,109 @@
         "element_length": 40.0,
         "element_width": 1.0
       }
+    },
+    "colors": {
+      "player_0": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_1": {
+        "r": 0.0,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_2": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_3": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_4": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_5": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_6": {
+        "r": 1.0,
+        "g": 0.5,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_7": {
+        "r": 0.5,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "pose_left": {
+        "r": 1.0,
+        "g": 0.5,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "pose_right": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "pose_center": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "history": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      }
+    },
+    "window": {
+      "title": "Poser",
+      "v_sync": false,
+      "monitor": "M0",
+      "x": 20,
+      "y": 80,
+      "width": 1080,
+      "height": 1000,
+      "secondary_list": [
+        "M1"
+      ],
+      "secondary_fullscreen": true,
+      "fullscreen_mode": "WINDOWED"
     }
   },
   "inout": {
     "osc_sound": {
-      "ip_addresses": "127.0.0.1",
-      "port": 9000,
+      "stage": "LERP",
       "max_players": 1,
-      "stage": "LERP"
+      "ip_addresses": "127.0.0.1",
+      "port": 9000
+    },
+    "osc_control": {
+      "port_in": 9000,
+      "return_messages": true,
+      "port_out": 9001,
+      "ip_address_out": "127.0.0.1",
+      "verbose": false
     }
   },
   "server": {

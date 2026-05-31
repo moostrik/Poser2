@@ -17,3 +17,6 @@ from .Tensor import Tensor
 
 # TEXT RENDERING
 from .Text import Text
+
+# PROFILING
+from .Profiler import Profiler

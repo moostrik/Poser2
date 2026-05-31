@@ -12,7 +12,7 @@ The root class is ``Settings``.
 from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, NiceSettings, Field, Group
-from modules.oak import CameraSettings, FrameType, CoderFormat, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.oak import CameraSettings, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings
@@ -89,15 +89,11 @@ class OakGroup(BaseSettings):
     hd_ready:           Field[bool]              = Field(False, access=Field.INIT, description="Use HD resolution")
     sim_enabled:        Field[bool]              = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path:         Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
-    video_path:         Field[str]               = Field("recordings", access=Field.INIT, visible=False, description="Video recordings directory")
-    temp_path:          Field[str]               = Field("temp", access=Field.INIT, visible=False, description="Temporary files directory")
-    video_format:       Field[CoderFormat]       = Field(CoderFormat.H264, access=Field.INIT, description="Video format")
-    video_frame_types:  Field[list[FrameType]]   = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record")
 
     _cam_share = [fps, color, square, stereo, yolo, hd_ready, model_path]
-    cam_0       = Group(CameraSettings, share=_cam_share)
-    simulator   = Group(SimulatorSettings, share=[video_path, video_format, video_frame_types, num_cameras, fps, color, square, stereo])
-    recorder    = Group(RecorderSettings, share=[video_path, temp_path, video_format, video_frame_types, color, square, stereo, num_cameras, fps])
+    cam_0         = Group(CameraSettings, share=_cam_share)
+    simulator     = Group(SimulatorSettings, share=[num_cameras, fps])
+    recorder      = Group(RecorderSettings, share=[num_cameras, fps])
     frame_sync  = Group(SyncSettings, share=[num_cameras, fps])
     tracklet_sync = Group(SyncSettings, share=[num_cameras, fps])
 
@@ -125,7 +121,7 @@ class InOutGroup(BaseSettings):
 
 class BboxFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
+    output_frequency:   Field[float] = Field(60.0)
 
     smoother     = Group(nodes.EuroSmootherSettings, share=[frequency])
     prediction   = Group(nodes.PredictorSettings, share=[frequency])
@@ -133,7 +129,7 @@ class BboxFeature(BaseSettings):
 
 class PointFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
+    output_frequency:   Field[float] = Field(60.0)
 
     confidence_filter = Group(nodes.DualConfFilterSettings)
     smoother     = Group(nodes.EuroSmootherSettings, share=[frequency])
@@ -142,7 +138,7 @@ class PointFeature(BaseSettings):
 
 class AngleFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
+    output_frequency:   Field[float] = Field(60.0)
 
     smoother     = Group(nodes.EuroSmootherSettings, share=[frequency])
     prediction   = Group(nodes.PredictorSettings, share=[frequency])
@@ -151,7 +147,7 @@ class AngleFeature(BaseSettings):
 
 class VelocityFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency:   Field[float] = Field(60.0, access=Field.INIT)
+    output_frequency:   Field[float] = Field(60.0)
 
     extractor     = Group(nodes.AngleVelExtractorSettings, share=[frequency])
     smoother         = Group(nodes.EuroSmootherSettings, share=[frequency])
@@ -174,7 +170,7 @@ class PoseGroup(BaseSettings):
     model_path:         Field[str]                  = Field("", access=Field.INIT, visible=False)
     verbose:            Field[bool]                 = Field(False, access=Field.INIT)
     frequency:          Field[float]                = Field(30.0, access=Field.INIT)
-    output_frequency:   Field[float]                = Field(60.0, access=Field.INIT)
+    output_frequency:   Field[float]                = Field(60.0)
 
     _batch_share = [max_poses, model_type, model_path, verbose]
     _feature_share = [frequency, output_frequency]

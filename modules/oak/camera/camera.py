@@ -122,7 +122,7 @@ class Camera(Thread):
                 self.inputs[Input.COLOR_CONTROL] =  self.device.getInputQueue('color_control')
             self.inputs[Input.MONO_CONTROL] =       self.device.getInputQueue('mono_control')
             self.inputs[Input.STEREO_CONTROL] =     self.device.getInputQueue('stereo_control')
-            self.outputs[Output.SYNC_FRAMES_OUT] =  self.device.getOutputQueue(name='sync', maxSize=1, blocking=False)
+            self.outputs[Output.SYNC_FRAMES_OUT] =  self.device.getOutputQueue(name='sync', maxSize=1, blocking=False) # type: ignore
             self.outputs[Output.SYNC_FRAMES_OUT].addCallback(self._sync_callback)
             self.fps_counters[FrameType.VIDEO] = FPS(120)
             self.fps_counters[FrameType.LEFT_] = FPS(120)
@@ -131,16 +131,16 @@ class Camera(Thread):
                 self.fps_counters[FrameType.DEPTH] = FPS(120)
         elif self.do_color:
             self.inputs[Input.COLOR_CONTROL] =      self.device.getInputQueue('color_control')
-            self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False)
+            self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False) # type: ignore
             self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
             self.fps_counters[FrameType.VIDEO] = FPS(120)
         else: # only mono
             self.inputs[Input.MONO_CONTROL] =       self.device.getInputQueue('mono_control')
-            self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False)
+            self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False) # type: ignore
             self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
             self.fps_counters[FrameType.VIDEO] = FPS(120)
         if self.do_yolo:
-            self.outputs[Output.TRACKLETS_OUT] = self.device.getOutputQueue(name='tracklets', maxSize=1, blocking=False)
+            self.outputs[Output.TRACKLETS_OUT] = self.device.getOutputQueue(name='tracklets', maxSize=1, blocking=False) # type: ignore
             self.outputs[Output.TRACKLETS_OUT].addCallback(self._tracker_callback)
 
     def _close(self) -> None:

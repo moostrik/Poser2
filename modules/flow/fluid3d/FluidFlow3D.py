@@ -26,9 +26,8 @@ Boundary conditions via per-field wrap modes (no explicit border obstacles):
     Obstacle:          GL_CLAMP_TO_BORDER(1,0,0,0)   -> OOB = obstacle
 """
 from OpenGL.GL import *  # type: ignore
-import time
 
-from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D
+from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, Profiler
 from ..fluid.fluid_config import FluidFlowSettings, DepthSettings, VelocitySettings
 from ..fluid.shaders import AddBoolean
 from ..FlowUtil import FlowUtil
@@ -105,11 +104,12 @@ class FluidFlow3D:
         self._reallocate_pending: bool = False
 
         # ---- GPU profiling ----
-        self._profile_enabled: bool = True
-        self._profile_frame_count: int = 0
-        self._profile_interval: int = 120  # print every N frames
-        self._profile_accum: dict[str, float] = {}
-        self._profile_queries: list[int] = []  # reusable query object pool
+        self._profiler: Profiler = Profiler(
+            lambda: f"FluidFlow3D {self._simulation_width}x{self._simulation_height}x{self._depth}",
+            names=["dampen_vel", "advect_vel", "viscosity", "vorticity",
+                   "advect_temp", "buoyancy", "advect_pres", "incompress",
+                   "advect_color", "advect_composite"],
+        )
 
         # ---- Volumetric fields (SwapTexture3D for ping-pong) ----
         # Velocity: CLAMP_TO_BORDER(0) = no-slip walls
@@ -165,6 +165,7 @@ class FluidFlow3D:
         self.config.depth.bind(DepthSettings.depth, lambda _: self._request_reallocate())
         self.config.bind(FluidFlowSettings.width, lambda _: self._request_reallocate())
         self.config.bind(FluidFlowSettings.height, lambda _: self._request_reallocate())
+        self.config.bind(FluidFlowSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -343,56 +344,53 @@ class FluidFlow3D:
         self._dt = 1.0 / max(1, self.config.fps)
         self._depth_aspect = (self._simulation_width / max(1, self._depth)) * self.config.depth.scale
 
-        profiling = self._profile_enabled
-
         # Dampen velocity (clean input for all steps)
         vel: VelocitySettings = self.config.velocity
-        self._profile_begin("dampen_vel", profiling)
+        self._profiler.begin("dampen_vel")
         self._dampen(self._velocity, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
-        self._profile_end("dampen_vel", profiling)
+        self._profiler.end("dampen_vel")
 
         # Simulation steps
-        self._profile_begin("advect_vel", profiling)
+        self._profiler.begin("advect_vel")
         self._advect_velocity()
-        self._profile_end("advect_vel", profiling)
+        self._profiler.end("advect_vel")
 
-        self._profile_begin("viscosity", profiling)
+        self._profiler.begin("viscosity")
         self._apply_viscosity()
-        self._profile_end("viscosity", profiling)
+        self._profiler.end("viscosity")
 
-        self._profile_begin("vorticity", profiling)
+        self._profiler.begin("vorticity")
         self._confine_vorticity()
-        self._profile_end("vorticity", profiling)
+        self._profiler.end("vorticity")
 
-        self._profile_begin("advect_temp", profiling)
+        self._profiler.begin("advect_temp")
         self._advect_temperature()
-        self._profile_end("advect_temp", profiling)
+        self._profiler.end("advect_temp")
 
-        self._profile_begin("buoyancy", profiling)
+        self._profiler.begin("buoyancy")
         self._apply_buoyancy()
-        self._profile_end("buoyancy", profiling)
+        self._profiler.end("buoyancy")
 
-        self._profile_begin("advect_pres", profiling)
+        self._profiler.begin("advect_pres")
         self._advect_pressure()
-        self._profile_end("advect_pres", profiling)
+        self._profiler.end("advect_pres")
 
-        self._profile_begin("incompress", profiling)
+        self._profiler.begin("incompress")
         self._enforce_incompressibility()
-        self._profile_end("incompress", profiling)
+        self._profiler.end("incompress")
 
-        self._profile_begin("advect_color", profiling)
+        self._profiler.begin("advect_color")
         self._advect_color()
-        self._profile_end("advect_color", profiling)
+        self._profiler.end("advect_color")
 
         # Density dampen disabled — not meaningful for 3D and wastes a full-volume pass
 
         # Fused: advect density inline + colour lookup + 2D composite in one pass
-        self._profile_begin("advect_composite", profiling)
+        self._profiler.begin("advect_composite")
         self._advect_density_and_composite()
-        self._profile_end("advect_composite", profiling)
+        self._profiler.end("advect_composite")
 
-        # if profiling:
-        #     self._profile_report()
+        self._profiler.report()
 
     # ========== Pipeline Steps ==========
 
@@ -646,58 +644,6 @@ class FluidFlow3D:
             internal_format=internal_format
         )
         glMemoryBarrier(_BARRIER_IMAGE)
-
-    # ========== GPU Profiling ==========
-
-    def _profile_begin(self, name: str, enabled: bool) -> None:
-        """Insert a GPU fence before a pass (uses glFinish for accurate timing)."""
-        if not enabled:
-            return
-        glFinish()
-        self._profile_accum.setdefault(name + "_start", 0.0)
-        self._profile_accum[name + "_start"] = time.perf_counter()
-
-    def _profile_end(self, name: str, enabled: bool) -> None:
-        """Record GPU time for a pass."""
-        if not enabled:
-            return
-        glFinish()
-        start = self._profile_accum.get(name + "_start", 0.0)
-        elapsed_ms = (time.perf_counter() - start) * 1000.0
-        self._profile_accum[name] = self._profile_accum.get(name, 0.0) + elapsed_ms
-
-    def _profile_report(self) -> None:
-        """Print averaged per-pass timings every N frames."""
-        self._profile_frame_count += 1
-        if self._profile_frame_count < self._profile_interval:
-            return
-
-        n = self._profile_frame_count
-        pass_names = [
-            "dampen_vel", "advect_vel", "viscosity", "vorticity",
-            "advect_temp", "buoyancy", "advect_pres", "incompress",
-            "advect_color", "advect_composite",
-        ]
-
-        total = 0.0
-        lines = [f"FluidFlow3D GPU profile ({self._simulation_width}x{self._simulation_height}x{self._depth}, "
-                 f"density {self._density_width}x{self._density_height}x{self._depth}, "
-                 f"avg over {n} frames):"]
-        for name in pass_names:
-            avg_ms = self._profile_accum.get(name, 0.0) / n
-            total += avg_ms
-            bar = "█" * int(avg_ms * 2)  # 1 block per 0.5ms
-            lines.append(f"  {name:<14s} {avg_ms:6.2f} ms  {bar}")
-        lines.append(f"  {'TOTAL':<14s} {total:6.2f} ms  ({1000.0 / max(total, 0.001):.0f} fps budget)")
-
-        logging.info("\n".join(lines))
-        logger.debug("\n".join(lines))
-
-        # Reset accumulators
-        self._profile_frame_count = 0
-        for key in list(self._profile_accum.keys()):
-            if not key.endswith("_start"):
-                self._profile_accum[key] = 0.0
 
     # ========== Deferred ==========
 
