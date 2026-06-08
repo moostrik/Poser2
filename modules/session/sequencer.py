@@ -146,6 +146,7 @@ class Sequencer:
         self._active = False
         self.config.running = False
         self._set_idle_state()
+        self._notify_state(0.0)
 
     def _enter_stage(self) -> None:
         self._stage_start = time.time()

@@ -196,6 +196,7 @@ class IdleStage(StageLayer):
     def update(self, progress: float) -> None:
         self.compose([
             (Layers.fluid, 1.0),
+            (Layers.color_mask, 1.0), # keep the color mask for now
         ])
 
 

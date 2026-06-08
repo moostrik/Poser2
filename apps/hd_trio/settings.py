@@ -38,21 +38,21 @@ class Stage(IntEnum):
 
 
 class ShowStage(IntEnum):
-    START =         0
+    IDLE =          0
+    START =         auto()
     INTRO_IN =      auto()
     INTRO =         auto()
     INTRO_OUT =     auto()
     PLAY_IN =       auto()
     PLAY =          auto()
     CONCLUSION =    auto()
-    IDLE =          auto()
 
 
 class ShowSequencerSettings(SequencerSettings):
     """HD Trio show sequencer with project-specific stages."""
-    stages:     Field[list[ShowStage]] = Field(list(ShowStage), widget=Widget.checklist, description="Stages to play")
-    durations:  Field[list] = Field([10.0, 3.0, 30.0, 3.0, 3.0, 60.0, 10.0, 3.0], min=0.0, max=600.0, step=0.1, description="Stage durations")
-    stage:      Field[ShowStage]   = Field(ShowStage.START, access=Field.READ, description="Current stage", newline=True)
+    stages:     Field[list[ShowStage]] = Field([ShowStage.START, ShowStage.INTRO_IN, ShowStage.INTRO, ShowStage.INTRO_OUT, ShowStage.PLAY_IN, ShowStage.PLAY, ShowStage.CONCLUSION, ShowStage.IDLE], widget=Widget.checklist, description="Stages to play")
+    durations:  Field[list] = Field([3.0, 10.0, 3.0, 30.0, 3.0, 3.0, 60.0, 10.0], min=0.0, max=600.0, step=0.1, description="Stage durations")
+    stage:      Field[ShowStage]   = Field(ShowStage.IDLE, access=Field.READ, description="Current stage", newline=True)
 
 
 # ---------------------------------------------------------------------------
