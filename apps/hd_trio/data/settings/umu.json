@@ -1,13 +1,13 @@
 {
   "num_players": 3,
   "input_fps": 23.0,
-  "render_fps": 60.0,
+  "render_fps": 62.0,
   "camera": {
     "yolo": true,
     "color": true,
     "square": true,
     "stereo": false,
-    "hd_ready": true,
+    "hd_ready": false,
     "sim_enabled": true,
     "model_path": "data/models",
     "cam_0": {
@@ -92,7 +92,7 @@
       "stereo_bright_max": 255
     },
     "simulator": {
-      "video_path": "recordings",
+      "video_path": "test_video",
       "video_decoder": "iGPU",
       "video_format": "H264",
       "video_frame_types": [
@@ -220,8 +220,8 @@
     },
     "point": {
       "confidence_filter": {
-        "threshold_low": 0.5,
-        "threshold_high": 0.6,
+        "threshold_low": 0.4,
+        "threshold_high": 0.5,
         "rescale_scores": true
       },
       "smoother": {
@@ -468,9 +468,9 @@
     },
     "intro_sequence": {
       "verbose": true,
+      "loop": false,
       "intro_path": "intro",
       "folder": "intro",
-      "refresh_path": false,
       "source_track": 0,
       "color": {
         "r": 1.0,
@@ -551,7 +551,7 @@
         "density": {
           "input_strength": 10.0,
           "speed_offset": 0.0,
-          "fade_time": 18.0,
+          "fade_time": 4.0000000000000036,
           "dampen_threshold": 1.47,
           "dampen_time": 3.63
         },
@@ -718,7 +718,6 @@
     },
     "pose": {
       "stage": "RAW",
-      "enabled": false,
       "features": [
         "Age",
         "AngleMotion",
@@ -731,7 +730,8 @@
         "MotionTime",
         "Points2D",
         "Similarity"
-      ]
+      ],
+      "enabled": false
     }
   }
 }

@@ -125,6 +125,8 @@ class Player(Thread):
         if folder and folder in self.folders:
             num_chunks = self.get_num_folder_chunks(folder)
             self.settings.max_chunks = num_chunks
+            self.settings.range_start = 0
+            self.settings.range_end = num_chunks
             self.play(True, folder)
 
         while self.running:
@@ -419,7 +421,8 @@ class Player(Thread):
         if folder and folder in self.folders:
             num_chunks: int = self.get_num_folder_chunks(folder)
             self.settings.max_chunks = num_chunks
-            self.set_chunk_range(0, num_chunks)
+            self.settings.range_start = 0
+            self.settings.range_end = num_chunks
             self.play(True, folder)
 
     def _on_refresh_path(self, _=None) -> None:
