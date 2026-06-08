@@ -52,7 +52,7 @@ class Recorder(Thread):
         self.recorders: dict[int, dict[FrameType, StreamWriter]] = {}
         self.fps: dict[int, float] = {}
         self.frames: dict[int, Queue[dict[FrameType, ndarray]]] = {}
-        self.folder_path: Path = Path()
+        self.folder_path: Path | None = None
 
         for c in range(settings.num_cameras):
             self.recorders[c] = {}
@@ -151,7 +151,7 @@ class Recorder(Thread):
                         logger.exception("Failed to move %s → %s", src, dst)
 
     def _remove_temp_folder(self) -> None:
-        if hasattr(self, 'folder_path') and self.folder_path.exists():
+        if self.folder_path is not None and self.folder_path.exists():
             try:
                 self.folder_path.rmdir()
             except OSError:
