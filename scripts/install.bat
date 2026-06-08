@@ -67,11 +67,12 @@ echo.
 echo [92mInstall complete.[0m
 echo.
 echo Run makemodels.bat to build TensorRT engines:
-echo   makemodels.bat ^<app_name^>
+echo   scripts/makemodels.bat ^<app_name^>
 echo or
-echo   makemodels.bat all
+echo   scripts/makemodels.bat all
 echo.
 pause
+goto :eof
 
 :endofscript
 echo.
