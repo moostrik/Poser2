@@ -321,12 +321,15 @@ class CentreGroup(BaseSettings):
 
 class IntroSequenceSettings(BaseSettings):
     """Settings for prerecorded pose overlay during INTRO stages."""
-    verbose:        Field[bool]  = Field(False, description="Log start/stop events")
-    loop:           Field[bool]  = Field(False, description="Loop recording continuously")
-    recording_path: Field[str]   = Field("recordings/intro", widget=Widget.input, description="Path to recorded pose folder")
-    source_track:   Field[int]   = Field(0, min=0, max=16, description="Track ID to use from recording")
-    color:          Field[Color] = Field(Color(1.0, 1.0, 1.0), description="Skeleton color for intro overlay")
-    pose:           Group[layers.CentrePoseSettings]  = Group(layers.CentrePoseSettings)
+    verbose:           Field[bool]      = Field(False, description="Log start/stop events")
+    loop:              Field[bool]      = Field(False, description="Loop recording continuously")
+    intro_path:        Field[str]       = Field("intro", access=Field.INIT, description="Path to intro recordings folder")
+    refresh_path:      Field[bool]      = Field(False, widget=Widget.button, description="Refresh intro folder list")
+    available_folders: Field[list[str]] = Field([""], access=Field.READ, visible=False, description="Available intro recordings")
+    folder:            Field[str]       = Field("", widget=Widget.text_select, options=available_folders, description="Selected intro recording")
+    source_track:      Field[int]       = Field(0, min=0, max=16, description="Track ID to use from recording")
+    color:             Field[Color]     = Field(Color(1.0, 1.0, 1.0), description="Skeleton color for intro overlay")
+    pose:              Group[layers.CentrePoseSettings]  = Group(layers.CentrePoseSettings)
 
 
 class RenderSettings(BaseSettings):

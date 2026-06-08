@@ -17,6 +17,7 @@ from .settings import Settings, Stage
 from .render import DeepFlowRender
 
 APP_NAME = 'deep_flow'
+DATA_PATH = 'apps/deep_flow/data'
 
 
 class DeepFlowMain:
@@ -49,11 +50,11 @@ class DeepFlowMain:
         self.recorder: Optional[Recorder] = None
         self.player: Optional[Player] = None
         if self.settings.camera.sim_enabled:
-            self.player = Player(self.settings.camera.simulator)
+            self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
             for i in range(num_players):
                 self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
-            self.recorder = Recorder(self.settings.camera.recorder)
+            self.recorder = Recorder(self.settings.camera.recorder, data_path=DATA_PATH)
             for i in range(num_players):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')

@@ -229,7 +229,7 @@ class SessionGroup(BaseSettings):
 
     start:         Field[bool]  = Field(False, widget=Widget.button, description="Start session")
     stop:          Field[bool]  = Field(False, widget=Widget.button, description="Stop session")
-    output_path:   Field[str]   = Field("apps/white_space/data/recordings", access=Field.INIT, description="Recordings output directory")
+    output_path:   Field[str]   = Field("recordings", access=Field.INIT, description="Recordings output directory")
     name:          Field[str]   = Field("", widget=Widget.input, description="Recording group ID")
     split:         Field[bool]  = Field(False, widget=Widget.button, description="Split chunk", visible=False)
     split_seconds: Field[float] = Field(10, min=1, max=60, widget=Widget.number, description="Split recording into chunks (seconds)")

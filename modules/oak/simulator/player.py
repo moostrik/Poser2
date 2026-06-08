@@ -54,9 +54,10 @@ class Folder():
 FolderDict = Dict[str, Folder]
 
 class Player(Thread):
-    def __init__(self, settings: SimulatorSettings) -> None:
+    def __init__(self, settings: SimulatorSettings, data_path: str = "") -> None:
         super().__init__()
         self.settings: SimulatorSettings = settings
+        self.data_path: str = data_path
         self.num_cams: int = settings.num_cameras
         self.types: list[FrameType] = settings.video_frame_types
         self.fps: float = settings.fps
@@ -74,7 +75,7 @@ class Player(Thread):
         self.load_folder: str = ''
         self.suffix: str = settings.video_format.value
 
-        self.folders: FolderDict = self._get_video_folders(settings)
+        self.folders: FolderDict = self._get_video_folders(settings, data_path)
         self.settings.available_folders = list(self.folders.keys())
 
         self.hwt: str = HwaccelString[settings.video_decoder]
@@ -102,7 +103,7 @@ class Player(Thread):
         self.settings.bind(SimulatorSettings.folder, self._on_folder_changed)
         self.settings.bind(SimulatorSettings.range_start, self._on_range_changed)
         self.settings.bind(SimulatorSettings.range_end, self._on_range_changed)
-        self.settings.bind(SimulatorSettings.refresh_path, self._on_refresh_path)
+        self.settings.bind(SimulatorSettings.refresh, self._on_refresh_path)
         self.settings.bind(SimulatorSettings.video_path, self._on_refresh_path)
 
     def stop(self) -> None:
@@ -388,9 +389,9 @@ class Player(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def _get_video_folders(settings: SimulatorSettings) -> FolderDict :
+    def _get_video_folders(settings: SimulatorSettings, data_path: str = "") -> FolderDict:
         folders: FolderDict = {}
-        video_path: Path = Path(settings.video_path)
+        video_path: Path = Path(data_path) / settings.video_path
         if not video_path.is_dir():
             return folders
         for folder in video_path.iterdir():
@@ -422,7 +423,7 @@ class Player(Thread):
             self.play(True, folder)
 
     def _on_refresh_path(self, _=None) -> None:
-        self.folders = self._get_video_folders(self.settings)
+        self.folders = self._get_video_folders(self.settings, self.data_path)
         self.settings.available_folders = list(self.folders.keys())
 
     def _on_range_changed(self, _=None) -> None:

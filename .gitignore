@@ -9,6 +9,8 @@ apps/**/data/settings/.*
 apps/**/data/recordings/*
 !apps/**/data/recordings/.gitkeep
 temp*
+*.h5
+*.mp4
 
 # Python
 __pycache__/

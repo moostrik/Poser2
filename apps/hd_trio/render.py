@@ -44,7 +44,7 @@ LARGE_LAYERS: list[Layers] = [
 
 
 class HDTrioRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings) -> None:
+    def __init__(self, board: RenderBoard, settings: RenderSettings, data_path: str = "") -> None:
         super().__init__(settings.window)
         self.num_players: int = settings.num_players
         self.num_cams: int = settings.num_cams
@@ -67,7 +67,7 @@ class HDTrioRender(RenderBase):
 
         # intro sequence overlay — shared objects must exist before the per-camera loop
         self._intro_proxy = SequenceDataProxy()
-        self._intro_player = IntroSequencePlayer(settings.intro_sequence, self.num_cams)
+        self._intro_player = IntroSequencePlayer(settings.intro_sequence, self.num_cams, data_path=data_path)
         self._intro_color_proxy = FixedColorProxy(settings.intro_sequence)
         self._intro_geoms: dict[int, ls.CentreGeometry] = {}
 
@@ -128,8 +128,6 @@ class HDTrioRender(RenderBase):
         self._prev_stage: ShowStage | None = None
         self._active_stages: list[StageLayer] = []
 
-        settings.intro_sequence.bind(IntroSequenceSettings.recording_path, self._on_recording_path_changed)
-
     def _rebuild_stages(self) -> None:
         """Re-instantiate stage objects after hot-reload of stages.py."""
         self._stages = {
@@ -141,9 +139,6 @@ class HDTrioRender(RenderBase):
         }
         self._prev_stage = None
         self._active_stages = []
-
-    def _on_recording_path_changed(self, path: str) -> None:
-        self._intro_player.load(Path(path))
 
     def on_main_window_resize(self, width: int, height: int) -> None:
         self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)
@@ -165,7 +160,6 @@ class HDTrioRender(RenderBase):
             self.L[Layers.poser][i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
-        self.settings.intro_sequence.unbind(IntroSequenceSettings.recording_path, self._on_recording_path_changed)
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()

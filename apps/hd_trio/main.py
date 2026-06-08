@@ -19,6 +19,7 @@ from .settings import Settings, Stage
 from .render import HDTrioRender
 
 APP_NAME = 'hd_trio'
+DATA_PATH = 'apps/hd_trio/data'
 
 
 class HDTrioMain:
@@ -53,8 +54,8 @@ class HDTrioMain:
         self.sequencer = Sequencer(self.settings.session.sequencer)
         self.sequencer.add_state_callback(self.board.set_sequence)
         self.sequencer.add_state_callback(self.sound_osc.set_sequencer_state)
-        self.video_recorder = VideoRecorder(self.settings.session.video)
-        self.pose_recorder = PoseRecorder(self.settings.session.pose)
+        self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
+        self.pose_recorder = PoseRecorder(self.settings.session.pose, data_path=DATA_PATH)
         self.artnet_controllers: list[ArtNetBars] = []
         for i in range(num_players):
             self.artnet_controllers.append(ArtNetBars(self.settings.inout.artnets[i]))
@@ -63,7 +64,7 @@ class HDTrioMain:
         self.cameras: list[Camera | Simulator] = []
         self.player: Optional[Player] = None
         if self.settings.camera.sim_enabled:
-            self.player = Player(self.settings.camera.simulator)
+            self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
             for i in range(num_players):
                 self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
@@ -225,7 +226,7 @@ class HDTrioMain:
         self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
 
         # RENDER
-        self.render = HDTrioRender(self.board, self.settings.render)
+        self.render = HDTrioRender(self.board, self.settings.render, data_path=DATA_PATH)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
         self.render.add_update_callback(self.sequencer.update)
         self.render.add_update_callback(self.interpolators_lerp.update)

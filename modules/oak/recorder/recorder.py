@@ -42,9 +42,10 @@ class RecState(Enum):
     STOP =  auto()
 
 class Recorder(Thread):
-    def __init__(self, settings: RecorderSettings) -> None:
+    def __init__(self, settings: RecorderSettings, data_path: str = "") -> None:
         super().__init__()
         self.temp_path: Path = Path(settings.temp_path)
+        self.data_path: str = data_path
 
         self.settings: RecorderSettings = settings
 
@@ -103,7 +104,7 @@ class Recorder(Thread):
         self.folder_path = self.temp_path / self.folder_name
         self.folder_path.mkdir(parents=True, exist_ok=True)
 
-        self.output_folder_path = Path(self.settings.output_path) / self.folder_name
+        self.output_folder_path = Path(self.data_path) / self.settings.output_path / self.folder_name
         self.output_folder_path.mkdir(parents=True, exist_ok=True)
 
         self.chunk_index = 0

@@ -122,7 +122,7 @@
       "stereo_bright_max": 255
     },
     "simulator": {
-      "video_path": "apps/white_space/data/recordings",
+      "video_path": "recordings",
       "video_decoder": "iGPU",
       "video_format": "H264",
       "video_frame_types": [
@@ -646,7 +646,7 @@
     "port": 666
   },
   "session": {
-    "output_path": "apps/white_space/data/recordings",
+    "output_path": "recordings",
     "name": "Yens_2",
     "split_seconds": 10,
     "osc": {

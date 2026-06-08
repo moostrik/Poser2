@@ -468,7 +468,9 @@
     },
     "intro_sequence": {
       "verbose": true,
-      "recording_path": "recordings/intro",
+      "intro_path": "intro",
+      "folder": "intro",
+      "refresh_path": false,
       "source_track": 0,
       "color": {
         "r": 1.0,

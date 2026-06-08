@@ -25,6 +25,7 @@ from .settings import Settings, Stage
 from .render import WhiteSpaceRender
 
 APP_NAME = 'white_space'
+DATA_PATH = 'apps/white_space/data'
 
 import logging
 logger = logging.getLogger(__name__)
@@ -60,13 +61,13 @@ class WhiteSpaceMain:
         self.sequencer = Sequencer(self.settings.session.sequencer)
         self.sequencer.add_state_callback(self.board.set_sequence)
         self.sequencer.add_state_callback(self.sound_osc.set_sequencer_state)
-        self.video_recorder = VideoRecorder(self.settings.session.video)
+        self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
 
         # CAMERA
         self.cameras: list[Camera | Simulator] = []
         self.player: Optional[Player] = None
         if self.settings.camera.sim_enabled:
-            self.player = Player(self.settings.camera.simulator)
+            self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
             for i in range(num_cameras):
                 self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:

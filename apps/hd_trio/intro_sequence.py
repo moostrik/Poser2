@@ -69,16 +69,44 @@ class IntroSequencePlayer:
     frame the player deactivates and ``update()`` returns an empty dict.
     """
 
-    def __init__(self, settings: IntroSequenceSettings, num_cams: int) -> None:
+    def __init__(self, settings: IntroSequenceSettings, num_cams: int, data_path: str = "") -> None:
         self._settings = settings
         self._num_cams = num_cams
+        self._data_path = data_path
         self._player = Player()
         self._active = False
         self._start_time = 0.0
         self._duration = 0.0
         self._time_offset = 0.0
 
-        self.load(Path(settings.recording_path))
+        self._on_refresh_path()
+        if settings.folder:
+            self._load_folder(settings.folder)
+
+        settings.bind(IntroSequenceSettings.folder, self._on_folder_changed)
+        settings.bind(IntroSequenceSettings.refresh_path, self._on_refresh_path)
+        settings.bind(IntroSequenceSettings.intro_path, self._on_refresh_path)
+
+    def _base_path(self) -> Path:
+        return Path(self._data_path) / self._settings.intro_path
+
+    def _on_refresh_path(self, _=None) -> None:
+        base = self._base_path()
+        if not base.is_dir():
+            self._settings.available_folders = []
+            return
+        folders = sorted(
+            f.name for f in base.iterdir()
+            if f.is_dir() and any(f.glob("pose_*.h5"))
+        )
+        self._settings.available_folders = folders
+
+    def _on_folder_changed(self, folder: str) -> None:
+        if folder:
+            self._load_folder(folder)
+
+    def _load_folder(self, folder: str) -> None:
+        self.load(self._base_path() / folder)
 
     def load(self, folder: Path) -> None:
         """Load (or reload) a recording. Stops active playback first."""

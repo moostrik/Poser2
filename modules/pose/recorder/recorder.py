@@ -60,8 +60,9 @@ class Recorder:
       - ``name`` — appended to folder timestamp
     """
 
-    def __init__(self, settings: RecorderSettings) -> None:
+    def __init__(self, settings: RecorderSettings, data_path: str = "") -> None:
         self.settings = settings
+        self.data_path: str = data_path
         self._queue: queue.Queue = queue.Queue()
         self._thread: threading.Thread | None = None
         self._active: threading.Event = threading.Event()
@@ -85,7 +86,7 @@ class Recorder:
         if self._active.is_set():
             return
         folder_name = make_folder_name(self.settings.name)
-        folder = Path(self.settings.output_path) / folder_name
+        folder = Path(self.data_path) / self.settings.output_path / folder_name
         folder.mkdir(parents=True, exist_ok=True)
         self._start(folder, time.time())
         self.settings.recording = True
