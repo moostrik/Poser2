@@ -64,6 +64,7 @@ class Recorder:
         self.settings = settings
         self._queue: queue.Queue = queue.Queue()
         self._thread: threading.Thread | None = None
+        self._active: threading.Event = threading.Event()
         self._folder: Path | None = None
         self._recording_start: float = 0.0
 
@@ -81,7 +82,7 @@ class Recorder:
     def _on_start(self, _=None) -> None:
         if not self.settings.enabled:
             return
-        if self._thread is not None and self._thread.is_alive():
+        if self._active.is_set():
             return
         folder_name = make_folder_name(self.settings.name)
         folder = Path(self.settings.output_path) / folder_name
@@ -90,40 +91,55 @@ class Recorder:
         self.settings.recording = True
 
     def _on_stop(self, _=None) -> None:
-        if self._thread is None or not self._thread.is_alive():
+        if not self._active.is_set():
             return
         self._stop()
         self.settings.recording = False
 
     def _on_split(self, _=None) -> None:
-        if self._thread is not None and self._thread.is_alive():
+        if self._active.is_set():
             self._queue.put(_SPLIT)
 
     # ── Internal lifecycle ───────────────────────────────────────────────
 
     def _start(self, folder: Path, recording_start_time: float) -> None:
-        if self._thread is not None and self._thread.is_alive():
+        if self._active.is_set():
             logger.warning("PoseRecorder._start() called while already recording — ignored")
             return
+        # Discard any frames left in the queue from a previous session
+        # (the stop/submit_frames race can strand a stale frame here).
+        self._drain_queue()
         self._folder = folder
         self._recording_start = recording_start_time
+        self._active.set()
         self._thread = threading.Thread(target=self._run, daemon=True, name="PoseRecorder")
         self._thread.start()
         logger.info("PoseRecorder started → %s", folder)
 
     def _stop(self) -> None:
-        if self._thread is None or not self._thread.is_alive():
+        if not self._active.is_set():
             return
+        # Clear the active flag first so submit_frames stops enqueuing immediately.
+        self._active.clear()
         self._queue.put(_STOP)
-        self._thread.join()
-        self._thread = None
+        if self._thread is not None:
+            self._thread.join()
+            self._thread = None
         logger.info("PoseRecorder stopped")
+
+    def _drain_queue(self) -> None:
+        """Remove any pending items from the queue."""
+        try:
+            while True:
+                self._queue.get_nowait()
+        except queue.Empty:
+            pass
 
     def submit_frames(self, stage: int, frame_dict: 'FrameDict') -> None:
         """Callback — enqueue a shallow copy of the FrameDict if recording and stage matches."""
         if stage != self.settings.stage:
             return
-        if self._thread is not None and self._thread.is_alive():
+        if self._active.is_set():
             self._queue.put((time.time(), dict(frame_dict)))
 
     # ── Background thread ────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 {
   "num_players": 3,
   "input_fps": 23.0,
-  "render_fps": 51.0,
+  "render_fps": 54.0,
   "camera": {
     "yolo": true,
     "color": true,
@@ -359,12 +359,10 @@
     "layer": {
       "select": {
         "preview": [
-          "flow",
-          "intro_pose"
+          "flow"
         ],
         "final": [
-          "composite",
-          "intro_pose"
+          "composite"
         ]
       },
       "composite": {
@@ -419,7 +417,7 @@
     },
     "centre": {
       "geometry": {
-        "stage": "LERP",
+        "stage": "SMOOTH",
         "cam_aspect": 1.7778,
         "target_top_x": 0.5,
         "target_top_y": 0.33,
@@ -470,8 +468,9 @@
     },
     "intro_sequence": {
       "verbose": false,
-      "recording_path": "recordings/intro_1",
-      "source_track": 1,
+      "loop": true,
+      "recording_path": "recordings/intro_2",
+      "source_track": 0,
       "color": {
         "r": 1.0,
         "g": 1.0,
@@ -674,7 +673,7 @@
   },
   "session": {
     "output_path": "recordings",
-    "name": "no_id",
+    "name": "test_01",
     "split_seconds": 10,
     "osc": {
       "port_in": 9001,
@@ -694,14 +693,14 @@
       "durations": [
         10.0,
         3.0,
-        3.0,
+        30.0,
         3.0,
         20.0,
         60.0,
         10.0,
         3.0
       ],
-      "loop": true
+      "loop": false
     },
     "video": {
       "temp_path": "temp",
@@ -710,7 +709,7 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "enabled": false
+      "enabled": true
     },
     "pose": {
       "stage": "RAW",
@@ -718,7 +717,7 @@
         "BBox",
         "Points2D"
       ],
-      "enabled": false
+      "enabled": true
     }
   }
 }
