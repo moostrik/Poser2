@@ -47,6 +47,7 @@ depth cam pose synchony detection
 
 ### Install Script
 * in the terminal run ```scripts\install.bat```
+* and make the models for an app ```scripts/makemodels.bat <app_name>``` or all apps ```scripts/makemodels.bat all```
 
 ### Run Project
 * activate venv and run ```python launcher.py```
