@@ -38,20 +38,32 @@ class Stage(IntEnum):
 
 
 class ShowStage(IntEnum):
-    IDLE =          0
-    START =         auto()
+    START =         0
     INTRO_IN =      auto()
     INTRO =         auto()
     INTRO_OUT =     auto()
     PLAY_IN =       auto()
     PLAY =          auto()
     CONCLUSION =    auto()
+    IDLE =          auto()
+
+_SHOW_STAGES = [s for s in ShowStage if s != ShowStage.IDLE]
+_STAGE_DURATIONS: dict[ShowStage, float] = {
+    ShowStage.START: 10.0,
+    ShowStage.INTRO_IN: 3.0,
+    ShowStage.INTRO: 30.0,
+    ShowStage.INTRO_OUT: 3.0,
+    ShowStage.PLAY_IN: 3.0,
+    ShowStage.PLAY: 60.0,
+    ShowStage.CONCLUSION: 10.0,
+    ShowStage.IDLE: 3.0,
+}
 
 
 class ShowSequencerSettings(SequencerSettings):
     """HD Trio show sequencer with project-specific stages."""
-    stages:     Field[list[ShowStage]] = Field([ShowStage.START, ShowStage.INTRO_IN, ShowStage.INTRO, ShowStage.INTRO_OUT, ShowStage.PLAY_IN, ShowStage.PLAY, ShowStage.CONCLUSION, ShowStage.IDLE], widget=Widget.checklist, description="Stages to play")
-    durations:  Field[list] = Field([3.0, 10.0, 3.0, 30.0, 3.0, 3.0, 60.0, 10.0], min=0.0, max=600.0, step=0.1, description="Stage durations")
+    stages:     Field[list[ShowStage]] = Field(_SHOW_STAGES, widget=Widget.checklist, description="Stages to play")
+    durations:  Field[list] = Field([_STAGE_DURATIONS[s] for s in _SHOW_STAGES], min=0.0, max=600.0, step=0.1, description="Stage durations")
     stage:      Field[ShowStage]   = Field(ShowStage.IDLE, access=Field.READ, description="Current stage", newline=True)
 
 
@@ -252,7 +264,7 @@ class SessionGroup(BaseSettings):
     num_cameras:   Field[int]   = Field(1, access=Field.INIT, description="Number of cameras")
     fps:           Field[float] = Field(30.0, access=Field.INIT, description="Camera frame rate")
 
-    start:         Field[bool]  = Field(False, widget=Widget.button, description="Start session")
+    start:         Field[bool]  = Field(False, widget=Widget.button, description="Start session", pinned=True)
     stop:          Field[bool]  = Field(False, widget=Widget.button, description="Stop session")
     output_path:   Field[str]   = Field("recordings", access=Field.INIT, description="Recordings output directory")
     name:          Field[str]   = Field("", widget=Widget.input, description="Recording group ID")
@@ -262,11 +274,11 @@ class SessionGroup(BaseSettings):
     _session_share:  list = [output_path, name, start, stop, split, split_seconds]
     _recorder_share: list = [start, stop, split, name, output_path]
 
-    osc     : Group[OscReceiverSettings]     = Group(OscReceiverSettings)
-    core    : Group[SessionSettings]         = Group(SessionSettings, share=_session_share)
-    sequencer: Group[ShowSequencerSettings]   = Group(ShowSequencerSettings, share=[start, stop])
-    video   : Group[RecorderSettings]        = Group(RecorderSettings, share=_recorder_share + [num_cameras, fps])
-    pose    : Group[_PoseRecorderSettings]   = Group(_PoseRecorderSettings, share=_recorder_share)
+    osc:        Group[OscReceiverSettings]     = Group(OscReceiverSettings)
+    control:    Group[SessionSettings]         = Group(SessionSettings, share=_session_share)
+    sequencer:  Group[ShowSequencerSettings]   = Group(ShowSequencerSettings, share=[start, stop])
+    video:      Group[RecorderSettings]        = Group(RecorderSettings, share=_recorder_share + [num_cameras, fps])
+    pose:       Group[_PoseRecorderSettings]   = Group(_PoseRecorderSettings, share=_recorder_share)
 
 
 # ---------------------------------------------------------------------------
@@ -310,8 +322,9 @@ class CentreGroup(BaseSettings):
 class IntroSequenceSettings(BaseSettings):
     """Settings for prerecorded pose overlay during INTRO stages."""
     verbose:        Field[bool]  = Field(False, description="Log start/stop events")
-    recording_path: Field[str]   = Field("recordings/intro", access=Field.INIT, description="Path to recorded pose folder")
-    source_track:   Field[int]   = Field(0, min=0, max=16, access=Field.INIT, description="Track ID to use from recording")
+    loop:           Field[bool]  = Field(False, description="Loop recording continuously")
+    recording_path: Field[str]   = Field("recordings/intro", widget=Widget.input, description="Path to recorded pose folder")
+    source_track:   Field[int]   = Field(0, min=0, max=16, description="Track ID to use from recording")
     color:          Field[Color] = Field(Color(1.0, 1.0, 1.0), description="Skeleton color for intro overlay")
     pose:           Group[layers.CentrePoseSettings]  = Group(layers.CentrePoseSettings)
 

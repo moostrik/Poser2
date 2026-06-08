@@ -37,13 +37,14 @@ class SequencerSettings(BaseSettings):
     """
     stages:         Field[list[int]]   = Field([0], description="Stages to play")
     durations:      Field[list[float]] = Field([0.0], min=0.0, description="Duration per stage (seconds)")
-    start:          Field[bool]        = Field(False, widget=Widget.button, newline=True, description="Start show")
-    stop:           Field[bool]        = Field(False, widget=Widget.button, description="Stop show")
-    running:        Field[bool]        = Field(False, access=Field.READ, description="Show running")
-    skip:           Field[bool]        = Field(False, widget=Widget.button, description="Skip to next stage")
     stage:          Field[int]         = Field(0, access=Field.READ, description="Current stage")
     stage_progress: Field[float]       = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Stage progress")
     progress:       Field[float]       = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Overall progress")
+    start:          Field[bool]        = Field(False, widget=Widget.button, description="Start show", newline=True)
+    stop:           Field[bool]        = Field(False, widget=Widget.button, description="Stop show")
+    running:        Field[bool]        = Field(False, access=Field.READ, description="Show running")
+    skip:           Field[bool]        = Field(False, widget=Widget.button, description="Skip to next stage")
+    loop:           Field[bool]        = Field(False, description="Loop show back to start")
 
 
 class Sequencer:
@@ -88,6 +89,8 @@ class Sequencer:
         config.bind(SequencerSettings.start, self._on_start)
         config.bind(SequencerSettings.stop, self._on_stop)
         config.bind(SequencerSettings.skip, self._on_skip)
+        config.bind(SequencerSettings.durations, self._on_playlist_changed)
+        config.bind(SequencerSettings.stages, self._on_playlist_changed)
         self._set_idle_state()
 
     # -- Settings callbacks --------------------------------------------------
@@ -103,6 +106,14 @@ class Sequencer:
     def _on_skip(self, value: bool) -> None:
         if value and self._active:
             self._advance_stage()
+
+    def _on_playlist_changed(self, _=None) -> None:
+        """Rebuild playlist cache immediately when stages or durations change."""
+        if not self._active:
+            return
+        self._build_playlist()
+        if self._pos >= len(self._playlist):
+            self._pos = max(0, len(self._playlist) - 1)
 
     # -- Playlist cache ------------------------------------------------------
 
@@ -160,6 +171,9 @@ class Sequencer:
         if next_pos < len(self._playlist):
             self._pos = next_pos
             self._enter_stage()
+        elif self.config.loop:
+            self._pos = 0
+            self._enter_stage()
         else:
             SequencerSettings.stop.fire(self.config)
 
@@ -167,6 +181,13 @@ class Sequencer:
 
     def add_state_callback(self, callback: Callable[[SequencerState], None]) -> None:
         self._state_callbacks.add(callback)
+        callback(SequencerState(
+            stage=self.config.stage,
+            stage_progress=self.config.stage_progress,
+            progress=self.config.progress,
+            elapsed=0.0,
+            active=self._active,
+        ))
 
     def remove_state_callback(self, callback: Callable[[SequencerState], None]) -> None:
         self._state_callbacks.discard(callback)

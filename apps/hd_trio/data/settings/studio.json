@@ -1,7 +1,7 @@
 {
   "num_players": 3,
   "input_fps": 23.0,
-  "render_fps": 57.0,
+  "render_fps": 51.0,
   "camera": {
     "yolo": true,
     "color": true,
@@ -359,10 +359,12 @@
     "layer": {
       "select": {
         "preview": [
-          "flow"
+          "flow",
+          "intro_pose"
         ],
         "final": [
-          "composite"
+          "composite",
+          "intro_pose"
         ]
       },
       "composite": {
@@ -468,8 +470,8 @@
     },
     "intro_sequence": {
       "verbose": false,
-      "recording_path": "recordings/intro",
-      "source_track": 0,
+      "recording_path": "recordings/intro_1",
+      "source_track": 1,
       "color": {
         "r": 1.0,
         "g": 1.0,
@@ -477,7 +479,7 @@
         "a": 1.0
       },
       "pose": {
-        "line_width": 3.0,
+        "line_width": 6.61,
         "line_smooth": 0.0,
         "use_scores": false,
         "draw_anchors": false
@@ -681,26 +683,25 @@
       "ip_address_out": "127.0.0.1",
       "verbose": true
     },
-    "core": {},
+    "control": {},
     "sequencer": {
       "stages": [
-        "START",
         "INTRO_IN",
         "INTRO",
         "INTRO_OUT",
-        "PLAY_IN",
         "IDLE"
       ],
       "durations": [
-        3.0,
         10.0,
         3.0,
-        30.0,
+        3.0,
         3.0,
         20.0,
         60.0,
-        10.0
-      ]
+        10.0,
+        3.0
+      ],
+      "loop": true
     },
     "video": {
       "temp_path": "temp",
@@ -713,11 +714,11 @@
     },
     "pose": {
       "stage": "RAW",
-      "enabled": false,
       "features": [
         "BBox",
         "Points2D"
-      ]
+      ],
+      "enabled": false
     }
   }
 }

@@ -44,7 +44,7 @@ class HDTrioMain:
         self.board = RenderBoard()
 
         # SESSION
-        self.session = Session(self.settings.session.core)
+        self.session = Session(self.settings.session.control)
         self.session_osc = OscReceiver(self.settings.session.osc)
         self.session_osc.bind('/start/recording', self._on_osc_start_recording)
         self.session_osc.bind('/stop/recording',  self._on_osc_stop_recording)

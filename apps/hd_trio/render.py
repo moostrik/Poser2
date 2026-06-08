@@ -8,10 +8,11 @@ from modules.render import layers as ls, make_subdivision, SubdivisionRow, Subdi
 from modules.utils import Rect, Point2f, HotReloadMethods
 
 from .render_board import RenderBoard
-from .settings import Layers, RenderSettings, ShowStage, Stage
+from .settings import Layers, RenderSettings, ShowStage, Stage, IntroSequenceSettings
 from . import render_stages
 from .render_stages import STAGES, StageLayer
 from .intro_sequence import IntroSequencePlayer, SequenceDataProxy, FixedColorProxy
+from pathlib import Path
 
 
 UPDATE_LAYERS: list[Layers] = [
@@ -64,6 +65,12 @@ class HDTrioRender(RenderBase):
         settings.data.b.line_smooth = 6.0
         settings.data.b.use_history_color = True
 
+        # intro sequence overlay — shared objects must exist before the per-camera loop
+        self._intro_proxy = SequenceDataProxy()
+        self._intro_player = IntroSequencePlayer(settings.intro_sequence, self.num_cams)
+        self._intro_color_proxy = FixedColorProxy(settings.intro_sequence)
+        self._intro_geoms: dict[int, ls.CentreGeometry] = {}
+
         flows: dict[int, ls.FlowLayer] = {}
         cmt: dict[int, Texture] = {}
         for i in range(self.num_cams):
@@ -81,6 +88,9 @@ class HDTrioRender(RenderBase):
             centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(      i, centre_gmtry,    cam_image.texture,  cmt[i], settings.centre.cam)
             centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(      i, centre_gmtry,    cam_frg.texture,    cmt[i], settings.centre.frg,        settings.colors)
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(     i, centre_gmtry,                                settings.centre.pose,       settings.colors)
+
+            intro_geom =    self._intro_geoms[i] =           ls.CentreGeometry(      i, self._intro_proxy,                          settings.centre.geometry)  # type: ignore[arg-type]
+            self.L[Layers.intro_pose][i] =                   ls.CentrePoseLayer(     i, intro_geom,                                 settings.intro_sequence.pose, self._intro_color_proxy)  # type: ignore[arg-type]
 
             ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,      centre_frg.texture, cmt,    settings.centre.color,      settings.colors)
             flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,      cam_mask,  centre_mask.texture, centre_frg.texture,     settings.flow)
@@ -118,14 +128,7 @@ class HDTrioRender(RenderBase):
         self._prev_stage: ShowStage | None = None
         self._active_stages: list[StageLayer] = []
 
-        # intro sequence overlay
-        self._intro_proxy = SequenceDataProxy()
-        self._intro_player = IntroSequencePlayer(settings.intro_sequence, self.num_cams)
-        self._intro_color_proxy = FixedColorProxy(settings.intro_sequence)
-        self._intro_geoms: dict[int, ls.CentreGeometry] = {}
-        for i in range(self.num_cams):
-            self._intro_geoms[i] = ls.CentreGeometry(i, self._intro_proxy, settings.centre.geometry)  # type: ignore[arg-type]
-            self.L[Layers.intro_pose][i] = ls.CentrePoseLayer(i, self._intro_geoms[i], settings.intro_sequence.pose, self._intro_color_proxy)  # type: ignore[arg-type]
+        settings.intro_sequence.bind(IntroSequenceSettings.recording_path, self._on_recording_path_changed)
 
     def _rebuild_stages(self) -> None:
         """Re-instantiate stage objects after hot-reload of stages.py."""
@@ -138,6 +141,9 @@ class HDTrioRender(RenderBase):
         }
         self._prev_stage = None
         self._active_stages = []
+
+    def _on_recording_path_changed(self, path: str) -> None:
+        self._intro_player.load(Path(path))
 
     def on_main_window_resize(self, width: int, height: int) -> None:
         self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)
@@ -159,6 +165,7 @@ class HDTrioRender(RenderBase):
             self.L[Layers.poser][i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
+        self.settings.intro_sequence.unbind(IntroSequenceSettings.recording_path, self._on_recording_path_changed)
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()
@@ -174,7 +181,8 @@ class HDTrioRender(RenderBase):
         seq = self.board.get_sequence()
         stage = ShowStage(seq.stage)
         progress = seq.stage_progress
-        if stage != self._prev_stage:
+        prev_stage = self._prev_stage
+        if stage != prev_stage:
             for s in self._active_stages:
                 s.exit()
             self._active_stages = self._stages.get(stage, [])
@@ -195,7 +203,7 @@ class HDTrioRender(RenderBase):
         # Intro sequence overlay — tick player during INTRO stages
         _INTRO_STAGES = (ShowStage.INTRO_IN, ShowStage.INTRO, ShowStage.INTRO_OUT)
         if stage in _INTRO_STAGES:
-            if not self._intro_player.active:
+            if prev_stage not in _INTRO_STAGES:  # first frame of intro sequence
                 self._intro_player.start()
             frames = self._intro_player.update()
             self._intro_proxy.update(frames)

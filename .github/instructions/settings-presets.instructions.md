@@ -1,6 +1,6 @@
 ---
 description: "Use when modifying, adding, or removing Field, Group, or Child definitions in any app settings file (apps/*/settings.py), or when editing preset JSON files in apps/*/data/settings/."
-applyTo: "apps/*/settings.py, apps/*/data/settings/*.json"
+applyTo: "apps/**/*settings*.py, modules/**/*settings*.py, apps/*/data/settings/*.json"
 ---
 # Settings & Preset Maintenance
 

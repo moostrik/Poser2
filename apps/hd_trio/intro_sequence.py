@@ -78,7 +78,14 @@ class IntroSequencePlayer:
         self._duration = 0.0
         self._time_offset = 0.0
 
-        folder = Path(settings.recording_path)
+        self.load(Path(settings.recording_path))
+
+    def load(self, folder: Path) -> None:
+        """Load (or reload) a recording. Stops active playback first."""
+        self.stop()
+        self._player = Player()
+        self._duration = 0.0
+        self._time_offset = 0.0
         if folder.exists():
             self._player.load(folder)
             ts = self._player._all_timestamps
@@ -120,14 +127,22 @@ class IntroSequencePlayer:
         Returns an empty dict when inactive or past the recording end.
         """
         if not self._active:
-            return {}
+            if self._settings.loop and self._duration > 0.0:
+                self._start_time = time.time()
+                self._active = True
+            else:
+                return {}
 
         elapsed = time.time() - self._start_time
         if elapsed >= self._duration:
-            self._active = False
-            if self._settings.verbose:
-                logger.info("IntroSequencePlayer finished (%.1fs)", elapsed)
-            return {}
+            if self._settings.loop:
+                self._start_time += self._duration
+                elapsed -= self._duration
+            else:
+                self._active = False
+                if self._settings.verbose:
+                    logger.info("IntroSequencePlayer finished (%.1fs)", elapsed)
+                return {}
 
         query_ts = self._time_offset + elapsed
         source = self._player.get_frame_dict(query_ts)
