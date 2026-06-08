@@ -60,9 +60,7 @@
       "name": ""
     },
     "frame_sync": {},
-    "tracklet_sync": {}
-  },
-  "tt": {
+    "tracklet_sync": {},
     "tracker": {
       "tracklet_min_age": 3,
       "add_centre_threshold": 0.25,

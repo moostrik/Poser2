@@ -94,7 +94,8 @@ class OakGroup(BaseSettings):
     cam_0         = Group(CameraSettings, share=_cam_share)
     simulator     = Group(SimulatorSettings, share=[num_cameras, fps])
     recorder      = Group(RecorderSettings, share=[num_cameras, fps])
-    frame_sync  = Group(SyncSettings, share=[num_cameras, fps])
+    tracker       = Group(OnePerCamTrackerSettings)
+    frame_sync    = Group(SyncSettings, share=[num_cameras, fps])
     tracklet_sync = Group(SyncSettings, share=[num_cameras, fps])
 
     @property
@@ -194,14 +195,6 @@ class PoseGroup(BaseSettings):
 
 
 # ---------------------------------------------------------------------------
-#  Tracker
-# ---------------------------------------------------------------------------
-
-class TTGroup(BaseSettings):
-    tracker = Group(OnePerCamTrackerSettings)
-
-
-# ---------------------------------------------------------------------------
 #  Render settings
 # ---------------------------------------------------------------------------
 
@@ -260,7 +253,6 @@ class Settings(BaseSettings):
     fps:                Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
 
     camera  = Group(OakGroup, share=[num_players.as_('num_cameras'), fps])
-    tt      = Group(TTGroup)
     pose    = Group(PoseGroup, share=[num_players.as_('max_poses'), fps.as_('frequency')])
     render  = Group(RenderSettings)
     inout   = Group(InOutGroup)

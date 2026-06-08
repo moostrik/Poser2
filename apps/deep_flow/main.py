@@ -57,7 +57,7 @@ class DeepFlowMain:
             for i in range(num_players):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
-        self.tracker = OnePerCamTracker(self.settings.tt.tracker, num_players)
+        self.tracker = OnePerCamTracker(self.settings.camera.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.image_uploader = source.Uploader()
         self.crop_extractor = crop.Extractor(p.image_crop)
@@ -229,6 +229,8 @@ class DeepFlowMain:
             return
         self.is_running = False
 
+        self.settings_server.stop()
+
         self.render.stop()
 
         if self.player:
@@ -244,8 +246,6 @@ class DeepFlowMain:
         self.pose_predictor.stop()
         self.segmentation_predictor.stop()
         self.optical_flow_predictor.stop()
-
-        self.settings_server.stop()
 
         for camera in self.cameras:
             camera.join(timeout=10)
