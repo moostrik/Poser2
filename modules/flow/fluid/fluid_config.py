@@ -10,7 +10,7 @@ from modules.settings import Field, BaseSettings, Widget, Group
 class VelocitySettings(BaseSettings):
     """Velocity field parameters."""
     input_strength: Field[float]    = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="Multiplier applied to all velocity inputs")
-    self_advection: Field[float]    = Field(0.01,   min=0.0,    max=0.2,    color="blue-grey",      description="How much velocity advects itself. Keep low for stability.")
+    self_advection: Field[float]    = Field(0.01,   min=0.0,    max=1.0,    color="blue-grey",      description="How much velocity advects itself. Keep low for stability.")
     fade_time: Field[float]         = Field(30.0,   min=0.1,    max=60.0,   color="deep-blue",      description="Seconds until velocity fades to ~1%")
     dampen_threshold: Field[float]  = Field(5.0,    min=0.1,    max=50.0,   color="cyan",           description="Magnitude above which velocity is dampened")
     dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")

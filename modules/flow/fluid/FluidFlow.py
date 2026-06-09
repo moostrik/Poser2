@@ -87,8 +87,8 @@ class FluidFlow:
         self._density_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         # Temperature: CLAMP_TO_EDGE = insulated walls (Neumann)
         self._temperature_fbo: SwapFbo = SwapFbo()
-        # Pressure: CLAMP_TO_EDGE = zero-gradient walls (Neumann)
-        self._pressure_fbo: SwapFbo = SwapFbo()
+        # Pressure: CLAMP_TO_BORDER(0) = zero pressure at walls (Dirichlet / open boundary)
+        self._pressure_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
         self._simulation_obstacle_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 1.0, 1.0, 1.0))
         # Full-resolution obstacle for density advection (same wrap)

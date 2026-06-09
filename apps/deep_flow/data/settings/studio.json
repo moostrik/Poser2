@@ -212,7 +212,7 @@
           "centre_frg"
         ],
         "right": [
-          "flow"
+          "fluid3d"
         ],
         "final": [
           "composite"
@@ -296,7 +296,7 @@
         "gamma": 1.0,
         "offset": 0.0,
         "contrast": 1.1,
-        "saturation": 1.42,
+        "saturation": 2.0,
         "levels": 9,
         "smoothness": 0.33,
         "colorize": 0.0,
@@ -324,8 +324,8 @@
       "fps": 60.0,
       "draw_mode": "DENSITY_BRIDGE_INPUT_COLOR",
       "blend_mode": "ADD",
-      "width": 512,
-      "height": 288,
+      "width": 896,
+      "height": 1600,
       "inputs": {
         "flow": "centre_mask",
         "density": "centre_frg"
@@ -345,8 +345,8 @@
         "boost": 0.4
       },
       "velocity_trail": {
-        "scale": 0.94,
-        "trail_weight": 0.63,
+        "scale": 1.0,
+        "trail_weight": 0.86,
         "blur_radius": 0.0,
         "blur_steps": 4
       },
@@ -365,7 +365,7 @@
       "blend_mode": "ADD",
       "fluid_flow": {
         "profile": true,
-        "width": 900,
+        "width": 896,
         "height": 1600,
         "speed": 1.0,
         "depth": {
@@ -378,9 +378,9 @@
           "injection_spread": 0.09
         },
         "velocity": {
-          "input_strength": 1.2,
-          "self_advection": 0.05,
-          "fade_time": 5.09,
+          "input_strength": 1.0,
+          "self_advection": 0.2,
+          "fade_time": 23.5,
           "dampen_threshold": 26.61,
           "dampen_time": 5.52,
           "vorticity": 0.0,
@@ -389,9 +389,9 @@
           "viscosity_iter": 15
         },
         "density": {
-          "input_strength": 0.94,
+          "input_strength": 3.28,
           "speed_offset": 0.78,
-          "fade_time": 47.81,
+          "fade_time": 20.63,
           "dampen_threshold": 2.6,
           "dampen_time": 3.63
         },
@@ -404,9 +404,9 @@
           "ambient": 0.2
         },
         "pressure": {
-          "speed": 0.67,
+          "speed": 1.85,
           "fade_time": 23.13,
-          "iterations": 25
+          "iterations": 40
         }
       },
       "visualisation": {
@@ -494,11 +494,11 @@
     "window": {
       "title": "Poser",
       "v_sync": true,
-      "monitor": "M1",
-      "x": 517,
-      "y": 2716,
-      "width": 1080,
-      "height": 1000,
+      "monitor": "M0",
+      "x": 56,
+      "y": 52,
+      "width": 1476,
+      "height": 1007,
       "secondary_list": [
         "M1"
       ],

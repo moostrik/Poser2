@@ -115,8 +115,8 @@ class FluidFlow3DArray:
         self._density: SwapTexture2DArray = SwapTexture2DArray(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         # Temperature: CLAMP_TO_EDGE = insulated walls (Neumann)
         self._temperature: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_EDGE)
-        # Pressure: CLAMP_TO_EDGE = zero-gradient walls (Neumann)
-        self._pressure: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_EDGE)
+        # Pressure: CLAMP_TO_BORDER(0) = zero pressure at walls (Dirichlet / open boundary)
+        self._pressure: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
         self._simulation_obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
         # Density-resolution obstacle (for density advection when grid_scale < 1)
