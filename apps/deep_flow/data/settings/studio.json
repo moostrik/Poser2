@@ -300,7 +300,7 @@
         "levels": 9,
         "smoothness": 0.33,
         "colorize": 0.0,
-        "sharpen": 0.0,
+        "sharpen": 0.42,
         "use_mask": false
       },
       "pose": {
@@ -321,6 +321,10 @@
       }
     },
     "flow": {
+      "inputs": {
+        "flow": "centre_mask",
+        "density": "centre_frg"
+      },
       "fps": 60.0,
       "draw_mode": "DENSITY_BRIDGE_INPUT_COLOR",
       "blend_mode": "ADD",
@@ -341,7 +345,7 @@
         "boost": 0.0
       },
       "velocity_trail": {
-        "scale": 1.54,
+        "scale": 0.31,
         "trail_weight": 0.9,
         "blur_radius": 8.0,
         "blur_steps": 4
@@ -355,12 +359,8 @@
       }
     },
     "fluid3d": {
-      "inputs": {
-        "flow": "centre_mask",
-        "density": "centre_frg"
-      },
       "num_players": 1,
-      "sim_engine": "FLUID_3D",
+      "sim_engine": "FLUID_3D_ARRAY",
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",
       "fluid_flow": {

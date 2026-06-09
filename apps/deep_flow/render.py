@@ -141,8 +141,8 @@ class DeepFlowRender(RenderBase):
         self._right_layers = self.settings.layer.select.right
         self._draw_layers = self.settings.layer.select.final
 
-        flow_key: Layers = self.settings.fluid3d.inputs.flow
-        density_key: Layers = self.settings.fluid3d.inputs.density
+        flow_key: Layers = self.settings.flow.inputs.flow
+        density_key: Layers = self.settings.flow.inputs.density
         for i, _flow_layer in self.L[Layers.flow].items():
             flow_layer = cast(ls.FlowLayer, _flow_layer)
             if flow_key in self.L and i in self.L[flow_key]:

@@ -10,6 +10,8 @@ from modules.gl.shaders import Sharpen
 from ...color_settings import ColorSettings
 
 
+from modules.utils import HotReloadMethods
+
 class CentreFrgSettings(BaseSettings):
     """Configuration for CentreFrgLayer foreground rendering."""
     blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Foreground temporal blending")
@@ -56,6 +58,8 @@ class CentreFrgLayer(LayerBase):
         self._hue_shift_shader = HueShift()
         self._sharpen_shader = Sharpen()
         self._mask_shader = MaskApply()
+
+        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:
@@ -122,6 +126,7 @@ class CentreFrgLayer(LayerBase):
         self._blend_fbo.end()
 
         self._cel_shade_shader.reload()
+        self._effect_fbo.swap()
         self._effect_fbo.begin()
         self._cel_shade_shader.use(
             self._blend_fbo.texture,

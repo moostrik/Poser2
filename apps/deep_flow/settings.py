@@ -216,7 +216,7 @@ class FluidInputSettings(BaseSettings):
     flow:    Field[Layers] = Field(Layers.centre_mask, description="Texture used as optical flow input")
     density: Field[Layers] = Field(Layers.centre_frg,  description="Texture used as density and temperature input")
 
-class _Fluid3DLayerSettings(layers.Fluid3DLayerSettings):
+class _FlowLayerSettings(layers.FlowLayerSettings):
     inputs = Group(FluidInputSettings)
 
 
@@ -246,8 +246,8 @@ class RenderSettings(BaseSettings):
     data    = Group(DataGroup)
     preview = Group(PreviewGroup)
     centre  = Group(CentreGroup)
-    flow    = Group(layers.FlowLayerSettings, share=[stage])
-    fluid3d = Group(_Fluid3DLayerSettings, share=[stage])
+    flow    = Group(_FlowLayerSettings, share=[stage])
+    fluid3d = Group(layers.Fluid3DLayerSettings, share=[stage])
     colors  = Group(ColorSettings)
     window  = Group(WindowSettings)
 
