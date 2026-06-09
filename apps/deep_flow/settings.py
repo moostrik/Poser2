@@ -209,7 +209,8 @@ class _PoseCompSettings(layers.PoseCompSettings):
     stage: Field[Stage] = Field(Stage.LERP)
 
 class _CentreGeomSettings(layers.CentreGeomSettings):
-    stage: Field[Stage] = Field(Stage.SMOOTH)
+    stage:         Field[Stage] = Field(Stage.SMOOTH)
+    lock_rotation: Field[bool]  = Field(True)
 
 
 class LayerGroup(BaseSettings):

@@ -27,6 +27,7 @@ class CentreGeomSettings(BaseSettings):
     target_bottom_x:    Field[float] = Field(0.5, min=0.0, max=1.0, description="Bottom anchor X position (normalized)")
     target_bottom_y:    Field[float] = Field(0.6, min=0.0, max=1.0, description="Bottom anchor Y position (normalized)")
     dst_aspectratio:    Field[float] = Field(0.5625, min=0.5, max=2.0, description="Output aspect ratio (9/16 = 0.5625)")
+    lock_rotation:      Field[bool] = Field(False, description="Anchor position to neck only; scale by hip distance but do not rotate")
 
 
 @dataclass
@@ -147,6 +148,8 @@ class CentreGeometry(LayerBase):
         cam_rotation_img, distance, cam_crop_roi_img = CentreGeometry._calculate_roi(
             anchor_top_img, anchor_bot_img, target_top, target_distance, self.config.dst_aspectratio
         )
+        if self.config.lock_rotation:
+            cam_rotation_img = 0.0
 
         # Store camera geometry (texture space)
         self._cam_geometry = CamGeometry(
@@ -163,7 +166,7 @@ class CentreGeometry(LayerBase):
         # Calculate bbox-space geometry (aspect-corrected for mask)
         bbox_aspect = bbox.width / bbox.height if bbox.height > 0 else 1.0
         mask_delta = hip_mid - shoulder_mid
-        mask_rotation = -math.atan2(mask_delta.x * bbox_aspect, mask_delta.y)
+        mask_rotation = -math.atan2(mask_delta.x * bbox_aspect, mask_delta.y) if not self.config.lock_rotation else 0.0
         mask_distance = math.hypot(mask_delta.x * bbox_aspect, mask_delta.y)
 
         mask_height = mask_distance / target_distance
