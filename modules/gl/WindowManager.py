@@ -68,6 +68,8 @@ class MouseButton(IntEnum):
 
 
 class WindowManager():
+    _MIN_VISIBLE = 100  # px of window that must remain on-screen after a monitor switch
+
     _GLFW_BUTTON_MAP: dict[int, MouseButton] = {
         glfw.MOUSE_BUTTON_LEFT:   MouseButton.LEFT,
         glfw.MOUSE_BUTTON_RIGHT:  MouseButton.RIGHT,
@@ -664,7 +666,14 @@ class WindowManager():
             )
             return
         posX, posY = glfw.get_monitor_pos(self._monitor)
-        glfw.set_window_pos(self._main_window, posX + self.settings.x, posY + self.settings.y)
+        video_mode = glfw.get_video_mode(self._monitor)
+        max_x = video_mode.size.width - self._MIN_VISIBLE
+        max_y = video_mode.size.height - self._MIN_VISIBLE
+        x = min(self.settings.x, max_x)
+        y = min(self.settings.y, max_y)
+        if x != self.settings.x: self.settings.x = x
+        if y != self.settings.y: self.settings.y = y
+        glfw.set_window_pos(self._main_window, posX + x, posY + y)
 
     def set_position(self, x: int, y: int) -> None:
         """Move the main window to (x, y) relative to current monitor."""
