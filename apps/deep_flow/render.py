@@ -1,5 +1,7 @@
 """Deep Flow render — split-view layer graph with 3D volumetric fluid."""
 
+from typing import cast
+
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, WindowSettings
@@ -138,6 +140,15 @@ class DeepFlowRender(RenderBase):
         self._left_layers = self.settings.layer.select.left
         self._right_layers = self.settings.layer.select.right
         self._draw_layers = self.settings.layer.select.final
+
+        flow_key: Layers = self.settings.fluid3d.inputs.flow
+        density_key: Layers = self.settings.fluid3d.inputs.density
+        for i, _flow_layer in self.L[Layers.flow].items():
+            flow_layer = cast(ls.FlowLayer, _flow_layer)
+            if flow_key in self.L and i in self.L[flow_key]:
+                flow_layer.set_flow_input(self.L[flow_key][i].texture)
+            if density_key in self.L and i in self.L[density_key]:
+                flow_layer.set_density_input(self.L[density_key][i].texture)
 
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)

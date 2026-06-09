@@ -151,6 +151,14 @@ class FlowLayer(LayerBase):
         """Temperature output (R16F) for fluid simulation."""
         return self._temperature_bridge.temperature
 
+    # ========== Input Setters ==========
+
+    def set_flow_input(self, texture: Texture) -> None:
+        self._flow_input = texture
+
+    def set_density_input(self, texture: Texture) -> None:
+        self._density_input = texture
+
     # ========== Lifecycle Methods ==========
 
     def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:

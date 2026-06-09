@@ -212,6 +212,13 @@ class _CentreGeomSettings(layers.CentreGeomSettings):
     stage:         Field[Stage] = Field(Stage.SMOOTH)
     lock_rotation: Field[bool]  = Field(True)
 
+class FluidInputSettings(BaseSettings):
+    flow:    Field[Layers] = Field(Layers.centre_mask, description="Texture used as optical flow input")
+    density: Field[Layers] = Field(Layers.centre_frg,  description="Texture used as density and temperature input")
+
+class _Fluid3DLayerSettings(layers.Fluid3DLayerSettings):
+    inputs = Group(FluidInputSettings)
+
 
 class LayerGroup(BaseSettings):
     select = Group(LayerSettings)
@@ -240,7 +247,7 @@ class RenderSettings(BaseSettings):
     preview = Group(PreviewGroup)
     centre  = Group(CentreGroup)
     flow    = Group(layers.FlowLayerSettings, share=[stage])
-    fluid3d = Group(layers.Fluid3DLayerSettings, share=[stage])
+    fluid3d = Group(_Fluid3DLayerSettings, share=[stage])
     colors  = Group(ColorSettings)
     window  = Group(WindowSettings)
 

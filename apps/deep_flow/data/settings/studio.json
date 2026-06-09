@@ -209,10 +209,10 @@
     "layer": {
       "select": {
         "left": [
-          "fluid3d"
+          "centre_frg"
         ],
         "right": [
-          "fluid3d"
+          "flow"
         ],
         "final": [
           "fluid3d"
@@ -296,12 +296,12 @@
         "gamma": 1.0,
         "offset": 0.0,
         "contrast": 1.1,
-        "saturation": 2.0,
+        "saturation": 1.84,
         "levels": 9,
         "smoothness": 0.33,
-        "colorize": 0.96,
+        "colorize": 0.0,
         "sharpen": 0.0,
-        "use_mask": true
+        "use_mask": false
       },
       "pose": {
         "line_width": 3.0,
@@ -322,7 +322,7 @@
     },
     "flow": {
       "fps": 60.0,
-      "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
+      "draw_mode": "DENSITY_BRIDGE_INPUT_COLOR",
       "blend_mode": "ADD",
       "width": 512,
       "height": 288,
@@ -355,6 +355,10 @@
       }
     },
     "fluid3d": {
+      "inputs": {
+        "flow": "centre_mask",
+        "density": "centre_frg"
+      },
       "num_players": 1,
       "sim_engine": "FLUID_3D",
       "draw_mode": "DENSITY",
@@ -374,8 +378,8 @@
           "injection_spread": 0.001
         },
         "velocity": {
-          "input_strength": 0.73,
-          "self_advection": 0.01,
+          "input_strength": 0.62,
+          "self_advection": 0.05,
           "fade_time": 31.77,
           "dampen_threshold": 9.62,
           "dampen_time": 3.0,
@@ -385,9 +389,9 @@
           "viscosity_iter": 20
         },
         "density": {
-          "input_strength": 1.41,
+          "input_strength": 5.21,
           "speed_offset": 0.0,
-          "fade_time": 18.0,
+          "fade_time": 1.57,
           "dampen_threshold": 1.47,
           "dampen_time": 3.63
         },
@@ -400,9 +404,9 @@
           "ambient": 0.2
         },
         "pressure": {
-          "speed": 0.0,
-          "fade_time": 8.0,
-          "iterations": 40
+          "speed": 0.2,
+          "fade_time": 6.26,
+          "iterations": 24
         }
       },
       "visualisation": {
