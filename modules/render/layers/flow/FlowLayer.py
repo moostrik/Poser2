@@ -95,7 +95,7 @@ class FlowLayer(LayerBase):
         fluid.add_temperature(flow.temperature)
     """
 
-    def __init__(self, cam_id: int, board: HasFrames, mask_source: MaskSourceLayer, mask: Texture, image: Texture, settings: FlowLayerSettings | None = None) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, mask_source: MaskSourceLayer, flow_input: Texture, density_input: Texture, settings: FlowLayerSettings | None = None) -> None:
         """Initialize flow layer.
 
         Args:
@@ -108,8 +108,8 @@ class FlowLayer(LayerBase):
         self._cam_id: int = cam_id
         self._board: HasFrames = board
         self._mask_source: MaskSourceLayer = mask_source
-        self._mask: Texture = mask
-        self._image: Texture = image
+        self._flow_input: Texture = flow_input
+        self._density_input: Texture = density_input
         self.config: FlowLayerSettings = settings or FlowLayerSettings()
 
         self._delta_time: float = 1 / self.config.fps
@@ -201,7 +201,7 @@ class FlowLayer(LayerBase):
         if self._mask_source.dirty:
             # pass
             # Stage 1: Optical flow
-            self._optical_flow.set_input(self._image)
+            self._optical_flow.set_input(self._flow_input)
             self._optical_flow.update()
 
         # Stage 2: Bridges
@@ -211,14 +211,14 @@ class FlowLayer(LayerBase):
         self._velocity_magnitude.set_input(self._velocity_trail.velocity)
         self._velocity_magnitude.update()
 
-        self._density_bridge.set_color(self._image)
-        self._density_bridge.set_color(self._mask)
+        # self._density_bridge.set_color(self._flow_input)
+        self._density_bridge.set_color(self._density_input)
         # self._density_bridge.set_velocity(self._mask)
         # self._density_bridge.update(motion)
         self._density_bridge.set_velocity(self._velocity_trail.velocity)
         self._density_bridge.update()
 
-        self._temperature_bridge.set_color(self._mask)
+        self._temperature_bridge.set_color(self._density_input)
         self._temperature_bridge.set_mask(self._velocity_magnitude.magnitude)
         self._temperature_bridge.update()
 
@@ -255,4 +255,4 @@ class FlowLayer(LayerBase):
             FlowDrawMode.TEMP_BRIDGE_INPUT_MASK: self._temperature_bridge.mask_input,
             FlowDrawMode.TEMP_BRIDGE_OUTPUT: self._temperature_bridge.temperature,
         }
-        return textures.get(self.config.draw_mode, self._mask)
+        return textures.get(self.config.draw_mode, self._density_input)

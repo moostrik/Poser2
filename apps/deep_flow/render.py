@@ -92,10 +92,9 @@ class DeepFlowRender(RenderBase):
             self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.b, settings.colors)
             self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.board)
 
-        # Split-view composition: left panel + right panel
+        # Split-view composition: left panel + right panel side by side
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name='left',  columns=1, rows=1, src_aspect_ratio=1.0, padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name='right', columns=1, rows=1, src_aspect_ratio=1.0, padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name='panels', columns=2, rows=1, src_aspect_ratio=9.0/16.0, padding=Point2f(1.0, 1.0)),
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, False)
 
@@ -125,7 +124,7 @@ class DeepFlowRender(RenderBase):
         # Allocate interface layers to split-view panel sizes
         for layer_type in INTERFACE_LAYERS:
             for i in range(self.num_cams):
-                w, h = self.subdivision.get_allocation_size('right', 0)
+                w, h = self.subdivision.get_allocation_size('panels', 0)
                 self.L[layer_type][i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
@@ -156,14 +155,14 @@ class DeepFlowRender(RenderBase):
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
         # Left panel
-        left_rect: Rect = self.subdivision.get_rect('left', 0)
+        left_rect: Rect = self.subdivision.get_rect('panels', 0)
         glViewport(int(left_rect.x), int(height - left_rect.y - left_rect.height), int(left_rect.width), int(left_rect.height))
         for layer_type in self._left_layers:
             if 0 in self.L[layer_type]:
                 self.L[layer_type][0].draw()
 
         # Right panel
-        right_rect: Rect = self.subdivision.get_rect('right', 0)
+        right_rect: Rect = self.subdivision.get_rect('panels', 1)
         glViewport(int(right_rect.x), int(height - right_rect.y - right_rect.height), int(right_rect.width), int(right_rect.height))
         for layer_type in self._right_layers:
             if 0 in self.L[layer_type]:
