@@ -11,6 +11,7 @@ apps/**/data/recordings/*
 temp*
 *.h5
 *.mp4
+.claude/*
 
 # Python
 __pycache__/
