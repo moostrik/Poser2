@@ -104,6 +104,27 @@ class Texture3D:
         self.allocated = True
         self.clear()
 
+    def set_wrap(self, wrap: int, border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
+        """Change XY (S+T) wrap mode at runtime (GL thread only). Z axis unchanged."""
+        if not self.allocated:
+            return
+        self._wrap = wrap
+        self._border_color = border_color
+        glBindTexture(GL_TEXTURE_3D, self.tex_id)
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, wrap)
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, wrap)
+        glTexParameterfv(GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, border_color)
+        glBindTexture(GL_TEXTURE_3D, 0)
+
+    def set_wrap_z(self, wrap: int, border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
+        """Change Z (R) wrap mode at runtime independently from XY (GL thread only)."""
+        if not self.allocated:
+            return
+        glBindTexture(GL_TEXTURE_3D, self.tex_id)
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, wrap)
+        glTexParameterfv(GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, border_color)
+        glBindTexture(GL_TEXTURE_3D, 0)
+
     def deallocate(self) -> None:
         """Release texture resources."""
         if not self.allocated:
@@ -266,6 +287,16 @@ class SwapTexture3D:
     def clear_back(self, r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 0.0) -> None:
         """Clear back buffer."""
         self._textures[1 - self._swap_state].clear(r, g, b, a)
+
+    def set_wrap(self, wrap: int, border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
+        """Change XY wrap mode on both buffers at runtime (GL thread only)."""
+        self._textures[0].set_wrap(wrap, border_color)
+        self._textures[1].set_wrap(wrap, border_color)
+
+    def set_wrap_z(self, wrap: int, border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
+        """Change Z wrap mode on both buffers at runtime (GL thread only)."""
+        self._textures[0].set_wrap_z(wrap, border_color)
+        self._textures[1].set_wrap_z(wrap, border_color)
 
     def clear_all(self, r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 0.0) -> None:
         """Clear both buffers."""

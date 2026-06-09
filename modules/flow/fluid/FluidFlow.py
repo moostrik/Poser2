@@ -24,7 +24,7 @@ from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, SwapFbo, Fbo, Profiler
 from .. import FlowUtil
-from .fluid_config import FluidFlowSettings, VelocitySettings, DensitySettings
+from .fluid_config import FluidFlowSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings, BoundaryMode
 from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,
@@ -32,6 +32,11 @@ from .shaders import (
 )
 
 from modules.utils import HotReloadMethods
+
+_BOUNDARY_GL: dict = {
+    BoundaryMode.OPEN:   (GL_CLAMP_TO_BORDER, (0.0, 0.0, 0.0, 0.0)),
+    BoundaryMode.CLOSED: (GL_CLAMP_TO_EDGE,   (0.0, 0.0, 0.0, 0.0)),
+}
 
 
 # ---------------------------------------------------------------------------
@@ -79,16 +84,14 @@ class FluidFlow:
 
         self._reset_pending: bool = False
         self._reallocate_pending: bool = False
+        self._boundary_dirty: bool = False
 
         # ---- Simulation fields (SwapFbo for ping-pong) ----
-        # Velocity: CLAMP_TO_BORDER(0) = no-slip walls
+        # Velocity always uses Dirichlet (v=0 at walls); others configurable via _apply_boundary_modes().
         self._velocity_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
-        # Density: CLAMP_TO_BORDER(0) = nothing leaks out
-        self._density_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
-        # Temperature: CLAMP_TO_EDGE = insulated walls (Neumann)
+        self._density_fbo: SwapFbo = SwapFbo()
         self._temperature_fbo: SwapFbo = SwapFbo()
-        # Pressure: CLAMP_TO_BORDER(0) = zero pressure at walls (Dirichlet / open boundary)
-        self._pressure_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
+        self._pressure_fbo: SwapFbo = SwapFbo()
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
         self._simulation_obstacle_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 1.0, 1.0, 1.0))
         # Full-resolution obstacle for density advection (same wrap)
@@ -131,6 +134,10 @@ class FluidFlow:
         self.config.bind(FluidFlowSettings.width, lambda _: self._request_reallocate())
         self.config.bind(FluidFlowSettings.height, lambda _: self._request_reallocate())
         self.config.bind(FluidFlowSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
+        mark_boundary = lambda _: setattr(self, '_boundary_dirty', True)
+        self.config.density.bind(DensitySettings.boundary, mark_boundary)
+        self.config.temperature.bind(TemperatureSettings.boundary, mark_boundary)
+        self.config.pressure.bind(PressureSettings.boundary, mark_boundary)
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -198,6 +205,8 @@ class FluidFlow:
         self._vorticity_curl_fbo.allocate(sim_w, sim_h, GL_R16F)
         self._vorticity_force_fbo.allocate(sim_w, sim_h, GL_RG16F)
         self._buoyancy_fbo.allocate(sim_w, sim_h, GL_RG16F)
+
+        self._apply_boundary_modes()
 
     def deallocate(self) -> None:
         """Release all GPU resources."""
@@ -563,6 +572,12 @@ class FluidFlow:
 
     # ========== Deferred ==========
 
+    def _apply_boundary_modes(self) -> None:
+        """Apply current boundary mode config to all field FBOs (GL thread only)."""
+        self._density_fbo.set_wrap(*_BOUNDARY_GL[self.config.density.boundary])
+        self._temperature_fbo.set_wrap(*_BOUNDARY_GL[self.config.temperature.boundary])
+        self._pressure_fbo.set_wrap(*_BOUNDARY_GL[self.config.pressure.boundary])
+
     def _handle_deferred_actions(self) -> None:
         """Process reset and reallocation requests queued from the UI thread."""
         if self._reallocate_pending:
@@ -575,6 +590,10 @@ class FluidFlow:
         if self._reset_pending:
             self._reset_pending = False
             self.reset()
+
+        if self._boundary_dirty:
+            self._boundary_dirty = False
+            self._apply_boundary_modes()
 
     def _request_reset(self) -> None:
         """Thread-safe reset request — deferred to next update() on the GL thread."""

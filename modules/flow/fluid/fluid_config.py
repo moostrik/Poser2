@@ -4,7 +4,14 @@ Groups fields by physical domain (velocity, density, temperature, pressure)
 with prefixes stripped — the group name provides context.
 """
 
+from enum import IntEnum
+
 from modules.settings import Field, BaseSettings, Widget, Group
+
+
+class BoundaryMode(IntEnum):
+    OPEN   = 0  # Dirichlet — zero value at boundary (field escapes / absorbing)
+    CLOSED = 1  # Neumann   — zero gradient at boundary (field reflects / insulating)
 
 
 class VelocitySettings(BaseSettings):
@@ -27,6 +34,7 @@ class DensitySettings(BaseSettings):
     fade_time: Field[float]         = Field(4.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%")
     dampen_threshold: Field[float]  = Field(1.2,    min=0.1,    max=5.0,    color="cyan",           description="Magnitude above which density is dampened")
     dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
+    boundary: Field[BoundaryMode]   = Field(BoundaryMode.OPEN,                                      description="Open: density absorbed at edges (fluid escapes). Closed: density reflects at edges")
 
 
 class TemperatureSettings(BaseSettings):
@@ -37,6 +45,7 @@ class TemperatureSettings(BaseSettings):
     buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Thermal buoyancy coefficient: hot air rises")
     weight: Field[float]            = Field(-10.0,  min=-20.0,  max=2.0,    color="red",            description="Ratio of gravity/settling vs thermal lift")
     ambient: Field[float]           = Field(0.2,    min=0.0,    max=1.0,    color="brown",          description="Reference temperature (buoyancy = 0 at this temp)")
+    boundary: Field[BoundaryMode]   = Field(BoundaryMode.CLOSED,                                    description="Closed: insulated walls (temperature reflects). Open: cold walls (temperature=0 at edges)")
 
 
 class PressureSettings(BaseSettings):
@@ -44,6 +53,7 @@ class PressureSettings(BaseSettings):
     speed: Field[float]             = Field(0.0,    min=0.0,    max=2.0,    color="blue-grey",      description="Pressure advection speed")
     fade_time: Field[float]         = Field(8.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until pressure fades to ~1%")
     iterations: Field[int]          = Field(40,     min=1,      max=60,     color="orange",         description="Solver quality for pressure (iterations at 60fps, auto-scaled for frame rate)")
+    boundary: Field[BoundaryMode]   = Field(BoundaryMode.OPEN,                                      description="Open: pressure escapes at edges (reduces sticky feel at low resolution). Closed: pressure reflects")
 
 
 class DepthSettings(BaseSettings):
@@ -55,6 +65,7 @@ class DepthSettings(BaseSettings):
     absorption: Field[float]        = Field(4.0,  min=0.01,  max=50.0,   description="Beer's law absorption coefficient (higher = more opaque per unit density)")
     injection_layer: Field[float]   = Field(1.0,  min=0.0,  max=1.0,    description="Normalized depth for 2D->3D injection center")
     injection_spread: Field[float]  = Field(0.001, min=0.001, max=0.5,   description="Gaussian sigma for depth spread during injection")
+    boundary: Field[BoundaryMode]   = Field(BoundaryMode.CLOSED,                                    description="Z-axis boundary (3D only). Closed: depth layers reflect at front/back. Open: depth layers absorb")
 
 
 class FluidFlowSettings(BaseSettings):

@@ -24,7 +24,7 @@ Boundary conditions via per-field wrap modes (no explicit border obstacles):
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, Texture2DArray, SwapTexture2DArray, Profiler
-from ..fluid.fluid_config import FluidFlowSettings, DepthSettings, VelocitySettings
+from ..fluid.fluid_config import FluidFlowSettings, DepthSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings, BoundaryMode
 from ..fluid.shaders import AddBoolean
 from ..FlowUtil import FlowUtil
 from .shaders import (
@@ -42,6 +42,11 @@ _BARRIER_IMAGE: int = int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
 
 from modules.utils import HotReloadMethods
+
+_BOUNDARY_GL: dict = {
+    BoundaryMode.OPEN:   (GL_CLAMP_TO_BORDER, (0.0, 0.0, 0.0, 0.0)),
+    BoundaryMode.CLOSED: (GL_CLAMP_TO_EDGE,   (0.0, 0.0, 0.0, 0.0)),
+}
 
 import logging
 logger = logging.getLogger(__name__)
@@ -99,6 +104,7 @@ class FluidFlow3DArray:
 
         self._reset_pending: bool = False
         self._reallocate_pending: bool = False
+        self._boundary_dirty: bool = False
 
         # ---- GPU profiling ----
         self._profiler: Profiler = Profiler(
@@ -109,14 +115,12 @@ class FluidFlow3DArray:
         )
 
         # ---- Volumetric fields (SwapTexture3D for ping-pong) ----
-        # Velocity: CLAMP_TO_BORDER(0) = no-slip walls
+        # Velocity always uses Dirichlet (v=0 at walls); others configurable via _apply_boundary_modes().
         self._velocity: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
-        # Density: GL_TEXTURE_2D_ARRAY for optimal per-layer 2D tiling
-        self._density: SwapTexture2DArray = SwapTexture2DArray(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
-        # Temperature: CLAMP_TO_EDGE = insulated walls (Neumann)
-        self._temperature: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_EDGE)
-        # Pressure: CLAMP_TO_BORDER(0) = zero pressure at walls (Dirichlet / open boundary)
-        self._pressure: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
+        # Density uses GL_TEXTURE_2D_ARRAY for optimal per-layer 2D tiling.
+        self._density: SwapTexture2DArray = SwapTexture2DArray()
+        self._temperature: SwapTexture3D = SwapTexture3D()
+        self._pressure: SwapTexture3D = SwapTexture3D()
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
         self._simulation_obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
         # Density-resolution obstacle (for density advection when grid_scale < 1)
@@ -165,6 +169,11 @@ class FluidFlow3DArray:
         self.config.bind(FluidFlowSettings.width, lambda _: self._request_reallocate())
         self.config.bind(FluidFlowSettings.height, lambda _: self._request_reallocate())
         self.config.bind(FluidFlowSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
+        mark_boundary = lambda _: setattr(self, '_boundary_dirty', True)
+        self.config.density.bind(DensitySettings.boundary, mark_boundary)
+        self.config.temperature.bind(TemperatureSettings.boundary, mark_boundary)
+        self.config.pressure.bind(PressureSettings.boundary, mark_boundary)
+        self.config.depth.bind(DepthSettings.boundary, mark_boundary)
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -253,6 +262,8 @@ class FluidFlow3DArray:
         self._curl_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
         self._vorticity_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
         self._buoyancy_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
+
+        self._apply_boundary_modes()
 
     def _regenerate_obstacle_volumes(self) -> None:
         """Project 2D obstacle source into both 3D obstacle volumes."""
@@ -635,6 +646,15 @@ class FluidFlow3DArray:
 
     # ========== Deferred ==========
 
+    def _apply_boundary_modes(self) -> None:
+        """Apply current boundary mode config to all field volumes (GL thread only)."""
+        self._density.set_wrap(*_BOUNDARY_GL[self.config.density.boundary])
+        self._temperature.set_wrap(*_BOUNDARY_GL[self.config.temperature.boundary])
+        self._pressure.set_wrap(*_BOUNDARY_GL[self.config.pressure.boundary])
+        z_wrap, z_color = _BOUNDARY_GL[self.config.depth.boundary]
+        for vol in [self._velocity, self._temperature, self._pressure]:
+            vol.set_wrap_z(z_wrap, z_color)
+
     def _handle_deferred_actions(self) -> None:
         """Process reset and reallocation requests queued from the UI thread."""
         if self._reallocate_pending:
@@ -651,6 +671,10 @@ class FluidFlow3DArray:
         if self._reset_pending:
             self._reset_pending = False
             self.reset()
+
+        if self._boundary_dirty:
+            self._boundary_dirty = False
+            self._apply_boundary_modes()
 
     def _request_reset(self) -> None:
         """Thread-safe reset request — deferred to next update() on the GL thread."""

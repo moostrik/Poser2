@@ -160,6 +160,18 @@ class Texture():
 
         self.allocated = True
 
+    def set_wrap(self, wrap: int, border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
+        """Change wrap mode at runtime (GL thread only)."""
+        if not self.allocated:
+            return
+        self._wrap = wrap
+        self._border_color = border_color
+        glBindTexture(GL_TEXTURE_2D, self.tex_id)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap)
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color)
+        glBindTexture(GL_TEXTURE_2D, 0)
+
     def deallocate(self) -> None :
         if not self.allocated: return
         self.allocated = False

@@ -141,6 +141,11 @@ class SwapFbo(Fbo):
         """Clear previous buffer."""
         self._fbos[1 - self._swap_state].clear(r, g, b, a)
 
+    def set_wrap(self, wrap: int, border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
+        """Change wrap mode on both buffers at runtime (GL thread only)."""
+        self._fbos[0].set_wrap(wrap, border_color)
+        self._fbos[1].set_wrap(wrap, border_color)
+
     def clear_all(self, r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
         """Clear both buffers (useful for initialization/reset)."""
         self.clear(r, g, b, a)
