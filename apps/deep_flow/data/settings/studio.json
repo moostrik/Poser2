@@ -215,7 +215,7 @@
           "flow"
         ],
         "final": [
-          "fluid3d"
+          "composite"
         ]
       },
       "composite": {
@@ -292,11 +292,11 @@
       },
       "frg": {
         "blend_factor": 0.2,
-        "exposure": 1.2,
+        "exposure": 1.19,
         "gamma": 1.0,
         "offset": 0.0,
         "contrast": 1.1,
-        "saturation": 1.84,
+        "saturation": 1.42,
         "levels": 9,
         "smoothness": 0.33,
         "colorize": 0.0,
@@ -321,15 +321,15 @@
       }
     },
     "flow": {
-      "inputs": {
-        "flow": "centre_mask",
-        "density": "centre_frg"
-      },
       "fps": 60.0,
       "draw_mode": "DENSITY_BRIDGE_INPUT_COLOR",
       "blend_mode": "ADD",
       "width": 512,
       "height": 288,
+      "inputs": {
+        "flow": "centre_mask",
+        "density": "centre_frg"
+      },
       "visualisation": {
         "toggle_scalar": false,
         "scale": 1.0,
@@ -342,17 +342,17 @@
         "threshold": 0.0,
         "strength_x": 3.3,
         "strength_y": 3.3,
-        "boost": 0.0
+        "boost": 0.4
       },
       "velocity_trail": {
-        "scale": 0.31,
-        "trail_weight": 0.9,
-        "blur_radius": 8.0,
+        "scale": 0.94,
+        "trail_weight": 0.63,
+        "blur_radius": 0.0,
         "blur_steps": 4
       },
       "density_bridge": {
-        "saturation": 1.2,
-        "brightness": 2.0
+        "saturation": 1.02,
+        "brightness": 1.07
       },
       "temperature_bridge": {
         "scale": 0.5
@@ -365,34 +365,34 @@
       "blend_mode": "ADD",
       "fluid_flow": {
         "profile": true,
-        "width": 288,
-        "height": 512,
+        "width": 900,
+        "height": 1600,
         "speed": 1.0,
         "depth": {
-          "depth": 32,
+          "depth": 16,
           "scale": 1.0,
-          "composite_mode": 3,
+          "composite_mode": 1,
           "ray_steps": 32,
-          "absorption": 4.0,
-          "injection_layer": 1.0,
-          "injection_spread": 0.001
+          "absorption": 28.13,
+          "injection_layer": 0.0,
+          "injection_spread": 0.09
         },
         "velocity": {
-          "input_strength": 0.62,
+          "input_strength": 1.2,
           "self_advection": 0.05,
-          "fade_time": 31.77,
-          "dampen_threshold": 9.62,
-          "dampen_time": 3.0,
+          "fade_time": 5.09,
+          "dampen_threshold": 26.61,
+          "dampen_time": 5.52,
           "vorticity": 0.0,
-          "vorticity_radius": 8.98,
+          "vorticity_radius": 3.0,
           "viscosity": 0.0,
-          "viscosity_iter": 20
+          "viscosity_iter": 15
         },
         "density": {
-          "input_strength": 5.21,
-          "speed_offset": 0.0,
-          "fade_time": 1.57,
-          "dampen_threshold": 1.47,
+          "input_strength": 0.94,
+          "speed_offset": 0.78,
+          "fade_time": 47.81,
+          "dampen_threshold": 2.6,
           "dampen_time": 3.63
         },
         "temperature": {
@@ -404,9 +404,9 @@
           "ambient": 0.2
         },
         "pressure": {
-          "speed": 0.2,
-          "fade_time": 6.26,
-          "iterations": 24
+          "speed": 0.67,
+          "fade_time": 23.13,
+          "iterations": 25
         }
       },
       "visualisation": {
@@ -493,7 +493,7 @@
     },
     "window": {
       "title": "Poser",
-      "v_sync": false,
+      "v_sync": true,
       "monitor": "M1",
       "x": 517,
       "y": 2716,
