@@ -273,10 +273,9 @@
         "stage": "SMOOTH",
         "torso_upright": true,
         "cam_aspect": 1.7778,
-        "target_top_x": 0.5,
-        "target_top_y": 0.33,
-        "target_bottom_x": 0.5,
-        "target_bottom_y": 0.6,
+        "target_x": 0.5,
+        "target_y": 0.33,
+        "target_size": 0.27,
         "dst_aspectratio": 0.5625
       },
       "mask": {

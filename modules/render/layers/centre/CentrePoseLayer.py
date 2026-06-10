@@ -9,6 +9,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture, clear_color
+from modules.pose.features import PointLandmark
 from ..LayerBase import LayerBase
 from .CentreGeometry import CentreGeometry
 from ...shaders import PosePointLines, DrawCircles
@@ -67,11 +68,15 @@ class CentrePoseLayer(LayerBase):
         anchor_smooth: float = line_smooth
         anchor_color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
 
-        # Create anchor circle positions from config
-        positions = [
-            (self._geometry.config.target_top_x, 1.0 - self._geometry.config.target_top_y),
-            (self._geometry.config.target_bottom_x, 1.0 - self._geometry.config.target_bottom_y)
+        # Candidate snap-point dots: shoulder / hip / feet midpoints, computed from
+        # the transformed pose points (same space as the skeleton). PosePointLines
+        # flips Y internally, so pre-flip here to match (DrawCircles takes GL coords).
+        mids = [
+            CentreGeometry._get_midpoint(transformed_points, PointLandmark.left_shoulder, PointLandmark.right_shoulder),
+            CentreGeometry._get_midpoint(transformed_points, PointLandmark.left_hip, PointLandmark.right_hip),
+            CentreGeometry._get_midpoint(transformed_points, PointLandmark.left_ankle, PointLandmark.right_ankle),
         ]
+        positions = [(m.x, 1.0 - m.y) for m in mids if m is not None]
 
         aspect_ratio = self._fbo.width / self._fbo.height if self._fbo.height > 0 else 1.0
 
@@ -79,6 +84,6 @@ class CentrePoseLayer(LayerBase):
         clear_color()
         color = self._color_settings.track_colors[self._cam_id % len(self._color_settings.track_colors)].to_tuple()
         self._shader.use(transformed_points, line_width, line_smooth, color, self.settings.use_scores)
-        if self.settings.draw_anchors:
+        if self.settings.draw_anchors and positions:
             self._circle_shader.use(positions, anchor_size, anchor_smooth, anchor_color, aspect_ratio)
         self._fbo.end()
