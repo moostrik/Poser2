@@ -3,7 +3,7 @@ from .LayerBase import LayerBase, Rect, DataCache, Blit
 from .cam import      BBoxRenderer, BBoxRendererSettings, CropLayer, CropSettings, \
                       PoseRenderer, PoseRendererSettings, PoseCompositor, PoseCompSettings, \
                       TrackerCompositor, TrackerCompSettings, TrackletRenderer
-from .centre import   CentreGeometry, CentreGeomSettings, CentreCamLayer, CentreCamSettings, \
+from .centre import   CentreGeometry, CentreGeomSettings, SnapPoint, CentreCamLayer, CentreCamSettings, \
                       CentreMaskLayer, CentreMaskSettings, CentreFrgLayer, CentreFrgSettings, \
                       CentrePoseLayer, CentrePoseSettings, CentreDenseFlowLayer, CentreDlowSettings
 from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES, \

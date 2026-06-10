@@ -3,6 +3,7 @@
 # Standard library imports
 import math
 import numpy as np
+from enum import IntEnum
 from dataclasses import dataclass
 
 # Third-party imports
@@ -18,6 +19,13 @@ from modules.utils import Rect, Point2f
 from modules.gl import Texture
 
 
+class SnapPoint(IntEnum):
+    """Body landmark that stays pinned in the output frame."""
+    SHOULDERS = 0
+    HIPS      = 1
+    FEET      = 2
+
+
 class CentreGeomSettings(BaseSettings):
     """Configuration for CentreGeometry anchor point positioning."""
     stage:              Field[int] = Field(0, description="Pose data pipeline stage")
@@ -27,7 +35,8 @@ class CentreGeomSettings(BaseSettings):
     target_bottom_x:    Field[float] = Field(0.5, min=0.0, max=1.0, description="Bottom anchor X position (normalized)")
     target_bottom_y:    Field[float] = Field(0.6, min=0.0, max=1.0, description="Bottom anchor Y position (normalized)")
     dst_aspectratio:    Field[float] = Field(0.5625, min=0.5, max=2.0, description="Output aspect ratio (9/16 = 0.5625)")
-    lock_rotation:      Field[bool] = Field(False, description="Anchor position to neck only; scale by hip distance but do not rotate")
+    torso_upright:      Field[bool] = Field(False, description="Active: torso is always straight. Passive: torso rotates naturally")
+    snap_point:         Field[SnapPoint] = Field(SnapPoint.SHOULDERS, description="Body point pinned in the frame. Scale & rotation always come from the torso (shoulder-hip).")
 
 
 @dataclass
@@ -135,20 +144,36 @@ class CentreGeometry(LayerBase):
             self._transformed_points = None
             return
 
+        # Select the pinned point (bbox-relative). Scale & rotation always come from
+        # the torso (shoulder-hip); only the pinned position changes here.
+        feet_mid = CentreGeometry._get_midpoint(
+            pose[Points2D], PointLandmark.left_ankle, PointLandmark.right_ankle
+        )
+        pin_mid = shoulder_mid
+        if self.config.snap_point == SnapPoint.HIPS:
+            pin_mid = hip_mid
+        elif self.config.snap_point == SnapPoint.FEET:
+            pin_mid = feet_mid or hip_mid  # graceful fallback: feet -> hips
+
         # Calculate anchor points in image space (full image coordinates)
         bbox = pose[BBox].to_rect()
         anchor_top_img = shoulder_mid * bbox.size + bbox.position
         anchor_bot_img = hip_mid * bbox.size + bbox.position
+        pin_img = pin_mid * bbox.size + bbox.position
 
-        # Convert anchor points to texture space (bottom-left origin)
-        anchor_top_tex = CentreGeometry._image_to_texture_point(anchor_top_img)
+        # Convert pinned point to texture space (bottom-left origin)
+        pin_tex = CentreGeometry._image_to_texture_point(pin_img)
 
-        # Calculate camera-space geometry
+        # Calculate camera-space geometry. Guard against a degenerate target
+        # (top == bottom) which would otherwise divide by zero when scaling.
         target_distance: float = target_bottom.y - target_top.y
+        if abs(target_distance) < 1e-6:
+            self._transformed_points = None
+            return
         cam_rotation_img, distance, cam_crop_roi_img = CentreGeometry._calculate_roi(
-            anchor_top_img, anchor_bot_img, target_top, target_distance, self.config.dst_aspectratio
+            anchor_top_img, anchor_bot_img, pin_img, target_top, target_distance, self.config.dst_aspectratio
         )
-        if self.config.lock_rotation:
+        if self.config.torso_upright:
             cam_rotation_img = 0.0
 
         # Store camera geometry (texture space)
@@ -160,34 +185,34 @@ class CentreGeometry(LayerBase):
                 cam_crop_roi_img.height
             ),
             rotation=CentreGeometry._image_to_texture_rotation(cam_rotation_img),
-            rotation_center=anchor_top_tex
+            rotation_center=pin_tex
         )
 
         # Calculate bbox-space geometry (aspect-corrected for mask)
         bbox_aspect = bbox.width / bbox.height if bbox.height > 0 else 1.0
         mask_delta = hip_mid - shoulder_mid
-        mask_rotation = -math.atan2(mask_delta.x * bbox_aspect, mask_delta.y) if not self.config.lock_rotation else 0.0
+        mask_rotation = 0.0 if self.config.torso_upright else -math.atan2(mask_delta.x * bbox_aspect, mask_delta.y)
         mask_distance = math.hypot(mask_delta.x * bbox_aspect, mask_delta.y)
 
         mask_height = mask_distance / target_distance
         mask_width = mask_height * bbox_aspect
 
-        # Store bbox geometry
+        # Store bbox geometry (positioned around the pinned point)
         self._bbox_geometry = BboxGeometry(
             crop_roi=Rect(
-                x=shoulder_mid.x - mask_width * target_top.x,
-                y=1.0 - shoulder_mid.y - mask_height * (1.0 - target_top.y),
+                x=pin_mid.x - mask_width * target_top.x,
+                y=1.0 - pin_mid.y - mask_height * (1.0 - target_top.y),
                 width=mask_width,
                 height=mask_height
             ),
             rotation=mask_rotation,
-            rotation_center=Point2f(shoulder_mid.x, 1.0 - shoulder_mid.y),
+            rotation_center=Point2f(pin_mid.x, 1.0 - pin_mid.y),
             aspect=bbox_aspect
         )
 
         # Transform pose points using camera geometry (in image space)
         self._transformed_points = CentreGeometry._transform_points(
-            pose[Points2D], bbox, anchor_top_img, self._cam_aspect, cam_rotation_img, cam_crop_roi_img
+            pose[Points2D], bbox, pin_img, self._cam_aspect, cam_rotation_img, cam_crop_roi_img
         )
 
     @staticmethod
@@ -203,14 +228,17 @@ class CentreGeometry(LayerBase):
         return None
 
     @staticmethod
-    def _calculate_roi(top_point: Point2f, bottom_point: Point2f,
+    def _calculate_roi(scale_top: Point2f, scale_bot: Point2f, pin_point: Point2f,
                       target_top: Point2f, target_distance: float,
                       output_aspect: float) -> tuple[float, float, Rect]:
         """Calculate rotation angle and ROI for cropping.
 
+        Rotation and scale derive from the torso reference (scale_top -> scale_bot),
+        while the ROI is positioned so that pin_point lands at target_top.
+
         Returns: (rotation_angle, distance, roi_rect)
         """
-        delta = bottom_point - top_point
+        delta = scale_bot - scale_top
         rotation = math.atan2(delta.x, delta.y)
         distance = math.hypot(delta.x, delta.y)
 
@@ -218,8 +246,8 @@ class CentreGeometry(LayerBase):
         width = height * output_aspect
 
         roi = Rect(
-            x=top_point.x - width * target_top.x,
-            y=top_point.y - height * target_top.y,
+            x=pin_point.x - width * target_top.x,
+            y=pin_point.y - height * target_top.y,
             width=width,
             height=height
         )

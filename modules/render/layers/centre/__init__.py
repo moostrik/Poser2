@@ -1,4 +1,4 @@
-from .CentreGeometry import       CentreGeometry, CentreGeomSettings
+from .CentreGeometry import       CentreGeometry, CentreGeomSettings, SnapPoint
 from .CentreCamLayer import       CentreCamLayer, CentreCamSettings
 from .CentreMaskLayer import      CentreMaskLayer, CentreMaskSettings
 from .CentreFrgLayer import       CentreFrgLayer, CentreFrgSettings
