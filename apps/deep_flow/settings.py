@@ -210,7 +210,7 @@ class _PoseCompSettings(layers.PoseCompSettings):
 
 class _CentreGeomSettings(layers.CentreGeomSettings):
     stage:         Field[Stage] = Field(Stage.SMOOTH)
-    lock_rotation: Field[bool]  = Field(True)
+    torso_upright: Field[bool]  = Field(True)
 
 class FluidInputSettings(BaseSettings):
     flow:    Field[Layers] = Field(Layers.centre_mask, description="Texture used as optical flow input")

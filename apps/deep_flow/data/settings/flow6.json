@@ -401,7 +401,7 @@
           "input_strength": 2.0,
           "speed_offset": 0.0,
           "fade_time": 3.0,
-          "buoyancy": 2.14,
+          "buoyancy": 0.0,
           "weight": 2.0,
           "ambient": 0.0,
           "boundary": "CLOSED"

@@ -371,12 +371,12 @@
         "depth": {
           "depth": 20,
           "scale": 0.61,
-          "composite_mode": 1,
+          "composite_mode": 0,
           "ray_steps": 32,
           "absorption": 35.68,
-          "injection_layer": 0.0,
-          "injection_spread": 0.13,
-          "boundary": "OPEN"
+          "injection_layer": 0.1,
+          "injection_spread": 0.2,
+          "boundary": "CLOSED"
         },
         "velocity": {
           "input_strength": 0.99,
@@ -390,9 +390,9 @@
           "viscosity_iter": 15
         },
         "density": {
-          "input_strength": 1.25,
+          "input_strength": 7.24,
           "speed_offset": 0.1,
-          "fade_time": 20.63,
+          "fade_time": 11.88,
           "dampen_threshold": 2.6,
           "dampen_time": 3.63,
           "boundary": "CLOSED"
@@ -401,7 +401,7 @@
           "input_strength": 2.0,
           "speed_offset": 0.0,
           "fade_time": 3.0,
-          "buoyancy": 2.14,
+          "buoyancy": 0.0,
           "weight": 2.0,
           "ambient": 0.0,
           "boundary": "CLOSED"
