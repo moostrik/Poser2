@@ -371,7 +371,7 @@
         "depth": {
           "depth": 20,
           "scale": 0.61,
-          "composite_mode": 0,
+          "composite_mode": 1,
           "ray_steps": 32,
           "absorption": 35.68,
           "injection_layer": 0.0,
@@ -390,8 +390,8 @@
           "viscosity_iter": 15
         },
         "density": {
-          "input_strength": 2.14,
-          "speed_offset": 0.0,
+          "input_strength": 1.25,
+          "speed_offset": 0.1,
           "fade_time": 20.63,
           "dampen_threshold": 2.6,
           "dampen_time": 3.63,
