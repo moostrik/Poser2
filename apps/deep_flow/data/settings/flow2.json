@@ -115,8 +115,8 @@
     },
     "point": {
       "confidence_filter": {
-        "threshold_low": 0.5,
-        "threshold_high": 0.6,
+        "threshold_low": 0.4,
+        "threshold_high": 0.5,
         "rescale_scores": true
       },
       "smoother": {
@@ -346,8 +346,8 @@
         "boost": 0.4
       },
       "velocity_trail": {
-        "scale": 1.0,
-        "trail_weight": 0.86,
+        "scale": 5.31,
+        "trail_weight": 0.48,
         "blur_radius": 0.0,
         "blur_steps": 4
       },
@@ -361,7 +361,7 @@
     },
     "fluid3d": {
       "num_players": 1,
-      "sim_engine": "FLUID_3D_ARRAY",
+      "sim_engine": "FLUID_3D",
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",
       "fluid_flow": {
@@ -376,23 +376,23 @@
           "ray_steps": 32,
           "absorption": 28.13,
           "injection_layer": 0.0,
-          "injection_spread": 0.09,
+          "injection_spread": 0.1,
           "boundary": "OPEN"
         },
         "velocity": {
-          "input_strength": 1.0,
-          "self_advection": 0.2,
-          "fade_time": 23.5,
+          "input_strength": 0.57,
+          "self_advection": 0.06,
+          "fade_time": 27.87,
           "dampen_threshold": 26.61,
           "dampen_time": 5.52,
-          "vorticity": 2.0,
-          "vorticity_radius": 3.0,
+          "vorticity": 1.0,
+          "vorticity_radius": 13.54,
           "viscosity": 0.0,
           "viscosity_iter": 15
         },
         "density": {
-          "input_strength": 3.28,
-          "speed_offset": 0.78,
+          "input_strength": 6.04,
+          "speed_offset": 0.0,
           "fade_time": 20.63,
           "dampen_threshold": 2.6,
           "dampen_time": 3.63,

@@ -11,7 +11,7 @@ The root class is ``Settings``.
 
 from enum import IntEnum, auto
 
-from modules.settings import BaseSettings, NiceSettings, Field, Group
+from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
 from modules.oak import CameraSettings, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
@@ -70,9 +70,9 @@ class Layers(IntEnum):
 # ---------------------------------------------------------------------------
 
 class LayerSettings(BaseSettings):
-    left:   Field[list[Layers]] = Field([Layers.composite],  description="Layers drawn in the left viewport")
-    right:  Field[list[Layers]] = Field([Layers.tracker],    description="Layers drawn in the right viewport")
-    final:  Field[list[Layers]] = Field([Layers.composite],  description="Layers drawn on the output monitors")
+    left:   Field[list[Layers]] = Field([Layers.composite],  description="Layers drawn in the left viewport",   widget=Widget.playlist)
+    right:  Field[list[Layers]] = Field([Layers.tracker],    description="Layers drawn in the right viewport",  widget=Widget.playlist)
+    final:  Field[list[Layers]] = Field([Layers.composite],  description="Layers drawn on the output monitors", widget=Widget.playlist)
 
 
 # ---------------------------------------------------------------------------

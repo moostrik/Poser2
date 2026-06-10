@@ -43,10 +43,10 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "folder": "intro",
+      "folder": "20260610-101741_Test",
       "sim_passthrough": false,
       "range_start": 0,
-      "range_end": 1
+      "range_end": 0
     },
     "recorder": {
       "temp_path": "temp",
@@ -115,8 +115,8 @@
     },
     "point": {
       "confidence_filter": {
-        "threshold_low": 0.5,
-        "threshold_high": 0.6,
+        "threshold_low": 0.4,
+        "threshold_high": 0.5,
         "rescale_scores": true
       },
       "smoother": {
@@ -368,11 +368,11 @@
         "profile": true,
         "width": 896,
         "height": 1600,
-        "speed": 1.0,
+        "speed": 0.4,
         "depth": {
           "depth": 20,
-          "scale": 1.0,
-          "composite_mode": 1,
+          "scale": 0.61,
+          "composite_mode": 0,
           "ray_steps": 32,
           "absorption": 28.13,
           "injection_layer": 0.0,
@@ -381,18 +381,18 @@
         },
         "velocity": {
           "input_strength": 0.42,
-          "self_advection": 1.0,
-          "fade_time": 36.29,
+          "self_advection": 0.95,
+          "fade_time": 20.38,
           "dampen_threshold": 26.61,
           "dampen_time": 5.52,
-          "vorticity": 2.0,
+          "vorticity": 1.83,
           "vorticity_radius": 3.0,
           "viscosity": 0.0,
           "viscosity_iter": 15
         },
         "density": {
-          "input_strength": 2.76,
-          "speed_offset": -0.16,
+          "input_strength": 1.98,
+          "speed_offset": 0.1,
           "fade_time": 20.63,
           "dampen_threshold": 2.6,
           "dampen_time": 3.63,
