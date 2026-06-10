@@ -221,9 +221,9 @@ class FlowLayer(LayerBase):
 
         # self._density_bridge.set_color(self._flow_input)
         self._density_bridge.set_color(self._density_input)
-        # self._density_bridge.set_velocity(self._mask)
         # self._density_bridge.update(motion)
         self._density_bridge.set_velocity(self._velocity_trail.velocity)
+        # self._density_bridge.set_velocity(self._mask_source.texture)
         self._density_bridge.update()
 
         self._temperature_bridge.set_color(self._density_input)

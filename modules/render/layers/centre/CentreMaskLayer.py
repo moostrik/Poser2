@@ -7,14 +7,14 @@ from OpenGL.GL import GL_R16F
 from modules.settings import Field, BaseSettings
 from ..LayerBase import LayerBase
 from .CentreGeometry import CentreGeometry
-from ...shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur, MaskDilate
+from ...shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur, MaskDilate, MaskErode
 from modules.gl import Fbo, SwapFbo, Texture, Style
 
 
 class CentreMaskSettings(BaseSettings):
     """Configuration for CentreMaskLayer temporal blending and blur."""
     blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Temporal blending strength (0=static, 1=instant)")
-    dilation_steps: Field[int]   = Field(0, min=0, max=5, description="Number of mask dilation iterations")
+    dilation_steps: Field[int]   = Field(0, min=-10, max=10, description="Mask dilation iterations (positive=expand, negative=shrink)")
     blur_steps:     Field[int]   = Field(0, min=0, max=10, description="Number of blur iterations")
     blur_radius:    Field[float] = Field(1.0, min=0.0, max=20.0, description="Blur kernel radius in pixels")
 
@@ -40,6 +40,7 @@ class CentreMaskLayer(LayerBase):
         self._mask_blend_shader = MaskBlend()
         self._mask_AA_shader = MaskAA()
         self._mask_dilate_shader = MaskDilate()
+        self._mask_erode_shader = MaskErode()
         self._mask_blur_shader = MaskBlur()
 
     @property
@@ -56,6 +57,7 @@ class CentreMaskLayer(LayerBase):
         self._mask_blend_shader.allocate()
         self._mask_AA_shader.allocate()
         self._mask_dilate_shader.allocate()
+        self._mask_erode_shader.allocate()
         self._mask_blur_shader.allocate()
 
     def deallocate(self) -> None:
@@ -67,6 +69,7 @@ class CentreMaskLayer(LayerBase):
         self._mask_blend_shader.deallocate()
         self._mask_AA_shader.deallocate()
         self._mask_dilate_shader.deallocate()
+        self._mask_erode_shader.deallocate()
         self._mask_blur_shader.deallocate()
 
     def update(self) -> None:
@@ -108,12 +111,20 @@ class CentreMaskLayer(LayerBase):
         self._mask_AA_shader.use(self._blend_fbo.texture)
         self._mask_blur_fbo.end()
 
-        # Multi-pass dilation
-        for i in range(self.config.dilation_steps):
-            self._mask_blur_fbo.swap()
-            self._mask_blur_fbo.begin()
-            self._mask_dilate_shader.use(self._mask_blur_fbo.back_texture, 1.0)
-            self._mask_blur_fbo.end()
+        # Multi-pass dilation or erosion
+        steps = self.config.dilation_steps
+        if steps > 0:
+            for _ in range(steps):
+                self._mask_blur_fbo.swap()
+                self._mask_blur_fbo.begin()
+                self._mask_dilate_shader.use(self._mask_blur_fbo.back_texture, 1.0)
+                self._mask_blur_fbo.end()
+        elif steps < 0:
+            for _ in range(-steps):
+                self._mask_blur_fbo.swap()
+                self._mask_blur_fbo.begin()
+                self._mask_erode_shader.use(self._mask_blur_fbo.back_texture, 1.0)
+                self._mask_blur_fbo.end()
 
         # Multi-pass blur
         for i in range(self.config.blur_steps):
