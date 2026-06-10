@@ -418,6 +418,7 @@
     "centre": {
       "geometry": {
         "stage": "SMOOTH",
+        "torso_upright": true,
         "cam_aspect": 1.7778,
         "target_x": 0.5,
         "target_y": 0.33,
