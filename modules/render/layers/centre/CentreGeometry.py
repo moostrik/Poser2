@@ -81,6 +81,11 @@ class CentreGeometry(LayerBase):
         )
         self._transformed_points: Points2D | None = None
 
+        # Last valid pin midpoint (bbox-relative), held when the selected
+        # snap point is momentarily lost (e.g. feet out of frame).
+        self._last_pin_mid: Point2f | None = None
+        self._last_snap_point: SnapPoint | None = None
+
     @property
     def present(self) -> bool:
         """Whether valid pose data exists."""
@@ -125,6 +130,7 @@ class CentreGeometry(LayerBase):
 
         if pose is None:
             self._transformed_points = None
+            self._last_pin_mid = None
             return
 
         # Reconstruct the target (where the pinned point lands) from config
@@ -147,11 +153,27 @@ class CentreGeometry(LayerBase):
         feet_mid = CentreGeometry._get_midpoint(
             pose[Points2D], PointLandmark.left_ankle, PointLandmark.right_ankle
         )
-        pin_mid = shoulder_mid
+
+        # Raw midpoint for the selected snap point (feet may be None this frame)
         if self.config.snap_point == SnapPoint.HIPS:
-            pin_mid = hip_mid
+            raw_pin = hip_mid
         elif self.config.snap_point == SnapPoint.FEET:
-            pin_mid = feet_mid or hip_mid  # graceful fallback: feet -> hips
+            raw_pin = feet_mid
+        else:
+            raw_pin = shoulder_mid
+
+        # Reset the held value when the user switches snap point
+        if self.config.snap_point != self._last_snap_point:
+            self._last_pin_mid = None
+            self._last_snap_point = self.config.snap_point
+
+        if raw_pin is not None:
+            pin_mid = raw_pin
+            self._last_pin_mid = raw_pin          # remember last good position
+        elif self._last_pin_mid is not None:
+            pin_mid = self._last_pin_mid          # hold last value (e.g. feet lost)
+        else:
+            pin_mid = hip_mid                     # cold start: no history yet
 
         # Calculate anchor points in image space (full image coordinates)
         bbox = pose[BBox].to_rect()
