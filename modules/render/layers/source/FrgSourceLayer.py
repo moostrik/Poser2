@@ -19,7 +19,7 @@ class FrgSourceLayer(LayerBase):
     def __init__(self, track_id: int, board: HasSegmentationImages) -> None:
         self._track_id: int = track_id
         self._board: HasSegmentationImages = board
-        self._cuda_image: Tensor = Tensor()
+        self._cuda_image: Tensor = Tensor(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._data_cache: DataCache[torch.Tensor]= DataCache[torch.Tensor]()
         self._dirty: bool = False
 

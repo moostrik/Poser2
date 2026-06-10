@@ -157,6 +157,9 @@ class CompositeLayer(LayerBase):
         self._composite_fbo.end()
         Style.pop_style()
 
+    def set_layers(self, layers: list[LayerBase]) -> None:
+        self._layers = layers
+
     def update(self) -> None:
         """Composite all layer textures to internal FBO."""
         self.compose([(layer.texture, 1.0) for layer in self._layers

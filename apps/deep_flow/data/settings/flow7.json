@@ -7,7 +7,7 @@
     "square": true,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "cam_0": {
       "device_id": "14442C101136D1D200",
@@ -15,10 +15,10 @@
       "flip_h": true,
       "flip_v": false,
       "perspective": -0.22,
-      "color_exposure": 0,
-      "color_iso": 0,
+      "color_exposure": 8308,
+      "color_iso": 100,
       "color_auto_exposure": true,
-      "color_balance": 0,
+      "color_balance": 3400,
       "color_auto_balance": true,
       "color_brightness": 0,
       "color_contrast": 0,
@@ -209,17 +209,21 @@
     "layer": {
       "select": {
         "left": [
-          "centre_frg"
+          "centre_cam"
         ],
         "right": [
           "fluid3d"
         ],
+        "composite": [
+          "fluid3d",
+          "centre_frg"
+        ],
         "final": [
-          "fluid3d"
+          "composite"
         ]
       },
       "composite": {
-        "blend_mode": "ALPHA",
+        "blend_mode": "SCREEN",
         "lut": {
           "folder": "data/luts",
           "files": [
@@ -228,7 +232,7 @@
             "Frosted.cube",
             "Vibrance.cube"
           ],
-          "file": "",
+          "file": "Blockbuster.cube",
           "strength": 1.0
         }
       }

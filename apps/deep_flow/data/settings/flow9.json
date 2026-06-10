@@ -115,8 +115,8 @@
     },
     "point": {
       "confidence_filter": {
-        "threshold_low": 0.5,
-        "threshold_high": 0.6,
+        "threshold_low": 0.4,
+        "threshold_high": 0.5,
         "rescale_scores": true
       },
       "smoother": {
@@ -214,17 +214,15 @@
         "right": [
           "fluid3d"
         ],
-        "final": [
-          "centre_frg",
+        "composite": [
           "fluid3d"
         ],
-        "composite": [
-          "fluid3d",
-          "color_mask"
+        "final": [
+          "composite"
         ]
       },
       "composite": {
-        "blend_mode": "ALPHA",
+        "blend_mode": "SCREEN",
         "lut": {
           "folder": "data/luts",
           "files": [
@@ -233,7 +231,7 @@
             "Frosted.cube",
             "Vibrance.cube"
           ],
-          "file": "",
+          "file": "Blockbuster.cube",
           "strength": 1.0
         }
       }
@@ -279,14 +277,14 @@
         "torso_upright": false,
         "cam_aspect": 1.7778,
         "target_x": 0.5,
-        "target_y": 0.33,
+        "target_y": 0.9,
         "target_size": 0.27,
         "dst_aspectratio": 0.5625,
-        "snap_point": "SHOULDERS"
+        "snap_point": "FEET"
       },
       "mask": {
         "blend_factor": 0.2,
-        "dilation_steps": 0,
+        "dilation_steps": -3,
         "blur_steps": 0,
         "blur_radius": 1.0
       },
@@ -297,16 +295,16 @@
       },
       "frg": {
         "blend_factor": 0.2,
-        "exposure": 1.19,
+        "exposure": 0.99,
         "gamma": 1.0,
         "offset": 0.0,
         "contrast": 1.1,
-        "saturation": 2.0,
-        "levels": 9,
-        "smoothness": 0.33,
+        "saturation": 1.78,
+        "levels": 3,
+        "smoothness": 0.0,
         "colorize": 0.0,
         "sharpen": 0.42,
-        "use_mask": false
+        "use_mask": true
       },
       "pose": {
         "line_width": 3.0,
@@ -332,7 +330,7 @@
       "width": 896,
       "height": 1600,
       "inputs": {
-        "flow": "centre_mask",
+        "flow": "centre_frg",
         "density": "centre_frg"
       },
       "visualisation": {
@@ -344,14 +342,14 @@
       },
       "optical_flow": {
         "offset": 3,
-        "threshold": 0.0,
+        "threshold": 0.09,
         "strength_x": 3.3,
         "strength_y": 3.3,
         "boost": 0.4
       },
       "velocity_trail": {
         "scale": 1.0,
-        "trail_weight": 0.86,
+        "trail_weight": 0.93,
         "blur_radius": 0.0,
         "blur_steps": 4
       },
@@ -372,48 +370,48 @@
         "profile": true,
         "width": 896,
         "height": 1600,
-        "speed": 1.0,
+        "speed": 0.4,
         "depth": {
-          "depth": 20,
-          "scale": 1.0,
+          "depth": 16,
+          "scale": 0.61,
           "composite_mode": 1,
           "ray_steps": 32,
-          "absorption": 28.13,
+          "absorption": 35.68,
           "injection_layer": 0.0,
-          "injection_spread": 0.09,
+          "injection_spread": 0.13,
           "boundary": "OPEN"
         },
         "velocity": {
-          "input_strength": 1.0,
+          "input_strength": 1.35,
           "self_advection": 0.2,
-          "fade_time": 23.5,
+          "fade_time": 16.32,
           "dampen_threshold": 26.61,
           "dampen_time": 5.52,
-          "vorticity": 2.0,
+          "vorticity": 0.0,
           "vorticity_radius": 3.0,
-          "viscosity": 0.0,
+          "viscosity": 100.0,
           "viscosity_iter": 15
         },
         "density": {
-          "input_strength": 3.28,
-          "speed_offset": 0.78,
+          "input_strength": 0.62,
+          "speed_offset": 0.1,
           "fade_time": 20.63,
           "dampen_threshold": 2.6,
           "dampen_time": 3.63,
-          "boundary": "OPEN"
+          "boundary": "CLOSED"
         },
         "temperature": {
-          "input_strength": 0.0,
-          "speed_offset": 0.0,
+          "input_strength": 2.0,
+          "speed_offset": 1.04,
           "fade_time": 3.0,
           "buoyancy": 0.0,
-          "weight": -10.0,
-          "ambient": 0.2,
-          "boundary": "OPEN"
+          "weight": 2.0,
+          "ambient": 0.0,
+          "boundary": "CLOSED"
         },
         "pressure": {
-          "speed": 1.85,
-          "fade_time": 23.13,
+          "speed": 0.66,
+          "fade_time": 3.45,
           "iterations": 40,
           "boundary": "OPEN"
         }

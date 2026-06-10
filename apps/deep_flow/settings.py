@@ -70,9 +70,10 @@ class Layers(IntEnum):
 # ---------------------------------------------------------------------------
 
 class LayerSettings(BaseSettings):
-    left:   Field[list[Layers]] = Field([Layers.composite],  description="Layers drawn in the left viewport",   widget=Widget.playlist)
-    right:  Field[list[Layers]] = Field([Layers.tracker],    description="Layers drawn in the right viewport",  widget=Widget.playlist)
-    final:  Field[list[Layers]] = Field([Layers.composite],  description="Layers drawn on the output monitors", widget=Widget.playlist)
+    left:      Field[list[Layers]] = Field([Layers.composite],                    description="Layers drawn in the left viewport",       widget=Widget.playlist)
+    right:     Field[list[Layers]] = Field([Layers.tracker],                      description="Layers drawn in the right viewport",      widget=Widget.playlist)
+    composite: Field[list[Layers]] = Field([Layers.fluid3d, Layers.color_mask],   description="Layers composited into composite output", widget=Widget.playlist)
+    final:     Field[list[Layers]] = Field([Layers.composite],                    description="Layers drawn on the output monitors",     widget=Widget.playlist)
 
 
 # ---------------------------------------------------------------------------
