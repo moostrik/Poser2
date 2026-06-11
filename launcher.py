@@ -59,7 +59,7 @@ logging.info(f"Process PID: {os.getpid()}")
 
 
 
-from threading import Event
+from threading import Event, Thread
 
 import psutil
 p = psutil.Process(os.getpid())
@@ -124,6 +124,19 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     app.start()
 
     shutdown_event = Event()
+    start_time = datetime.now()
+
+    def heartbeat(stop_event: Event) -> None:
+        beat = 0
+        while not stop_event.wait(60.0):
+            beat += 1
+            elapsed = datetime.now() - start_time
+            h, rem = divmod(int(elapsed.total_seconds()), 3600)
+            m, s = divmod(rem, 60)
+            logging.info(f"[HEARTBEAT] beat={beat} uptime={h:02d}:{m:02d}:{s:02d}")
+
+    heartbeat_thread = Thread(target=heartbeat, args=(shutdown_event,), daemon=True, name="heartbeat")
+    heartbeat_thread.start()
 
     def signal_handler_exit(sig, frame) -> None:
         logging.info("Received interrupt signal, shutting down...")
