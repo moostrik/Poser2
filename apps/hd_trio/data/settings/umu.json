@@ -1,7 +1,7 @@
 {
   "num_players": 3,
   "input_fps": 23.0,
-  "render_fps": 62.0,
+  "render_fps": 50.0,
   "camera": {
     "yolo": true,
     "color": true,
@@ -98,10 +98,10 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "folder": "intro",
+      "folder": "20260607-152033_3_square_color_UMU260607-1500",
       "sim_passthrough": false,
-      "range_start": 3,
-      "range_end": 3
+      "range_start": 0,
+      "range_end": 22
     },
     "tracker": {
       "tracklet_min_age": 3,
@@ -418,12 +418,12 @@
     "centre": {
       "geometry": {
         "stage": "SMOOTH",
-        "torso_upright": true,
         "cam_aspect": 1.7778,
         "target_x": 0.5,
         "target_y": 0.33,
         "target_size": 0.27,
         "dst_aspectratio": 0.5625,
+        "torso_upright": true,
         "snap_point": "SHOULDERS"
       },
       "mask": {
@@ -528,7 +528,7 @@
         "profile": false,
         "width": 1088,
         "height": 1920,
-        "speed": 1.0,
+        "speed": 0.5,
         "depth": {
           "depth": 4,
           "scale": 1.0,
@@ -536,25 +536,27 @@
           "ray_steps": 32,
           "absorption": 4.0,
           "injection_layer": 1.0,
-          "injection_spread": 0.001
+          "injection_spread": 0.001,
+          "boundary": "CLOSED"
         },
         "velocity": {
-          "input_strength": 0.73,
-          "self_advection": 0.01,
+          "input_strength": 0.57,
+          "self_advection": 0.2,
           "fade_time": 31.77,
-          "dampen_threshold": 14.91,
+          "dampen_threshold": 14.13,
           "dampen_time": 3.0,
           "vorticity": 0.0,
-          "vorticity_radius": 8.98,
+          "vorticity_radius": 9.0,
           "viscosity": 0.0,
           "viscosity_iter": 20
         },
         "density": {
-          "input_strength": 10.0,
-          "speed_offset": 0.0,
-          "fade_time": 4.0000000000000036,
-          "dampen_threshold": 1.47,
-          "dampen_time": 3.63
+          "input_strength": 1.0,
+          "speed_offset": 0.1,
+          "fade_time": 4.066111459876787,
+          "dampen_threshold": 1.02,
+          "dampen_time": 3.63,
+          "boundary": "OPEN"
         },
         "temperature": {
           "input_strength": 0.0,
@@ -562,12 +564,14 @@
           "fade_time": 3.0,
           "buoyancy": 0.0,
           "weight": -10.0,
-          "ambient": 0.2
+          "ambient": 0.2,
+          "boundary": "CLOSED"
         },
         "pressure": {
           "speed": 0.0,
           "fade_time": 8.0,
-          "iterations": 40
+          "iterations": 40,
+          "boundary": "OPEN"
         }
       },
       "visualisation": {
@@ -656,8 +660,8 @@
       "title": "Poser",
       "v_sync": false,
       "monitor": "M0",
-      "x": 155,
-      "y": 47,
+      "x": 101,
+      "y": 36,
       "width": 1080,
       "height": 1000,
       "secondary_list": [
@@ -688,23 +692,22 @@
     "sequencer": {
       "stages": [
         "START",
-        "INTRO_IN",
-        "INTRO",
-        "INTRO_OUT",
         "PLAY_IN",
         "PLAY",
         "CONCLUSION",
+        "BLACKOUT",
         "IDLE"
       ],
       "durations": [
-        5.0,
+        6.0,
         3.0,
         30.0,
         3.0,
-        20.0,
-        60.0,
-        10.0,
-        3.0
+        6.0,
+        270.0,
+        6.0,
+        12.0,
+        6.0
       ],
       "loop": false
     },

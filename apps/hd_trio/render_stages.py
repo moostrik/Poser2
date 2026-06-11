@@ -148,10 +148,12 @@ class PlayInStage(StageLayer):
     def update(self, progress: float) -> None:
         motion_time_duration = 2.0  # movement threshold before centre pose fully visible
         progress_alpha: float = _fade_in(progress, 0.0, 1.0)
-        eased_alpha: float = easeInOutSine(max(progress_alpha, self._motion_alpha(motion_time_duration)))
+        eased_alpha = easeOutSine(progress_alpha)
+        pose_alpha = easeOutQuad(1.0 - progress_alpha)
+        # eased_alpha: float = easeInOutSine(max(progress_alpha, self._motion_alpha(motion_time_duration)))
         # can we store the movement time of the last stage and use it here to fade out the centre pose?
         self.compose([
-            (Layers.centre_pose, 1.0 - eased_alpha),
+            (Layers.centre_pose, pose_alpha),
             (Layers.fluid, eased_alpha),
             (Layers.color_mask, eased_alpha),
         ])
@@ -183,10 +185,20 @@ class ConclusionStage(StageLayer):
         cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.SMOOTH
 
     def update(self, progress: float) -> None:
+
+        alpha = _fade_in(progress, 1.0, 0.0)
+        fluid_alpha = easeOutSine(alpha)
+        mask_alpha = easeInQuint(alpha)
+
         self.compose([
-            (Layers.fluid, 1.0),
-            (Layers.color_mask, 1.0),
+            (Layers.fluid, fluid_alpha),
+            (Layers.color_mask, mask_alpha),
         ])
+
+
+class BlackoutStage(StageLayer):
+    def update(self, progress: float) -> None:
+        self.compose([])
 
 
 class IdleStage(StageLayer):
@@ -194,9 +206,11 @@ class IdleStage(StageLayer):
         cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.SMOOTH
 
     def update(self, progress: float) -> None:
+        alpha = easeInOutSine(_fade_in(progress, 0.0, 1.0))
+
         self.compose([
-            (Layers.fluid, 1.0),
-            (Layers.color_mask, 1.0), # keep the color mask for now
+            (Layers.fluid, alpha),
+            (Layers.color_mask, alpha),
         ])
 
 
@@ -212,5 +226,6 @@ STAGES: dict[ShowStage, type[StageLayer]] = {
     ShowStage.PLAY_IN:    PlayInStage,
     ShowStage.PLAY:       PlayStage,
     ShowStage.CONCLUSION: ConclusionStage,
+    ShowStage.BLACKOUT:   BlackoutStage,
     ShowStage.IDLE:       IdleStage,
 }
