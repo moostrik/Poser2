@@ -48,7 +48,7 @@ if __name__ == '__main__':
     if args.app is None:
         args.app = _read_launcher_file()
 
-    logging.info("Starting >>> %s <<<  pid: %s  simulation: %s", args.app, process_id, args.simulation)
+    logging.info("Starting  >>> %s <<<  pid: %s  simulation: %s", args.app, process_id, args.simulation)
     logging.info("Logging to: %s", log_file)
 
     AppClass = APP_REGISTRY[args.app]

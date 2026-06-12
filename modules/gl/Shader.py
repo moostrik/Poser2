@@ -133,7 +133,7 @@ class Shader():
             self.need_reload = False
             compiled: bool = self._compile_shaders()
             if compiled:
-                logger.debug("%s reload succeeded", self.shader_name)
+                logger.info("%s reload succeeded", self.shader_name)
             else:
                 logger.error("%s reload failed", self.shader_name)
             return True  # We attempted reload
