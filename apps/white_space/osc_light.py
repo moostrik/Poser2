@@ -10,7 +10,7 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from .composition import CompositionOutput
 from modules.settings import BaseSettings, Field, Group, Widget
-from modules.inout.network_validation import validate_connection
+from modules.inout.net_probe import validate_connection
 
 import logging
 logger = logging.getLogger(__name__)
@@ -98,7 +98,7 @@ class OscLight:
             return
 
         logger.info(
-            f"OscLight: {self._config.ip_addresses}:{self._config.port}, "
+            f"{self._config.ip_addresses}:{self._config.port}, "
             f"resolution={self._config.resolution}, "
             f"{self._num_chunks} chunks of {self._chunk_size} bytes each."
         )
@@ -128,7 +128,7 @@ class OscLight:
     def _on_connection_change(self, _=None) -> None:
         with self._client_lock:
             self._client = UDPClient(self._config.ip_addresses, self._config.port)
-        logger.info(f"OscLight: reconnected to {self._config.ip_addresses}:{self._config.port}")
+        logger.info(f"reconnected to {self._config.ip_addresses}:{self._config.port}")
 
     # ------------------------------------------------------------------
     # Message builders

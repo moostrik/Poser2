@@ -1,4 +1,4 @@
-﻿"""Compositor - threaded LED composition host running at a fixed rate."""
+"""Compositor - threaded LED composition host running at a fixed rate."""
 
 from dataclasses import replace
 from threading import Event, Thread, Lock

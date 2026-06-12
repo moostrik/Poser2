@@ -69,7 +69,7 @@ class UdpReceiver:
         try:
             sock.bind(("0.0.0.0", self._config.port))
             sock.settimeout(0.5)
-            logger.info(f"UdpReceiver: listening on port {self._config.port}")
+            logger.info(f"listening on port {self._config.port}")
 
             prev_time: float = 0.0
             while self._running:
@@ -82,12 +82,12 @@ class UdpReceiver:
                     address = data.split(b"\x00")[0].decode("utf-8").strip()
                 except UnicodeDecodeError:
                     if self._config.verbose:
-                        logger.warning(f"UdpReceiver: non-UTF-8 data ({len(data)} bytes) from {_}")
+                        logger.warning(f"non-UTF-8 data ({len(data)} bytes) from {_}")
                     continue
 
                 if self._config.verbose:
                     bound = address in self._bindings
-                    logger.info(f"UdpReceiver: '{address}'"
+                    logger.info(f"'{address}'"
                                 + ("" if bound else " (no binding)"))
 
                 now = time()
@@ -104,7 +104,7 @@ class UdpReceiver:
                         logger.warning(f"UdpReceiver callback error for '{address}': {e}")
 
         except OSError as e:
-            logger.error(f"UdpReceiver socket error on port {self._config.port}: {e}")
+            logger.error(f"socket error on port {self._config.port}: {e}")
             self._running = False
         finally:
             sock.close()

@@ -86,7 +86,7 @@
       "reset_interval": 240
     },
     "optical_flow": {
-      "resolution": "EXTREME",
+      "resolution": "STANDARD",
       "enabled": false
     },
     "image_crop": {

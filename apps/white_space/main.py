@@ -49,7 +49,7 @@ class WhiteSpaceMain:
 
         num_players: int = self.settings.num_players
         num_cameras: int = self.settings.camera.num_cameras
-        print(f"Settings loaded: {num_players} players, {num_cameras} cameras, simulation={simulation}")
+        logging.info("Settings loaded: %s players, %s cameras, simulation=%s", num_players, num_cameras, simulation)
         ps = self.settings.pose
 
         # BLACKBOARD
