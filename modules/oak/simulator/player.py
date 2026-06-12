@@ -70,9 +70,14 @@ class Player(Thread):
         self.play_chunk: int = -1
         self.load_chunk: int = -1
         self.num_chunks: int = 0
-        self.chunk_range_0: int = 0
-        self.chunk_range_1: int = 0
+        self.chunk_frames: list[int] = []
+        self.start_chunk: int = 0
+        self.start_offset: int = 0
+        self.end_chunk: int = 0
+        self.end_offset: int = 0
         self.load_folder: str = ''
+        self.active_folder: str = ''        # folder we currently intend to play ('' = stopped)
+        self._suppress_restart: bool = False  # guards programmatic norm resets
         self.suffix: str = settings.video_format.value
 
         self.folders: FolderDict = self._get_video_folders(settings, data_path)
@@ -101,8 +106,8 @@ class Player(Thread):
         self.settings.bind(SimulatorSettings.start, self._on_start)
         self.settings.bind(SimulatorSettings.stop, self._on_stop)
         self.settings.bind(SimulatorSettings.folder, self._on_folder_changed)
-        self.settings.bind(SimulatorSettings.range_start, self._on_range_changed)
-        self.settings.bind(SimulatorSettings.range_end, self._on_range_changed)
+        self.settings.bind(SimulatorSettings.start_norm, self._on_range_changed)
+        self.settings.bind(SimulatorSettings.end_norm, self._on_range_changed)
         self.settings.bind(SimulatorSettings.refresh, self._on_refresh_path)
         self.settings.bind(SimulatorSettings.video_path, self._on_refresh_path)
 
@@ -117,16 +122,10 @@ class Player(Thread):
         state: State = State.IDLE
         self.running = True
 
-        # Apply preset chunk range
-        self.set_chunk_range(self.settings.range_start, self.settings.range_end)
-
         # Auto-start if a folder was loaded from preset
         folder = self.settings.folder
         if folder and folder in self.folders:
-            num_chunks = self.get_num_folder_chunks(folder)
-            self.settings.max_chunks = num_chunks
-            self.settings.range_start = 0
-            self.settings.range_end = num_chunks
+            self._prepare_folder(folder)
             self.play(True, folder)
 
         while self.running:
@@ -172,13 +171,21 @@ class Player(Thread):
 
     def _load(self) -> None:
         folder: Folder = self.folders[self.load_folder]
-        LC: int = self._get_load_chunk() + 1
-        LC = max(LC, self.chunk_range_0)
-        LC = min(LC, self.chunk_range_1 + 1)
-        if LC > self.chunk_range_1:
-            LC = self.chunk_range_0
 
+        with self.playback_lock:
+            start_chunk: int = self.start_chunk
+            start_offset: int = self.start_offset
+            end_chunk: int = self.end_chunk
+            end_offset: int = self.end_offset
+
+        # Advance to the next chunk in the [start_chunk, end_chunk] range, wrapping.
+        LC: int = self._get_load_chunk() + 1
+        if LC > end_chunk or LC < start_chunk:
+            LC = start_chunk
         self._set_load_chunk(LC)
+
+        lo: int = start_offset if LC == start_chunk else 0
+        hi: int | None = end_offset if LC == end_chunk else None
 
         for c in range(self.num_cams):
             for t in self.types:
@@ -186,7 +193,7 @@ class Player(Thread):
                 if path.is_file():
 
                     player: StreamReader = StreamReader(c, t, self._frame_sync_callback, self.hwt, self.hwd, self.fps)
-                    player.load(str(path), self.load_chunk)
+                    player.load(str(path), self.load_chunk, lo, hi)
                     self.loaders.append(player)
                 else:
                     logger.warning(f"File {path} not found")
@@ -248,7 +255,7 @@ class Player(Thread):
             return
 
         if cam_id == 0 and frame_type == FrameType.VIDEO:
-            self.update_gui()
+            self.update_gui(frame_id)
 
         sync_frames:Dict[FrameType, ndarray] = {}
         with self.sync_lock:
@@ -348,8 +355,10 @@ class Player(Thread):
                 logger.warning(f"Folder {name} not found")
                 return
             message: Message = Message(MessageType.START, name)
+            self.active_folder = name
         else:
             message: Message = Message(MessageType.STOP)
+            self.active_folder = ''
 
         self.num_chunks = self.get_num_folder_chunks(name)
         self.state_messages.put(message)
@@ -372,11 +381,6 @@ class Player(Thread):
 
     def get_num_chunks(self) -> int:
         return self.num_chunks
-
-    def set_chunk_range(self, R0: int, R1: int) -> None:
-        with self.playback_lock:
-            self.chunk_range_0 = R0
-            self.chunk_range_1 = R1
 
     def get_drift(self) -> int:
         with self.drift_lock:
@@ -419,10 +423,7 @@ class Player(Thread):
 
     def _on_folder_changed(self, folder: str) -> None:
         if folder and folder in self.folders:
-            num_chunks: int = self.get_num_folder_chunks(folder)
-            self.settings.max_chunks = num_chunks
-            self.settings.range_start = 0
-            self.settings.range_end = num_chunks
+            self._prepare_folder(folder)
             self.play(True, folder)
 
     def _on_refresh_path(self, _=None) -> None:
@@ -430,9 +431,112 @@ class Player(Thread):
         self.settings.available_folders = list(self.folders.keys())
 
     def _on_range_changed(self, _=None) -> None:
-        r0: int = self.settings.range_start
-        r1: int = self.settings.range_end
-        self.set_chunk_range(r0, r1)
+        self._recompute_range()
+        if self._suppress_restart:
+            return
+        # Restart playback so the new range takes effect immediately.
+        if self.active_folder and self.active_folder in self.folders:
+            self.clear_state_messages()
+            self.play(True, self.active_folder)
 
-    def update_gui(self) -> None:
-        self.settings.current_chunk = self.get_current_chunk()
+    def update_gui(self, frame_id: int = 0) -> None:
+        chunk: int = self.get_current_chunk()
+        self.settings.current_chunk = chunk
+        self.settings.playback_time = self._format_time(self._global_frame(chunk, frame_id) / self.fps)
+
+    def _global_frame(self, chunk: int, frame_id: int) -> int:
+        """Absolute frame index across the whole timeline for (chunk, in-chunk frame)."""
+        if chunk < 0:
+            return 0
+        with self.playback_lock:
+            chunk_frames: list[int] = self.chunk_frames
+        return sum(chunk_frames[:chunk]) + frame_id
+
+    # RANGE / TIMELINE
+    def _prepare_folder(self, folder: str) -> None:
+        """Probe every chunk's frame count and reset the range to the full timeline."""
+        chunk_frames: list[int] = self._probe_chunk_frames(folder)
+        with self.playback_lock:
+            self.chunk_frames = chunk_frames
+        self.settings.max_chunks = len(chunk_frames)
+        # Reset norms without triggering a restart; the caller starts playback.
+        self._suppress_restart = True
+        try:
+            self.settings.start_norm = 0.0
+            self.settings.end_norm = 1.0
+        finally:
+            self._suppress_restart = False
+        self._recompute_range()
+
+    def _probe_chunk_frames(self, folder: str) -> list[int]:
+        """Frame count of each chunk (cam 0 / first frame type), indexed 0..max_chunk."""
+        if folder not in self.folders:
+            return []
+        folder_obj: Folder = self.folders[folder]
+        frame_type: FrameType = self.types[0]
+        frames: list[int] = []
+        for chunk in range(folder_obj.chunks + 1):
+            path: Path = folder_obj.path / make_file_name(0, frame_type, chunk, self.suffix)
+            count: int = StreamReader.frame_count(str(path)) if path.is_file() else 0
+            frames.append(count)
+        return frames
+
+    def _recompute_range(self) -> None:
+        """Map normalized start/end onto global frame positions and chunk offsets."""
+        with self.playback_lock:
+            chunk_frames: list[int] = self.chunk_frames
+            total: int = sum(chunk_frames)
+
+        if total <= 0:
+            with self.playback_lock:
+                self.start_chunk = self.start_offset = 0
+                self.end_chunk = self.end_offset = 0
+            self.settings.start_time = self._format_time(0.0)
+            self.settings.end_time = self._format_time(0.0)
+            return
+
+        start_norm: float = max(0.0, min(1.0, self.settings.start_norm))
+        end_norm: float = max(0.0, min(1.0, self.settings.end_norm))
+
+        start_global: int = min(max(round(start_norm * total), 0), total - 1)
+        end_global: int = min(max(round(end_norm * total), start_global + 1), total)
+
+        start_chunk, start_offset = self._locate(chunk_frames, start_global)
+        end_chunk, end_offset = self._locate_end(chunk_frames, end_global)
+
+        with self.playback_lock:
+            self.start_chunk = start_chunk
+            self.start_offset = start_offset
+            self.end_chunk = end_chunk
+            self.end_offset = end_offset
+
+        self.settings.start_time = self._format_time(start_global / self.fps)
+        self.settings.end_time = self._format_time(end_global / self.fps)
+
+    @staticmethod
+    def _locate(chunk_frames: list[int], global_frame: int) -> tuple[int, int]:
+        """Map an (inclusive) global frame index to (chunk, offset within chunk)."""
+        acc: int = 0
+        for i, n in enumerate(chunk_frames):
+            if global_frame < acc + n:
+                return i, global_frame - acc
+            acc += n
+        last: int = len(chunk_frames) - 1
+        return last, max(0, chunk_frames[last] - 1)
+
+    @staticmethod
+    def _locate_end(chunk_frames: list[int], end_global: int) -> tuple[int, int]:
+        """Map an (exclusive) global end index to (chunk, exclusive offset in chunk)."""
+        acc: int = 0
+        for i, n in enumerate(chunk_frames):
+            if end_global <= acc + n:
+                return i, end_global - acc
+            acc += n
+        last: int = len(chunk_frames) - 1
+        return last, chunk_frames[last]
+
+    @staticmethod
+    def _format_time(seconds: float) -> str:
+        minutes: int = int(seconds // 60)
+        secs: float = seconds - minutes * 60
+        return f"{minutes}:{secs:04.1f}"
