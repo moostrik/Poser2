@@ -63,7 +63,7 @@ class JacobiDiffusionCompute(ComputeShader):
 
         # Validate inputs
         if not all(t.allocated for t in [velocity_in, velocity_out, obstacle]):
-            logger.warning("JacobiDiffusionCompute: input texture(s) not allocated.")
+            logger.warning("input texture(s) not allocated.")
             return
 
         # Compute Jacobi parameters (same as fragment shader version)

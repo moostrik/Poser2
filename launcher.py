@@ -1,7 +1,10 @@
+import json
 import logging
 import os
+os.environ.setdefault('DEPTHAI_LEVEL', 'error')  # suppress noisy unbooted-device warnings
 import time
 from argparse import ArgumentParser, Namespace
+from pathlib import Path
 from signal import signal, SIGINT
 from threading import Event, Thread
 
@@ -9,6 +12,21 @@ import psutil
 
 from modules.log_config import setup_logging, install_thread_excepthook
 from apps import APP_REGISTRY
+
+
+def _read_launcher_file() -> str:
+    path = Path(__file__).parent / ".launcher.json"
+    try:
+        data = json.loads(path.read_text())
+        name = data.get("app", "")
+        if name in APP_REGISTRY:
+            return name
+        logging.warning(".launcher.json: unknown app %r, falling back to first in registry", name)
+    except FileNotFoundError:
+        pass
+    except json.JSONDecodeError as e:
+        logging.warning(".launcher.json: invalid JSON (%s), falling back to first in registry", e)
+    return next(iter(APP_REGISTRY))
 
 
 if __name__ == '__main__':
@@ -21,16 +39,17 @@ if __name__ == '__main__':
         pass
 
     parser: ArgumentParser = ArgumentParser()
-    parser.add_argument('-app',     '--app',            type=str,   default='white_space', choices=list(APP_REGISTRY.keys()), help='app to launch (default: hd_trio)')
+    parser.add_argument('-app',     '--app',            type=str,   default=None, choices=list(APP_REGISTRY.keys()), help='app to launch (default: from .launcher.json or first in registry)')
     parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecorded video with camera')
     parser.add_argument('-v',       '--verbose',        action='store_true',        help='enable verbose (DEBUG) console output')
     args: Namespace = parser.parse_args()
-
     log_file = setup_logging(verbose=args.verbose)
     install_thread_excepthook()
+    if args.app is None:
+        args.app = _read_launcher_file()
+
+    logging.info("Starting >>> %s <<<  pid: %s  simulation: %s", args.app, process_id, args.simulation)
     logging.info("Logging to: %s", log_file)
-    logging.info("Process PID: %s", process_id)
-    logging.info("App: %s", args.app)
 
     AppClass = APP_REGISTRY[args.app]
     app = AppClass(simulation=args.simulation)

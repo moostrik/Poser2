@@ -14,7 +14,7 @@ from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, Similari
 
 from modules.session import SequencerState
 from modules.settings import BaseSettings, Field, Widget
-from .network_validation import validate_connection
+from .net_probe import validate_connection
 
 import logging
 logger = logging.getLogger(__name__)
@@ -161,7 +161,7 @@ class OscSound:
     def _on_connection_change(self, _=None) -> None:
         with self._client_lock:
             self._client = SimpleUDPClient(self._config.ip_addresses, self._config.port)
-        logger.info(f"SoundOSC: Reconnected to {self._config.ip_addresses}:{self._config.port}")
+        logger.info(f"Reconnected to {self._config.ip_addresses}:{self._config.port}")
 
     @staticmethod
     def _build_inactive_message(id: int, bundle_builder: OscBundleBuilder, num_players: int) -> None:

@@ -1,4 +1,5 @@
 
+import numpy as np
 from depthai import Pipeline
 from ..camera.camera import *
 from ..camera.settings import CameraSettings
@@ -42,27 +43,27 @@ class Simulator(Camera):
 
 
     def _setup_queues(self) -> None: # override
-        self.inputs[Input.VIDEO_FRAME_IN] =     self.device.getInputQueue(name='ex_video', maxSize=1, blocking=False)
-        self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False)
+        self.inputs[Input.VIDEO_FRAME_IN] =     self.device.getInputQueue(name='ex_video', maxSize=1, blocking=False) # type: ignore
+        self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False) # type: ignore
         self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
         self.fps_counters[FrameType.VIDEO] = FPS(120)
         if self.do_stereo:
             self.inputs[Input.STEREO_CONTROL] =     self.device.getInputQueue('stereo_control')
-            self.inputs[Input.LEFT_FRAME_IN] =      self.device.getInputQueue(name='ex_left', maxSize=1, blocking=False)
-            self.inputs[Input.RIGHT_FRAME_IN] =     self.device.getInputQueue(name='ex_right', maxSize=1, blocking=False)
+            self.inputs[Input.LEFT_FRAME_IN] =      self.device.getInputQueue(name='ex_left', maxSize=1, blocking=False) # type: ignore
+            self.inputs[Input.RIGHT_FRAME_IN] =     self.device.getInputQueue(name='ex_right', maxSize=1, blocking=False) # type: ignore
             if not self.do_yolo:
-                self.outputs[Output.LEFT_FRAME_OUT] =   self.device.getOutputQueue(name='left', maxSize=1, blocking=False)
+                self.outputs[Output.LEFT_FRAME_OUT] =   self.device.getOutputQueue(name='left', maxSize=1, blocking=False) # type: ignore
                 self.outputs[Output.LEFT_FRAME_OUT].addCallback(self._left_callback)
-                self.outputs[Output.RIGHT_FRAME_OUT] =  self.device.getOutputQueue(name='right', maxSize=1, blocking=False)
+                self.outputs[Output.RIGHT_FRAME_OUT] =  self.device.getOutputQueue(name='right', maxSize=1, blocking=False) # type: ignore
                 self.outputs[Output.RIGHT_FRAME_OUT].addCallback(self._right_callback)
             self.fps_counters[FrameType.LEFT_] = FPS(120)
             self.fps_counters[FrameType.RIGHT] = FPS(120)
             if self.show_stereo:
-                self.outputs[Output.STEREO_FRAME_OUT] = self.device.getOutputQueue(name='stereo', maxSize=1, blocking=False)
+                self.outputs[Output.STEREO_FRAME_OUT] = self.device.getOutputQueue(name='stereo', maxSize=1, blocking=False) # type: ignore
                 self.outputs[Output.STEREO_FRAME_OUT].addCallback(self._stereo_callback)
                 self.fps_counters[FrameType.DEPTH] = FPS(120)
         if self.do_yolo:
-            self.outputs[Output.TRACKLETS_OUT] = self.device.getOutputQueue(name='tracklets', maxSize=1, blocking=False)
+            self.outputs[Output.TRACKLETS_OUT] = self.device.getOutputQueue(name='tracklets', maxSize=1, blocking=False) # type: ignore
             self.outputs[Output.TRACKLETS_OUT].addCallback(self._tracker_callback)
 
     def _video_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray) -> None:
@@ -77,12 +78,12 @@ class Simulator(Camera):
                 # img.setInstanceNum(int(dai.CameraBoardSocket.CAM_A))
                 if self.do_color:
                     img.setType(dai.ImgFrame.Type.BGR888p)
-                    img.setData(self.to_planar(frame, (width, height)))
+                    img.setData(self.to_planar(frame, (width, height))) # type: ignore
                 else:
                     img.setType(dai.ImgFrame.Type.RAW8)
                     if frame.shape[2] == 3:
                         frame = cvtColor(frame, COLOR_RGB2GRAY)
-                    img.setData(frame.flatten())
+                    img.setData(frame.flatten()) # type: ignore
                 img.setTimestamp(frame_time)
                 img.setWidth(width)
                 img.setHeight(height)
@@ -92,7 +93,7 @@ class Simulator(Camera):
                 img = dai.ImgFrame()
                 img.setType(dai.ImgFrame.Type.RAW8)
                 img.setInstanceNum(int(dai.CameraBoardSocket.CAM_B))
-                img.setData(frame.flatten())
+                img.setData(frame.flatten()) # type: ignore
                 img.setTimestamp(frame_time)
                 img.setWidth(width)
                 img.setHeight(height)
@@ -102,7 +103,7 @@ class Simulator(Camera):
                 img = dai.ImgFrame()
                 img.setType(dai.ImgFrame.Type.RAW8)
                 img.setInstanceNum(int(dai.CameraBoardSocket.CAM_C))
-                img.setData(frame.flatten())
+                img.setData(frame.flatten()) # type: ignore
                 img.setTimestamp(frame_time)
                 img.setWidth(width)
                 img.setHeight(height)

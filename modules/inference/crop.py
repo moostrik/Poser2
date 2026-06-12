@@ -83,7 +83,7 @@ class Extractor:
 
                 if pose_count >= self._config.max_poses:
                     logger.warning(
-                        f"Extractor: Exceeded max poses ({self._config.max_poses}), skipping {pose_id}"
+                        f"Exceeded max poses ({self._config.max_poses}), skipping {pose_id}"
                     )
                     continue
 
@@ -111,7 +111,7 @@ class Extractor:
                     pose_count += 1
 
                 except Exception:
-                    logger.exception(f"Extractor: Error processing pose {pose_id}")
+                    logger.exception(f"Error processing pose {pose_id}")
 
         self._stream.synchronize()
 

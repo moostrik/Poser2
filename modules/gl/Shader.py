@@ -267,7 +267,7 @@ class Shader():
                 if shader.shader_dir:
                     cls._watch_directory(shader.shader_dir)
             if cls._directory_observers:
-                logger.info(f"Hot-reload enabled for {len(cls._directory_observers)} directories")
+                logger.info(f"Hot reload enabled for {len(cls._directory_observers)} directories")
 
     @classmethod
     def _watch_directory(cls, shader_dir: Path) -> None:

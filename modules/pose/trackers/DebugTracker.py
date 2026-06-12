@@ -34,22 +34,22 @@ class DebugTracker(TrackerBase):
 
         # Check if pose count exceeds expected number
         if len(current_ids) > self._num_players:
-            logger.warning(f"DebugTracker: WARNING - More poses than expected! Found {len(current_ids)}, expected {self._num_players}")
+            logger.warning(f"WARNING - More poses than expected! Found {len(current_ids)}, expected {self._num_players}")
 
         # Detect new poses
         new_ids = current_ids - self._tracked_ids
         for pose_id in new_ids:
-            logger.debug(f"DebugTracker: New pose detected [id={pose_id}]")
+            logger.debug(f"New pose detected [id={pose_id}]")
 
         # Detect lost poses (reset)
         lost_ids = self._tracked_ids - current_ids
         for pose_id in lost_ids:
-            logger.debug(f"DebugTracker: Pose lost/reset [id={pose_id}]")
+            logger.debug(f"Pose lost/reset [id={pose_id}]")
 
         # Log updates if enabled
         if self._log_updates:
             for pose_id in current_ids & self._tracked_ids:
-                logger.debug(f"DebugTracker: Pose updated [id={pose_id}]")
+                logger.debug(f"Pose updated [id={pose_id}]")
 
         # Update tracked set
         self._tracked_ids = current_ids
@@ -61,11 +61,11 @@ class DebugTracker(TrackerBase):
     def reset(self) -> None:
         """Reset tracker state."""
         if self._tracked_ids:
-            logger.debug(f"DebugTracker: Reset all poses {self._tracked_ids}")
+            logger.debug(f"Reset all poses {self._tracked_ids}")
         self._tracked_ids.clear()
 
     def reset_at(self, id: int) -> None:
         """Reset tracking for specific pose."""
         if id in self._tracked_ids:
-            logger.debug(f"DebugTracker: Reset pose [id={id}]")
+            logger.debug(f"Reset pose [id={id}]")
             self._tracked_ids.discard(id)

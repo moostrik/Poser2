@@ -95,7 +95,7 @@ class RunnerONNX(Thread):
         self.join(timeout=2.0)
 
         if self.is_alive():
-            logger.warning("Warning: ONNX Optical Flow inference thread did not stop cleanly")
+            logger.warning("ONNX Optical Flow inference thread did not stop cleanly")
 
         # Wake up callback thread with sentinel
         try:
@@ -105,7 +105,7 @@ class RunnerONNX(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            logger.warning("Warning: ONNX Optical Flow callback thread did not stop cleanly")
+            logger.warning("ONNX Optical Flow callback thread did not stop cleanly")
 
     def run(self) -> None:
         """Main inference thread loop."""
@@ -133,7 +133,7 @@ class RunnerONNX(Thread):
 
         # Validate batch size
         if len(input_batch.gpu_image_pairs) > self._max_batch:
-            logger.warning(f"ONNX Optical Flow Warning: Batch size {len(input_batch.gpu_image_pairs)} exceeds max {self._max_batch}, will process only first {self._max_batch} pairs")
+            logger.warning(f"ONNX Optical Flow Batch size {len(input_batch.gpu_image_pairs)} exceeds max {self._max_batch}, will process only first {self._max_batch} pairs")
 
         dropped_batch: OpticalFlowInput | None = None
 
@@ -288,7 +288,7 @@ class RunnerONNX(Thread):
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            logger.warning("ONNX Optical Flow Warning: Callback queue full, dropping results")
+            logger.warning("ONNX Optical Flow Callback queue full, dropping results")
 
     def _infer(self, gpu_pairs: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, float]:
         """Run batched ONNX inference on GPU frame pairs.

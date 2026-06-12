@@ -118,7 +118,7 @@ class RunnerONNX(Thread):
         self.join(timeout=2.0)
 
         if self.is_alive():
-            logger.warning("Warning: ONNX Segmentation inference thread did not stop cleanly")
+            logger.warning("ONNX Segmentation inference thread did not stop cleanly")
 
         # Wake up callback thread with sentinel
         try:
@@ -128,7 +128,7 @@ class RunnerONNX(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            logger.warning("Warning: ONNX Segmentation callback thread did not stop cleanly")
+            logger.warning("ONNX Segmentation callback thread did not stop cleanly")
 
     def run(self) -> None:
         self._setup()
@@ -159,7 +159,7 @@ class RunnerONNX(Thread):
 
         # Validate batch size
         if len(input_batch.gpu_images) > self._max_batch:
-            logger.warning(f"ONNX Segmentation Warning: Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
+            logger.warning(f"ONNX Segmentation Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: SegmentationInput | None = None
 
@@ -185,7 +185,7 @@ class RunnerONNX(Thread):
                 self._callback_queue.put_nowait(dropped_output)
             except:
                 if self.verbose:
-                    logger.warning("ONNX Segmentation Warning: Callback queue full, not critical for dropped notifications")
+                    logger.warning("ONNX Segmentation Callback queue full, not critical for dropped notifications")
                 pass  # Queue full, not critical for dropped notifications
 
         self._notify_update_event.set()
@@ -344,7 +344,7 @@ class RunnerONNX(Thread):
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            logger.warning("ONNX Segmentation Warning: Callback queue full, dropping inference results")
+            logger.warning("ONNX Segmentation Callback queue full, dropping inference results")
 
     def _infer(self, gpu_imgs: list[torch.Tensor], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float]:
         """Run batched ONNX inference with per-tracklet recurrent states using GPU images.
@@ -546,7 +546,7 @@ class RunnerONNX(Thread):
         while not self._shutdown_event.is_set():
             try:
                 if self._callback_queue.qsize() > 1:
-                    logger.warning("ONNX Segmentation Warning: Callback queue size > 1, consumers may be falling behind")
+                    logger.warning("ONNX Segmentation Callback queue size > 1, consumers may be falling behind")
 
                 output: SegmentationOutput | None = self._callback_queue.get(timeout=0.5)
 

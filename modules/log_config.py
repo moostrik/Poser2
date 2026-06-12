@@ -15,7 +15,8 @@ class ShortNameFormatter(logging.Formatter):
 
     def format(self, record):
         # "modules.oak.camera.camera" → "camera"
-        record.short_name = record.name.rsplit('.', 1)[-1]
+        short = record.name.rsplit('.', 1)[-1]
+        record.short_name = short.ljust(16, '.')
         return super().format(record)
 
 
@@ -115,12 +116,12 @@ def setup_logging(verbose: bool = False) -> Path:
     # Console handler
     console = logging.StreamHandler(sys.stdout)
     console.setLevel(logging.DEBUG if verbose else logging.INFO)
-    console.setFormatter(ShortNameFormatter("%(levelname)-7s %(short_name)s: %(message)s"))
+    console.setFormatter(ShortNameFormatter("%(levelname)-7s %(short_name)s %(message)s"))
 
     # File handler — flush every record so logs survive crashes
     file_handler = FlushFileHandler(str(log_file), encoding="utf-8")
     file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(ShortNameFormatter("%(asctime)s %(levelname)-7s %(short_name)s: %(message)s"))
+    file_handler.setFormatter(ShortNameFormatter("%(asctime)s %(levelname)-7s %(short_name)s %(message)s"))
 
     # Ring buffer — captures all records for the NiceGUI log drawer
     _log_buffer = LogRingBuffer(maxlen=1000)

@@ -80,7 +80,7 @@ class RunnerONNX(Thread):
         self.join(timeout=2.0)
 
         if self.is_alive():
-            logger.warning("Warning: ONNX inference thread did not stop cleanly")
+            logger.warning("ONNX inference thread did not stop cleanly")
 
         try:
             self._callback_queue.put_nowait(None)
@@ -89,7 +89,7 @@ class RunnerONNX(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            logger.warning("Warning: ONNX callback thread did not stop cleanly")
+            logger.warning("ONNX callback thread did not stop cleanly")
 
     def run(self) -> None:
         self._setup()
@@ -116,7 +116,7 @@ class RunnerONNX(Thread):
 
         # Validate batch size
         if len(input_batch.gpu_images) > self._max_batch:
-            logger.warning(f"ONNX Detection Warning: Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
+            logger.warning(f"ONNX Detection Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: DetectionInput | None = None
 
@@ -267,7 +267,7 @@ class RunnerONNX(Thread):
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            logger.warning("ONNX Detection Warning: Callback queue full")
+            logger.warning("ONNX Detection Callback queue full")
 
     def _infer(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray]:
         """Run inference on GPU images using IOBinding for zero-copy.

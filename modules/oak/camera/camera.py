@@ -2,18 +2,20 @@
 # https://oak-web.readthedocs.io/
 # https://docs.luxonis.com/software/depthai/examples/depth_post_processing/
 
+import logging
+from threading import Thread, Event
+from typing import Set
+
 import depthai as dai
 from cv2 import applyColorMap, COLORMAP_JET
 from numpy import ndarray
-from typing import Set
-from threading import Thread, Event
 
-from .pipeline import setup_pipeline, get_frame_types, PerspectiveConfig
-from .definitions import *
-from .settings import CameraSettings
 from modules.utils import FPS
 
-import logging
+from .definitions import FrameType, Input, Output, Tracklet, FrameCallback, SyncCallback, TrackerCallback, get_device_list
+from .pipeline import setup_pipeline, get_frame_types, PerspectiveConfig
+from .settings import CameraSettings
+
 logger = logging.getLogger(__name__)
 
 class Camera(Thread):
@@ -93,7 +95,7 @@ class Camera(Thread):
         device_list: list[str] = get_device_list(verbose=False)
 
         if self.device_id not in device_list:
-            logger.warning(f'Camera: {self.device_id} NOT AVAILABLE in {device_list}')
+            logger.warning(f'{self.device_id} NOT AVAILABLE in {device_list}')
             return False
 
         if Camera._pipeline is None:
@@ -108,7 +110,7 @@ class Camera(Thread):
 
         self._setup_queues()
 
-        logger.info(f'Camera: {self.device_id} OPEN')
+        logger.info(f'{self.device_id} OPEN')
         self.running = True
         self.settings.connect(self.device, self.inputs, self.do_color)
         return True
@@ -156,7 +158,7 @@ class Camera(Thread):
         self.sync_callbacks.clear()
         self.tracker_callbacks.clear()
 
-        logger.info(f'Camera: {self.device_id} CLOSED')
+        logger.info(f'{self.device_id} CLOSED')
 
     def _video_callback(self, msg: dai.ImgFrame) -> None:
         # print('RV', msg.getTimestamp())
@@ -256,25 +258,25 @@ class Camera(Thread):
 
     def add_frame_callback(self, callback: FrameCallback) -> None:
         if self.running:
-            logger.warning('Camera: cannot add callback while camera is running')
+            logger.warning('cannot add callback while camera is running')
             return
         self.frame_callbacks.add(callback)
 
     def add_sync_callback(self, callback: SyncCallback) -> None:
         if self.running:
-            logger.warning('Camera: cannot add callback while camera is running')
+            logger.warning('cannot add callback while camera is running')
             return
         self.sync_callbacks.add(callback)
 
     def add_preview_callback(self, callback: FrameCallback) -> None:
         if self.running:
-            logger.warning('Camera: cannot add callback while camera is running')
+            logger.warning('cannot add callback while camera is running')
             return
         self.preview_callbacks.add(callback)
 
     def add_tracker_callback(self, callback: TrackerCallback) -> None:
         if self.running:
-            logger.warning('Camera: cannot add callback while camera is running')
+            logger.warning('cannot add callback while camera is running')
             return
         self.tracker_callbacks.add(callback)
 
@@ -289,14 +291,3 @@ class Camera(Thread):
                 print (f'Attempt {attempt + 1}/{num_tries} - could not open camera: {e}')
                 continue
         raise Exception('Failed to open device after multiple attempts')
-
-
-
-
-
-
-
-
-
-
-

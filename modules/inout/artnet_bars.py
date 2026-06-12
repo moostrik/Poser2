@@ -13,7 +13,7 @@ from stupidArtnet import StupidArtnet
 
 from modules.settings import BaseSettings, Field, Widget, Access
 from modules.utils import Color
-from .network_validation import validate_connection
+from .net_probe import validate_connection
 
 import logging
 logger = logging.getLogger(__name__)
@@ -162,7 +162,7 @@ class ArtNetBars:
         self._thread = Thread(target=self._update_loop, daemon=True, name=f"ArtNetLed-{self._config.ip_address}")
         self._thread.start()
         if self._config.verbose:
-            logger.info(f"ArtNetLed: Starting output to {self._config.ip_address}...")
+            logger.info(f"Starting output to {self._config.ip_address}...")
 
     def stop(self) -> None:
         """Stop the ArtNet output thread and blackout."""
@@ -184,7 +184,7 @@ class ArtNetBars:
         self._config.unbind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]
 
         if self._config.verbose:
-            logger.info(f"ArtNetLed: Stopped output to {self._config.ip_address}")
+            logger.info(f"Stopped output to {self._config.ip_address}")
 
     def set_bar(self, value: float) -> None:
         """Set the bar fill level.
@@ -206,7 +206,7 @@ class ArtNetBars:
         if not enabled:
             self._blackout()
             if self._config.verbose:
-                logger.info(f"ArtNetLed: Output disabled, LEDs blacked out")
+                logger.info(f"Output disabled, LEDs blacked out")
 
     def _on_config_change(self, _=None) -> None:
         """Called on any config change - mark dirty and wake thread."""
@@ -230,14 +230,14 @@ class ArtNetBars:
             self._artnet.clear()  # Sync internal buffer to new packet_size
             self._buffer = bytearray(self._total_channels)
             if self._config.verbose:
-                logger.info(f"ArtNetLed: Updated packet size to {self._total_channels} channels ({self._config.pixels} pixels/bar)")
+                logger.info(f"Updated packet size to {self._total_channels} channels ({self._config.pixels} pixels/bar)")
 
     def _update_universe(self) -> None:
         """Update universe when it changes."""
         with self._lock:
             self._artnet.set_universe(self._config.base_universe)
             if self._config.verbose:
-                logger.info(f"ArtNetLed: Updated base universe to {self._config.base_universe}/{self._config.base_universe + 1}")
+                logger.info(f"Updated base universe to {self._config.base_universe}/{self._config.base_universe + 1}")
 
     def _reinit_artnet(self) -> None:
         """Full reinitialize for IP or FPS changes (requires new instance)."""
@@ -285,7 +285,7 @@ class ArtNetBars:
             self._thread = Thread(target=self._update_loop, daemon=True, name=f"ArtNetLed-{self._config.ip_address}")
             self._thread.start()
             if self._config.verbose:
-                logger.info(f"ArtNetLed: Restarted output thread")
+                logger.info(f"Restarted output thread")
 
     def _reinit_channel_order(self) -> None:
         """Update channel order parsing."""
@@ -293,9 +293,9 @@ class ArtNetBars:
             try:
                 self._channel_indices = _parse_channel_order(self._config.channel_order)
                 if self._config.verbose:
-                    logger.info(f"ArtNetLed: Channel order updated to {self._config.channel_order.name}")
+                    logger.info(f"Channel order updated to {self._config.channel_order.name}")
             except ValueError as e:
-                logger.warning(f"ArtNetLed: Invalid channel order - {e}")
+                logger.warning(f"Invalid channel order - {e}")
 
     def _blackout(self) -> None:
         """Clear all pixels (set to 0) and send to both universes."""
@@ -411,7 +411,7 @@ class ArtNetBars:
                 self._running = False
                 break
             except Exception as e:
-                logger.error(f"ArtNetLed: Error in update loop: {e}")
+                logger.error(f"Error in update loop: {e}")
 
         # Blackout after exiting the loop
         self._blackout()

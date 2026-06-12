@@ -295,6 +295,6 @@ class Tracker(Thread, BaseTracker):
         for t in cam_tracklets:
             tracklet: Tracklet | None = Tracklet.from_depthcam(cam_id, t)
             if tracklet is None:
-                logger.warning(f"PanoramicTracker: Invalid tracklet from camera {cam_id}, skipping.")
+                logger.warning(f"Invalid tracklet from camera {cam_id}, skipping.")
                 continue
             self._input_queue.put(tracklet)

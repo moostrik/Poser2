@@ -73,7 +73,7 @@ class OscReceiver:
             dispatcher.map(address, self._handle)
         server = BlockingOSCUDPServer(('0.0.0.0', port), dispatcher)
         Thread(target=server.serve_forever, daemon=True).start()
-        logger.info(f"OscReceiver: listening on port {port}")
+        logger.info(f"listening on port {port}")
         return server
 
     def _on_out_change(self, _=None) -> None:

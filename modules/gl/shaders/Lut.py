@@ -55,17 +55,17 @@ class Lut(Shader):
         """
         path = Path(filepath)
         if not path.exists():
-            logger.warning("Lut: File not found: %s", filepath)
+            logger.warning("File not found: %s", filepath)
             return False
 
         if path.suffix.lower() != '.cube':
-            logger.warning("Lut: Unsupported file format: %s", path.suffix)
+            logger.warning("Unsupported file format: %s", path.suffix)
             return False
 
         try:
             lut_data, size, title, domain_min, domain_max = self._parse_cube_file(path)
         except Exception as e:
-            logger.error("Lut: Failed to parse .cube file: %s", e)
+            logger.error("Failed to parse .cube file: %s", e)
             return False
 
         # Clean up existing LUT texture if one was loaded
@@ -81,7 +81,7 @@ class Lut(Shader):
         self._domain_max = domain_max
         self._lut_loaded = True
 
-        logger.info("Lut: Loaded '%s' (%sx%sx%s)", title, size, size, size)
+        logger.info("Loaded '%s' (%sx%sx%s)", title, size, size, size)
         return True
 
     def _parse_cube_file(self, path: Path) -> tuple[np.ndarray, int, str, tuple, tuple]:
@@ -188,7 +188,7 @@ class Lut(Shader):
             return True
 
         except Exception as e:
-            logger.error("Lut: Failed to create 3D texture: %s", e)
+            logger.error("Failed to create 3D texture: %s", e)
             if self._lut_tex_id:
                 glDeleteTextures(1, [self._lut_tex_id])
                 self._lut_tex_id = 0

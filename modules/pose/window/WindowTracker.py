@@ -47,7 +47,7 @@ class WindowTracker(FrameWindowDictCallbackMixin):
                     if window is not None:
                         windows[track_id] = window
                 except Exception as e:
-                    logger.error(f"WindowTracker: Error processing track {track_id} feature {ft.__name__}: {e}")
+                    logger.error(f"Error processing track {track_id} feature {ft.__name__}: {e}")
             result[ft] = windows
 
         self._notify_windows_callbacks(result)
