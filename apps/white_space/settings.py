@@ -110,7 +110,7 @@ class OakGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class _OscSoundSettings(OscSoundSettings):
-    stage: Field[Stage] = Field(Stage.LERP)
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage to read poses from")
 
 
 class InOutGroup(BaseSettings):
@@ -248,10 +248,10 @@ class SessionGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class _TrackerCompSettings(layers.TrackerCompSettings):
-    stage: Field[Stage] = Field(Stage.LERP)
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
 class _PoseCompSettings(layers.PoseCompSettings):
-    stage: Field[Stage] = Field(Stage.LERP)
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
 
 
 class PreviewGroup(BaseSettings):
