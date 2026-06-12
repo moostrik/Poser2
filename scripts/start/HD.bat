@@ -65,7 +65,8 @@ cmd /c start "" "%CURRENT_DIR%apps\hd_trio\data\audio\umu MAIN.maxpat"
 timeout /t 5 /nobreak >nul
 
 echo Opening Main App
-start "" "%CURRENT_DIR%.venv\Scripts\python.exe" launcher.py -app hd_trio
+@REM start "" "%CURRENT_DIR%.venv\Scripts\python.exe" launcher.py -app hd_trio
+start "Main App" cmd /k "cd /d "%CURRENT_DIR%" && "%CURRENT_DIR%.venv\Scripts\python.exe" "%CURRENT_DIR%launcher.py" -app hd_trio"
 timeout /t 2 /nobreak >nul
 
 @REM echo Press any key to continue . . .

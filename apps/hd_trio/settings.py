@@ -45,6 +45,7 @@ class ShowStage(IntEnum):
     PLAY_IN =       auto()
     PLAY =          auto()
     CONCLUSION =    auto()
+    BLACKOUT =      auto()
     IDLE =          auto()
 
 _SHOW_STAGES = [s for s in ShowStage if s != ShowStage.IDLE]
@@ -56,6 +57,7 @@ _STAGE_DURATIONS: dict[ShowStage, float] = {
     ShowStage.PLAY_IN: 3.0,
     ShowStage.PLAY: 60.0,
     ShowStage.CONCLUSION: 10.0,
+    ShowStage.BLACKOUT: 18.0,
     ShowStage.IDLE: 3.0,
 }
 
