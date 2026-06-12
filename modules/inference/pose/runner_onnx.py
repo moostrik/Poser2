@@ -105,7 +105,7 @@ class RunnerONNX(Thread):
             try:
                 self._process()
             except Exception as e:
-                logger.error(f"ONNX Detection Error: {str(e)}")
+                logger.error(f"Pose: {str(e)}")
     def submit(self, input_batch: DetectionInput) -> None:
         """Submit batch for processing. Identical to MMDetection."""
         if self._shutdown_event.is_set():
@@ -116,7 +116,7 @@ class RunnerONNX(Thread):
 
         # Validate batch size
         if len(input_batch.gpu_images) > self._max_batch:
-            logger.warning(f"ONNX Detection Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
+            logger.warning(f"Pose Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: DetectionInput | None = None
 
@@ -125,7 +125,7 @@ class RunnerONNX(Thread):
                 dropped_batch = self._pending_batch
                 if self.verbose:
                     lag = int((time.time() - self._input_timestamp) * 1000)
-                    logger.info(f"ONNX Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
+                    logger.info(f"Pose: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -166,7 +166,7 @@ class RunnerONNX(Thread):
             # Verify CUDA provider is active
             providers_used = self._session.get_providers()
             if 'CUDAExecutionProvider' not in providers_used:
-                logger.warning("ONNX Detection WARNING: CUDA provider not available, using CPU")
+                logger.warning("Pose: CUDA provider not available, using CPU")
 
             # Determine model precision from 'input' tensor
             input_tensor = self._session.get_inputs()[0]  # First input is 'input'
@@ -224,10 +224,10 @@ class RunnerONNX(Thread):
             self._warmup()
 
             self._model_ready.set()
-            logger.info(f"ONNX Detection: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
+            logger.info(f"Pose: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
 
         except Exception as e:
-            logger.error(f"ONNX Detection Error: Failed to load model - {str(e)}")
+            logger.error(f"Pose: Failed to load model - {str(e)}")
     def _claim(self) -> DetectionInput | None:
         """Atomically get and clear pending batch."""
         with self._input_lock:
@@ -267,7 +267,7 @@ class RunnerONNX(Thread):
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            logger.warning("ONNX Detection Callback queue full")
+            logger.warning("Pose Callback queue full")
 
     def _infer(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray]:
         """Run inference on GPU images using IOBinding for zero-copy.
@@ -376,7 +376,7 @@ class RunnerONNX(Thread):
             keypoints, scores = self._infer(dummy_images)
 
         except Exception as e:
-            logger.info(f"ONNX Detection: Warmup failed (non-critical) - {str(e)}")
+            logger.info(f"Pose: Warmup failed (non-critical) - {str(e)}")
     # CALLBACK METHODS
     def register_callback(self, callback: PoseDetectionOutputCallback) -> None:
         """Register callback to receive results."""
@@ -403,7 +403,7 @@ class RunnerONNX(Thread):
                 for callback in callbacks:
                     try:
                         callback(output)
-                    except Exception as e:
+                    except Exception:
                         logger.exception("Error in callback")
                 self._callback_queue.task_done()
             except Empty:

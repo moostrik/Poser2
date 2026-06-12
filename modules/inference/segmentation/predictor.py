@@ -149,7 +149,7 @@ class Predictor:
             for callback in self._callbacks:
                 try:
                     callback(poses, mask_frames)
-                except Exception as e:
+                except Exception:
                     logger.exception("Error in callback")
     def add_segmentation_image_callback(self, callback: ImageCallback) -> None:
         """Register callback to receive poses and segmentation images."""

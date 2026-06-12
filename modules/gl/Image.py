@@ -46,7 +46,7 @@ def _get_format_bgr(internal_format, channel_order: Literal['BGR', 'RGB']) -> Co
     if internal_format == GL_RG8: return GL_RG
     if internal_format == GL_RG16F: return GL_RG
     if internal_format == GL_RG32F: return GL_RG
-    logger.warning("GL_Image: internal format not supported")
+    logger.warning("internal format not supported")
     return GL_NONE
 
 def _get_internal_format(image: np.ndarray) -> Constant:
@@ -82,7 +82,7 @@ def _get_internal_format(image: np.ndarray) -> Constant:
             elif image.shape[2] == 4:  # RGBA image
                 return GL_RGBA32F
 
-    logger.warning("GL_Image: image format not supported")
+    logger.warning("image format not supported")
     return GL_NONE
 
 

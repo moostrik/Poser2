@@ -69,7 +69,7 @@ def get_format(internal_format) -> Constant:
     if internal_format == GL_RG8: return GL_RG
     if internal_format == GL_RG16F: return GL_RG
     if internal_format == GL_RG32F: return GL_RG
-    logger.warning("GL_texture: internal format not supported")
+    logger.warning("internal format not supported")
     return GL_RGB  # fallback
 
 
@@ -88,7 +88,7 @@ def get_data_type(internal_format) -> Constant:
     if internal_format == GL_RG8: return GL_UNSIGNED_BYTE
     if internal_format == GL_RG16F: return GL_FLOAT
     if internal_format == GL_RG32F: return GL_FLOAT
-    logger.warning("GL_texture: internal format not supported")
+    logger.warning("internal format not supported")
     return GL_NONE
 
 

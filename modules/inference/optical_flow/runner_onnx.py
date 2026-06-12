@@ -95,7 +95,7 @@ class RunnerONNX(Thread):
         self.join(timeout=2.0)
 
         if self.is_alive():
-            logger.warning("ONNX Optical Flow inference thread did not stop cleanly")
+            logger.warning("Optical Flow inference thread did not stop cleanly")
 
         # Wake up callback thread with sentinel
         try:
@@ -105,7 +105,7 @@ class RunnerONNX(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            logger.warning("ONNX Optical Flow callback thread did not stop cleanly")
+            logger.warning("Optical Flow callback thread did not stop cleanly")
 
     def run(self) -> None:
         """Main inference thread loop."""
@@ -122,7 +122,7 @@ class RunnerONNX(Thread):
             try:
                 self._process()
             except Exception as e:
-                logger.error(f"ONNX Optical Flow Error: {str(e)}")
+                logger.error(f"Optical Flow: {str(e)}")
     def submit(self, input_batch: OpticalFlowInput) -> None:
         """Submit batch for processing. Replaces any pending (not yet started) batch."""
         if self._shutdown_event.is_set():
@@ -133,7 +133,7 @@ class RunnerONNX(Thread):
 
         # Validate batch size
         if len(input_batch.gpu_image_pairs) > self._max_batch:
-            logger.warning(f"ONNX Optical Flow Batch size {len(input_batch.gpu_image_pairs)} exceeds max {self._max_batch}, will process only first {self._max_batch} pairs")
+            logger.warning(f"Optical Flow Batch size {len(input_batch.gpu_image_pairs)} exceeds max {self._max_batch}, will process only first {self._max_batch} pairs")
 
         dropped_batch: OpticalFlowInput | None = None
 
@@ -142,7 +142,7 @@ class RunnerONNX(Thread):
                 dropped_batch = self._pending_batch
                 if self.verbose:
                     lag = int((time.time() - self._input_timestamp) * 1000)
-                    logger.info(f"ONNX Optical Flow: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
+                    logger.info(f"Optical Flow: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -192,7 +192,7 @@ class RunnerONNX(Thread):
             # Verify CUDA provider is active
             providers_used = self._session.get_providers()
             if 'CUDAExecutionProvider' not in providers_used:
-                logger.warning("ONNX Optical Flow WARNING: CUDA provider not available, using CPU")
+                logger.warning("Optical Flow WARNING: CUDA provider not available, using CPU")
 
             # Determine model precision from input tensor
             input_tensor = self._session.get_inputs()[0]
@@ -243,10 +243,10 @@ class RunnerONNX(Thread):
             self._warmup()
 
             self._model_ready.set()
-            logger.info(f"ONNX Optical Flow: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
+            logger.info(f"Optical Flow: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
 
         except Exception as e:
-            logger.error(f"ONNX Optical Flow Error: Failed to load model - {str(e)}")
+            logger.error(f"Optical Flow: Failed to load model - {str(e)}")
     def _claim(self) -> OpticalFlowInput | None:
         """Atomically get and clear pending batch."""
         with self._input_lock:
@@ -280,7 +280,7 @@ class RunnerONNX(Thread):
                     inference_time_ms=inference_time_ms
                 )
             except Exception as e:
-                logger.error(f"ONNX Optical Flow Error: Batched inference failed: {str(e)}")
+                logger.error(f"Optical Flow: Batched inference failed: {str(e)}")
         else:
             output = OpticalFlowOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
 
@@ -288,7 +288,7 @@ class RunnerONNX(Thread):
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            logger.warning("ONNX Optical Flow Callback queue full, dropping results")
+            logger.warning("Optical Flow Callback queue full, dropping results")
 
     def _infer(self, gpu_pairs: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, float]:
         """Run batched ONNX inference on GPU frame pairs.
@@ -417,7 +417,7 @@ class RunnerONNX(Thread):
             flow_tensor, ms = self._infer(dummy_pairs)
 
         except Exception as e:
-            logger.info(f"ONNX Optical Flow: Warmup failed (non-critical) - {str(e)}")
+            logger.info(f"Optical Flow: Warmup failed (non-critical) - {str(e)}")
     # CALLBACK METHODS
     def register_callback(self, callback: OpticalFlowOutputCallback) -> None:
         """Register callback to receive optical flow results."""
@@ -444,7 +444,7 @@ class RunnerONNX(Thread):
                 for callback in callbacks:
                     try:
                         callback(output)
-                    except Exception as e:
+                    except Exception:
                         logger.exception("Error in callback")
                 self._callback_queue.task_done()
             except Empty:

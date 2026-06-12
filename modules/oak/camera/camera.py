@@ -288,6 +288,6 @@ class Camera(Thread):
                 device = dai.Device(pipeline, device_info)
                 return device
             except Exception as e:
-                print (f'Attempt {attempt + 1}/{num_tries} - could not open camera: {e}')
+                logger.warning("Attempt %s/%s - could not open camera: %s", attempt + 1, num_tries, e)
                 continue
         raise Exception('Failed to open device after multiple attempts')
