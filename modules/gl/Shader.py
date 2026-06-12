@@ -101,7 +101,7 @@ class Shader():
                 Shader._watch_directory(self.shader_dir)
 
         # Now try to compile - sets self.allocated on success
-        self.allocated = self._compile_shaders(False)
+        self.allocated = self._compile_shaders()
 
     def deallocate(self) -> None:
         """Clean up OpenGL resources and unregister from hot-reload."""
@@ -131,8 +131,11 @@ class Shader():
 
         with self._reload_lock:
             self.need_reload = False
-            compiled: bool = self._compile_shaders(verbose=True)
-            logger.info("%s reload %s", self.shader_name, 'succeeded' if compiled else 'failed')
+            compiled: bool = self._compile_shaders()
+            if compiled:
+                logger.debug("%s reload succeeded", self.shader_name)
+            else:
+                logger.error("%s reload failed", self.shader_name)
             return True  # We attempted reload
 
     def get_uniform_loc(self, name: str) -> int:
@@ -145,7 +148,7 @@ class Shader():
             self._uniform_cache[name] = glGetUniformLocation(self.shader_program, name)
         return self._uniform_cache[name]
 
-    def _compile_shaders(self, verbose: bool = False) -> bool:
+    def _compile_shaders(self) -> bool:
         """Load and compile shader sources into OpenGL program. Returns True if successful."""
         # Load vertex shader source
         vertex_source: str = ''
@@ -231,8 +234,6 @@ class Shader():
             # Clear uniform cache (locations may have changed)
             self._uniform_cache.clear()
 
-            if verbose:
-                logger.info(f"{self.shader_name} loaded successfully")
             return True
 
         except Exception as e:

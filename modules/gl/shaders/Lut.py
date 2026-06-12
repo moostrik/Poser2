@@ -81,7 +81,6 @@ class Lut(Shader):
         self._domain_max = domain_max
         self._lut_loaded = True
 
-        logger.info("Loaded '%s' (%sx%sx%s)", title, size, size, size)
         return True
 
     def _parse_cube_file(self, path: Path) -> tuple[np.ndarray, int, str, tuple, tuple]:
