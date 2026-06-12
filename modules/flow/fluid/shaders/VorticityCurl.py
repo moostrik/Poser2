@@ -1,4 +1,4 @@
-﻿"""VorticityCurl shader - Compute curl of velocity field."""
+"""VorticityCurl shader - Compute curl of velocity field."""
 
 from OpenGL.GL import *  # type: ignore
 from modules.gl import Shader, draw_quad, Texture

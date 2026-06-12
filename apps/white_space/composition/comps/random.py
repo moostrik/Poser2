@@ -1,4 +1,4 @@
-﻿"""Random composition - 2D fBm noise: spatial x time, no directional scrolling."""
+"""Random composition - 2D fBm noise: spatial x time, no directional scrolling."""
 
 import math
 

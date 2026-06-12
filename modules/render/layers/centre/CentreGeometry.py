@@ -34,7 +34,7 @@ class CentreGeomSettings(BaseSettings):
     target_y:           Field[float] = Field(0.33, min=0.0, max=1.0, description="Vertical position of the pinned point in the output")
     target_size:        Field[float] = Field(0.27, min=0.01, max=1.0, description="Torso height as a fraction of output height (zoom)")
     dst_aspectratio:    Field[float] = Field(0.5625, min=0.5, max=2.0, description="Output aspect ratio (9/16 = 0.5625)")
-    torso_upright:      Field[bool] = Field(True, description="When checked, the torso is straightened to vertical; when unchecked, it tilts naturally with the body.")
+    torso_upright:      Field[bool] = Field(True, description="When checked, the torso is straightened to vertical; when unchecked, it tilts naturally with the body.", newline=True)
     snap_point:         Field[SnapPoint] = Field(SnapPoint.SHOULDERS, description="Body point pinned in the frame. Scale & rotation always come from the torso (shoulder-hip).")
 
 

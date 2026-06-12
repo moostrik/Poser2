@@ -204,14 +204,13 @@ class _DataLayerSettings(layers.DataLayerSettings):
     stage: Field[Stage] = Field(Stage.SMOOTH)
 
 class _TrackerCompSettings(layers.TrackerCompSettings):
-    stage: Field[Stage] = Field(Stage.LERP)
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
 class _PoseCompSettings(layers.PoseCompSettings):
-    stage: Field[Stage] = Field(Stage.LERP)
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
 
 class _CentreGeomSettings(layers.CentreGeomSettings):
-    stage:         Field[Stage] = Field(Stage.SMOOTH)
-    torso_upright: Field[bool]  = Field(False)
+    stage: Field[Stage] = Field(Stage.SMOOTH, description="Pose data pipeline stage")
 
 class FluidInputSettings(BaseSettings):
     flow:    Field[Layers] = Field(Layers.centre_mask, description="Texture used as optical flow input")

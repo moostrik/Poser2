@@ -1,4 +1,4 @@
-﻿"""Gradient shader - Subtract pressure gradient from velocity."""
+"""Gradient shader - Subtract pressure gradient from velocity."""
 
 from OpenGL.GL import *  # type: ignore
 from modules.gl import Shader, draw_quad, Texture
