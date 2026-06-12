@@ -495,8 +495,9 @@ class Player(Thread):
             self.settings.end_time = self._format_time(0.0)
             return
 
-        start_norm: float = max(0.0, min(1.0, self.settings.start_norm))
-        end_norm: float = max(0.0, min(1.0, self.settings.end_norm))
+        a: float = max(0.0, min(1.0, self.settings.start_norm))
+        b: float = max(0.0, min(1.0, self.settings.end_norm))
+        start_norm, end_norm = min(a, b), max(a, b)
 
         start_global: int = min(max(round(start_norm * total), 0), total - 1)
         end_global: int = min(max(round(end_norm * total), start_global + 1), total)

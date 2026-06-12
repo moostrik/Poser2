@@ -83,6 +83,7 @@ class LayerSettings(BaseSettings):
 class OakGroup(BaseSettings):
     num_cameras:        Field[int]               = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
     fps:                Field[float]             = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
+    keyframe_interval:  Field[int]               = Field(1, access=Field.INIT, visible=False, description="Keyframe interval in frames (1 = every frame)")
     yolo:               Field[bool]              = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color:              Field[bool]              = Field(True, access=Field.INIT, description="Enable color capture")
     square:             Field[bool]              = Field(True, access=Field.INIT, description="Use square aspect ratio")
@@ -94,7 +95,7 @@ class OakGroup(BaseSettings):
     _cam_share = [fps, color, square, stereo, yolo, hd_ready, model_path]
     cam_0         = Group(CameraSettings, share=_cam_share)
     simulator     = Group(SimulatorSettings, share=[num_cameras, fps])
-    recorder      = Group(RecorderSettings, share=[num_cameras, fps])
+    recorder      = Group(RecorderSettings, share=[num_cameras, fps, keyframe_interval])
     tracker       = Group(OnePerCamTrackerSettings)
     frame_sync    = Group(SyncSettings, share=[num_cameras, fps])
     tracklet_sync = Group(SyncSettings, share=[num_cameras, fps])

@@ -59,7 +59,7 @@ class Recorder(Thread):
             self.fps[c] = settings.fps
             self.frames[c] = Queue()
             for t in self.settings.video_frame_types:
-                self.recorders[c][t] = StreamWriter(EncoderString[settings.video_format][settings.video_encoder])
+                self.recorders[c][t] = StreamWriter(EncoderString[settings.video_format][settings.video_encoder], settings.keyframe_interval)
 
         self.chunk_index = 0
         self.suffix: str = settings.video_format.value
