@@ -231,6 +231,17 @@ def widget_builder(widget: Widget):
     return decorator
 
 
+def _commit_on_enter_blur(element, commit):
+    """Commit a typed input's value on Enter or when focus leaves the field."""
+    element.on("keydown.enter", lambda _e: commit(element.value))
+    element.on("blur", lambda _e: commit(element.value))
+
+
+def _commit_on_release(element, commit):
+    """Commit a slider/knob value when the drag ends (Quasar lazy 'change')."""
+    element.on("change", lambda _e: commit(element.value))
+
+
 # -- bool builders -----------------------------------------------------------
 
 @widget_builder(Widget.switch)
@@ -322,24 +333,34 @@ def _build_slider(settings, name, field, polls):
     _updating = {"lock": False}
 
     if not is_disabled:
+        # Live readout only while dragging — do NOT commit until release.
         def on_slider_change(e):
             if not _updating["lock"]:
                 _updating["lock"] = True
-                setattr(settings, name, field.type_(e.value))
                 val_input.set_value(e.value)
                 _updating["lock"] = False
         sl.on_value_change(on_slider_change)
 
-        def on_input_change(e):
-            if not _updating["lock"] and e.value is not None:
-                _updating["lock"] = True
-                clamped = max(field.min, min(field.max, field.type_(e.value)))
-                setattr(settings, name, clamped)
-                sl.set_value(clamped)
-                if clamped != e.value:
-                    val_input.set_value(clamped)
-                _updating["lock"] = False
-        val_input.on_value_change(on_input_change)
+        def commit_slider(val):
+            if val is None:
+                return
+            _updating["lock"] = True
+            v = field.type_(val)
+            setattr(settings, name, v)
+            val_input.set_value(v)
+            _updating["lock"] = False
+        _commit_on_release(sl, commit_slider)
+
+        def commit_input(val):
+            if _updating["lock"] or val is None:
+                return
+            _updating["lock"] = True
+            clamped = max(field.min, min(field.max, field.type_(val)))
+            setattr(settings, name, clamped)
+            sl.set_value(clamped)
+            val_input.set_value(clamped)
+            _updating["lock"] = False
+        _commit_on_enter_blur(val_input, commit_input)
 
     if _field_needs_poll(settings, name, field):
         def _poll_slider(v, _sl=sl, _vi=val_input):
@@ -363,10 +384,10 @@ def _build_number(settings, name, field, polls):
     ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24"), desc)
 
     if not is_disabled:
-        def on_num_change(e):
-            if e.value is not None:
-                setattr(settings, name, field.type_(e.value))
-        num.on_value_change(on_num_change)
+        def commit_num(val):
+            if val is not None:
+                setattr(settings, name, field.type_(val))
+        _commit_on_enter_blur(num, commit_num)
 
     if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, num=num: num.set_value(v)))
@@ -392,9 +413,10 @@ def _build_knob(settings, name, field, polls):
         )
 
     if not is_disabled:
-        def on_knob_change(e):
-            setattr(settings, name, field.type_(e.value))
-        kn.on_value_change(on_knob_change)
+        def commit_knob(val):
+            if val is not None:
+                setattr(settings, name, field.type_(val))
+        _commit_on_release(kn, commit_knob)
 
     if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, kn=kn: kn.set_value(v)))
@@ -490,9 +512,9 @@ def _build_input(settings, name, field, polls):
     ), desc)
 
     if not is_disabled:
-        def on_input_change(e):
-            setattr(settings, name, e.value)
-        inp.on_value_change(on_input_change)
+        def commit_input(val):
+            setattr(settings, name, val)
+        _commit_on_enter_blur(inp, commit_input)
 
     if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
@@ -517,10 +539,10 @@ def _build_ip(settings, name, field, polls):
     ).classes("w-36"), desc)
 
     if not is_disabled:
-        def on_ip_change(e):
-            if is_valid_ip(e.value):
-                setattr(settings, name, e.value)
-        inp.on_value_change(on_ip_change)
+        def commit_ip(val):
+            if is_valid_ip(val):
+                setattr(settings, name, val)
+        _commit_on_enter_blur(inp, commit_ip)
 
     if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
@@ -555,10 +577,10 @@ def _build_number_input(settings, name, field, polls):
     ).classes("w-24"), desc)
 
     if not is_disabled:
-        def on_change(e, inp=inp):
-            if is_valid(e.value):
-                setattr(settings, name, ft(e.value))
-        inp.on_value_change(on_change)
+        def commit_field(val):
+            if is_valid(val):
+                setattr(settings, name, ft(val))
+        _commit_on_enter_blur(inp, commit_field)
 
     if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(str(v))))
@@ -576,9 +598,8 @@ def _build_textarea(settings, name, field, polls):
     ), desc)
 
     if not is_disabled:
-        def on_ta_change(e):
-            setattr(settings, name, e.value)
-        ta.on_value_change(on_ta_change)
+        # Enter inserts a newline in a textarea, so commit on blur only.
+        ta.on("blur", lambda _e: setattr(settings, name, ta.value))
 
     if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, ta=ta: ta.set_value(v)))
@@ -653,11 +674,11 @@ def _build_color_alpha(settings, name, field, polls):
                 setattr(settings, name, Color(c.r, c.g, c.b, float(cur_alpha)))
         ci.on_value_change(on_color_change)
 
-        def on_alpha_change(e):
-            if e.value is not None:
+        def commit_alpha(val):
+            if val is not None:
                 cur = getattr(settings, name)
-                setattr(settings, name, Color(cur.r, cur.g, cur.b, float(e.value)))
-        alpha_num.on_value_change(on_alpha_change)
+                setattr(settings, name, Color(cur.r, cur.g, cur.b, float(val)))
+        _commit_on_enter_blur(alpha_num, commit_alpha)
 
     def _color_alpha_setter(v, _ci=ci, _an=alpha_num):
         if isinstance(v, Color):
@@ -887,17 +908,17 @@ def _build_point2f(settings, name, field, polls):
             ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
 
     if not is_disabled:
-        def on_x_change(e, _y=y_num):
-            if e.value is not None:
+        def commit_x(val):
+            if val is not None:
                 cur = getattr(settings, name)
-                setattr(settings, name, Point2f(float(e.value), cur.y))
-        x_num.on_value_change(on_x_change)
+                setattr(settings, name, Point2f(float(val), cur.y))
+        _commit_on_enter_blur(x_num, commit_x)
 
-        def on_y_change(e, _x=x_num):
-            if e.value is not None:
+        def commit_y(val):
+            if val is not None:
                 cur = getattr(settings, name)
-                setattr(settings, name, Point2f(cur.x, float(e.value)))
-        y_num.on_value_change(on_y_change)
+                setattr(settings, name, Point2f(cur.x, float(val)))
+        _commit_on_enter_blur(y_num, commit_y)
 
     def _point_setter(v, _x=x_num, _y=y_num):
         if isinstance(v, Point2f):
@@ -935,29 +956,29 @@ def _build_rect(settings, name, field, polls):
             ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
 
     if not is_disabled:
-        def on_rx(e, _ry=ry, _rw=rw, _rh=rh):
-            if e.value is not None:
+        def commit_rx(val):
+            if val is not None:
                 cur = getattr(settings, name)
-                setattr(settings, name, Rect(float(e.value), cur.y, cur.width, cur.height))
-        rx.on_value_change(on_rx)
+                setattr(settings, name, Rect(float(val), cur.y, cur.width, cur.height))
+        _commit_on_enter_blur(rx, commit_rx)
 
-        def on_ry(e, _rx=rx, _rw=rw, _rh=rh):
-            if e.value is not None:
+        def commit_ry(val):
+            if val is not None:
                 cur = getattr(settings, name)
-                setattr(settings, name, Rect(cur.x, float(e.value), cur.width, cur.height))
-        ry.on_value_change(on_ry)
+                setattr(settings, name, Rect(cur.x, float(val), cur.width, cur.height))
+        _commit_on_enter_blur(ry, commit_ry)
 
-        def on_rw(e, _rx=rx, _ry=ry, _rh=rh):
-            if e.value is not None:
+        def commit_rw(val):
+            if val is not None:
                 cur = getattr(settings, name)
-                setattr(settings, name, Rect(cur.x, cur.y, float(e.value), cur.height))
-        rw.on_value_change(on_rw)
+                setattr(settings, name, Rect(cur.x, cur.y, float(val), cur.height))
+        _commit_on_enter_blur(rw, commit_rw)
 
-        def on_rh(e, _rx=rx, _ry=ry, _rw=rw):
-            if e.value is not None:
+        def commit_rh(val):
+            if val is not None:
                 cur = getattr(settings, name)
-                setattr(settings, name, Rect(cur.x, cur.y, cur.width, float(e.value)))
-        rh.on_value_change(on_rh)
+                setattr(settings, name, Rect(cur.x, cur.y, cur.width, float(val)))
+        _commit_on_enter_blur(rh, commit_rh)
 
     def _rect_setter(v, _rx=rx, _ry=ry, _rw=rw, _rh=rh):
         if isinstance(v, Rect):

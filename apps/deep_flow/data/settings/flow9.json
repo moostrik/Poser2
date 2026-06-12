@@ -2,6 +2,7 @@
   "num_players": 1,
   "fps": 30.0,
   "camera": {
+    "keyframe_interval": 1,
     "yolo": true,
     "color": true,
     "square": true,
@@ -43,10 +44,10 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "folder": "20260610-101741_Test",
+      "folder": "20260612-131225_keyframes",
       "sim_passthrough": false,
-      "range_start": 0,
-      "range_end": 0
+      "start_norm": 0.51,
+      "end_norm": 0.6
     },
     "recorder": {
       "temp_path": "temp",
@@ -226,6 +227,7 @@
         "lut": {
           "folder": "data/luts",
           "files": [
+            "",
             "Blockbuster.cube",
             "Cityscape.cube",
             "Frosted.cube",
@@ -274,12 +276,12 @@
     "centre": {
       "geometry": {
         "stage": "SMOOTH",
-        "torso_upright": false,
         "cam_aspect": 1.7778,
         "target_x": 0.5,
         "target_y": 0.9,
         "target_size": 0.27,
         "dst_aspectratio": 0.5625,
+        "torso_upright": false,
         "snap_point": "FEET"
       },
       "mask": {
