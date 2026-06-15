@@ -249,6 +249,11 @@ class WindowManager():
 
         glfw.focus_window(self._main_window)
 
+        # Raise secondary windows above the main window so they are in front
+        # on any monitor they share with the main window.
+        for win in self._secondary_windows.values():
+            glfw.focus_window(win)
+
         if self.settings.fullscreen_mode != FullscreenMode.WINDOWED:
             self.set_fullscreen_mode(self.settings.fullscreen_mode)
 
@@ -489,6 +494,7 @@ class WindowManager():
                     logger.info("Monitor slot %s now available, moving secondary window to screen", logical_id)
                     self._secondary_fallback.discard(logical_id)
                 self._setup_secondary_window(win, physical_id, self.settings.secondary_fullscreen)
+                glfw.focus_window(win)
             elif logical_id not in self._secondary_fallback:
                 logger.info("Monitor slot %s lost, moving secondary window to fallback", logical_id)
                 self._setup_secondary_window_fallback(win, slot_index)
