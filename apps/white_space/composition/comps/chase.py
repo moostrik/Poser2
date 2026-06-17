@@ -6,8 +6,7 @@ import numpy as np
 
 from modules.settings import BaseSettings, Group
 
-from ..base import Composition
-from ..settings import ChannelSettings
+from ..base import Composition, ChannelSettings
 from ..transport import Transport
 
 

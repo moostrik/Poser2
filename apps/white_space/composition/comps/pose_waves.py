@@ -11,7 +11,7 @@ from modules.settings import BaseSettings, Field
 
 from ..base import Composition
 from ..transport import Transport
-from ..output import COMP_DTYPE
+from ..output import BUFFER_DTYPE
 from ..draw import BlendType, draw_waves, draw_field
 
 import logging
@@ -92,10 +92,10 @@ class PoseWaves(Composition):
             freq=1.0 / tick_interval, mincutoff=1.0, beta=0.0
         )
 
-        self._Wh_L: np.ndarray = np.zeros(resolution, dtype=COMP_DTYPE)
-        self._Wh_R: np.ndarray = np.zeros(resolution, dtype=COMP_DTYPE)
-        self._blue: np.ndarray = np.zeros(resolution, dtype=COMP_DTYPE)
-        self._void: np.ndarray = np.zeros(resolution, dtype=COMP_DTYPE)
+        self._Wh_L: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
+        self._Wh_R: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
+        self._blue: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
+        self._void: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
 
         self._latest_frames:    list[Frame]         = []
         self._latest_tracklets: dict[int, Tracklet] = {}
