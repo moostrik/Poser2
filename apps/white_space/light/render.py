@@ -6,7 +6,6 @@ and forwards the Frame to the board and to registered output callbacks (UDP send
 """
 
 from threading import Event, Thread
-from time import time, sleep
 from typing import Any, Callable
 
 import numpy as np
@@ -15,7 +14,7 @@ from modules.utils import HotReloadMethods
 from modules.gl import FpsCounter
 from modules.tracker.panoramic.settings import DistortionSettings
 
-from .clock import Clock
+from .clock import Clock, Tick
 from .frame import Frame, FrameCallback
 from .motor import MotorController
 from .sampler import Sampler
@@ -45,7 +44,6 @@ class Render(Thread):
         self._motor_controller      = MotorController(config.motor)
         self._clock                 = Clock(config)
         self._sampler               = Sampler(board, pose_stage)
-        self._interval: float       = 1.0 / config.light_rate
 
         resolution: int             = config.light_resolution
         num_players: int            = config.max_poses
@@ -53,7 +51,7 @@ class Render(Thread):
         # Fixed layer registry — ordered list of (id, instance) pairs (order = blend order).
         # Every layer receives the board and pulls the slices it needs in _draw.
         self._layers: list[tuple[LayerId, BaseLayer]] = [
-            (LayerId.pose_waves,     PoseWaves   (resolution, num_players, config.pose_waves, self._interval, board, pose_stage)),
+            (LayerId.pose_waves,     PoseWaves   (resolution, num_players, config.pose_waves, self._clock.interval, board, pose_stage)),
             (LayerId.fill,           Fill        (resolution, config.fill,         board)),
             (LayerId.pulse,          Pulse       (resolution, config.pulse,        board)),
             (LayerId.chase,          Chase       (resolution, config.chase,        board)),
@@ -92,32 +90,24 @@ class Render(Thread):
         self._motor_controller.notify_fall()
 
     def run(self) -> None:
-        next_time: float = time()
         while not self._stop_event.is_set():
             try:
-                self._update()
+                tick = self._clock.next_tick()   # blocks until the next frame deadline
+                self._update(tick)
             except Exception:
                 logger.exception("Error in light render update")
-            next_time += self._interval
-            sleep_time: float = next_time - time()
-            if sleep_time > 0:
-                sleep(sleep_time)
-            else:
-                next_time = time()
 
     # ------------------------------------------------------------------
     # Per-tick
     # ------------------------------------------------------------------
 
-    def _update(self) -> None:
+    def _update(self, tick: Tick) -> None:
         # Pre-render state callbacks (sequencer, interpolators)
         for cb in self._update_callbacks:
             try:
                 cb()
             except Exception:
                 logger.exception("Error in light render update callback")
-
-        tick = self._clock.tick()
 
         active = set(self._config.active)
 
