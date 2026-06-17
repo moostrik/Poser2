@@ -9,7 +9,10 @@ Line width is modulated by the player's vertical position (BBox center_y) scaled
 higher center_y) produces wider lines.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -23,6 +26,9 @@ from modules.pose.features import PointLandmark
 from ._base_layer import BaseLayer, LayerSettings
 from ..frame import Frame
 from ._utilities import BlendType, apply_circular
+
+if TYPE_CHECKING:
+    from ...board import Board
 
 
 class PlayerLinesSettings(LayerSettings):
@@ -46,9 +52,10 @@ class _PlayerState:
 class PlayerLines(BaseLayer):
     """Draws a centre line + two flanking lines for each tracked player."""
 
-    def __init__(self, resolution: int, config: PlayerLinesSettings) -> None:
-        super().__init__(resolution, config)
+    def __init__(self, resolution: int, config: PlayerLinesSettings, board: Board, pose_stage: int) -> None:
+        super().__init__(resolution, config, board)
         self._config = config
+        self._pose_stage = pose_stage
         self._states: dict[int, _PlayerState] = {}
         self._flank_buf: np.ndarray = np.zeros(resolution, dtype=np.float32)
         self._zeros_buf: np.ndarray = np.zeros(resolution, dtype=np.float32)
@@ -58,7 +65,7 @@ class PlayerLines(BaseLayer):
     # Layer interface
     # ------------------------------------------------------------------
 
-    def set_pose_inputs(self, frames: list[pose_frame.Frame], tracklets: dict[int, Tracklet]) -> None:
+    def _update_states(self, frames: list[pose_frame.Frame], tracklets: dict[int, Tracklet]) -> None:
         seen: set[int] = set()
 
         for pose in frames:
@@ -96,6 +103,10 @@ class PlayerLines(BaseLayer):
                 state.active = False
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+        frames    = list(self._board.get_frames(self._pose_stage).values())
+        tracklets = self._board.get_tracklets()
+        self._update_states(frames, tracklets)
+
         P = self._config
         depth_scale:   float = P.depth_scale
         level_center:  float = P.level_center

@@ -4,8 +4,11 @@ Owns its own cross-tick state (previous playhead position and last-tick wall tim
 so the renderer does not have to track it.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from time import monotonic
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -14,6 +17,9 @@ from modules.pose.frame import Frame
 from modules.pose import features
 
 from .motor import MotorMode
+
+if TYPE_CHECKING:
+    from ..board import Board
 
 
 @dataclass(frozen=True)
@@ -34,27 +40,26 @@ def sweep_contains(prev: float, curr: float, pos: float) -> bool:
 class Sampler:
     """Detects playhead crossings; owns previous-playhead and gap-check state."""
 
-    def __init__(self) -> None:
+    def __init__(self, board: Board, pose_stage: int) -> None:
+        self._board           = board
+        self._pose_stage      = pose_stage
         self._prev_playhead:  float = 0.0
         self._last_tick_mono: float = float('-inf')
 
-    def detect(
-        self,
-        frames:    list[Frame],
-        tracklets: dict[int, Tracklet],
-        playhead:  float,
-        mode:      MotorMode,
-    ) -> tuple[Hit, ...]:
+    def detect(self, playhead: float, mode: MotorMode) -> tuple[Hit, ...]:
         """Return one Hit per active player whose azimuth was crossed since the previous tick.
 
-        Detection is skipped after a long gap (e.g. first tick or a stall) and when the
-        motor is not in LOW_SPEED, where playhead tracking is not meaningful.
+        Reads the current pose snapshot from the board. Detection is skipped after a long gap
+        (e.g. first tick or a stall) and when the motor is not in LOW_SPEED, where playhead
+        tracking is not meaningful.
         """
         now_mono = monotonic()
         gap_ok   = (now_mono - self._last_tick_mono) < 0.5
 
         hits: tuple[Hit, ...] = ()
         if gap_ok and mode == MotorMode.LOW_SPEED:
+            frames    = list(self._board.get_frames(self._pose_stage).values())
+            tracklets = self._board.get_tracklets()
             hits = self._crossings(frames, tracklets, self._prev_playhead, playhead)
 
         self._prev_playhead  = playhead

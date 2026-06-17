@@ -18,8 +18,8 @@ class LinesSettings(LayerSettings):
 class Lines(BaseLayer):
     """Discrete bright lines scrolling around the strip."""
 
-    def __init__(self, resolution: int, config: LinesSettings) -> None:
-        super().__init__(resolution, config)
+    def __init__(self, resolution: int, config: LinesSettings, board) -> None:
+        super().__init__(resolution, config, board)
         self._config = config
         self._indices: np.ndarray = np.arange(resolution, dtype=np.float32)
 

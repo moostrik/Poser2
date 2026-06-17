@@ -18,8 +18,8 @@ class ChaseSettings(LayerSettings):
 class Chase(BaseLayer):
     """Sine wave chase pattern scrolling continuously around the strip."""
 
-    def __init__(self, resolution: int, config: ChaseSettings) -> None:
-        super().__init__(resolution, config)
+    def __init__(self, resolution: int, config: ChaseSettings, board) -> None:
+        super().__init__(resolution, config, board)
         self._config = config
         self._indices: np.ndarray = np.arange(resolution, dtype=np.float32)
 

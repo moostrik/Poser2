@@ -1,15 +1,19 @@
 """Layer base class and shared settings primitives."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from modules.settings import BaseSettings, Field
-from modules.tracker import Tracklet
-from modules.pose import frame as pose_frame
 
 from ._utilities import BlendType, blend_values
 from ..frame import Frame, BUFFER_DTYPE
+
+if TYPE_CHECKING:
+    from ...board import Board
 
 
 class LayerSettings(BaseSettings):
@@ -40,9 +44,10 @@ class BaseLayer(ABC):
     ``white`` / ``blue`` scratch arrays (shape ``(resolution,)``, pre-zeroed).
     """
 
-    def __init__(self, resolution: int, settings: LayerSettings) -> None:
+    def __init__(self, resolution: int, settings: LayerSettings, board: Board) -> None:
         self.resolution: int           = resolution
         self._settings:  LayerSettings = settings
+        self._board                    = board  # full blackboard — layers pull the slices they need
         self._scratch_white: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
         self._scratch_blue:  np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
         self.target_rpm: float | None = None  # motor speed target — None means no opinion; 0.0 explicitly stops the motor
@@ -59,8 +64,5 @@ class BaseLayer(ABC):
         """Additively write into the white and blue scratch arrays."""
         ...
 
-    def set_pose_inputs(self, frames: list[pose_frame.Frame], tracklets: dict[int, Tracklet]) -> None:
-        """Receive the latest pose snapshot each tick. Default: no-op."""
-
     def reset(self) -> None:
-        """Reset internal time/phase state. Default: no-op."""
+        """Reset internal state. Called by the renderer when the layer is deactivated. Default: no-op."""

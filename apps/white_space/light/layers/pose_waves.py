@@ -1,17 +1,22 @@
 """Pose-driven void and wave pattern composition."""
 
+from __future__ import annotations
+
 import numpy as np
 from time import time
+from typing import TYPE_CHECKING
 
 from modules.utils import OneEuroFilter
 from modules.tracker import Tracklet
-from modules.pose import frame as pose_frame
 from modules.pose import features
 from modules.settings import Field
 
 from ._base_layer import BaseLayer, LayerSettings
 from ..frame import Frame, BUFFER_DTYPE
 from ._utilities import BlendType, draw_waves, draw_field
+
+if TYPE_CHECKING:
+    from ...board import Board
 
 import logging
 logger = logging.getLogger(__name__)
@@ -80,9 +85,12 @@ class PoseWaves(BaseLayer):
         num_players: int,
         config: PoseWavesSettings,
         tick_interval: float,
+        board: Board,
+        pose_stage: int,
     ) -> None:
-        super().__init__(resolution, config)
+        super().__init__(resolution, config, board)
         self._config = config
+        self._pose_stage = pose_stage
 
         self._player_states: dict[int, PlayerState] = {
             i: PlayerState() for i in range(num_players)
@@ -96,16 +104,9 @@ class PoseWaves(BaseLayer):
         self._blue: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
         self._void: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
 
-        self._latest_frames:    list[pose_frame.Frame] = []
-        self._latest_tracklets: dict[int, Tracklet]    = {}
-
     # ------------------------------------------------------------------
     # Layer interface
     # ------------------------------------------------------------------
-
-    def set_pose_inputs(self, frames: list[pose_frame.Frame], tracklets: dict[int, Tracklet]) -> None:
-        self._latest_frames    = frames
-        self._latest_tracklets = tracklets
 
     def reset(self) -> None:
         for state in self._player_states.values():
@@ -116,11 +117,14 @@ class PoseWaves(BaseLayer):
         fov_degrees: float = P.fov_degrees
         dt:          float = frame.tick.dt
 
-        for pose in self._latest_frames:
+        frames    = list(self._board.get_frames(self._pose_stage).values())
+        tracklets = self._board.get_tracklets()
+
+        for pose in frames:
             track_id = pose.track_id
             if track_id not in self._player_states:
                 continue
-            tracklet = self._latest_tracklets.get(track_id)
+            tracklet = tracklets.get(track_id)
             if tracklet is None:
                 continue
 

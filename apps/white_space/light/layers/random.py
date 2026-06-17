@@ -33,8 +33,8 @@ class Random(BaseLayer):
     Each pixel evolves independently over time - no directional motion.
     """
 
-    def __init__(self, resolution: int, config: RandomSettings) -> None:
-        super().__init__(resolution, config)
+    def __init__(self, resolution: int, config: RandomSettings, board) -> None:
+        super().__init__(resolution, config, board)
         self._config    = config
         self._positions = np.linspace(0.0, 1.0, resolution, endpoint=False, dtype=np.float64)
 

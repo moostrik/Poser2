@@ -16,8 +16,8 @@ class FillSettings(LayerSettings):
 class Fill(BaseLayer):
     """Fills the entire strip with a flat brightness value on each channel."""
 
-    def __init__(self, resolution: int, config: FillSettings) -> None:
-        super().__init__(resolution, config)
+    def __init__(self, resolution: int, config: FillSettings, board) -> None:
+        super().__init__(resolution, config, board)
         self._config = config
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:

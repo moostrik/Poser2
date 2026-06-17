@@ -9,8 +9,10 @@ Columns that pass the brightness threshold are projected as a hard ON marker at
 operator can verify seam positions without needing a feature there.
 """
 
+from __future__ import annotations
+
 from enum import IntEnum, auto
-from threading import Lock
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -19,6 +21,9 @@ from modules.tracker.panoramic.settings import DistortionSettings, DistortAlgori
 
 from ._base_layer import BaseLayer, LayerSettings
 from ..frame import Frame
+
+if TYPE_CHECKING:
+    from ...board import Board
 
 
 class DetectMode(IntEnum):
@@ -54,22 +59,16 @@ class Calibration(BaseLayer):
         config:      CalibrationSettings,
         distortion:  DistortionSettings,
         num_cameras: int,
+        board:       Board,
     ) -> None:
-        super().__init__(resolution, config)
+        super().__init__(resolution, config, board)
         self._config      = config
         self._distortion  = distortion
         self._num_cameras = num_cameras
-        self._lock        = Lock()
-        self._images: dict[int, np.ndarray] = {}
 
     # ------------------------------------------------------------------
     # Layer interface
     # ------------------------------------------------------------------
-
-    def set_camera_image(self, cam_id: int, image: np.ndarray) -> None:
-        """Store the latest VIDEO frame for a camera; called once per render tick."""
-        with self._lock:
-            self._images[cam_id] = image
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         cfg = self._config
@@ -77,8 +76,7 @@ class Calibration(BaseLayer):
         nc   = self._num_cameras
         res  = self.resolution
 
-        with self._lock:
-            images = dict(self._images)
+        images = {cam_id: self._board.get_video_image(cam_id) for cam_id in range(nc)}
 
         # DistortionSettings snapshot (live from tracker)
         dist    = self._distortion

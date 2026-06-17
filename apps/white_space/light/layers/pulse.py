@@ -18,8 +18,8 @@ class PulseSettings(LayerSettings):
 class Pulse(BaseLayer):
     """Pulses the whole strip at a uniform sine rate per channel."""
 
-    def __init__(self, resolution: int, config: PulseSettings) -> None:
-        super().__init__(resolution, config)
+    def __init__(self, resolution: int, config: PulseSettings, board) -> None:
+        super().__init__(resolution, config, board)
         self._config = config
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:

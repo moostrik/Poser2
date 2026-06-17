@@ -30,8 +30,8 @@ class PlayheadFlash(BaseLayer):
     continuously, and adds a fading flash whenever the playhead crosses a player.
     """
 
-    def __init__(self, resolution: int, config: PlayheadFlashSettings) -> None:
-        super().__init__(resolution, config)
+    def __init__(self, resolution: int, config: PlayheadFlashSettings, board) -> None:
+        super().__init__(resolution, config, board)
         self._config = config
         self._flash_start: float = float('-inf')
 

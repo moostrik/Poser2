@@ -46,8 +46,8 @@ class Harmonic(BaseLayer):
     into white and blue according to their individual amplitudes.
     """
 
-    def __init__(self, resolution: int, config: HarmonicSettings) -> None:
-        super().__init__(resolution, config)
+    def __init__(self, resolution: int, config: HarmonicSettings, board) -> None:
+        super().__init__(resolution, config, board)
         self._config = config
         # Normalised position per pixel: 0.0 → 1.0 (exclusive)
         self._x: np.ndarray = np.linspace(0.0, 1.0, resolution, endpoint=False, dtype=np.float32)

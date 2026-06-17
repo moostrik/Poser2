@@ -45,29 +45,31 @@ class Render(Thread):
         self._pose_stage: int       = pose_stage
         self._motor_controller      = MotorController(config.motor)
         self._clock                 = Clock(config)
-        self._sampler               = Sampler()
+        self._sampler               = Sampler(board, pose_stage)
         self.interval: float        = 1.0 / config.light_rate
 
         resolution: int             = config.light_resolution
         num_players: int            = config.max_poses
 
-        # Fixed layer registry — ordered list of (id, instance) pairs
-        self._pose_waves  = PoseWaves   (resolution, num_players, config.pose_waves, self.interval)
-        self._calibration = Calibration (resolution, config.calibration, distortion, config.num_cameras)
+        # Fixed layer registry — ordered list of (id, instance) pairs.
+        # Every layer receives the board and pulls the slices it needs in _draw.
+        self._pose_waves  = PoseWaves   (resolution, num_players, config.pose_waves, self.interval, board, pose_stage)
+        self._calibration = Calibration (resolution, config.calibration, distortion, config.num_cameras, board)
         self._layers: list[tuple[LayerId, BaseLayer]] = [
             (LayerId.pose_waves,     self._pose_waves),
-            (LayerId.fill,           Fill        (resolution, config.fill)),
-            (LayerId.pulse,          Pulse       (resolution, config.pulse)),
-            (LayerId.chase,          Chase       (resolution, config.chase)),
-            (LayerId.lines,          Lines       (resolution, config.lines)),
-            (LayerId.random,         Random      (resolution, config.random)),
-            (LayerId.harmonic,       Harmonic    (resolution, config.harmonic)),
-            (LayerId.player_lines,   PlayerLines (resolution, config.player_lines)),
-            (LayerId.playhead_flash, PlayheadFlash(resolution, config.playhead_flash)),
+            (LayerId.fill,           Fill        (resolution, config.fill,         board)),
+            (LayerId.pulse,          Pulse       (resolution, config.pulse,        board)),
+            (LayerId.chase,          Chase       (resolution, config.chase,        board)),
+            (LayerId.lines,          Lines       (resolution, config.lines,        board)),
+            (LayerId.random,         Random      (resolution, config.random,       board)),
+            (LayerId.harmonic,       Harmonic    (resolution, config.harmonic,     board)),
+            (LayerId.player_lines,   PlayerLines (resolution, config.player_lines, board, pose_stage)),
+            (LayerId.playhead_flash, PlayheadFlash(resolution, config.playhead_flash, board)),
             (LayerId.calibration,    self._calibration),
         ]
 
         self.fps_counter = FpsCounter()
+        self._active_prev: set[LayerId] = set()
         self._update_callbacks: list[Callable[[], Any]] = []
         self._render_callbacks: list[FrameCallback] = []
 
@@ -118,34 +120,30 @@ class Render(Thread):
             except Exception:
                 logger.exception("Error in LightRenderer update callback")
 
-        # All data inputs from the board
-        frames    = list(self._board.get_frames(self._pose_stage).values())
-        tracklets = self._board.get_tracklets()
-        for cam_id in range(self._config.num_cameras):
-            img = self._board.get_video_image(cam_id)
-            if img is not None:
-                self._calibration.set_camera_image(cam_id, img)
-
         tick = self._clock.tick()
+
+        active = set(self._config.active)
+
+        # Reset layers that just became inactive so they start fresh on reactivation
+        for layer_id, layer in self._layers:
+            if layer_id not in active and layer_id in self._active_prev:
+                layer.reset()
+        self._active_prev = active
 
         # Motor target: active layers override the manual config value.
         # None means "no opinion"; 0.0 is an explicit stop command.
-        active = set(self._config.active)
         active_rpm: float = self._config.target_rpm
         for layer_id, layer in self._layers:
             if layer_id in active and layer.target_rpm is not None:
                 active_rpm = layer.target_rpm
 
         motor = self._motor_controller.tick(active_rpm)
-        hits  = self._sampler.detect(frames, tracklets, motor.playhead, motor.mode)
+        hits  = self._sampler.detect(motor.playhead, motor.mode)
 
         frame = Frame(self._config.light_resolution, tick, motor, hits=hits)
 
-        # Forward latest pose data to layers that need it
-        for _, layer in self._layers:
-            layer.set_pose_inputs(frames, tracklets)
-
-        # Render each active layer; the layer blends itself into the frame
+        # Render each active layer; the layer pulls its inputs from the board and
+        # blends itself into the frame
         for layer_id, layer in self._layers:
             if layer_id not in active:
                 continue
