@@ -1,20 +1,29 @@
+"""Frame — the full per-tick render context and output.
+
+Carries the clock snapshot (`tick`), motor state (`motor`), playhead crossings (`hits`),
+and the LED pixel buffer. One object flows into every layer's `_draw` and out to every
+consumer (board, osc_light, sound_osc, render).
+"""
+
 import numpy as np
 from typing import Callable
 from dataclasses import dataclass, field
 
-from .playhead_hit import PlayheadHit
+from .clock import Tick
+from .motor import MotorState
+from .sampler import Hit
 
 BUFFER_DTYPE = np.float32
 
 
 @dataclass
-class CompositionOutput:
-    """LED strip output — white and blue channels sent to the installation over UDP."""
-    resolution:  int
-    target_rpm: float = 0.0
-    playhead: float = 0.0
-    hits: tuple[PlayheadHit, ...] = field(default_factory=tuple)
-    light_img: np.ndarray = field(init=False)
+class Frame:
+    """Per-tick render context + LED output. `white`/`blue` are views into `light_img`."""
+    resolution: int
+    tick:       Tick
+    motor:      MotorState              = field(default_factory=MotorState)
+    hits:       tuple[Hit, ...]         = field(default_factory=tuple)
+    light_img:  np.ndarray              = field(init=False)
 
     def __post_init__(self) -> None:
         # Shape (1, R, 3): channel 0 = white, channel 1 = blue, channel 2 = reserved
@@ -39,4 +48,4 @@ class CompositionOutput:
         self.light_img[0, :, 1] = value
 
 
-CompositionOutputCallback = Callable[[CompositionOutput], None]
+FrameCallback = Callable[[Frame], None]

@@ -5,20 +5,19 @@ from time import time
 
 from modules.utils import OneEuroFilter
 from modules.tracker import Tracklet
-from modules.pose.frame import Frame
+from modules.pose import frame as pose_frame
 from modules.pose import features
-from modules.settings import BaseSettings, Field
+from modules.settings import Field
 
-from ..base import Composition
-from ..transport import Transport
-from ..output import BUFFER_DTYPE
+from ..base_layer import BaseLayer, LayerSettings
+from ..frame import Frame, BUFFER_DTYPE
 from ..draw import BlendType, draw_waves, draw_field
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class PoseWavesSettings(BaseSettings):
+class PoseWavesSettings(LayerSettings):
     """Settings for the pose-driven void and wave pattern composition."""
     fov_degrees: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5,
                                       description="Camera horizontal FOV — must match PanoramicTracker.fov")
@@ -69,8 +68,8 @@ class PlayerState:
         self.age       = 0.0
 
 
-class PoseWaves(Composition):
-    """Pose-driven void + wave pattern composition.
+class PoseWaves(BaseLayer):
+    """Pose-driven void + wave pattern layer.
 
     Ported 1-to-1 from the original Compositor._draw / make_voids / make_patterns.
     """
@@ -97,14 +96,14 @@ class PoseWaves(Composition):
         self._blue: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
         self._void: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
 
-        self._latest_frames:    list[Frame]         = []
-        self._latest_tracklets: dict[int, Tracklet] = {}
+        self._latest_frames:    list[pose_frame.Frame] = []
+        self._latest_tracklets: dict[int, Tracklet]    = {}
 
     # ------------------------------------------------------------------
-    # Composition interface
+    # Layer interface
     # ------------------------------------------------------------------
 
-    def set_pose_inputs(self, frames: list[Frame], tracklets: dict[int, Tracklet]) -> None:
+    def set_pose_inputs(self, frames: list[pose_frame.Frame], tracklets: dict[int, Tracklet]) -> None:
         self._latest_frames    = frames
         self._latest_tracklets = tracklets
 
@@ -112,13 +111,13 @@ class PoseWaves(Composition):
         for state in self._player_states.values():
             state.reset()
 
-    def render(self, transport: Transport, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         P = self._config
         fov_degrees: float = P.fov_degrees
-        dt:          float = transport.dt
+        dt:          float = frame.tick.dt
 
-        for frame in self._latest_frames:
-            track_id = frame.track_id
+        for pose in self._latest_frames:
+            track_id = pose.track_id
             if track_id not in self._player_states:
                 continue
             tracklet = self._latest_tracklets.get(track_id)
@@ -130,9 +129,9 @@ class PoseWaves(Composition):
             if not state.present:
                 continue
 
-            azimuth: float = frame[features.Azimuth].value
-            bbox    = frame[features.BBox]
-            points  = frame[features.Points2D]
+            azimuth: float = pose[features.Azimuth].value
+            bbox    = pose[features.BBox]
+            points  = pose[features.Points2D]
             nose_xy = points[features.PointLandmark.nose]
             nose_conf: float = points.get_score(features.PointLandmark.nose)
             bbox_rect = bbox.to_rect()
@@ -146,7 +145,7 @@ class PoseWaves(Composition):
                 bbox_height if not np.isnan(bbox_height) and bbox_height > 0.0 else 1.0
             )
 
-            angles = frame[features.Angles]
+            angles = pose[features.Angles]
             state.left_shoulder  = angles.values[features.AngleLandmark.left_shoulder]
             state.right_shoulder = angles.values[features.AngleLandmark.right_shoulder]
             state.left_elbow     = angles.values[features.AngleLandmark.left_elbow]

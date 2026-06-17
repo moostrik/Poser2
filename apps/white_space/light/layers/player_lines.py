@@ -16,16 +16,16 @@ import numpy as np
 from modules.settings import BaseSettings, Field
 from modules.utils import HotReloadMethods
 from modules.tracker import Tracklet
-from modules.pose.frame import Frame
+from modules.pose import frame as pose_frame
 from modules.pose import features
 from modules.pose.features import PointLandmark
 
-from ..base import Composition
-from ..transport import Transport
+from ..base_layer import BaseLayer, LayerSettings
+from ..frame import Frame
 from ..draw import BlendType, apply_circular
 
 
-class PlayerLinesSettings(BaseSettings):
+class PlayerLinesSettings(LayerSettings):
     center_width:  Field[float] = Field(0.02,  min=0.0, max=0.2,   step=0.01, description="Centre line width (strip fraction)")
     flank_width:   Field[float] = Field(0.03,  min=0.0, max=0.2,   step=0.01, description="Flank line width (strip fraction)")
     depth_scale:   Field[float] = Field(0.0,   min=0.0, max=1.0,   step=0.01, description="Depth scaling: 0=flat, 1=far player vanishes (centre_width is max)")
@@ -43,7 +43,7 @@ class _PlayerState:
     active:    bool  = False
 
 
-class PlayerLines(Composition):
+class PlayerLines(BaseLayer):
     """Draws a centre line + two flanking lines for each tracked player."""
 
     def __init__(self, resolution: int, config: PlayerLinesSettings) -> None:
@@ -55,25 +55,25 @@ class PlayerLines(Composition):
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
     # ------------------------------------------------------------------
-    # Composition interface
+    # Layer interface
     # ------------------------------------------------------------------
 
-    def set_pose_inputs(self, frames: list[Frame], tracklets: dict[int, Tracklet]) -> None:
+    def set_pose_inputs(self, frames: list[pose_frame.Frame], tracklets: dict[int, Tracklet]) -> None:
         seen: set[int] = set()
 
-        for frame in frames:
-            track_id = frame.track_id
+        for pose in frames:
+            track_id = pose.track_id
             tracklet = tracklets.get(track_id)
             if tracklet is None or not tracklet.is_active:
                 continue
 
-            strip_pos: float = frame[features.Azimuth].value
+            strip_pos: float = pose[features.Azimuth].value
 
             if self._config.anchor_nose:
-                points    = frame[features.Points2D]
+                points    = pose[features.Points2D]
                 nose_xy   = points[features.PointLandmark.nose]
                 nose_conf: float = points.get_score(features.PointLandmark.nose)
-                bbox_rect = frame[features.BBox].to_rect()
+                bbox_rect = pose[features.BBox].to_rect()
                 # NOTE: nose_xy comes from the raw 2D pose keypoints and is NOT
                 # undistorted. The tracker's distortion correction is already baked
                 # into Azimuth (via Geometry.undistort_x on the bbox centre), so
@@ -81,7 +81,7 @@ class PlayerLines(Composition):
                 if nose_conf > 0.3 and not np.isnan(nose_xy[0]) and not np.isnan(bbox_rect.width):
                     strip_pos = (strip_pos + (float(nose_xy[0]) - 0.5) * bbox_rect.width * self._config.fov / 360.0) % 1.0
 
-            bottom_y: float = frame[features.BBox].to_rect().bottom
+            bottom_y: float = pose[features.BBox].to_rect().bottom
             if np.isnan(bottom_y):
                 bottom_y = 0.5
 
@@ -95,7 +95,7 @@ class PlayerLines(Composition):
             if track_id not in seen:
                 state.active = False
 
-    def render(self, transport: Transport, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         P = self._config
         depth_scale:   float = P.depth_scale
         level_center:  float = P.level_center

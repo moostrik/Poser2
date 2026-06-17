@@ -1,7 +1,7 @@
-from .output import CompositionOutput, BUFFER_DTYPE, CompositionOutputCallback
-from .compositor import Compositor
-from .settings import CompositorSettings
-from .base import Composition, ChannelSettings
-from .transport import Transport
-from .motor import Motor, MotorMode, MotorSettings
-from .playhead_hit import PlayheadHit
+from .clock import Tick, Clock
+from .motor import MotorController, MotorState, MotorMode, MotorSettings
+from .sampler import Hit, Sampler
+from .frame import Frame, FrameCallback, BUFFER_DTYPE
+from .base_layer import BaseLayer, LayerSettings, ChannelSettings
+from .settings import LightRendererSettings, LayerId
+from .light_renderer import LightRenderer

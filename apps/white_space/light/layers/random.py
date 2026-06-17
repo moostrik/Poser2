@@ -6,8 +6,8 @@ import numpy as np
 
 from modules.settings import BaseSettings, Field, Group
 
-from ..base import Composition
-from ..transport import Transport
+from ..base_layer import BaseLayer, LayerSettings
+from ..frame import Frame
 
 
 _TABLE_SIZE = 256
@@ -23,12 +23,12 @@ class RandomChannelSettings(BaseSettings):
     threshold:   Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.01, description="Hard gate: 0=smooth gradient, >0=lit pixels above this level only")
 
 
-class RandomSettings(BaseSettings):
+class RandomSettings(LayerSettings):
     white: Group[RandomChannelSettings] = Group(RandomChannelSettings)
     blue:  Group[RandomChannelSettings] = Group(RandomChannelSettings)
 
 
-class Random(Composition):
+class Random(BaseLayer):
     """2D fBm value noise: noise(pixel * scale, beat_time * speed).
     Each pixel evolves independently over time - no directional motion.
     """
@@ -44,8 +44,8 @@ class Random(Composition):
         self._perm_b: np.ndarray = rng.permutation(_TABLE_SIZE).astype(np.int32)
         self._vals_b: np.ndarray = rng.random(_TABLE_SIZE)
 
-    def render(self, transport: Transport, white: np.ndarray, blue: np.ndarray) -> None:
-        beat_time = transport.beat + transport.phase
+    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+        beat_time = frame.tick.beat + frame.tick.phase
         W = self._config.white
         B = self._config.blue
 

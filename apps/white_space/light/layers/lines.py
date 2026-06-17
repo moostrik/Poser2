@@ -4,18 +4,18 @@ import math
 
 import numpy as np
 
-from modules.settings import BaseSettings, Group
+from modules.settings import Group
 
-from ..base import Composition, ChannelSettings
-from ..transport import Transport
+from ..base_layer import BaseLayer, ChannelSettings, LayerSettings
+from ..frame import Frame
 
 
-class LinesSettings(BaseSettings):
+class LinesSettings(LayerSettings):
     white: Group[ChannelSettings] = Group(ChannelSettings)
     blue:  Group[ChannelSettings] = Group(ChannelSettings)
 
 
-class Lines(Composition):
+class Lines(BaseLayer):
     """Discrete bright lines scrolling around the strip."""
 
     def __init__(self, resolution: int, config: LinesSettings) -> None:
@@ -23,8 +23,8 @@ class Lines(Composition):
         self._config = config
         self._indices: np.ndarray = np.arange(resolution, dtype=np.float32)
 
-    def render(self, transport: Transport, white: np.ndarray, blue: np.ndarray) -> None:
-        beat_time = transport.beat + transport.phase
+    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+        beat_time = frame.tick.beat + frame.tick.phase
         res       = self.resolution
         W         = self._config.white
         B         = self._config.blue

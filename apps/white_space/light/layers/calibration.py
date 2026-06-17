@@ -14,11 +14,11 @@ from threading import Lock
 
 import numpy as np
 
-from modules.settings import BaseSettings, Field
+from modules.settings import Field
 from modules.tracker.panoramic.settings import DistortionSettings, DistortAlgorithm
 
-from ..base import Composition
-from ..transport import Transport
+from ..base_layer import BaseLayer, LayerSettings
+from ..frame import Frame
 
 
 class DetectMode(IntEnum):
@@ -32,7 +32,7 @@ class SampleMethod(IntEnum):
     AVG = auto()
 
 
-class CalibrationSettings(BaseSettings):
+class CalibrationSettings(LayerSettings):
     """Settings for the Calibration composition."""
     slice_centre:  Field[float]        = Field(0.5,  min=0.0,  max=1.0,   step=0.01, description="Vertical centre of the sample band (0=top, 1=bottom)")
     slice_height:  Field[float]        = Field(0.2,  min=0.01, max=1.0,   step=0.01, description="Height of the sample band as a fraction of frame height")
@@ -45,7 +45,7 @@ class CalibrationSettings(BaseSettings):
     fov:           Field[float]        = Field(110.0, min=60.0, max=180.0, step=0.5,  description="Camera horizontal FOV (shared from compositor)", access=Field.READ)
 
 
-class Calibration(Composition):
+class Calibration(BaseLayer):
     """Projects horizontal camera slices onto the LED strip for distortion calibration."""
 
     def __init__(
@@ -63,15 +63,15 @@ class Calibration(Composition):
         self._images: dict[int, np.ndarray] = {}
 
     # ------------------------------------------------------------------
-    # Composition interface
+    # Layer interface
     # ------------------------------------------------------------------
 
-    def set_camera_image(self, cam_id: int, frame: np.ndarray) -> None:
-        """Store the latest VIDEO frame for a camera; called directly from a camera thread."""
+    def set_camera_image(self, cam_id: int, image: np.ndarray) -> None:
+        """Store the latest VIDEO frame for a camera; called once per render tick."""
         with self._lock:
-            self._images[cam_id] = frame
+            self._images[cam_id] = image
 
-    def render(self, transport: Transport, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         cfg = self._config
         fov  = cfg.fov
         nc   = self._num_cameras

@@ -8,7 +8,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle import OscBundle
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
-from .composition import CompositionOutput
+from .light import Frame
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.inout.net_probe import validate_connection
 
@@ -57,7 +57,7 @@ class OscLight:
         self._config.chunk_size = self._chunk_size
         self._config.num_chunks = self._num_chunks
 
-        self._latest_output: Optional[CompositionOutput] = None
+        self._latest_output: Optional[Frame] = None
         self._output_lock:   Lock  = Lock()
         self._client_lock:   Lock  = Lock()
         self._update_event:  Event = Event()
@@ -87,7 +87,7 @@ class OscLight:
             self._thread.join(timeout=1.0)
             self._thread = None
 
-    def send_message(self, output: CompositionOutput) -> None:
+    def send_message(self, output: Frame) -> None:
         with self._output_lock:
             self._latest_output = output
         self._update_event.set()
@@ -150,7 +150,7 @@ class OscLight:
 
     @staticmethod
     def _build_data_message(
-        output: CompositionOutput,
+        output: Frame,
         settings: OscLightSettings,
         chunk_size: int,
         num_chunks: int,
@@ -169,7 +169,7 @@ class OscLight:
                 message_list.append(off_msgb.build())
 
             rpm_msgb = OscMessageBuilder("/WS/r/0")
-            rpm_msgb.add_arg(int(output.target_rpm))
+            rpm_msgb.add_arg(int(output.motor.target_rpm))
             message_list.append(rpm_msgb.build())
 
             if settings.use_signed:

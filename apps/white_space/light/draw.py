@@ -1,4 +1,4 @@
-"""Low-level 1-D LED drawing primitives — used by all Composition implementations."""
+"""Low-level 1-D LED drawing primitives — used by all layer implementations."""
 
 from enum import Enum
 

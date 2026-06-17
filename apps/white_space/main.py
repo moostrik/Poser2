@@ -3,8 +3,10 @@
 from typing import Optional
 from functools import partial
 
+import numpy as np
+
 from modules.utils import Broadcast
-from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder
+from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType
 from modules.settings import presets, NiceServer
 from modules.inout import OscReceiver
 from .sound_osc import WhiteSpaceSoundOsc
@@ -14,7 +16,7 @@ from modules.inference import source, crop, pose, segmentation
 from modules.session import Session, Sequencer
 from modules.gl import WindowSettings
 
-from .composition import Compositor
+from .light import LightRenderer
 from .board import Board
 from .osc_light import OscLight
 from .udp_receiver import UdpReceiver
@@ -118,20 +120,18 @@ class WhiteSpaceMain:
                 wt.process,
             ])
 
-        # WS PIPELINE — composition output
-        self.compositor = Compositor(self.settings.composition, distortion=self.settings.camera.tracker.distortion, board=self.board)
+        # WS PIPELINE — light output
+        ws_input: Stage = Stage(int(ps.ws_input_stage))
+        self.light_renderer = LightRenderer(self.settings.light, distortion=self.settings.camera.tracker.distortion, board=self.board, pose_stage=int(ws_input))
         self.osc_light    = OscLight(self.settings.inout.osc_light)
         self.osc_receiver = OscReceiver(self.settings.inout.osc_receiver)
         self.udp_receiver = UdpReceiver(self.settings.inout.udp_receiver)
-        self.osc_receiver.bind("/WS/sensor/fall", lambda *_: self.compositor.notify_fall())
-        self.udp_receiver.bind("/WS/sensor/fall", lambda *_: self.compositor.notify_fall())
-        self.tracker.add_tracklet_callback(self.compositor.set_tracklets)
-        ws_input: Stage = Stage(int(ps.ws_input_stage))
-        self.stages[ws_input].add_callback(self.compositor.add_poses)
+        self.osc_receiver.bind("/WS/sensor/fall", lambda *_: self.light_renderer.notify_fall())
+        self.udp_receiver.bind("/WS/sensor/fall", lambda *_: self.light_renderer.notify_fall())
         for camera in self.cameras:
-            camera.add_frame_callback(self.compositor.set_image)
-        self.compositor.add_render_callback(self.osc_light.send_message)
-        self.compositor.add_render_callback(self.sound_osc.set_composition)
+            camera.add_frame_callback(self._store_video_frame)
+        self.light_renderer.add_render_callback(self.osc_light.send_message)
+        self.light_renderer.add_render_callback(self.sound_osc.set_composition)
 
         # POSE STAGE RAW
         self.pose_predictor.add_frames_callback(self.stages[Stage.RAW])
@@ -237,8 +237,8 @@ class WhiteSpaceMain:
         # RENDER
         self.render = WhiteSpaceRender(self.board, self.settings.render)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
-        self.compositor.add_update_callback(self.sequencer.update)
-        self.compositor.add_update_callback(self.interpolators_lerp.update)
+        self.light_renderer.add_update_callback(self.sequencer.update)
+        self.light_renderer.add_update_callback(self.interpolators_lerp.update)
         self.render.add_exit_callback(self.stop)
 
     def start(self) -> None:
@@ -252,7 +252,7 @@ class WhiteSpaceMain:
         self.segmentation_predictor.start()
         self.window_similator.start()
         self.window_correlator.start()
-        self.compositor.start()
+        self.light_renderer.start()
         self.osc_light.start()
         self.osc_receiver.start()
         self.udp_receiver.start()
@@ -265,6 +265,11 @@ class WhiteSpaceMain:
 
         self.is_running = True
         self.render.start()
+
+    def _store_video_frame(self, cam_id: int, frame_type: FrameType, frame: np.ndarray) -> None:
+        """Camera frame callback — store raw VIDEO frames on the board for the light renderer."""
+        if frame_type == FrameType.VIDEO:
+            self.board.set_video_image(cam_id, frame)
 
     def _process_poses(self, poses: FrameDict) -> None:
         images, prev_images = self.source_uploader.snapshot()
@@ -291,7 +296,7 @@ class WhiteSpaceMain:
         self.osc_light.stop()
         self.osc_receiver.stop()
         self.udp_receiver.stop()
-        self.compositor.stop()
+        self.light_renderer.stop()
 
         self.pose_predictor.stop()
         self.segmentation_predictor.stop()

@@ -4,20 +4,20 @@ playhead sweeps past an active player's angular position.
 When triggered: the first half of the white pixels and all of the blue pixels
 light up instantly and fade out over a configurable duration.
 
-Hit detection is centralised in the Compositor and delivered via transport.hits.
+Hit detection is centralised in the LightRenderer and delivered via frame.hits.
 """
 
 from time import monotonic
 
 import numpy as np
 
-from modules.settings import BaseSettings, Field
+from modules.settings import Field
 
-from ..base import Composition
-from ..transport import Transport
+from ..base_layer import BaseLayer, LayerSettings
+from ..frame import Frame
 
 
-class PlayheadFlashSettings(BaseSettings):
+class PlayheadFlashSettings(LayerSettings):
     base_white:   Field[float] = Field(0.1,  min=0.0,  max=1.0,  step=0.01, description="Base brightness for white channel (first half of strip)")
     base_blue:    Field[float] = Field(0.1,  min=0.0,  max=1.0,  step=0.01, description="Base brightness for blue channel (full strip)")
     flash_white:  Field[float] = Field(1.0,  min=0.0,  max=1.0,  step=0.01, description="Flash intensity for white channel", newline=True)
@@ -25,7 +25,7 @@ class PlayheadFlashSettings(BaseSettings):
     fadeout_time: Field[float] = Field(0.5,  min=0.01, max=10.0, step=0.01, description="Fade-out duration (seconds)", newline=True)
 
 
-class PlayheadFlash(Composition):
+class PlayheadFlash(BaseLayer):
     """Lights the first half of the white strip and all of blue at a base level
     continuously, and adds a fading flash whenever the playhead crosses a player.
     """
@@ -36,13 +36,13 @@ class PlayheadFlash(Composition):
         self._flash_start: float = float('-inf')
 
     # ------------------------------------------------------------------
-    # Composition interface
+    # Layer interface
     # ------------------------------------------------------------------
 
-    def render(self, transport: Transport, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         now = monotonic()
 
-        if transport.hits:
+        if frame.hits:
             self._flash_start = now
 
         half = self.resolution // 2

@@ -6,8 +6,8 @@ import numpy as np
 
 from modules.settings import BaseSettings, Field, Group
 
-from ..base import Composition
-from ..transport import Transport
+from ..base_layer import BaseLayer, LayerSettings
+from ..frame import Frame
 
 
 class HarmonicSourceSettings(BaseSettings):
@@ -27,7 +27,7 @@ class HarmonicSourceSettings(BaseSettings):
                                            description="Contribution to blue channel")
 
 
-class HarmonicSettings(BaseSettings):
+class HarmonicSettings(LayerSettings):
     """Settings for the LFO/harmonic-interference composition."""
     source_0: Group[HarmonicSourceSettings] = Group(HarmonicSourceSettings)
     source_1: Group[HarmonicSourceSettings] = Group(HarmonicSourceSettings)
@@ -35,7 +35,7 @@ class HarmonicSettings(BaseSettings):
     source_3: Group[HarmonicSourceSettings] = Group(HarmonicSourceSettings)
 
 
-class Harmonic(Composition):
+class Harmonic(BaseLayer):
     """BPM-locked spatiotemporal LFO and harmonic interference composition.
 
     Each source generates a 1-D spatial sine wave::
@@ -52,7 +52,7 @@ class Harmonic(Composition):
         # Normalised position per pixel: 0.0 → 1.0 (exclusive)
         self._x: np.ndarray = np.linspace(0.0, 1.0, resolution, endpoint=False, dtype=np.float32)
 
-    def render(self, transport: Transport, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         sources = (
             self._config.source_0,
             self._config.source_1,
@@ -62,10 +62,10 @@ class Harmonic(Composition):
         for src in sources:
             if not src.enabled:
                 continue
-            hz = src.bpm_multiplier * transport.bpm / 60.0
+            hz = src.bpm_multiplier * frame.tick.bpm / 60.0
             arg = (
                 self._x * src.spatial_cycles
-                + hz * transport.time
+                + hz * frame.tick.time
                 + src.phase_offset
                 + src.spatial_phase
             ) * math.tau

@@ -354,17 +354,17 @@
       "emit_partial": true
     }
   },
-  "composition": {
+  "light": {
     "bpm": 20.0,
     "active": [
       "lines"
     ],
-    "blend": "ADD",
     "master": 1.0,
     "hardness": 0.0,
     "threshold": 0.5,
     "target_rpm": 3.0,
     "pose_waves": {
+      "blend": "ADD",
       "fov_degrees": 110.0,
       "void_width": 0.05,
       "void_edge": 0.01,
@@ -377,6 +377,7 @@
       "line_amount": 20.0
     },
     "fill": {
+      "blend": "ADD",
       "white": {
         "level": 0.5,
         "speed": 0.5,
@@ -393,6 +394,7 @@
       }
     },
     "pulse": {
+      "blend": "ADD",
       "white": {
         "level": 0.5,
         "speed": 0.5,
@@ -409,6 +411,7 @@
       }
     },
     "chase": {
+      "blend": "ADD",
       "white": {
         "level": 1.0,
         "speed": 0.25,
@@ -425,6 +428,7 @@
       }
     },
     "lines": {
+      "blend": "ADD",
       "white": {
         "level": 1.0,
         "speed": 0.0,
@@ -441,6 +445,7 @@
       }
     },
     "random": {
+      "blend": "ADD",
       "white": {
         "level": 0.5,
         "speed": 0.5,
@@ -459,6 +464,7 @@
       }
     },
     "harmonic": {
+      "blend": "ADD",
       "source_0": {
         "enabled": true,
         "bpm_multiplier": 1.0,
@@ -497,6 +503,7 @@
       }
     },
     "player_lines": {
+      "blend": "ADD",
       "center_width": 0.06,
       "flank_width": 0.03,
       "depth_scale": 2.0,
@@ -506,6 +513,7 @@
       "anchor_nose": true
     },
     "calibration": {
+      "blend": "ADD",
       "slice_centre": 0.5,
       "slice_height": 0.2,
       "threshold": 1.0,
@@ -516,6 +524,7 @@
       "white_markers": true
     },
     "playhead_flash": {
+      "blend": "ADD",
       "base_white": 0.0,
       "base_blue": 0.0,
       "flash_white": 1.0,

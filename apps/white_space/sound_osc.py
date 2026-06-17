@@ -1,7 +1,7 @@
 from pythonosc.osc_message_builder import OscMessageBuilder
 
 from modules.inout import OscSound, OscSoundSettings
-from .composition import CompositionOutput
+from .light import Frame
 
 import logging
 logger = logging.getLogger(__name__)
@@ -12,10 +12,10 @@ class WhiteSpaceSoundOsc(OscSound):
 
     def __init__(self, settings: OscSoundSettings) -> None:
         super().__init__(settings)
-        self._composition: CompositionOutput | None = None
+        self._composition: Frame | None = None
 
-    def set_composition(self, output: CompositionOutput) -> None:
-        """Store the latest CompositionOutput; thread-safe."""
+    def set_composition(self, output: Frame) -> None:
+        """Store the latest Frame; thread-safe."""
         with self._input_lock:
             self._composition = output
 
@@ -23,7 +23,7 @@ class WhiteSpaceSoundOsc(OscSound):
         with self._input_lock:
             composition = self._composition
 
-        playhead = composition.playhead if composition is not None else 0.0
+        playhead = composition.motor.playhead if composition is not None else 0.0
         msg = OscMessageBuilder(address="/global/playhead")
         msg.add_arg(float(playhead), OscMessageBuilder.ARG_TYPE_FLOAT)
         with self._client_lock:

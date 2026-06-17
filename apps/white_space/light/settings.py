@@ -3,16 +3,15 @@ from modules.settings import BaseSettings, Field, Group
 from modules.settings.widget import Widget
 
 
-from .draw import BlendType
 from .motor import MotorSettings
-from .comps import (
+from .layers import (
     PoseWavesSettings, FillSettings, PulseSettings,
     ChaseSettings, LinesSettings, RandomSettings, HarmonicSettings,
     PlayerLinesSettings, CalibrationSettings, PlayheadFlashSettings,
 )
 
 
-class CompositionId(IntEnum):
+class LayerId(IntEnum):
     pose_waves   = auto()
     fill         = auto()
     pulse        = auto()
@@ -25,8 +24,8 @@ class CompositionId(IntEnum):
     playhead_flash = auto()
 
 
-class CompositorSettings(BaseSettings):
-    """Settings for the LED composition thread."""
+class LightRendererSettings(BaseSettings):
+    """Settings for the LED light renderer thread."""
 
     # Construction / wiring (INIT — requires restart to take effect)
     max_poses:        Field[int]   = Field(3,    min=1,   max=16,   access=Field.INIT, description="Max tracked poses")
@@ -38,14 +37,13 @@ class CompositorSettings(BaseSettings):
     time:  Field[float] = Field(0.0,  access=Field.READ,               description="Elapsed wall-clock time (s)")
     phase: Field[float] = Field(0.0,  access=Field.READ,               description="Beat phase (0–1)")
 
-    active: Field[list[CompositionId]] = Field([CompositionId.pose_waves], widget=Widget.checklist,description="Active compositions", newline=True)
-    blend: Field[BlendType] = Field(BlendType.ADD, description="Blend mode")
+    active: Field[list[LayerId]] = Field([LayerId.pose_waves], widget=Widget.checklist,description="Active layers", newline=True)
 
     master:    Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Master brightness", newline=True)
     hardness:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Contrast hardness (0=off, 1=hard step)")
     threshold: Field[float] = Field(0.5, min=0.0, max=1.0, step=0.01, description="Hardness pivot point")
 
-    target_rpm: Field[float] = Field(0.0, min=0.0, max=2400.0, step=1.0, description="Motor speed target (RPM); overridden by active composition", newline=True)
+    target_rpm: Field[float] = Field(0.0, min=0.0, max=2400.0, step=1.0, description="Motor speed target (RPM); overridden by active layer", newline=True)
 
     fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV (shared from root)", newline=True)
 

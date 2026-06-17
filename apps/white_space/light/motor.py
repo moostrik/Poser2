@@ -1,4 +1,5 @@
-"""Motor — derives the rotating light's playhead from fall signals.
+"""MotorController — derives the rotating light's playhead from fall signals
+and echoes the commanded target speed.
 
 Real mode (simulate=False):
     Each "fall" signal marks one full revolution completing.  The period is
@@ -14,6 +15,7 @@ Simulate mode (simulate=True):
     stall detection) apply identically.
 """
 
+from dataclasses import dataclass
 from enum import IntEnum, auto
 from threading import Thread, Event, Lock
 from time import monotonic
@@ -25,6 +27,14 @@ class MotorMode(IntEnum):
     STOPPED    = auto()  # motor not spinning; no fall signals
     LOW_SPEED  = auto()  # playhead tracking is meaningful
     HIGH_SPEED = auto()  # spinning too fast; playhead irrelevant, content switches
+
+
+@dataclass
+class MotorState:
+    """Per-tick motor snapshot: rotation position, speed regime, commanded speed."""
+    playhead:   float     = 0.0
+    mode:       MotorMode = MotorMode.STOPPED
+    target_rpm: float     = 0.0
 
 
 class MotorSettings(BaseSettings):
@@ -39,12 +49,13 @@ class MotorSettings(BaseSettings):
     playhead:             Field[float]    = Field(0.0,              min=0.0, max=1.0,    step=0.001, access=Field.READ, widget=Widget.slider, description="Current light playhead (0–1)")
 
 
-class Motor:
-    """Tracks the rotating light's angular position (playhead 0.0–1.0).
+class MotorController:
+    """Tracks the rotating light's angular position (playhead 0.0–1.0) and
+    relays the commanded target speed.
 
     Call start() / stop() to manage the internal simulation thread.
     Call notify_fall() from external hardware signals (OSC/UDP).
-    Call tick() once per compositor tick to advance and read playhead.
+    Call tick(target_rpm) once per render tick to advance and read the state.
     """
 
     def __init__(self, settings: MotorSettings) -> None:
@@ -134,8 +145,8 @@ class Motor:
     # Per-tick
     # ------------------------------------------------------------------
 
-    def tick(self) -> tuple[float, MotorMode]:
-        """Return (playhead, motor_mode) for the current moment."""
+    def tick(self, target_rpm: float = 0.0) -> MotorState:
+        """Advance and return the current motor state, echoing the commanded target_rpm."""
         offset   = self._settings.phase_offset
         simulate = self._settings.simulate
 
@@ -177,4 +188,4 @@ class Motor:
         self._settings.measured_rpm = rpm
         self._settings.motor_mode   = motor_mode
         self._settings.playhead     = playhead
-        return playhead, motor_mode
+        return MotorState(playhead=playhead, mode=motor_mode, target_rpm=target_rpm)

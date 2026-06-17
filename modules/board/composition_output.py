@@ -4,7 +4,8 @@ from threading import Lock
 from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from apps.white_space.composition.output import CompositionOutput, CompositionDebug
+    from apps.white_space.light.frame import Frame as CompositionOutput
+    from apps.white_space.light.frame import Frame as CompositionDebug
 
 
 class HasCompositionOutput(Protocol):
