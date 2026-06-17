@@ -24,7 +24,7 @@ class LayerId(IntEnum):
     playhead_flash = auto()
 
 
-class LightRendererSettings(BaseSettings):
+class LightSettings(BaseSettings):
     """Settings for the LED light renderer thread."""
 
     # Construction / wiring (INIT — requires restart to take effect)

@@ -19,7 +19,7 @@ from .clock import Clock
 from .frame import Frame, FrameCallback
 from .motor import MotorController
 from .sampler import Sampler
-from .settings import LightRendererSettings, LayerId
+from .settings import LightSettings, LayerId
 from .layers import BaseLayer, PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, Calibration, PlayheadFlash
 from ..board import Board
 
@@ -35,20 +35,21 @@ class Render(Thread):
     Output: Frame via the board and registered render callbacks.
     """
 
-    def __init__(self, config: LightRendererSettings, distortion: DistortionSettings, board: Board, pose_stage: int) -> None:
+    def __init__(self, config: LightSettings, distortion: DistortionSettings, board: Board, pose_stage: int) -> None:
         super().__init__(daemon=True, name="LightRenderer")
 
         self._stop_event = Event()
 
-        self._config           = config
-        self._board            = board
-        self._pose_stage       = pose_stage
-        self._motor_controller = MotorController(config.motor)
-        self._clock            = Clock(config)
-        self._sampler          = Sampler()
-        self.interval: float   = 1.0 / config.light_rate
-        resolution: int        = config.light_resolution
-        num_players: int       = config.max_poses
+        self._config: LightSettings = config
+        self._board: Board          = board
+        self._pose_stage: int       = pose_stage
+        self._motor_controller      = MotorController(config.motor)
+        self._clock                 = Clock(config)
+        self._sampler               = Sampler()
+        self.interval: float        = 1.0 / config.light_rate
+
+        resolution: int             = config.light_resolution
+        num_players: int            = config.max_poses
 
         # Fixed layer registry — ordered list of (id, instance) pairs
         self._pose_waves  = PoseWaves   (resolution, num_players, config.pose_waves, self.interval)
@@ -86,15 +87,16 @@ class Render(Thread):
         if self.is_alive():
             self.join()
 
-    def notify_fall(self) -> None:
-        """Signal a revolution fall edge; forwarded to the motor controller."""
+    def notify_fall(self, *args: object) -> None:
+        """Signal a revolution fall edge; forwarded to the motor controller.
+        Accepts and ignores any receiver callback args (OSC address/values)."""
         self._motor_controller.notify_fall()
 
     def run(self) -> None:
         next_time: float = time()
         while not self._stop_event.is_set():
             try:
-                self._tick()
+                self._update()
             except Exception:
                 logger.exception("Error in LightRenderer tick")
             next_time += self.interval
@@ -108,7 +110,7 @@ class Render(Thread):
     # Per-tick
     # ------------------------------------------------------------------
 
-    def _tick(self) -> None:
+    def _update(self) -> None:
         # Pre-render state callbacks (sequencer, interpolators)
         for cb in self._update_callbacks:
             try:

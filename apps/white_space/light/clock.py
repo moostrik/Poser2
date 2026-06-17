@@ -7,7 +7,7 @@ from time import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .settings import LightRendererSettings
+    from .settings import LightSettings
 
 
 @dataclass
@@ -23,7 +23,7 @@ class Tick:
 class Clock:
     """Advances the master clock once per render tick."""
 
-    def __init__(self, settings: LightRendererSettings) -> None:
+    def __init__(self, settings: LightSettings) -> None:
         self._settings   = settings
         self._start_time: float = time()
         self._last_time:  float = self._start_time

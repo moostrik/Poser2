@@ -4,18 +4,6 @@ from enum import Enum
 
 import numpy as np
 
-PI:     float = np.pi
-TWOPI:  float = 2.0 * np.pi
-HALFPI: float = np.pi / 2.0
-
-
-class EdgeSide(Enum):
-    NONE  = 0
-    LEFT  = 1
-    RIGHT = 2
-    BOTH  = 3
-
-
 class BlendType(Enum):
     NONE     = "replace"
     ADD      = "add"
@@ -24,6 +12,17 @@ class BlendType(Enum):
     MAX      = "max"
     MIN      = "min"
     NON_ZERO = "non_zero"
+
+
+PI:     float = np.pi
+TWOPI:  float = 2.0 * np.pi
+HALFPI: float = np.pi / 2.0
+
+class EdgeSide(Enum):
+    NONE  = 0
+    LEFT  = 1
+    RIGHT = 2
+    BOTH  = 3
 
 
 # ---------------------------------------------------------------------------

@@ -10,5 +10,5 @@ from .lines         import Lines,        LinesSettings
 from .random        import Random,       RandomSettings, RandomChannelSettings
 from .harmonic      import Harmonic,     HarmonicSettings, HarmonicSourceSettings
 from .player_lines  import PlayerLines,  PlayerLinesSettings
-from .calibration    import Calibration,    CalibrationSettings
+from .calibration   import Calibration,    CalibrationSettings
 from .playhead_flash import PlayheadFlash, PlayheadFlashSettings

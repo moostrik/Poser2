@@ -125,8 +125,8 @@ class WhiteSpaceMain:
         self.osc_light    = OscLight(self.settings.inout.osc_light)
         self.osc_receiver = OscReceiver(self.settings.inout.osc_receiver)
         self.udp_receiver = UdpReceiver(self.settings.inout.udp_receiver)
-        self.osc_receiver.bind("/WS/sensor/fall", lambda *_: self.light_renderer.notify_fall())
-        self.udp_receiver.bind("/WS/sensor/fall", lambda *_: self.light_renderer.notify_fall())
+        self.osc_receiver.bind("/WS/sensor/fall", self.light_renderer.notify_fall)
+        self.udp_receiver.bind("/WS/sensor/fall", self.light_renderer.notify_fall)
         for camera in self.cameras:
             camera.add_frame_callback(self._store_video_frame)
         self.light_renderer.add_render_callback(self.osc_light.send_message)
