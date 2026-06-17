@@ -17,18 +17,17 @@ from modules.tracker.panoramic.settings import DistortionSettings
 
 from .clock import Clock
 from .frame import Frame, FrameCallback
-from .base_layer import BaseLayer
 from .motor import MotorController
 from .sampler import Sampler
 from .settings import LightRendererSettings, LayerId
-from .layers import PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, Calibration, PlayheadFlash
+from .layers import BaseLayer, PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, Calibration, PlayheadFlash
 from ..board import Board
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-class LightRenderer(Thread):
+class Render(Thread):
     """Runs the LED render loop at a fixed rate (light_rate Hz) and forwards the
     result to registered output callbacks (UDP sender, render board, audio).
 

@@ -17,7 +17,7 @@ import numpy as np
 from modules.settings import Field
 from modules.tracker.panoramic.settings import DistortionSettings, DistortAlgorithm
 
-from ..base_layer import BaseLayer, LayerSettings
+from ._base_layer import BaseLayer, LayerSettings
 from ..frame import Frame
 
 

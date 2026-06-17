@@ -17,7 +17,7 @@ from ..board import Board
 from ..settings import Layers, RenderSettings
 
 
-class WhiteSpaceRender(RenderBase):
+class Render(RenderBase):
     def __init__(self, board: Board, settings: RenderSettings) -> None:
         super().__init__(settings.window)
         self.num_players: int = settings.num_players

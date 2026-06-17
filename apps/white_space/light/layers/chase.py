@@ -6,7 +6,7 @@ import numpy as np
 
 from modules.settings import Group
 
-from ..base_layer import BaseLayer, ChannelSettings, LayerSettings
+from ._base_layer import BaseLayer, ChannelSettings, LayerSettings
 from ..frame import Frame
 
 

@@ -20,9 +20,9 @@ from modules.pose import frame as pose_frame
 from modules.pose import features
 from modules.pose.features import PointLandmark
 
-from ..base_layer import BaseLayer, LayerSettings
+from ._base_layer import BaseLayer, LayerSettings
 from ..frame import Frame
-from ..draw import BlendType, apply_circular
+from ._utilities import BlendType, apply_circular
 
 
 class PlayerLinesSettings(LayerSettings):

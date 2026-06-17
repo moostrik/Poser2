@@ -9,9 +9,9 @@ from modules.pose import frame as pose_frame
 from modules.pose import features
 from modules.settings import Field
 
-from ..base_layer import BaseLayer, LayerSettings
+from ._base_layer import BaseLayer, LayerSettings
 from ..frame import Frame, BUFFER_DTYPE
-from ..draw import BlendType, draw_waves, draw_field
+from ._utilities import BlendType, draw_waves, draw_field
 
 import logging
 logger = logging.getLogger(__name__)

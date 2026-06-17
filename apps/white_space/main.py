@@ -16,13 +16,12 @@ from modules.inference import source, crop, pose, segmentation
 from modules.session import Session, Sequencer
 from modules.gl import WindowSettings
 
-from .light import LightRenderer
 from .board import Board
+from .light import Render as LightRender
 from .osc_light import OscLight
-from .udp_receiver import UdpReceiver
-
+from .render import Render as WindowRender
 from .settings import Settings, Stage
-from .render import WhiteSpaceRender
+from .udp_receiver import UdpReceiver
 
 APP_NAME = 'white_space'
 DATA_PATH = 'apps/white_space/data'
@@ -122,7 +121,7 @@ class WhiteSpaceMain:
 
         # WS PIPELINE — light output
         ws_input: Stage = Stage(int(ps.ws_input_stage))
-        self.light_renderer = LightRenderer(self.settings.light, distortion=self.settings.camera.tracker.distortion, board=self.board, pose_stage=int(ws_input))
+        self.light_renderer = LightRender(self.settings.light, distortion=self.settings.camera.tracker.distortion, board=self.board, pose_stage=int(ws_input))
         self.osc_light    = OscLight(self.settings.inout.osc_light)
         self.osc_receiver = OscReceiver(self.settings.inout.osc_receiver)
         self.udp_receiver = UdpReceiver(self.settings.inout.udp_receiver)
@@ -235,7 +234,7 @@ class WhiteSpaceMain:
         self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
 
         # RENDER
-        self.render = WhiteSpaceRender(self.board, self.settings.render)
+        self.render = WindowRender(self.board, self.settings.render)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
         self.light_renderer.add_update_callback(self.sequencer.update)
         self.light_renderer.add_update_callback(self.interpolators_lerp.update)

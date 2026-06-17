@@ -6,7 +6,7 @@ import numpy as np
 
 from modules.settings import BaseSettings, Field, Group
 
-from ..base_layer import BaseLayer, LayerSettings
+from ._base_layer import BaseLayer, LayerSettings
 from ..frame import Frame
 
 

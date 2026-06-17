@@ -13,7 +13,7 @@ import numpy as np
 
 from modules.settings import Field
 
-from ..base_layer import BaseLayer, LayerSettings
+from ._base_layer import BaseLayer, LayerSettings
 from ..frame import Frame
 
 

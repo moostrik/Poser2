@@ -1,1 +1,1 @@
-from .render import WhiteSpaceRender
+from .render import Render

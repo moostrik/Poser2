@@ -8,8 +8,8 @@ from modules.settings import BaseSettings, Field
 from modules.tracker import Tracklet
 from modules.pose import frame as pose_frame
 
-from .draw import BlendType, blend_values
-from .frame import Frame, BUFFER_DTYPE
+from ._utilities import BlendType, blend_values
+from ..frame import Frame, BUFFER_DTYPE
 
 
 class LayerSettings(BaseSettings):
