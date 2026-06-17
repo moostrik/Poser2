@@ -1,7 +1,9 @@
 ---
 description: Pose nodes, trackers, windows, and analytics
 paths:
-  - "modules/pose/**"
+  - "modules/pose/trackers/**"
+  - "modules/pose/window/**"
+  - "modules/pose/analytics/**"
 ---
 # Pose Processing Guidelines
 

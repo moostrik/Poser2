@@ -12,6 +12,9 @@ temp*
 *.h5
 *.mp4
 
+# Claude Code
+.claude/settings.local.json
+
 # Python
 __pycache__/
 *.py[cod]

@@ -14,12 +14,10 @@ Poser2 is a real-time, low-latency system with app-specific orchestration in `ap
 
 - `BaseSettings` subclasses are pure data containers with no runtime side effects.
 - Use `BaseSettings` for reactive configuration, `@dataclass` for plain value objects.
-- Detailed rules: @.claude/rules/settings-presets.md
 
 ## Pose Frame contract
 
 - `frame[FeatureType]` never raises; missing data is NaN with score `0.0`.
-- Detailed rules: @.claude/rules/pose-data.md
 
 ## Composition and wiring
 
@@ -32,7 +30,6 @@ Poser2 is a real-time, low-latency system with app-specific orchestration in `ap
 ## Board
 
 `modules/board/` defines protocol + mixin pairs for shared runtime data. Each app composes its own `RenderBoard` from the mixins it needs.
-- Detailed rules: @.claude/rules/board.md
 
 ## Concurrency
 
@@ -47,7 +44,6 @@ Poser2 is a real-time, low-latency system with app-specific orchestration in `ap
 
 Latency is a first-order concern.
 - Prefer vectorized numpy operations; avoid unnecessary copies
-- Detailed array/buffer rules: @.claude/rules/pose-data.md
 
 ## Types
 
