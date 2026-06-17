@@ -1,12 +1,13 @@
 """Shared master clock injected into every Composition each tick."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import time
 from typing import Protocol
 
 from modules.settings import Field
 
 from .motor import MotorMode
+from .playhead_hit import PlayheadHit
 
 
 @dataclass
@@ -18,7 +19,8 @@ class Transport:
     phase:      float                          # beat phase: 0.0 = beat start, approaching 1.0 = next beat
     beat:       int                            # monotonic beat counter (increments each time phase wraps)
     playhead:   float     = 0.0               # rotating light position (0.0–1.0)
-    motor_mode: MotorMode = MotorMode.STOPPED    # speed regime
+    motor_mode: MotorMode = MotorMode.STOPPED  # speed regime
+    hits: tuple[PlayheadHit, ...] = field(default_factory=tuple)  # players crossed this tick
 
 
 class _TransportHost(Protocol):

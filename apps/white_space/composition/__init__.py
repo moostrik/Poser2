@@ -4,4 +4,4 @@ from .settings import CompositorSettings
 from .base import Composition, ChannelSettings
 from .transport import Transport
 from .motor import Motor, MotorMode, MotorSettings
-from .base import Composition
+from .playhead_hit import PlayheadHit

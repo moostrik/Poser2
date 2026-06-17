@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 from threading import Event, Thread, Lock
-from time import time, sleep
+from time import time, sleep, monotonic
 from typing import Any, Callable
 
 import numpy as np
@@ -18,9 +18,10 @@ from .transport import Clock, Transport
 from .base import Composition
 from ..board import Board
 from .output import CompositionOutput, BUFFER_DTYPE, CompositionOutputCallback
-from .motor import Motor
+from .motor import Motor, MotorMode
 from .settings import CompositorSettings, CompositionId
 from .comps import PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, Calibration, PlayheadFlash
+from .playhead_hit import PlayheadHit, detect_hits
 from .draw import blend_values
 
 import logging
@@ -81,6 +82,9 @@ class Compositor(Thread):
         self._update_callbacks: list[Callable[[], Any]] = []
         self._render_callbacks: list[CompositionOutputCallback] = []
 
+        self._prev_playhead:  float = 0.0
+        self._last_tick_mono: float = float('-inf')
+
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
     # ------------------------------------------------------------------
@@ -132,7 +136,16 @@ class Compositor(Thread):
 
         transport = self._transport.tick()
         playhead, motor_mode = self._motor.tick()
-        transport = replace(transport, playhead=playhead, motor_mode=motor_mode)
+
+        now_mono = monotonic()
+        gap_ok = (now_mono - self._last_tick_mono) < 0.5
+        hits: tuple[PlayheadHit, ...] = ()
+        if gap_ok and motor_mode == MotorMode.LOW_SPEED:
+            hits = detect_hits(frames, tracklets, self._prev_playhead, playhead)
+        self._prev_playhead  = playhead
+        self._last_tick_mono = now_mono
+
+        transport = replace(transport, playhead=playhead, motor_mode=motor_mode, hits=hits)
 
         # Forward latest pose data to compositions that need it
         for comp_id, comp in self._compositions:
@@ -176,8 +189,8 @@ class Compositor(Thread):
         output.blue  = blue
         output.target_rpm = active_rpm
         output.playhead = playhead
+        output.hits = hits
         self.board.set_composition_output(output)
-        self.board.set_transport(transport)
         self._notify_render(output)
         self.fps_counter.tick()
 

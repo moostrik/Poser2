@@ -29,4 +29,12 @@ class WhiteSpaceSoundOsc(OscSound):
         with self._client_lock:
             self._client.send(msg.build())  # type: ignore[arg-type]
 
+        hits = composition.hits if composition is not None else ()
+        for hit in hits:
+            hit_msg = OscMessageBuilder(address="/playhead/hit")
+            hit_msg.add_arg(hit.track_id, OscMessageBuilder.ARG_TYPE_INT)
+            hit_msg.add_arg(float(hit.position), OscMessageBuilder.ARG_TYPE_FLOAT)
+            with self._client_lock:
+                self._client.send(hit_msg.build())  # type: ignore[arg-type]
+
         super()._send_data()

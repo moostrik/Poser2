@@ -2,6 +2,8 @@ import numpy as np
 from typing import Callable
 from dataclasses import dataclass, field
 
+from .playhead_hit import PlayheadHit
+
 BUFFER_DTYPE = np.float32
 
 
@@ -11,6 +13,7 @@ class CompositionOutput:
     resolution:  int
     target_rpm: float = 0.0
     playhead: float = 0.0
+    hits: tuple[PlayheadHit, ...] = field(default_factory=tuple)
     light_img: np.ndarray = field(init=False)
 
     def __post_init__(self) -> None:
