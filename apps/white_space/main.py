@@ -1,7 +1,5 @@
 """White Space — 3-camera panoramic installation with circular LED light output."""
 
-# TODO - should the compositor not use a board or even the renderboard?
-
 from typing import Optional
 from functools import partial
 
@@ -17,10 +15,10 @@ from modules.session import Session, Sequencer
 from modules.gl import WindowSettings
 
 from .composition import Compositor
+from .board import Board
 from .osc_light import OscLight
 from .udp_receiver import UdpReceiver
 
-from .render.board import RenderBoard
 from .settings import Settings, Stage
 from .render import WhiteSpaceRender
 
@@ -53,7 +51,7 @@ class WhiteSpaceMain:
         ps = self.settings.pose
 
         # BLACKBOARD
-        self.board = RenderBoard()
+        self.board = Board()
 
         # SESSION
         self.session = Session(self.settings.session.core)
@@ -121,10 +119,7 @@ class WhiteSpaceMain:
             ])
 
         # WS PIPELINE — composition output
-        self.compositor = Compositor(
-            self.settings.composition,
-            distortion=self.settings.camera.tracker.distortion,
-        )
+        self.compositor = Compositor(self.settings.composition, distortion=self.settings.camera.tracker.distortion, board=self.board)
         self.osc_light    = OscLight(self.settings.inout.osc_light)
         self.osc_receiver = OscReceiver(self.settings.inout.osc_receiver)
         self.udp_receiver = UdpReceiver(self.settings.inout.udp_receiver)
@@ -135,9 +130,8 @@ class WhiteSpaceMain:
         self.stages[ws_input].add_callback(self.compositor.add_poses)
         for camera in self.cameras:
             camera.add_frame_callback(self.compositor.set_image)
-        self.compositor.add_output_callback(self.osc_light.send_message)
-        self.compositor.add_output_callback(self.sound_osc.set_composition)
-        self.compositor.add_output_callback(self.board.set_composition_output)
+        self.compositor.add_render_callback(self.osc_light.send_message)
+        self.compositor.add_render_callback(self.sound_osc.set_composition)
 
         # POSE STAGE RAW
         self.pose_predictor.add_frames_callback(self.stages[Stage.RAW])
@@ -243,8 +237,8 @@ class WhiteSpaceMain:
         # RENDER
         self.render = WhiteSpaceRender(self.board, self.settings.render)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
-        self.render.add_update_callback(self.sequencer.update)
-        self.render.add_update_callback(self.interpolators_lerp.update)
+        self.compositor.add_update_callback(self.sequencer.update)
+        self.compositor.add_update_callback(self.interpolators_lerp.update)
         self.render.add_exit_callback(self.stop)
 
     def start(self) -> None:

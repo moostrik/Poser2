@@ -13,17 +13,17 @@ from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-from .board import RenderBoard
+from ..board import Board
 from ..settings import Layers, RenderSettings
 
 
 class WhiteSpaceRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings) -> None:
+    def __init__(self, board: Board, settings: RenderSettings) -> None:
         super().__init__(settings.window)
         self.num_players: int = settings.num_players
         self.num_cams: int = settings.num_cams
         self.settings: RenderSettings = settings
-        self.board: RenderBoard = board
+        self.board: Board = board
 
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
 

@@ -3,7 +3,7 @@
 from dataclasses import replace
 from threading import Event, Thread, Lock
 from time import time, sleep
-from typing import Callable
+from typing import Any, Callable
 
 import numpy as np
 
@@ -16,6 +16,7 @@ from modules.oak import FrameType
 
 from .transport import TransportClock, Transport
 from .base import Composition
+from ..board import Board
 from .output import CompositionOutput, COMP_DTYPE, CompositionOutputCallback
 from .rotation_tracker import RotationTracker
 from .settings import CompositorSettings, CompositionId
@@ -34,7 +35,7 @@ class Compositor(Thread):
     Output: CompositionOutput via registered callbacks
     """
 
-    def __init__(self, config: CompositorSettings, distortion: DistortionSettings) -> None:
+    def __init__(self, config: CompositorSettings, distortion: DistortionSettings, board: Board) -> None:
         super().__init__(daemon=True, name="Compositor")
 
         self._stop_event    = Event()
@@ -75,7 +76,9 @@ class Compositor(Thread):
         ]
 
         self.fps_counter = FpsCounter()
-        self._output_callbacks: list[CompositionOutputCallback] = []
+        self.board = board
+        self._update_callbacks: list[Callable[[], Any]] = []
+        self._render_callbacks: list[CompositionOutputCallback] = []
 
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
@@ -116,6 +119,12 @@ class Compositor(Thread):
     # ------------------------------------------------------------------
 
     def _tick(self) -> None:
+        for cb in self._update_callbacks:
+            try:
+                cb()
+            except Exception:
+                logger.exception("Error in Compositor update callback")
+
         frames = self._snapshot_frames()
         with self._tracklet_lock:
             tracklets = dict(self._latest_tracklets)
@@ -160,13 +169,15 @@ class Compositor(Thread):
             if comp_id in active and comp.target_rpm is not None:
                 active_rpm = comp.target_rpm
 
-        # Build output and dispatch
+        # Build output, update board, dispatch to render callbacks
         output = CompositionOutput(self._config.light_resolution)
         output.light_0 = white
         output.light_1 = blue
         output.target_rpm = active_rpm
         output.playhead = playhead
-        self._notify_output(output)
+        self.board.set_composition_output(output)
+        self.board.set_transport(transport)
+        self._notify_render(output)
         self.fps_counter.tick()
 
     def _master_process(self, arr: np.ndarray) -> np.ndarray:
@@ -210,18 +221,27 @@ class Compositor(Thread):
         return frames
 
     # ------------------------------------------------------------------
-    # Output callbacks
+    # Callbacks
     # ------------------------------------------------------------------
 
-    def add_output_callback(self, callback: CompositionOutputCallback) -> None:
-        self._output_callbacks.append(callback)
+    def add_update_callback(self, callback: Callable[[], Any]) -> None:
+        """Register a callback fired at the start of each compositor tick, before composition.
+        Use for time-driven state advances (sequencer, interpolators).
+        """
+        self._update_callbacks.append(callback)
 
-    def _notify_output(self, output: CompositionOutput) -> None:
-        for cb in self._output_callbacks:
+    def add_render_callback(self, callback: CompositionOutputCallback) -> None:
+        """Register a callback fired after each compositor tick with the new CompositionOutput.
+        Use for output consumers (hardware sender, audio).
+        """
+        self._render_callbacks.append(callback)
+
+    def _notify_render(self, output: CompositionOutput) -> None:
+        for cb in self._render_callbacks:
             try:
                 cb(output)
             except Exception:
-                logger.exception("Error in Compositor output callback")
+                logger.exception("Error in Compositor render callback")
 
     # ------------------------------------------------------------------
     # Diagnostics
