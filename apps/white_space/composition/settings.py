@@ -3,7 +3,7 @@ from modules.settings import BaseSettings, Field, Group
 from modules.settings.widget import Widget
 
 from .draw import BlendType
-from .rotation_tracker import RotationTrackerSettings
+from .motor import MotorSettings
 from .comps import (
     PoseWavesSettings, FillSettings, PulseSettings,
     ChaseSettings, LinesSettings, RandomSettings, HarmonicSettings,
@@ -22,6 +22,15 @@ class CompositionId(IntEnum):
     player_lines   = auto()
     calibration    = auto()
     playhead_flash = auto()
+
+
+class ChannelSettings(BaseSettings):
+    """Shared per-channel knobs for waveform-style compositions (white or blue)."""
+    level:  Field[float] = Field(0.5,  min=0.0,   max=1.0,  step=0.01, description="Brightness level")
+    speed:  Field[float] = Field(0.5,  min=-10.0, max=10.0, step=0.01, description="Animation speed")
+    phase:  Field[float] = Field(0.0,  min=0.0,   max=1.0,  step=0.01, description="Phase offset (0–1)")
+    width:  Field[float] = Field(0.5,  min=0.0,   max=1.0,  step=0.01, description="Pattern width")
+    amount: Field[int]   = Field(36,   min=1,     max=200,  step=1,    description="Pattern count")
 
 
 class CompositorSettings(BaseSettings):
@@ -48,7 +57,7 @@ class CompositorSettings(BaseSettings):
 
     fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV (shared from root)", newline=True)
 
-    rotation:     Group[RotationTrackerSettings] = Group(RotationTrackerSettings)
+    motor:        Group[MotorSettings]        = Group(MotorSettings)
     pose_waves:   Group[PoseWavesSettings]   = Group(PoseWavesSettings)
     fill:         Group[FillSettings]         = Group(FillSettings)
     pulse:        Group[PulseSettings]        = Group(PulseSettings)

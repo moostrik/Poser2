@@ -173,11 +173,11 @@ class OscLight:
             message_list.append(rpm_msgb.build())
 
             if settings.use_signed:
-                white_channel: np.ndarray = OscLight.float_to_int8(output.light_0)
-                blue_channel:  np.ndarray = OscLight.float_to_int8(output.light_1)
+                white_channel: np.ndarray = OscLight.float_to_int8(output.white)
+                blue_channel:  np.ndarray = OscLight.float_to_int8(output.blue)
             else:
-                white_channel = OscLight.float_to_uint8(output.light_0)
-                blue_channel  = OscLight.float_to_uint8(output.light_1)
+                white_channel = OscLight.float_to_uint8(output.white)
+                blue_channel  = OscLight.float_to_uint8(output.blue)
 
             if settings.phase != 0.0:
                 shift = int(settings.phase * len(white_channel))

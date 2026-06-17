@@ -1,23 +1,14 @@
-"""Composition base class and shared settings primitives."""
+"""Composition base class."""
 
 from abc import ABC, abstractmethod
 
 import numpy as np
 
-from modules.settings import BaseSettings, Field
+from modules.settings import BaseSettings
 from modules.tracker import Tracklet
 from modules.pose.frame import Frame
 
 from .transport import Transport
-
-
-class ChannelSettings(BaseSettings):
-    """Shared per-channel knobs for waveform-style compositions (white or blue)."""
-    level:  Field[float] = Field(0.5,  min=0.0,   max=1.0,  step=0.01, description="Brightness level")
-    speed:  Field[float] = Field(0.5,  min=-10.0, max=10.0, step=0.01, description="Animation speed")
-    phase:  Field[float] = Field(0.0,  min=0.0,   max=1.0,  step=0.01, description="Phase offset (0–1)")
-    width:  Field[float] = Field(0.5,  min=0.0,   max=1.0,  step=0.01, description="Pattern width")
-    amount: Field[int]   = Field(36,   min=1,     max=200,  step=1,    description="Pattern count")
 
 
 class Composition(ABC):

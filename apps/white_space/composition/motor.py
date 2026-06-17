@@ -1,4 +1,4 @@
-"""RotationTracker — derives the rotating light's playhead from fall signals.
+"""Motor — derives the rotating light's playhead from fall signals.
 
 Real mode (simulate=False):
     Each "fall" signal marks one full revolution completing.  The period is
@@ -14,26 +14,32 @@ Simulate mode (simulate=True):
     stall detection) apply identically.
 """
 
+from enum import IntEnum, auto
 from threading import Thread, Event, Lock
 from time import monotonic
 
 from modules.settings import BaseSettings, Field, Widget
-from .transport import MotorMode
 
 
-class RotationTrackerSettings(BaseSettings):
+class MotorMode(IntEnum):
+    STOPPED    = auto()  # motor not spinning; no fall signals
+    LOW_SPEED  = auto()  # playhead tracking is meaningful
+    HIGH_SPEED = auto()  # spinning too fast; playhead irrelevant, content switches
+
+
+class MotorSettings(BaseSettings):
     simulate:             Field[bool]  = Field(False,                                description="Advance playhead using internal simulation thread")
     simulate_rpm:         Field[float] = Field(0.0,   min=0.0, max=120.0,  step=0.1,  description="Motor speed used in simulate mode (RPM)")
     latency_ms:           Field[float] = Field(10.0,  min=0.0, max=100.0,  step=0.5,  description="Signal latency compensation (ms) — pre-advances phase on each fall", newline=True)
     phase_offset:         Field[float] = Field(0.0,   min=0.0, max=1.0,    step=0.001, description="Playhead zero-point offset (0–1)")
     low_speed_threshold:  Field[float] = Field(1.0,   min=1,   max=100.0,  step=0.1,  description="RPM below which motor is declared STOPPED (stall detection)", newline=True)
     high_speed_threshold: Field[float] = Field(240.0, min=120, max=360.0,  step=1.0,  description="RPM above which motor mode switches to HIGH_SPEED")
-    measured_rpm:         Field[float]     = Field(0.0,               min=0.0, max=2400.0, step=0.1,   access=Field.READ, description="Current measured RPM", newline=True)
-    motor_mode:           Field[MotorMode] = Field(MotorMode.STOPPED,                                  access=Field.READ, description="Current motor speed regime")
-    playhead:             Field[float]     = Field(0.0,               min=0.0, max=1.0,    step=0.001, access=Field.READ, widget=Widget.slider, description="Current light playhead (0–1)")
+    measured_rpm:         Field[float]    = Field(0.0,              min=0.0, max=2400.0, step=0.1,   access=Field.READ, description="Current measured RPM", newline=True)
+    motor_mode:           Field[MotorMode] = Field(MotorMode.STOPPED,                               access=Field.READ, description="Current motor speed regime")
+    playhead:             Field[float]    = Field(0.0,              min=0.0, max=1.0,    step=0.001, access=Field.READ, widget=Widget.slider, description="Current light playhead (0–1)")
 
 
-class RotationTracker:
+class Motor:
     """Tracks the rotating light's angular position (playhead 0.0–1.0).
 
     Call start() / stop() to manage the internal simulation thread.
@@ -41,14 +47,14 @@ class RotationTracker:
     Call tick() once per compositor tick to advance and read playhead.
     """
 
-    def __init__(self, settings: RotationTrackerSettings) -> None:
+    def __init__(self, settings: MotorSettings) -> None:
         self._settings         = settings
         self._measured_period: float | None = None
         self._last_fall_time:  float | None = None
         self._fall_lock        = Lock()
         self._wakeup           = Event()
         self._running          = False
-        self._sim_thread       = Thread(target=self._sim_loop, daemon=True, name="RotationSimulator")
+        self._sim_thread       = Thread(target=self._sim_loop, daemon=True, name="MotorSimulator")
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -56,14 +62,14 @@ class RotationTracker:
 
     def start(self) -> None:
         self._running = True
-        self._settings.bind(RotationTrackerSettings.simulate,     self._on_sim_setting_changed)
-        self._settings.bind(RotationTrackerSettings.simulate_rpm, self._on_sim_setting_changed)
+        self._settings.bind(MotorSettings.simulate,     self._on_sim_setting_changed)
+        self._settings.bind(MotorSettings.simulate_rpm, self._on_sim_setting_changed)
         self._sim_thread.start()
 
     def stop(self) -> None:
         self._running = False
-        self._settings.unbind(RotationTrackerSettings.simulate,     self._on_sim_setting_changed)
-        self._settings.unbind(RotationTrackerSettings.simulate_rpm, self._on_sim_setting_changed)
+        self._settings.unbind(MotorSettings.simulate,     self._on_sim_setting_changed)
+        self._settings.unbind(MotorSettings.simulate_rpm, self._on_sim_setting_changed)
         self._wakeup.set()
         self._sim_thread.join()
 

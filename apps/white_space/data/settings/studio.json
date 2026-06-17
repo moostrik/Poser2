@@ -364,14 +364,6 @@
     "hardness": 0.0,
     "threshold": 0.5,
     "target_rpm": 3.0,
-    "rotation": {
-      "simulate": false,
-      "simulate_rpm": 120.0,
-      "latency_ms": 5.0,
-      "phase_offset": 0.271,
-      "low_speed_threshold": 3.0,
-      "high_speed_threshold": 200.0
-    },
     "pose_waves": {
       "fov_degrees": 110.0,
       "void_width": 0.05,
@@ -529,6 +521,14 @@
       "flash_white": 1.0,
       "flash_blue": 0.0,
       "fadeout_time": 0.08
+    },
+    "motor": {
+      "simulate": false,
+      "simulate_rpm": 120.0,
+      "latency_ms": 5.0,
+      "phase_offset": 0.271,
+      "low_speed_threshold": 3.0,
+      "high_speed_threshold": 200.0
     }
   },
   "render": {

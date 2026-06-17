@@ -1,17 +1,12 @@
 """Shared master clock injected into every Composition each tick."""
 
 from dataclasses import dataclass
-from enum import IntEnum, auto
 from time import time
 from typing import Protocol
 
 from modules.settings import Field
 
-
-class MotorMode(IntEnum):
-    STOPPED    = auto()  # motor not spinning; no fall signals
-    LOW_SPEED  = auto()  # playhead tracking is meaningful
-    HIGH_SPEED = auto()  # spinning too fast; playhead irrelevant, content switches
+from .motor import MotorMode
 
 
 @dataclass
@@ -27,13 +22,13 @@ class Transport:
 
 
 class _TransportHost(Protocol):
-    """Minimal interface TransportClock needs from its settings object."""
+    """Minimal interface Clock needs from its settings object."""
     bpm:   Field[float]
     time:  Field[float]
     phase: Field[float]
 
 
-class TransportClock:
+class Clock:
     """Advances the master transport state once per compositor tick."""
 
     def __init__(self, settings: _TransportHost) -> None:

@@ -14,11 +14,11 @@ from modules.tracker.panoramic.settings import DistortionSettings
 from modules.pose.frame import Frame, FrameDict
 from modules.oak import FrameType
 
-from .transport import TransportClock, Transport
+from .transport import Clock, Transport
 from .base import Composition
 from ..board import Board
-from .output import CompositionOutput, COMP_DTYPE, CompositionOutputCallback
-from .rotation_tracker import RotationTracker
+from .output import CompositionOutput, BUFFER_DTYPE, CompositionOutputCallback
+from .motor import Motor
 from .settings import CompositorSettings, CompositionId
 from .comps import PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, Calibration, PlayheadFlash
 from .draw import blend_values
@@ -46,18 +46,19 @@ class Compositor(Thread):
         self._latest_frames:    dict[int, Frame]    = {}
 
         self._config          = config
-        self._rotation_tracker = RotationTracker(config.rotation)
+        self._motor           = Motor(config.motor)
         self.interval: float  = 1.0 / config.light_rate
         resolution: int      = config.light_resolution
         num_players: int     = config.max_poses
 
-        # Host-owned mix buffers â€” zeroed before each composition round
-        self._white: np.ndarray = np.zeros(resolution, dtype=COMP_DTYPE)
-        self._blue:  np.ndarray = np.zeros(resolution, dtype=COMP_DTYPE)        # Per-comp temp buffers — reused each render call
-        self._temp_white: np.ndarray = np.zeros(resolution, dtype=COMP_DTYPE)
-        self._temp_blue:  np.ndarray = np.zeros(resolution, dtype=COMP_DTYPE)
+        # Host-owned mix buffers — zeroed before each composition round
+        self._white: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
+        self._blue:  np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
+        # Per-comp temp buffers — reused each render call
+        self._temp_white: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
+        self._temp_blue:  np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
         # Master transport clock — reads bpm, writes time/phase back as READ fields
-        self._transport = TransportClock(config)
+        self._transport = Clock(config)
 
         # Fixed composition registry — ordered list of (id, instance) pairs
         self._pose_waves  = PoseWaves   (resolution, num_players, config.pose_waves, self.interval)
@@ -87,18 +88,18 @@ class Compositor(Thread):
     # ------------------------------------------------------------------
 
     def start(self) -> None:
-        self._rotation_tracker.start()
+        self._motor.start()
         super().start()
 
     def stop(self) -> None:
-        self._rotation_tracker.stop()
+        self._motor.stop()
         self._stop_event.set()
         if self.is_alive():
             self.join()
 
     def notify_fall(self) -> None:
-        """Signal a revolution fall edge; forwarded to the rotation tracker."""
-        self._rotation_tracker.notify_fall()
+        """Signal a revolution fall edge; forwarded to the motor."""
+        self._motor.notify_fall()
 
     def run(self) -> None:
         next_time: float = time()
@@ -125,12 +126,12 @@ class Compositor(Thread):
             except Exception:
                 logger.exception("Error in Compositor update callback")
 
-        frames = self._snapshot_frames()
+        frames = self._consume_frames()
         with self._tracklet_lock:
             tracklets = dict(self._latest_tracklets)
 
         transport = self._transport.tick()
-        playhead, motor_mode = self._rotation_tracker.tick()
+        playhead, motor_mode = self._motor.tick()
         transport = replace(transport, playhead=playhead, motor_mode=motor_mode)
 
         # Forward latest pose data to compositions that need it
@@ -171,8 +172,8 @@ class Compositor(Thread):
 
         # Build output, update board, dispatch to render callbacks
         output = CompositionOutput(self._config.light_resolution)
-        output.light_0 = white
-        output.light_1 = blue
+        output.white = white
+        output.blue  = blue
         output.target_rpm = active_rpm
         output.playhead = playhead
         self.board.set_composition_output(output)
@@ -213,7 +214,7 @@ class Compositor(Thread):
         with self._tracklet_lock:
             self._latest_tracklets = dict(tracklets)
 
-    def _snapshot_frames(self) -> list[Frame]:
+    def _consume_frames(self) -> list[Frame]:
         """Consume the latest frames for this tick and clear the buffer."""
         with self._frames_lock:
             frames = list(self._latest_frames.values())
