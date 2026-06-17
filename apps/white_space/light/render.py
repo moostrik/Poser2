@@ -1,8 +1,8 @@
-"""LightRenderer — threaded LED light renderer running at a fixed rate.
+"""Render — threaded LED light renderer running at a fixed rate.
 
-Reads all data inputs from the board (pose frames, tracklets, camera VIDEO frames),
-renders the active layers into a per-tick Frame, and forwards the result to the board
-and to registered output callbacks (UDP sender, audio, render).
+Drives the per-tick loop: advances the clock and motor, renders the active layers (each pulls the
+board slices it needs and blends itself into the per-tick Frame), applies master post-processing,
+and forwards the Frame to the board and to registered output callbacks (UDP sender, audio, render).
 """
 
 from threading import Event, Thread
@@ -28,11 +28,10 @@ logger = logging.getLogger(__name__)
 
 
 class Render(Thread):
-    """Runs the LED render loop at a fixed rate (light_rate Hz) and forwards the
-    result to registered output callbacks (UDP sender, render board, audio).
-
-    Input:  pose frames + tracklets + camera VIDEO frames, all read from the board.
-    Output: Frame via the board and registered render callbacks.
+    """Runs the LED render loop at a fixed rate (light_rate Hz). Each tick it advances the clock
+    and motor, renders the active layers — which pull the board slices they need — and publishes
+    the resulting Frame to the board and to the registered output callbacks (UDP sender, audio,
+    render board).
     """
 
     def __init__(self, config: LightSettings, distortion: DistortionSettings, board: Board, pose_stage: int) -> None:
@@ -46,17 +45,15 @@ class Render(Thread):
         self._motor_controller      = MotorController(config.motor)
         self._clock                 = Clock(config)
         self._sampler               = Sampler(board, pose_stage)
-        self.interval: float        = 1.0 / config.light_rate
+        self._interval: float       = 1.0 / config.light_rate
 
         resolution: int             = config.light_resolution
         num_players: int            = config.max_poses
 
-        # Fixed layer registry — ordered list of (id, instance) pairs.
+        # Fixed layer registry — ordered list of (id, instance) pairs (order = blend order).
         # Every layer receives the board and pulls the slices it needs in _draw.
-        self._pose_waves  = PoseWaves   (resolution, num_players, config.pose_waves, self.interval, board, pose_stage)
-        self._calibration = Calibration (resolution, config.calibration, distortion, config.num_cameras, board)
         self._layers: list[tuple[LayerId, BaseLayer]] = [
-            (LayerId.pose_waves,     self._pose_waves),
+            (LayerId.pose_waves,     PoseWaves   (resolution, num_players, config.pose_waves, self._interval, board, pose_stage)),
             (LayerId.fill,           Fill        (resolution, config.fill,         board)),
             (LayerId.pulse,          Pulse       (resolution, config.pulse,        board)),
             (LayerId.chase,          Chase       (resolution, config.chase,        board)),
@@ -65,7 +62,7 @@ class Render(Thread):
             (LayerId.harmonic,       Harmonic    (resolution, config.harmonic,     board)),
             (LayerId.player_lines,   PlayerLines (resolution, config.player_lines, board, pose_stage)),
             (LayerId.playhead_flash, PlayheadFlash(resolution, config.playhead_flash, board)),
-            (LayerId.calibration,    self._calibration),
+            (LayerId.calibration,    Calibration (resolution, config.calibration, distortion, config.num_cameras, board)),
         ]
 
         self.fps_counter = FpsCounter()
@@ -100,8 +97,8 @@ class Render(Thread):
             try:
                 self._update()
             except Exception:
-                logger.exception("Error in LightRenderer tick")
-            next_time += self.interval
+                logger.exception("Error in light render update")
+            next_time += self._interval
             sleep_time: float = next_time - time()
             if sleep_time > 0:
                 sleep(sleep_time)
@@ -118,7 +115,7 @@ class Render(Thread):
             try:
                 cb()
             except Exception:
-                logger.exception("Error in LightRenderer update callback")
+                logger.exception("Error in light render update callback")
 
         tick = self._clock.tick()
 
@@ -138,6 +135,7 @@ class Render(Thread):
                 active_rpm = layer.target_rpm
 
         motor = self._motor_controller.tick(active_rpm)
+
         hits  = self._sampler.detect(motor.playhead, motor.mode)
 
         frame = Frame(self._config.light_resolution, tick, motor, hits=hits)
@@ -195,7 +193,7 @@ class Render(Thread):
             try:
                 cb(frame)
             except Exception:
-                logger.exception("Error in LightRenderer render callback")
+                logger.exception("Error in light render output callback")
 
     # ------------------------------------------------------------------
     # Diagnostics
