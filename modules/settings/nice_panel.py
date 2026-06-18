@@ -231,10 +231,18 @@ def widget_builder(widget: Widget):
     return decorator
 
 
-def _commit_on_enter_blur(element, commit):
-    """Commit a typed input's value on Enter or when focus leaves the field."""
-    element.on("keydown.enter", lambda _e: commit(element.value))
-    element.on("blur", lambda _e: commit(element.value))
+def _commit_typed(element, commit, *, on_enter=True):
+    """Commit a typed input's value on commit-style events rather than per keystroke.
+
+    Uses the native ``change`` DOM event, which bubbles (so it reaches NiceGUI even for the
+    custom ``ui.input`` component) and fires on defocus-with-change *and* on each spinner-arrow
+    click of a ``<input type=number>``. ``keydown.enter`` covers explicit Enter and ``blur`` is a
+    harmless backup for the plain ``q-input`` path. All are idempotent — ``Field._apply`` no-ops
+    when the value is unchanged."""
+    if on_enter:
+        element.on("keydown.enter", lambda _e: commit(element.value))
+    element.on("change", lambda _e: commit(element.value), [])
+    element.on("blur", lambda _e: commit(element.value), [])
 
 
 def _commit_on_release(element, commit):
@@ -360,7 +368,7 @@ def _build_slider(settings, name, field, polls):
             sl.set_value(clamped)
             val_input.set_value(clamped)
             _updating["lock"] = False
-        _commit_on_enter_blur(val_input, commit_input)
+        _commit_typed(val_input, commit_input)
 
     if _field_needs_poll(settings, name, field):
         def _poll_slider(v, _sl=sl, _vi=val_input):
@@ -387,7 +395,7 @@ def _build_number(settings, name, field, polls):
         def commit_num(val):
             if val is not None:
                 setattr(settings, name, field.type_(val))
-        _commit_on_enter_blur(num, commit_num)
+        _commit_typed(num, commit_num)
 
     if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, num=num: num.set_value(v)))
@@ -514,7 +522,7 @@ def _build_input(settings, name, field, polls):
     if not is_disabled:
         def commit_input(val):
             setattr(settings, name, val)
-        _commit_on_enter_blur(inp, commit_input)
+        _commit_typed(inp, commit_input)
 
     if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
@@ -542,7 +550,7 @@ def _build_ip(settings, name, field, polls):
         def commit_ip(val):
             if is_valid_ip(val):
                 setattr(settings, name, val)
-        _commit_on_enter_blur(inp, commit_ip)
+        _commit_typed(inp, commit_ip)
 
     if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
@@ -580,7 +588,7 @@ def _build_number_input(settings, name, field, polls):
         def commit_field(val):
             if is_valid(val):
                 setattr(settings, name, ft(val))
-        _commit_on_enter_blur(inp, commit_field)
+        _commit_typed(inp, commit_field)
 
     if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(str(v))))
@@ -598,8 +606,8 @@ def _build_textarea(settings, name, field, polls):
     ), desc)
 
     if not is_disabled:
-        # Enter inserts a newline in a textarea, so commit on blur only.
-        ta.on("blur", lambda _e: setattr(settings, name, ta.value))
+        # Enter inserts a newline in a textarea, so commit on focus-out / change only.
+        _commit_typed(ta, lambda val: setattr(settings, name, val), on_enter=False)
 
     if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, ta=ta: ta.set_value(v)))
@@ -678,7 +686,7 @@ def _build_color_alpha(settings, name, field, polls):
             if val is not None:
                 cur = getattr(settings, name)
                 setattr(settings, name, Color(cur.r, cur.g, cur.b, float(val)))
-        _commit_on_enter_blur(alpha_num, commit_alpha)
+        _commit_typed(alpha_num, commit_alpha)
 
     def _color_alpha_setter(v, _ci=ci, _an=alpha_num):
         if isinstance(v, Color):
@@ -912,13 +920,13 @@ def _build_point2f(settings, name, field, polls):
             if val is not None:
                 cur = getattr(settings, name)
                 setattr(settings, name, Point2f(float(val), cur.y))
-        _commit_on_enter_blur(x_num, commit_x)
+        _commit_typed(x_num, commit_x)
 
         def commit_y(val):
             if val is not None:
                 cur = getattr(settings, name)
                 setattr(settings, name, Point2f(cur.x, float(val)))
-        _commit_on_enter_blur(y_num, commit_y)
+        _commit_typed(y_num, commit_y)
 
     def _point_setter(v, _x=x_num, _y=y_num):
         if isinstance(v, Point2f):
@@ -960,25 +968,25 @@ def _build_rect(settings, name, field, polls):
             if val is not None:
                 cur = getattr(settings, name)
                 setattr(settings, name, Rect(float(val), cur.y, cur.width, cur.height))
-        _commit_on_enter_blur(rx, commit_rx)
+        _commit_typed(rx, commit_rx)
 
         def commit_ry(val):
             if val is not None:
                 cur = getattr(settings, name)
                 setattr(settings, name, Rect(cur.x, float(val), cur.width, cur.height))
-        _commit_on_enter_blur(ry, commit_ry)
+        _commit_typed(ry, commit_ry)
 
         def commit_rw(val):
             if val is not None:
                 cur = getattr(settings, name)
                 setattr(settings, name, Rect(cur.x, cur.y, float(val), cur.height))
-        _commit_on_enter_blur(rw, commit_rw)
+        _commit_typed(rw, commit_rw)
 
         def commit_rh(val):
             if val is not None:
                 cur = getattr(settings, name)
                 setattr(settings, name, Rect(cur.x, cur.y, cur.width, float(val)))
-        _commit_on_enter_blur(rh, commit_rh)
+        _commit_typed(rh, commit_rh)
 
     def _rect_setter(v, _rx=rx, _ry=ry, _rw=rw, _rh=rh):
         if isinstance(v, Rect):
