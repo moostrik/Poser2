@@ -130,8 +130,6 @@ class Render(Thread):
 
         frame = Frame(self._config.light_resolution, tick, motor, hits=hits)
 
-        # Render each active layer; the layer pulls its inputs from the board and
-        # blends itself into the frame
         for layer_id, layer in self._layers:
             if layer_id not in active:
                 continue
