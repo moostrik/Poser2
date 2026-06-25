@@ -213,6 +213,10 @@
     "angle_extractor": {
       "aspect_ratio": 0.75
     },
+    "distance_extractor": {
+      "near_y": 0.9,
+      "far_y": 0.3
+    },
     "bbox": {},
     "point": {
       "confidence": {

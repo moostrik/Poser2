@@ -213,6 +213,7 @@ class WhiteSpaceMain:
         })
         self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
+                nodes.DistanceExtractor(ps.distance_extractor),
                 nodes.AngleSymExtractor(),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),

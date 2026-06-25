@@ -1,6 +1,11 @@
+import numpy as np
+from pythonosc.osc_bundle_builder import OscBundleBuilder
 from pythonosc.osc_message_builder import OscMessageBuilder
 
 from modules.inout import OscSound, OscSoundSettings
+from modules.pose.frame import Frame as PoseFrame, FrameDict
+from modules.pose.features import Azimuth, Distance
+from modules.session import SequencerState
 from .light import Frame
 
 import logging
@@ -8,7 +13,11 @@ logger = logging.getLogger(__name__)
 
 
 class WhiteSpaceSoundOsc(OscSound):
-    """OscSound extended with a rotation playhead sent as /global/playhead."""
+    """OscSound extended with a rotation playhead (/global/playhead, /playhead/hit) and
+    the panoramic-only per-pose azimuth and distance messages.
+
+    Everything flows through the base's single-bundle send path by overriding the three
+    leaf builders; there is no separate _send_data/_send_blackout."""
 
     def __init__(self, settings: OscSoundSettings) -> None:
         super().__init__(settings)
@@ -19,22 +28,43 @@ class WhiteSpaceSoundOsc(OscSound):
         with self._input_lock:
             self._composition = output
 
-    def _send_data(self) -> None:
+    def _add_global_messages(self, bundle_builder: OscBundleBuilder, seq_state: SequencerState | None) -> None:
+        super()._add_global_messages(bundle_builder, seq_state)
+
         with self._input_lock:
             composition = self._composition
 
-        playhead = composition.motor.playhead if composition is not None else 0.0
-        msg = OscMessageBuilder(address="/global/playhead")
-        msg.add_arg(float(playhead), OscMessageBuilder.ARG_TYPE_FLOAT)
-        with self._client_lock:
-            self._client.send(msg.build())  # type: ignore[arg-type]
+        # seq_state is None during idle/blackout → zero the playhead and emit no hits.
+        idle: bool = seq_state is None
+        playhead: float = 0.0 if (idle or composition is None) else float(composition.motor.playhead)
+        playhead_msg = OscMessageBuilder(address="/global/playhead")
+        playhead_msg.add_arg(playhead, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(playhead_msg.build())  # type: ignore
 
-        hits = composition.hits if composition is not None else ()
-        for hit in hits:
-            hit_msg = OscMessageBuilder(address="/playhead/hit")
-            hit_msg.add_arg(hit.track_id, OscMessageBuilder.ARG_TYPE_INT)
-            hit_msg.add_arg(float(hit.position), OscMessageBuilder.ARG_TYPE_FLOAT)
-            with self._client_lock:
-                self._client.send(hit_msg.build())  # type: ignore[arg-type]
+        if not idle and composition is not None:
+            for hit in composition.hits:
+                hit_msg = OscMessageBuilder(address="/playhead/hit")
+                hit_msg.add_arg(hit.track_id, OscMessageBuilder.ARG_TYPE_INT)
+                hit_msg.add_arg(float(hit.position), OscMessageBuilder.ARG_TYPE_FLOAT)
+                bundle_builder.add_content(hit_msg.build())  # type: ignore
 
-        super()._send_data()
+    def _add_active_frame_messages(self, bundle_builder: OscBundleBuilder, frame: PoseFrame, frames: FrameDict, num_players: int) -> None:
+        super()._add_active_frame_messages(bundle_builder, frame, frames, num_players)
+        id: int = frame.track_id
+
+        azimuth: float = frame[Azimuth].value if Azimuth in frame else np.nan
+        azimuth_msg = OscMessageBuilder(address=f"/pose/{id}/azimuth")
+        azimuth_msg.add_arg(azimuth, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(azimuth_msg.build())  # type: ignore
+
+        distance: float = frame[Distance].value if Distance in frame else np.nan
+        distance_msg = OscMessageBuilder(address=f"/pose/{id}/distance")
+        distance_msg.add_arg(distance, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(distance_msg.build())  # type: ignore
+
+    def _add_inactive_frame_messages(self, bundle_builder: OscBundleBuilder, id: int, num_players: int) -> None:
+        super()._add_inactive_frame_messages(bundle_builder, id, num_players)
+        for address in (f"/pose/{id}/azimuth", f"/pose/{id}/distance"):
+            msg = OscMessageBuilder(address=address)
+            msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+            bundle_builder.add_content(msg.build())  # type: ignore

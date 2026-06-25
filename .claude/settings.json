@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./.venv/Scripts/python.exe -m unittest modules.pose.tests.test_distance_extractor -v)",
+      "Bash(./.venv/Scripts/python.exe -c ' *)",
+      "Bash(./.venv/Scripts/python.exe -m unittest modules.settings.tests.test_reactive modules.pose.tests.test_distance_extractor)",
+      "Bash(./.venv/Scripts/python.exe -m unittest modules.settings.tests.test_reactive)",
+      "Bash(git -C /c/Developer/Poser2 stash list)",
+      "Bash(cat ~/.claude/settings.json 2>/dev/null; echo \"---LOCAL---\"; cat c:/Developer/Poser2/.claude/settings.local.json 2>/dev/null)",
+      "Read(//c/Users/moost/.claude/**)",
+      "Bash(./.venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('modules/inout/osc_sound.py'\\).read\\(\\)\\); print\\('osc_sound.py parses OK'\\)\")"
+    ]
+  }
+}
