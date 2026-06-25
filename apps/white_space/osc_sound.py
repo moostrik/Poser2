@@ -2,7 +2,7 @@ import numpy as np
 from pythonosc.osc_bundle_builder import OscBundleBuilder
 from pythonosc.osc_message_builder import OscMessageBuilder
 
-from modules.inout import OscSound, OscSoundSettings
+from modules.inout import OscSound as BaseOscSound, OscSoundSettings
 from modules.pose.frame import Frame as PoseFrame, FrameDict
 from modules.pose.features import Azimuth, Distance
 from modules.session import SequencerState
@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class WhiteSpaceSoundOsc(OscSound):
+class OscSound(BaseOscSound):
     """OscSound extended with a rotation playhead (/global/playhead, /playhead/hit) and
     the panoramic-only per-pose azimuth and distance messages.
 

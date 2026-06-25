@@ -2,7 +2,7 @@
 
 Carries the clock snapshot (`tick`), motor state (`motor`), playhead crossings (`hits`),
 and the LED pixel buffer. One object flows into every layer's `_draw` and out to every
-consumer (board, osc_light, sound_osc, render).
+consumer (board, osc_light, osc_sound, render).
 """
 
 import numpy as np

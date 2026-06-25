@@ -50,10 +50,10 @@ class HDTrioMain:
         self.session_osc.bind('/start/recording', self._on_osc_start_recording)
         self.session_osc.bind('/stop/recording',  self._on_osc_stop_recording)
         self.session_osc.bind('/group/id',        self._on_osc_group_id)
-        self.sound_osc = OscSound(self.settings.inout.osc_sound)
+        self.osc_sound = OscSound(self.settings.inout.osc_sound)
         self.sequencer = Sequencer(self.settings.session.sequencer)
         self.sequencer.add_state_callback(self.board.set_sequence)
-        self.sequencer.add_state_callback(self.sound_osc.set_sequencer_state)
+        self.sequencer.add_state_callback(self.osc_sound.set_sequencer_state)
         self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
         self.pose_recorder = PoseRecorder(self.settings.session.pose, data_path=DATA_PATH)
         self.artnet_controllers: list[ArtNetBars] = []
@@ -121,7 +121,7 @@ class HDTrioMain:
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),
                 partial(self.pose_recorder.submit_frames, stage),
-                partial(self.sound_osc.set_frames, stage),
+                partial(self.osc_sound.set_frames, stage),
                 wt.process,
             ])
 
@@ -244,7 +244,7 @@ class HDTrioMain:
         self.window_similator.start()
         self.window_correlator.start()
 
-        self.sound_osc.start()
+        self.osc_sound.start()
         self.session_osc.start()
         for artnet in self.artnet_controllers:
             artnet.start()
@@ -277,7 +277,7 @@ class HDTrioMain:
         self.video_recorder.stop()
 
         self.tracker.stop()
-        self.sound_osc.stop()
+        self.osc_sound.stop()
 
         for artnet in self.artnet_controllers:
             artnet.stop()

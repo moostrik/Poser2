@@ -9,7 +9,7 @@ from modules.utils import Broadcast
 from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType
 from modules.settings import presets, NiceServer
 from modules.inout import OscReceiver
-from .sound_osc import WhiteSpaceSoundOsc
+from .osc_sound import OscSound
 from modules.tracker import PanoramicTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
 from modules.inference import source, crop, pose, segmentation
@@ -56,10 +56,10 @@ class WhiteSpaceMain:
 
         # SESSION
         self.session = Session(self.settings.session.core)
-        self.sound_osc = WhiteSpaceSoundOsc(self.settings.inout.osc_sound)
+        self.osc_sound = OscSound(self.settings.inout.osc_sound)
         self.sequencer = Sequencer(self.settings.session.sequencer)
         self.sequencer.add_state_callback(self.board.set_sequence)
-        self.sequencer.add_state_callback(self.sound_osc.set_sequencer_state)
+        self.sequencer.add_state_callback(self.osc_sound.set_sequencer_state)
         self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
 
         # CAMERA
@@ -115,7 +115,7 @@ class WhiteSpaceMain:
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),
-                partial(self.sound_osc.set_frames, stage),
+                partial(self.osc_sound.set_frames, stage),
                 wt.process,
             ])
 
@@ -130,7 +130,7 @@ class WhiteSpaceMain:
         for camera in self.cameras:
             camera.add_frame_callback(self._store_video_frame)
         self.light_renderer.add_render_callback(self.osc_light.send_message)
-        self.light_renderer.add_render_callback(self.sound_osc.set_composition)
+        self.light_renderer.add_render_callback(self.osc_sound.set_composition)
 
         # POSE STAGE RAW
         self.pose_predictor.add_frames_callback(self.stages[Stage.RAW])
@@ -257,7 +257,7 @@ class WhiteSpaceMain:
         self.osc_receiver.start()
         self.udp_receiver.start()
 
-        self.sound_osc.start()
+        self.osc_sound.start()
 
         if self.player:
             self.player.start()
@@ -292,7 +292,7 @@ class WhiteSpaceMain:
         self.video_recorder.stop()
 
         self.tracker.stop()
-        self.sound_osc.stop()
+        self.osc_sound.stop()
         self.osc_light.stop()
         self.osc_receiver.stop()
         self.udp_receiver.stop()
