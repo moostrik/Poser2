@@ -1,9 +1,13 @@
-"""Playhead — the continuous content clock, derived from the motor.
+"""Playhead — the LOW-speed content clock, derived from the motor.
 
-A numerically-controlled oscillator (NCO/PLL): each tick it free-runs at the current
-rpm and softly phase-locks to the motor's measured phase when a lock exists. Its phase
-is **never reset**, so it stays continuous across mode/speed switches, stalls, and NaN
-gaps — at a transition it holds and keeps winding, only the rate changes.
+A numerically-controlled oscillator (NCO/PLL) whose behavior depends on the motor's
+active mode (it is the *content sweep*, which never runs faster than LOW):
+  - STOPPED → holds its last position (frozen).
+  - IDLE / LOW → free-runs at the motor's rpm and softly phase-locks to its measured phase.
+  - HIGH → free-runs at `low_rpm` and ignores the motor's fast phase, so the content sweep
+    continues seamlessly from LOW (the motor's HIGH speed is for the pixel system).
+Its phase is never snapped or reset, so it stays continuous across mode/speed switches,
+stalls, and NaN gaps — only the rate changes.
 
 The motor is offset-agnostic; the playhead owns its single content-alignment `offset`
 (constant → does not break continuity). Pixel compositions own their own offsets.
@@ -13,7 +17,7 @@ import math
 
 from modules.settings import BaseSettings, Field, Widget
 
-from .motor import MotorState
+from .motor import MotorState, MotorMode
 
 
 def _wrap_to_pi(x: float) -> float:
@@ -37,14 +41,20 @@ class Playhead:
         self._phase: float = 0.0   # offset-free continuous NCO state
 
     def tick(self, dt: float, motor: MotorState) -> None:
-        """Advance the NCO from the motor state: free-run at its rpm, then soft-lock to its
-        measured phase when locked. Free-runs at the measured rpm when locked, else the
-        commanded rpm (best estimate while the measurement is unavailable)."""
-        rpm = motor.measured_rpm if motor.locked else motor.target_rpm
-        self._phase += (rpm / 60.0) * math.tau * dt
-        if motor.locked and not math.isnan(motor.phase):
-            self._phase += self._settings.tracking * _wrap_to_pi(motor.phase - self._phase)
-        self._phase = _wrap_to_pi(self._phase)
+        """Advance the content clock from the motor's active mode (see module docstring):
+        STOPPED holds, IDLE/LOW follow the motor (free-run + soft-lock), HIGH free-runs at
+        `low_rpm` ignoring the fast motor phase."""
+        if motor.mode == MotorMode.STOPPED:
+            pass                                              # hold last position (frozen)
+        elif motor.mode == MotorMode.HIGH:
+            # Keep sweeping at the LOW content rate; the motor's fast phase is for the pixels.
+            self._phase = _wrap_to_pi(self._phase + (motor.low_rpm / 60.0) * math.tau * dt)
+        else:                                                 # IDLE, LOW — follow the motor
+            rpm = motor.measured_rpm if motor.locked else motor.target_rpm
+            self._phase += (rpm / 60.0) * math.tau * dt
+            if motor.locked and not math.isnan(motor.phase):
+                self._phase += self._settings.tracking * _wrap_to_pi(motor.phase - self._phase)
+            self._phase = _wrap_to_pi(self._phase)
         self._settings.phase = self.phase
 
     @property

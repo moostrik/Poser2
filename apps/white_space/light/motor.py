@@ -59,6 +59,7 @@ class MotorState:
     measured_rpm: float     = 0.0                  # measured speed
     mode:         MotorMode = MotorMode.STOPPED    # commanded mode
     target_rpm:   float     = 0.0                  # commanded speed (sent to the motor by osc_light)
+    low_rpm:      float     = 0.0                  # LOW-mode rpm — the playhead's content-sweep rate in HIGH
 
 
 class MotorSettings(BaseSettings):
@@ -244,4 +245,5 @@ class MotorController:
 
         self._settings.measured_rpm = rpm
         self._settings.active_mode  = mode
-        return MotorState(phase=phase, locked=locked, measured_rpm=rpm, mode=mode, target_rpm=target_rpm)
+        return MotorState(phase=phase, locked=locked, measured_rpm=rpm, mode=mode,
+                          target_rpm=target_rpm, low_rpm=self._settings.low_rpm)

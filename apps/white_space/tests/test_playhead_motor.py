@@ -14,12 +14,13 @@ def wrap(x: float) -> float:
     return (x + math.pi) % TAU - math.pi
 
 
-def mstate(phase: float, locked: bool, rpm: float) -> MotorState:
+def mstate(phase: float, locked: bool, rpm: float,
+           mode: MotorMode = MotorMode.LOW, low_rpm: float = 72.0) -> MotorState:
     """A MotorState for the playhead: measured rpm when locked, commanded rpm otherwise."""
     return MotorState(
         phase=phase, locked=locked,
         measured_rpm=rpm if locked else 0.0,
-        target_rpm=rpm,
+        target_rpm=rpm, mode=mode, low_rpm=low_rpm,
     )
 
 
@@ -129,17 +130,36 @@ class PlayheadNcoTest(unittest.TestCase):
         p.tick(dt, mstate(float("nan"), False, rpm))             # unlocked → uses target_rpm
         self.assertAlmostEqual(wrap(p.phase - before), rpm / 60.0 * TAU * dt, places=6)
 
-    def test_continuity_across_rpm_step(self) -> None:
+    def test_stopped_holds_position(self) -> None:
+        p = Playhead(PlayheadSettings()); p._phase = 1.0
+        before = p.phase
+        for _ in range(50):
+            p.tick(1 / 60, mstate(0.5, False, 0.0, mode=MotorMode.STOPPED))
+        self.assertEqual(p.phase, before)                        # frozen — no advance
+
+    def test_high_free_runs_at_low_rpm(self) -> None:
+        dt = 1 / 60
+        p = Playhead(PlayheadSettings())
+        before = p.phase
+        # motor measured/target at 2000 but mode HIGH → playhead sweeps at low_rpm, ignoring motor.phase
+        p.tick(dt, mstate(2.5, True, 2000.0, mode=MotorMode.HIGH, low_rpm=72.0))
+        self.assertAlmostEqual(wrap(p.phase - before), 72.0 / 60.0 * TAU * dt, places=6)
+
+    def test_low_to_high_switch_is_seamless(self) -> None:
         dt = 1 / 60
         p = Playhead(PlayheadSettings())
         mp, prev, max_step = 0.0, p.phase, 0.0
         for i in range(300):
-            rpm = 72.0 if i < 150 else 2000.0                    # instant jump (worst case)
-            mp = wrap(mp + rpm / 60.0 * TAU * dt)
-            p.tick(dt, mstate(mp, True, rpm))
+            if i < 150:                                          # LOW: motor at 72, playhead follows
+                mp = wrap(mp + 72.0 / 60.0 * TAU * dt)
+                p.tick(dt, mstate(mp, True, 72.0, mode=MotorMode.LOW))
+            else:                                                # HIGH: motor races at 2000, playhead ignores it
+                mp = wrap(mp + 2000.0 / 60.0 * TAU * dt)
+                p.tick(dt, mstate(mp, True, 2000.0, mode=MotorMode.HIGH))
             max_step = max(max_step, abs(wrap(p.phase - prev)))
             prev = p.phase
-        self.assertLess(max_step, (2000.0 / 60.0 * TAU * dt) * 1.6)
+        # never steps faster than the LOW sweep — no jump at the switch, no speed-up to 2000
+        self.assertLess(max_step, (72.0 / 60.0 * TAU * dt) * 1.6)
 
     def test_offset_applied(self) -> None:
         p = Playhead(PlayheadSettings()); p._settings.offset = 0.5; p._phase = 1.0
