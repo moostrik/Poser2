@@ -367,15 +367,18 @@
     "hardness": 0.0,
     "threshold": 0.5,
     "motor": {
-      "simulate": "OFF",
+      "simulate": "HIGH",
       "mode": "LOW",
       "idle_rpm": 7.0,
-      "low_rpm": 15.0,
+      "low_rpm": 34.0,
       "high_rpm": 2000.0
     },
     "playhead": {
-      "offset": -0.0,
-      "tracking": 0.93
+      "offset": 0.0,
+      "tracking": 0.93,
+      "high_follow": true,
+      "release_rpm": 600.0,
+      "release_smooth": 0.9
     },
     "pose_waves": {
       "fov_degrees": 110.0,

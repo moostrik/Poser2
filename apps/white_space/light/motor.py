@@ -23,13 +23,18 @@ from time import monotonic
 from modules.settings import BaseSettings, Field, Widget
 
 # Stall = no fall for this many revolutions at the last measured speed → motor stopped.
+# Floored by _STALL_MIN_S so the window doesn't shrink to near-nothing at high rpm (where a
+# tiny period × 3 would spuriously trip on scheduling jitter or a couple of missed falls).
 _STALL_MISSED_REVS: float = 3.0
+_STALL_MIN_S:       float = 0.25
 
 # Simulation loop cadence (s). The ramp + fall timing are sub-tick accurate regardless.
 _SIM_TICK: float = 1.0 / 30.0 # same as the motor
 
-# Simulated spin-up/down acceleration (RPM/s); ≈6 s to reach 2000.
+# Simulated spin-up / spin-down rates (RPM/s). The real motor brakes ~3× faster than it
+# accelerates: ≈6 s up to 2000, ≈2 s back down.
 _SIM_ACCEL: float = 333.0
+_SIM_DECEL: float = _SIM_ACCEL * 3.0
 
 
 class MotorMode(IntEnum):
@@ -65,7 +70,7 @@ class MotorState:
 class MotorSettings(BaseSettings):
     simulate:             Field[MotorSimMode] = Field(MotorSimMode.OFF,                          description="OFF = real hardware; any mode simulates the motor at that mode's rpm")
     mode:                 Field[MotorMode] = Field(MotorMode.LOW,                     description="Commanded mode — the target rpm is derived from it")
-    active_mode:          Field[MotorMode] = Field(MotorMode.LOW, access=Field.READ, description="Mode actually in effect (the sim selector overrides the command)", newline=True)
+    active_mode:          Field[MotorMode] = Field(MotorMode.STOPPED, access=Field.READ, description="Actual mode — the target mode once the motor has responded (locked); STOPPED until then")
     idle_rpm:             Field[float] = Field(7.0,    min=0.0, max=60.0,   step=0.5,  description="Target rpm in IDLE mode", newline=True)
     low_rpm:              Field[float] = Field(72.0,   min=0.0, max=300.0,  step=1.0,  description="Target rpm in LOW mode")
     high_rpm:             Field[float] = Field(2000.0, min=0.0, max=2400.0, step=1.0,  description="Target rpm in HIGH mode")
@@ -136,7 +141,7 @@ class MotorController:
         """Synthetic-fall rpm — the active (sim) mode's rpm; 0 for OFF/STOPPED."""
         if self._settings.simulate == MotorSimMode.OFF:
             return 0.0
-        return self._target_rpm(self._active_mode())
+        return self._target_rpm(self._target_mode())
 
     def _on_sim_setting_changed(self, _value) -> None:
         """Wake the sim loop on a `simulate` change; clear fall history when switching to
@@ -175,11 +180,15 @@ class MotorController:
             last = now
 
             target = self._sim_rpm()                  # mode rpm (0 = STOPPED → coast to stop)
-            current_rpm = self._ramp_toward(current_rpm, target, _SIM_ACCEL * dt)
+            rate = _SIM_ACCEL if current_rpm < target else _SIM_DECEL   # brakes faster than it spins up
+            current_rpm = self._ramp_toward(current_rpm, target, rate * dt)
 
             if current_rpm > 0.0:
                 revs += current_rpm / 60.0 * dt
-                if revs >= 1.0:
+                # Fire every completed revolution — not just one — so that when the fall rate
+                # exceeds the loop rate (high rpm), revs stays in [0,1) and the latest fall
+                # timestamp stays at `now` instead of drifting into the past (→ spurious stall).
+                while revs >= 1.0:
                     revs -= 1.0
                     self._fire_fall_at(now - revs / (current_rpm / 60.0))   # interpolated crossing
             else:
@@ -200,8 +209,10 @@ class MotorController:
             MotorMode.HIGH: self._settings.high_rpm,
         }.get(mode, 0.0)   # STOPPED → 0
 
-    def _active_mode(self) -> MotorMode:
-        """The mode in effect: the sim selector overrides the commanded mode while simulating."""
+    def _target_mode(self) -> MotorMode:
+        """The mode we are driving toward: the sim selector while simulating, else the
+        commanded `mode`. This sets `target_rpm` (sent to the motor); the *actual* mode is
+        only confirmed once the motor responds (see `tick`)."""
         sim = self._settings.simulate
         return MotorMode[sim.name] if sim != MotorSimMode.OFF else self._settings.mode
 
@@ -211,11 +222,13 @@ class MotorController:
         Offset-agnostic — returns the raw measured phase (radians [-π,π)) and a `locked`
         flag. When unlocked (stalled / no falls) phase is NaN and the playhead free-runs.
 
-        While simulating, the `simulate` selector overrides the commanded `mode` so the
-        whole system behaves as that mode (rpm, content, MotorState.mode).
+        The commanded `target_rpm` always reflects the target mode (so the motor is told to
+        spin up). The reported `mode`, however, is the **actual** mode: it stays STOPPED until
+        the motor has actually responded (locked) — we don't claim a mode we haven't heard back
+        on. While simulating, the sim selector is the target mode.
         """
-        mode         = self._active_mode()
-        target_rpm   = self._target_rpm(mode)
+        target_mode  = self._target_mode()
+        target_rpm   = self._target_rpm(target_mode)
         now          = monotonic()
 
         with self._fall_lock:
@@ -225,7 +238,8 @@ class MotorController:
             # has stopped/slowed; unlock so the playhead free-runs. Self-adapting (fast →
             # quick, idle → patient); checked under the lock so a concurrent fall isn't wiped.
             if last_fall_time is not None and measured_period is not None:
-                if now - last_fall_time > _STALL_MISSED_REVS * measured_period:
+                stall_timeout = max(_STALL_MISSED_REVS * measured_period, _STALL_MIN_S)
+                if now - last_fall_time > stall_timeout:
                     self._last_fall_time  = None
                     self._measured_period = None
                     last_fall_time        = None
@@ -243,7 +257,10 @@ class MotorController:
             phase  = float('nan')
             self._settings.phase = 0.0
 
+        # Actual mode: only the target mode once we've heard back (locked); STOPPED until then.
+        actual_mode = target_mode if locked else MotorMode.STOPPED
+
         self._settings.measured_rpm = rpm
-        self._settings.active_mode  = mode
-        return MotorState(phase=phase, locked=locked, measured_rpm=rpm, mode=mode,
+        self._settings.active_mode  = actual_mode
+        return MotorState(phase=phase, locked=locked, measured_rpm=rpm, mode=actual_mode,
                           target_rpm=target_rpm, low_rpm=self._settings.low_rpm)

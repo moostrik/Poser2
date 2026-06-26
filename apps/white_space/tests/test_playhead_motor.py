@@ -5,7 +5,7 @@ import unittest
 from time import monotonic
 
 from apps.white_space.light.motor import MotorController, MotorSettings, MotorState, MotorMode, MotorSimMode
-from apps.white_space.light.playhead import Playhead, PlayheadSettings
+from apps.white_space.light.playhead import Playhead, PlayheadSettings, _lerp_angle, _wrap_to_pi
 
 TAU = math.tau
 
@@ -57,6 +57,15 @@ class MotorTest(unittest.TestCase):
         st = MotorController(MotorSettings()).tick()
         self.assertFalse(st.locked)
         self.assertTrue(math.isnan(st.phase))
+
+    def test_actual_mode_stopped_until_heard_back(self) -> None:
+        s = MotorSettings(); s.mode = MotorMode.LOW
+        m = MotorController(s)
+        st = m.tick()                                   # no falls yet — haven't heard back
+        self.assertEqual(st.mode, MotorMode.STOPPED)    # actual mode stays STOPPED
+        self.assertEqual(st.target_rpm, 72.0)           # but the motor is still commanded to LOW
+        m._last_fall_time = monotonic() - 0.25; m._measured_period = 0.5
+        self.assertEqual(m.tick().mode, MotorMode.LOW)  # once it responds (locked) → actual = LOW
 
     def test_stall_unlocks_after_missed_revs(self) -> None:
         m = MotorController(MotorSettings())
@@ -116,7 +125,7 @@ class PlayheadNcoTest(unittest.TestCase):
     def test_locks_to_advancing_motor(self) -> None:
         dt, rpm = 1 / 30, 72.0
         gen = _advancing(rpm, dt)
-        p = Playhead(PlayheadSettings()); p._phase = 2.0          # start 2 rad off
+        p = Playhead(PlayheadSettings()); p._internal = 2.0       # start 2 rad off
         mp = 0.0
         for _ in range(200):
             mp = next(gen)
@@ -131,7 +140,7 @@ class PlayheadNcoTest(unittest.TestCase):
         self.assertAlmostEqual(wrap(p.phase - before), rpm / 60.0 * TAU * dt, places=6)
 
     def test_stopped_holds_position(self) -> None:
-        p = Playhead(PlayheadSettings()); p._phase = 1.0
+        p = Playhead(PlayheadSettings()); p._internal = p._output = 1.0
         before = p.phase
         for _ in range(50):
             p.tick(1 / 60, mstate(0.5, False, 0.0, mode=MotorMode.STOPPED))
@@ -162,7 +171,7 @@ class PlayheadNcoTest(unittest.TestCase):
         self.assertLess(max_step, (72.0 / 60.0 * TAU * dt) * 1.6)
 
     def test_offset_applied(self) -> None:
-        p = Playhead(PlayheadSettings()); p._settings.offset = 0.5; p._phase = 1.0
+        p = Playhead(PlayheadSettings()); p._settings.offset = 0.5; p._output = 1.0
         self.assertAlmostEqual(wrap(p.phase - 1.5), 0.0, places=6)
 
     def test_offset_constant_keeps_continuity(self) -> None:
@@ -174,6 +183,86 @@ class PlayheadNcoTest(unittest.TestCase):
             p.tick(dt, mstate(next(gen), True, rpm))
             self.assertLess(abs(wrap(p.phase - prev)), rpm / 60.0 * TAU * dt + 0.5)
             prev = p.phase
+
+
+class SpinupRideTest(unittest.TestCase):
+    """§11 — optional LOW→HIGH ride: output rides the accelerating motor until release_rpm,
+    then eases back to the internal low sweep."""
+
+    def _ride_playhead(self, **kw) -> Playhead:
+        s = PlayheadSettings()
+        s.high_follow, s.release_rpm, s.release_smooth = True, 1200.0, 0.5
+        for k, v in kw.items():
+            setattr(s, k, v)
+        return Playhead(s)
+
+    LOW = MotorMode.LOW
+    HIGH = MotorMode.HIGH
+
+    def test_lerp_angle_shortest_path(self) -> None:
+        self.assertAlmostEqual(_lerp_angle(0.0, 1.0, 0.0), 0.0)
+        self.assertAlmostEqual(_lerp_angle(0.0, 1.0, 1.0), 1.0)
+        self.assertAlmostEqual(_lerp_angle(0.0, 1.0, 0.5), 0.5)
+        self.assertAlmostEqual(_lerp_angle(3.0, -3.0, 0.5), _wrap_to_pi(3.0 + 0.5 * _wrap_to_pi(-6.0)), places=6)
+
+    def test_off_uses_internal_low_sweep(self) -> None:
+        dt = 1 / 60
+        p = self._ride_playhead(high_follow=False)
+        p.tick(dt, mstate(0.0, True, 72.0, mode=self.LOW))
+        before = p._internal
+        p.tick(dt, mstate(1.0, True, 2000.0, mode=self.HIGH, low_rpm=72.0))
+        self.assertEqual(p._output, p._internal)                       # no ride
+        self.assertAlmostEqual(wrap(p._internal - before), 72.0 / 60.0 * TAU * dt, places=6)
+
+    def test_rides_motor_below_release_rpm(self) -> None:
+        dt = 1 / 60
+        p = self._ride_playhead()
+        p.tick(dt, mstate(0.0, True, 72.0, mode=self.LOW))             # LOW first → arms the edge
+        p.tick(dt, mstate(2.5, True, 500.0, mode=self.HIGH, low_rpm=72.0))  # measured < release → ride
+        self.assertTrue(p._riding)
+        self.assertEqual(p._w, 1.0)
+        self.assertAlmostEqual(p.phase, wrap(2.5), places=6)           # output == motor.phase
+
+    def test_internal_stays_low_sweep_while_riding(self) -> None:
+        dt = 1 / 60
+        p = self._ride_playhead()
+        p.tick(dt, mstate(0.0, True, 72.0, mode=self.LOW))
+        before = p._internal
+        p.tick(dt, mstate(2.0, True, 500.0, mode=self.HIGH, low_rpm=72.0))
+        self.assertTrue(p._riding)
+        self.assertAlmostEqual(wrap(p._internal - before), 72.0 / 60.0 * TAU * dt, places=6)
+
+    def test_releases_and_eases_to_internal(self) -> None:
+        dt = 1 / 60
+        p = self._ride_playhead(release_smooth=0.1)
+        p.tick(dt, mstate(0.0, True, 72.0, mode=self.LOW))
+        p.tick(dt, mstate(1.0, True, 500.0, mode=self.HIGH, low_rpm=72.0))   # riding, w=1
+        for _ in range(20):                                            # measured ≥ release → ease out (0.33s > 0.1)
+            p.tick(dt, mstate(2.0, True, 1500.0, mode=self.HIGH, low_rpm=72.0))
+        self.assertFalse(p._riding)
+        self.assertEqual(p._w, 0.0)
+        self.assertEqual(p._output, p._internal)                       # settled back on the internal sweep
+
+    def test_ride_survives_transient_unlock(self) -> None:
+        dt = 1 / 60
+        p = self._ride_playhead()
+        p.tick(dt, mstate(0.0, True, 72.0, mode=self.LOW))
+        p.tick(dt, mstate(float("nan"), False, 0.0, mode=self.HIGH, low_rpm=72.0))  # entered HIGH still unlocked
+        self.assertTrue(p._riding)                                     # armed, not cancelled
+        self.assertEqual(p._output, p._internal)                       # no phase to ride yet
+        p.tick(dt, mstate(2.0, True, 500.0, mode=self.HIGH, low_rpm=72.0))          # lock appears → ride
+        self.assertTrue(p._riding)
+        self.assertEqual(p._w, 1.0)
+        self.assertAlmostEqual(p.phase, wrap(2.0), places=6)
+
+    def test_ride_cancels_when_leaving_high(self) -> None:
+        dt = 1 / 60
+        p = self._ride_playhead()
+        p.tick(dt, mstate(0.0, True, 72.0, mode=self.LOW))
+        p.tick(dt, mstate(1.0, True, 500.0, mode=self.HIGH, low_rpm=72.0))   # riding
+        p.tick(dt, mstate(0.5, True, 72.0, mode=self.LOW))             # back to LOW → cancel
+        self.assertFalse(p._riding)
+        self.assertEqual(p._output, p._internal)
 
 
 if __name__ == "__main__":
