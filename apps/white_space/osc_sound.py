@@ -7,6 +7,7 @@ from modules.pose.frame import Frame as PoseFrame, FrameDict
 from modules.pose.features import Azimuth, Distance
 from modules.session import SequencerState
 from .light import Frame
+from .pose import PlayheadPhase
 
 import logging
 logger = logging.getLogger(__name__)
@@ -62,9 +63,14 @@ class OscSound(BaseOscSound):
         distance_msg.add_arg(distance, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(distance_msg.build())  # type: ignore
 
+        playhead_phase: float = frame[PlayheadPhase].value if PlayheadPhase in frame else np.nan
+        phase_msg = OscMessageBuilder(address=f"/pose/{id}/playhead_phase")
+        phase_msg.add_arg(playhead_phase, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(phase_msg.build())  # type: ignore
+
     def _add_inactive_frame_messages(self, bundle_builder: OscBundleBuilder, id: int, num_players: int) -> None:
         super()._add_inactive_frame_messages(bundle_builder, id, num_players)
-        for address in (f"/pose/{id}/azimuth", f"/pose/{id}/distance"):
+        for address in (f"/pose/{id}/azimuth", f"/pose/{id}/distance", f"/pose/{id}/playhead_phase"):
             msg = OscMessageBuilder(address=address)
             msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
             bundle_builder.add_content(msg.build())  # type: ignore

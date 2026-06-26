@@ -16,7 +16,7 @@ from modules.tracker.panoramic.settings import DistortionSettings
 
 from .clock import Clock, Tick
 from .frame import Frame, FrameCallback
-from .motor import MotorController
+from .motor import MotorController, MotorMode
 from .sampler import Sampler
 from .settings import LightSettings, LayerId
 from .layers import BaseLayer, PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, Calibration, PlayheadFlash
@@ -102,7 +102,22 @@ class Render(Thread):
     # ------------------------------------------------------------------
 
     def _update(self, tick: Tick) -> None:
-        # Pre-render state callbacks (sequencer, interpolators)
+        # Advance the motor FIRST so this tick's playhead is published to the board
+        # before the update callbacks run the pose-LERP (whose final node reads it).
+        # Motor target: active layers override the manual config value. None means
+        # "no opinion"; 0.0 is an explicit stop command. It reads the *previous* tick's
+        # active layers — immaterial for a physically ramping motor.
+        active_rpm: float = self._config.target_rpm
+        for layer_id, layer in self._layers:
+            if layer_id in self._active_prev and layer.target_rpm is not None:
+                active_rpm = layer.target_rpm
+
+        motor = self._motor_controller.tick(active_rpm)
+        # NaN when the playhead is not meaningful, so downstream consumers skip it.
+        self._board.set_playhead(motor.playhead if motor.mode == MotorMode.LOW_SPEED else np.nan)
+
+        # Pre-render state callbacks (sequencer; interpolators drive the pose-LERP,
+        # which now reads this tick's board playhead).
         for cb in self._update_callbacks:
             try:
                 cb()
@@ -116,15 +131,6 @@ class Render(Thread):
             if layer_id not in active and layer_id in self._active_prev:
                 layer.reset()
         self._active_prev = active
-
-        # Motor target: active layers override the manual config value.
-        # None means "no opinion"; 0.0 is an explicit stop command.
-        active_rpm: float = self._config.target_rpm
-        for layer_id, layer in self._layers:
-            if layer_id in active and layer.target_rpm is not None:
-                active_rpm = layer.target_rpm
-
-        motor = self._motor_controller.tick(active_rpm)
 
         hits  = self._sampler.detect(motor.playhead, motor.mode)
 

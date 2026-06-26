@@ -17,6 +17,7 @@ from modules.session import Session, Sequencer
 from modules.gl import WindowSettings
 
 from .board import Board
+from .pose import PlayheadPhaseExtractor
 from .light import Render as LightRender
 from .osc_light import OscLight
 from .render import Render as WindowRender
@@ -221,6 +222,7 @@ class WhiteSpaceMain:
                 nodes.AngleVelEuroSmoother(ps.velocity.smoother),
                 nodes.AngleMotionExtractor(ps.motion.extractor),
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
+                PlayheadPhaseExtractor(self.board.get_playhead),
             ])
             for i in range(num_players)
         })

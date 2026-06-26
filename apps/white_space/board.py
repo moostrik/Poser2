@@ -4,6 +4,7 @@ from modules.board import (
     FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
     SegmentationImageStoreMixin, DepthTrackletStoreMixin, TrackletStoreMixin,
     VideoImageStoreMixin, CompositionOutputStoreMixin, SequenceStoreMixin,
+    PlayheadStoreMixin,
 )
 
 
@@ -11,6 +12,7 @@ class Board(
     FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
     SegmentationImageStoreMixin, DepthTrackletStoreMixin, TrackletStoreMixin,
     VideoImageStoreMixin, CompositionOutputStoreMixin, SequenceStoreMixin,
+    PlayheadStoreMixin,
 ):
     """Thread-safe blackboard for the White Space app.
 
@@ -29,3 +31,4 @@ class Board(
         VideoImageStoreMixin.__init__(self)
         CompositionOutputStoreMixin.__init__(self)
         SequenceStoreMixin.__init__(self)
+        PlayheadStoreMixin.__init__(self)
