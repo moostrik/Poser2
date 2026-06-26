@@ -45,7 +45,7 @@ class Random(BaseLayer):
         self._vals_b: np.ndarray = rng.random(_TABLE_SIZE)
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
-        beat_time = frame.tick.beat + frame.tick.phase
+        beat_time = frame.tick.beat + frame.tick.beat_phase
         W = self._config.white
         B = self._config.blue
 

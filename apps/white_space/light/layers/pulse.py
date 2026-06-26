@@ -23,7 +23,7 @@ class Pulse(BaseLayer):
         self._config = config
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
-        beat_time = frame.tick.beat + frame.tick.phase
+        beat_time = frame.tick.beat + frame.tick.beat_phase
         W = self._config.white
         B = self._config.blue
         white += (0.5 * math.sin(beat_time * math.tau * W.speed + W.phase * math.tau) + 0.5) * W.level

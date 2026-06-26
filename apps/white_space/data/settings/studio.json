@@ -359,13 +359,15 @@
     }
   },
   "light": {
-    "bpm": 20.0,
     "active": [
       "playhead_flash"
     ],
     "master": 1.0,
     "hardness": 0.0,
     "threshold": 0.5,
+    "clock": {
+      "bpm": 20.0
+    },
     "motor": {
       "simulate": "LOW",
       "mode": "LOW",

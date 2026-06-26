@@ -43,7 +43,7 @@ class Render(Thread):
         self._pose_stage: int       = pose_stage
         self._motor_controller      = MotorController(config.motor)
         self._playhead              = Playhead(config.playhead)
-        self._clock                 = Clock(config)
+        self._clock                 = Clock(config.clock, config.light_rate)
 
         resolution: int             = config.light_resolution
         num_players: int            = config.max_poses

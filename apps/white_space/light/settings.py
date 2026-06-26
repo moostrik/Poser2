@@ -3,6 +3,7 @@ from modules.settings import BaseSettings, Field, Group
 from modules.settings.widget import Widget
 
 
+from .clock import ClockSettings
 from .motor import MotorSettings
 from .playhead import PlayheadSettings
 from .layers import (
@@ -33,10 +34,7 @@ class LightSettings(BaseSettings):
     num_cameras:      Field[int]   = Field(1,    min=1,   max=16,   access=Field.INIT, visible=False, description="Number of cameras")
     light_rate:       Field[float] = Field(30.0, min=1,   max=120,  access=Field.INIT, description="Light output frame rate (fps)")
     light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, visible=False, description="LED strip resolution (pixels)")
-
-    bpm:   Field[float] = Field(120.0, min=20.0, max=480.0, step=0.5,  description="Master tempo (BPM)", newline=True)
-    time:  Field[float] = Field(0.0,  access=Field.READ,               description="Elapsed wall-clock time (s)")
-    phase: Field[float] = Field(0.0,  access=Field.READ,               description="Beat phase (0–1)")
+    fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, visible=False, description="Camera horizontal FOV — hidden relay from root to player_lines/calibration")
 
     active: Field[list[LayerId]] = Field([LayerId.pose_waves], widget=Widget.checklist,description="Active layers", newline=True)
 
@@ -44,8 +42,7 @@ class LightSettings(BaseSettings):
     hardness:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Contrast hardness (0=off, 1=hard step)")
     threshold: Field[float] = Field(0.5, min=0.0, max=1.0, step=0.01, description="Hardness pivot point")
 
-    fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV (shared from root)", newline=True)
-
+    clock:        Group[ClockSettings]        = Group(ClockSettings)
     motor:        Group[MotorSettings]        = Group(MotorSettings)
     playhead:     Group[PlayheadSettings]     = Group(PlayheadSettings)
     pose_waves:   Group[PoseWavesSettings]   = Group(PoseWavesSettings)

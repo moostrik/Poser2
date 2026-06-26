@@ -9,24 +9,28 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from time import perf_counter, sleep
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from .settings import LightSettings
+from modules.settings import BaseSettings, Field
 
 # Seconds before each deadline to stop coarse-sleeping and busy-spin instead.
 # Trades a brief spin (~this long, per frame) for sub-100 µs deadline accuracy.
 _SPIN_MARGIN: float = 0.001
 
 
+class ClockSettings(BaseSettings):
+    bpm:        Field[float] = Field(120.0, min=20.0, max=480.0, step=0.5, description="Master tempo (BPM)")
+    time:       Field[float] = Field(0.0, access=Field.READ, description="Elapsed wall-clock time (s)")
+    beat_phase: Field[float] = Field(0.0, access=Field.READ, description="Beat phase (0–1)")
+
+
 @dataclass
 class Tick:
     """Immutable clock snapshot produced once per render tick."""
-    time:  float   # monotonic elapsed seconds since the first tick
-    dt:    float   # seconds elapsed since the previous tick
-    bpm:   float   # current master tempo in beats per minute
-    phase: float   # beat phase: 0.0 = beat start, approaching 1.0 = next beat
-    beat:  int     # monotonic beat counter (increments each time phase wraps)
+    time:       float   # monotonic elapsed seconds since the first tick
+    dt:         float   # seconds elapsed since the previous tick
+    bpm:        float   # current master tempo in beats per minute
+    beat_phase: float   # beat phase: 0.0 = beat start, approaching 1.0 = next beat
+    beat:       int     # monotonic beat counter (increments each time beat_phase wraps)
 
 
 class Clock:
@@ -35,9 +39,9 @@ class Clock:
     Owns the per-frame cadence: callers loop on the blocking ``next_tick()``.
     """
 
-    def __init__(self, settings: LightSettings) -> None:
+    def __init__(self, settings: ClockSettings, rate: float) -> None:
         self._settings  = settings
-        self._interval: float = 1.0 / settings.light_rate
+        self._interval: float = 1.0 / rate
         self._start: float | None = None   # baselines set lazily on the first tick
         self._last:  float = 0.0
         self._next:  float = 0.0
@@ -79,11 +83,11 @@ class Clock:
             self._phase_acc -= full_beats
 
         t = Tick(
-            time  = elapsed,
-            dt    = dt,
-            bpm   = bpm,
-            phase = self._phase_acc,
-            beat  = self._beat,
+            time       = elapsed,
+            dt         = dt,
+            bpm        = bpm,
+            beat_phase = self._phase_acc,
+            beat       = self._beat,
         )
         self._update_readouts(t)
         return t
@@ -98,5 +102,5 @@ class Clock:
             pass
 
     def _update_readouts(self, t: Tick) -> None:
-        self._settings.time  = t.time
-        self._settings.phase = t.phase
+        self._settings.time       = t.time
+        self._settings.beat_phase = t.beat_phase

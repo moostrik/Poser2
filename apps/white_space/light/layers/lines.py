@@ -24,7 +24,7 @@ class Lines(BaseLayer):
         self._indices: np.ndarray = np.arange(resolution, dtype=np.float32)
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
-        beat_time = frame.tick.beat + frame.tick.phase
+        beat_time = frame.tick.beat + frame.tick.beat_phase
         res       = self.resolution
         W         = self._config.white
         B         = self._config.blue
