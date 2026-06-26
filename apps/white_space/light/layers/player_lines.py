@@ -25,7 +25,7 @@ from modules.pose.features import PointLandmark
 
 from ._base_layer import BaseLayer, LayerSettings
 from ..frame import Frame
-from ._utilities import BlendType, apply_circular
+from ._utilities import BlendType, apply_circular, angle_to_strip_position
 
 if TYPE_CHECKING:
     from ...board import Board
@@ -74,7 +74,7 @@ class PlayerLines(BaseLayer):
             if tracklet is None or not tracklet.is_active:
                 continue
 
-            strip_pos: float = pose[features.Azimuth].value
+            strip_pos: float = angle_to_strip_position(pose[features.Azimuth].value)
 
             if self._config.anchor_nose:
                 points    = pose[features.Points2D]

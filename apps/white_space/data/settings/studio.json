@@ -371,7 +371,7 @@
       "simulate": false,
       "simulate_rpm": 72.0,
       "latency_ms": 5.0,
-      "phase_offset": 0.67,
+      "phase_offset": -2.0736,
       "low_speed_threshold": 3.0,
       "high_speed_threshold": 200.0
     },

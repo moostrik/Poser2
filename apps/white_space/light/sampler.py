@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 class Hit:
     """Emitted when the rotating playhead sweeps past an active player."""
     track_id: int
-    position: float  # azimuth 0.0–1.0 of the person at moment of crossing
+    position: float  # azimuth (radians [-π, π)) of the person at moment of crossing
 
 
 def sweep_contains(prev: float, curr: float, pos: float) -> bool:

@@ -18,6 +18,14 @@ PI:     float = np.pi
 TWOPI:  float = 2.0 * np.pi
 HALFPI: float = np.pi / 2.0
 
+
+def angle_to_strip_position(rad: float) -> float:
+    """Map an azimuth angle (radians) to its [0,1) position along the circular strip.
+
+    Multiply by the strip resolution to get a pixel index. NaN-preserving.
+    """
+    return (rad / TWOPI) % 1.0
+
 class EdgeSide(Enum):
     NONE  = 0
     LEFT  = 1

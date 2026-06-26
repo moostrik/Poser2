@@ -13,7 +13,7 @@ from modules.settings import Field
 
 from ._base_layer import BaseLayer, LayerSettings
 from ..frame import Frame, BUFFER_DTYPE
-from ._utilities import BlendType, draw_waves, draw_field
+from ._utilities import BlendType, draw_waves, draw_field, angle_to_strip_position
 
 if TYPE_CHECKING:
     from ...board import Board
@@ -133,7 +133,7 @@ class PoseWaves(BaseLayer):
             if not state.present:
                 continue
 
-            azimuth: float = pose[features.Azimuth].value
+            azimuth: float = angle_to_strip_position(pose[features.Azimuth].value)
             bbox    = pose[features.BBox]
             points  = pose[features.Points2D]
             nose_xy = points[features.PointLandmark.nose]

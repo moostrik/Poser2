@@ -5,7 +5,7 @@ from typing import Protocol
 
 
 class HasPlayhead(Protocol):
-    """Rotating-light playhead access (revolution fraction [0,1); NaN when not meaningful)."""
+    """Rotating-light playhead access (radians [-π, π); NaN when not meaningful)."""
     def get_playhead(self) -> float: ...
     def set_playhead(self, playhead: float) -> None: ...
 

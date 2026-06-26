@@ -1,6 +1,6 @@
 from enum import IntEnum
 
-from .base import           BaseFeature, BaseScalarFeature, BaseVectorFeature, NormalizedScalarFeature, AggregationMethod, NormalizedSingleValue, SingleValue
+from .base import           BaseFeature, BaseScalarFeature, BaseVectorFeature, NormalizedScalarFeature, AggregationMethod, NormalizedSingleValue, SingleValue, SingleAngle
 from .BBox import           BBox, BBoxElement
 from .Points2D import       Points2D, PointLandmark
 from .Angles import         Angles, AngleLandmark

@@ -15,6 +15,7 @@ Simulate mode (simulate=True):
     stall detection) apply identically.
 """
 
+import math
 from dataclasses import dataclass
 from enum import IntEnum, auto
 from threading import Thread, Event, Lock
@@ -41,16 +42,16 @@ class MotorSettings(BaseSettings):
     simulate:             Field[bool]  = Field(False,                                description="Advance playhead using internal simulation thread")
     simulate_rpm:         Field[float] = Field(0.0,   min=0.0, max=120.0,  step=0.1,  description="Motor speed used in simulate mode (RPM)")
     latency_ms:           Field[float] = Field(10.0,  min=0.0, max=100.0,  step=0.5,  description="Signal latency compensation (ms) — pre-advances phase on each fall", newline=True)
-    phase_offset:         Field[float] = Field(0.0,   min=0.0, max=1.0,    step=0.001, description="Playhead zero-point offset (0–1)")
+    phase_offset:         Field[float] = Field(0.0,   min=-math.pi, max=math.pi, step=0.01, description="Playhead zero-point offset (radians)")
     low_speed_threshold:  Field[float] = Field(1.0,   min=1,   max=100.0,  step=0.1,  description="RPM below which motor is declared STOPPED (stall detection)", newline=True)
     high_speed_threshold: Field[float] = Field(240.0, min=120, max=360.0,  step=1.0,  description="RPM above which motor mode switches to HIGH_SPEED")
     measured_rpm:         Field[float]    = Field(0.0,              min=0.0, max=2400.0, step=0.1,   access=Field.READ, description="Current measured RPM", newline=True)
     motor_mode:           Field[MotorMode] = Field(MotorMode.STOPPED,                               access=Field.READ, description="Current motor speed regime")
-    playhead:             Field[float]    = Field(0.0,              min=0.0, max=1.0,    step=0.001, access=Field.READ, widget=Widget.slider, description="Current light playhead (0–1)")
+    playhead:             Field[float]    = Field(0.0,              min=-math.pi, max=math.pi, step=0.001, access=Field.READ, widget=Widget.slider, description="Current light playhead (−π…π)")
 
 
 class MotorController:
-    """Tracks the rotating light's angular position (playhead 0.0–1.0) and
+    """Tracks the rotating light's angular position (playhead, radians [-π, π)) and
     relays the commanded target speed.
 
     Call start() / stop() to manage the internal simulation thread.
@@ -170,10 +171,13 @@ class MotorController:
         if last_fall_time is not None and measured_period is not None:
             # Sub-tick precision: elapsed uses now captured before the lock (error < lock hold time, ~μs).
             # latency_ms pre-advances phase to compensate for signal transmission delay.
+            # raw and latency are dimensionless revolution ratios (time/time); one × τ makes
+            # them radians, then add the (radian) phase offset and wrap to [-π, π).
             elapsed = now - last_fall_time
             rpm     = 60.0 / measured_period
             raw     = elapsed / measured_period
-            playhead = (min(raw, 1.0) + latency_offset / measured_period + offset) % 1.0
+            theta   = (min(raw, 1.0) + latency_offset / measured_period) * math.tau + offset
+            playhead = (theta + math.pi) % math.tau - math.pi
         else:
             rpm      = 0.0
             playhead = 0.0

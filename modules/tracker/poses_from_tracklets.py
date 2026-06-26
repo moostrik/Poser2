@@ -1,4 +1,5 @@
 import logging
+import math
 from threading import Lock
 
 from modules.pose.frame import Frame, FrameDict, FrameDictCallbackMixin
@@ -58,7 +59,8 @@ class PosesFromTracklets(FrameDictCallbackMixin):
                 world_angle = tracklet.annotation.world_angle if isinstance(tracklet.annotation, PanoramicAnnotation) else None
                 features: dict = {BBox: bounding_box}
                 if world_angle is not None:
-                    features[Azimuth] = Azimuth.from_value(float(world_angle) % 360.0 / 360.0)
+                    # SingleAngle.from_value wraps degrees-as-radians to [-π, π).
+                    features[Azimuth] = Azimuth.from_value(math.radians(float(world_angle)))
 
                 generated_poses[track_id] = Frame(
                     track_id=tracklet.id,
