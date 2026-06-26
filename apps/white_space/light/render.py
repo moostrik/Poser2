@@ -17,7 +17,6 @@ from modules.tracker.panoramic.settings import DistortionSettings
 from .clock import Clock, Tick
 from .frame import Frame, FrameCallback
 from .motor import MotorController, MotorMode
-from .sampler import Sampler
 from .settings import LightSettings, LayerId
 from .layers import BaseLayer, PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, Calibration, PlayheadFlash
 from ..board import Board
@@ -43,7 +42,6 @@ class Render(Thread):
         self._pose_stage: int       = pose_stage
         self._motor_controller      = MotorController(config.motor)
         self._clock                 = Clock(config)
-        self._sampler               = Sampler(board, pose_stage)
 
         resolution: int             = config.light_resolution
         num_players: int            = config.max_poses
@@ -59,7 +57,7 @@ class Render(Thread):
             (LayerId.random,         Random      (resolution, config.random,       board)),
             (LayerId.harmonic,       Harmonic    (resolution, config.harmonic,     board)),
             (LayerId.player_lines,   PlayerLines (resolution, config.player_lines, board, pose_stage)),
-            (LayerId.playhead_flash, PlayheadFlash(resolution, config.playhead_flash, board)),
+            (LayerId.playhead_flash, PlayheadFlash(resolution, config.playhead_flash, board, pose_stage)),
             (LayerId.calibration,    Calibration (resolution, config.calibration, distortion, config.num_cameras, board)),
         ]
 
@@ -132,9 +130,7 @@ class Render(Thread):
                 layer.reset()
         self._active_prev = active
 
-        hits  = self._sampler.detect(motor.playhead, motor.mode)
-
-        frame = Frame(self._config.light_resolution, tick, motor, hits=hits)
+        frame = Frame(self._config.light_resolution, tick, motor)
 
         for layer_id, layer in self._layers:
             if layer_id not in active:

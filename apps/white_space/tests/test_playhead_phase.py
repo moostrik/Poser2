@@ -6,8 +6,8 @@ import unittest
 from modules.pose.frame import Frame
 from modules.pose.features import Azimuth
 from apps.white_space.pose import PlayheadPhase, PlayheadPhaseExtractor
-from apps.white_space.light.sampler import sweep_contains
 from apps.white_space.light.layers._utilities import angle_to_strip_position
+from apps.white_space.light.layers.playhead_flash import phase_to_level
 
 PI = math.pi
 TAU = math.tau
@@ -68,17 +68,24 @@ class PlayheadPhaseExtractorTest(unittest.TestCase):
         self.assertNotIn(PlayheadPhase, PlayheadPhaseExtractor(lambda: float("nan")).process(_frame(0.5)))
 
 
-class SweepContainsRadiansTest(unittest.TestCase):
-    def test_flags_pose_when_swept(self) -> None:
-        # playhead sweeps from 0.4 to 0.6 rad, pose at 0.5 → crossed
-        self.assertTrue(sweep_contains(0.4, 0.6, 0.5))
-        self.assertFalse(sweep_contains(0.4, 0.6, 0.7))
+class PlayheadFlashEnvelopeTest(unittest.TestCase):
+    def test_peak_rise_fall(self) -> None:
+        self.assertAlmostEqual(phase_to_level(0.0, 0.5, 0.5), 1.0, places=5)     # on the playhead
+        self.assertAlmostEqual(phase_to_level(0.25, 0.5, 0.5), 0.5, places=5)    # half-way through the rise
+        self.assertAlmostEqual(phase_to_level(-0.25, 0.5, 0.5), 0.5, places=5)   # half-way through the fall
+        self.assertAlmostEqual(phase_to_level(0.5, 0.5, 0.5), 0.0, places=5)     # edge of rise
+        self.assertAlmostEqual(phase_to_level(-0.5, 0.5, 0.5), 0.0, places=5)    # edge of fall
 
-    def test_across_pi_wrap(self) -> None:
-        # playhead wraps +π → -π; a pose near +π is crossed
-        self.assertTrue(sweep_contains(PI - 0.05, -PI + 0.05, PI - 0.01))
-        self.assertTrue(sweep_contains(PI - 0.05, -PI + 0.05, -PI + 0.01))
-        self.assertFalse(sweep_contains(PI - 0.05, -PI + 0.05, 0.0))
+    def test_outside_window_and_nan(self) -> None:
+        self.assertEqual(phase_to_level(1.0, 0.5, 0.5), 0.0)        # ahead, beyond rise
+        self.assertEqual(phase_to_level(-1.0, 0.5, 0.5), 0.0)       # behind, beyond fall
+        self.assertEqual(phase_to_level(float("nan"), 0.5, 0.5), 0.0)
+        self.assertEqual(phase_to_level(0.3, 0.0, 0.0), 0.0)       # zero widths → no glow
+
+    def test_asymmetric_widths(self) -> None:
+        # wide rise, narrow fall
+        self.assertAlmostEqual(phase_to_level(0.5, 1.0, 0.2), 0.5, places=5)
+        self.assertAlmostEqual(phase_to_level(-0.1, 1.0, 0.2), 0.5, places=5)
 
 
 if __name__ == "__main__":

@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 class OscSound(BaseOscSound):
-    """OscSound extended with a rotation playhead (/global/playhead, /playhead/hit) and
-    the panoramic-only per-pose azimuth and distance messages.
+    """OscSound extended with the rotation playhead (/global/playhead) and the
+    panoramic-only per-pose azimuth, distance, and playhead-phase messages.
 
     Everything flows through the base's single-bundle send path by overriding the three
     leaf builders; there is no separate _send_data/_send_blackout."""
@@ -41,13 +41,6 @@ class OscSound(BaseOscSound):
         playhead_msg = OscMessageBuilder(address="/global/playhead")
         playhead_msg.add_arg(playhead, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(playhead_msg.build())  # type: ignore
-
-        if not idle and composition is not None:
-            for hit in composition.hits:
-                hit_msg = OscMessageBuilder(address="/playhead/hit")
-                hit_msg.add_arg(hit.track_id, OscMessageBuilder.ARG_TYPE_INT)
-                hit_msg.add_arg(float(hit.position), OscMessageBuilder.ARG_TYPE_FLOAT)
-                bundle_builder.add_content(hit_msg.build())  # type: ignore
 
     def _add_active_frame_messages(self, bundle_builder: OscBundleBuilder, frame: PoseFrame, frames: FrameDict, num_players: int) -> None:
         super()._add_active_frame_messages(bundle_builder, frame, frames, num_players)

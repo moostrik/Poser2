@@ -540,7 +540,8 @@
       "base_blue": 0.0,
       "flash_white": 1.0,
       "flash_blue": 0.0,
-      "fadeout_time": 0.2,
+      "rise": 0.5,
+      "fall": 0.5,
       "blend": "ADD"
     }
   },

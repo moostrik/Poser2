@@ -1,8 +1,8 @@
 """Frame — the full per-tick render context and output.
 
-Carries the clock snapshot (`tick`), motor state (`motor`), playhead crossings (`hits`),
-and the LED pixel buffer. One object flows into every layer's `_draw` and out to every
-consumer (board, osc_light, osc_sound, render).
+Carries the clock snapshot (`tick`), motor state (`motor`), and the LED pixel buffer.
+One object flows into every layer's `_draw` and out to every consumer (board, osc_light,
+osc_sound, render).
 """
 
 import numpy as np
@@ -11,7 +11,6 @@ from dataclasses import dataclass, field
 
 from .clock import Tick
 from .motor import MotorState
-from .sampler import Hit
 
 BUFFER_DTYPE = np.float32
 
@@ -22,7 +21,6 @@ class Frame:
     resolution: int
     tick:       Tick
     motor:      MotorState              = field(default_factory=MotorState)
-    hits:       tuple[Hit, ...]         = field(default_factory=tuple)
     light_img:  np.ndarray              = field(init=False)
 
     def __post_init__(self) -> None:
