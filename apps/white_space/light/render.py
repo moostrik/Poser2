@@ -16,7 +16,8 @@ from modules.tracker.panoramic.settings import DistortionSettings
 
 from .clock import Clock, Tick
 from .frame import Frame, FrameCallback
-from .motor import MotorController, MotorMode
+from .motor import MotorController
+from .playhead import Playhead
 from .settings import LightSettings, LayerId
 from .layers import BaseLayer, PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, Calibration, PlayheadFlash
 from ..board import Board
@@ -41,6 +42,7 @@ class Render(Thread):
         self._board: Board          = board
         self._pose_stage: int       = pose_stage
         self._motor_controller      = MotorController(config.motor)
+        self._playhead              = Playhead(config.playhead)
         self._clock                 = Clock(config)
 
         resolution: int             = config.light_resolution
@@ -100,19 +102,13 @@ class Render(Thread):
     # ------------------------------------------------------------------
 
     def _update(self, tick: Tick) -> None:
-        # Advance the motor FIRST so this tick's playhead is published to the board
-        # before the update callbacks run the pose-LERP (whose final node reads it).
-        # Motor target: active layers override the manual config value. None means
-        # "no opinion"; 0.0 is an explicit stop command. It reads the *previous* tick's
-        # active layers — immaterial for a physically ramping motor.
-        active_rpm: float = self._config.target_rpm
-        for layer_id, layer in self._layers:
-            if layer_id in self._active_prev and layer.target_rpm is not None:
-                active_rpm = layer.target_rpm
-
-        motor = self._motor_controller.tick(active_rpm)
-        # NaN when the playhead is not meaningful, so downstream consumers skip it.
-        self._board.set_playhead(motor.playhead if motor.mode == MotorMode.LOW_SPEED else np.nan)
+        # Advance the motor + playhead FIRST so this tick's playhead is published to the
+        # board before the update callbacks run the pose-LERP (whose final node reads it).
+        motor = self._motor_controller.tick()                   # commands rpm from its mode
+        self._playhead.tick(tick.dt, motor)                     # NCO tracks the motor
+        self._board.set_playhead(self._playhead.phase)          # continuous (offset applied)
+        # The measured MotorState rides the composition Frame (motor=...) below — no
+        # separate board slice needed; nothing reads the raw phase this-tick.
 
         # Pre-render state callbacks (sequencer; interpolators drive the pose-LERP,
         # which now reads this tick's board playhead).
@@ -130,7 +126,7 @@ class Render(Thread):
                 layer.reset()
         self._active_prev = active
 
-        frame = Frame(self._config.light_resolution, tick, motor)
+        frame = Frame(self._config.light_resolution, tick, motor, playhead=self._playhead.phase)
 
         for layer_id, layer in self._layers:
             if layer_id not in active:

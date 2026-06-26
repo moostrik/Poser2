@@ -21,6 +21,7 @@ class Frame:
     resolution: int
     tick:       Tick
     motor:      MotorState              = field(default_factory=MotorState)
+    playhead:   float                   = 0.0   # continuous content playhead (radians [-π,π), offset applied)
     light_img:  np.ndarray              = field(init=False)
 
     def __post_init__(self) -> None:

@@ -4,6 +4,7 @@ from modules.settings.widget import Widget
 
 
 from .motor import MotorSettings
+from .playhead import PlayheadSettings
 from .layers import (
     PoseWavesSettings, FillSettings, PulseSettings,
     ChaseSettings, LinesSettings, RandomSettings, HarmonicSettings,
@@ -43,11 +44,10 @@ class LightSettings(BaseSettings):
     hardness:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Contrast hardness (0=off, 1=hard step)")
     threshold: Field[float] = Field(0.5, min=0.0, max=1.0, step=0.01, description="Hardness pivot point")
 
-    target_rpm: Field[float] = Field(0.0, min=0.0, max=2400.0, step=1.0, description="Motor speed target (RPM); overridden by active layer", newline=True)
-
     fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV (shared from root)", newline=True)
 
     motor:        Group[MotorSettings]        = Group(MotorSettings)
+    playhead:     Group[PlayheadSettings]     = Group(PlayheadSettings)
     pose_waves:   Group[PoseWavesSettings]   = Group(PoseWavesSettings)
     fill:         Group[FillSettings]         = Group(FillSettings)
     pulse:        Group[PulseSettings]        = Group(PulseSettings)

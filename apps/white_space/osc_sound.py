@@ -35,9 +35,9 @@ class OscSound(BaseOscSound):
         with self._input_lock:
             composition = self._composition
 
-        # seq_state is None during idle/blackout → zero the playhead and emit no hits.
+        # seq_state is None during idle/blackout → zero the playhead.
         idle: bool = seq_state is None
-        playhead: float = 0.0 if (idle or composition is None) else float(composition.motor.playhead)
+        playhead: float = 0.0 if (idle or composition is None) else float(composition.playhead)
         playhead_msg = OscMessageBuilder(address="/global/playhead")
         playhead_msg.add_arg(playhead, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(playhead_msg.build())  # type: ignore

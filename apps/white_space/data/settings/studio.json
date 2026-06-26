@@ -11,7 +11,7 @@
     "square": false,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "cam_0": {
       "device_id": "14442C1031DDD2D200",
@@ -29,8 +29,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 689,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.4,
@@ -56,8 +56,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 601,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.4,
@@ -83,8 +83,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 362,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.4,
@@ -110,8 +110,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 1056,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.4,
@@ -361,19 +361,21 @@
   "light": {
     "bpm": 20.0,
     "active": [
-      "lines"
+      "playhead_flash"
     ],
     "master": 1.0,
     "hardness": 0.0,
     "threshold": 0.5,
-    "target_rpm": 72.0,
     "motor": {
-      "simulate": false,
-      "simulate_rpm": 72.0,
-      "latency_ms": 5.0,
-      "phase_offset": -2.0736,
-      "low_speed_threshold": 3.0,
-      "high_speed_threshold": 200.0
+      "mode": "LOW",
+      "idle_rpm": 7.0,
+      "low_rpm": 72.0,
+      "high_rpm": 2000.0,
+      "simulate": "OFF"
+    },
+    "playhead": {
+      "offset": -2.0736,
+      "tracking": 0.1
     },
     "pose_waves": {
       "fov_degrees": 110.0,
