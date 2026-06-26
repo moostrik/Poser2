@@ -106,7 +106,10 @@ class Render(Thread):
         # board before the update callbacks run the pose-LERP (whose final node reads it).
         motor = self._motor_controller.tick()                   # commands rpm from its mode
         self._playhead.tick(tick.dt, motor)                     # NCO tracks the motor
-        self._board.set_playhead(self._playhead.phase)          # continuous (offset applied)
+        # NaN while the light isn't rotating (motor STOPPED) → downstream pose-phase features
+        # read "no meaningful playhead" instead of a stale held angle (offset applied).
+        playhead = self._playhead.phase
+        self._board.set_playhead(playhead)
         # The measured MotorState rides the composition Frame (motor=...) below — no
         # separate board slice needed; nothing reads the raw phase this-tick.
 
@@ -126,7 +129,7 @@ class Render(Thread):
                 layer.reset()
         self._active_prev = active
 
-        frame = Frame(self._config.light_resolution, tick, motor, playhead=self._playhead.phase)
+        frame = Frame(self._config.light_resolution, tick, motor, playhead=playhead)
 
         for layer_id, layer in self._layers:
             if layer_id not in active:

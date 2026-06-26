@@ -367,7 +367,7 @@
     "hardness": 0.0,
     "threshold": 0.5,
     "motor": {
-      "simulate": "HIGH",
+      "simulate": "LOW",
       "mode": "LOW",
       "idle_rpm": 7.0,
       "low_rpm": 34.0,

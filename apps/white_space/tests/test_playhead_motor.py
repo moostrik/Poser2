@@ -24,6 +24,14 @@ def mstate(phase: float, locked: bool, rpm: float,
     )
 
 
+def running_playhead(settings: "PlayheadSettings | None" = None,
+                     mode: MotorMode = MotorMode.LOW) -> "Playhead":
+    """A Playhead already in a rotating mode, so `.phase` is finite (not the stopped-NaN)."""
+    p = Playhead(settings or PlayheadSettings())
+    p._prev_mode = mode
+    return p
+
+
 def _advancing(rpm: float, dt: float, start: float = 0.0):
     """Yield a phase advancing at `rpm`, like a steadily rotating light."""
     phase, rate = start, rpm / 60.0 * TAU
@@ -78,13 +86,18 @@ class MotorTest(unittest.TestCase):
 
 
 class SimTest(unittest.TestCase):
-    def test_sim_rpm_from_mode(self) -> None:
+    def test_sim_mode_selects_target_rpm(self) -> None:
         s = MotorSettings(); m = MotorController(s)
-        s.simulate = MotorSimMode.LOW;     self.assertEqual(m._sim_rpm(), s.low_rpm)
-        s.simulate = MotorSimMode.IDLE;    self.assertEqual(m._sim_rpm(), s.idle_rpm)
-        s.simulate = MotorSimMode.HIGH;    self.assertEqual(m._sim_rpm(), s.high_rpm)
-        s.simulate = MotorSimMode.STOPPED; self.assertEqual(m._sim_rpm(), 0.0)
-        s.simulate = MotorSimMode.OFF;     self.assertEqual(m._sim_rpm(), 0.0)
+        for sim, rpm in [(MotorSimMode.LOW, s.low_rpm), (MotorSimMode.IDLE, s.idle_rpm),
+                         (MotorSimMode.HIGH, s.high_rpm), (MotorSimMode.STOPPED, 0.0)]:
+            s.simulate = sim
+            self.assertEqual(m._target_rpm(m._target_mode()), rpm)
+
+    def test_sim_mode_names_map_to_motor_modes(self) -> None:
+        # _target_mode() does MotorMode[sim.name]; guard the two enums against drifting apart.
+        for sim in MotorSimMode:
+            if sim is not MotorSimMode.OFF:
+                self.assertIn(sim.name, MotorMode.__members__)
 
     def test_simulate_overrides_active_mode(self) -> None:
         s = MotorSettings(); s.mode = MotorMode.LOW
@@ -134,21 +147,21 @@ class PlayheadNcoTest(unittest.TestCase):
 
     def test_free_run_advances_at_commanded_rpm(self) -> None:
         dt, rpm = 1 / 30, 72.0
-        p = Playhead(PlayheadSettings())
+        p = running_playhead()
         before = p.phase
         p.tick(dt, mstate(float("nan"), False, rpm))             # unlocked → uses target_rpm
         self.assertAlmostEqual(wrap(p.phase - before), rpm / 60.0 * TAU * dt, places=6)
 
     def test_stopped_holds_position(self) -> None:
         p = Playhead(PlayheadSettings()); p._internal = p._output = 1.0
-        before = p.phase
         for _ in range(50):
             p.tick(1 / 60, mstate(0.5, False, 0.0, mode=MotorMode.STOPPED))
-        self.assertEqual(p.phase, before)                        # frozen — no advance
+        self.assertEqual(p._output, 1.0)                         # internal sweep frozen — no advance
+        self.assertTrue(math.isnan(p.phase))                     # stopped → NaN to consumers
 
     def test_high_free_runs_at_low_rpm(self) -> None:
         dt = 1 / 60
-        p = Playhead(PlayheadSettings())
+        p = running_playhead(mode=MotorMode.HIGH)
         before = p.phase
         # motor measured/target at 2000 but mode HIGH → playhead sweeps at low_rpm, ignoring motor.phase
         p.tick(dt, mstate(2.5, True, 2000.0, mode=MotorMode.HIGH, low_rpm=72.0))
@@ -156,7 +169,7 @@ class PlayheadNcoTest(unittest.TestCase):
 
     def test_low_to_high_switch_is_seamless(self) -> None:
         dt = 1 / 60
-        p = Playhead(PlayheadSettings())
+        p = running_playhead()
         mp, prev, max_step = 0.0, p.phase, 0.0
         for i in range(300):
             if i < 150:                                          # LOW: motor at 72, playhead follows
@@ -170,13 +183,22 @@ class PlayheadNcoTest(unittest.TestCase):
         # never steps faster than the LOW sweep — no jump at the switch, no speed-up to 2000
         self.assertLess(max_step, (72.0 / 60.0 * TAU * dt) * 1.6)
 
+    def test_phase_nan_only_when_stopped(self) -> None:
+        dt = 1 / 60
+        p = Playhead(PlayheadSettings())
+        p.tick(dt, mstate(0.5, False, 0.0, mode=MotorMode.STOPPED))
+        self.assertTrue(math.isnan(p.phase))                    # stopped → NaN to consumers
+        for mode in (MotorMode.IDLE, MotorMode.LOW, MotorMode.HIGH):
+            p.tick(dt, mstate(0.5, True, 72.0, mode=mode))
+            self.assertFalse(math.isnan(p.phase))               # rotating → finite
+
     def test_offset_applied(self) -> None:
-        p = Playhead(PlayheadSettings()); p._settings.offset = 0.5; p._output = 1.0
+        p = running_playhead(); p._settings.offset = 0.5; p._output = 1.0
         self.assertAlmostEqual(wrap(p.phase - 1.5), 0.0, places=6)
 
     def test_offset_constant_keeps_continuity(self) -> None:
         dt, rpm = 1 / 30, 72.0
-        p = Playhead(PlayheadSettings()); p._settings.offset = -2.0736
+        p = running_playhead(); p._settings.offset = -2.0736
         gen = _advancing(rpm, dt)
         prev = p.phase
         for _ in range(100):

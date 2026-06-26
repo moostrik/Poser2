@@ -70,7 +70,8 @@ class Playhead:
         self._advance_internal(dt, motor)
         self._update_ride(dt, motor)
         self._settings.follow = self._w
-        self._settings.phase  = self.phase
+        # Finite continuous position for the UI slider (`.phase` itself is NaN while stopped).
+        self._settings.phase  = _wrap_to_pi(self._output + self._settings.offset)
 
     def _advance_internal(self, dt: float, motor: MotorState) -> None:
         """The §10 mode-based content sweep (STOPPED holds, IDLE/LOW follow, HIGH free-runs low)."""
@@ -115,11 +116,10 @@ class Playhead:
 
     @property
     def phase(self) -> float:
-        """Continuous playhead in radians [-π, π), with the alignment offset applied."""
+        """Playhead in radians [-π, π) with the alignment offset applied — the value the outside
+        world consumes. NaN while the motor is STOPPED (frozen sweep → no meaningful playhead, per
+        the board's HasPlayhead contract). The internal sweep (_internal/_output) stays continuous
+        underneath, and `settings.phase` keeps the last finite position for the UI."""
+        if self._prev_mode == MotorMode.STOPPED:
+            return float('nan')
         return _wrap_to_pi(self._output + self._settings.offset)
-
-    def reset(self) -> None:
-        self._internal = self._output = 0.0
-        self._prev_mode = MotorMode.STOPPED
-        self._riding = self._released = False
-        self._w = 0.0
