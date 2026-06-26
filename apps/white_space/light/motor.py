@@ -25,6 +25,12 @@ from modules.settings import BaseSettings, Field, Widget
 # Stall = no fall for this many revolutions at the last measured speed → motor stopped.
 _STALL_MISSED_REVS: float = 3.0
 
+# Simulation loop cadence (s). The ramp + fall timing are sub-tick accurate regardless.
+_SIM_TICK: float = 1.0 / 30.0 # same as the motor
+
+# Simulated spin-up/down acceleration (RPM/s); ≈6 s to reach 2000.
+_SIM_ACCEL: float = 333.0
+
 
 class MotorMode(IntEnum):
     """Commanded operating mode (the system sets it; target rpm is derived from it)."""
@@ -58,6 +64,7 @@ class MotorState:
 class MotorSettings(BaseSettings):
     simulate:             Field[MotorSimMode] = Field(MotorSimMode.OFF,                          description="OFF = real hardware; any mode simulates the motor at that mode's rpm")
     mode:                 Field[MotorMode] = Field(MotorMode.LOW,                     description="Commanded mode — the target rpm is derived from it")
+    active_mode:          Field[MotorMode] = Field(MotorMode.LOW, access=Field.READ, description="Mode actually in effect (the sim selector overrides the command)", newline=True)
     idle_rpm:             Field[float] = Field(7.0,    min=0.0, max=60.0,   step=0.5,  description="Target rpm in IDLE mode", newline=True)
     low_rpm:              Field[float] = Field(72.0,   min=0.0, max=300.0,  step=1.0,  description="Target rpm in LOW mode")
     high_rpm:             Field[float] = Field(2000.0, min=0.0, max=2400.0, step=1.0,  description="Target rpm in HIGH mode")
@@ -110,12 +117,15 @@ class MotorController:
         self._fire_fall()
 
     def _fire_fall(self) -> None:
-        """Record a fall unconditionally — used by both hardware and simulation."""
-        now = monotonic()
+        """Record a real (hardware) fall at the current time."""
+        self._fire_fall_at(monotonic())
+
+    def _fire_fall_at(self, t: float) -> None:
+        """Record a fall that occurred at time `t` (used for sub-tick-accurate sim falls)."""
         with self._fall_lock:
             if self._last_fall_time is not None:
-                self._measured_period = now - self._last_fall_time
-            self._last_fall_time = now
+                self._measured_period = t - self._last_fall_time
+            self._last_fall_time = t
 
     # ------------------------------------------------------------------
     # Simulation thread
@@ -136,28 +146,46 @@ class MotorController:
                 self._measured_period = None
         self._wakeup.set()
 
-    def _sim_loop(self) -> None:
-        """Internal thread: fires synthetic falls at the sim mode's rpm cadence.
+    @staticmethod
+    def _ramp_toward(current: float, target: float, max_step: float) -> float:
+        """Move `current` toward `target` by at most `max_step` (models spin-up/down inertia)."""
+        if current < target:
+            return min(current + max_step, target)
+        return max(current - max_step, target)
 
-        last_fire tracks the previous fall; on each wakeup the remaining time is
-        recomputed from last_fire + period, so rpm/mode changes take effect immediately
-        without a spurious early fire.
+    def _sim_loop(self) -> None:
+        """Internal thread: ramps a simulated rpm toward the sim mode's rpm and fires a
+        synthetic fall each completed revolution (sub-tick timed), so spin-up/down is modelled.
         """
-        last_fire: float = 0.0
+        current_rpm: float = 0.0
+        revs:        float = 0.0   # revolutions accumulated toward the next fall
+        last:        float = monotonic()
 
         while self._running:
+            if self._settings.simulate == MotorSimMode.OFF:
+                current_rpm, revs = 0.0, 0.0          # real hardware drives the falls
+                self._wakeup.wait(0.1)
+                self._wakeup.clear()
+                last = monotonic()
+                continue
+
+            now  = monotonic()
+            dt   = now - last
+            last = now
+
+            target = self._sim_rpm()                  # mode rpm (0 = STOPPED → coast to stop)
+            current_rpm = self._ramp_toward(current_rpm, target, _SIM_ACCEL * dt)
+
+            if current_rpm > 0.0:
+                revs += current_rpm / 60.0 * dt
+                if revs >= 1.0:
+                    revs -= 1.0
+                    self._fire_fall_at(now - revs / (current_rpm / 60.0))   # interpolated crossing
+            else:
+                revs = 0.0
+
+            self._wakeup.wait(_SIM_TICK)
             self._wakeup.clear()
-            rpm = self._sim_rpm()
-            if rpm <= 0.0:
-                last_fire = 0.0
-                self._wakeup.wait(0.1)  # timeout guards against missed wakeup
-                continue
-            remaining = last_fire + 60.0 / rpm - monotonic()
-            if remaining > 0.0:
-                self._wakeup.wait(remaining)
-                continue
-            self._fire_fall()
-            last_fire = monotonic()
 
     # ------------------------------------------------------------------
     # Per-tick
@@ -215,4 +243,5 @@ class MotorController:
             self._settings.phase = 0.0
 
         self._settings.measured_rpm = rpm
+        self._settings.active_mode  = mode
         return MotorState(phase=phase, locked=locked, measured_rpm=rpm, mode=mode, target_rpm=target_rpm)

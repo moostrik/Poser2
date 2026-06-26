@@ -89,6 +89,18 @@ class SimTest(unittest.TestCase):
         self.assertEqual(st.mode, MotorMode.LOW)           # commanded mode rules when not simulating
         self.assertEqual(st.target_rpm, 72.0)
 
+    def test_ramp_toward_models_inertia(self) -> None:
+        r = MotorController._ramp_toward
+        self.assertEqual(r(0.0, 2000.0, 100.0), 100.0)     # spin up, capped by max_step
+        self.assertEqual(r(1950.0, 2000.0, 100.0), 2000.0) # never overshoots the target
+        self.assertEqual(r(2000.0, 0.0, 100.0), 1900.0)    # spin down
+        self.assertEqual(r(50.0, 0.0, 100.0), 0.0)         # never undershoots
+        # 0 → 2000 at the default 333 rpm/s reaches target in ~6 s
+        rpm, accel, dt, t = 0.0, 333.0, 0.05, 0.0
+        while rpm < 2000.0:
+            rpm = r(rpm, 2000.0, accel * dt); t += dt
+        self.assertAlmostEqual(t, 6.0, delta=0.3)
+
     def test_notify_fall_gated_while_simulating(self) -> None:
         s = MotorSettings(); m = MotorController(s)
         s.simulate = MotorSimMode.LOW
