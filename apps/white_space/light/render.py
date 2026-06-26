@@ -139,7 +139,7 @@ class Render(Thread):
             except Exception:
                 logger.exception("Error in %s.render", layer.__class__.__name__)
 
-        # Master output: contrast (hardness) then brightness (master)
+        # Master output: gamma curve + master brightness, then floor-lift above the lamp's dead zone
         frame.white = self._master_process(frame.white)
         frame.blue  = self._master_process(frame.blue)
 
@@ -148,18 +148,12 @@ class Render(Thread):
         self.fps_counter.tick()
 
     def _master_process(self, arr: np.ndarray) -> np.ndarray:
-        """Apply contrast hardness then master brightness to a mix buffer."""
-        cfg = self._config
+        """Floor-lift master transform: gamma curve + master brightness, then lift lit pixels above
+        the lamp's turn-on floor (`lower_edge`); true-black pixels stay off."""
+        o = self._config.levels
         x = np.clip(arr, 0.0, 1.0)
-        h = cfg.hardness
-        if h > 0.0:
-            k = 20.0 * h
-            sigmoid = 1.0 / (1.0 + np.exp(-k * (x - cfg.threshold)))
-            x = (1.0 - h) * x + h * sigmoid
-        m = cfg.master
-        if m != 1.0:
-            x = x * m
-        return x
+        s = (x ** o.curve) * o.master
+        return np.where(s > 0.0, o.lower_edge + (1.0 - o.lower_edge) * s, 0.0)
 
     # ------------------------------------------------------------------
     # Callbacks

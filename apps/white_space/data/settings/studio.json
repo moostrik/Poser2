@@ -363,10 +363,12 @@
       "playhead_flash"
     ],
     "master": 1.0,
-    "hardness": 0.0,
-    "threshold": 0.5,
     "clock": {
       "bpm": 20.0
+    },
+    "levels": {
+      "lower_edge": 0.35,
+      "curve": 1.0
     },
     "motor": {
       "simulate": "LOW",

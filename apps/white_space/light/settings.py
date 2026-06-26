@@ -13,6 +13,12 @@ from .layers import (
 )
 
 
+class LevelsSettings(BaseSettings):
+    master:     Field[float] = Field(1.0,  min=0.0, max=1.0, step=0.01, description="Master brightness")
+    lower_edge: Field[float] = Field(0.35, min=0.0, max=1.0, step=0.01, description="Lamp turn-on floor: lit pixels lift to at least this; black stays off")
+    curve:      Field[float] = Field(1.0,  min=0.5, max=2.0, step=0.01, description="Brightness power curve (gamma); <1 brightens mids, >1 darkens")
+
+
 class LayerId(IntEnum):
     pose_waves   = auto()
     fill         = auto()
@@ -39,13 +45,12 @@ class LightSettings(BaseSettings):
     active: Field[list[LayerId]] = Field([LayerId.pose_waves], widget=Widget.checklist,description="Active layers", newline=True)
 
     master:    Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Master brightness", newline=True)
-    hardness:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Contrast hardness (0=off, 1=hard step)")
-    threshold: Field[float] = Field(0.5, min=0.0, max=1.0, step=0.01, description="Hardness pivot point")
 
     clock:        Group[ClockSettings]        = Group(ClockSettings)
     motor:        Group[MotorSettings]        = Group(MotorSettings)
     playhead:     Group[PlayheadSettings]     = Group(PlayheadSettings)
-    pose_waves:   Group[PoseWavesSettings]   = Group(PoseWavesSettings)
+    levels:       Group[LevelsSettings]       = Group(LevelsSettings, share=[master.as_('master')])
+    pose_waves:   Group[PoseWavesSettings]    = Group(PoseWavesSettings)
     fill:         Group[FillSettings]         = Group(FillSettings)
     pulse:        Group[PulseSettings]        = Group(PulseSettings)
     chase:        Group[ChaseSettings]        = Group(ChaseSettings)
