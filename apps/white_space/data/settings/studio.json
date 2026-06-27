@@ -338,6 +338,11 @@
       },
       "motion_gate": {}
     },
+    "playhead_sampler": {
+      "max_samples": 4,
+      "angle_scale": 0.8,
+      "azimuth_reset": 0.35
+    },
     "window_raw": {
       "window_size": 180,
       "emit_partial": true

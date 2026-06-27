@@ -22,6 +22,7 @@ from modules.session import SessionSettings, SequencerSettings
 from modules.gl import WindowSettings
 from .light import LightSettings
 from .inout import OscLightSettings, UdpReceiverSettings
+from .pose import PlayheadSamplerSettings
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +212,7 @@ class PoseGroup(BaseSettings):
     velocity        : Group[VelocityFeature]                 = Group(VelocityFeature, share=_feature_share)
     motion          : Group[MotionFeature]                   = Group(MotionFeature)
     similarity      : Group[SimilarityFeature]               = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
+    playhead_sampler: Group[PlayheadSamplerSettings]         = Group(PlayheadSamplerSettings)
     window_raw      : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_clean    : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_smooth   : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
