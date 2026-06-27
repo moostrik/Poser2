@@ -80,8 +80,8 @@ class Playhead:
         elif motor.mode == MotorMode.HIGH:
             # Keep sweeping at the LOW content rate; the motor's fast phase is for the pixels.
             self._internal = _wrap_to_pi(self._internal + (motor.low_rpm / 60.0) * math.tau * dt)
-        else:                                                 # IDLE, LOW — follow the motor
-            rpm = motor.measured_rpm if motor.locked else motor.target_rpm
+        else:                                                 # IDLE, LOW — follow the motor (locked here)
+            rpm = motor.measured_rpm
             self._internal += (rpm / 60.0) * math.tau * dt
             if motor.locked and not math.isnan(motor.phase):
                 self._internal += self._settings.tracking * _wrap_to_pi(motor.phase - self._internal)

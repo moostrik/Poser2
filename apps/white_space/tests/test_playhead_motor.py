@@ -16,7 +16,7 @@ def wrap(x: float) -> float:
 
 def mstate(phase: float, locked: bool, rpm: float,
            mode: MotorMode = MotorMode.LOW, low_rpm: float = 72.0) -> MotorState:
-    """A MotorState for the playhead: measured rpm when locked, commanded rpm otherwise."""
+    """A MotorState for the playhead: measured rpm when locked, 0 (no measurement) otherwise."""
     return MotorState(
         phase=phase, locked=locked,
         measured_rpm=rpm if locked else 0.0,
@@ -144,13 +144,6 @@ class PlayheadNcoTest(unittest.TestCase):
             mp = next(gen)
             p.tick(dt, mstate(mp, True, rpm))
         self.assertAlmostEqual(wrap(p.phase - mp), 0.0, places=2)
-
-    def test_free_run_advances_at_commanded_rpm(self) -> None:
-        dt, rpm = 1 / 30, 72.0
-        p = running_playhead()
-        before = p.phase
-        p.tick(dt, mstate(float("nan"), False, rpm))             # unlocked → uses target_rpm
-        self.assertAlmostEqual(wrap(p.phase - before), rpm / 60.0 * TAU * dt, places=6)
 
     def test_stopped_holds_position(self) -> None:
         p = Playhead(PlayheadSettings()); p._internal = p._output = 1.0

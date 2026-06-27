@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from apps.white_space.light.render import crossfade_weights, CROSSFADE_DEADZONE
+from apps.white_space.light.layers.crossfade import crossfade_weights, CROSSFADE_DEADZONE
 
 IR, LR, XR = 7.0, 34.0, 600.0   # idle / low / high_cross rpm (studio defaults)
 
@@ -55,7 +55,7 @@ class CrossfadeWeightsTest(unittest.TestCase):
 
 
 class LightOffsetShiftTest(unittest.TestCase):
-    """Documents the light_offset → pixel-shift convention used in Render._compose."""
+    """Documents the light_offset → pixel-shift convention used in Crossfade._draw."""
 
     @staticmethod
     def _shift(offset: float, resolution: int) -> int:
