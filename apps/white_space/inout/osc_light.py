@@ -8,7 +8,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle import OscBundle
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
-from .light import Frame
+from ..light import Frame
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.inout.net_probe import validate_connection
 

@@ -21,8 +21,7 @@ from modules import inference
 from modules.session import SessionSettings, SequencerSettings
 from modules.gl import WindowSettings
 from .light import LightSettings
-from .osc_light import OscLightSettings
-from .udp_receiver import UdpReceiverSettings
+from .inout import OscLightSettings, UdpReceiverSettings
 
 
 # ---------------------------------------------------------------------------

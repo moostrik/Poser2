@@ -6,8 +6,8 @@ from modules.inout import OscSound as BaseOscSound, OscSoundSettings
 from modules.pose.frame import Frame as PoseFrame, FrameDict
 from modules.pose.features import Azimuth, Distance
 from modules.session import SequencerState
-from .light import Frame
-from .pose import PlayheadPhase
+from ..light import Frame
+from ..pose import PlayheadPhase
 
 import logging
 logger = logging.getLogger(__name__)

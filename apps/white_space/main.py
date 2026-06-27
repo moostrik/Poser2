@@ -9,7 +9,6 @@ from modules.utils import Broadcast
 from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType
 from modules.settings import presets, NiceServer
 from modules.inout import OscReceiver
-from .osc_sound import OscSound
 from modules.tracker import PanoramicTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
 from modules.inference import source, crop, pose, segmentation
@@ -19,10 +18,9 @@ from modules.gl import WindowSettings
 from .board import Board
 from .pose import PlayheadPhaseExtractor
 from .light import Render as LightRender
-from .osc_light import OscLight
+from .inout import OscLight, OscSound, UdpReceiver
 from .render import Render as WindowRender
 from .settings import Settings, Stage
-from .udp_receiver import UdpReceiver
 
 APP_NAME = 'white_space'
 DATA_PATH = 'apps/white_space/data'
