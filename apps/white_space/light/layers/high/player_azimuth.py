@@ -23,12 +23,12 @@ from modules.pose import frame as pose_frame
 from modules.pose import features
 from modules.pose.features import PointLandmark
 
-from ._base_layer import BaseLayer, LayerSettings
-from ..frame import Frame
-from ._utilities import BlendType, apply_circular, angle_to_strip_position
+from .._base_layer import BaseLayer, LayerSettings
+from ...frame import Frame
+from .._utilities import BlendType, apply_circular, angle_to_strip_position
 
 if TYPE_CHECKING:
-    from ...board import Board
+    from ....board import Board
 
 
 class PlayerLinesSettings(LayerSettings):

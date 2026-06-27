@@ -6,12 +6,24 @@ import numpy as np
 
 from modules.settings import BaseSettings, Field, Group
 
-from ._base_layer import BaseLayer, LayerSettings
-from ..frame import Frame
+from .._base_layer import BaseLayer, LayerSettings
+from ...frame import Frame
 
 
 _TABLE_SIZE = 256
 _MASK       = _TABLE_SIZE - 1
+
+
+def _apply_gamma(x: np.ndarray, midpoint: float, gamma: float) -> np.ndarray:
+    """Gamma curve about a pivot: ``gamma > 1`` pushes values away from ``midpoint`` (more contrast),
+    ``< 1`` pulls them toward it; ``gamma == 1`` is identity. Maps [0,1] → [0,1] with the 0 and 1
+    endpoints fixed."""
+    if gamma == 1.0:
+        return x
+    m     = min(max(midpoint, 1e-6), 1.0 - 1e-6)   # keep the pivot strictly inside (no div-by-zero)
+    below = m * np.power(np.clip(x / m, 0.0, 1.0), gamma)
+    above = 1.0 - (1.0 - m) * np.power(np.clip((1.0 - x) / (1.0 - m), 0.0, 1.0), gamma)
+    return np.where(x <= m, below, above)
 
 
 class RandomChannelSettings(BaseSettings):
@@ -20,6 +32,8 @@ class RandomChannelSettings(BaseSettings):
     scale:       Field[float] = Field(4.0, min=0.5, max=32.0, step=0.1,  description="Spatial feature size (low=large blobs, high=fine grain)")
     octaves:     Field[int]   = Field(3,   min=1,   max=6,               description="fBm octave count (1=smooth, 6=detailed)")
     persistence: Field[float] = Field(0.5, min=0.1, max=1.0,  step=0.01, description="Octave amplitude decay")
+    midpoint:    Field[float] = Field(0.5, min=0.0, max=1.0,  step=0.01, description="Gamma pivot — noise is pushed away from (or toward) this level")
+    gamma:       Field[float] = Field(1.0, min=0.1, max=5.0,  step=0.05, description="Gamma about the midpoint: 1=neutral, >1 = more contrast, <1 = less")
     threshold:   Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.01, description="Hard gate: 0=smooth gradient, >0=lit pixels above this level only")
 
 
@@ -51,10 +65,10 @@ class Random(BaseLayer):
 
         white += self._fbm(self._perm_w, self._vals_w, self._positions,
                            beat_time, W.scale, W.speed, W.octaves,
-                           W.persistence, W.threshold, W.level)
+                           W.persistence, W.midpoint, W.gamma, W.threshold, W.level)
         blue  += self._fbm(self._perm_b, self._vals_b, self._positions,
                            beat_time, B.scale, B.speed, B.octaves,
-                           B.persistence, B.threshold, B.level)
+                           B.persistence, B.midpoint, B.gamma, B.threshold, B.level)
 
     @staticmethod
     def _fbm(
@@ -66,6 +80,8 @@ class Random(BaseLayer):
         speed:       float,
         octaves:     int,
         persistence: float,
+        midpoint:    float,
+        gamma:       float,
         threshold:   float,
         amplitude:   float,
     ) -> np.ndarray:
@@ -103,6 +119,7 @@ class Random(BaseLayer):
             freq_t  *= 2.0
 
         result /= max_val
+        result = _apply_gamma(result, midpoint, gamma)
 
         if threshold > 0.0:
             result = np.where(result >= threshold, (result - threshold) / (1.0 - threshold + 1e-9), 0.0)

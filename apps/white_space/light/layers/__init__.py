@@ -2,13 +2,15 @@
 from ._base_layer   import BaseLayer, LayerSettings, ChannelSettings
 from ._utilities    import BlendType
 
-from .pose_waves    import PoseWaves,   PoseWavesSettings
-from .fill          import Fill,         FillSettings
-from .pulse         import Pulse,        PulseSettings
-from .chase         import Chase,        ChaseSettings
-from .lines         import Lines,        LinesSettings
-from .random        import Random,       RandomSettings, RandomChannelSettings
-from .harmonic      import Harmonic,     HarmonicSettings, HarmonicSourceSettings
-from .player_lines  import PlayerLines,  PlayerLinesSettings
-from .calibration   import Calibration,    CalibrationSettings
-from .playhead_flash import PlayheadFlash, PlayheadFlashSettings
+from .high.pose_waves    import PoseWaves,   PoseWavesSettings
+from .test.fill          import Fill,         FillSettings
+from .test.pulse         import Pulse,        PulseSettings
+from .test.chase         import Chase,        ChaseSettings
+from .test.lines         import Lines,        LinesSettings
+from .test.random        import Random,       RandomSettings, RandomChannelSettings
+from .high.harmonic      import Harmonic,     HarmonicSettings, HarmonicSourceSettings
+from .high.player_azimuth  import PlayerLines,  PlayerLinesSettings
+from .high.camera_light   import CameraLight,    CameraLightSettings
+from .low.playhead_flash import PlayheadFlash, PlayheadFlashSettings
+from .low.playhead   import Playhead as PlayheadLow,  PlayheadSettings as PlayheadLowSettings
+from .high.playhead  import Playhead as PlayheadHigh, PlayheadSettings as PlayheadHighSettings

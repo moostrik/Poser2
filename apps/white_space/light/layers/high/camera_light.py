@@ -19,11 +19,11 @@ import numpy as np
 from modules.settings import Field
 from modules.tracker.panoramic.settings import DistortionSettings, DistortAlgorithm
 
-from ._base_layer import BaseLayer, LayerSettings
-from ..frame import Frame
+from .._base_layer import BaseLayer, LayerSettings
+from ...frame import Frame
 
 if TYPE_CHECKING:
-    from ...board import Board
+    from ....board import Board
 
 
 class DetectMode(IntEnum):
@@ -37,7 +37,7 @@ class SampleMethod(IntEnum):
     AVG = auto()
 
 
-class CalibrationSettings(LayerSettings):
+class CameraLightSettings(LayerSettings):
     """Settings for the Calibration composition."""
     slice_centre:  Field[float]        = Field(0.5,  min=0.0,  max=1.0,   step=0.01, description="Vertical centre of the sample band (0=top, 1=bottom)")
     slice_height:  Field[float]        = Field(0.2,  min=0.01, max=1.0,   step=0.01, description="Height of the sample band as a fraction of frame height")
@@ -50,13 +50,13 @@ class CalibrationSettings(LayerSettings):
     fov:           Field[float]        = Field(110.0, min=60.0, max=180.0, step=0.5,  description="Camera horizontal FOV (shared from compositor)", access=Field.READ)
 
 
-class Calibration(BaseLayer):
+class CameraLight(BaseLayer):
     """Projects horizontal camera slices onto the LED strip for distortion calibration."""
 
     def __init__(
         self,
         resolution:  int,
-        config:      CalibrationSettings,
+        config:      CameraLightSettings,
         distortion:  DistortionSettings,
         num_cameras: int,
         board:       Board,

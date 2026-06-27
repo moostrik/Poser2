@@ -164,7 +164,8 @@
       "port": 6454,
       "use_signed": false,
       "mtu": 1500,
-      "phase": 0.0,
+      "lower_edge": 0.35,
+      "curve": 1.0,
       "offsets": {
         "white_0": 0,
         "white_1": 0,
@@ -359,16 +360,204 @@
     }
   },
   "light": {
-    "active": [
+    "master": 1.0,
+    "high_cross_rpm": 600.0,
+    "idle_layers": [],
+    "low_layers": [
       "playhead_flash"
     ],
-    "master": 1.0,
+    "high_layers": [
+      "pose_waves"
+    ],
+    "light_offset": 0.0,
     "clock": {
       "bpm": 20.0
     },
-    "levels": {
-      "lower_edge": 0.35,
-      "curve": 1.0
+    "low": {
+      "playhead": {
+        "level": 1.0
+      },
+      "playhead_flash": {
+        "base_white": 0.0,
+        "base_blue": 0.0,
+        "flash_white": 1.0,
+        "flash_blue": 0.0,
+        "rise": 0.5,
+        "fall": 0.5,
+        "blend": "ADD"
+      }
+    },
+    "high": {
+      "pose_waves": {
+        "fov_degrees": 110.0,
+        "void_width": 0.05,
+        "void_edge": 0.01,
+        "use_void": true,
+        "pattern_width": 0.2,
+        "pattern_edge": 0.2,
+        "line_sharpness": 1.5,
+        "line_speed": 1.5,
+        "line_width": 0.1,
+        "line_amount": 20.0,
+        "blend": "ADD"
+      },
+      "harmonic": {
+        "blend": "ADD",
+        "source_0": {
+          "enabled": true,
+          "bpm_multiplier": 1.0,
+          "spatial_cycles": 3.0,
+          "phase_offset": 0.0,
+          "spatial_phase": 0.0,
+          "amplitude_white": 0.5,
+          "amplitude_blue": 0.0
+        },
+        "source_1": {
+          "enabled": true,
+          "bpm_multiplier": 2.0,
+          "spatial_cycles": 5.0,
+          "phase_offset": 0.25,
+          "spatial_phase": 0.0,
+          "amplitude_white": 0.0,
+          "amplitude_blue": 0.5
+        },
+        "source_2": {
+          "enabled": false,
+          "bpm_multiplier": 3.0,
+          "spatial_cycles": 7.0,
+          "phase_offset": 0.5,
+          "spatial_phase": 0.0,
+          "amplitude_white": 0.3,
+          "amplitude_blue": 0.0
+        },
+        "source_3": {
+          "enabled": false,
+          "bpm_multiplier": 4.0,
+          "spatial_cycles": 9.0,
+          "phase_offset": 0.75,
+          "spatial_phase": 0.0,
+          "amplitude_white": 0.0,
+          "amplitude_blue": 0.3
+        }
+      },
+      "player_lines": {
+        "center_width": 0.06,
+        "flank_width": 0.03,
+        "depth_scale": 2.0,
+        "invert": true,
+        "level_center": 1.0,
+        "level_flank": 0.0,
+        "anchor_nose": true,
+        "blend": "ADD"
+      },
+      "calibration": {
+        "slice_centre": 0.5,
+        "slice_height": 0.2,
+        "threshold": 1.0,
+        "detect": "BRIGHT",
+        "method": "MAX",
+        "show_overlap": false,
+        "show_centre": false,
+        "white_markers": false,
+        "blend": "ADD"
+      },
+      "playhead": {
+        "level": 1.0,
+        "width": 0.01
+      }
+    },
+    "test": {
+      "fill": {
+        "blend": "ADD",
+        "white": {
+          "level": 0.5,
+          "speed": 0.5,
+          "phase": 0.0,
+          "width": 0.5,
+          "amount": 36
+        },
+        "blue": {
+          "level": 0.5,
+          "speed": 0.5,
+          "phase": 0.5,
+          "width": 0.5,
+          "amount": 36
+        }
+      },
+      "pulse": {
+        "blend": "ADD",
+        "white": {
+          "level": 0.5,
+          "speed": 0.5,
+          "phase": 0.0,
+          "width": 0.5,
+          "amount": 36
+        },
+        "blue": {
+          "level": 0.5,
+          "speed": 0.5,
+          "phase": 0.5,
+          "width": 0.5,
+          "amount": 36
+        }
+      },
+      "chase": {
+        "blend": "ADD",
+        "white": {
+          "level": 1.0,
+          "speed": 0.25,
+          "phase": 0.0,
+          "width": 0.2,
+          "amount": 22
+        },
+        "blue": {
+          "level": 0.5,
+          "speed": 0.5,
+          "phase": 0.5,
+          "width": 0.5,
+          "amount": 36
+        }
+      },
+      "lines": {
+        "blend": "ADD",
+        "white": {
+          "level": 1.0,
+          "speed": 0.0,
+          "phase": 0.19,
+          "width": 0.37,
+          "amount": 1
+        },
+        "blue": {
+          "level": 0.0,
+          "speed": 0.5,
+          "phase": 0.5,
+          "width": 0.5,
+          "amount": 36
+        }
+      },
+      "random": {
+        "blend": "ADD",
+        "white": {
+          "level": 0.5,
+          "speed": 0.5,
+          "scale": 4.0,
+          "octaves": 3,
+          "persistence": 0.5,
+          "midpoint": 0.5,
+          "gamma": 1.0,
+          "threshold": 0.0
+        },
+        "blue": {
+          "level": 0.5,
+          "speed": 0.5,
+          "scale": 4.0,
+          "octaves": 3,
+          "persistence": 0.5,
+          "midpoint": 0.5,
+          "gamma": 1.0,
+          "threshold": 0.0
+        }
+      }
     },
     "motor": {
       "simulate": "LOW",
@@ -381,177 +570,7 @@
       "offset": 0.0,
       "tracking": 0.93,
       "high_follow": true,
-      "release_rpm": 600.0,
       "release_smooth": 0.9
-    },
-    "pose_waves": {
-      "fov_degrees": 110.0,
-      "void_width": 0.05,
-      "void_edge": 0.01,
-      "use_void": true,
-      "pattern_width": 0.2,
-      "pattern_edge": 0.2,
-      "line_sharpness": 1.5,
-      "line_speed": 1.5,
-      "line_width": 0.1,
-      "line_amount": 20.0,
-      "blend": "ADD"
-    },
-    "fill": {
-      "blend": "ADD",
-      "white": {
-        "level": 0.5,
-        "speed": 0.5,
-        "phase": 0.0,
-        "width": 0.5,
-        "amount": 36
-      },
-      "blue": {
-        "level": 0.5,
-        "speed": 0.5,
-        "phase": 0.5,
-        "width": 0.5,
-        "amount": 36
-      }
-    },
-    "pulse": {
-      "blend": "ADD",
-      "white": {
-        "level": 0.5,
-        "speed": 0.5,
-        "phase": 0.0,
-        "width": 0.5,
-        "amount": 36
-      },
-      "blue": {
-        "level": 0.5,
-        "speed": 0.5,
-        "phase": 0.5,
-        "width": 0.5,
-        "amount": 36
-      }
-    },
-    "chase": {
-      "blend": "ADD",
-      "white": {
-        "level": 1.0,
-        "speed": 0.25,
-        "phase": 0.0,
-        "width": 0.2,
-        "amount": 22
-      },
-      "blue": {
-        "level": 0.5,
-        "speed": 0.5,
-        "phase": 0.5,
-        "width": 0.5,
-        "amount": 36
-      }
-    },
-    "lines": {
-      "blend": "ADD",
-      "white": {
-        "level": 1.0,
-        "speed": 0.0,
-        "phase": 0.19,
-        "width": 0.37,
-        "amount": 1
-      },
-      "blue": {
-        "level": 0.0,
-        "speed": 0.5,
-        "phase": 0.5,
-        "width": 0.5,
-        "amount": 36
-      }
-    },
-    "random": {
-      "blend": "ADD",
-      "white": {
-        "level": 0.5,
-        "speed": 0.5,
-        "scale": 4.0,
-        "octaves": 3,
-        "persistence": 0.5,
-        "threshold": 0.0
-      },
-      "blue": {
-        "level": 0.5,
-        "speed": 0.5,
-        "scale": 4.0,
-        "octaves": 3,
-        "persistence": 0.5,
-        "threshold": 0.0
-      }
-    },
-    "harmonic": {
-      "blend": "ADD",
-      "source_0": {
-        "enabled": true,
-        "bpm_multiplier": 1.0,
-        "spatial_cycles": 3.0,
-        "phase_offset": 0.0,
-        "spatial_phase": 0.0,
-        "amplitude_white": 0.5,
-        "amplitude_blue": 0.0
-      },
-      "source_1": {
-        "enabled": true,
-        "bpm_multiplier": 2.0,
-        "spatial_cycles": 5.0,
-        "phase_offset": 0.25,
-        "spatial_phase": 0.0,
-        "amplitude_white": 0.0,
-        "amplitude_blue": 0.5
-      },
-      "source_2": {
-        "enabled": false,
-        "bpm_multiplier": 3.0,
-        "spatial_cycles": 7.0,
-        "phase_offset": 0.5,
-        "spatial_phase": 0.0,
-        "amplitude_white": 0.3,
-        "amplitude_blue": 0.0
-      },
-      "source_3": {
-        "enabled": false,
-        "bpm_multiplier": 4.0,
-        "spatial_cycles": 9.0,
-        "phase_offset": 0.75,
-        "spatial_phase": 0.0,
-        "amplitude_white": 0.0,
-        "amplitude_blue": 0.3
-      }
-    },
-    "player_lines": {
-      "center_width": 0.06,
-      "flank_width": 0.03,
-      "depth_scale": 2.0,
-      "invert": true,
-      "level_center": 1.0,
-      "level_flank": 0.0,
-      "anchor_nose": true,
-      "blend": "ADD"
-    },
-    "calibration": {
-      "slice_centre": 0.5,
-      "slice_height": 0.2,
-      "threshold": 1.0,
-      "detect": "BRIGHT",
-      "method": "MAX",
-      "show_overlap": false,
-      "show_centre": false,
-      "white_markers": false,
-      "blend": "ADD"
-    },
-    "playhead_flash": {
-      "base_white": 0.0,
-      "base_blue": 0.0,
-      "flash_white": 1.0,
-      "flash_blue": 0.0,
-      "rise": 0.5,
-      "fall": 0.5,
-      "blend": "ADD"
     }
   },
   "render": {

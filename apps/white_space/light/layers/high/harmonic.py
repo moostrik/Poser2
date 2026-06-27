@@ -6,8 +6,8 @@ import numpy as np
 
 from modules.settings import BaseSettings, Field, Group
 
-from ._base_layer import BaseLayer, LayerSettings
-from ..frame import Frame
+from .._base_layer import BaseLayer, LayerSettings
+from ...frame import Frame
 
 
 class HarmonicSourceSettings(BaseSettings):

@@ -7,7 +7,7 @@ from modules.pose.frame import Frame
 from modules.pose.features import Azimuth
 from apps.white_space.pose import PlayheadPhase, PlayheadPhaseExtractor
 from apps.white_space.light.layers._utilities import angle_to_strip_position
-from apps.white_space.light.layers.playhead_flash import phase_to_level
+from apps.white_space.light.layers.low.playhead_flash import phase_to_level
 
 PI = math.pi
 TAU = math.tau

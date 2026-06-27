@@ -11,12 +11,12 @@ from modules.tracker import Tracklet
 from modules.pose import features
 from modules.settings import Field
 
-from ._base_layer import BaseLayer, LayerSettings
-from ..frame import Frame, BUFFER_DTYPE
-from ._utilities import BlendType, draw_waves, draw_field, angle_to_strip_position
+from .._base_layer import BaseLayer, LayerSettings
+from ...frame import Frame, BUFFER_DTYPE
+from .._utilities import BlendType, draw_waves, draw_field, angle_to_strip_position
 
 if TYPE_CHECKING:
-    from ...board import Board
+    from ....board import Board
 
 import logging
 logger = logging.getLogger(__name__)

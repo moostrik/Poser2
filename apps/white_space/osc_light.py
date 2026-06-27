@@ -34,7 +34,8 @@ class OscLightSettings(BaseSettings):
     mtu:          Field[int]  = Field(1500, min=576, max=9000,  access=Field.INIT, description="Network MTU (affects chunk size)")
     chunk_size:    Field[int]  = Field(0,    access=Field.READ,  description="Computed chunk size (bytes)")
     num_chunks:   Field[int]  = Field(0,    access=Field.READ,  description="Computed number of chunks")
-    phase:        Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.001, description="Circular phase shift of the LED ring (0–1 normalised)")
+    lower_edge:   Field[float] = Field(0.35, min=0.0, max=1.0, step=0.01, description="Lamp turn-on floor: lit pixels lift to at least this; black stays off")
+    curve:        Field[float] = Field(1.0,  min=0.5, max=2.0, step=0.01, description="Output gamma curve; <1 brightens mids, >1 darkens")
     offsets:      Group[OscLightOffsetSettings] = Group(OscLightOffsetSettings)
 
 
@@ -172,17 +173,15 @@ class OscLight:
             rpm_msgb.add_arg(int(output.motor.target_rpm))
             message_list.append(rpm_msgb.build())
 
+            # Lamp output mapping: gamma curve + turn-on floor (master brightness applied upstream).
+            white_f = OscLight._apply_levels(output.white, settings.curve, settings.lower_edge)
+            blue_f  = OscLight._apply_levels(output.blue,  settings.curve, settings.lower_edge)
             if settings.use_signed:
-                white_channel: np.ndarray = OscLight.float_to_int8(output.white)
-                blue_channel:  np.ndarray = OscLight.float_to_int8(output.blue)
+                white_channel: np.ndarray = OscLight.float_to_int8(white_f)
+                blue_channel:  np.ndarray = OscLight.float_to_int8(blue_f)
             else:
-                white_channel = OscLight.float_to_uint8(output.white)
-                blue_channel  = OscLight.float_to_uint8(output.blue)
-
-            if settings.phase != 0.0:
-                shift = int(settings.phase * len(white_channel))
-                white_channel = np.roll(white_channel, shift)
-                blue_channel  = np.roll(blue_channel,  shift)
+                white_channel = OscLight.float_to_uint8(white_f)
+                blue_channel  = OscLight.float_to_uint8(blue_f)
 
             for i in range(num_chunks):
                 start_idx = i * chunk_size
@@ -225,6 +224,14 @@ class OscLight:
     # ------------------------------------------------------------------
     # Conversion helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _apply_levels(arr: np.ndarray, curve: float, lower_edge: float) -> np.ndarray:
+        """Lamp output mapping: gamma `curve`, then lift lit pixels above the turn-on floor
+        (`lower_edge`); true-black pixels stay off. In/out in [0,1]."""
+        x = np.clip(arr, 0.0, 1.0)
+        s = x ** curve
+        return np.where(s > 0.0, lower_edge + (1.0 - lower_edge) * s, 0.0)
 
     @staticmethod
     def float_to_uint8(arr: np.ndarray) -> np.ndarray:

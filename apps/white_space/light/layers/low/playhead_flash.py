@@ -13,9 +13,9 @@ import numpy as np
 
 from modules.settings import Field
 
-from ._base_layer import BaseLayer, LayerSettings
-from ..frame import Frame
-from ...pose import PlayheadPhase
+from .._base_layer import BaseLayer, LayerSettings
+from ...frame import Frame
+from ....pose import PlayheadPhase
 
 
 def phase_to_level(phi: float, rise: float, fall: float) -> float:
