@@ -14,6 +14,7 @@ from enum import IntEnum, auto
 from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
 from modules.oak import CameraSettings, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
+from modules.render.layers import LayerMode
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import PanoramicTrackerSettings
 from modules.pose import nodes, trackers, window, analytics
@@ -71,7 +72,8 @@ class Layers(IntEnum):
     data_W       = auto()
     data_F       = auto()
     data_time    = auto()
-    data_playhead = auto()
+    data_playhead_W = auto()
+    data_playhead_F = auto()
 
 
 # ---------------------------------------------------------------------------
@@ -262,11 +264,35 @@ class PreviewGroup(BaseSettings):
     poser  : Group[_PoseCompSettings]    = Group(_PoseCompSettings)
 
 
+class PlayheadFeatureSelect(IntEnum):
+    """App-local feature dropdown for the playhead data layers (keys PLAYHEAD_FEATURE_MAP)."""
+    PlayheadPhase     = 0
+    PlayheadStability = auto()
+
+
+class PlayheadDataLayerSettings(BaseSettings):
+    """App-owned data-layer config (mirrors DataLayerSettings, but its own feature dropdown).
+
+    Drives the generic FeatureWindowLayer/FeatureFrameLayer over the app's playhead features.
+    Defaults off (mode NONE) and to the LERP stage — the only stage where the features exist.
+    Set the generic ``data.mode`` to NONE when enabling this to avoid two graphs overlapping.
+    """
+    mode:              Field[LayerMode]            = Field(LayerMode.NONE)
+    feature_field:     Field[PlayheadFeatureSelect] = Field(PlayheadFeatureSelect.PlayheadStability)
+    stage:             Field[Stage]               = Field(Stage.LERP)
+    line_width:        Field[float]               = Field(3.0)
+    line_smooth:       Field[float]               = Field(1.0)
+    use_scores:        Field[bool]                = Field(False)
+    render_labels:     Field[bool]                = Field(True)
+    use_history_color: Field[bool]                = Field(False)
+
+
 class RenderSettings(BaseSettings):
     num_cams:    Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of players")
     preview:     Group[PreviewGroup]     = Group(PreviewGroup)
     data:        Group[layers.DataLayerSettings] = Group(layers.DataLayerSettings)
+    playhead_data: Group[PlayheadDataLayerSettings] = Group(PlayheadDataLayerSettings)
     colors:      Group[ColorSettings]    = Group(ColorSettings)
     window:      Group[WindowSettings]   = Group(WindowSettings)
 

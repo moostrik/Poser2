@@ -9,13 +9,20 @@ from modules.render.layers import TrackerCompositor, PoseCompositor
 from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer
 from modules.render.layers.generic.PanoramicTrackerLayer import PanoramicTrackerLayer
 from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
-from apps.white_space.render.layers.playhead_data_renderer import PlayheadDataRenderer
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from ..board import Board
-from ..settings import Layers, RenderSettings
+from ..pose import PlayheadPhase, PlayheadStability
+from ..settings import Layers, RenderSettings, PlayheadFeatureSelect
+
+# Maps the app-local feature dropdown to the concrete app features. Kept here (not in
+# settings, which stays data-only) and handed to the generic data layers via feature_map.
+PLAYHEAD_FEATURE_MAP = {
+    PlayheadFeatureSelect.PlayheadPhase:     PlayheadPhase,
+    PlayheadFeatureSelect.PlayheadStability: PlayheadStability,
+}
 
 
 class Render(RenderBase):
@@ -53,7 +60,8 @@ class Render(RenderBase):
             self.L[Layers.data_W][i]    = FeatureWindowLayer(i, board, settings.data, settings.colors)
             self.L[Layers.data_F][i]    = FeatureFrameLayer( i, board, settings.data, settings.colors)
             self.L[Layers.data_time][i] = MTimeRenderer(     i, board)
-            self.L[Layers.data_playhead][i] = PlayheadDataRenderer(i, board)
+            self.L[Layers.data_playhead_W][i] = FeatureWindowLayer(i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP)
+            self.L[Layers.data_playhead_F][i] = FeatureFrameLayer( i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP)
 
         # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready
         self.L[Layers.ws_tracker][0] = PanoramicTrackerLayer(board, self.num_cams, settings.colors)
@@ -141,7 +149,8 @@ class Render(RenderBase):
             self.L[Layers.data_W][i].draw()
             self.L[Layers.data_F][i].draw()
             self.L[Layers.data_time][i].draw()
-            self.L[Layers.data_playhead][i].draw()
+            self.L[Layers.data_playhead_W][i].draw()
+            self.L[Layers.data_playhead_F][i].draw()
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         pass

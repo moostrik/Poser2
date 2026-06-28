@@ -1,5 +1,5 @@
 {
-  "num_players": 8,
+  "num_players": 4,
   "num_cameras": 4,
   "input_fps": 23.0,
   "render_fps": 60.0,
@@ -596,6 +596,16 @@
       "mode": "WINDOW",
       "feature_field": "AngleMotion",
       "stage": 0,
+      "line_width": 3.0,
+      "line_smooth": 1.0,
+      "use_scores": false,
+      "render_labels": true,
+      "use_history_color": false
+    },
+    "playhead_data": {
+      "mode": "NONE",
+      "feature_field": "PlayheadStability",
+      "stage": "LERP",
       "line_width": 3.0,
       "line_smooth": 1.0,
       "use_scores": false,

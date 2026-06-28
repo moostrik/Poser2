@@ -16,7 +16,7 @@ from modules.session import Session, Sequencer
 from modules.gl import WindowSettings
 
 from .board import Board
-from .pose import PlayheadPhaseExtractor, PlayheadStabilityExtractor
+from .pose import PlayheadPhase, PlayheadPhaseExtractor, PlayheadStability, PlayheadStabilityExtractor
 from .light import Render as LightRender
 from .inout import OscLight, OscSound, UdpReceiver
 from .render import Render as WindowRender
@@ -106,10 +106,14 @@ class WhiteSpaceMain:
         self.poses_from_tracklets.add_frames_callback(self._process_poses)
 
         # STAGE WINDOW TRACKERS & BROADCASTS
+        # The LERP tracker also windows the app-local playhead features (the only stage where
+        # they're stamped) so the data layers can graph them; other stages use the built-ins.
+        lerp_features = features.SCALAR_FEATURES + [PlayheadPhase, PlayheadStability]
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
-            wt = window.WindowTracker(num_players, getattr(ps, f'window_{stage.name.lower()}'))
+            wt_features = lerp_features if stage == Stage.LERP else None
+            wt = window.WindowTracker(num_players, getattr(ps, f'window_{stage.name.lower()}'), features=wt_features)
             wt.add_windows_callback(partial(self.board.set_windows, stage))
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([

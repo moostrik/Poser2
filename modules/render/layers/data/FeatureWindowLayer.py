@@ -1,5 +1,6 @@
 # Standard library imports
 from dataclasses import dataclass
+from enum import IntEnum
 from typing import Tuple
 
 # Third-party imports
@@ -12,7 +13,8 @@ from modules.gl import Fbo, Texture, Blit, Image, clear_color, Text
 from modules.pose.frame import FeatureWindow
 from ..LayerBase import LayerBase, DataCache, Rect
 from ...shaders import WindowShader
-from .DataLayerSettings import DataLayerSettings, LayerMode, ScalarFeatureSelect, FEATURE_MAP, TRACK_COLOR_FEATURES
+from modules.pose.features import BaseScalarFeature
+from .DataLayerSettings import DataLayerConfig, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES
 from ...color_settings import ColorSettings
 
 
@@ -25,11 +27,13 @@ class FeatureWindowLayer(LayerBase):
     """
     LAYER_MODE: LayerMode = LayerMode.WINDOW
 
-    def __init__(self, track_id: int, board: HasWindows, config: DataLayerSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, track_id: int, board: HasWindows, config: DataLayerConfig, color_settings: ColorSettings,
+                 feature_map: dict[IntEnum, type[BaseScalarFeature]] = FEATURE_MAP) -> None:
         self._track_id: int = track_id
         self._board: HasWindows = board
-        self._config: DataLayerSettings = config
+        self._config: DataLayerConfig = config
         self._color_settings: ColorSettings = color_settings
+        self._feature_map: dict[IntEnum, type[BaseScalarFeature]] = feature_map
         self._was_active: bool = False
 
         self._fbo: Fbo = Fbo()
@@ -93,8 +97,8 @@ class FeatureWindowLayer(LayerBase):
         self._was_active = active
         if not active:
             return
-        # ScalarFeatureSelect maps to feature type for DataHub lookup
-        feature_type = FEATURE_MAP[self._config.feature_field]
+        # feature_field maps to feature type for DataHub lookup
+        feature_type = self._feature_map[self._config.feature_field]
         window: FeatureWindow | None = self._board.get_window(
             self._config.stage, self._track_id, feature_type
         )
@@ -179,7 +183,7 @@ class FeatureWindowLayer(LayerBase):
     def _resolve_colors(self) -> list[tuple[float, float, float, float]]:
         if self._config.use_history_color:
             return [self._color_settings.history.to_tuple()]
-        feature_type = FEATURE_MAP[self._config.feature_field]
+        feature_type = self._feature_map[self._config.feature_field]
         if feature_type in TRACK_COLOR_FEATURES:
             return self._color_settings.track_color_tuples
         return self._color_settings.default_color_tuples

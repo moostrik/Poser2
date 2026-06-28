@@ -1,7 +1,7 @@
 """Tracks feature windows for all scalar features across multiple tracks."""
 
 from .WindowNode import WindowNode, WindowNodeSettings
-from ..features import SCALAR_FEATURES, BaseFeature
+from ..features import SCALAR_FEATURES, BaseFeature, BaseScalarFeature
 from ..frame import FrameDict, FrameWindowDict, FrameWindowDictCallbackMixin
 
 import logging
@@ -16,15 +16,21 @@ class WindowTracker(FrameWindowDictCallbackMixin):
     Automatically resets buffers when a track disappears.
     """
 
-    def __init__(self, num_tracks: int, config: WindowNodeSettings | None = None) -> None:
+    def __init__(self, num_tracks: int, config: WindowNodeSettings | None = None,
+                 features: list[type[BaseScalarFeature]] | None = None) -> None:
         super().__init__()
 
         if config is None:
             config = WindowNodeSettings()
 
+        # Default to all module-registered scalar features; callers can pass an explicit set
+        # (e.g. app-local features in addition to the built-ins) without touching the registry.
+        if features is None:
+            features = SCALAR_FEATURES
+
         self._nodes: dict[type[BaseFeature], dict[int, WindowNode]] = {
             ft: {i: WindowNode(ft, config) for i in range(num_tracks)}
-            for ft in SCALAR_FEATURES
+            for ft in features
         }
         self._track_ids = set(range(num_tracks))
 
