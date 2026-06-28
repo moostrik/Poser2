@@ -22,7 +22,7 @@ from modules.session import SessionSettings, SequencerSettings
 from modules.gl import WindowSettings
 from .light import LightSettings
 from .inout import OscLightSettings, UdpReceiverSettings
-from .pose import PlayheadSamplerSettings
+from .pose import PlayheadStabilityExtractorSettings
 
 
 # ---------------------------------------------------------------------------
@@ -71,6 +71,7 @@ class Layers(IntEnum):
     data_W       = auto()
     data_F       = auto()
     data_time    = auto()
+    data_playhead = auto()
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +213,7 @@ class PoseGroup(BaseSettings):
     velocity        : Group[VelocityFeature]                 = Group(VelocityFeature, share=_feature_share)
     motion          : Group[MotionFeature]                   = Group(MotionFeature)
     similarity      : Group[SimilarityFeature]               = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
-    playhead_sampler: Group[PlayheadSamplerSettings]         = Group(PlayheadSamplerSettings)
+    playhead_stability: Group[PlayheadStabilityExtractorSettings] = Group(PlayheadStabilityExtractorSettings)
     window_raw      : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_clean    : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_smooth   : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)

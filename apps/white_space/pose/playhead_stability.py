@@ -1,5 +1,6 @@
 """PlayheadStability — a White Space-native pose feature: how consistently a person holds
-their pose across successive playhead sweeps.
+their pose across successive playhead sweeps. It measures the *pose's* consistency; the
+playhead is only the sampling trigger.
 
 Each time the rotating playhead crosses a person (a ``PlayheadPhase`` zero-crossing) the
 current pose (``Angles``) is sampled into a short per-person ring buffer. Stability is the
@@ -8,7 +9,7 @@ it is ``0.0`` with a single sample and only reaches ``1.0`` with a full buffer o
 poses. The history (and the value) reset when the person's azimuth drifts too far from
 where the history began.
 
-Playhead is a White Space concept, so the feature, its sampler and its settings live with
+Playhead is a White Space concept, so the feature, its extractor and its settings live with
 the app rather than in ``modules/pose`` — like ``PlayheadPhase`` (see ``playhead_phase.py``).
 The open Frame ECS still lets the feature ride on ``Frame`` (via ``replace``) without
 modules depending on app code.
@@ -41,8 +42,8 @@ class PlayheadStability(NormalizedSingleValue):
     """
 
 
-class PlayheadSamplerSettings(BaseSettings):
-    """Configuration for ``PlayheadSampler``."""
+class PlayheadStabilityExtractorSettings(BaseSettings):
+    """Configuration for ``PlayheadStabilityExtractor``."""
     max_samples:   Field[int]   = Field(4, min=1, max=8, access=Field.INIT, description="Pose samples retained per person")
     angle_scale:   Field[float] = Field(0.8, min=0.1, max=2.0, step=0.05, description="Angle similarity scale (rad)")
     azimuth_reset: Field[float] = Field(0.35, min=0.0, max=math.pi, step=0.01, description="Azimuth drift from history start that resets the buffer (rad)")
@@ -64,7 +65,7 @@ def _pose_similarity(current: Angles, older: Angles, scale: float) -> float:
     return float(weights.sum() / (weights / sim).sum())     # weighted harmonic mean
 
 
-class PlayheadSampler(FilterNode):
+class PlayheadStabilityExtractor(FilterNode):
     """Samples the pose at each playhead hit and stamps ``PlayheadStability``.
 
     Holds per-track state (one instance per ``FilterPipeline``); ``reset()`` is called
@@ -73,8 +74,8 @@ class PlayheadSampler(FilterNode):
     writes ``PlayheadStability``. The value holds between hits (a step per sweep).
     """
 
-    def __init__(self, settings: PlayheadSamplerSettings | None = None) -> None:
-        self._settings = settings if settings is not None else PlayheadSamplerSettings()
+    def __init__(self, settings: PlayheadStabilityExtractorSettings | None = None) -> None:
+        self._settings = settings if settings is not None else PlayheadStabilityExtractorSettings()
         self.reset()
 
     def reset(self) -> None:

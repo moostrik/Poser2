@@ -9,6 +9,7 @@ from modules.render.layers import TrackerCompositor, PoseCompositor
 from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer
 from modules.render.layers.generic.PanoramicTrackerLayer import PanoramicTrackerLayer
 from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
+from apps.white_space.render.layers.playhead_data_renderer import PlayheadDataRenderer
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -52,6 +53,7 @@ class Render(RenderBase):
             self.L[Layers.data_W][i]    = FeatureWindowLayer(i, board, settings.data, settings.colors)
             self.L[Layers.data_F][i]    = FeatureFrameLayer( i, board, settings.data, settings.colors)
             self.L[Layers.data_time][i] = MTimeRenderer(     i, board)
+            self.L[Layers.data_playhead][i] = PlayheadDataRenderer(i, board)
 
         # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready
         self.L[Layers.ws_tracker][0] = PanoramicTrackerLayer(board, self.num_cams, settings.colors)
@@ -139,6 +141,7 @@ class Render(RenderBase):
             self.L[Layers.data_W][i].draw()
             self.L[Layers.data_F][i].draw()
             self.L[Layers.data_time][i].draw()
+            self.L[Layers.data_playhead][i].draw()
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         pass

@@ -1,4 +1,4 @@
-"""Tests for PlayheadSampler — playhead-hit sampling, the stability formula, the
+"""Tests for PlayheadStabilityExtractor — playhead-hit sampling, the stability formula, the
 zero-crossing/​wrap guard, and azimuth/track resets."""
 
 import math
@@ -8,7 +8,7 @@ import numpy as np
 
 from modules.pose.frame import Frame
 from modules.pose.features import Angles, Azimuth
-from apps.white_space.pose import PlayheadPhase, PlayheadStability, PlayheadSampler, PlayheadSamplerSettings
+from apps.white_space.pose import PlayheadPhase, PlayheadStability, PlayheadStabilityExtractor, PlayheadStabilityExtractorSettings
 
 _NUM_JOINTS = len(Angles.enum())
 
@@ -29,7 +29,7 @@ def _frame(phase: float, azimuth: float, angle_value: float) -> Frame:
 
 class StabilityFormulaTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.sampler = PlayheadSampler(PlayheadSamplerSettings())
+        self.extractor = PlayheadStabilityExtractor(PlayheadStabilityExtractorSettings())
 
     def _value(self, frame: Frame) -> float:
         return frame[PlayheadStability].value
@@ -57,7 +57,7 @@ class StabilityFormulaTest(unittest.TestCase):
     def _hit(self, angle: float, azimuth: float = 0.0) -> Frame:
         last = None
         for phase in (2.0, 0.1, -0.1):
-            last = self.sampler.process(_frame(phase, azimuth, angle))
+            last = self.extractor.process(_frame(phase, azimuth, angle))
         return last
 
     def _last(self, _drive: int, angle: float) -> Frame:
@@ -69,12 +69,12 @@ class StabilityFormulaTest(unittest.TestCase):
 
 class CrossingGuardTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.sampler = PlayheadSampler(PlayheadSamplerSettings())
+        self.extractor = PlayheadStabilityExtractor(PlayheadStabilityExtractorSettings())
 
     def _hit(self, angle: float = 0.5, azimuth: float = 0.0) -> Frame:
         last = None
         for phase in (2.0, 0.1, -0.1):
-            last = self.sampler.process(_frame(phase, azimuth, angle))
+            last = self.extractor.process(_frame(phase, azimuth, angle))
         return last
 
     def test_pi_wrap_does_not_sample(self) -> None:
@@ -82,44 +82,44 @@ class CrossingGuardTest(unittest.TestCase):
         # second real hit. If the wrap had sampled, we'd see 3 samples (≈0.667).
         self._hit()
         for phase in (-3.0, 3.0):   # sweep across the −π/+π seam (|phase| > π/2 → guarded)
-            self.sampler.process(_frame(phase, 0.0, 0.5))
+            self.extractor.process(_frame(phase, 0.0, 0.5))
         frame = self._hit()
         self.assertAlmostEqual(frame[PlayheadStability].value, 1.0 / 3.0, places=4)
 
     def test_value_holds_between_hits(self) -> None:
         self._hit()
-        self._hit()                                          # 2 samples → 1/3
-        held = self.sampler.process(_frame(-0.5, 0.0, 0.5))  # stays below zero — no crossing
+        self._hit()                                            # 2 samples → 1/3
+        held = self.extractor.process(_frame(-0.5, 0.0, 0.5))  # stays below zero — no crossing
         self.assertAlmostEqual(held[PlayheadStability].value, 1.0 / 3.0, places=4)
 
 
 class ResetTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.sampler = PlayheadSampler(PlayheadSamplerSettings())   # azimuth_reset = 0.35 rad
+        self.extractor = PlayheadStabilityExtractor(PlayheadStabilityExtractorSettings())   # azimuth_reset = 0.35 rad
 
     def _hit(self, angle: float = 0.5, azimuth: float = 0.0) -> Frame:
         last = None
         for phase in (2.0, 0.1, -0.1):
-            last = self.sampler.process(_frame(phase, azimuth, angle))
+            last = self.extractor.process(_frame(phase, azimuth, angle))
         return last
 
     def test_azimuth_drift_clears_history(self) -> None:
         for _ in range(4):
-            self._hit(azimuth=0.0)                            # build to 1.0 anchored at az 0
-        moved = self.sampler.process(_frame(2.0, 1.0, 0.5))  # drift 1.0 rad > 0.35 → reset
+            self._hit(azimuth=0.0)                              # build to 1.0 anchored at az 0
+        moved = self.extractor.process(_frame(2.0, 1.0, 0.5))  # drift 1.0 rad > 0.35 → reset
         self.assertTrue(math.isnan(moved[PlayheadStability].value))
         self.assertEqual(moved[PlayheadStability].score, 0.0)
 
     def test_small_azimuth_drift_keeps_history(self) -> None:
         self._hit(azimuth=0.0)
-        frame = self._hit(azimuth=0.2)                       # 0.2 rad < 0.35 → kept
+        frame = self._hit(azimuth=0.2)                         # 0.2 rad < 0.35 → kept
         self.assertAlmostEqual(frame[PlayheadStability].value, 1.0 / 3.0, places=4)
 
     def test_reset_makes_value_absent(self) -> None:
         for _ in range(3):
             self._hit()
-        self.sampler.reset()
-        frame = self.sampler.process(_frame(2.0, 0.0, 0.5))  # no hit
+        self.extractor.reset()
+        frame = self.extractor.process(_frame(2.0, 0.0, 0.5))  # no hit
         self.assertTrue(math.isnan(frame[PlayheadStability].value))
         self.assertEqual(frame[PlayheadStability].score, 0.0)
 
