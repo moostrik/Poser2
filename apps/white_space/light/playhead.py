@@ -14,9 +14,15 @@ mode/speed switches, stalls, and NaN gaps — only the rate changes.
 **Spin-down re-acquire** (HIGH → LOW/IDLE): leaving HIGH does *not* re-lock onto the measured
 phase right away — the motor is still spinning fast (unmeasurable above the sensor ceiling, then
 measuring *above* `low_rpm` as it brakes). The sweep keeps free-running at `low_rpm` until the
-motor has slowed back to content speed (`measured_rpm ≤ low_rpm × (1 + _RESYNC_RPM_TOL)`), then
-the normal `tracking` gain eases the internal phase onto the measured phase. The sweep stays
-"live" throughout the spin-down (never NaN).
+motor has slowed back to content speed, then the normal `tracking` gain eases the internal phase
+onto the measured phase. The sweep stays "live" throughout the spin-down (never NaN).
+
+Re-lock is two-stage to defeat the motor's lack of stall detection: above the sensor ceiling the
+motor keeps reporting its *stale* pre-HIGH measurement (`locked` with `measured_rpm ≈ low_rpm`), so
+trusting the first content-speed reading would re-lock instantly while the light is still spinning
+fast (the content would then race at the resumed sensor rpm). We therefore wait until we have seen a
+*fresh* above-content measurement (the real spin-down in progress) and only re-lock once it has since
+settled to `measured_rpm ≤ low_rpm × (1 + _RESYNC_RPM_TOL)`.
 
 The motor is offset-agnostic; the playhead owns its single content-alignment `offset`
 (constant → does not break continuity). Pixel compositions own their own offsets.
@@ -56,21 +62,28 @@ class Playhead:
         self._internal: float = 0.0                  # offset-free continuous content clock
         self._prev_mode: MotorMode = MotorMode.STOPPED
         self._resyncing: bool = False                # left HIGH → free-running until the motor slows to content speed
+        self._seen_fast: bool = False                # saw a fresh above-content measurement since leaving HIGH
         self._live:     bool  = False                # is there a real playhead this tick (locked, HIGH, or re-syncing)
 
     def tick(self, dt: float, motor: MotorState) -> None:
         """Advance the internal content clock from the motor's active mode, gating the re-lock onto
         the measured phase until a spun-down motor has returned to content speed."""
         # Leaving HIGH arms the re-sync: keep free-running until the motor slows back to content speed
-        # rather than snapping onto its still-too-fast (or unmeasurable) phase.
+        # rather than snapping onto its still-too-fast (or stale, see below) measured phase.
         if self._prev_mode == MotorMode.HIGH and motor.mode != MotorMode.HIGH:
-            self._resyncing = True
+            self._resyncing, self._seen_fast = True, False
         self._prev_mode = motor.mode
 
         if motor.mode == MotorMode.HIGH or motor.mode == MotorMode.STOPPED:
             self._resyncing = False                       # HIGH free-runs anyway; STOPPED holds
-        elif self._resyncing and motor.locked and motor.measured_rpm <= motor.low_rpm * (1.0 + _RESYNC_RPM_TOL):
-            self._resyncing = False                       # motor reached content speed → re-lock
+        elif self._resyncing and motor.locked:
+            # Two-stage gate: first catch a *fresh* above-content reading (the real spin-down — the
+            # motor otherwise keeps reporting its stale pre-HIGH ≈low_rpm measurement), then re-lock
+            # only once that has settled back to content speed.
+            if motor.measured_rpm > motor.low_rpm * (1.0 + _RESYNC_RPM_TOL):
+                self._seen_fast = True
+            elif self._seen_fast:
+                self._resyncing = False                   # motor reached content speed → re-lock
 
         # A real playhead exists with a measurement (locked), in HIGH (free-run content sweep), or
         # while re-syncing (a live free-running sweep). IDLE/LOW with no measurement → not live → NaN.

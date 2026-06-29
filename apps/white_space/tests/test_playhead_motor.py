@@ -299,6 +299,27 @@ class ReacquireTest(unittest.TestCase):
             p.tick(dt, mstate(mp, True, 72.0, mode=self.LOW, low_rpm=72.0))
         self.assertAlmostEqual(wrap(p.phase - p._settings.phase * TAU - mp), 0.0, places=2)
 
+    def test_stale_content_speed_reading_does_not_relock(self) -> None:
+        # Hardware spin-down: above the sensor ceiling the motor has no fresh falls and keeps reporting
+        # its STALE pre-HIGH ≈low_rpm measurement (locked, no stall detection). That must NOT re-lock
+        # while the light is still physically spinning fast — otherwise the content races at the rpm the
+        # sensor reports once falls resume (~ceiling). Re-lock only after a fresh fast reading settles.
+        dt = 1 / 60
+        p = self._into_high()
+        before = p._internal
+        # First LOW ticks: stale content-speed reading, no fast measurement seen yet → stay re-syncing.
+        for _ in range(3):
+            p.tick(dt, mstate(2.5, True, 72.0, mode=self.LOW, low_rpm=72.0))
+            self.assertTrue(p._resyncing)
+            self.assertFalse(p._seen_fast)
+        self.assertAlmostEqual(wrap(p._internal - before), 3 * 72.0 / 60.0 * TAU * dt, places=6)  # free-ran at low
+        # Falls resume as the light passes the ceiling (real fast measurement) → still re-syncing.
+        p.tick(dt, mstate(2.5, True, 180.0, mode=self.LOW, low_rpm=72.0))
+        self.assertTrue(p._resyncing); self.assertTrue(p._seen_fast)
+        # Now it has settled to content speed → re-lock.
+        p.tick(dt, mstate(2.5, True, 73.0, mode=self.LOW, low_rpm=72.0))
+        self.assertFalse(p._resyncing)
+
     def test_resync_is_live_while_motor_unmeasurable(self) -> None:
         dt = 1 / 60
         p = self._into_high()
