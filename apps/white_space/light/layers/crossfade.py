@@ -70,9 +70,9 @@ class Crossfade(BaseLayer):
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         cfg = self._config
-        # Unlocked motor → measured_rpm is 0 (a locked reading is always > 0), which resolves to the
-        # idle slot. No fallback to the commanded speed: with no measurement there's nothing to fade to.
-        rpm = frame.motor.measured_rpm
+        # Effective speed: the measured rpm below the sensor ceiling, the commanded speed above it
+        # (the sensor can't see past ~200 rpm), 0 when stopped → resolves to the idle slot.
+        rpm = frame.motor.effective_rpm
         w_idle, w_low, w_high = crossfade_weights(
             rpm, cfg.motor.idle_rpm, cfg.motor.low_rpm, cfg.high_cross_rpm)
         shift = int(round(cfg.light_offset / (2.0 * np.pi) * self.resolution)) % self.resolution

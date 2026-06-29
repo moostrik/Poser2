@@ -59,7 +59,7 @@ class PlayerLines(BaseLayer):
         self._states: dict[int, _PlayerState] = {}
         self._flank_buf: np.ndarray = np.zeros(resolution, dtype=np.float32)
         self._zeros_buf: np.ndarray = np.zeros(resolution, dtype=np.float32)
-        self.hot_reloader = HotReloadMethods(self.__class__, True)
+        # self.hot_reloader = HotReloadMethods(self.__class__, True)
 
     # ------------------------------------------------------------------
     # Layer interface

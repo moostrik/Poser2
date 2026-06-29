@@ -22,11 +22,9 @@ from time import monotonic
 
 from modules.settings import BaseSettings, Field, Widget
 
-# Stall = no fall for this many revolutions at the last measured speed → motor stopped.
-# Floored by _STALL_MIN_S so the window doesn't shrink to near-nothing at high rpm (where a
-# tiny period × 3 would spuriously trip on scheduling jitter or a couple of missed falls).
-_STALL_MISSED_REVS: float = 3.0
-_STALL_MIN_S:       float = 0.25
+# Above this rpm the hardware fall sensor can't keep up and stops emitting pulses, so no measurement is
+# available even though the motor is spinning. When commanded above it we trust the command.
+_SENSOR_CEILING_RPM: float = 200.0
 
 # Simulation loop cadence (s). The ramp + fall timing are sub-tick accurate regardless.
 _SIM_TICK: float = 1.0 / 30.0 # same as the motor
@@ -59,18 +57,20 @@ class MotorSimMode(IntEnum):
 class MotorState:
     """Per-tick motor state: what it measures (phase, rpm) and what it commands (mode, rpm).
     Offset-agnostic — `phase` is the raw measured angle."""
-    phase:        float     = 0.0                  # measured angular position, radians [-π, π)
-    locked:       bool      = False                # a valid fall measurement exists this tick
-    measured_rpm: float     = 0.0                  # measured speed
-    mode:         MotorMode = MotorMode.STOPPED    # commanded mode
-    target_rpm:   float     = 0.0                  # commanded speed (sent to the motor by osc_light)
-    low_rpm:      float     = 0.0                  # LOW-mode rpm — the playhead's content-sweep rate in HIGH
+    phase:         float     = 0.0                  # measured angular position, radians [-π, π)
+    locked:        bool      = False                # a valid fall measurement exists this tick
+    measured_rpm:  float     = 0.0                  # measured speed (0 when unlocked — sensor silent)
+    effective_rpm: float     = 0.0                  # speed to act on: measured when locked, else the
+                                                    # commanded target above the sensor ceiling, else 0
+    mode:          MotorMode = MotorMode.STOPPED    # commanded mode (sim selector while simulating)
+    target_rpm:    float     = 0.0                  # commanded speed (sent to the motor by osc_light)
+    low_rpm:       float     = 0.0                  # LOW-mode rpm — the playhead's content-sweep rate in HIGH
 
 
 class MotorSettings(BaseSettings):
     simulate:             Field[MotorSimMode] = Field(MotorSimMode.OFF,                          description="OFF = real hardware; any mode simulates the motor at that mode's rpm")
     mode:                 Field[MotorMode] = Field(MotorMode.LOW,                     description="Commanded mode — the target rpm is derived from it")
-    active_mode:          Field[MotorMode] = Field(MotorMode.STOPPED, access=Field.READ, description="Actual mode — the target mode once the motor has responded (locked); STOPPED until then")
+    active_mode:          Field[MotorMode] = Field(MotorMode.STOPPED, access=Field.READ, description="Active mode — the commanded mode (or the sim selector while simulating)")
     idle_rpm:             Field[float] = Field(7.0,    min=0.0, max=60.0,   step=0.5,  description="Target rpm in IDLE mode", newline=True)
     low_rpm:              Field[float] = Field(72.0,   min=0.0, max=300.0,  step=1.0,  description="Target rpm in LOW mode")
     high_rpm:             Field[float] = Field(2000.0, min=0.0, max=2400.0, step=1.0,  description="Target rpm in HIGH mode")
@@ -211,24 +211,15 @@ class MotorController:
         return MotorMode[sim.name] if sim != MotorSimMode.OFF else self._settings.mode
 
     def _measure(self, now: float) -> tuple[bool, float, float]:
-        """Raw phase measurement from the fall timestamps — returns (locked, rpm, phase).
+        """Phase + rpm from the fall timestamps — returns (have_measurement, rpm, phase).
 
-        Pure read of the fall state (apart from clearing it on stall); writes no settings.
-        Unlocked (stalled / no falls) → (False, 0.0, NaN).
+        Pure read of the fall state; writes nothing. No falls yet → (False, 0.0, NaN). There is no
+        stall/stop detection: a long silence is never treated as "stopped" (the fall signal is too
+        sparse/late for that) — the last measurement simply persists until a new fall updates it.
         """
         with self._fall_lock:
             last_fall_time  = self._last_fall_time
             measured_period = self._measured_period
-            # Stall = no fall for several revolutions at the last measured speed → the motor
-            # has stopped/slowed; unlock so the playhead free-runs. Self-adapting (fast →
-            # quick, idle → patient); checked under the lock so a concurrent fall isn't wiped.
-            if last_fall_time is not None and measured_period is not None:
-                stall_timeout = max(_STALL_MISSED_REVS * measured_period, _STALL_MIN_S)
-                if now - last_fall_time > stall_timeout:
-                    self._last_fall_time  = None
-                    self._measured_period = None
-                    last_fall_time        = None
-                    measured_period       = None
 
         if last_fall_time is None or measured_period is None:
             return False, 0.0, float('nan')
@@ -239,26 +230,31 @@ class MotorController:
         return True, rpm, phase
 
     def tick(self) -> MotorState:
-        """Measure the raw motor phase + rpm from falls; command the rpm derived from the mode.
+        """Report the motor state from the commanded mode, refined by fall measurements when available.
 
-        Offset-agnostic — returns the raw measured phase (radians [-π,π)) and a `locked`
-        flag. When unlocked (stalled / no falls) phase is NaN and the playhead free-runs.
-
-        The commanded `target_rpm` always reflects the target mode (so the motor is told to
-        spin up). The reported `mode`, however, is the **actual** mode: it stays STOPPED until
-        the motor has actually responded (locked) — we don't claim a mode we haven't heard back
-        on. While simulating, the sim selector is the target mode.
+        Trusts the command: `mode` is always the commanded mode and `target_rpm` its rpm — there is no
+        stall/stop detection (the fall signal is too sparse/late for that). Falls give a measured phase
+        + rpm only while running *in the sensor's range*: below the ceiling (above it no falls arrive)
+        and not commanded STOPPED. When measuring, `effective_rpm` is the real measured speed and the
+        playhead tracks `phase`; otherwise `effective_rpm` falls back to the commanded `target_rpm` and
+        `phase` is NaN (the playhead free-runs). While simulating, the sim selector is the target mode.
         """
         target_mode = self._target_mode()
         target_rpm  = self._target_rpm(target_mode)
 
-        locked, rpm, phase = self._measure(monotonic())
-        # Actual mode: only the target mode once we've heard back (locked); STOPPED until then.
-        actual_mode = target_mode if locked else MotorMode.STOPPED
+        have_measurement, measured, phase = self._measure(monotonic())
+        # A measurement is usable only while running within the sensor's range: below the ceiling (above
+        # it no falls arrive) and not commanded STOPPED. Otherwise we trust the command.
+        fast   = target_rpm > _SENSOR_CEILING_RPM
+        locked = have_measurement and not fast and target_mode != MotorMode.STOPPED
+
+        measured_rpm  = measured if locked else 0.0
+        effective_rpm = measured_rpm if locked else target_rpm
+        phase         = phase if locked else float('nan')
 
         # Publish the measurement to the read-back settings.
         self._settings.phase        = phase if locked else 0.0
-        self._settings.measured_rpm = rpm
-        self._settings.active_mode  = actual_mode
-        return MotorState(phase=phase, locked=locked, measured_rpm=rpm, mode=actual_mode,
-                          target_rpm=target_rpm, low_rpm=self._settings.low_rpm)
+        self._settings.measured_rpm = measured_rpm
+        self._settings.active_mode  = target_mode
+        return MotorState(phase=phase, locked=locked, measured_rpm=measured_rpm, effective_rpm=effective_rpm,
+                          mode=target_mode, target_rpm=target_rpm, low_rpm=self._settings.low_rpm)

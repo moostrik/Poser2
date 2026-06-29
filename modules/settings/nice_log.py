@@ -5,6 +5,8 @@ from typing import Callable
 
 from nicegui import ui
 
+from .nice_util import SafeTimer
+
 LOG_DRAWER_DEFAULT_HEIGHT = '33vh'
 
 _LOG_LEVEL_COLORS = {
@@ -196,7 +198,7 @@ def build_log_drawer(timers: list, *, poll_interval: float) -> tuple:
         except RuntimeError:
             pass
 
-    t = ui.timer(poll_interval, _poll_log)
+    t = SafeTimer(poll_interval, _poll_log)
     timers.append(t)
 
     log_area.on('scroll', lambda: ui.run_javascript(f'''

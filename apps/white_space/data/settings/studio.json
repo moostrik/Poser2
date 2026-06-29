@@ -11,7 +11,7 @@
     "square": false,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "cam_0": {
       "device_id": "14442C1031DDD2D200",
@@ -29,8 +29,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 30001,
+      "mono_iso": 1549,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.4,
@@ -56,8 +56,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 29992,
+      "mono_iso": 985,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.4,
@@ -83,8 +83,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 29992,
+      "mono_iso": 395,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.4,
@@ -110,8 +110,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 0,
-      "mono_iso": 0,
+      "mono_exposure": 30001,
+      "mono_iso": 1549,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.4,
@@ -164,7 +164,7 @@
       "port": 6454,
       "use_signed": false,
       "mtu": 1500,
-      "lower_edge": 0.35,
+      "lower_edge": 0.32,
       "curve": 1.0,
       "offsets": {
         "white_0": 0,
@@ -175,7 +175,7 @@
     },
     "osc_sound": {
       "stage": "LERP",
-      "ip_addresses": "192.168.1.64",
+      "ip_addresses": "192.168.1.39",
       "port": 8000
     },
     "osc_receiver": {
@@ -365,22 +365,37 @@
     }
   },
   "light": {
-    "master": 1.0,
-    "high_cross_rpm": 600.0,
     "idle_layers": [],
     "low_layers": [
-      "playhead_flash"
+      "playhead_flash",
+      "lines"
     ],
     "high_layers": [
-      "pose_waves"
+      "lines"
     ],
+    "master": 1.0,
+    "high_cross_rpm": 600.0,
     "light_offset": 0.0,
     "clock": {
       "bpm": 20.0
     },
+    "motor": {
+      "simulate": "OFF",
+      "mode": "HIGH",
+      "idle_rpm": 7.0,
+      "low_rpm": 36.0,
+      "high_rpm": 2000.0
+    },
+    "playhead": {
+      "offset": 0.0,
+      "tracking": 0.93,
+      "high_follow": true,
+      "release_smooth": 0.9
+    },
     "low": {
       "playhead": {
-        "level": 1.0
+        "level": 1.0,
+        "blend": "ADD"
       },
       "playhead_flash": {
         "base_white": 0.0,
@@ -468,7 +483,8 @@
       },
       "playhead": {
         "level": 1.0,
-        "width": 0.01
+        "width": 0.01,
+        "blend": "ADD"
       }
     },
     "test": {
@@ -527,10 +543,10 @@
         "blend": "ADD",
         "white": {
           "level": 1.0,
-          "speed": 0.0,
+          "speed": 1.0,
           "phase": 0.19,
-          "width": 0.37,
-          "amount": 1
+          "width": 0.1,
+          "amount": 16
         },
         "blue": {
           "level": 0.0,
@@ -563,19 +579,6 @@
           "threshold": 0.0
         }
       }
-    },
-    "motor": {
-      "simulate": "LOW",
-      "mode": "LOW",
-      "idle_rpm": 7.0,
-      "low_rpm": 34.0,
-      "high_rpm": 2000.0
-    },
-    "playhead": {
-      "offset": 0.0,
-      "tracking": 0.93,
-      "high_follow": true,
-      "release_smooth": 0.9
     }
   },
   "render": {

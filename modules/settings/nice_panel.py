@@ -43,6 +43,7 @@ from nicegui import ui
 
 from .base_settings import BaseSettings
 from .nice_log import LOG_DRAWER_DEFAULT_HEIGHT, build_log_drawer
+from .nice_util import SafeTimer
 from . import presets
 from .field import Field, Access
 from .widget import Widget
@@ -1082,17 +1083,15 @@ def _register_polls(polls, all_polls):
 
 
 def _make_poll_timer(polls, timers):
-    """Create a single page-level ``ui.timer`` that polls all collected entries.
+    """Create a single page-level ``SafeTimer`` that polls all collected entries.
 
     Each entry is ``(settings, name, [last_value], setter)``.
     The timer runs on NiceGUI's event loop so UI calls are thread-safe.
-    *timers* collects the timer for later cleanup reference.
-    Cancels itself if the client has been deleted (parent slot gone).
+    *timers* collects the timer for later cleanup reference. ``SafeTimer``
+    cancels itself once the client's parent slot is torn down.
     """
     if not polls:
         return
-
-    t_holder: list = [None]
 
     def _tick():
         try:
@@ -1101,16 +1100,10 @@ def _make_poll_timer(polls, timers):
                 if cur != last[0]:
                     last[0] = cur
                     setter(cur)
-        except RuntimeError:
-            # Parent slot deleted — client is gone, cancel to stop recurring errors
-            if t_holder[0] is not None:
-                t_holder[0].cancel()
         except Exception:
             pass  # Transient error (e.g. WebSocket drop) — skip this tick, retry next
 
-    t = ui.timer(POLL_INTERVAL, _tick)
-    t_holder[0] = t
-    timers.append(t)
+    timers.append(SafeTimer(POLL_INTERVAL, _tick))
 
 
 def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=""):

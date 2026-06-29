@@ -16,10 +16,11 @@ def wrap(x: float) -> float:
 
 def mstate(phase: float, locked: bool, rpm: float,
            mode: MotorMode = MotorMode.LOW, low_rpm: float = 72.0) -> MotorState:
-    """A MotorState for the playhead: measured rpm when locked, 0 (no measurement) otherwise."""
+    """A MotorState for the playhead: `rpm` is the effective speed to sweep at; measured rpm and phase
+    are valid only when locked."""
     return MotorState(
         phase=phase, locked=locked,
-        measured_rpm=rpm if locked else 0.0,
+        measured_rpm=rpm if locked else 0.0, effective_rpm=rpm,
         target_rpm=rpm, mode=mode, low_rpm=low_rpm,
     )
 
@@ -66,23 +67,52 @@ class MotorTest(unittest.TestCase):
         self.assertFalse(st.locked)
         self.assertTrue(math.isnan(st.phase))
 
-    def test_actual_mode_stopped_until_heard_back(self) -> None:
+    def test_mode_is_commanded_immediately(self) -> None:
+        # No stall/stop detection: the reported mode is the commanded mode at once, even before any falls.
+        s = MotorSettings(); s.mode = MotorMode.LOW
+        self.assertEqual(MotorController(s).tick().mode, MotorMode.LOW)
+
+    def test_long_gap_does_not_unlock(self) -> None:
+        # No stall detection: a long silence never zeroes the measurement (fixes spin-down false-stops).
         s = MotorSettings(); s.mode = MotorMode.LOW
         m = MotorController(s)
-        st = m.tick()                                   # no falls yet — haven't heard back
-        self.assertEqual(st.mode, MotorMode.STOPPED)    # actual mode stays STOPPED
-        self.assertEqual(st.target_rpm, 72.0)           # but the motor is still commanded to LOW
-        m._last_fall_time = monotonic() - 0.25; m._measured_period = 0.5
-        self.assertEqual(m.tick().mode, MotorMode.LOW)  # once it responds (locked) → actual = LOW
+        m._measured_period = 1.0                    # 60 rpm
+        m._last_fall_time  = monotonic() - 30.0     # 30 s since the last fall — would have stalled before
+        st = m.tick()
+        self.assertTrue(st.locked)
+        self.assertAlmostEqual(st.effective_rpm, 60.0)
 
-    def test_stall_unlocks_after_missed_revs(self) -> None:
-        m = MotorController(MotorSettings())
-        m._measured_period = 1.0
-        m._last_fall_time = monotonic() - 5.0      # 5s > 3 revolutions (3 x 1s) → stalled
-        self.assertFalse(m.tick().locked)
-        m._measured_period = 1.0
-        m._last_fall_time = monotonic() - 0.25     # within 3 revolutions → still locked
-        self.assertTrue(m.tick().locked)
+    def test_high_runs_above_sensor_ceiling(self) -> None:
+        # Above the sensor ceiling no falls arrive, so the motor is unlocked even while spinning.
+        # Commanded HIGH (2000 > ceiling) → trust the command: report HIGH and act on target_rpm.
+        s = MotorSettings(); s.mode = MotorMode.HIGH
+        st = MotorController(s).tick()                  # no falls → unlocked
+        self.assertFalse(st.locked)
+        self.assertTrue(math.isnan(st.phase))          # phase still unmeasurable
+        self.assertEqual(st.mode, MotorMode.HIGH)      # but reported as running in HIGH
+        self.assertEqual(st.effective_rpm, 2000.0)     # acts on the commanded speed
+        self.assertEqual(st.measured_rpm, 0.0)         # measured stays honest (sensor silent)
+
+    def test_effective_rpm_is_measured_when_locked(self) -> None:
+        st = self._locked(MotorMode.LOW, period=1.0).tick()   # 60 rpm measured, below the ceiling
+        self.assertTrue(st.locked)
+        self.assertAlmostEqual(st.effective_rpm, st.measured_rpm, places=6)
+
+    def test_no_falls_uses_commanded_speed(self) -> None:
+        # With no measurement, the effective speed follows the command — there is no 'stopped' state.
+        s = MotorSettings(); s.mode = MotorMode.LOW    # 72 rpm, below ceiling
+        st = MotorController(s).tick()                 # no falls
+        self.assertFalse(st.locked)
+        self.assertEqual(st.mode, MotorMode.LOW)
+        self.assertEqual(st.effective_rpm, 72.0)
+
+    def test_commanded_stopped_is_idle(self) -> None:
+        # Commanded STOPPED is the one deliberate 'off' path: effective speed 0 regardless of falls.
+        m = self._locked(MotorMode.STOPPED)            # has falls, but commanded STOPPED
+        st = m.tick()
+        self.assertEqual(st.mode, MotorMode.STOPPED)
+        self.assertEqual(st.effective_rpm, 0.0)
+        self.assertFalse(st.locked)
 
 
 class SimTest(unittest.TestCase):
