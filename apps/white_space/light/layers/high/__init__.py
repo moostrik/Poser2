@@ -1,4 +1,4 @@
-"""High-speed light layers — shown above the LOW→HIGH crossfade, with the ring light_offset applied.
+"""High-speed light layers — shown above the LOW→HIGH crossfade, with the ring light_phase applied.
 
 Persistence-of-vision content that only reads while the bar spins fast: pose/camera-driven visuals.
 """

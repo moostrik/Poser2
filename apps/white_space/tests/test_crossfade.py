@@ -1,6 +1,5 @@
 """Tests for the compositor's motor-rpm crossfade weights."""
 
-import math
 import unittest
 
 import numpy as np
@@ -54,18 +53,18 @@ class CrossfadeWeightsTest(unittest.TestCase):
         self.assertGreater(wl, 0.0); self.assertGreater(wh, 0.0)
 
 
-class LightOffsetShiftTest(unittest.TestCase):
-    """Documents the light_offset → pixel-shift convention used in Crossfade._draw."""
+class LightPhaseShiftTest(unittest.TestCase):
+    """Documents the light_phase → pixel-shift convention used in Crossfade._draw."""
 
     @staticmethod
-    def _shift(offset: float, resolution: int) -> int:
-        return int(round(offset / (2.0 * np.pi) * resolution)) % resolution
+    def _shift(phase: float, resolution: int) -> int:
+        return int(round(phase * resolution)) % resolution
 
-    def test_zero_offset_is_identity(self) -> None:
+    def test_zero_phase_is_identity(self) -> None:
         self.assertEqual(self._shift(0.0, 3600), 0)
 
-    def test_pi_is_half_ring(self) -> None:
-        self.assertEqual(self._shift(math.pi, 3600), 1800)
+    def test_half_turn_is_half_ring(self) -> None:
+        self.assertEqual(self._shift(0.5, 3600), 1800)
 
 
 if __name__ == "__main__":

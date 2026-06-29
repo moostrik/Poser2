@@ -4,7 +4,7 @@ The CPU mirror of ``modules.render`` ``CompositeLayer``: a layer that is handed 
 and owns the combining. Each tick it reads the motor rpm off the frame, computes the idle/low/high
 crossfade weights, resolves each slot's selected layers from its pool, blends them (via their own
 blend modes) into a private scratch, and adds ``weight ×`` that composite into the output — the high
-slot ring-rolled by ``light_offset``. The renderer just builds the pools and calls ``render(frame)``.
+slot ring-rolled by ``light_phase``. The renderer just builds the pools and calls ``render(frame)``.
 """
 
 from __future__ import annotations
@@ -75,13 +75,13 @@ class Crossfade(BaseLayer):
         rpm = frame.motor.effective_rpm
         w_idle, w_low, w_high = crossfade_weights(
             rpm, cfg.motor.idle_rpm, cfg.motor.low_rpm, cfg.high_cross_rpm)
-        shift = int(round(cfg.light_offset / (2.0 * np.pi) * self.resolution)) % self.resolution
+        shift = int(round(cfg.light_phase * self.resolution)) % self.resolution
 
         pick = lambda d, ids: [d[i] for i in ids if i in d]   # selected instances, in blend order
         entries = (
             (pick(self._low_layers,  cfg.idle_layers), w_idle, 0),
             (pick(self._low_layers,  cfg.low_layers),  w_low,  0),
-            (pick(self._high_layers, cfg.high_layers), w_high, shift),   # high slot gets light_offset
+            (pick(self._high_layers, cfg.high_layers), w_high, shift),   # high slot gets light_phase
         )
 
         # Reset any layer no longer selected in any slot, so it restarts fresh on reselection.

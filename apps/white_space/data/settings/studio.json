@@ -57,7 +57,7 @@
       "color_denoise": 0,
       "color_sharpness": 0,
       "mono_exposure": 29992,
-      "mono_iso": 1540,
+      "mono_iso": 1549,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.3,
@@ -114,7 +114,7 @@
       "mono_iso": 1549,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.3,
+      "ir_flood_light": 0.33,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -371,11 +371,12 @@
       "playhead_flash"
     ],
     "high_layers": [
-      "lines"
+      "player_lines",
+      "playhead"
     ],
     "master": 1.0,
     "high_cross_rpm": 600.0,
-    "light_offset": 0.0,
+    "light_phase": 0.55,
     "clock": {
       "bpm": 20.0
     },
@@ -459,12 +460,12 @@
         }
       },
       "player_lines": {
-        "center_width": 0.06,
+        "center_width": 0.04,
         "flank_width": 0.03,
         "depth_scale": 2.0,
-        "invert": true,
-        "level_center": 1.0,
-        "level_flank": 0.0,
+        "invert": false,
+        "level_center": 0.0,
+        "level_flank": 1.0,
         "anchor_nose": true,
         "blend": "ADD"
       },

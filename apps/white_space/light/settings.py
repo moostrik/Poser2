@@ -1,4 +1,3 @@
-import math
 from enum import IntEnum, auto
 from modules.settings import BaseSettings, Field, Group, Widget
 
@@ -77,11 +76,11 @@ class LightSettings(BaseSettings):
     # Per-motor-speed layer selectors (multi-select; layers in a slot blend, slots crossfade by rpm)
     idle_layers:  Field[list[LowLayerId]]  = Field([LowLayerId.playhead], widget=Widget.checklist, description="Layers shown at idle", newline=True)
     low_layers:   Field[list[LowLayerId]]  = Field([LowLayerId.playhead_flash],widget=Widget.checklist, description="Layers shown at low speed")
-    high_layers:  Field[list[HighLayerId]] = Field([HighLayerId.pose_waves],   widget=Widget.checklist, description="Layers shown at high speed (light_offset applied)")
+    high_layers:  Field[list[HighLayerId]] = Field([HighLayerId.pose_waves],   widget=Widget.checklist, description="Layers shown at high speed (light_phase applied)")
 
     master:         Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Master brightness (applied to the composite; lamp gamma/floor live in osc_light)", newline=True)
     high_cross_rpm: Field[float] = Field(1200.0, min=0.0, max=2400.0, step=10.0, description="LOW→HIGH crossfade rpm")
-    light_offset: Field[float]   = Field(0.0, min=-math.pi, max=math.pi, step=0.01, description="High-slot ring offset (radians)")
+    light_phase: Field[float]    = Field(0.0, min=0.0, max=1.0, step=0.01, description="High-slot ring offset (0–1 turn)")
 
     clock:        Group[ClockSettings]        = Group(ClockSettings)
     motor:        Group[MotorSettings]        = Group(MotorSettings)
