@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class OscSound(BaseOscSound):
     """OscSound extended with the rotation playhead (/global/playhead) and the
-    panoramic-only per-pose azimuth, distance, and playhead-phase messages.
+    panoramic-only per-pose azimuth, distance, and playhead-offset messages.
 
     Everything flows through the base's single-bundle send path by overriding the three
     leaf builders; there is no separate _send_data/_send_blackout."""
@@ -57,9 +57,9 @@ class OscSound(BaseOscSound):
         bundle_builder.add_content(distance_msg.build())  # type: ignore
 
         playhead_offset: float = frame[PlayheadOffset].value if PlayheadOffset in frame else np.nan
-        phase_msg = OscMessageBuilder(address=f"/pose/{id}/playhead_phase")
-        phase_msg.add_arg(playhead_offset, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(phase_msg.build())  # type: ignore
+        offset_msg = OscMessageBuilder(address=f"/pose/{id}/playhead_offset")
+        offset_msg.add_arg(playhead_offset, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(offset_msg.build())  # type: ignore
 
         stability: float = frame[PlayheadStability].value if PlayheadStability in frame else np.nan
         stability_msg = OscMessageBuilder(address=f"/pose/{id}/playhead_stability")
@@ -68,7 +68,7 @@ class OscSound(BaseOscSound):
 
     def _add_inactive_frame_messages(self, bundle_builder: OscBundleBuilder, id: int, num_players: int) -> None:
         super()._add_inactive_frame_messages(bundle_builder, id, num_players)
-        for address in (f"/pose/{id}/azimuth", f"/pose/{id}/distance", f"/pose/{id}/playhead_phase", f"/pose/{id}/playhead_stability"):
+        for address in (f"/pose/{id}/azimuth", f"/pose/{id}/distance", f"/pose/{id}/playhead_offset", f"/pose/{id}/playhead_stability"):
             msg = OscMessageBuilder(address=address)
             msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
             bundle_builder.add_content(msg.build())  # type: ignore

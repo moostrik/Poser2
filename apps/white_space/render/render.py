@@ -20,7 +20,7 @@ from ..settings import Layers, RenderSettings, PlayheadFeatureSelect
 # Maps the app-local feature dropdown to the concrete app features. Kept here (not in
 # settings, which stays data-only) and handed to the generic data layers via feature_map.
 PLAYHEAD_FEATURE_MAP = {
-    PlayheadFeatureSelect.PlayheadPhase:     PlayheadOffset,
+    PlayheadFeatureSelect.PlayheadOffset:    PlayheadOffset,
     PlayheadFeatureSelect.PlayheadStability: PlayheadStability,
 }
 

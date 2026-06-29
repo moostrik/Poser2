@@ -1,4 +1,4 @@
-"""PlayheadPhase — a White Space-native pose feature: the signed phase offset of a
+"""PlayheadOffset — a White Space-native pose feature: the signed angular offset of a
 pose's azimuth relative to the rotating light playhead.
 
 The playhead is a White Space concept, so the feature and its extractor live with the
@@ -18,7 +18,7 @@ from modules.pose.nodes import FilterNode
 
 
 class PlayheadOffset(SingleAngle):
-    """Signed phase offset in radians [-π, π) of a pose's azimuth relative to the playhead.
+    """Signed angular offset in radians [-π, π) of a pose's azimuth relative to the playhead.
 
     ``0`` = playhead on the pose, ``>0`` = playhead approaching (pose ahead in the sweep
     direction), ``<0`` = playhead just passed, ``±π`` = opposite side of the ring.
@@ -27,7 +27,7 @@ class PlayheadOffset(SingleAngle):
 
 
 class PlayheadOffsetExtractor(FilterNode):
-    """Stamps ``PlayheadPhase`` from the pose azimuth and a live playhead provider.
+    """Stamps ``PlayheadOffset`` from the pose azimuth and a live playhead provider.
 
     ``playhead`` returns the current playhead (radians [-π, π); NaN when not meaningful).
     Wired in main to ``board.get_playhead`` — read live so there is no lag.

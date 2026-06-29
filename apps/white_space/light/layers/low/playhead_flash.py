@@ -1,8 +1,8 @@
 """PlayheadFlash composition — brightens the strip as the rotating playhead approaches
-each player and fades as it departs, driven by the continuous ``PlayheadPhase``.
+each player and fades as it departs, driven by the continuous ``PlayheadOffset``.
 
-Replaces the old discrete hit-flash: each pose's signed phase to the playhead gives a
-smooth rise (approaching, phase ``+rise → 0``) and fall (departing, ``0 → -fall``) around
+Replaces the old discrete hit-flash: each pose's signed offset to the playhead gives a
+smooth rise (approaching, offset ``+rise → 0``) and fall (departing, ``0 → -fall``) around
 the crossing — the asymmetric lead/trail a single hit moment could never express. The
 whole-strip brightness follows the closest-approaching pose.
 """
@@ -18,10 +18,10 @@ from ...frame import Frame
 from ....pose import PlayheadOffset
 
 
-def phase_to_level(phi: float, rise: float, fall: float) -> float:
-    """Asymmetric triangular envelope of a pose's playhead phase, peaking at the crossing.
+def offset_to_level(phi: float, rise: float, fall: float) -> float:
+    """Asymmetric triangular envelope of a pose's playhead offset, peaking at the crossing.
 
-    ``rise``/``fall`` are widths in radians. Returns 0 for NaN or out-of-window phases.
+    ``rise``/``fall`` are widths in radians. Returns 0 for NaN or out-of-window offsets.
     """
     if math.isnan(phi):
         return 0.0
@@ -37,13 +37,13 @@ class PlayheadFlashSettings(LayerSettings):
     base_blue:   Field[float] = Field(0.1, min=0.0, max=1.0, step=0.01, description="Base brightness for blue channel (full strip)")
     flash_white: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Peak flash intensity for white channel", newline=True)
     flash_blue:  Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Peak flash intensity for blue channel")
-    rise:        Field[float] = Field(0.5, min=0.0, max=math.pi, step=0.01, description="Approach width (radians): phase ahead at which brightening starts", newline=True)
-    fall:        Field[float] = Field(0.5, min=0.0, max=math.pi, step=0.01, description="Departure width (radians): phase behind at which the glow fades out")
+    rise:        Field[float] = Field(0.5, min=0.0, max=math.pi, step=0.01, description="Approach width (radians): offset ahead at which brightening starts", newline=True)
+    fall:        Field[float] = Field(0.5, min=0.0, max=math.pi, step=0.01, description="Departure width (radians): offset behind at which the glow fades out")
 
 
 class PlayheadFlash(BaseLayer):
     """Continuous base level plus a rise/fall glow tracking the playhead's approach to
-    each active player, read from ``PlayheadPhase``."""
+    each active player, read from ``PlayheadOffset``."""
 
     def __init__(self, resolution: int, config: PlayheadFlashSettings, board, pose_stage: int) -> None:
         super().__init__(resolution, config, board)
@@ -61,7 +61,7 @@ class PlayheadFlash(BaseLayer):
             tracklet = tracklets.get(pose.track_id)
             if tracklet is None or not tracklet.is_active:
                 continue
-            level = max(level, phase_to_level(pose[PlayheadOffset].value, rise, fall))
+            level = max(level, offset_to_level(pose[PlayheadOffset].value, rise, fall))
 
         half = self.resolution // 2
         white[:half] += P.base_white + level * P.flash_white

@@ -2,7 +2,7 @@
 their pose across successive playhead sweeps. It measures the *pose's* consistency; the
 playhead is only the sampling trigger.
 
-Each time the rotating playhead crosses a person (a ``PlayheadPhase`` zero-crossing) the
+Each time the rotating playhead crosses a person (a ``PlayheadOffset`` zero-crossing) the
 current pose (``Angles``) is sampled into a short per-person ring buffer. Stability is the
 summed similarity of the current sample to the older ones, normalised by buffer capacity:
 it is ``0.0`` with a single sample and only reaches ``1.0`` with a full buffer of matching
@@ -10,7 +10,7 @@ poses. The history (and the value) reset when the person's azimuth drifts too fa
 where the history began.
 
 Playhead is a White Space concept, so the feature, its extractor and its settings live with
-the app rather than in ``modules/pose`` — like ``PlayheadPhase`` (see ``playhead_phase.py``).
+the app rather than in ``modules/pose`` — like ``PlayheadOffset`` (see ``playhead_offset.py``).
 The open Frame ECS still lets the feature ride on ``Frame`` (via ``replace``) without
 modules depending on app code.
 """
@@ -29,7 +29,7 @@ from modules.settings import BaseSettings, Field
 
 from .playhead_offset import PlayheadOffset
 
-# Zero-crossing guard: only treat a phase sign change as a hit when both samples are within
+# Zero-crossing guard: only treat an offset sign change as a hit when both samples are within
 # a quarter-turn of the playhead, so the ±π wrap (opposite side of the ring) never counts.
 _HALF_PI: float = math.pi / 2.0
 
@@ -69,7 +69,7 @@ class PlayheadStabilityExtractor(FilterNode):
     """Samples the pose at each playhead hit and stamps ``PlayheadStability``.
 
     Holds per-track state (one instance per ``FilterPipeline``); ``reset()`` is called
-    automatically by ``FilterTracker`` when the track is lost. Reads ``PlayheadPhase``
+    automatically by ``FilterTracker`` when the track is lost. Reads ``PlayheadOffset``
     (stamped upstream in the same ``filters_lerp`` pipeline), ``Azimuth`` and ``Angles``;
     writes ``PlayheadStability``. The value holds between hits (a step per sweep).
     """
@@ -81,11 +81,11 @@ class PlayheadStabilityExtractor(FilterNode):
     def reset(self) -> None:
         self._samples: deque[Angles] = deque(maxlen=self._settings.max_samples)
         self._anchor_az:  float = float("nan")   # azimuth where the current history began
-        self._prev_phase: float = float("nan")   # last frame's PlayheadPhase, for crossing detection
+        self._prev_offset: float = float("nan")  # last frame's PlayheadOffset, for crossing detection
         self._stability:  float = float("nan")   # last computed value, held between hits
 
     def process(self, pose: Frame) -> Frame:
-        phase:   float = pose[PlayheadOffset].value
+        offset:  float = pose[PlayheadOffset].value
         azimuth: float = pose[Azimuth].value
 
         # Azimuth drift (absolute from where the history began) → drop the history.
@@ -94,12 +94,12 @@ class PlayheadStabilityExtractor(FilterNode):
             if drift > self._settings.azimuth_reset:
                 self.reset()
 
-        # Hit = PlayheadPhase zero-crossing near 0 (the ±π wrap is excluded by the guard).
-        # NaN phase (playhead unlocked / no azimuth) fails the comparison, so no hit fires.
-        if (self._prev_phase * phase < 0.0
-                and abs(self._prev_phase) < _HALF_PI and abs(phase) < _HALF_PI):
+        # Hit = PlayheadOffset zero-crossing near 0 (the ±π wrap is excluded by the guard).
+        # NaN offset (playhead unlocked / no azimuth) fails the comparison, so no hit fires.
+        if (self._prev_offset * offset < 0.0
+                and abs(self._prev_offset) < _HALF_PI and abs(offset) < _HALF_PI):
             self._on_hit(pose[Angles], azimuth)
-        self._prev_phase = phase
+        self._prev_offset = offset
 
         score = 0.0 if math.isnan(self._stability) else 1.0
         return replace(pose, {PlayheadStability: PlayheadStability.from_value(self._stability, score)})

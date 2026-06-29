@@ -266,7 +266,7 @@ class PreviewGroup(BaseSettings):
 
 class PlayheadFeatureSelect(IntEnum):
     """App-local feature dropdown for the playhead data layers (keys PLAYHEAD_FEATURE_MAP)."""
-    PlayheadPhase     = 0
+    PlayheadOffset    = 0
     PlayheadStability = auto()
 
 

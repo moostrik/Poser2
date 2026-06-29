@@ -15,5 +15,5 @@ Layers in this package light those specific pixels rather than drawing a ring. A
 bar blurs into a ring and the high-speed layers take over (the compositor crossfades by motor rpm).
 """
 
-from .playhead_flash import PlayheadFlash, PlayheadFlashSettings, phase_to_level
+from .playhead_flash import PlayheadFlash, PlayheadFlashSettings, offset_to_level
 from .playhead       import Playhead,      PlayheadSettings
