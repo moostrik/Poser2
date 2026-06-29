@@ -38,8 +38,8 @@ def _wrap_to_pi(x: float) -> float:
 
 
 class PlayheadSettings(BaseSettings):
-    offset:         Field[float] = Field(0.0,  min=-math.pi, max=math.pi, step=0.01,
-                                         description="Playhead zero-point alignment (radians)")
+    phase:          Field[float] = Field(0.0,  min=0.0, max=1.0, step=0.01,
+                                         description="Playhead zero-point alignment (0–1 turn)")
     tracking:       Field[float] = Field(0.1,  min=0.0, max=1.0, step=0.01,
                                          description="How tightly the playhead tracks the measured motor phase (0=free-run, 1=snap)")
     playhead:       Field[float] = Field(0.0,  min=-math.pi, max=math.pi, step=0.001,
@@ -77,7 +77,7 @@ class Playhead:
         self._live = motor.mode == MotorMode.HIGH or motor.locked or self._resyncing
         self._advance_internal(dt, motor)
         # Finite continuous position for the UI slider (`.phase` itself is NaN when not live).
-        self._settings.playhead = _wrap_to_pi(self._internal + self._settings.offset)
+        self._settings.playhead = _wrap_to_pi(self._internal + self._settings.phase * math.tau)
 
     def _advance_internal(self, dt: float, motor: MotorState) -> None:
         """The mode-based content sweep (STOPPED holds, IDLE/LOW track the measured phase, HIGH and
@@ -102,4 +102,4 @@ class Playhead:
         stays continuous underneath, and `settings.playhead` keeps the last finite position for the UI."""
         if not self._live:
             return float('nan')
-        return _wrap_to_pi(self._internal + self._settings.offset)
+        return _wrap_to_pi(self._internal + self._settings.phase * math.tau)

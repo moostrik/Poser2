@@ -4,7 +4,7 @@
   "input_fps": 23.0,
   "render_fps": 60.0,
   "light_resolution": 3600,
-  "fov": 120.0,
+  "fov": 127.0,
   "camera": {
     "yolo": true,
     "color": false,
@@ -29,11 +29,11 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 210,
+      "mono_exposure": 30001,
+      "mono_iso": 1549,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.4,
+      "ir_flood_light": 0.3,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -57,10 +57,10 @@
       "color_denoise": 0,
       "color_sharpness": 0,
       "mono_exposure": 29992,
-      "mono_iso": 1497,
+      "mono_iso": 1540,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.4,
+      "ir_flood_light": 0.3,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -83,11 +83,11 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 1040,
+      "mono_exposure": 30001,
+      "mono_iso": 1549,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.4,
+      "ir_flood_light": 0.3,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -114,7 +114,7 @@
       "mono_iso": 1549,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.4,
+      "ir_flood_light": 0.3,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -128,7 +128,7 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "folder": "20250514-130512_4_wide_mono",
+      "folder": "20260629-174832_Wolfie_1",
       "sim_passthrough": false,
       "start_norm": 0.0,
       "end_norm": 1.0
@@ -139,8 +139,8 @@
       "timeout": 2.0,
       "seam": {
         "reject": 0.5,
-        "reach": 1.15,
-        "hysteresis": 0.9,
+        "reach": 1.2,
+        "hysteresis": 0.75,
         "angles": {}
       },
       "distortion": {
@@ -368,26 +368,26 @@
     "light_rate": 30.0,
     "idle_layers": [],
     "low_layers": [
-      "playhead"
+      "playhead_flash"
     ],
     "high_layers": [
       "lines"
     ],
-    "master": 0.17,
+    "master": 1.0,
     "high_cross_rpm": 600.0,
     "light_offset": 0.0,
     "clock": {
       "bpm": 20.0
     },
     "motor": {
-      "simulate": "LOW",
+      "simulate": "OFF",
       "mode": "LOW",
       "idle_rpm": 7.0,
-      "low_rpm": 72.0,
+      "low_rpm": 60.0,
       "high_rpm": 2000.0
     },
     "playhead": {
-      "offset": 0.0,
+      "phase": 0.70715,
       "tracking": 0.93
     },
     "low": {
@@ -397,7 +397,7 @@
       },
       "playhead_flash": {
         "base_white": 0.0,
-        "base_blue": 0.0,
+        "base_blue": 0.1,
         "flash_white": 1.0,
         "flash_blue": 0.0,
         "rise": 0.5,
@@ -542,7 +542,7 @@
         "white": {
           "level": 1.0,
           "speed": 1.0,
-          "phase": 0.2,
+          "phase": 0.3,
           "width": 0.1,
           "amount": 16
         },

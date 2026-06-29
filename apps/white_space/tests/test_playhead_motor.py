@@ -231,12 +231,12 @@ class PlayheadNcoTest(unittest.TestCase):
         self.assertFalse(math.isnan(p.phase))                   # HIGH free-runs content (unmeasurable) → finite
 
     def test_offset_applied(self) -> None:
-        p = running_playhead(); p._settings.offset = 0.5; p._internal = 1.0
-        self.assertAlmostEqual(wrap(p.phase - 1.5), 0.0, places=6)
+        p = running_playhead(); p._settings.phase = 0.25; p._internal = 1.0   # 0.25 turn = π/2 rad
+        self.assertAlmostEqual(wrap(p.phase - (1.0 + math.pi / 2)), 0.0, places=6)
 
     def test_offset_constant_keeps_continuity(self) -> None:
         dt, rpm = 1 / 30, 72.0
-        p = running_playhead(); p._settings.offset = -2.0736
+        p = running_playhead(); p._settings.phase = -0.33
         gen = _advancing(rpm, dt)
         prev = p.phase
         for _ in range(100):
@@ -281,7 +281,7 @@ class ReacquireTest(unittest.TestCase):
         for _ in range(200):                                           # tracking pulls onto the measured phase
             mp = next(gen)
             p.tick(dt, mstate(mp, True, 72.0, mode=self.LOW, low_rpm=72.0))
-        self.assertAlmostEqual(wrap(p.phase - p._settings.offset - mp), 0.0, places=2)
+        self.assertAlmostEqual(wrap(p.phase - p._settings.phase * TAU - mp), 0.0, places=2)
 
     def test_resync_is_live_while_motor_unmeasurable(self) -> None:
         dt = 1 / 60
