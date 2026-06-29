@@ -107,6 +107,9 @@ class OscLight:
         info_message = self._build_info_message(self._config.resolution, self._chunk_size, self._num_chunks)
         with self._client_lock:
             self._client.send(info_message)
+            # Startup edge: emit rpm 0 once so the first commanded rpm is a *change* the motor acts on
+            # (the controller ignores a constant value already present when it powers on).
+            self._client.send(self._build_rpm_message(0))
 
         while self._running:
             self._update_event.wait()
@@ -134,6 +137,13 @@ class OscLight:
     # ------------------------------------------------------------------
     # Message builders
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _build_rpm_message(rpm: float) -> OscMessage:
+        """Motor speed command (`/WS/r/0`)."""
+        msgb = OscMessageBuilder("/WS/r/0")
+        msgb.add_arg(int(rpm))
+        return msgb.build()
 
     @staticmethod
     def _build_info_message(resolution: int, chunk_size: int, num_chunks: int) -> OscBundle:
@@ -169,9 +179,7 @@ class OscLight:
                 off_msgb.add_arg(val)
                 message_list.append(off_msgb.build())
 
-            rpm_msgb = OscMessageBuilder("/WS/r/0")
-            rpm_msgb.add_arg(int(output.motor.target_rpm))
-            message_list.append(rpm_msgb.build())
+            message_list.append(OscLight._build_rpm_message(output.motor.target_rpm))
 
             # Lamp output mapping: gamma curve + turn-on floor (master brightness applied upstream).
             white_f = OscLight._apply_levels(output.white, settings.curve, settings.lower_edge)

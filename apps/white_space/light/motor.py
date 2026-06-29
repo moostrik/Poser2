@@ -103,6 +103,13 @@ class MotorController:
 
     def start(self) -> None:
         self._running = True
+        # Safety: never spin up to HIGH on boot — demote a persisted HIGH command (real or simulated)
+        # to LOW. The operator must explicitly select HIGH after startup. Done before binding/starting
+        # the sim so the first tick already sees the demoted mode.
+        if self._settings.mode == MotorMode.HIGH:
+            self._settings.mode = MotorMode.LOW
+        if self._settings.simulate == MotorSimMode.HIGH:
+            self._settings.simulate = MotorSimMode.LOW
         self._settings.bind(MotorSettings.simulate, self._on_sim_setting_changed)
         self._sim_thread.start()
 

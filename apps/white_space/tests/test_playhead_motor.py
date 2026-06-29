@@ -68,6 +68,16 @@ class MotorTest(unittest.TestCase):
         self.assertFalse(st.locked)
         self.assertTrue(math.isnan(st.phase))
 
+    def test_does_not_start_in_high(self) -> None:
+        # Safety: a persisted HIGH command is demoted to LOW on start so the motor never boots into a fast spin.
+        s = MotorSettings(); s.mode = MotorMode.HIGH
+        m = MotorController(s)
+        m.start()
+        try:
+            self.assertEqual(s.mode, MotorMode.LOW)
+        finally:
+            m.stop()
+
     def test_mode_is_commanded_immediately(self) -> None:
         # No stall/stop detection: the reported mode is the commanded mode at once, even before any falls.
         s = MotorSettings(); s.mode = MotorMode.LOW
