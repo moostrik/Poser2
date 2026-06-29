@@ -136,7 +136,9 @@ class MotorController:
     def _fire_fall_at(self, t: float) -> None:
         """Record a fall that occurred at time `t` (used for sub-tick-accurate sim falls)."""
         with self._fall_lock:
-            if self._last_fall_time is not None:
+            # Only a strictly positive interval is a valid period; ignore duplicate/simultaneous falls
+            # (bouncing sensor, repeated packets) so `measured_period` never becomes 0 → div-by-zero.
+            if self._last_fall_time is not None and t > self._last_fall_time:
                 self._measured_period = t - self._last_fall_time
             self._last_fall_time = t
 
@@ -228,7 +230,7 @@ class MotorController:
             last_fall_time  = self._last_fall_time
             measured_period = self._measured_period
 
-        if last_fall_time is None or measured_period is None:
+        if last_fall_time is None or measured_period is None or measured_period <= 0.0:
             return False, 0.0, float('nan')
 
         rpm   = 60.0 / measured_period

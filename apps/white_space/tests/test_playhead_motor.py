@@ -78,6 +78,22 @@ class MotorTest(unittest.TestCase):
         finally:
             m.stop()
 
+    def test_duplicate_fall_does_not_divide_by_zero(self) -> None:
+        # Two falls at the same instant (bouncing sensor / repeated packet) must not crash tick().
+        s = MotorSettings(); s.mode = MotorMode.LOW
+        m = MotorController(s)
+        t = monotonic()
+        m._fire_fall_at(t)
+        m._fire_fall_at(t)              # simultaneous duplicate → no positive period recorded
+        st = m.tick()                  # must not raise ZeroDivisionError
+        self.assertFalse(st.locked)    # no valid measurement → not locked
+
+    def test_zero_period_does_not_lock(self) -> None:
+        # Defensive: a degenerate 0 period is treated as no measurement, not a div-by-zero.
+        m = MotorController(MotorSettings())
+        m._last_fall_time = monotonic(); m._measured_period = 0.0
+        self.assertFalse(m.tick().locked)
+
     def test_mode_is_commanded_immediately(self) -> None:
         # No stall/stop detection: the reported mode is the commanded mode at once, even before any falls.
         s = MotorSettings(); s.mode = MotorMode.LOW

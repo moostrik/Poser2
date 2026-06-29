@@ -1,4 +1,5 @@
 from threading import Thread, Event, Lock
+from time import monotonic
 from typing import Optional, Union
 
 import numpy as np
@@ -36,6 +37,7 @@ class OscLightSettings(BaseSettings):
     num_chunks:   Field[int]  = Field(0,    access=Field.READ,  description="Computed number of chunks")
     lower_edge:   Field[float] = Field(0.35, min=0.0, max=1.0, step=0.01, description="Lamp turn-on floor: lit pixels lift to at least this; black stays off")
     curve:        Field[float] = Field(1.0,  min=0.5, max=2.0, step=0.01, description="Output gamma curve; <1 brightens mids, >1 darkens")
+    startup_delay: Field[float] = Field(2.0, min=0.0, max=10.0, step=0.5, description="Hold motor rpm at 0 for this long after connect, then release to the commanded speed — forces a 0→target edge the motor controller acts on at boot")
     offsets:      Group[OscLightOffsetSettings] = Group(OscLightOffsetSettings)
 
 
@@ -59,6 +61,7 @@ class OscLight:
         self._config.num_chunks = self._num_chunks
 
         self._latest_output: Optional[Frame] = None
+        self._start_time:    Optional[float] = None   # connect time → motor-rpm startup hold (boot edge)
         self._output_lock:   Lock  = Lock()
         self._client_lock:   Lock  = Lock()
         self._update_event:  Event = Event()
@@ -107,9 +110,7 @@ class OscLight:
         info_message = self._build_info_message(self._config.resolution, self._chunk_size, self._num_chunks)
         with self._client_lock:
             self._client.send(info_message)
-            # Startup edge: emit rpm 0 once so the first commanded rpm is a *change* the motor acts on
-            # (the controller ignores a constant value already present when it powers on).
-            self._client.send(self._build_rpm_message(0))
+        self._start_time = monotonic()   # begin the startup rpm-zero hold (forces a boot edge)
 
         while self._running:
             self._update_event.wait()
@@ -120,7 +121,12 @@ class OscLight:
                 output = self._latest_output
             if output is None:
                 continue
-            message_list = self._build_data_message(output, self._config, self._chunk_size, self._num_chunks)
+            # Hold rpm at 0 for `startup_delay` after connect, then release to the commanded speed: a
+            # sustained 0→target edge the motor controller reliably acts on (a single 0 packet is too
+            # transient / may arrive before the controller is listening).
+            held = self._start_time is not None and (monotonic() - self._start_time) < self._config.startup_delay
+            motor_rpm = 0 if held else int(output.motor.target_rpm)
+            message_list = self._build_data_message(output, self._config, self._chunk_size, self._num_chunks, motor_rpm)
             if message_list:
                 with self._client_lock:
                     for message in message_list:
@@ -165,6 +171,7 @@ class OscLight:
         settings: OscLightSettings,
         chunk_size: int,
         num_chunks: int,
+        motor_rpm: int,
     ) -> Optional[OscMessageList]:
         try:
             message_list: OscMessageList = []
@@ -179,7 +186,7 @@ class OscLight:
                 off_msgb.add_arg(val)
                 message_list.append(off_msgb.build())
 
-            message_list.append(OscLight._build_rpm_message(output.motor.target_rpm))
+            message_list.append(OscLight._build_rpm_message(motor_rpm))
 
             # Lamp output mapping: gamma curve + turn-on floor (master brightness applied upstream).
             white_f = OscLight._apply_levels(output.white, settings.curve, settings.lower_edge)

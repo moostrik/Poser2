@@ -2,7 +2,7 @@
   "num_players": 4,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "render_fps": 60.0,
+  "render_fps": 59.0,
   "light_resolution": 3600,
   "fov": 127.0,
   "camera": {
@@ -56,7 +56,7 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
+      "mono_exposure": 30001,
       "mono_iso": 1549,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
@@ -166,6 +166,7 @@
       "mtu": 1500,
       "lower_edge": 0.32,
       "curve": 1.0,
+      "startup_delay": 2.0,
       "offsets": {
         "white_0": 5,
         "white_1": -5,
@@ -372,7 +373,8 @@
     ],
     "high_layers": [
       "player_lines",
-      "playhead"
+      "playhead",
+      "lines"
     ],
     "master": 1.0,
     "high_cross_rpm": 600.0,
