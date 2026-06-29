@@ -11,10 +11,10 @@
     "square": false,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "cam_0": {
-      "device_id": "14442C1031DDD2D200",
+      "device_id": "14442C101136D1D200",
       "show_stereo": false,
       "flip_h": true,
       "flip_v": false,
@@ -29,8 +29,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 30001,
-      "mono_iso": 1549,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.4,
@@ -41,7 +41,7 @@
       "stereo_bright_max": 255
     },
     "cam_1": {
-      "device_id": "14442C10110AD3D200",
+      "device_id": "14442C10F124D9D600",
       "show_stereo": false,
       "flip_h": true,
       "flip_v": false,
@@ -56,8 +56,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 985,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.4,
@@ -68,7 +68,7 @@
       "stereo_bright_max": 255
     },
     "cam_2": {
-      "device_id": "14442C10F124D9D600",
+      "device_id": "14442C10110AD3D200",
       "show_stereo": false,
       "flip_h": true,
       "flip_v": false,
@@ -83,8 +83,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 395,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.4,
@@ -95,7 +95,7 @@
       "stereo_bright_max": 255
     },
     "cam_3": {
-      "device_id": "14442C101136D1D200",
+      "device_id": "14442C1031DDD2D200",
       "show_stereo": false,
       "flip_h": true,
       "flip_v": false,
@@ -110,8 +110,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 30001,
-      "mono_iso": 1549,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.4,
@@ -167,10 +167,10 @@
       "lower_edge": 0.32,
       "curve": 1.0,
       "offsets": {
-        "white_0": 0,
-        "white_1": 0,
-        "blue_0": 0,
-        "blue_1": 0
+        "white_0": 5,
+        "white_1": -5,
+        "blue_0": -3,
+        "blue_1": 3
       }
     },
     "osc_sound": {
@@ -368,13 +368,12 @@
     "light_rate": 30.0,
     "idle_layers": [],
     "low_layers": [
-      "playhead_flash",
-      "lines"
+      "playhead"
     ],
     "high_layers": [
       "lines"
     ],
-    "master": 1.0,
+    "master": 0.17,
     "high_cross_rpm": 600.0,
     "light_offset": 0.0,
     "clock": {
@@ -382,7 +381,7 @@
     },
     "motor": {
       "simulate": "OFF",
-      "mode": "HIGH",
+      "mode": "LOW",
       "idle_rpm": 7.0,
       "low_rpm": 36.0,
       "high_rpm": 2000.0
@@ -390,7 +389,7 @@
     "playhead": {
       "offset": 0.0,
       "tracking": 0.93,
-      "high_follow": true,
+      "high_follow": false,
       "release_smooth": 0.9
     },
     "low": {
@@ -545,16 +544,16 @@
         "white": {
           "level": 1.0,
           "speed": 1.0,
-          "phase": 0.19,
+          "phase": 0.2,
           "width": 0.1,
           "amount": 16
         },
         "blue": {
-          "level": 0.0,
-          "speed": 0.5,
+          "level": 1.0,
+          "speed": -3.56,
           "phase": 0.5,
-          "width": 0.5,
-          "amount": 36
+          "width": 0.1,
+          "amount": 16
         }
       },
       "random": {

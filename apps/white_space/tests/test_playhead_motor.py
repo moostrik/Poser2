@@ -30,6 +30,7 @@ def running_playhead(settings: "PlayheadSettings | None" = None,
     """A Playhead already in a rotating mode, so `.phase` is finite (not the stopped-NaN)."""
     p = Playhead(settings or PlayheadSettings())
     p._prev_mode = mode
+    p._live = True
     return p
 
 
@@ -206,14 +207,18 @@ class PlayheadNcoTest(unittest.TestCase):
         # never steps faster than the LOW sweep — no jump at the switch, no speed-up to 2000
         self.assertLess(max_step, (72.0 / 60.0 * TAU * dt) * 1.6)
 
-    def test_phase_nan_only_when_stopped(self) -> None:
+    def test_phase_nan_without_live_signal(self) -> None:
         dt = 1 / 60
         p = Playhead(PlayheadSettings())
         p.tick(dt, mstate(0.5, False, 0.0, mode=MotorMode.STOPPED))
-        self.assertTrue(math.isnan(p.phase))                    # stopped → NaN to consumers
-        for mode in (MotorMode.IDLE, MotorMode.LOW, MotorMode.HIGH):
+        self.assertTrue(math.isnan(p.phase))                    # stopped → NaN
+        p.tick(dt, mstate(0.5, False, 72.0, mode=MotorMode.LOW))
+        self.assertTrue(math.isnan(p.phase))                    # LOW but unlocked (disconnected) → NaN
+        for mode in (MotorMode.IDLE, MotorMode.LOW):
             p.tick(dt, mstate(0.5, True, 72.0, mode=mode))
-            self.assertFalse(math.isnan(p.phase))               # rotating → finite
+            self.assertFalse(math.isnan(p.phase))               # locked → finite
+        p.tick(dt, mstate(0.5, False, 2000.0, mode=MotorMode.HIGH))
+        self.assertFalse(math.isnan(p.phase))                   # HIGH free-runs content (unmeasurable) → finite
 
     def test_offset_applied(self) -> None:
         p = running_playhead(); p._settings.offset = 0.5; p._output = 1.0

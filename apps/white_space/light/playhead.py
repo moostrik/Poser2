@@ -2,10 +2,12 @@
 
 A numerically-controlled oscillator (NCO/PLL) whose behavior depends on the motor's
 active mode (it is the *content sweep*, which never runs faster than LOW):
-  - STOPPED → holds its last position (frozen).
-  - IDLE / LOW → free-runs at the motor's rpm and softly phase-locks to its measured phase.
+  - STOPPED → holds its last position (frozen); no playhead (`.phase` is NaN).
+  - IDLE / LOW → tracks the measured phase *while locked*. With no measurement (motor disconnected
+    / not turning) there is nothing real to track, so the sweep holds and `.phase` is NaN.
   - HIGH → free-runs at `low_rpm` and ignores the motor's fast phase, so the content sweep
-    continues seamlessly from LOW (the motor's HIGH speed is for the pixel system).
+    continues seamlessly from LOW (the motor's HIGH speed is for the pixel system). HIGH is
+    unmeasurable by design, so it is always "live" (the content sweep is the playhead).
 This is the **internal** phase; it is never snapped or reset, so it stays continuous across
 mode/speed switches, stalls, and NaN gaps — only the rate changes.
 
@@ -63,14 +65,18 @@ class Playhead:
         self._riding:   bool  = False                # spin-up ride active
         self._released: bool  = False                # past release_rpm → easing back
         self._w:        float = 0.0                  # ride weight (1=motor, 0=internal)
+        self._live:     bool  = False                # is there a real playhead this tick (locked or HIGH)
 
     def tick(self, dt: float, motor: MotorState) -> None:
         """Advance the internal content clock from the motor's active mode, then apply the
         optional spin-up ride to produce the output."""
+        # A real playhead exists only with a measurement (locked) or in HIGH (free-run content sweep).
+        # IDLE/LOW with no measurement (disconnected) → not live → `.phase` is NaN.
+        self._live = motor.mode == MotorMode.HIGH or motor.locked
         self._advance_internal(dt, motor)
         self._update_ride(dt, motor)
         self._settings.follow = self._w
-        # Finite continuous position for the UI slider (`.phase` itself is NaN while stopped).
+        # Finite continuous position for the UI slider (`.phase` itself is NaN when not live).
         self._settings.phase  = _wrap_to_pi(self._output + self._settings.offset)
 
     def _advance_internal(self, dt: float, motor: MotorState) -> None:
@@ -80,12 +86,11 @@ class Playhead:
         elif motor.mode == MotorMode.HIGH:
             # Keep sweeping at the LOW content rate; the motor's fast phase is for the pixels.
             self._internal = _wrap_to_pi(self._internal + (motor.low_rpm / 60.0) * math.tau * dt)
-        else:                                                 # IDLE, LOW — sweep at the effective speed
-            rpm = motor.effective_rpm                          # measured when locked, else commanded
-            self._internal += (rpm / 60.0) * math.tau * dt
-            if motor.locked and not math.isnan(motor.phase):  # nudge toward the measured phase only when locked
-                self._internal += self._settings.tracking * _wrap_to_pi(motor.phase - self._internal)
+        elif motor.locked and not math.isnan(motor.phase):    # IDLE, LOW — track the measured rotation
+            self._internal += (motor.measured_rpm / 60.0) * math.tau * dt
+            self._internal += self._settings.tracking * _wrap_to_pi(motor.phase - self._internal)
             self._internal = _wrap_to_pi(self._internal)
+        # else IDLE/LOW with no measurement (disconnected) → hold; `.phase` reports NaN (not live)
 
     def _update_ride(self, dt: float, motor: MotorState) -> None:
         """Spin-up ride: ride `motor.phase` from the entry-to-HIGH edge until `release_rpm`,
@@ -117,9 +122,10 @@ class Playhead:
     @property
     def phase(self) -> float:
         """Playhead in radians [-π, π) with the alignment offset applied — the value the outside
-        world consumes. NaN while the motor is STOPPED (frozen sweep → no meaningful playhead, per
-        the board's HasPlayhead contract). The internal sweep (_internal/_output) stays continuous
-        underneath, and `settings.phase` keeps the last finite position for the UI."""
-        if self._prev_mode == MotorMode.STOPPED:
+        world consumes. NaN when there is no live playhead — STOPPED, or IDLE/LOW with no measurement
+        (motor disconnected / not turning) — per the board's HasPlayhead contract. The internal sweep
+        (_internal/_output) stays continuous underneath, and `settings.phase` keeps the last finite
+        position for the UI."""
+        if not self._live:
             return float('nan')
         return _wrap_to_pi(self._output + self._settings.offset)

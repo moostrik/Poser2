@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Crossfade dead-zone: each fade starts `deadzone` ABOVE the mode below it and ends `deadzone` BELOW
 # its own mode rpm, so a band around every mode rpm shows only that mode (no neighbour bleed on jitter).
-CROSSFADE_DEADZONE: float = 0.05
+CROSSFADE_DEADZONE: float = 0.1
 
 
 def _ease(t: float) -> float:
