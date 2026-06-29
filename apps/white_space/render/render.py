@@ -14,13 +14,13 @@ from modules.render.composition_subdivider import make_subdivision, SubdivisionR
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from ..board import Board
-from ..pose import PlayheadPhase, PlayheadStability
+from ..pose import PlayheadOffset, PlayheadStability
 from ..settings import Layers, RenderSettings, PlayheadFeatureSelect
 
 # Maps the app-local feature dropdown to the concrete app features. Kept here (not in
 # settings, which stays data-only) and handed to the generic data layers via feature_map.
 PLAYHEAD_FEATURE_MAP = {
-    PlayheadFeatureSelect.PlayheadPhase:     PlayheadPhase,
+    PlayheadFeatureSelect.PlayheadPhase:     PlayheadOffset,
     PlayheadFeatureSelect.PlayheadStability: PlayheadStability,
 }
 

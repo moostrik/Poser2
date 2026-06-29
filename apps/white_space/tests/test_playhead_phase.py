@@ -5,7 +5,7 @@ import unittest
 
 from modules.pose.frame import Frame
 from modules.pose.features import Azimuth
-from apps.white_space.pose import PlayheadPhase, PlayheadPhaseExtractor
+from apps.white_space.pose import PlayheadOffset, PlayheadOffsetExtractor
 from apps.white_space.light.layers._utilities import angle_to_strip_position
 from apps.white_space.light.layers.low.playhead_flash import phase_to_level
 
@@ -45,7 +45,7 @@ class AngleToStripPositionTest(unittest.TestCase):
 
 class PlayheadPhaseExtractorTest(unittest.TestCase):
     def _phase(self, azimuth: float, playhead: float) -> float:
-        return PlayheadPhaseExtractor(lambda: playhead).process(_frame(azimuth))[PlayheadPhase].value
+        return PlayheadOffsetExtractor(lambda: playhead).process(_frame(azimuth))[PlayheadOffset].value
 
     def test_on_playhead_is_zero(self) -> None:
         self.assertAlmostEqual(self._phase(0.3, 0.3), 0.0, places=4)
@@ -64,8 +64,8 @@ class PlayheadPhaseExtractorTest(unittest.TestCase):
         self.assertAlmostEqual(self._phase(-PI + 0.1, PI - 0.1), 0.2, places=4)
 
     def test_missing_inputs_absent(self) -> None:
-        self.assertNotIn(PlayheadPhase, PlayheadPhaseExtractor(lambda: 0.5).process(_frame(float("nan"))))
-        self.assertNotIn(PlayheadPhase, PlayheadPhaseExtractor(lambda: float("nan")).process(_frame(0.5)))
+        self.assertNotIn(PlayheadOffset, PlayheadOffsetExtractor(lambda: 0.5).process(_frame(float("nan"))))
+        self.assertNotIn(PlayheadOffset, PlayheadOffsetExtractor(lambda: float("nan")).process(_frame(0.5)))
 
 
 class PlayheadFlashEnvelopeTest(unittest.TestCase):

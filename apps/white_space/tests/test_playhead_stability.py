@@ -8,7 +8,7 @@ import numpy as np
 
 from modules.pose.frame import Frame
 from modules.pose.features import Angles, Azimuth
-from apps.white_space.pose import PlayheadPhase, PlayheadStability, PlayheadStabilityExtractor, PlayheadStabilityExtractorSettings
+from apps.white_space.pose import PlayheadOffset, PlayheadStability, PlayheadStabilityExtractor, PlayheadStabilityExtractorSettings
 
 _NUM_JOINTS = len(Angles.enum())
 
@@ -23,7 +23,7 @@ def _frame(phase: float, azimuth: float, angle_value: float) -> Frame:
     if not math.isnan(azimuth):
         features[Azimuth] = Azimuth.from_value(azimuth)
     if not math.isnan(phase):
-        features[PlayheadPhase] = PlayheadPhase.from_value(phase)
+        features[PlayheadOffset] = PlayheadOffset.from_value(phase)
     return Frame(track_id=0, cam_id=0, features=features)
 
 

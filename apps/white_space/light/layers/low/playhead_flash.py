@@ -15,7 +15,7 @@ from modules.settings import Field
 
 from .._base_layer import BaseLayer, LayerSettings
 from ...frame import Frame
-from ....pose import PlayheadPhase
+from ....pose import PlayheadOffset
 
 
 def phase_to_level(phi: float, rise: float, fall: float) -> float:
@@ -61,7 +61,7 @@ class PlayheadFlash(BaseLayer):
             tracklet = tracklets.get(pose.track_id)
             if tracklet is None or not tracklet.is_active:
                 continue
-            level = max(level, phase_to_level(pose[PlayheadPhase].value, rise, fall))
+            level = max(level, phase_to_level(pose[PlayheadOffset].value, rise, fall))
 
         half = self.resolution // 2
         white[:half] += P.base_white + level * P.flash_white

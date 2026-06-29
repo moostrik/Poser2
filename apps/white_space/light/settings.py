@@ -80,12 +80,12 @@ class LightSettings(BaseSettings):
     high_layers:  Field[list[HighLayerId]] = Field([HighLayerId.pose_waves],   widget=Widget.checklist, description="Layers shown at high speed (light_offset applied)")
 
     master:         Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Master brightness (applied to the composite; lamp gamma/floor live in osc_light)", newline=True)
-    high_cross_rpm: Field[float] = Field(1200.0, min=0.0, max=2400.0, step=10.0, description="LOW→HIGH crossfade rpm; also the playhead spin-up release")
+    high_cross_rpm: Field[float] = Field(1200.0, min=0.0, max=2400.0, step=10.0, description="LOW→HIGH crossfade rpm")
     light_offset: Field[float]   = Field(0.0, min=-math.pi, max=math.pi, step=0.01, description="High-slot ring offset (radians)")
 
     clock:        Group[ClockSettings]        = Group(ClockSettings)
     motor:        Group[MotorSettings]        = Group(MotorSettings)
-    playhead:     Group[PlayheadSettings]     = Group(PlayheadSettings, share=[high_cross_rpm.as_('release_rpm')])
+    playhead:     Group[PlayheadSettings]     = Group(PlayheadSettings)
 
     # Composition settings grouped by category (mirrors the layers/ low|high|test subpackages)
     low:  Group[LowCompSettings]  = Group(LowCompSettings)

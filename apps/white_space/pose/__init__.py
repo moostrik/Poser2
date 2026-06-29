@@ -1,2 +1,2 @@
-from .playhead_phase import PlayheadPhase, PlayheadPhaseExtractor
+from .playhead_offset import PlayheadOffset, PlayheadOffsetExtractor
 from .playhead_stability import PlayheadStability, PlayheadStabilityExtractor, PlayheadStabilityExtractorSettings

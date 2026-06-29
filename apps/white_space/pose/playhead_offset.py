@@ -17,7 +17,7 @@ from modules.pose.frame import Frame, replace
 from modules.pose.nodes import FilterNode
 
 
-class PlayheadPhase(SingleAngle):
+class PlayheadOffset(SingleAngle):
     """Signed phase offset in radians [-π, π) of a pose's azimuth relative to the playhead.
 
     ``0`` = playhead on the pose, ``>0`` = playhead approaching (pose ahead in the sweep
@@ -26,7 +26,7 @@ class PlayheadPhase(SingleAngle):
     """
 
 
-class PlayheadPhaseExtractor(FilterNode):
+class PlayheadOffsetExtractor(FilterNode):
     """Stamps ``PlayheadPhase`` from the pose azimuth and a live playhead provider.
 
     ``playhead`` returns the current playhead (radians [-π, π); NaN when not meaningful).
@@ -43,4 +43,4 @@ class PlayheadPhaseExtractor(FilterNode):
             return pose
 
         # SingleAngle.from_value wraps the difference to the signed shortest angle [-π, π).
-        return replace(pose, {PlayheadPhase: PlayheadPhase.from_value(azimuth - playhead)})
+        return replace(pose, {PlayheadOffset: PlayheadOffset.from_value(azimuth - playhead)})

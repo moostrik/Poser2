@@ -7,7 +7,7 @@ from modules.pose.frame import Frame as PoseFrame, FrameDict
 from modules.pose.features import Azimuth, Distance
 from modules.session import SequencerState
 from ..light import Frame
-from ..pose import PlayheadPhase, PlayheadStability
+from ..pose import PlayheadOffset, PlayheadStability
 
 import logging
 logger = logging.getLogger(__name__)
@@ -56,9 +56,9 @@ class OscSound(BaseOscSound):
         distance_msg.add_arg(distance, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(distance_msg.build())  # type: ignore
 
-        playhead_phase: float = frame[PlayheadPhase].value if PlayheadPhase in frame else np.nan
+        playhead_offset: float = frame[PlayheadOffset].value if PlayheadOffset in frame else np.nan
         phase_msg = OscMessageBuilder(address=f"/pose/{id}/playhead_phase")
-        phase_msg.add_arg(playhead_phase, OscMessageBuilder.ARG_TYPE_FLOAT)
+        phase_msg.add_arg(playhead_offset, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(phase_msg.build())  # type: ignore
 
         stability: float = frame[PlayheadStability].value if PlayheadStability in frame else np.nan

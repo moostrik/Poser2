@@ -27,7 +27,7 @@ from modules.pose.frame import Frame, replace
 from modules.pose.nodes import FilterNode
 from modules.settings import BaseSettings, Field
 
-from .playhead_phase import PlayheadPhase
+from .playhead_offset import PlayheadOffset
 
 # Zero-crossing guard: only treat a phase sign change as a hit when both samples are within
 # a quarter-turn of the playhead, so the ±π wrap (opposite side of the ring) never counts.
@@ -85,7 +85,7 @@ class PlayheadStabilityExtractor(FilterNode):
         self._stability:  float = float("nan")   # last computed value, held between hits
 
     def process(self, pose: Frame) -> Frame:
-        phase:   float = pose[PlayheadPhase].value
+        phase:   float = pose[PlayheadOffset].value
         azimuth: float = pose[Azimuth].value
 
         # Azimuth drift (absolute from where the history began) → drop the history.

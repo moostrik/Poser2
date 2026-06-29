@@ -5,7 +5,7 @@ import unittest
 from time import monotonic
 
 from apps.white_space.light.motor import MotorController, MotorSettings, MotorState, MotorMode, MotorSimMode
-from apps.white_space.light.playhead import Playhead, PlayheadSettings, _lerp_angle, _wrap_to_pi
+from apps.white_space.light.playhead import Playhead, PlayheadSettings, _wrap_to_pi
 
 TAU = math.tau
 
@@ -187,10 +187,10 @@ class PlayheadNcoTest(unittest.TestCase):
         self.assertAlmostEqual(wrap(p.phase - mp), 0.0, places=2)
 
     def test_stopped_holds_position(self) -> None:
-        p = Playhead(PlayheadSettings()); p._internal = p._output = 1.0
+        p = Playhead(PlayheadSettings()); p._internal = 1.0
         for _ in range(50):
             p.tick(1 / 60, mstate(0.5, False, 0.0, mode=MotorMode.STOPPED))
-        self.assertEqual(p._output, 1.0)                         # internal sweep frozen — no advance
+        self.assertEqual(p._internal, 1.0)                       # internal sweep frozen — no advance
         self.assertTrue(math.isnan(p.phase))                     # stopped → NaN to consumers
 
     def test_high_free_runs_at_low_rpm(self) -> None:
@@ -231,7 +231,7 @@ class PlayheadNcoTest(unittest.TestCase):
         self.assertFalse(math.isnan(p.phase))                   # HIGH free-runs content (unmeasurable) → finite
 
     def test_offset_applied(self) -> None:
-        p = running_playhead(); p._settings.offset = 0.5; p._output = 1.0
+        p = running_playhead(); p._settings.offset = 0.5; p._internal = 1.0
         self.assertAlmostEqual(wrap(p.phase - 1.5), 0.0, places=6)
 
     def test_offset_constant_keeps_continuity(self) -> None:
@@ -245,84 +245,62 @@ class PlayheadNcoTest(unittest.TestCase):
             prev = p.phase
 
 
-class SpinupRideTest(unittest.TestCase):
-    """§11 — optional LOW→HIGH ride: output rides the accelerating motor until release_rpm,
-    then eases back to the internal low sweep."""
-
-    def _ride_playhead(self, **kw) -> Playhead:
-        s = PlayheadSettings()
-        s.high_follow, s.release_rpm, s.release_smooth = True, 1200.0, 0.5
-        for k, v in kw.items():
-            setattr(s, k, v)
-        return Playhead(s)
+class ReacquireTest(unittest.TestCase):
+    """HIGH → LOW/IDLE re-acquire gate: after leaving HIGH the sweep keeps free-running at low_rpm
+    until the motor slows back to content speed, then re-locks onto the measured phase."""
 
     LOW = MotorMode.LOW
     HIGH = MotorMode.HIGH
 
-    def test_lerp_angle_shortest_path(self) -> None:
-        self.assertAlmostEqual(_lerp_angle(0.0, 1.0, 0.0), 0.0)
-        self.assertAlmostEqual(_lerp_angle(0.0, 1.0, 1.0), 1.0)
-        self.assertAlmostEqual(_lerp_angle(0.0, 1.0, 0.5), 0.5)
-        self.assertAlmostEqual(_lerp_angle(3.0, -3.0, 0.5), _wrap_to_pi(3.0 + 0.5 * _wrap_to_pi(-6.0)), places=6)
+    def _into_high(self, low_rpm: float = 72.0) -> Playhead:
+        """A playhead that has just been in HIGH (so leaving it arms the re-sync)."""
+        p = running_playhead(mode=self.HIGH)
+        p.tick(1 / 60, mstate(float("nan"), False, 2000.0, mode=self.HIGH, low_rpm=low_rpm))
+        return p
 
-    def test_off_uses_internal_low_sweep(self) -> None:
+    def test_does_not_relock_while_motor_still_fast(self) -> None:
         dt = 1 / 60
-        p = self._ride_playhead(high_follow=False)
-        p.tick(dt, mstate(0.0, True, 72.0, mode=self.LOW))
+        p = self._into_high()
         before = p._internal
-        p.tick(dt, mstate(1.0, True, 2000.0, mode=self.HIGH, low_rpm=72.0))
-        self.assertEqual(p._output, p._internal)                       # no ride
+        # Back to LOW but the motor is still braking well above low_rpm → keep free-running at low_rpm,
+        # do NOT advance at the (faster) measured rpm or snap toward the measured phase.
+        p.tick(dt, mstate(2.5, True, 150.0, mode=self.LOW, low_rpm=72.0))
+        self.assertTrue(p._resyncing)
+        self.assertFalse(math.isnan(p.phase))                          # re-syncing sweep is live
         self.assertAlmostEqual(wrap(p._internal - before), 72.0 / 60.0 * TAU * dt, places=6)
 
-    def test_rides_motor_below_release_rpm(self) -> None:
+    def test_relocks_once_motor_reaches_content_speed(self) -> None:
         dt = 1 / 60
-        p = self._ride_playhead()
-        p.tick(dt, mstate(0.0, True, 72.0, mode=self.LOW))             # LOW first → arms the edge
-        p.tick(dt, mstate(2.5, True, 500.0, mode=self.HIGH, low_rpm=72.0))  # measured < release → ride
-        self.assertTrue(p._riding)
-        self.assertEqual(p._w, 1.0)
-        self.assertAlmostEqual(p.phase, wrap(2.5), places=6)           # output == motor.phase
+        p = self._into_high()
+        p.tick(dt, mstate(2.5, True, 150.0, mode=self.LOW, low_rpm=72.0))   # still fast → re-syncing
+        self.assertTrue(p._resyncing)
+        # Within tolerance of low_rpm (72 × 1.05 = 75.6) → re-lock and resume tracking the measured phase.
+        p.tick(dt, mstate(2.5, True, 75.0, mode=self.LOW, low_rpm=72.0))
+        self.assertFalse(p._resyncing)
+        gen, mp = _advancing(72.0, dt, start=2.5), 2.5                 # now a steadily rotating motor
+        for _ in range(200):                                           # tracking pulls onto the measured phase
+            mp = next(gen)
+            p.tick(dt, mstate(mp, True, 72.0, mode=self.LOW, low_rpm=72.0))
+        self.assertAlmostEqual(wrap(p.phase - p._settings.offset - mp), 0.0, places=2)
 
-    def test_internal_stays_low_sweep_while_riding(self) -> None:
+    def test_resync_is_live_while_motor_unmeasurable(self) -> None:
         dt = 1 / 60
-        p = self._ride_playhead()
-        p.tick(dt, mstate(0.0, True, 72.0, mode=self.LOW))
+        p = self._into_high()
         before = p._internal
-        p.tick(dt, mstate(2.0, True, 500.0, mode=self.HIGH, low_rpm=72.0))
-        self.assertTrue(p._riding)
+        # Just after HIGH the motor is still above the sensor ceiling → unlocked, no measurement.
+        p.tick(dt, mstate(float("nan"), False, 0.0, mode=self.LOW, low_rpm=72.0))
+        self.assertTrue(p._resyncing)
+        self.assertFalse(math.isnan(p.phase))                          # not NaN — a live free-running sweep
         self.assertAlmostEqual(wrap(p._internal - before), 72.0 / 60.0 * TAU * dt, places=6)
 
-    def test_releases_and_eases_to_internal(self) -> None:
+    def test_high_to_stopped_clears_gate_and_holds(self) -> None:
         dt = 1 / 60
-        p = self._ride_playhead(release_smooth=0.1)
-        p.tick(dt, mstate(0.0, True, 72.0, mode=self.LOW))
-        p.tick(dt, mstate(1.0, True, 500.0, mode=self.HIGH, low_rpm=72.0))   # riding, w=1
-        for _ in range(20):                                            # measured ≥ release → ease out (0.33s > 0.1)
-            p.tick(dt, mstate(2.0, True, 1500.0, mode=self.HIGH, low_rpm=72.0))
-        self.assertFalse(p._riding)
-        self.assertEqual(p._w, 0.0)
-        self.assertEqual(p._output, p._internal)                       # settled back on the internal sweep
-
-    def test_ride_survives_transient_unlock(self) -> None:
-        dt = 1 / 60
-        p = self._ride_playhead()
-        p.tick(dt, mstate(0.0, True, 72.0, mode=self.LOW))
-        p.tick(dt, mstate(float("nan"), False, 0.0, mode=self.HIGH, low_rpm=72.0))  # entered HIGH still unlocked
-        self.assertTrue(p._riding)                                     # armed, not cancelled
-        self.assertEqual(p._output, p._internal)                       # no phase to ride yet
-        p.tick(dt, mstate(2.0, True, 500.0, mode=self.HIGH, low_rpm=72.0))          # lock appears → ride
-        self.assertTrue(p._riding)
-        self.assertEqual(p._w, 1.0)
-        self.assertAlmostEqual(p.phase, wrap(2.0), places=6)
-
-    def test_ride_cancels_when_leaving_high(self) -> None:
-        dt = 1 / 60
-        p = self._ride_playhead()
-        p.tick(dt, mstate(0.0, True, 72.0, mode=self.LOW))
-        p.tick(dt, mstate(1.0, True, 500.0, mode=self.HIGH, low_rpm=72.0))   # riding
-        p.tick(dt, mstate(0.5, True, 72.0, mode=self.LOW))             # back to LOW → cancel
-        self.assertFalse(p._riding)
-        self.assertEqual(p._output, p._internal)
+        p = self._into_high()
+        p._internal = 1.0
+        p.tick(dt, mstate(0.5, False, 0.0, mode=MotorMode.STOPPED, low_rpm=72.0))
+        self.assertFalse(p._resyncing)
+        self.assertEqual(p._internal, 1.0)                             # held
+        self.assertTrue(math.isnan(p.phase))
 
 
 if __name__ == "__main__":

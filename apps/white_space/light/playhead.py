@@ -11,10 +11,12 @@ active mode (it is the *content sweep*, which never runs faster than LOW):
 This is the **internal** phase; it is never snapped or reset, so it stays continuous across
 mode/speed switches, stalls, and NaN gaps — only the rate changes.
 
-Optional **spin-up ride** (`high_follow`): on entering HIGH the *output* rides the physically
-accelerating light (`= motor.phase`) until the motor passes `release_rpm`, then eases back to
-the internal sweep over `release_smooth` seconds — a transition "whoosh". The internal phase
-advances underneath the whole time, so the output reconverges onto the right content position.
+**Spin-down re-acquire** (HIGH → LOW/IDLE): leaving HIGH does *not* re-lock onto the measured
+phase right away — the motor is still spinning fast (unmeasurable above the sensor ceiling, then
+measuring *above* `low_rpm` as it brakes). The sweep keeps free-running at `low_rpm` until the
+motor has slowed back to content speed (`measured_rpm ≤ low_rpm × (1 + _RESYNC_RPM_TOL)`), then
+the normal `tracking` gain eases the internal phase onto the measured phase. The sweep stays
+"live" throughout the spin-down (never NaN).
 
 The motor is offset-agnostic; the playhead owns its single content-alignment `offset`
 (constant → does not break continuity). Pixel compositions own their own offsets.
@@ -26,14 +28,13 @@ from modules.settings import BaseSettings, Field, Widget
 
 from .motor import MotorState, MotorMode
 
+# Re-lock onto the measured phase once the spinning-down motor reaches content speed, within this
+# relative tolerance of low_rpm (absorbs measurement jitter as it settles at the LOW target).
+_RESYNC_RPM_TOL: float = 0.05
+
 
 def _wrap_to_pi(x: float) -> float:
     return (x + math.pi) % math.tau - math.pi
-
-
-def _lerp_angle(a: float, b: float, w: float) -> float:
-    """Shortest-path angular blend: w=0 → a, w=1 → b."""
-    return _wrap_to_pi(a + w * _wrap_to_pi(b - a))
 
 
 class PlayheadSettings(BaseSettings):
@@ -41,50 +42,51 @@ class PlayheadSettings(BaseSettings):
                                          description="Playhead zero-point alignment (radians)")
     tracking:       Field[float] = Field(0.1,  min=0.0, max=1.0, step=0.01,
                                          description="How tightly the playhead tracks the measured motor phase (0=free-run, 1=snap)")
-    high_follow:    Field[bool]  = Field(False, newline=True,
-                                         description="On entering HIGH, ride the accelerating motor through spin-up, then ease back to the low sweep")
-    release_rpm:    Field[float] = Field(1200.0, min=0.0, max=2400.0, step=10.0,
-                                         description="Ride the spin-up until the motor passes this RPM (≤ high_rpm)")
-    release_smooth: Field[float] = Field(0.5,  min=0.0, max=5.0, step=0.05,
-                                         description="Seconds to ease the ride back to the internal sweep")
-    follow:         Field[float] = Field(0.0,  min=0.0, max=1.0, step=0.001,
-                                         access=Field.READ, widget=Widget.slider, description="Ride weight (1=on the motor, 0=internal)")
-    phase:          Field[float] = Field(0.0,  min=-math.pi, max=math.pi, step=0.001,
+    playhead:       Field[float] = Field(0.0,  min=-math.pi, max=math.pi, step=0.001,
                                          access=Field.READ, widget=Widget.slider, description="Continuous playhead (−π…π)")
 
 
 class Playhead:
     """Content clock derived from the motor; exposes `.phase` (offset applied). Holds an
-    always-continuous internal sweep plus an optional spin-up ride toward the real motor."""
+    always-continuous internal sweep that free-runs at `low_rpm` in HIGH and re-acquires the
+    measured phase once the motor has spun back down to content speed."""
 
     def __init__(self, settings: PlayheadSettings) -> None:
         self._settings = settings
         self._internal: float = 0.0                  # offset-free continuous content clock
-        self._output:   float = 0.0                  # what `.phase` exposes (internal, or the ride)
         self._prev_mode: MotorMode = MotorMode.STOPPED
-        self._riding:   bool  = False                # spin-up ride active
-        self._released: bool  = False                # past release_rpm → easing back
-        self._w:        float = 0.0                  # ride weight (1=motor, 0=internal)
-        self._live:     bool  = False                # is there a real playhead this tick (locked or HIGH)
+        self._resyncing: bool = False                # left HIGH → free-running until the motor slows to content speed
+        self._live:     bool  = False                # is there a real playhead this tick (locked, HIGH, or re-syncing)
 
     def tick(self, dt: float, motor: MotorState) -> None:
-        """Advance the internal content clock from the motor's active mode, then apply the
-        optional spin-up ride to produce the output."""
-        # A real playhead exists only with a measurement (locked) or in HIGH (free-run content sweep).
-        # IDLE/LOW with no measurement (disconnected) → not live → `.phase` is NaN.
-        self._live = motor.mode == MotorMode.HIGH or motor.locked
+        """Advance the internal content clock from the motor's active mode, gating the re-lock onto
+        the measured phase until a spun-down motor has returned to content speed."""
+        # Leaving HIGH arms the re-sync: keep free-running until the motor slows back to content speed
+        # rather than snapping onto its still-too-fast (or unmeasurable) phase.
+        if self._prev_mode == MotorMode.HIGH and motor.mode != MotorMode.HIGH:
+            self._resyncing = True
+        self._prev_mode = motor.mode
+
+        if motor.mode == MotorMode.HIGH or motor.mode == MotorMode.STOPPED:
+            self._resyncing = False                       # HIGH free-runs anyway; STOPPED holds
+        elif self._resyncing and motor.locked and motor.measured_rpm <= motor.low_rpm * (1.0 + _RESYNC_RPM_TOL):
+            self._resyncing = False                       # motor reached content speed → re-lock
+
+        # A real playhead exists with a measurement (locked), in HIGH (free-run content sweep), or
+        # while re-syncing (a live free-running sweep). IDLE/LOW with no measurement → not live → NaN.
+        self._live = motor.mode == MotorMode.HIGH or motor.locked or self._resyncing
         self._advance_internal(dt, motor)
-        self._update_ride(dt, motor)
-        self._settings.follow = self._w
         # Finite continuous position for the UI slider (`.phase` itself is NaN when not live).
-        self._settings.phase  = _wrap_to_pi(self._output + self._settings.offset)
+        self._settings.playhead = _wrap_to_pi(self._internal + self._settings.offset)
 
     def _advance_internal(self, dt: float, motor: MotorState) -> None:
-        """The §10 mode-based content sweep (STOPPED holds, IDLE/LOW follow, HIGH free-runs low)."""
+        """The mode-based content sweep (STOPPED holds, IDLE/LOW track the measured phase, HIGH and
+        the post-HIGH re-sync free-run at the LOW content rate)."""
         if motor.mode == MotorMode.STOPPED:
             pass                                              # hold last position (frozen)
-        elif motor.mode == MotorMode.HIGH:
-            # Keep sweeping at the LOW content rate; the motor's fast phase is for the pixels.
+        elif motor.mode == MotorMode.HIGH or self._resyncing:
+            # Free-run at the LOW content rate: HIGH ignores the fast motor; the re-sync waits out the
+            # spin-down without snapping to the still-too-fast measured phase.
             self._internal = _wrap_to_pi(self._internal + (motor.low_rpm / 60.0) * math.tau * dt)
         elif motor.locked and not math.isnan(motor.phase):    # IDLE, LOW — track the measured rotation
             self._internal += (motor.measured_rpm / 60.0) * math.tau * dt
@@ -92,40 +94,12 @@ class Playhead:
             self._internal = _wrap_to_pi(self._internal)
         # else IDLE/LOW with no measurement (disconnected) → hold; `.phase` reports NaN (not live)
 
-    def _update_ride(self, dt: float, motor: MotorState) -> None:
-        """Spin-up ride: ride `motor.phase` from the entry-to-HIGH edge until `release_rpm`,
-        then ease the weight to 0 over `release_smooth`. Output = blend(internal, motor)."""
-        entered_high = motor.mode == MotorMode.HIGH and self._prev_mode != MotorMode.HIGH
-        self._prev_mode = motor.mode
-
-        if self._settings.high_follow and entered_high:
-            self._riding, self._released, self._w = True, False, 1.0
-
-        if self._riding and motor.mode != MotorMode.HIGH:
-            self._riding, self._w = False, 0.0            # left HIGH → cancel
-
-        if self._riding and not math.isnan(motor.phase):
-            # Locked: ride the motor; advance the release once it passes the threshold.
-            if not self._released and motor.measured_rpm >= self._settings.release_rpm:
-                self._released = True
-            if self._released:
-                smooth = self._settings.release_smooth
-                self._w = max(0.0, self._w - dt / smooth) if smooth > 0.0 else 0.0
-                if self._w == 0.0:
-                    self._riding = False
-            self._output = _lerp_angle(self._internal, motor.phase, self._w)
-        else:
-            # Not riding, or riding but momentarily unlocked (e.g. the spin-up's first falls):
-            # stay on the internal sweep and keep the ride armed until a lock appears.
-            self._output = self._internal
-
     @property
     def phase(self) -> float:
         """Playhead in radians [-π, π) with the alignment offset applied — the value the outside
         world consumes. NaN when there is no live playhead — STOPPED, or IDLE/LOW with no measurement
         (motor disconnected / not turning) — per the board's HasPlayhead contract. The internal sweep
-        (_internal/_output) stays continuous underneath, and `settings.phase` keeps the last finite
-        position for the UI."""
+        stays continuous underneath, and `settings.playhead` keeps the last finite position for the UI."""
         if not self._live:
             return float('nan')
-        return _wrap_to_pi(self._output + self._settings.offset)
+        return _wrap_to_pi(self._internal + self._settings.offset)

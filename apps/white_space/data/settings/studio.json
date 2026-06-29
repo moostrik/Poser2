@@ -388,9 +388,7 @@
     },
     "playhead": {
       "offset": 0.0,
-      "tracking": 0.93,
-      "high_follow": false,
-      "release_smooth": 0.9
+      "tracking": 0.93
     },
     "low": {
       "playhead": {
