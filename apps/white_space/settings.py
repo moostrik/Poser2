@@ -312,7 +312,7 @@ class Settings(BaseSettings):
     camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov])
     inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players'), light_resolution.as_('resolution')])
     pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
-    light: Group[LightSettings] = Group(LightSettings, share=[num_players.as_('max_poses'), num_cameras.as_('num_cameras'), input_fps.as_('light_rate'), light_resolution.as_('light_resolution'), fov])
+    light: Group[LightSettings] = Group(LightSettings, share=[num_players.as_('max_poses'), num_cameras.as_('num_cameras'), light_resolution.as_('light_resolution'), fov])
     render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams')])
     server : Group[NiceSettings]    = Group(NiceSettings)
     session: Group[SessionGroup]    = Group(SessionGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])

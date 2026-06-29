@@ -365,6 +365,7 @@
     }
   },
   "light": {
+    "light_rate": 30.0,
     "idle_layers": [],
     "low_layers": [
       "playhead_flash",

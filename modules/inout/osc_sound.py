@@ -1,5 +1,7 @@
 from threading import Thread, Event, Lock
+from collections import deque
 import socket
+import time
 
 import numpy as np
 from pythonosc.udp_client import SimpleUDPClient
@@ -22,6 +24,9 @@ class OscSoundSettings(BaseSettings):
     port: Field[int]         = Field(9000, min=1024, max=65535, widget=Widget.number_field, description="Target OSC port")
     stage: Field[int]        = Field(0,                                                     description="Pipeline stage to read poses from")
     active_players: Field[int] = Field(0, access=Field.READ,                                description="Current number of active players being sent")
+    interval_mean_ms: Field[float] = Field(0.0, access=Field.READ,                          description="Mean interval between sent OSC bundles (ms)")
+    interval_min_ms: Field[float]  = Field(0.0, access=Field.READ,                          description="Shortest interval between sent OSC bundles (ms)")
+    interval_max_ms: Field[float]  = Field(0.0, access=Field.READ,                          description="Longest interval between sent OSC bundles (ms)")
 
 
 class OscSound:
@@ -41,6 +46,10 @@ class OscSound:
 
         self._config.bind(OscSoundSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
         self._config.bind(OscSoundSettings.port, self._on_connection_change)          # type: ignore[arg-type]
+
+        # Send-interval measurement (rolling window of inter-send gaps).
+        self._last_send_time: float | None = None
+        self._interval_samples: deque[float] = deque(maxlen=120)
 
         self._running = False
         self._update_event: Event = Event()
@@ -98,6 +107,7 @@ class OscSound:
             self._update_event.clear()
             if self._running:
 
+                self._record_interval()
                 try:
                     self._send_data()
                 except socket.error as e:
@@ -106,6 +116,18 @@ class OscSound:
                     break
                 except Exception as e:
                     logger.error(f"Error sending SoundOSC data: {e}")
+
+    def _record_interval(self) -> None:
+        """Track the gap between consecutive sends and publish mean/deviation (ms)."""
+        now = time.perf_counter()
+        if self._last_send_time is not None:
+            self._interval_samples.append(now - self._last_send_time)
+        self._last_send_time = now
+        if self._interval_samples:
+            samples = np.fromiter(self._interval_samples, dtype=float)
+            self._config.interval_mean_ms = float(samples.mean() * 1000.0)
+            self._config.interval_min_ms = float(samples.min() * 1000.0)
+            self._config.interval_max_ms = float(samples.max() * 1000.0)
 
     def _send_data(self) -> None:
         with self._input_lock:
