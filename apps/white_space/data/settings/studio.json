@@ -377,7 +377,7 @@
       "lines"
     ],
     "master": 1.0,
-    "high_cross_rpm": 600.0,
+    "fade_times": [1.0, 0.5],
     "light_phase": 0.55,
     "clock": {
       "bpm": 20.0

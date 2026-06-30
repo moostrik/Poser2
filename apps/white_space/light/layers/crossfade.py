@@ -1,10 +1,11 @@
-"""Crossfade — the speed compositor, itself a layer.
+"""Crossfade — the mode compositor, itself a layer.
 
 The CPU mirror of ``modules.render`` ``CompositeLayer``: a layer that is handed the slot layer pools
-and owns the combining. Each tick it reads the motor rpm off the frame, computes the idle/low/high
-crossfade weights, resolves each slot's selected layers from its pool, blends them (via their own
-blend modes) into a private scratch, and adds ``weight ×`` that composite into the output — the high
-slot ring-rolled by ``light_phase``. The renderer just builds the pools and calls ``render(frame)``.
+and owns the combining. Each tick it resolves the motor *mode* to a slot (idle/low/high), time-fades
+the idle/low/high crossfade weights toward that slot — with separate up/down durations — resolves each
+slot's selected layers from its pool, blends them (via their own blend modes) into a private scratch,
+and adds ``weight ×`` that composite into the output — the high slot ring-rolled by ``light_phase``.
+The renderer just builds the pools and calls ``render(frame)``.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ import numpy as np
 from ._base_layer import BaseLayer, LayerSettings
 from ..clock import Tick
 from ..frame import Frame
+from ..motor import MotorMode
 
 if TYPE_CHECKING:
     from ...board import Board
@@ -25,37 +27,42 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Crossfade dead-zone: each fade starts `deadzone` ABOVE the mode below it and ends `deadzone` BELOW
-# its own mode rpm, so a band around every mode rpm shows only that mode (no neighbour bleed on jitter).
-CROSSFADE_DEADZONE: float = 0.1
-
 
 def _ease(t: float) -> float:
-    """Sine ease-in-out on [0,1] — the crossfade accelerates out of one comp and settles into the next."""
+    """Sine ease-in-out on [0,1] — the crossfade accelerates out of one slot and settles into the next."""
     return 0.5 - 0.5 * math.cos(math.pi * t)
 
 
-def crossfade_weights(rpm: float, idle_rpm: float, low_rpm: float,
-                      high_cross_rpm: float, deadzone: float = CROSSFADE_DEADZONE) -> tuple[float, float, float]:
-    """``(w_idle, w_low, w_high)`` for the motor rpm. Each comp fades in over a band *inside* the gap
-    between mode rpms — from a deadzone above the mode below it to a deadzone below its own mode rpm —
-    so the dead zone around each mode rpm keeps the neighbouring comp off under rpm jitter (e.g. in low
-    mode the high comp stays fully off). The fade is sine-eased in/out. High ends at ``high_cross_rpm``
-    (nothing higher to bleed). Weights sum to 1."""
-    eps = 1e-6
-    s = min(1.0, max(0.0, (rpm - idle_rpm * (1.0 + deadzone)) / max(low_rpm * (1.0 - deadzone) - idle_rpm * (1.0 + deadzone), eps)))
-    h = min(1.0, max(0.0, (rpm - low_rpm * (1.0 + deadzone)) / max(high_cross_rpm - low_rpm * (1.0 + deadzone), eps)))
-    s_in, h_in = _ease(s), _ease(h)
-    return (1.0 - s_in) * (1.0 - h_in), s_in * (1.0 - h_in), h_in
+def _slot_for_mode(mode: MotorMode) -> int:
+    """Motor mode → crossfade slot index: idle(0) ← STOPPED/IDLE, low(1) ← LOW, high(2) ← HIGH."""
+    if mode == MotorMode.LOW:  return 1
+    if mode == MotorMode.HIGH: return 2
+    return 0
+
+
+def transition_weights(from_w: tuple[float, float, float], target_slot: int,
+                       t: float) -> tuple[float, float, float]:
+    """Sine-eased lerp from ``from_w`` toward one-hot(``target_slot``); ``t`` clamped to [0,1].
+    ``from_w`` sums to 1 and one-hot sums to 1, so the result sums to 1."""
+    e = _ease(max(0.0, min(1.0, t)))
+    return (
+        (1.0 - e) * from_w[0] + (e if target_slot == 0 else 0.0),
+        (1.0 - e) * from_w[1] + (e if target_slot == 1 else 0.0),
+        (1.0 - e) * from_w[2] + (e if target_slot == 2 else 0.0),
+    )
 
 
 class Crossfade(BaseLayer):
-    """Speed compositor: blends each slot's selected layers and crossfades the slots by motor rpm.
+    """Mode compositor: blends each slot's selected layers and time-crossfades the slots by motor mode.
 
     Handed the low/high layer pools (built by the renderer, like the GPU ``CompositeLayer(layers, …)``).
     Uses the ``BaseLayer`` template: ``_draw`` accumulates the weighted composite into this layer's own
     scratch, then ``render`` ADD-blends it into the frame. Owns reset-on-deselect: a layer that drops
     out of every slot gets ``reset()`` so it restarts fresh on reselection.
+
+    The slot weights are decoupled from rpm: the motor *mode* selects a slot, and the weights ease to
+    that slot's one-hot target over ``fade_times`` seconds — the up time when climbing the slot order
+    (idle→low→high), the down time when dropping back. At rest the weights sit one-hot on the slot.
     """
 
     def __init__(self, config: LightSettings,
@@ -67,14 +74,31 @@ class Crossfade(BaseLayer):
         self._high_layers = high_layers
         self._scratch = Frame(config.light_resolution, Tick(0.0, 0.0, 0.0, 0.0, 0))
         self._prev: set[BaseLayer] = set()
+        # Time-driven slot transition state (sentinel -1 → first frame snaps, no startup fade).
+        self._target_slot: int = -1
+        self._cur_w: tuple[float, float, float] = (1.0, 0.0, 0.0)
+        self._from_w: tuple[float, float, float] = (1.0, 0.0, 0.0)
+        self._t_start: float = 0.0
+        self._duration: float = 0.0
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         cfg = self._config
-        # Effective speed: the measured rpm below the sensor ceiling, the commanded speed above it
-        # (the sensor can't see past ~200 rpm), 0 when stopped → resolves to the idle slot.
-        rpm = frame.motor.effective_rpm
-        w_idle, w_low, w_high = crossfade_weights(
-            rpm, cfg.motor.idle_rpm, cfg.motor.low_rpm, cfg.high_cross_rpm)
+        # The motor mode selects a slot; the weights ease toward it over the up/down fade time.
+        now = frame.tick.time
+        slot = _slot_for_mode(frame.motor.mode)
+        if slot != self._target_slot:
+            if self._target_slot < 0:          # first observation: snap, don't animate
+                self._from_w = (1.0 if slot == 0 else 0.0, 1.0 if slot == 1 else 0.0, 1.0 if slot == 2 else 0.0)
+                self._duration = 0.0
+            else:
+                self._from_w = self._cur_w     # start from the current on-screen blend
+                up, down = (list(cfg.fade_times) + [0.0, 0.0])[:2]
+                self._duration = up if slot > self._target_slot else down
+            self._t_start = now
+            self._target_slot = slot
+
+        t = 1.0 if self._duration <= 0.0 else (now - self._t_start) / self._duration
+        w_idle, w_low, w_high = self._cur_w = transition_weights(self._from_w, slot, t)
         shift = int(round(cfg.light_phase * self.resolution)) % self.resolution
 
         pick = lambda d, ids: [d[i] for i in ids if i in d]   # selected instances, in blend order
@@ -115,3 +139,4 @@ class Crossfade(BaseLayer):
         for layer in set(self._low_layers.values()) | set(self._high_layers.values()):
             layer.reset()
         self._prev = set()
+        self._target_slot = -1   # re-snap to the current mode's slot on the next draw

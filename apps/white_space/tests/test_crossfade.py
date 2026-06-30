@@ -1,56 +1,62 @@
-"""Tests for the compositor's motor-rpm crossfade weights."""
+"""Tests for the compositor's time-driven mode→slot crossfade."""
 
 import unittest
 
 import numpy as np
 
-from apps.white_space.light.layers.crossfade import crossfade_weights, CROSSFADE_DEADZONE
+from apps.white_space.light.layers.crossfade import _slot_for_mode, transition_weights
+from apps.white_space.light.motor import MotorMode
 
-IR, LR, XR = 7.0, 34.0, 600.0   # idle / low / high_cross rpm (studio defaults)
+IDLE, LOW, HIGH = 0, 1, 2   # slot indices
 
 
-class CrossfadeWeightsTest(unittest.TestCase):
-    def test_idle_only_below_low_band(self) -> None:
-        self.assertEqual(crossfade_weights(0.0, IR, LR, XR), (1.0, 0.0, 0.0))
-        wi, wl, wh = crossfade_weights(IR, IR, LR, XR)   # low has not started at idle_rpm
-        self.assertAlmostEqual(wi, 1.0); self.assertAlmostEqual(wl, 0.0); self.assertAlmostEqual(wh, 0.0)
+class SlotForModeTest(unittest.TestCase):
+    def test_mode_to_slot_mapping(self) -> None:
+        self.assertEqual(_slot_for_mode(MotorMode.STOPPED), IDLE)
+        self.assertEqual(_slot_for_mode(MotorMode.IDLE), IDLE)   # stopped & idle share the idle slot
+        self.assertEqual(_slot_for_mode(MotorMode.LOW), LOW)
+        self.assertEqual(_slot_for_mode(MotorMode.HIGH), HIGH)
 
-    def test_low_full_at_low_rpm(self) -> None:
-        wi, wl, wh = crossfade_weights(LR, IR, LR, XR)   # fully on a bit before low_rpm (deadzone)
-        self.assertAlmostEqual(wl, 1.0); self.assertAlmostEqual(wi, 0.0); self.assertAlmostEqual(wh, 0.0)
 
-    def test_high_full_at_and_above_cross_rpm(self) -> None:
-        self.assertAlmostEqual(crossfade_weights(XR, IR, LR, XR)[2], 1.0)
-        self.assertAlmostEqual(crossfade_weights(XR * 2, IR, LR, XR)[2], 1.0)
+class TransitionWeightsTest(unittest.TestCase):
+    FROM = (1.0, 0.0, 0.0)   # resting on idle
+
+    def test_start_returns_from_weights(self) -> None:
+        self.assertEqual(transition_weights(self.FROM, LOW, 0.0), self.FROM)
+        self.assertEqual(transition_weights(self.FROM, LOW, -0.5), self.FROM)   # clamped
+
+    def test_end_is_one_hot_target(self) -> None:
+        self.assertEqual(transition_weights(self.FROM, LOW, 1.0), (0.0, 1.0, 0.0))
+        self.assertEqual(transition_weights(self.FROM, HIGH, 2.0), (0.0, 0.0, 1.0))   # clamped
 
     def test_partition_sums_to_one(self) -> None:
-        for rpm in np.linspace(0.0, XR * 1.2, 200):
-            wi, wl, wh = crossfade_weights(float(rpm), IR, LR, XR)
-            self.assertAlmostEqual(wi + wl + wh, 1.0, places=6)
-            for w in (wi, wl, wh):
-                self.assertGreaterEqual(w, 0.0)
-                self.assertLessEqual(w, 1.0)
+        for t in np.linspace(0.0, 1.0, 50):
+            for target in (IDLE, LOW, HIGH):
+                w = transition_weights(self.FROM, target, float(t))
+                self.assertAlmostEqual(sum(w), 1.0, places=6)
+                for x in w:
+                    self.assertGreaterEqual(x, 0.0)
+                    self.assertLessEqual(x, 1.0)
 
-    def test_dead_zone_no_neighbour_bleed(self) -> None:
-        # within +deadzone of a mode rpm, the next comp stays fully off (no bleed under rpm jitter)
-        jit = 1.0 + CROSSFADE_DEADZONE * 0.5
-        for f in (1.0, jit):                        # at/just above low_rpm → high must be off
-            wi, wl, wh = crossfade_weights(LR * f, IR, LR, XR)
-            self.assertEqual(wh, 0.0)
-            self.assertAlmostEqual(wl, 1.0)
-        for f in (1.0, jit):                        # at/just above idle_rpm → low must be off
-            wi, wl, wh = crossfade_weights(IR * f, IR, LR, XR)
-            self.assertEqual(wl, 0.0)
-            self.assertAlmostEqual(wi, 1.0)
+    def test_midpoint_is_eased_half(self) -> None:
+        # sine ease at t=0.5 → 0.5, so an idle→low transition sits half-and-half
+        wi, wl, wh = transition_weights(self.FROM, LOW, 0.5)
+        self.assertAlmostEqual(wi, 0.5); self.assertAlmostEqual(wl, 0.5); self.assertAlmostEqual(wh, 0.0)
 
-    def test_bands_blend_two_slots(self) -> None:
-        mid_low = (IR + LR * (1.0 - CROSSFADE_DEADZONE)) / 2.0   # idle↔low mix, no high
-        wi, wl, wh = crossfade_weights(mid_low, IR, LR, XR)
-        self.assertEqual(wh, 0.0)
-        self.assertGreater(wi, 0.0); self.assertGreater(wl, 0.0)
-        mid_high = (LR + XR) / 2.0                              # low↔high mix
-        wi, wl, wh = crossfade_weights(mid_high, IR, LR, XR)
-        self.assertGreater(wl, 0.0); self.assertGreater(wh, 0.0)
+    def test_direct_idle_to_high_skips_low(self) -> None:
+        wi, wl, wh = transition_weights(self.FROM, HIGH, 0.5)
+        self.assertAlmostEqual(wl, 0.0)                       # low never lights up
+        self.assertAlmostEqual(wi, 0.5); self.assertAlmostEqual(wh, 0.5)
+
+    def test_up_down_progress_from_duration(self) -> None:
+        # The layer computes t = elapsed / duration; up vs down picks a different duration,
+        # so the same elapsed time yields different progress (and thus different weights).
+        up, down = 2.0, 0.5
+        elapsed = 0.5
+        slow = transition_weights(self.FROM, LOW, elapsed / up)     # t = 0.25
+        fast = transition_weights(self.FROM, LOW, elapsed / down)   # t = 1.0 → settled
+        self.assertLess(slow[1], fast[1])
+        self.assertEqual(fast, (0.0, 1.0, 0.0))
 
 
 class LightPhaseShiftTest(unittest.TestCase):

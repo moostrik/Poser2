@@ -79,7 +79,8 @@ class LightSettings(BaseSettings):
     high_layers:  Field[list[HighLayerId]] = Field([HighLayerId.pose_waves],   widget=Widget.checklist, description="Layers shown at high speed (light_phase applied)")
 
     master:         Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Master brightness (applied to the composite; lamp gamma/floor live in osc_light)", newline=True)
-    high_cross_rpm: Field[float] = Field(1200.0, min=0.0, max=2400.0, step=10.0, description="LOW→HIGH crossfade rpm")
+    fade_times: Field[list[float]] = Field([1.0, 0.5], widget=Widget.number_list, min=0.0, max=10.0, step=0.1,
+                                           description="Crossfade transition seconds between motor-mode slots: [up, down]")
     light_phase: Field[float]    = Field(0.0, min=0.0, max=1.0, step=0.01, description="High-slot ring offset (0–1 turn)")
 
     clock:        Group[ClockSettings]        = Group(ClockSettings)
