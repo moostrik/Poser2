@@ -68,24 +68,25 @@ class PlayheadOffsetExtractorTest(unittest.TestCase):
         self.assertNotIn(PlayheadOffset, PlayheadOffsetExtractor(lambda: float("nan")).process(_frame(0.5)))
 
 
-class PlayheadFlashEnvelopeTest(unittest.TestCase):
-    def test_peak_rise_fall(self) -> None:
-        self.assertAlmostEqual(offset_to_level(0.0, 0.5, 0.5), 1.0, places=5)     # on the playhead
-        self.assertAlmostEqual(offset_to_level(0.25, 0.5, 0.5), 0.5, places=5)    # half-way through the rise
-        self.assertAlmostEqual(offset_to_level(-0.25, 0.5, 0.5), 0.5, places=5)   # half-way through the fall
-        self.assertAlmostEqual(offset_to_level(0.5, 0.5, 0.5), 0.0, places=5)     # edge of rise
-        self.assertAlmostEqual(offset_to_level(-0.5, 0.5, 0.5), 0.0, places=5)    # edge of fall
+class PlayheadFlashWindowTest(unittest.TestCase):
+    def test_on_within_window(self) -> None:
+        self.assertEqual(offset_to_level(0.0, 0.5, 0.5), 1.0)     # on the playhead
+        self.assertEqual(offset_to_level(0.25, 0.5, 0.5), 1.0)    # ahead, within rise
+        self.assertEqual(offset_to_level(-0.25, 0.5, 0.5), 1.0)   # behind, within fall
+        self.assertEqual(offset_to_level(0.5, 0.5, 0.5), 1.0)     # edge of rise (inclusive)
+        self.assertEqual(offset_to_level(-0.5, 0.5, 0.5), 1.0)    # edge of fall (inclusive)
 
-    def test_outside_window_and_nan(self) -> None:
+    def test_off_outside_and_nan(self) -> None:
         self.assertEqual(offset_to_level(1.0, 0.5, 0.5), 0.0)        # ahead, beyond rise
         self.assertEqual(offset_to_level(-1.0, 0.5, 0.5), 0.0)       # behind, beyond fall
         self.assertEqual(offset_to_level(float("nan"), 0.5, 0.5), 0.0)
-        self.assertEqual(offset_to_level(0.3, 0.0, 0.0), 0.0)       # zero widths → no glow
+        self.assertEqual(offset_to_level(0.3, 0.0, 0.0), 0.0)       # zero widths → off
 
-    def test_asymmetric_widths(self) -> None:
+    def test_asymmetric_window(self) -> None:
         # wide rise, narrow fall
-        self.assertAlmostEqual(offset_to_level(0.5, 1.0, 0.2), 0.5, places=5)
-        self.assertAlmostEqual(offset_to_level(-0.1, 1.0, 0.2), 0.5, places=5)
+        self.assertEqual(offset_to_level(0.9, 1.0, 0.2), 1.0)    # ahead, within wide rise
+        self.assertEqual(offset_to_level(-0.1, 1.0, 0.2), 1.0)   # behind, within narrow fall
+        self.assertEqual(offset_to_level(-0.3, 1.0, 0.2), 0.0)   # behind, beyond narrow fall
 
 
 if __name__ == "__main__":

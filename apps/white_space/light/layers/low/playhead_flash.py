@@ -1,10 +1,10 @@
-"""PlayheadFlash composition — brightens the strip as the rotating playhead approaches
-each player and fades as it departs, driven by the continuous ``PlayheadOffset``.
+"""PlayheadFlash composition — flashes the strip on while the rotating playhead is near each
+player, driven by the continuous ``PlayheadOffset``.
 
-Replaces the old discrete hit-flash: each pose's signed offset to the playhead gives a
-smooth rise (approaching, offset ``+rise → 0``) and fall (departing, ``0 → -fall``) around
-the crossing — the asymmetric lead/trail a single hit moment could never express. The
-whole-strip brightness follows the closest-approaching pose.
+Each pose's signed offset to the playhead defines an on/off window around the crossing: the
+flash switches on while the playhead is within ``rise`` radians before the pose and stays on
+until ``fall`` radians after it — an asymmetric lead/trail a single hit moment could never
+express. The whole-strip brightness follows the closest active pose.
 """
 
 import math
@@ -19,17 +19,14 @@ from ....pose import PlayheadOffset, PlayheadStability
 
 
 def offset_to_level(phi: float, rise: float, fall: float) -> float:
-    """Asymmetric triangular envelope of a pose's playhead offset, peaking at the crossing.
+    """On/off window around the crossing: ``1`` while the playhead is within ``rise`` radians
+    before the pose or ``fall`` radians after it, ``0`` elsewhere (and for NaN offsets).
 
-    ``rise``/``fall`` are widths in radians. Returns 0 for NaN or out-of-window offsets.
+    ``phi`` is the pose's signed playhead offset: positive approaching, negative departing.
     """
     if math.isnan(phi):
         return 0.0
-    if rise > 0.0 and 0.0 <= phi <= rise:
-        return 1.0 - phi / rise          # approaching: 0 at φ=rise → 1 at φ=0
-    if fall > 0.0 and -fall <= phi < 0.0:
-        return 1.0 + phi / fall          # departing: 1 at φ=0 → 0 at φ=-fall
-    return 0.0
+    return 1.0 if -fall <= phi <= rise else 0.0
 
 
 def stability_to_flash(stability: float, under: float, flash: float) -> float:
@@ -50,12 +47,12 @@ class PlayheadFlashSettings(LayerSettings):
     flash_blue:  Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Peak flash intensity for blue channel at stability 1")
     under_white: Field[float] = Field(0.2, min=0.0, max=1.0, step=0.01, description="Flash intensity floor for white channel at stability 0", newline=True)
     under_blue:  Field[float] = Field(0.2, min=0.0, max=1.0, step=0.01, description="Flash intensity floor for blue channel at stability 0")
-    rise:        Field[float] = Field(0.5, min=0.0, max=math.pi, step=0.01, description="Approach width (radians): offset ahead at which brightening starts", newline=True)
-    fall:        Field[float] = Field(0.5, min=0.0, max=math.pi, step=0.01, description="Departure width (radians): offset behind at which the glow fades out")
+    rise:        Field[float] = Field(0.5, min=0.0, max=math.pi, step=0.01, description="How far ahead of the crossing (radians) the flash switches on", newline=True)
+    fall:        Field[float] = Field(0.5, min=0.0, max=math.pi, step=0.01, description="How far behind the crossing (radians) the flash switches off")
 
 
 class PlayheadFlash(BaseLayer):
-    """Continuous base level plus a rise/fall glow tracking the playhead's approach to
+    """Continuous base level plus an on/off flash window tracking the playhead's approach to
     each active player, read from ``PlayheadOffset``. Each pose's peak flash intensity is
     scaled by its ``PlayheadStability``: a steady pose flashes up to the full ``flash_*``
     value, an unstable one only up to the ``under_*`` floor."""
