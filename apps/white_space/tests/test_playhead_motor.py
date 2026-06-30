@@ -88,6 +88,19 @@ class MotorTest(unittest.TestCase):
         st = m.tick()                  # must not raise ZeroDivisionError
         self.assertFalse(st.locked)    # no valid measurement → not locked
 
+    def test_duplicate_is_debounced_keeps_real_period(self) -> None:
+        # A duplicate 32 ms after a real fall is ignored, so the measured period stays the real one
+        # (without the debounce it would read ~1875 rpm for a full revolution).
+        s = MotorSettings(); s.mode = MotorMode.LOW
+        m = MotorController(s)
+        t = monotonic()
+        m._fire_fall_at(t)
+        m._fire_fall_at(t + 0.5)        # real revolution: 0.5 s → 120 rpm
+        m._fire_fall_at(t + 0.532)      # duplicate 32 ms later → debounced
+        m._fire_fall_at(t + 1.0)        # next real revolution: 0.5 s after the REAL pulse
+        st = m.tick()
+        self.assertAlmostEqual(st.measured_rpm, 120.0, delta=2.0)   # real speed, not the duplicate spike
+
     def test_zero_period_does_not_lock(self) -> None:
         # Defensive: a degenerate 0 period is treated as no measurement, not a div-by-zero.
         m = MotorController(MotorSettings())
@@ -109,16 +122,39 @@ class MotorTest(unittest.TestCase):
         self.assertTrue(st.locked)
         self.assertAlmostEqual(st.effective_rpm, 60.0)
 
-    def test_high_runs_above_sensor_ceiling(self) -> None:
-        # Above the sensor ceiling no falls arrive, so the motor is unlocked even while spinning.
-        # Commanded HIGH (2000 > ceiling) → trust the command: report HIGH and act on target_rpm.
+    def test_high_no_falls_uses_command(self) -> None:
+        # Commanded HIGH with no falls yet (cold start) → trust the command: report HIGH, act on target.
         s = MotorSettings(); s.mode = MotorMode.HIGH
-        st = MotorController(s).tick()                  # no falls → unlocked
+        st = MotorController(s).tick()                  # no falls
         self.assertFalse(st.locked)
-        self.assertTrue(math.isnan(st.phase))          # phase still unmeasurable
-        self.assertEqual(st.mode, MotorMode.HIGH)      # but reported as running in HIGH
-        self.assertEqual(st.effective_rpm, 2000.0)     # acts on the commanded speed
-        self.assertEqual(st.measured_rpm, 0.0)         # measured stays honest (sensor silent)
+        self.assertTrue(math.isnan(st.phase))
+        self.assertEqual(st.mode, MotorMode.HIGH)
+        self.assertEqual(st.effective_rpm, 2000.0)     # commanded speed (no measurement yet)
+        self.assertEqual(st.measured_rpm, 0.0)
+
+    def test_high_ignores_stale_fall_uses_command(self) -> None:
+        # The motor sends no sync pulses above the ceiling, so HIGH ignores any leftover/stale fall
+        # reading and trusts the command (otherwise a frozen pre-HIGH reading would drive the crossfade).
+        s = MotorSettings(); s.mode = MotorMode.HIGH
+        m = MotorController(s)
+        m._last_fall_time = monotonic() - 0.001; m._measured_period = 1.0   # stale 60 rpm reading
+        st = m.tick()
+        self.assertFalse(st.locked)
+        self.assertEqual(st.measured_rpm, 0.0)        # stale reading not used in HIGH
+        self.assertEqual(st.effective_rpm, 2000.0)    # commanded speed
+        self.assertTrue(math.isnan(st.phase))
+
+    def test_above_ceiling_measurement_not_trusted(self) -> None:
+        # Spinning down from HIGH: commanded LOW but still physically fast → the >ceiling reading
+        # (sensor can't keep up / phase aliases) is not trusted; trust the command instead.
+        s = MotorSettings(); s.mode = MotorMode.LOW
+        m = MotorController(s)
+        m._last_fall_time = monotonic() - 0.001; m._measured_period = 0.040   # 1500 rpm, above ceiling
+        st = m.tick()
+        self.assertFalse(st.locked)
+        self.assertEqual(st.measured_rpm, 0.0)        # >ceiling reading discarded
+        self.assertEqual(st.effective_rpm, 72.0)      # trust the command (low_rpm)
+        self.assertTrue(math.isnan(st.phase))
 
     def test_effective_rpm_is_measured_when_locked(self) -> None:
         st = self._locked(MotorMode.LOW, period=1.0).tick()   # 60 rpm measured, below the ceiling

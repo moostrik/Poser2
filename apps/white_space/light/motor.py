@@ -22,9 +22,14 @@ from time import monotonic
 
 from modules.settings import BaseSettings, Field, Widget
 
-# Above this rpm the hardware fall sensor can't keep up and stops emitting pulses, so no measurement is
-# available even though the motor is spinning. When commanded above it we trust the command.
+# The fall sensor is only valid below this rpm: no pulses are sent above it, and a reading above it
+# (spinning down from HIGH) isn't trusted either — outside this range we trust the commanded speed.
 _SENSOR_CEILING_RPM: float = 200.0
+
+# A real revolution can't be faster than the sensor ceiling allows (60 / ceiling). A fall closer than
+# this to the previous one is a repeated/duplicate signal (the one-sided sensor pulsed twice) — ignore
+# it so it can't corrupt the measured period.
+_MIN_FALL_INTERVAL_S: float = 60.0 / _SENSOR_CEILING_RPM
 
 # Simulation loop cadence (s). The ramp + fall timing are sub-tick accurate regardless.
 _SIM_TICK: float = 1.0 / 30.0 # same as the motor
@@ -74,7 +79,7 @@ class MotorSettings(BaseSettings):
     idle_rpm:             Field[float] = Field(7.0,    min=0.0, max=60.0,   step=0.5,  description="Target rpm in IDLE mode", newline=True)
     low_rpm:              Field[float] = Field(72.0,   min=0.0, max=300.0,  step=1.0,  description="Target rpm in LOW mode")
     high_rpm:             Field[float] = Field(2000.0, min=0.0, max=2400.0, step=1.0,  description="Target rpm in HIGH mode")
-    measured_rpm:         Field[float] = Field(0.0,   min=0.0, max=2400.0, step=0.1,  access=Field.READ, description="Current measured RPM", newline=True)
+    measured_rpm:         Field[float] = Field(0.0,   min=0.0, max=_SENSOR_CEILING_RPM, step=0.01,  access=Field.READ, description="Current measured RPM", newline=True)
     phase:                Field[float] = Field(0.0,   min=-math.pi, max=math.pi, step=0.001, access=Field.READ, widget=Widget.slider, description="Measured motor phase (−π…π)")
 
 
@@ -134,12 +139,15 @@ class MotorController:
         self._fire_fall_at(monotonic())
 
     def _fire_fall_at(self, t: float) -> None:
-        """Record a fall that occurred at time `t` (used for sub-tick-accurate sim falls)."""
+        """Record a fall at time `t`, debouncing repeated/duplicate signals (and sub-tick sim falls)."""
         with self._fall_lock:
-            # Only a strictly positive interval is a valid period; ignore duplicate/simultaneous falls
-            # (bouncing sensor, repeated packets) so `measured_period` never becomes 0 → div-by-zero.
-            if self._last_fall_time is not None and t > self._last_fall_time:
-                self._measured_period = t - self._last_fall_time
+            last = self._last_fall_time
+            if last is not None and t - last < _MIN_FALL_INTERVAL_S:
+                # Too soon to be a real revolution (or out-of-order): a repeated/duplicate signal —
+                # ignore it (keep last_fall_time at the real pulse) so it can't corrupt the period.
+                return
+            if last is not None:
+                self._measured_period = t - last
             self._last_fall_time = t
 
     # ------------------------------------------------------------------
@@ -252,11 +260,10 @@ class MotorController:
         target_rpm  = self._target_rpm(target_mode)
 
         have_measurement, measured, phase = self._measure(monotonic())
-        # A measurement is usable only while running within the sensor's range: below the ceiling (above
-        # it no falls arrive) and not commanded STOPPED. Otherwise we trust the command.
-        fast   = target_rpm > _SENSOR_CEILING_RPM
+        # A measurement is usable only in the sensor's range — both the commanded and the measured speed
+        # below the ceiling (no falls above it; a >ceiling reading isn't trusted) — and not STOPPED.
+        fast   = target_rpm > _SENSOR_CEILING_RPM or measured > _SENSOR_CEILING_RPM
         locked = have_measurement and not fast and target_mode != MotorMode.STOPPED
-
         measured_rpm  = measured if locked else 0.0
         effective_rpm = measured_rpm if locked else target_rpm
         phase         = phase if locked else float('nan')
