@@ -395,7 +395,8 @@
     },
     "playhead": {
       "phase": 0.73,
-      "tracking": 0.12
+      "tracking": 0.12,
+      "speed_smoothing": 0.66
     },
     "low": {
       "playhead": {
@@ -409,9 +410,9 @@
         "max_white": 1.0,
         "min_blue": 0.0,
         "max_blue": 0.0,
-        "min_width": 0.15,
-        "max_width": 0.2,
-        "gap": 0.33,
+        "min_width": 0.1,
+        "max_width": 0.1,
+        "gap": 0.0,
         "blend": "ADD"
       }
     },

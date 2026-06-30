@@ -3,8 +3,10 @@
 A numerically-controlled oscillator (NCO/PLL) whose behavior depends on the motor's
 active mode (it is the *content sweep*, which never runs faster than LOW):
   - STOPPED → holds its last position (frozen); no playhead (`.phase` is NaN).
-  - IDLE / LOW → tracks the measured phase *while locked*. With no measurement (motor disconnected
-    / not turning) there is nothing real to track, so the sweep holds and `.phase` is NaN.
+  - IDLE / LOW → tracks the measured rotation *while locked*: the sweep rate is the motor speed
+    *averaged* over a few revolutions (`speed_smoothing`, so per-revolution timing jitter does not
+    wobble the sweep), and the `tracking` gain eases the *position* onto the measured phase. With no
+    measurement (motor disconnected / not turning) there is nothing real to track, so it holds (NaN).
   - HIGH → free-runs at `low_rpm` and ignores the motor's fast phase, so the content sweep
     continues seamlessly from LOW (the motor's HIGH speed is for the pixel system). HIGH is
     unmeasurable by design, so it is always "live" (the content sweep is the playhead).
@@ -67,10 +69,14 @@ class Playhead:
         self._resyncing: bool = False                # left HIGH → free-running until the motor slows to content speed
         self._seen_fast: bool = False                # saw a fresh above-content measurement since leaving HIGH
         self._live:     bool  = False                # is there a real playhead this tick (locked, HIGH, or re-syncing)
+        self._rpm_ema = EMAFilter(freq=30.0)         # averages the per-revolution measured speed (feed-forward)
+        self._time:    float = 0.0                   # accumulated time for the EMA's dt-correction
+        self._tracking_prev: bool = False            # was the previous tick the locked-tracking branch (to seed the EMA)
 
     def tick(self, dt: float, motor: MotorState) -> None:
         """Advance the internal content clock from the motor's active mode, gating the re-lock onto
         the measured phase until a spun-down motor has returned to content speed."""
+        self._time += dt
         # Leaving HIGH arms the re-sync: keep free-running until the motor slows back to content speed
         # rather than snapping onto its still-too-fast (or stale, see below) measured phase.
         if self._prev_mode == MotorMode.HIGH and motor.mode != MotorMode.HIGH:
@@ -99,16 +105,26 @@ class Playhead:
         """The mode-based content sweep (STOPPED holds, IDLE/LOW track the measured phase, HIGH and
         the post-HIGH re-sync free-run at the LOW content rate)."""
         if motor.mode == MotorMode.STOPPED:
-            pass                                              # hold last position (frozen)
+            self._tracking_prev = False                       # hold last position (frozen)
         elif motor.mode == MotorMode.HIGH or self._resyncing:
             # Free-run at the LOW content rate: HIGH ignores the fast motor; the re-sync waits out the
             # spin-down without snapping to the still-too-fast measured phase.
             self._internal = _wrap_to_pi(self._internal + (motor.low_rpm / 60.0) * math.tau * dt)
+            self._tracking_prev = False
         elif motor.locked and not math.isnan(motor.phase):    # IDLE, LOW — track the measured rotation
-            self._internal += (motor.measured_rpm / 60.0) * math.tau * dt
+            # Feed-forward at the *smoothed* speed: per-revolution measurements jitter, so averaging the
+            # rate keeps the sweep steady; the low `tracking` gain then eases the phase onto the light.
+            if not self._tracking_prev:
+                self._rpm_ema.reset(motor.measured_rpm)       # seed on (re)acquire → no ramp-in
+            self._rpm_ema.setAlpha(max(0.03, 1.0 - self._settings.speed_smoothing))   # 0=raw … 1=heavy
+            rpm = self._rpm_ema(motor.measured_rpm, self._time)
+            self._internal += (rpm / 60.0) * math.tau * dt
             self._internal += self._settings.tracking * _wrap_to_pi(motor.phase - self._internal)
             self._internal = _wrap_to_pi(self._internal)
-        # else IDLE/LOW with no measurement (disconnected) → hold; `.phase` reports NaN (not live)
+            self._tracking_prev = True
+        else:
+            self._tracking_prev = False
+        # (IDLE/LOW with no measurement (disconnected) → hold; `.phase` reports NaN, not live)
 
     @property
     def phase(self) -> float:

@@ -333,7 +333,8 @@ class ReacquireTest(unittest.TestCase):
         for _ in range(200):                                           # tracking pulls onto the measured phase
             mp = next(gen)
             p.tick(dt, mstate(mp, True, 72.0, mode=self.LOW, low_rpm=72.0))
-        self.assertAlmostEqual(wrap(p.phase - p._settings.phase * TAU - mp), 0.0, places=2)
+        # Converges onto the measured phase (within ~1° — the speed EMA eases from the re-lock rpm to 72).
+        self.assertAlmostEqual(wrap(p.phase - p._settings.phase * TAU - mp), 0.0, delta=0.02)
 
     def test_stale_content_speed_reading_does_not_relock(self) -> None:
         # Hardware spin-down: above the sensor ceiling the motor has no fresh falls and keeps reporting
@@ -374,6 +375,42 @@ class ReacquireTest(unittest.TestCase):
         self.assertFalse(p._resyncing)
         self.assertEqual(p._internal, 1.0)                             # held
         self.assertTrue(math.isnan(p.phase))
+
+
+class SpeedSmoothingTest(unittest.TestCase):
+    """The feed-forward sweep rate uses the *averaged* measured speed, so per-revolution rpm jitter
+    does not wobble the playhead. `tracking=0` isolates the rate term from the phase correction."""
+
+    def _settings(self, speed_smoothing: float) -> PlayheadSettings:
+        s = PlayheadSettings(); s.tracking = 0.0; s.speed_smoothing = speed_smoothing
+        return s
+
+    def test_speed_smoothing_rejects_a_speed_spike(self) -> None:
+        dt = 1 / 60
+        p = running_playhead(self._settings(0.9))
+        for _ in range(120):                                       # warm up: EMA settles at 72 rpm
+            p.tick(dt, mstate(0.0, True, 72.0))
+        before = p._internal
+        p.tick(dt, mstate(0.0, True, 720.0))                       # one-tick 10× spike
+        step = wrap(p._internal - before)
+        self.assertLess(step, 72.0 / 60.0 * TAU * dt * 2.0)        # averaged — nowhere near the 10× raw step
+
+    def test_no_smoothing_follows_raw_speed(self) -> None:
+        dt = 1 / 60
+        p = running_playhead(self._settings(0.0))
+        for _ in range(10):
+            p.tick(dt, mstate(0.0, True, 72.0))
+        before = p._internal
+        p.tick(dt, mstate(0.0, True, 720.0))                       # spike passes straight through at 0 smoothing
+        self.assertAlmostEqual(wrap(p._internal - before), 720.0 / 60.0 * TAU * dt, places=3)
+
+    def test_ema_seeds_on_reacquire(self) -> None:
+        dt = 1 / 60
+        p = running_playhead(self._settings(0.9))
+        p.tick(dt, mstate(float("nan"), False, 72.0, mode=MotorMode.LOW))   # disconnected → hold, not tracking
+        before = p._internal
+        p.tick(dt, mstate(0.0, True, 100.0, mode=MotorMode.LOW))            # re-acquire → seed EMA to 100, not ramp from 0
+        self.assertAlmostEqual(wrap(p._internal - before), 100.0 / 60.0 * TAU * dt, places=3)
 
 
 if __name__ == "__main__":
