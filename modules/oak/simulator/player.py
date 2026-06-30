@@ -442,7 +442,11 @@ class Player(Thread):
     def update_gui(self, frame_id: int = 0) -> None:
         chunk: int = self.get_current_chunk()
         self.settings.current_chunk = chunk
-        self.settings.playback_time = self._format_time(self._global_frame(chunk, frame_id) / self.fps)
+        global_frame: int = self._global_frame(chunk, frame_id)
+        self.settings.playback_time = self._format_time(global_frame / self.fps)
+        with self.playback_lock:
+            total: int = sum(self.chunk_frames)
+        self.settings.playback_norm = global_frame / total if total > 0 else 0.0
 
     def _global_frame(self, chunk: int, frame_id: int) -> int:
         """Absolute frame index across the whole timeline for (chunk, in-chunk frame)."""

@@ -38,7 +38,7 @@ class PlayheadStability(NormalizedSingleValue):
     """Per-person pose consistency across playhead sweeps, in ``[0, 1]``.
 
     ``0.0`` with a single sample; ``1.0`` only with a full sample buffer of matching poses.
-    Absent (NaN, score ``0.0``) before the first hit or after an azimuth reset.
+    ``0.0`` with score ``0.0`` before the first hit or after an azimuth reset.
     """
 
 
@@ -82,7 +82,7 @@ class PlayheadStabilityExtractor(FilterNode):
         self._samples: deque[Angles] = deque(maxlen=self._settings.max_samples)
         self._anchor_az:  float = float("nan")   # azimuth where the current history began
         self._prev_offset: float = float("nan")  # last frame's PlayheadOffset, for crossing detection
-        self._stability:  float = float("nan")   # last computed value, held between hits
+        self._stability:  float = 0.0            # last computed value, held between hits (0.0 until first hit)
 
     def process(self, pose: Frame) -> Frame:
         offset:  float = pose[PlayheadOffset].value
@@ -101,7 +101,8 @@ class PlayheadStabilityExtractor(FilterNode):
             self._on_hit(pose[Angles], azimuth)
         self._prev_offset = offset
 
-        score = 0.0 if math.isnan(self._stability) else 1.0
+        # No samples yet (before first hit / after a reset) → value 0.0 with score 0.0.
+        score = 1.0 if self._samples else 0.0
         return replace(pose, {PlayheadStability: PlayheadStability.from_value(self._stability, score)})
 
     def _on_hit(self, angles: Angles, azimuth: float) -> None:

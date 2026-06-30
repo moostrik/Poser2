@@ -11,7 +11,7 @@
     "square": false,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "cam_0": {
       "device_id": "14442C101136D1D200",
@@ -29,8 +29,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 30001,
-      "mono_iso": 1549,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.3,
@@ -56,8 +56,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 30001,
-      "mono_iso": 1549,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.3,
@@ -83,8 +83,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 30001,
-      "mono_iso": 1549,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.3,
@@ -110,8 +110,8 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 30001,
-      "mono_iso": 1549,
+      "mono_exposure": 0,
+      "mono_iso": 0,
       "mono_auto_exposure": true,
       "ir_grid_light": 0.0,
       "ir_flood_light": 0.33,
@@ -128,10 +128,10 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "folder": "20260629-174832_Wolfie_1",
+      "folder": "20260630-123110_Stability",
       "sim_passthrough": false,
-      "start_norm": 0.0,
-      "end_norm": 1.0
+      "start_norm": 0.32,
+      "end_norm": 0.72
     },
     "tracker": {
       "min_age": 5,
@@ -377,7 +377,10 @@
       "lines"
     ],
     "master": 1.0,
-    "fade_times": [1.0, 0.5],
+    "fade_times": [
+      1.0,
+      0.5
+    ],
     "light_phase": 0.55,
     "clock": {
       "bpm": 20.0
@@ -597,7 +600,7 @@
       }
     },
     "data": {
-      "mode": "WINDOW",
+      "mode": "NONE",
       "feature_field": "AngleMotion",
       "stage": 0,
       "line_width": 3.0,
