@@ -36,7 +36,7 @@ class OscLightSettings(BaseSettings):
     chunk_size:    Field[int]  = Field(0,    access=Field.READ,  description="Computed chunk size (bytes)")
     num_chunks:   Field[int]  = Field(0,    access=Field.READ,  description="Computed number of chunks")
     lower_edge:   Field[float] = Field(0.35, min=0.0, max=1.0, step=0.01, description="Lamp turn-on floor: lit pixels lift to at least this; black stays off")
-    curve:        Field[float] = Field(1.0,  min=0.5, max=2.0, step=0.01, description="Output gamma curve; <1 brightens mids, >1 darkens")
+    curve:        Field[float] = Field(1.0,  min=0.5, max=3.0, step=0.01, description="Output gamma curve; <1 brightens mids, >1 darkens")
     startup_delay: Field[float] = Field(2.0, min=0.0, max=10.0, step=0.5, description="Hold motor rpm at 0 for this long after connect, then release to the commanded speed — forces a 0→target edge the motor controller acts on at boot")
     offsets:      Group[OscLightOffsetSettings] = Group(OscLightOffsetSettings)
 

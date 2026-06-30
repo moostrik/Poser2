@@ -3,11 +3,13 @@ their pose across successive playhead sweeps. It measures the *pose's* consisten
 playhead is only the sampling trigger.
 
 Each time the rotating playhead crosses a person (a ``PlayheadOffset`` zero-crossing) the
-current pose (``Angles``) is sampled into a short per-person ring buffer. Stability is the
-summed similarity of the current sample to the older ones, normalised by buffer capacity:
-it is ``0.0`` with a single sample and only reaches ``1.0`` with a full buffer of matching
-poses. The history (and the value) reset when the person's azimuth drifts too far from
-where the history began.
+current pose (``Angles``) is banked into a short per-person ring of past sweeps. Stability
+is computed *every frame* as the summed similarity of the **live** pose to those banked
+sweeps, normalised by ring capacity: ``0.0`` with no banked sweeps and ``1.0`` only when
+the live pose matches a full ring. Because it scores the live pose — not the last sampled
+one — the value tracks the person in real time as the playhead approaches, rather than
+lagging a full rotation behind. The history (and the value) reset when the person's azimuth
+drifts too far from where the history began.
 
 Playhead is a White Space concept, so the feature, its extractor and its settings live with
 the app rather than in ``modules/pose`` — like ``PlayheadOffset`` (see ``playhead_offset.py``).
@@ -37,16 +39,18 @@ _HALF_PI: float = math.pi / 2.0
 class PlayheadStability(NormalizedSingleValue):
     """Per-person pose consistency across playhead sweeps, in ``[0, 1]``.
 
-    ``0.0`` with a single sample; ``1.0`` only with a full sample buffer of matching poses.
-    ``0.0`` with score ``0.0`` before the first hit or after an azimuth reset.
+    ``0.0`` with no banked sweeps; ``1.0`` only when the live pose matches a full ring of
+    banked sweeps. ``0.0`` with score ``0.0`` before the first hit or after an azimuth reset.
     """
 
 
 class PlayheadStabilityExtractorSettings(BaseSettings):
     """Configuration for ``PlayheadStabilityExtractor``."""
-    max_samples:   Field[int]   = Field(4, min=1, max=8, access=Field.INIT, description="Pose samples retained per person")
-    angle_scale:   Field[float] = Field(0.8, min=0.1, max=2.0, step=0.05, description="Angle similarity scale (rad)")
-    azimuth_reset: Field[float] = Field(0.35, min=0.0, max=math.pi, step=0.01, description="Azimuth drift from history start that resets the buffer (rad)")
+    max_samples:    Field[int]   = Field(4, min=1, max=8, access=Field.INIT, description="Sweeps per person (live pose compared against the previous max_samples − 1)")
+    angle_scale:    Field[float] = Field(0.8, min=0.1, max=2.0, step=0.05, description="Angle similarity scale (rad)")
+    azimuth_reset:  Field[float] = Field(0.35, min=0.0, max=math.pi, step=0.01, description="Azimuth drift from history start that resets the buffer (rad)")
+    override:       Field[bool]  = Field(False, description="Force a fixed stability value instead of the computed one", newline=True)
+    override_value: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Stability value used while override is enabled")
 
 
 def _pose_similarity(current: Angles, older: Angles, scale: float) -> float:
@@ -71,7 +75,8 @@ class PlayheadStabilityExtractor(FilterNode):
     Holds per-track state (one instance per ``FilterPipeline``); ``reset()`` is called
     automatically by ``FilterTracker`` when the track is lost. Reads ``PlayheadOffset``
     (stamped upstream in the same ``filters_lerp`` pipeline), ``Azimuth`` and ``Angles``;
-    writes ``PlayheadStability``. The value holds between hits (a step per sweep).
+    writes ``PlayheadStability``. The value tracks the live pose against the banked sweeps
+    every frame; the ring advances by one banked sweep at each hit.
     """
 
     def __init__(self, settings: PlayheadStabilityExtractorSettings | None = None) -> None:
@@ -79,10 +84,10 @@ class PlayheadStabilityExtractor(FilterNode):
         self.reset()
 
     def reset(self) -> None:
-        self._samples: deque[Angles] = deque(maxlen=self._settings.max_samples)
+        # Banked poses from past playhead crossings; the live pose is scored against them.
+        self._samples: deque[Angles] = deque(maxlen=self._settings.max_samples - 1)
         self._anchor_az:  float = float("nan")   # azimuth where the current history began
         self._prev_offset: float = float("nan")  # last frame's PlayheadOffset, for crossing detection
-        self._stability:  float = 0.0            # last computed value, held between hits (0.0 until first hit)
 
     def process(self, pose: Frame) -> Frame:
         offset:  float = pose[PlayheadOffset].value
@@ -94,29 +99,33 @@ class PlayheadStabilityExtractor(FilterNode):
             if drift > self._settings.azimuth_reset:
                 self.reset()
 
-        # Hit = PlayheadOffset zero-crossing near 0 (the ±π wrap is excluded by the guard).
-        # NaN offset (playhead unlocked / no azimuth) fails the comparison, so no hit fires.
+        # Hit = PlayheadOffset zero-crossing near 0 (the ±π wrap is excluded by the guard) →
+        # bank the current pose as a completed sweep. NaN offset (playhead unlocked / no
+        # azimuth) fails the comparison, so no hit fires.
         if (self._prev_offset * offset < 0.0
                 and abs(self._prev_offset) < _HALF_PI and abs(offset) < _HALF_PI):
             self._on_hit(pose[Angles], azimuth)
         self._prev_offset = offset
 
-        # No samples yet (before first hit / after a reset) → value 0.0 with score 0.0.
-        score = 1.0 if self._samples else 0.0
-        return replace(pose, {PlayheadStability: PlayheadStability.from_value(self._stability, score)})
+        if self._settings.override:
+            return replace(pose, {PlayheadStability: PlayheadStability.from_value(self._settings.override_value, 1.0)})
+
+        # Score the *live* pose against the banked sweeps every frame, so the value tracks
+        # what the person is doing now instead of lagging behind the last sampled sweep.
+        # No banked sweeps yet (before first hit / after a reset) → value 0.0, score 0.0.
+        if not self._samples:
+            return replace(pose, {PlayheadStability: PlayheadStability.from_value(0.0, 0.0)})
+        stability = self._compute_stability(pose[Angles])
+        return replace(pose, {PlayheadStability: PlayheadStability.from_value(stability, 1.0)})
 
     def _on_hit(self, angles: Angles, azimuth: float) -> None:
         if not self._samples:
             self._anchor_az = azimuth        # anchor where a fresh history begins
-        self._samples.append(angles)         # newest = current; ring caps at max_samples
-        self._stability = self._compute_stability()
+        self._samples.append(angles)         # bank this sweep; ring caps at max_samples − 1
 
-    def _compute_stability(self) -> float:
-        if len(self._samples) < 2:
-            return 0.0                        # one sample → 0.0
-        current = self._samples[-1]
+    def _compute_stability(self, current: Angles) -> float:
         scale = self._settings.angle_scale
-        total = sum(_pose_similarity(current, older, scale) for older in tuple(self._samples)[:-1])
-        # Σ sim / (capacity − 1): folds match quality × buffer fill; 1.0 only when the buffer
-        # is full and every older sample matches the current one.
+        total = sum(_pose_similarity(current, older, scale) for older in self._samples)
+        # Σ sim / (max_samples − 1): folds match quality × buffer fill; 1.0 only when the
+        # ring is full and every banked sweep matches the live pose.
         return total / (self._settings.max_samples - 1)
