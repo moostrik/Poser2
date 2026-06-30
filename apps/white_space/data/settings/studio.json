@@ -130,12 +130,12 @@
       ],
       "folder": "20260630-123110_Stability",
       "sim_passthrough": false,
-      "start_norm": 0.32,
-      "end_norm": 0.72
+      "start_norm": 0.0,
+      "end_norm": 1.0
     },
     "tracker": {
       "min_age": 5,
-      "min_height": 0.25,
+      "min_height": 0.5,
       "timeout": 2.0,
       "seam": {
         "reject": 0.5,
@@ -391,7 +391,7 @@
       "simulate": "OFF",
       "mode": "LOW",
       "idle_rpm": 7.0,
-      "low_rpm": 60.0,
+      "low_rpm": 50.0,
       "high_rpm": 2000.0
     },
     "playhead": {
@@ -405,13 +405,13 @@
       },
       "playhead_flash": {
         "base_white": 0.0,
-        "base_blue": 0.0,
-        "flash_white": 1.0,
-        "flash_blue": 1.0,
-        "under_white": 0.1,
-        "under_blue": 0.1,
-        "rise": 0.5,
-        "fall": 0.5,
+        "base_blue": 0.33,
+        "min_white": 0.1,
+        "max_white": 1.0,
+        "min_blue": 0.1,
+        "max_blue": 1.0,
+        "min_width": 0.2,
+        "max_width": 0.3,
         "blend": "ADD"
       }
     },
