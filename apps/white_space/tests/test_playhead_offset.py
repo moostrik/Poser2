@@ -82,6 +82,14 @@ class PlayheadFlashWindowTest(unittest.TestCase):
         self.assertEqual(offset_to_level(float("nan"), 0.5), 0.0)
         self.assertEqual(offset_to_level(0.3, 0.0), 0.0)         # zero width → off
 
+    def test_centre_gap(self) -> None:
+        # gap = 0.25 of width = 0.1 rad dark notch on each side of the crossing
+        self.assertEqual(offset_to_level(0.0, 0.4, 0.25), 0.0)   # dead centre → notched off
+        self.assertEqual(offset_to_level(0.05, 0.4, 0.25), 0.0)  # inside the notch → off
+        self.assertEqual(offset_to_level(0.1, 0.4, 0.25), 1.0)   # notch edge (inclusive) → on
+        self.assertEqual(offset_to_level(0.3, 0.4, 0.25), 1.0)   # past notch, within width → on
+        self.assertEqual(offset_to_level(0.5, 0.4, 0.25), 0.0)   # beyond width → off
+
 
 class StabilityLerpTest(unittest.TestCase):
     def test_endpoints_and_midpoint(self) -> None:

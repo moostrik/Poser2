@@ -31,6 +31,7 @@ The motor is offset-agnostic; the playhead owns its single content-alignment `of
 import math
 
 from modules.settings import BaseSettings, Field, Widget
+from modules.utils import EMAFilter
 
 from .motor import MotorState, MotorMode
 
@@ -47,7 +48,9 @@ class PlayheadSettings(BaseSettings):
     phase:          Field[float] = Field(0.0,  min=0.0, max=1.0, step=0.01,
                                          description="Playhead zero-point alignment (0–1 turn)")
     tracking:       Field[float] = Field(0.1,  min=0.0, max=1.0, step=0.01,
-                                         description="How tightly the playhead tracks the measured motor phase (0=free-run, 1=snap)")
+                                         description="Phase-lock gain — how tightly the playhead's position locks to the measured motor phase (0=free-run, 1=snap)")
+    speed_smoothing:Field[float] = Field(0.5,  min=0.0, max=1.0, step=0.01,
+                                         description="How much to average the measured motor speed feeding the sweep rate (0=raw, 1=heavy)")
     playhead:       Field[float] = Field(0.0,  min=-math.pi, max=math.pi, step=0.001,
                                          access=Field.READ, widget=Widget.slider, description="Continuous playhead (−π…π)")
 

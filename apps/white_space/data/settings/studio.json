@@ -375,8 +375,7 @@
     ],
     "high_layers": [
       "player_lines",
-      "playhead",
-      "lines"
+      "playhead"
     ],
     "master": 1.0,
     "fade_times": [
@@ -391,12 +390,12 @@
       "simulate": "OFF",
       "mode": "LOW",
       "idle_rpm": 7.0,
-      "low_rpm": 50.0,
+      "low_rpm": 36.0,
       "high_rpm": 2000.0
     },
     "playhead": {
-      "phase": 0.76,
-      "tracking": 0.93
+      "phase": 0.73,
+      "tracking": 0.12
     },
     "low": {
       "playhead": {
@@ -405,13 +404,14 @@
       },
       "playhead_flash": {
         "base_white": 0.0,
-        "base_blue": 0.33,
+        "base_blue": 0.0,
         "min_white": 0.1,
         "max_white": 1.0,
-        "min_blue": 0.1,
-        "max_blue": 1.0,
-        "min_width": 0.2,
-        "max_width": 0.3,
+        "min_blue": 0.0,
+        "max_blue": 0.0,
+        "min_width": 0.15,
+        "max_width": 0.2,
+        "gap": 0.33,
         "blend": "ADD"
       }
     },

@@ -3,9 +3,10 @@ player, driven by the continuous ``PlayheadOffset``.
 
 Each pose's signed offset to the playhead defines an on/off window around the crossing: the
 flash switches on while the playhead is within ``width`` radians of the pose, on either side
-of the crossing. Both the window width and the brightness interpolate per pose by its
-``PlayheadStability``, from the ``min_*`` endpoints (stability 0) to the ``max_*`` endpoints
-(stability 1). The whole-strip brightness follows the closest active pose.
+of the crossing, save a dark ``gap`` notch straddling the crossing itself. Both the window
+width and the brightness interpolate per pose by its ``PlayheadStability``, from the ``min_*``
+endpoints (stability 0) to the ``max_*`` endpoints (stability 1). The whole-strip brightness
+follows the closest active pose.
 """
 
 import math
@@ -19,15 +20,17 @@ from ...frame import Frame
 from ....pose import PlayheadOffset, PlayheadStability
 
 
-def offset_to_level(phi: float, width: float) -> float:
+def offset_to_level(phi: float, width: float, gap: float = 0.0) -> float:
     """On/off window around the crossing: ``1`` while the playhead is within ``width`` radians
-    of the pose (either side of the crossing), ``0`` elsewhere (and for NaN offsets).
+    of the pose, except the central ``gap`` fraction of that width — a dark notch straddling
+    the crossing. ``0`` outside the window, inside the notch, and for NaN offsets.
 
     ``phi`` is the pose's signed playhead offset: positive approaching, negative departing.
     """
     if math.isnan(phi):
         return 0.0
-    return 1.0 if abs(phi) <= width else 0.0
+    distance = abs(phi)
+    return 1.0 if gap * width <= distance <= width else 0.0
 
 
 def stability_lerp(stability: float, lo: float, hi: float) -> float:
@@ -50,6 +53,7 @@ class PlayheadFlashSettings(LayerSettings):
     max_blue:   Field[float] = Field(1.0, min=0.0, max=1.0,     step=0.01, description="Blue flash intensity at stability 1")
     min_width:  Field[float] = Field(0.2, min=0.0, max=math.pi, step=0.01, description="How far either side of the crossing (rad) the flash is on at stability 0", newline=True)
     max_width:  Field[float] = Field(0.4, min=0.0, max=math.pi, step=0.01, description="How far either side of the crossing (rad) the flash is on at stability 1")
+    gap:        Field[float] = Field(0.25, min=0.0, max=1.0,    step=0.01, description="Fraction of the window centre that stays dark — a notch at the crossing (0 = solid)", newline=True)
 
 
 class PlayheadFlash(BaseLayer):
@@ -76,7 +80,7 @@ class PlayheadFlash(BaseLayer):
                 continue
             stability = pose[PlayheadStability].value
             width = stability_lerp(stability, P.min_width, P.max_width)
-            level = offset_to_level(pose[PlayheadOffset].value, width)
+            level = offset_to_level(pose[PlayheadOffset].value, width, P.gap)
             if level <= 0.0:
                 continue
             flash_white = max(flash_white, level * stability_lerp(stability, P.min_white, P.max_white))
