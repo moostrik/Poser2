@@ -344,7 +344,7 @@
       "stability_beats": 4,
       "dwell_beats": 4,
       "angle_scale": 0.8,
-      "motion_scale": 3.0,
+      "motion_scale": 1.0,
       "spot_radius": 9.0,
       "override": false,
       "override_value": 0.0
@@ -427,11 +427,11 @@
         "blend": "ADD"
       },
       "haunt_flash": {
-        "min_brightness": 0.2,
+        "min_brightness": 1.0,
         "max_brightness": 1.0,
         "ghost_brightness": 1.0,
-        "min_width": 10.0,
-        "max_width": 15.0,
+        "min_width": 7.0,
+        "max_width": 7.0,
         "ghost_width": 7.0,
         "blend": "ADD"
       }
@@ -722,9 +722,9 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 1626,
+      "x": 1895,
       "y": 31,
-      "width": 933,
+      "width": 664,
       "height": 598,
       "secondary_list": [],
       "secondary_fullscreen": true,
