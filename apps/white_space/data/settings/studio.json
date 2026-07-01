@@ -426,8 +426,10 @@
       "haunt_flash": {
         "min_brightness": 0.1,
         "max_brightness": 1.0,
-        "min_width": 22.9,
-        "max_width": 45.8,
+        "ghost_brightness": 1.0,
+        "min_width": 10.0,
+        "max_width": 15.0,
+        "ghost_width": 7.0,
         "blend": "ADD"
       }
     },

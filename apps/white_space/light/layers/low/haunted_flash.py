@@ -1,8 +1,8 @@
-"""HauntedFlash composition — the low-speed player flash: a WHITE flash on the front lamps as the
-rotating playhead crosses each *free* live player. A *ghosted* player (standing on a spot a ghost
-claims, tagged ``GhostedFeature = 1`` by ``Ghoster``) is instead taken over by the ghost — it gets
-no white flash, only a BLUE flash a fixed quarter-turn *later*. So the two are mutually exclusive:
-white marks free players, blue marks ghosted ones.
+"""HauntedFlash composition — the low-speed player flash. On the WHITE (front-lamp) channel: a
+flash as the rotating playhead crosses each *free* live player, and a flash as it crosses each
+*ghost* (at the ghost's fixed azimuth, at its own ``ghost_brightness``). A *ghosted* live player
+(standing on a spot a ghost claims, tagged ``GhostedFeature = 1`` by ``Ghoster``) gets no white
+flash — it's taken over by its ghost — only a BLUE flash a fixed quarter-turn *later*.
 
 The blue lamp trails the white by 0.25 of a turn, so the blue fires when the playhead is a
 quarter-turn *past* the pose (``PlayheadOffset ≈ −0.25·2π``, the departing side). Following
@@ -29,15 +29,18 @@ _PHASE_OFFSET: float = 0.25
 
 
 class HauntedFlashSettings(LayerSettings):
-    min_brightness: Field[float] = Field(0.1, min=0.0, max=1.0,     step=0.01, description="Flash brightness at stability 0", newline=True)
-    max_brightness: Field[float] = Field(1.0, min=0.0, max=1.0,     step=0.01, description="Flash brightness at stability 1")
-    min_width:      Field[float] = Field(20.0, min=0.0, max=360.0, step=1.0, description="Flash window width (deg) at stability 0", newline=True)
-    max_width:      Field[float] = Field(40.0, min=0.0, max=360.0, step=1.0, description="Flash window width (deg) at stability 1")
+    min_brightness:   Field[float] = Field(0.1, min=0.0, max=1.0,    step=0.01, description="Player flash brightness at stability 0", newline=True)
+    max_brightness:   Field[float] = Field(1.0, min=0.0, max=1.0,    step=0.01, description="Player flash brightness at stability 1")
+    ghost_brightness: Field[float] = Field(1.0, min=0.0, max=1.0,    step=0.01, description="Ghost white flash brightness")
+    min_width:        Field[float] = Field(20.0, min=0.0, max=360.0, step=1.0, description="Player flash window width (deg) at stability 0", newline=True)
+    max_width:        Field[float] = Field(40.0, min=0.0, max=360.0, step=1.0, description="Player flash window width (deg) at stability 1")
+    ghost_width:      Field[float] = Field(30.0, min=0.0, max=360.0, step=1.0, description="Ghost flash window width (deg)")
 
 
 class HauntedFlash(BaseLayer):
-    """White flash for every live player at the crossing, plus a blue flash a fixed quarter-turn
-    later for ghosted players; width and brightness interpolate by ``PlayheadStability``."""
+    """White flash for each free live player and each ghost at their crossings, plus a blue flash a
+    fixed quarter-turn later for ghosted players; width/brightness interpolate by
+    ``PlayheadStability`` (ghosts use a fixed ``ghost_brightness``)."""
 
     def __init__(self, resolution: int, config: HauntedFlashSettings, board, pose_stage: int) -> None:
         super().__init__(resolution, config, board)
@@ -72,6 +75,14 @@ class HauntedFlash(BaseLayer):
                 b_level = offset_to_level(math.atan2(math.sin(d), math.cos(d)), half_rad)
                 if b_level > 0.0:
                     flash_blue = max(flash_blue, b_level * brightness)
+
+        # WHITE — each ghost flashes at its own (fixed) crossing, at its own brightness/width. Its
+        # PlayheadOffset is refreshed to the live playhead by Ghoster, so this tracks the sweep.
+        g_half = math.radians(P.ghost_width / 2.0)
+        for ghost in self._board.get_ghosts().values():
+            g_level = offset_to_level(ghost[PlayheadOffset].value, g_half)
+            if g_level > 0.0:
+                flash_white = max(flash_white, g_level * P.ghost_brightness)
 
         half = self.resolution // 2
         if flash_white > 0.0:
