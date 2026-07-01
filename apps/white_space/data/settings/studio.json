@@ -136,7 +136,7 @@
     },
     "tracker": {
       "min_age": 5,
-      "min_height": 0.5,
+      "min_height": 0.25,
       "timeout": 2.0,
       "seam": {
         "reject": 0.5,
@@ -344,7 +344,7 @@
       "stability_beats": 4,
       "dwell_beats": 4,
       "angle_scale": 0.8,
-      "motion_scale": 10.0,
+      "motion_scale": 3.0,
       "spot_radius": 9.0,
       "override": false,
       "override_value": 0.0
@@ -385,7 +385,8 @@
     ],
     "high_layers": [
       "player_lines",
-      "playhead"
+      "playhead",
+      "lines"
     ],
     "master": 1.0,
     "fade_times": [
@@ -426,7 +427,7 @@
         "blend": "ADD"
       },
       "haunt_flash": {
-        "min_brightness": 0.1,
+        "min_brightness": 0.2,
         "max_brightness": 1.0,
         "ghost_brightness": 1.0,
         "min_width": 10.0,
@@ -721,10 +722,10 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 910,
+      "x": 1626,
       "y": 31,
-      "width": 1649,
-      "height": 1358,
+      "width": 933,
+      "height": 598,
       "secondary_list": [],
       "secondary_fullscreen": true,
       "fullscreen_mode": "WINDOWED"
@@ -736,7 +737,7 @@
   },
   "session": {
     "output_path": "recordings",
-    "name": "Yens_2",
+    "name": "dinges",
     "split_seconds": 10,
     "osc": {
       "port_in": 9000,
