@@ -1,7 +1,7 @@
 """White Space app-wide blackboard."""
 
 from modules.board import (
-    FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
+    FrameStoreMixin, GhostStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
     SegmentationImageStoreMixin, DepthTrackletStoreMixin, TrackletStoreMixin,
     VideoImageStoreMixin, CompositionOutputStoreMixin, SequenceStoreMixin,
     PlayheadStoreMixin,
@@ -9,7 +9,7 @@ from modules.board import (
 
 
 class Board(
-    FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
+    FrameStoreMixin, GhostStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
     SegmentationImageStoreMixin, DepthTrackletStoreMixin, TrackletStoreMixin,
     VideoImageStoreMixin, CompositionOutputStoreMixin, SequenceStoreMixin,
     PlayheadStoreMixin,
@@ -22,6 +22,7 @@ class Board(
 
     def __init__(self) -> None:
         FrameStoreMixin.__init__(self)
+        GhostStoreMixin.__init__(self)
         WindowStoreMixin.__init__(self)
         CameraImageStoreMixin.__init__(self)
         CropImageStoreMixin.__init__(self)

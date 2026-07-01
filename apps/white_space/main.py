@@ -16,7 +16,7 @@ from modules.session import Session, Sequencer
 from modules.gl import WindowSettings
 
 from .board import Board
-from .pose import PlayheadOffset, PlayheadOffsetExtractor, PlayheadStability, PlayheadStabilityExtractor
+from .pose import PlayheadOffset, PlayheadOffsetExtractor, PlayheadStability, PlayheadStabilityExtractor, Ghoster, GhostedFeature
 from .light import Render as LightRender
 from .inout import OscLight, OscSound, UdpReceiver
 from .render import Render as WindowRender
@@ -56,6 +56,7 @@ class WhiteSpaceMain:
         # SESSION
         self.session = Session(self.settings.session.core)
         self.osc_sound = OscSound(self.settings.inout.osc_sound)
+        self.ghoster = Ghoster(ps.ghoster)   # live/pool counts shared into GhosterSettings from root
         self.sequencer = Sequencer(self.settings.session.sequencer)
         self.sequencer.add_state_callback(self.board.set_sequence)
         self.sequencer.add_state_callback(self.osc_sound.set_sequencer_state)
@@ -108,7 +109,7 @@ class WhiteSpaceMain:
         # STAGE WINDOW TRACKERS & BROADCASTS
         # The LERP tracker also windows the app-local playhead features (the only stage where
         # they're stamped) so the data layers can graph them; other stages use the built-ins.
-        lerp_features = features.SCALAR_FEATURES + [PlayheadOffset, PlayheadStability]
+        lerp_features = features.SCALAR_FEATURES + [PlayheadOffset, PlayheadStability, GhostedFeature]
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
@@ -118,7 +119,6 @@ class WhiteSpaceMain:
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),
-                partial(self.osc_sound.set_frames, stage),
                 wt.process,
             ])
 
@@ -237,7 +237,12 @@ class WhiteSpaceMain:
         self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
         self.filters_lerp.add_frames_callback(self.motion_gate_applicator.set)
         self.filters_lerp.add_frames_callback(self.gate_lerp.process)
-        self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
+        # Ghoster sits between LERP and the fan-out: tags GhostedFeature on live frames, spawns ghosts,
+        # publishes the ghost snapshot to the board, and feeds (muted live + ghosts) to OSC sound.
+        self.gate_lerp.add_frames_callback(self.ghoster.process)
+        self.ghoster.add_frames_callback(self.stages[Stage.LERP])
+        self.ghoster.add_ghosts_callback(self.board.set_ghosts)
+        self.ghoster.add_sound_callback(partial(self.osc_sound.set_frames, int(Stage.LERP)))
 
         # RENDER
         self.render = WindowRender(self.board, self.settings.render)
@@ -298,6 +303,7 @@ class WhiteSpaceMain:
 
         self.tracker.stop()
         self.osc_sound.stop()
+        self.ghoster.stop()
         self.osc_light.stop()
         self.osc_receiver.stop()
         self.udp_receiver.stop()

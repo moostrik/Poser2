@@ -17,7 +17,7 @@ from .frame import Frame, FrameCallback
 from .motor import MotorController
 from .playhead import Playhead
 from .settings import LightSettings, LowLayerId, HighLayerId
-from .layers import BaseLayer, Crossfade, PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, CameraLight, PlayheadFlash, PlayheadLow, PlayheadHigh
+from .layers import BaseLayer, Crossfade, PoseWaves, Fill, Pulse, Chase, Lines, Random, Harmonic, PlayerLines, CameraLight, PlayheadFlash, HauntedFlash, PlayheadLow, PlayheadHigh
 from ..board import Board
 
 import logging
@@ -51,8 +51,9 @@ class Render(Thread):
         # slots as a per-scope instance reading the same config.test.* settings.
         low, high, test = config.low, config.high, config.test
         self.low_layers: dict[LowLayerId, BaseLayer] = {
-            LowLayerId.playhead:       PlayheadLow  (resolution, low.playhead,       board),
-            LowLayerId.playhead_flash: PlayheadFlash(resolution, low.playhead_flash, board, pose_stage),
+            LowLayerId.playhead:        PlayheadLow  (resolution, low.playhead,        board),
+            LowLayerId.playhead_flash:  PlayheadFlash(resolution, low.playhead_flash,  board, pose_stage),
+            LowLayerId.haunt_flash:     HauntedFlash(resolution, low.haunt_flash,    board, pose_stage),
             LowLayerId.fill:   Fill  (resolution, test.fill,   board),
             LowLayerId.pulse:  Pulse (resolution, test.pulse,  board),
             LowLayerId.chase:  Chase (resolution, test.chase,  board),

@@ -9,14 +9,15 @@ from .layers import (
     PoseWavesSettings, FillSettings, PulseSettings,
     ChaseSettings, LinesSettings, RandomSettings, HarmonicSettings,
     PlayerLinesSettings, CameraLightSettings, PlayheadFlashSettings,
-    PlayheadLowSettings, PlayheadHighSettings,
+    HauntedFlashSettings, PlayheadLowSettings, PlayheadHighSettings,
 )
 
 
 class LowLayerId(IntEnum):
     """idle/low slot options: the low (slow) layers + the shared test layers (empty = black)."""
-    playhead       = auto()
-    playhead_flash = auto()
+    playhead        = auto()
+    playhead_flash  = auto()
+    haunt_flash     = auto()
     fill           = auto()
     pulse          = auto()
     chase          = auto()
@@ -40,8 +41,9 @@ class HighLayerId(IntEnum):
 
 class LowCompSettings(BaseSettings):
     """Low (slow) composition settings."""
-    playhead:       Group[PlayheadLowSettings]     = Group(PlayheadLowSettings)
-    playhead_flash: Group[PlayheadFlashSettings]   = Group(PlayheadFlashSettings)
+    playhead:        Group[PlayheadLowSettings]    = Group(PlayheadLowSettings)
+    playhead_flash:  Group[PlayheadFlashSettings]  = Group(PlayheadFlashSettings)
+    haunt_flash:     Group[HauntedFlashSettings]     = Group(HauntedFlashSettings)
 
 
 class HighCompSettings(BaseSettings):

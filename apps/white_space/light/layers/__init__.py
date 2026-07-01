@@ -13,5 +13,6 @@ from .high.harmonic      import Harmonic,     HarmonicSettings, HarmonicSourceSe
 from .high.player_azimuth  import PlayerLines,  PlayerLinesSettings
 from .high.camera_light   import CameraLight,    CameraLightSettings
 from .low.playhead_flash import PlayheadFlash, PlayheadFlashSettings
+from .low.haunted_flash import HauntedFlash, HauntedFlashSettings
 from .low.playhead   import Playhead as PlayheadLow,  PlayheadSettings as PlayheadLowSettings
 from .high.playhead  import Playhead as PlayheadHigh, PlayheadSettings as PlayheadHighSettings

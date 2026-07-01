@@ -2,8 +2,8 @@
 player, driven by the continuous ``PlayheadOffset``.
 
 Each pose's signed offset to the playhead defines an on/off window around the crossing: the
-flash switches on while the playhead is within ``width`` radians of the pose, on either side
-of the crossing, save a dark ``gap`` notch straddling the crossing itself. Both the window
+flash switches on while the playhead is within the ``width``° window of the crossing
+(±``width``/2 each side), save a dark ``gap`` notch straddling the crossing itself. Both the window
 width and the brightness interpolate per pose by its ``PlayheadStability``, from the ``min_*``
 endpoints (stability 0) to the ``max_*`` endpoints (stability 1). The whole-strip brightness
 follows the closest active pose.
@@ -51,8 +51,8 @@ class PlayheadFlashSettings(LayerSettings):
     max_white:  Field[float] = Field(1.0, min=0.0, max=1.0,     step=0.01, description="White flash intensity at stability 1")
     min_blue:   Field[float] = Field(0.1, min=0.0, max=1.0,     step=0.01, description="Blue flash intensity at stability 0", newline=True)
     max_blue:   Field[float] = Field(1.0, min=0.0, max=1.0,     step=0.01, description="Blue flash intensity at stability 1")
-    min_width:  Field[float] = Field(0.2, min=0.0, max=math.pi, step=0.01, description="How far either side of the crossing (rad) the flash is on at stability 0", newline=True)
-    max_width:  Field[float] = Field(0.4, min=0.0, max=math.pi, step=0.01, description="How far either side of the crossing (rad) the flash is on at stability 1")
+    min_width:  Field[float] = Field(20.0, min=0.0, max=360.0, step=1.0, description="Flash window width (deg) at stability 0", newline=True)
+    max_width:  Field[float] = Field(40.0, min=0.0, max=360.0, step=1.0, description="Flash window width (deg) at stability 1")
     gap:        Field[float] = Field(0.25, min=0.0, max=1.0,    step=0.01, description="Fraction of the window centre that stays dark — a notch at the crossing (0 = solid)", newline=True)
 
 
@@ -79,8 +79,8 @@ class PlayheadFlash(BaseLayer):
             if tracklet is None or not tracklet.is_active:
                 continue
             stability = pose[PlayheadStability].value
-            width = stability_lerp(stability, P.min_width, P.max_width)
-            level = offset_to_level(pose[PlayheadOffset].value, width, P.gap)
+            half_rad = math.radians(stability_lerp(stability, P.min_width, P.max_width) / 2.0)
+            level = offset_to_level(pose[PlayheadOffset].value, half_rad, P.gap)
             if level <= 0.0:
                 continue
             flash_white = max(flash_white, level * stability_lerp(stability, P.min_white, P.max_white))

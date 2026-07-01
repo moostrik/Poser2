@@ -23,7 +23,7 @@ from modules.session import SessionSettings, SequencerSettings
 from modules.gl import WindowSettings
 from .light import LightSettings
 from .inout import OscLightSettings, UdpReceiverSettings
-from .pose import PlayheadStabilityExtractorSettings
+from .pose import PlayheadStabilityExtractorSettings, GhosterSettings
 
 
 # ---------------------------------------------------------------------------
@@ -114,13 +114,16 @@ class OakGroup(BaseSettings):
 
 class _OscSoundSettings(OscSoundSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage to read poses from")
+    virtual_players: Field[int] = Field(0, min=0, max=16, access=Field.INIT, visible=False, description="Extra virtual (ghost) id slots beyond max_players (shared from root num_virtual)")
 
 
 class InOutGroup(BaseSettings):
     num_players:     Field[int] = Field(8,   access=Field.INIT, visible=False)
+    num_virtual:     Field[int] = Field(8,   access=Field.INIT, visible=False)
     resolution:      Field[int] = Field(3600, access=Field.INIT, visible=False)
     osc_light      : Group[OscLightSettings]       = Group(OscLightSettings, share=[resolution])
-    osc_sound      : Group[_OscSoundSettings]      = Group(_OscSoundSettings, share=[num_players.as_('max_players')])
+    # OSC sends max_players (live) + virtual_players (ghost) id slots; both shared from root.
+    osc_sound      : Group[_OscSoundSettings]      = Group(_OscSoundSettings, share=[num_players.as_('max_players'), num_virtual.as_('virtual_players')])
     osc_receiver   : Group[OscReceiverSettings]    = Group(OscReceiverSettings)
     udp_receiver   : Group[UdpReceiverSettings]    = Group(UdpReceiverSettings)
 
@@ -195,6 +198,7 @@ class SimilarityFeature(BaseSettings):
 
 class PoseGroup(BaseSettings):
     max_poses        : Field[int]       = Field(3, min=1, max=16, access=Field.INIT)
+    num_virtual      : Field[int]       = Field(8, min=0, max=16, access=Field.INIT, visible=False)
     model_type       : Field[inference.ModelType] = Field(inference.ModelType.TRT, access=Field.INIT)
     model_path       : Field[str]       = Field("", access=Field.INIT, visible=False)
     verbose          : Field[bool]      = Field(False, access=Field.INIT)
@@ -216,6 +220,7 @@ class PoseGroup(BaseSettings):
     motion          : Group[MotionFeature]                   = Group(MotionFeature)
     similarity      : Group[SimilarityFeature]               = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
     playhead_stability: Group[PlayheadStabilityExtractorSettings] = Group(PlayheadStabilityExtractorSettings)
+    ghoster         : Group[GhosterSettings]                = Group(GhosterSettings, share=[max_poses.as_('live_players'), num_virtual.as_('num_virtual')])
     window_raw      : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_clean    : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_smooth   : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
@@ -302,7 +307,8 @@ class RenderSettings(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class Settings(BaseSettings):
-    num_players     : Field[int]   = Field(8, access=Field.INIT)
+    num_players     : Field[int]   = Field(4, access=Field.INIT)
+    num_virtual     : Field[int]   = Field(8, access=Field.INIT)
     num_cameras     : Field[int]   = Field(4, access=Field.INIT)
     input_fps       : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     render_fps      : Field[float] = Field(30.0)
@@ -310,8 +316,8 @@ class Settings(BaseSettings):
     fov             : Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV — shared with tracker and composition")
 
     camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov])
-    inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players'), light_resolution.as_('resolution')])
-    pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
+    inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players'), num_virtual.as_('num_virtual'), light_resolution.as_('resolution')])
+    pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), num_virtual.as_('num_virtual'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     light: Group[LightSettings] = Group(LightSettings, share=[num_players.as_('max_poses'), num_cameras.as_('num_cameras'), light_resolution.as_('light_resolution'), fov])
     render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams')])
     server : Group[NiceSettings]    = Group(NiceSettings)

@@ -149,6 +149,21 @@ def replace(frame: Frame, updates: dict[type[BaseFeature], BaseFeature]) -> Fram
     )
 
 
+def reidentify(frame: Frame, track_id: int) -> Frame:
+    """Create a frozen snapshot of a frame under a new ``track_id``.
+
+    Copies the source frame's features verbatim (a shallow dict copy — the feature
+    objects are immutable) and re-stamps the identity. Used to mint a ``ghost`` from a
+    live pose: same pose data, a distinct track id.
+    """
+    return Frame(
+        track_id=track_id,
+        cam_id=frame._cam_id,
+        time_stamp=frame._time_stamp,
+        features=dict(frame._features),
+    )
+
+
 FrameCallback: TypeAlias =      Callable[[Frame], Any]
 FrameDict: TypeAlias =          dict[int, Frame]
 FrameDictCallback: TypeAlias =  Callable[[FrameDict], Any]

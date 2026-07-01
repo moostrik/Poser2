@@ -1,5 +1,6 @@
 {
   "num_players": 4,
+  "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
   "render_fps": 60.0,
@@ -60,7 +61,7 @@
       "mono_iso": 1436,
       "mono_auto_exposure": false,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.3,
+      "ir_flood_light": 1.0,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -87,7 +88,7 @@
       "mono_iso": 1600,
       "mono_auto_exposure": false,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.34,
+      "ir_flood_light": 1.0,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -114,7 +115,7 @@
       "mono_iso": 1600,
       "mono_auto_exposure": false,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.26,
+      "ir_flood_light": 1.0,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -346,6 +347,13 @@
       "override": false,
       "override_value": 0.0
     },
+    "ghoster": {
+      "enabled": true,
+      "threshold": 0.95,
+      "release": 0.6,
+      "band_degrees": 10.0,
+      "recycle_oldest": true
+    },
     "window_raw": {
       "window_size": 180,
       "emit_partial": true
@@ -371,7 +379,7 @@
     "light_rate": 30.0,
     "idle_layers": [],
     "low_layers": [
-      "playhead_flash"
+      "haunt_flash"
     ],
     "high_layers": [
       "player_lines",
@@ -410,9 +418,16 @@
         "max_white": 1.0,
         "min_blue": 0.0,
         "max_blue": 0.0,
-        "min_width": 0.1,
-        "max_width": 0.1,
+        "min_width": 11.5,
+        "max_width": 11.5,
         "gap": 0.0,
+        "blend": "ADD"
+      },
+      "haunt_flash": {
+        "min_brightness": 0.1,
+        "max_brightness": 1.0,
+        "min_width": 22.9,
+        "max_width": 45.8,
         "blend": "ADD"
       }
     },
