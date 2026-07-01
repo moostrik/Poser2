@@ -25,12 +25,14 @@ import logging
 import math
 from collections import deque
 from threading import Lock
+from typing import Callable
 
 from modules.pose.frame import Frame, FrameDict, FrameDictCallback, replace, reidentify
 from modules.pose.features import Azimuth
 from modules.settings import BaseSettings, Field, Widget
 
 from .ghosted_feature import GhostedFeature
+from .playhead_offset import PlayheadOffset
 from .playhead_stability import PlayheadStability
 
 logger = logging.getLogger(__name__)
@@ -52,8 +54,9 @@ class GhosterSettings(BaseSettings):
 class Ghoster:
     """Lock-detector + ghost registry; see the module docstring."""
 
-    def __init__(self, settings: GhosterSettings) -> None:
+    def __init__(self, settings: GhosterSettings, playhead: Callable[[], float]) -> None:
         self._settings = settings
+        self._playhead = playhead   # live playhead (radians) — refreshes each ghost's PlayheadOffset
         live = settings.live_players
         self._ghost_ids: list[int] = list(range(live, live + settings.num_virtual))
 
@@ -110,10 +113,11 @@ class Ghoster:
             self._emit(frames, {}, frames)
             return
 
+        playhead = self._playhead()   # read once, outside the lock
         with self._lock:
             self._detect_locks(frames)
-            tagged, sound = self._build_outputs(frames)
-            ghosts = dict(self._ghosts)
+            ghosts = self._live_ghosts(playhead)
+            tagged, sound = self._build_outputs(frames, ghosts)
         self._settings.num_ghosts = len(ghosts)
         self._emit(tagged, ghosts, sound)
 
@@ -175,9 +179,19 @@ class Ghoster:
                 return gid
         return None
 
+    def _live_ghosts(self, playhead: float) -> FrameDict:
+        """The frozen ghost registry with each ghost's ``PlayheadOffset`` recomputed from its fixed
+        azimuth and the current ``playhead`` — the pose stays frozen, only the playhead-relative
+        offset sweeps. Call under ``_lock``. A NaN playhead (no meaningful playhead) leaves the
+        frozen offsets untouched, matching ``PlayheadOffsetExtractor``."""
+        if math.isnan(playhead):
+            return dict(self._ghosts)
+        return {gid: replace(g, {PlayheadOffset: PlayheadOffset.from_value(self._ghost_az[gid] - playhead)})
+                for gid, g in self._ghosts.items()}
+
     # -- output build (call under _lock) -------------------------------------
 
-    def _build_outputs(self, frames: FrameDict) -> tuple[FrameDict, FrameDict]:
+    def _build_outputs(self, frames: FrameDict, ghosts: FrameDict) -> tuple[FrameDict, FrameDict]:
         tagged: FrameDict = {}
         sound: FrameDict = {}
         for tid, frame in frames.items():
@@ -187,7 +201,7 @@ class Ghoster:
             tagged[tid] = tagged_frame
             if not ghosted:
                 sound[tid] = tagged_frame
-        sound.update(self._ghosts)   # ghost ids never collide with live ids
+        sound.update(ghosts)   # ghost ids never collide with live ids
         return tagged, sound
 
     # -- settings ------------------------------------------------------------

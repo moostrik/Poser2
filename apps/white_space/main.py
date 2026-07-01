@@ -56,7 +56,7 @@ class WhiteSpaceMain:
         # SESSION
         self.session = Session(self.settings.session.core)
         self.osc_sound = OscSound(self.settings.inout.osc_sound)
-        self.ghoster = Ghoster(ps.ghoster)   # live/pool counts shared into GhosterSettings from root
+        self.ghoster = Ghoster(ps.ghoster, playhead=self.board.get_playhead)   # live/pool counts shared from root
         self.sequencer = Sequencer(self.settings.session.sequencer)
         self.sequencer.add_state_callback(self.board.set_sequence)
         self.sequencer.add_state_callback(self.osc_sound.set_sequencer_state)

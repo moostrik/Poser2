@@ -9,7 +9,7 @@ import numpy as np
 
 from modules.pose.frame import Frame, reidentify
 from modules.pose.features import Angles, Azimuth
-from apps.white_space.pose import Ghoster, GhosterSettings, GhostedFeature, PlayheadStability
+from apps.white_space.pose import Ghoster, GhosterSettings, GhostedFeature, PlayheadOffset, PlayheadStability
 
 _NUM_JOINTS = len(Angles.enum())
 _HALF_BAND = math.radians(10.0 / 2.0)   # default band_degrees = 10° → ±5° ≈ 0.0873 rad
@@ -58,7 +58,7 @@ class ReidentifyTest(unittest.TestCase):
 
 class GhosterTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.ghoster = Ghoster(GhosterSettings())   # defaults: live_players=4, num_virtual=8
+        self.ghoster = Ghoster(GhosterSettings(), playhead=lambda: 0.0)   # defaults: live_players=4, num_virtual=8
         self.cap = _Capture(self.ghoster)
 
     def tearDown(self) -> None:
@@ -118,6 +118,21 @@ class GhosterTest(unittest.TestCase):
         self.assertEqual(len(self.cap.ghosts), 1)                      # person 1 locked out
         self.assertEqual(self.cap.tagged[1][GhostedFeature].value, 1.0)
 
+    def test_ghost_playhead_offset_tracks_playhead(self) -> None:
+        ph = {"v": 0.0}
+        ghoster = Ghoster(GhosterSettings(), playhead=lambda: ph["v"])
+        cap = _Capture(ghoster)
+        ghoster.process({0: _live(0, 1.0, 1.0)})               # lock a ghost at azimuth 1.0
+        gid = 4
+        self.assertIn(gid, cap.ghosts)
+        self.assertAlmostEqual(cap.ghosts[gid][PlayheadOffset].value, 1.0, places=4)   # az − playhead
+        frozen_az = cap.ghosts[gid][Azimuth].value
+        ph["v"] = 0.5                                           # playhead sweeps on
+        ghoster.process({0: _live(0, 0.0, 1.0)})               # re-emit, no new lock
+        self.assertAlmostEqual(cap.ghosts[gid][Azimuth].value, frozen_az, places=5)    # azimuth frozen
+        self.assertAlmostEqual(cap.ghosts[gid][PlayheadOffset].value, 0.5, places=4)   # 1.0 − 0.5
+        ghoster.stop()
+
     # -- lifecycle --------------------------------------------------------
 
     def test_clear_empties_registry(self) -> None:
@@ -147,7 +162,7 @@ class GhosterPoolTest(unittest.TestCase):
         settings = GhosterSettings()
         settings.num_virtual = 2          # small pool to force the full/recycle path
         settings.recycle_oldest = recycle
-        ghoster = Ghoster(settings)
+        ghoster = Ghoster(settings, playhead=lambda: 0.0)
         cap = _Capture(ghoster)
         for az in (0.0, 1.0, 2.0):                                     # three distinct holds
             ghoster.process({0: _live(0, 1.0, az)})
