@@ -344,7 +344,7 @@
       "stability_beats": 4,
       "dwell_beats": 4,
       "angle_scale": 0.8,
-      "motion_scale": 1.0,
+      "motion_scale": 10.0,
       "spot_radius": 9.0,
       "override": false,
       "override_value": 0.0
@@ -624,8 +624,8 @@
       }
     },
     "data": {
-      "mode": "NONE",
-      "feature_field": "AngleMotion",
+      "mode": "WINDOW",
+      "feature_field": "MotionGate",
       "stage": 0,
       "line_width": 3.0,
       "line_smooth": 1.0,
@@ -721,10 +721,10 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 1899,
+      "x": 910,
       "y": 31,
-      "width": 660,
-      "height": 594,
+      "width": 1649,
+      "height": 1358,
       "secondary_list": [],
       "secondary_fullscreen": true,
       "fullscreen_mode": "WINDOWED"
