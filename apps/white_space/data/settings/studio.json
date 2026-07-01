@@ -341,9 +341,11 @@
       "motion_gate": {}
     },
     "playhead_stability": {
-      "max_samples": 4,
+      "stability_beats": 4,
+      "dwell_beats": 4,
       "angle_scale": 0.8,
-      "azimuth_reset": 0.15,
+      "motion_scale": 1.0,
+      "spot_radius": 9.0,
       "override": false,
       "override_value": 0.0
     },

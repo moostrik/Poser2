@@ -33,7 +33,7 @@ from modules.settings import BaseSettings, Field, Widget
 
 from .ghosted_feature import GhostedFeature
 from .playhead_offset import PlayheadOffset
-from .playhead_stability import PlayheadStability
+from .playhead_stability import PlayheadElement, PlayheadStability
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +135,7 @@ class Ghoster:
         thr = self._settings.threshold
         rel = self._settings.release
         for tid, frame in frames.items():
-            s = frame[PlayheadStability].value
+            s = frame[PlayheadStability].get(PlayheadElement.Stability)
             if math.isnan(s):
                 s = 0.0
             az = frame[Azimuth].value

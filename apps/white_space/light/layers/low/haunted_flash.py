@@ -21,7 +21,7 @@ from modules.settings import Field
 from .._base_layer import BaseLayer, LayerSettings
 from .playhead_flash import offset_to_level, stability_lerp
 from ...frame import Frame
-from ....pose import GhostedFeature, PlayheadOffset, PlayheadStability
+from ....pose import GhostedFeature, PlayheadElement, PlayheadOffset, PlayheadStability
 
 # The blue lamp sits a quarter-turn behind the white reference, so the blue flash fires when the
 # playhead is 0.25 of a turn *past* the pose (PlayheadOffset ≈ −0.25·2π, i.e. departing).
@@ -58,7 +58,7 @@ class HauntedFlash(BaseLayer):
             tracklet = tracklets.get(pose.track_id)
             if tracklet is None or not tracklet.is_active:
                 continue
-            stability = pose[PlayheadStability].value
+            stability = pose[PlayheadStability].get(PlayheadElement.Stability)
             half_rad   = math.radians(stability_lerp(stability, P.min_width, P.max_width) / 2.0)
             brightness = stability_lerp(stability, P.min_brightness, P.max_brightness)
             offset: float = pose[PlayheadOffset].value

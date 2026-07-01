@@ -9,7 +9,7 @@ import numpy as np
 
 from modules.pose.frame import Frame, reidentify
 from modules.pose.features import Angles, Azimuth
-from apps.white_space.pose import Ghoster, GhosterSettings, GhostedFeature, PlayheadOffset, PlayheadStability
+from apps.white_space.pose import Ghoster, GhosterSettings, GhostedFeature, PlayheadElement, PlayheadOffset, PlayheadStability
 
 _NUM_JOINTS = len(Angles.enum())
 _HALF_BAND = math.radians(10.0 / 2.0)   # default band_degrees = 10° → ±5° ≈ 0.0873 rad
@@ -20,10 +20,17 @@ def _angles(value: float) -> Angles:
                   np.full(_NUM_JOINTS, 1.0, dtype=np.float32))
 
 
+def _playhead_stability(stability: float) -> PlayheadStability:
+    """A PlayheadStability feature with the given Stability element (dwell/motion unused here)."""
+    values = np.zeros(len(PlayheadElement), dtype=np.float32)
+    values[PlayheadElement.Stability] = stability
+    return PlayheadStability(values=values, scores=np.ones(len(PlayheadElement), dtype=np.float32))
+
+
 def _live(track_id: int, stability: float, azimuth: float, angle: float = 0.5) -> Frame:
     return Frame(track_id=track_id, cam_id=0, features={
         Azimuth: Azimuth.from_value(azimuth),
-        PlayheadStability: PlayheadStability.from_value(stability, 1.0),
+        PlayheadStability: _playhead_stability(stability),
         Angles: _angles(angle),
     })
 

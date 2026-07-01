@@ -17,7 +17,7 @@ from modules.settings import Field
 
 from .._base_layer import BaseLayer, LayerSettings
 from ...frame import Frame
-from ....pose import PlayheadOffset, PlayheadStability
+from ....pose import PlayheadElement, PlayheadOffset, PlayheadStability
 
 
 def offset_to_level(phi: float, width: float, gap: float = 0.0) -> float:
@@ -78,7 +78,7 @@ class PlayheadFlash(BaseLayer):
             tracklet = tracklets.get(pose.track_id)
             if tracklet is None or not tracklet.is_active:
                 continue
-            stability = pose[PlayheadStability].value
+            stability = pose[PlayheadStability].get(PlayheadElement.Stability)
             half_rad = math.radians(stability_lerp(stability, P.min_width, P.max_width) / 2.0)
             level = offset_to_level(pose[PlayheadOffset].value, half_rad, P.gap)
             if level <= 0.0:
