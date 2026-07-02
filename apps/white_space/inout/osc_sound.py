@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 from pythonosc.osc_message_builder import OscMessageBuilder
@@ -16,6 +18,11 @@ logger = logging.getLogger(__name__)
 class OscSound(BaseOscSound):
     """OscSound extended with the rotation playhead (/global/playhead) and the
     panoramic-only per-pose azimuth, distance, and playhead-offset messages.
+
+    OVERRIDE (for now): ``/global/state`` carries the commanded ``MotorMode`` (see
+    ``light.motor``) instead of the sequencer stage the base class puts there — the sound
+    side wants motor mode on that address for now, not a new one. ``/global/state/progress``
+    and ``/global/progress`` are untouched.
 
     Also owns the id-slot count: it sends ``max_players`` live slots plus ``virtual_players``
     ghost slots (ids Ghoster injects beyond the tracked players). It overrides the base's
@@ -67,10 +74,16 @@ class OscSound(BaseOscSound):
         self._send_bundle(bundle)
 
     def _add_global_messages(self, bundle_builder: OscBundleBuilder, seq_state: SequencerState | None) -> None:
-        super()._add_global_messages(bundle_builder, seq_state)
-
         with self._input_lock:
             composition = self._composition
+
+        # Repurpose /global/state: substitute the commanded MotorMode for the sequencer stage.
+        # seq_state is None during idle/blackout — leave it as None so the base class still zeroes
+        # /global/state (and the other globals) exactly as it does today.
+        if seq_state is not None:
+            mode = int(composition.motor.mode) if composition is not None else 0
+            seq_state = replace(seq_state, stage=mode)
+        super()._add_global_messages(bundle_builder, seq_state)
 
         # seq_state is None during idle/blackout → zero the playhead.
         idle: bool = seq_state is None

@@ -12,7 +12,7 @@
     "square": false,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "ir_flood_light": 0.75,
     "cam_0": {
@@ -126,10 +126,10 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "folder": "20260630-123110_Stability",
+      "folder": "20260702-161442_flabber",
       "sim_passthrough": false,
-      "start_norm": 0.3,
-      "end_norm": 0.64
+      "start_norm": 0.0,
+      "end_norm": 1.0
     },
     "tracker": {
       "min_age": 5,
@@ -340,6 +340,9 @@
     "ghoster": {
       "enabled": true,
       "recycle_oldest": true,
+      "reclaim_near": false,
+      "ghost_limit": 2,
+      "limit_fade_beats": 8,
       "dwell_radius": 8.0,
       "dwell_beats": 4,
       "motion_beats": 2,
@@ -347,10 +350,7 @@
       "stability_hold_beats": 2,
       "stability_expiry_beats": 3,
       "stability_scale": 0.8,
-      "stability_threshold": 0.9,
-      "ghost_limit": 5,
-      "fade_beats": 24,
-      "reclaim": false
+      "stability_threshold": 0.9
     },
     "window_raw": {
       "window_size": 180,
@@ -734,7 +734,7 @@
   },
   "session": {
     "output_path": "recordings",
-    "name": "dinges",
+    "name": "flabber",
     "split_seconds": 10,
     "osc": {
       "port_in": 9000,
@@ -771,5 +771,9 @@
       ],
       "enabled": true
     }
+  },
+  "escalator": {
+    "enabled": true,
+    "high_threshold": 20
   }
 }

@@ -17,10 +17,10 @@ Ghosts are ordinary pose ``Frame``s carrying a ``GhostState`` feature (``PASSIVE
 kinds live in the one board ghost store, told apart by that feature. Only **active** ghosts are sent to
 OSC. An active ghost is a frozen ``reidentify``-ed frame on a pool id, its ``PlayheadOffset`` refreshed
 each tick so it tracks the playhead. Ghosts **persist** — they do not fade with age; only when more than
-``ghost_limit`` are active does the **oldest** fade out (``Fade`` steps down by ``1/fade_beats`` per beat
-across it, removed at 0) while the rest stay fully present. Optionally (``reclaim``, off by default) a
-ghost is **reclaimed** (removed) when the playhead beats across it while a live pose overlaps it — a
-just-made ghost is skipped on its birth tick.
+``ghost_limit`` are active do the **surplus** ghosts (the oldest ``count - ghost_limit``) fade out
+(``Fade`` steps down by ``1/limit_fade_beats`` per beat across each, removed at 0) while the rest stay
+fully present. Optionally (``reclaim_near``, off by default) a ghost is **reclaimed** (removed) when the
+playhead beats across it while a live pose overlaps it — a just-made ghost is skipped on its birth tick.
 
 The Ghoster owns the per-pose metrics: it stamps a ``GhostFeature`` (**Dwell**, **Motion**, **Stability**,
 **Fade**, each in [0, 1]) on every frame it emits — live poses and ghosts — so the GPU renderer / light /
@@ -101,8 +101,8 @@ class GhosterSettings(BaseSettings):
     recycle_oldest:         Field[bool]  = Field(True, description="When the pool is full, recycle the oldest ghost (else ignore new commits)")
     reclaim_near:           Field[bool]  = Field(False, description="When the playhead crosses a ghost while its live person stands there, reclaim (remove) it")
     num_ghosts:             Field[int]   = Field(0, access=Field.READ, description="Current number of active ghosts")
-    ghost_limit:            Field[int]   = Field(5, min=1, max=8, step=1, description="Active ghosts kept present; above this the oldest fades out (max = ghost_slots)", newline=True)
-    limit_fade_beats:       Field[int]   = Field(16, min=1, max=256, step=1, description="Playhead beats over which the oldest surplus ghost fades out, then is removed")
+    ghost_limit:            Field[int]   = Field(5, min=0, max=8, step=1, description="Active ghosts kept present; the oldest beyond this fade out (max = ghost_slots)", newline=True)
+    limit_fade_beats:       Field[int]   = Field(16, min=1, max=64, step=1, description="Playhead beats over which each surplus ghost fades out, then is removed")
     dwell_radius:           Field[float] = Field(10.0, min=0.0, max=36.0, step=0.5, description="Distance (deg) that counts as the same spot / must be exceeded to break free", newline=True)
     dwell_beats:            Field[int]   = Field(4, min=1, max=8, step=1, description="Playhead beats on a spot for dwell to fill")
     motion_beats:           Field[int]   = Field(2, min=1, max=8, step=1, description="Beats on a spot before motion starts counting", newline=True)
@@ -134,6 +134,8 @@ class Ghoster:
         self._frame_callbacks: list[FrameDictCallback] = []
         self._ghost_callbacks: list[FrameDictCallback] = []
         self._sound_callbacks: list[FrameDictCallback] = []
+        self._new_ghost_callbacks: list[Callable[[Frame], None]] = []
+        self._new_ghosts: list[Frame] = []         # active ghosts born this tick (dispatched after the lock)
 
         self._settings.bind(GhosterSettings.reset, self._on_reset)  # type: ignore[arg-type]
 
@@ -150,6 +152,12 @@ class Ghoster:
     def add_sound_callback(self, cb: FrameDictCallback) -> None:
         """Tagged live frames + active ghosts → OSC sound sender."""
         self._sound_callbacks.append(cb)
+
+    def add_new_ghost_callback(self, cb: Callable[[Frame], None]) -> None:
+        """Fires once per **active ghost born** this tick (committed to the pool), carrying its frozen
+        frame — a cumulative "a ghost was left" signal for consumers that escalate on the total (e.g. the
+        motor). Passive candidates and un-committed valid poses do not fire it."""
+        self._new_ghost_callbacks.append(cb)
 
     # -- lifecycle -----------------------------------------------------------
 
@@ -182,15 +190,20 @@ class Ghoster:
 
         playhead = self._playhead()   # read once, outside the lock
         with self._lock:
+            self._new_ghosts = []                   # _beat_sample appends each active ghost born here
             self._beat_sample(frames)               # update passive ghosts; promote on break-free
             self._advance_ghosts(playhead, frames)  # active ghosts: fade / reclaim on beat
             tagged = self._tag_live(frames)         # stamp dwell/motion/fade (GhostFeature) on live frames
             active = self._live_ghosts(playhead)    # active ghosts, PlayheadOffset + GhostFeature refreshed
             ghosts = {**self._passive_ghosts(tagged), **active}
             sound = {**tagged, **active}            # live + active-only; passive never reaches OSC
+            new_ghosts = self._new_ghosts
             count = len(active)
         self._settings.num_ghosts = count
         self._emit(tagged, ghosts, sound)
+        for ghost in new_ghosts:                     # "a ghost was born" — dispatched outside the lock
+            for cb in self._new_ghost_callbacks:
+                cb(ghost)
 
     def _emit(self, tagged: FrameDict, ghosts: FrameDict, sound: FrameDict) -> None:
         for cb in self._frame_callbacks:
@@ -302,22 +315,23 @@ class Ghoster:
 
     def _advance_ghosts(self, playhead: float, frames: FrameDict) -> None:
         """Advance active ghosts as the playhead beats across them (offset crosses zero). Ghosts persist —
-        they do **not** fade with age. Only when there are more than ``ghost_limit`` of them does the
-        **oldest** fade out, by ``1/fade_beats`` per beat across it, removed at 0; every other ghost is
-        held fully present (``Fade`` 1.0). When ``reclaim`` is enabled, a ghost the playhead beats across
-        while a live pose overlaps it is removed (the person takes the spot back). A just-made ghost has a
-        NaN prev-offset, so it registers no beat on its birth tick. Frozen while the playhead is NaN."""
+        they do **not** fade with age. Only when there are more than ``ghost_limit`` of them do the
+        **surplus** ghosts — the oldest ``count - ghost_limit`` — fade out, by ``1/limit_fade_beats`` per
+        beat across each, removed at 0; every ghost within the limit is held fully present (``Fade`` 1.0).
+        When ``reclaim_near`` is enabled, a ghost the playhead beats across while a live pose overlaps it is
+        removed (the person takes the spot back). A just-made ghost has a NaN prev-offset, so it registers
+        no beat on its birth tick. Frozen while the playhead is NaN."""
         if math.isnan(playhead):
             return
         radius = math.radians(self._settings.dwell_radius)
         step = 1.0 / max(1, self._settings.limit_fade_beats)
         reclaim = self._settings.reclaim_near
-        oldest = self._order[0] if self._order else None
-        over = len(self._ghosts) > self._settings.ghost_limit   # too many → the oldest fades
+        n_surplus = max(0, len(self._ghosts) - self._settings.ghost_limit)   # oldest N over the limit fade
+        surplus = set(list(self._order)[:n_surplus])
         gone: list[int] = []
         for gid, gaz in self._ghost_az.items():
-            if not (over and gid == oldest):
-                self._ghost_fade[gid] = 1.0        # only the surplus oldest fades; all others stay present
+            if gid not in surplus:
+                self._ghost_fade[gid] = 1.0        # within the limit → held fully present
             offset = math.atan2(math.sin(gaz - playhead), math.cos(gaz - playhead))
             prev = self._ghost_prev_offset[gid]
             self._ghost_prev_offset[gid] = offset
@@ -327,8 +341,8 @@ class Ghoster:
                 continue
             if reclaim and self._person_overlaps(gaz, frames, radius):
                 gone.append(gid)                   # a live pose overlaps → reclaim the spot
-            elif over and gid == oldest:
-                self._ghost_fade[gid] -= step      # surplus: fade the oldest out over fade_beats
+            elif gid in surplus:
+                self._ghost_fade[gid] -= step      # surplus: fade it out over limit_fade_beats
                 if self._ghost_fade[gid] <= 0.0:
                     gone.append(gid)
         for gid in gone:
@@ -358,6 +372,7 @@ class Ghoster:
             if gid is None:
                 return                       # pool full and recycling disabled — ignore
         self._set_ghost(gid, frame, az)
+        self._new_ghosts.append(self._ghosts[gid])   # record the new active ghost (dispatched after the lock)
 
     def _set_ghost(self, gid: int, frame: Frame, az: float) -> None:
         # Freeze the pose at the spot: pinned to the commit azimuth, marked ACTIVE, with a full (settled,
@@ -392,7 +407,7 @@ class Ghoster:
 
     def _live_ghosts(self, playhead: float) -> FrameDict:
         """The frozen active-ghost registry, each stamped with its current ``GhostFeature`` (dwell/motion/
-        stability pinned at 1, Fade 1.0 unless it is the surplus oldest fading out) and — when the playhead
+        stability pinned at 1, Fade 1.0 unless it is a surplus ghost fading out) and — when the playhead
         is finite — its ``PlayheadOffset`` (from its fixed azimuth). ``GhostState.ACTIVE`` is carried on the
         stored frame and preserved. Call under ``_lock``."""
         out: FrameDict = {}

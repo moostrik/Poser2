@@ -17,6 +17,7 @@ from modules.gl import WindowSettings
 
 from .board import Board
 from .pose import GhostFeature, PlayheadOffset, PlayheadOffsetExtractor, Ghoster
+from .escalator import GhostEscalator
 from .light import Render as LightRender
 from .inout import OscLight, OscSound, UdpReceiver
 from .render import Render as WindowRender
@@ -242,6 +243,9 @@ class WhiteSpaceMain:
         self.ghoster.add_frames_callback(self.stages[Stage.LERP])
         self.ghoster.add_ghosts_callback(self.board.set_ghosts)
         self.ghoster.add_sound_callback(partial(self.osc_sound.set_frames, int(Stage.LERP)))
+        # GhostEscalator counts ghosts ever made and escalates the motor LOW→HIGH at its threshold.
+        self.escalator = GhostEscalator(self.settings.escalator, self.settings.light.motor)
+        self.ghoster.add_new_ghost_callback(self.escalator.on_new_ghost)
 
         # RENDER
         self.render = WindowRender(self.board, self.settings.render)
@@ -302,6 +306,7 @@ class WhiteSpaceMain:
 
         self.tracker.stop()
         self.osc_sound.stop()
+        self.escalator.stop()
         self.ghoster.stop()
         self.osc_light.stop()
         self.osc_receiver.stop()

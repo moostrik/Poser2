@@ -24,6 +24,7 @@ from modules.gl import WindowSettings
 from .light import LightSettings
 from .inout import OscLightSettings, UdpReceiverSettings
 from .pose import GhosterSettings
+from .escalator import GhostEscalatorSettings
 
 
 # ---------------------------------------------------------------------------
@@ -329,3 +330,4 @@ class Settings(BaseSettings):
     render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams')])
     server : Group[NiceSettings]    = Group(NiceSettings)
     session: Group[SessionGroup]    = Group(SessionGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])
+    escalator: Group[GhostEscalatorSettings] = Group(GhostEscalatorSettings)
