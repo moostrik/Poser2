@@ -2,9 +2,9 @@
 
 The Ghoster stamps this on every pose it emits — live poses and ghosts alike:
 
-- ``Dwell``     — how long the pose has held its spot (sweeps on the spot / ``dwell_sweeps``).
+- ``Dwell``     — how long the pose has held its spot (beats on the spot / ``dwell_beats``).
 - ``Motion``    — on-spot performance (accumulated ``MotionTime`` / ``motion_scale``).
-- ``Stability`` — how held the pose is (consecutive similar sweeps / ``stability_sweeps``); 1.0 = valid.
+- ``Stability`` — how held the pose is (consecutive similar beats / ``stability_hold_beats``); 1.0 = valid.
 - ``Fade``      — how present the pose is: ``1.0`` live / fresh; a released ghost decays it 1→0.
 
 Kinds are told apart by the separate ``GhostState`` feature (present only on ghosts); this feature is

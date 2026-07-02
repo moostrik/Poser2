@@ -1,9 +1,9 @@
 """Tests for Ghoster — the active/passive model. Each live person has a passive ghost that follows him
-sweep-by-sweep, building the ghost's own dwell (sweeps on spot) and motion (MotionTime). When he moves
-> band_degrees in one sweep (breaks free) *and* the passive had settled (dwell & motion full), it is
-committed as an ACTIVE ghost frozen at the spot; otherwise nothing. Ghosts are frames carrying a
-GhostState feature; only ACTIVE ones reach OSC. Active ghosts fade / are reclaimed on sweeps. The Ghoster
-also stamps dwell/motion/fade (as GhostFeature) onto live frames."""
+beat-by-beat, building the ghost's own dwell (beats on spot) and motion (MotionTime). When he moves
+> dwell_radius (breaks free) *and* the passive had settled (dwell & motion full), it is committed as an
+ACTIVE ghost frozen at the spot; otherwise nothing. Ghosts are frames carrying a GhostState feature; only
+ACTIVE ones reach OSC. Active ghosts fade / are reclaimed on beats. The Ghoster also stamps
+dwell/motion/stability/fade (as GhostFeature) onto live frames."""
 
 import math
 import unittest
@@ -35,8 +35,8 @@ def _live(track_id: int, azimuth: float, offset: float = -0.1, angle: float = 0.
     })
 
 
-def _sweep(ghoster: Ghoster, poses: dict[int, float | tuple[float, float]], motion_time: float = 0.0) -> None:
-    """One playhead sweep across each person in ``poses`` (tid -> az, or tid -> (az, angle)); the sweep
+def _beat(ghoster: Ghoster, poses: dict[int, float | tuple[float, float]], motion_time: float = 0.0) -> None:
+    """One playhead beat across each person in ``poses`` (tid -> az, or tid -> (az, angle)); the beat
     sample fires on the −0.1 frame. Each frame carries ``motion_time``."""
     def build(offset: float) -> dict[int, Frame]:
         frames: dict[int, Frame] = {}
@@ -45,30 +45,30 @@ def _sweep(ghoster: Ghoster, poses: dict[int, float | tuple[float, float]], moti
             frames[tid] = _live(tid, az, offset, angle, motion_time)
         return frames
     ghoster.process(build(0.1))     # approaching
-    ghoster.process(build(-0.1))    # crossed zero → sweep sample fires here
-    ghoster.process(build(3.0))     # far side, so next sweep's +0.1 isn't a false crossing
+    ghoster.process(build(-0.1))    # crossed zero → beat sample fires here
+    ghoster.process(build(3.0))     # far side, so next beat's +0.1 isn't a false crossing
 
 
 def _settle(ghoster: Ghoster, tid: int, spot: float, angle: float = 0.5) -> None:
-    """Four sweeps on ``spot`` with motion accumulating → the passive ghost settles (dwell & motion full)
-    under the default settings (dwell_sweeps 4, motion_sweeps 2, motion_scale 5.0)."""
-    _sweep(ghoster, {tid: (spot, angle)}, motion_time=0.0)   # sweep 1
-    _sweep(ghoster, {tid: (spot, angle)}, motion_time=0.0)   # sweep 2 → motion anchor = 0
-    _sweep(ghoster, {tid: (spot, angle)}, motion_time=6.0)   # sweep 3 → motion 1.2
-    _sweep(ghoster, {tid: (spot, angle)}, motion_time=6.0)   # sweep 4 → dwell full → settled
+    """Four beats on ``spot`` with motion accumulating → the passive ghost settles (dwell & motion full)
+    under the default settings (dwell_beats 4, motion_beats 2, motion_scale 5.0)."""
+    _beat(ghoster, {tid: (spot, angle)}, motion_time=0.0)   # beat 1
+    _beat(ghoster, {tid: (spot, angle)}, motion_time=0.0)   # beat 2 → motion anchor = 0
+    _beat(ghoster, {tid: (spot, angle)}, motion_time=6.0)   # beat 3 → motion 1.2
+    _beat(ghoster, {tid: (spot, angle)}, motion_time=6.0)   # beat 4 → dwell full → settled
 
 
 def _make_active(ghoster: Ghoster, tid: int = 0, spot: float = 1.0, leave: float = 2.0,
                  angle: float = 0.5) -> None:
     """Settle at ``spot`` then break free to ``leave`` → one ACTIVE ghost committed at ``spot``."""
     _settle(ghoster, tid, spot, angle)
-    _sweep(ghoster, {tid: (leave, angle)}, motion_time=6.0)
+    _beat(ghoster, {tid: (leave, angle)}, motion_time=6.0)
 
 
-def _ghost_sweep(ghoster: Ghoster, az: float, ph: dict[str, float],
-                 persons: dict[int, float] | None = None) -> None:
-    """Advance the ``ph`` playhead across an active ghost fixed at ``az`` — one ghost crossing. With no
-    ``persons`` the ghost fades a step; a ``persons`` (tid -> az) member within band reclaims it."""
+def _ghost_beat(ghoster: Ghoster, az: float, ph: dict[str, float],
+                persons: dict[int, float] | None = None) -> None:
+    """Advance the ``ph`` playhead across an active ghost fixed at ``az`` — one ghost beat. With no
+    ``persons`` the ghost fades a step; a ``persons`` (tid -> az) member within radius reclaims it."""
     for offset in (0.1, -0.1, 3.0):
         ph["v"] = az - offset
         frames = {tid: _live(tid, paz, offset=5.0) for tid, paz in (persons or {}).items()}
@@ -108,7 +108,7 @@ class ReidentifyTest(unittest.TestCase):
 
 class GhosterTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.ghoster = Ghoster(GhosterSettings(), playhead=lambda: 0.0)   # band 10°, constant playhead
+        self.ghoster = Ghoster(GhosterSettings(), playhead=lambda: 0.0)   # radius 10°, constant playhead
         self.cap = _Capture(self.ghoster)
 
     def tearDown(self) -> None:
@@ -120,8 +120,8 @@ class GhosterTest(unittest.TestCase):
         self.assertEqual(len(active), 1)
         self.assertAlmostEqual(next(iter(active.values()))[Azimuth].value, 1.0, places=4)
 
-    def test_break_free_commits_without_a_sweep(self) -> None:
-        # Once settled, a single non-crossing tick with the person moved > band commits immediately —
+    def test_break_free_commits_without_a_beat(self) -> None:
+        # Once settled, a single non-crossing tick with the person moved > radius commits immediately —
         # no waiting for the playhead to reach him again.
         _settle(self.ghoster, 0, 1.0)
         self.ghoster.process({0: _live(0, 2.0, offset=5.0)})   # offset 5.0 → no crossing this tick
@@ -130,51 +130,51 @@ class GhosterTest(unittest.TestCase):
         self.assertAlmostEqual(next(iter(active.values()))[Azimuth].value, 1.0, places=4)
 
     def test_slow_drift_leaves_nothing(self) -> None:
-        # Steps < band each sweep (motion growing) → the passive follows, never breaks free → no active.
+        # Steps < radius each beat (motion growing) → the passive follows, never breaks free → no active.
         for i in range(6):
-            _sweep(self.ghoster, {0: i * 0.1}, motion_time=float(i) * 3.0)
+            _beat(self.ghoster, {0: i * 0.1}, motion_time=float(i) * 3.0)
         self.assertEqual(len(_active(self.cap.ghosts)), 0)
         self.assertEqual(len(_passive(self.cap.ghosts)), 1)   # a passive ghost follows him
 
     def test_break_free_before_dwell_leaves_nothing(self) -> None:
-        _sweep(self.ghoster, {0: 1.0}, motion_time=6.0)   # only 2 sweeps on the spot (dwell not full)
-        _sweep(self.ghoster, {0: 1.0}, motion_time=6.0)
-        _sweep(self.ghoster, {0: 2.0}, motion_time=6.0)   # break free
+        _beat(self.ghoster, {0: 1.0}, motion_time=6.0)   # only 2 beats on the spot (dwell not full)
+        _beat(self.ghoster, {0: 1.0}, motion_time=6.0)
+        _beat(self.ghoster, {0: 2.0}, motion_time=6.0)   # break free
         self.assertEqual(len(_active(self.cap.ghosts)), 0)
 
     def test_break_free_without_motion_leaves_nothing(self) -> None:
-        _settle_no_motion = lambda az: _sweep(self.ghoster, {0: az}, motion_time=0.0)
+        _settle_no_motion = lambda az: _beat(self.ghoster, {0: az}, motion_time=0.0)
         for _ in range(4):
             _settle_no_motion(1.0)          # dwell fills but MotionTime never grows → motion 0
         _settle_no_motion(2.0)              # break free
         self.assertEqual(len(_active(self.cap.ghosts)), 0)
 
     def test_unheld_pose_never_commits(self) -> None:
-        # Dwell and motion fill, but the pose flips every sweep on the same spot → it is never *held*
+        # Dwell and motion fill, but the pose flips every beat on the same spot → it is never *held*
         # long enough to become a valid ghost pose, so breaking free leaves nothing.
         for angle, mt in [(0.2, 0.0), (1.5, 0.0), (0.2, 6.0), (1.5, 6.0)]:
-            _sweep(self.ghoster, {0: (1.0, angle)}, motion_time=mt)
-        _sweep(self.ghoster, {0: (2.0, 1.5)}, motion_time=6.0)   # break free
+            _beat(self.ghoster, {0: (1.0, angle)}, motion_time=mt)
+        _beat(self.ghoster, {0: (2.0, 1.5)}, motion_time=6.0)   # break free
         self.assertEqual(len(_active(self.cap.ghosts)), 0)
 
     def test_stale_valid_pose_not_left(self) -> None:
-        # Hold a pose long enough to make it valid, then flip the pose every sweep for more than
-        # stability_max_age (3) sweeps → the valid pose ages out → breaking free leaves nothing.
-        _sweep(self.ghoster, {0: (1.0, 0.5)}, motion_time=0.0)   # sweep 1
-        _sweep(self.ghoster, {0: (1.0, 0.5)}, motion_time=0.0)   # sweep 2 → pose valid, motion anchor 0
-        for angle in (1.5, 0.5, 1.5, 0.5):                       # 4 unheld sweeps > max_age
-            _sweep(self.ghoster, {0: (1.0, angle)}, motion_time=6.0)
-        _sweep(self.ghoster, {0: (2.0, 0.5)}, motion_time=6.0)   # break free
+        # Hold a pose long enough to make it valid, then flip the pose every beat for more than
+        # stability_expiry_beats (3) beats → the valid pose ages out → breaking free leaves nothing.
+        _beat(self.ghoster, {0: (1.0, 0.5)}, motion_time=0.0)   # beat 1
+        _beat(self.ghoster, {0: (1.0, 0.5)}, motion_time=0.0)   # beat 2 → pose valid, motion anchor 0
+        for angle in (1.5, 0.5, 1.5, 0.5):                      # 4 unheld beats > expiry
+            _beat(self.ghoster, {0: (1.0, angle)}, motion_time=6.0)
+        _beat(self.ghoster, {0: (2.0, 0.5)}, motion_time=6.0)   # break free
         self.assertEqual(len(_active(self.cap.ghosts)), 0)
 
     def test_ghost_is_last_valid_pose_not_departure(self) -> None:
-        # Hold pose A at a spot (valid), drift the pose within max_age, then break free at a new azimuth
+        # Hold pose A at a spot (valid), drift the pose within expiry, then break free at a new azimuth
         # with a different pose B → the ghost freezes pose A at A's spot, not B / the departure position.
-        _sweep(self.ghoster, {0: (1.0, 0.5)}, motion_time=0.0)   # sweep 1
-        _sweep(self.ghoster, {0: (1.0, 0.5)}, motion_time=0.0)   # sweep 2 → pose A (0.5) valid, motion anchor 0
-        _sweep(self.ghoster, {0: (1.0, 1.5)}, motion_time=6.0)   # sweep 3 → unheld (age 1)
-        _sweep(self.ghoster, {0: (1.0, 0.7)}, motion_time=6.0)   # sweep 4 → unheld (age 2), dwell full
-        _sweep(self.ghoster, {0: (3.0, 2.0)}, motion_time=6.0)   # break free at a new az with pose B
+        _beat(self.ghoster, {0: (1.0, 0.5)}, motion_time=0.0)   # beat 1
+        _beat(self.ghoster, {0: (1.0, 0.5)}, motion_time=0.0)   # beat 2 → pose A (0.5) valid, motion anchor 0
+        _beat(self.ghoster, {0: (1.0, 1.5)}, motion_time=6.0)   # beat 3 → unheld (age 1)
+        _beat(self.ghoster, {0: (1.0, 0.7)}, motion_time=6.0)   # beat 4 → unheld (age 2), dwell full
+        _beat(self.ghoster, {0: (3.0, 2.0)}, motion_time=6.0)   # break free at a new az with pose B
         active = _active(self.cap.ghosts)
         self.assertEqual(len(active), 1)
         ghost = next(iter(active.values()))
@@ -182,7 +182,7 @@ class GhosterTest(unittest.TestCase):
         self.assertAlmostEqual(float(ghost[Angles].values[0]), 0.5, places=4)   # pose A, not B (2.0)
 
     def test_passive_present_and_not_in_sound(self) -> None:
-        _sweep(self.ghoster, {0: 1.0})                    # one sweep → a passive ghost exists
+        _beat(self.ghoster, {0: 1.0})                     # one beat → a passive ghost exists
         passive = _passive(self.cap.ghosts)
         self.assertEqual(len(passive), 1)
         self.assertNotIn(0, {gid for gid in self.cap.sound if ghost_state(self.cap.sound[gid]) is GhostStateValue.PASSIVE})
@@ -248,13 +248,13 @@ class ActiveGhostTest(unittest.TestCase):
         self.assertAlmostEqual(cap.ghosts[gid][PlayheadOffset].value, 0.5, places=4)
         ghoster.stop()
 
-    def test_reclaim_only_at_sweep(self) -> None:
+    def test_reclaim_only_at_beat(self) -> None:
         ghoster, cap, ph = self._ghoster_with_active_at_1()
         self.assertEqual(len(_active(cap.ghosts)), 1)
-        for _ in range(3):                                 # person on the ghost, no sweep across it
+        for _ in range(3):                                 # person on the ghost, no beat across it
             ghoster.process({3: _live(3, 1.0, offset=5.0)})
         self.assertEqual(len(_active(cap.ghosts)), 1)      # not deleted every frame
-        _ghost_sweep(ghoster, 1.0, ph, persons={3: 1.0})   # swept while overlapped → reclaimed
+        _ghost_beat(ghoster, 1.0, ph, persons={3: 1.0})    # beat while overlapped → reclaimed
         self.assertEqual(len(_active(cap.ghosts)), 0)
         ghoster.stop()
 
@@ -266,14 +266,14 @@ class ActiveGhostTest(unittest.TestCase):
         self.assertEqual(len(_active(cap.ghosts)), 1)
         ghoster.stop()
 
-    def test_fades_out_over_fade_sweeps(self) -> None:
-        ghoster, cap, ph = self._ghoster_with_active_at_1(fade_sweeps=4)
+    def test_fades_out_over_fade_beats(self) -> None:
+        ghoster, cap, ph = self._ghoster_with_active_at_1(fade_beats=4)
         gid = next(iter(_active(cap.ghosts)))
         ph["v"] = 0.0
         ghoster.process({})
         self.assertAlmostEqual(cap.ghosts[gid][GhostFeature].get(GhostElement.Fade), 1.0, places=5)
-        for _ in range(4):                                  # 4 sweeps with no one overlapping → fade to 0
-            _ghost_sweep(ghoster, 1.0, ph)
+        for _ in range(4):                                  # 4 beats with no one overlapping → fade to 0
+            _ghost_beat(ghoster, 1.0, ph)
         self.assertEqual(len(_active(cap.ghosts)), 0)
         ghoster.stop()
 
