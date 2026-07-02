@@ -220,7 +220,7 @@ class PoseGroup(BaseSettings):
     velocity        : Group[VelocityFeature]                 = Group(VelocityFeature, share=_feature_share)
     motion          : Group[MotionFeature]                   = Group(MotionFeature)
     similarity      : Group[SimilarityFeature]               = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
-    ghoster         : Group[GhosterSettings]                = Group(GhosterSettings, share=[max_poses.as_('live_players'), num_virtual.as_('num_virtual')])
+    ghoster         : Group[GhosterSettings]                = Group(GhosterSettings, share=[max_poses.as_('live_players'), num_virtual.as_('ghost_slots')])
     window_raw      : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_clean    : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_smooth   : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)

@@ -16,9 +16,11 @@ leaves nothing.
 Ghosts are ordinary pose ``Frame``s carrying a ``GhostState`` feature (``PASSIVE`` / ``ACTIVE``); both
 kinds live in the one board ghost store, told apart by that feature. Only **active** ghosts are sent to
 OSC. An active ghost is a frozen ``reidentify``-ed frame on a pool id, its ``PlayheadOffset`` refreshed
-each tick so it tracks the playhead; it carries a ``Fade`` that steps down by ``1/fade_beats`` on each
-beat it is not reclaimed (removed at 0), and is **reclaimed** (removed) when the playhead beats across it
-while a live pose overlaps it — a just-made ghost is skipped on its birth tick.
+each tick so it tracks the playhead. Ghosts **persist** — they do not fade with age; only when more than
+``ghost_limit`` are active does the **oldest** fade out (``Fade`` steps down by ``1/fade_beats`` per beat
+across it, removed at 0) while the rest stay fully present. Optionally (``reclaim``, off by default) a
+ghost is **reclaimed** (removed) when the playhead beats across it while a live pose overlaps it — a
+just-made ghost is skipped on its birth tick.
 
 The Ghoster owns the per-pose metrics: it stamps a ``GhostFeature`` (**Dwell**, **Motion**, **Stability**,
 **Fade**, each in [0, 1]) on every frame it emits — live poses and ghosts — so the GPU renderer / light /
@@ -92,21 +94,23 @@ class _Passive:
 
 class GhosterSettings(BaseSettings):
     """Configuration for ``Ghoster``."""
-    live_players:           Field[int]   = Field(4, access=Field.INIT, visible=False, description="Live player count (shared from root num_players)")
-    num_virtual:            Field[int]   = Field(8, access=Field.INIT, visible=False, description="Ghost pool size (shared from root num_virtual)")
-    enabled:                Field[bool]  = Field(True, description="Record and commit ghosts")
+    live_players:           Field[int]   = Field(4, access=Field.INIT, description="Live player count (shared from root num_players)")
+    ghost_slots:            Field[int]   = Field(8, access=Field.INIT, description="Ghost id pool size (shared from root num_virtual)")
+    enabled:                Field[bool]  = Field(True, description="Record and commit ghosts", newline=True)
     reset:                  Field[bool]  = Field(False, widget=Widget.button, description="Clear all ghosts")
     recycle_oldest:         Field[bool]  = Field(True, description="When the pool is full, recycle the oldest ghost (else ignore new commits)")
+    reclaim_near:           Field[bool]  = Field(False, description="When the playhead crosses a ghost while its live person stands there, reclaim (remove) it")
     num_ghosts:             Field[int]   = Field(0, access=Field.READ, description="Current number of active ghosts")
-    dwell_radius:           Field[float] = Field(10.0, min=0.0, max=180.0, step=0.5, description="Distance (deg) that counts as the same spot / must be exceeded to break free", newline=True)
-    dwell_beats:            Field[int]   = Field(4, min=1, max=32, step=1, description="Playhead beats on a spot for dwell to fill")
-    motion_beats:           Field[int]   = Field(2, min=1, max=32, step=1, description="Beats on a spot before motion starts counting", newline=True)
-    motion_scale:           Field[float] = Field(5.0, min=0.1, max=50.0, step=0.1, description="On-spot MotionTime that maps motion to 1.0")
-    stability_hold_beats:   Field[int]   = Field(2, min=1, max=32, step=1, description="Beats a pose must be held to become a valid ghost pose (1 = off)", newline=True)
-    stability_expiry_beats: Field[int]   = Field(3, min=0, max=32, step=1, description="A valid pose expires this many beats after it was last held")
+    ghost_limit:            Field[int]   = Field(5, min=1, max=8, step=1, description="Active ghosts kept present; above this the oldest fades out (max = ghost_slots)", newline=True)
+    limit_fade_beats:       Field[int]   = Field(16, min=1, max=256, step=1, description="Playhead beats over which the oldest surplus ghost fades out, then is removed")
+    dwell_radius:           Field[float] = Field(10.0, min=0.0, max=36.0, step=0.5, description="Distance (deg) that counts as the same spot / must be exceeded to break free", newline=True)
+    dwell_beats:            Field[int]   = Field(4, min=1, max=8, step=1, description="Playhead beats on a spot for dwell to fill")
+    motion_beats:           Field[int]   = Field(2, min=1, max=8, step=1, description="Beats on a spot before motion starts counting", newline=True)
+    motion_scale:           Field[float] = Field(5.0, min=0.1, max=4.0, step=0.1, description="On-spot MotionTime that maps motion to 1.0")
+    stability_hold_beats:   Field[int]   = Field(2, min=1, max=8, step=1, description="Beats a pose must be held to become a valid ghost pose (1 = off)", newline=True)
+    stability_expiry_beats: Field[int]   = Field(3, min=0, max=8, step=1, description="A valid pose expires this many beats after it was last held")
     stability_scale:        Field[float] = Field(0.8, min=0.1, max=2.0, step=0.05, description="Pose-similarity scale (rad) — larger = more forgiving")
     stability_threshold:    Field[float] = Field(0.9, min=0.0, max=1.0, step=0.01, description="Min pose similarity between beats to count as 'held'")
-    fade_beats:             Field[int]   = Field(16, min=1, max=256, step=1, description="Playhead beats over which an active ghost fades out, then is removed", newline=True)
 
 
 class Ghoster:
@@ -116,7 +120,7 @@ class Ghoster:
         self._settings = settings
         self._playhead = playhead   # live playhead (radians) — refreshes each ghost's PlayheadOffset
         live = settings.live_players
-        self._ghost_ids: list[int] = list(range(live, live + settings.num_virtual))
+        self._ghost_ids: list[int] = list(range(live, live + settings.ghost_slots))
 
         self._lock = Lock()
         self._prev_offset: dict[int, float] = {}   # live id -> last PlayheadOffset (beat-crossing detection)
@@ -297,16 +301,23 @@ class Ghoster:
     # -- active ghost machinery (call under _lock) ---------------------------
 
     def _advance_ghosts(self, playhead: float, frames: FrameDict) -> None:
-        """Each time the playhead beats across an active ghost (its offset crosses zero): if a live
-        pose overlaps it, **remove it** (a live person reclaims the spot); otherwise fade it by
-        ``1/fade_beats`` and remove it once faded out. A just-made ghost has a NaN prev-offset, so it
-        registers no beat on its birth tick. Frozen while the playhead is NaN."""
+        """Advance active ghosts as the playhead beats across them (offset crosses zero). Ghosts persist —
+        they do **not** fade with age. Only when there are more than ``ghost_limit`` of them does the
+        **oldest** fade out, by ``1/fade_beats`` per beat across it, removed at 0; every other ghost is
+        held fully present (``Fade`` 1.0). When ``reclaim`` is enabled, a ghost the playhead beats across
+        while a live pose overlaps it is removed (the person takes the spot back). A just-made ghost has a
+        NaN prev-offset, so it registers no beat on its birth tick. Frozen while the playhead is NaN."""
         if math.isnan(playhead):
             return
         radius = math.radians(self._settings.dwell_radius)
-        step = 1.0 / max(1, self._settings.fade_beats)
+        step = 1.0 / max(1, self._settings.limit_fade_beats)
+        reclaim = self._settings.reclaim_near
+        oldest = self._order[0] if self._order else None
+        over = len(self._ghosts) > self._settings.ghost_limit   # too many → the oldest fades
         gone: list[int] = []
         for gid, gaz in self._ghost_az.items():
+            if not (over and gid == oldest):
+                self._ghost_fade[gid] = 1.0        # only the surplus oldest fades; all others stay present
             offset = math.atan2(math.sin(gaz - playhead), math.cos(gaz - playhead))
             prev = self._ghost_prev_offset[gid]
             self._ghost_prev_offset[gid] = offset
@@ -314,10 +325,10 @@ class Ghoster:
                     and abs(prev) < _HALF_PI and abs(offset) < _HALF_PI)
             if not beat:
                 continue
-            if self._person_overlaps(gaz, frames, radius):
-                gone.append(gid)                       # a live pose overlaps → reclaim the spot
-            else:
-                self._ghost_fade[gid] -= step
+            if reclaim and self._person_overlaps(gaz, frames, radius):
+                gone.append(gid)                   # a live pose overlaps → reclaim the spot
+            elif over and gid == oldest:
+                self._ghost_fade[gid] -= step      # surplus: fade the oldest out over fade_beats
                 if self._ghost_fade[gid] <= 0.0:
                     gone.append(gid)
         for gid in gone:
@@ -381,9 +392,9 @@ class Ghoster:
 
     def _live_ghosts(self, playhead: float) -> FrameDict:
         """The frozen active-ghost registry, each stamped with its current ``GhostFeature`` (dwell/motion/
-        stability pinned at 1, Fade decaying) and — when the playhead is finite — its ``PlayheadOffset``
-        (from its fixed azimuth). ``GhostState.ACTIVE`` is carried on the stored frame and preserved. Call
-        under ``_lock``."""
+        stability pinned at 1, Fade 1.0 unless it is the surplus oldest fading out) and — when the playhead
+        is finite — its ``PlayheadOffset`` (from its fixed azimuth). ``GhostState.ACTIVE`` is carried on the
+        stored frame and preserved. Call under ``_lock``."""
         out: FrameDict = {}
         for gid, g in self._ghosts.items():
             feats: dict = {GhostFeature: GhostFeature.make(1.0, 1.0, 1.0, self._ghost_fade[gid])}

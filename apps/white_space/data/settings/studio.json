@@ -348,7 +348,9 @@
       "stability_expiry_beats": 3,
       "stability_scale": 0.8,
       "stability_threshold": 0.9,
-      "fade_beats": 24
+      "ghost_limit": 5,
+      "fade_beats": 24,
+      "reclaim": false
     },
     "window_raw": {
       "window_size": 180,

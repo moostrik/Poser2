@@ -70,10 +70,10 @@ class LightSettings(BaseSettings):
 
     # Construction / wiring (INIT — requires restart to take effect)
     max_poses:        Field[int]   = Field(3,    min=1,   max=16,   access=Field.INIT, description="Max tracked poses")
-    num_cameras:      Field[int]   = Field(1,    min=1,   max=16,   access=Field.INIT, visible=False, description="Number of cameras")
+    num_cameras:      Field[int]   = Field(1,    min=1,   max=16,   access=Field.INIT, description="Number of cameras")
     light_rate:       Field[float] = Field(30.0, min=1,   max=120,  access=Field.INIT, description="Light output frame rate (fps)")
-    light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, visible=False, description="LED strip resolution (pixels)")
-    fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, visible=False, description="Camera horizontal FOV — hidden relay from root to player_lines/calibration")
+    light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, description="LED strip resolution (pixels)")
+    fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV — hidden relay from root to player_lines/calibration")
 
     # Per-motor-speed layer selectors (multi-select; layers in a slot blend, slots crossfade by rpm)
     idle_layers:  Field[list[LowLayerId]]  = Field([LowLayerId.playhead], widget=Widget.checklist, description="Layers shown at idle", newline=True)

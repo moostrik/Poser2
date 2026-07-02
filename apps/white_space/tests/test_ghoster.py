@@ -249,7 +249,7 @@ class ActiveGhostTest(unittest.TestCase):
         ghoster.stop()
 
     def test_reclaim_only_at_beat(self) -> None:
-        ghoster, cap, ph = self._ghoster_with_active_at_1()
+        ghoster, cap, ph = self._ghoster_with_active_at_1(reclaim=True)
         self.assertEqual(len(_active(cap.ghosts)), 1)
         for _ in range(3):                                 # person on the ghost, no beat across it
             ghoster.process({3: _live(3, 1.0, offset=5.0)})
@@ -258,23 +258,44 @@ class ActiveGhostTest(unittest.TestCase):
         self.assertEqual(len(_active(cap.ghosts)), 0)
         ghoster.stop()
 
-    def test_just_made_not_deleted(self) -> None:
-        # A person standing where the ghost is committed does not delete it on its birth tick.
+    def test_reclaim_off_by_default(self) -> None:
+        # With reclaim disabled (the default), a person standing on a ghost the playhead beats across
+        # does NOT remove it — ghosts persist.
         ghoster, cap, ph = self._ghoster_with_active_at_1()
+        _ghost_beat(ghoster, 1.0, ph, persons={3: 1.0})    # beat while overlapped, but reclaim off
+        self.assertEqual(len(_active(cap.ghosts)), 1)
+        ghoster.stop()
+
+    def test_just_made_not_deleted(self) -> None:
+        # A person standing where the ghost is committed does not reclaim it on its birth tick.
+        ghoster, cap, ph = self._ghoster_with_active_at_1(reclaim=True)
         ph["v"] = 1.0                                       # playhead sits on the ghost
         ghoster.process({3: _live(3, 1.0, offset=5.0)})     # person 3 overlaps; ghost has no prev-offset yet
         self.assertEqual(len(_active(cap.ghosts)), 1)
         ghoster.stop()
 
-    def test_fades_out_over_fade_beats(self) -> None:
-        ghoster, cap, ph = self._ghoster_with_active_at_1(fade_beats=4)
+    def test_lone_ghost_never_fades(self) -> None:
+        # Under the limit (1 <= ghost_limit): the ghost persists across many beats, Fade stays 1.0.
+        ghoster, cap, ph = self._ghoster_with_active_at_1(ghost_limit=5, fade_beats=4)
         gid = next(iter(_active(cap.ghosts)))
-        ph["v"] = 0.0
-        ghoster.process({})
-        self.assertAlmostEqual(cap.ghosts[gid][GhostFeature].get(GhostElement.Fade), 1.0, places=5)
-        for _ in range(4):                                  # 4 beats with no one overlapping → fade to 0
+        for _ in range(8):
             _ghost_beat(ghoster, 1.0, ph)
-        self.assertEqual(len(_active(cap.ghosts)), 0)
+        self.assertEqual(len(_active(cap.ghosts)), 1)
+        self.assertAlmostEqual(cap.ghosts[gid][GhostFeature].get(GhostElement.Fade), 1.0, places=5)
+        ghoster.stop()
+
+    def test_only_oldest_fades_when_over_limit(self) -> None:
+        # 2 active ghosts with ghost_limit=1 → only the OLDEST fades out over fade_beats; the newer stays.
+        ghoster, cap, ph = self._ghoster_with_active_at_1(ghost_limit=1, fade_beats=4)
+        _make_active(ghoster, 1, spot=-2.0, leave=-1.0)     # newer ghost at -2.0 → count 2 > limit 1
+        self.assertEqual(len(_active(cap.ghosts)), 2)
+        for _ in range(4):                                  # beat across the oldest (at 1.0)
+            _ghost_beat(ghoster, 1.0, ph)
+        active = _active(cap.ghosts)
+        self.assertEqual(len(active), 1)                    # oldest faded out and removed
+        survivor = next(iter(active.values()))
+        self.assertAlmostEqual(survivor[Azimuth].value, -2.0, places=4)                       # newer stayed
+        self.assertAlmostEqual(survivor[GhostFeature].get(GhostElement.Fade), 1.0, places=5)  # never faded
         ghoster.stop()
 
 
