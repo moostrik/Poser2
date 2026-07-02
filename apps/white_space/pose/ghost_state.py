@@ -1,7 +1,7 @@
 """GhostState — a White Space-native pose feature marking a ghost frame as PASSIVE or ACTIVE.
 
 A ghost is an ordinary pose ``Frame``; its lifecycle state rides on the frame as this feature (like
-``Fade`` / ``PlayheadOffset``). A frame **without** ``GhostState`` is a live pose. Consumers filter by it:
+``GhostFeature`` / ``PlayheadOffset``). A frame **without** ``GhostState`` is a live pose. Consumers filter by it:
 only ``ACTIVE`` ghosts are sent to OSC; the light reads the state to render active (and, later, passive)
 ghosts. The Frame ECS stores scalar features, so the enum rides as the single value.
 """

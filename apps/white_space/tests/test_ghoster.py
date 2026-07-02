@@ -3,7 +3,7 @@ sweep-by-sweep, building the ghost's own dwell (sweeps on spot) and motion (Moti
 > band_degrees in one sweep (breaks free) *and* the passive had settled (dwell & motion full), it is
 committed as an ACTIVE ghost frozen at the spot; otherwise nothing. Ghosts are frames carrying a
 GhostState feature; only ACTIVE ones reach OSC. Active ghosts fade / are reclaimed on sweeps. The Ghoster
-also stamps dwell/motion (as PlayheadStability) onto live frames."""
+also stamps dwell/motion/fade (as GhostFeature) onto live frames."""
 
 import math
 import unittest
@@ -13,8 +13,8 @@ import numpy as np
 from modules.pose.frame import Frame, reidentify
 from modules.pose.features import Angles, Azimuth, MotionTime
 from apps.white_space.pose import (
-    Fade, Ghoster, GhosterSettings, GhostState, GhostStateValue, PlayheadElement, PlayheadOffset,
-    PlayheadStability, ghost_state,
+    GhostElement, GhostFeature, Ghoster, GhosterSettings, GhostState, GhostStateValue, PlayheadOffset,
+    ghost_state,
 )
 
 _NUM_JOINTS = len(Angles.enum())
@@ -158,9 +158,9 @@ class GhosterTest(unittest.TestCase):
 
     def test_live_frames_carry_dwell_motion(self) -> None:
         _settle(self.ghoster, 0, 1.0)                     # settle without breaking free
-        stab = self.cap.tagged[0][PlayheadStability]
-        self.assertGreaterEqual(stab.get(PlayheadElement.Dwell, 0.0), 1.0)
-        self.assertGreaterEqual(stab.get(PlayheadElement.Motion, 0.0), 1.0)
+        g = self.cap.tagged[0][GhostFeature]
+        self.assertGreaterEqual(g.get(GhostElement.Dwell, 0.0), 1.0)
+        self.assertGreaterEqual(g.get(GhostElement.Motion, 0.0), 1.0)
 
     def test_clear_empties_registry(self) -> None:
         _make_active(self.ghoster, 0, spot=1.0, leave=2.0)
@@ -230,7 +230,7 @@ class ActiveGhostTest(unittest.TestCase):
         gid = next(iter(_active(cap.ghosts)))
         ph["v"] = 0.0
         ghoster.process({})
-        self.assertAlmostEqual(cap.ghosts[gid][Fade].value, 1.0, places=5)
+        self.assertAlmostEqual(cap.ghosts[gid][GhostFeature].get(GhostElement.Fade), 1.0, places=5)
         for _ in range(4):                                  # 4 sweeps with no one overlapping → fade to 0
             _ghost_sweep(ghoster, 1.0, ph)
         self.assertEqual(len(_active(cap.ghosts)), 0)

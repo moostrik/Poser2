@@ -7,7 +7,7 @@ from modules.pose.frame import Frame as PoseFrame, FrameDict
 from modules.pose.features import Azimuth, Distance
 from modules.session import SequencerState
 from ..light import Frame
-from ..pose import Fade, PlayheadElement, PlayheadOffset, PlayheadStability
+from ..pose import GhostElement, GhostFeature, PlayheadOffset
 
 import logging
 logger = logging.getLogger(__name__)
@@ -99,17 +99,10 @@ class OscSound(BaseOscSound):
         bundle_builder.add_content(offset_msg.build())  # type: ignore
 
         # 1.0 for a live pose; a ghost's presence fades 1→0 over its lifetime (absent → fully present).
-        fade: float = frame[Fade].value if Fade in frame else 1.0
+        fade: float = frame[GhostFeature].get(GhostElement.Fade) if GhostFeature in frame else 1.0
         fade_msg = OscMessageBuilder(address=f"/pose/{id}/playhead/fade")
         fade_msg.add_arg(fade, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(fade_msg.build())  # type: ignore
-
-        # PlayheadStability carries three per-spot values; emit each (NaN when absent).
-        playhead = frame[PlayheadStability]
-        for suffix, element in (("dwell", PlayheadElement.Dwell), ("motion", PlayheadElement.Motion), ("stability", PlayheadElement.Stability)):
-            msg = OscMessageBuilder(address=f"/pose/{id}/playhead/{suffix}")
-            msg.add_arg(float(playhead.get(element)), OscMessageBuilder.ARG_TYPE_FLOAT)
-            bundle_builder.add_content(msg.build())  # type: ignore
 
     def _add_inactive_frame_messages(self, bundle_builder: OscBundleBuilder, id: int, num_players: int) -> None:
         super()._add_inactive_frame_messages(bundle_builder, id, num_players)

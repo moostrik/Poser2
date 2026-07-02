@@ -4,8 +4,8 @@ player, driven by the continuous ``PlayheadOffset``.
 Each pose's signed offset to the playhead defines an on/off window around the crossing: the
 flash switches on while the playhead is within the ``width``° window of the crossing
 (±``width``/2 each side), save a dark ``gap`` notch straddling the crossing itself. Both the window
-width and the brightness interpolate per pose by its ``PlayheadStability``, from the ``min_*``
-endpoints (stability 0) to the ``max_*`` endpoints (stability 1). The whole-strip brightness
+width and the brightness interpolate per pose by its ``GhostFeature`` Dwell, from the ``min_*``
+endpoints (dwell 0) to the ``max_*`` endpoints (dwell 1). The whole-strip brightness
 follows the closest active pose.
 """
 
@@ -17,7 +17,7 @@ from modules.settings import Field
 
 from .._base_layer import BaseLayer, LayerSettings
 from ...frame import Frame
-from ....pose import PlayheadElement, PlayheadOffset, PlayheadStability
+from ....pose import GhostElement, GhostFeature, PlayheadOffset
 
 
 def offset_to_level(phi: float, width: float, gap: float = 0.0) -> float:
@@ -59,9 +59,9 @@ class PlayheadFlashSettings(LayerSettings):
 class PlayheadFlash(BaseLayer):
     """Continuous base level plus an on/off flash window tracking the playhead's approach to
     each active player, read from ``PlayheadOffset``. Each pose's window width and flash
-    intensity are interpolated by its ``PlayheadStability`` from the ``min_*`` endpoints
-    (stability 0) to the ``max_*`` endpoints (stability 1): a steady pose flashes brighter
-    and over a wider window than an unstable one."""
+    intensity are interpolated by its ``GhostFeature`` Dwell from the ``min_*`` endpoints
+    (dwell 0) to the ``max_*`` endpoints (dwell 1): a settled pose flashes brighter
+    and over a wider window than a fresh one."""
 
     def __init__(self, resolution: int, config: PlayheadFlashSettings, board, pose_stage: int) -> None:
         super().__init__(resolution, config, board)
@@ -78,13 +78,13 @@ class PlayheadFlash(BaseLayer):
             tracklet = tracklets.get(pose.track_id)
             if tracklet is None or not tracklet.is_active:
                 continue
-            stability = pose[PlayheadStability].get(PlayheadElement.Stability)
-            half_rad = math.radians(stability_lerp(stability, P.min_width, P.max_width) / 2.0)
+            dwell = pose[GhostFeature].get(GhostElement.Dwell)
+            half_rad = math.radians(stability_lerp(dwell, P.min_width, P.max_width) / 2.0)
             level = offset_to_level(pose[PlayheadOffset].value, half_rad, P.gap)
             if level <= 0.0:
                 continue
-            flash_white = max(flash_white, level * stability_lerp(stability, P.min_white, P.max_white))
-            flash_blue  = max(flash_blue,  level * stability_lerp(stability, P.min_blue,  P.max_blue))
+            flash_white = max(flash_white, level * stability_lerp(dwell, P.min_white, P.max_white))
+            flash_blue  = max(flash_blue,  level * stability_lerp(dwell, P.min_blue,  P.max_blue))
 
         half = self.resolution // 2
         white[:half] += P.base_white + flash_white

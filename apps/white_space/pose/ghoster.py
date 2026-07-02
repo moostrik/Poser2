@@ -15,9 +15,10 @@ each tick so it sweeps with the playhead; it carries a ``Fade`` that steps down 
 each sweep it is not reclaimed (removed at 0), and is **reclaimed** (removed) when the playhead sweeps it
 while a live pose overlaps it — a just-made ghost is skipped on its birth tick.
 
-The Ghoster is also the source of **dwell/motion**: it stamps them onto every live frame it emits as the
-``PlayheadStability`` feature (Dwell, Motion; the Stability element is left 0), so the GPU renderer and OSC
-read the same band-based values that drive the gate — there is no ``PlayheadStabilityExtractor`` any more.
+The Ghoster owns the per-pose metrics: it stamps a ``GhostFeature`` (**Dwell**, **Motion**, **Fade**, each
+in [0, 1]) on every frame it emits — live poses and ghosts — so the GPU renderer / light / OSC read the same
+band-based values that drive the gate. A live pose has ``Fade`` 1.0; an active ghost's ``Fade`` decays. The
+ghost *kind* rides separately on ``GhostState`` (absent ⇒ live).
 
 There is no muting: every live person is always audible; ghosts are extra OSC voices. ``process(frames)``
 runs once per tick and emits on three channels:
@@ -36,16 +37,13 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import Callable
 
-import numpy as np
-
 from modules.pose.frame import Frame, FrameDict, FrameDictCallback, replace, reidentify
 from modules.pose.features import Azimuth, MotionTime
 from modules.settings import BaseSettings, Field, Widget
 
-from .fade import Fade
+from .ghost_feature import GhostFeature
 from .ghost_state import GhostState, GhostStateValue
 from .playhead_offset import PlayheadOffset
-from .playhead_stability import PlayheadStability
 
 logger = logging.getLogger(__name__)
 
@@ -154,8 +152,8 @@ class Ghoster:
         with self._lock:
             self._sweep_sample(frames)              # update passive ghosts; promote on break-free
             self._advance_ghosts(playhead, frames)  # active ghosts: fade / reclaim on sweep
-            tagged = self._tag_live(frames)         # stamp dwell/motion (PlayheadStability) on live frames
-            active = self._live_ghosts(playhead)    # active ghosts, PlayheadOffset + Fade refreshed
+            tagged = self._tag_live(frames)         # stamp dwell/motion/fade (GhostFeature) on live frames
+            active = self._live_ghosts(playhead)    # active ghosts, PlayheadOffset + GhostFeature refreshed
             ghosts = {**self._passive_ghosts(tagged), **active}
             sound = {**tagged, **active}            # live + active-only; passive never reaches OSC
             count = len(active)
@@ -231,13 +229,11 @@ class Ghoster:
         return dwell, motion
 
     def _tag_live(self, frames: FrameDict) -> FrameDict:
-        """Stamp each live frame with its band-based ``PlayheadStability`` (Dwell, Motion; Stability 0)."""
+        """Stamp each live frame with its band-based ``GhostFeature`` (Dwell, Motion; Fade 1.0)."""
         out: FrameDict = {}
         for tid, frame in frames.items():
             dwell, motion = self._dwell_motion(tid, frame)
-            stab = PlayheadStability(values=np.array([dwell, motion, 0.0], dtype=np.float32),
-                                     scores=np.array([1.0, 1.0, 1.0], dtype=np.float32))
-            out[tid] = replace(frame, {PlayheadStability: stab})
+            out[tid] = replace(frame, {GhostFeature: GhostFeature.make(dwell, motion, 1.0)})
         return out
 
     def _passive_ghosts(self, tagged: FrameDict) -> FrameDict:
@@ -302,14 +298,12 @@ class Ghoster:
         self._set_ghost(gid, frame, az)
 
     def _set_ghost(self, gid: int, frame: Frame, az: float) -> None:
-        # Freeze the pose at the spot: pinned to the commit azimuth, marked ACTIVE, and carrying a full
-        # (settled) PlayheadStability so OSC/light read finite dwell/motion for the ghost.
-        settled = PlayheadStability(values=np.array([1.0, 1.0, 0.0], dtype=np.float32),
-                                    scores=np.array([1.0, 1.0, 1.0], dtype=np.float32))
+        # Freeze the pose at the spot: pinned to the commit azimuth, marked ACTIVE, with a full (settled,
+        # fully-present) GhostFeature — _live_ghosts refreshes its Fade each tick.
         self._ghosts[gid] = replace(reidentify(frame, gid),
                                     {Azimuth: Azimuth.from_value(az),
                                      GhostState: GhostState.from_value(float(GhostStateValue.ACTIVE)),
-                                     PlayheadStability: settled})
+                                     GhostFeature: GhostFeature.make(1.0, 1.0, 1.0)})
         self._ghost_az[gid] = az
         self._ghost_fade[gid] = 1.0             # fresh / replaced ghost starts fully present
         self._ghost_prev_offset[gid] = float("nan")
@@ -335,12 +329,13 @@ class Ghoster:
         return None
 
     def _live_ghosts(self, playhead: float) -> FrameDict:
-        """The frozen active-ghost registry, each stamped with its current ``Fade`` and — when the
-        playhead is finite — its ``PlayheadOffset`` (from its fixed azimuth). ``GhostState.ACTIVE`` is
-        carried on the stored frame and preserved. Call under ``_lock``."""
+        """The frozen active-ghost registry, each stamped with its current ``GhostFeature`` (dwell/motion
+        pinned at 1, Fade decaying) and — when the playhead is finite — its ``PlayheadOffset`` (from its
+        fixed azimuth). ``GhostState.ACTIVE`` is carried on the stored frame and preserved. Call under
+        ``_lock``."""
         out: FrameDict = {}
         for gid, g in self._ghosts.items():
-            feats: dict = {Fade: Fade.from_value(self._ghost_fade[gid])}
+            feats: dict = {GhostFeature: GhostFeature.make(1.0, 1.0, self._ghost_fade[gid])}
             if not math.isnan(playhead):
                 feats[PlayheadOffset] = PlayheadOffset.from_value(self._ghost_az[gid] - playhead)
             out[gid] = replace(g, feats)

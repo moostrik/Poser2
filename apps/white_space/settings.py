@@ -23,7 +23,7 @@ from modules.session import SessionSettings, SequencerSettings
 from modules.gl import WindowSettings
 from .light import LightSettings
 from .inout import OscLightSettings, UdpReceiverSettings
-from .pose import PlayheadStabilityExtractorSettings, GhosterSettings
+from .pose import GhosterSettings
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +220,6 @@ class PoseGroup(BaseSettings):
     velocity        : Group[VelocityFeature]                 = Group(VelocityFeature, share=_feature_share)
     motion          : Group[MotionFeature]                   = Group(MotionFeature)
     similarity      : Group[SimilarityFeature]               = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
-    playhead_stability: Group[PlayheadStabilityExtractorSettings] = Group(PlayheadStabilityExtractorSettings)
     ghoster         : Group[GhosterSettings]                = Group(GhosterSettings, share=[max_poses.as_('live_players'), num_virtual.as_('num_virtual')])
     window_raw      : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_clean    : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
@@ -279,7 +278,7 @@ class PreviewGroup(BaseSettings):
 class PlayheadFeatureSelect(IntEnum):
     """App-local feature dropdown for the playhead data layers (keys PLAYHEAD_FEATURE_MAP)."""
     PlayheadOffset    = 0
-    PlayheadStability = auto()
+    GhostFeature      = auto()
 
 
 class PlayheadDataLayerSettings(BaseSettings):
@@ -291,7 +290,7 @@ class PlayheadDataLayerSettings(BaseSettings):
     """
     stage:             Field[Stage]               = Field(Stage.LERP)
     mode:              Field[LayerMode]            = Field(LayerMode.NONE)
-    feature_field:     Field[PlayheadFeatureSelect] = Field(PlayheadFeatureSelect.PlayheadStability)
+    feature_field:     Field[PlayheadFeatureSelect] = Field(PlayheadFeatureSelect.GhostFeature)
     line_width:        Field[float]               = Field(3.0)
     line_smooth:       Field[float]               = Field(1.0)
     use_scores:        Field[bool]                = Field(False)

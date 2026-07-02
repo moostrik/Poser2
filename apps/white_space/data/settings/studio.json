@@ -337,15 +337,6 @@
       },
       "motion_gate": {}
     },
-    "playhead_stability": {
-      "stability_beats": 4,
-      "dwell_beats": 2,
-      "angle_scale": 0.8,
-      "motion_scale": 1.0,
-      "spot_radius": 9.0,
-      "override": true,
-      "override_value": 1.0
-    },
     "ghoster": {
       "enabled": true,
       "band_degrees": 15.0,
@@ -639,7 +630,7 @@
     "playhead_data": {
       "stage": "LERP",
       "mode": "WINDOW",
-      "feature_field": "PlayheadStability",
+      "feature_field": "GhostFeature",
       "line_width": 10.0,
       "line_smooth": 0.0,
       "use_scores": false,

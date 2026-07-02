@@ -16,7 +16,7 @@ from modules.session import Session, Sequencer
 from modules.gl import WindowSettings
 
 from .board import Board
-from .pose import FadeExtractor, PlayheadOffset, PlayheadOffsetExtractor, PlayheadStability, Ghoster
+from .pose import GhostFeature, PlayheadOffset, PlayheadOffsetExtractor, Ghoster
 from .light import Render as LightRender
 from .inout import OscLight, OscSound, UdpReceiver
 from .render import Render as WindowRender
@@ -109,7 +109,7 @@ class WhiteSpaceMain:
         # STAGE WINDOW TRACKERS & BROADCASTS
         # The LERP tracker also windows the app-local playhead features (the only stage where
         # they're stamped) so the data layers can graph them; other stages use the built-ins.
-        lerp_features = features.SCALAR_FEATURES + [PlayheadOffset, PlayheadStability]
+        lerp_features = features.SCALAR_FEATURES + [PlayheadOffset, GhostFeature]
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
@@ -225,7 +225,6 @@ class WhiteSpaceMain:
                 nodes.AngleMotionExtractor(ps.motion.extractor),
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
                 PlayheadOffsetExtractor(self.board.get_playhead),
-                FadeExtractor(),   # Fade = 1.0 on every live pose; ghosts inherit it, then fade down
             ])
             for i in range(num_players)
         })
