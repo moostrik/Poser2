@@ -4,11 +4,11 @@ WHITE (front-lamp) channel: a flash as the rotating playhead crosses each live p
 ``PlayheadStability`` / brightness by its motion), and a flash as it crosses each **active** ghost (at the
 ghost's fixed azimuth, its own ``ghost_brightness`` / ``ghost_width``, dimmed by its ``Fade``).
 
-BLUE (full-strip) channel: a flash for each **passive** ghost — a ghost still forming on its live person —
-fired a fixed quarter-turn *later* than the crossing (``PlayheadOffset ≈ −0.25·2π``, the departing side),
-so it trails the white. Its window widens with the passive ghost's ``Dwell`` and brightens with its
-``Motion``, so a ghost about to break free glows harder. Reuses ``PlayheadFlash``'s ``offset_to_level`` /
-``stability_lerp`` kernels. No base level, no gap.
+BLUE (front-lamp) channel: a flash for each **verified** passive ghost — one whose ``Dwell`` and ``Motion``
+have both reached ``1.0`` (settled = ready to break free into an active ghost) — fired a fixed quarter-turn
+*later* than the crossing (``PlayheadOffset ≈ −0.25·2π``, the departing side), so it trails the white. A
+still-building passive ghost gets no blue; a verified one flashes at full ``max_width`` / ``max_brightness``.
+Reuses ``PlayheadFlash``'s ``offset_to_level`` / ``stability_lerp`` kernels. No base level, no gap.
 """
 
 import math
@@ -28,17 +28,17 @@ _PHASE_OFFSET: float = 0.25
 
 
 class HauntedFlashSettings(LayerSettings):
-    min_brightness:   Field[float] = Field(0.1, min=0.0, max=1.0,    step=0.01, description="Player/passive flash brightness at motion 0", newline=True)
-    max_brightness:   Field[float] = Field(1.0, min=0.0, max=1.0,    step=0.01, description="Player/passive flash brightness at motion 1")
+    min_brightness:   Field[float] = Field(0.1, min=0.0, max=1.0,    step=0.01, description="Player flash brightness at motion 0", newline=True)
+    max_brightness:   Field[float] = Field(1.0, min=0.0, max=1.0,    step=0.01, description="Player flash brightness at motion 1 / verified passive (blue) flash brightness")
     ghost_brightness: Field[float] = Field(1.0, min=0.0, max=1.0,    step=0.01, description="Active ghost flash brightness")
-    min_width:        Field[float] = Field(20.0, min=0.0, max=360.0, step=1.0, description="Player/passive flash window width (deg) at stability/dwell 0", newline=True)
-    max_width:        Field[float] = Field(40.0, min=0.0, max=360.0, step=1.0, description="Player/passive flash window width (deg) at stability/dwell 1")
+    min_width:        Field[float] = Field(20.0, min=0.0, max=360.0, step=1.0, description="Player flash window width (deg) at stability 0", newline=True)
+    max_width:        Field[float] = Field(40.0, min=0.0, max=360.0, step=1.0, description="Player flash window width (deg) at stability 1 / verified passive (blue) flash width")
     ghost_width:      Field[float] = Field(30.0, min=0.0, max=360.0, step=1.0, description="Active ghost flash window width (deg)")
 
 
 class HauntedFlash(BaseLayer):
     """White flash as the playhead crosses each live player and each **active** ghost, plus a blue flash a
-    quarter-turn later for each **passive** ghost (width by its Dwell, brightness by its Motion)."""
+    quarter-turn later for each **verified** passive ghost (Dwell & Motion both 1)."""
 
     def __init__(self, resolution: int, config: HauntedFlashSettings, board, pose_stage: int) -> None:
         super().__init__(resolution, config, board)
@@ -66,8 +66,10 @@ class HauntedFlash(BaseLayer):
             if level > 0.0:
                 flash_white = max(flash_white, level * brightness)
 
-        # Ghosts — ACTIVE flash white at their fixed crossing; PASSIVE flash blue a quarter-turn later.
-        g_half = math.radians(P.ghost_width / 2.0)
+        # Ghosts — ACTIVE flash white at their fixed crossing; a VERIFIED passive (dwell & motion both 1)
+        # flashes blue a quarter-turn later. A still-building passive gets no flash.
+        g_half   = math.radians(P.ghost_width / 2.0)
+        blue_half = math.radians(P.max_width / 2.0)
         for ghost in self._board.get_ghosts().values():
             state = ghost_state(ghost)
             offset = ghost[PlayheadOffset].value
@@ -78,15 +80,14 @@ class HauntedFlash(BaseLayer):
                     flash_white = max(flash_white, level * P.ghost_brightness * fade)
             elif state is GhostStateValue.PASSIVE:
                 stab = ghost[PlayheadStability]
-                half_rad   = math.radians(stability_lerp(stab.get(PlayheadElement.Dwell), P.min_width, P.max_width) / 2.0)
-                brightness = stability_lerp(stab.get(PlayheadElement.Motion), P.min_brightness, P.max_brightness)
-                d = offset + centre   # shift a quarter-turn, then wrap to [-π, π)
-                level = offset_to_level(math.atan2(math.sin(d), math.cos(d)), half_rad)
-                if level > 0.0:
-                    flash_blue = max(flash_blue, level * brightness)
+                if stab.get(PlayheadElement.Dwell, 0.0) >= 1.0 and stab.get(PlayheadElement.Motion, 0.0) >= 1.0:
+                    d = offset + centre   # verified → full blue, shifted a quarter-turn then wrapped to [-π, π)
+                    level = offset_to_level(math.atan2(math.sin(d), math.cos(d)), blue_half)
+                    if level > 0.0:
+                        flash_blue = max(flash_blue, level * P.max_brightness)
 
         half = self.resolution // 2
         if flash_white > 0.0:
             white[:half] += flash_white
         if flash_blue > 0.0:
-            blue[:] += flash_blue
+            blue[:half] += flash_blue
