@@ -34,7 +34,7 @@
       "mono_iso": 1600,
       "mono_auto_exposure": false,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.3,
+      "ir_flood_light": 1.0,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -131,8 +131,8 @@
       ],
       "folder": "20260630-123110_Stability",
       "sim_passthrough": false,
-      "start_norm": 0.0,
-      "end_norm": 1.0
+      "start_norm": 0.3,
+      "end_norm": 0.64
     },
     "tracker": {
       "min_age": 5,
@@ -342,18 +342,17 @@
     },
     "playhead_stability": {
       "stability_beats": 4,
-      "dwell_beats": 4,
+      "dwell_beats": 2,
       "angle_scale": 0.8,
       "motion_scale": 1.0,
       "spot_radius": 9.0,
-      "override": false,
-      "override_value": 0.0
+      "override": true,
+      "override_value": 1.0
     },
     "ghoster": {
       "enabled": true,
-      "threshold": 0.95,
-      "release": 0.6,
-      "band_degrees": 10.0,
+      "band_degrees": 15.0,
+      "fade_sweeps": 256,
       "recycle_oldest": true
     },
     "window_raw": {
@@ -430,9 +429,9 @@
         "min_brightness": 1.0,
         "max_brightness": 1.0,
         "ghost_brightness": 1.0,
-        "min_width": 7.0,
-        "max_width": 7.0,
-        "ghost_width": 7.0,
+        "min_width": 10.0,
+        "max_width": 10.0,
+        "ghost_width": 10.0,
         "blend": "ADD"
       }
     },
@@ -624,18 +623,21 @@
         "use_gpu_crop": true
       }
     },
+    "data_time": {
+      "stage": "LERP"
+    },
     "data": {
-      "mode": "WINDOW",
+      "stage": "LERP",
+      "mode": "FRAME",
       "feature_field": "MotionGate",
-      "stage": 0,
       "line_width": 3.0,
-      "line_smooth": 1.0,
+      "line_smooth": 10.0,
       "use_scores": false,
       "render_labels": true,
       "use_history_color": false
     },
     "playhead_data": {
-      "mode": "WINDOW",
+      "mode": "NONE",
       "feature_field": "PlayheadStability",
       "stage": "LERP",
       "line_width": 10.0,
@@ -722,10 +724,10 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 1895,
+      "x": 1,
       "y": 31,
-      "width": 664,
-      "height": 598,
+      "width": 1705,
+      "height": 1360,
       "secondary_list": [],
       "secondary_fullscreen": true,
       "fullscreen_mode": "WINDOWED"

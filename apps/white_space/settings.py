@@ -263,6 +263,12 @@ class _TrackerCompSettings(layers.TrackerCompSettings):
 class _PoseCompSettings(layers.PoseCompSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
 
+class _MTimeSettings(layers.MTimeRendererSettings):
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
+
+class _DataLayerSettings(layers.DataLayerSettings):
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
+
 
 class PreviewGroup(BaseSettings):
     tracker: Group[_TrackerCompSettings] = Group(_TrackerCompSettings)
@@ -282,9 +288,9 @@ class PlayheadDataLayerSettings(BaseSettings):
     Defaults off (mode NONE) and to the LERP stage — the only stage where the features exist.
     Set the generic ``data.mode`` to NONE when enabling this to avoid two graphs overlapping.
     """
+    stage:             Field[Stage]               = Field(Stage.LERP)
     mode:              Field[LayerMode]            = Field(LayerMode.NONE)
     feature_field:     Field[PlayheadFeatureSelect] = Field(PlayheadFeatureSelect.PlayheadStability)
-    stage:             Field[Stage]               = Field(Stage.LERP)
     line_width:        Field[float]               = Field(3.0)
     line_smooth:       Field[float]               = Field(1.0)
     use_scores:        Field[bool]                = Field(False)
@@ -295,11 +301,12 @@ class PlayheadDataLayerSettings(BaseSettings):
 class RenderSettings(BaseSettings):
     num_cams:    Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of players")
-    preview:     Group[PreviewGroup]     = Group(PreviewGroup)
-    data:        Group[layers.DataLayerSettings] = Group(layers.DataLayerSettings)
+    preview:     Group[PreviewGroup]        = Group(PreviewGroup)
+    data_time:   Group[_MTimeSettings]      = Group(_MTimeSettings)
+    data:        Group[_DataLayerSettings]  = Group(_DataLayerSettings)
     playhead_data: Group[PlayheadDataLayerSettings] = Group(PlayheadDataLayerSettings)
-    colors:      Group[ColorSettings]    = Group(ColorSettings)
-    window:      Group[WindowSettings]   = Group(WindowSettings)
+    colors:      Group[ColorSettings]       = Group(ColorSettings)
+    window:      Group[WindowSettings]      = Group(WindowSettings)
 
 
 # ---------------------------------------------------------------------------

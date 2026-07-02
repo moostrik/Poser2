@@ -7,7 +7,7 @@ from modules.pose.frame import Frame as PoseFrame, FrameDict
 from modules.pose.features import Azimuth, Distance
 from modules.session import SequencerState
 from ..light import Frame
-from ..pose import PlayheadElement, PlayheadOffset, PlayheadStability
+from ..pose import Fade, PlayheadElement, PlayheadOffset, PlayheadStability
 
 import logging
 logger = logging.getLogger(__name__)
@@ -94,21 +94,26 @@ class OscSound(BaseOscSound):
         bundle_builder.add_content(distance_msg.build())  # type: ignore
 
         playhead_offset: float = frame[PlayheadOffset].value if PlayheadOffset in frame else np.nan
-        offset_msg = OscMessageBuilder(address=f"/pose/{id}/playhead_offset")
+        offset_msg = OscMessageBuilder(address=f"/pose/{id}/playhead/offset")
         offset_msg.add_arg(playhead_offset, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(offset_msg.build())  # type: ignore
+
+        # 1.0 for a live pose; a ghost's presence fades 1→0 over its lifetime (absent → fully present).
+        fade: float = frame[Fade].value if Fade in frame else 1.0
+        fade_msg = OscMessageBuilder(address=f"/pose/{id}/playhead/fade")
+        fade_msg.add_arg(fade, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(fade_msg.build())  # type: ignore
 
         # PlayheadStability carries three per-spot values; emit each (NaN when absent).
         playhead = frame[PlayheadStability]
         for suffix, element in (("dwell", PlayheadElement.Dwell), ("motion", PlayheadElement.Motion), ("stability", PlayheadElement.Stability)):
-            msg = OscMessageBuilder(address=f"/pose/{id}/playhead_{suffix}")
+            msg = OscMessageBuilder(address=f"/pose/{id}/playhead/{suffix}")
             msg.add_arg(float(playhead.get(element)), OscMessageBuilder.ARG_TYPE_FLOAT)
             bundle_builder.add_content(msg.build())  # type: ignore
 
     def _add_inactive_frame_messages(self, bundle_builder: OscBundleBuilder, id: int, num_players: int) -> None:
         super()._add_inactive_frame_messages(bundle_builder, id, num_players)
-        for address in (f"/pose/{id}/azimuth", f"/pose/{id}/distance", f"/pose/{id}/playhead_offset",
-                        f"/pose/{id}/playhead_dwell", f"/pose/{id}/playhead_motion", f"/pose/{id}/playhead_stability"):
+        for address in (f"/pose/{id}/azimuth", f"/pose/{id}/distance", f"/pose/{id}/playhead/offset", f"/pose/{id}/playhead/fade"):
             msg = OscMessageBuilder(address=address)
             msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
             bundle_builder.add_content(msg.build())  # type: ignore

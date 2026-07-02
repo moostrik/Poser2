@@ -16,7 +16,7 @@ from modules.session import Session, Sequencer
 from modules.gl import WindowSettings
 
 from .board import Board
-from .pose import PlayheadOffset, PlayheadOffsetExtractor, PlayheadStability, PlayheadStabilityExtractor, Ghoster, GhostedFeature
+from .pose import FadeExtractor, PlayheadOffset, PlayheadOffsetExtractor, PlayheadStability, PlayheadStabilityExtractor, Ghoster
 from .light import Render as LightRender
 from .inout import OscLight, OscSound, UdpReceiver
 from .render import Render as WindowRender
@@ -109,7 +109,7 @@ class WhiteSpaceMain:
         # STAGE WINDOW TRACKERS & BROADCASTS
         # The LERP tracker also windows the app-local playhead features (the only stage where
         # they're stamped) so the data layers can graph them; other stages use the built-ins.
-        lerp_features = features.SCALAR_FEATURES + [PlayheadOffset, PlayheadStability, GhostedFeature]
+        lerp_features = features.SCALAR_FEATURES + [PlayheadOffset, PlayheadStability]
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
@@ -226,6 +226,7 @@ class WhiteSpaceMain:
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
                 PlayheadOffsetExtractor(self.board.get_playhead),
                 PlayheadStabilityExtractor(ps.playhead_stability),
+                FadeExtractor(),   # Fade = 1.0 on every live pose; ghosts inherit it, then fade down
             ])
             for i in range(num_players)
         })
@@ -237,7 +238,7 @@ class WhiteSpaceMain:
         self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
         self.filters_lerp.add_frames_callback(self.motion_gate_applicator.set)
         self.filters_lerp.add_frames_callback(self.gate_lerp.process)
-        # Ghoster sits between LERP and the fan-out: tags GhostedFeature on live frames, spawns ghosts,
+        # Ghoster sits between LERP and the fan-out: records held poses, commits/refreshes ghosts,
         # publishes the ghost snapshot to the board, and feeds (muted live + ghosts) to OSC sound.
         self.gate_lerp.add_frames_callback(self.ghoster.process)
         self.ghoster.add_frames_callback(self.stages[Stage.LERP])

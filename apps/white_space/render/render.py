@@ -57,11 +57,11 @@ class Render(RenderBase):
                 settings.preview.poser,
                 settings.colors,
             )
-            self.L[Layers.data_W][i]    = FeatureWindowLayer(i, board, settings.data, settings.colors)
-            self.L[Layers.data_F][i]    = FeatureFrameLayer( i, board, settings.data, settings.colors)
-            self.L[Layers.data_time][i] = MTimeRenderer(     i, board)
-            self.L[Layers.data_playhead_W][i] = FeatureWindowLayer(i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP)
-            self.L[Layers.data_playhead_F][i] = FeatureFrameLayer( i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP)
+            self.L[Layers.data_W][i]    = FeatureWindowLayer(i, board, settings.data, settings.colors) # type: ignore
+            self.L[Layers.data_F][i]    = FeatureFrameLayer( i, board, settings.data, settings.colors)   # type: ignore
+            self.L[Layers.data_time][i] = MTimeRenderer(     i, board, settings.data_time)
+            self.L[Layers.data_playhead_W][i] = FeatureWindowLayer(i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
+            self.L[Layers.data_playhead_F][i] = FeatureFrameLayer( i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
 
         # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready
         self.L[Layers.ws_tracker][0] = PanoramicTrackerLayer(board, self.num_cams, settings.colors)
