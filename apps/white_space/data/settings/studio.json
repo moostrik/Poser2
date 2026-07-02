@@ -12,7 +12,7 @@
     "square": false,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "ir_flood_light": 0.75,
     "cam_0": {
@@ -336,21 +336,6 @@
         "hold_scores": false
       },
       "motion_gate": {}
-    },
-    "ghoster": {
-      "enabled": true,
-      "recycle_oldest": true,
-      "reclaim_near": false,
-      "ghost_limit": 2,
-      "limit_fade_beats": 8,
-      "dwell_radius": 8.0,
-      "dwell_beats": 4,
-      "motion_beats": 2,
-      "motion_scale": 1.0,
-      "stability_hold_beats": 2,
-      "stability_expiry_beats": 3,
-      "stability_scale": 0.8,
-      "stability_threshold": 0.9
     },
     "window_raw": {
       "window_size": 180,
@@ -772,8 +757,25 @@
       "enabled": true
     }
   },
-  "escalator": {
-    "enabled": true,
-    "high_threshold": 20
+  "ghost": {
+    "ghoster": {
+      "enabled": true,
+      "recycle_oldest": true,
+      "reclaim_near": false,
+      "ghost_limit": 0,
+      "limit_fade_beats": 24,
+      "dwell_radius": 8.0,
+      "dwell_beats": 4,
+      "motion_beats": 2,
+      "motion_scale": 1.0,
+      "stability_hold_beats": 2,
+      "stability_expiry_beats": 3,
+      "stability_scale": 0.8,
+      "stability_threshold": 0.9
+    },
+    "escalator": {
+      "enabled": true,
+      "high_threshold": 16
+    }
   }
 }

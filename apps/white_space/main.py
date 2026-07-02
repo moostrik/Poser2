@@ -57,7 +57,7 @@ class WhiteSpaceMain:
         # SESSION
         self.session = Session(self.settings.session.core)
         self.osc_sound = OscSound(self.settings.inout.osc_sound)
-        self.ghoster = Ghoster(ps.ghoster, playhead=self.board.get_playhead)   # live/pool counts shared from root
+        self.ghoster = Ghoster(self.settings.ghost.ghoster, playhead=self.board.get_playhead)   # live/pool counts shared from root
         self.sequencer = Sequencer(self.settings.session.sequencer)
         self.sequencer.add_state_callback(self.board.set_sequence)
         self.sequencer.add_state_callback(self.osc_sound.set_sequencer_state)
@@ -244,7 +244,7 @@ class WhiteSpaceMain:
         self.ghoster.add_ghosts_callback(self.board.set_ghosts)
         self.ghoster.add_sound_callback(partial(self.osc_sound.set_frames, int(Stage.LERP)))
         # GhostEscalator counts ghosts ever made and escalates the motor LOW→HIGH at its threshold.
-        self.escalator = GhostEscalator(self.settings.escalator, self.settings.light.motor)
+        self.escalator = GhostEscalator(self.settings.ghost.escalator, self.settings.light.motor)
         self.ghoster.add_new_ghost_callback(self.escalator.on_new_ghost)
 
         # RENDER
