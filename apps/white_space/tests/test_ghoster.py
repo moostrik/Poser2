@@ -120,6 +120,15 @@ class GhosterTest(unittest.TestCase):
         self.assertEqual(len(active), 1)
         self.assertAlmostEqual(next(iter(active.values()))[Azimuth].value, 1.0, places=4)
 
+    def test_break_free_commits_without_a_sweep(self) -> None:
+        # Once settled, a single non-crossing tick with the person moved > band commits immediately —
+        # no waiting for the playhead to reach him again.
+        _settle(self.ghoster, 0, 1.0)
+        self.ghoster.process({0: _live(0, 2.0, offset=5.0)})   # offset 5.0 → no crossing this tick
+        active = _active(self.cap.ghosts)
+        self.assertEqual(len(active), 1)
+        self.assertAlmostEqual(next(iter(active.values()))[Azimuth].value, 1.0, places=4)
+
     def test_slow_drift_leaves_nothing(self) -> None:
         # Steps < band each sweep (motion growing) → the passive follows, never breaks free → no active.
         for i in range(6):

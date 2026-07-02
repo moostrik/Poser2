@@ -3,10 +3,11 @@
 Each live person carries a **passive ghost**: a candidate that follows him sweep-by-sweep (a
 ``PlayheadOffset`` zero-crossing marks each sweep) while he stays within ``band_degrees`` of its spot,
 accumulating the ghost's own **dwell** (sweeps on the spot) and **motion** (on-spot ``MotionTime``).
-When he **breaks free** — moves > ``band_degrees`` in one sweep — and the passive ghost had **settled**
-(dwell & motion both full = an intentional pose), it is committed as an **active ghost** frozen at the
-spot he left; otherwise it is dropped. A fresh passive re-anchors at his new spot. Slow drift (≤ band
-every sweep) never breaks free, so it leaves nothing.
+When he **breaks free** — the moment he moves > ``band_degrees`` from his last-swept spot (checked every
+tick, not only on a sweep) — and the passive ghost had **settled** (dwell & motion both full = an
+intentional pose), it is committed as an **active ghost** frozen at that spot with the pose the playhead
+last caught there; otherwise it is dropped. A fresh passive re-anchors at his new spot on the next sweep.
+Slow drift (the spot follows him sweep to sweep) never breaks free, so it leaves nothing.
 
 Ghosts are ordinary pose ``Frame``s carrying a ``GhostState`` feature (``PASSIVE`` / ``ACTIVE``); both
 kinds live in the one board ghost store, told apart by that feature. Only **active** ghosts are sent to
@@ -71,13 +72,13 @@ class GhosterSettings(BaseSettings):
     live_players:        Field[int]   = Field(4, access=Field.INIT, visible=False, description="Live player count (shared from root num_players)")
     num_virtual:         Field[int]   = Field(8, access=Field.INIT, visible=False, description="Ghost pool size (shared from root num_virtual)")
     enabled:             Field[bool]  = Field(True, description="Record and commit ghosts")
+    reset:               Field[bool]  = Field(False, widget=Widget.button, description="Clear all ghosts")
     band_degrees:        Field[float] = Field(10.0, min=0.0, max=180.0, step=0.5, description="Distance (deg) that counts as the same spot / must be exceeded to break free")
     dwell_sweeps:        Field[int]   = Field(4, min=1, max=32, step=1, description="Playhead sweeps on a spot for dwell to fill", newline=True)
     motion_sweeps:       Field[int]   = Field(2, min=1, max=32, step=1, description="Sweeps on a spot before motion starts counting")
     motion_scale:        Field[float] = Field(5.0, min=0.1, max=50.0, step=0.1, description="On-spot MotionTime that maps motion to 1.0")
     fade_sweeps:         Field[int]   = Field(16, min=1, max=256, step=1, description="Playhead sweeps over which an active ghost fades out, then is removed", newline=True)
     recycle_oldest:      Field[bool]  = Field(True, description="When the pool is full, recycle the oldest ghost (else ignore new commits)")
-    reset:               Field[bool]  = Field(False, widget=Widget.button, description="Clear all ghosts", newline=True)
     num_ghosts:          Field[int]   = Field(0, access=Field.READ, description="Current number of active ghosts")
 
 
@@ -171,26 +172,33 @@ class Ghoster:
     # -- passive layer & dwell/motion (call under _lock) ---------------------
 
     def _sweep_sample(self, frames: FrameDict) -> None:
-        """At each playhead sweep of a person: follow his passive ghost while he stays within
-        ``band_degrees`` (building dwell/motion), or break free (> band) — committing an active ghost if
-        the passive had settled — then re-anchor a fresh passive at his new spot."""
+        """Two things per person, per tick:
+        - **Break free (continuous):** the moment he is > ``band_degrees`` from his last-swept spot,
+          commit his last-swept snapshot as an active ghost (if it had settled) and drop the passive — so
+          the ghost freezes exactly the pose the playhead last caught, with no wait for the next sweep.
+        - **Follow (on a playhead crossing):** refresh his passive ghost's spot/pose and build dwell/motion.
+        """
         band = math.radians(self._settings.band_degrees)
         for tid, frame in frames.items():
+            az = frame[Azimuth].value
+
+            # Break free — checked every tick, not just at a crossing.
+            p = self._passive.get(tid)
+            if (p is not None and not math.isnan(az)
+                    and abs(math.atan2(math.sin(az - p.spot), math.cos(az - p.spot))) > band):
+                if self._settled(p):
+                    self._commit(p.frame, p.spot)   # freeze his last-swept snapshot at its spot
+                del self._passive[tid]               # re-anchor a fresh passive on the next crossing
+
+            # Follow — only when the playhead sweeps across him.
             offset = frame[PlayheadOffset].value
             prev = self._prev_offset.get(tid, float("nan"))
             self._prev_offset[tid] = offset      # updated every tick to catch the crossing
             hit = (not math.isnan(prev) and prev * offset < 0.0
                    and abs(prev) < _HALF_PI and abs(offset) < _HALF_PI)
-            if not hit:
-                continue
-            az = frame[Azimuth].value
-            if math.isnan(az):
+            if not hit or math.isnan(az):
                 continue
             p = self._passive.get(tid)
-            if p is not None and abs(math.atan2(math.sin(az - p.spot), math.cos(az - p.spot))) > band:
-                if self._settled(p):
-                    self._commit(p.frame, p.spot)   # broke free from a settled spot → active ghost
-                p = None                            # re-anchor a fresh passive below
             if p is None:
                 p = _Passive(spot=az, frame=frame, sweeps=1, anchor_motion=float("nan"))
                 self._passive[tid] = p
