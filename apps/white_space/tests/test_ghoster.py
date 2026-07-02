@@ -149,6 +149,38 @@ class GhosterTest(unittest.TestCase):
         _settle_no_motion(2.0)              # break free
         self.assertEqual(len(_active(self.cap.ghosts)), 0)
 
+    def test_unheld_pose_never_commits(self) -> None:
+        # Dwell and motion fill, but the pose flips every sweep on the same spot → it is never *held*
+        # long enough to become a valid ghost pose, so breaking free leaves nothing.
+        for angle, mt in [(0.2, 0.0), (1.5, 0.0), (0.2, 6.0), (1.5, 6.0)]:
+            _sweep(self.ghoster, {0: (1.0, angle)}, motion_time=mt)
+        _sweep(self.ghoster, {0: (2.0, 1.5)}, motion_time=6.0)   # break free
+        self.assertEqual(len(_active(self.cap.ghosts)), 0)
+
+    def test_stale_valid_pose_not_left(self) -> None:
+        # Hold a pose long enough to make it valid, then flip the pose every sweep for more than
+        # stability_max_age (3) sweeps → the valid pose ages out → breaking free leaves nothing.
+        _sweep(self.ghoster, {0: (1.0, 0.5)}, motion_time=0.0)   # sweep 1
+        _sweep(self.ghoster, {0: (1.0, 0.5)}, motion_time=0.0)   # sweep 2 → pose valid, motion anchor 0
+        for angle in (1.5, 0.5, 1.5, 0.5):                       # 4 unheld sweeps > max_age
+            _sweep(self.ghoster, {0: (1.0, angle)}, motion_time=6.0)
+        _sweep(self.ghoster, {0: (2.0, 0.5)}, motion_time=6.0)   # break free
+        self.assertEqual(len(_active(self.cap.ghosts)), 0)
+
+    def test_ghost_is_last_valid_pose_not_departure(self) -> None:
+        # Hold pose A at a spot (valid), drift the pose within max_age, then break free at a new azimuth
+        # with a different pose B → the ghost freezes pose A at A's spot, not B / the departure position.
+        _sweep(self.ghoster, {0: (1.0, 0.5)}, motion_time=0.0)   # sweep 1
+        _sweep(self.ghoster, {0: (1.0, 0.5)}, motion_time=0.0)   # sweep 2 → pose A (0.5) valid, motion anchor 0
+        _sweep(self.ghoster, {0: (1.0, 1.5)}, motion_time=6.0)   # sweep 3 → unheld (age 1)
+        _sweep(self.ghoster, {0: (1.0, 0.7)}, motion_time=6.0)   # sweep 4 → unheld (age 2), dwell full
+        _sweep(self.ghoster, {0: (3.0, 2.0)}, motion_time=6.0)   # break free at a new az with pose B
+        active = _active(self.cap.ghosts)
+        self.assertEqual(len(active), 1)
+        ghost = next(iter(active.values()))
+        self.assertAlmostEqual(ghost[Azimuth].value, 1.0, places=4)       # A's spot, not the exit (3.0)
+        self.assertAlmostEqual(float(ghost[Angles].values[0]), 0.5, places=4)   # pose A, not B (2.0)
+
     def test_passive_present_and_not_in_sound(self) -> None:
         _sweep(self.ghoster, {0: 1.0})                    # one sweep → a passive ghost exists
         passive = _passive(self.cap.ghosts)

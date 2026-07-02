@@ -30,10 +30,10 @@ _PHASE_OFFSET: float = 0.25
 
 
 class HauntedFlashSettings(LayerSettings):
-    white:  Field[float] = Field(1.0, min=0.0, max=1.0,    step=0.01, description="White flash brightness (live players + active ghosts)", newline=True)
+    white:  Field[float] = Field(1.0, min=0.0, max=1.0,    step=0.01, description="White flash brightness (live players + active ghosts)")
     blue:   Field[float] = Field(1.0, min=0.0, max=1.0,    step=0.01, description="Blue flash brightness (verified passive ghosts)")
-    width:  Field[float] = Field(30.0, min=0.0, max=360.0, step=1.0, description="Flash window width (deg)", newline=True)
-    ghosts: Field[bool]  = Field(True, description="Enable ghost flashes", newline=True)
+    width:  Field[float] = Field(30.0, min=0.0, max=360.0, step=1.0, description="Flash window width (deg)")
+    ghosts: Field[bool]  = Field(True, description="Enable ghost flashes")
 
 
 class HauntedFlash(BaseLayer):

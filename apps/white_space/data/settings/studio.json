@@ -339,12 +339,16 @@
     },
     "ghoster": {
       "enabled": true,
+      "recycle_oldest": true,
       "band_degrees": 8.0,
       "dwell_sweeps": 4,
       "motion_sweeps": 2,
-      "motion_scale": 5.0,
-      "fade_sweeps": 24,
-      "recycle_oldest": true
+      "motion_scale": 1.0,
+      "stability_sweeps": 2,
+      "stability_max_age": 3,
+      "stability_scale": 0.8,
+      "stability_threshold": 0.9,
+      "fade_sweeps": 24
     },
     "window_raw": {
       "window_size": 180,

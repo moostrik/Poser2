@@ -2,12 +2,15 @@
 
 Each live person carries a **passive ghost**: a candidate that follows him sweep-by-sweep (a
 ``PlayheadOffset`` zero-crossing marks each sweep) while he stays within ``band_degrees`` of its spot,
-accumulating the ghost's own **dwell** (sweeps on the spot) and **motion** (on-spot ``MotionTime``).
-When he **breaks free** — the moment he moves > ``band_degrees`` from his last-swept spot (checked every
-tick, not only on a sweep) — and the passive ghost had **settled** (dwell & motion both full = an
-intentional pose), it is committed as an **active ghost** frozen at that spot with the pose the playhead
-last caught there; otherwise it is dropped. A fresh passive re-anchors at his new spot on the next sweep.
-Slow drift (the spot follows him sweep to sweep) never breaks free, so it leaves nothing.
+accumulating the ghost's own **dwell** (sweeps on the spot), **motion** (on-spot ``MotionTime``), and
+**stability** — how many consecutive sweeps his pose has stayed similar (a Gaussian over ``Angles``). A
+pose held for ``stability_sweeps`` sweeps becomes **valid**: the Ghoster remembers that pose and the spot
+it was held at, replacing it whenever a newer pose is held. When he **breaks free** — the moment he moves
+> ``band_degrees`` from his last-swept spot (checked every tick, not only on a sweep) — and the passive
+ghost had **settled** (dwell & motion both full, and a valid pose held no more than ``stability_max_age``
+sweeps ago), the **last valid held pose is frozen at the spot he held it** as an **active ghost** — never
+the transitional pose/position he is in while walking away; otherwise it is dropped. A fresh passive
+re-anchors at his new spot on the next sweep. Slow drift never breaks free, so it leaves nothing.
 
 Ghosts are ordinary pose ``Frame``s carrying a ``GhostState`` feature (``PASSIVE`` / ``ACTIVE``); both
 kinds live in the one board ghost store, told apart by that feature. Only **active** ghosts are sent to
@@ -16,10 +19,10 @@ each tick so it sweeps with the playhead; it carries a ``Fade`` that steps down 
 each sweep it is not reclaimed (removed at 0), and is **reclaimed** (removed) when the playhead sweeps it
 while a live pose overlaps it — a just-made ghost is skipped on its birth tick.
 
-The Ghoster owns the per-pose metrics: it stamps a ``GhostFeature`` (**Dwell**, **Motion**, **Fade**, each
-in [0, 1]) on every frame it emits — live poses and ghosts — so the GPU renderer / light / OSC read the same
-band-based values that drive the gate. A live pose has ``Fade`` 1.0; an active ghost's ``Fade`` decays. The
-ghost *kind* rides separately on ``GhostState`` (absent ⇒ live).
+The Ghoster owns the per-pose metrics: it stamps a ``GhostFeature`` (**Dwell**, **Motion**, **Stability**,
+**Fade**, each in [0, 1]) on every frame it emits — live poses and ghosts — so the GPU renderer / light /
+OSC read the same band-based values that drive the gate. A live pose has ``Fade`` 1.0; an active ghost's
+``Fade`` decays. The ghost *kind* rides separately on ``GhostState`` (absent ⇒ live).
 
 There is no muting: every live person is always audible; ghosts are extra OSC voices. ``process(frames)``
 runs once per tick and emits on three channels:
@@ -38,8 +41,10 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import Callable
 
+import numpy as np
+
 from modules.pose.frame import Frame, FrameDict, FrameDictCallback, replace, reidentify
-from modules.pose.features import Azimuth, MotionTime
+from modules.pose.features import Angles, Azimuth, MotionTime
 from modules.settings import BaseSettings, Field, Widget
 
 from .ghost_feature import GhostFeature
@@ -58,13 +63,30 @@ def _clamp01(x: float) -> float:
     return 0.0 if x < 0.0 else 1.0 if x > 1.0 else x
 
 
+def _pose_similarity(current: Angles, older: Angles, scale: float) -> float:
+    """Confidence-weighted harmonic-mean Gaussian similarity in ``[0, 1]`` between two poses — used to tell
+    whether a pose is being *held* from one sweep to the next. Reuses ``Angles.subtract`` for the wrapped
+    per-joint difference; the harmonic mean is strict, so one moved joint pulls the whole score down."""
+    diff = current.subtract(older)
+    valid = diff.scores > 0.0
+    if not valid.any():
+        return 0.0
+    sim = np.exp(-np.square(diff.values[valid] / scale))   # per-joint Gaussian, (0, 1]
+    weights = diff.scores[valid]
+    return float(weights.sum() / (weights / sim).sum())     # weighted harmonic mean
+
+
 @dataclass
 class _Passive:
-    """A live person's candidate ghost: follows him and builds its own dwell/motion."""
-    spot: float           # anchor azimuth (his position at the last sweep)
-    frame: Frame          # pose held at the spot (refreshed each sweep)
-    sweeps: int           # consecutive sweeps on this spot (dwell)
-    anchor_motion: float  # MotionTime snapshot at motion_sweeps (NaN until reached)
+    """A live person's candidate ghost: follows him and builds its own dwell/motion/stability."""
+    spot: float                  # anchor azimuth (his position at the last sweep)
+    frame: Frame                 # pose held at the spot (refreshed each sweep)
+    sweeps: int                  # consecutive sweeps on this spot (dwell)
+    anchor_motion: float         # MotionTime snapshot at motion_sweeps (NaN until reached)
+    stable_sweeps: int           # consecutive sweeps his pose has stayed similar (starts 1)
+    stable_frame: Frame | None   # last pose held long enough to be valid (None until then)
+    stable_spot: float           # azimuth where that valid pose was held
+    stable_age: int              # sweeps since the valid pose was last held (0 while held)
 
 
 class GhosterSettings(BaseSettings):
@@ -73,13 +95,17 @@ class GhosterSettings(BaseSettings):
     num_virtual:         Field[int]   = Field(8, access=Field.INIT, visible=False, description="Ghost pool size (shared from root num_virtual)")
     enabled:             Field[bool]  = Field(True, description="Record and commit ghosts")
     reset:               Field[bool]  = Field(False, widget=Widget.button, description="Clear all ghosts")
+    recycle_oldest:      Field[bool]  = Field(True, description="When the pool is full, recycle the oldest ghost (else ignore new commits)")
+    num_ghosts:          Field[int]   = Field(0, access=Field.READ, description="Current number of active ghosts")
     band_degrees:        Field[float] = Field(10.0, min=0.0, max=180.0, step=0.5, description="Distance (deg) that counts as the same spot / must be exceeded to break free")
     dwell_sweeps:        Field[int]   = Field(4, min=1, max=32, step=1, description="Playhead sweeps on a spot for dwell to fill", newline=True)
     motion_sweeps:       Field[int]   = Field(2, min=1, max=32, step=1, description="Sweeps on a spot before motion starts counting")
     motion_scale:        Field[float] = Field(5.0, min=0.1, max=50.0, step=0.1, description="On-spot MotionTime that maps motion to 1.0")
+    stability_sweeps:    Field[int]   = Field(2, min=1, max=32, step=1, description="Sweeps a pose must be held to become a valid ghost pose (1 = off)", newline=True)
+    stability_max_age:   Field[int]   = Field(3, min=0, max=32, step=1, description="A valid pose expires this many sweeps after it was last held")
+    stability_scale:     Field[float] = Field(0.8, min=0.1, max=2.0, step=0.05, description="Pose-similarity scale (rad) — larger = more forgiving")
+    stability_threshold: Field[float] = Field(0.9, min=0.0, max=1.0, step=0.01, description="Min pose similarity between sweeps to count as 'held'")
     fade_sweeps:         Field[int]   = Field(16, min=1, max=256, step=1, description="Playhead sweeps over which an active ghost fades out, then is removed", newline=True)
-    recycle_oldest:      Field[bool]  = Field(True, description="When the pool is full, recycle the oldest ghost (else ignore new commits)")
-    num_ghosts:          Field[int]   = Field(0, access=Field.READ, description="Current number of active ghosts")
 
 
 class Ghoster:
@@ -174,9 +200,10 @@ class Ghoster:
     def _sweep_sample(self, frames: FrameDict) -> None:
         """Two things per person, per tick:
         - **Break free (continuous):** the moment he is > ``band_degrees`` from his last-swept spot,
-          commit his last-swept snapshot as an active ghost (if it had settled) and drop the passive — so
-          the ghost freezes exactly the pose the playhead last caught, with no wait for the next sweep.
-        - **Follow (on a playhead crossing):** refresh his passive ghost's spot/pose and build dwell/motion.
+          commit his **last valid (held) pose** at the spot he held it (if it had settled) and drop the
+          passive — so the ghost is his intentional held pose, never the pose he was in while leaving.
+        - **Follow (on a playhead crossing):** refresh his passive ghost's spot/pose, build dwell/motion,
+          and track pose stability (how long he's held the same pose).
         """
         band = math.radians(self._settings.band_degrees)
         for tid, frame in frames.items():
@@ -186,8 +213,8 @@ class Ghoster:
             p = self._passive.get(tid)
             if (p is not None and not math.isnan(az)
                     and abs(math.atan2(math.sin(az - p.spot), math.cos(az - p.spot))) > band):
-                if self._settled(p):
-                    self._commit(p.frame, p.spot)   # freeze his last-swept snapshot at its spot
+                if self._settled(p) and p.stable_frame is not None:
+                    self._commit(p.stable_frame, p.stable_spot)   # freeze the last held pose at its spot
                 del self._passive[tid]               # re-anchor a fresh passive on the next crossing
 
             # Follow — only when the playhead sweeps across him.
@@ -200,12 +227,22 @@ class Ghoster:
                 continue
             p = self._passive.get(tid)
             if p is None:
-                p = _Passive(spot=az, frame=frame, sweeps=1, anchor_motion=float("nan"))
+                p = _Passive(spot=az, frame=frame, sweeps=1, anchor_motion=float("nan"),
+                             stable_sweeps=1, stable_frame=None, stable_spot=float("nan"), stable_age=0)
                 self._passive[tid] = p
             else:
+                sim = _pose_similarity(frame[Angles], p.frame[Angles], self._settings.stability_scale)
+                p.stable_sweeps = p.stable_sweeps + 1 if sim >= self._settings.stability_threshold else 1
                 p.sweeps += 1          # still on the spot → follow him, build dwell
                 p.spot = az
                 p.frame = frame
+            # A pose held long enough is "valid" (remembered); otherwise the last valid pose ages.
+            if p.stable_sweeps >= self._settings.stability_sweeps:
+                p.stable_frame = p.frame
+                p.stable_spot = p.spot
+                p.stable_age = 0
+            elif p.stable_frame is not None:
+                p.stable_age += 1
             if p.sweeps >= self._settings.motion_sweeps and math.isnan(p.anchor_motion):
                 p.anchor_motion = frame[MotionTime].value   # motion begins counting after the warm-up
         # Drop per-person state for vanished tracks (vanishing leaves nothing).
@@ -215,33 +252,38 @@ class Ghoster:
                 del store[tid]
 
     def _settled(self, p: _Passive) -> bool:
-        """Has the passive ghost settled — dwell full (``sweeps ≥ dwell_sweeps``) and motion full? Only
-        then is the pose worth committing when it breaks free."""
+        """Has the passive ghost settled — worth committing when it breaks free? Requires dwell full
+        (``sweeps ≥ dwell_sweeps``), motion full, and a **valid, fresh** held pose: ``stable_frame`` set
+        and last held no more than ``stability_max_age`` sweeps ago (so a stale pose leaves nothing)."""
         if p.sweeps < self._settings.dwell_sweeps or math.isnan(p.anchor_motion):
+            return False
+        if p.stable_frame is None or p.stable_age > self._settings.stability_max_age:
             return False
         mt = p.frame[MotionTime].value
         return not math.isnan(mt) and (mt - p.anchor_motion) / self._settings.motion_scale >= 1.0
 
-    def _dwell_motion(self, tid: int, frame: Frame) -> tuple[float, float]:
-        """Continuous dwell (whole sweeps + sub-sweep phase from ``PlayheadOffset``) and motion for a
-        live person, from his passive ghost. Zero if he has no passive ghost yet."""
+    def _metrics(self, tid: int, frame: Frame) -> tuple[float, float, float]:
+        """Continuous dwell (whole sweeps + sub-sweep phase from ``PlayheadOffset``), motion, and
+        stability (held sweeps / ``stability_sweeps``, 1.0 = valid) for a live person, from his passive
+        ghost. All zero if he has no passive ghost yet."""
         p = self._passive.get(tid)
         if p is None:
-            return 0.0, 0.0
+            return 0.0, 0.0, 0.0
         offset = frame[PlayheadOffset].value
         phase = 0.0 if math.isnan(offset) else ((-offset) % _TWO_PI) / _TWO_PI
         dwell = _clamp01((p.sweeps - 1 + phase) / max(1, self._settings.dwell_sweeps - 1))
         mt = frame[MotionTime].value
         motion = (0.0 if (math.isnan(p.anchor_motion) or math.isnan(mt))
                   else _clamp01((mt - p.anchor_motion) / self._settings.motion_scale))
-        return dwell, motion
+        stability = _clamp01(p.stable_sweeps / max(1, self._settings.stability_sweeps))
+        return dwell, motion, stability
 
     def _tag_live(self, frames: FrameDict) -> FrameDict:
-        """Stamp each live frame with its band-based ``GhostFeature`` (Dwell, Motion; Fade 1.0)."""
+        """Stamp each live frame with its band-based ``GhostFeature`` (Dwell, Motion, Stability; Fade 1.0)."""
         out: FrameDict = {}
         for tid, frame in frames.items():
-            dwell, motion = self._dwell_motion(tid, frame)
-            out[tid] = replace(frame, {GhostFeature: GhostFeature.make(dwell, motion, 1.0)})
+            dwell, motion, stability = self._metrics(tid, frame)
+            out[tid] = replace(frame, {GhostFeature: GhostFeature.make(dwell, motion, stability, 1.0)})
         return out
 
     def _passive_ghosts(self, tagged: FrameDict) -> FrameDict:
@@ -311,7 +353,7 @@ class Ghoster:
         self._ghosts[gid] = replace(reidentify(frame, gid),
                                     {Azimuth: Azimuth.from_value(az),
                                      GhostState: GhostState.from_value(float(GhostStateValue.ACTIVE)),
-                                     GhostFeature: GhostFeature.make(1.0, 1.0, 1.0)})
+                                     GhostFeature: GhostFeature.make(1.0, 1.0, 1.0, 1.0)})
         self._ghost_az[gid] = az
         self._ghost_fade[gid] = 1.0             # fresh / replaced ghost starts fully present
         self._ghost_prev_offset[gid] = float("nan")
@@ -337,13 +379,13 @@ class Ghoster:
         return None
 
     def _live_ghosts(self, playhead: float) -> FrameDict:
-        """The frozen active-ghost registry, each stamped with its current ``GhostFeature`` (dwell/motion
-        pinned at 1, Fade decaying) and — when the playhead is finite — its ``PlayheadOffset`` (from its
-        fixed azimuth). ``GhostState.ACTIVE`` is carried on the stored frame and preserved. Call under
-        ``_lock``."""
+        """The frozen active-ghost registry, each stamped with its current ``GhostFeature`` (dwell/motion/
+        stability pinned at 1, Fade decaying) and — when the playhead is finite — its ``PlayheadOffset``
+        (from its fixed azimuth). ``GhostState.ACTIVE`` is carried on the stored frame and preserved. Call
+        under ``_lock``."""
         out: FrameDict = {}
         for gid, g in self._ghosts.items():
-            feats: dict = {GhostFeature: GhostFeature.make(1.0, 1.0, self._ghost_fade[gid])}
+            feats: dict = {GhostFeature: GhostFeature.make(1.0, 1.0, 1.0, self._ghost_fade[gid])}
             if not math.isnan(playhead):
                 feats[PlayheadOffset] = PlayheadOffset.from_value(self._ghost_az[gid] - playhead)
             out[gid] = replace(g, feats)
