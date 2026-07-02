@@ -1,29 +1,30 @@
-"""Ghoster — leaves held poses behind as frozen "ghost" persons, sampled per playhead sweep.
+"""Ghoster — active & passive "ghost" persons left behind from intentional held poses.
 
-Each time the rotating playhead sweeps across a person (a ``PlayheadOffset`` zero-crossing near 0),
-Ghoster compares his azimuth to where he was at the **previous** sweep. If he moved more than
-``band_degrees`` since then — and the pose he left had **settled** on the spot (``PlayheadStability``
-Dwell and Motion both 1) — the pose he held at that previous spot is **committed** as a ghost there.
-A ghost is deleted only as the playhead **sweeps across it** while a live pose overlaps it (within
-``band_degrees``) — a live person reclaims the spot; a just-made ghost is skipped on its birth tick, so
-you can't wipe a ghost the instant you leave it. A ghost is a frozen ``Frame`` ``reidentify``-ed under a
-pool track id, fixed at the commit azimuth; its ``PlayheadOffset`` is refreshed each tick so it sweeps
-with the playhead. Each ghost also carries a ``Fade`` (1.0 when left behind) that steps down by
-``1/fade_sweeps`` on each sweep where it is not reclaimed, and is removed at 0 — so an unreclaimed ghost
-fades out over ``fade_sweeps`` sweeps.
+Each live person carries a **passive ghost**: a candidate that follows him sweep-by-sweep (a
+``PlayheadOffset`` zero-crossing marks each sweep) while he stays within ``band_degrees`` of its spot,
+accumulating the ghost's own **dwell** (sweeps on the spot) and **motion** (on-spot ``MotionTime``).
+When he **breaks free** — moves > ``band_degrees`` in one sweep — and the passive ghost had **settled**
+(dwell & motion both full = an intentional pose), it is committed as an **active ghost** frozen at the
+spot he left; otherwise it is dropped. A fresh passive re-anchors at his new spot. Slow drift (≤ band
+every sweep) never breaks free, so it leaves nothing.
 
-There is no muting: every live person is always audible; ghosts are simply extra OSC voices.
+Ghosts are ordinary pose ``Frame``s carrying a ``GhostState`` feature (``PASSIVE`` / ``ACTIVE``); both
+kinds live in the one board ghost store, told apart by that feature. Only **active** ghosts are sent to
+OSC. An active ghost is a frozen ``reidentify``-ed frame on a pool id, its ``PlayheadOffset`` refreshed
+each tick so it sweeps with the playhead; it carries a ``Fade`` that steps down by ``1/fade_sweeps`` on
+each sweep it is not reclaimed (removed at 0), and is **reclaimed** (removed) when the playhead sweeps it
+while a live pose overlaps it — a just-made ghost is skipped on its birth tick.
 
-Ghoster sits between the LERP pipeline and its fan-out. ``process(frames)`` runs once per tick and
-emits on three channels:
+The Ghoster is also the source of **dwell/motion**: it stamps them onto every live frame it emits as the
+``PlayheadStability`` feature (Dwell, Motion; the Stability element is left 0), so the GPU renderer and OSC
+read the same band-based values that drive the gate — there is no ``PlayheadStabilityExtractor`` any more.
 
-* **frames**  → board live store + window tracker: the live frames, unchanged.
-* **ghosts**  → board ghost store: the ghost registry (``PlayheadOffset`` refreshed).
-* **sound**   → OSC: live frames **plus** the ghosts.
+There is no muting: every live person is always audible; ghosts are extra OSC voices. ``process(frames)``
+runs once per tick and emits on three channels:
 
-The internal ``_ghosts`` registry is the source of truth; the board ghost store is a published
-snapshot. Ghosts persist until ``reset``; commits accumulate up to the pool size (then recycle the
-oldest or ignore, per ``recycle_oldest``).
+* **frames** → board live store + window tracker: live frames tagged with dwell/motion.
+* **ghosts** → board ghost store: passive + active ghosts (each carrying ``GhostState``).
+* **sound**  → OSC: tagged live frames **plus active ghosts only**.
 """
 
 from __future__ import annotations
@@ -31,38 +32,59 @@ from __future__ import annotations
 import logging
 import math
 from collections import deque
+from dataclasses import dataclass
 from threading import Lock
 from typing import Callable
 
+import numpy as np
+
 from modules.pose.frame import Frame, FrameDict, FrameDictCallback, replace, reidentify
-from modules.pose.features import Azimuth
+from modules.pose.features import Azimuth, MotionTime
 from modules.settings import BaseSettings, Field, Widget
 
 from .fade import Fade
+from .ghost_state import GhostState, GhostStateValue
 from .playhead_offset import PlayheadOffset
-from .playhead_stability import PlayheadElement, PlayheadStability
+from .playhead_stability import PlayheadStability
 
 logger = logging.getLogger(__name__)
 
-# Only treat a PlayheadOffset sign change as a sweep hit when both samples are within a quarter-turn
-# of the playhead, so the ±π wrap (opposite side of the ring) never counts.
+# Sweep-crossing guard: only treat a PlayheadOffset sign change as a hit when both samples are within a
+# quarter-turn of the playhead, so the ±π wrap (opposite side of the ring) never counts.
 _HALF_PI: float = math.pi / 2.0
+_TWO_PI:  float = 2.0 * math.pi
+
+
+def _clamp01(x: float) -> float:
+    return 0.0 if x < 0.0 else 1.0 if x > 1.0 else x
+
+
+@dataclass
+class _Passive:
+    """A live person's candidate ghost: follows him and builds its own dwell/motion."""
+    spot: float           # anchor azimuth (his position at the last sweep)
+    frame: Frame          # pose held at the spot (refreshed each sweep)
+    sweeps: int           # consecutive sweeps on this spot (dwell)
+    anchor_motion: float  # MotionTime snapshot at motion_sweeps (NaN until reached)
 
 
 class GhosterSettings(BaseSettings):
     """Configuration for ``Ghoster``."""
-    live_players:   Field[int]   = Field(4, access=Field.INIT, visible=False, description="Live player count (shared from root num_players)")
-    num_virtual:    Field[int]   = Field(8, access=Field.INIT, visible=False, description="Ghost pool size (shared from root num_virtual)")
-    enabled:        Field[bool]  = Field(True,  description="Record and commit ghosts")
-    band_degrees:   Field[float] = Field(10.0, min=0.0, max=180.0, step=0.5, description="Distance (deg) that counts as the same spot / must be exceeded to leave a ghost")
-    fade_sweeps:    Field[int]   = Field(16, min=1, max=256, step=1, description="Playhead sweeps over which a ghost fades out, then is removed")
-    recycle_oldest: Field[bool]  = Field(True, description="When the pool is full, recycle the oldest ghost (else ignore new commits)", newline=True)
-    reset:          Field[bool]  = Field(False, widget=Widget.button, description="Clear all ghosts")
-    num_ghosts:     Field[int]   = Field(0, access=Field.READ, description="Current number of active ghosts", newline=True)
+    live_players:        Field[int]   = Field(4, access=Field.INIT, visible=False, description="Live player count (shared from root num_players)")
+    num_virtual:         Field[int]   = Field(8, access=Field.INIT, visible=False, description="Ghost pool size (shared from root num_virtual)")
+    enabled:             Field[bool]  = Field(True, description="Record and commit ghosts")
+    band_degrees:        Field[float] = Field(10.0, min=0.0, max=180.0, step=0.5, description="Distance (deg) that counts as the same spot / must be exceeded to break free")
+    dwell_sweeps:        Field[int]   = Field(4, min=1, max=32, step=1, description="Playhead sweeps on a spot for dwell to fill", newline=True)
+    motion_sweeps:       Field[int]   = Field(2, min=1, max=32, step=1, description="Sweeps on a spot before motion starts counting")
+    motion_scale:        Field[float] = Field(5.0, min=0.1, max=50.0, step=0.1, description="On-spot MotionTime that maps motion to 1.0")
+    fade_sweeps:         Field[int]   = Field(16, min=1, max=256, step=1, description="Playhead sweeps over which an active ghost fades out, then is removed", newline=True)
+    recycle_oldest:      Field[bool]  = Field(True, description="When the pool is full, recycle the oldest ghost (else ignore new commits)")
+    reset:               Field[bool]  = Field(False, widget=Widget.button, description="Clear all ghosts", newline=True)
+    num_ghosts:          Field[int]   = Field(0, access=Field.READ, description="Current number of active ghosts")
 
 
 class Ghoster:
-    """Record-and-commit ghost registry; see the module docstring."""
+    """Passive/active ghost registry; see the module docstring."""
 
     def __init__(self, settings: GhosterSettings, playhead: Callable[[], float]) -> None:
         self._settings = settings
@@ -71,15 +93,13 @@ class Ghoster:
         self._ghost_ids: list[int] = list(range(live, live + settings.num_virtual))
 
         self._lock = Lock()
-        self._prev_offset: dict[int, float] = {}  # live id -> last PlayheadOffset (sweep-crossing detection)
-        self._last_az: dict[int, float] = {}      # live id -> azimuth at the previous playhead sweep
-        self._last_frame: dict[int, Frame] = {}   # live id -> pose at the previous playhead sweep
-        self._ghosts: dict[int, Frame] = {}      # ghost id -> frozen frame (source of truth)
-        self._ghost_az: dict[int, float] = {}    # ghost id -> commit azimuth (radians)
-        self._order: deque[int] = deque()        # ghost ids in commit order (FIFO recycle)
-        self._ghost_fade: dict[int, float] = {}         # ghost id -> presence in [0, 1] (1.0 at commit)
-        self._ghost_prev_offset: dict[int, float] = {}  # ghost id -> last offset (sweep-crossing detection)
-        self._ghost_maker: dict[int, int] = {}          # ghost id -> live id that made it (can't reclaim its own)
+        self._prev_offset: dict[int, float] = {}   # live id -> last PlayheadOffset (sweep-crossing detection)
+        self._passive: dict[int, _Passive] = {}    # live id -> candidate ghost following him
+        self._ghosts: dict[int, Frame] = {}        # active ghost id -> frozen frame (source of truth)
+        self._ghost_az: dict[int, float] = {}      # active ghost id -> commit azimuth (radians)
+        self._order: deque[int] = deque()          # active ghost ids in commit order (FIFO recycle)
+        self._ghost_fade: dict[int, float] = {}         # active ghost id -> presence in [0, 1] (1.0 at commit)
+        self._ghost_prev_offset: dict[int, float] = {}  # active ghost id -> last offset (sweep-crossing detection)
 
         self._frame_callbacks: list[FrameDictCallback] = []
         self._ghost_callbacks: list[FrameDictCallback] = []
@@ -90,15 +110,15 @@ class Ghoster:
     # -- output channels -----------------------------------------------------
 
     def add_frames_callback(self, cb: FrameDictCallback) -> None:
-        """Live frames → board live store + window tracker."""
+        """Tagged live frames (dwell/motion stamped) → board live store + window tracker."""
         self._frame_callbacks.append(cb)
 
     def add_ghosts_callback(self, cb: FrameDictCallback) -> None:
-        """Ghost snapshot → board ghost store."""
+        """Passive + active ghosts (with ``GhostState``) → board ghost store."""
         self._ghost_callbacks.append(cb)
 
     def add_sound_callback(self, cb: FrameDictCallback) -> None:
-        """Live + ghosts dict → OSC sound sender."""
+        """Tagged live frames + active ghosts → OSC sound sender."""
         self._sound_callbacks.append(cb)
 
     # -- lifecycle -----------------------------------------------------------
@@ -108,24 +128,22 @@ class Ghoster:
         self._settings.unbind(GhosterSettings.reset, self._on_reset)  # type: ignore[arg-type]
 
     def clear(self) -> None:
-        """Drop all ghosts and every in-progress recording."""
+        """Drop all ghosts (active + passive candidates)."""
         with self._lock:
             self._ghosts.clear()
             self._ghost_az.clear()
             self._order.clear()
             self._ghost_fade.clear()
             self._ghost_prev_offset.clear()
-            self._ghost_maker.clear()
             self._prev_offset.clear()
-            self._last_az.clear()
-            self._last_frame.clear()
+            self._passive.clear()
         self._settings.num_ghosts = 0
 
     # -- main transform ------------------------------------------------------
 
     def process(self, frames: FrameDict) -> None:
         if not self._settings.enabled:
-            # Bypass: pass live frames through untouched, publish no ghosts.
+            # Bypass: pass live frames through untouched (no dwell/motion), publish no ghosts.
             with self._lock:
                 count = len(self._ghosts)
             self._settings.num_ghosts = count
@@ -134,12 +152,15 @@ class Ghoster:
 
         playhead = self._playhead()   # read once, outside the lock
         with self._lock:
-            self._sweep_sample(frames)            # once per sweep: leave a ghost if he moved > band
-            self._advance_ghosts(playhead, frames)  # per ghost sweep: reclaim if overlapped, else fade
-            ghosts = self._live_ghosts(playhead)
-            sound = {**frames, **ghosts}   # ghost ids never collide with live ids; no muting
-        self._settings.num_ghosts = len(ghosts)
-        self._emit(frames, ghosts, sound)
+            self._sweep_sample(frames)              # update passive ghosts; promote on break-free
+            self._advance_ghosts(playhead, frames)  # active ghosts: fade / reclaim on sweep
+            tagged = self._tag_live(frames)         # stamp dwell/motion (PlayheadStability) on live frames
+            active = self._live_ghosts(playhead)    # active ghosts, PlayheadOffset + Fade refreshed
+            ghosts = {**self._passive_ghosts(tagged), **active}
+            sound = {**tagged, **active}            # live + active-only; passive never reaches OSC
+            count = len(active)
+        self._settings.num_ghosts = count
+        self._emit(tagged, ghosts, sound)
 
     def _emit(self, tagged: FrameDict, ghosts: FrameDict, sound: FrameDict) -> None:
         for cb in self._frame_callbacks:
@@ -149,12 +170,12 @@ class Ghoster:
         for cb in self._sound_callbacks:
             cb(sound)
 
-    # -- sweep sample, delete & commit (call under _lock) --------------------
+    # -- passive layer & dwell/motion (call under _lock) ---------------------
 
     def _sweep_sample(self, frames: FrameDict) -> None:
-        """Once per playhead sweep (a PlayheadOffset zero-crossing near 0), compare each person's
-        azimuth to where he was at the previous sweep; if he moved > ``band_degrees``, leave a ghost
-        at that previous spot with the pose he held there. Call under ``_lock``."""
+        """At each playhead sweep of a person: follow his passive ghost while he stays within
+        ``band_degrees`` (building dwell/motion), or break free (> band) — committing an active ghost if
+        the passive had settled — then re-anchor a fresh passive at his new spot."""
         band = math.radians(self._settings.band_degrees)
         for tid, frame in frames.items():
             offset = frame[PlayheadOffset].value
@@ -167,32 +188,72 @@ class Ghoster:
             az = frame[Azimuth].value
             if math.isnan(az):
                 continue
-            last_az = self._last_az.get(tid)
-            if (last_az is not None
-                    and abs(math.atan2(math.sin(az - last_az), math.cos(az - last_az))) > band
-                    and self._settled(self._last_frame[tid])):
-                self._commit(self._last_frame[tid], last_az)   # moved on from a settled spot → leave a ghost
-            self._last_az[tid] = az
-            self._last_frame[tid] = frame
+            p = self._passive.get(tid)
+            if p is not None and abs(math.atan2(math.sin(az - p.spot), math.cos(az - p.spot))) > band:
+                if self._settled(p):
+                    self._commit(p.frame, p.spot)   # broke free from a settled spot → active ghost
+                p = None                            # re-anchor a fresh passive below
+            if p is None:
+                p = _Passive(spot=az, frame=frame, sweeps=1, anchor_motion=float("nan"))
+                self._passive[tid] = p
+            else:
+                p.sweeps += 1          # still on the spot → follow him, build dwell
+                p.spot = az
+                p.frame = frame
+            if p.sweeps >= self._settings.motion_sweeps and math.isnan(p.anchor_motion):
+                p.anchor_motion = frame[MotionTime].value   # motion begins counting after the warm-up
         # Drop per-person state for vanished tracks (vanishing leaves nothing).
         present = set(frames)
-        for store in (self._prev_offset, self._last_az, self._last_frame):
+        for store in (self._prev_offset, self._passive):
             for tid in [t for t in store if t not in present]:
                 del store[tid]
 
-    @staticmethod
-    def _settled(frame: Frame) -> bool:
-        """Has the pose settled on its spot — ``PlayheadStability`` Dwell and Motion both full? Only
-        then is the pose worth leaving behind (a quick pass-through never fills dwell)."""
-        stab = frame[PlayheadStability]
-        return stab.get(PlayheadElement.Dwell, 0.0) >= 1.0 and stab.get(PlayheadElement.Motion, 0.0) >= 1.0
+    def _settled(self, p: _Passive) -> bool:
+        """Has the passive ghost settled — dwell full (``sweeps ≥ dwell_sweeps``) and motion full? Only
+        then is the pose worth committing when it breaks free."""
+        if p.sweeps < self._settings.dwell_sweeps or math.isnan(p.anchor_motion):
+            return False
+        mt = p.frame[MotionTime].value
+        return not math.isnan(mt) and (mt - p.anchor_motion) / self._settings.motion_scale >= 1.0
+
+    def _dwell_motion(self, tid: int, frame: Frame) -> tuple[float, float]:
+        """Continuous dwell (whole sweeps + sub-sweep phase from ``PlayheadOffset``) and motion for a
+        live person, from his passive ghost. Zero if he has no passive ghost yet."""
+        p = self._passive.get(tid)
+        if p is None:
+            return 0.0, 0.0
+        offset = frame[PlayheadOffset].value
+        phase = 0.0 if math.isnan(offset) else ((-offset) % _TWO_PI) / _TWO_PI
+        dwell = _clamp01((p.sweeps - 1 + phase) / max(1, self._settings.dwell_sweeps - 1))
+        mt = frame[MotionTime].value
+        motion = (0.0 if (math.isnan(p.anchor_motion) or math.isnan(mt))
+                  else _clamp01((mt - p.anchor_motion) / self._settings.motion_scale))
+        return dwell, motion
+
+    def _tag_live(self, frames: FrameDict) -> FrameDict:
+        """Stamp each live frame with its band-based ``PlayheadStability`` (Dwell, Motion; Stability 0)."""
+        out: FrameDict = {}
+        for tid, frame in frames.items():
+            dwell, motion = self._dwell_motion(tid, frame)
+            stab = PlayheadStability(values=np.array([dwell, motion, 0.0], dtype=np.float32),
+                                     scores=np.array([1.0, 1.0, 1.0], dtype=np.float32))
+            out[tid] = replace(frame, {PlayheadStability: stab})
+        return out
+
+    def _passive_ghosts(self, tagged: FrameDict) -> FrameDict:
+        """One passive ghost per live person: his tagged (dwell/motion-carrying) frame marked
+        ``PASSIVE``, keyed by his live id. Not sent to OSC; there for the light to visualise later."""
+        state = GhostState.from_value(float(GhostStateValue.PASSIVE))
+        return {tid: replace(tagged[tid], {GhostState: state})
+                for tid in self._passive if tid in tagged}
+
+    # -- active ghost machinery (call under _lock) ---------------------------
 
     def _advance_ghosts(self, playhead: float, frames: FrameDict) -> None:
-        """Each time the playhead sweeps across a ghost (its offset crosses zero): if a live pose
-        overlaps it, **remove it** (a live person reclaims the spot); otherwise fade it by
+        """Each time the playhead sweeps across an active ghost (its offset crosses zero): if a live
+        pose overlaps it, **remove it** (a live person reclaims the spot); otherwise fade it by
         ``1/fade_sweeps`` and remove it once faded out. A just-made ghost has a NaN prev-offset, so it
-        registers no crossing on its birth tick and can't be reclaimed until its next real sweep.
-        Frozen while the playhead is NaN. Call under ``_lock``."""
+        registers no crossing on its birth tick. Frozen while the playhead is NaN."""
         if math.isnan(playhead):
             return
         band = math.radians(self._settings.band_degrees)
@@ -224,7 +285,7 @@ class Ghoster:
         return False
 
     def _remove_ghost(self, gid: int) -> None:
-        """Drop a ghost and all its per-ghost state. Call under ``_lock``."""
+        """Drop an active ghost and all its per-ghost state. Call under ``_lock``."""
         self._ghosts.pop(gid, None)
         self._ghost_az.pop(gid, None)
         self._ghost_fade.pop(gid, None)
@@ -241,8 +302,14 @@ class Ghoster:
         self._set_ghost(gid, frame, az)
 
     def _set_ghost(self, gid: int, frame: Frame, az: float) -> None:
-        # Pin the ghost to the anchor spot, overriding the frame's own (slightly drifted) azimuth.
-        self._ghosts[gid] = replace(reidentify(frame, gid), {Azimuth: Azimuth.from_value(az)})
+        # Freeze the pose at the spot: pinned to the commit azimuth, marked ACTIVE, and carrying a full
+        # (settled) PlayheadStability so OSC/light read finite dwell/motion for the ghost.
+        settled = PlayheadStability(values=np.array([1.0, 1.0, 0.0], dtype=np.float32),
+                                    scores=np.array([1.0, 1.0, 1.0], dtype=np.float32))
+        self._ghosts[gid] = replace(reidentify(frame, gid),
+                                    {Azimuth: Azimuth.from_value(az),
+                                     GhostState: GhostState.from_value(float(GhostStateValue.ACTIVE)),
+                                     PlayheadStability: settled})
         self._ghost_az[gid] = az
         self._ghost_fade[gid] = 1.0             # fresh / replaced ghost starts fully present
         self._ghost_prev_offset[gid] = float("nan")
@@ -259,7 +326,7 @@ class Ghoster:
         return None
 
     def _band_owner(self, az: float) -> int | None:
-        """Ghost id within ``band_degrees`` (radius) of ``az``, or ``None``. Call under ``_lock``."""
+        """Active ghost id within ``band_degrees`` (radius) of ``az``, or ``None``. Call under ``_lock``."""
         band = math.radians(self._settings.band_degrees)
         for gid, gaz in self._ghost_az.items():
             d = az - gaz
@@ -268,10 +335,9 @@ class Ghoster:
         return None
 
     def _live_ghosts(self, playhead: float) -> FrameDict:
-        """The frozen ghost registry, each ghost stamped with its current ``Fade`` and — when the
-        playhead is finite — its ``PlayheadOffset`` recomputed from its fixed azimuth and the current
-        ``playhead`` (the pose stays frozen; only fade and the playhead-relative offset change). Call
-        under ``_lock``."""
+        """The frozen active-ghost registry, each stamped with its current ``Fade`` and — when the
+        playhead is finite — its ``PlayheadOffset`` (from its fixed azimuth). ``GhostState.ACTIVE`` is
+        carried on the stored frame and preserved. Call under ``_lock``."""
         out: FrameDict = {}
         for gid, g in self._ghosts.items():
             feats: dict = {Fade: Fade.from_value(self._ghost_fade[gid])}

@@ -91,8 +91,9 @@ class OakGroup(BaseSettings):
     hd_ready          : Field[bool]            = Field(False, access=Field.INIT, description="Use HD resolution")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, description="Model files directory")
+    ir_flood_light    : Field[float]           = Field(0.8, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
 
-    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path]
+    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path, ir_flood_light]
 
     cam_0     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_1     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)

@@ -14,6 +14,7 @@
     "hd_ready": true,
     "sim_enabled": false,
     "model_path": "data/models",
+    "ir_flood_light": 0.75,
     "cam_0": {
       "device_id": "14442C101136D1D200",
       "show_stereo": false,
@@ -34,7 +35,6 @@
       "mono_iso": 1600,
       "mono_auto_exposure": false,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 1.0,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -61,7 +61,6 @@
       "mono_iso": 1436,
       "mono_auto_exposure": false,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 1.0,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -88,7 +87,6 @@
       "mono_iso": 1600,
       "mono_auto_exposure": false,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 1.0,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -115,7 +113,6 @@
       "mono_iso": 1600,
       "mono_auto_exposure": false,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 1.0,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -352,7 +349,10 @@
     "ghoster": {
       "enabled": true,
       "band_degrees": 15.0,
-      "fade_sweeps": 256,
+      "dwell_sweeps": 4,
+      "motion_sweeps": 2,
+      "motion_scale": 5.0,
+      "fade_sweeps": 24,
       "recycle_oldest": true
     },
     "window_raw": {
@@ -628,7 +628,7 @@
     },
     "data": {
       "stage": "LERP",
-      "mode": "FRAME",
+      "mode": "NONE",
       "feature_field": "MotionGate",
       "line_width": 3.0,
       "line_smooth": 10.0,
@@ -637,9 +637,9 @@
       "use_history_color": false
     },
     "playhead_data": {
-      "mode": "NONE",
-      "feature_field": "PlayheadStability",
       "stage": "LERP",
+      "mode": "WINDOW",
+      "feature_field": "PlayheadStability",
       "line_width": 10.0,
       "line_smooth": 0.0,
       "use_scores": false,
@@ -724,10 +724,10 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 1,
+      "x": 1896,
       "y": 31,
-      "width": 1705,
-      "height": 1360,
+      "width": 663,
+      "height": 592,
       "secondary_list": [],
       "secondary_fullscreen": true,
       "fullscreen_mode": "WINDOWED"
