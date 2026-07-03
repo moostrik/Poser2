@@ -16,6 +16,8 @@ class SeamSettings(BaseSettings):
                                 description="Matching zone size as a fraction of the overlap zone.")
     hysteresis: Field[float] = Field(0.9, min=0.1, max=1.0, step=0.05,
                                      description="Lower values make active camera stickier.")
+    max_height_diff: Field[float] = Field(0.15, min=0.0, max=0.5, step=0.01,
+                                          description="Maximum ROI height difference for cross-camera matching.")
     angles: Group[SeamAngles] = Group(SeamAngles)
 
 

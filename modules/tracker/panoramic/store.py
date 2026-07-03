@@ -1,5 +1,6 @@
 # Standard library imports
 import logging
+from collections import deque
 from dataclasses import replace
 from threading import Lock
 
@@ -13,29 +14,34 @@ TrackletKey = tuple[int, int]  # (cam_id, external_id)
 
 
 class TrackletIdPool:
+    """FIFO id pool: released ids go to the back of the queue, so a freed id
+    is reused as late as possible instead of being handed to the next arrival."""
+
     def __init__(self, max_size: int) -> None:
+        self._queue: deque[int] = deque(range(max_size))
         self._available: set[int] = set(range(max_size))
         self._lock = Lock()
 
     def acquire(self) -> int:
         with self._lock:
-            if not self._available:
+            if not self._queue:
                 raise Exception("No more IDs available")
-            min_id: int = min(self._available)
-            self._available.remove(min_id)
-            return min_id
+            id_: int = self._queue.popleft()
+            self._available.remove(id_)
+            return id_
 
     def release(self, obj: int) -> None:
         with self._lock:
             if obj in self._available:
                 raise Exception(
                     f"ID {obj} is not currently in use and cannot be "
-                    f"released. in use: {self._available}"
+                    f"released. available: {sorted(self._available)}"
                 )
+            self._queue.append(obj)
             self._available.add(obj)
 
     def size(self) -> int:
-        return len(self._available)
+        return len(self._queue)
 
     def is_available(self, obj: int) -> bool:
         with self._lock:
@@ -43,8 +49,9 @@ class TrackletIdPool:
 
     @property
     def available(self) -> list[int]:
+        """Free ids in reuse order (front of the queue first)."""
         with self._lock:
-            return sorted(self._available)
+            return list(self._queue)
 
 
 class TrackletStore:
