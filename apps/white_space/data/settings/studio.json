@@ -172,10 +172,10 @@
       "curve": 2.0,
       "startup_delay": 2.0,
       "offsets": {
-        "white_0": 5,
-        "white_1": -5,
-        "blue_0": -3,
-        "blue_1": 3
+        "white_0": 0,
+        "white_1": 5,
+        "blue_0": -10,
+        "blue_1": 9
       }
     },
     "osc_sound": {
@@ -366,7 +366,7 @@
   },
   "ghost": {
     "ghoster": {
-      "enabled": true,
+      "enabled": false,
       "recycle_oldest": true,
       "reclaim_near": false,
       "ghost_limit": 0,
@@ -393,7 +393,7 @@
     ],
     "high_layers": [
       "player_lines",
-      "playhead"
+      "lines"
     ],
     "master": 1.0,
     "fade_times": [
@@ -436,7 +436,7 @@
       "haunt_flash": {
         "white": 1.0,
         "base_white": 0.33,
-        "blue": 1.0,
+        "blue": 0.0,
         "width": 0.0,
         "ghosts": true,
         "blend": "ADD"
@@ -496,11 +496,11 @@
         }
       },
       "player_lines": {
-        "center_width": 0.04,
-        "flank_width": 0.03,
+        "center_width": 0.05,
+        "flank_width": 0.01,
         "depth_scale": 2.0,
         "invert": false,
-        "level_center": 0.0,
+        "level_center": 0.5,
         "level_flank": 1.0,
         "anchor_nose": true,
         "blend": "ADD"
