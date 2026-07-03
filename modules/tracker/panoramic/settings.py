@@ -70,6 +70,26 @@ class DistortionSettings(BaseSettings):
     tanh: Group[TanhSettings] = Group(TanhSettings)
 
 
+class ParallaxSettings(BaseSettings):
+    """
+    Corrects for the cameras sitting on a ring rather than at a shared optical
+    centre. Each camera is ``ring_radius`` metres from the rig centre, so the
+    same person is seen at different world angles by neighbouring cameras — a
+    disagreement of several degrees at the seams. Distance to the person is
+    estimated from the bounding-box height (assuming ``person_height`` and the
+    detection frame's ``vfov``), which is enough to re-project each observation
+    to the shared centre.
+
+    At ``ring_radius = 0`` the correction is disabled (identity).
+    """
+    ring_radius: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01,
+                                      description="Camera distance from rig center (m). 0 disables parallax correction.")
+    person_height: Field[float] = Field(1.7, min=1.0, max=2.2, step=0.05,
+                                        description="Assumed person height (m) for distance-from-bbox estimation.")
+    vfov: Field[float] = Field(71.6, min=40.0, max=110.0, step=0.1,
+                              description="Vertical FOV (°) of the detection frame, for distance estimation.")
+
+
 class TrackerSettings(BaseSettings):
     fov: Field[float] = Field(110.0, min=90.0, max=130.0, step=0.5, visible=False)
     min_age: Field[int] = Field(5, min=0, max=9, step=1,
@@ -80,3 +100,4 @@ class TrackerSettings(BaseSettings):
                                   description="Seconds before an inactive tracklet is retired.")
     seam: Group[SeamSettings] = Group(SeamSettings)
     distortion: Group[DistortionSettings] = Group(DistortionSettings)
+    parallax: Group[ParallaxSettings] = Group(ParallaxSettings)

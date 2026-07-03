@@ -1,12 +1,14 @@
 """Tests for the panoramic tracker: seam hysteresis, dead-zone handling,
-cross-camera linking, and world id reuse."""
+cross-camera linking, world id reuse, and ring parallax correction."""
 
+import math
 import unittest
 
 from modules.tracker import (
     PanoramicTracker, PanoramicTrackerSettings, PanoramicAnnotation,
     Tracklet, TrackingStatus, TrackletDict,
 )
+from modules.tracker.panoramic.geometry import Geometry
 from modules.tracker.panoramic.store import TrackletIdPool
 from modules.utils import Rect
 
@@ -176,6 +178,105 @@ class TestTrackletIdPool(unittest.TestCase):
         self.assertEqual(pool.size(), 1)
         pool.release(acquired)
         self.assertTrue(pool.is_available(acquired))
+
+
+# Rig geometry for the parallax tests: 4 cameras, fov 127, ring radius 0.25 m.
+PARALLAX_FOV = 127.0
+TARGET_FOV = 90.0
+RING_RADIUS = 0.25
+PERSON_HEIGHT = 1.7
+VFOV = 71.6
+
+
+def synth_observation(cam_id: int, world_azimuth: float, radius: float) -> tuple[Rect, float]:
+    """Build the ROI a camera on the ring would report for a person at
+    ``world_azimuth`` degrees, ``radius`` m from the rig centre. Returns the ROI
+    and the true camera->person distance. Inverts the tracker's own projection
+    so the parallax correction can be checked against ground truth."""
+    fov_overlap = (PARALLAX_FOV - TARGET_FOV) / 2.0
+    facing = TARGET_FOV * cam_id + PARALLAX_FOV / 2.0 - fov_overlap  # world angle the camera faces
+    cx = RING_RADIUS * math.cos(math.radians(facing))
+    cy = RING_RADIUS * math.sin(math.radians(facing))
+    px = radius * math.cos(math.radians(world_azimuth))
+    py = radius * math.sin(math.radians(world_azimuth))
+    dx, dy = px - cx, py - cy
+    distance = math.hypot(dx, dy)
+    bearing = math.degrees(math.atan2(dy, dx))
+    theta = (bearing - facing + 180.0) % 360.0 - 180.0  # offset from camera facing
+    local_angle = theta + PARALLAX_FOV / 2.0
+    angular_height = 2.0 * math.degrees(math.atan((PERSON_HEIGHT / 2.0) / distance))
+    roi_height = angular_height / VFOV
+    width = 0.05
+    center_x = local_angle / PARALLAX_FOV
+    return Rect(x=center_x - width / 2.0, y=0.1, width=width, height=roi_height), distance
+
+
+class TestGeometryParallax(unittest.TestCase):
+
+    def make_geometry(self, ring_radius: float = RING_RADIUS) -> Geometry:
+        g = Geometry(num_cameras=4, cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
+        g.set_ring_radius(ring_radius)
+        g.set_person_height(PERSON_HEIGHT)
+        g.set_vfov(VFOV)
+        return g
+
+    def test_recovers_true_azimuth_from_both_sides_of_seam(self) -> None:
+        g = self.make_geometry()
+        # A person at the cam0/cam1 seam (world azimuth 90) at 2 m: both cameras
+        # must report the same true azimuth once parallax is corrected.
+        for cam_id in (0, 1):
+            roi, _distance = synth_observation(cam_id, world_azimuth=90.0, radius=2.0)
+            _local, world, _dist = g.calc_angle(roi, cam_id)
+            self.assertAlmostEqual(world, 90.0, delta=0.05,
+                                   msg=f"cam {cam_id} did not recover 90 deg")
+
+    def test_recovers_true_azimuth_across_distances(self) -> None:
+        g = self.make_geometry()
+        for radius in (2.0, 3.0, 4.0):
+            roi, _distance = synth_observation(0, world_azimuth=90.0, radius=radius)
+            _local, world, _dist = g.calc_angle(roi, 0)
+            self.assertAlmostEqual(world, 90.0, delta=0.05)
+
+    def test_uncorrected_model_disagrees_at_seam(self) -> None:
+        # Sanity check that the correction is actually doing something: with
+        # parallax disabled the two cameras disagree by several degrees.
+        g = self.make_geometry(ring_radius=0.0)
+        roi0, _ = synth_observation(0, world_azimuth=90.0, radius=2.0)
+        roi1, _ = synth_observation(1, world_azimuth=90.0, radius=2.0)
+        _l0, world0, _d0 = g.calc_angle(roi0, 0)
+        _l1, world1, _d1 = g.calc_angle(roi1, 1)
+        self.assertGreater(abs(world0 - world1), 5.0)
+
+    def test_disabled_matches_raw_model(self) -> None:
+        g = self.make_geometry(ring_radius=0.0)
+        roi = Rect(x=0.6, y=0.1, width=0.05, height=0.5)
+        local, world, _dist = g.calc_angle(roi, 2)
+        fov_overlap = (PARALLAX_FOV - TARGET_FOV) / 2.0
+        expected = (TARGET_FOV * 2 + local - fov_overlap) % 360.0
+        self.assertAlmostEqual(world, expected, places=6)
+
+    def test_estimate_distance_clamps_degenerate_box(self) -> None:
+        g = self.make_geometry()
+        self.assertEqual(g.estimate_distance(Rect(height=0.0)), 10.0)
+        d = g.estimate_distance(Rect(height=0.5))
+        self.assertGreaterEqual(d, 0.5)
+        self.assertLessEqual(d, 10.0)
+
+
+class TestInitialGeometrySync(unittest.TestCase):
+
+    def test_config_applied_to_geometry_at_construction(self) -> None:
+        # bind() does not fire with the initial value and presets load before
+        # the tracker exists, so construction must push config into geometry.
+        config = PanoramicTrackerSettings(fov=PARALLAX_FOV)
+        config.parallax.ring_radius = RING_RADIUS
+        config.parallax.vfov = 70.0
+        config.distortion.poly.k2 = 0.1
+        tracker = PanoramicTracker(config, num_players=4, num_cameras=4)
+        self.assertEqual(tracker.geometry.cam_fov, PARALLAX_FOV)
+        self.assertEqual(tracker.geometry._ring_radius, RING_RADIUS)
+        self.assertEqual(tracker.geometry._vfov, 70.0)
+        self.assertEqual(tracker.geometry._poly_k2, 0.1)
 
 
 if __name__ == "__main__":

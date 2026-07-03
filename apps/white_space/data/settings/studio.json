@@ -136,10 +136,10 @@
       "min_height": 0.25,
       "timeout": 2.0,
       "seam": {
-        "reject": 0.5,
-        "reach": 1.2,
+        "reject": 0.35,
+        "reach": 1.1,
         "hysteresis": 0.75,
-        "max_height_diff": 0.15,
+        "max_height_diff": 0.2,
         "angles": {}
       },
       "distortion": {
@@ -152,6 +152,11 @@
           "slope": 0.0,
           "cubic": 0.0
         }
+      },
+      "parallax": {
+        "ring_radius": 0.25,
+        "person_height": 1.7,
+        "vfov": 71.6
       }
     },
     "frame_sync": {},
@@ -357,6 +362,27 @@
     "window_lerp": {
       "window_size": 360,
       "emit_partial": true
+    }
+  },
+  "ghost": {
+    "ghoster": {
+      "enabled": true,
+      "recycle_oldest": true,
+      "reclaim_near": false,
+      "ghost_limit": 0,
+      "limit_fade_beats": 24,
+      "dwell_radius": 8.0,
+      "dwell_beats": 4,
+      "motion_beats": 2,
+      "motion_scale": 1.0,
+      "stability_hold_beats": 2,
+      "stability_expiry_beats": 3,
+      "stability_scale": 0.8,
+      "stability_threshold": 0.9
+    },
+    "escalator": {
+      "enabled": true,
+      "high_threshold": 16
     }
   },
   "light": {
@@ -741,7 +767,7 @@
       "durations": [
         10.0,
         3.0,
-        120.0,
+        600.0,
         10.0,
         5.0
       ],
@@ -756,27 +782,6 @@
         "VIDEO"
       ],
       "enabled": true
-    }
-  },
-  "ghost": {
-    "ghoster": {
-      "enabled": true,
-      "recycle_oldest": true,
-      "reclaim_near": false,
-      "ghost_limit": 0,
-      "limit_fade_beats": 24,
-      "dwell_radius": 8.0,
-      "dwell_beats": 4,
-      "motion_beats": 2,
-      "motion_scale": 1.0,
-      "stability_hold_beats": 2,
-      "stability_expiry_beats": 3,
-      "stability_scale": 0.8,
-      "stability_threshold": 0.9
-    },
-    "escalator": {
-      "enabled": true,
-      "high_threshold": 16
     }
   }
 }

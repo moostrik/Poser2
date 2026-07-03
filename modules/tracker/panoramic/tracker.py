@@ -13,7 +13,7 @@ from .. import (
 )
 from .store import TrackletStore
 from .geometry import Geometry, DistortAlgorithm
-from .settings import SeamSettings, TanhSettings, PolySettings, DistortionSettings, TrackerSettings
+from .settings import SeamSettings, TanhSettings, PolySettings, DistortionSettings, ParallaxSettings, TrackerSettings
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,7 @@ class Annotation(TrackerAnnotation):
     local_angle: float
     world_angle: float
     overlap: bool
+    distance: float = 0.0
 
 
 class Tracker(Thread, BaseTracker):
@@ -67,13 +68,20 @@ class Tracker(Thread, BaseTracker):
         self.config: TrackerSettings = config
         self.geometry: Geometry = Geometry(num_cameras, config.fov, 90.0)
 
-        # Wire fov and distortion changes to geometry
+        # Wire fov, distortion and parallax changes to geometry
         TrackerSettings.fov.bind(config, lambda v: (self.geometry.set_fov(v), self._update_seam_angles()))
         DistortionSettings.algorithm.bind(config.distortion, lambda v: self.geometry.set_algorithm(v))
         TanhSettings.slope.bind(config.distortion.tanh, lambda v: self.geometry.set_tanh_slope(v))
         TanhSettings.cubic.bind(config.distortion.tanh, lambda v: self.geometry.set_tanh_cubic(v))
         PolySettings.k1.bind(config.distortion.poly, lambda v: self.geometry.set_poly_k1(v))
         PolySettings.k2.bind(config.distortion.poly, lambda v: self.geometry.set_poly_k2(v))
+        ParallaxSettings.ring_radius.bind(config.parallax, lambda v: self.geometry.set_ring_radius(v))
+        ParallaxSettings.person_height.bind(config.parallax, lambda v: self.geometry.set_person_height(v))
+        ParallaxSettings.vfov.bind(config.parallax, lambda v: self.geometry.set_vfov(v))
+
+        # bind() does not fire with the current value, and the preset is loaded
+        # before this tracker is constructed — push config into geometry once now.
+        self._sync_geometry_from_config()
 
         # Wire seam ratio changes to the angles display
         SeamSettings.reject.bind(config.seam, lambda _: self._update_seam_angles())
@@ -85,6 +93,20 @@ class Tracker(Thread, BaseTracker):
 
         self._callback_lock = Lock()
         self._tracklet_callbacks: set[TrackletDictCallback] = set()
+
+    def _sync_geometry_from_config(self) -> None:
+        """Apply current config values to geometry. Needed at construction
+        because ``bind`` does not fire with the initial value and the preset is
+        loaded before the tracker exists."""
+        self.geometry.set_fov(self.config.fov)
+        self.geometry.set_algorithm(self.config.distortion.algorithm)
+        self.geometry.set_tanh_slope(self.config.distortion.tanh.slope)
+        self.geometry.set_tanh_cubic(self.config.distortion.tanh.cubic)
+        self.geometry.set_poly_k1(self.config.distortion.poly.k1)
+        self.geometry.set_poly_k2(self.config.distortion.poly.k2)
+        self.geometry.set_ring_radius(self.config.parallax.ring_radius)
+        self.geometry.set_person_height(self.config.parallax.person_height)
+        self.geometry.set_vfov(self.config.parallax.vfov)
 
     def _update_seam_angles(self) -> None:
         a = self.config.seam.angles
@@ -144,9 +166,9 @@ class Tracker(Thread, BaseTracker):
         if new_tracklet.roi.height < self.config.min_height:
             return
 
-        # Annotate with local/world angles and overlap flag
-        local_angle, world_angle, _overlap = self.geometry.get_angles_and_overlap(new_tracklet.roi, cam_id, self.config.seam.reject)
-        new_tracklet = replace(new_tracklet, annotation=Annotation(local_angle, world_angle, _overlap))
+        # Annotate with local/world angles, overlap flag and estimated distance
+        local_angle, world_angle, _overlap, distance = self.geometry.get_angles_and_overlap(new_tracklet.roi, cam_id, self.config.seam.reject)
+        new_tracklet = replace(new_tracklet, annotation=Annotation(local_angle, world_angle, _overlap, distance))
 
         # Existing observation — refresh in place, even inside the edge dead
         # zone: starving it would freeze its angles and expire it via timeout
