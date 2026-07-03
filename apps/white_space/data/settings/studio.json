@@ -372,9 +372,9 @@
       "ghost_limit": 0,
       "limit_fade_beats": 32,
       "dwell_radius": 8.0,
-      "dwell_beats": 4,
+      "dwell_beats": 3,
       "motion_beats": 2,
-      "motion_scale": 1.0,
+      "motion_scale": 0.1,
       "stability_hold_beats": 2,
       "stability_expiry_beats": 3,
       "stability_scale": 0.8,
@@ -393,8 +393,7 @@
     ],
     "high_layers": [
       "player_lines",
-      "playhead",
-      "lines"
+      "playhead"
     ],
     "master": 1.0,
     "fade_times": [
@@ -436,6 +435,7 @@
       },
       "haunt_flash": {
         "white": 1.0,
+        "base_white": 0.33,
         "blue": 1.0,
         "width": 0.0,
         "ghosts": true,
