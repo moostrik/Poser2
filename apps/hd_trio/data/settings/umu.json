@@ -355,6 +355,7 @@
   },
   "render": {
     "stage": "LERP",
+    "similarity_scale": 1.0,
     "num_players": 3,
     "layer": {
       "select": {
@@ -462,15 +463,14 @@
         "blend_mode": "ALPHA",
         "similarity_threshold": 0.1,
         "motion_exponent": 1.0,
-        "similarity_scale": 1.0,
         "layered": 0.8
       }
     },
     "intro_sequence": {
       "verbose": true,
-      "loop": false,
+      "loop": true,
       "intro_path": "intro",
-      "folder": "intro",
+      "folder": "intro_2",
       "source_track": 0,
       "color": {
         "r": 1.0,
@@ -705,16 +705,16 @@
       ],
       "durations": [
         3.0,
+        7.0,
+        17.0,
+        3.0,
         5.0,
-        24.0,
-        3.0,
-        3.0,
-        10.0,
-        3.0,
-        10.0,
-        170.0,
+        25.0,
+        13.0,
+        1.0,
+        150.0,
         6.0,
-        12.0,
+        4.0,
         6.0
       ],
       "loop": false

@@ -84,11 +84,12 @@ class StageLayer:
         cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = stage
 
     def set_similarity_scale(self, value: float) -> None:
-        """Set how strongly other cameras contribute to the colour mask.
+        """Set how strongly other cameras contribute to the fluid and the colour mask.
 
-        Settings values persist across stages, so every stage states its own.
+        Shared from RenderSettings, so both layers follow one write. Settings values
+        persist across stages, so every stage states its own.
         """
-        cast(ls.MSColorMaskLayer, self.layers[Layers.color_mask]).config.similarity_scale = value
+        self.settings.similarity_scale = value
 
     # -- motion time ----------------------------------------------------------
 

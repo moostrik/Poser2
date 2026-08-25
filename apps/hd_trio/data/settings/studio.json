@@ -355,6 +355,7 @@
   },
   "render": {
     "stage": "LERP",
+    "similarity_scale": 1.0,
     "num_players": 3,
     "layer": {
       "select": {
@@ -465,7 +466,6 @@
         "blend_mode": "ALPHA",
         "similarity_threshold": 0.1,
         "motion_exponent": 1.0,
-        "similarity_scale": 1.0,
         "layered": 0.8
       }
     },
@@ -693,12 +693,6 @@
     "control": {},
     "sequencer": {
       "stages": [
-        "WELCOME_IN",
-        "WELCOME",
-        "MOVEMENT",
-        "WHITE_IN",
-        "WHITE_OUT",
-        "PRACTICE",
         "ENJOY_IN",
         "ENJOY",
         "PLAY",
@@ -713,9 +707,9 @@
         3.0,
         5.0,
         25.0,
-        3.0,
-        10.0,
-        170.0,
+        13.0,
+        2.0,
+        150.0,
         6.0,
         4.0,
         6.0

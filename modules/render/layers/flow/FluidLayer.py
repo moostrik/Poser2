@@ -53,6 +53,7 @@ class FluidLayerSettings(BaseSettings):
     """Configuration for FluidLayer (fluid simulation)."""
     stage: Field[int] =                     Field(0, description="Pipeline stage for pose data")
     num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
+    similarity_scale: Field[float] =        Field(1.0, min=0.0, max=1.0, description="0 = own camera only, 1 = full cross-camera response")
     draw_mode: Field[FluidDrawMode] =       Field(FluidDrawMode.DENSITY)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
 
@@ -194,7 +195,9 @@ class FluidLayer(LayerBase):
         similarities: np.ndarray = pose[Similarity].values if pose is not None and Similarity in pose else np.full((self.settings.num_players,), 0.0)
         motion_gates: np.ndarray = pose[MotionGate].values if pose is not None and MotionGate in pose else np.full((self.settings.num_players,), 0.0)
         motion: float = pose[AngleMotion].value if pose is not None and AngleMotion in pose else 0.0
-        m_s = similarities
+        # Cross-camera weight for both velocity and density below. The own-camera
+        # branch uses `motion`, so a visitor's own fluid is unaffected by the scale.
+        m_s = similarities * self.settings.similarity_scale
 
         self.settings.fluid_flow.density.fade_time = 18.0 - (pow(motion, 2.0) * 14.0)  # More motion = faster decay
 

@@ -329,12 +329,15 @@ class PreviewGroup(BaseSettings):
     poser  : Group[_PoseCompSettings]    = Group(_PoseCompSettings)
 
 class CentreGroup(BaseSettings):
+    # Received from RenderSettings and passed on to the colour mask.
+    similarity_scale: Field[float] = Field(1.0, min=0.0, max=1.0, visible=False, description="Cross-camera response")
+
     geometry: Group[_CentreGeomSettings]            = Group(_CentreGeomSettings)
     mask    : Group[layers.CentreMaskSettings]      = Group(layers.CentreMaskSettings)
     cam     : Group[layers.CentreCamSettings]       = Group(layers.CentreCamSettings)
     frg     : Group[layers.CentreFrgSettings]       = Group(layers.CentreFrgSettings)
     pose    : Group[layers.CentrePoseSettings]      = Group(layers.CentrePoseSettings)
-    color   : Group[layers.ColorMaskLayerSettings]  = Group(layers.ColorMaskLayerSettings)
+    color   : Group[layers.ColorMaskLayerSettings]  = Group(layers.ColorMaskLayerSettings, share=[similarity_scale])
 
 class IntroSequenceSettings(BaseSettings):
     """Settings for prerecorded pose overlay during INTRO stages."""
@@ -351,15 +354,16 @@ class IntroSequenceSettings(BaseSettings):
 
 class RenderSettings(BaseSettings):
     stage:       Field[Stage] = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
+    similarity_scale: Field[float] = Field(1.0, min=0.0, max=1.0, description="Cross-camera response for fluid and colour mask (driven per show stage)")
     num_cams:    Field[int]   = Field(3, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int]   = Field(3, access=Field.INIT, visible=False, description="Number of players")
     layer  : Group[LayerGroup]                = Group(LayerGroup)
     data   : Group[DataGroup]                 = Group(DataGroup)
     preview: Group[PreviewGroup]              = Group(PreviewGroup)
-    centre : Group[CentreGroup]               = Group(CentreGroup)
+    centre : Group[CentreGroup]               = Group(CentreGroup, share=[similarity_scale])
     intro_sequence: Group[IntroSequenceSettings] = Group(IntroSequenceSettings)
     flow   : Group[layers.FlowLayerSettings]  = Group(layers.FlowLayerSettings, share=[stage])
-    fluid  : Group[layers.FluidLayerSettings] = Group(layers.FluidLayerSettings, share=[stage])
+    fluid  : Group[layers.FluidLayerSettings] = Group(layers.FluidLayerSettings, share=[stage, similarity_scale])
     colors : Group[ColorSettings]             = Group(ColorSettings)
     window : Group[WindowSettings]            = Group(WindowSettings)
 
