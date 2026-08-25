@@ -38,34 +38,49 @@ class Stage(IntEnum):
 
 
 class ShowStage(IntEnum):
-    START =         0
-    INTRO_IN =      auto()
-    INTRO =         auto()
-    INTRO_OUT =     auto()
-    PLAY_IN =       auto()
+    """Show stages, in play order.
+
+    The integer value is also the audio cue: it is sent verbatim on
+    ``/global/state`` and the Max patch plays ``state{value}.wav``.
+    Renumbering re-points every narration cue.
+    """
+    WELCOME_IN =    0
+    WELCOME =       auto()
+    MOVEMENT =      auto()
+    WHITE_IN =      auto()
+    WHITE_OUT =     auto()
+    PRACTICE =      auto()
+    ENJOY_IN =      auto()
+    ENJOY =         auto()
     PLAY =          auto()
     CONCLUSION =    auto()
     BLACKOUT =      auto()
     IDLE =          auto()
 
-_SHOW_STAGES = [s for s in ShowStage if s != ShowStage.IDLE]
+# IDLE is the resting state: the sequencer parks on the LAST playlist entry when
+# the show stops, so it must stay last.
+_SHOW_STAGES = list(ShowStage)
 _STAGE_DURATIONS: dict[ShowStage, float] = {
-    ShowStage.START: 10.0,
-    ShowStage.INTRO_IN: 3.0,
-    ShowStage.INTRO: 30.0,
-    ShowStage.INTRO_OUT: 3.0,
-    ShowStage.PLAY_IN: 3.0,
-    ShowStage.PLAY: 60.0,
-    ShowStage.CONCLUSION: 10.0,
-    ShowStage.BLACKOUT: 18.0,
-    ShowStage.IDLE: 3.0,
+    ShowStage.WELCOME_IN: 3.0,
+    ShowStage.WELCOME: 5.0,
+    ShowStage.MOVEMENT: 24.0,
+    ShowStage.WHITE_IN: 3.0,
+    ShowStage.WHITE_OUT: 3.0,
+    ShowStage.PRACTICE: 10.0,
+    ShowStage.ENJOY_IN: 3.0,
+    ShowStage.ENJOY: 10.0,
+    ShowStage.PLAY: 170.0,
+    ShowStage.CONCLUSION: 6.0,
+    ShowStage.BLACKOUT: 12.0,
+    ShowStage.IDLE: 6.0,
 }
 
 
 class ShowSequencerSettings(SequencerSettings):
     """HD Trio show sequencer with project-specific stages."""
     stages:     Field[list[ShowStage]] = Field(_SHOW_STAGES, widget=Widget.checklist, description="Stages to play")
-    durations:  Field[list] = Field([_STAGE_DURATIONS[s] for s in _SHOW_STAGES], min=0.0, max=600.0, step=0.1, description="Stage durations")
+    # Indexed by ShowStage value, not by playlist position — must cover every member.
+    durations:  Field[list] = Field([_STAGE_DURATIONS[s] for s in ShowStage], min=0.0, max=600.0, step=0.1, description="Stage durations")
     stage:      Field[ShowStage]   = Field(ShowStage.IDLE, access=Field.READ, description="Current stage", newline=True)
 
 

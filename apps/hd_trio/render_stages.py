@@ -53,6 +53,7 @@ class StageLayer:
         self.board: HasFrames = board
         self.settings = settings
         self.layers = layers
+        self._start_mt: float = 0.0
 
     def enter(self) -> None:
         """Called once when this stage becomes active."""
@@ -78,106 +79,164 @@ class StageLayer:
             if layer in self.layers
         ])
 
+    def set_geom_stage(self, stage: Stage) -> None:
+        """Select which pipeline stage the centre geometry reads poses from."""
+        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = stage
+
+    def set_similarity_scale(self, value: float) -> None:
+        """Set how strongly other cameras contribute to the colour mask.
+
+        Settings values persist across stages, so every stage states its own.
+        """
+        cast(ls.MSColorMaskLayer, self.layers[Layers.color_mask]).config.similarity_scale = value
+
+    # -- motion time ----------------------------------------------------------
+
+    def mark_motion_time(self) -> None:
+        """Snapshot MotionTime as the zero point for `_motion_alpha`."""
+        self._start_mt = self._get_motion_time()
+
+    def _motion_alpha(self, threshold: float) -> float:
+        """Fraction of `threshold` MotionTime accumulated since enter()."""
+        return _clamp((self._get_motion_time() - self._start_mt) / threshold)
+
+    def _get_motion_time(self) -> float:
+        pose = self.board.get_frame(Stage.LERP, self.cam_id)
+        if pose is None:
+            return 0.0
+        v = pose[MotionTime].value
+        return v if not math.isnan(v) else 0.0
+
 
 # ---------------------------------------------------------------------------
 #  Concrete stages
 # ---------------------------------------------------------------------------
 
-class StartStage(StageLayer):
+class WelcomeInStage(StageLayer):
+    """Attract state fades away, the centre pose appears."""
 
     def enter(self) -> None:
-        self._start_mt = self._get_motion_time()
-        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.LERP
+        self.set_geom_stage(Stage.LERP)
+        self.set_similarity_scale(0.0)
 
     def update(self, progress: float) -> None:
-        # MotionTime accumulated since enter() before the centre pose is fully visible.
+        out_alpha = _fade_out(progress)
+        self.compose([
+            (Layers.centre_pose, easeInOutSine(_fade_in(progress))),
+            (Layers.fluid, out_alpha),
+            (Layers.color_mask, out_alpha),
+        ])
+
+
+class WelcomeStage(StageLayer):
+    """Centre pose alone, while the welcome is spoken."""
+
+    def enter(self) -> None:
+        self.set_geom_stage(Stage.LERP)
+        self.set_similarity_scale(0.0)
+
+    def update(self, progress: float) -> None:
+        self.compose([(Layers.centre_pose, 1.0)])
+
+
+class MovementStage(StageLayer):
+    """"Move and a silhouette appears" — the mask opens up as the visitor moves."""
+
+    def enter(self) -> None:
+        self.mark_motion_time()
+        self.set_geom_stage(Stage.LERP)
+        self.set_similarity_scale(0.0)
+
+    def update(self, progress: float) -> None:
+        # MotionTime accumulated since enter() before the mask envelope is fully open.
         # Not wall-clock seconds and not the sequencer's stage duration — a separate
         # "visitor has moved enough" threshold, so the fade completes on whichever
         # comes first: the stage running out or the visitor moving.
+        #
+        # Opening on progress alone reveals nothing: MSColorMaskLayer already weights
+        # the own-camera slot by AngleMotion, so a motionless visitor stays dark at
+        # any alpha. The max() only guarantees no pop into WHITE_IN.
         motion_time_duration = 6.0
         progress_alpha: float = _fade_in(progress, 0.0, 1.0)
-        eased_alpha: float = easeInOutSine(max(progress_alpha, self._motion_alpha(motion_time_duration)))
-        self.compose([(Layers.centre_pose, eased_alpha)])
-
-    def _motion_alpha(self, threshold: float) -> float:
-        return _clamp((self._get_motion_time() - self._start_mt) / threshold)
-
-    def _get_motion_time(self) -> float:
-        pose = self.board.get_frame(Stage.LERP, self.cam_id)
-        if pose is None:
-            return 0.0
-        v = pose[MotionTime].value
-        return v if not math.isnan(v) else 0.0
+        mask_alpha: float = easeInOutSine(max(progress_alpha, self._motion_alpha(motion_time_duration)))
+        self.compose([
+            (Layers.centre_pose, 1.0),
+            (Layers.color_mask, mask_alpha),
+        ])
 
 
-class IntroInStage(StageLayer):
+class WhiteInStage(StageLayer):
+    """The white example figure fades in. Intro playback starts here (see render.py)."""
+
     def enter(self) -> None:
-        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.LERP
+        self.set_geom_stage(Stage.LERP)
+        self.set_similarity_scale(0.0)
 
     def update(self, progress: float) -> None:
         self.compose([
             (Layers.centre_pose, 1.0),
+            (Layers.color_mask, 1.0),
             (Layers.intro_pose, _fade_in(progress)),
         ])
 
 
-class IntroStage(StageLayer):
+class WhiteOutStage(StageLayer):
+    """The fluid joins the white example."""
+
     def enter(self) -> None:
-        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.LERP
+        self.set_geom_stage(Stage.LERP)
+        self.set_similarity_scale(0.0)
+        cast(ls.FluidLayer, self.layers[Layers.fluid]).reset()
 
     def update(self, progress: float) -> None:
         self.compose([
             (Layers.centre_pose, 1.0),
+            (Layers.color_mask, 1.0),
+            (Layers.fluid, easeOutSine(_fade_in(progress))),
             (Layers.intro_pose, 1.0),
         ])
 
 
-class IntroOutStage(StageLayer):
+class PracticeStage(StageLayer):
+    """Everything on — the visitor copies the white example."""
+
     def enter(self) -> None:
-        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.LERP
+        self.set_geom_stage(Stage.LERP)
+        self.set_similarity_scale(0.0)
 
     def update(self, progress: float) -> None:
         self.compose([
             (Layers.centre_pose, 1.0),
-            (Layers.intro_pose, _fade_out(progress)),
+            (Layers.color_mask, 1.0),
+            (Layers.fluid, 1.0),
+            (Layers.intro_pose, 1.0),
         ])
 
 
-class PlayInStage(StageLayer):
+class EnjoyInStage(StageLayer):
+    """Guidance withdraws and the cross-camera response ramps up."""
+
     def enter(self) -> None:
-        self._start_mt = self._get_motion_time()
-        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.SMOOTH
-        cast(ls.FluidLayer, self.layers[Layers.fluid]).reset()
+        self.set_geom_stage(Stage.SMOOTH)
 
     def update(self, progress: float) -> None:
-        # MotionTime threshold, as in StartStage — unused while the motion-driven
-        # eased_alpha below stays commented out.
-        motion_time_duration = 2.0
         progress_alpha: float = _fade_in(progress, 0.0, 1.0)
-        eased_alpha = easeOutSine(progress_alpha)
-        pose_alpha = easeOutQuad(1.0 - progress_alpha)
-        # eased_alpha: float = easeInOutSine(max(progress_alpha, self._motion_alpha(motion_time_duration)))
-        # can we store the movement time of the last stage and use it here to fade out the centre pose?
+        out_alpha = easeOutQuad(1.0 - progress_alpha)
+        self.set_similarity_scale(easeInOutSine(progress_alpha))
         self.compose([
-            (Layers.centre_pose, pose_alpha),
-            (Layers.fluid, eased_alpha),
-            (Layers.color_mask, eased_alpha),
+            (Layers.centre_pose, out_alpha),
+            (Layers.color_mask, 1.0),
+            (Layers.fluid, 1.0),
+            (Layers.intro_pose, out_alpha),
         ])
-
-    def _motion_alpha(self, threshold: float) -> float:
-        return _clamp((self._get_motion_time() - self._start_mt) / threshold)
-
-    def _get_motion_time(self) -> float:
-        pose = self.board.get_frame(Stage.LERP, self.cam_id)
-        if pose is None:
-            return 0.0
-        v = pose[MotionTime].value
-        return v if not math.isnan(v) else 0.0
 
 
 class PlayStage(StageLayer):
+    """Free play — fluid and mask at full cross-camera response."""
+
     def enter(self) -> None:
-        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.SMOOTH
+        self.set_geom_stage(Stage.SMOOTH)
+        self.set_similarity_scale(1.0)
 
     def update(self, progress: float) -> None:
         self.compose([
@@ -188,7 +247,8 @@ class PlayStage(StageLayer):
 
 class ConclusionStage(StageLayer):
     def enter(self) -> None:
-        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.SMOOTH
+        self.set_geom_stage(Stage.SMOOTH)
+        self.set_similarity_scale(1.0)
 
     def update(self, progress: float) -> None:
 
@@ -208,8 +268,11 @@ class BlackoutStage(StageLayer):
 
 
 class IdleStage(StageLayer):
+    """Attract state — parked here whenever the show is stopped."""
+
     def enter(self) -> None:
-        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.SMOOTH
+        self.set_geom_stage(Stage.SMOOTH)
+        self.set_similarity_scale(1.0)
 
     def update(self, progress: float) -> None:
         alpha = easeInOutSine(_fade_in(progress, 0.0, 1.0))
@@ -224,12 +287,17 @@ class IdleStage(StageLayer):
 #  Stage registry
 # ---------------------------------------------------------------------------
 
+# Must stay total over ShowStage — render.py falls back to composing nothing
+# for a stage with no entry here.
 STAGES: dict[ShowStage, type[StageLayer]] = {
-    ShowStage.START:      StartStage,
-    ShowStage.INTRO_IN:   IntroInStage,
-    ShowStage.INTRO:      IntroStage,
-    ShowStage.INTRO_OUT:  IntroOutStage,
-    ShowStage.PLAY_IN:    PlayInStage,
+    ShowStage.WELCOME_IN: WelcomeInStage,
+    ShowStage.WELCOME:    WelcomeStage,
+    ShowStage.MOVEMENT:   MovementStage,
+    ShowStage.WHITE_IN:   WhiteInStage,
+    ShowStage.WHITE_OUT:  WhiteOutStage,
+    ShowStage.PRACTICE:   PracticeStage,
+    ShowStage.ENJOY_IN:   EnjoyInStage,
+    ShowStage.ENJOY:      PlayStage,   # identical composition to PLAY
     ShowStage.PLAY:       PlayStage,
     ShowStage.CONCLUSION: ConclusionStage,
     ShowStage.BLACKOUT:   BlackoutStage,

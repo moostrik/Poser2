@@ -18,6 +18,11 @@ from .net_probe import validate_connection
 import logging
 logger = logging.getLogger(__name__)
 
+# Sent as /global/state when there is no show running (shutdown blackout). Shutdown is
+# not a show stage, and receivers key scenes off this integer — an out-of-band value
+# keeps them from firing a cue for whichever stage happens to be numbered 0.
+_NO_STATE = -1
+
 class OscSoundSettings(BaseSettings):
     max_players: Field[int]  = Field(4,    min=1,    max=16,    access=Field.INIT,         description="Max number of player poses to send (IDs 0 to N-1)")
     ip_addresses: Field[str] = Field("127.0.0.1",               widget=Widget.ip_field,     description="Target OSC IP address")
@@ -180,7 +185,7 @@ class OscSound:
     def _add_global_messages(self, bundle_builder: OscBundleBuilder, seq_state: SequencerState | None) -> None:
         """Tick-wide messages. A None seq_state yields the all-zero (idle/blackout) globals."""
         stage_msg = OscMessageBuilder(address="/global/state")
-        stage_msg.add_arg(seq_state.stage if seq_state is not None else 0, arg_type=OscMessageBuilder.ARG_TYPE_INT)
+        stage_msg.add_arg(seq_state.stage if seq_state is not None else _NO_STATE, arg_type=OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(stage_msg.build()) # type: ignore
 
         stage_progress_msg = OscMessageBuilder(address="/global/state/progress")
