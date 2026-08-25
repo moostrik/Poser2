@@ -3,7 +3,7 @@
   "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "render_fps": 121.0,
+  "render_fps": 120.0,
   "light_resolution": 3600,
   "fov": 127.0,
   "camera": {
@@ -173,9 +173,9 @@
       "startup_delay": 2.0,
       "offsets": {
         "white_0": 0,
-        "white_1": 5,
+        "white_1": 1,
         "blue_0": -10,
-        "blue_1": 9
+        "blue_1": 10
       }
     },
     "osc_sound": {
@@ -392,10 +392,9 @@
       "haunt_flash"
     ],
     "high_layers": [
-      "harmonic",
-      "player_lines"
+      "lines"
     ],
-    "master": 1.0,
+    "master": 0.4,
     "fade_times": [
       1.0,
       0.5
@@ -578,15 +577,15 @@
         "blend": "ADD",
         "white": {
           "level": 1.0,
-          "speed": 1.0,
+          "speed": 0.0,
           "phase": 0.3,
           "width": 0.1,
           "amount": 16
         },
         "blue": {
-          "level": 1.0,
-          "speed": -3.56,
-          "phase": 0.5,
+          "level": 0.0,
+          "speed": 0.0,
+          "phase": 0.3,
           "width": 0.1,
           "amount": 16
         }
