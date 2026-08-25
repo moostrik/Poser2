@@ -314,6 +314,7 @@
         "blend_mode": "ALPHA",
         "similarity_threshold": 0.1,
         "motion_exponent": 1.0,
+        "similarity_scale": 1.0,
         "layered": 0.8
       }
     },

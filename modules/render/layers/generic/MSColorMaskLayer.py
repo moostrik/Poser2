@@ -29,6 +29,7 @@ class ColorMaskLayerSettings(BaseSettings):
     blend_mode:             Field[Style.BlendMode] = Field(Style.BlendMode.ALPHA)
     similarity_threshold:   Field[float] = Field(0.1, min=0.0, max=1.0, description="Similarity below this contributes nothing")
     motion_exponent:        Field[float] = Field(1.0, min=0.0, max=5.0, description="Similarity response curve")
+    similarity_scale:       Field[float] = Field(1.0, min=0.0, max=1.0, description="0 = own silhouette only, 1 = full cross-camera response")
     # MSColorMask parameters
     layered:                Field[float] = Field(0.8, min=0.0, max=1.0, description="0 = additive, 1 = own in front")
 
@@ -120,7 +121,7 @@ class MSColorMaskLayer(LayerBase):
         exponent = self.config.motion_exponent
         similarities = np.clip((similarities - threshold) / (1.0 - threshold), 0.0, 1.0)
         similarities = np.power(similarities, exponent)
-        motion_similarities = similarities # * motion_gates
+        motion_similarities = similarities * self.config.similarity_scale
         # print(motion)
 
         # Foreground blend: 0 if single person, otherwise Nth highest similarity
