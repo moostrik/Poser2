@@ -1,5 +1,6 @@
 """HD Trio — 3-camera interactive installation with fluid rendering."""
 
+import logging
 from typing import Optional
 from functools import partial
 
@@ -10,13 +11,16 @@ from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
 from modules.pose import Recorder as PoseRecorder
+from modules.pose.recorder import RecorderSettings as PoseRecorderSettings
 from modules.inference import source, crop, pose, segmentation
-from modules.session import Session, SessionSettings, Sequencer
+from modules.session import Session, SessionSettings, Sequencer, SequencerState
 from modules.gl import WindowSettings
 
 from .render_board import RenderBoard
-from .settings import Settings, Stage
+from .settings import Settings, Stage, ShowStage, IntroSequenceSettings
 from .render import HDTrioRender
+
+logger = logging.getLogger(__name__)
 
 APP_NAME = 'hd_trio'
 DATA_PATH = 'apps/hd_trio/data'
@@ -35,6 +39,9 @@ class HDTrioMain:
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
         self.settings.camera.sim_enabled = simulation
+        # Never resume armed: a preset saved mid-take would otherwise record the
+        # first show after startup.
+        self.settings.render.intro_sequence.arm_record = False
         self.settings.initialize()
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
@@ -56,6 +63,13 @@ class HDTrioMain:
         self.sequencer.add_state_callback(self.osc_sound.set_sequencer_state)
         self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
         self.pose_recorder = PoseRecorder(self.settings.session.pose, data_path=DATA_PATH)
+
+        # Authoring recorder for the white example figure. Deliberately not part of
+        # the session share group — its start/stop must not reach the sequencer.
+        self.intro_recorder = PoseRecorder(self.settings.render.intro_sequence.recorder, data_path=DATA_PATH)
+        self._prev_in_record_window: bool = False
+        self.sequencer.add_state_callback(self._on_show_state)
+        self.settings.render.intro_sequence.bind(IntroSequenceSettings.arm_record, self._on_arm_record)
         self.artnet_controllers: list[ArtNetBars] = []
         for i in range(num_players):
             self.artnet_controllers.append(ArtNetBars(self.settings.inout.artnets[i]))
@@ -121,6 +135,7 @@ class HDTrioMain:
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),
                 partial(self.pose_recorder.submit_frames, stage),
+                partial(self._submit_intro_frames, stage),
                 partial(self.osc_sound.set_frames, stage),
                 wt.process,
             ])
@@ -275,6 +290,10 @@ class HDTrioMain:
         for camera in self.cameras:
             camera.stop()
         self.video_recorder.stop()
+        # The pose recorders have no stop() — an in-flight chunk is only written
+        # when the stop button fires, so flush it explicitly.
+        if self.settings.render.intro_sequence.recorder.recording:
+            PoseRecorderSettings.stop.fire(self.settings.render.intro_sequence.recorder)
 
         self.tracker.stop()
         self.osc_sound.stop()
@@ -293,6 +312,39 @@ class HDTrioMain:
             camera.join(timeout=10)
 
         self.is_finished = True
+
+    def _on_arm_record(self, armed: bool) -> None:
+        """Warn at arm time if the configured window can never open."""
+        intro = self.settings.render.intro_sequence
+        if armed and intro.record_end < intro.record_start:
+            logger.warning("intro record window is empty: record_end (%s) is before record_start (%s)",
+                           intro.record_end.name, intro.record_start.name)
+
+    def _submit_intro_frames(self, stage: Stage, frames: FrameDict) -> None:
+        """Submit only the performer's track, so the intro file holds one figure."""
+        track_id: int = self.settings.render.intro_sequence.record_track
+        frame = frames.get(track_id)
+        self.intro_recorder.submit_frames(stage, {track_id: frame} if frame is not None else {})
+
+    def _on_show_state(self, state: SequencerState) -> None:
+        """Start and stop the intro recording on the configured stage window.
+
+        The window is a value range because ShowStage declaration order is show
+        order — so leaving it also covers the show being stopped or skipped
+        mid-recording, which a 'did we just leave stage X' rule would miss.
+        """
+        intro = self.settings.render.intro_sequence
+        stage = ShowStage(state.stage)
+        in_window: bool = intro.record_start <= stage <= intro.record_end
+        entering: bool = in_window and not self._prev_in_record_window
+        leaving: bool = self._prev_in_record_window and not in_window
+        self._prev_in_record_window = in_window
+
+        if entering and intro.arm_record:
+            PoseRecorderSettings.start.fire(intro.recorder)
+        elif leaving and intro.recorder.recording:
+            PoseRecorderSettings.stop.fire(intro.recorder)
+            intro.arm_record = False
 
     def _on_osc_start_recording(self, *_) -> None:
         SessionSettings.start.fire(self.settings.session)

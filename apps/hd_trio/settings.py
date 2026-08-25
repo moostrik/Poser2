@@ -272,6 +272,17 @@ class _PoseRecorderSettings(PoseRecorderSettings):
     stage: Field[Stage] = Field(Stage.RAW)
 
 
+class _IntroRecorderSettings(_PoseRecorderSettings):
+    """Dedicated recorder for authoring the white example figure.
+
+    Kept unshared from SessionGroup on purpose — its start/stop must not
+    propagate to the sequencer and the session recorders.
+    """
+    stage:       Field[Stage] = Field(Stage.SMOOTH, description="Pipeline stage to record")
+    output_path: Field[str]   = Field("intro", access=Field.INIT, description="Intro recordings directory")
+    name:        Field[str]   = Field("intro", widget=Widget.input, description="Recording name suffix")
+
+
 # ---------------------------------------------------------------------------
 #  Session group (recording lifecycle: OSC, timer, video & pose recorders)
 # ---------------------------------------------------------------------------
@@ -347,7 +358,15 @@ class IntroSequenceSettings(BaseSettings):
     refresh_path:      Field[bool]      = Field(False, widget=Widget.button, description="Refresh intro folder list")
     available_folders: Field[list[str]] = Field([""], access=Field.READ, visible=False, description="Available intro recordings")
     folder:            Field[str]       = Field("", widget=Widget.text_select, options=available_folders, description="Selected intro recording")
-    source_track:      Field[int]       = Field(0, min=0, max=16, description="Track ID to use from recording")
+    source_track:      Field[int]       = Field(0, min=0, max=7, description="Track ID to use from recording")
+
+    # -- authoring a new intro recording --
+    record_track:      Field[int]       = Field(1, min=0, max=7, description="Camera to record the intro from — set source_track to match when playing it back")
+    record_start:      Field[ShowStage] = Field(ShowStage.WHITE_POSE, newline=True, description="Show stage where recording begins")
+    record_end:        Field[ShowStage] = Field(ShowStage.ENJOY_IN, description="Last show stage recorded (inclusive)")
+    arm_record:        Field[bool]      = Field(False, widget=Widget.toggle, description="Record the next show's window into a new intro folder")
+    recorder:          Group[_IntroRecorderSettings]     = Group(_IntroRecorderSettings)
+
     color:             Field[Color]     = Field(Color(1.0, 1.0, 1.0), description="Skeleton color for intro overlay")
     pose:              Group[layers.CentrePoseSettings]  = Group(layers.CentrePoseSettings)
 

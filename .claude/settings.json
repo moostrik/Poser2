@@ -6,7 +6,8 @@
       "Bash(./.venv/Scripts/python.exe -m py_compile *)",
       "Bash(python \"C:\\\\Users\\\\moost\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Developer-Poser2\\\\2ad4f02f-96ed-494d-a3c9-9eebee410f4e\\\\scratchpad\\\\fix_colormask_presets.py\")",
       "Bash(python \"C:\\\\Users\\\\moost\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Developer-Poser2\\\\2ad4f02f-96ed-494d-a3c9-9eebee410f4e\\\\scratchpad\\\\add_similarity_scale.py\")",
-      "Bash(python \"C:\\\\Users\\\\moost\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Developer-Poser2\\\\2ad4f02f-96ed-494d-a3c9-9eebee410f4e\\\\scratchpad\\\\move_similarity_scale.py\")"
+      "Bash(python \"C:\\\\Users\\\\moost\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Developer-Poser2\\\\2ad4f02f-96ed-494d-a3c9-9eebee410f4e\\\\scratchpad\\\\move_similarity_scale.py\")",
+      "Bash(python \"C:\\\\Users\\\\moost\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Developer-Poser2\\\\2ad4f02f-96ed-494d-a3c9-9eebee410f4e\\\\scratchpad\\\\add_intro_recorder.py\")"
     ]
   }
 }

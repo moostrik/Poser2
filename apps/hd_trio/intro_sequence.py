@@ -121,10 +121,26 @@ class IntroSequencePlayer:
                 self._time_offset = float(ts[0])
                 self._duration = float(ts[-1]) - self._time_offset
                 logger.info("IntroSequencePlayer loaded %.1fs from %s", self._duration, folder)
+                self._adopt_source_track()
             else:
                 logger.warning("no frames in %s", folder)
         else:
             logger.warning("folder not found: %s", folder)
+
+    def _adopt_source_track(self) -> None:
+        """Fall back to a track the recording actually holds.
+
+        A recording made with `record_track` set to a side camera stores that
+        track id, so the default `source_track` of 0 would find nothing and
+        render no figure. An explicit choice is respected whenever that track
+        is present, which keeps the older multi-track intro folders working.
+        """
+        tracks = sorted(self._player.get_frame_dict(self._time_offset).keys())
+        if not tracks or self._settings.source_track in tracks:
+            return
+        logger.info("intro recording has no track %d, using track %d (available: %s)",
+                    self._settings.source_track, tracks[0], tracks)
+        self._settings.source_track = tracks[0]
 
     @property
     def active(self) -> bool:
