@@ -317,11 +317,9 @@
         "stage": 3,
         "num_players": 1,
         "blend_mode": "ALPHA",
-        "similarity_threshold": 0.33,
-        "motion_exponent": 1.5,
-        "add_curve": 2.0,
-        "dodge_curve": 1.5,
-        "layered": 1.0
+        "similarity_threshold": 0.1,
+        "motion_exponent": 1.0,
+        "layered": 0.8
       }
     },
     "flow": {

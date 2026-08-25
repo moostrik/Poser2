@@ -27,13 +27,10 @@ class ColorMaskLayerSettings(BaseSettings):
     stage:                  Field[int]   = Field(0, description="Pipeline stage for pose data")
     num_players:            Field[int]   = Field(3, access=Field.INIT)
     blend_mode:             Field[Style.BlendMode] = Field(Style.BlendMode.ALPHA)
-    similarity_threshold:   Field[float] = Field(0.33, min=0.0, max=1.0)
-    motion_exponent:        Field[float] = Field(1.5, min=0.0, max=5.0)
-    # AddDodgeBlend parameters
-    add_curve:              Field[float] = Field(2.0, min=0.0, max=5.0)
-    dodge_curve:            Field[float] = Field(1.5, min=0.0, max=5.0)
+    similarity_threshold:   Field[float] = Field(0.1, min=0.0, max=1.0, description="Similarity below this contributes nothing")
+    motion_exponent:        Field[float] = Field(1.0, min=0.0, max=5.0, description="Similarity response curve")
     # MSColorMask parameters
-    layered:                Field[float] = Field(1.0, min=0.0, max=1.0, description="0 = additive, 1 = own in front")
+    layered:                Field[float] = Field(0.8, min=0.0, max=1.0, description="0 = additive, 1 = own in front")
 
 
 class MSColorMaskLayer(LayerBase):
@@ -119,8 +116,8 @@ class MSColorMaskLayer(LayerBase):
         motion = easeInOutSine(motion)
 
         # Apply similarity threshold and exponent
-        threshold = 0.1# self.config.similarity_threshold
-        exponent = 1.0# self.config.motion_exponent
+        threshold = self.config.similarity_threshold
+        exponent = self.config.motion_exponent
         similarities = np.clip((similarities - threshold) / (1.0 - threshold), 0.0, 1.0)
         similarities = np.power(similarities, exponent)
         motion_similarities = similarities # * motion_gates
@@ -134,8 +131,8 @@ class MSColorMaskLayer(LayerBase):
 
         # foreground_blend: float = (lowest_similarity - 0.25) * 2.0
         # foreground_blend = max(0.0, min(1.0, foreground_blend))
-        threshold = 0.2
-        foreground_blend: float = (lowest_similarity - threshold) / (1.0 - threshold)
+        frg_threshold = 0.2
+        foreground_blend: float = (lowest_similarity - frg_threshold) / (1.0 - frg_threshold)
         foreground_blend = max(0.0, min(1.0, foreground_blend))
         foreground_blend = easeInSine(foreground_blend)
 
@@ -184,7 +181,7 @@ class MSColorMaskLayer(LayerBase):
 
         self._output_fbo.begin()
         # Blit.use(self._blend_fbo)
-        self._shader.use(styled_textures, weights, 0.8)
+        self._shader.use(styled_textures, weights, self.config.layered)
         self._output_fbo.end()
 
         Style.pop_style()

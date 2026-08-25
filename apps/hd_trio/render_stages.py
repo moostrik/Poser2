@@ -90,7 +90,11 @@ class StartStage(StageLayer):
         cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).config.stage = Stage.LERP
 
     def update(self, progress: float) -> None:
-        motion_time_duration = 6.0  # movement threshold before centre pose fully visible
+        # MotionTime accumulated since enter() before the centre pose is fully visible.
+        # Not wall-clock seconds and not the sequencer's stage duration — a separate
+        # "visitor has moved enough" threshold, so the fade completes on whichever
+        # comes first: the stage running out or the visitor moving.
+        motion_time_duration = 6.0
         progress_alpha: float = _fade_in(progress, 0.0, 1.0)
         eased_alpha: float = easeInOutSine(max(progress_alpha, self._motion_alpha(motion_time_duration)))
         self.compose([(Layers.centre_pose, eased_alpha)])
@@ -146,7 +150,9 @@ class PlayInStage(StageLayer):
         cast(ls.FluidLayer, self.layers[Layers.fluid]).reset()
 
     def update(self, progress: float) -> None:
-        motion_time_duration = 2.0  # movement threshold before centre pose fully visible
+        # MotionTime threshold, as in StartStage — unused while the motion-driven
+        # eased_alpha below stays commented out.
+        motion_time_duration = 2.0
         progress_alpha: float = _fade_in(progress, 0.0, 1.0)
         eased_alpha = easeOutSine(progress_alpha)
         pose_alpha = easeOutQuad(1.0 - progress_alpha)
