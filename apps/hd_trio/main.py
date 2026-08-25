@@ -11,7 +11,7 @@ from modules.tracker import OnePerCamTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
 from modules.pose import Recorder as PoseRecorder
 from modules.inference import source, crop, pose, segmentation
-from modules.session import Session, Sequencer
+from modules.session import Session, SessionSettings, Sequencer
 from modules.gl import WindowSettings
 
 from .render_board import RenderBoard
@@ -295,10 +295,10 @@ class HDTrioMain:
         self.is_finished = True
 
     def _on_osc_start_recording(self, *_) -> None:
-        self.settings.session.start = True
+        SessionSettings.start.fire(self.settings.session)
 
     def _on_osc_stop_recording(self, *_) -> None:
-        self.settings.session.stop = True
+        SessionSettings.stop.fire(self.settings.session)
 
     def _on_osc_group_id(self, gid: str, *_) -> None:
         self.settings.session.name = gid
