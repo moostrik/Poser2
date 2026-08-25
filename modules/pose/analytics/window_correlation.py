@@ -137,7 +137,7 @@ class WindowCorrelation:
                     cb(result)
 
             except Exception as e:
-                logger.error(f"WindowCorrelation: Processing error: {e}")
+                logger.error(f"Processing error: {e}")
     def _process(
         self,
         windows: FeatureWindowDict,

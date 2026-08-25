@@ -1,4 +1,4 @@
-﻿"""JacobiDiffusionCompute - Compute shader diffusion solver.
+"""JacobiDiffusionCompute - Compute shader diffusion solver.
 
 Multi-iteration Jacobi solver for velocity viscosity using shared memory tiling.
 Performs multiple iterations per dispatch, reducing the number of texture swaps
@@ -63,7 +63,7 @@ class JacobiDiffusionCompute(ComputeShader):
 
         # Validate inputs
         if not all(t.allocated for t in [velocity_in, velocity_out, obstacle]):
-            logger.warning("JacobiDiffusionCompute: input texture(s) not allocated.")
+            logger.warning("input texture(s) not allocated.")
             return
 
         # Compute Jacobi parameters (same as fragment shader version)

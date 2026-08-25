@@ -1,18 +1,20 @@
 {
-  "num_players": 8,
+  "num_players": 4,
+  "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "render_fps": 60.0,
+  "render_fps": 121.0,
   "light_resolution": 3600,
-  "fov": 120.0,
+  "fov": 127.0,
   "camera": {
     "yolo": true,
     "color": false,
     "square": false,
     "stereo": false,
     "hd_ready": true,
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
+    "ir_flood_light": 0.75,
     "cam_0": {
       "device_id": "14442C101136D1D200",
       "show_stereo": false,
@@ -29,11 +31,10 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 1029,
-      "mono_auto_exposure": true,
+      "mono_exposure": 33000,
+      "mono_iso": 1600,
+      "mono_auto_exposure": false,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.8,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -57,10 +58,9 @@
       "color_denoise": 0,
       "color_sharpness": 0,
       "mono_exposure": 29992,
-      "mono_iso": 476,
-      "mono_auto_exposure": true,
+      "mono_iso": 1436,
+      "mono_auto_exposure": false,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.8,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -83,11 +83,10 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 823,
-      "mono_auto_exposure": true,
+      "mono_exposure": 33000,
+      "mono_iso": 1600,
+      "mono_auto_exposure": false,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.8,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -110,11 +109,10 @@
       "color_saturation": 0,
       "color_denoise": 0,
       "color_sharpness": 0,
-      "mono_exposure": 29992,
-      "mono_iso": 487,
-      "mono_auto_exposure": true,
+      "mono_exposure": 33000,
+      "mono_iso": 1600,
+      "mono_auto_exposure": false,
       "ir_grid_light": 0.0,
-      "ir_flood_light": 0.8,
       "stereo_depth_min": 500,
       "stereo_depth_max": 15000,
       "stereo_median_filter": "OFF",
@@ -128,19 +126,20 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "folder": "20250514-130512_4_wide_mono",
+      "folder": "20260702-161442_flabber",
       "sim_passthrough": false,
-      "range_start": 0,
-      "range_end": 10
+      "start_norm": 0.0,
+      "end_norm": 1.0
     },
     "tracker": {
       "min_age": 5,
       "min_height": 0.25,
       "timeout": 2.0,
       "seam": {
-        "reject": 0.5,
-        "reach": 1.3,
-        "hysteresis": 0.9,
+        "reject": 0.35,
+        "reach": 1.1,
+        "hysteresis": 0.6,
+        "max_height_diff": 0.2,
         "angles": {}
       },
       "distortion": {
@@ -153,6 +152,11 @@
           "slope": 0.0,
           "cubic": 0.0
         }
+      },
+      "parallax": {
+        "ring_radius": 0.25,
+        "person_height": 1.7,
+        "vfov": 71.6
       }
     },
     "frame_sync": {},
@@ -164,17 +168,19 @@
       "port": 6454,
       "use_signed": false,
       "mtu": 1500,
-      "phase": 0.0,
+      "lower_edge": 0.32,
+      "curve": 2.0,
+      "startup_delay": 2.0,
       "offsets": {
         "white_0": 0,
-        "white_1": 0,
-        "blue_0": 0,
-        "blue_1": 0
+        "white_1": 5,
+        "blue_0": -10,
+        "blue_1": 9
       }
     },
     "osc_sound": {
       "stage": "LERP",
-      "ip_addresses": "192.168.1.59",
+      "ip_addresses": "192.168.1.39",
       "port": 8000
     },
     "osc_receiver": {
@@ -212,6 +218,10 @@
     },
     "angle_extractor": {
       "aspect_ratio": 0.75
+    },
+    "distance_extractor": {
+      "near_y": 0.9,
+      "far_y": 0.3
     },
     "bbox": {},
     "point": {
@@ -354,181 +364,256 @@
       "emit_partial": true
     }
   },
-  "composition": {
-    "bpm": 20.0,
-    "active": [
-      "lines"
+  "ghost": {
+    "ghoster": {
+      "enabled": false,
+      "recycle_oldest": true,
+      "reclaim_near": false,
+      "ghost_limit": 0,
+      "limit_fade_beats": 32,
+      "dwell_radius": 8.0,
+      "dwell_beats": 3,
+      "motion_beats": 2,
+      "motion_scale": 0.1,
+      "stability_hold_beats": 2,
+      "stability_expiry_beats": 3,
+      "stability_scale": 0.8,
+      "stability_threshold": 0.9
+    },
+    "escalator": {
+      "enabled": true,
+      "high_threshold": 16
+    }
+  },
+  "light": {
+    "light_rate": 30.0,
+    "idle_layers": [],
+    "low_layers": [
+      "haunt_flash"
     ],
-    "blend": "ADD",
+    "high_layers": [
+      "harmonic",
+      "player_lines"
+    ],
     "master": 1.0,
-    "hardness": 0.0,
-    "threshold": 0.5,
-    "target_rpm": 3.0,
-    "rotation": {
-      "simulate": false,
-      "simulate_rpm": 120.0,
-      "latency_ms": 5.0,
-      "phase_offset": 0.271,
-      "low_speed_threshold": 3.0,
-      "high_speed_threshold": 200.0
+    "fade_times": [
+      1.0,
+      0.5
+    ],
+    "light_phase": 0.55,
+    "clock": {
+      "bpm": 20.0
     },
-    "pose_waves": {
-      "fov_degrees": 110.0,
-      "void_width": 0.05,
-      "void_edge": 0.01,
-      "use_void": true,
-      "pattern_width": 0.2,
-      "pattern_edge": 0.2,
-      "line_sharpness": 1.5,
-      "line_speed": 1.5,
-      "line_width": 0.1,
-      "line_amount": 20.0
+    "motor": {
+      "simulate": "OFF",
+      "mode": "HIGH",
+      "idle_rpm": 7.0,
+      "low_rpm": 36.0,
+      "high_rpm": 2000.0
     },
-    "fill": {
-      "white": {
+    "playhead": {
+      "phase": 0.73,
+      "tracking": 0.12,
+      "speed_smoothing": 0.66
+    },
+    "low": {
+      "playhead": {
         "level": 0.5,
-        "speed": 0.5,
-        "phase": 0.0,
-        "width": 0.5,
-        "amount": 36
+        "blend": "ADD"
       },
-      "blue": {
-        "level": 0.5,
-        "speed": 0.5,
-        "phase": 0.5,
-        "width": 0.5,
-        "amount": 36
+      "playhead_flash": {
+        "base_white": 0.0,
+        "base_blue": 0.0,
+        "min_white": 0.1,
+        "max_white": 1.0,
+        "min_blue": 0.0,
+        "max_blue": 0.0,
+        "min_width": 11.5,
+        "max_width": 11.5,
+        "gap": 0.0,
+        "blend": "ADD"
+      },
+      "haunt_flash": {
+        "white": 1.0,
+        "base_white": 0.33,
+        "blue": 0.0,
+        "width": 0.0,
+        "ghosts": true,
+        "blend": "ADD"
       }
     },
-    "pulse": {
-      "white": {
-        "level": 0.5,
-        "speed": 0.5,
-        "phase": 0.0,
-        "width": 0.5,
-        "amount": 36
+    "high": {
+      "pose_waves": {
+        "fov_degrees": 110.0,
+        "void_width": 0.05,
+        "void_edge": 0.01,
+        "use_void": true,
+        "pattern_width": 0.2,
+        "pattern_edge": 0.2,
+        "line_sharpness": 1.5,
+        "line_speed": 1.5,
+        "line_width": 0.1,
+        "line_amount": 20.0,
+        "blend": "ADD"
       },
-      "blue": {
-        "level": 0.5,
-        "speed": 0.5,
-        "phase": 0.5,
-        "width": 0.5,
-        "amount": 36
-      }
-    },
-    "chase": {
-      "white": {
+      "harmonic": {
+        "blend": "ADD",
+        "source_0": {
+          "enabled": true,
+          "bpm_multiplier": 1.0,
+          "spatial_cycles": 3.0,
+          "phase_offset": 0.0,
+          "spatial_phase": 0.0,
+          "amplitude_white": 0.5,
+          "amplitude_blue": 0.0
+        },
+        "source_1": {
+          "enabled": true,
+          "bpm_multiplier": 2.0,
+          "spatial_cycles": 5.0,
+          "phase_offset": 0.25,
+          "spatial_phase": 0.0,
+          "amplitude_white": 0.0,
+          "amplitude_blue": 0.5
+        },
+        "source_2": {
+          "enabled": false,
+          "bpm_multiplier": 3.0,
+          "spatial_cycles": 7.0,
+          "phase_offset": 0.5,
+          "spatial_phase": 0.0,
+          "amplitude_white": 0.3,
+          "amplitude_blue": 0.0
+        },
+        "source_3": {
+          "enabled": false,
+          "bpm_multiplier": 4.0,
+          "spatial_cycles": 9.0,
+          "phase_offset": 0.75,
+          "spatial_phase": 0.0,
+          "amplitude_white": 0.0,
+          "amplitude_blue": 0.3
+        }
+      },
+      "player_lines": {
+        "center_width": 0.05,
+        "flank_width": 0.01,
+        "depth_scale": 2.0,
+        "invert": false,
+        "level_center": 0.5,
+        "level_flank": 1.0,
+        "anchor_nose": true,
+        "blend": "ADD"
+      },
+      "calibration": {
+        "slice_centre": 0.5,
+        "slice_height": 0.2,
+        "threshold": 1.0,
+        "detect": "BRIGHT",
+        "method": "MAX",
+        "show_overlap": false,
+        "show_centre": false,
+        "white_markers": false,
+        "blend": "ADD"
+      },
+      "playhead": {
         "level": 1.0,
-        "speed": 0.25,
-        "phase": 0.0,
-        "width": 0.2,
-        "amount": 22
-      },
-      "blue": {
-        "level": 0.5,
-        "speed": 0.5,
-        "phase": 0.5,
-        "width": 0.5,
-        "amount": 36
+        "width": 0.01,
+        "blend": "ADD"
       }
     },
-    "lines": {
-      "white": {
-        "level": 1.0,
-        "speed": 0.0,
-        "phase": 0.95,
-        "width": 0.69,
-        "amount": 1
+    "test": {
+      "fill": {
+        "blend": "ADD",
+        "white": {
+          "level": 0.5,
+          "speed": 0.5,
+          "phase": 0.0,
+          "width": 0.5,
+          "amount": 36
+        },
+        "blue": {
+          "level": 0.5,
+          "speed": 0.5,
+          "phase": 0.5,
+          "width": 0.5,
+          "amount": 36
+        }
       },
-      "blue": {
-        "level": 0.0,
-        "speed": 0.5,
-        "phase": 0.5,
-        "width": 0.5,
-        "amount": 36
+      "pulse": {
+        "blend": "ADD",
+        "white": {
+          "level": 0.5,
+          "speed": 0.5,
+          "phase": 0.0,
+          "width": 0.5,
+          "amount": 36
+        },
+        "blue": {
+          "level": 0.5,
+          "speed": 0.5,
+          "phase": 0.5,
+          "width": 0.5,
+          "amount": 36
+        }
+      },
+      "chase": {
+        "blend": "ADD",
+        "white": {
+          "level": 1.0,
+          "speed": 0.25,
+          "phase": 0.0,
+          "width": 0.2,
+          "amount": 22
+        },
+        "blue": {
+          "level": 0.5,
+          "speed": 0.5,
+          "phase": 0.5,
+          "width": 0.5,
+          "amount": 36
+        }
+      },
+      "lines": {
+        "blend": "ADD",
+        "white": {
+          "level": 1.0,
+          "speed": 1.0,
+          "phase": 0.3,
+          "width": 0.1,
+          "amount": 16
+        },
+        "blue": {
+          "level": 1.0,
+          "speed": -3.56,
+          "phase": 0.5,
+          "width": 0.1,
+          "amount": 16
+        }
+      },
+      "random": {
+        "blend": "ADD",
+        "white": {
+          "level": 0.5,
+          "speed": 0.5,
+          "scale": 4.0,
+          "octaves": 3,
+          "persistence": 0.5,
+          "midpoint": 0.5,
+          "gamma": 1.0,
+          "threshold": 0.0
+        },
+        "blue": {
+          "level": 0.5,
+          "speed": 0.5,
+          "scale": 4.0,
+          "octaves": 3,
+          "persistence": 0.5,
+          "midpoint": 0.5,
+          "gamma": 1.0,
+          "threshold": 0.0
+        }
       }
-    },
-    "random": {
-      "white": {
-        "level": 0.5,
-        "speed": 0.5,
-        "scale": 4.0,
-        "octaves": 3,
-        "persistence": 0.5,
-        "threshold": 0.0
-      },
-      "blue": {
-        "level": 0.5,
-        "speed": 0.5,
-        "scale": 4.0,
-        "octaves": 3,
-        "persistence": 0.5,
-        "threshold": 0.0
-      }
-    },
-    "harmonic": {
-      "source_0": {
-        "enabled": true,
-        "bpm_multiplier": 1.0,
-        "spatial_cycles": 3.0,
-        "phase_offset": 0.0,
-        "spatial_phase": 0.0,
-        "amplitude_white": 0.5,
-        "amplitude_blue": 0.0
-      },
-      "source_1": {
-        "enabled": true,
-        "bpm_multiplier": 2.0,
-        "spatial_cycles": 5.0,
-        "phase_offset": 0.25,
-        "spatial_phase": 0.0,
-        "amplitude_white": 0.0,
-        "amplitude_blue": 0.5
-      },
-      "source_2": {
-        "enabled": false,
-        "bpm_multiplier": 3.0,
-        "spatial_cycles": 7.0,
-        "phase_offset": 0.5,
-        "spatial_phase": 0.0,
-        "amplitude_white": 0.3,
-        "amplitude_blue": 0.0
-      },
-      "source_3": {
-        "enabled": false,
-        "bpm_multiplier": 4.0,
-        "spatial_cycles": 9.0,
-        "phase_offset": 0.75,
-        "spatial_phase": 0.0,
-        "amplitude_white": 0.0,
-        "amplitude_blue": 0.3
-      }
-    },
-    "player_lines": {
-      "center_width": 0.06,
-      "flank_width": 0.03,
-      "depth_scale": 2.0,
-      "invert": true,
-      "level_center": 1.0,
-      "level_flank": 0.0,
-      "anchor_nose": true
-    },
-    "calibration": {
-      "slice_centre": 0.5,
-      "slice_height": 0.2,
-      "threshold": 1.0,
-      "detect": "BRIGHT",
-      "method": "MAX",
-      "show_overlap": true,
-      "show_centre": true,
-      "white_markers": true
-    },
-    "playhead_flash": {
-      "base_white": 0.0,
-      "base_blue": 0.0,
-      "flash_white": 1.0,
-      "flash_blue": 0.0,
-      "fadeout_time": 0.08
     }
   },
   "render": {
@@ -545,12 +630,25 @@
         "use_gpu_crop": true
       }
     },
+    "data_time": {
+      "stage": "LERP"
+    },
     "data": {
-      "mode": "WINDOW",
-      "feature_field": "AngleMotion",
-      "stage": 0,
+      "stage": "LERP",
+      "mode": "NONE",
+      "feature_field": "MotionGate",
       "line_width": 3.0,
-      "line_smooth": 1.0,
+      "line_smooth": 10.0,
+      "use_scores": false,
+      "render_labels": true,
+      "use_history_color": false
+    },
+    "playhead_data": {
+      "stage": "LERP",
+      "mode": "WINDOW",
+      "feature_field": "GhostFeature",
+      "line_width": 10.0,
+      "line_smooth": 0.0,
       "use_scores": false,
       "render_labels": true,
       "use_history_color": false
@@ -632,13 +730,14 @@
     "window": {
       "title": "Poser",
       "v_sync": true,
-      "monitor": 0,
-      "x": 0,
-      "y": 0,
-      "width": 1278,
-      "height": 1000,
+      "monitor": "M0",
+      "x": 1896,
+      "y": 31,
+      "width": 663,
+      "height": 592,
       "secondary_list": [],
-      "secondary_fullscreen": true
+      "secondary_fullscreen": true,
+      "fullscreen_mode": "WINDOWED"
     }
   },
   "server": {
@@ -647,7 +746,7 @@
   },
   "session": {
     "output_path": "recordings",
-    "name": "Yens_2",
+    "name": "flabber",
     "split_seconds": 10,
     "osc": {
       "port_in": 9000,
@@ -668,12 +767,14 @@
       "durations": [
         10.0,
         3.0,
-        120.0,
+        600.0,
         10.0,
         5.0
-      ]
+      ],
+      "loop": false
     },
     "video": {
+      "keyframe_interval": 0,
       "temp_path": "temp",
       "video_encoder": "iGPU",
       "video_format": "H264",

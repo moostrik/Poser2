@@ -1,12 +1,22 @@
-import depthai as dai
+from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 import logging
 
+import depthai as dai
+
+from .definitions import (
+    FrameType,
+    YOLOV8_WIDE_5S, YOLOV8_WIDE_6S, YOLOV8_WIDE_7S,
+    YOLOV8_SQUARE_5S, YOLOV8_SQUARE_6S, YOLOV8_SQUARE_7S,
+    YOLO_CONFIDENCE_THRESHOLD, YOLO_OVERLAP_THRESHOLD,
+    TRACKER_PERSON_LABEL, TRACKER_TYPE,
+    DEPTH_TRACKER_BOX_SCALE, DEPTH_TRACKER_LOCATION,
+    DEPTH_TRACKER_MIN_DEPTH, DEPTH_TRACKER_MAX_DEPTH,
+)
+
 logger = logging.getLogger(__name__)
 
-from .definitions import *
-from dataclasses import dataclass
 
 @dataclass
 class PerspectiveConfig:
@@ -216,7 +226,7 @@ class SetupColorYolo(SetupColor):
 
 class SetupColorStereo(SetupColor):
     def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, show_stereo:bool, lowres: bool = False) -> None:
-        logger.warning("Pipeline: WARNING Color Stereo not implemented")
+        logger.warning("Color Stereo not implemented")
         return
         super().__init__(pipeline, fps, square = False)
         self.show_stereo: bool = show_stereo
@@ -275,7 +285,7 @@ class SetupColorStereo(SetupColor):
 
 class SetupColorStereoYolo(SetupColorStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, show_stereo: bool, nn_path: Path) -> None:
-        logger.warning("Pipeline: WARNING Color Stereo not implemented")
+        logger.warning("Color Stereo not implemented")
         return
         super().__init__(pipeline, fps, do_720p, show_stereo, lowres = True)
 
@@ -393,7 +403,7 @@ class SetupMonoYolo(SetupMono):
 
 class SetupMonoStereo(SetupMono):
     def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool) -> None:
-        logger.warning("Pipeline: WARNING Mono Stereo not implemented")
+        logger.warning("Mono Stereo not implemented")
         return
         super().__init__(pipeline, fps, square = False)
         self.show_stereo: bool = show_stereo
@@ -437,7 +447,7 @@ class SetupMonoStereo(SetupMono):
 
 class SetupMonoStereoYolo(SetupMonoStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool, nn_path: Path) -> None:
-        logger.warning("Pipeline: WARNING Mono Stereo not implemented")
+        logger.warning("Mono Stereo not implemented")
         return
         super().__init__(pipeline, fps, show_stereo)
 
@@ -504,7 +514,7 @@ class SimulationColorYolo(SetupColorYolo):
 
 class SimulationColorStereo(SetupColorStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, show_stereo: bool) -> None:
-        logger.warning("Pipeline: WARNING Color Stereo not implemented")
+        logger.warning("Color Stereo not implemented")
         return
         super().__init__(pipeline, fps, show_stereo)
 
@@ -552,7 +562,7 @@ class SimulationColorStereo(SetupColorStereo):
 
 class SimulationColorStereoYolo(SimulationColorStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float,  do_720p: bool, show_stereo: bool, nn_path: Path) -> None:
-        logger.warning("Pipeline: WARNING Color Stereo not implemented")
+        logger.warning("Color Stereo not implemented")
         return
         super().__init__(pipeline, fps, do_720p, show_stereo)
 
@@ -625,7 +635,7 @@ class SimulationMonoYolo(SetupMonoYolo):
 
 class SimulationMonoStereo(SetupMonoStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool) -> None:
-        logger.warning("Pipeline: WARNING Mono Stereo not implemented")
+        logger.warning("Mono Stereo not implemented")
         return
         super().__init__(pipeline, fps, show_stereo)
 
@@ -678,7 +688,7 @@ class SimulationMonoStereo(SetupMonoStereo):
 
 class SimulationMonoStereoYolo(SimulationMonoStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float,  show_stereo: bool, nn_path: Path) -> None:
-        logger.warning("Pipeline: WARNING Mono Stereo not implemented")
+        logger.warning("Mono Stereo not implemented")
         return
         super().__init__(pipeline, fps, show_stereo)
 

@@ -13,7 +13,7 @@ from .. import (
 )
 from .store import TrackletStore
 from .geometry import Geometry, DistortAlgorithm
-from .settings import SeamSettings, TanhSettings, PolySettings, DistortionSettings, TrackerSettings
+from .settings import SeamSettings, TanhSettings, PolySettings, DistortionSettings, ParallaxSettings, TrackerSettings
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,7 @@ class Annotation(TrackerAnnotation):
     local_angle: float
     world_angle: float
     overlap: bool
+    distance: float = 0.0
 
 
 class Tracker(Thread, BaseTracker):
@@ -38,9 +39,10 @@ class Tracker(Thread, BaseTracker):
     identity emitted to callbacks.
 
     - **Cross-camera continuity**: when a brand-new observation arrives inside
-      an overlap zone and exactly one existing world has a same-position match
-      in another camera, the new observation is linked into that world. No
-      merge, no rewrite — the person keeps the same id as they cross.
+      an overlap zone, it is linked into the existing world whose other-camera
+      observation matches it best in world angle (recently LOST observations
+      still anchor). No merge, no rewrite — the person keeps the same id as
+      they cross.
     - **View selection (primary)**: per world, the tracker emits one primary
       observation each tick. Selection is sticky with hysteresis (governed by
       ``seam.hysteresis``): the current primary stays primary unless a
@@ -66,13 +68,20 @@ class Tracker(Thread, BaseTracker):
         self.config: TrackerSettings = config
         self.geometry: Geometry = Geometry(num_cameras, config.fov, 90.0)
 
-        # Wire fov and distortion changes to geometry
+        # Wire fov, distortion and parallax changes to geometry
         TrackerSettings.fov.bind(config, lambda v: (self.geometry.set_fov(v), self._update_seam_angles()))
         DistortionSettings.algorithm.bind(config.distortion, lambda v: self.geometry.set_algorithm(v))
         TanhSettings.slope.bind(config.distortion.tanh, lambda v: self.geometry.set_tanh_slope(v))
         TanhSettings.cubic.bind(config.distortion.tanh, lambda v: self.geometry.set_tanh_cubic(v))
         PolySettings.k1.bind(config.distortion.poly, lambda v: self.geometry.set_poly_k1(v))
         PolySettings.k2.bind(config.distortion.poly, lambda v: self.geometry.set_poly_k2(v))
+        ParallaxSettings.ring_radius.bind(config.parallax, lambda v: self.geometry.set_ring_radius(v))
+        ParallaxSettings.person_height.bind(config.parallax, lambda v: self.geometry.set_person_height(v))
+        ParallaxSettings.vfov.bind(config.parallax, lambda v: self.geometry.set_vfov(v))
+
+        # bind() does not fire with the current value, and the preset is loaded
+        # before this tracker is constructed — push config into geometry once now.
+        self._sync_geometry_from_config()
 
         # Wire seam ratio changes to the angles display
         SeamSettings.reject.bind(config.seam, lambda _: self._update_seam_angles())
@@ -84,6 +93,20 @@ class Tracker(Thread, BaseTracker):
 
         self._callback_lock = Lock()
         self._tracklet_callbacks: set[TrackletDictCallback] = set()
+
+    def _sync_geometry_from_config(self) -> None:
+        """Apply current config values to geometry. Needed at construction
+        because ``bind`` does not fire with the initial value and the preset is
+        loaded before the tracker exists."""
+        self.geometry.set_fov(self.config.fov)
+        self.geometry.set_algorithm(self.config.distortion.algorithm)
+        self.geometry.set_tanh_slope(self.config.distortion.tanh.slope)
+        self.geometry.set_tanh_cubic(self.config.distortion.tanh.cubic)
+        self.geometry.set_poly_k1(self.config.distortion.poly.k1)
+        self.geometry.set_poly_k2(self.config.distortion.poly.k2)
+        self.geometry.set_ring_radius(self.config.parallax.ring_radius)
+        self.geometry.set_person_height(self.config.parallax.person_height)
+        self.geometry.set_vfov(self.config.parallax.vfov)
 
     def _update_seam_angles(self) -> None:
         a = self.config.seam.angles
@@ -143,20 +166,20 @@ class Tracker(Thread, BaseTracker):
         if new_tracklet.roi.height < self.config.min_height:
             return
 
-        # Annotate with local/world angles and overlap flag
-        local_angle, world_angle, _overlap = self.geometry.get_angles_and_overlap(new_tracklet.roi, cam_id, self.config.seam.reject)
-        new_tracklet = replace(new_tracklet, annotation=Annotation(local_angle, world_angle, _overlap))
+        # Annotate with local/world angles, overlap flag and estimated distance
+        local_angle, world_angle, _overlap, distance = self.geometry.get_angles_and_overlap(new_tracklet.roi, cam_id, self.config.seam.reject)
+        new_tracklet = replace(new_tracklet, annotation=Annotation(local_angle, world_angle, _overlap, distance))
 
-        # Filter out tracklets too close to the FOV edge
-        if self.geometry.angle_in_edge(local_angle, self.config.seam.reject):
-            return
-
-        # Existing observation — refresh in place
+        # Existing observation — refresh in place, even inside the edge dead
+        # zone: starving it would freeze its angles and expire it via timeout
+        # while the camera still tracks the person.
         if self.store.get_world_id(cam_id, ext_id) is not None:
             self.store.replace_tracklet(new_tracklet)
             return
 
-        # Brand-new observation
+        # Brand-new observations are ignored too close to the FOV edge
+        if self.geometry.angle_in_edge(local_angle, self.config.seam.reject):
+            return
         if not new_tracklet.is_active:
             return
         if _overlap:
@@ -175,20 +198,30 @@ class Tracker(Thread, BaseTracker):
             return False
         if self.geometry.angle_diff(a.annotation.world_angle, b.annotation.world_angle) > self.geometry.fov_overlap * self.config.seam.reach:
             return False
-        if abs(a.roi.height - b.roi.height) > 0.1:
+        if abs(a.roi.height - b.roi.height) > self.config.seam.max_height_diff:
             return False
         return True
 
     def _find_world_candidate(self, new_tracklet: Tracklet) -> int | None:
-        """Return the unique world id whose other-camera observation matches
-        ``new_tracklet`` in angle and height; None if zero or multiple match."""
-        candidate_worlds: set[int] = set()
+        """Return the world id whose other-camera observation best matches
+        ``new_tracklet`` in angle and height; None if none match. LOST
+        observations still anchor (removal is bounded by ``timeout``) so the
+        link survives the previous camera losing the person first. Among
+        multiple matching worlds the closest in world angle wins."""
+        assert isinstance(new_tracklet.annotation, Annotation)
+        best_world: int | None = None
+        best_diff: float = float('inf')
         for t in self.store.all_tracklets():
-            if not t.is_active:
+            if t.is_removed:
                 continue
-            if self._observations_match(new_tracklet, t):
-                candidate_worlds.add(t.id)
-        return next(iter(candidate_worlds)) if len(candidate_worlds) == 1 else None
+            if not self._observations_match(new_tracklet, t):
+                continue
+            assert isinstance(t.annotation, Annotation)
+            diff: float = self.geometry.angle_diff(new_tracklet.annotation.world_angle, t.annotation.world_angle)
+            if diff < best_diff:
+                best_diff = diff
+                best_world = t.id
+        return best_world
 
     def _update_and_notify(self) -> None:
         # Expire timed-out observations
@@ -220,7 +253,14 @@ class Tracker(Thread, BaseTracker):
                 del self._primary_for_world[world_id]
 
     def _pick_primary(self, world_id: int) -> Tracklet | None:
-        """Sticky primary selection with hysteresis to avoid per-tick flicker."""
+        """Sticky primary selection with hysteresis to avoid per-tick flicker.
+
+        The incumbent is held through transient LOST states: takeover
+        candidates must be active, but a LOST incumbent only yields once a
+        competitor beats its last-known edge distance by the hysteresis
+        ratio. Truly departed observations are bounded by the timeout-based
+        retirement in ``_update_and_notify``.
+        """
         members: list[Tracklet] = self.store.get_tracklets(world_id)
         if not members:
             return None
@@ -235,7 +275,13 @@ class Tracker(Thread, BaseTracker):
             return self.geometry.angle_from_edge(t.annotation.local_angle)
 
         current_key: tuple[int, int] | None = self._primary_for_world.get(world_id)
-        current: Tracklet | None = next((t for t in active if (t.cam_id, t.external_id) == current_key), None)
+        current: Tracklet | None = next(
+            (t for t in members
+             if (t.cam_id, t.external_id) == current_key
+             and not t.is_removed
+             and isinstance(t.annotation, Annotation)),
+            None,
+        )
         if current is None:
             chosen = max(active, key=edge)
         else:
@@ -253,22 +299,44 @@ class Tracker(Thread, BaseTracker):
         """Find world id pairs that should be collapsed because their observations
         match across cameras. Returns (keep_id, drop_id) pairs; older world wins.
         Each world id appears in at most one pair to avoid collapsing into a
-        world that is itself about to be dropped."""
+        world that is itself about to be dropped. Only mutual nearest matches
+        collapse, so an observation already explained by a partner in its own
+        world cannot drag a neighbouring world into a merge."""
         observations: list[Tracklet] = [
             t for t in self.store.all_tracklets()
-            if t.is_active
+            if not t.is_removed
             and isinstance(t.annotation, Annotation)
             and self.geometry.angle_in_overlap(t.annotation.local_angle, self.config.seam.reach - 1.0)
         ]
 
+        def nearest_match(t: Tracklet) -> Tracklet | None:
+            best: Tracklet | None = None
+            best_diff: float = float('inf')
+            assert isinstance(t.annotation, Annotation)
+            for o in observations:
+                if o is t or not self._observations_match(t, o):
+                    continue
+                assert isinstance(o.annotation, Annotation)
+                diff: float = self.geometry.angle_diff(t.annotation.world_angle, o.annotation.world_angle)
+                if diff < best_diff:
+                    best_diff = diff
+                    best = o
+            return best
+
+        nearest: list[Tracklet | None] = [nearest_match(t) for t in observations]
+
         used: set[int] = set()  # world ids already committed to a pair
         pairs: list[tuple[int, int]] = []
-        for a, b in combinations(observations, 2):
+        for (i, a), (j, b) in combinations(enumerate(observations), 2):
             if a.id == b.id:
                 continue
             if a.id in used or b.id in used:
                 continue
-            if not self._observations_match(a, b):
+            # A LOST observation may anchor a merge, but never merge two
+            # worlds on lost data alone.
+            if not (a.is_active or b.is_active):
+                continue
+            if nearest[i] is not b or nearest[j] is not a:
                 continue
             # Older world wins
             members_a: list[Tracklet] = self.store.get_tracklets(a.id)
@@ -295,6 +363,6 @@ class Tracker(Thread, BaseTracker):
         for t in cam_tracklets:
             tracklet: Tracklet | None = Tracklet.from_depthcam(cam_id, t)
             if tracklet is None:
-                logger.warning(f"PanoramicTracker: Invalid tracklet from camera {cam_id}, skipping.")
+                logger.warning(f"Invalid tracklet from camera {cam_id}, skipping.")
                 continue
             self._input_queue.put(tracklet)

@@ -146,7 +146,7 @@ class Sequencer:
     def _start_show(self) -> None:
         self._build_playlist()
         if not self._playlist:
-            logger.warning("Sequencer: empty stages playlist, not starting")
+            logger.warning("empty stages playlist, not starting")
             return
         self._active = True
         self.config.running = True

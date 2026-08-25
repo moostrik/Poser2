@@ -19,7 +19,7 @@ class FilterTracker(TrackerBase):
     def __init__(self, pipelines: dict[int, FilterPipeline]) -> None:
         super().__init__()
         if not pipelines:
-            raise ValueError("FilterTracker: pipelines dict must not be empty.")
+            raise ValueError("pipelines dict must not be empty.")
         self._pipelines = pipelines
 
     def process(self, poses: FrameDict) -> FrameDict:
@@ -36,7 +36,7 @@ class FilterTracker(TrackerBase):
             try:
                 filtered_poses[id] = self._pipelines[id].process(pose)
             except Exception as e:
-                logger.error(f"FilterTracker: Error processing pose {id}: {e}")
+                logger.error(f"Error processing pose {id}: {e}")
                 filtered_poses[id] = pose
 
         self._notify_frames_callbacks(filtered_poses)

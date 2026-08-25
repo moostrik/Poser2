@@ -1,4 +1,4 @@
-﻿"""Divergence shader - Compute divergence of velocity field."""
+"""Divergence shader - Compute divergence of velocity field."""
 
 from OpenGL.GL import *  # type: ignore
 from modules.gl import Shader, draw_quad, Texture

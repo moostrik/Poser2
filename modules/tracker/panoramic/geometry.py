@@ -1,8 +1,15 @@
+import math
 from enum import IntEnum
 
 import numpy as np
 
 from modules.utils import Rect
+
+
+# Distance estimation is clamped to a plausible range so a degenerate bounding
+# box can never produce a nonsensical parallax correction.
+_MIN_DISTANCE: float = 0.5
+_MAX_DISTANCE: float = 10.0
 
 
 class DistortAlgorithm(IntEnum):
@@ -24,15 +31,50 @@ class Geometry:
         self._poly_k2: float = 0.0
         self.algorithm: DistortAlgorithm = DistortAlgorithm.NONE
 
-    def get_angles_and_overlap(self, roi: Rect, cam_id: int, expansion: float) -> tuple[float, float, bool]:
-        local_angle, world_angle = self.calc_angle(roi, cam_id)
-        overlap: bool = self.angle_in_overlap(local_angle, expansion)
-        return (local_angle, world_angle, overlap)
+        # Parallax: cameras sit on a ring of this radius (m), not at the shared
+        # centre the world-angle model assumes. 0 disables the correction.
+        self._ring_radius: float = 0.0
+        self._person_height: float = 1.7
+        self._vfov: float = 71.6
 
-    def calc_angle(self, roi: Rect, cam_id: int) -> tuple[float, float]:
+    def get_angles_and_overlap(self, roi: Rect, cam_id: int, expansion: float) -> tuple[float, float, bool, float]:
+        local_angle, world_angle, distance = self.calc_angle(roi, cam_id)
+        overlap: bool = self.angle_in_overlap(local_angle, expansion)
+        return (local_angle, world_angle, overlap, distance)
+
+    def calc_angle(self, roi: Rect, cam_id: int) -> tuple[float, float, float]:
         local_angle: float = self._calc_local_angle(roi)
-        world_angle: float = self._calc_world_angle(local_angle, cam_id)
-        return local_angle, world_angle
+        distance: float = self.estimate_distance(roi)
+        # Edge/overlap/hysteresis tests stay in the raw camera frame; only the
+        # world angle is re-projected to the shared centre for cross-camera fusion.
+        corrected_local: float = self._parallax_corrected_local(local_angle, distance)
+        world_angle: float = self._calc_world_angle(corrected_local, cam_id)
+        return local_angle, world_angle, distance
+
+    def estimate_distance(self, roi: Rect) -> float:
+        """Estimate distance from the camera (m) from the bounding-box height,
+        assuming a person of ``person_height`` filling ``roi.height`` of a frame
+        with vertical field of view ``vfov``. Clamped to a plausible range."""
+        angular_height: float = roi.height * self._vfov
+        if angular_height <= 0.0:
+            return _MAX_DISTANCE
+        half_angle: float = math.radians(angular_height / 2.0)
+        distance: float = (self._person_height / 2.0) / math.tan(half_angle)
+        return max(_MIN_DISTANCE, min(_MAX_DISTANCE, distance))
+
+    def _parallax_corrected_local(self, local_angle: float, distance: float) -> float:
+        """Re-project a local angle so it reads as if seen from the rig centre.
+
+        The camera faces radially outward, so the centre sits ``ring_radius``
+        behind it. Placing the person at (distance, angle) in the camera frame
+        and re-measuring the bearing from the centre removes the cross-camera
+        seam disagreement caused by the off-centre mounting."""
+        if self._ring_radius <= 0.0:
+            return local_angle
+        theta: float = math.radians(local_angle - self.cam_fov / 2.0)
+        x: float = distance * math.cos(theta) + self._ring_radius
+        y: float = distance * math.sin(theta)
+        return math.degrees(math.atan2(y, x)) + self.cam_fov / 2.0
 
     def _calc_local_angle(self, roi: Rect) -> float:
         normalized_x: float = roi.x + roi.width / 2.0
@@ -97,3 +139,12 @@ class Geometry:
 
     def set_algorithm(self, algorithm: DistortAlgorithm) -> None:
         self.algorithm = algorithm
+
+    def set_ring_radius(self, ring_radius: float) -> None:
+        self._ring_radius = ring_radius
+
+    def set_person_height(self, person_height: float) -> None:
+        self._person_height = person_height
+
+    def set_vfov(self, vfov: float) -> None:
+        self._vfov = vfov

@@ -12,11 +12,14 @@ need.  Render layers declare the protocol slice they require (e.g.
 """
 
 from .frames import                 HasFrames, FrameStoreMixin
+from .ghosts import                 HasGhosts, GhostStoreMixin
 from .windows import                HasWindows, WindowStoreMixin
 from .inference import                 HasCameraImages, CameraImageStoreMixin, HasCropImages, CropImageStoreMixin, \
                                     HasSegmentationImages, SegmentationImageStoreMixin
 from .depth_tracklets import        HasDepthTracklets, DepthTrackletStoreMixin
 from .sequence import               HasSequence, SequenceStoreMixin
+from .playhead import               HasPlayhead, PlayheadStoreMixin
 from .tracklets import              HasTracklets, TrackletStoreMixin
+from .video import                  HasVideoImages, VideoImageStoreMixin
 from .composition_output import     HasCompositionOutput, CompositionOutputStoreMixin, HasCompositionDebug, \
                                     CompositionDebugStoreMixin

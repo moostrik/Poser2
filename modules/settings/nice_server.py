@@ -10,6 +10,7 @@ from nicegui import ui, app as nicegui_app
 
 from .base_settings import BaseSettings
 from .field import Field
+from .nice_util import SafeTimer
 from . import nice_panel as nice_panel_module
 
 logger = logging.getLogger(__name__)
@@ -70,7 +71,7 @@ class NiceServer:
                         except Exception:
                             logger.warning('Settings UI reload failed', exc_info=True)
 
-                    ui.timer(0.5, _reload_panel_if_changed)
+                    SafeTimer(0.5, _reload_panel_if_changed)
 
                 with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
                     panel_module.create_settings_panel(root, title=title, port=port, on_exit=on_exit)

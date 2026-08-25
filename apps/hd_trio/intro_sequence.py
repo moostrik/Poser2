@@ -122,9 +122,9 @@ class IntroSequencePlayer:
                 self._duration = float(ts[-1]) - self._time_offset
                 logger.info("IntroSequencePlayer loaded %.1fs from %s", self._duration, folder)
             else:
-                logger.warning("IntroSequencePlayer: no frames in %s", folder)
+                logger.warning("no frames in %s", folder)
         else:
-            logger.warning("IntroSequencePlayer: folder not found: %s", folder)
+            logger.warning("folder not found: %s", folder)
 
     @property
     def active(self) -> bool:

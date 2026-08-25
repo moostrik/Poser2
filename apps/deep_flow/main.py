@@ -41,7 +41,7 @@ class DeepFlowMain:
 
         # BLACKBOARD
         self.board = RenderBoard()
-        self.sound_osc = OscSound(self.settings.inout.osc_sound)
+        self.osc_sound = OscSound(self.settings.inout.osc_sound)
 
         # CAMERA
         configure_features(num_players)
@@ -107,7 +107,7 @@ class DeepFlowMain:
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),
-                partial(self.sound_osc.set_frames, stage),
+                partial(self.osc_sound.set_frames, stage),
                 wt.process,
             ])
 
@@ -210,7 +210,7 @@ class DeepFlowMain:
         self.segmentation_predictor.start()
         self.optical_flow_predictor.start()
 
-        self.sound_osc.start()
+        self.osc_sound.start()
 
         if self.player:
             self.player.start()
@@ -242,7 +242,7 @@ class DeepFlowMain:
             self.recorder.stop()
 
         self.tracker.stop()
-        self.sound_osc.stop()
+        self.osc_sound.stop()
 
         self.pose_predictor.stop()
         self.segmentation_predictor.stop()

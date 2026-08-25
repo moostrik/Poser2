@@ -118,7 +118,7 @@ class CompositeLayer(LayerBase):
         else:
             logger.warning("LUT directory not found: %s", lut_dir)
             filenames = []
-        self.config.lut.files = filenames
+        self.config.lut.files = [""] + filenames
         if self.config.lut.file and self.config.lut.file not in filenames:
             self.config.lut.file = ""
 

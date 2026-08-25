@@ -7,6 +7,7 @@ class RecorderSettings(BaseSettings):
     # ── Initial settings ───────────────────────────────────────────────
     num_cameras:        Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
     fps:                Field[float]            = Field(30.0, access=Field.INIT, description="Camera frame rate")
+    keyframe_interval:  Field[int]              = Field(0, access=Field.INIT, description="Keyframe interval in frames (0 = encoder default, 1 = every frame)")
     temp_path:          Field[str]              = Field("temp", access=Field.INIT, description="Temporary files directory")
     video_encoder:      Field[CoderType]        = Field(CoderType.iGPU, access=Field.INIT, description="Video encoder type")
     video_format:       Field[CoderFormat]      = Field(CoderFormat.H264, access=Field.INIT, description="Video format")

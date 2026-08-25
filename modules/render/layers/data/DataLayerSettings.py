@@ -1,6 +1,7 @@
 # Standard library imports
 import math
 from enum import IntEnum, auto
+from typing import Protocol
 
 # Local application imports
 from modules.settings import Field, BaseSettings
@@ -42,6 +43,21 @@ class LayerMode(IntEnum):
     NONE =      0
     FRAME =     auto()
     WINDOW =    auto()
+
+
+class DataLayerConfig(Protocol):
+    """Structural config a data layer reads. `DataLayerSettings` satisfies it, and so can an
+    app-local settings class whose `feature_field` is a different IntEnum (keys into the
+    layer's `feature_map`). Lets the generic layers serve app-owned dropdowns without
+    depending on the module-global feature enum."""
+    mode:              LayerMode
+    feature_field:     IntEnum
+    stage:             int
+    line_width:        float
+    line_smooth:       float
+    use_scores:        bool
+    render_labels:     bool
+    use_history_color: bool
 
 
 class DataLayerSettings(BaseSettings):

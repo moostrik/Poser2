@@ -168,7 +168,7 @@ class WindowSimilarity:
                     cb(result)
 
             except Exception as e:
-                logger.error(f"WindowSimilarity: Processing error: {e}")
+                logger.error(f"Processing error: {e}")
     def _process(
         self,
         windows: FeatureWindowDict,

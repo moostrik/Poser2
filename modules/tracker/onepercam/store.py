@@ -24,14 +24,14 @@ class TrackletStore:
 
             if tracklet_id in self._tracklets:
                 logger.warning(
-                    f"TrackletManager: Tracklet with cam_id "
+                    f"Tracklet with cam_id "
                     f"{tracklet_id} already exists. Skipping addition."
                 )
                 return None
 
             if tracklet_id >= self._max_size:
                 logger.warning(
-                    f"TrackletManager: Tracklet with cam_id "
+                    f"Tracklet with cam_id "
                     f"{tracklet_id} exceeds max size {self._max_size}. "
                     f"Skipping addition."
                 )
@@ -49,7 +49,7 @@ class TrackletStore:
         with self._lock:
             tracklet: Tracklet | None = self._tracklets.pop(id, None)
             if tracklet is None:
-                logger.warning(f"TrackletManager: Attempted to remove non-existent tracklet with ID {id}.")
+                logger.warning(f"Attempted to remove non-existent tracklet with ID {id}.")
 
     def get_tracklet(self, id: int) -> Tracklet | None:
         with self._lock:
@@ -70,7 +70,7 @@ class TrackletStore:
         with self._lock:
             old_tracklet: Tracklet | None = self._tracklets.get(id)
             if old_tracklet is None:
-                logger.warning(f"TrackletManager: Attempted to replace non-existent tracklet with ID {id}.")
+                logger.warning(f"Attempted to replace non-existent tracklet with ID {id}.")
                 return -1
 
             status: TrackingStatus = new_tracklet.status
@@ -95,7 +95,7 @@ class TrackletStore:
         with self._lock:
             tracklet: Tracklet | None = self._tracklets.get(id)
             if tracklet is None:
-                logger.warning(f"TrackletManager: Attempted to retire non-existent tracklet with ID {id}.")
+                logger.warning(f"Attempted to retire non-existent tracklet with ID {id}.")
                 return
             self._tracklets[id] = replace(tracklet, status=TrackingStatus.REMOVED)
 
@@ -103,6 +103,6 @@ class TrackletStore:
         with self._lock:
             tracklet: Tracklet | None = self._tracklets.get(id)
             if tracklet is None:
-                logger.warning(f"TrackletManager: Attempted to lose non-existent tracklet with ID {id}.")
+                logger.warning(f"Attempted to lose non-existent tracklet with ID {id}.")
                 return
             self._tracklets[id] = replace(tracklet, status=TrackingStatus.LOST)

@@ -43,7 +43,7 @@ class FrameCallbackMixin:
             for callback in self._frame_callbacks:
                 try:
                     callback(frame)
-                except Exception as e:
+                except Exception:
                     logger.exception("Error in callback")
     def add_frame_callback(self, callback: FrameCallback) -> None:
         """Register output callback.
@@ -99,7 +99,7 @@ class FrameDictCallbackMixin:
             for callback in self._frames_callbacks:
                 try:
                     callback(frames)
-                except Exception as e:
+                except Exception:
                     logger.exception("Error in callback")
     def add_frames_callback(self, callback: FrameDictCallback) -> None:
         """Register output callback.
@@ -136,7 +136,7 @@ class FrameWindowDictCallbackMixin:
             for callback in self._frame_window_callbacks:
                 try:
                     callback(windows)
-                except Exception as e:
+                except Exception:
                     logger.exception("Error in callback")
     def add_windows_callback(self, callback: FrameWindowDictCallback) -> None:
         with self._frame_window_callback_lock:

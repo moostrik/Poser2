@@ -292,13 +292,13 @@ class _DataLayerSettings(layers.DataLayerSettings):
     stage: Field[Stage] = Field(Stage.SMOOTH)
 
 class _TrackerCompSettings(layers.TrackerCompSettings):
-    stage: Field[Stage] = Field(Stage.LERP)
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
 class _PoseCompSettings(layers.PoseCompSettings):
-    stage: Field[Stage] = Field(Stage.LERP)
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
 
 class _CentreGeomSettings(layers.CentreGeomSettings):
-    stage: Field[Stage] = Field(Stage.SMOOTH)
+    stage: Field[Stage] = Field(Stage.SMOOTH, description="Pose data pipeline stage")
 
 
 class LayerGroup(BaseSettings):

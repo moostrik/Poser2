@@ -98,7 +98,7 @@ class RunnerTRT(Thread):
         self.join(timeout=2.0)
 
         if self.is_alive():
-            logger.warning("Warning: TensorRT inference thread did not stop cleanly")
+            logger.warning("Pose inference thread did not stop cleanly")
 
         try:
             self._callback_queue.put_nowait(None)
@@ -107,7 +107,7 @@ class RunnerTRT(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            logger.warning("Warning: TensorRT callback thread did not stop cleanly")
+            logger.warning("Pose callback thread did not stop cleanly")
 
     def run(self) -> None:
         self._setup()
@@ -123,7 +123,7 @@ class RunnerTRT(Thread):
             try:
                 self._process()
             except Exception as e:
-                logger.error(f"TensorRT Detection Error: {str(e)}")
+                logger.error(f"Pose: {str(e)}")
     def submit(self, input_batch: DetectionInput) -> None:
         """Submit batch for processing. Replaces pending batch if not yet started.
 
@@ -137,7 +137,7 @@ class RunnerTRT(Thread):
 
         # Validate batch size
         if len(input_batch.gpu_images) > self._max_batch:
-            logger.warning(f"TensorRT Detection Warning: Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
+            logger.warning(f"Pose Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: DetectionInput | None = None
 
@@ -146,7 +146,7 @@ class RunnerTRT(Thread):
                 dropped_batch = self._pending_batch
                 if self.verbose:
                     lag = int((time.time() - self._input_timestamp) * 1000)
-                    logger.info(f"TensorRT Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms")
+                    logger.info(f"Pose: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -173,7 +173,7 @@ class RunnerTRT(Thread):
 
                 self.engine = runtime.deserialize_cuda_engine(engine_data)
                 if self.engine is None:
-                    logger.error("TensorRT Detection ERROR: Failed to load engine")
+                    logger.error("Pose: Failed to load engine")
                     return
 
                 self.context = self.engine.create_execution_context()
@@ -194,7 +194,7 @@ class RunnerTRT(Thread):
 
             # Validate expected tensor counts
             if len(self.output_names) != 2:
-                logger.error(f"TensorRT Detection ERROR: Expected 2 outputs, got {len(self.output_names)}")
+                logger.error(f"Pose: Expected 2 outputs, got {len(self.output_names)}")
                 return
 
             # Determine model precision from input tensor
@@ -246,10 +246,10 @@ class RunnerTRT(Thread):
             self.context.set_tensor_address(self.input_name, self._input_buffer.data_ptr())
 
             self._model_ready.set()
-            logger.info(f"TensorRT Detection: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
+            logger.info(f"Pose: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
 
         except Exception as e:
-            logger.error(f"TensorRT Detection Error: Failed to load model - {str(e)}")
+            logger.error(f"Pose: Failed to load model - {str(e)}")
             return
 
     def _claim(self) -> DetectionInput | None:
@@ -291,7 +291,7 @@ class RunnerTRT(Thread):
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            logger.warning("TensorRT Detection Warning: Callback queue full")
+            logger.warning("Pose Callback queue full, dropping results")
 
     def _infer(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray, float, float]:
         """Run TensorRT inference on batch of GPU images.
@@ -397,7 +397,7 @@ class RunnerTRT(Thread):
                 for callback in callbacks:
                     try:
                         callback(output)
-                    except Exception as e:
+                    except Exception:
                         logger.exception("Error in callback")
                 self._callback_queue.task_done()
             except Empty:

@@ -1,4 +1,4 @@
-﻿"""VorticityForce shader - Compute vorticity confinement force."""
+"""VorticityForce shader - Compute vorticity confinement force."""
 
 from OpenGL.GL import *  # type: ignore
 from modules.gl import Shader, draw_quad, Texture

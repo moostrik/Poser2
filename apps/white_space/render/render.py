@@ -13,17 +13,25 @@ from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-from .board import RenderBoard
-from ..settings import Layers, RenderSettings
+from ..board import Board
+from ..pose import PlayheadOffset, GhostFeature
+from ..settings import Layers, RenderSettings, PlayheadFeatureSelect
+
+# Maps the app-local feature dropdown to the concrete app features. Kept here (not in
+# settings, which stays data-only) and handed to the generic data layers via feature_map.
+PLAYHEAD_FEATURE_MAP = {
+    PlayheadFeatureSelect.PlayheadOffset: PlayheadOffset,
+    PlayheadFeatureSelect.GhostFeature:   GhostFeature,
+}
 
 
-class WhiteSpaceRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings) -> None:
+class Render(RenderBase):
+    def __init__(self, board: Board, settings: RenderSettings) -> None:
         super().__init__(settings.window)
         self.num_players: int = settings.num_players
         self.num_cams: int = settings.num_cams
         self.settings: RenderSettings = settings
-        self.board: RenderBoard = board
+        self.board: Board = board
 
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
 
@@ -49,9 +57,11 @@ class WhiteSpaceRender(RenderBase):
                 settings.preview.poser,
                 settings.colors,
             )
-            self.L[Layers.data_W][i]    = FeatureWindowLayer(i, board, settings.data, settings.colors)
-            self.L[Layers.data_F][i]    = FeatureFrameLayer( i, board, settings.data, settings.colors)
-            self.L[Layers.data_time][i] = MTimeRenderer(     i, board)
+            self.L[Layers.data_W][i]    = FeatureWindowLayer(i, board, settings.data, settings.colors) # type: ignore
+            self.L[Layers.data_F][i]    = FeatureFrameLayer( i, board, settings.data, settings.colors)   # type: ignore
+            self.L[Layers.data_time][i] = MTimeRenderer(     i, board, settings.data_time)
+            self.L[Layers.data_playhead_W][i] = FeatureWindowLayer(i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
+            self.L[Layers.data_playhead_F][i] = FeatureFrameLayer( i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
 
         # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready
         self.L[Layers.ws_tracker][0] = PanoramicTrackerLayer(board, self.num_cams, settings.colors)
@@ -139,6 +149,8 @@ class WhiteSpaceRender(RenderBase):
             self.L[Layers.data_W][i].draw()
             self.L[Layers.data_F][i].draw()
             self.L[Layers.data_time][i].draw()
+            self.L[Layers.data_playhead_W][i].draw()
+            self.L[Layers.data_playhead_F][i].draw()
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         pass

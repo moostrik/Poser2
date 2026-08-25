@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-from .base import NormalizedSingleValue
+from .base import SingleAngle
 
 
-class Azimuth(NormalizedSingleValue):
-    """Horizontal world-space position normalized to [0, 1] over 360°.
+class Azimuth(SingleAngle):
+    """Horizontal world-space angular position in radians [-π, π).
 
     Populated by the panoramic tracker. Absent (NaN, score 0.0) for other tracker types.
     """
-
-    @classmethod
-    def range(cls) -> tuple[float, float]:
-        return (0.0, 1.0)

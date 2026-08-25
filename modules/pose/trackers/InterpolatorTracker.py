@@ -19,7 +19,7 @@ class InterpolatorTracker(TrackerBase):
     def __init__(self, pipelines: dict[int, InterpolatorPipeline]) -> None:
         super().__init__()
         if not pipelines:
-            raise ValueError("InterpolatorTracker: pipelines dict must not be empty.")
+            raise ValueError("pipelines dict must not be empty.")
         self._pipelines = pipelines
 
     def set(self, poses: FrameDict) -> None:
@@ -34,7 +34,7 @@ class InterpolatorTracker(TrackerBase):
             for id, pose in poses.items():
                 self._pipelines[id].set(pose)
         except Exception as e:
-            logger.error(f"InterpolatorTracker: Error setting pose {id}: {e}")
+            logger.error(f"Error setting pose {id}: {e}")
 
     def update(self) -> FrameDict:
         """Get interpolated poses from all pipelines."""
@@ -47,7 +47,7 @@ class InterpolatorTracker(TrackerBase):
                 if pose is not None:
                     interpolated_poses[id] = pose
         except Exception as e:
-            logger.error(f"InterpolatorTracker: Error updating pose {id}: {e}")
+            logger.error(f"Error updating pose {id}: {e}")
 
         self._notify_frames_callbacks(interpolated_poses)
 

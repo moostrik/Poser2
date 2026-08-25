@@ -14,15 +14,17 @@ from enum import IntEnum, auto
 from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
 from modules.oak import CameraSettings, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
+from modules.render.layers import LayerMode
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import PanoramicTrackerSettings
 from modules.pose import nodes, trackers, window, analytics
 from modules import inference
 from modules.session import SessionSettings, SequencerSettings
 from modules.gl import WindowSettings
-from .composition import CompositorSettings
-from .osc_light import OscLightSettings
-from .udp_receiver import UdpReceiverSettings
+from .light import LightSettings
+from .inout import OscLightSettings, UdpReceiverSettings
+from .pose import GhosterSettings
+from .escalator import GhostEscalatorSettings
 
 
 # ---------------------------------------------------------------------------
@@ -71,6 +73,8 @@ class Layers(IntEnum):
     data_W       = auto()
     data_F       = auto()
     data_time    = auto()
+    data_playhead_W = auto()
+    data_playhead_F = auto()
 
 
 # ---------------------------------------------------------------------------
@@ -88,8 +92,9 @@ class OakGroup(BaseSettings):
     hd_ready          : Field[bool]            = Field(False, access=Field.INIT, description="Use HD resolution")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, description="Model files directory")
+    ir_flood_light    : Field[float]           = Field(0.8, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
 
-    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path]
+    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path, ir_flood_light]
 
     cam_0     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_1     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
@@ -110,14 +115,17 @@ class OakGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class _OscSoundSettings(OscSoundSettings):
-    stage: Field[Stage] = Field(Stage.LERP)
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage to read poses from")
+    virtual_players: Field[int] = Field(0, min=0, max=16, access=Field.INIT, visible=False, description="Extra virtual (ghost) id slots beyond max_players (shared from root num_virtual)")
 
 
 class InOutGroup(BaseSettings):
     num_players:     Field[int] = Field(8,   access=Field.INIT, visible=False)
+    num_virtual:     Field[int] = Field(8,   access=Field.INIT, visible=False)
     resolution:      Field[int] = Field(3600, access=Field.INIT, visible=False)
     osc_light      : Group[OscLightSettings]       = Group(OscLightSettings, share=[resolution])
-    osc_sound      : Group[_OscSoundSettings]      = Group(_OscSoundSettings, share=[num_players.as_('max_players')])
+    # OSC sends max_players (live) + virtual_players (ghost) id slots; both shared from root.
+    osc_sound      : Group[_OscSoundSettings]      = Group(_OscSoundSettings, share=[num_players.as_('max_players'), num_virtual.as_('virtual_players')])
     osc_receiver   : Group[OscReceiverSettings]    = Group(OscReceiverSettings)
     udp_receiver   : Group[UdpReceiverSettings]    = Group(UdpReceiverSettings)
 
@@ -205,6 +213,7 @@ class PoseGroup(BaseSettings):
     segmentation    : Group[inference.segmentation.Settings] = Group(inference.segmentation.Settings, share=[max_poses, model_type, model_path, verbose])
     image_crop      : Group[inference.crop.Settings]         = Group(inference.crop.Settings, share=[max_poses])
     angle_extractor : Group[nodes.AngleExtractorSettings]    = Group(nodes.AngleExtractorSettings)
+    distance_extractor: Group[nodes.DistanceExtractorSettings] = Group(nodes.DistanceExtractorSettings)
     bbox            : Group[BboxFeature]                     = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                    = Group(PointFeature, share=_feature_share)
     angle           : Group[AngleFeature]                    = Group(AngleFeature, share=_feature_share)
@@ -248,10 +257,16 @@ class SessionGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class _TrackerCompSettings(layers.TrackerCompSettings):
-    stage: Field[Stage] = Field(Stage.LERP)
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
 class _PoseCompSettings(layers.PoseCompSettings):
-    stage: Field[Stage] = Field(Stage.LERP)
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
+
+class _MTimeSettings(layers.MTimeRendererSettings):
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
+
+class _DataLayerSettings(layers.DataLayerSettings):
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
 
 class PreviewGroup(BaseSettings):
@@ -259,13 +274,50 @@ class PreviewGroup(BaseSettings):
     poser  : Group[_PoseCompSettings]    = Group(_PoseCompSettings)
 
 
+class PlayheadFeatureSelect(IntEnum):
+    """App-local feature dropdown for the playhead data layers (keys PLAYHEAD_FEATURE_MAP)."""
+    PlayheadOffset    = 0
+    GhostFeature      = auto()
+
+
+class PlayheadDataLayerSettings(BaseSettings):
+    """App-owned data-layer config (mirrors DataLayerSettings, but its own feature dropdown).
+
+    Drives the generic FeatureWindowLayer/FeatureFrameLayer over the app's playhead features.
+    Defaults off (mode NONE) and to the LERP stage — the only stage where the features exist.
+    Set the generic ``data.mode`` to NONE when enabling this to avoid two graphs overlapping.
+    """
+    stage:             Field[Stage]               = Field(Stage.LERP)
+    mode:              Field[LayerMode]            = Field(LayerMode.NONE)
+    feature_field:     Field[PlayheadFeatureSelect] = Field(PlayheadFeatureSelect.GhostFeature)
+    line_width:        Field[float]               = Field(3.0)
+    line_smooth:       Field[float]               = Field(1.0)
+    use_scores:        Field[bool]                = Field(False)
+    render_labels:     Field[bool]                = Field(True)
+    use_history_color: Field[bool]                = Field(False)
+
+
 class RenderSettings(BaseSettings):
     num_cams:    Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of players")
-    preview:     Group[PreviewGroup]     = Group(PreviewGroup)
-    data:        Group[layers.DataLayerSettings] = Group(layers.DataLayerSettings)
-    colors:      Group[ColorSettings]    = Group(ColorSettings)
-    window:      Group[WindowSettings]   = Group(WindowSettings)
+    preview:     Group[PreviewGroup]        = Group(PreviewGroup)
+    data_time:   Group[_MTimeSettings]      = Group(_MTimeSettings)
+    data:        Group[_DataLayerSettings]  = Group(_DataLayerSettings)
+    playhead_data: Group[PlayheadDataLayerSettings] = Group(PlayheadDataLayerSettings)
+    colors:      Group[ColorSettings]       = Group(ColorSettings)
+    window:      Group[WindowSettings]      = Group(WindowSettings)
+
+
+# ---------------------------------------------------------------------------
+#  Ghost group — the ghost subsystem: the Ghoster and its motor Escalator
+# ---------------------------------------------------------------------------
+
+class GhostGroup(BaseSettings):
+    live_players: Field[int] = Field(4, access=Field.INIT, visible=False, description="Live player count (shared from root num_players)")
+    ghost_slots:  Field[int] = Field(8, min=0, max=16, access=Field.INIT, visible=False, description="Ghost id pool size (shared from root num_virtual)")
+
+    ghoster  : Group[GhosterSettings]        = Group(GhosterSettings, share=[live_players, ghost_slots])
+    escalator: Group[GhostEscalatorSettings] = Group(GhostEscalatorSettings)
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +325,8 @@ class RenderSettings(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class Settings(BaseSettings):
-    num_players     : Field[int]   = Field(8, access=Field.INIT)
+    num_players     : Field[int]   = Field(4, access=Field.INIT)
+    num_virtual     : Field[int]   = Field(8, access=Field.INIT)
     num_cameras     : Field[int]   = Field(4, access=Field.INIT)
     input_fps       : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     render_fps      : Field[float] = Field(30.0)
@@ -281,9 +334,10 @@ class Settings(BaseSettings):
     fov             : Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV — shared with tracker and composition")
 
     camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov])
-    inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players'), light_resolution.as_('resolution')])
+    inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players'), num_virtual.as_('num_virtual'), light_resolution.as_('resolution')])
     pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
-    composition: Group[CompositorSettings] = Group(CompositorSettings, share=[num_players.as_('max_poses'), num_cameras.as_('num_cameras'), input_fps.as_('light_rate'), light_resolution.as_('light_resolution'), fov])
+    ghost  : Group[GhostGroup]      = Group(GhostGroup, share=[num_players.as_('live_players'), num_virtual.as_('ghost_slots')])
+    light: Group[LightSettings] = Group(LightSettings, share=[num_players.as_('max_poses'), num_cameras.as_('num_cameras'), light_resolution.as_('light_resolution'), fov])
     render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams')])
     server : Group[NiceSettings]    = Group(NiceSettings)
     session: Group[SessionGroup]    = Group(SessionGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])

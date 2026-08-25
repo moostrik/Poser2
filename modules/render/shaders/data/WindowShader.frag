@@ -45,12 +45,6 @@ void main() {
     vec2 stream_uv = vec2(texCoord.x, flipped_y);
     vec2 frag_pos = vec2(texCoord.x, flipped_y);
 
-    // Draw stream separator lines
-    if (isBetweenStreamLine(stream_uv, stream_step, line_width / output_aspect_ratio * 0.5, num_streams, used_height)) {
-        fragColor = vec4(1.0, 1.0, 1.0, 1.0);  // White separator lines
-        return;
-    }
-
     // Calculate stream ID and bounds
     int stream_id = int(floor(stream_uv.y / stream_step));
     float stream_center = (float(stream_id) + 0.5) * stream_step;
@@ -62,25 +56,28 @@ void main() {
     float value = texture(tex0, value_uv).r;
     float mask = texture(tex0, value_uv).g;
 
-    if (mask < 0.001) {
-        fragColor = vec4(0.0);
-        return;
+    // Draw the data dot FIRST so it sits in front of the white separator lines.
+    // (Otherwise a value landing on a band boundary — e.g. 0 or 1 — is hidden by the line.)
+    if (mask >= 0.001) {
+        float norm = clamp((value - display_range.x) / (display_range.y - display_range.x), 0.0, 1.0);
+        // Invert norm so high values are at top, low values at bottom
+        vec2 point = vec2(value_uv.x, stream_top + (1.0 - norm) * stream_step);
+
+        // Draw continuous dots (no spacing)
+        float dot_radius = line_width * 2.0;
+        vec2 diff = frag_pos - point;
+        // Correct for aspect ratio by dividing Y
+        diff.y /= output_aspect_ratio;
+        if (length(diff) < dot_radius) {
+            int color_index = stream_id % num_colors;
+            fragColor = colors[color_index];
+            return;
+        }
     }
 
-    float norm = clamp((value - display_range.x) / (display_range.y - display_range.x), 0.0, 1.0);
-    // Invert norm so high values are at top, low values at bottom
-    vec2 point = vec2(value_uv.x, stream_top + (1.0 - norm) * stream_step);
-
-    // Draw continuous dots (no spacing)
-    float dot_radius = line_width * 2.0;
-    vec2 diff = frag_pos - point;
-    // Correct for aspect ratio by dividing Y
-    diff.y /= output_aspect_ratio;
-    float dist = length(diff);
-    if (dist < dot_radius) {
-        int color_index = stream_id % num_colors;
-        vec4 dot_color = colors[color_index];
-        fragColor = dot_color;
+    // Stream separator lines behind the data
+    if (isBetweenStreamLine(stream_uv, stream_step, line_width / output_aspect_ratio * 0.5, num_streams, used_height)) {
+        fragColor = vec4(1.0, 1.0, 1.0, 1.0);  // White separator lines
         return;
     }
 

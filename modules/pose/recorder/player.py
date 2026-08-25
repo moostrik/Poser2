@@ -41,7 +41,7 @@ class Player:
         """Discover and load all ``pose_*.h5`` files in *folder*."""
         chunk_files = sorted(folder.glob('pose_*.h5'))
         if not chunk_files:
-            logger.warning("Player: no pose_*.h5 files in %s", folder)
+            logger.warning("no pose_*.h5 files in %s", folder)
         self._chunks = [read_chunk(f) for f in chunk_files]
 
         timestamps_list: list[np.ndarray] = []

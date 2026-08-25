@@ -1,4 +1,4 @@
-﻿"""FluidFlow3DArray - 3D Navier-Stokes fluid simulation using GL_TEXTURE_2D_ARRAY for density.
+"""FluidFlow3DArray - 3D Navier-Stokes fluid simulation using GL_TEXTURE_2D_ARRAY for density.
 
 Same pipeline as FluidFlow3D but density is stored as GL_TEXTURE_2D_ARRAY
 for optimal per-layer 2D tiling. Velocity, pressure, temperature, and

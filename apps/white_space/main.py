@@ -1,28 +1,27 @@
 """White Space — 3-camera panoramic installation with circular LED light output."""
 
-# TODO - should the compositor not use a board or even the renderboard?
-
 from typing import Optional
 from functools import partial
 
+import numpy as np
+
 from modules.utils import Broadcast
-from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder
+from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType
 from modules.settings import presets, NiceServer
 from modules.inout import OscReceiver
-from .sound_osc import WhiteSpaceSoundOsc
 from modules.tracker import PanoramicTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
 from modules.inference import source, crop, pose, segmentation
 from modules.session import Session, Sequencer
 from modules.gl import WindowSettings
 
-from .composition import Compositor
-from .osc_light import OscLight
-from .udp_receiver import UdpReceiver
-
-from .render.board import RenderBoard
+from .board import Board
+from .pose import GhostFeature, PlayheadOffset, PlayheadOffsetExtractor, Ghoster
+from .escalator import GhostEscalator
+from .light import Render as LightRender
+from .inout import OscLight, OscSound, UdpReceiver
+from .render import Render as WindowRender
 from .settings import Settings, Stage
-from .render import WhiteSpaceRender
 
 APP_NAME = 'white_space'
 DATA_PATH = 'apps/white_space/data'
@@ -49,18 +48,19 @@ class WhiteSpaceMain:
 
         num_players: int = self.settings.num_players
         num_cameras: int = self.settings.camera.num_cameras
-        print(f"Settings loaded: {num_players} players, {num_cameras} cameras, simulation={simulation}")
+        logging.info("Settings loaded: %s players, %s cameras, simulation=%s", num_players, num_cameras, simulation)
         ps = self.settings.pose
 
         # BLACKBOARD
-        self.board = RenderBoard()
+        self.board = Board()
 
         # SESSION
         self.session = Session(self.settings.session.core)
-        self.sound_osc = WhiteSpaceSoundOsc(self.settings.inout.osc_sound)
+        self.osc_sound = OscSound(self.settings.inout.osc_sound)
+        self.ghoster = Ghoster(self.settings.ghost.ghoster, playhead=self.board.get_playhead)   # live/pool counts shared from root
         self.sequencer = Sequencer(self.settings.session.sequencer)
         self.sequencer.add_state_callback(self.board.set_sequence)
-        self.sequencer.add_state_callback(self.sound_osc.set_sequencer_state)
+        self.sequencer.add_state_callback(self.osc_sound.set_sequencer_state)
         self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
 
         # CAMERA
@@ -108,36 +108,33 @@ class WhiteSpaceMain:
         self.poses_from_tracklets.add_frames_callback(self._process_poses)
 
         # STAGE WINDOW TRACKERS & BROADCASTS
+        # The LERP tracker also windows the app-local playhead features (the only stage where
+        # they're stamped) so the data layers can graph them; other stages use the built-ins.
+        lerp_features = features.SCALAR_FEATURES + [PlayheadOffset, GhostFeature]
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
-            wt = window.WindowTracker(num_players, getattr(ps, f'window_{stage.name.lower()}'))
+            wt_features = lerp_features if stage == Stage.LERP else None
+            wt = window.WindowTracker(num_players, getattr(ps, f'window_{stage.name.lower()}'), features=wt_features)
             wt.add_windows_callback(partial(self.board.set_windows, stage))
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),
-                partial(self.sound_osc.set_frames, stage),
                 wt.process,
             ])
 
-        # WS PIPELINE — composition output
-        self.compositor = Compositor(
-            self.settings.composition,
-            distortion=self.settings.camera.tracker.distortion,
-        )
+        # WS PIPELINE — light output
+        ws_input: Stage = Stage(int(ps.ws_input_stage))
+        self.light_renderer = LightRender(self.settings.light, distortion=self.settings.camera.tracker.distortion, board=self.board, pose_stage=int(ws_input))
         self.osc_light    = OscLight(self.settings.inout.osc_light)
         self.osc_receiver = OscReceiver(self.settings.inout.osc_receiver)
         self.udp_receiver = UdpReceiver(self.settings.inout.udp_receiver)
-        self.osc_receiver.bind("/WS/sensor/fall", lambda *_: self.compositor.notify_fall())
-        self.udp_receiver.bind("/WS/sensor/fall", lambda *_: self.compositor.notify_fall())
-        self.tracker.add_tracklet_callback(self.compositor.set_tracklets)
-        ws_input: Stage = Stage(int(ps.ws_input_stage))
-        self.stages[ws_input].add_callback(self.compositor.add_poses)
+        self.osc_receiver.bind("/WS/sensor/fall", self.light_renderer.notify_fall)
+        self.udp_receiver.bind("/WS/sensor/fall", self.light_renderer.notify_fall)
         for camera in self.cameras:
-            camera.add_frame_callback(self.compositor.set_image)
-        self.compositor.add_output_callback(self.osc_light.send_message)
-        self.compositor.add_output_callback(self.sound_osc.set_composition)
-        self.compositor.add_output_callback(self.board.set_composition_output)
+            camera.add_frame_callback(self._store_video_frame)
+        self.light_renderer.add_render_callback(self.osc_light.send_message)
+        self.light_renderer.add_render_callback(self.osc_sound.set_composition)
 
         # POSE STAGE RAW
         self.pose_predictor.add_frames_callback(self.stages[Stage.RAW])
@@ -220,6 +217,7 @@ class WhiteSpaceMain:
         })
         self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
+                nodes.DistanceExtractor(ps.distance_extractor),
                 nodes.AngleSymExtractor(),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
@@ -227,6 +225,7 @@ class WhiteSpaceMain:
                 nodes.AngleVelEuroSmoother(ps.velocity.smoother),
                 nodes.AngleMotionExtractor(ps.motion.extractor),
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
+                PlayheadOffsetExtractor(self.board.get_playhead),
             ])
             for i in range(num_players)
         })
@@ -238,13 +237,21 @@ class WhiteSpaceMain:
         self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
         self.filters_lerp.add_frames_callback(self.motion_gate_applicator.set)
         self.filters_lerp.add_frames_callback(self.gate_lerp.process)
-        self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
+        # Ghoster sits between LERP and the fan-out: records held poses, commits/refreshes ghosts,
+        # publishes the ghost snapshot to the board, and feeds (muted live + ghosts) to OSC sound.
+        self.gate_lerp.add_frames_callback(self.ghoster.process)
+        self.ghoster.add_frames_callback(self.stages[Stage.LERP])
+        self.ghoster.add_ghosts_callback(self.board.set_ghosts)
+        self.ghoster.add_sound_callback(partial(self.osc_sound.set_frames, int(Stage.LERP)))
+        # GhostEscalator counts ghosts ever made and escalates the motor LOW→HIGH at its threshold.
+        self.escalator = GhostEscalator(self.settings.ghost.escalator, self.settings.light.motor)
+        self.ghoster.add_new_ghost_callback(self.escalator.on_new_ghost)
 
         # RENDER
-        self.render = WhiteSpaceRender(self.board, self.settings.render)
+        self.render = WindowRender(self.board, self.settings.render)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
-        self.render.add_update_callback(self.sequencer.update)
-        self.render.add_update_callback(self.interpolators_lerp.update)
+        self.light_renderer.add_update_callback(self.sequencer.update)
+        self.light_renderer.add_update_callback(self.interpolators_lerp.update)
         self.render.add_exit_callback(self.stop)
 
     def start(self) -> None:
@@ -258,12 +265,12 @@ class WhiteSpaceMain:
         self.segmentation_predictor.start()
         self.window_similator.start()
         self.window_correlator.start()
-        self.compositor.start()
+        self.light_renderer.start()
         self.osc_light.start()
         self.osc_receiver.start()
         self.udp_receiver.start()
 
-        self.sound_osc.start()
+        self.osc_sound.start()
 
         if self.player:
             self.player.start()
@@ -271,6 +278,11 @@ class WhiteSpaceMain:
 
         self.is_running = True
         self.render.start()
+
+    def _store_video_frame(self, cam_id: int, frame_type: FrameType, frame: np.ndarray) -> None:
+        """Camera frame callback — store raw VIDEO frames on the board for the light renderer."""
+        if frame_type == FrameType.VIDEO:
+            self.board.set_video_image(cam_id, frame)
 
     def _process_poses(self, poses: FrameDict) -> None:
         images, prev_images = self.source_uploader.snapshot()
@@ -293,11 +305,13 @@ class WhiteSpaceMain:
         self.video_recorder.stop()
 
         self.tracker.stop()
-        self.sound_osc.stop()
+        self.osc_sound.stop()
+        self.escalator.stop()
+        self.ghoster.stop()
         self.osc_light.stop()
         self.osc_receiver.stop()
         self.udp_receiver.stop()
-        self.compositor.stop()
+        self.light_renderer.stop()
 
         self.pose_predictor.stop()
         self.segmentation_predictor.stop()

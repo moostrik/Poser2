@@ -1,5 +1,6 @@
 # Standard library imports
 from dataclasses import dataclass
+from enum import IntEnum
 from typing import Tuple
 
 # Third-party imports
@@ -8,11 +9,11 @@ from OpenGL.GL import *  # type: ignore
 # Local application imports
 from modules.board import HasFrames
 from modules.gl import Fbo, Texture, Blit, clear_color, Text
-from modules.pose.features import AngleVelocity
+from modules.pose.features import AngleVelocity, Angles, BaseScalarFeature
 from modules.pose.frame import Frame
 from ..LayerBase import LayerBase, DataCache, Rect
 from ...shaders import FeatureShader
-from .DataLayerSettings import DataLayerSettings, LayerMode, ScalarFeatureSelect, FEATURE_MAP, TRACK_COLOR_FEATURES
+from .DataLayerSettings import DataLayerConfig, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES
 from ...color_settings import ColorSettings
 
 
@@ -24,11 +25,13 @@ class FeatureFrameLayer(LayerBase):
     """
     LAYER_MODE: LayerMode = LayerMode.FRAME
 
-    def __init__(self, track_id: int, board: HasFrames, config: DataLayerSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, track_id: int, board: HasFrames, config: DataLayerConfig, color_settings: ColorSettings,
+                 feature_map: dict[IntEnum, type[BaseScalarFeature]] = FEATURE_MAP) -> None:
         self._track_id: int = track_id
         self._board: HasFrames = board
-        self._config: DataLayerSettings = config
+        self._config: DataLayerConfig = config
         self._color_settings: ColorSettings = color_settings
+        self._feature_map: dict[IntEnum, type[BaseScalarFeature]] = feature_map
         self._was_active: bool = False
 
         self._fbo: Fbo = Fbo()
@@ -92,11 +95,12 @@ class FeatureFrameLayer(LayerBase):
             return
 
         # Extract feature from frame
-        feature_type = FEATURE_MAP[self._config.feature_field]
+        feature_type = self._feature_map[self._config.feature_field]
         feature = pose[feature_type]
 
-        # If showing angles, also fetch velocity for thickness modulation
-        deltas = pose[AngleVelocity].values if self._config.feature_field == ScalarFeatureSelect.Angles else None  # type: ignore[attr-defined]
+        # If showing angles, also fetch velocity for thickness modulation. Compare the
+        # resolved feature type (not the enum member) so any feature_map/enum works.
+        deltas = pose[AngleVelocity].values if feature_type is Angles else None
 
         colors = self._resolve_colors()
 
@@ -150,7 +154,7 @@ class FeatureFrameLayer(LayerBase):
     def _resolve_colors(self) -> list[tuple[float, float, float, float]]:
         if self._config.use_history_color:
             return [self._color_settings.history.to_tuple()]
-        feature_type = FEATURE_MAP[self._config.feature_field]
+        feature_type = self._feature_map[self._config.feature_field]
         if feature_type in TRACK_COLOR_FEATURES:
             return self._color_settings.track_color_tuples
         return self._color_settings.default_color_tuples

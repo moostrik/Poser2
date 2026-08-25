@@ -4,3 +4,4 @@ from .BaseVectorFeature import BaseVectorFeature
 from .NormalizedScalarFeature import NormalizedScalarFeature, AggregationMethod
 from .NormalizedSingleValue import NormalizedSingleValue
 from .SingleValue import SingleValue
+from .SingleAngle import SingleAngle

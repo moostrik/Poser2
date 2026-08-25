@@ -53,6 +53,8 @@ class StreamReader:
         self.stop_event = Event()
 
         self.chunk_id: int
+        self.start_frame: int = 0
+        self.end_frame: int | None = None
 
     def is_loaded(self) -> bool:
         with self._load_lock:
@@ -67,9 +69,9 @@ class StreamReader:
     def is_stopped(self) -> bool:
         return not self.is_loading() and not self.is_playing()
 
-    def load(self, video_file: str, chunk_id: int) -> None:
+    def load(self, video_file: str, chunk_id: int, start_frame: int = 0, end_frame: int | None = None) -> None:
         self.stop()
-        self._load_thread = Thread(target=self._load, args=(video_file, chunk_id))
+        self._load_thread = Thread(target=self._load, args=(video_file, chunk_id, start_frame, end_frame))
         self._load_thread.start()
 
     def play(self) -> None:
@@ -95,7 +97,7 @@ class StreamReader:
             self._play_thread.join()
             self._play_thread = None
 
-    def _load(self, video_file: str, chunk_id: int) -> None:
+    def _load(self, video_file: str, chunk_id: int, start_frame: int = 0, end_frame: int | None = None) -> None:
         try:
             self.frame_width, self.frame_height, frame_rate = self._get_video_dimensions(video_file)
             if self.frame_rate == 0.0:
@@ -134,6 +136,8 @@ class StreamReader:
         with self._load_lock:
             self.ffmpeg_process = ffmpeg_process
             self.chunk_id = chunk_id
+            self.start_frame = start_frame
+            self.end_frame = end_frame
 
     def _play(self) -> None:
         if self.ffmpeg_process is None:
@@ -141,9 +145,21 @@ class StreamReader:
             return
         frame_interval: float = 1.0 / self.frame_rate
 
+        start_frame: int = self.start_frame
+        end_frame: int | None = self.end_frame
         frame_count: int = 0
 
+        # Skip frames before the start of the requested range (decode & discard,
+        # no callback, no pacing). Bounded by one chunk.
+        while frame_count < start_frame and not self.stop_event.is_set():
+            skip_bytes = self.ffmpeg_process.stdout.read(self.bytes_per_frame)
+            if not skip_bytes:
+                break
+            frame_count += 1
+
         while not self.stop_event.is_set():
+            if end_frame is not None and frame_count >= end_frame:
+                break
             start_time: float = time.time()
             try:
                 in_bytes = self.ffmpeg_process.stdout.read(self.bytes_per_frame)
@@ -169,6 +185,46 @@ class StreamReader:
         self.ffmpeg_process.stdout.close()
         self.ffmpeg_process.terminate()
         self.ffmpeg_process = None
+
+    @staticmethod
+    def frame_count(video_file: str) -> int:
+        """Return the number of frames in *video_file*.
+
+        Uses ``nb_frames`` when the container provides it (e.g. .mp4), else
+        derives it from ``duration * fps``. Falls back to a full ``-count_frames``
+        decode for raw elementary streams (e.g. .hevc) that expose neither.
+        """
+        try:
+            probe = ffmpeg.probe(video_file)
+        except ffmpeg.Error as e:
+            logger.error('Error probing frame count: %s', e)
+            return 0
+        video_stream = next((s for s in probe['streams'] if s['codec_type'] == 'video'), None)
+        if video_stream is None:
+            return 0
+
+        nb_frames = video_stream.get('nb_frames')
+        if nb_frames is not None and str(nb_frames).isdigit() and int(nb_frames) > 0:
+            return int(nb_frames)
+
+        duration = video_stream.get('duration') or probe.get('format', {}).get('duration')
+        frame_rate_str: str = video_stream.get('r_frame_rate', '30/1')
+        num, denom = map(int, frame_rate_str.split('/'))
+        fps: float = num / denom if denom != 0 else 0.0
+        if duration is not None and fps > 0.0:
+            return round(float(duration) * fps)
+
+        # Last resort: count decoded frames (slow, but reliable for raw streams).
+        try:
+            probe = ffmpeg.probe(video_file, count_frames=None, select_streams='v:0')
+            video_stream = next((s for s in probe['streams'] if s['codec_type'] == 'video'), None)
+            if video_stream is not None:
+                read_frames = video_stream.get('nb_read_frames')
+                if read_frames is not None and str(read_frames).isdigit():
+                    return int(read_frames)
+        except ffmpeg.Error as e:
+            logger.error('Error counting frames: %s', e)
+        return 0
 
     def _get_video_dimensions(self, video_file: str) -> tuple:
         probe = ffmpeg.probe(video_file)

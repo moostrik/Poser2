@@ -1,5 +1,6 @@
 # Standard library imports
 import logging
+from collections import deque
 from dataclasses import replace
 from threading import Lock
 
@@ -13,29 +14,34 @@ TrackletKey = tuple[int, int]  # (cam_id, external_id)
 
 
 class TrackletIdPool:
+    """FIFO id pool: released ids go to the back of the queue, so a freed id
+    is reused as late as possible instead of being handed to the next arrival."""
+
     def __init__(self, max_size: int) -> None:
+        self._queue: deque[int] = deque(range(max_size))
         self._available: set[int] = set(range(max_size))
         self._lock = Lock()
 
     def acquire(self) -> int:
         with self._lock:
-            if not self._available:
+            if not self._queue:
                 raise Exception("No more IDs available")
-            min_id: int = min(self._available)
-            self._available.remove(min_id)
-            return min_id
+            id_: int = self._queue.popleft()
+            self._available.remove(id_)
+            return id_
 
     def release(self, obj: int) -> None:
         with self._lock:
             if obj in self._available:
                 raise Exception(
                     f"ID {obj} is not currently in use and cannot be "
-                    f"released. in use: {self._available}"
+                    f"released. available: {sorted(self._available)}"
                 )
+            self._queue.append(obj)
             self._available.add(obj)
 
     def size(self) -> int:
-        return len(self._available)
+        return len(self._queue)
 
     def is_available(self, obj: int) -> bool:
         with self._lock:
@@ -43,8 +49,9 @@ class TrackletIdPool:
 
     @property
     def available(self) -> list[int]:
+        """Free ids in reuse order (front of the queue first)."""
         with self._lock:
-            return sorted(self._available)
+            return list(self._queue)
 
 
 class TrackletStore:
@@ -79,17 +86,17 @@ class TrackletStore:
         """
         key: TrackletKey = (tracklet.cam_id, tracklet.external_id)
         if key in self._tracklets:
-            logger.warning(f"TrackletManager: add_tracklet on existing key {key}; use replace_tracklet.")
+            logger.warning(f"add_tracklet on existing key {key}; use replace_tracklet.")
             return self._world_for.get(key)
 
         if world_id is None:
             try:
                 world_id = self._id_pool.acquire()
             except Exception as e:
-                logger.info(f"TrackletManager: No more world IDs available: {e}")
+                logger.info(f"No more world IDs available: {e}")
                 return None
         elif world_id not in self._world_members:
-            logger.warning(f"TrackletManager: add_tracklet linking to unknown world {world_id}.")
+            logger.warning(f"add_tracklet linking to unknown world {world_id}.")
             return None
 
         self._tracklets[key] = replace(tracklet, id=world_id, status=TrackingStatus.NEW)
@@ -107,7 +114,7 @@ class TrackletStore:
         key: TrackletKey = (new_tracklet.cam_id, new_tracklet.external_id)
         old_tracklet: Tracklet | None = self._tracklets.get(key)
         if old_tracklet is None:
-            logger.warning(f"TrackletManager: Attempted to replace non-existent tracklet {key}.")
+            logger.warning(f"Attempted to replace non-existent tracklet {key}.")
             return -1
 
         status: TrackingStatus = new_tracklet.status
@@ -132,7 +139,7 @@ class TrackletStore:
         key: TrackletKey = (cam_id, external_id)
         tracklet: Tracklet | None = self._tracklets.get(key)
         if tracklet is None:
-            logger.warning(f"TrackletManager: Attempted to lose non-existent tracklet {key}.")
+            logger.warning(f"Attempted to lose non-existent tracklet {key}.")
             return
         self._tracklets[key] = replace(tracklet, status=TrackingStatus.LOST)
 
@@ -140,7 +147,7 @@ class TrackletStore:
         key: TrackletKey = (cam_id, external_id)
         tracklet: Tracklet | None = self._tracklets.get(key)
         if tracklet is None:
-            logger.warning(f"TrackletManager: Attempted to retire non-existent tracklet {key}.")
+            logger.warning(f"Attempted to retire non-existent tracklet {key}.")
             return
         self._tracklets[key] = replace(tracklet, status=TrackingStatus.REMOVED)
 
@@ -148,7 +155,7 @@ class TrackletStore:
         """Delete an observation. Releases its world id if it was the last member."""
         key: TrackletKey = (cam_id, external_id)
         if self._tracklets.pop(key, None) is None:
-            logger.warning(f"TrackletManager: Attempted to remove non-existent tracklet {key}.")
+            logger.warning(f"Attempted to remove non-existent tracklet {key}.")
             return
         world_id: int | None = self._world_for.pop(key, None)
         if world_id is None:
@@ -164,7 +171,7 @@ class TrackletStore:
         if keep_id == drop_id:
             return False
         if keep_id not in self._world_members or drop_id not in self._world_members:
-            logger.warning(f"TrackletManager: merge_worlds with unknown world id (keep={keep_id}, drop={drop_id}).")
+            logger.warning(f"merge_worlds with unknown world id (keep={keep_id}, drop={drop_id}).")
             return False
         for key in self._world_members[drop_id]:
             self._world_for[key] = keep_id

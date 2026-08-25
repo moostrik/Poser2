@@ -1,4 +1,4 @@
-﻿"""JacobiPressureCompute - Compute shader Jacobi pressure solver.
+"""JacobiPressureCompute - Compute shader Jacobi pressure solver.
 
 Multi-iteration Jacobi solver using shared memory tiling for improved performance.
 Performs multiple iterations per dispatch, reducing the number of texture swaps
@@ -69,7 +69,7 @@ class JacobiPressureCompute(ComputeShader):
 
         # Validate inputs
         if not all(t.allocated for t in [pressure_in, pressure_out, divergence, obstacle]):
-            logger.warning("JacobiPressureCompute: input texture(s) not allocated.")
+            logger.warning("input texture(s) not allocated.")
             return
 
         # Compute Jacobi parameters (same as fragment shader version)

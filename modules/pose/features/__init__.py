@@ -1,6 +1,6 @@
 from enum import IntEnum
 
-from .base import           BaseFeature, BaseScalarFeature, BaseVectorFeature, NormalizedScalarFeature, AggregationMethod, NormalizedSingleValue, SingleValue
+from .base import           BaseFeature, BaseScalarFeature, BaseVectorFeature, NormalizedScalarFeature, AggregationMethod, NormalizedSingleValue, SingleValue, SingleAngle
 from .BBox import           BBox, BBoxElement
 from .Points2D import       Points2D, PointLandmark
 from .Angles import         Angles, AngleLandmark
@@ -13,11 +13,12 @@ from .MotionGate import     MotionGate
 from .MotionTime import     MotionTime
 from .Age import            Age
 from .Azimuth import        Azimuth
+from .Distance import       Distance
 
 
 FEATURES: list[type[BaseFeature]] = [
     Age, AngleMotion, Angles, AngleSymmetry, AngleVelocity,
-    Azimuth, BBox, LeaderScore, MotionGate, MotionTime, Points2D, Similarity,
+    Azimuth, BBox, Distance, LeaderScore, MotionGate, MotionTime, Points2D, Similarity,
 ]
 
 Feature: type[IntEnum] = IntEnum('Feature', {cls.__name__: i for i, cls in enumerate(FEATURES, 1)})  # type: ignore[misc]
