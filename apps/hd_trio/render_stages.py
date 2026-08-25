@@ -156,7 +156,7 @@ class MovementStage(StageLayer):
         #
         # Opening on progress alone reveals nothing: MSColorMaskLayer already weights
         # the own-camera slot by AngleMotion, so a motionless visitor stays dark at
-        # any alpha. The max() only guarantees no pop into WHITE_IN.
+        # any alpha. The max() only guarantees no pop into WHITE_POSE.
         motion_time_duration = 6.0
         progress_alpha: float = _fade_in(progress, 0.0, 1.0)
         mask_alpha: float = easeInOutSine(max(progress_alpha, self._motion_alpha(motion_time_duration)))
@@ -166,8 +166,8 @@ class MovementStage(StageLayer):
         ])
 
 
-class WhiteInStage(StageLayer):
-    """The white example figure fades in. Intro playback starts here (see render.py)."""
+class WhitePoseStage(StageLayer):
+    """Brings in the white example figure. Intro playback starts here (see render.py)."""
 
     def enter(self) -> None:
         self.set_geom_stage(Stage.LERP)
@@ -181,8 +181,8 @@ class WhiteInStage(StageLayer):
         ])
 
 
-class WhiteOutStage(StageLayer):
-    """The fluid joins the white example."""
+class FluidStage(StageLayer):
+    """Brings in the fluid, alongside the white example figure."""
 
     def enter(self) -> None:
         self.set_geom_stage(Stage.LERP)
@@ -215,20 +215,38 @@ class PracticeStage(StageLayer):
 
 
 class EnjoyInStage(StageLayer):
-    """Guidance withdraws and the cross-camera response ramps up."""
+    """Guidance withdraws — centre pose and white example fade out."""
 
     def enter(self) -> None:
         self.set_geom_stage(Stage.SMOOTH)
+        self.set_similarity_scale(0.0)
 
     def update(self, progress: float) -> None:
         progress_alpha: float = _fade_in(progress, 0.0, 1.0)
         out_alpha = easeOutQuad(1.0 - progress_alpha)
-        self.set_similarity_scale(easeInOutSine(progress_alpha))
         self.compose([
             (Layers.centre_pose, out_alpha),
             (Layers.color_mask, 1.0),
             (Layers.fluid, 1.0),
             (Layers.intro_pose, out_alpha),
+        ])
+
+
+class EnjoyStage(StageLayer):
+    """The cross-camera response reveals itself — moving in sync starts to show."""
+
+    def enter(self) -> None:
+        self.set_geom_stage(Stage.SMOOTH)
+        # enter() runs before the layer updates and update() after, so the held
+        # value is stated here too — otherwise the transition frame would still
+        # carry the previous stage's scale.
+        self.set_similarity_scale(0.0)
+
+    def update(self, progress: float) -> None:
+        self.set_similarity_scale(easeInOutSine(_fade_in(progress, 0.0, 1.0)))
+        self.compose([
+            (Layers.fluid, 1.0),
+            (Layers.color_mask, 1.0),
         ])
 
 
@@ -294,11 +312,11 @@ STAGES: dict[ShowStage, type[StageLayer]] = {
     ShowStage.WELCOME_IN: WelcomeInStage,
     ShowStage.WELCOME:    WelcomeStage,
     ShowStage.MOVEMENT:   MovementStage,
-    ShowStage.WHITE_IN:   WhiteInStage,
-    ShowStage.WHITE_OUT:  WhiteOutStage,
+    ShowStage.WHITE_POSE: WhitePoseStage,
+    ShowStage.FLUID:      FluidStage,
     ShowStage.PRACTICE:   PracticeStage,
     ShowStage.ENJOY_IN:   EnjoyInStage,
-    ShowStage.ENJOY:      PlayStage,   # identical composition to PLAY
+    ShowStage.ENJOY:      EnjoyStage,
     ShowStage.PLAY:       PlayStage,
     ShowStage.CONCLUSION: ConclusionStage,
     ShowStage.BLACKOUT:   BlackoutStage,

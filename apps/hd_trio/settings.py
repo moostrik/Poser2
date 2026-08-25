@@ -47,8 +47,8 @@ class ShowStage(IntEnum):
     WELCOME_IN =    0
     WELCOME =       auto()
     MOVEMENT =      auto()
-    WHITE_IN =      auto()
-    WHITE_OUT =     auto()
+    WHITE_POSE =    auto()
+    FLUID =         auto()
     PRACTICE =      auto()
     ENJOY_IN =      auto()
     ENJOY =         auto()
@@ -64,8 +64,8 @@ _STAGE_DURATIONS: dict[ShowStage, float] = {
     ShowStage.WELCOME_IN: 3.0,
     ShowStage.WELCOME: 5.0,
     ShowStage.MOVEMENT: 24.0,
-    ShowStage.WHITE_IN: 3.0,
-    ShowStage.WHITE_OUT: 3.0,
+    ShowStage.WHITE_POSE: 3.0,
+    ShowStage.FLUID: 3.0,
     ShowStage.PRACTICE: 10.0,
     ShowStage.ENJOY_IN: 3.0,
     ShowStage.ENJOY: 10.0,

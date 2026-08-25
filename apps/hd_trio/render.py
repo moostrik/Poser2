@@ -195,7 +195,7 @@ class HDTrioRender(RenderBase):
                     layer.update()
 
         # Intro sequence overlay — tick player while the white example is on screen
-        _INTRO_STAGES = (ShowStage.WHITE_IN, ShowStage.WHITE_OUT, ShowStage.PRACTICE, ShowStage.ENJOY_IN)
+        _INTRO_STAGES = (ShowStage.WHITE_POSE, ShowStage.FLUID, ShowStage.PRACTICE, ShowStage.ENJOY_IN)
         if stage in _INTRO_STAGES:
             if prev_stage not in _INTRO_STAGES:  # first frame of intro sequence
                 self._intro_player.start()
