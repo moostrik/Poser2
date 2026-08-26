@@ -387,7 +387,7 @@
     }
   },
   "light": {
-    "light_rate": 29.0,
+    "light_rate": 30.0,
     "idle_layers": [],
     "low_layers": [
       "haunt_flash"

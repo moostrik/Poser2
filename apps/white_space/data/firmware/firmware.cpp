@@ -2,19 +2,14 @@
 // CONFIGURATIE
 // ==========================================
 //#define TEST_MODE // Uncomment voor testmodus
-#define DEBUG_SERIAL // Uncomment voor logging in het pakketpad (kost UDP pakketten!)
+//#define DEBUG_SERIAL // Uncomment voor logging in het pakketpad (kost UDP pakketten!)
 //nog doen. Wanneer RPM==0 de 4 DACS data halen uit White[0],White[1800] en blu... etc
 
-// ETHERNET_LARGE_BUFFERS splits the W5500's 16 KB of RX memory over MAX_SOCK_NUM sockets instead
-// of using the fixed 2 KB default. Ethernet_Generic is header-only, so this define does reach the
-// library from here.
 #define ETHERNET_LARGE_BUFFERS 1
-// NOTE: setting MAX_SOCK_NUM here has NO effect on RP2040 — Ethernet_Generic.hpp #undef's it (this
-// board has no RAMEND/RAMSTART, so it takes the #undef branch) and ETHERNET_LARGE_BUFFERS then
-// pins it at 2 unconditionally. 2 sockets => SSIZE = 8192, so our one UDP socket gets 8 KB RX.
-// The value below only documents what the library ends up using; do not "tune" it. One frame is
-// 6 chunk datagrams of 1220 bytes = 7368 bytes with the chip's 8-byte per-datagram headers, so
-// there is ~11% headroom — see the boot report in setup() to verify against the actual chip.
+// The W5500's 16 KB of RX memory is split evenly over MAX_SOCK_NUM sockets. We only ever open one
+// UDP socket, and one frame is 6 chunk datagrams of 1220 bytes (~7.4 KB once the chip's 8-byte
+// per-datagram header is counted) — at 4 sockets the socket held only ~3 of them and the rest were
+// silently discarded. 2 gives 8 KB: a whole frame fits.
 #define MAX_SOCK_NUM 2
 volatile int ISERNOGETHERNET=10;   // volatile: incremented on core 1, cleared on core 0
 
@@ -42,7 +37,11 @@ volatile int cor3 = 0; // blauw2
 #include <Ethernet_Generic.h>
 #include <SPI.h>
 #include <string.h>
-#include <ws_protocol.h>
+
+// This file is a .cpp, not an .ino, so Arduino's build step no longer auto-generates function
+// prototypes -- anything called before it's defined further down needs a forward declaration here.
+uint16_t crc16_modbus(uint8_t *data, uint16_t len);
+
 // ---- PINOUT ----
 #define W5500_CS   17
 #define W5500_RST  20
@@ -54,8 +53,8 @@ volatile int cor3 = 0; // blauw2
 #define DAC_SPI      SPI1
 static const uint8_t PIN_SCK     = 10;
 static const uint8_t PIN_MOSI    = 11;
-static const uint8_t PIN_CS_DAC  = 13;
-static const uint8_t PIN_SENSOR  = 15;
+static const uint8_t PIN_CS_DAC  = 13; 
+static const uint8_t PIN_SENSOR  = 15; 
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -78,17 +77,17 @@ static inline void sioClr(uint pin) { sio_hw->gpio_clr = 1u << pin; }
 // 5. DAC SCHRIJF-FUNCTIE
 static inline void ad7304_write_turbo(uint8_t channel, uint8_t data) {
     sioClr(PIN_CS_DAC);
-
+    
     // We duwen beide bytes direct achter elkaar in de FIFO buffer
     while (!spi_is_writable(SPI_HW));
     spi_get_hw(SPI_HW)->dr = (uint32_t)(0x0C | channel); // Byte 1
-
+    
     while (!spi_is_writable(SPI_HW));
     spi_get_hw(SPI_HW)->dr = (uint32_t)data;             // Byte 2
 
     // Wacht tot de FIFO helemaal leeg is en de laatste bit verzonden
     while (spi_is_busy(SPI_HW));
-
+    
     sioSet(PIN_CS_DAC);
 }
 
@@ -115,9 +114,6 @@ static uint8_t backBuffer = 1;
 static uint8_t recvMask = 0;
 // All six chunks of a frame present: /WS/white0..2 (bits 0-2) and /WS/blue0..2 (bits 3-5).
 #define FRAME_COMPLETE 0x3F
-// Upper bound on datagrams drained per loop() call — two frames' worth. Only ever reached under a
-// packet flood (port 6454 is also the Art-Net port); it keeps the watchdog from being starved.
-#define MAX_DRAIN_PER_LOOP 12
 static uint32_t rx_total = 0, drop_total = 0, incomplete_total = 0;
 
 IPAddress artnetMasterIP(192,168,1,123); // fallback, change if useful
@@ -131,52 +127,61 @@ bool haveArtnetMaster = false;
 // Variabelen voor PLL (Alles float voor snelheid)
 #define MIN_INTERVAL 500
 #define MAX_INTERVAL 1000000
-// Weight of ONE new measurement in the interval estimate. MEASURED: 0.95 (the original) makes
-// `pll_interval` the raw previous-revolution time, so every bit of edge-timing noise is written
-// straight into this revolution's pixel spacing — visible as jitter on EVERY frame. 0.05 averages
-// it over ~20 revolutions and the ring is stable. Speed changes are handled by the phase-error
-// term below, not by this; that is the usual PLL split (slow frequency, fast phase). Do not raise.
+// Weight of ONE new measurement in the interval estimate. This must stay small: at 0.95 the
+// estimate was essentially the raw last-revolution time, so a single jittery sensor edge rescaled
+// `step` for the whole next revolution and the hard sync snapped it back at the following edge —
+// visible as the image shifting for exactly one frame.
 #define ALPHA 0.05f // 'f' forceert float
-// How far past the end of the ring the sample counter may run, and the phase error the step
-// correction will act on in one revolution (samples; 3600 = one full turn).
+// How far past the end of the ring the sample counter is allowed to run, and how much phase error
+// the step correction will act on in one revolution (both in samples, 3600 = one full turn).
 #define WTELLER_CEILING 4320
 #define MAX_PHASE_ERROR 360.0f
 
 float pll_interval = 30000.0f;
 float step = 8.33f; // Startwaarde
-// Sample count reached at the last sync edge, for the DEBUG_SERIAL report. Written on core 1,
-// read on core 0 — diagnostics only, so a torn read would just misprint one line.
-volatile int wteller_at_sync = 0;
 uint64_t start_time = 0;
-bool vsensor = HIGH;
+bool vsensor = HIGH; 
 float loopL = 3600.0f;
 
 // Functie om de snelheid dynamisch te berekenen en te versturen
 void setSpeed(uint16_t snelheid) {
   uint8_t msg[8];
-
+  
   msg[0] = 0x01;                       // Slave ID
   msg[1] = 0x06;                       // Function Code
   msg[2] = 0x81;                       // Register High
   msg[3] = 0x92;                       // Register Low
   msg[4] = (snelheid >> 8) & 0xFF;     // Snelheid High byte
   msg[5] = snelheid & 0xFF;            // Snelheid Low byte
-
+  
   // Bereken de CRC-16 checksum voor de eerste 6 bytes
   uint16_t crc = crc16_modbus(msg, 6);
-
+  
   // Modbus CRC is Little Endian (Low byte eerst)
   msg[6] = crc & 0xFF;
   msg[7] = (crc >> 8) & 0xFF;
-
+  
   // Verstuur het 8-bytes pakket
   Serial1.write(msg, 8);
-  Serial1.flush();
+  Serial1.flush(); 
 }
 
-// De Modbus CRC-16 berekening leeft in lib/ws_protocol/ws_protocol.h zodat `pio test` hem kan
-// testen zonder dit bestand te compileren.
-
+// De Modbus CRC-16 berekening
+uint16_t crc16_modbus(uint8_t *data, uint16_t len) {
+  uint16_t crc = 0xFFFF;
+  for (uint16_t i = 0; i < len; i++) {
+    crc ^= (uint16_t)data[i];
+    for (int j = 8; j != 0; j--) {
+      if ((crc & 0x0001) != 0) {
+        crc >>= 1;
+        crc ^= 0xA001;
+      } else {
+        crc >>= 1;
+      }
+    }
+  }
+  return crc;
+}
 // Functie om de motor AAN te zetten (01 06 07 D0 00 00 + CRC 89 47)
 void motorOn() {
   uint8_t cmd[] = {0x01, 0x06, 0x07, 0xD0, 0x00, 0x00, 0x89, 0x47};
@@ -195,31 +200,31 @@ void motorOff() {
 
 void setup1() {
   pinMode(PIN_SENSOR, INPUT_PULLUP); // PULLUP niet nodig als sensor actief pushed, anders INPUT_PULLUP
-  pinMode(PIN_CS_DAC, OUTPUT);
+  pinMode(PIN_CS_DAC, OUTPUT);    
   digitalWrite(PIN_CS_DAC, HIGH);
 
   DAC_SPI.setSCK(PIN_SCK);
   DAC_SPI.setTX(PIN_MOSI);
   DAC_SPI.begin();
   // 20 MHz is veilig
-  DAC_SPI.beginTransaction(SPISettings(48000000, MSBFIRST, SPI_MODE0));
+  DAC_SPI.beginTransaction(SPISettings(48000000, MSBFIRST, SPI_MODE0)); 
 }
 
 // Extra variabele bovenaan je code
-float phase_error_accumulator = 0.0f;
+float phase_error_accumulator = 0.0f; 
 
 void loop1() {
   static double next_t_us = 0;
   static int Wteller = 0;
 
   // 1. SENSOR CHECK met Phase-correction
-  bool sensor = !gpio_get(PIN_SENSOR);
+  bool sensor = !gpio_get(PIN_SENSOR); 
   gpio_put(LED_BUILTIN, sensor);
 
 
   {
 
-    if (sensor == LOW && vsensor == HIGH) {
+    if (sensor == LOW && vsensor == HIGH) { 
 
       ISERNOGETHERNET++;
 
@@ -231,15 +236,12 @@ void loop1() {
         if (delta > MIN_INTERVAL && delta < MAX_INTERVAL) {
           // Standaard PLL interval (frequentie volgen)
           pll_interval = ALPHA * delta + (1.0f - ALPHA) * pll_interval;
-
+          
           // --- DE MAGIE: Phase Error ---
           // Hoeveel samples zaten we ernaast? (3600 is het doel)
-          // Wteller runs past 3600 (see below), so this is SIGNED: positive = too slow to finish
-          // the ring, negative = finished early and idled. That sign is what makes this a closed
-          // loop. While the counter saturated at 3600 the error read 0 on every revolution once
-          // the ring was being finished, so there was no feedback at all and `step` was just a
-          // copy of the last measured period. Clamped so one wild revolution (missed edge, sensor
-          // glitch) cannot drive the divisor near zero.
+          // Wteller now runs past 3600, so this is signed: positive = we were too slow to finish
+          // the ring, negative = we finished early and idled. Clamped so one wild revolution
+          // (missed edge, sensor glitch) cannot drive the divisor near zero.
           float error = 3600.0f - (float)Wteller;
           if (error >  MAX_PHASE_ERROR) error =  MAX_PHASE_ERROR;
           if (error < -MAX_PHASE_ERROR) error = -MAX_PHASE_ERROR;
@@ -251,22 +253,21 @@ void loop1() {
         }
       }
       start_time = now;
-
+      
       // Harde Sync blijft nodig om jitter te voorkomen
-      next_t_us = (double)now;
-      wteller_at_sync = Wteller;   // how far the ring got this revolution (3600 = saturated)
+      next_t_us = (double)now; 
       Wteller = 0;
     }
     vsensor = sensor;
 
     // 2. DAC OUTPUT TIMER (Immuun voor schrijfduur)
     double now_d = (double)time_us_64();
-
+    
     if(SLOW==false)
     {
 
       if (now_d >= next_t_us) {
-        next_t_us += (double)step;
+        next_t_us += (double)step; 
 
         if (Wteller < 3600) {
           // Snapshot both pointers once so all four lamps of this sample come from the same
@@ -286,13 +287,13 @@ void loop1() {
 
         }
         // Keep counting past the end of the ring (up to a ceiling) so the phase error at the next
-        // edge can go negative. Capping the counter at 3600 kills the feedback: the error then
-        // reads 0 forever and `step` follows the raw last measurement, which jitters every frame.
+        // edge can go negative. While the counter stopped at 3600 the PLL could only ever see
+        // "too slow" and had no way to correct a revolution that ran fast.
         if (Wteller < WTELLER_CEILING) Wteller++;
       }
-
+      
     }
-
+    
     else
       {
           uint8_t *wit   = WIT;
@@ -318,7 +319,7 @@ void setup() {
   delay(500);
 
   Serial.println("Initialiseren motorsturing...");
-
+  
   // De '3-berichten truc' om de poort/pijplijn stabiel te openen
   for(int i = 0; i < 3; i++) {
     motorOff();
@@ -336,7 +337,7 @@ void setup() {
   setSpeed(110);
   delay(500);
 }*/
-
+  
   pinMode(W5500_RST, OUTPUT);
   digitalWrite(W5500_RST, LOW);  delay(5);
   digitalWrite(W5500_RST, HIGH); delay(50);
@@ -347,22 +348,11 @@ void setup() {
   Udp.begin(localPort);
 
 
-
+    
   delay(5000);
 
   Serial.println("\n[boot] up - Core 1 doet ALLES (Sensor+DAC)");
   Serial.print("IP: "); Serial.println(Ethernet.localIP());
-
-  // Socket buffer report — read back from the W5500 itself, not from our #defines, because
-  // Ethernet_Generic overrides MAX_SOCK_NUM on this board. Expect: sockets=2, SSIZE=8192,
-  // SnRX_SIZE=8 KB, chip=4 (w5500). One frame needs 7368 bytes, so RX must be >= 8 KB.
-  Serial.print("[w5500] chip="); Serial.print((int)W5100.getChip());
-  Serial.print(" sockets="); Serial.print(MAX_SOCK_NUM);
-  Serial.print(" SSIZE="); Serial.print(W5100.SSIZE);
-  Serial.print(" SnRX_SIZE(0)="); Serial.print(W5100.readSnRX_SIZE(0));
-  Serial.print("K SnTX_SIZE(0)="); Serial.print(W5100.readSnTX_SIZE(0));
-  Serial.print("K  frame needs "); Serial.print(6 * (1220 + 8));
-  Serial.println(" bytes");
 
   #ifdef TEST_MODE
     Serial.println("TEST MODE ON");
@@ -425,8 +415,7 @@ void loop() {
         lastReport = nowMs;
         Serial.print("rx="); Serial.print(rx_total);
         Serial.print(" incomplete="); Serial.print(incomplete_total);
-        Serial.print(" pll="); Serial.print(pll_interval);
-        Serial.print(" Wteller="); Serial.println(wteller_at_sync);
+        Serial.print(" pll="); Serial.println(pll_interval);
       }
     }
   #endif
@@ -451,13 +440,9 @@ void loop() {
   }
 
 
-  // Simpele UDP loop, hoeft zich geen zorgen te maken over sensoren.
-  // Drain the whole socket queue here rather than one datagram per loop() call: the host sends a
-  // frame as six 1220-byte chunks and every bail-out below used to cost a full loop() iteration,
-  // so config packets alone could stall the drain long enough to overflow the 8 KB RX buffer.
-  int pktSize;
-  int drained = 0;
-  while (drained++ < MAX_DRAIN_PER_LOOP && (pktSize = Udp.parsePacket()) > 0) {
+  // Simpele UDP loop, hoeft zich geen zorgen te maken over sensoren
+  int pktSize = Udp.parsePacket();
+  if (pktSize > 0) {
     uint8_t hdr[20];
     int needHdr = (pktSize < (int)sizeof(hdr)) ? pktSize : (int)sizeof(hdr);
     int h = Udp.read(hdr, needHdr);
@@ -493,12 +478,12 @@ void loop() {
  {
       //if (!haveArtnetMaster) return;
 
-
+          
       //Serial.println("X");
   }
   //Serial1.println("X");*/
 
-    if (idx < 0) { dumpRemainder(pktSize - h); drop_total++; continue; }
+    if (idx < 0) { dumpRemainder(pktSize - h); drop_total++; return; }
 
     /*if((testteller%100)==0)Serial.println("TEST ");
   testteller++;*/
@@ -510,14 +495,14 @@ void loop() {
       if (n <= 0) break;
       got += n;
     }
-    if (got < need) { dumpRemainder(pktSize - h - got); drop_total++; continue; }
+    if (got < need) { dumpRemainder(pktSize - h - got); drop_total++; return; }
 
     int extra = pktSize - h - need;
     if (extra > 0) dumpRemainder(extra);
 
     recvMask |= (1u << idx);
     rx_total++;
-
+    
     if (idx == 5) {
       #ifndef TEST_MODE
         // Only publish a frame we received in full. An incomplete frame used to be committed
