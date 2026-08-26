@@ -2,11 +2,16 @@
 // CONFIGURATIE
 // ==========================================
 //#define TEST_MODE // Uncomment voor testmodus
+//#define DEBUG_SERIAL // Uncomment voor logging in het pakketpad (kost UDP pakketten!)
 //nog doen. Wanneer RPM==0 de 4 DACS data halen uit White[0],White[1800] en blu... etc
 
 #define ETHERNET_LARGE_BUFFERS 1
-#define MAX_SOCK_NUM 4
-int ISERNOGETHERNET=10;
+// The W5500's 16 KB of RX memory is split evenly over MAX_SOCK_NUM sockets. We only ever open one
+// UDP socket, and one frame is 6 chunk datagrams of 1220 bytes (~7.4 KB once the chip's 8-byte
+// per-datagram header is counted) — at 4 sockets the socket held only ~3 of them and the rest were
+// silently discarded. 2 gives 8 KB: a whole frame fits.
+#define MAX_SOCK_NUM 2
+volatile int ISERNOGETHERNET=10;   // volatile: incremented on core 1, cleared on core 0
 
 unsigned long vmillis;
 
@@ -31,7 +36,7 @@ volatile int cor3 = 0; // blauw2
 #include <Arduino.h>
 #include <Ethernet_Generic.h>
 #include <SPI.h>
-static int Wteller = 0;
+#include <string.h>
 // ---- PINOUT ----
 #define W5500_CS   17
 #define W5500_RST  20
@@ -92,10 +97,19 @@ static IPAddress sn (255,255,255,0);
 static const uint16_t localPort = 6454;
 EthernetUDP Udp;
 static unsigned char Data[6][1200];
-static uint8_t WIT[3600];
-static uint8_t BLAUW[3600];
+// Double buffered: core 0 fills the back buffer and then swaps the pointer, so core 1 never reads
+// an array that is halfway through a 3600-byte memcpy.
+static uint8_t WIT_BUF[2][3600];
+static uint8_t BLAUW_BUF[2][3600];
+// `volatile` applies to the pointer, not the pixels: core 1 must re-read it every sample so it
+// picks up the swap, but the buffer it points at is never written while it is the published one.
+static uint8_t * volatile WIT   = WIT_BUF[0];
+static uint8_t * volatile BLAUW = BLAUW_BUF[0];
+static uint8_t backBuffer = 1;
 static uint8_t recvMask = 0;
-static uint32_t rx_total = 0, drop_total = 0;
+// All six chunks of a frame present: /WS/white0..2 (bits 0-2) and /WS/blue0..2 (bits 3-5).
+#define FRAME_COMPLETE 0x3F
+static uint32_t rx_total = 0, drop_total = 0, incomplete_total = 0;
 
 IPAddress artnetMasterIP(192,168,1,123); // fallback, change if useful
 uint16_t artnetMasterPort = 6454;
@@ -108,7 +122,15 @@ bool haveArtnetMaster = false;
 // Variabelen voor PLL (Alles float voor snelheid)
 #define MIN_INTERVAL 500
 #define MAX_INTERVAL 1000000
-#define ALPHA 0.95f // 'f' forceert float
+// Weight of ONE new measurement in the interval estimate. This must stay small: at 0.95 the
+// estimate was essentially the raw last-revolution time, so a single jittery sensor edge rescaled
+// `step` for the whole next revolution and the hard sync snapped it back at the following edge —
+// visible as the image shifting for exactly one frame.
+#define ALPHA 0.05f // 'f' forceert float
+// How far past the end of the ring the sample counter is allowed to run, and how much phase error
+// the step correction will act on in one revolution (both in samples, 3600 = one full turn).
+#define WTELLER_CEILING 4320
+#define MAX_PHASE_ERROR 360.0f
 
 float pll_interval = 30000.0f;
 float step = 8.33f; // Startwaarde
@@ -212,11 +234,16 @@ void loop1() {
           
           // --- DE MAGIE: Phase Error ---
           // Hoeveel samples zaten we ernaast? (3600 is het doel)
-          float error = 3600.0f - (float)Wteller; 
-          
+          // Wteller now runs past 3600, so this is signed: positive = we were too slow to finish
+          // the ring, negative = we finished early and idled. Clamped so one wild revolution
+          // (missed edge, sensor glitch) cannot drive the divisor near zero.
+          float error = 3600.0f - (float)Wteller;
+          if (error >  MAX_PHASE_ERROR) error =  MAX_PHASE_ERROR;
+          if (error < -MAX_PHASE_ERROR) error = -MAX_PHASE_ERROR;
+
           // Pas de stapgrootte aan: als error > 0 (te laat), maak stapjes groter.
           // We corrigeren een klein deel van de fout (bijv. 10%) per ronde
-          float correction = (error * 0.10f); 
+          float correction = (error * 0.10f);
           step = (pll_interval / (3600.0f + correction));
         }
       }
@@ -238,30 +265,38 @@ void loop1() {
         next_t_us += (double)step; 
 
         if (Wteller < 3600) {
-          ad7304_write_turbo(0, WIT[(Wteller + 0+TEST+cor0) % 3600]); 
-          ad7304_write_turbo(1, BLAUW[(Wteller + 1800+900+TEST+cor1) % 3600]);
-          ad7304_write_turbo(2,WIT[(Wteller + 1800 + TEST+cor2) % 3600]); 
-          ad7304_write_turbo(3, BLAUW[(Wteller + 900+TEST+cor3) % 3600]);
+          // Snapshot both pointers once so all four lamps of this sample come from the same
+          // frame even if core 0 swaps buffers mid-sample (and so it is one load, not four).
+          uint8_t *wit   = WIT;
+          uint8_t *blauw = BLAUW;
+          ad7304_write_turbo(0, wit[(Wteller + 0+TEST+cor0) % 3600]);
+          ad7304_write_turbo(1, blauw[(Wteller + 1800+900+TEST+cor1) % 3600]);
+          ad7304_write_turbo(2,wit[(Wteller + 1800 + TEST+cor2) % 3600]);
+          ad7304_write_turbo(3, blauw[(Wteller + 900+TEST+cor3) % 3600]);
     /*
-          ad7304_write_turbo(0, 255); 
+          ad7304_write_turbo(0, 255);
           ad7304_write_turbo(1, 255);
-          ad7304_write_turbo(2,255); 
+          ad7304_write_turbo(2,255);
           ad7304_write_turbo(3, 255);
     */
 
-
-          Wteller++; 
         }
+        // Keep counting past the end of the ring (up to a ceiling) so the phase error at the next
+        // edge can go negative. While the counter stopped at 3600 the PLL could only ever see
+        // "too slow" and had no way to correct a revolution that ran fast.
+        if (Wteller < WTELLER_CEILING) Wteller++;
       }
       
     }
     
-    else      
+    else
       {
-          ad7304_write_turbo(0, WIT[0]); 
-          ad7304_write_turbo(1, BLAUW[0]);
-          ad7304_write_turbo(2,WIT[1800]); 
-          ad7304_write_turbo(3, BLAUW[1800]);
+          uint8_t *wit   = WIT;
+          uint8_t *blauw = BLAUW;
+          ad7304_write_turbo(0, wit[0]);
+          ad7304_write_turbo(1, blauw[0]);
+          ad7304_write_turbo(2,wit[1800]);
+          ad7304_write_turbo(3, blauw[1800]);
       }
   }
 }
@@ -336,20 +371,27 @@ static void dumpRemainder(int rem) {
   }
 }
 
-static void processFrameOnCore0_wit(void) {
-  for (int i = 0; i < 1200; i++) { 
-      WIT[i]      = Data[0][i];
-      WIT[i+1200] = Data[1][i];
-      WIT[i+2400] = Data[2][i];
-  }
-}
+// Fill the back buffer from the six staged chunks, then publish it to core 1 with a single
+// pointer store (aligned, so atomic on RP2040). Core 1 keeps reading the old buffer until then.
+static void processFrameOnCore0(void) {
+  uint8_t *wit   = WIT_BUF[backBuffer];
+  uint8_t *blauw = BLAUW_BUF[backBuffer];
 
-static void processFrameOnCore0_blauw(void) {
-  for (int i = 0; i < 1200; i++) { 
-      BLAUW[i]      = Data[3][i];
-      BLAUW[i+1200] = Data[4][i];
-      BLAUW[i+2400] = Data[5][i];
+  for (int i = 0; i < 1200; i++) {
+      wit[i]      = Data[0][i];
+      wit[i+1200] = Data[1][i];
+      wit[i+2400] = Data[2][i];
   }
+  for (int i = 0; i < 1200; i++) {
+      blauw[i]      = Data[3][i];
+      blauw[i+1200] = Data[4][i];
+      blauw[i+2400] = Data[5][i];
+  }
+
+  __sync_synchronize();   // buffer writes must land before core 1 can see the new pointer
+  WIT        = wit;
+  BLAUW      = blauw;
+  backBuffer ^= 1;
 }
 
 void loop() {
@@ -358,20 +400,40 @@ void loop() {
   //TEST+=1;
   //delay(5);
   //TEST=1000;
-  if(ISERNOGETHERNET>5){
-    setSpeed(0);delay(1000);
-    for (int i = 0; i < 3600; i++) { 
-      WIT[i]   = 0;
-      BLAUW[i] = 0;    
-    }
+  #ifdef DEBUG_SERIAL
+    // Once per second, outside the packet path. `incomplete` counts frames that arrived with a
+    // missing chunk — if it climbs, the host is still outrunning the socket buffer.
     {
-          ad7304_write_turbo(0, 0); 
-          ad7304_write_turbo(1, 0);
-          ad7304_write_turbo(2, 0); 
-          ad7304_write_turbo(3, 0);
+      static unsigned long lastReport = 0;
+      unsigned long nowMs = millis();
+      if (nowMs - lastReport >= 1000) {
+        lastReport = nowMs;
+        Serial.print("rx="); Serial.print(rx_total);
+        Serial.print(" incomplete="); Serial.print(incomplete_total);
+        Serial.print(" pll="); Serial.println(pll_interval);
+      }
+    }
+  #endif
+
+  // Ethernet watchdog: no packets for several revolutions → stop the motor and blank the lamps.
+  // Blanking goes through the back buffer so core 1 keeps sole ownership of the SPI1 DAC bus, and
+  // the retry is rate limited instead of blocking the UDP drain with delay(1000).
+  if(ISERNOGETHERNET>5){
+    static unsigned long lastWatchdog = 0;
+    unsigned long nowMs = millis();
+    if (nowMs - lastWatchdog >= 1000) {
+      lastWatchdog = nowMs;
+      setSpeed(0);
+      memset(WIT_BUF[backBuffer],   0, 3600);
+      memset(BLAUW_BUF[backBuffer], 0, 3600);
+      __sync_synchronize();
+      WIT        = WIT_BUF[backBuffer];
+      BLAUW      = BLAUW_BUF[backBuffer];
+      backBuffer ^= 1;
+      SLOW = true;   // stop stepping the POV image; core 1 falls back to WIT[0]/WIT[1800]
     }
   }
-  
+
 
   // Simpele UDP loop, hoeft zich geen zorgen te maken over sensoren
   int pktSize = Udp.parsePacket();
@@ -438,20 +500,21 @@ void loop() {
     
     if (idx == 5) {
       #ifndef TEST_MODE
-        processFrameOnCore0_wit();
-        processFrameOnCore0_blauw();
-
-        
-          
-        //Serial.println("process");
+        // Only publish a frame we received in full. An incomplete frame used to be committed
+        // anyway, which put the previous frame's pixels in that third of the ring for one
+        // revolution — the white light appearing to shift for a single frame. Holding the last
+        // complete frame for one more revolution is far less visible.
+        if (recvMask == FRAME_COMPLETE) {
+          processFrameOnCore0();
+        } else {
+          incomplete_total++;
+        }
 
         if(NULPUNT)
         {
           NULPUNT=false;
-          char msg[40];
-          int len = snprintf(msg, sizeof(msg), "/WS/sensor/fall\n");
-          if (len <= 0) return;
-          if (len >= (int)sizeof(msg)) len = sizeof(msg) - 1;
+          static const char msg[] = "/WS/sensor/fall\n";
+          const int len = (int)sizeof(msg) - 1;
 
            artnetMasterIP = Udp.remoteIP();
            //artnetMasterPort = Udp.remotePort();
@@ -460,34 +523,29 @@ void loop() {
           Udp.beginPacket(artnetMasterIP, artnetMasterPort);
           Udp.write((const uint8_t*)msg, len);
           int result = Udp.endPacket();
-          Serial.println(artnetMasterIP);
 
-          
-
-          if (result == 1) {
-            
-            //unsigned long tijdverlopen=vmillis-millis();
-            //Serial.print(tijdverlopen);
-            unsigned long nu=millis();
-            unsigned long tijdverlopen=nu-vmillis;
-            vmillis=nu;
-            Serial.println(tijdverlopen);
-            
-          } else {
-              Serial.println("Fout: Pakket kon niet worden verzonden.");
-          }
-          
-        // Serial.println("X");
+          // Printing here blocks core 0 at 115200 baud exactly while the next burst is landing,
+          // which costs us chunks — keep it out of the packet path unless explicitly debugging.
+          unsigned long nu = millis();
+          #ifdef DEBUG_SERIAL
+            Serial.print(result == 1 ? "fall " : "fall SEND FAILED ");
+            Serial.println(nu - vmillis);
+          #else
+            (void)result;
+          #endif
+          vmillis = nu;
         }
         if(RPM!=vRPM)
         {
-          Serial.print("niuwe RPM= ");
-          Serial.println(RPM);
+          #ifdef DEBUG_SERIAL
+            Serial.print("niuwe RPM= ");
+            Serial.println(RPM);
+          #endif
           setSpeed(RPM);
           vRPM=RPM;
         }
       #endif
-      recvMask = 0; 
+      recvMask = 0;
     }
   }
 }

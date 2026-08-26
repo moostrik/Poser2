@@ -1,13 +1,11 @@
 from threading import Thread, Event, Lock
-from time import monotonic
-from typing import Optional, Union
+from time import monotonic, perf_counter, sleep
+from typing import Optional
 
 import numpy as np
 from pythonosc.udp_client import UDPClient
 from pythonosc.osc_message import OscMessage
 from pythonosc.osc_message_builder import OscMessageBuilder
-from pythonosc.osc_bundle import OscBundle
-from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from ..light import Frame
 from modules.settings import BaseSettings, Field, Group, Widget
@@ -17,7 +15,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-OscMessageList = list[Union[OscMessage, OscBundle]]
+OscMessageList = list[OscMessage]
+
+# The fixture firmware hard-codes a 1200-byte body and exactly three chunks per channel, and finds
+# the chunk digit at a fixed byte offset in the address. Changing `resolution` or `mtu` such that
+# `_calculate_optimal_chunks` yields anything else silently breaks the installation.
+FIRMWARE_CHUNK_SIZE: int = 1200
+FIRMWARE_NUM_CHUNKS: int = 3
+
+# Offsets and rpm are constant for a whole show, so they are sent on change only. This keepalive
+# re-sends them anyway at a low rate so a lost config packet self-heals; the firmware ignores a
+# repeat of the value it already holds.
+_CONFIG_KEEPALIVE_S: float = 1.0
 
 
 class OscLightOffsetSettings(BaseSettings):
@@ -38,6 +47,7 @@ class OscLightSettings(BaseSettings):
     lower_edge:   Field[float] = Field(0.35, min=0.0, max=1.0, step=0.01, description="Lamp turn-on floor: lit pixels lift to at least this; black stays off")
     curve:        Field[float] = Field(1.0,  min=0.5, max=3.0, step=0.01, description="Output gamma curve; <1 brightens mids, >1 darkens")
     startup_delay: Field[float] = Field(2.0, min=0.0, max=10.0, step=0.5, description="Hold motor rpm at 0 for this long after connect, then release to the commanded speed — forces a 0→target edge the motor controller acts on at boot")
+    chunk_interval: Field[float] = Field(0.0015, min=0.0, max=0.005, step=0.0005, description="Seconds between consecutive pixel datagrams; spreads the burst so the fixture's small socket buffer never has to queue it whole (0 = send back-to-back)")
     offsets:      Group[OscLightOffsetSettings] = Group(OscLightOffsetSettings)
 
 
@@ -45,13 +55,21 @@ class OscLight:
     """Sends LED strip data over OSC/UDP to the installation hardware.
 
     OSC address pattern (all under /WS/):
-        /WS/i/res         -- info: total resolution (pixels)
-        /WS/i/chunk_sz    -- info: chunk size (bytes)
-        /WS/i/n_chunks    -- info: number of chunks
-        /WS/o/0..3        -- offsets: white_0, white_1, blue_0, blue_1
-        /WS/r/0           -- rotation: RPM
-        /WS/w/{i}         -- white channel chunk i (bytes)
-        /WS/b/{i}         -- blue channel chunk i (bytes)
+        /WS/o/0..3        -- offsets: white_0, white_1, blue_0, blue_1 (int)
+        /WS/r/0           -- rotation: RPM (int)
+        /WS/white{i}      -- white channel chunk i (blob)
+        /WS/blue{i}       -- blue channel chunk i (blob)
+
+    Wire contract with the fixture firmware (`apps/white_space/data/firmware/firmware.ino`):
+
+    * A chunk datagram is exactly 1220 bytes — a 20-byte OSC preamble (12-byte padded address,
+      4-byte typetag, 4-byte blob length) followed by 1200 pixel bytes. The firmware reads exactly
+      those 20 + 1200 bytes, and locates the chunk digit at a fixed offset in the address, so both
+      the chunk size and the address spelling are load-bearing.
+    * The firmware commits a frame when `/WS/blue2` arrives, so that message must be sent **last**.
+    * Its socket receive buffer holds only about three chunk datagrams, so the six are paced
+      (`chunk_interval`) and the constant config messages are kept out of the per-frame burst:
+      anything the firmware drops is published as a stale third of the ring for one revolution.
     """
 
     def __init__(self, settings: OscLightSettings) -> None:
@@ -60,6 +78,14 @@ class OscLight:
         self._config.chunk_size = self._chunk_size
         self._config.num_chunks = self._num_chunks
 
+        if (self._chunk_size, self._num_chunks) != (FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS):
+            logger.error(
+                "chunking is %s x %s bytes but the fixture firmware only accepts %s x %s — "
+                "the fixture will not display correctly. Check `resolution` (%s) and `mtu` (%s).",
+                self._num_chunks, self._chunk_size, FIRMWARE_NUM_CHUNKS, FIRMWARE_CHUNK_SIZE,
+                settings.resolution, settings.mtu,
+            )
+
         self._latest_output: Optional[Frame] = None
         self._start_time:    Optional[float] = None   # connect time → motor-rpm startup hold (boot edge)
         self._output_lock:   Lock  = Lock()
@@ -67,11 +93,18 @@ class OscLight:
         self._update_event:  Event = Event()
         self._client: UDPClient = UDPClient(settings.ip_addresses, settings.port)
 
+        # Config (offsets + rpm) is sent on change instead of every frame; `None` rpm forces the
+        # first send. `_config_dirty` is set from the settings callback on whichever thread edits.
+        self._config_dirty:   bool = True
+        self._sent_rpm:       Optional[int] = None
+        self._last_config_at: float = 0.0
+
         self._running = False
         self._thread: Optional[Thread] = None
 
         self._config.bind(OscLightSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
         self._config.bind(OscLightSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
+        self._config.offsets.bind_all(self._on_offsets_change)
 
     @property
     def running(self) -> bool:
@@ -91,6 +124,10 @@ class OscLight:
             self._thread.join(timeout=1.0)
             self._thread = None
 
+        self._config.unbind(OscLightSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
+        self._config.unbind(OscLightSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
+        self._config.offsets.unbind_all(self._on_offsets_change)
+
     def send_message(self, output: Frame) -> None:
         with self._output_lock:
             self._latest_output = output
@@ -107,9 +144,6 @@ class OscLight:
             f"{self._num_chunks} chunks of {self._chunk_size} bytes each."
         )
 
-        info_message = self._build_info_message(self._config.resolution, self._chunk_size, self._num_chunks)
-        with self._client_lock:
-            self._client.send(info_message)
         self._start_time = monotonic()   # begin the startup rpm-zero hold (forces a boot edge)
 
         while self._running:
@@ -117,28 +151,72 @@ class OscLight:
             self._update_event.clear()
             if not self._running:
                 break
+            # Take the frame *and* clear the slot under one lock: a plain read leaves the event set
+            # when a new frame lands between the clear and the read, which resends the same frame.
             with self._output_lock:
-                output = self._latest_output
+                output, self._latest_output = self._latest_output, None
             if output is None:
                 continue
-            # Hold rpm at 0 for `startup_delay` after connect, then release to the commanded speed: a
-            # sustained 0→target edge the motor controller reliably acts on (a single 0 packet is too
-            # transient / may arrive before the controller is listening).
+
+            # Hold rpm at 0 for `startup_delay` after connect, then release to the commanded speed:
+            # the 0→target edge is what the motor controller acts on. Sending it on change gives
+            # exactly one clean edge; the keepalive below covers a lost packet.
             held = self._start_time is not None and (monotonic() - self._start_time) < self._config.startup_delay
             motor_rpm = 0 if held else int(output.motor.target_rpm)
-            message_list = self._build_data_message(output, self._config, self._chunk_size, self._num_chunks, motor_rpm)
-            if message_list:
-                with self._client_lock:
-                    for message in message_list:
-                        try:
-                            self._client.send(message)
-                        except Exception as e:
-                            logger.error(f"LedUdpSender send error: {e}")
+            self._send_config(motor_rpm)
+
+            chunks = self._build_chunk_messages(output, self._config, self._chunk_size, self._num_chunks)
+            if chunks:
+                self._send_paced(chunks, self._config.chunk_interval)
+
+    def _send_config(self, motor_rpm: int) -> None:
+        """Send the offsets and rpm — on change, or when the keepalive interval has elapsed.
+
+        Keeping these five datagrams out of the per-frame burst is what buys the fixture's socket
+        buffer enough headroom for the six pixel chunks.
+        """
+        now = monotonic()
+        due = self._config_dirty or motor_rpm != self._sent_rpm or (now - self._last_config_at) >= _CONFIG_KEEPALIVE_S
+        if not due:
+            return
+        self._config_dirty   = False
+        self._sent_rpm       = motor_rpm
+        self._last_config_at = now
+        for message in self._build_config_messages(self._config, motor_rpm):
+            self._send(message)
+
+    def _send_paced(self, messages: OscMessageList, interval: float) -> None:
+        """Send `messages` spaced `interval` seconds apart, against a fixed deadline grid.
+
+        The fixture drains one datagram per firmware loop over SPI while its socket buffer holds
+        only about three; sending back-to-back overruns it and costs a chunk.
+        """
+        deadline = perf_counter()
+        for message in messages:
+            if interval > 0.0:
+                remaining = deadline - perf_counter()
+                if remaining > 0.0:
+                    sleep(remaining)
+                deadline += interval
+            self._send(message)
+
+    def _send(self, message: OscMessage) -> None:
+        with self._client_lock:
+            client = self._client
+        try:
+            client.send(message)
+        except Exception as e:
+            logger.error(f"OscLight send error: {e}")
 
     def _on_connection_change(self, _=None) -> None:
         with self._client_lock:
             self._client = UDPClient(self._config.ip_addresses, self._config.port)
+        self._config_dirty = True   # the new endpoint has not seen the offsets or rpm yet
+        self._sent_rpm     = None
         logger.info(f"reconnected to {self._config.ip_addresses}:{self._config.port}")
+
+    def _on_offsets_change(self, _=None) -> None:
+        self._config_dirty = True
 
     # ------------------------------------------------------------------
     # Message builders
@@ -152,42 +230,34 @@ class OscLight:
         return msgb.build()
 
     @staticmethod
-    def _build_info_message(resolution: int, chunk_size: int, num_chunks: int) -> OscBundle:
-        bundle = OscBundleBuilder(IMMEDIATELY)
-        r_msgb = OscMessageBuilder("/WS/i/res")
-        r_msgb.add_arg(resolution)
-        bundle.add_content(r_msgb.build())  # type: ignore
-        cz_msgb = OscMessageBuilder("/WS/i/chunk_sz")
-        cz_msgb.add_arg(chunk_size)
-        bundle.add_content(cz_msgb.build())  # type: ignore
-        cn_msgb = OscMessageBuilder("/WS/i/n_chunks")
-        cn_msgb.add_arg(num_chunks)
-        bundle.add_content(cn_msgb.build())  # type: ignore
-        return bundle.build()
+    def _build_config_messages(settings: OscLightSettings, motor_rpm: int) -> OscMessageList:
+        """The four lamp-alignment offsets plus the motor speed — constant for a whole show."""
+        message_list: OscMessageList = []
+        for addr, val in (
+            ("/WS/o/0", settings.offsets.white_0),
+            ("/WS/o/1", settings.offsets.white_1),
+            ("/WS/o/2", settings.offsets.blue_0),
+            ("/WS/o/3", settings.offsets.blue_1),
+        ):
+            off_msgb = OscMessageBuilder(addr)
+            off_msgb.add_arg(val)
+            message_list.append(off_msgb.build())
+        message_list.append(OscLight._build_rpm_message(motor_rpm))
+        return message_list
 
     @staticmethod
-    def _build_data_message(
+    def _build_chunk_messages(
         output: Frame,
         settings: OscLightSettings,
         chunk_size: int,
         num_chunks: int,
-        motor_rpm: int,
     ) -> Optional[OscMessageList]:
+        """The pixel payload: all white chunks, then all blue.
+
+        Grouping each channel keeps its chunks adjacent on the wire, and leaves `/WS/blue{n-1}`
+        last — the message the firmware treats as the frame's commit trigger.
+        """
         try:
-            message_list: OscMessageList = []
-
-            for addr, val in (
-                ("/WS/o/0", settings.offsets.white_0),
-                ("/WS/o/1", settings.offsets.white_1),
-                ("/WS/o/2", settings.offsets.blue_0),
-                ("/WS/o/3", settings.offsets.blue_1),
-            ):
-                off_msgb = OscMessageBuilder(addr)
-                off_msgb.add_arg(val)
-                message_list.append(off_msgb.build())
-
-            message_list.append(OscLight._build_rpm_message(motor_rpm))
-
             # Lamp output mapping: gamma curve + turn-on floor (master brightness applied upstream).
             white_f = OscLight._apply_levels(output.white, settings.curve, settings.lower_edge)
             blue_f  = OscLight._apply_levels(output.blue,  settings.curve, settings.lower_edge)
@@ -198,18 +268,14 @@ class OscLight:
                 white_channel = OscLight.float_to_uint8(white_f)
                 blue_channel  = OscLight.float_to_uint8(blue_f)
 
-            for i in range(num_chunks):
-                start_idx = i * chunk_size
-                end_idx   = min((i + 1) * chunk_size, len(white_channel))
-
-                wc_msgb = OscMessageBuilder(f"/WS/white{i}") # -> w/{i}
-                wc_msgb.add_arg(white_channel[start_idx:end_idx].tobytes(), 'b')
-                message_list.append(wc_msgb.build())
-
-                bc_msgb = OscMessageBuilder(f"/WS/blue{i}") # -> b/{i}
-                bc_msgb.add_arg(blue_channel[start_idx:end_idx].tobytes(), 'b')
-                message_list.append(bc_msgb.build())
-
+            message_list: OscMessageList = []
+            for prefix, channel in (("white", white_channel), ("blue", blue_channel)):
+                for i in range(num_chunks):
+                    start_idx = i * chunk_size
+                    end_idx   = min((i + 1) * chunk_size, len(channel))
+                    msgb = OscMessageBuilder(f"/WS/{prefix}{i}")
+                    msgb.add_arg(channel[start_idx:end_idx].tobytes(), 'b')
+                    message_list.append(msgb.build())
             return message_list
         except Exception as e:
             logger.error(f"OscLight error preparing data: {e}")

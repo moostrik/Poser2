@@ -171,6 +171,7 @@
       "lower_edge": 0.32,
       "curve": 2.0,
       "startup_delay": 2.0,
+      "chunk_interval": 0.0015,
       "offsets": {
         "white_0": 0,
         "white_1": 5,
