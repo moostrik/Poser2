@@ -171,7 +171,7 @@
       "lower_edge": 0.32,
       "curve": 2.0,
       "startup_delay": 2.0,
-      "chunk_interval": 0.0,
+      "chunk_interval": 0.0015,
       "offsets": {
         "white_0": 0,
         "white_1": 5,
@@ -578,13 +578,13 @@
         "blend": "ADD",
         "white": {
           "level": 1.0,
-          "speed": 1.0,
-          "phase": 0.3,
-          "width": 0.1,
-          "amount": 16
+          "speed": 0.0,
+          "phase": 0.9,
+          "width": 0.01,
+          "amount": 1
         },
         "blue": {
-          "level": 1.0,
+          "level": 0.0,
           "speed": -3.56,
           "phase": 0.5,
           "width": 0.1,

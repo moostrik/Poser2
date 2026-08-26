@@ -2,7 +2,7 @@
 // CONFIGURATIE
 // ==========================================
 //#define TEST_MODE // Uncomment voor testmodus
-//#define DEBUG_SERIAL // Uncomment voor logging in het pakketpad (kost UDP pakketten!)
+#define DEBUG_SERIAL // Uncomment voor logging in het pakketpad (kost UDP pakketten!)
 //nog doen. Wanneer RPM==0 de 4 DACS data halen uit White[0],White[1800] en blu... etc
 
 // ETHERNET_LARGE_BUFFERS splits the W5500's 16 KB of RX memory over MAX_SOCK_NUM sockets instead
@@ -42,6 +42,7 @@ volatile int cor3 = 0; // blauw2
 #include <Ethernet_Generic.h>
 #include <SPI.h>
 #include <string.h>
+#include <ws_protocol.h>
 // ---- PINOUT ----
 #define W5500_CS   17
 #define W5500_RST  20
@@ -53,8 +54,8 @@ volatile int cor3 = 0; // blauw2
 #define DAC_SPI      SPI1
 static const uint8_t PIN_SCK     = 10;
 static const uint8_t PIN_MOSI    = 11;
-static const uint8_t PIN_CS_DAC  = 13; 
-static const uint8_t PIN_SENSOR  = 15; 
+static const uint8_t PIN_CS_DAC  = 13;
+static const uint8_t PIN_SENSOR  = 15;
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -77,17 +78,17 @@ static inline void sioClr(uint pin) { sio_hw->gpio_clr = 1u << pin; }
 // 5. DAC SCHRIJF-FUNCTIE
 static inline void ad7304_write_turbo(uint8_t channel, uint8_t data) {
     sioClr(PIN_CS_DAC);
-    
+
     // We duwen beide bytes direct achter elkaar in de FIFO buffer
     while (!spi_is_writable(SPI_HW));
     spi_get_hw(SPI_HW)->dr = (uint32_t)(0x0C | channel); // Byte 1
-    
+
     while (!spi_is_writable(SPI_HW));
     spi_get_hw(SPI_HW)->dr = (uint32_t)data;             // Byte 2
 
     // Wacht tot de FIFO helemaal leeg is en de laatste bit verzonden
     while (spi_is_busy(SPI_HW));
-    
+
     sioSet(PIN_CS_DAC);
 }
 
@@ -130,12 +131,16 @@ bool haveArtnetMaster = false;
 // Variabelen voor PLL (Alles float voor snelheid)
 #define MIN_INTERVAL 500
 #define MAX_INTERVAL 1000000
-// Weight of ONE new measurement in the interval estimate, so 0.95 means `pll_interval` is
-// essentially the last revolution's time. That looks twitchy, but the motor really does change
-// speed (~6 s ramp to 2000 rpm) and fast tracking is what keeps `step` matched through it — a
-// slow average lags badly during spin-up. Do not lower this without first watching the `pll=`
-// spread in the DEBUG_SERIAL line at a steady rpm.
-#define ALPHA 0.95f // 'f' forceert float
+// Weight of ONE new measurement in the interval estimate. MEASURED: 0.95 (the original) makes
+// `pll_interval` the raw previous-revolution time, so every bit of edge-timing noise is written
+// straight into this revolution's pixel spacing — visible as jitter on EVERY frame. 0.05 averages
+// it over ~20 revolutions and the ring is stable. Speed changes are handled by the phase-error
+// term below, not by this; that is the usual PLL split (slow frequency, fast phase). Do not raise.
+#define ALPHA 0.05f // 'f' forceert float
+// How far past the end of the ring the sample counter may run, and the phase error the step
+// correction will act on in one revolution (samples; 3600 = one full turn).
+#define WTELLER_CEILING 4320
+#define MAX_PHASE_ERROR 360.0f
 
 float pll_interval = 30000.0f;
 float step = 8.33f; // Startwaarde
@@ -143,48 +148,35 @@ float step = 8.33f; // Startwaarde
 // read on core 0 — diagnostics only, so a torn read would just misprint one line.
 volatile int wteller_at_sync = 0;
 uint64_t start_time = 0;
-bool vsensor = HIGH; 
+bool vsensor = HIGH;
 float loopL = 3600.0f;
 
 // Functie om de snelheid dynamisch te berekenen en te versturen
 void setSpeed(uint16_t snelheid) {
   uint8_t msg[8];
-  
+
   msg[0] = 0x01;                       // Slave ID
   msg[1] = 0x06;                       // Function Code
   msg[2] = 0x81;                       // Register High
   msg[3] = 0x92;                       // Register Low
   msg[4] = (snelheid >> 8) & 0xFF;     // Snelheid High byte
   msg[5] = snelheid & 0xFF;            // Snelheid Low byte
-  
+
   // Bereken de CRC-16 checksum voor de eerste 6 bytes
   uint16_t crc = crc16_modbus(msg, 6);
-  
+
   // Modbus CRC is Little Endian (Low byte eerst)
   msg[6] = crc & 0xFF;
   msg[7] = (crc >> 8) & 0xFF;
-  
+
   // Verstuur het 8-bytes pakket
   Serial1.write(msg, 8);
-  Serial1.flush(); 
+  Serial1.flush();
 }
 
-// De Modbus CRC-16 berekening
-uint16_t crc16_modbus(uint8_t *data, uint16_t len) {
-  uint16_t crc = 0xFFFF;
-  for (uint16_t i = 0; i < len; i++) {
-    crc ^= (uint16_t)data[i];
-    for (int j = 8; j != 0; j--) {
-      if ((crc & 0x0001) != 0) {
-        crc >>= 1;
-        crc ^= 0xA001;
-      } else {
-        crc >>= 1;
-      }
-    }
-  }
-  return crc;
-}
+// De Modbus CRC-16 berekening leeft in lib/ws_protocol/ws_protocol.h zodat `pio test` hem kan
+// testen zonder dit bestand te compileren.
+
 // Functie om de motor AAN te zetten (01 06 07 D0 00 00 + CRC 89 47)
 void motorOn() {
   uint8_t cmd[] = {0x01, 0x06, 0x07, 0xD0, 0x00, 0x00, 0x89, 0x47};
@@ -203,31 +195,31 @@ void motorOff() {
 
 void setup1() {
   pinMode(PIN_SENSOR, INPUT_PULLUP); // PULLUP niet nodig als sensor actief pushed, anders INPUT_PULLUP
-  pinMode(PIN_CS_DAC, OUTPUT);    
+  pinMode(PIN_CS_DAC, OUTPUT);
   digitalWrite(PIN_CS_DAC, HIGH);
 
   DAC_SPI.setSCK(PIN_SCK);
   DAC_SPI.setTX(PIN_MOSI);
   DAC_SPI.begin();
   // 20 MHz is veilig
-  DAC_SPI.beginTransaction(SPISettings(48000000, MSBFIRST, SPI_MODE0)); 
+  DAC_SPI.beginTransaction(SPISettings(48000000, MSBFIRST, SPI_MODE0));
 }
 
 // Extra variabele bovenaan je code
-float phase_error_accumulator = 0.0f; 
+float phase_error_accumulator = 0.0f;
 
 void loop1() {
   static double next_t_us = 0;
   static int Wteller = 0;
 
   // 1. SENSOR CHECK met Phase-correction
-  bool sensor = !gpio_get(PIN_SENSOR); 
+  bool sensor = !gpio_get(PIN_SENSOR);
   gpio_put(LED_BUILTIN, sensor);
 
 
   {
 
-    if (sensor == LOW && vsensor == HIGH) { 
+    if (sensor == LOW && vsensor == HIGH) {
 
       ISERNOGETHERNET++;
 
@@ -239,15 +231,18 @@ void loop1() {
         if (delta > MIN_INTERVAL && delta < MAX_INTERVAL) {
           // Standaard PLL interval (frequentie volgen)
           pll_interval = ALPHA * delta + (1.0f - ALPHA) * pll_interval;
-          
+
           // --- DE MAGIE: Phase Error ---
           // Hoeveel samples zaten we ernaast? (3600 is het doel)
-          // Wteller saturates at 3600, so this is one-sided: it can see "too slow" but never
-          // "too fast". Whether that matters is measurable — the DEBUG_SERIAL line reports
-          // Wteller at this edge. Pinned at 3600 every revolution means the ring tail really is
-          // freezing and the counter should be allowed to run past; anything below means the
-          // loop is tracking fine as written.
+          // Wteller runs past 3600 (see below), so this is SIGNED: positive = too slow to finish
+          // the ring, negative = finished early and idled. That sign is what makes this a closed
+          // loop. While the counter saturated at 3600 the error read 0 on every revolution once
+          // the ring was being finished, so there was no feedback at all and `step` was just a
+          // copy of the last measured period. Clamped so one wild revolution (missed edge, sensor
+          // glitch) cannot drive the divisor near zero.
           float error = 3600.0f - (float)Wteller;
+          if (error >  MAX_PHASE_ERROR) error =  MAX_PHASE_ERROR;
+          if (error < -MAX_PHASE_ERROR) error = -MAX_PHASE_ERROR;
 
           // Pas de stapgrootte aan: als error > 0 (te laat), maak stapjes groter.
           // We corrigeren een klein deel van de fout (bijv. 10%) per ronde
@@ -266,12 +261,12 @@ void loop1() {
 
     // 2. DAC OUTPUT TIMER (Immuun voor schrijfduur)
     double now_d = (double)time_us_64();
-    
+
     if(SLOW==false)
     {
 
       if (now_d >= next_t_us) {
-        next_t_us += (double)step; 
+        next_t_us += (double)step;
 
         if (Wteller < 3600) {
           // Snapshot both pointers once so all four lamps of this sample come from the same
@@ -289,13 +284,15 @@ void loop1() {
           ad7304_write_turbo(3, 255);
     */
 
-
-          Wteller++;
         }
+        // Keep counting past the end of the ring (up to a ceiling) so the phase error at the next
+        // edge can go negative. Capping the counter at 3600 kills the feedback: the error then
+        // reads 0 forever and `step` follows the raw last measurement, which jitters every frame.
+        if (Wteller < WTELLER_CEILING) Wteller++;
       }
-      
+
     }
-    
+
     else
       {
           uint8_t *wit   = WIT;
@@ -321,7 +318,7 @@ void setup() {
   delay(500);
 
   Serial.println("Initialiseren motorsturing...");
-  
+
   // De '3-berichten truc' om de poort/pijplijn stabiel te openen
   for(int i = 0; i < 3; i++) {
     motorOff();
@@ -339,7 +336,7 @@ void setup() {
   setSpeed(110);
   delay(500);
 }*/
-  
+
   pinMode(W5500_RST, OUTPUT);
   digitalWrite(W5500_RST, LOW);  delay(5);
   digitalWrite(W5500_RST, HIGH); delay(50);
@@ -350,7 +347,7 @@ void setup() {
   Udp.begin(localPort);
 
 
-    
+
   delay(5000);
 
   Serial.println("\n[boot] up - Core 1 doet ALLES (Sensor+DAC)");
@@ -496,7 +493,7 @@ void loop() {
  {
       //if (!haveArtnetMaster) return;
 
-          
+
       //Serial.println("X");
   }
   //Serial1.println("X");*/
@@ -520,7 +517,7 @@ void loop() {
 
     recvMask |= (1u << idx);
     rx_total++;
-    
+
     if (idx == 5) {
       #ifndef TEST_MODE
         // Only publish a frame we received in full. An incomplete frame used to be committed
