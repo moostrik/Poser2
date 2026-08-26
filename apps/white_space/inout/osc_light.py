@@ -47,7 +47,7 @@ class OscLightSettings(BaseSettings):
     lower_edge:   Field[float] = Field(0.35, min=0.0, max=1.0, step=0.01, description="Lamp turn-on floor: lit pixels lift to at least this; black stays off")
     curve:        Field[float] = Field(1.0,  min=0.5, max=3.0, step=0.01, description="Output gamma curve; <1 brightens mids, >1 darkens")
     startup_delay: Field[float] = Field(2.0, min=0.0, max=10.0, step=0.5, description="Hold motor rpm at 0 for this long after connect, then release to the commanded speed — forces a 0→target edge the motor controller acts on at boot")
-    chunk_interval: Field[float] = Field(0.0015, min=0.0, max=0.005, step=0.0005, description="Seconds between consecutive pixel datagrams; spreads the burst so the fixture's small socket buffer never has to queue it whole (0 = send back-to-back)")
+    chunk_interval: Field[float] = Field(0.0,    min=0.0, max=0.005, step=0.0005, description="Seconds between consecutive pixel datagrams (0 = send back-to-back). Only raise this if the fixture reports dropped chunks — it adds output latency")
     offsets:      Group[OscLightOffsetSettings] = Group(OscLightOffsetSettings)
 
 
@@ -67,9 +67,10 @@ class OscLight:
       those 20 + 1200 bytes, and locates the chunk digit at a fixed offset in the address, so both
       the chunk size and the address spelling are load-bearing.
     * The firmware commits a frame when `/WS/blue2` arrives, so that message must be sent **last**.
-    * Its socket receive buffer holds only about three chunk datagrams, so the six are paced
-      (`chunk_interval`) and the constant config messages are kept out of the per-frame burst:
-      anything the firmware drops is published as a stale third of the ring for one revolution.
+    * Its socket receive buffer is 8 KB against a 7.4 KB frame, and it drains while it fills, so
+      the burst normally fits. Config messages are kept out of it anyway (they never change), and
+      `chunk_interval` can spread the six chunks further if the fixture ever reports dropped
+      chunks — a chunk it misses is published as a stale third of the ring for one revolution.
     """
 
     def __init__(self, settings: OscLightSettings) -> None:

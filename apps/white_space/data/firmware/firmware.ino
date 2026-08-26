@@ -5,11 +5,16 @@
 //#define DEBUG_SERIAL // Uncomment voor logging in het pakketpad (kost UDP pakketten!)
 //nog doen. Wanneer RPM==0 de 4 DACS data halen uit White[0],White[1800] en blu... etc
 
+// ETHERNET_LARGE_BUFFERS splits the W5500's 16 KB of RX memory over MAX_SOCK_NUM sockets instead
+// of using the fixed 2 KB default. Ethernet_Generic is header-only, so this define does reach the
+// library from here.
 #define ETHERNET_LARGE_BUFFERS 1
-// The W5500's 16 KB of RX memory is split evenly over MAX_SOCK_NUM sockets. We only ever open one
-// UDP socket, and one frame is 6 chunk datagrams of 1220 bytes (~7.4 KB once the chip's 8-byte
-// per-datagram header is counted) — at 4 sockets the socket held only ~3 of them and the rest were
-// silently discarded. 2 gives 8 KB: a whole frame fits.
+// NOTE: setting MAX_SOCK_NUM here has NO effect on RP2040 — Ethernet_Generic.hpp #undef's it (this
+// board has no RAMEND/RAMSTART, so it takes the #undef branch) and ETHERNET_LARGE_BUFFERS then
+// pins it at 2 unconditionally. 2 sockets => SSIZE = 8192, so our one UDP socket gets 8 KB RX.
+// The value below only documents what the library ends up using; do not "tune" it. One frame is
+// 6 chunk datagrams of 1220 bytes = 7368 bytes with the chip's 8-byte per-datagram headers, so
+// there is ~11% headroom — see the boot report in setup() to verify against the actual chip.
 #define MAX_SOCK_NUM 2
 volatile int ISERNOGETHERNET=10;   // volatile: incremented on core 1, cleared on core 0
 
@@ -109,6 +114,9 @@ static uint8_t backBuffer = 1;
 static uint8_t recvMask = 0;
 // All six chunks of a frame present: /WS/white0..2 (bits 0-2) and /WS/blue0..2 (bits 3-5).
 #define FRAME_COMPLETE 0x3F
+// Upper bound on datagrams drained per loop() call — two frames' worth. Only ever reached under a
+// packet flood (port 6454 is also the Art-Net port); it keeps the watchdog from being starved.
+#define MAX_DRAIN_PER_LOOP 12
 static uint32_t rx_total = 0, drop_total = 0, incomplete_total = 0;
 
 IPAddress artnetMasterIP(192,168,1,123); // fallback, change if useful
@@ -122,18 +130,18 @@ bool haveArtnetMaster = false;
 // Variabelen voor PLL (Alles float voor snelheid)
 #define MIN_INTERVAL 500
 #define MAX_INTERVAL 1000000
-// Weight of ONE new measurement in the interval estimate. This must stay small: at 0.95 the
-// estimate was essentially the raw last-revolution time, so a single jittery sensor edge rescaled
-// `step` for the whole next revolution and the hard sync snapped it back at the following edge —
-// visible as the image shifting for exactly one frame.
-#define ALPHA 0.05f // 'f' forceert float
-// How far past the end of the ring the sample counter is allowed to run, and how much phase error
-// the step correction will act on in one revolution (both in samples, 3600 = one full turn).
-#define WTELLER_CEILING 4320
-#define MAX_PHASE_ERROR 360.0f
+// Weight of ONE new measurement in the interval estimate, so 0.95 means `pll_interval` is
+// essentially the last revolution's time. That looks twitchy, but the motor really does change
+// speed (~6 s ramp to 2000 rpm) and fast tracking is what keeps `step` matched through it — a
+// slow average lags badly during spin-up. Do not lower this without first watching the `pll=`
+// spread in the DEBUG_SERIAL line at a steady rpm.
+#define ALPHA 0.95f // 'f' forceert float
 
 float pll_interval = 30000.0f;
 float step = 8.33f; // Startwaarde
+// Sample count reached at the last sync edge, for the DEBUG_SERIAL report. Written on core 1,
+// read on core 0 — diagnostics only, so a torn read would just misprint one line.
+volatile int wteller_at_sync = 0;
 uint64_t start_time = 0;
 bool vsensor = HIGH; 
 float loopL = 3600.0f;
@@ -234,12 +242,12 @@ void loop1() {
           
           // --- DE MAGIE: Phase Error ---
           // Hoeveel samples zaten we ernaast? (3600 is het doel)
-          // Wteller now runs past 3600, so this is signed: positive = we were too slow to finish
-          // the ring, negative = we finished early and idled. Clamped so one wild revolution
-          // (missed edge, sensor glitch) cannot drive the divisor near zero.
+          // Wteller saturates at 3600, so this is one-sided: it can see "too slow" but never
+          // "too fast". Whether that matters is measurable — the DEBUG_SERIAL line reports
+          // Wteller at this edge. Pinned at 3600 every revolution means the ring tail really is
+          // freezing and the counter should be allowed to run past; anything below means the
+          // loop is tracking fine as written.
           float error = 3600.0f - (float)Wteller;
-          if (error >  MAX_PHASE_ERROR) error =  MAX_PHASE_ERROR;
-          if (error < -MAX_PHASE_ERROR) error = -MAX_PHASE_ERROR;
 
           // Pas de stapgrootte aan: als error > 0 (te laat), maak stapjes groter.
           // We corrigeren een klein deel van de fout (bijv. 10%) per ronde
@@ -248,9 +256,10 @@ void loop1() {
         }
       }
       start_time = now;
-      
+
       // Harde Sync blijft nodig om jitter te voorkomen
-      next_t_us = (double)now; 
+      next_t_us = (double)now;
+      wteller_at_sync = Wteller;   // how far the ring got this revolution (3600 = saturated)
       Wteller = 0;
     }
     vsensor = sensor;
@@ -280,11 +289,9 @@ void loop1() {
           ad7304_write_turbo(3, 255);
     */
 
+
+          Wteller++;
         }
-        // Keep counting past the end of the ring (up to a ceiling) so the phase error at the next
-        // edge can go negative. While the counter stopped at 3600 the PLL could only ever see
-        // "too slow" and had no way to correct a revolution that ran fast.
-        if (Wteller < WTELLER_CEILING) Wteller++;
       }
       
     }
@@ -349,6 +356,17 @@ void setup() {
   Serial.println("\n[boot] up - Core 1 doet ALLES (Sensor+DAC)");
   Serial.print("IP: "); Serial.println(Ethernet.localIP());
 
+  // Socket buffer report — read back from the W5500 itself, not from our #defines, because
+  // Ethernet_Generic overrides MAX_SOCK_NUM on this board. Expect: sockets=2, SSIZE=8192,
+  // SnRX_SIZE=8 KB, chip=4 (w5500). One frame needs 7368 bytes, so RX must be >= 8 KB.
+  Serial.print("[w5500] chip="); Serial.print((int)W5100.getChip());
+  Serial.print(" sockets="); Serial.print(MAX_SOCK_NUM);
+  Serial.print(" SSIZE="); Serial.print(W5100.SSIZE);
+  Serial.print(" SnRX_SIZE(0)="); Serial.print(W5100.readSnRX_SIZE(0));
+  Serial.print("K SnTX_SIZE(0)="); Serial.print(W5100.readSnTX_SIZE(0));
+  Serial.print("K  frame needs "); Serial.print(6 * (1220 + 8));
+  Serial.println(" bytes");
+
   #ifdef TEST_MODE
     Serial.println("TEST MODE ON");
     memset(WIT, 0, 3600);
@@ -410,7 +428,8 @@ void loop() {
         lastReport = nowMs;
         Serial.print("rx="); Serial.print(rx_total);
         Serial.print(" incomplete="); Serial.print(incomplete_total);
-        Serial.print(" pll="); Serial.println(pll_interval);
+        Serial.print(" pll="); Serial.print(pll_interval);
+        Serial.print(" Wteller="); Serial.println(wteller_at_sync);
       }
     }
   #endif
@@ -435,9 +454,13 @@ void loop() {
   }
 
 
-  // Simpele UDP loop, hoeft zich geen zorgen te maken over sensoren
-  int pktSize = Udp.parsePacket();
-  if (pktSize > 0) {
+  // Simpele UDP loop, hoeft zich geen zorgen te maken over sensoren.
+  // Drain the whole socket queue here rather than one datagram per loop() call: the host sends a
+  // frame as six 1220-byte chunks and every bail-out below used to cost a full loop() iteration,
+  // so config packets alone could stall the drain long enough to overflow the 8 KB RX buffer.
+  int pktSize;
+  int drained = 0;
+  while (drained++ < MAX_DRAIN_PER_LOOP && (pktSize = Udp.parsePacket()) > 0) {
     uint8_t hdr[20];
     int needHdr = (pktSize < (int)sizeof(hdr)) ? pktSize : (int)sizeof(hdr);
     int h = Udp.read(hdr, needHdr);
@@ -478,7 +501,7 @@ void loop() {
   }
   //Serial1.println("X");*/
 
-    if (idx < 0) { dumpRemainder(pktSize - h); drop_total++; return; }
+    if (idx < 0) { dumpRemainder(pktSize - h); drop_total++; continue; }
 
     /*if((testteller%100)==0)Serial.println("TEST ");
   testteller++;*/
@@ -490,7 +513,7 @@ void loop() {
       if (n <= 0) break;
       got += n;
     }
-    if (got < need) { dumpRemainder(pktSize - h - got); drop_total++; return; }
+    if (got < need) { dumpRemainder(pktSize - h - got); drop_total++; continue; }
 
     int extra = pktSize - h - need;
     if (extra > 0) dumpRemainder(extra);
