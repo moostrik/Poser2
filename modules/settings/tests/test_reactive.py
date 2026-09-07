@@ -6,6 +6,7 @@ import tempfile
 import threading
 import unittest
 from enum import Enum
+from pathlib import Path
 
 from modules.settings import Field, Widget, BaseSettings, Group, presets
 from modules.utils import Color, Point2f, Rect
@@ -2011,44 +2012,45 @@ class TestLoadReturnValue(unittest.TestCase):
 class TestPresetsUtilities(unittest.TestCase):
     """Tests for path(), scan(), get_startup(), set_startup()."""
 
+    APP = "_test_app"
+
+    def setUp(self):
+        # presets resolves "apps/<app>/data/settings" relative to the cwd, so each test runs
+        # inside a temp tree under a throwaway app name — exercising the real _app_dir lookup.
+        tmp = self.enterContext(tempfile.TemporaryDirectory())
+        self._orig_cwd = os.getcwd()
+        os.chdir(tmp)
+        self.settings_dir = Path(tmp) / "apps" / self.APP / "data" / "settings"
+        presets.set_app(self.APP)
+
+    def tearDown(self):
+        presets.set_app(None)          # module default: no app set
+        os.chdir(self._orig_cwd)
+
     def test_path_returns_expected(self):
         p = presets.path("mypreset")
         self.assertEqual(p.name, "mypreset.json")
+        self.assertEqual(p.parent, Path("apps") / self.APP / "data" / "settings")
+
+    def test_path_without_app_raises(self):
+        presets.set_app(None)
+        with self.assertRaises(RuntimeError):
+            presets.path("mypreset")
 
     def test_set_startup_get_startup_round_trip(self):
-        with tempfile.TemporaryDirectory() as d:
-            from pathlib import Path
-            orig_dir = presets.SETTINGS_DIR
-            presets.SETTINGS_DIR = Path(d)
-            try:
-                presets.set_startup("custom")
-                self.assertEqual(presets.get_startup(), "custom")
-            finally:
-                presets.SETTINGS_DIR = orig_dir
+        presets.set_startup("custom")
+        self.assertEqual(presets.get_startup(), "custom")
 
     def test_get_startup_default_fallback(self):
-        with tempfile.TemporaryDirectory() as d:
-            from pathlib import Path
-            orig_dir = presets.SETTINGS_DIR
-            presets.SETTINGS_DIR = Path(d)
-            try:
-                # No .ui_preset.json → should return "studio"
-                self.assertEqual(presets.get_startup(), "studio")
-            finally:
-                presets.SETTINGS_DIR = orig_dir
+        # No .ui_preset.json → should return "studio"
+        self.assertEqual(presets.get_startup(), "studio")
 
     def test_scan_returns_sorted_names(self):
-        with tempfile.TemporaryDirectory() as d:
-            from pathlib import Path
-            orig_dir = presets.SETTINGS_DIR
-            presets.SETTINGS_DIR = Path(d)
-            try:
-                (Path(d) / "beta.json").write_text("{}")
-                (Path(d) / "alpha.json").write_text("{}")
-                result = presets.scan()
-                self.assertEqual(result, ["alpha", "beta"])
-            finally:
-                presets.SETTINGS_DIR = orig_dir
+        self.settings_dir.mkdir(parents=True, exist_ok=True)
+        (self.settings_dir / "beta.json").write_text("{}")
+        (self.settings_dir / "alpha.json").write_text("{}")
+        (self.settings_dir / ".ui_preset.json").write_text("{}")   # dotfiles are not presets
+        self.assertEqual(presets.scan(), ["alpha", "beta"])
 
     def test_set_startup_rejects_path_traversal(self):
         with self.assertRaises(ValueError):
