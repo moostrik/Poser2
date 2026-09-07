@@ -37,6 +37,11 @@ volatile int cor3 = 0; // blauw2
 #include <Ethernet_Generic.h>
 #include <SPI.h>
 #include <string.h>
+
+// This file is a .cpp, not an .ino, so Arduino's build step no longer auto-generates function
+// prototypes -- anything called before it's defined further down needs a forward declaration here.
+uint16_t crc16_modbus(uint8_t *data, uint16_t len);
+
 // ---- PINOUT ----
 #define W5500_CS   17
 #define W5500_RST  20
