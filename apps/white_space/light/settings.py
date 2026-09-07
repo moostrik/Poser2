@@ -13,60 +13,48 @@ from .layers import (
 )
 
 
-class LowLayerId(IntEnum):
-    """idle/low slot options: the low (slow) layers + the shared test layers (empty = black)."""
-    playhead        = auto()
+class LayerId(IntEnum):
+    """The unified layer pool: everything a show state (or the manual selector) can put in a look.
+
+    One instance per layer. The slow-speed lamp layers and the high-speed ring layers share
+    the pool — a state selects what fits the motor mode it commands.
+    """
+    playhead_lamp   = auto()   # slow-speed front white lamp (the searchlight line)
     playhead_flash  = auto()
     haunt_flash     = auto()
-    fill           = auto()
-    pulse          = auto()
-    chase          = auto()
-    lines          = auto()
-    random         = auto()
+    pose_waves      = auto()
+    harmonic        = auto()
+    player_lines    = auto()
+    calibration     = auto()
+    playhead_marker = auto()   # bright ring marker visualising the content playhead
+    fill            = auto()
+    pulse           = auto()
+    chase           = auto()
+    lines           = auto()
+    random          = auto()
 
 
-class HighLayerId(IntEnum):
-    """high slot options: the high layers + the shared test layers (empty = black)."""
-    pose_waves   = auto()
-    harmonic     = auto()
-    player_lines = auto()
-    calibration  = auto()
-    playhead     = auto()
-    fill         = auto()
-    pulse        = auto()
-    chase        = auto()
-    lines        = auto()
-    random       = auto()
-
-
-class LowCompSettings(BaseSettings):
-    """Low (slow) composition settings."""
-    playhead:        Group[PlayheadLowSettings]    = Group(PlayheadLowSettings)
-    playhead_flash:  Group[PlayheadFlashSettings]  = Group(PlayheadFlashSettings)
-    haunt_flash:     Group[HauntedFlashSettings]     = Group(HauntedFlashSettings)
-
-
-class HighCompSettings(BaseSettings):
-    """High composition settings. `fov` is a hidden relay (from the root) into player_lines/calibration."""
+class LayerCompSettings(BaseSettings):
+    """Per-layer composition settings — one group per pool layer.
+    `fov` is a hidden relay (from the root) into player_lines/calibration."""
     fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, visible=False, description="Camera horizontal FOV — hidden relay to player_lines/calibration")
-    pose_waves:   Group[PoseWavesSettings]    = Group(PoseWavesSettings)
-    harmonic:     Group[HarmonicSettings]     = Group(HarmonicSettings)
-    player_lines: Group[PlayerLinesSettings]  = Group(PlayerLinesSettings,  share=[fov.as_('fov')])
-    calibration:  Group[CameraLightSettings]  = Group(CameraLightSettings,   share=[fov.as_('fov')])
-    playhead:     Group[PlayheadHighSettings] = Group(PlayheadHighSettings)
-
-
-class TestCompSettings(BaseSettings):
-    """Test composition settings — generic patterns shared by the low and high slots."""
-    fill:   Group[FillSettings]   = Group(FillSettings)
-    pulse:  Group[PulseSettings]  = Group(PulseSettings)
-    chase:  Group[ChaseSettings]  = Group(ChaseSettings)
-    lines:  Group[LinesSettings]  = Group(LinesSettings)
-    random: Group[RandomSettings] = Group(RandomSettings)
+    playhead_lamp:   Group[PlayheadLowSettings]   = Group(PlayheadLowSettings)
+    playhead_flash:  Group[PlayheadFlashSettings] = Group(PlayheadFlashSettings)
+    haunt_flash:     Group[HauntedFlashSettings]  = Group(HauntedFlashSettings)
+    pose_waves:      Group[PoseWavesSettings]     = Group(PoseWavesSettings)
+    harmonic:        Group[HarmonicSettings]      = Group(HarmonicSettings)
+    player_lines:    Group[PlayerLinesSettings]   = Group(PlayerLinesSettings, share=[fov.as_('fov')])
+    calibration:     Group[CameraLightSettings]   = Group(CameraLightSettings, share=[fov.as_('fov')])
+    playhead_marker: Group[PlayheadHighSettings]  = Group(PlayheadHighSettings)
+    fill:            Group[FillSettings]          = Group(FillSettings)
+    pulse:           Group[PulseSettings]         = Group(PulseSettings)
+    chase:           Group[ChaseSettings]         = Group(ChaseSettings)
+    lines:           Group[LinesSettings]         = Group(LinesSettings)
+    random:          Group[RandomSettings]        = Group(RandomSettings)
 
 
 class LightSettings(BaseSettings):
-    """Settings for the LED light renderer thread."""
+    """Settings for the LED light system (conductor thread + layers + compositor)."""
 
     # Construction / wiring (INIT — requires restart to take effect)
     max_poses:        Field[int]   = Field(3,    min=1,   max=16,   access=Field.INIT, description="Max tracked poses")
@@ -75,21 +63,16 @@ class LightSettings(BaseSettings):
     light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, description="LED strip resolution (pixels)")
     fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV — hidden relay from root to player_lines/calibration")
 
-    # Per-motor-speed layer selectors (multi-select; layers in a slot blend, slots crossfade by rpm)
-    idle_layers:  Field[list[LowLayerId]]  = Field([LowLayerId.playhead], widget=Widget.checklist, description="Layers shown at idle", newline=True)
-    low_layers:   Field[list[LowLayerId]]  = Field([LowLayerId.playhead_flash],widget=Widget.checklist, description="Layers shown at low speed")
-    high_layers:  Field[list[HighLayerId]] = Field([HighLayerId.pose_waves],   widget=Widget.checklist, description="Layers shown at high speed (light_phase applied)")
-
     master:         Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Master brightness (applied to the composite; lamp gamma/floor live in osc_light)", newline=True)
-    fade_times: Field[list[float]] = Field([1.0, 0.5], widget=Widget.number_list, min=0.0, max=10.0, step=0.1,
-                                           description="Crossfade transition seconds between motor-mode slots: [up, down]")
-    light_phase: Field[float]    = Field(0.0, min=0.0, max=1.0, step=0.01, description="High-slot ring offset (0–1 turn)")
+    light_phase: Field[float]    = Field(0.0, min=0.0, max=1.0, step=0.01, description="High-speed ring offset (0–1 turn), applied to the spun-content layers")
+
+    # Manual/debug look override — replaces the state machine's look at the Compositor when on.
+    manual:        Field[bool]          = Field(False, description="Manual look: override the show state's layer selection", newline=True)
+    manual_layers: Field[list[LayerId]] = Field([LayerId.playhead_lamp], widget=Widget.checklist, description="Layers shown while manual is on (full weight each)")
 
     clock:        Group[ClockSettings]        = Group(ClockSettings)
     motor:        Group[MotorSettings]        = Group(MotorSettings)
     playhead:     Group[PlayheadSettings]     = Group(PlayheadSettings)
 
-    # Composition settings grouped by category (mirrors the layers/ low|high|test subpackages)
-    low:  Group[LowCompSettings]  = Group(LowCompSettings)
-    high: Group[HighCompSettings] = Group(HighCompSettings, share=[fov.as_('fov')])   # relay fov into high
-    test: Group[TestCompSettings] = Group(TestCompSettings)
+    # The unified per-layer composition settings pool (was low/high/test slot groups).
+    layers: Group[LayerCompSettings] = Group(LayerCompSettings, share=[fov.as_('fov')])

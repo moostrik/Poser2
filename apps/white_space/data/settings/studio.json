@@ -380,28 +380,16 @@
       "stability_expiry_beats": 3,
       "stability_scale": 0.8,
       "stability_threshold": 0.9
-    },
-    "escalator": {
-      "enabled": true,
-      "high_threshold": 16
     }
   },
   "light": {
     "light_rate": 30.0,
-    "idle_layers": [],
-    "low_layers": [
-      "haunt_flash"
-    ],
-    "high_layers": [
-      "harmonic",
-      "player_lines"
-    ],
     "master": 1.0,
-    "fade_times": [
-      1.0,
-      0.5
-    ],
     "light_phase": 0.55,
+    "manual": false,
+    "manual_layers": [
+      "playhead_lamp"
+    ],
     "clock": {
       "bpm": 20.0
     },
@@ -417,8 +405,8 @@
       "tracking": 0.12,
       "speed_smoothing": 0.66
     },
-    "low": {
-      "playhead": {
+    "layers": {
+      "playhead_lamp": {
         "level": 0.5,
         "blend": "ADD"
       },
@@ -441,9 +429,7 @@
         "width": 0.0,
         "ghosts": true,
         "blend": "ADD"
-      }
-    },
-    "high": {
+      },
       "pose_waves": {
         "fov_degrees": 110.0,
         "void_width": 0.05,
@@ -517,13 +503,11 @@
         "white_markers": false,
         "blend": "ADD"
       },
-      "playhead": {
+      "playhead_marker": {
         "level": 1.0,
         "width": 0.01,
         "blend": "ADD"
-      }
-    },
-    "test": {
+      },
       "fill": {
         "blend": "ADD",
         "white": {
@@ -616,6 +600,21 @@
         }
       }
     }
+  },
+  "state": {
+    "enabled": true,
+    "hold": false,
+    "session": false,
+    "select": "IDLE",
+    "intro_idle_bars": 1.0,
+    "intro_play_seconds": 14.0,
+    "end_bars": 3.0,
+    "end_intro_seconds": 6.0,
+    "end_idle_seconds": 6.0,
+    "intro_session_seconds": 60.0,
+    "play_session_seconds": 150.0,
+    "sync_threshold": 0.75,
+    "count_hold_seconds": 1.0
   },
   "render": {
     "preview": {
@@ -745,7 +744,7 @@
     "title": "White Space",
     "port": 666
   },
-  "session": {
+  "recording": {
     "output_path": "recordings",
     "name": "flabber",
     "split_seconds": 10,
@@ -757,23 +756,6 @@
       "verbose": false
     },
     "core": {},
-    "sequencer": {
-      "stages": [
-        "START",
-        "PLAY_IN",
-        "PLAY",
-        "CONCLUSION",
-        "IDLE"
-      ],
-      "durations": [
-        10.0,
-        3.0,
-        600.0,
-        10.0,
-        5.0
-      ],
-      "loop": false
-    },
     "video": {
       "keyframe_interval": 0,
       "temp_path": "temp",

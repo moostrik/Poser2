@@ -19,16 +19,16 @@ from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import PanoramicTrackerSettings
 from modules.pose import nodes, trackers, window, analytics
 from modules import inference
-from modules.session import SessionSettings, SequencerSettings
+from modules.session import SessionSettings
 from modules.gl import WindowSettings
 from .light import LightSettings
 from .inout import OscLightSettings, UdpReceiverSettings
 from .pose import GhosterSettings
-from .escalator import GhostEscalatorSettings
+from .state import StateMachineSettings
 
 
 # ---------------------------------------------------------------------------
-#  Pipeline stages & show sequencer
+#  Pipeline stages
 # ---------------------------------------------------------------------------
 
 class Stage(IntEnum):
@@ -37,21 +37,6 @@ class Stage(IntEnum):
     SMOOTH  = auto()
     PREDICT = auto()
     LERP    = auto()
-
-
-class ShowStage(IntEnum):
-    START      = 0
-    PLAY_IN    = auto()
-    PLAY       = auto()
-    CONCLUSION = auto()
-    IDLE       = auto()
-
-
-class ShowSequencerSettings(SequencerSettings):
-    """White Space show sequencer."""
-    stages:    Field[list[ShowStage]] = Field(list(ShowStage), widget=Widget.checklist, description="Stages to play")
-    durations: Field[list]            = Field([10.0, 3.0, 120.0, 10.0, 5.0], min=0.0, max=600.0, step=0.1, description="Stage durations")
-    stage:     Field[ShowStage]       = Field(ShowStage.START, access=Field.READ, description="Current stage", newline=True)
 
 
 # ---------------------------------------------------------------------------
@@ -228,16 +213,18 @@ class PoseGroup(BaseSettings):
 
 
 # ---------------------------------------------------------------------------
-#  Session group (recording lifecycle)
+#  Recording group (recording lifecycle — independent of the show state machine)
 # ---------------------------------------------------------------------------
 
-class SessionGroup(BaseSettings):
-    """App session group — composes SessionSettings with app-specific recorders."""
+class RecordingGroup(BaseSettings):
+    """App recording group — composes SessionSettings with app-specific recorders.
+    Recording is decoupled from the show: it works stand-alone and during session mode,
+    and nothing here touches the state machine."""
     num_cameras:   Field[int]   = Field(4, access=Field.INIT, description="Number of cameras")
     fps:           Field[float] = Field(30.0, access=Field.INIT, description="Camera frame rate")
 
-    start:         Field[bool]  = Field(False, widget=Widget.button, description="Start session")
-    stop:          Field[bool]  = Field(False, widget=Widget.button, description="Stop session")
+    start:         Field[bool]  = Field(False, widget=Widget.button, description="Start recording")
+    stop:          Field[bool]  = Field(False, widget=Widget.button, description="Stop recording")
     output_path:   Field[str]   = Field("recordings", access=Field.INIT, description="Recordings output directory")
     name:          Field[str]   = Field("", widget=Widget.input, description="Recording group ID")
     split:         Field[bool]  = Field(False, widget=Widget.button, description="Split chunk", visible=False)
@@ -248,7 +235,6 @@ class SessionGroup(BaseSettings):
 
     osc:      Group[OscReceiverSettings]    = Group(OscReceiverSettings)
     core:     Group[SessionSettings]        = Group(SessionSettings, share=_session_share)
-    sequencer: Group[ShowSequencerSettings] = Group(ShowSequencerSettings, share=[start, stop])
     video:    Group[RecorderSettings]       = Group(RecorderSettings, share=_recorder_share + [num_cameras, fps])
 
 
@@ -317,7 +303,6 @@ class GhostGroup(BaseSettings):
     ghost_slots:  Field[int] = Field(8, min=0, max=16, access=Field.INIT, visible=False, description="Ghost id pool size (shared from root num_virtual)")
 
     ghoster  : Group[GhosterSettings]        = Group(GhosterSettings, share=[live_players, ghost_slots])
-    escalator: Group[GhostEscalatorSettings] = Group(GhostEscalatorSettings)
 
 
 # ---------------------------------------------------------------------------
@@ -338,6 +323,7 @@ class Settings(BaseSettings):
     pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     ghost  : Group[GhostGroup]      = Group(GhostGroup, share=[num_players.as_('live_players'), num_virtual.as_('ghost_slots')])
     light: Group[LightSettings] = Group(LightSettings, share=[num_players.as_('max_poses'), num_cameras.as_('num_cameras'), light_resolution.as_('light_resolution'), fov])
+    state  : Group[StateMachineSettings] = Group(StateMachineSettings)
     render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams')])
     server : Group[NiceSettings]    = Group(NiceSettings)
-    session: Group[SessionGroup]    = Group(SessionGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])
+    recording: Group[RecordingGroup] = Group(RecordingGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])

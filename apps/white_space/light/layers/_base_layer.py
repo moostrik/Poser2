@@ -50,7 +50,6 @@ class BaseLayer(ABC):
         self._board                    = board  # full blackboard — layers pull the slices they need
         self._scratch_white: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
         self._scratch_blue:  np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
-        self.target_rpm: float | None = None  # motor speed target — None means no opinion; 0.0 explicitly stops the motor
 
     def render(self, frame: Frame) -> None:
         self._scratch_white.fill(0.0)
@@ -65,4 +64,5 @@ class BaseLayer(ABC):
         ...
 
     def reset(self) -> None:
-        """Reset internal state. Called by the renderer when the layer is deactivated. Default: no-op."""
+        """Reset internal state. Called explicitly (a show state's ``enter()`` via the
+        Compositor) when the layer should start fresh. Default: no-op."""

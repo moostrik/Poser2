@@ -95,6 +95,7 @@ class MotorController:
 
     def __init__(self, settings: MotorSettings) -> None:
         self._settings         = settings
+        self._commanded:       MotorMode | None = None   # state machine command; None = follow settings.mode
         self._measured_period: float | None = None
         self._last_fall_time:  float | None = None
         self._fall_lock        = Lock()
@@ -127,6 +128,11 @@ class MotorController:
     # ------------------------------------------------------------------
     # Fall signal interface
     # ------------------------------------------------------------------
+
+    def set_mode(self, mode: MotorMode | None) -> None:
+        """State-machine command channel: overrides ``settings.mode`` while set; ``None``
+        relinquishes back to it (the settings field is the manual fallback)."""
+        self._commanded = mode
 
     def notify_fall(self) -> None:
         """External hardware fall signal. No-op while simulating."""
@@ -221,11 +227,15 @@ class MotorController:
             case _:              return 0.0   # STOPPED → 0
 
     def _target_mode(self) -> MotorMode:
-        """The mode we are driving toward: the sim selector while simulating, else the
-        commanded `mode`. This sets `target_rpm` (sent to the motor); the *actual* mode is
-        only confirmed once the motor responds (see `tick`)."""
+        """The mode we are driving toward: the sim selector while simulating, else the state
+        machine's command when present, else the manual `mode` setting. This sets `target_rpm`
+        (sent to the motor); the *actual* mode is only confirmed once the motor responds (see `tick`)."""
         sim = self._settings.simulate
-        return MotorMode[sim.name] if sim != MotorSimMode.OFF else self._settings.mode
+        if sim != MotorSimMode.OFF:
+            return MotorMode[sim.name]
+        if self._commanded is not None:
+            return self._commanded
+        return self._settings.mode
 
     def _measure(self, now: float) -> tuple[bool, float, float]:
         """Phase + rpm from the fall timestamps — returns (have_measurement, rpm, phase).

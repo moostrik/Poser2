@@ -43,7 +43,9 @@
       "Bash(gh api *)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:arduino-pico.readthedocs.io)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "PowerShell(python -m unittest discover -s apps/white_space/tests -t . -v 2>&1)",
+      "PowerShell(python -m unittest apps.white_space.tests.test_playhead_motor apps.white_space.tests.test_compositor apps.white_space.tests.test_state_machine 2>&1)"
     ]
   }
 }

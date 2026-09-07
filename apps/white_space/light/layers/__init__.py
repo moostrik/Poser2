@@ -1,7 +1,7 @@
 
 from ._base_layer   import BaseLayer, LayerSettings, ChannelSettings
 from ._utilities    import BlendType
-from .crossfade     import Crossfade
+from .compositor    import Compositor, Look
 
 from .high.pose_waves    import PoseWaves,   PoseWavesSettings
 from .test.fill          import Fill,         FillSettings

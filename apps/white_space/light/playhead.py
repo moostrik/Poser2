@@ -65,6 +65,7 @@ class Playhead:
     def __init__(self, settings: PlayheadSettings) -> None:
         self._settings = settings
         self._internal: float = 0.0                  # offset-free continuous content clock
+        self._bars:     float = 0.0                  # monotonic bar counter (1 bar = 1 full playhead cycle)
         self._prev_mode: MotorMode = MotorMode.STOPPED
         self._resyncing: bool = False                # left HIGH → free-running until the motor slows to content speed
         self._seen_fast: bool = False                # saw a fresh above-content measurement since leaving HIGH
@@ -103,13 +104,18 @@ class Playhead:
 
     def _advance_internal(self, dt: float, motor: MotorState) -> None:
         """The mode-based content sweep (STOPPED holds, IDLE/LOW track the measured phase, HIGH and
-        the post-HIGH re-sync free-run at the LOW content rate)."""
+        the post-HIGH re-sync free-run at the LOW content rate).
+
+        The bar counter accumulates alongside: at the sweep's own rate while it advances, and at
+        the commanded content rate while unmeasured (IDLE/LOW with no falls) — so bar-denominated
+        show durations never stall on a missing sensor. Only STOPPED holds the count."""
         if motor.mode == MotorMode.STOPPED:
             self._tracking_prev = False                       # hold last position (frozen)
         elif motor.mode == MotorMode.HIGH or self._resyncing:
             # Free-run at the LOW content rate: HIGH ignores the fast motor; the re-sync waits out the
             # spin-down without snapping to the still-too-fast measured phase.
             self._internal = _wrap_to_pi(self._internal + (motor.low_rpm / 60.0) * math.tau * dt)
+            self._bars += (motor.low_rpm / 60.0) * dt
             self._tracking_prev = False
         elif motor.locked and not math.isnan(motor.phase):    # IDLE, LOW — track the measured rotation
             # Feed-forward at the *smoothed* speed: per-revolution measurements jitter, so averaging the
@@ -121,10 +127,13 @@ class Playhead:
             self._internal += (rpm / 60.0) * math.tau * dt
             self._internal += self._settings.tracking * _wrap_to_pi(motor.phase - self._internal)
             self._internal = _wrap_to_pi(self._internal)
+            self._bars += (rpm / 60.0) * dt
             self._tracking_prev = True
         else:
+            # IDLE/LOW with no measurement (disconnected): the sweep holds (`.phase` NaN, not live),
+            # but bars advance at the commanded content rate — the best estimate of the rotation.
+            self._bars += (min(motor.target_rpm, motor.low_rpm) / 60.0) * dt
             self._tracking_prev = False
-        # (IDLE/LOW with no measurement (disconnected) → hold; `.phase` reports NaN, not live)
 
     @property
     def phase(self) -> float:
@@ -135,3 +144,10 @@ class Playhead:
         if not self._live:
             return float('nan')
         return _wrap_to_pi(self._internal + self._settings.phase * math.tau)
+
+    @property
+    def bars(self) -> float:
+        """Monotonic bar counter (float, fractional): 1 bar = 1 full playhead cycle. The
+        show's content clock — musical-timeline vocabulary, deliberately distinct from the
+        machine's physical rotation. Never NaN; only STOPPED holds it."""
+        return self._bars

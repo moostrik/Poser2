@@ -12,16 +12,16 @@ from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
 from modules.inference import source, crop, pose, segmentation
-from modules.session import Session, Sequencer
+from modules.session import Session
 from modules.gl import WindowSettings
 
 from .board import Board
 from .pose import GhostFeature, PlayheadOffset, PlayheadOffsetExtractor, Ghoster
-from .escalator import GhostEscalator
-from .light import Render as LightRender
+from .light import Conductor
 from .inout import OscLight, OscSound, UdpReceiver
 from .render import Render as WindowRender
 from .settings import Settings, Stage
+from .state import StateMachine
 
 APP_NAME = 'white_space'
 DATA_PATH = 'apps/white_space/data'
@@ -54,14 +54,11 @@ class WhiteSpaceMain:
         # BLACKBOARD
         self.board = Board()
 
-        # SESSION
-        self.session = Session(self.settings.session.core)
+        # RECORDING (independent of the show — works stand-alone and during session mode)
+        self.session = Session(self.settings.recording.core)
         self.osc_sound = OscSound(self.settings.inout.osc_sound)
         self.ghoster = Ghoster(self.settings.ghost.ghoster, playhead=self.board.get_playhead)   # live/pool counts shared from root
-        self.sequencer = Sequencer(self.settings.session.sequencer)
-        self.sequencer.add_state_callback(self.board.set_sequence)
-        self.sequencer.add_state_callback(self.osc_sound.set_sequencer_state)
-        self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
+        self.video_recorder = VideoRecorder(self.settings.recording.video, data_path=DATA_PATH)
 
         # CAMERA
         self.cameras: list[Camera | Simulator] = []
@@ -125,16 +122,28 @@ class WhiteSpaceMain:
 
         # WS PIPELINE — light output
         ws_input: Stage = Stage(int(ps.ws_input_stage))
-        self.light_renderer = LightRender(self.settings.light, distortion=self.settings.camera.tracker.distortion, board=self.board, pose_stage=int(ws_input))
+        self.conductor = Conductor(self.settings.light, distortion=self.settings.camera.tracker.distortion, board=self.board, pose_stage=int(ws_input))
         self.osc_light    = OscLight(self.settings.inout.osc_light)
         self.osc_receiver = OscReceiver(self.settings.inout.osc_receiver)
         self.udp_receiver = UdpReceiver(self.settings.inout.udp_receiver)
-        self.osc_receiver.bind("/WS/sensor/fall", self.light_renderer.notify_fall)
-        self.udp_receiver.bind("/WS/sensor/fall", self.light_renderer.notify_fall)
+        self.osc_receiver.bind("/WS/sensor/fall", self.conductor.notify_fall)
+        self.udp_receiver.bind("/WS/sensor/fall", self.conductor.notify_fall)
         for camera in self.cameras:
             camera.add_frame_callback(self._store_video_frame)
-        self.light_renderer.add_render_callback(self.osc_light.send_message)
-        self.light_renderer.add_render_callback(self.osc_sound.set_composition)
+        self.conductor.add_render_callback(self.osc_light.send_message)
+        self.conductor.add_render_callback(self.osc_sound.set_composition)
+
+        # STATE MACHINE — the show's single decision maker; commands the Conductor through
+        # its three channels (look, layer resets, motor) and emits state to board + OSC.
+        self.state_machine = StateMachine(
+            self.settings.state, self.settings.light, board=self.board,
+            compose=self.conductor.set_look,
+            reset_layers=self.conductor.reset_layers,
+            set_motor=self.conductor.set_motor_mode,
+            pose_stage=int(Stage.LERP),
+        )
+        self.state_machine.add_state_callback(self.board.set_sequence)
+        self.state_machine.add_state_callback(self.osc_sound.set_sequencer_state)
 
         # POSE STAGE RAW
         self.pose_predictor.add_frames_callback(self.stages[Stage.RAW])
@@ -184,10 +193,12 @@ class WhiteSpaceMain:
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similator.submit)
         self.window_similator.add_similarity_callback(self.similarity_applicator.set)
         self.window_similator.add_similarity_callback(self.leader_applicator.set)
+        self.window_similator.add_similarity_callback(self.state_machine.set_similarity)
 
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_correlator.submit)
         self.window_correlator.add_similarity_callback(self.similarity_applicator.set)
         self.window_correlator.add_similarity_callback(self.leader_applicator.set)
+        self.window_correlator.add_similarity_callback(self.state_machine.set_similarity)
 
         # POSE STAGE PREDICT
         self.filters_predict = trackers.FilterTracker({
@@ -243,15 +254,12 @@ class WhiteSpaceMain:
         self.ghoster.add_frames_callback(self.stages[Stage.LERP])
         self.ghoster.add_ghosts_callback(self.board.set_ghosts)
         self.ghoster.add_sound_callback(partial(self.osc_sound.set_frames, int(Stage.LERP)))
-        # GhostEscalator counts ghosts ever made and escalates the motor LOW→HIGH at its threshold.
-        self.escalator = GhostEscalator(self.settings.ghost.escalator, self.settings.light.motor)
-        self.ghoster.add_new_ghost_callback(self.escalator.on_new_ghost)
 
         # RENDER
         self.render = WindowRender(self.board, self.settings.render)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
-        self.light_renderer.add_update_callback(self.sequencer.update)
-        self.light_renderer.add_update_callback(self.interpolators_lerp.update)
+        self.conductor.add_update_callback(self.state_machine.update)
+        self.conductor.add_update_callback(self.interpolators_lerp.update)
         self.render.add_exit_callback(self.stop)
 
     def start(self) -> None:
@@ -265,7 +273,7 @@ class WhiteSpaceMain:
         self.segmentation_predictor.start()
         self.window_similator.start()
         self.window_correlator.start()
-        self.light_renderer.start()
+        self.conductor.start()
         self.osc_light.start()
         self.osc_receiver.start()
         self.udp_receiver.start()
@@ -306,12 +314,12 @@ class WhiteSpaceMain:
 
         self.tracker.stop()
         self.osc_sound.stop()
-        self.escalator.stop()
+        self.state_machine.stop()
         self.ghoster.stop()
         self.osc_light.stop()
         self.osc_receiver.stop()
         self.udp_receiver.stop()
-        self.light_renderer.stop()
+        self.conductor.stop()
 
         self.pose_predictor.stop()
         self.segmentation_predictor.stop()

@@ -377,6 +377,79 @@ class ReacquireTest(unittest.TestCase):
         self.assertTrue(math.isnan(p.phase))
 
 
+class SetModeTest(unittest.TestCase):
+    """The state machine's command channel: set_mode() overrides settings.mode while set;
+    None relinquishes back to it (the settings field is the manual fallback)."""
+
+    def test_command_wins_over_settings(self) -> None:
+        s = MotorSettings(); s.mode = MotorMode.LOW
+        m = MotorController(s)
+        m.set_mode(MotorMode.HIGH)
+        self.assertEqual(m.tick().mode, MotorMode.HIGH)
+        self.assertEqual(s.mode, MotorMode.LOW)            # the manual setting is untouched
+
+    def test_none_relinquishes_to_settings(self) -> None:
+        s = MotorSettings(); s.mode = MotorMode.IDLE
+        m = MotorController(s)
+        m.set_mode(MotorMode.HIGH)
+        m.set_mode(None)
+        self.assertEqual(m.tick().mode, MotorMode.IDLE)
+
+    def test_sim_selector_still_overrides_the_command(self) -> None:
+        s = MotorSettings(); s.simulate = MotorSimMode.IDLE
+        m = MotorController(s)
+        m.set_mode(MotorMode.HIGH)
+        self.assertEqual(m._target_mode(), MotorMode.IDLE)
+
+
+class BarsTest(unittest.TestCase):
+    """The playhead's monotonic bar counter (1 bar = 1 full playhead cycle): accumulates at
+    the sweep's own rate, at the commanded content rate while unmeasured, and only STOPPED
+    holds it."""
+
+    def test_high_accumulates_at_content_rate(self) -> None:
+        dt = 1 / 60
+        p = running_playhead(mode=MotorMode.HIGH)
+        for _ in range(60):
+            p.tick(dt, mstate(2.5, True, 2000.0, mode=MotorMode.HIGH, low_rpm=72.0))
+        self.assertAlmostEqual(p.bars, 72.0 / 60.0, places=6)   # 1 s at 72 rpm = 1.2 bars
+
+    def test_locked_low_accumulates_at_measured_rate(self) -> None:
+        dt = 1 / 60
+        p = running_playhead()
+        p.tick(dt, mstate(0.0, True, 60.0, mode=MotorMode.LOW))
+        self.assertAlmostEqual(p.bars, 60.0 / 60.0 * dt, places=6)
+
+    def test_unmeasured_low_advances_at_commanded_rate(self) -> None:
+        dt = 1 / 60
+        p = Playhead(PlayheadSettings())
+        p.tick(dt, mstate(float("nan"), False, 72.0, mode=MotorMode.LOW))
+        self.assertTrue(math.isnan(p.phase))                    # not live…
+        self.assertAlmostEqual(p.bars, 72.0 / 60.0 * dt, places=6)   # …but bars never stall
+
+    def test_stopped_holds(self) -> None:
+        p = Playhead(PlayheadSettings())
+        for _ in range(30):
+            p.tick(1 / 60, mstate(0.5, False, 0.0, mode=MotorMode.STOPPED))
+        self.assertEqual(p.bars, 0.0)
+
+    def test_monotonic_across_mode_changes(self) -> None:
+        dt = 1 / 60
+        p = running_playhead()
+        prev = p.bars
+        sequence = (
+            [mstate(0.0, True, 72.0, mode=MotorMode.LOW)] * 30
+            + [mstate(2.5, True, 2000.0, mode=MotorMode.HIGH)] * 30
+            + [mstate(float("nan"), False, 0.0, mode=MotorMode.LOW)] * 30   # spin-down, unmeasurable
+            + [mstate(0.0, True, 72.0, mode=MotorMode.LOW)] * 30
+        )
+        for st in sequence:
+            p.tick(dt, st)
+            self.assertGreaterEqual(p.bars, prev)
+            prev = p.bars
+        self.assertGreater(p.bars, 0.0)
+
+
 class SpeedSmoothingTest(unittest.TestCase):
     """The feed-forward sweep rate uses the *averaged* measured speed, so per-revolution rpm jitter
     does not wobble the playhead. `tracking=0` isolates the rate term from the phase correction."""
