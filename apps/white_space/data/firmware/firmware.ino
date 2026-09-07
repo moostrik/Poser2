@@ -48,8 +48,8 @@ volatile int cor3 = 0; // blauw2
 #define DAC_SPI      SPI1
 static const uint8_t PIN_SCK     = 10;
 static const uint8_t PIN_MOSI    = 11;
-static const uint8_t PIN_CS_DAC  = 13; 
-static const uint8_t PIN_SENSOR  = 15; 
+static const uint8_t PIN_CS_DAC  = 13;
+static const uint8_t PIN_SENSOR  = 15;
 
 #include <Arduino.h>
 #include <SPI.h>
@@ -72,17 +72,17 @@ static inline void sioClr(uint pin) { sio_hw->gpio_clr = 1u << pin; }
 // 5. DAC SCHRIJF-FUNCTIE
 static inline void ad7304_write_turbo(uint8_t channel, uint8_t data) {
     sioClr(PIN_CS_DAC);
-    
+
     // We duwen beide bytes direct achter elkaar in de FIFO buffer
     while (!spi_is_writable(SPI_HW));
     spi_get_hw(SPI_HW)->dr = (uint32_t)(0x0C | channel); // Byte 1
-    
+
     while (!spi_is_writable(SPI_HW));
     spi_get_hw(SPI_HW)->dr = (uint32_t)data;             // Byte 2
 
     // Wacht tot de FIFO helemaal leeg is en de laatste bit verzonden
     while (spi_is_busy(SPI_HW));
-    
+
     sioSet(PIN_CS_DAC);
 }
 
@@ -120,8 +120,8 @@ bool haveArtnetMaster = false;
 // ==========================================
 
 // Variabelen voor PLL (Alles float voor snelheid)
-#define MIN_INTERVAL 500
-#define MAX_INTERVAL 1000000
+#define MIN_INTERVAL 25000
+#define MAX_INTERVAL 3000000
 // Weight of ONE new measurement in the interval estimate. This must stay small: at 0.95 the
 // estimate was essentially the raw last-revolution time, so a single jittery sensor edge rescaled
 // `step` for the whole next revolution and the hard sync snapped it back at the following edge —
@@ -135,30 +135,30 @@ bool haveArtnetMaster = false;
 float pll_interval = 30000.0f;
 float step = 8.33f; // Startwaarde
 uint64_t start_time = 0;
-bool vsensor = HIGH; 
+bool vsensor = HIGH;
 float loopL = 3600.0f;
 
 // Functie om de snelheid dynamisch te berekenen en te versturen
 void setSpeed(uint16_t snelheid) {
   uint8_t msg[8];
-  
+
   msg[0] = 0x01;                       // Slave ID
   msg[1] = 0x06;                       // Function Code
   msg[2] = 0x81;                       // Register High
   msg[3] = 0x92;                       // Register Low
   msg[4] = (snelheid >> 8) & 0xFF;     // Snelheid High byte
   msg[5] = snelheid & 0xFF;            // Snelheid Low byte
-  
+
   // Bereken de CRC-16 checksum voor de eerste 6 bytes
   uint16_t crc = crc16_modbus(msg, 6);
-  
+
   // Modbus CRC is Little Endian (Low byte eerst)
   msg[6] = crc & 0xFF;
   msg[7] = (crc >> 8) & 0xFF;
-  
+
   // Verstuur het 8-bytes pakket
   Serial1.write(msg, 8);
-  Serial1.flush(); 
+  Serial1.flush();
 }
 
 // De Modbus CRC-16 berekening
@@ -195,31 +195,31 @@ void motorOff() {
 
 void setup1() {
   pinMode(PIN_SENSOR, INPUT_PULLUP); // PULLUP niet nodig als sensor actief pushed, anders INPUT_PULLUP
-  pinMode(PIN_CS_DAC, OUTPUT);    
+  pinMode(PIN_CS_DAC, OUTPUT);
   digitalWrite(PIN_CS_DAC, HIGH);
 
   DAC_SPI.setSCK(PIN_SCK);
   DAC_SPI.setTX(PIN_MOSI);
   DAC_SPI.begin();
   // 20 MHz is veilig
-  DAC_SPI.beginTransaction(SPISettings(48000000, MSBFIRST, SPI_MODE0)); 
+  DAC_SPI.beginTransaction(SPISettings(48000000, MSBFIRST, SPI_MODE0));
 }
 
 // Extra variabele bovenaan je code
-float phase_error_accumulator = 0.0f; 
+float phase_error_accumulator = 0.0f;
 
 void loop1() {
   static double next_t_us = 0;
   static int Wteller = 0;
 
   // 1. SENSOR CHECK met Phase-correction
-  bool sensor = !gpio_get(PIN_SENSOR); 
+  bool sensor = !gpio_get(PIN_SENSOR);
   gpio_put(LED_BUILTIN, sensor);
 
 
   {
 
-    if (sensor == LOW && vsensor == HIGH) { 
+    if (sensor == LOW && vsensor == HIGH) {
 
       ISERNOGETHERNET++;
 
@@ -231,7 +231,7 @@ void loop1() {
         if (delta > MIN_INTERVAL && delta < MAX_INTERVAL) {
           // Standaard PLL interval (frequentie volgen)
           pll_interval = ALPHA * delta + (1.0f - ALPHA) * pll_interval;
-          
+
           // --- DE MAGIE: Phase Error ---
           // Hoeveel samples zaten we ernaast? (3600 is het doel)
           // Wteller now runs past 3600, so this is signed: positive = we were too slow to finish
@@ -248,21 +248,21 @@ void loop1() {
         }
       }
       start_time = now;
-      
+
       // Harde Sync blijft nodig om jitter te voorkomen
-      next_t_us = (double)now; 
+      next_t_us = (double)now;
       Wteller = 0;
     }
     vsensor = sensor;
 
     // 2. DAC OUTPUT TIMER (Immuun voor schrijfduur)
     double now_d = (double)time_us_64();
-    
+
     if(SLOW==false)
     {
 
       if (now_d >= next_t_us) {
-        next_t_us += (double)step; 
+        next_t_us += (double)step;
 
         if (Wteller < 3600) {
           // Snapshot both pointers once so all four lamps of this sample come from the same
@@ -286,9 +286,9 @@ void loop1() {
         // "too slow" and had no way to correct a revolution that ran fast.
         if (Wteller < WTELLER_CEILING) Wteller++;
       }
-      
+
     }
-    
+
     else
       {
           uint8_t *wit   = WIT;
@@ -314,7 +314,7 @@ void setup() {
   delay(500);
 
   Serial.println("Initialiseren motorsturing...");
-  
+
   // De '3-berichten truc' om de poort/pijplijn stabiel te openen
   for(int i = 0; i < 3; i++) {
     motorOff();
@@ -332,7 +332,7 @@ void setup() {
   setSpeed(110);
   delay(500);
 }*/
-  
+
   pinMode(W5500_RST, OUTPUT);
   digitalWrite(W5500_RST, LOW);  delay(5);
   digitalWrite(W5500_RST, HIGH); delay(50);
@@ -343,7 +343,7 @@ void setup() {
   Udp.begin(localPort);
 
 
-    
+
   delay(5000);
 
   Serial.println("\n[boot] up - Core 1 doet ALLES (Sensor+DAC)");
@@ -473,7 +473,7 @@ void loop() {
  {
       //if (!haveArtnetMaster) return;
 
-          
+
       //Serial.println("X");
   }
   //Serial1.println("X");*/
@@ -497,7 +497,7 @@ void loop() {
 
     recvMask |= (1u << idx);
     rx_total++;
-    
+
     if (idx == 5) {
       #ifndef TEST_MODE
         // Only publish a frame we received in full. An incomplete frame used to be committed
