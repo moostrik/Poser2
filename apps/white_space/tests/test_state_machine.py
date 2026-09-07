@@ -165,6 +165,19 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, ShowState.INTRO)
         self.board.frames = {}
 
+    def test_enter_resets_are_explicit_and_targeted(self) -> None:
+        # INTRO resets the flash layer; INTRO_PLAY resets pose_waves (fresh instrument per
+        # show cycle); PLAY inherits the running waves — no reset on the END → PLAY path.
+        self._to_intro(participants=3)
+        self.assertIn([LayerId.playhead_flash], self.resets)
+        self.machine.set_similarity(SimpleNamespace(similarity={0: FakeSimilarity(0.9)}))
+        self.tick()
+        self.assertIn([LayerId.pose_waves], self.resets)
+        self.resets.clear()
+        self.tick(dt=self.config.intro_play_seconds + 0.1)   # INTRO_PLAY → PLAY
+        self.assertEqual(self.current, ShowState.PLAY)
+        self.assertEqual(self.resets, [])                    # PLAY inherits, never resets
+
     def test_intro_to_intro_play_on_sync_and_through_to_play(self) -> None:
         self._to_intro(participants=3)
         self.machine.set_similarity(SimpleNamespace(

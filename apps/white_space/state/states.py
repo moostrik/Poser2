@@ -116,6 +116,9 @@ class IntroState(StateBase):
     MOTOR = MotorMode.LOW
     DIM = 0.4                           # the DIM line level (INTRO_IDLE fades back up from it)
 
+    def enter(self, ctx: StateContext) -> None:
+        self._reset_layers([LayerId.playhead_flash])   # no stale flash decay from a previous cycle
+
     def update(self, ctx: StateContext) -> Look:
         return [(LayerId.playhead_lamp, self.DIM), (LayerId.playhead_flash, 1.0)]
 
@@ -166,6 +169,11 @@ class IntroIdleState(StateBase):
 class IntroPlayState(StateBase):
     """S4 — spin-up: cross the line into the pose instrument over the spin-up time."""
     MOTOR = MotorMode.HIGH
+
+    def enter(self, ctx: StateContext) -> None:
+        # A new show cycle's instrument starts with clean wave history. Deliberately NOT in
+        # PLAY's enter — PLAY is re-entered from END's wind-back and must inherit the waves.
+        self._reset_layers([LayerId.pose_waves])
 
     def update(self, ctx: StateContext) -> Look:
         e = _ease(self.progress(ctx))
