@@ -35,11 +35,15 @@ import math
 from modules.settings import BaseSettings, Field, Widget
 from modules.utils import EMAFilter
 
-from .motor import MotorState, MotorMode
+from .motor import MotorState, MotorMode, _SENSOR_CEILING_RPM
 
 # Re-lock onto the measured phase once the spinning-down motor reaches content speed, within this
 # relative tolerance of low_rpm (absorbs measurement jitter as it settles at the LOW target).
 _RESYNC_RPM_TOL: float = 0.05
+
+# Falls silent for this long while commanded HIGH → the bar has physically blurred into the ring
+# (the sensor cannot pulse above the ceiling; 2.5 ceiling-periods absorbs the last slow pulses).
+_RING_SILENCE_S: float = 2.5 * 60.0 / _SENSOR_CEILING_RPM
 
 
 def _wrap_to_pi(x: float) -> float:
@@ -73,6 +77,8 @@ class Playhead:
         self._rpm_ema = EMAFilter(freq=30.0)         # averages the per-revolution measured speed (feed-forward)
         self._time:    float = 0.0                   # accumulated time for the EMA's dt-correction
         self._tracking_prev: bool = False            # was the previous tick the locked-tracking branch (to seed the EMA)
+        self._ring_formed: bool = False              # regime signal: the bar has physically blurred into the ring
+        self._spin_down: float = 0.0                 # regime signal: normalized deceleration ceiling→LOW (1 at re-lock)
 
     def tick(self, dt: float, motor: MotorState) -> None:
         """Advance the internal content clock from the motor's active mode, gating the re-lock onto
@@ -99,8 +105,30 @@ class Playhead:
         # while re-syncing (a live free-running sweep). IDLE/LOW with no measurement → not live → NaN.
         self._live = motor.mode == MotorMode.HIGH or motor.locked or self._resyncing
         self._advance_internal(dt, motor)
+        self._update_regime_signals(motor)
         # Finite continuous position for the UI slider (`.phase` itself is NaN when not live).
         self._settings.playhead = _wrap_to_pi(self._internal + self._settings.phase * math.tau)
+
+    def _update_regime_signals(self, motor: MotorState) -> None:
+        """The two physical regime-flip signals the show anchors on (the playhead owns them:
+        it holds all the sync/resync/stale-reading knowledge).
+
+        ``ring_formed`` (spin-up): commanded HIGH and the falls have gone silent — the sensor
+        cannot pulse above the ceiling, so silence is the evidence the bar has blurred into
+        the ring. ``spin_down`` (spin-down): the gated, normalized deceleration — 0 until a
+        fresh measurement exists (the two-stage gate defeats stale readings), then
+        (ceiling − measured)/(ceiling − low_rpm) as the motor brakes toward LOW, and 1.0 once
+        re-locked (``synced``)."""
+        self._ring_formed = motor.mode == MotorMode.HIGH and motor.fall_age > _RING_SILENCE_S
+
+        if self._tracking_prev:                                 # re-locked at LOW → complete
+            self._spin_down = 1.0
+        elif self._resyncing and self._seen_fast and motor.locked:
+            span = _SENSOR_CEILING_RPM - motor.low_rpm
+            e = (_SENSOR_CEILING_RPM - motor.measured_rpm) / span if span > 0.0 else 1.0
+            self._spin_down = min(max(e, 0.0), 1.0)
+        else:
+            self._spin_down = 0.0
 
     def _advance_internal(self, dt: float, motor: MotorState) -> None:
         """The mode-based content sweep (STOPPED holds, IDLE/LOW track the measured phase, HIGH and
@@ -151,3 +179,22 @@ class Playhead:
         show's content clock — musical-timeline vocabulary, deliberately distinct from the
         machine's physical rotation. Never NaN; only STOPPED holds it."""
         return self._bars
+
+    @property
+    def synced(self) -> bool:
+        """True while the sweep is actively tracking the measured rotation at LOW — the
+        stale-proof "motor lock" the show anchors on (re-lock gate passed)."""
+        return self._tracking_prev
+
+    @property
+    def ring_formed(self) -> bool:
+        """True while commanded HIGH with the falls gone silent — the bar has physically
+        blurred into the ring (the spin-up's un-lock anchor)."""
+        return self._ring_formed
+
+    @property
+    def spin_down(self) -> float:
+        """Gated normalized deceleration, 0..1: 0 above the ceiling (or on stale readings),
+        rising with the fresh measured braking toward LOW, 1.0 at re-lock. Drives the
+        S8/S9 fades and progress — the fade IS the deceleration."""
+        return self._spin_down

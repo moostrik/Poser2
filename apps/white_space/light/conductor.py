@@ -19,17 +19,32 @@ from .frame import Frame, FrameCallback
 from .motor import MotorController, MotorMode
 from .playhead import Playhead
 from .settings import LightSettings, LayerId
-from .layers import (BaseLayer, Compositor, Look, PoseWaves, Fill, Pulse, Chase, Lines, Random,
+from .layers import (BaseLayer, Compositor, Mix, PoseWaves, Fill, Pulse, Chase, Lines, Random,
                      Harmonic, PlayerLines, CameraLight, PlayheadFlash, HauntedFlash,
                      PlayheadLow, PlayheadHigh)
+from modules.board import PlayheadSignals
+
 from ..board import Board
 
 import logging
 logger = logging.getLogger(__name__)
 
 # Spun-content layers: their pixels ride the fast ring, so they get the light_phase shift.
+# Doubles as the high-layer knowledge for the debug auto-follow (until the LowLayer/HighLayer
+# base classes carry the flag).
 _SHIFTED: set[LayerId] = {LayerId.pose_waves, LayerId.harmonic, LayerId.player_lines,
                           LayerId.calibration, LayerId.playhead_marker}
+
+
+def _debug_motor_mode(selection: list[LayerId]) -> MotorMode:
+    """The debug auto-follow: derive the motor regime from the selected debug layers —
+    any high layer → HIGH, else any low layer → LOW, empty selection → STOPPED. Selecting
+    a layer is the only gesture: the speed rides the selection, inside debug's consent."""
+    if any(id in _SHIFTED for id in selection):
+        return MotorMode.HIGH
+    if selection:
+        return MotorMode.LOW
+    return MotorMode.STOPPED
 
 
 class Conductor(Thread):
@@ -43,6 +58,9 @@ class Conductor(Thread):
         self._config: LightSettings = config
         self._board: Board          = board
         self._pose_stage: int       = pose_stage
+        # Boot failsafe #3: a preset saved mid-debug (debug on + a high layer ticked) must
+        # never auto-derive HIGH at power-on — the installation always wakes in the show.
+        config.debug = False
         self._motor_controller      = MotorController(config.motor)
         self._playhead              = Playhead(config.playhead)
         self._clock                 = Clock(config.clock, config.light_rate)
@@ -107,9 +125,9 @@ class Conductor(Thread):
     # State-machine command channels (forwarded; the machine is the sole caller)
     # ------------------------------------------------------------------
 
-    def set_look(self, entries: Look) -> None:
-        """Forward the state machine's look to the Compositor."""
-        self._compositor.set_look(entries)
+    def set_mix(self, entries: Mix) -> None:
+        """Forward the state machine's mix to the Compositor."""
+        self._compositor.set_mix(entries)
 
     def reset_layers(self, ids: list[LayerId]) -> None:
         """Forward an explicit layer reset (a show state's ``enter()``) to the Compositor."""
@@ -124,13 +142,20 @@ class Conductor(Thread):
     # ------------------------------------------------------------------
 
     def _update(self, tick: Tick) -> None:
+        # Debug auto-follow: while the debug override is on, the motor follows the selected
+        # debug layers' regime (outranking the machine); off relinquishes back to the machine.
+        self._motor_controller.set_debug_mode(
+            _debug_motor_mode(list(self._config.debug_layers)) if self._config.debug else None)
+
         # Advance motor + playhead and publish the playhead BEFORE the update callbacks: the
         # state machine and pose-LERP read it. Phase is NaN while the motor is STOPPED (no
         # meaningful playhead); the bar counter stays monotonic throughout.
         motor = self._motor_controller.tick()
         self._playhead.tick(tick.dt, motor)
         playhead = self._playhead.phase
-        self._board.set_playhead(playhead, self._playhead.bars)
+        self._board.set_playhead(PlayheadSignals(
+            phase=playhead, bars=self._playhead.bars, synced=self._playhead.synced,
+            ring_formed=self._playhead.ring_formed, spin_down=self._playhead.spin_down))
 
         self._notify_update()
 

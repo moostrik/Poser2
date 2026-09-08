@@ -24,7 +24,7 @@ from modules.gl import WindowSettings
 from .light import LightSettings
 from .inout import OscLightSettings, UdpReceiverSettings
 from .pose import GhosterSettings
-from .state import StateMachineSettings
+from .statemachine import StateMachineSettings
 
 
 # ---------------------------------------------------------------------------
@@ -323,7 +323,7 @@ class Settings(BaseSettings):
     pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     ghost  : Group[GhostGroup]      = Group(GhostGroup, share=[num_players.as_('live_players'), num_virtual.as_('ghost_slots')])
     light: Group[LightSettings] = Group(LightSettings, share=[num_players.as_('max_poses'), num_cameras.as_('num_cameras'), light_resolution.as_('light_resolution'), fov])
-    state  : Group[StateMachineSettings] = Group(StateMachineSettings)
+    statemachine: Group[StateMachineSettings] = Group(StateMachineSettings)
     render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams')])
     server : Group[NiceSettings]    = Group(NiceSettings)
     recording: Group[RecordingGroup] = Group(RecordingGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])

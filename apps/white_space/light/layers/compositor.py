@@ -6,8 +6,9 @@ draws itself into a private scratch frame (via its own blend mode) and is added
 
 The Compositor holds no timing, easing, transition, or reset logic: weight curves live in
 the show state classes, and layer resets are explicit (``reset_layers``). The one policy it
-owns is the manual/debug override: while ``light.manual`` is on, the operator's
-``manual_layers`` checklist (full weight each) replaces the state's entries.
+owns is its half of the debug override: while ``light.debug`` is on, the operator's
+``debug_layers`` checklist (full weight each) replaces the state's entries (the Conductor
+owns the other half — the motor auto-following the selection's regime).
 """
 
 from __future__ import annotations
@@ -26,15 +27,25 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# The look: which layers to draw this tick, at which weight.
-Look = list[tuple['LayerId', float]]
+# The mix: which layers to draw this tick, at which weight. A plain float weighs both
+# channels; a (white, blue) tuple weighs them independently (the show specifies white
+# and blue light separately per state).
+MixWeight = 'float | tuple[float, float]'
+Mix = list[tuple['LayerId', 'float | tuple[float, float]']]
+
+
+def _channel_weights(weight: 'float | tuple[float, float]') -> tuple[float, float]:
+    """Normalize a mix weight to per-channel (white, blue)."""
+    if isinstance(weight, tuple):
+        return weight
+    return (weight, weight)
 
 
 class Compositor:
-    """Mixes the current look into the output frame; see the module docstring.
+    """Mixes the current mix into the output frame; see the module docstring.
 
     Deliberately not a ``BaseLayer``: "layer" means exactly "a thing a state can put in
-    its look" — the Compositor is the mixer those layers pass through.
+    its mix" — the Compositor is the mixer those layers pass through.
     """
 
     def __init__(self, config: LightSettings, layers: dict[LayerId, BaseLayer],
@@ -42,14 +53,14 @@ class Compositor:
         self._config = config
         self._layers = layers
         self._shifted = shifted            # layers that get the light_phase ring shift
-        self._entries: Look = []
+        self._entries: Mix = []
         self._scratch = Frame(config.light_resolution, Tick(0.0, 0.0, 0.0, 0.0, 0))
 
-    # -- Look input (light thread, same thread as render) ----------------------
+    # -- Mix input (light thread, same thread as render) ----------------------
 
-    def set_look(self, entries: Look) -> None:
-        """Set the look to draw this tick — called every tick by the state machine.
-        A weight of 0.0 keeps the layer in the look but silent; layers are never
+    def set_mix(self, entries: Mix) -> None:
+        """Set the mix to draw this tick — called every tick by the state machine.
+        A weight of 0.0 keeps the layer in the mix but silent; layers are never
         reset implicitly."""
         self._entries = entries
 
@@ -65,16 +76,17 @@ class Compositor:
 
     def render(self, frame: Frame) -> None:
         cfg = self._config
-        entries: Look = self._entries
-        if cfg.manual:
-            entries = [(id, 1.0) for id in cfg.manual_layers]
+        entries: Mix = self._entries
+        if cfg.debug:
+            entries = [(id, 1.0) for id in cfg.debug_layers]
 
         shift = int(round(cfg.light_phase * frame.white.shape[0])) % frame.white.shape[0]
 
         s = self._scratch
         s.tick, s.motor, s.playhead = frame.tick, frame.motor, frame.playhead
         for id, weight in entries:
-            if weight <= 0.0:
+            w_white, w_blue = _channel_weights(weight)
+            if w_white <= 0.0 and w_blue <= 0.0:
                 continue
             layer = self._layers.get(id)
             if layer is None:
@@ -88,5 +100,7 @@ class Compositor:
             sw, sb = s.white, s.blue
             if shift and id in self._shifted:
                 sw, sb = np.roll(sw, shift), np.roll(sb, shift)
-            frame.white += weight * sw
-            frame.blue  += weight * sb
+            if w_white > 0.0:
+                frame.white += w_white * sw
+            if w_blue > 0.0:
+                frame.blue  += w_blue * sb

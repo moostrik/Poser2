@@ -66,9 +66,12 @@ class LightSettings(BaseSettings):
     master:         Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Master brightness (applied to the composite; lamp gamma/floor live in osc_light)", newline=True)
     light_phase: Field[float]    = Field(0.0, min=0.0, max=1.0, step=0.01, description="High-speed ring offset (0–1 turn), applied to the spun-content layers")
 
-    # Manual/debug look override — replaces the state machine's look at the Compositor when on.
-    manual:        Field[bool]          = Field(False, description="Manual look: override the show state's layer selection", newline=True)
-    manual_layers: Field[list[LayerId]] = Field([LayerId.playhead_lamp], widget=Widget.checklist, description="Layers shown while manual is on (full weight each)")
+    # Debug override — a first-class switch ABOVE the state machine: while on, the
+    # Compositor draws debug_layers (raw, full weight) and the motor auto-follows the
+    # selection's regime (any high layer → HIGH, else any low → LOW, empty → STOPPED).
+    # Forced off at startup (boot failsafe: a preset saved mid-debug must never spin at power-on).
+    debug:        Field[bool]          = Field(False, description="Debug override: show debug_layers and auto-follow the motor to their regime", newline=True)
+    debug_layers: Field[list[LayerId]] = Field([LayerId.playhead_lamp], widget=Widget.checklist, description="Layers shown while debug is on (full weight; motor follows their regime)")
 
     clock:        Group[ClockSettings]        = Group(ClockSettings)
     motor:        Group[MotorSettings]        = Group(MotorSettings)

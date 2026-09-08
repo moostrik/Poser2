@@ -4,7 +4,7 @@ import math
 import unittest
 from time import monotonic
 
-from apps.white_space.light.motor import MotorController, MotorSettings, MotorState, MotorMode, MotorSimMode
+from apps.white_space.light.motor import MotorController, MotorSettings, MotorState, MotorMode
 from apps.white_space.light.playhead import Playhead, PlayheadSettings, _wrap_to_pi
 
 TAU = math.tau
@@ -178,31 +178,20 @@ class MotorTest(unittest.TestCase):
 
 
 class SimTest(unittest.TestCase):
-    def test_sim_mode_selects_target_rpm(self) -> None:
-        s = MotorSettings(); m = MotorController(s)
-        for sim, rpm in [(MotorSimMode.LOW, s.low_rpm),
-                         (MotorSimMode.HIGH, s.high_rpm), (MotorSimMode.STOPPED, 0.0)]:
-            s.simulate = sim
-            self.assertEqual(m._target_rpm(m._target_mode()), rpm)
+    """The sim is a physical stand-in, never a decision-maker: it obeys the commanded
+    mode (same arbitration as the real motor) and mimics the sensor's silence above
+    the ceiling."""
 
-    def test_sim_mode_names_map_to_motor_modes(self) -> None:
-        # _target_mode() does MotorMode[sim.name]; guard the two enums against drifting apart.
-        for sim in MotorSimMode:
-            if sim is not MotorSimMode.OFF:
-                self.assertIn(sim.name, MotorMode.__members__)
-
-    def test_simulate_overrides_active_mode(self) -> None:
+    def test_sim_obeys_the_commanded_mode(self) -> None:
+        # simulate on/off never changes the arbitration — the sim is not a mode source.
         s = MotorSettings(); s.mode = MotorMode.LOW
         m = MotorController(s)
-        m._last_fall_time = monotonic() - 0.1; m._measured_period = 0.5
-        s.simulate = MotorSimMode.HIGH
-        st = m.tick()
-        self.assertEqual(st.mode, MotorMode.HIGH)          # sim overrides the commanded mode
-        self.assertEqual(st.target_rpm, 2000.0)
-        s.simulate = MotorSimMode.OFF
-        st = m.tick()
-        self.assertEqual(st.mode, MotorMode.LOW)           # commanded mode rules when not simulating
-        self.assertEqual(st.target_rpm, 72.0)
+        s.simulate = True
+        self.assertEqual(m._target_mode(), MotorMode.LOW)     # manual fallback
+        m.set_mode(MotorMode.HIGH)
+        self.assertEqual(m._target_mode(), MotorMode.HIGH)    # machine command wins, sim or not
+        s.simulate = False
+        self.assertEqual(m._target_mode(), MotorMode.HIGH)
 
     def test_ramp_toward_models_inertia(self) -> None:
         r = MotorController._ramp_toward
@@ -218,10 +207,10 @@ class SimTest(unittest.TestCase):
 
     def test_notify_fall_gated_while_simulating(self) -> None:
         s = MotorSettings(); m = MotorController(s)
-        s.simulate = MotorSimMode.LOW
+        s.simulate = True
         m.notify_fall()
         self.assertIsNone(m._last_fall_time)        # real falls ignored while simulating
-        s.simulate = MotorSimMode.OFF
+        s.simulate = False
         m.notify_fall()
         self.assertIsNotNone(m._last_fall_time)
 
@@ -393,11 +382,43 @@ class SetModeTest(unittest.TestCase):
         m.set_mode(None)
         self.assertEqual(m.tick().mode, MotorMode.STOPPED)
 
-    def test_sim_selector_still_overrides_the_command(self) -> None:
-        s = MotorSettings(); s.simulate = MotorSimMode.STOPPED
+
+
+class DebugOverrideTest(unittest.TestCase):
+    """The debug rung outranks the machine; the auto-follow derives the regime from the
+    selected debug layers."""
+
+    def test_debug_mode_outranks_the_machine_command(self) -> None:
+        s = MotorSettings(); s.mode = MotorMode.STOPPED
         m = MotorController(s)
-        m.set_mode(MotorMode.HIGH)
+        m.set_mode(MotorMode.LOW)                       # machine command
+        m.set_debug_mode(MotorMode.HIGH)                # debug override wins
+        self.assertEqual(m._target_mode(), MotorMode.HIGH)
+        m.set_debug_mode(None)                          # debug off → machine again
+        self.assertEqual(m._target_mode(), MotorMode.LOW)
+        m.set_mode(None)                                # machine relinquishes → manual fallback
         self.assertEqual(m._target_mode(), MotorMode.STOPPED)
+
+    def test_auto_follow_derives_regime_from_selection(self) -> None:
+        from apps.white_space.light.conductor import _debug_motor_mode
+        from apps.white_space.light import LayerId
+        self.assertEqual(_debug_motor_mode([LayerId.pose_waves]), MotorMode.HIGH)
+        self.assertEqual(_debug_motor_mode([LayerId.playhead_lamp, LayerId.pose_waves]),
+                         MotorMode.HIGH)                # any high layer wins
+        self.assertEqual(_debug_motor_mode([LayerId.playhead_lamp]), MotorMode.LOW)
+        self.assertEqual(_debug_motor_mode([]), MotorMode.STOPPED)
+
+    def test_boot_failsafe_clears_debug(self) -> None:
+        # A preset saved mid-debug (debug on + a high layer ticked) must never auto-derive
+        # HIGH at power-on: the Conductor forces debug off at construction.
+        from apps.white_space.light import Conductor, LightSettings, LayerId
+        from apps.white_space.board import Board
+        from modules.tracker.panoramic.settings import DistortionSettings
+        cfg = LightSettings()
+        cfg.debug = True
+        cfg.debug_layers = [LayerId.pose_waves]
+        Conductor(cfg, DistortionSettings(), Board(), pose_stage=4)
+        self.assertFalse(cfg.debug)
 
 
 class BarsTest(unittest.TestCase):
@@ -446,6 +467,51 @@ class BarsTest(unittest.TestCase):
             self.assertGreaterEqual(p.bars, prev)
             prev = p.bars
         self.assertGreater(p.bars, 0.0)
+
+
+class RegimeSignalsTest(unittest.TestCase):
+    """The playhead's regime-flip signals: `synced` (re-locked at LOW — the stale-proof
+    motor lock), `ring_formed` (HIGH + fall silence — the bar blurred into the ring), and
+    `spin_down` (gated normalized deceleration, ceiling → LOW, 1.0 at re-lock)."""
+
+    DT = 1 / 60
+
+    def test_synced_only_while_tracking_at_low(self) -> None:
+        p = running_playhead()
+        p.tick(self.DT, mstate(0.0, True, 72.0, mode=MotorMode.LOW))
+        self.assertTrue(p.synced)
+        p.tick(self.DT, mstate(2.5, True, 2000.0, mode=MotorMode.HIGH))
+        self.assertFalse(p.synced)                       # HIGH free-runs — not tracking
+
+    def test_ring_formed_needs_high_plus_fall_silence(self) -> None:
+        p = running_playhead(mode=MotorMode.HIGH)
+        st = mstate(float("nan"), False, 2000.0, mode=MotorMode.HIGH)
+        st.fall_age = 0.1                                # falls still arriving (climbing below ceiling)
+        p.tick(self.DT, st)
+        self.assertFalse(p.ring_formed)
+        st.fall_age = 1.0                                # silence beyond the window → ring formed
+        p.tick(self.DT, st)
+        self.assertTrue(p.ring_formed)
+        low = mstate(0.0, True, 72.0, mode=MotorMode.LOW)
+        low.fall_age = 999.0                             # silence in LOW is never "ring formed"
+        p.tick(self.DT, low)
+        self.assertFalse(p.ring_formed)
+
+    def test_spin_down_is_gated_normalized_and_completes_at_relock(self) -> None:
+        p = running_playhead(mode=MotorMode.HIGH)
+        p.tick(self.DT, mstate(float("nan"), False, 2000.0, mode=MotorMode.HIGH))
+        # Back to LOW: the stale pre-HIGH reading must NOT produce a fade (gate not passed).
+        p.tick(self.DT, mstate(2.5, True, 72.0, mode=MotorMode.LOW))
+        self.assertEqual(p.spin_down, 0.0)
+        # Fresh fast reading → gate passes; spin_down = (200 − measured) / (200 − 72).
+        p.tick(self.DT, mstate(2.5, True, 180.0, mode=MotorMode.LOW))
+        self.assertAlmostEqual(p.spin_down, (200.0 - 180.0) / (200.0 - 72.0), places=6)
+        p.tick(self.DT, mstate(2.5, True, 100.0, mode=MotorMode.LOW))
+        self.assertAlmostEqual(p.spin_down, (200.0 - 100.0) / (200.0 - 72.0), places=6)
+        # Settled at content speed → re-lock: synced and spin_down = 1.0 together.
+        p.tick(self.DT, mstate(2.5, True, 73.0, mode=MotorMode.LOW))
+        self.assertTrue(p.synced)
+        self.assertEqual(p.spin_down, 1.0)
 
 
 class SpeedSmoothingTest(unittest.TestCase):

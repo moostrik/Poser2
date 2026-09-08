@@ -21,7 +21,7 @@ from .light import Conductor
 from .inout import OscLight, OscSound, UdpReceiver
 from .render import Render as WindowRender
 from .settings import Settings, Stage
-from .state import StateMachine
+from .statemachine import StateMachine
 
 APP_NAME = 'white_space'
 DATA_PATH = 'apps/white_space/data'
@@ -136,8 +136,8 @@ class WhiteSpaceMain:
         # STATE MACHINE — the show's single decision maker; commands the Conductor through
         # its three channels (look, layer resets, motor) and emits state to board + OSC.
         self.state_machine = StateMachine(
-            self.settings.state, self.settings.light, board=self.board,
-            compose=self.conductor.set_look,
+            self.settings.statemachine, self.settings.light, board=self.board,
+            set_mix=self.conductor.set_mix,
             reset_layers=self.conductor.reset_layers,
             set_motor=self.conductor.set_motor_mode,
             pose_stage=int(Stage.LERP),

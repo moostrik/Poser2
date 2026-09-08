@@ -1,14 +1,14 @@
-"""StateMachine — the show's single decision maker.
+"""StateMachine — the installation's single decision maker.
 
-A condition-driven state machine that plays the 9-state show designed in
-``data/Stages-STAGES.csv``: a sequencer hybrid, progress-driven *within* a state and
+A condition-driven state machine that plays the states designed in ``data/STATES.md``
+(the source of truth): a sequencer hybrid, progress-driven *within* a state and
 condition-driven *between* states. Each tick (on the Conductor's light thread) it builds a
-``StateContext`` from the board (participants, sync, hit-by-light, playhead bars), lets the
-active state compose its look, evaluates that state's transition conditions, and emits a
-``SequencerState`` snapshot for the board and OSC sound.
+``StateContext`` from the board (participants, sync, hit-by-light, the playhead's content
+clock and regime signals), lets the active state return its mix, evaluates that state's
+transition conditions, and emits a ``SequencerState`` snapshot for the board and OSC sound.
 
 The machine is the only component that talks to the Conductor, through three explicit
-command callables: ``compose`` (the look), ``reset_layers`` (explicit layer resets), and
+command callables: ``set_mix`` (the mix), ``reset_layers`` (explicit layer resets), and
 ``set_motor`` (the motor command; ``None`` relinquishes to the manual ``motor.mode`` setting).
 
 ``SequencerState`` is a boundary wire format only — reusing it keeps the board/OSC wiring
@@ -31,7 +31,7 @@ from modules.pose.analytics import SimilarityResult
 from modules.utils import HotReloadMethods
 
 from ..board import Board
-from ..light import LightSettings, LayerId, Look, MotorMode
+from ..light import LightSettings, LayerId, Mix, MotorMode
 from ..pose import PlayheadOffset
 
 import logging
@@ -51,10 +51,13 @@ class SyncMode(IntEnum):
             case _:                      return participants
 
 
-class ShowState(IntEnum):
-    """The show's states — the CSV's 9 stages. The *_INTRO / *_IDLE / *_PLAY entries are
-    transitions promoted to states: their durations are the transition durations."""
-    IDLE       = 0
+class StateId(IntEnum):
+    """The states of ``data/STATES.md`` (the source of truth). OFF = 0 is the
+    operational off (outside the automatic graph, goto only; ``/global/state`` 0 means
+    off on the wire). The *_INTRO / *_IDLE / *_PLAY entries are transitions promoted to
+    states: their durations are the transition durations."""
+    OFF        = 0
+    IDLE       = auto()
     IDLE_INTRO = auto()
     INTRO      = auto()
     INTRO_IDLE = auto()
@@ -71,15 +74,14 @@ class StateMachineSettings(BaseSettings):
     enabled: Field[bool]      = Field(True,  description="Evaluate transitions automatically")
     hold:    Field[bool]      = Field(False, description="Freeze transitions; the active state keeps updating")
     session: Field[bool]      = Field(False, description="Session mode: timed overrides for the open-ended states (INTRO, PLAY)")
-    select:  Field[ShowState] = Field(ShowState.IDLE, description="State to jump to with the goto button", newline=True)
+    select:  Field[StateId] = Field(StateId.IDLE, description="State to jump to with the goto button", newline=True)
     goto:    Field[bool]      = Field(False, widget=Widget.button, description="Jump to the selected state now (also when disabled)")
 
-    # Transition-state durations — one per state
+    # Transition-state durations — one per state. END_INTRO/END_IDLE have none: their
+    # duration IS the physical spin-down (exit = the re-lock at LOW; fade = spin_down).
     intro_idle_bars:       Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="INTRO_IDLE: playhead bars back to IDLE", newline=True)
     intro_play_seconds:    Field[float] = Field(14.0, min=1.0, max=60.0,  step=0.5, description="INTRO_PLAY: spin-up transition (seconds)")
     end_bars:              Field[float] = Field(3.0,  min=0.5, max=20.0,  step=0.5, description="END: wind-down playhead bars (bidirectional ramp)")
-    end_intro_seconds:     Field[float] = Field(6.0,  min=1.0, max=60.0,  step=0.5, description="END_INTRO: spin-down transition (seconds)")
-    end_idle_seconds:      Field[float] = Field(6.0,  min=1.0, max=60.0,  step=0.5, description="END_IDLE: spin-down transition (seconds)")
 
     # Session-mode timeouts — named for the state they cut short
     intro_session_seconds: Field[float] = Field(60.0,  min=5.0, max=600.0,  step=1.0, description="Session: INTRO → INTRO_PLAY after this time", newline=True)
@@ -91,7 +93,7 @@ class StateMachineSettings(BaseSettings):
     count_hold_seconds: Field[float] = Field(1.0,  min=0.0, max=10.0, step=0.1, description="Participant-count debounce: a new count must persist this long before conditions see it")
 
     # Telemetry (read-only)
-    current:      Field[ShowState] = Field(ShowState.IDLE, access=Field.READ, description="Current show state", newline=True)
+    current:      Field[StateId] = Field(StateId.IDLE, access=Field.READ, description="Current show state", newline=True)
     progress:     Field[float]     = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Active state progress")
     participants: Field[int]       = Field(0, access=Field.READ, description="Debounced participant count")
     sync:         Field[float]     = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Mean pose similarity")
@@ -110,8 +112,14 @@ class StateContext:
     sync_count: int         # participants whose similarity is ≥ sync_threshold
     hit:     bool           # a live participant was passed by the playhead this tick
     session: bool           # session mode active — states consult it in needs_state_change()
-    prev: ShowState | None  # the state we arrived from (None at boot) — lets a transition
+    prev: StateId | None    # the state we arrived from (None at boot) — lets a transition
                             # state ramp from where the show actually was (no dips)
+    motor_locked: bool      # the playhead has re-synced to the measured rotation at LOW
+                            # (stale-proof "at low speed" — S8/S9's exit anchor)
+    ring_formed: bool       # commanded HIGH and the falls have gone silent — the bar has
+                            # physically blurred into the ring (S5's un-lock anchor)
+    spin_down: float        # gated normalized deceleration 0..1 (1 at re-lock) — the
+                            # spin-down fade IS this signal
 
 
 class StateMachine:
@@ -120,14 +128,14 @@ class StateMachine:
     needs no locking (``set_similarity`` is the one cross-thread input and is locked)."""
 
     def __init__(self, config: StateMachineSettings, light: LightSettings, board: Board,
-                 compose: Callable[[Look], None],
+                 set_mix: Callable[[Mix], None],
                  reset_layers: Callable[[list[LayerId]], None],
                  set_motor: Callable[[MotorMode | None], None],
                  pose_stage: int) -> None:
         self._config = config
         self._light = light
         self._board = board
-        self._compose = compose
+        self._set_mix = set_mix
         self._reset_layers = reset_layers
         self._set_motor = set_motor
         self._pose_stage = pose_stage
@@ -137,7 +145,7 @@ class StateMachine:
         # Failsafe: the show ALWAYS starts in IDLE (motor LOW), regardless of the persisted
         # `select` value — that field is only the goto target. A preset saved mid-show must
         # never boot the machine into a HIGH-motor state.
-        self._current: ShowState = ShowState.IDLE
+        self._current: StateId = StateId.IDLE
         self._active = None                     # set on the first update() tick
 
         self._state_callbacks: set[Callable[[SequencerState], None]] = set()
@@ -147,7 +155,7 @@ class StateMachine:
         self._entered_time: float = 0.0
         self._entered_bars: float = 0.0
         self._prev_bars: float = 0.0
-        self._prev_state: ShowState | None = None   # where the current state was entered from
+        self._prev_state: StateId | None = None   # where the current state was entered from
 
         # Condition inputs
         self._eff_participants: int | None = None   # debounced count (None until first tick)
@@ -231,7 +239,7 @@ class StateMachine:
         self._prev_offsets = offsets
         return hit
 
-    def _build_context(self, now: float, dt: float, bars_now: float,
+    def _build_context(self, now: float, dt: float, signals,
                        participants: int, hit: bool) -> StateContext:
         with self._sync_lock:
             values = self._sync_values
@@ -239,15 +247,18 @@ class StateMachine:
         sync_count = sum(1 for v in values if v >= self._config.sync_threshold)
         return StateContext(
             elapsed=now - self._entered_time,
-            bars=bars_now - self._entered_bars,
+            bars=signals.bars - self._entered_bars,
             dt=dt,
-            dbar=bars_now - self._prev_bars,
+            dbar=signals.bars - self._prev_bars,
             participants=participants,
             sync=sync,
             sync_count=sync_count,
             hit=hit,
             session=self._config.session,
             prev=self._prev_state,
+            motor_locked=signals.synced,
+            ring_formed=signals.ring_formed,
+            spin_down=signals.spin_down,
         )
 
     # -- Tick (light thread, via conductor.add_update_callback) ---------------
@@ -256,7 +267,7 @@ class StateMachine:
         now = time.time()
         dt = now - self._prev_time if self._prev_time is not None else 0.0
         self._prev_time = now
-        bars_now = self._board.get_playhead_bars()
+        signals = self._board.get_playhead_signals()
 
         live_ids = {id for id, t in self._board.get_tracklets().items() if t.is_active}
         participants = self._debounced_participants(now)
@@ -265,24 +276,24 @@ class StateMachine:
         if self._active is None:
             # Startup failsafe: always enter IDLE (see __init__) — `select` is not consulted.
             self._goto_requested = False
-            self._switch(ShowState.IDLE, now, dt, bars_now, participants, hit)
+            self._switch(StateId.IDLE, now, dt, signals.bars, participants, hit, signals)
         elif self._goto_requested:
             self._goto_requested = False
-            self._switch(ShowState(int(self._config.select)), now, dt, bars_now, participants, hit)
+            self._switch(StateId(int(self._config.select)), now, dt, signals.bars, participants, hit, signals)
 
-        ctx = self._build_context(now, dt, bars_now, participants, hit)
+        ctx = self._build_context(now, dt, signals, participants, hit)
         entries = self._active.update(ctx)
-        self._compose(entries)
+        self._set_mix(entries)
 
         if self._config.enabled and not self._config.hold:
             nxt = self._active.needs_state_change(ctx)
             if nxt is not None:
-                self._switch(nxt, now, dt, bars_now, participants, hit)
-                ctx = self._build_context(now, dt, bars_now, participants, hit)
+                self._switch(nxt, now, dt, signals.bars, participants, hit, signals)
+                ctx = self._build_context(now, dt, signals, participants, hit)
                 entries = self._active.update(ctx)
-                self._compose(entries)
+                self._set_mix(entries)
 
-        self._prev_bars = bars_now
+        self._prev_bars = signals.bars
 
         p = self._active.progress(ctx)
         self._config.progress = p
@@ -292,14 +303,14 @@ class StateMachine:
         self._notify_state(SequencerState(
             stage=int(self._current),                       # wire-format naming (see module doc)
             stage_progress=p,
-            progress=(int(self._current) + p) / len(ShowState),
+            progress=(int(self._current) + p) / len(StateId),
             elapsed=ctx.elapsed,
             active=self._config.enabled,
         ))
 
-    def _switch(self, target: ShowState, now: float, dt: float, bars_now: float,
-                participants: int, hit: bool) -> None:
-        """exit() old → reset timers → command motor → enter() new (its look composes in the
+    def _switch(self, target: StateId, now: float, dt: float, bars_now: float,
+                participants: int, hit: bool, signals) -> None:
+        """exit() old → reset timers → command motor → enter() new (its mix composes in the
         same tick's update() that follows, before the frame renders)."""
         if self._active is not None:
             self._active.exit()
@@ -313,7 +324,7 @@ class StateMachine:
         if self._config.enabled:
             self._set_motor(self._active.MOTOR)   # while disabled the operator owns the motor
         self._config.current = target
-        self._active.enter(self._build_context(now, dt, bars_now, participants, hit))
+        self._active.enter(self._build_context(now, dt, signals, participants, hit))
 
     # -- State callbacks (Sequencer-compatible) --------------------------------
 
@@ -322,7 +333,7 @@ class StateMachine:
         callback(SequencerState(
             stage=int(self._current),
             stage_progress=self._config.progress,
-            progress=(int(self._current) + self._config.progress) / len(ShowState),
+            progress=(int(self._current) + self._config.progress) / len(StateId),
             elapsed=0.0,
             active=self._config.enabled,
         ))

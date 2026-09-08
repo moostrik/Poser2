@@ -14,7 +14,7 @@ RES = 8
 
 
 def config(**overrides) -> SimpleNamespace:
-    base = dict(light_resolution=RES, light_phase=0.0, manual=False, manual_layers=[])
+    base = dict(light_resolution=RES, light_phase=0.0, debug=False, debug_layers=[])
     base.update(overrides)
     return SimpleNamespace(**base)
 
@@ -45,24 +45,37 @@ class CompositorTest(unittest.TestCase):
         self.comp = Compositor(self.cfg, self.layers, shifted={LayerId.pose_waves})
 
     def test_weighted_blend(self) -> None:
-        self.comp.set_look([(LayerId.playhead_lamp, 0.5), (LayerId.pose_waves, 0.25)])
+        self.comp.set_mix([(LayerId.playhead_lamp, 0.5), (LayerId.pose_waves, 0.25)])
         f = frame()
         self.comp.render(f)
         np.testing.assert_allclose(f.white, 0.5 * 1.0 + 0.25 * 2.0)
 
     def test_zero_weight_is_silent_but_never_resets(self) -> None:
-        self.comp.set_look([(LayerId.playhead_lamp, 0.0)])
+        self.comp.set_mix([(LayerId.playhead_lamp, 0.0)])
         f = frame()
         self.comp.render(f)
         np.testing.assert_allclose(f.white, 0.0)
         self.assertEqual(self.a.resets, 0)
 
     def test_absent_layer_is_not_reset_implicitly(self) -> None:
-        self.comp.set_look([(LayerId.playhead_lamp, 1.0)])
+        self.comp.set_mix([(LayerId.playhead_lamp, 1.0)])
         self.comp.render(frame())
-        self.comp.set_look([(LayerId.pose_waves, 1.0)])   # lamp dropped from the look
+        self.comp.set_mix([(LayerId.pose_waves, 1.0)])   # lamp dropped from the look
         self.comp.render(frame())
         self.assertEqual(self.a.resets, 0)                 # resets are explicit only
+
+    def test_per_channel_weights(self) -> None:
+        class Both(FakeLayer):
+            def render(self, frame: Frame) -> None:
+                frame.white += 1.0
+                frame.blue += 1.0
+
+        comp = Compositor(config(), {LayerId.pose_waves: Both(1.0)}, shifted=set())
+        comp.set_mix([(LayerId.pose_waves, (1.0, 0.25))])   # white hard, blue partial
+        f = frame()
+        comp.render(f)
+        np.testing.assert_allclose(f.white, 1.0)
+        np.testing.assert_allclose(f.blue, 0.25)
 
     def test_explicit_reset_layers(self) -> None:
         self.comp.reset_layers([LayerId.playhead_lamp])
@@ -80,18 +93,18 @@ class CompositorTest(unittest.TestCase):
                           {LayerId.pose_waves: marker, LayerId.playhead_lamp: lamp},
                           shifted={LayerId.pose_waves})
         f = frame()
-        comp.set_look([(LayerId.pose_waves, 1.0), (LayerId.playhead_lamp, 1.0)])
+        comp.set_mix([(LayerId.pose_waves, 1.0), (LayerId.playhead_lamp, 1.0)])
         comp.render(f)
         self.assertEqual(f.white[RES // 4], 1.0)   # spun content rolled by a quarter turn
         self.assertEqual(f.white[0], 1.0)          # lamp content not rolled
 
-    def test_manual_override_replaces_state_look(self) -> None:
-        self.cfg.manual = True
-        self.cfg.manual_layers = [LayerId.pose_waves]
-        self.comp.set_look([(LayerId.playhead_lamp, 1.0)])
+    def test_debug_override_replaces_state_mix(self) -> None:
+        self.cfg.debug = True
+        self.cfg.debug_layers = [LayerId.pose_waves]
+        self.comp.set_mix([(LayerId.playhead_lamp, 1.0)])
         f = frame()
         self.comp.render(f)
-        np.testing.assert_allclose(f.white, 2.0)   # only the manual layer, full weight
+        np.testing.assert_allclose(f.white, 2.0)   # only the debug layer, full weight
 
 
 if __name__ == "__main__":
