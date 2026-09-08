@@ -22,7 +22,7 @@ from modules import inference
 from modules.session import SessionSettings
 from modules.gl import WindowSettings
 from .light import LightSettings
-from .inout import OscLightSettings, UdpReceiverSettings
+from .inout import OscLightSenderSettings, UdpLightReceiverSettings
 from .pose import GhosterSettings
 from .statemachine import StateMachineSettings
 
@@ -105,14 +105,17 @@ class _OscSoundSettings(OscSoundSettings):
 
 
 class InOutGroup(BaseSettings):
+    """Sender/receiver per domain: the light sender feeds the fixture and its receiver
+    hears the fall sensor (plain UDP); the sound sender feeds Max and its receiver hears
+    /WS/sound/level (real OSC)."""
     num_players:     Field[int] = Field(8,   access=Field.INIT, visible=False)
     num_virtual:     Field[int] = Field(8,   access=Field.INIT, visible=False)
     resolution:      Field[int] = Field(3600, access=Field.INIT, visible=False)
-    osc_light      : Group[OscLightSettings]       = Group(OscLightSettings, share=[resolution])
+    osc_light_sender  : Group[OscLightSenderSettings]   = Group(OscLightSenderSettings, share=[resolution])
+    udp_light_receiver: Group[UdpLightReceiverSettings] = Group(UdpLightReceiverSettings)
     # OSC sends max_players (live) + virtual_players (ghost) id slots; both shared from root.
-    osc_sound      : Group[_OscSoundSettings]      = Group(_OscSoundSettings, share=[num_players.as_('max_players'), num_virtual.as_('virtual_players')])
-    osc_receiver   : Group[OscReceiverSettings]    = Group(OscReceiverSettings)
-    udp_receiver   : Group[UdpReceiverSettings]    = Group(UdpReceiverSettings)
+    osc_sound_sender  : Group[_OscSoundSettings]        = Group(_OscSoundSettings, share=[num_players.as_('max_players'), num_virtual.as_('virtual_players')])
+    osc_sound_receiver: Group[OscReceiverSettings]      = Group(OscReceiverSettings)
 
 
 # ---------------------------------------------------------------------------

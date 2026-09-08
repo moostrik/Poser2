@@ -1,3 +1,3 @@
-from .osc_light    import OscLight, OscLightSettings, OscLightOffsetSettings
-from .osc_sound    import OscSound
-from .udp_receiver import UdpReceiver, UdpReceiverSettings
+from .osc_light_sender   import OscLightSender, OscLightSenderSettings, OscLightOffsetSettings
+from .osc_sound_sender   import OscSoundSender
+from .udp_light_receiver import UdpLightReceiver, UdpLightReceiverSettings

@@ -13,8 +13,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class OscSound(BaseOscSound):
-    """OscSound extended with the rotation playhead (/global/playhead), the motor mode
+class OscSoundSender(BaseOscSound):
+    """The sound sender — modules' OscSound extended with the rotation playhead
+    (/global/playhead), the motor mode
     (/global/motor), and the panoramic-only per-pose azimuth, distance, and
     playhead-offset messages.
 

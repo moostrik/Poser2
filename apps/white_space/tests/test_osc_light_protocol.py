@@ -9,8 +9,8 @@ import unittest
 
 import numpy as np
 
-from apps.white_space.inout.osc_light import (
-    FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS, OscLight, OscLightSettings,
+from apps.white_space.inout.osc_light_sender import (
+    FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS, OscLightSender, OscLightSenderSettings,
 )
 from apps.white_space.light import Frame, Tick
 
@@ -31,15 +31,15 @@ class ChunkCalculationTest(unittest.TestCase):
     def test_installation_config_matches_firmware(self) -> None:
         """3600 px over a 1500-byte MTU must yield exactly what the firmware hard-codes."""
         self.assertEqual(
-            OscLight._calculate_optimal_chunks(RESOLUTION, 1500),
+            OscLightSender._calculate_optimal_chunks(RESOLUTION, 1500),
             (FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS),
         )
 
 
 class ChunkMessageTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.settings = OscLightSettings()
-        self.messages = OscLight._build_chunk_messages(
+        self.settings = OscLightSenderSettings()
+        self.messages = OscLightSender._build_chunk_messages(
             _frame(), self.settings, FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS
         )
         assert self.messages is not None
@@ -73,8 +73,8 @@ class ChunkMessageTest(unittest.TestCase):
             self.assertEqual(blue[8:9], str(i).encode())
 
     def test_body_is_the_channel_slice(self) -> None:
-        expected = OscLight.float_to_uint8(
-            OscLight._apply_levels(_frame().white, self.settings.curve, self.settings.lower_edge)
+        expected = OscLightSender.float_to_uint8(
+            OscLightSender._apply_levels(_frame().white, self.settings.curve, self.settings.lower_edge)
         )
         for i in range(FIRMWARE_NUM_CHUNKS):
             body = self.messages[i].dgram[OSC_PREAMBLE:]
@@ -84,12 +84,12 @@ class ChunkMessageTest(unittest.TestCase):
 
 class ConfigMessageTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.settings = OscLightSettings()
+        self.settings = OscLightSenderSettings()
         self.settings.offsets.white_0 = 0
         self.settings.offsets.white_1 = 5
         self.settings.offsets.blue_0 = -10
         self.settings.offsets.blue_1 = 9
-        self.messages = OscLight._build_config_messages(self.settings, 2000)
+        self.messages = OscLightSender._build_config_messages(self.settings, 2000)
 
     def test_config_is_five_datagrams(self) -> None:
         self.assertEqual(
@@ -99,7 +99,7 @@ class ConfigMessageTest(unittest.TestCase):
 
     def test_config_is_absent_from_the_pixel_burst(self) -> None:
         """Config is sent on change; keeping it out of the per-frame burst is the whole point."""
-        chunks = OscLight._build_chunk_messages(
+        chunks = OscLightSender._build_chunk_messages(
             _frame(), self.settings, FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS
         )
         assert chunks is not None

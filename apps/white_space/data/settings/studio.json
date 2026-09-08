@@ -163,7 +163,7 @@
     "tracklet_sync": {}
   },
   "inout": {
-    "osc_light": {
+    "osc_light_sender": {
       "ip_addresses": "192.168.1.177",
       "port": 6454,
       "use_signed": false,
@@ -179,21 +179,21 @@
         "blue_1": 9
       }
     },
-    "osc_sound": {
+    "udp_light_receiver": {
+      "port": 6454,
+      "verbose": false
+    },
+    "osc_sound_sender": {
       "stage": "LERP",
       "ip_addresses": "192.168.1.39",
       "port": 8000
     },
-    "osc_receiver": {
+    "osc_sound_receiver": {
       "port_in": 6455,
       "return_messages": false,
       "port_out": 9001,
       "ip_address_out": "192.168.0.0",
       "verbose": true
-    },
-    "udp_receiver": {
-      "port": 6454,
-      "verbose": false
     }
   },
   "pose": {

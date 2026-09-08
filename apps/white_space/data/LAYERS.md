@@ -49,9 +49,10 @@ The soundscape made visible: the left and right blue lamps breathe with the actu
 sound Max is playing.
 
 - **Used by**: S1 IDLE and S2 IDLE_INTRO at full; S4 INTRO_IDLE and S9 END_IDLE fading in
-- **Input**: `/WS/sound/level` from Max — two floats (left, right), 0..1 — received on
-  the existing OSC/UDP receivers and stored on the board (new sound-level store:
-  levels + received-timestamp). **Max must send this message** (coordination item).
+- **Input**: `/WS/sound/level` from Max — two floats (left, right), 0..1, real OSC —
+  received on the **OSC sound receiver** (`inout.osc_sound_receiver`) and stored on the
+  board (sound-level store: levels + received-timestamp). **Max must send this message**
+  (coordination item).
 - **Behavior**: left level → left blue lamp, right level → right blue lamp; a gain scales
   the mapping. **Latency first**: no softening — only a minimal smoothing window of at
   most 2–3 light frames (~66–100 ms), there purely to bridge OSC-arrival vs 30 Hz tick

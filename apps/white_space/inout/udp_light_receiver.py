@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class UdpReceiverSettings(BaseSettings):
+class UdpLightReceiverSettings(BaseSettings):
     port:         Field[int]   = Field(9001, min=1024, max=65535, widget=Widget.number_field, description="Incoming UDP port")
     verbose:      Field[bool]  = Field(False,                                                 description="Log received messages")
     counter:      Field[int]   = Field(0,    min=0,    max=99999, access=Field.READ,          description="Message activity")
@@ -19,7 +19,7 @@ class UdpReceiverSettings(BaseSettings):
     interval:     Field[float] = Field(0.0,                       access=Field.READ,          description="Interval between last two messages (s)")
 
 
-class UdpReceiver:
+class UdpLightReceiver:
     """Receives plain UDP packets and dispatches by exact string address.
 
     The sender does not need to support OSC — any UDP payload whose decoded
@@ -30,7 +30,7 @@ class UdpReceiver:
         receiver.bind("/WS/sensor/fall", lambda *_: on_bang())
     """
 
-    def __init__(self, settings: UdpReceiverSettings) -> None:
+    def __init__(self, settings: UdpLightReceiverSettings) -> None:
         self._config   = settings
         self._bindings: dict[str, list[Callable]] = {}
         self._running  = False
@@ -49,7 +49,7 @@ class UdpReceiver:
         if self._thread is not None and self._thread.is_alive():
             return
         self._running = True
-        self._thread = Thread(target=self._run, daemon=True, name="UdpReceiver")
+        self._thread = Thread(target=self._run, daemon=True, name="UdpLightReceiver")
         self._thread.start()
 
     def stop(self) -> None:
@@ -101,7 +101,7 @@ class UdpReceiver:
                     try:
                         callback()
                     except Exception as e:
-                        logger.warning(f"UdpReceiver callback error for '{address}': {e}")
+                        logger.warning(f"UdpLightReceiver callback error for '{address}': {e}")
 
         except OSError as e:
             logger.error(f"socket error on port {self._config.port}: {e}")

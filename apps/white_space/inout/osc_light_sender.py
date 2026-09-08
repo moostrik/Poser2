@@ -36,7 +36,7 @@ class OscLightOffsetSettings(BaseSettings):
     blue_1:  Field[int] = Field(0, min=-10, max=10, description="Blue strip 1 offset")
 
 
-class OscLightSettings(BaseSettings):
+class OscLightSenderSettings(BaseSettings):
     ip_addresses: Field[str]  = Field("127.0.0.1", widget=Widget.ip_field,      description="Target LED receiver IP address")
     port:         Field[int]  = Field(8000, min=1024, max=65535, widget=Widget.number_field, description="Target UDP port")
     use_signed:   Field[bool] = Field(False,                                     description="Send signed int8 instead of uint8")
@@ -51,7 +51,7 @@ class OscLightSettings(BaseSettings):
     offsets:      Group[OscLightOffsetSettings] = Group(OscLightOffsetSettings)
 
 
-class OscLight:
+class OscLightSender:
     """Sends LED strip data over OSC/UDP to the installation hardware.
 
     OSC address pattern (all under /WS/):
@@ -73,7 +73,7 @@ class OscLight:
       chunks — a chunk it misses is published as a stale third of the ring for one revolution.
     """
 
-    def __init__(self, settings: OscLightSettings) -> None:
+    def __init__(self, settings: OscLightSenderSettings) -> None:
         self._config = settings
         self._chunk_size, self._num_chunks = self._calculate_optimal_chunks(settings.resolution, settings.mtu)
         self._config.chunk_size = self._chunk_size
@@ -103,8 +103,8 @@ class OscLight:
         self._running = False
         self._thread: Optional[Thread] = None
 
-        self._config.bind(OscLightSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
-        self._config.bind(OscLightSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
+        self._config.bind(OscLightSenderSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
+        self._config.bind(OscLightSenderSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
         self._config.offsets.bind_all(self._on_offsets_change)
 
     @property
@@ -115,7 +115,7 @@ class OscLight:
         if self._thread is not None and self._thread.is_alive():
             return
         self._running = True
-        self._thread = Thread(target=self._run, daemon=True, name="OscLight")
+        self._thread = Thread(target=self._run, daemon=True, name="OscLightSender")
         self._thread.start()
 
     def stop(self) -> None:
@@ -125,8 +125,8 @@ class OscLight:
             self._thread.join(timeout=1.0)
             self._thread = None
 
-        self._config.unbind(OscLightSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
-        self._config.unbind(OscLightSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
+        self._config.unbind(OscLightSenderSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
+        self._config.unbind(OscLightSenderSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
         self._config.offsets.unbind_all(self._on_offsets_change)
 
     def send_message(self, output: Frame) -> None:
@@ -135,7 +135,7 @@ class OscLight:
         self._update_event.set()
 
     def _run(self) -> None:
-        if not validate_connection(self._config.ip_addresses, self._config.port, "OscLight"):
+        if not validate_connection(self._config.ip_addresses, self._config.port, "OscLightSender"):
             self._running = False
             return
 
@@ -207,7 +207,7 @@ class OscLight:
         try:
             client.send(message)
         except Exception as e:
-            logger.error(f"OscLight send error: {e}")
+            logger.error(f"OscLightSender send error: {e}")
 
     def _on_connection_change(self, _=None) -> None:
         with self._client_lock:
@@ -231,7 +231,7 @@ class OscLight:
         return msgb.build()
 
     @staticmethod
-    def _build_config_messages(settings: OscLightSettings, motor_rpm: int) -> OscMessageList:
+    def _build_config_messages(settings: OscLightSenderSettings, motor_rpm: int) -> OscMessageList:
         """The four lamp-alignment offsets plus the motor speed — constant for a whole show."""
         message_list: OscMessageList = []
         for addr, val in (
@@ -243,13 +243,13 @@ class OscLight:
             off_msgb = OscMessageBuilder(addr)
             off_msgb.add_arg(val)
             message_list.append(off_msgb.build())
-        message_list.append(OscLight._build_rpm_message(motor_rpm))
+        message_list.append(OscLightSender._build_rpm_message(motor_rpm))
         return message_list
 
     @staticmethod
     def _build_chunk_messages(
         output: Frame,
-        settings: OscLightSettings,
+        settings: OscLightSenderSettings,
         chunk_size: int,
         num_chunks: int,
     ) -> Optional[OscMessageList]:
@@ -260,14 +260,14 @@ class OscLight:
         """
         try:
             # Lamp output mapping: gamma curve + turn-on floor (master brightness applied upstream).
-            white_f = OscLight._apply_levels(output.white, settings.curve, settings.lower_edge)
-            blue_f  = OscLight._apply_levels(output.blue,  settings.curve, settings.lower_edge)
+            white_f = OscLightSender._apply_levels(output.white, settings.curve, settings.lower_edge)
+            blue_f  = OscLightSender._apply_levels(output.blue,  settings.curve, settings.lower_edge)
             if settings.use_signed:
-                white_channel: np.ndarray = OscLight.float_to_int8(white_f)
-                blue_channel:  np.ndarray = OscLight.float_to_int8(blue_f)
+                white_channel: np.ndarray = OscLightSender.float_to_int8(white_f)
+                blue_channel:  np.ndarray = OscLightSender.float_to_int8(blue_f)
             else:
-                white_channel = OscLight.float_to_uint8(white_f)
-                blue_channel  = OscLight.float_to_uint8(blue_f)
+                white_channel = OscLightSender.float_to_uint8(white_f)
+                blue_channel  = OscLightSender.float_to_uint8(blue_f)
 
             message_list: OscMessageList = []
             for prefix, channel in (("white", white_channel), ("blue", blue_channel)):
@@ -279,7 +279,7 @@ class OscLight:
                     message_list.append(msgb.build())
             return message_list
         except Exception as e:
-            logger.error(f"OscLight error preparing data: {e}")
+            logger.error(f"OscLightSender error preparing data: {e}")
             return None
 
     # ------------------------------------------------------------------

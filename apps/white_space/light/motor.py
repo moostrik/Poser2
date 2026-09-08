@@ -60,7 +60,7 @@ class MotorState:
     effective_rpm: float     = 0.0                  # speed to act on: measured when locked, else the
                                                     # commanded target above the sensor ceiling, else 0
     mode:          MotorMode = MotorMode.STOPPED    # the driven (arbitrated) mode
-    target_rpm:    float     = 0.0                  # commanded speed (sent to the motor by osc_light)
+    target_rpm:    float     = 0.0                  # commanded speed (sent to the motor by the light sender)
     low_rpm:       float     = 0.0                  # LOW-mode rpm — the playhead's content-sweep rate in HIGH
     raw_rpm:       float     = float('nan')         # last measured speed, regardless of trust (NaN = no falls yet)
     fall_age:      float     = float('inf')         # seconds since the last fall (inf = none) — silence above the

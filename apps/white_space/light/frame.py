@@ -1,8 +1,8 @@
 """Frame — the full per-tick render context and output.
 
 Carries the clock snapshot (`tick`), motor state (`motor`), and the LED pixel buffer.
-One object flows into every layer's `_draw` and out to every consumer (board, osc_light,
-osc_sound, render).
+One object flows into every layer's `_draw` and out to every consumer (board, the
+light/sound senders, render).
 """
 
 import numpy as np
