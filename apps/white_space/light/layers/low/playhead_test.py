@@ -1,6 +1,6 @@
-"""TestSlow — the lamp regime's direct test tool: four settings levels drive the four
+"""PlayheadTest — the lamp regime's direct test tool: four settings levels drive the four
 physical lamps (front/back white, left/right blue) straight through the ``LowLayer``
-mapping. Stateless; a debug layer (``test_slow``), never in a state's mix — and the
+mapping. Stateless; a debug layer (``playhead_test``), never in a state's mix — and the
 immediate hardware check for the lamp wiring itself.
 """
 
@@ -12,17 +12,17 @@ from .._base_layer import LowLayer, LayerSettings
 from ...frame import Frame
 
 
-class TestSlowSettings(LayerSettings):
+class PlayheadTestSettings(LayerSettings):
     front_white: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Front white lamp level")
     back_white:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Back white lamp level")
     left_blue:   Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Left blue lamp level")
     right_blue:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Right blue lamp level")
 
 
-class TestSlow(LowLayer):
+class PlayheadTest(LowLayer):
     """Direct levels for the four physical lamps; see the module docstring."""
 
-    def __init__(self, resolution: int, config: TestSlowSettings, board) -> None:
+    def __init__(self, resolution: int, config: PlayheadTestSettings, board) -> None:
         super().__init__(resolution, config, board)
         self._config = config
 

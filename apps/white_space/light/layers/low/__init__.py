@@ -13,13 +13,14 @@ R = light resolution) is:
 
 Layers in this package light those specific pixels rather than drawing a ring (the `LowLayer`
 base encodes the mapping as named lamps). Above ~200 rpm the bar blurs into a ring and the
-high-regime layers take over — the states choose per regime. Show layers and ``test_``-prefixed
-debug layers live side by side: the name carries the role, the folder carries the regime.
+high-regime layers take over — the states choose per regime. Show layers and debug layers
+live side by side; each layer's docstring states its role (``playhead_haunted`` and
+``playhead_test`` are debug tools, never in a state's mix).
 """
 
-from .playhead_low        import PlayheadLow,   PlayheadLowSettings
-from .playhead_flash      import PlayheadFlash, PlayheadFlashSettings, offset_to_level
-from .sound_light         import SoundLight,    SoundLightSettings
-from .wind_down           import WindDown,      WindDownSettings
-from .test_haunted_flash  import HauntedFlash,  HauntedFlashSettings
-from .test_slow           import TestSlow,      TestSlowSettings
+from .playhead_low        import PlayheadLow,     PlayheadLowSettings
+from .playhead_flash      import PlayheadFlash,   PlayheadFlashSettings, offset_to_level
+from .sound_light         import SoundLight,      SoundLightSettings
+from .wind_down           import WindDown,        WindDownSettings
+from .playhead_haunted    import PlayheadHaunted, PlayheadHauntedSettings
+from .playhead_test       import PlayheadTest,    PlayheadTestSettings

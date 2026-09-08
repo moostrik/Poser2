@@ -1,4 +1,4 @@
-"""Tests for HauntedFlash's closest-approach guarantee (``_closest_pass``).
+"""Tests for PlayheadHaunted's closest-approach guarantee (``_closest_pass``).
 
 The width window can be stepped clean over on a fast crossing; ``_closest_pass`` guarantees one flash
 on the frame where the playhead is *nearest* the pose — the local minimum of |offset| — firing in real
@@ -8,7 +8,7 @@ time on that sample whether it sits just before or just after the zero-crossing.
 import math
 import unittest
 
-from apps.white_space.light.layers.low.test_haunted_flash import _closest_pass
+from apps.white_space.light.layers.low.playhead_haunted import _closest_pass
 
 R = math.radians
 

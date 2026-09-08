@@ -250,7 +250,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.END_INTRO)
         self.assertIn([LayerId.wind_down], self.resets)          # fade restarted at the full wall
         self.assertEqual(self.mixes[-1], [(LayerId.wind_down, 1.0), (LayerId.playhead_low, 0.4)])
-        self.light.layers.wind_down.progress = 0.5               # the layer's fade readout
+        self.light.high_layers.wind_down.progress = 0.5               # the layer's fade readout
         self.tick()
         self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.5)
         self.tick(dt=999.0, dbar=5.0)                  # time and bars alone never exit — no lock yet
@@ -269,7 +269,7 @@ class StateMachineTest(unittest.TestCase):
         for _ in range(4):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_IDLE)
-        self.light.layers.wind_down.progress = 0.25
+        self.light.high_layers.wind_down.progress = 0.25
         self.tick()
         self.assertEqual(self.mixes[-1], [(LayerId.wind_down, 1.0), (LayerId.playhead_low, 1.0),
                                           (LayerId.sound_light, 0.25)])

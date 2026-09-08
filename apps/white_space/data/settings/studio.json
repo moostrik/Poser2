@@ -386,10 +386,7 @@
     "light_rate": 30.0,
     "master": 1.0,
     "light_phase": 0.55,
-    "debug": false,
-    "debug_layers": [
-      "playhead_low"
-    ],
+    "debug": "OFF",
     "clock": {
       "bpm": 20.0
     },
@@ -404,7 +401,15 @@
       "tracking": 0.12,
       "speed_smoothing": 0.66
     },
-    "layers": {
+    "low_layers": {
+      "sound_light": {
+        "gain": 1.0,
+        "smoothing_frames": 2,
+        "stale_seconds": 2.0,
+        "fallback": "OFF",
+        "fallback_level": 0.15,
+        "blend": "ADD"
+      },
       "playhead_low": {
         "level": 0.5,
         "blend": "ADD"
@@ -421,14 +426,23 @@
         "gap": 0.0,
         "blend": "ADD"
       },
-      "sound_light": {
-        "gain": 1.0,
-        "smoothing_frames": 2,
-        "stale_seconds": 2.0,
-        "fallback": "OFF",
-        "fallback_level": 0.15,
+      "playhead_haunted": {
+        "white": 1.0,
+        "base_white": 0.33,
+        "blue": 0.0,
+        "width": 0.0,
+        "ghosts": true,
         "blend": "ADD"
       },
+      "playhead_test": {
+        "front_white": 0.0,
+        "back_white": 0.0,
+        "left_blue": 0.0,
+        "right_blue": 0.0,
+        "blend": "ADD"
+      }
+    },
+    "high_layers": {
       "pose_instrument": {
         "band_width": 0.06,
         "band_level": 0.8,
@@ -452,21 +466,6 @@
       "wind_down": {
         "level": 1.0,
         "spin_down_seconds": 10.0,
-        "blend": "ADD"
-      },
-      "test_haunted_flash": {
-        "white": 1.0,
-        "base_white": 0.33,
-        "blue": 0.0,
-        "width": 0.0,
-        "ghosts": true,
-        "blend": "ADD"
-      },
-      "test_slow": {
-        "front_white": 0.0,
-        "back_white": 0.0,
-        "left_blue": 0.0,
-        "right_blue": 0.0,
         "blend": "ADD"
       },
       "test_pose_waves": {

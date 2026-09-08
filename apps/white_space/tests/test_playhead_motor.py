@@ -402,26 +402,23 @@ class DebugOverrideTest(unittest.TestCase):
     def test_auto_follow_derives_regime_from_selection(self) -> None:
         from types import SimpleNamespace
         from apps.white_space.light.conductor import _debug_motor_mode
-        from apps.white_space.light import LayerId
+        from apps.white_space.light import DebugLayer, LayerId
         layers = {LayerId.test_pose_waves: SimpleNamespace(SHIFTED=True),    # HighLayer
                   LayerId.playhead_low:    SimpleNamespace(SHIFTED=False)}   # LowLayer
-        self.assertEqual(_debug_motor_mode([LayerId.test_pose_waves], layers), MotorMode.HIGH)
-        self.assertEqual(_debug_motor_mode([LayerId.playhead_low, LayerId.test_pose_waves], layers),
-                         MotorMode.HIGH)                # any high layer wins
-        self.assertEqual(_debug_motor_mode([LayerId.playhead_low], layers), MotorMode.LOW)
-        self.assertEqual(_debug_motor_mode([], layers), MotorMode.STOPPED)
+        self.assertEqual(_debug_motor_mode(DebugLayer.test_pose_waves, layers), MotorMode.HIGH)
+        self.assertEqual(_debug_motor_mode(DebugLayer.playhead_low, layers), MotorMode.LOW)
+        self.assertIsNone(_debug_motor_mode(DebugLayer.OFF, layers))         # debug disarmed
 
     def test_boot_failsafe_clears_debug(self) -> None:
-        # A preset saved mid-debug (debug on + a high layer ticked) must never auto-derive
-        # HIGH at power-on: the Conductor forces debug off at construction.
-        from apps.white_space.light import Conductor, LightSettings, LayerId
+        # A preset saved mid-debug (a high layer selected) must never auto-derive HIGH at
+        # power-on: the Conductor forces the select back to OFF at construction.
+        from apps.white_space.light import Conductor, DebugLayer, LightSettings
         from apps.white_space.board import Board
         from modules.tracker.panoramic.settings import DistortionSettings
         cfg = LightSettings()
-        cfg.debug = True
-        cfg.debug_layers = [LayerId.test_pose_waves]
+        cfg.debug = DebugLayer.test_pose_waves
         Conductor(cfg, DistortionSettings(), Board(), pose_stage=4)
-        self.assertFalse(cfg.debug)
+        self.assertEqual(DebugLayer(int(cfg.debug)), DebugLayer.OFF)
 
 
 class BarsTest(unittest.TestCase):

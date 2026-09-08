@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from apps.white_space.light import LayerId, Tick
+from apps.white_space.light import DebugLayer, LayerId, Tick
 from apps.white_space.light.frame import Frame
 from apps.white_space.light.layers.compositor import Compositor
 
@@ -14,7 +14,7 @@ RES = 8
 
 
 def config(**overrides) -> SimpleNamespace:
-    base = dict(light_resolution=RES, light_phase=0.0, debug=False, debug_layers=[])
+    base = dict(light_resolution=RES, light_phase=0.0, debug=DebugLayer.OFF)
     base.update(overrides)
     return SimpleNamespace(**base)
 
@@ -101,8 +101,8 @@ class CompositorTest(unittest.TestCase):
         self.assertEqual(f.white[0], 1.0)          # lamp content not rolled
 
     def test_debug_override_replaces_state_mix(self) -> None:
-        self.cfg.debug = True
-        self.cfg.debug_layers = [LayerId.test_pose_waves]
+        # Selecting a layer IS turning debug on: the select replaces the state's mix solo.
+        self.cfg.debug = DebugLayer.test_pose_waves
         self.comp.set_mix([(LayerId.playhead_low, 1.0)])
         f = frame()
         self.comp.render(f)
@@ -111,14 +111,14 @@ class CompositorTest(unittest.TestCase):
 
 class LampMappingTest(unittest.TestCase):
     """LowLayer's named lamp writes land on the exact pixels from low/__init__.py's
-    hardware table — verified through test_slow, the lamp regime's direct test tool."""
+    hardware table — verified through playhead_test, the lamp regime's direct test tool."""
 
     def test_named_lamps_hit_the_hardware_pixels(self) -> None:
-        from apps.white_space.light.layers.low.test_slow import TestSlow, TestSlowSettings
-        cfg = TestSlowSettings()
+        from apps.white_space.light.layers.low.playhead_test import PlayheadTest, PlayheadTestSettings
+        cfg = PlayheadTestSettings()
         cfg.front_white, cfg.back_white = 0.9, 0.6
         cfg.left_blue, cfg.right_blue = 0.4, 0.2
-        layer = TestSlow(RES, cfg, board=None)
+        layer = PlayheadTest(RES, cfg, board=None)
         f = frame()
         layer.render(f)
         half = RES // 2

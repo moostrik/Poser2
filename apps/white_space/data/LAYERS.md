@@ -9,8 +9,10 @@ sections here — they have no code yet, so this is their specification.
 Regimes: **low** layers drive the four physical lamps (front/back white = `white[0]` /
 `white[R//2]`, left/right blue = `blue[0]` / `blue[R//2]`); **high** layers draw the
 persistence-of-vision ring. Base classes `LowLayer` / `HighLayer` encode this, and the
-folders follow the same single axis (`layers/low/`, `layers/high/` — no separate test
-folder: the `test_` name prefix carries the role).
+folders and settings groups follow the same single axis (`layers/low/` ↔ `light.low_layers`,
+`layers/high/` ↔ `light.high_layers` — no separate test folder). Debug-only layers state
+that role in their docstrings; the high block's generic patterns keep a `test_` prefix,
+while the low tools are named as playhead tools (`playhead_haunted`, `playhead_test`).
 
 ## Index — show layers
 
@@ -26,17 +28,18 @@ folder: the `test_` name prefix carries the role).
 
 \* `wind_down` is the one deliberate cross-regime layer — classed `LowLayer` (unshifted;
 debug auto-follow derives LOW) but drawing the full strip, so it reads as the POV wall
-while fast and as the white lamps once slow. See its section below.
+while fast and as the white lamps once slow. In the interface it sits in High Layers
+right after `flood`, whose ending it is. See its section below.
 
-Test layers (never in a state's mix; reached via the debug override, all prefixed
-`test_` so the checklist separates them from show layers at a glance):
-`test_haunted_flash` (low — the ghost flash; pairs with `ghost.ghoster.enabled` for solo
-experimentation), `test_slow` (low — direct levels for the four physical lamps: front/back
-white, left/right blue; the lamp regime's hardware check), `test_pose_waves` (the old
+Debug layers (never in a state's mix; reached via the `light.debug` select — **choosing a
+layer IS turning debug on**: it shows solo at full weight and the motor auto-follows its
+regime, OFF returns the show): the two low tools `playhead_haunted` (the ghost flash;
+pairs with `ghost.ghoster.enabled` for solo experimentation) and `playhead_test` (direct
+levels for the four physical lamps: front/back white, left/right blue — the lamp regime's
+hardware check), plus the high `test_`-prefixed patterns: `test_pose_waves` (the old
 wave/void instrument, kept as a reference/montage visual), `test_harmonic`,
 `test_player_lines`, `test_calibration`, `test_fill`, `test_pulse`, `test_chase`,
-`test_lines`, `test_random` — all high except the two named low, so the debug auto-follow
-derives the right motor regime from any selection.
+`test_lines`, `test_random`.
 
 ---
 

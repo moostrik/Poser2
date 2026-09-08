@@ -309,7 +309,7 @@ class WindDownStateBase(StateBase):
         return None
 
     def progress(self, ctx: StateContext) -> float:
-        return self._light.layers.wind_down.progress
+        return self._light.high_layers.wind_down.progress
 
 
 class EndIntroState(WindDownStateBase):

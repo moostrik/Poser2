@@ -1,4 +1,5 @@
-"""HauntedFlash composition — the low-speed player/ghost flash.
+"""PlayheadHaunted — the low-speed player/ghost flash (a debug/experimentation layer,
+never in a state's mix; pairs with ``ghost.ghoster.enabled`` for solo ghost sessions).
 
 WHITE (front-lamp) channel: a flash as the rotating playhead crosses each live player (at full
 ``white``), and — when ``ghosts`` is enabled — as it crosses each **active** ghost at its fixed
@@ -51,7 +52,7 @@ def _closest_pass(prev: float, cur: float) -> bool:
     return abs(cur) <= abs(prev) and abs(cur) <= abs(nxt)
 
 
-class HauntedFlashSettings(LayerSettings):
+class PlayheadHauntedSettings(LayerSettings):
     white:      Field[float] = Field(1.0, min=0.0, max=1.0,    step=0.01, description="White flash brightness (live players + active ghosts)")
     base_white: Field[float] = Field(0.0, min=0.0, max=1.0,    step=0.01, description="White base brightness of the front lamps when not flashing")
     blue:       Field[float] = Field(1.0, min=0.0, max=1.0,    step=0.01, description="Blue flash brightness (verified passive ghosts)")
@@ -59,12 +60,12 @@ class HauntedFlashSettings(LayerSettings):
     ghosts:     Field[bool]  = Field(True, description="Enable ghost flashes")
 
 
-class HauntedFlash(LowLayer):
+class PlayheadHaunted(LowLayer):
     """White flash as the playhead crosses each live player (full ``white``) and each **active** ghost
     (dimmed by Fade), plus a blue flash a quarter-turn later for each **verified** passive ghost (Dwell
     & Motion both 1). Ghost flashes are gated by ``ghosts``."""
 
-    def __init__(self, resolution: int, config: HauntedFlashSettings, board, pose_stage: int) -> None:
+    def __init__(self, resolution: int, config: PlayheadHauntedSettings, board, pose_stage: int) -> None:
         super().__init__(resolution, config, board)
         self._config = config
         self._pose_stage = pose_stage

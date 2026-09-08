@@ -6,9 +6,9 @@ draws itself into a private scratch frame (via its own blend mode) and is added
 
 The Compositor holds no timing, easing, transition, or reset logic: weight curves live in
 the show state classes, and layer resets are explicit (``reset_layers``). The one policy it
-owns is its half of the debug override: while ``light.debug`` is on, the operator's
-``debug_layers`` checklist (full weight each) replaces the state's entries (the Conductor
-owns the other half — the motor auto-following the selection's regime).
+owns is its half of the debug override: while ``light.debug`` selects a layer, that one
+layer (solo, full weight) replaces the state's entries (the Conductor owns the other half —
+the motor auto-following the selected layer's regime).
 """
 
 from __future__ import annotations
@@ -75,8 +75,9 @@ class Compositor:
     def render(self, frame: Frame) -> None:
         cfg = self._config
         entries: Mix = self._entries
-        if cfg.debug:
-            entries = [(id, 1.0) for id in cfg.debug_layers]
+        if int(cfg.debug) != 0:                       # a debug layer is selected → solo it
+            from ..settings import LayerId            # local: settings imports this package
+            entries = [(LayerId(int(cfg.debug)), 1.0)]
 
         shift = int(round(cfg.light_phase * frame.white.shape[0])) % frame.white.shape[0]
 

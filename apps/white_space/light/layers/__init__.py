@@ -7,8 +7,8 @@ from .low.playhead_low        import PlayheadLow,     PlayheadLowSettings
 from .low.playhead_flash      import PlayheadFlash,   PlayheadFlashSettings
 from .low.sound_light         import SoundLight,      SoundLightSettings
 from .low.wind_down           import WindDown,        WindDownSettings
-from .low.test_haunted_flash  import HauntedFlash,    HauntedFlashSettings
-from .low.test_slow           import TestSlow,        TestSlowSettings
+from .low.playhead_haunted    import PlayheadHaunted, PlayheadHauntedSettings
+from .low.playhead_test       import PlayheadTest,    PlayheadTestSettings
 from .high.pose_instrument    import PoseInstrument,  PoseInstrumentSettings
 from .high.playhead_high      import PlayheadHigh,    PlayheadHighSettings
 from .high.flood              import Flood,           FloodSettings
