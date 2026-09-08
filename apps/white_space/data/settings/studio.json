@@ -421,9 +421,32 @@
         "gap": 0.0,
         "blend": "ADD"
       },
+      "sound_light": {
+        "gain": 1.0,
+        "smoothing_frames": 2,
+        "stale_seconds": 2.0,
+        "fallback": "OFF",
+        "fallback_level": 0.15,
+        "blend": "ADD"
+      },
+      "pose_instrument": {
+        "band_width": 0.06,
+        "band_level": 0.8,
+        "band_edge": 0.02,
+        "marker_width": 0.02,
+        "marker_level": 0.8,
+        "fill_threshold": 0.75,
+        "fill_level": 0.5,
+        "fill_edge": 0.03,
+        "blend": "ADD"
+      },
       "playhead_high": {
         "level": 1.0,
         "width": 0.01,
+        "blend": "ADD"
+      },
+      "flood": {
+        "level": 1.0,
         "blend": "ADD"
       },
       "test_haunted_flash": {

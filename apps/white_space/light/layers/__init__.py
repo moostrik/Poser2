@@ -15,5 +15,8 @@ from .high.camera_light   import CameraLight,    CameraLightSettings
 from .low.playhead_flash import PlayheadFlash, PlayheadFlashSettings
 from .low.haunted_flash import HauntedFlash, HauntedFlashSettings
 from .low.test_slow  import TestSlow,      TestSlowSettings
+from .low.sound_light import SoundLight,   SoundLightSettings
+from .high.pose_instrument import PoseInstrument, PoseInstrumentSettings
+from .high.flood     import Flood,         FloodSettings
 from .low.playhead   import Playhead as PlayheadLow,  PlayheadSettings as PlayheadLowSettings
 from .high.playhead  import Playhead as PlayheadHigh, PlayheadSettings as PlayheadHighSettings

@@ -21,7 +21,7 @@ from .playhead import Playhead
 from .settings import LightSettings, LayerId
 from .layers import (BaseLayer, Compositor, Mix, PoseWaves, Fill, Pulse, Chase, Lines, Random,
                      Harmonic, PlayerLines, CameraLight, PlayheadFlash, HauntedFlash,
-                     PlayheadLow, PlayheadHigh, TestSlow)
+                     PlayheadLow, PlayheadHigh, TestSlow, SoundLight, PoseInstrument, Flood)
 from modules.board import PlayheadSignals
 
 from ..board import Board
@@ -70,7 +70,10 @@ class Conductor(Thread):
         self.layers: dict[LayerId, BaseLayer] = {
             LayerId.playhead_low:       PlayheadLow  (resolution, L.playhead_low,       board),
             LayerId.playhead_flash:     PlayheadFlash(resolution, L.playhead_flash,     board, pose_stage),
+            LayerId.sound_light:        SoundLight   (resolution, L.sound_light,        board),
+            LayerId.pose_instrument:    PoseInstrument(resolution, L.pose_instrument,   board, pose_stage),
             LayerId.playhead_high:      PlayheadHigh (resolution, L.playhead_high,      board),
+            LayerId.flood:              Flood        (resolution, L.flood,              board),
             LayerId.test_haunted_flash: HauntedFlash (resolution, L.test_haunted_flash, board, pose_stage),
             LayerId.test_slow:          TestSlow     (resolution, L.test_slow,          board),
             LayerId.test_pose_waves:    PoseWaves    (resolution, num_players, L.test_pose_waves, self._clock.interval, board, pose_stage),

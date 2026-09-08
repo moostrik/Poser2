@@ -19,6 +19,7 @@ from .inference import                 HasCameraImages, CameraImageStoreMixin, H
 from .depth_tracklets import        HasDepthTracklets, DepthTrackletStoreMixin
 from .sequence import               HasSequence, SequenceStoreMixin
 from .playhead import               HasPlayhead, PlayheadStoreMixin, PlayheadSignals
+from .sound import                  HasSoundLevels, SoundLevelStoreMixin, SoundLevels
 from .tracklets import              HasTracklets, TrackletStoreMixin
 from .video import                  HasVideoImages, VideoImageStoreMixin
 from .composition_output import     HasCompositionOutput, CompositionOutputStoreMixin, HasCompositionDebug, \

@@ -128,6 +128,9 @@ class WhiteSpaceMain:
         self.udp_receiver = UdpReceiver(self.settings.inout.udp_receiver)
         self.osc_receiver.bind("/WS/sensor/fall", self.conductor.notify_fall)
         self.udp_receiver.bind("/WS/sensor/fall", self.conductor.notify_fall)
+        # Sound levels from Max (left, right 0..1) → board → the sound_light layer.
+        self.osc_receiver.bind("/WS/sound/level", self._on_sound_level)
+        self.udp_receiver.bind("/WS/sound/level", self._on_sound_level)
         for camera in self.cameras:
             camera.add_frame_callback(self._store_video_frame)
         self.conductor.add_render_callback(self.osc_light.send_message)
@@ -286,6 +289,10 @@ class WhiteSpaceMain:
 
         self.is_running = True
         self.render.start()
+
+    def _on_sound_level(self, left: float = 0.0, right: float = 0.0, *_rest: object) -> None:
+        """OSC/UDP callback for /WS/sound/level — store the Max soundscape levels."""
+        self.board.set_sound_levels(float(left), float(right))
 
     def _store_video_frame(self, cam_id: int, frame_type: FrameType, frame: np.ndarray) -> None:
         """Camera frame callback — store raw VIDEO frames on the board for the light renderer."""

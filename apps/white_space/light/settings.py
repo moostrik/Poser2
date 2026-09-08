@@ -10,7 +10,7 @@ from .layers import (
     ChaseSettings, LinesSettings, RandomSettings, HarmonicSettings,
     PlayerLinesSettings, CameraLightSettings, PlayheadFlashSettings,
     HauntedFlashSettings, PlayheadLowSettings, PlayheadHighSettings,
-    TestSlowSettings,
+    TestSlowSettings, SoundLightSettings, PoseInstrumentSettings, FloodSettings,
 )
 
 
@@ -23,7 +23,10 @@ class LayerId(IntEnum):
     """
     playhead_low        = auto()   # low: front white lamp (the searchlight line)
     playhead_flash      = auto()   # low: flash as the playhead crosses a participant
+    sound_light         = auto()   # low: soundscape levels on the left/right blue lamps
+    pose_instrument     = auto()   # high: the pose instrument (placeholder — see LAYERS.md)
     playhead_high       = auto()   # high: bright ring marker visualising the content playhead
+    flood               = auto()   # high: constant full-strip white
     test_haunted_flash  = auto()   # low: player/ghost flash (solo experimentation)
     test_slow           = auto()   # low: direct levels for the four physical lamps
     test_pose_waves     = auto()   # high: the old wave/void instrument (reference/montage)
@@ -41,10 +44,13 @@ class LayerCompSettings(BaseSettings):
     """Per-layer composition settings — one group per pool layer.
     `fov` is a hidden relay (from the root) into test_player_lines/test_calibration."""
     fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, visible=False, description="Camera horizontal FOV — hidden relay to test_player_lines/test_calibration")
-    playhead_low:       Group[PlayheadLowSettings]   = Group(PlayheadLowSettings)
-    playhead_flash:     Group[PlayheadFlashSettings] = Group(PlayheadFlashSettings)
-    playhead_high:      Group[PlayheadHighSettings]  = Group(PlayheadHighSettings)
-    test_haunted_flash: Group[HauntedFlashSettings]  = Group(HauntedFlashSettings)
+    playhead_low:       Group[PlayheadLowSettings]     = Group(PlayheadLowSettings)
+    playhead_flash:     Group[PlayheadFlashSettings]   = Group(PlayheadFlashSettings)
+    sound_light:        Group[SoundLightSettings]      = Group(SoundLightSettings)
+    pose_instrument:    Group[PoseInstrumentSettings]  = Group(PoseInstrumentSettings)
+    playhead_high:      Group[PlayheadHighSettings]    = Group(PlayheadHighSettings)
+    flood:              Group[FloodSettings]           = Group(FloodSettings)
+    test_haunted_flash: Group[HauntedFlashSettings]    = Group(HauntedFlashSettings)
     test_slow:          Group[TestSlowSettings]      = Group(TestSlowSettings)
     test_pose_waves:    Group[PoseWavesSettings]     = Group(PoseWavesSettings)
     test_harmonic:      Group[HarmonicSettings]      = Group(HarmonicSettings)
