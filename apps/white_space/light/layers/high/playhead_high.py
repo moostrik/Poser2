@@ -1,8 +1,8 @@
 """Playhead (high) — visualises the content playhead as a bright marker on the pixel ring.
 
 Draws a marker at the strip position of ``frame.playhead`` (the continuous content playhead,
-radians [-π, π); NaN → nothing drawn). Imported as ``PlayheadHigh`` to distinguish it from the
-low-speed ``PlayheadLow`` and the motor/content ``Playhead`` (the NCO in ``light/playhead.py``).
+radians [-π, π); NaN → nothing drawn). Distinct from the low-regime ``PlayheadLow`` and the motor/content ``Playhead``
+(the NCO in ``light/playhead.py``).
 """
 
 import math
@@ -16,15 +16,15 @@ from .._utilities import angle_to_strip_position
 from ...frame import Frame
 
 
-class PlayheadSettings(LayerSettings):
+class PlayheadHighSettings(LayerSettings):
     level: Field[float] = Field(1.0,  min=0.0, max=1.0,  step=0.01,  description="Marker brightness")
     width: Field[float] = Field(0.01, min=0.0, max=0.5,  step=0.005, description="Marker width (fraction of the ring)")
 
 
-class Playhead(HighLayer):
+class PlayheadHigh(HighLayer):
     """A bright marker at the playhead's position on the pixel ring (visualises the content playhead)."""
 
-    def __init__(self, resolution: int, config: PlayheadSettings, board) -> None:
+    def __init__(self, resolution: int, config: PlayheadHighSettings, board) -> None:
         super().__init__(resolution, config, board)
         self._config = config
 

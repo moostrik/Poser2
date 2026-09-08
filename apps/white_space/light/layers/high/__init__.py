@@ -4,13 +4,15 @@ reads while the bar spins fast; all carry the ``light_phase`` ring shift. Show l
 carries the regime.
 """
 
-from .pose_waves        import PoseWaves,   PoseWavesSettings
-from .harmonic          import Harmonic,    HarmonicSettings, HarmonicSourceSettings
-from .player_azimuth    import PlayerLines,  PlayerLinesSettings
-from .camera_light      import CameraLight,  CameraLightSettings
-from .playhead          import Playhead,    PlayheadSettings
-from .fill              import Fill,   FillSettings
-from .pulse             import Pulse,  PulseSettings
-from .chase             import Chase,  ChaseSettings
-from .lines             import Lines,  LinesSettings
-from .random            import Random, RandomSettings, RandomChannelSettings
+from .pose_instrument     import PoseInstrument, PoseInstrumentSettings
+from .playhead_high       import PlayheadHigh,   PlayheadHighSettings
+from .flood               import Flood,          FloodSettings
+from .test_pose_waves     import PoseWaves,      PoseWavesSettings
+from .test_harmonic       import Harmonic,       HarmonicSettings, HarmonicSourceSettings
+from .test_player_lines   import PlayerLines,    PlayerLinesSettings
+from .test_calibration    import CameraLight,    CameraLightSettings
+from .test_fill           import Fill,           FillSettings
+from .test_pulse          import Pulse,          PulseSettings
+from .test_chase          import Chase,          ChaseSettings
+from .test_lines          import Lines,          LinesSettings
+from .test_random         import Random,         RandomSettings, RandomChannelSettings

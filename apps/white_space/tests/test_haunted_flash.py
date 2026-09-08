@@ -8,7 +8,7 @@ time on that sample whether it sits just before or just after the zero-crossing.
 import math
 import unittest
 
-from apps.white_space.light.layers.low.haunted_flash import _closest_pass
+from apps.white_space.light.layers.low.test_haunted_flash import _closest_pass
 
 R = math.radians
 

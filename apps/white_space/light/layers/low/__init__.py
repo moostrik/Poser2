@@ -1,4 +1,4 @@
-"""Slow-speed light layers — the < ~200 rpm "low pixel system".
+"""Low-regime light layers (`LowLayer`) — the < ~200 rpm "low pixel system".
 
 At slow rotation the pixel bar no longer blurs into a persistence-of-vision ring; instead each
 output pixel drives a discrete physical lamp on the bar. The hardware mapping (per channel, with
@@ -17,7 +17,8 @@ high-regime layers take over — the states choose per regime. Show layers and `
 debug layers live side by side: the name carries the role, the folder carries the regime.
 """
 
-from .playhead_flash import PlayheadFlash, PlayheadFlashSettings, offset_to_level
-from .playhead       import Playhead,      PlayheadSettings
-from .haunted_flash  import HauntedFlash,  HauntedFlashSettings
-from .test_slow      import TestSlow,      TestSlowSettings
+from .playhead_low        import PlayheadLow,   PlayheadLowSettings
+from .playhead_flash      import PlayheadFlash, PlayheadFlashSettings, offset_to_level
+from .sound_light         import SoundLight,    SoundLightSettings
+from .test_haunted_flash  import HauntedFlash,  HauntedFlashSettings
+from .test_slow           import TestSlow,      TestSlowSettings
