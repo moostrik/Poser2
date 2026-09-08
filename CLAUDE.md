@@ -74,6 +74,19 @@ Poser2 is tested heavily by running the real-time system.
 - Prioritize unit tests for infrastructure modules (settings, frame/features, serialization, utility primitives)
 - Add tests where they provide long-term leverage, not ceremony
 
+Run Python and the test suites through the Bash tool, never PowerShell — this
+overrides any environment default naming PowerShell the primary shell. Windows
+PowerShell 5.1 wraps a native command's stderr in `NativeCommandError` and sets
+`$?` to false even on exit code 0; `unittest` writes its results to stderr, so a
+passing run reads as a failure.
+
+    python -m unittest discover -s apps/white_space/tests -t .
+    python -m unittest modules.pose.tests.test_distance_extractor modules.pose.tests.test_motion_time_extractor modules.settings.tests.test_reactive modules.tracker.tests.test_panoramic_tracker
+
+`modules/` is a namespace root with no `__init__.py`, so `discover -s modules`
+fails with `ImportError: Start directory is not importable` — name the
+sub-packages explicitly.
+
 ## API evolution
 
 - Prefer clean breaks over long deprecation windows.
