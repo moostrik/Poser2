@@ -392,7 +392,6 @@
     },
     "motor": {
       "simulate": false,
-      "mode": "HIGH",
       "low_rpm": 36.0,
       "high_rpm": 2000.0
     },

@@ -57,10 +57,30 @@ the automatic graph**: no condition enters or leaves it — only the operator's 
 **session mode** the two open-ended states (INTRO, PLAY) gain timed exits, and END only
 winds down (no return to PLAY), so a session always concludes.
 
+**Boot invariant — the motor NEVER powers on into HIGH.** Every path that could command
+HIGH at boot is guarded, and each guard has a unit test:
+
+1. **State machine**: always boots into IDLE (motor LOW), ignoring the persisted `select`
+   — a preset saved mid-show can never boot into a HIGH state (`statemachine/machine.py`;
+   `test_startup_ignores_persisted_select`).
+2. **Motor**: there is no manual mode field — the arbitration is debug > machine command >
+   **STOPPED**, so before the machine's first tick (or with the machine disabled) nothing
+   spins (`light/motor.py` `_target_mode`; `test_boot_without_command_is_stopped`).
+3. **Debug**: the Conductor forces the `light.debug` select back to OFF at construction —
+   a preset saved with a high layer selected can never auto-follow to HIGH at power-on
+   (`light/conductor.py`; `test_boot_failsafe_clears_debug`).
+
+On top of these, `osc_light` holds the commanded rpm at 0 for `startup_delay` seconds
+after connecting, giving the motor controller one clean 0 → target edge. HIGH is
+therefore reachable only through an explicit runtime action: the show's own sync into
+INTRO_PLAY, an operator goto to a HIGH state, or selecting a high layer in the debug
+select. **Any future change to boot, arbitration, or the debug select must preserve
+this invariant.**
+
 **Hardware failsafe**: if the machine does not rotate, it turns the lights off — so a
 stalled spin-down can never strand bright lights on a stationary bar. A sensor failure on
 a machine that *is* still spinning can hold a state (e.g. S8/S9 waiting for lock); that is
-an operator-intervention case (`goto` / manual), not a safety one.
+an operator-intervention case (`goto` / the debug select), not a safety one.
 
 ## Layers
 

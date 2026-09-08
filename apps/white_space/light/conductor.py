@@ -138,7 +138,7 @@ class Conductor(Thread):
         self._compositor.reset_layers(ids)
 
     def set_motor_mode(self, mode: MotorMode | None) -> None:
-        """Forward the state machine's motor command (None = relinquish to settings.mode)."""
+        """Forward the state machine's motor command (None = relinquish → STOPPED)."""
         self._motor_controller.set_mode(mode)
 
     # ------------------------------------------------------------------

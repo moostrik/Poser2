@@ -69,8 +69,7 @@ class MotorState:
 
 class MotorSettings(BaseSettings):
     simulate:             Field[bool] = Field(False,                              description="Simulate the motor + fall sensor (no hardware): obeys the commanded mode with modeled inertia")
-    mode:                 Field[MotorMode] = Field(MotorMode.LOW,                     description="Manual mode — drives the motor when the state machine has relinquished")
-    active_mode:          Field[MotorMode] = Field(MotorMode.STOPPED, access=Field.READ, description="Active mode — the arbitrated mode actually driven")
+    active_mode:          Field[MotorMode] = Field(MotorMode.STOPPED, access=Field.READ, description="Active mode — the arbitrated mode actually driven (debug > state machine; no command = STOPPED)")
     low_rpm:              Field[float] = Field(72.0,   min=0.0, max=300.0,  step=1.0,  description="Target rpm in LOW mode", newline=True)
     high_rpm:             Field[float] = Field(2000.0, min=0.0, max=2400.0, step=1.0,  description="Target rpm in HIGH mode")
     measured_rpm:         Field[float] = Field(0.0,   min=0.0, max=_SENSOR_CEILING_RPM, step=0.01,  access=Field.READ, description="Current measured RPM", newline=True)
@@ -89,7 +88,7 @@ class MotorController:
 
     def __init__(self, settings: MotorSettings) -> None:
         self._settings         = settings
-        self._commanded:       MotorMode | None = None   # state machine command; None = follow settings.mode
+        self._commanded:       MotorMode | None = None   # state machine command; None = relinquished (STOPPED)
         self._debug_mode:      MotorMode | None = None   # debug override (auto-follow); outranks the machine
         self._measured_period: float | None = None
         self._last_fall_time:  float | None = None
@@ -104,11 +103,6 @@ class MotorController:
 
     def start(self) -> None:
         self._running = True
-        # Safety: never spin up to HIGH on boot — demote a persisted HIGH manual mode to LOW.
-        # The operator must explicitly select HIGH after startup. Done before binding/starting
-        # the sim so the first tick already sees the demoted mode.
-        if self._settings.mode == MotorMode.HIGH:
-            self._settings.mode = MotorMode.LOW
         self._settings.bind(MotorSettings.simulate, self._on_sim_setting_changed)
         self._sim_thread.start()
 
@@ -123,8 +117,8 @@ class MotorController:
     # ------------------------------------------------------------------
 
     def set_mode(self, mode: MotorMode | None) -> None:
-        """State-machine command channel: overrides ``settings.mode`` while set; ``None``
-        relinquishes back to it (the settings field is the manual fallback)."""
+        """State-machine command channel; ``None`` relinquishes — the motor stops (there
+        is no manual mode: the machine and the debug select are the only authorities)."""
         self._commanded = mode
 
     def set_debug_mode(self, mode: MotorMode | None) -> None:
@@ -229,14 +223,15 @@ class MotorController:
     def _target_mode(self) -> MotorMode:
         """The mode we are driving toward — arbitration, each rung explicitly owned:
         debug (auto-followed from the debug selection) > state machine command >
-        `settings.mode` (the relinquish fallback). The sim is never a source — it obeys
-        this same arbitration. Sets `target_rpm` (sent to the motor); the *actual* mode
-        is only confirmed once the motor responds (see `tick`)."""
+        STOPPED (relinquished / before the machine's first tick — no command means no
+        spin). The sim is never a source — it obeys this same arbitration. Sets
+        `target_rpm` (sent to the motor); the *actual* mode is only confirmed once the
+        motor responds (see `tick`)."""
         if self._debug_mode is not None:
             return self._debug_mode
         if self._commanded is not None:
             return self._commanded
-        return self._settings.mode
+        return MotorMode.STOPPED
 
     def _measure(self, now: float) -> tuple[bool, float, float, float, float]:
         """Phase + rpm from the fall timestamps — returns

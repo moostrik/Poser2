@@ -9,7 +9,7 @@ transition conditions, and emits a ``SequencerState`` snapshot for the board and
 
 The machine is the only component that talks to the Conductor, through three explicit
 command callables: ``set_mix`` (the mix), ``reset_layers`` (explicit layer resets), and
-``set_motor`` (the motor command; ``None`` relinquishes to the manual ``motor.mode`` setting).
+``set_motor`` (the motor command; ``None`` relinquishes — the motor stops).
 
 ``SequencerState`` is a boundary wire format only — reusing it keeps the board/OSC wiring
 and the Max-facing contract identical to hd_trio's; its legacy ``stage`` field naming stays
@@ -186,8 +186,8 @@ class StateMachine:
             self._goto_requested = True
 
     def _on_enabled(self, value: bool) -> None:
-        """Relinquish the motor to the manual `motor.mode` setting while disabled;
-        re-command the active state's mode when re-enabled."""
+        """Relinquish the motor while disabled (no command = STOPPED, unless the debug
+        select drives it); re-command the active state's mode when re-enabled."""
         if not value:
             self._set_motor(None)
         elif self._active is not None:

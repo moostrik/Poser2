@@ -44,8 +44,8 @@ def _advancing(rpm: float, dt: float, start: float = 0.0):
 
 class MotorTest(unittest.TestCase):
     def _locked(self, mode: MotorMode = MotorMode.LOW, period: float = 1.0) -> MotorController:
-        s = MotorSettings(); s.mode = mode
-        m = MotorController(s)
+        m = MotorController(MotorSettings())
+        m.set_mode(mode)
         m._last_fall_time = monotonic() - 0.25
         m._measured_period = period
         return m
@@ -67,20 +67,17 @@ class MotorTest(unittest.TestCase):
         self.assertFalse(st.locked)
         self.assertTrue(math.isnan(st.phase))
 
-    def test_does_not_start_in_high(self) -> None:
-        # Safety: a persisted HIGH command is demoted to LOW on start so the motor never boots into a fast spin.
-        s = MotorSettings(); s.mode = MotorMode.HIGH
-        m = MotorController(s)
-        m.start()
-        try:
-            self.assertEqual(s.mode, MotorMode.LOW)
-        finally:
-            m.stop()
+    def test_boot_without_command_is_stopped(self) -> None:
+        # There is no manual mode: until the machine (or debug) commands one, the motor
+        # never spins — no command means STOPPED, so a boot can never start a fast spin.
+        st = MotorController(MotorSettings()).tick()
+        self.assertEqual(st.mode, MotorMode.STOPPED)
+        self.assertEqual(st.target_rpm, 0.0)
 
     def test_duplicate_fall_does_not_divide_by_zero(self) -> None:
         # Two falls at the same instant (bouncing sensor / repeated packet) must not crash tick().
-        s = MotorSettings(); s.mode = MotorMode.LOW
-        m = MotorController(s)
+        m = MotorController(MotorSettings())
+        m.set_mode(MotorMode.LOW)
         t = monotonic()
         m._fire_fall_at(t)
         m._fire_fall_at(t)              # simultaneous duplicate → no positive period recorded
@@ -90,8 +87,8 @@ class MotorTest(unittest.TestCase):
     def test_duplicate_is_debounced_keeps_real_period(self) -> None:
         # A duplicate 32 ms after a real fall is ignored, so the measured period stays the real one
         # (without the debounce it would read ~1875 rpm for a full revolution).
-        s = MotorSettings(); s.mode = MotorMode.LOW
-        m = MotorController(s)
+        m = MotorController(MotorSettings())
+        m.set_mode(MotorMode.LOW)
         t = monotonic()
         m._fire_fall_at(t)
         m._fire_fall_at(t + 0.5)        # real revolution: 0.5 s → 120 rpm
@@ -108,13 +105,14 @@ class MotorTest(unittest.TestCase):
 
     def test_mode_is_commanded_immediately(self) -> None:
         # No stall/stop detection: the reported mode is the commanded mode at once, even before any falls.
-        s = MotorSettings(); s.mode = MotorMode.LOW
-        self.assertEqual(MotorController(s).tick().mode, MotorMode.LOW)
+        m = MotorController(MotorSettings())
+        m.set_mode(MotorMode.LOW)
+        self.assertEqual(m.tick().mode, MotorMode.LOW)
 
     def test_long_gap_does_not_unlock(self) -> None:
         # No stall detection: a long silence never zeroes the measurement (fixes spin-down false-stops).
-        s = MotorSettings(); s.mode = MotorMode.LOW
-        m = MotorController(s)
+        m = MotorController(MotorSettings())
+        m.set_mode(MotorMode.LOW)
         m._measured_period = 1.0                    # 60 rpm
         m._last_fall_time  = monotonic() - 30.0     # 30 s since the last fall — would have stalled before
         st = m.tick()
@@ -123,8 +121,9 @@ class MotorTest(unittest.TestCase):
 
     def test_high_no_falls_uses_command(self) -> None:
         # Commanded HIGH with no falls yet (cold start) → trust the command: report HIGH, act on target.
-        s = MotorSettings(); s.mode = MotorMode.HIGH
-        st = MotorController(s).tick()                  # no falls
+        m = MotorController(MotorSettings())
+        m.set_mode(MotorMode.HIGH)
+        st = m.tick()                                   # no falls
         self.assertFalse(st.locked)
         self.assertTrue(math.isnan(st.phase))
         self.assertEqual(st.mode, MotorMode.HIGH)
@@ -134,8 +133,8 @@ class MotorTest(unittest.TestCase):
     def test_high_ignores_stale_fall_uses_command(self) -> None:
         # The motor sends no sync pulses above the ceiling, so HIGH ignores any leftover/stale fall
         # reading and trusts the command (otherwise a frozen pre-HIGH reading would drive the crossfade).
-        s = MotorSettings(); s.mode = MotorMode.HIGH
-        m = MotorController(s)
+        m = MotorController(MotorSettings())
+        m.set_mode(MotorMode.HIGH)
         m._last_fall_time = monotonic() - 0.001; m._measured_period = 1.0   # stale 60 rpm reading
         st = m.tick()
         self.assertFalse(st.locked)
@@ -146,8 +145,8 @@ class MotorTest(unittest.TestCase):
     def test_above_ceiling_measurement_not_trusted(self) -> None:
         # Spinning down from HIGH: commanded LOW but still physically fast → the >ceiling reading
         # (sensor can't keep up / phase aliases) is not trusted; trust the command instead.
-        s = MotorSettings(); s.mode = MotorMode.LOW
-        m = MotorController(s)
+        m = MotorController(MotorSettings())
+        m.set_mode(MotorMode.LOW)
         m._last_fall_time = monotonic() - 0.001; m._measured_period = 0.040   # 1500 rpm, above ceiling
         st = m.tick()
         self.assertFalse(st.locked)
@@ -162,8 +161,9 @@ class MotorTest(unittest.TestCase):
 
     def test_no_falls_uses_commanded_speed(self) -> None:
         # With no measurement, the effective speed follows the command — there is no 'stopped' state.
-        s = MotorSettings(); s.mode = MotorMode.LOW    # 72 rpm, below ceiling
-        st = MotorController(s).tick()                 # no falls
+        m = MotorController(MotorSettings())
+        m.set_mode(MotorMode.LOW)                      # 72 rpm, below ceiling
+        st = m.tick()                                  # no falls
         self.assertFalse(st.locked)
         self.assertEqual(st.mode, MotorMode.LOW)
         self.assertEqual(st.effective_rpm, 72.0)
@@ -184,10 +184,10 @@ class SimTest(unittest.TestCase):
 
     def test_sim_obeys_the_commanded_mode(self) -> None:
         # simulate on/off never changes the arbitration — the sim is not a mode source.
-        s = MotorSettings(); s.mode = MotorMode.LOW
+        s = MotorSettings()
         m = MotorController(s)
         s.simulate = True
-        self.assertEqual(m._target_mode(), MotorMode.LOW)     # manual fallback
+        self.assertEqual(m._target_mode(), MotorMode.STOPPED)  # no command yet → no spin
         m.set_mode(MotorMode.HIGH)
         self.assertEqual(m._target_mode(), MotorMode.HIGH)    # machine command wins, sim or not
         s.simulate = False
@@ -365,19 +365,16 @@ class ReacquireTest(unittest.TestCase):
 
 
 class SetModeTest(unittest.TestCase):
-    """The state machine's command channel: set_mode() overrides settings.mode while set;
-    None relinquishes back to it (the settings field is the manual fallback)."""
+    """The state machine's command channel: set_mode() drives the motor while set;
+    None relinquishes — no command means STOPPED (there is no manual mode)."""
 
-    def test_command_wins_over_settings(self) -> None:
-        s = MotorSettings(); s.mode = MotorMode.LOW
-        m = MotorController(s)
+    def test_command_drives_the_mode(self) -> None:
+        m = MotorController(MotorSettings())
         m.set_mode(MotorMode.HIGH)
         self.assertEqual(m.tick().mode, MotorMode.HIGH)
-        self.assertEqual(s.mode, MotorMode.LOW)            # the manual setting is untouched
 
-    def test_none_relinquishes_to_settings(self) -> None:
-        s = MotorSettings(); s.mode = MotorMode.STOPPED
-        m = MotorController(s)
+    def test_none_relinquishes_to_stopped(self) -> None:
+        m = MotorController(MotorSettings())
         m.set_mode(MotorMode.HIGH)
         m.set_mode(None)
         self.assertEqual(m.tick().mode, MotorMode.STOPPED)
@@ -389,14 +386,13 @@ class DebugOverrideTest(unittest.TestCase):
     selected debug layers."""
 
     def test_debug_mode_outranks_the_machine_command(self) -> None:
-        s = MotorSettings(); s.mode = MotorMode.STOPPED
-        m = MotorController(s)
+        m = MotorController(MotorSettings())
         m.set_mode(MotorMode.LOW)                       # machine command
         m.set_debug_mode(MotorMode.HIGH)                # debug override wins
         self.assertEqual(m._target_mode(), MotorMode.HIGH)
         m.set_debug_mode(None)                          # debug off → machine again
         self.assertEqual(m._target_mode(), MotorMode.LOW)
-        m.set_mode(None)                                # machine relinquishes → manual fallback
+        m.set_mode(None)                                # machine relinquishes → STOPPED
         self.assertEqual(m._target_mode(), MotorMode.STOPPED)
 
     def test_auto_follow_derives_regime_from_selection(self) -> None:
