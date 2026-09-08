@@ -474,8 +474,8 @@ class BarsTest(unittest.TestCase):
 
 class RegimeSignalsTest(unittest.TestCase):
     """The playhead's regime-flip signals: `synced` (re-locked at LOW — the stale-proof
-    motor lock), `ring_formed` (HIGH + fall silence — the bar blurred into the ring), and
-    `spin_down` (gated normalized deceleration, ceiling → LOW, 1.0 at re-lock)."""
+    motor lock, which the S8/S9 exit and the wind_down layer's final bar anchor on) and
+    `ring_formed` (HIGH + fall silence — the bar blurred into the ring)."""
 
     DT = 1 / 60
 
@@ -500,21 +500,18 @@ class RegimeSignalsTest(unittest.TestCase):
         p.tick(self.DT, low)
         self.assertFalse(p.ring_formed)
 
-    def test_spin_down_is_gated_normalized_and_completes_at_relock(self) -> None:
+    def test_relock_is_gated_against_stale_readings(self) -> None:
         p = running_playhead(mode=MotorMode.HIGH)
         p.tick(self.DT, mstate(float("nan"), False, 2000.0, mode=MotorMode.HIGH))
-        # Back to LOW: the stale pre-HIGH reading must NOT produce a fade (gate not passed).
+        # Back to LOW: the stale pre-HIGH reading must NOT re-lock instantly (gate not passed).
         p.tick(self.DT, mstate(2.5, True, 72.0, mode=MotorMode.LOW))
-        self.assertEqual(p.spin_down, 0.0)
-        # Fresh fast reading → gate passes; spin_down = (200 − measured) / (200 − 72).
+        self.assertFalse(p.synced)
+        # A fresh above-content reading (the real spin-down) passes the gate; still braking.
         p.tick(self.DT, mstate(2.5, True, 180.0, mode=MotorMode.LOW))
-        self.assertAlmostEqual(p.spin_down, (200.0 - 180.0) / (200.0 - 72.0), places=6)
-        p.tick(self.DT, mstate(2.5, True, 100.0, mode=MotorMode.LOW))
-        self.assertAlmostEqual(p.spin_down, (200.0 - 100.0) / (200.0 - 72.0), places=6)
-        # Settled at content speed → re-lock: synced and spin_down = 1.0 together.
+        self.assertFalse(p.synced)
+        # Settled at content speed → re-lock.
         p.tick(self.DT, mstate(2.5, True, 73.0, mode=MotorMode.LOW))
         self.assertTrue(p.synced)
-        self.assertEqual(p.spin_down, 1.0)
 
 
 class SpeedSmoothingTest(unittest.TestCase):

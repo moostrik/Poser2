@@ -27,8 +27,8 @@ the way up (the lamp bar physically blurring into the ring).
 | S5 | INTRO_PLAY | ≥ 3      | 14 s spin-up  | HIGH    | instrument + playhead at un-lock | pose instrument (ease in) | yes (effect?)        | enhance spin-up chaos          |
 | S6 | PLAY       | ≥ 3      | ∞             | HIGH    | pose instrument + playhead       | pose instrument           | yes                  | enhance spin                   |
 | S7 | END        | < 3      | N bars (↔)    | HIGH    | instrument + playhead → full     | fade-out instrument       | distortion?          | fade-out spin + distortion?    |
-| S8 | END_INTRO  | < 3, > 0 | spin-down     | LOW     | fade BRIGHT → DIM                | none                      | fade out distortion? | fade out distortion?           |
-| S9 | END_IDLE   | 0        | spin-down     | LOW     | stays BRIGHT                     | fade-in sound visuals     | fade out distortion? | fade out distortion?           |
+| S8 | END_INTRO  | < 3, > 0 | spin-down + 1 bar | LOW | fade → DIM, then back out in 1 bar | none                    | fade out distortion? | fade out distortion?           |
+| S9 | END_IDLE   | 0        | spin-down + 1 bar | LOW | stays BRIGHT, back out in 1 bar  | fade-in sound visuals     | fade out distortion? | fade out distortion?           |
 
 ## Transition graph
 
@@ -47,8 +47,8 @@ stateDiagram-v2
     END --> PLAY: P ≥ 3 — winds back first\n(stand-alone only)
     END --> END_INTRO: wound down, P > 0
     END --> END_IDLE: wound down, P == 0
-    END_INTRO --> INTRO: LOW reacquired
-    END_IDLE --> IDLE: LOW reacquired
+    END_INTRO --> INTRO: 1 bar after LOW reacquired
+    END_IDLE --> IDLE: 1 bar after LOW reacquired
 ```
 
 The machine always **boots into IDLE** (failsafe — the persisted `select` is only the goto
@@ -74,7 +74,8 @@ Each state composes its **mix**: a weighted list of layers, returned every tick
 | `sound_light`     | low    | soundscape levels on the left/right blue lamps (`/WS/sound/level` from Max) |
 | `pose_instrument` | high   | the pose instrument — each participant in a blue light with a pose-derived pattern, sync fill between matched participants (placeholder for now — see `LAYERS.md`) |
 | `playhead_high`   | high   | the playhead line on the ring — full-white marker |
-| `flood`           | high   | constant full-strip white |
+| `flood`           | high   | constant full-strip white (S7's wall) |
+| `wind_down`       | low*   | the dying wall — fades ring *and* lamps to nothing, finishing one bar after the motor lock (S8/S9; the one cross-regime layer, see `LAYERS.md`) |
 
 Per-layer design, inputs, and settings: see `LAYERS.md`. `playhead_low` and
 `playhead_high` are deliberately two layers: the light data protocol differs between the
@@ -180,9 +181,9 @@ searchlight and the soundscape fades back in.
 The participants have synced their poses: the machine spins up. The pose instrument takes
 over from the line during the spin-up, and the sound enhances the accelerating chaos.
 
-- **Participants**: ≥ 3 · **Duration**: spin-up (`intro_play_seconds`, 14 s) · **Motor**: HIGH
+- **Participants**: ≥ 3 · **Duration**: spin-up (`spin_up_seconds`, 14 s) · **Motor**: HIGH
 - **Transitions**
-  1. elapsed ≥ `intro_play_seconds` → S6 PLAY *(stands in for "at motor top speed" —
+  1. elapsed ≥ `spin_up_seconds` → S6 PLAY *(stands in for "at motor top speed" —
      the sensor is blind above 200 RPM, so time approximates it)*
 - **Mix**: `playhead_low` DIM until motor **un-lock**, then `pose_instrument` white 1.0
   (hard) / blue ease-in · `playhead_high` 1.0 — per-channel weights; pose_instrument
@@ -239,41 +240,54 @@ back and PLAY resumes — the ramp runs both ways, never jumping.
 
 ## S8 — END_INTRO
 
-Participants remain, so the machine returns to the intro: it spins down and the
-full white fades to the dim playhead line while the distortion sound disappears.
+Participants remain, so the machine returns to the intro: the wall of white **fades
+away during the spin-down**, revealing the dim playhead line underneath, and once the
+motor finds its lock at LOW the fade **finishes within one round** — the back light
+extinguishing completely. The state outlives the spin-down by that final bar.
 
-- **Participants**: < 3, > 0 · **Duration**: the spin-down itself · **Motor**: LOW
+*(The fade lives in the `wind_down` layer, not in mix weights: fading a wall across
+the ring→lamps regime flip needs knowledge of both light mechanics, which belongs in
+one robust place — see `LAYERS.md`. And it is timed, not driven by the measured
+deceleration: the sensor's spin-down readings don't resolve a usable ramp — driving a
+fade from them snaps. The layer's `spin_down_seconds` slider is tuned by hand to the
+physical spin-down; S5's `spin_up_seconds` is its mirror.)*
+
+- **Participants**: < 3, > 0 · **Duration**: the spin-down + 1 bar · **Motor**: LOW
 - **Transitions**
-  1. LOW speed reacquired (motor lock) → S3 INTRO *(the literal "at motor low speed" —
-     by then the fade has completed by construction)*
-- **Mix**: `flood` 1.0 while above the ceiling, then `flood` 1−e · `playhead_low` DIM·e,
-  where **e = the measured deceleration itself**: (ceiling − measured) / (ceiling −
-  `low_rpm`), gated against stale readings — 0 just under the ceiling, 1 at LOW
-- **White**: fade BRIGHT → DIM, driven by the physics: as the fresh measured speed falls
-  from the ceiling to LOW, flood's fade takes the **back lamp** to 0 while the front hands
-  over seamlessly (front = (1−e) + DIM·e, monotonic, no seam); fade-done and state-done
-  are the same physical fact. The state's progress (OSC `stage_progress`) is e, so the
-  sound-side distortion fade rides the same deceleration
+  1. one full bar after motor lock (fade finished by construction) → S3 INTRO
+- **Mix**: `wind_down` 1.0 · `playhead_low` DIM — **constant weights**; the dynamics
+  live inside `wind_down` (reset on entry). The dim line sits underneath from the
+  start and is *revealed* as the wall dies — no splice, no seam into INTRO (the front
+  sums past full and clips until the wall drops away; monotonic to DIM)
+- **White**: the wall fades BRIGHT → gone over `spin_down_seconds`; whatever remains
+  at the lock is extinguished over exactly one round of the reborn playhead — the
+  back lamp's graceful exit
 - **Blue**: none
 - **Pose sound**: fade out distortion?
 - **Secondary sound**: fade out distortion?
+- **Progress** (OSC `stage_progress`): the layer's own fade readout (0 = full wall,
+  1 = gone), so the sound-side distortion fade rides the actual fade
 - **Open questions**: distortion fade (Max side)
 
 ## S9 — END_IDLE
 
-The space is empty: the machine spins down with the light staying bright, the distortion
-disappears, and the searchlight soundscape returns.
+The space is empty: the wall of white fades away during the spin-down, revealing the
+bright searchlight line; the distortion disappears and the searchlight soundscape
+returns with it. The same engine as S8 — `wind_down` owns the fade, finishing within
+one round after the motor lock — landing on the BRIGHT line instead of the dim one.
 
-- **Participants**: 0 · **Duration**: the spin-down itself · **Motor**: LOW
+- **Participants**: 0 · **Duration**: the spin-down + 1 bar · **Motor**: LOW
 - **Transitions**
-  1. LOW speed reacquired (motor lock) → S1 IDLE
-- **Mix**: `flood` 1.0 while above the ceiling, then `flood` 1−e · `playhead_low` e ·
-  `sound_light` ease-in(e), where **e = the measured deceleration itself**
-  ((ceiling − measured) / (ceiling − `low_rpm`), gated against stale readings)
-- **White**: stays BRIGHT — front lamp = (1−e) + e = constant 1.0 through the hand-off,
-  while the deceleration takes the **back lamp** to 0. The state's progress (OSC
-  `stage_progress`) is e, so the sound-side fades ride the same deceleration
-- **Blue**: fade-in sound visuals
+  1. one full bar after motor lock (fade finished by construction) → S1 IDLE
+- **Mix**: `wind_down` 1.0 · `playhead_low` 1.0 · `sound_light` p — the line at
+  constant full underneath the dying wall (the front lamp clips at full throughout:
+  constant BRIGHT, no seam into IDLE); the sound visuals fade in on p = the layer's
+  fade readout
+- **White**: stays BRIGHT — the front is at full the whole way, while the back lamp
+  rides the wall down and is extinguished within one round after the lock
+- **Blue**: sound visuals fade in with the wall's fade
 - **Pose sound**: fade out distortion?
 - **Secondary sound**: fade out distortion?
+- **Progress** (OSC `stage_progress`): the layer's own fade readout, so the
+  sound-side fades ride the actual fade
 - **Open questions**: distortion fade (Max side)

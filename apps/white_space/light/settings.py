@@ -11,6 +11,7 @@ from .layers import (
     PlayerLinesSettings, CameraLightSettings, PlayheadFlashSettings,
     HauntedFlashSettings, PlayheadLowSettings, PlayheadHighSettings,
     TestSlowSettings, SoundLightSettings, PoseInstrumentSettings, FloodSettings,
+    WindDownSettings,
 )
 
 
@@ -26,7 +27,8 @@ class LayerId(IntEnum):
     sound_light         = auto()   # low: soundscape levels on the left/right blue lamps
     pose_instrument     = auto()   # high: the pose instrument (placeholder — see LAYERS.md)
     playhead_high       = auto()   # high: bright ring marker visualising the content playhead
-    flood               = auto()   # high: constant full-strip white
+    flood               = auto()   # high: constant full-strip white (S7's wall)
+    wind_down           = auto()   # low (cross-regime): the dying wall — fades ring + lamps, finishing one bar after motor lock
     test_haunted_flash  = auto()   # low: player/ghost flash (solo experimentation)
     test_slow           = auto()   # low: direct levels for the four physical lamps
     test_pose_waves     = auto()   # high: the old wave/void instrument (reference/montage)
@@ -50,6 +52,7 @@ class LayerCompSettings(BaseSettings):
     pose_instrument:    Group[PoseInstrumentSettings]  = Group(PoseInstrumentSettings)
     playhead_high:      Group[PlayheadHighSettings]    = Group(PlayheadHighSettings)
     flood:              Group[FloodSettings]           = Group(FloodSettings)
+    wind_down:          Group[WindDownSettings]        = Group(WindDownSettings)
     test_haunted_flash: Group[HauntedFlashSettings]    = Group(HauntedFlashSettings)
     test_slow:          Group[TestSlowSettings]      = Group(TestSlowSettings)
     test_pose_waves:    Group[PoseWavesSettings]     = Group(PoseWavesSettings)

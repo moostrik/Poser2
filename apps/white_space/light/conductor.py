@@ -21,7 +21,8 @@ from .playhead import Playhead
 from .settings import LightSettings, LayerId
 from .layers import (BaseLayer, Compositor, Mix, PoseWaves, Fill, Pulse, Chase, Lines, Random,
                      Harmonic, PlayerLines, CameraLight, PlayheadFlash, HauntedFlash,
-                     PlayheadLow, PlayheadHigh, TestSlow, SoundLight, PoseInstrument, Flood)
+                     PlayheadLow, PlayheadHigh, TestSlow, SoundLight, PoseInstrument, Flood,
+                     WindDown)
 from modules.board import PlayheadSignals
 
 from ..board import Board
@@ -74,6 +75,7 @@ class Conductor(Thread):
             LayerId.pose_instrument:    PoseInstrument(resolution, L.pose_instrument,   board, pose_stage),
             LayerId.playhead_high:      PlayheadHigh (resolution, L.playhead_high,      board),
             LayerId.flood:              Flood        (resolution, L.flood,              board),
+            LayerId.wind_down:          WindDown     (resolution, L.wind_down,          board),
             LayerId.test_haunted_flash: HauntedFlash (resolution, L.test_haunted_flash, board, pose_stage),
             LayerId.test_slow:          TestSlow     (resolution, L.test_slow,          board),
             LayerId.test_pose_waves:    PoseWaves    (resolution, num_players, L.test_pose_waves, self._clock.interval, board, pose_stage),
@@ -157,7 +159,7 @@ class Conductor(Thread):
         playhead = self._playhead.phase
         self._board.set_playhead(PlayheadSignals(
             phase=playhead, bars=self._playhead.bars, synced=self._playhead.synced,
-            ring_formed=self._playhead.ring_formed, spin_down=self._playhead.spin_down))
+            ring_formed=self._playhead.ring_formed))
 
         self._notify_update()
 

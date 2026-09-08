@@ -4,7 +4,9 @@ Each state owns its outgoing transitions (``needs_state_change``, in priority or
 when several conditions are true the same tick, the first wins) and returns its mix every
 tick (``update``: a weighted layer list the machine forwards to the Compositor). Steady
 states return constant weights; transition states blend by their own ``progress`` — their
-duration *is* the transition duration (or the physical spin-down itself for S8/S9).
+duration *is* the transition duration. S8/S9 are the exception: their fade lives in the
+``wind_down`` layer (constant mix; the layer owns the regime-crossing dynamics) and their
+duration is the spin-down plus one playhead bar after the motor lock.
 
 Mix-authoring rules:
 - A layer at weight 0.0 stays *in* the returned list while it is still part of the look;
@@ -232,17 +234,17 @@ class IntroPlayState(StateBase):
             self._unlock_elapsed = ctx.elapsed          # the ring physically formed — hard mix now
         if self._unlock_elapsed is None:
             return [(LayerId.playhead_low, IntroState.DIM)]   # still lamps: hold INTRO's dim line
-        remaining = max(self._config.intro_play_seconds - self._unlock_elapsed, 1e-6)
+        remaining = max(self._config.spin_up_seconds - self._unlock_elapsed, 1e-6)
         blue = _ease((ctx.elapsed - self._unlock_elapsed) / remaining)
         return [(LayerId.pose_instrument, (1.0, blue)), (LayerId.playhead_high, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
-        if ctx.elapsed >= self._config.intro_play_seconds:
+        if ctx.elapsed >= self._config.spin_up_seconds:
             return StateId.PLAY
         return None
 
     def progress(self, ctx: StateContext) -> float:
-        return _clamp(ctx.elapsed / self._config.intro_play_seconds)
+        return _clamp(ctx.elapsed / self._config.spin_up_seconds)
 
 
 class EndState(StateBase):
@@ -281,53 +283,58 @@ class EndState(StateBase):
         return self._p
 
 
-class EndIntroState(StateBase):
-    """S8 — END_INTRO. Participants remain, so the machine returns to the intro: it spins
-    down and the full white fades to the dim playhead line while the distortion sound
-    disappears.
-
-    The fade IS the deceleration: the mix rides ``ctx.spin_down`` (gated measured
-    braking, ceiling → LOW), and flood's fade is what takes the **back lamp** to 0 while
-    the front hands over seamlessly (front = (1−e) + DIM·e, monotonic). The exit is the
-    physical re-lock at LOW (``ctx.motor_locked``) — fade-done and state-done are the
-    same fact. Progress (OSC stage_progress) is the same signal, so the sound fades ride
-    the deceleration too."""
+class WindDownStateBase(StateBase):
+    """Shared S8/S9 engine: the dying wall. The mix is constant — the ``wind_down`` layer
+    (reset on entry) owns the whole fade, timed over its ``spin_down_seconds`` and
+    guaranteed extinguished within one round after the motor re-locks at LOW — and the
+    landing look sits underneath, revealed as the wall dies. Exit: one full playhead bar
+    after the lock (the state outlives the spin-down by that round). Progress is the
+    layer's own fade readout, so OSC stage_progress rides the actual fade."""
     MOTOR = MotorMode.LOW
+    TARGET: StateId
 
-    def update(self, ctx: StateContext) -> Mix:
-        e = _ease(ctx.spin_down)
-        return [(LayerId.flood, 1.0 - e), (LayerId.playhead_low, IntroState.DIM * e)]
+    def __init__(self, *args) -> None:
+        super().__init__(*args)
+        self._lock_bars: float | None = None    # ctx.bars at the motor lock
+
+    def enter(self, ctx: StateContext) -> None:
+        self._reset_layers([LayerId.wind_down])  # restart the fade at the full wall
+        self._lock_bars = None
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
-        if ctx.motor_locked:                # LOW speed reacquired — the literal "at motor low speed"
-            return StateId.INTRO
+        if self._lock_bars is None and ctx.motor_locked:
+            self._lock_bars = ctx.bars
+        if self._lock_bars is not None and ctx.bars - self._lock_bars >= 1.0:
+            return self.TARGET
         return None
 
     def progress(self, ctx: StateContext) -> float:
-        return ctx.spin_down
+        return self._light.layers.wind_down.progress
 
 
-class EndIdleState(StateBase):
-    """S9 — END_IDLE. The space is empty: the machine spins down with the light staying
-    bright, the distortion disappears, and the searchlight soundscape returns.
-
-    Same deceleration-driven fade as S8, landing BRIGHT: the front lamp stays at exactly
-    1.0 through the hand-off ((1−e) + e), the back lamp rides flood down to 0, and the
-    sound visuals fade in on the same signal. Exit on the physical re-lock at LOW."""
-    MOTOR = MotorMode.LOW
+class EndIntroState(WindDownStateBase):
+    """S8 — END_INTRO. Participants remain, so the machine returns to the intro: the wall
+    of white fades away during the spin-down, revealing the dim playhead line underneath,
+    while the distortion sound disappears; the fade finishes — the back light
+    extinguishing completely — within one round after the motor lock (see
+    ``WindDownStateBase``). The dim line is in the mix from the start, so there is no
+    splice and no seam into INTRO."""
+    TARGET = StateId.INTRO
 
     def update(self, ctx: StateContext) -> Mix:
-        e = _ease(ctx.spin_down)
-        return [(LayerId.flood, 1.0 - e), (LayerId.playhead_low, e),
-                (LayerId.sound_light, e)]
+        return [(LayerId.wind_down, 1.0), (LayerId.playhead_low, IntroState.DIM)]
 
-    def needs_state_change(self, ctx: StateContext) -> StateId | None:
-        if ctx.motor_locked:
-            return StateId.IDLE
-        return None
 
-    def progress(self, ctx: StateContext) -> float:
-        return ctx.spin_down
+class EndIdleState(WindDownStateBase):
+    """S9 — END_IDLE. The space is empty: the wall of white fades away during the
+    spin-down, revealing the bright searchlight line — the front lamp stays at full the
+    whole way — while the distortion disappears and the searchlight soundscape returns.
+    The sound visuals fade in on the wall's own fade readout."""
+    TARGET = StateId.IDLE
+
+    def update(self, ctx: StateContext) -> Mix:
+        return [(LayerId.wind_down, 1.0), (LayerId.playhead_low, 1.0),
+                (LayerId.sound_light, self.progress(ctx))]
 
 
 # -- Registry (total over StateId) ----------------------------------------------

@@ -449,6 +449,11 @@
         "level": 1.0,
         "blend": "ADD"
       },
+      "wind_down": {
+        "level": 1.0,
+        "spin_down_seconds": 10.0,
+        "blend": "ADD"
+      },
       "test_haunted_flash": {
         "white": 1.0,
         "base_white": 0.33,
@@ -636,7 +641,7 @@
     "session": false,
     "select": "IDLE",
     "intro_idle_bars": 1.0,
-    "intro_play_seconds": 14.0,
+    "spin_up_seconds": 14.0,
     "end_bars": 3.0,
     "intro_session_seconds": 60.0,
     "play_session_seconds": 150.0,

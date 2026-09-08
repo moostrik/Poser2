@@ -10,13 +10,11 @@ class PlayheadSignals:
     """The playhead's published clock + regime signals (pure data; producers define the
     semantics — for white_space: phase in radians [-π, π) or NaN, bars = monotonic
     content-clock cycles, synced = tracking the measured rotation at content speed,
-    ring_formed = the bar has physically blurred into the POV ring, spin_down =
-    normalized deceleration 0..1)."""
+    ring_formed = the bar has physically blurred into the POV ring)."""
     phase:       float = float("nan")
     bars:        float = 0.0
     synced:      bool  = False
     ring_formed: bool  = False
-    spin_down:   float = 0.0
 
 
 class HasPlayhead(Protocol):

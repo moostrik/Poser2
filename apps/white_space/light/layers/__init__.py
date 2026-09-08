@@ -6,6 +6,7 @@ from .compositor    import Compositor, Mix
 from .low.playhead_low        import PlayheadLow,     PlayheadLowSettings
 from .low.playhead_flash      import PlayheadFlash,   PlayheadFlashSettings
 from .low.sound_light         import SoundLight,      SoundLightSettings
+from .low.wind_down           import WindDown,        WindDownSettings
 from .low.test_haunted_flash  import HauntedFlash,    HauntedFlashSettings
 from .low.test_slow           import TestSlow,        TestSlowSettings
 from .high.pose_instrument    import PoseInstrument,  PoseInstrumentSettings

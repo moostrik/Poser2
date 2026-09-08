@@ -20,5 +20,6 @@ debug layers live side by side: the name carries the role, the folder carries th
 from .playhead_low        import PlayheadLow,   PlayheadLowSettings
 from .playhead_flash      import PlayheadFlash, PlayheadFlashSettings, offset_to_level
 from .sound_light         import SoundLight,    SoundLightSettings
+from .wind_down           import WindDown,      WindDownSettings
 from .test_haunted_flash  import HauntedFlash,  HauntedFlashSettings
 from .test_slow           import TestSlow,      TestSlowSettings

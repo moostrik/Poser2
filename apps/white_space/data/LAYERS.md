@@ -20,8 +20,13 @@ folder: the `test_` name prefix carries the role).
 | `playhead_flash`  | low    | LERP frames (PlayheadOffset, Dwell), tracklets         | front white lamp + blue lamps (blue zeroed in presets — S3 runs blue-none by design) | S3 |
 | `playhead_high`   | high   | frame playhead phase                                   | white ring marker             | S5 (post-un-lock), S6, S7 |
 | `pose_instrument` | high   | LERP frames (Azimuth, BBox, Angles, Similarity), tracklets | white bands + sync arcs, blue markers *(placeholder — see below)* | S5 (post-un-lock), S6, S7 |
-| `flood`           | high   | — (settings only)                                      | full-strip white              | S7, S8, S9 |
+| `flood`           | high   | — (settings only)                                      | full-strip white              | S7 |
+| `wind_down`       | low*   | playhead signals (motor lock + bars, board), tick clock | the dying white wall — ring *and* lamps | S8, S9 |
 | `sound_light`     | low    | sound levels from Max (board)                          | left/right blue lamps         | S1, S2, S4, S9 |
+
+\* `wind_down` is the one deliberate cross-regime layer — classed `LowLayer` (unshifted;
+debug auto-follow derives LOW) but drawing the full strip, so it reads as the POV wall
+while fast and as the white lamps once slow. See its section below.
 
 Test layers (never in a state's mix; reached via the debug override, all prefixed
 `test_` so the checklist separates them from show layers at a glance):
@@ -60,15 +65,40 @@ sound Max is playing.
 ## flood (new — HighLayer)
 
 Constant full-strip white — the END's wall of light. Deliberately the dumbest layer in
-the pool: all dynamics (the cross-to-full, the spin-down hand-off) are mix weights set
-by the states, never behavior inside the layer.
+the pool: all dynamics (the cross-to-full) are mix weights set by the states, never
+behavior inside the layer. The *ending* of the wall belongs to `wind_down` — S7's flood
+at 1.0 hands over to S8/S9's wind_down starting at the full wall, seamlessly.
 
-- **Used by**: S7 END (easing in as the instrument fades), S8/S9 (easing out with the
-  measured deceleration — in the low regime its fade is what takes the back lamp to 0)
+- **Used by**: S7 END (easing in as the instrument fades)
 - **Input**: none
 - **Behavior**: `white[:] += level`; stateless
 - **Settings**: `level` (white; blue stays 0 — the flood is a white statement)
 - **Reset**: no-op
+- **Open questions**: —
+
+## wind_down (new — LowLayer, cross-regime)
+
+The dying wall of light: owns the S8/S9 ending fade in both regimes. The one layer
+deliberately aware of BOTH light mechanics — it draws the wall that reads as the POV
+ring while the machine still spins fast and as the physical white lamps once slow.
+When the low-layer/lamp mechanics change in the future, this layer is the single place
+to update.
+
+- **Used by**: S8/S9 at constant weight 1.0 (reset on state entry). The states put the
+  landing look underneath (`playhead_low` at DIM/BRIGHT, `sound_light`) — it is
+  *revealed* as the wall dies, so nothing has to splice or match at the hand-off.
+- **Input**: the playhead signals from the board (motor lock + the bar counter) and
+  the tick clock; no pose data.
+- **Behavior**: draws the full-strip white wall at fade level
+  `f = (1 − ease(elapsed / spin_down_seconds)) × (1 − ease(bars since motor lock))`.
+  The timed factor rides the physical spin-down (hand-tuned slider); the lock factor
+  guarantees complete extinguishing within **exactly one round of the reborn playhead**
+  after the motor re-locks at LOW. Whichever factor is still unfinished, the wall is
+  gone one bar after the lock, smoothly and monotonically — a clock can't snap.
+- **Settings**: `level`, `spin_down_seconds` (the spin-down slider —
+  `statemachine.spin_up_seconds` is its mirror), `progress` (read-only fade readout
+  0..1: the states' `stage_progress` and S9's sound-visual reveal ride it)
+- **Reset**: restarts the fade at the full wall (called from S8/S9 `enter()`)
 - **Open questions**: —
 
 ## pose_instrument (new — HighLayer, **placeholder**)

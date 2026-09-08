@@ -78,7 +78,6 @@ class Playhead:
         self._time:    float = 0.0                   # accumulated time for the EMA's dt-correction
         self._tracking_prev: bool = False            # was the previous tick the locked-tracking branch (to seed the EMA)
         self._ring_formed: bool = False              # regime signal: the bar has physically blurred into the ring
-        self._spin_down: float = 0.0                 # regime signal: normalized deceleration ceiling→LOW (1 at re-lock)
 
     def tick(self, dt: float, motor: MotorState) -> None:
         """Advance the internal content clock from the motor's active mode, gating the re-lock onto
@@ -110,25 +109,15 @@ class Playhead:
         self._settings.playhead = _wrap_to_pi(self._internal + self._settings.phase * math.tau)
 
     def _update_regime_signals(self, motor: MotorState) -> None:
-        """The two physical regime-flip signals the show anchors on (the playhead owns them:
+        """The physical regime-flip signals the show anchors on (the playhead owns them:
         it holds all the sync/resync/stale-reading knowledge).
 
         ``ring_formed`` (spin-up): commanded HIGH and the falls have gone silent — the sensor
         cannot pulse above the ceiling, so silence is the evidence the bar has blurred into
-        the ring. ``spin_down`` (spin-down): the gated, normalized deceleration — 0 until a
-        fresh measurement exists (the two-stage gate defeats stale readings), then
-        (ceiling − measured)/(ceiling − low_rpm) as the motor brakes toward LOW, and 1.0 once
-        re-locked (``synced``)."""
+        the ring. The spin-down side anchors on ``synced`` itself (the re-lock): the sensor's
+        spin-down readings don't resolve a usable deceleration ramp, so the S8/S9 fade is
+        timed instead (the wind_down layer) and finishes one bar after the lock."""
         self._ring_formed = motor.mode == MotorMode.HIGH and motor.fall_age > _RING_SILENCE_S
-
-        if self._tracking_prev:                                 # re-locked at LOW → complete
-            self._spin_down = 1.0
-        elif self._resyncing and self._seen_fast and motor.locked:
-            span = _SENSOR_CEILING_RPM - motor.low_rpm
-            e = (_SENSOR_CEILING_RPM - motor.measured_rpm) / span if span > 0.0 else 1.0
-            self._spin_down = min(max(e, 0.0), 1.0)
-        else:
-            self._spin_down = 0.0
 
     def _advance_internal(self, dt: float, motor: MotorState) -> None:
         """The mode-based content sweep (STOPPED holds, IDLE/LOW track the measured phase, HIGH and
@@ -192,9 +181,3 @@ class Playhead:
         blurred into the ring (the spin-up's un-lock anchor)."""
         return self._ring_formed
 
-    @property
-    def spin_down(self) -> float:
-        """Gated normalized deceleration, 0..1: 0 above the ceiling (or on stale readings),
-        rising with the fresh measured braking toward LOW, 1.0 at re-lock. Drives the
-        S8/S9 fades and progress — the fade IS the deceleration."""
-        return self._spin_down

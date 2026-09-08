@@ -34,7 +34,6 @@ class FakeBoard:
         self.bars: float = 0.0
         self.synced: bool = False        # playhead re-locked at LOW (motor lock)
         self.ring_formed: bool = False   # bar blurred into the ring (un-lock)
-        self.spin_down: float = 0.0      # gated normalized deceleration
         self.frames: dict[int, FakeFrame] = {}
 
     def get_tracklets(self):
@@ -42,7 +41,7 @@ class FakeBoard:
 
     def get_playhead_signals(self):
         return SimpleNamespace(phase=float("nan"), bars=self.bars, synced=self.synced,
-                               ring_formed=self.ring_formed, spin_down=self.spin_down)
+                               ring_formed=self.ring_formed)
 
     def get_frames(self, stage: int):
         assert stage == POSE_STAGE
@@ -181,7 +180,7 @@ class StateMachineTest(unittest.TestCase):
         self.tick()
         self.assertIn([LayerId.pose_instrument], self.resets)
         self.resets.clear()
-        self.tick(dt=self.config.intro_play_seconds + 0.1)   # INTRO_PLAY → PLAY
+        self.tick(dt=self.config.spin_up_seconds + 0.1)   # INTRO_PLAY → PLAY
         self.assertEqual(self.current, StateId.PLAY)
         self.assertEqual(self.resets, [])                    # PLAY inherits, never resets
 
@@ -203,7 +202,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertLess(blue, 1.0)                            # easing in from the un-lock
         self.assertEqual(mix[LayerId.playhead_high], 1.0)
         self.assertNotIn(LayerId.playhead_low, mix)
-        self.tick(dt=self.config.intro_play_seconds)
+        self.tick(dt=self.config.spin_up_seconds)
         self.assertEqual(self.current, StateId.PLAY)
         self.assertEqual(self.mixes[-1], [(LayerId.pose_instrument, 1.0),
                                           (LayerId.playhead_high, 1.0)])
@@ -222,8 +221,10 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.motors[-1], MotorMode.LOW)
         self.tick(dt=999.0)                            # time alone never exits a spin-down
         self.assertEqual(self.current, StateId.END_IDLE)
-        self.board.synced = True                       # LOW reacquired — the physical exit
+        self.board.synced = True                       # LOW reacquired — arms the final bar
         self.tick()
+        self.assertEqual(self.current, StateId.END_IDLE)
+        self.tick(dbar=1.01)                           # one full round after the lock
         self.assertEqual(self.current, StateId.IDLE)
 
     def test_end_lands_in_end_intro_with_people_then_intro(self) -> None:
@@ -235,28 +236,43 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.END_INTRO)
         self.board.synced = True
         self.tick()
+        self.tick(dbar=1.01)                           # one full round after the lock
         self.assertEqual(self.current, StateId.INTRO)
 
-    def test_spin_down_drives_the_fade_and_progress(self) -> None:
-        # The S8 fade IS the deceleration: mix weights and stage_progress ride ctx.spin_down.
+    def test_wind_down_states_hold_a_constant_mix_and_ride_the_layer(self) -> None:
+        # S8/S9's fade lives in the wind_down layer: the mix is constant (the landing look
+        # underneath the dying wall), the layer is reset on entry, stage_progress is the
+        # layer's own readout, and the exit is one full bar after the motor lock.
         self._to_play()
         self.set_participants(2)
         for _ in range(4):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_INTRO)
-        self.board.spin_down = 0.0                     # still above the ceiling: full flood holds
+        self.assertIn([LayerId.wind_down], self.resets)          # fade restarted at the full wall
+        self.assertEqual(self.mixes[-1], [(LayerId.wind_down, 1.0), (LayerId.playhead_low, 0.4)])
+        self.light.layers.wind_down.progress = 0.5               # the layer's fade readout
         self.tick()
-        self.assertEqual(dict(self.mixes[-1])[LayerId.flood], 1.0)
-        self.board.spin_down = 0.5                     # braking through the sensor range
-        self.tick()
-        mix = dict(self.mixes[-1])
-        self.assertLess(mix[LayerId.flood], 1.0)       # the back lamp rides flood down
-        self.assertGreater(mix[LayerId.playhead_low], 0.0)
         self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.5)
-        self.board.spin_down = 1.0
-        self.board.synced = True                       # re-lock: fade done and state done together
-        self.tick()
+        self.tick(dt=999.0, dbar=5.0)                  # time and bars alone never exit — no lock yet
+        self.assertEqual(self.current, StateId.END_INTRO)
+        self.board.synced = True
+        self.tick()                                    # lock latched — the final bar starts here
+        self.tick(dbar=0.5)
+        self.assertEqual(self.current, StateId.END_INTRO)
+        self.tick(dbar=0.51)                           # one full round after the lock
         self.assertEqual(self.current, StateId.INTRO)
+
+    def test_end_idle_reveals_the_sound_visuals_on_the_fade(self) -> None:
+        self._to_play()
+        self.set_participants(0)
+        self.assertEqual(self.current, StateId.END)
+        for _ in range(4):
+            self.tick(dbar=self.config.end_bars / 3)
+        self.assertEqual(self.current, StateId.END_IDLE)
+        self.light.layers.wind_down.progress = 0.25
+        self.tick()
+        self.assertEqual(self.mixes[-1], [(LayerId.wind_down, 1.0), (LayerId.playhead_low, 1.0),
+                                          (LayerId.sound_light, 0.25)])
 
     def test_end_winds_back_to_play_never_jumps(self) -> None:
         self._to_play()

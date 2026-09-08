@@ -34,7 +34,8 @@
       "WebFetch(domain:arduino-pico.readthedocs.io)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Skill(update-config)",
-      "Skill(update-config:*)"
+      "Skill(update-config:*)",
+      "Bash(python -)"
     ],
     "additionalDirectories": [
       "C:\\Users\\moost\\AppData\\Local\\Temp\\claude\\c--Developer-Poser2"

@@ -78,9 +78,10 @@ class StateMachineSettings(BaseSettings):
     goto:    Field[bool]      = Field(False, widget=Widget.button, description="Jump to the selected state now (also when disabled)")
 
     # Transition-state durations — one per state. END_INTRO/END_IDLE have none: their
-    # duration IS the physical spin-down (exit = the re-lock at LOW; fade = spin_down).
+    # fade lives in the wind_down layer (its spin_down_seconds slider is spin_up_seconds'
+    # mirror) and their exit is one playhead bar after the motor re-locks at LOW.
     intro_idle_bars:       Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="INTRO_IDLE: playhead bars back to IDLE", newline=True)
-    intro_play_seconds:    Field[float] = Field(14.0, min=1.0, max=60.0,  step=0.5, description="INTRO_PLAY: spin-up transition (seconds)")
+    spin_up_seconds:       Field[float] = Field(14.0, min=1.0, max=60.0,  step=0.5, description="INTRO_PLAY: spin-up transition (seconds) — hand-tuned to the physical spin-up (wind_down.spin_down_seconds' mirror)")
     end_bars:              Field[float] = Field(3.0,  min=0.5, max=20.0,  step=0.5, description="END: wind-down playhead bars (bidirectional ramp)")
 
     # Session-mode timeouts — named for the state they cut short
@@ -115,11 +116,9 @@ class StateContext:
     prev: StateId | None    # the state we arrived from (None at boot) — lets a transition
                             # state ramp from where the show actually was (no dips)
     motor_locked: bool      # the playhead has re-synced to the measured rotation at LOW
-                            # (stale-proof "at low speed" — S8/S9's exit anchor)
+                            # (stale-proof "at low speed" — S8/S9 exit one bar after it)
     ring_formed: bool       # commanded HIGH and the falls have gone silent — the bar has
                             # physically blurred into the ring (S5's un-lock anchor)
-    spin_down: float        # gated normalized deceleration 0..1 (1 at re-lock) — the
-                            # spin-down fade IS this signal
 
 
 class StateMachine:
@@ -258,7 +257,6 @@ class StateMachine:
             prev=self._prev_state,
             motor_locked=signals.synced,
             ring_formed=signals.ring_formed,
-            spin_down=signals.spin_down,
         )
 
     # -- Tick (light thread, via conductor.add_update_callback) ---------------

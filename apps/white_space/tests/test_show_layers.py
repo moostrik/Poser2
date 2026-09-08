@@ -83,6 +83,63 @@ class SoundLightTest(unittest.TestCase):
         self.assertLessEqual(f.blue[0], self.cfg.fallback_level + 1e-6)
 
 
+# -- wind_down ---------------------------------------------------------------------
+
+class SignalsBoard(SimpleNamespace):
+    def get_playhead_signals(self) -> SimpleNamespace:
+        return SimpleNamespace(bars=self.bars, synced=self.synced)
+
+
+class WindDownTest(unittest.TestCase):
+    """The dying wall: timed fade over spin_down_seconds, guaranteed extinguished within
+    one bar after the motor lock, monotonic throughout; progress is the readout."""
+
+    def setUp(self) -> None:
+        from apps.white_space.light.layers.low.wind_down import WindDown, WindDownSettings
+        self.cfg = WindDownSettings()
+        self.board = SignalsBoard(bars=0.0, synced=False)
+        self.layer = WindDown(RES, self.cfg, self.board)
+
+    def _wall(self) -> float:
+        f = frame()
+        self.layer.render(f)
+        return float(f.white[0])
+
+    def test_timed_fade_reaches_zero_without_a_lock(self) -> None:
+        self.cfg.spin_down_seconds = 1.0
+        levels = [self._wall() for _ in range(45)]         # 1.5 s of 1/30 ticks
+        self.assertGreater(levels[0], 0.9)                 # starts at the full wall
+        self.assertEqual(levels[-1], 0.0)                  # gone by time alone
+        self.assertEqual(levels, sorted(levels, reverse=True))   # monotonic, no snap
+        self.assertEqual(self.cfg.progress, 1.0)
+
+    def test_lock_finishes_the_fade_within_one_bar(self) -> None:
+        self.cfg.spin_down_seconds = 1000.0                # timed fade effectively frozen
+        before = self._wall()
+        self.board.synced = True                           # motor lock latched this tick
+        self.board.bars = 10.0
+        mid_lock = self._wall()
+        self.board.bars = 10.5                             # half a round after the lock
+        half = self._wall()
+        self.assertLess(half, mid_lock)
+        self.assertGreater(half, 0.0)
+        self.board.bars = 11.0                             # one full round after the lock
+        self.assertEqual(self._wall(), 0.0)
+        self.assertEqual(self.cfg.progress, 1.0)
+        self.assertGreater(before, 0.9)
+
+    def test_reset_restarts_at_the_full_wall(self) -> None:
+        self.cfg.spin_down_seconds = 1.0
+        for _ in range(60):
+            self._wall()
+        self.board.synced = True
+        self._wall()
+        self.layer.reset()
+        self.board.synced = False                          # a new ending starts pre-lock
+        self.assertEqual(self.cfg.progress, 0.0)
+        self.assertGreater(self._wall(), 0.9)              # the wall is back at full
+
+
 # -- pose_instrument (placeholder) --------------------------------------------------
 
 class FakePose:
