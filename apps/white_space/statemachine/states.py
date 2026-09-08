@@ -95,11 +95,13 @@ class OffState(StateBase):
 
 
 class IdleState(StateBase):
-    """S1 — empty space, BRIGHT searchlight line sweeping."""
+    """S1 — IDLE. The white searchlight (playhead) spins slowly through the empty space,
+    supported by an atmospheric soundscape that evokes curiosity and plays on both blue
+    lamps."""
     MOTOR = MotorMode.LOW
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.playhead_low, 1.0)]
+        return [(LayerId.playhead_low, 1.0), (LayerId.sound_light, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.participants > 0:
@@ -108,22 +110,28 @@ class IdleState(StateBase):
 
 
 class IdleIntroState(StateBase):
-    """S2 — someone entered; BRIGHT line until the light hits them."""
+    """S2 — IDLE_INTRO. Someone has entered. The searchlight keeps sweeping at full
+    brightness, but the sound is already stirring: the pose instrument starts a little
+    *before* the actual hit — this anticipation is the reason the state exists. When the
+    bright beam strikes the person the intro begins: the line snaps to dim and the
+    soundscape stops."""
     MOTOR = MotorMode.LOW
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.playhead_low, 1.0)]
+        return [(LayerId.playhead_low, 1.0), (LayerId.sound_light, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.hit:
             return StateId.INTRO
-        if ctx.participants == 0:       # not in the CSV: left before being hit → wind back
+        if ctx.participants == 0:       # left before being hit → wind back via INTRO_IDLE
             return StateId.INTRO_IDLE
         return None
 
 
 class IntroState(StateBase):
-    """S3 — DIM line + BRIGHT flash when a participant is hit."""
+    """S3 — INTRO. The pose instrument is introduced. Neutral poses give a glass ping;
+    arms raised gives a heavy bass; all other arm positions give unique sounds. The dim
+    playhead flashes bright as it crosses each participant."""
     MOTOR = MotorMode.LOW
     DIM = 0.4                           # the DIM line level (INTRO_IDLE fades back up from it)
 
@@ -146,11 +154,12 @@ class IntroState(StateBase):
 
 
 class PlayState(StateBase):
-    """S6 — full-speed pose instrument."""
+    """S6 — PLAY. The participants play the instrument, creating music and light
+    patterns. The space between participants holding the same pose fills with light."""
     MOTOR = MotorMode.HIGH
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.test_pose_waves, 1.0)]
+        return [(LayerId.pose_instrument, 1.0), (LayerId.playhead_high, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.participants < 3:
@@ -163,22 +172,28 @@ class PlayState(StateBase):
 # -- Transition states (ramps) ----------------------------------------------------
 
 class IntroIdleState(StateBase):
-    """S4 — fade the line back to BRIGHT over one playhead bar, back to IDLE.
+    """S4 — INTRO_IDLE. The participants have left mid-intro. Over one bar the dim line
+    fades back to the bright searchlight and the soundscape fades back in.
 
-    Ramps from where the show actually was: DIM arriving from INTRO (the CSV case),
-    already-BRIGHT arriving from IDLE_INTRO (someone left before being hit — no dip)."""
+    Both channels ramp from where the show actually was on entry: from INTRO the line
+    starts DIM and the sound visuals at 0; on the IDLE_INTRO pass-through (someone left
+    before being hit) both are already at 1.0 — no dip, no blink."""
     MOTOR = MotorMode.LOW
 
     def __init__(self, *args) -> None:
         super().__init__(*args)
-        self._start: float = IntroState.DIM
+        self._start_lamp: float = IntroState.DIM
+        self._start_sound: float = 0.0
 
     def enter(self, ctx: StateContext) -> None:
-        self._start = IntroState.DIM if ctx.prev == StateId.INTRO else 1.0
+        from_intro = ctx.prev == StateId.INTRO
+        self._start_lamp = IntroState.DIM if from_intro else 1.0
+        self._start_sound = 0.0 if from_intro else 1.0
 
     def update(self, ctx: StateContext) -> Mix:
-        p = self.progress(ctx)
-        return [(LayerId.playhead_low, _lerp(self._start, 1.0, _ease(p)))]
+        e = _ease(self.progress(ctx))
+        return [(LayerId.playhead_low, _lerp(self._start_lamp, 1.0, e)),
+                (LayerId.sound_light, _lerp(self._start_sound, 1.0, e))]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.bars >= self._config.intro_idle_bars:
@@ -190,17 +205,36 @@ class IntroIdleState(StateBase):
 
 
 class IntroPlayState(StateBase):
-    """S5 — spin-up: cross the line into the pose instrument over the spin-up time."""
+    """S5 — INTRO_PLAY. The participants have synced their poses: the machine spins up.
+    The pose instrument takes over from the line during the spin-up, and the sound
+    enhances the accelerating chaos.
+
+    White is a **hard mix at the un-lock**: the dim line holds unchanged from INTRO while
+    the strip is still physically lamps; the moment the motor passes the sensor ceiling
+    and the ring forms (``ctx.ring_formed``), the instrument and the playhead line snap
+    in. Blue eases in from the un-lock over the remaining spin-up, reaching 1.0 at the
+    PLAY hand-off (per-channel mix weights)."""
     MOTOR = MotorMode.HIGH
 
+    def __init__(self, *args) -> None:
+        super().__init__(*args)
+        self._unlock_elapsed: float | None = None
+
     def enter(self, ctx: StateContext) -> None:
-        # A new show cycle's instrument starts with clean wave history. Deliberately NOT in
-        # PLAY's enter — PLAY is re-entered from END's wind-back and must inherit the waves.
-        self._reset_layers([LayerId.test_pose_waves])
+        # A new show cycle's instrument starts clean (patterns and sync fill alike).
+        # Deliberately NOT in PLAY's enter — PLAY is re-entered from END's wind-back
+        # and must inherit the running instrument.
+        self._reset_layers([LayerId.pose_instrument])
+        self._unlock_elapsed = None
 
     def update(self, ctx: StateContext) -> Mix:
-        e = _ease(self.progress(ctx))
-        return [(LayerId.playhead_low, 1.0 - e), (LayerId.test_pose_waves, e)]
+        if self._unlock_elapsed is None and ctx.ring_formed:
+            self._unlock_elapsed = ctx.elapsed          # the ring physically formed — hard mix now
+        if self._unlock_elapsed is None:
+            return [(LayerId.playhead_low, IntroState.DIM)]   # still lamps: hold INTRO's dim line
+        remaining = max(self._config.intro_play_seconds - self._unlock_elapsed, 1e-6)
+        blue = _ease((ctx.elapsed - self._unlock_elapsed) / remaining)
+        return [(LayerId.pose_instrument, (1.0, blue)), (LayerId.playhead_high, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.elapsed >= self._config.intro_play_seconds:
@@ -212,10 +246,11 @@ class IntroPlayState(StateBase):
 
 
 class EndState(StateBase):
-    """S7 — the bidirectional wind-down: while P < 3 the ramp advances toward the ending;
-    while P ≥ 3 it winds back, and only at 0 does it hand over to PLAY (seamless — both
-    looks are pose_waves at that point). In session mode the wind-back is disabled so the
-    show always concludes."""
+    """S7 — END. Fewer than three participants remain: the machine begins its end. Over N
+    bars the light crosses to full white and the sound reflects it. If participants
+    return, the white winds back and PLAY resumes — the ramp runs both ways, never
+    jumping (at p = 0 the mix equals PLAY's, so the hand-over is seamless). In session
+    mode the wind-back is disabled so a session always concludes."""
     MOTOR = MotorMode.HIGH
 
     def __init__(self, config: StateMachineSettings, light: LightSettings,
@@ -229,7 +264,11 @@ class EndState(StateBase):
     def update(self, ctx: StateContext) -> Mix:
         forward = ctx.participants < 3 or ctx.session
         self._p = self._ramp(self._p, ctx.dbar / self._config.end_bars, forward)
-        return [(LayerId.test_pose_waves, 1.0)]
+        # One ramp gives both CSV behaviors: the flood crosses the white to full while the
+        # blue fades out with the instrument (the instrument is the only blue source).
+        return [(LayerId.pose_instrument, 1.0 - self._p),
+                (LayerId.playhead_high, 1.0 - self._p),
+                (LayerId.flood, _ease(self._p))]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if self._p >= 1.0:
@@ -243,15 +282,21 @@ class EndState(StateBase):
 
 
 class EndIntroState(StateBase):
-    """S8 — spin-down with people present: the fade IS the deceleration. The mix rides
-    ``ctx.spin_down`` (gated measured braking, ceiling → LOW); the exit is the physical
-    re-lock at LOW (``ctx.motor_locked``) — fade-done and state-done are the same fact.
-    Progress (OSC stage_progress) is the same signal, so the sound fades ride it too."""
+    """S8 — END_INTRO. Participants remain, so the machine returns to the intro: it spins
+    down and the full white fades to the dim playhead line while the distortion sound
+    disappears.
+
+    The fade IS the deceleration: the mix rides ``ctx.spin_down`` (gated measured
+    braking, ceiling → LOW), and flood's fade is what takes the **back lamp** to 0 while
+    the front hands over seamlessly (front = (1−e) + DIM·e, monotonic). The exit is the
+    physical re-lock at LOW (``ctx.motor_locked``) — fade-done and state-done are the
+    same fact. Progress (OSC stage_progress) is the same signal, so the sound fades ride
+    the deceleration too."""
     MOTOR = MotorMode.LOW
 
     def update(self, ctx: StateContext) -> Mix:
         e = _ease(ctx.spin_down)
-        return [(LayerId.test_pose_waves, 1.0 - e), (LayerId.playhead_low, IntroState.DIM * e)]
+        return [(LayerId.flood, 1.0 - e), (LayerId.playhead_low, IntroState.DIM * e)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.motor_locked:                # LOW speed reacquired — the literal "at motor low speed"
@@ -263,13 +308,18 @@ class EndIntroState(StateBase):
 
 
 class EndIdleState(StateBase):
-    """S9 — spin-down to an empty space: same deceleration-driven fade as S8, landing
-    BRIGHT; exit on the physical re-lock at LOW, back to IDLE."""
+    """S9 — END_IDLE. The space is empty: the machine spins down with the light staying
+    bright, the distortion disappears, and the searchlight soundscape returns.
+
+    Same deceleration-driven fade as S8, landing BRIGHT: the front lamp stays at exactly
+    1.0 through the hand-off ((1−e) + e), the back lamp rides flood down to 0, and the
+    sound visuals fade in on the same signal. Exit on the physical re-lock at LOW."""
     MOTOR = MotorMode.LOW
 
     def update(self, ctx: StateContext) -> Mix:
         e = _ease(ctx.spin_down)
-        return [(LayerId.test_pose_waves, 1.0 - e), (LayerId.playhead_low, e)]
+        return [(LayerId.flood, 1.0 - e), (LayerId.playhead_low, e),
+                (LayerId.sound_light, e)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.motor_locked:
