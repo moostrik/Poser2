@@ -38,6 +38,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class SyncMode(IntEnum):
+    """How many participants must be in sync for INTRO → INTRO_PLAY."""
+    THREE         = 0   # at least 3 participants ≥ sync_threshold
+    ALL_MINUS_ONE = auto()   # all but one
+    ALL           = auto()   # everyone
+
+    def required(self, participants: int) -> int:
+        match self:
+            case SyncMode.THREE:         return 3
+            case SyncMode.ALL_MINUS_ONE: return max(participants - 1, 2)
+            case _:                      return participants
+
+
 class ShowState(IntEnum):
     """The show's states — the CSV's 9 stages. The *_INTRO / *_IDLE / *_PLAY entries are
     transitions promoted to states: their durations are the transition durations."""
@@ -73,7 +86,8 @@ class StateMachineSettings(BaseSettings):
     play_session_seconds:  Field[float] = Field(150.0, min=5.0, max=1200.0, step=1.0, description="Session: PLAY → END after this time")
 
     # Condition tunables
-    sync_threshold:     Field[float] = Field(0.75, min=0.0, max=1.0, step=0.01, widget=Widget.slider, description="INTRO → INTRO_PLAY: mean pose similarity", newline=True)
+    sync_threshold:     Field[float] = Field(0.75, min=0.0, max=1.0, step=0.01, widget=Widget.slider, description="A participant counts as in sync at this pose similarity", newline=True)
+    sync_mode:          Field[SyncMode] = Field(SyncMode.THREE, description="INTRO → INTRO_PLAY: how many participants must be in sync (3 / all−1 / all)")
     count_hold_seconds: Field[float] = Field(1.0,  min=0.0, max=10.0, step=0.1, description="Participant-count debounce: a new count must persist this long before conditions see it")
 
     # Telemetry (read-only)
@@ -81,6 +95,7 @@ class StateMachineSettings(BaseSettings):
     progress:     Field[float]     = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Active state progress")
     participants: Field[int]       = Field(0, access=Field.READ, description="Debounced participant count")
     sync:         Field[float]     = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Mean pose similarity")
+    in_sync:      Field[int]       = Field(0, access=Field.READ, description="Participants currently at or above sync_threshold")
 
 
 @dataclass
@@ -92,8 +107,11 @@ class StateContext:
     dbar:    float          # this tick's bar delta
     participants: int       # debounced live participant count (ghosts excluded)
     sync:    float          # mean pose similarity (0..1)
+    sync_count: int         # participants whose similarity is ≥ sync_threshold
     hit:     bool           # a live participant was passed by the playhead this tick
     session: bool           # session mode active — states consult it in needs_state_change()
+    prev: ShowState | None  # the state we arrived from (None at boot) — lets a transition
+                            # state ramp from where the show actually was (no dips)
 
 
 class StateMachine:
@@ -129,6 +147,7 @@ class StateMachine:
         self._entered_time: float = 0.0
         self._entered_bars: float = 0.0
         self._prev_bars: float = 0.0
+        self._prev_state: ShowState | None = None   # where the current state was entered from
 
         # Condition inputs
         self._eff_participants: int | None = None   # debounced count (None until first tick)
@@ -136,7 +155,7 @@ class StateMachine:
         self._pending_since: float = 0.0
         self._prev_offsets: dict[int, float] = {}   # per-id PlayheadOffset for hit detection
         self._sync_lock = Lock()
-        self._sync: float = 0.0
+        self._sync_values: list[float] = []
 
         self._goto_requested: bool = False
         config.bind(StateMachineSettings.goto, self._on_goto)
@@ -170,12 +189,11 @@ class StateMachine:
     # -- Inputs --------------------------------------------------------------
 
     def set_similarity(self, result: SimilarityResult) -> None:
-        """Store the mean pose similarity; thread-safe (called from the analytics thread)."""
+        """Store the per-participant similarities; thread-safe (called from the analytics thread)."""
         values = [s.overall_similarity() for s in result.similarity.values()]
         values = [v for v in values if not math.isnan(v)]
-        mean = sum(values) / len(values) if values else 0.0
         with self._sync_lock:
-            self._sync = mean
+            self._sync_values = values
 
     def _debounced_participants(self, now: float) -> int:
         """Live participant count from the tracker, debounced by count_hold_seconds so
@@ -216,7 +234,9 @@ class StateMachine:
     def _build_context(self, now: float, dt: float, bars_now: float,
                        participants: int, hit: bool) -> StateContext:
         with self._sync_lock:
-            sync = self._sync
+            values = self._sync_values
+        sync = sum(values) / len(values) if values else 0.0
+        sync_count = sum(1 for v in values if v >= self._config.sync_threshold)
         return StateContext(
             elapsed=now - self._entered_time,
             bars=bars_now - self._entered_bars,
@@ -224,8 +244,10 @@ class StateMachine:
             dbar=bars_now - self._prev_bars,
             participants=participants,
             sync=sync,
+            sync_count=sync_count,
             hit=hit,
             session=self._config.session,
+            prev=self._prev_state,
         )
 
     # -- Tick (light thread, via conductor.add_update_callback) ---------------
@@ -266,6 +288,7 @@ class StateMachine:
         self._config.progress = p
         self._config.participants = participants
         self._config.sync = ctx.sync
+        self._config.in_sync = ctx.sync_count
         self._notify_state(SequencerState(
             stage=int(self._current),                       # wire-format naming (see module doc)
             stage_progress=p,
@@ -281,6 +304,7 @@ class StateMachine:
         if self._active is not None:
             self._active.exit()
             logger.info("show state %s → %s", self._current.name, target.name)
+            self._prev_state = self._current
         self._current = target
         self._entered_time = now
         self._entered_bars = bars_now

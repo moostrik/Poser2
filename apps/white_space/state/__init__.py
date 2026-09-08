@@ -1,2 +1,2 @@
-from .machine import ShowState, StateMachine, StateMachineSettings, StateContext
+from .machine import ShowState, StateMachine, StateMachineSettings, StateContext, SyncMode
 from .states import StateBase, STATES

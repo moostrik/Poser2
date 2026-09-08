@@ -59,7 +59,6 @@ class MotorTest(unittest.TestCase):
         self.assertEqual(st.target_rpm, 72.0)          # low_rpm default, derived from mode
 
     def test_mode_drives_target_rpm(self) -> None:
-        self.assertEqual(self._locked(MotorMode.IDLE).tick().target_rpm, 7.0)
         self.assertEqual(self._locked(MotorMode.HIGH).tick().target_rpm, 2000.0)
         self.assertEqual(self._locked(MotorMode.STOPPED).tick().target_rpm, 0.0)
 
@@ -181,7 +180,7 @@ class MotorTest(unittest.TestCase):
 class SimTest(unittest.TestCase):
     def test_sim_mode_selects_target_rpm(self) -> None:
         s = MotorSettings(); m = MotorController(s)
-        for sim, rpm in [(MotorSimMode.LOW, s.low_rpm), (MotorSimMode.IDLE, s.idle_rpm),
+        for sim, rpm in [(MotorSimMode.LOW, s.low_rpm),
                          (MotorSimMode.HIGH, s.high_rpm), (MotorSimMode.STOPPED, 0.0)]:
             s.simulate = sim
             self.assertEqual(m._target_rpm(m._target_mode()), rpm)
@@ -276,9 +275,8 @@ class PlayheadNcoTest(unittest.TestCase):
         self.assertTrue(math.isnan(p.phase))                    # stopped → NaN
         p.tick(dt, mstate(0.5, False, 72.0, mode=MotorMode.LOW))
         self.assertTrue(math.isnan(p.phase))                    # LOW but unlocked (disconnected) → NaN
-        for mode in (MotorMode.IDLE, MotorMode.LOW):
-            p.tick(dt, mstate(0.5, True, 72.0, mode=mode))
-            self.assertFalse(math.isnan(p.phase))               # locked → finite
+        p.tick(dt, mstate(0.5, True, 72.0, mode=MotorMode.LOW))
+        self.assertFalse(math.isnan(p.phase))                   # locked → finite
         p.tick(dt, mstate(0.5, False, 2000.0, mode=MotorMode.HIGH))
         self.assertFalse(math.isnan(p.phase))                   # HIGH free-runs content (unmeasurable) → finite
 
@@ -389,17 +387,17 @@ class SetModeTest(unittest.TestCase):
         self.assertEqual(s.mode, MotorMode.LOW)            # the manual setting is untouched
 
     def test_none_relinquishes_to_settings(self) -> None:
-        s = MotorSettings(); s.mode = MotorMode.IDLE
+        s = MotorSettings(); s.mode = MotorMode.STOPPED
         m = MotorController(s)
         m.set_mode(MotorMode.HIGH)
         m.set_mode(None)
-        self.assertEqual(m.tick().mode, MotorMode.IDLE)
+        self.assertEqual(m.tick().mode, MotorMode.STOPPED)
 
     def test_sim_selector_still_overrides_the_command(self) -> None:
-        s = MotorSettings(); s.simulate = MotorSimMode.IDLE
+        s = MotorSettings(); s.simulate = MotorSimMode.STOPPED
         m = MotorController(s)
         m.set_mode(MotorMode.HIGH)
-        self.assertEqual(m._target_mode(), MotorMode.IDLE)
+        self.assertEqual(m._target_mode(), MotorMode.STOPPED)
 
 
 class BarsTest(unittest.TestCase):

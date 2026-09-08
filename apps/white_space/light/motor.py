@@ -43,7 +43,6 @@ _SIM_DECEL: float = _SIM_ACCEL * 3.0
 class MotorMode(IntEnum):
     """Commanded operating mode (the system sets it; target rpm is derived from it)."""
     STOPPED = auto()  # not spinning
-    IDLE    = auto()  # slow idle rotation
     LOW     = auto()  # playhead sweep speed
     HIGH    = auto()  # fast spin (pixel content)
 
@@ -53,7 +52,6 @@ class MotorSimMode(IntEnum):
     at that mode's rpm (STOPPED = none), so no separate simulate speed is needed."""
     OFF     = auto()
     STOPPED = auto()
-    IDLE    = auto()
     LOW     = auto()
     HIGH    = auto()
 
@@ -76,8 +74,7 @@ class MotorSettings(BaseSettings):
     simulate:             Field[MotorSimMode] = Field(MotorSimMode.OFF,                          description="OFF = real hardware; any mode simulates the motor at that mode's rpm")
     mode:                 Field[MotorMode] = Field(MotorMode.LOW,                     description="Commanded mode — the target rpm is derived from it")
     active_mode:          Field[MotorMode] = Field(MotorMode.STOPPED, access=Field.READ, description="Active mode — the commanded mode (or the sim selector while simulating)")
-    idle_rpm:             Field[float] = Field(7.0,    min=0.0, max=60.0,   step=0.5,  description="Target rpm in IDLE mode", newline=True)
-    low_rpm:              Field[float] = Field(72.0,   min=0.0, max=300.0,  step=1.0,  description="Target rpm in LOW mode")
+    low_rpm:              Field[float] = Field(72.0,   min=0.0, max=300.0,  step=1.0,  description="Target rpm in LOW mode", newline=True)
     high_rpm:             Field[float] = Field(2000.0, min=0.0, max=2400.0, step=1.0,  description="Target rpm in HIGH mode")
     measured_rpm:         Field[float] = Field(0.0,   min=0.0, max=_SENSOR_CEILING_RPM, step=0.01,  access=Field.READ, description="Current measured RPM", newline=True)
     phase:                Field[float] = Field(0.0,   min=-math.pi, max=math.pi, step=0.001, access=Field.READ, widget=Widget.slider, description="Measured motor phase (−π…π)")
@@ -221,7 +218,6 @@ class MotorController:
     def _target_rpm(self, mode: MotorMode) -> float:
         """Commanded rpm derived from the active mode."""
         match mode:
-            case MotorMode.IDLE: return self._settings.idle_rpm
             case MotorMode.LOW:  return self._settings.low_rpm
             case MotorMode.HIGH: return self._settings.high_rpm
             case _:              return 0.0   # STOPPED → 0

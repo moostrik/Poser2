@@ -117,7 +117,7 @@ class Playhead:
             self._internal = _wrap_to_pi(self._internal + (motor.low_rpm / 60.0) * math.tau * dt)
             self._bars += (motor.low_rpm / 60.0) * dt
             self._tracking_prev = False
-        elif motor.locked and not math.isnan(motor.phase):    # IDLE, LOW — track the measured rotation
+        elif motor.locked and not math.isnan(motor.phase):    # LOW — track the measured rotation
             # Feed-forward at the *smoothed* speed: per-revolution measurements jitter, so averaging the
             # rate keeps the sweep steady; the low `tracking` gain then eases the phase onto the light.
             if not self._tracking_prev:
@@ -130,7 +130,7 @@ class Playhead:
             self._bars += (rpm / 60.0) * dt
             self._tracking_prev = True
         else:
-            # IDLE/LOW with no measurement (disconnected): the sweep holds (`.phase` NaN, not live),
+            # LOW with no measurement (disconnected): the sweep holds (`.phase` NaN, not live),
             # but bars advance at the commanded content rate — the best estimate of the rotation.
             self._bars += (min(motor.target_rpm, motor.low_rpm) / 60.0) * dt
             self._tracking_prev = False

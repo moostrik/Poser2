@@ -396,7 +396,6 @@
     "motor": {
       "simulate": "OFF",
       "mode": "HIGH",
-      "idle_rpm": 7.0,
       "low_rpm": 36.0,
       "high_rpm": 2000.0
     },
@@ -614,6 +613,7 @@
     "intro_session_seconds": 60.0,
     "play_session_seconds": 150.0,
     "sync_threshold": 0.75,
+    "sync_mode": "THREE",
     "count_hold_seconds": 1.0
   },
   "render": {

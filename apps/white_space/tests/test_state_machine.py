@@ -143,6 +143,8 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, ShowState.IDLE_INTRO)
         self.set_participants(0)
         self.assertEqual(self.current, ShowState.INTRO_IDLE)
+        # Arrived from IDLE_INTRO (already bright): ramps from 1.0 — no visible dip
+        self.assertEqual(self.looks[-1], [(LayerId.playhead_lamp, 1.0)])
         self.tick(dbar=self.config.intro_idle_bars + 0.1)
         self.assertEqual(self.current, ShowState.IDLE)
 
@@ -170,7 +172,8 @@ class StateMachineTest(unittest.TestCase):
         # show cycle); PLAY inherits the running waves — no reset on the END → PLAY path.
         self._to_intro(participants=3)
         self.assertIn([LayerId.playhead_flash], self.resets)
-        self.machine.set_similarity(SimpleNamespace(similarity={0: FakeSimilarity(0.9)}))
+        self.machine.set_similarity(SimpleNamespace(similarity={
+            0: FakeSimilarity(0.9), 1: FakeSimilarity(0.9), 2: FakeSimilarity(0.9)}))
         self.tick()
         self.assertIn([LayerId.pose_waves], self.resets)
         self.resets.clear()
@@ -180,8 +183,8 @@ class StateMachineTest(unittest.TestCase):
 
     def test_intro_to_intro_play_on_sync_and_through_to_play(self) -> None:
         self._to_intro(participants=3)
-        self.machine.set_similarity(SimpleNamespace(
-            similarity={0: FakeSimilarity(0.9), 1: FakeSimilarity(0.8)}))
+        self.machine.set_similarity(SimpleNamespace(similarity={
+            0: FakeSimilarity(0.9), 1: FakeSimilarity(0.8), 2: FakeSimilarity(0.9)}))
         self.tick()
         self.assertEqual(self.current, ShowState.INTRO_PLAY)
         self.assertEqual(self.motors[-1], MotorMode.HIGH)
@@ -286,6 +289,20 @@ class StateMachineTest(unittest.TestCase):
         self.assertIsNone(self.motors[-1])
         self.set_participants(2)
         self.assertEqual(self.current, ShowState.IDLE)
+
+    def test_sync_mode_counts_participants_in_sync(self) -> None:
+        from apps.white_space.state import SyncMode
+        self.config.sync_mode = SyncMode.ALL
+        self._to_intro(participants=4)
+        # 3 of 4 in sync: enough for THREE, not for ALL
+        self.machine.set_similarity(SimpleNamespace(similarity={
+            0: FakeSimilarity(0.9), 1: FakeSimilarity(0.9),
+            2: FakeSimilarity(0.9), 3: FakeSimilarity(0.1)}))
+        self.tick()
+        self.assertEqual(self.current, ShowState.INTRO)
+        self.config.sync_mode = SyncMode.THREE
+        self.tick()
+        self.assertEqual(self.current, ShowState.INTRO_PLAY)
 
     def test_participant_flicker_is_debounced(self) -> None:
         self.tick()

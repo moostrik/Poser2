@@ -22,7 +22,7 @@ import math
 from typing import Callable
 
 from ..light import LightSettings, LayerId, Look, MotorMode
-from .machine import ShowState, StateMachineSettings, StateContext
+from .machine import ShowState, StateMachineSettings, StateContext, SyncMode
 
 
 # -- Easing helpers (weight curves over progress p in [0, 1]) -------------------
@@ -125,7 +125,9 @@ class IntroState(StateBase):
     def needs_state_change(self, ctx: StateContext) -> ShowState | None:
         if ctx.participants == 0:       # before the session timeout: an empty room never spins up
             return ShowState.INTRO_IDLE
-        if ctx.sync >= self._config.sync_threshold and ctx.participants > 2:
+        # Enough participants in sync (sync_mode: 3 / all−1 / all) launches the spin-up.
+        required = SyncMode(int(self._config.sync_mode)).required(ctx.participants)
+        if ctx.sync_count >= required and ctx.participants > 2:
             return ShowState.INTRO_PLAY
         if ctx.session and ctx.elapsed >= self._config.intro_session_seconds:
             return ShowState.INTRO_PLAY
@@ -150,12 +152,22 @@ class PlayState(StateBase):
 # -- Transition states (ramps) ----------------------------------------------------
 
 class IntroIdleState(StateBase):
-    """S3 — fade the line DIM → BRIGHT over one playhead bar, back to IDLE."""
+    """S3 — fade the line back to BRIGHT over one playhead bar, back to IDLE.
+
+    Ramps from where the show actually was: DIM arriving from INTRO (the CSV case),
+    already-BRIGHT arriving from IDLE_INTRO (someone left before being hit — no dip)."""
     MOTOR = MotorMode.LOW
+
+    def __init__(self, *args) -> None:
+        super().__init__(*args)
+        self._start: float = IntroState.DIM
+
+    def enter(self, ctx: StateContext) -> None:
+        self._start = IntroState.DIM if ctx.prev == ShowState.INTRO else 1.0
 
     def update(self, ctx: StateContext) -> Look:
         p = self.progress(ctx)
-        return [(LayerId.playhead_lamp, _lerp(IntroState.DIM, 1.0, _ease(p)))]
+        return [(LayerId.playhead_lamp, _lerp(self._start, 1.0, _ease(p)))]
 
     def needs_state_change(self, ctx: StateContext) -> ShowState | None:
         if ctx.bars >= self._config.intro_idle_bars:
