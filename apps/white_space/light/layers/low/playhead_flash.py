@@ -15,7 +15,7 @@ import numpy as np
 
 from modules.settings import Field
 
-from .._base_layer import BaseLayer, LayerSettings
+from .._base_layer import LowLayer, LayerSettings
 from ...frame import Frame
 from ....pose import GhostElement, GhostFeature, PlayheadOffset
 
@@ -56,7 +56,7 @@ class PlayheadFlashSettings(LayerSettings):
     gap:        Field[float] = Field(0.25, min=0.0, max=1.0,    step=0.01, description="Fraction of the window centre that stays dark — a notch at the crossing (0 = solid)", newline=True)
 
 
-class PlayheadFlash(BaseLayer):
+class PlayheadFlash(LowLayer):
     """Continuous base level plus an on/off flash window tracking the playhead's approach to
     each active player, read from ``PlayheadOffset``. Each pose's window width and flash
     intensity are interpolated by its ``GhostFeature`` Dwell from the ``min_*`` endpoints

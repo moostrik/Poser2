@@ -6,7 +6,7 @@ import numpy as np
 
 from modules.settings import Group
 
-from .._base_layer import BaseLayer, ChannelSettings, LayerSettings
+from .._base_layer import HighLayer, ChannelSettings, LayerSettings
 from ...frame import Frame
 
 
@@ -15,7 +15,7 @@ class ChaseSettings(LayerSettings):
     blue:  Group[ChannelSettings] = Group(ChannelSettings)
 
 
-class Chase(BaseLayer):
+class Chase(HighLayer):
     """Sine wave chase pattern scrolling continuously around the strip."""
 
     def __init__(self, resolution: int, config: ChaseSettings, board) -> None:

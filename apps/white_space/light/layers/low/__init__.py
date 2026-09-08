@@ -11,9 +11,13 @@ R = light resolution) is:
         blue[0]       → blue lamps on the LEFT side
         blue[R // 2]  → blue lamps on the RIGHT side (the halfway blue pixel)
 
-Layers in this package light those specific pixels rather than drawing a ring. Above ~200 rpm the
-bar blurs into a ring and the high-speed layers take over (the compositor crossfades by motor rpm).
+Layers in this package light those specific pixels rather than drawing a ring (the `LowLayer`
+base encodes the mapping as named lamps). Above ~200 rpm the bar blurs into a ring and the
+high-regime layers take over — the states choose per regime. Show layers and ``test_``-prefixed
+debug layers live side by side: the name carries the role, the folder carries the regime.
 """
 
 from .playhead_flash import PlayheadFlash, PlayheadFlashSettings, offset_to_level
 from .playhead       import Playhead,      PlayheadSettings
+from .haunted_flash  import HauntedFlash,  HauntedFlashSettings
+from .test_slow      import TestSlow,      TestSlowSettings

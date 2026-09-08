@@ -11,7 +11,7 @@ import numpy as np
 
 from modules.settings import Field
 
-from .._base_layer import BaseLayer, LayerSettings
+from .._base_layer import HighLayer, LayerSettings
 from .._utilities import angle_to_strip_position
 from ...frame import Frame
 
@@ -21,7 +21,7 @@ class PlayheadSettings(LayerSettings):
     width: Field[float] = Field(0.01, min=0.0, max=0.5,  step=0.005, description="Marker width (fraction of the ring)")
 
 
-class Playhead(BaseLayer):
+class Playhead(HighLayer):
     """A bright marker at the playhead's position on the pixel ring (visualises the content playhead)."""
 
     def __init__(self, resolution: int, config: PlayheadSettings, board) -> None:

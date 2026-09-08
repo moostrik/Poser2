@@ -400,13 +400,16 @@ class DebugOverrideTest(unittest.TestCase):
         self.assertEqual(m._target_mode(), MotorMode.STOPPED)
 
     def test_auto_follow_derives_regime_from_selection(self) -> None:
+        from types import SimpleNamespace
         from apps.white_space.light.conductor import _debug_motor_mode
         from apps.white_space.light import LayerId
-        self.assertEqual(_debug_motor_mode([LayerId.pose_waves]), MotorMode.HIGH)
-        self.assertEqual(_debug_motor_mode([LayerId.playhead_lamp, LayerId.pose_waves]),
+        layers = {LayerId.test_pose_waves: SimpleNamespace(SHIFTED=True),    # HighLayer
+                  LayerId.playhead_low:    SimpleNamespace(SHIFTED=False)}   # LowLayer
+        self.assertEqual(_debug_motor_mode([LayerId.test_pose_waves], layers), MotorMode.HIGH)
+        self.assertEqual(_debug_motor_mode([LayerId.playhead_low, LayerId.test_pose_waves], layers),
                          MotorMode.HIGH)                # any high layer wins
-        self.assertEqual(_debug_motor_mode([LayerId.playhead_lamp]), MotorMode.LOW)
-        self.assertEqual(_debug_motor_mode([]), MotorMode.STOPPED)
+        self.assertEqual(_debug_motor_mode([LayerId.playhead_low], layers), MotorMode.LOW)
+        self.assertEqual(_debug_motor_mode([], layers), MotorMode.STOPPED)
 
     def test_boot_failsafe_clears_debug(self) -> None:
         # A preset saved mid-debug (debug on + a high layer ticked) must never auto-derive
@@ -416,7 +419,7 @@ class DebugOverrideTest(unittest.TestCase):
         from modules.tracker.panoramic.settings import DistortionSettings
         cfg = LightSettings()
         cfg.debug = True
-        cfg.debug_layers = [LayerId.pose_waves]
+        cfg.debug_layers = [LayerId.test_pose_waves]
         Conductor(cfg, DistortionSettings(), Board(), pose_stage=4)
         self.assertFalse(cfg.debug)
 

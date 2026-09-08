@@ -8,7 +8,9 @@ sections here — they have no code yet, so this is their specification.
 
 Regimes: **low** layers drive the four physical lamps (front/back white = `white[0]` /
 `white[R//2]`, left/right blue = `blue[0]` / `blue[R//2]`); **high** layers draw the
-persistence-of-vision ring. Base classes `LowLayer` / `HighLayer` encode this.
+persistence-of-vision ring. Base classes `LowLayer` / `HighLayer` encode this, and the
+folders follow the same single axis (`layers/low/`, `layers/high/` — no separate test
+folder: the `test_` name prefix carries the role).
 
 ## Index — show layers
 
@@ -21,10 +23,15 @@ persistence-of-vision ring. Base classes `LowLayer` / `HighLayer` encode this.
 | `flood`           | high   | — (settings only)                                      | full-strip white              | S7, S8, S9 |
 | `sound_light`     | low    | sound levels from Max (board)                          | left/right blue lamps         | S1, S2, S4, S9 |
 
-Test layers (never in a state's mix; reached via the debug override): `haunted_flash`
-(the ghost flash — pairs with `ghost.ghoster.enabled` for solo experimentation),
-`pose_waves` (the old wave/void instrument, kept as a reference/montage visual),
-`harmonic`, `player_lines`, `calibration`, `fill`, `pulse`, `chase`, `lines`, `random`.
+Test layers (never in a state's mix; reached via the debug override, all prefixed
+`test_` so the checklist separates them from show layers at a glance):
+`test_haunted_flash` (low — the ghost flash; pairs with `ghost.ghoster.enabled` for solo
+experimentation), `test_slow` (low — direct levels for the four physical lamps: front/back
+white, left/right blue; the lamp regime's hardware check), `test_pose_waves` (the old
+wave/void instrument, kept as a reference/montage visual), `test_harmonic`,
+`test_player_lines`, `test_calibration`, `test_fill`, `test_pulse`, `test_chase`,
+`test_lines`, `test_random` — all high except the two named low, so the debug auto-follow
+derives the right motor regime from any selection.
 
 ---
 

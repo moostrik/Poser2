@@ -7,7 +7,6 @@
       "Bash(PYTHONPATH=. python *)",
       "Bash(./.venv/Scripts/python.exe *)",
       "Bash(command -v *)",
-
       "Bash(git diff *)",
       "Bash(git show *)",
       "Bash(git log *)",
@@ -15,7 +14,6 @@
       "Bash(git status *)",
       "Bash(git blame *)",
       "Bash(git stash list)",
-
       "Bash(sed -n *)",
       "Bash(echo *)",
       "Bash(grep *)",
@@ -29,16 +27,17 @@
       "Bash(cut *)",
       "Bash(awk *)",
       "Bash(diff *)",
-
       "Read(//tmp/**)",
       "WebSearch",
       "Bash(gh api *)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:arduino-pico.readthedocs.io)",
       "WebFetch(domain:raw.githubusercontent.com)",
-
       "Skill(update-config)",
       "Skill(update-config:*)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\moost\\AppData\\Local\\Temp\\claude\\c--Developer-Poser2"
     ]
   }
 }

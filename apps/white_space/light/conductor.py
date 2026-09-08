@@ -21,7 +21,7 @@ from .playhead import Playhead
 from .settings import LightSettings, LayerId
 from .layers import (BaseLayer, Compositor, Mix, PoseWaves, Fill, Pulse, Chase, Lines, Random,
                      Harmonic, PlayerLines, CameraLight, PlayheadFlash, HauntedFlash,
-                     PlayheadLow, PlayheadHigh)
+                     PlayheadLow, PlayheadHigh, TestSlow)
 from modules.board import PlayheadSignals
 
 from ..board import Board
@@ -29,18 +29,13 @@ from ..board import Board
 import logging
 logger = logging.getLogger(__name__)
 
-# Spun-content layers: their pixels ride the fast ring, so they get the light_phase shift.
-# Doubles as the high-layer knowledge for the debug auto-follow (until the LowLayer/HighLayer
-# base classes carry the flag).
-_SHIFTED: set[LayerId] = {LayerId.pose_waves, LayerId.harmonic, LayerId.player_lines,
-                          LayerId.calibration, LayerId.playhead_marker}
 
-
-def _debug_motor_mode(selection: list[LayerId]) -> MotorMode:
-    """The debug auto-follow: derive the motor regime from the selected debug layers —
-    any high layer → HIGH, else any low layer → LOW, empty selection → STOPPED. Selecting
-    a layer is the only gesture: the speed rides the selection, inside debug's consent."""
-    if any(id in _SHIFTED for id in selection):
+def _debug_motor_mode(selection: list[LayerId], layers: dict[LayerId, BaseLayer]) -> MotorMode:
+    """The debug auto-follow: derive the motor regime from the selected debug layers'
+    classes — any `HighLayer` → HIGH, else any low layer → LOW, empty selection → STOPPED.
+    Selecting a layer is the only gesture: the speed rides the selection, inside debug's
+    consent."""
+    if any(layers[id].SHIFTED for id in selection if id in layers):
         return MotorMode.HIGH
     if selection:
         return MotorMode.LOW
@@ -68,25 +63,28 @@ class Conductor(Thread):
         resolution: int             = config.light_resolution
         num_players: int            = config.max_poses
 
-        # The unified layer pool — one instance per LayerId, each reading its own settings group.
+        # The unified layer pool — one instance per LayerId, each reading its own settings
+        # group. Show layers first, then the test_ debug layers; each layer's regime lives
+        # in its class (LowLayer/HighLayer).
         L = config.layers
         self.layers: dict[LayerId, BaseLayer] = {
-            LayerId.playhead_lamp:   PlayheadLow  (resolution, L.playhead_lamp,   board),
-            LayerId.playhead_flash:  PlayheadFlash(resolution, L.playhead_flash,  board, pose_stage),
-            LayerId.haunt_flash:     HauntedFlash (resolution, L.haunt_flash,     board, pose_stage),
-            LayerId.pose_waves:      PoseWaves    (resolution, num_players, L.pose_waves, self._clock.interval, board, pose_stage),
-            LayerId.harmonic:        Harmonic     (resolution, L.harmonic,        board),
-            LayerId.player_lines:    PlayerLines  (resolution, L.player_lines,    board, pose_stage),
-            LayerId.calibration:     CameraLight  (resolution, L.calibration, distortion, config.num_cameras, board),
-            LayerId.playhead_marker: PlayheadHigh (resolution, L.playhead_marker, board),
-            LayerId.fill:   Fill  (resolution, L.fill,   board),
-            LayerId.pulse:  Pulse (resolution, L.pulse,  board),
-            LayerId.chase:  Chase (resolution, L.chase,  board),
-            LayerId.lines:  Lines (resolution, L.lines,  board),
-            LayerId.random: Random(resolution, L.random, board),
+            LayerId.playhead_low:       PlayheadLow  (resolution, L.playhead_low,       board),
+            LayerId.playhead_flash:     PlayheadFlash(resolution, L.playhead_flash,     board, pose_stage),
+            LayerId.playhead_high:      PlayheadHigh (resolution, L.playhead_high,      board),
+            LayerId.test_haunted_flash: HauntedFlash (resolution, L.test_haunted_flash, board, pose_stage),
+            LayerId.test_slow:          TestSlow     (resolution, L.test_slow,          board),
+            LayerId.test_pose_waves:    PoseWaves    (resolution, num_players, L.test_pose_waves, self._clock.interval, board, pose_stage),
+            LayerId.test_harmonic:      Harmonic     (resolution, L.test_harmonic,      board),
+            LayerId.test_player_lines:  PlayerLines  (resolution, L.test_player_lines,  board, pose_stage),
+            LayerId.test_calibration:   CameraLight  (resolution, L.test_calibration, distortion, config.num_cameras, board),
+            LayerId.test_fill:   Fill  (resolution, L.test_fill,   board),
+            LayerId.test_pulse:  Pulse (resolution, L.test_pulse,  board),
+            LayerId.test_chase:  Chase (resolution, L.test_chase,  board),
+            LayerId.test_lines:  Lines (resolution, L.test_lines,  board),
+            LayerId.test_random: Random(resolution, L.test_random, board),
         }
 
-        self._compositor = Compositor(config, self.layers, _SHIFTED)
+        self._compositor = Compositor(config, self.layers)
 
         self.fps_counter = FpsCounter()
         self._update_callbacks: list[Callable[[], Any]] = []
@@ -145,7 +143,8 @@ class Conductor(Thread):
         # Debug auto-follow: while the debug override is on, the motor follows the selected
         # debug layers' regime (outranking the machine); off relinquishes back to the machine.
         self._motor_controller.set_debug_mode(
-            _debug_motor_mode(list(self._config.debug_layers)) if self._config.debug else None)
+            _debug_motor_mode(list(self._config.debug_layers), self.layers)
+            if self._config.debug else None)
 
         # Advance motor + playhead and publish the playhead BEFORE the update callbacks: the
         # state machine and pose-LERP read it. Phase is NaN while the motor is STOPPED (no

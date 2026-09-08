@@ -78,11 +78,10 @@ Each state composes its **mix**: a weighted list of layers, returned every tick
 
 Per-layer design, inputs, and settings: see `LAYERS.md`. `playhead_low` and
 `playhead_high` are deliberately two layers: the light data protocol differs between the
-slow lamp regime and the fast ring regime. Test layers (`haunted_flash`,
-`harmonic`, `player_lines`, `calibration`, `fill`, `pulse`, `chase`, `lines`, `random`) are
-never in a state's mix — they are reached via the debug override (`light.debug` +
-`light.debug_layers`), which also hands the motor to the operator's `motor.mode` field
-while active.
+slow lamp regime and the fast ring regime. Test layers (all prefixed `test_` — see the
+roster in `LAYERS.md`) are never in a state's mix — they are reached via the debug
+override (`light.debug` + `light.debug_layers`), which also auto-follows the motor to
+the selected layers' regime while active.
 
 ---
 
@@ -156,7 +155,7 @@ as it crosses each participant.
 - **Pose sound**: yes (only sound)
 - **Ghosts**: an experimentation mode, used by no state — `ghost.ghoster.enabled` off
   means no ghosts anywhere (no sound slots, nothing to draw); enabling it plus the
-  `haunted_flash` debug layer brings ghost sound and visuals together for solo testing.
+  `test_haunted_flash` debug layer brings ghost sound and visuals together for solo testing.
 - **Secondary sound**: none
 - **Open questions**: —
 

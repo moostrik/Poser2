@@ -113,7 +113,7 @@ class StateMachineTest(unittest.TestCase):
         self.tick()
         self.assertEqual(self.current, StateId.IDLE)
         self.assertEqual(self.motors, [MotorMode.LOW])
-        self.assertEqual(self.mixes[-1], [(LayerId.playhead_lamp, 1.0)])
+        self.assertEqual(self.mixes[-1], [(LayerId.playhead_low, 1.0)])
         self.assertEqual(self.emitted[-1].stage, int(StateId.IDLE))
 
     def test_startup_ignores_persisted_select(self) -> None:
@@ -148,7 +148,7 @@ class StateMachineTest(unittest.TestCase):
         self.set_participants(0)
         self.assertEqual(self.current, StateId.INTRO_IDLE)
         # Arrived from IDLE_INTRO (already bright): ramps from 1.0 — no visible dip
-        self.assertEqual(self.mixes[-1], [(LayerId.playhead_lamp, 1.0)])
+        self.assertEqual(self.mixes[-1], [(LayerId.playhead_low, 1.0)])
         self.tick(dbar=self.config.intro_idle_bars + 0.1)
         self.assertEqual(self.current, StateId.IDLE)
 
@@ -179,7 +179,7 @@ class StateMachineTest(unittest.TestCase):
         self.machine.set_similarity(SimpleNamespace(similarity={
             0: FakeSimilarity(0.9), 1: FakeSimilarity(0.9), 2: FakeSimilarity(0.9)}))
         self.tick()
-        self.assertIn([LayerId.pose_waves], self.resets)
+        self.assertIn([LayerId.test_pose_waves], self.resets)
         self.resets.clear()
         self.tick(dt=self.config.intro_play_seconds + 0.1)   # INTRO_PLAY → PLAY
         self.assertEqual(self.current, StateId.PLAY)
@@ -195,11 +195,11 @@ class StateMachineTest(unittest.TestCase):
         # mid spin-up the look blends lamp → pose_waves
         self.tick(dt=self.config.intro_play_seconds / 2)
         look = dict(self.mixes[-1])
-        self.assertGreater(look[LayerId.pose_waves], 0.0)
-        self.assertGreater(look[LayerId.playhead_lamp], 0.0)
+        self.assertGreater(look[LayerId.test_pose_waves], 0.0)
+        self.assertGreater(look[LayerId.playhead_low], 0.0)
         self.tick(dt=self.config.intro_play_seconds)
         self.assertEqual(self.current, StateId.PLAY)
-        self.assertEqual(self.mixes[-1], [(LayerId.pose_waves, 1.0)])
+        self.assertEqual(self.mixes[-1], [(LayerId.test_pose_waves, 1.0)])
 
     def _to_play(self) -> None:
         self.test_intro_to_intro_play_on_sync_and_through_to_play()
@@ -239,12 +239,12 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.END_INTRO)
         self.board.spin_down = 0.0                     # still above the ceiling: flood-era mix holds
         self.tick()
-        self.assertEqual(dict(self.mixes[-1])[LayerId.pose_waves], 1.0)
+        self.assertEqual(dict(self.mixes[-1])[LayerId.test_pose_waves], 1.0)
         self.board.spin_down = 0.5                     # braking through the sensor range
         self.tick()
         mix = dict(self.mixes[-1])
-        self.assertLess(mix[LayerId.pose_waves], 1.0)
-        self.assertGreater(mix[LayerId.playhead_lamp], 0.0)
+        self.assertLess(mix[LayerId.test_pose_waves], 1.0)
+        self.assertGreater(mix[LayerId.playhead_low], 0.0)
         self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.5)
         self.board.spin_down = 1.0
         self.board.synced = True                       # re-lock: fade done and state done together

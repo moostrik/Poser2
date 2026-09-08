@@ -48,11 +48,9 @@ class Compositor:
     its mix" — the Compositor is the mixer those layers pass through.
     """
 
-    def __init__(self, config: LightSettings, layers: dict[LayerId, BaseLayer],
-                 shifted: set[LayerId]) -> None:
+    def __init__(self, config: LightSettings, layers: dict[LayerId, BaseLayer]) -> None:
         self._config = config
-        self._layers = layers
-        self._shifted = shifted            # layers that get the light_phase ring shift
+        self._layers = layers              # each layer's SHIFTED flag (HighLayer) grants the ring shift
         self._entries: Mix = []
         self._scratch = Frame(config.light_resolution, Tick(0.0, 0.0, 0.0, 0.0, 0))
 
@@ -98,7 +96,7 @@ class Compositor:
                 logger.exception("Error in %s.render", layer.__class__.__name__)
                 continue
             sw, sb = s.white, s.blue
-            if shift and id in self._shifted:
+            if shift and layer.SHIFTED:
                 sw, sb = np.roll(sw, shift), np.roll(sb, shift)
             if w_white > 0.0:
                 frame.white += w_white * sw

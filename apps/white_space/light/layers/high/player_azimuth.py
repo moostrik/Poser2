@@ -23,7 +23,7 @@ from modules.pose import frame as pose_frame
 from modules.pose import features
 from modules.pose.features import PointLandmark
 
-from .._base_layer import BaseLayer, LayerSettings
+from .._base_layer import HighLayer, LayerSettings
 from ...frame import Frame
 from .._utilities import BlendType, apply_circular, angle_to_strip_position
 
@@ -49,7 +49,7 @@ class _PlayerState:
     active:    bool  = False
 
 
-class PlayerLines(BaseLayer):
+class PlayerLines(HighLayer):
     """Draws a centre line + two flanking lines for each tracked player."""
 
     def __init__(self, resolution: int, config: PlayerLinesSettings, board: Board, pose_stage: int) -> None:

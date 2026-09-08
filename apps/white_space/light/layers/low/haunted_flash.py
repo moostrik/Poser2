@@ -22,7 +22,7 @@ import numpy as np
 
 from modules.settings import Field
 
-from .._base_layer import BaseLayer, LayerSettings
+from .._base_layer import LowLayer, LayerSettings
 from .playhead_flash import offset_to_level
 from ...frame import Frame
 from ....pose import GhostElement, GhostFeature, GhostStateValue, PlayheadOffset, ghost_state
@@ -59,7 +59,7 @@ class HauntedFlashSettings(LayerSettings):
     ghosts:     Field[bool]  = Field(True, description="Enable ghost flashes")
 
 
-class HauntedFlash(BaseLayer):
+class HauntedFlash(LowLayer):
     """White flash as the playhead crosses each live player (full ``white``) and each **active** ghost
     (dimmed by Fade), plus a blue flash a quarter-turn later for each **verified** passive ghost (Dwell
     & Motion both 1). Ghost flashes are gated by ``ghosts``."""

@@ -9,7 +9,7 @@ import numpy as np
 
 from modules.settings import Field
 
-from .._base_layer import BaseLayer, LayerSettings
+from .._base_layer import LowLayer, LayerSettings
 from ...frame import Frame
 
 
@@ -17,7 +17,7 @@ class PlayheadSettings(LayerSettings):
     level: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Front white lamp brightness")
 
 
-class Playhead(BaseLayer):
+class Playhead(LowLayer):
     """Slow-speed light. Lights the first white pixel (the front white lamps); see the module
     docstring for the full slow-speed pixel→lamp mapping (front/back white, left/right blue)."""
 
@@ -26,5 +26,4 @@ class Playhead(BaseLayer):
         self._config = config
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
-        # First white pixel = front white lamps. (Back = white[R//2], blue L/R = blue[0]/blue[R//2].)
-        white[0] += self._config.level
+        self._add_lamps(white, blue, front_white=self._config.level)

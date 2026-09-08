@@ -99,7 +99,7 @@ class IdleState(StateBase):
     MOTOR = MotorMode.LOW
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.playhead_lamp, 1.0)]
+        return [(LayerId.playhead_low, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.participants > 0:
@@ -112,7 +112,7 @@ class IdleIntroState(StateBase):
     MOTOR = MotorMode.LOW
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.playhead_lamp, 1.0)]
+        return [(LayerId.playhead_low, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.hit:
@@ -131,7 +131,7 @@ class IntroState(StateBase):
         self._reset_layers([LayerId.playhead_flash])   # no stale flash decay from a previous cycle
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.playhead_lamp, self.DIM), (LayerId.playhead_flash, 1.0)]
+        return [(LayerId.playhead_low, self.DIM), (LayerId.playhead_flash, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.participants == 0:       # before the session timeout: an empty room never spins up
@@ -150,7 +150,7 @@ class PlayState(StateBase):
     MOTOR = MotorMode.HIGH
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.pose_waves, 1.0)]
+        return [(LayerId.test_pose_waves, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.participants < 3:
@@ -178,7 +178,7 @@ class IntroIdleState(StateBase):
 
     def update(self, ctx: StateContext) -> Mix:
         p = self.progress(ctx)
-        return [(LayerId.playhead_lamp, _lerp(self._start, 1.0, _ease(p)))]
+        return [(LayerId.playhead_low, _lerp(self._start, 1.0, _ease(p)))]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.bars >= self._config.intro_idle_bars:
@@ -196,11 +196,11 @@ class IntroPlayState(StateBase):
     def enter(self, ctx: StateContext) -> None:
         # A new show cycle's instrument starts with clean wave history. Deliberately NOT in
         # PLAY's enter — PLAY is re-entered from END's wind-back and must inherit the waves.
-        self._reset_layers([LayerId.pose_waves])
+        self._reset_layers([LayerId.test_pose_waves])
 
     def update(self, ctx: StateContext) -> Mix:
         e = _ease(self.progress(ctx))
-        return [(LayerId.playhead_lamp, 1.0 - e), (LayerId.pose_waves, e)]
+        return [(LayerId.playhead_low, 1.0 - e), (LayerId.test_pose_waves, e)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.elapsed >= self._config.intro_play_seconds:
@@ -229,7 +229,7 @@ class EndState(StateBase):
     def update(self, ctx: StateContext) -> Mix:
         forward = ctx.participants < 3 or ctx.session
         self._p = self._ramp(self._p, ctx.dbar / self._config.end_bars, forward)
-        return [(LayerId.pose_waves, 1.0)]
+        return [(LayerId.test_pose_waves, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if self._p >= 1.0:
@@ -251,7 +251,7 @@ class EndIntroState(StateBase):
 
     def update(self, ctx: StateContext) -> Mix:
         e = _ease(ctx.spin_down)
-        return [(LayerId.pose_waves, 1.0 - e), (LayerId.playhead_lamp, IntroState.DIM * e)]
+        return [(LayerId.test_pose_waves, 1.0 - e), (LayerId.playhead_low, IntroState.DIM * e)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.motor_locked:                # LOW speed reacquired — the literal "at motor low speed"
@@ -269,7 +269,7 @@ class EndIdleState(StateBase):
 
     def update(self, ctx: StateContext) -> Mix:
         e = _ease(ctx.spin_down)
-        return [(LayerId.pose_waves, 1.0 - e), (LayerId.playhead_lamp, e)]
+        return [(LayerId.test_pose_waves, 1.0 - e), (LayerId.playhead_low, e)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.motor_locked:

@@ -6,7 +6,7 @@ import numpy as np
 
 from modules.settings import Group
 
-from .._base_layer import BaseLayer, ChannelSettings, LayerSettings
+from .._base_layer import HighLayer, ChannelSettings, LayerSettings
 from ...frame import Frame
 
 
@@ -15,7 +15,7 @@ class LinesSettings(LayerSettings):
     blue:  Group[ChannelSettings] = Group(ChannelSettings)
 
 
-class Lines(BaseLayer):
+class Lines(HighLayer):
     """Discrete bright lines scrolling around the strip."""
 
     def __init__(self, resolution: int, config: LinesSettings, board) -> None:

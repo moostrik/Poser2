@@ -6,7 +6,7 @@ import numpy as np
 
 from modules.settings import Group
 
-from .._base_layer import BaseLayer, ChannelSettings, LayerSettings
+from .._base_layer import HighLayer, ChannelSettings, LayerSettings
 from ...frame import Frame
 
 
@@ -15,7 +15,7 @@ class PulseSettings(LayerSettings):
     blue:  Group[ChannelSettings] = Group(ChannelSettings)
 
 
-class Pulse(BaseLayer):
+class Pulse(HighLayer):
     """Pulses the whole strip at a uniform sine rate per channel."""
 
     def __init__(self, resolution: int, config: PulseSettings, board) -> None:

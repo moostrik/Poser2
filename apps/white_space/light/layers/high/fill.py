@@ -4,7 +4,7 @@ import numpy as np
 
 from modules.settings import Group
 
-from .._base_layer import BaseLayer, ChannelSettings, LayerSettings
+from .._base_layer import HighLayer, ChannelSettings, LayerSettings
 from ...frame import Frame
 
 
@@ -13,7 +13,7 @@ class FillSettings(LayerSettings):
     blue:  Group[ChannelSettings] = Group(ChannelSettings)
 
 
-class Fill(BaseLayer):
+class Fill(HighLayer):
     """Fills the entire strip with a flat brightness value on each channel."""
 
     def __init__(self, resolution: int, config: FillSettings, board) -> None:

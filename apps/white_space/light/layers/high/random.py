@@ -6,7 +6,7 @@ import numpy as np
 
 from modules.settings import BaseSettings, Field, Group
 
-from .._base_layer import BaseLayer, LayerSettings
+from .._base_layer import HighLayer, LayerSettings
 from ...frame import Frame
 
 
@@ -42,7 +42,7 @@ class RandomSettings(LayerSettings):
     blue:  Group[RandomChannelSettings] = Group(RandomChannelSettings)
 
 
-class Random(BaseLayer):
+class Random(HighLayer):
     """2D fBm value noise: noise(pixel * scale, beat_time * speed).
     Each pixel evolves independently over time - no directional motion.
     """

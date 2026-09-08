@@ -388,7 +388,7 @@
     "light_phase": 0.55,
     "debug": false,
     "debug_layers": [
-      "playhead_lamp"
+      "playhead_low"
     ],
     "clock": {
       "bpm": 20.0
@@ -405,7 +405,7 @@
       "speed_smoothing": 0.66
     },
     "layers": {
-      "playhead_lamp": {
+      "playhead_low": {
         "level": 0.5,
         "blend": "ADD"
       },
@@ -421,7 +421,12 @@
         "gap": 0.0,
         "blend": "ADD"
       },
-      "haunt_flash": {
+      "playhead_high": {
+        "level": 1.0,
+        "width": 0.01,
+        "blend": "ADD"
+      },
+      "test_haunted_flash": {
         "white": 1.0,
         "base_white": 0.33,
         "blue": 0.0,
@@ -429,7 +434,14 @@
         "ghosts": true,
         "blend": "ADD"
       },
-      "pose_waves": {
+      "test_slow": {
+        "front_white": 0.0,
+        "back_white": 0.0,
+        "left_blue": 0.0,
+        "right_blue": 0.0,
+        "blend": "ADD"
+      },
+      "test_pose_waves": {
         "fov_degrees": 110.0,
         "void_width": 0.05,
         "void_edge": 0.01,
@@ -442,7 +454,7 @@
         "line_amount": 20.0,
         "blend": "ADD"
       },
-      "harmonic": {
+      "test_harmonic": {
         "blend": "ADD",
         "source_0": {
           "enabled": true,
@@ -481,7 +493,7 @@
           "amplitude_blue": 0.3
         }
       },
-      "player_lines": {
+      "test_player_lines": {
         "center_width": 0.05,
         "flank_width": 0.01,
         "depth_scale": 2.0,
@@ -491,7 +503,7 @@
         "anchor_nose": true,
         "blend": "ADD"
       },
-      "calibration": {
+      "test_calibration": {
         "slice_centre": 0.5,
         "slice_height": 0.2,
         "threshold": 1.0,
@@ -502,12 +514,7 @@
         "white_markers": false,
         "blend": "ADD"
       },
-      "playhead_marker": {
-        "level": 1.0,
-        "width": 0.01,
-        "blend": "ADD"
-      },
-      "fill": {
+      "test_fill": {
         "blend": "ADD",
         "white": {
           "level": 0.5,
@@ -524,7 +531,7 @@
           "amount": 36
         }
       },
-      "pulse": {
+      "test_pulse": {
         "blend": "ADD",
         "white": {
           "level": 0.5,
@@ -541,7 +548,7 @@
           "amount": 36
         }
       },
-      "chase": {
+      "test_chase": {
         "blend": "ADD",
         "white": {
           "level": 1.0,
@@ -558,7 +565,7 @@
           "amount": 36
         }
       },
-      "lines": {
+      "test_lines": {
         "blend": "ADD",
         "white": {
           "level": 1.0,
@@ -575,7 +582,7 @@
           "amount": 16
         }
       },
-      "random": {
+      "test_random": {
         "blend": "ADD",
         "white": {
           "level": 0.5,
