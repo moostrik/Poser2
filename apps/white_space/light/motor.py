@@ -25,14 +25,18 @@ from time import monotonic
 
 from modules.settings import BaseSettings, Field, Widget
 
-# The fall sensor is only valid below this rpm: no pulses are sent above it, and a reading above it
-# (spinning down from HIGH) isn't trusted either — outside this range we trust the commanded speed.
-_SENSOR_CEILING_RPM: float = 200.0
+# The fixture's one threshold (firmware.cpp: `RPM < 200`, lines 231 and 475), applied to the
+# *commanded* rpm on receipt of `/WS/r/0`, regardless of the bar's actual speed. Below it the
+# fixture is in slot mode — the four bar lights are driven directly and fall pulses are sent —
+# at or above it steps the ring and the sensor is silent. So a measurement only exists below it,
+# and a reading above it (spinning down from HIGH) isn't trusted either — outside this range we
+# trust the commanded speed. The light sender and the render apply the same rule to the same command.
+FIXTURE_SLOW_RPM: float = 200.0
 
 # A real revolution can't be faster than the sensor ceiling allows (60 / ceiling). A fall closer than
 # this to the previous one is a repeated/duplicate signal (the one-sided sensor pulsed twice) — ignore
 # it so it can't corrupt the measured period.
-_MIN_FALL_INTERVAL_S: float = 60.0 / _SENSOR_CEILING_RPM
+_MIN_FALL_INTERVAL_S: float = 60.0 / FIXTURE_SLOW_RPM
 
 # Simulation loop cadence (s). The ramp + fall timing are sub-tick accurate regardless.
 _SIM_TICK: float = 1.0 / 30.0 # same as the motor
@@ -72,7 +76,7 @@ class MotorSettings(BaseSettings):
     active_mode:          Field[MotorMode] = Field(MotorMode.STOPPED, access=Field.READ, description="Active mode — the arbitrated mode actually driven (debug > state machine; no command = STOPPED)")
     low_rpm:              Field[float] = Field(72.0,   min=0.0, max=300.0,  step=1.0,  description="Target rpm in LOW mode", newline=True)
     high_rpm:             Field[float] = Field(2000.0, min=0.0, max=2400.0, step=1.0,  description="Target rpm in HIGH mode")
-    measured_rpm:         Field[float] = Field(0.0,   min=0.0, max=_SENSOR_CEILING_RPM, step=0.01,  access=Field.READ, description="Current measured RPM", newline=True)
+    measured_rpm:         Field[float] = Field(0.0,   min=0.0, max=FIXTURE_SLOW_RPM, step=0.01,  access=Field.READ, description="Current measured RPM", newline=True)
     phase:                Field[float] = Field(0.0,   min=-math.pi, max=math.pi, step=0.001, access=Field.READ, widget=Widget.slider, description="Measured motor phase (−π…π)")
 
 
@@ -195,7 +199,7 @@ class MotorController:
             # Fire a synthetic fall per revolution — but only within the sensor's range: the real
             # sensor is silent above the ceiling, and the sim must be too, so measurement-driven
             # behavior (lock, un-lock, deceleration) is identical in sim and reality.
-            if 0.0 < current_rpm <= _SENSOR_CEILING_RPM:
+            if 0.0 < current_rpm <= FIXTURE_SLOW_RPM:
                 revs += current_rpm / 60.0 * dt
                 # Fire every completed revolution — not just one — so that when the fall rate
                 # exceeds the loop rate (high rpm), revs stays in [0,1) and the latest fall
@@ -271,7 +275,7 @@ class MotorController:
         have_measurement, measured, phase, raw_rpm, fall_age = self._measure(monotonic())
         # A measurement is usable only in the sensor's range — both the commanded and the measured speed
         # below the ceiling (no falls above it; a >ceiling reading isn't trusted) — and not STOPPED.
-        fast   = target_rpm > _SENSOR_CEILING_RPM or measured > _SENSOR_CEILING_RPM
+        fast   = target_rpm > FIXTURE_SLOW_RPM or measured > FIXTURE_SLOW_RPM
         locked = have_measurement and not fast and target_mode != MotorMode.STOPPED
         measured_rpm  = measured if locked else 0.0
         effective_rpm = measured_rpm if locked else target_rpm

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from apps.white_space.light import DebugLayer, LayerId, Tick
+from apps.white_space.light import DebugLayer, LayerId, Tick, BarLightId
 from apps.white_space.light.frame import Frame
 from apps.white_space.light.layers.compositor import Compositor
 
@@ -110,10 +110,10 @@ class CompositorTest(unittest.TestCase):
 
 
 class LampMappingTest(unittest.TestCase):
-    """LowLayer's named lamp writes land on the exact pixels from low/__init__.py's
-    hardware table — verified through playhead_test, the lamp regime's direct test tool."""
+    """LowLayer's named writes land on the frame's explicit bar lights and touch no pixel —
+    verified through playhead_test, the lamp regime's direct test tool."""
 
-    def test_named_lamps_hit_the_hardware_pixels(self) -> None:
+    def test_named_lamps_land_on_the_bar_lights(self) -> None:
         from apps.white_space.light.layers.low.playhead_test import PlayheadTest, PlayheadTestSettings
         cfg = PlayheadTestSettings()
         cfg.front_white, cfg.back_white = 0.9, 0.6
@@ -121,13 +121,47 @@ class LampMappingTest(unittest.TestCase):
         layer = PlayheadTest(RES, cfg, board=None)
         f = frame()
         layer.render(f)
-        half = RES // 2
-        self.assertAlmostEqual(f.white[0], 0.9)      # front white lamp
-        self.assertAlmostEqual(f.white[half], 0.6)   # back white lamp
-        self.assertAlmostEqual(f.blue[0], 0.4)       # left blue lamp
-        self.assertAlmostEqual(f.blue[half], 0.2)    # right blue lamp
-        self.assertAlmostEqual(float(f.white.sum()), 0.9 + 0.6, places=5)   # nothing else lit
-        self.assertAlmostEqual(float(f.blue.sum()), 0.4 + 0.2, places=5)
+        self.assertAlmostEqual(f.bar_lights[BarLightId.FRONT_WHITE], 0.9, places=6)
+        self.assertAlmostEqual(f.bar_lights[BarLightId.BACK_WHITE],  0.6, places=6)
+        self.assertAlmostEqual(f.bar_lights[BarLightId.LEFT_BLUE],   0.4, places=6)
+        self.assertAlmostEqual(f.bar_lights[BarLightId.RIGHT_BLUE],  0.2, places=6)
+        self.assertEqual(float(f.light_img.sum()), 0.0)                   # a low layer writes no pixels
+
+
+class BarLightMixTest(unittest.TestCase):
+    """The Compositor weighs the bar lights per channel (white weight on the whites, blue
+    weight on the blues) and never ring-shifts them."""
+
+    class BarLayer:
+        SHIFTED = False
+
+        def render(self, f: Frame) -> None:
+            f.bar_lights += np.array([1.0, 0.5, 1.0, 0.5], dtype=np.float32)
+
+        def reset(self) -> None:
+            pass
+
+    def test_per_channel_weights(self) -> None:
+        comp = Compositor(config(), {LayerId.playhead_test: self.BarLayer()})
+        f = frame()
+        comp.set_mix([(LayerId.playhead_test, (0.5, 0.2))])
+        comp.render(f)
+        np.testing.assert_allclose(f.bar_lights, [0.5, 0.25, 0.2, 0.1], rtol=1e-6)
+        self.assertEqual(float(f.light_img.sum()), 0.0)
+
+    def test_light_phase_leaves_bar_lights_alone(self) -> None:
+        comp = Compositor(config(light_phase=0.25), {LayerId.playhead_test: self.BarLayer()})
+        f = frame()
+        comp.set_mix([(LayerId.playhead_test, 1.0)])
+        comp.render(f)
+        np.testing.assert_allclose(f.bar_lights, [1.0, 0.5, 1.0, 0.5], rtol=1e-6)
+
+    def test_zero_weight_keeps_bar_lights_dark(self) -> None:
+        comp = Compositor(config(), {LayerId.playhead_test: self.BarLayer()})
+        f = frame()
+        comp.set_mix([(LayerId.playhead_test, 0.0)])
+        comp.render(f)
+        self.assertEqual(float(f.bar_lights.sum()), 0.0)
 
     def test_regime_flags(self) -> None:
         from apps.white_space.light import LowLayer, HighLayer

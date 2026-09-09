@@ -5,8 +5,8 @@ Each pose's signed offset to the playhead defines an on/off window around the cr
 flash switches on while the playhead is within the ``width``° window of the crossing
 (±``width``/2 each side), save a dark ``gap`` notch straddling the crossing itself. Both the window
 width and the brightness interpolate per pose by its ``GhostFeature`` Dwell, from the ``min_*``
-endpoints (dwell 0) to the ``max_*`` endpoints (dwell 1). The whole-strip brightness
-follows the closest active pose.
+endpoints (dwell 0) to the ``max_*`` endpoints (dwell 1). The flash brightness follows the
+closest active pose and lights the front white lamp and both blue lamps.
 """
 
 import math
@@ -45,8 +45,8 @@ def stability_lerp(stability: float, lo: float, hi: float) -> float:
 
 
 class PlayheadFlashSettings(LayerSettings):
-    base_white: Field[float] = Field(0.0, min=0.0, max=1.0,     step=0.01, description="Base brightness for white channel (first half of strip)")
-    base_blue:  Field[float] = Field(0.0, min=0.0, max=1.0,     step=0.01, description="Base brightness for blue channel (full strip)")
+    base_white: Field[float] = Field(0.0, min=0.0, max=1.0,     step=0.01, description="Base brightness of the front white lamp")
+    base_blue:  Field[float] = Field(0.0, min=0.0, max=1.0,     step=0.01, description="Base brightness of both blue lamps")
     min_white:  Field[float] = Field(0.1, min=0.0, max=1.0,     step=0.01, description="White flash intensity at stability 0", newline=True)
     max_white:  Field[float] = Field(1.0, min=0.0, max=1.0,     step=0.01, description="White flash intensity at stability 1")
     min_blue:   Field[float] = Field(0.1, min=0.0, max=1.0,     step=0.01, description="Blue flash intensity at stability 0", newline=True)
@@ -68,7 +68,7 @@ class PlayheadFlash(LowLayer):
         self._config = config
         self._pose_stage = pose_stage
 
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: Frame, bar_lights: np.ndarray) -> None:
         P = self._config
 
         tracklets = self._board.get_tracklets()
@@ -86,6 +86,8 @@ class PlayheadFlash(LowLayer):
             flash_white = max(flash_white, level * stability_lerp(dwell, P.min_white, P.max_white))
             flash_blue  = max(flash_blue,  level * stability_lerp(dwell, P.min_blue,  P.max_blue))
 
-        half = self.resolution // 2
-        white[:half] += P.base_white + flash_white
-        blue[:]      += P.base_blue  + flash_blue
+        # The flash is the front white lamp plus both blue lamps, on a constant base.
+        self._add_bar_lights(bar_lights,
+                             front_white=P.base_white + flash_white,
+                             left_blue=P.base_blue + flash_blue,
+                             right_blue=P.base_blue + flash_blue)

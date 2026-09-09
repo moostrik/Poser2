@@ -2,7 +2,9 @@
 
 Renders the look it was handed this tick: a weighted list of layers. Each entry's layer
 draws itself into a private scratch frame (via its own blend mode) and is added
-``weight ×`` into the output frame — the spun-content layers ring-rolled by ``light_phase``.
+``weight ×`` into the output frame — the ring pixels of the spun-content layers rolled by
+``light_phase``, the bar lights weighted per channel (white weight on the whites, blue
+weight on the blues) and never rolled.
 
 The Compositor holds no timing, easing, transition, or reset logic: weight curves live in
 the show state classes, and layer resets are explicit (``reset_layers``). The one policy it
@@ -20,7 +22,7 @@ import numpy as np
 
 from ._base_layer import BaseLayer
 from ..clock import Tick
-from ..frame import Frame
+from ..frame import Frame, BAR_LIGHT_CHANNEL
 
 if TYPE_CHECKING:
     from ..settings import LightSettings, LayerId
@@ -39,6 +41,11 @@ def _channel_weights(weight: 'float | tuple[float, float]') -> tuple[float, floa
     if isinstance(weight, tuple):
         return weight
     return (weight, weight)
+
+
+def _bar_light_weights(w_white: float, w_blue: float) -> np.ndarray:
+    """The per-channel weights spread over the four bar lights (index = BarLightId)."""
+    return np.where(BAR_LIGHT_CHANNEL == 0, w_white, w_blue)
 
 
 class Compositor:
@@ -91,6 +98,7 @@ class Compositor:
             if layer is None:
                 continue
             s.light_img.fill(0.0)
+            s.bar_lights.fill(0.0)
             try:
                 layer.render(s)   # blends into the private scratch via its own blend mode
             except Exception:
@@ -103,3 +111,4 @@ class Compositor:
                 frame.white += w_white * sw
             if w_blue > 0.0:
                 frame.blue  += w_blue * sb
+            frame.bar_lights += _bar_light_weights(w_white, w_blue) * s.bar_lights

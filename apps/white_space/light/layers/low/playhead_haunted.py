@@ -5,7 +5,7 @@ WHITE (front-lamp) channel: a flash as the rotating playhead crosses each live p
 ``white``), and — when ``ghosts`` is enabled — as it crosses each **active** ghost at its fixed
 azimuth, dimmed by that ghost's ``GhostFeature`` Fade (a released ghost decays 1→0).
 
-BLUE (front-lamp) channel: a flash for each **verified** passive ghost — one whose ``Dwell`` and
+BLUE (left-lamp) channel: a flash for each **verified** passive ghost — one whose ``Dwell`` and
 ``Motion`` have both reached ``1.0`` (settled = ready to break free into an active ghost) — fired a
 fixed quarter-turn *later* than the crossing (``PlayheadOffset ≈ −0.25·2π``, the departing side),
 so it trails the white. A still-building passive ghost gets no blue. Fade is irrelevant to blue.
@@ -80,7 +80,7 @@ class PlayheadHaunted(LowLayer):
         self._prev_ghost.clear()
         self._prev_blue.clear()
 
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: Frame, bar_lights: np.ndarray) -> None:
         P = self._config
         centre: float = _PHASE_OFFSET * math.tau   # blue fires 0.25 turn past the passive ghost
         half_rad: float = math.radians(P.width / 2.0)
@@ -135,7 +135,5 @@ class PlayheadHaunted(LowLayer):
 
         self._prev_live, self._prev_ghost, self._prev_blue = prev_live, prev_ghost, prev_blue
 
-        half = self.resolution // 2
-        white[:half] += P.base_white + flash_white   # constant front-lamp floor, brightened by the flash
-        if flash_blue > 0.0:
-            blue[:half] += flash_blue
+        # Constant front-lamp floor brightened by the white flash; the blue flash on the left lamp.
+        self._add_bar_lights(bar_lights, front_white=P.base_white + flash_white, left_blue=flash_blue)

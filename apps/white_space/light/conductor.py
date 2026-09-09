@@ -73,12 +73,12 @@ class Conductor(Thread):
             LayerId.sound_light:        SoundLight     (resolution, LO.sound_light,      board),
             LayerId.playhead_low:       PlayheadLow    (resolution, LO.playhead_low,     board),
             LayerId.playhead_flash:     PlayheadFlash  (resolution, LO.playhead_flash,   board, pose_stage),
+            LayerId.wind_down:          WindDown       (resolution, LO.wind_down,        board),
             LayerId.playhead_haunted:   PlayheadHaunted(resolution, LO.playhead_haunted, board, pose_stage),
             LayerId.playhead_test:      PlayheadTest   (resolution, LO.playhead_test,    board),
             LayerId.pose_instrument:    PoseInstrument (resolution, HI.pose_instrument,  board, pose_stage),
             LayerId.playhead_high:      PlayheadHigh   (resolution, HI.playhead_high,    board),
             LayerId.flood:              Flood          (resolution, HI.flood,            board),
-            LayerId.wind_down:          WindDown       (resolution, HI.wind_down,        board),
             LayerId.test_pose_waves:    PoseWaves      (resolution, num_players, HI.test_pose_waves, self._clock.interval, board, pose_stage),
             LayerId.test_harmonic:      Harmonic       (resolution, HI.test_harmonic,    board),
             LayerId.test_player_lines:  PlayerLines    (resolution, HI.test_player_lines, board, pose_stage),
@@ -171,11 +171,12 @@ class Conductor(Thread):
         frame = Frame(self._config.light_resolution, tick, motor, playhead=playhead)
         self._compositor.render(frame)
 
-        # Master brightness
+        # Master brightness — the ring and the bar lights alike
         m = self._config.master
         if m != 1.0:
-            frame.white *= m
-            frame.blue  *= m
+            frame.white      *= m
+            frame.blue       *= m
+            frame.bar_lights *= m
 
         self._board.set_composition_output(frame)
         self._notify_render(frame)

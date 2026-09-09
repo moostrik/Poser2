@@ -6,9 +6,14 @@ existing layers the module docstrings stay the source of truth for behavior; the
 layers (`sound_light`, `flood`, and the `pose_instrument` placeholder) get full design
 sections here — they have no code yet, so this is their specification.
 
-Regimes: **low** layers drive the four physical lamps (front/back white = `white[0]` /
-`white[R//2]`, left/right blue = `blue[0]` / `blue[R//2]`); **high** layers draw the
-persistence-of-vision ring. Base classes `LowLayer` / `HighLayer` encode this, and the
+Regimes: **low** layers write the four bar lights by name (`Frame.bar_lights`, indexed by
+`BarLightId`: front/back white, left/right blue) and no pixels; **high** layers draw the
+persistence-of-vision ring. The fixture's readout mode follows the *commanded* rpm — slot
+mode below 200, ring mode at or above, switching on receipt of the rpm regardless of the
+bar's actual speed (`firmware.cpp` line 475). The light sender maps the bar lights to the
+firmware's pixel slots exactly when the fixture reads them (`inout/osc_light_sender.py`),
+and the render simulates the bar at low speed in its own layer (`render/layers/
+bar_light_simulation_layer.py`). Base classes `LowLayer` / `HighLayer` encode this, and the
 folders and settings groups follow the same single axis (`layers/low/` ↔ `light.low_layers`,
 `layers/high/` ↔ `light.high_layers` — no separate test folder). Debug-only layers state
 that role in their docstrings; the high block's generic patterns keep a `test_` prefix,
@@ -23,13 +28,12 @@ while the low tools are named as playhead tools (`playhead_haunted`, `playhead_t
 | `playhead_high`   | high   | frame playhead phase                                   | white ring marker             | S5 (post-un-lock), S6, S7 |
 | `pose_instrument` | high   | LERP frames (Azimuth, BBox, Angles, Similarity), tracklets | white bands + sync arcs, blue markers *(placeholder — see below)* | S5 (post-un-lock), S6, S7 |
 | `flood`           | high   | — (settings only)                                      | full-strip white              | S7 |
-| `wind_down`       | low*   | playhead signals (motor lock + bars, board), tick clock | the dying white wall — ring *and* lamps | S8, S9 |
+| `wind_down`       | low    | tick clock                                             | both white lamps, fading (the wall while the bar is still fast) | S8, S9 |
 | `sound_light`     | low    | sound levels from Max (board)                          | left/right blue lamps         | S1, S2, S4, S9 |
 
-\* `wind_down` is the one deliberate cross-regime layer — classed `LowLayer` (unshifted;
-debug auto-follow derives LOW) but drawing the full strip, so it reads as the POV wall
-while fast and as the white lamps once slow. In the interface it sits in High Layers
-right after `flood`, whose ending it is. See its section below.
+`wind_down` is `flood`'s ending and a plain low layer: the fixture is in slot mode from
+S8's first packet, so the wall while the bar is still fast *is* the two white lamps
+spinning. See its section below.
 
 Debug layers (never in a state's mix; reached via the `light.debug` select — **choosing a
 layer IS turning debug on**: it shows solo at full weight and the motor auto-follows its
@@ -80,28 +84,27 @@ at 1.0 hands over to S8/S9's wind_down starting at the full wall, seamlessly.
 - **Reset**: no-op
 - **Open questions**: —
 
-## wind_down (new — LowLayer, cross-regime)
+## wind_down (LowLayer)
 
-The dying wall of light: owns the S8/S9 ending fade in both regimes. The one layer
-deliberately aware of BOTH light mechanics — it draws the wall that reads as the POV
-ring while the machine still spins fast and as the physical white lamps once slow.
-When the low-layer/lamp mechanics change in the future, this layer is the single place
-to update.
+The dying wall of light: owns the S8/S9 ending fade. It writes the two white lamps at a
+fading level; everything else is physics. The fixture is in slot mode from S8's first
+packet (its readout mode follows the commanded rpm), so the two lamps spin at whatever
+speed the bar still has — a wall of white while fast, thinning into two beams as it
+slows — and the fade rides through both. One mechanism; the layer never needs to know
+when the bar is slow. The S7 → S8 hand-off is seamless at the DACs: `flood` at 1.0 in ring
+mode drives the same two white outputs as this layer at 1.0 in slot mode.
 
 - **Used by**: S8/S9 at constant weight 1.0 (reset on state entry). The states put the
   landing look underneath (`playhead_low` at DIM/BRIGHT, `sound_light`) — it is
   *revealed* as the wall dies, so nothing has to splice or match at the hand-off.
-- **Input**: the playhead signals from the board (motor lock + the bar counter) and
-  the tick clock; no pose data.
-- **Behavior**: draws the full-strip white wall at fade level
-  `f = (1 − ease(elapsed / spin_down_seconds)) × (1 − ease(bars since motor lock))`.
-  The timed factor rides the physical spin-down (hand-tuned slider); the lock factor
-  guarantees complete extinguishing within **exactly one round of the reborn playhead**
-  after the motor re-locks at LOW. Whichever factor is still unfinished, the wall is
-  gone one bar after the lock, smoothly and monotonically — a clock can't snap.
+- **Input**: the tick clock; no pose data, no playhead signals.
+- **Behavior**: both white lamps at `f × level`, `f = 1 − ease(elapsed / spin_down_seconds)`,
+  hand-tuned to ride the physical spin-down (the sensor is silent above 200 rpm, so the
+  deceleration is not measurable). The states exit once `progress` reaches 1 and the
+  motor has locked at LOW.
 - **Settings**: `level`, `spin_down_seconds` (hidden — the visible slider is
   `statemachine.spin_down_seconds`, next to `spin_up_seconds`, shared in via the root),
-  `progress` (read-only fade readout 0..1: the states' `stage_progress` and S9's
+  `progress` (read-only fade readout 0..1: the states' exit, `stage_progress` and S9's
   sound-visual reveal ride it)
 - **Reset**: restarts the fade at the full wall (called from S8/S9 `enter()`)
 - **Open questions**: —

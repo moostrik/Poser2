@@ -5,8 +5,8 @@ when several conditions are true the same tick, the first wins) and returns its 
 tick (``update``: a weighted layer list the machine forwards to the Compositor). Steady
 states return constant weights; transition states blend by their own ``progress`` — their
 duration *is* the transition duration. S8/S9 are the exception: their fade lives in the
-``wind_down`` layer (constant mix; the layer owns the regime-crossing dynamics) and their
-duration is the spin-down plus one playhead bar after the motor lock.
+``wind_down`` layer (constant mix; the layer owns the timed fade) and they exit once that
+fade is complete and the motor has locked at LOW.
 
 Mix-authoring rules:
 - A layer at weight 0.0 stays *in* the returned list while it is still part of the look;
@@ -212,11 +212,16 @@ class IntroPlayState(StateBase):
     The pose instrument takes over from the line during the spin-up, and the sound
     enhances the accelerating chaos.
 
-    White is a **hard mix at the un-lock**: the dim line holds unchanged from INTRO while
-    the strip is still physically lamps; the moment the motor passes the sensor ceiling
-    and the ring forms (``ctx.ring_formed``), the instrument and the playhead line snap
-    in. Blue eases in from the un-lock over the remaining spin-up, reaching 1.0 at the
-    PLAY hand-off (per-channel mix weights)."""
+    White is a **hard mix at the un-lock**: the dim line is held from INTRO until the
+    motor passes the sensor ceiling and the ring forms (``ctx.ring_formed``), then the
+    instrument and the playhead line snap in. Blue eases in from the un-lock over the
+    remaining spin-up, reaching 1.0 at the PLAY hand-off (per-channel mix weights).
+
+    Firmware note: the fixture switches to ring mode on the first packet commanding HIGH,
+    before the bar is fast (its readout mode follows the commanded rpm, see
+    ``inout/osc_light_sender.py``), so the held ``playhead_low`` bar light is not read
+    during the spin-up — the strip is dark until the ring forms. Kept as designed; whether
+    to draw a line as ring content during the spin-up is an open show question."""
     MOTOR = MotorMode.HIGH
 
     def __init__(self, *args) -> None:
@@ -286,40 +291,31 @@ class EndState(StateBase):
 
 class WindDownStateBase(StateBase):
     """Shared S8/S9 engine: the dying wall. The mix is constant — the ``wind_down`` layer
-    (reset on entry) owns the whole fade, timed over its ``spin_down_seconds`` and
-    guaranteed extinguished within one round after the motor re-locks at LOW — and the
-    landing look sits underneath, revealed as the wall dies. Exit: one full playhead bar
-    after the lock (the state outlives the spin-down by that round). Progress is the
+    (reset on entry) owns the whole fade, timed over its ``spin_down_seconds`` — and the
+    landing look sits underneath, revealed as the wall dies. Exit: the fade complete and
+    the motor locked at LOW (the landing state needs a live playhead). Progress is the
     layer's own fade readout, so OSC stage_progress rides the actual fade."""
     MOTOR = MotorMode.LOW
     TARGET: StateId
 
-    def __init__(self, *args) -> None:
-        super().__init__(*args)
-        self._lock_bars: float | None = None    # ctx.bars at the motor lock
-
     def enter(self, ctx: StateContext) -> None:
         self._reset_layers([LayerId.wind_down])  # restart the fade at the full wall
-        self._lock_bars = None
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
-        if self._lock_bars is None and ctx.motor_locked:
-            self._lock_bars = ctx.bars
-        if self._lock_bars is not None and ctx.bars - self._lock_bars >= 1.0:
+        if ctx.motor_locked and self.progress(ctx) >= 1.0:
             return self.TARGET
         return None
 
     def progress(self, ctx: StateContext) -> float:
-        return self._light.high_layers.wind_down.progress
+        return self._light.low_layers.wind_down.progress
 
 
 class EndIntroState(WindDownStateBase):
     """S8 — END_INTRO. Participants remain, so the machine returns to the intro: the wall
     of white fades away during the spin-down, revealing the dim playhead line underneath,
-    while the distortion sound disappears; the fade finishes — the back light
-    extinguishing completely — within one round after the motor lock (see
-    ``WindDownStateBase``). The dim line is in the mix from the start, so there is no
-    splice and no seam into INTRO."""
+    while the distortion sound disappears; the state hands over once the fade is complete
+    and the motor has locked (see ``WindDownStateBase``). The dim line is in the mix from
+    the start, so there is no splice and no seam into INTRO."""
     TARGET = StateId.INTRO
 
     def update(self, ctx: StateContext) -> Mix:
@@ -330,7 +326,8 @@ class EndIdleState(WindDownStateBase):
     """S9 — END_IDLE. The space is empty: the wall of white fades away during the
     spin-down, revealing the bright searchlight line — the front lamp stays at full the
     whole way — while the distortion disappears and the searchlight soundscape returns.
-    The sound visuals fade in on the wall's own fade readout."""
+    The sound visuals fade in on the wall's own fade readout; the state hands over once
+    the fade is complete and the motor has locked."""
     TARGET = StateId.IDLE
 
     def update(self, ctx: StateContext) -> Mix:

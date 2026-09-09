@@ -9,6 +9,8 @@ from modules.render.layers import TrackerCompositor, PoseCompositor
 from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer
 from modules.render.layers.generic.PanoramicTrackerLayer import PanoramicTrackerLayer
 from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
+from apps.white_space.render.layers.bar_light_simulation_layer import BarLightSimulationLayer
+from apps.white_space.light import FIXTURE_SLOW_RPM
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -66,6 +68,7 @@ class Render(RenderBase):
         # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready
         self.L[Layers.ws_tracker][0] = PanoramicTrackerLayer(board, self.num_cams, settings.colors)
         self.L[Layers.ws_light][0]   = LightSimulationLayer(board)
+        self.L[Layers.ws_bar][0]     = BarLightSimulationLayer(board, settings.bar_light_sim)
 
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name='track',      columns=self.num_cams,    rows=1, src_aspect_ratio=16/9, padding=Point2f(1.0, 1.0)),
@@ -138,9 +141,12 @@ class Render(RenderBase):
         self._viewport(height, self.subdivision.get_rect('panoramic', 0))
         self.L[Layers.ws_tracker][0].draw()
 
-        # Row 3 - WS light strip
+        # Row 3 - WS light strip: the ring, or the bar's lights while the fixture is in slot mode —
+        # the same rule the fixture applies to the same command (the frame's target rpm).
+        output = self.board.get_composition_output()
+        slot_mode = output is not None and output.motor.target_rpm < FIXTURE_SLOW_RPM
         self._viewport(height, self.subdivision.get_rect('ws_light', 0))
-        self.L[Layers.ws_light][0].draw()
+        self.L[Layers.ws_bar if slot_mode else Layers.ws_light][0].draw()
 
         # Row 4 - pose cutouts with data overlays, one viewport per player
         for i in range(self.num_players):

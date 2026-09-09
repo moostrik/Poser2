@@ -221,10 +221,11 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.motors[-1], MotorMode.LOW)
         self.tick(dt=999.0)                            # time alone never exits a spin-down
         self.assertEqual(self.current, StateId.END_IDLE)
-        self.board.synced = True                       # LOW reacquired — arms the final bar
+        self.board.synced = True                       # LOW reacquired — but the fade is not done
         self.tick()
         self.assertEqual(self.current, StateId.END_IDLE)
-        self.tick(dbar=1.01)                           # one full round after the lock
+        self.light.low_layers.wind_down.progress = 1.0   # fade complete + lock → hand over
+        self.tick()
         self.assertEqual(self.current, StateId.IDLE)
 
     def test_end_lands_in_end_intro_with_people_then_intro(self) -> None:
@@ -235,14 +236,14 @@ class StateMachineTest(unittest.TestCase):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_INTRO)
         self.board.synced = True
-        self.tick()
-        self.tick(dbar=1.01)                           # one full round after the lock
+        self.light.low_layers.wind_down.progress = 1.0
+        self.tick()                                    # fade complete + lock → hand over
         self.assertEqual(self.current, StateId.INTRO)
 
     def test_wind_down_states_hold_a_constant_mix_and_ride_the_layer(self) -> None:
         # S8/S9's fade lives in the wind_down layer: the mix is constant (the landing look
         # underneath the dying wall), the layer is reset on entry, stage_progress is the
-        # layer's own readout, and the exit is one full bar after the motor lock.
+        # layer's own readout, and the exit is the fade complete plus the motor lock.
         self._to_play()
         self.set_participants(2)
         for _ in range(4):
@@ -250,16 +251,16 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.END_INTRO)
         self.assertIn([LayerId.wind_down], self.resets)          # fade restarted at the full wall
         self.assertEqual(self.mixes[-1], [(LayerId.wind_down, 1.0), (LayerId.playhead_low, 0.4)])
-        self.light.high_layers.wind_down.progress = 0.5               # the layer's fade readout
+        self.light.low_layers.wind_down.progress = 0.5                # the layer's fade readout
         self.tick()
         self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.5)
-        self.tick(dt=999.0, dbar=5.0)                  # time and bars alone never exit — no lock yet
+        self.tick(dt=999.0, dbar=5.0)                  # time and bars alone never exit
         self.assertEqual(self.current, StateId.END_INTRO)
-        self.board.synced = True
-        self.tick()                                    # lock latched — the final bar starts here
-        self.tick(dbar=0.5)
+        self.light.low_layers.wind_down.progress = 1.0                # fade complete — but no lock yet
+        self.tick(dbar=2.0)
         self.assertEqual(self.current, StateId.END_INTRO)
-        self.tick(dbar=0.51)                           # one full round after the lock
+        self.board.synced = True                       # lock + fade complete → hand over
+        self.tick()
         self.assertEqual(self.current, StateId.INTRO)
 
     def test_end_idle_reveals_the_sound_visuals_on_the_fade(self) -> None:
@@ -269,7 +270,7 @@ class StateMachineTest(unittest.TestCase):
         for _ in range(4):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_IDLE)
-        self.light.high_layers.wind_down.progress = 0.25
+        self.light.low_layers.wind_down.progress = 0.25
         self.tick()
         self.assertEqual(self.mixes[-1], [(LayerId.wind_down, 1.0), (LayerId.playhead_low, 1.0),
                                           (LayerId.sound_light, 0.25)])

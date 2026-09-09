@@ -467,7 +467,7 @@ class BarsTest(unittest.TestCase):
 
 class RegimeSignalsTest(unittest.TestCase):
     """The playhead's regime-flip signals: `synced` (re-locked at LOW — the stale-proof
-    motor lock, which the S8/S9 exit and the wind_down layer's final bar anchor on) and
+    motor lock, which the S8/S9 exit anchors on) and
     `ring_formed` (HIGH + fall silence — the bar blurred into the ring)."""
 
     DT = 1 / 60

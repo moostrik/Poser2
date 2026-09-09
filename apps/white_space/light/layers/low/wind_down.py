@@ -1,21 +1,20 @@
-"""WindDown — the dying wall of light: owns the S8/S9 ending fade in both regimes.
+"""WindDown — the dying wall of light: the S8/S9 ending fade.
 
-The one layer deliberately aware of BOTH light mechanics: it draws the full-strip white
-wall, which reads as the POV ring while the machine still spins fast and as the physical
-white lamps once it has slowed (see ``low/__init__.py`` for the lamp mapping — when the
-low-layer mechanics change, this layer is the single place to update). The states put
-the landing look (the playhead line, the sound visuals) underneath at constant weight;
-this layer fades the wall to nothing and thereby reveals it.
+Writes the two white bar lights at a fading level; everything else is physics. The fixture
+is in slot mode from S8's first packet (its readout mode follows the commanded rpm, see
+``inout/osc_light_sender.py``), so the two lamps spin at whatever speed the bar still has:
+a wall of white while it is fast, thinning into two beams as it slows — and the fade rides
+through both. One mechanism, and the layer never needs to know when the bar is slow. The
+S7 → S8 hand-off is seamless at the DACs: the flood at 1.0 in ring mode drives the same two
+white outputs as this layer at 1.0 in slot mode.
 
-Fade level: ``f = (1 − ease(elapsed / spin_down_seconds)) × (1 − ease(bars since motor
-lock))``. The timed factor is hand-tuned to ride the physical spin-down — its visible
-slider is ``statemachine.spin_down_seconds`` (next to ``spin_up_seconds``, its mirror),
-shared into this layer's hidden field via the root; the lock factor guarantees the
-remainder is extinguished within exactly one round of the reborn playhead after the
-motor re-locks at LOW — whichever factor is still unfinished, the wall is gone one bar
-after the lock, smoothly and monotonically. ``reset()`` (a show state's entry) restarts
-at the full wall. ``progress`` is the read-only fade readout the states' stage_progress
-(and S9's sound-visual reveal) ride.
+Fade level: ``f = 1 − ease(elapsed / spin_down_seconds)``, hand-tuned to ride the physical
+spin-down — its visible slider is ``statemachine.spin_down_seconds`` (next to
+``spin_up_seconds``, its mirror), shared into this layer's hidden field via the root. The
+states put the landing look (the playhead line, the sound visuals) underneath at constant
+weight; this layer fades the wall to nothing and thereby reveals it. ``reset()`` (a show
+state's entry) restarts at the full wall. ``progress`` is the read-only fade readout the
+states' exit and stage_progress (and S9's sound-visual reveal) ride.
 """
 
 import numpy as np
@@ -34,30 +33,21 @@ class WindDownSettings(LayerSettings):
 
 
 class WindDown(LowLayer):
-    """Draws the wall at the current fade level; see the module docstring."""
+    """The two white bar lights at the current fade level; see the module docstring."""
 
     def __init__(self, resolution: int, config: WindDownSettings, board) -> None:
         super().__init__(resolution, config, board)
         self._config = config
         self._elapsed: float = 0.0
-        self._lock_bars: float | None = None   # bar count at the motor lock (None until seen)
 
     def reset(self) -> None:
         self._elapsed = 0.0
-        self._lock_bars = None
         self._config.progress = 0.0
 
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: Frame, bar_lights: np.ndarray) -> None:
         self._elapsed += frame.tick.dt
-        signals = self._board.get_playhead_signals()
-        if self._lock_bars is None and signals.synced:
-            self._lock_bars = signals.bars
-
         t = min(self._elapsed / max(self._config.spin_down_seconds, 1e-6), 1.0)
         f = 1.0 - pytweening.easeInOutSine(t)
-        if self._lock_bars is not None:
-            b = min(signals.bars - self._lock_bars, 1.0)
-            f *= 1.0 - pytweening.easeInOutSine(b)
-
         self._config.progress = 1.0 - f
-        white += f * self._config.level
+        wall = f * self._config.level
+        self._add_bar_lights(bar_lights, front_white=wall, back_white=wall)

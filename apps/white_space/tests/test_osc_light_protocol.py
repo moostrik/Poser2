@@ -12,7 +12,7 @@ import numpy as np
 from apps.white_space.inout.osc_light_sender import (
     FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS, OscLightSender, OscLightSenderSettings,
 )
-from apps.white_space.light import Frame, Tick
+from apps.white_space.light import Frame, Tick, BarLightId
 
 # The firmware reads a fixed-size OSC preamble before the pixel body: 12-byte padded address,
 # 4-byte typetag, 4-byte blob length.
@@ -40,7 +40,7 @@ class ChunkMessageTest(unittest.TestCase):
     def setUp(self) -> None:
         self.settings = OscLightSenderSettings()
         self.messages = OscLightSender._build_chunk_messages(
-            _frame(), self.settings, FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS
+            _frame(), self.settings, FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS, slow=False
         )
         assert self.messages is not None
         self.addresses = [m.address for m in self.messages]
@@ -120,7 +120,7 @@ class ConfigMessageTest(unittest.TestCase):
     def test_config_is_absent_from_the_pixel_burst(self) -> None:
         """Config is sent on change; keeping it out of the per-frame burst is the whole point."""
         chunks = OscLightSender._build_chunk_messages(
-            _frame(), self.settings, FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS
+            _frame(), self.settings, FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS, slow=False
         )
         assert chunks is not None
         self.assertFalse([m for m in chunks if m.address.startswith(("/WS/o/", "/WS/r/"))])
@@ -135,6 +135,71 @@ class ConfigMessageTest(unittest.TestCase):
         """The firmware reassembles `/WS/r/0` from `hdr[12..15]`, MSB first."""
         rpm = self.messages[-1].dgram
         self.assertEqual(int.from_bytes(rpm[12:16], "big"), 2000)
+
+
+class FixtureSlotTest(unittest.TestCase):
+    """The fixture's readout mode follows the rpm sent with the frame: in slow mode it reads the
+    four bar lights from pixel 0 and the middle pixel of each channel and nothing else, in ring
+    mode it steps the ring and never reads a slot. The rebuild mirrors that exactly."""
+
+    LEVELS = {BarLightId.FRONT_WHITE: 0.9, BarLightId.BACK_WHITE: 0.6,
+              BarLightId.LEFT_BLUE: 0.4, BarLightId.RIGHT_BLUE: 0.2}
+    HALF = RESOLUTION // 2
+
+    def _lit_frame(self) -> Frame:
+        frame = _frame()
+        for light, level in self.LEVELS.items():
+            frame.bar_lights[light] = level
+        return frame
+
+    @staticmethod
+    def _bodies(frame: Frame, slow: bool) -> list[bytes]:
+        messages = OscLightSender._build_chunk_messages(
+            frame, OscLightSenderSettings(), FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS, slow
+        )
+        assert messages is not None
+        return [m.dgram[OSC_PREAMBLE:] for m in messages]
+
+    def test_slow_mode_puts_the_bar_lights_in_the_slots(self) -> None:
+        white, blue = OscLightSender._rebuild_fixture_pixels(self._lit_frame(), slow=True)
+        self.assertAlmostEqual(float(white[0]),         0.9, places=6)   # front white
+        self.assertAlmostEqual(float(white[self.HALF]), 0.6, places=6)   # back white
+        self.assertAlmostEqual(float(blue[0]),          0.4, places=6)   # left blue
+        self.assertAlmostEqual(float(blue[self.HALF]),  0.2, places=6)   # right blue
+        np.testing.assert_array_equal(white[1:self.HALF], _frame().white[1:self.HALF])   # the rest is the ring
+
+    def test_slow_mode_replaces_ring_content_at_the_slots(self) -> None:
+        frame = self._lit_frame()
+        frame.white[0], frame.blue[self.HALF] = 1.0, 1.0        # ring content the fixture never reads
+        white, blue = OscLightSender._rebuild_fixture_pixels(frame, slow=True)
+        self.assertAlmostEqual(float(white[0]), 0.9, places=6)
+        self.assertAlmostEqual(float(blue[self.HALF]), 0.2, places=6)
+
+    def test_ring_mode_sends_the_ring_and_drops_the_bar_lights(self) -> None:
+        frame = self._lit_frame()
+        white, blue = OscLightSender._rebuild_fixture_pixels(frame, slow=False)
+        np.testing.assert_array_equal(white, frame.white)
+        np.testing.assert_array_equal(blue, frame.blue)
+
+    def test_rebuild_never_mutates_the_shared_frame(self) -> None:
+        frame = self._lit_frame()
+        before = frame.light_img.copy()
+        OscLightSender._rebuild_fixture_pixels(frame, slow=True)
+        np.testing.assert_array_equal(frame.light_img, before)
+
+    def test_wire_is_identical_to_the_baked_in_pixel_model(self) -> None:
+        """Regression against the previous data model, where the low layers wrote the lamp
+        levels straight into the slot pixels: the same look must produce the same bytes."""
+        baked = _frame()
+        baked.white[0], baked.white[self.HALF] = 0.9, 0.6
+        baked.blue[0],  baked.blue[self.HALF]  = 0.4, 0.2
+        explicit = self._lit_frame()
+        self.assertEqual(self._bodies(explicit, slow=True), self._bodies(baked, slow=False))
+
+    def test_blackout_is_dark_in_slow_mode_too(self) -> None:
+        zero = Frame(RESOLUTION, Tick(0.0, 0.0))
+        for body in self._bodies(zero, slow=True):
+            self.assertEqual(body, bytes(FIRMWARE_CHUNK_SIZE))
 
 
 class BlackoutTest(unittest.TestCase):

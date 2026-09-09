@@ -7,7 +7,7 @@ from pythonosc.udp_client import UDPClient
 from pythonosc.osc_message import OscMessage
 from pythonosc.osc_message_builder import OscMessageBuilder
 
-from ..light import Frame, Tick
+from ..light import Frame, Tick, BarLightId, BAR_LIGHT_CHANNEL, FIXTURE_SLOW_RPM
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.inout.net_probe import validate_connection
 from modules.utils import ThreadPriority, set_current_thread_priority
@@ -23,6 +23,14 @@ OscMessageList = list[OscMessage]
 # `_calculate_optimal_chunks` yields anything else silently breaks the installation.
 FIRMWARE_CHUNK_SIZE: int = 1200
 FIRMWARE_NUM_CHUNKS: int = 3
+
+# The firmware's readout mode follows the *commanded* rpm, switching on receipt of `/WS/r/0`
+# regardless of the bar's actual speed (firmware.cpp line 475). Below FIXTURE_SLOW_RPM it is in
+# slot mode: the four DACs are copied from four fixed pixels — these slots, as a fraction of the
+# ring per bar light (index = BarLightId; the channel is BAR_LIGHT_CHANNEL) — and the rest of the
+# ring is never read (lines 297-305). At or above it steps the ring and never reads a fixed slot
+# (lines 266-295). So a slot carries the bar light's level in slow mode and ring content otherwise.
+FIRMWARE_LIGHT_SLOT_TURNS: np.ndarray = np.array([0.0, 0.5, 0.0, 0.5])
 
 # Offsets and rpm are constant for a whole show, so they are sent on change only. This keepalive
 # re-sends them anyway at a low rate so a lost config packet self-heals; the firmware ignores a
@@ -69,6 +77,12 @@ class OscLightSender:
       those 20 + 1200 bytes, and locates the chunk digit at a fixed offset in the address, so both
       the chunk size and the address spelling are load-bearing.
     * The firmware commits a frame when `/WS/blue2` arrives, so that message must be sent **last**.
+    * Its readout mode follows the **commanded** rpm (`/WS/r/0`), not the bar's speed: below
+      `FIXTURE_SLOW_RPM` it drives the four lamps from four fixed pixel slots (pixel 0 and the
+      middle pixel of each channel, `FIRMWARE_LIGHT_SLOT_TURNS`) and ignores the ring; at or above
+      it steps the ring and ignores the slots. `_rebuild_fixture_pixels` writes the frame's
+      explicit bar lights into those slots exactly when the fixture reads them, using the rpm
+      this sender actually put on the wire.
     * Its socket receive buffer is 8 KB against a 7.4 KB frame, and it drains while it fills, so
       the burst normally fits. Config messages are kept out of it anyway (they never change), and
       `chunk_interval` can spread the six chunks further if the fixture ever reports dropped
@@ -185,7 +199,9 @@ class OscLightSender:
             motor_rpm = 0 if held else int(output.motor.target_rpm)
             self._send_config(motor_rpm)
 
-            chunks = self._build_chunk_messages(output, self._config, self._chunk_size, self._num_chunks)
+            # The fixture's readout mode follows the rpm we just sent — so does the slot rebuild.
+            slow = motor_rpm < FIXTURE_SLOW_RPM
+            chunks = self._build_chunk_messages(output, self._config, self._chunk_size, self._num_chunks, slow)
             if chunks:
                 self._send_paced(chunks, self._config.chunk_interval)
 
@@ -262,7 +278,7 @@ class OscLightSender:
         more **last** — a lost single rpm datagram must not leave the motor spinning
         until the firmware watchdog."""
         zero = Frame(settings.resolution, Tick(0.0, 0.0))
-        chunks = OscLightSender._build_chunk_messages(zero, settings, chunk_size, num_chunks) or []
+        chunks = OscLightSender._build_chunk_messages(zero, settings, chunk_size, num_chunks, slow=True) or []
         return [OscLightSender._build_rpm_message(0), *chunks, OscLightSender._build_rpm_message(0)]
 
     @staticmethod
@@ -282,21 +298,42 @@ class OscLightSender:
         return message_list
 
     @staticmethod
+    def _rebuild_fixture_pixels(output: Frame, slow: bool) -> tuple[np.ndarray, np.ndarray]:
+        """The (white, blue) pixel channels as the fixture will read them.
+
+        In slow mode the firmware reads only the four slots, so each slot is **replaced** by its
+        bar light's level (the ring content there is never seen). In ring mode it never reads a
+        slot, so the ring goes out untouched and the bar lights are dropped — a slot value would
+        only be a one-pixel blip in the ring. Never mutates the shared frame.
+        """
+        if not slow:
+            return output.white, output.blue
+        white, blue = output.white.copy(), output.blue.copy()
+        slots = (FIRMWARE_LIGHT_SLOT_TURNS * output.resolution).astype(int)
+        for light in BarLightId:
+            channel = white if BAR_LIGHT_CHANNEL[light] == 0 else blue
+            channel[slots[light]] = output.bar_lights[light]
+        return white, blue
+
+    @staticmethod
     def _build_chunk_messages(
         output: Frame,
         settings: OscLightSenderSettings,
         chunk_size: int,
         num_chunks: int,
+        slow: bool,
     ) -> Optional[OscMessageList]:
         """The pixel payload: all white chunks, then all blue.
 
         Grouping each channel keeps its chunks adjacent on the wire, and leaves `/WS/blue{n-1}`
-        last — the message the firmware treats as the frame's commit trigger.
+        last — the message the firmware treats as the frame's commit trigger. ``slow`` is the
+        fixture's readout mode for this frame (the rpm sent with it below `FIXTURE_SLOW_RPM`).
         """
         try:
+            white_src, blue_src = OscLightSender._rebuild_fixture_pixels(output, slow)
             # Output mapping: gamma curve + the driver's usable window (master applied upstream).
-            white_f = OscLightSender._apply_levels(output.white, settings.curve, settings.lower_edge, settings.upper_edge)
-            blue_f  = OscLightSender._apply_levels(output.blue,  settings.curve, settings.lower_edge, settings.upper_edge)
+            white_f = OscLightSender._apply_levels(white_src, settings.curve, settings.lower_edge, settings.upper_edge)
+            blue_f  = OscLightSender._apply_levels(blue_src,  settings.curve, settings.lower_edge, settings.upper_edge)
             if settings.use_signed:
                 white_channel: np.ndarray = OscLightSender.float_to_int8(white_f)
                 blue_channel:  np.ndarray = OscLightSender.float_to_int8(blue_f)

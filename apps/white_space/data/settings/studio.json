@@ -3,7 +3,7 @@
   "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "render_fps": 121.0,
+  "render_fps": 60.0,
   "light_resolution": 3600,
   "fov": 127.0,
   "spin_down_seconds": 7.0,
@@ -423,6 +423,10 @@
         "gap": 0.0,
         "blend": "ADD"
       },
+      "wind_down": {
+        "level": 1.0,
+        "blend": "ADD"
+      },
       "playhead_haunted": {
         "white": 1.0,
         "base_white": 0.33,
@@ -432,10 +436,10 @@
         "blend": "ADD"
       },
       "playhead_test": {
-        "front_white": 0.0,
-        "back_white": 0.0,
-        "left_blue": 0.0,
-        "right_blue": 0.0,
+        "front_white": 1.0,
+        "back_white": 0.5,
+        "left_blue": 0.5,
+        "right_blue": 0.5,
         "blend": "ADD"
       }
     },
@@ -457,10 +461,6 @@
         "blend": "ADD"
       },
       "flood": {
-        "level": 1.0,
-        "blend": "ADD"
-      },
-      "wind_down": {
         "level": 1.0,
         "blend": "ADD"
       },
@@ -640,7 +640,7 @@
       "mode": "THREE"
     },
     "manual": {
-      "select": "PLAY",
+      "select": "END_INTRO",
       "hold": true
     },
     "session": {
@@ -685,6 +685,10 @@
       "use_scores": false,
       "render_labels": true,
       "use_history_color": false
+    },
+    "bar_light_sim": {
+      "beam": 5.0,
+      "blur": 6.0
     },
     "colors": {
       "player_0": {
@@ -763,11 +767,11 @@
     "window": {
       "title": "Poser",
       "v_sync": true,
-      "monitor": "M0",
-      "x": 1896,
-      "y": 31,
-      "width": 663,
-      "height": 592,
+      "monitor": "M1",
+      "x": 72,
+      "y": 2441,
+      "width": 2039,
+      "height": 1254,
       "secondary_list": [],
       "secondary_fullscreen": true,
       "fullscreen_mode": "WINDOWED"

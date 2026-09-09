@@ -1,6 +1,6 @@
 
 from ._base_layer   import BaseLayer, LowLayer, HighLayer, LayerSettings, ChannelSettings
-from ._utilities    import BlendType
+from ._utilities    import BlendType, angle_to_strip_position, apply_circular
 from .compositor    import Compositor, Mix
 
 from .low.playhead_low        import PlayheadLow,     PlayheadLowSettings

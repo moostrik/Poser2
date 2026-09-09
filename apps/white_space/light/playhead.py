@@ -35,7 +35,7 @@ import math
 from modules.settings import BaseSettings, Field, Widget
 from modules.utils import EMAFilter
 
-from .motor import MotorState, MotorMode, _SENSOR_CEILING_RPM
+from .motor import MotorState, MotorMode, FIXTURE_SLOW_RPM
 
 # Re-lock onto the measured phase once the spinning-down motor reaches content speed, within this
 # relative tolerance of low_rpm (absorbs measurement jitter as it settles at the LOW target).
@@ -43,7 +43,7 @@ _RESYNC_RPM_TOL: float = 0.05
 
 # Falls silent for this long while commanded HIGH → the bar has physically blurred into the ring
 # (the sensor cannot pulse above the ceiling; 2.5 ceiling-periods absorbs the last slow pulses).
-_RING_SILENCE_S: float = 2.5 * 60.0 / _SENSOR_CEILING_RPM
+_RING_SILENCE_S: float = 2.5 * 60.0 / FIXTURE_SLOW_RPM
 
 
 def _wrap_to_pi(x: float) -> float:

@@ -28,13 +28,13 @@ class LayerId(IntEnum):
     sound_light         = auto()   # low: soundscape levels on the left/right blue lamps
     playhead_low        = auto()   # low: front white lamp (the searchlight line)
     playhead_flash      = auto()   # low: flash as the playhead crosses a participant
+    wind_down           = auto()   # low: flood's ending — the two white lamps fading over the spin-down (the wall while fast)
     playhead_haunted    = auto()   # low: player/ghost flash (debug/experimentation)
     playhead_test       = auto()   # low: direct levels for the four physical lamps (debug)
     # high — the POV ring regime
     pose_instrument     = auto()   # high: the pose instrument (placeholder — see LAYERS.md)
     playhead_high       = auto()   # high: bright ring marker visualising the content playhead
     flood               = auto()   # high: constant full-strip white (S7's wall)
-    wind_down           = auto()   # cross-regime (classed LowLayer) — flood's ending: fades ring + lamps, finishing one bar after motor lock
     test_pose_waves     = auto()   # high: the old wave/void instrument (reference/montage)
     test_harmonic       = auto()
     test_player_lines   = auto()
@@ -59,13 +59,13 @@ class DebugLayer(IntEnum):
     sound_light         = auto()
     playhead_low        = auto()
     playhead_flash      = auto()
+    wind_down           = auto()
     playhead_haunted    = auto()
     playhead_test       = auto()
     # high — the POV ring regime
     pose_instrument     = auto()
     playhead_high       = auto()
     flood               = auto()
-    wind_down           = auto()
     test_pose_waves     = auto()
     test_harmonic       = auto()
     test_player_lines   = auto()
@@ -78,25 +78,25 @@ class DebugLayer(IntEnum):
 
 
 class LowLayersSettings(BaseSettings):
-    """Per-layer composition settings — the low (lamp-regime) block of the pool."""
+    """Per-layer composition settings — the low (lamp-regime) block of the pool.
+    `spin_down_seconds` is a hidden relay (from the root) into wind_down — the spin-down
+    slider's visible home is the statemachine panel, next to spin_up."""
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S8/S9 wall-fade seconds — hidden relay from statemachine (via the root) into wind_down")
     sound_light:        Group[SoundLightSettings]       = Group(SoundLightSettings)
     playhead_low:       Group[PlayheadLowSettings]      = Group(PlayheadLowSettings)
     playhead_flash:     Group[PlayheadFlashSettings]    = Group(PlayheadFlashSettings)
+    wind_down:          Group[WindDownSettings]         = Group(WindDownSettings, share=[spin_down_seconds.as_('spin_down_seconds')])
     playhead_haunted:   Group[PlayheadHauntedSettings]  = Group(PlayheadHauntedSettings)
     playhead_test:      Group[PlayheadTestSettings]     = Group(PlayheadTestSettings)
 
 
 class HighLayersSettings(BaseSettings):
-    """Per-layer composition settings — the high (ring-regime) block of the pool, plus
-    `wind_down` (cross-regime, classed LowLayer) sitting next to flood, its ending.
-    `fov` and `spin_down_seconds` are hidden relays (from the root) into their layers —
-    the spin-down slider's visible home is the statemachine panel, next to spin_up."""
+    """Per-layer composition settings — the high (ring-regime) block of the pool.
+    `fov` is a hidden relay (from the root) into the calibration layers."""
     fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, visible=False, description="Camera horizontal FOV — hidden relay to test_player_lines/test_calibration")
-    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S8/S9 wall-fade seconds — hidden relay from statemachine (via the root) into wind_down")
     pose_instrument:    Group[PoseInstrumentSettings]  = Group(PoseInstrumentSettings)
     playhead_high:      Group[PlayheadHighSettings]    = Group(PlayheadHighSettings)
     flood:              Group[FloodSettings]           = Group(FloodSettings)
-    wind_down:          Group[WindDownSettings]        = Group(WindDownSettings, share=[spin_down_seconds.as_('spin_down_seconds')])
     test_pose_waves:    Group[PoseWavesSettings]       = Group(PoseWavesSettings)
     test_harmonic:      Group[HarmonicSettings]        = Group(HarmonicSettings)
     test_player_lines:  Group[PlayerLinesSettings]     = Group(PlayerLinesSettings, share=[fov.as_('fov')])
@@ -134,5 +134,5 @@ class LightSettings(BaseSettings):
     playhead:     Group[PlayheadSettings]     = Group(PlayheadSettings)
 
     # The per-layer composition settings pool, grouped by regime (mirrors layers/low|high/).
-    low_layers:  Group[LowLayersSettings]  = Group(LowLayersSettings)
-    high_layers: Group[HighLayersSettings] = Group(HighLayersSettings, share=[fov.as_('fov'), spin_down_seconds.as_('spin_down_seconds')])
+    low_layers:  Group[LowLayersSettings]  = Group(LowLayersSettings, share=[spin_down_seconds.as_('spin_down_seconds')])
+    high_layers: Group[HighLayersSettings] = Group(HighLayersSettings, share=[fov.as_('fov')])
