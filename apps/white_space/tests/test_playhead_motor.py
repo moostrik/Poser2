@@ -177,6 +177,54 @@ class MotorTest(unittest.TestCase):
         self.assertFalse(st.locked)
 
 
+class RefreshCommandTest(unittest.TestCase):
+    """`refresh_command` folds a command issued *after* `tick()` into that tick's state — the
+    Conductor's fix for a mix and its regime disagreeing by one frame — without disturbing the
+    measurement the playhead has already consumed."""
+
+    def _locked(self, mode: MotorMode) -> MotorController:
+        m = MotorController(MotorSettings())
+        m.set_mode(mode)
+        m._last_fall_time = monotonic() - 0.25
+        m._measured_period = 1.0
+        return m
+
+    def test_an_unchanged_command_returns_the_state_untouched(self) -> None:
+        m = self._locked(MotorMode.LOW)
+        state = m.tick()
+        self.assertIs(m.refresh_command(state), state)
+
+    def test_a_new_command_lands_in_the_state(self) -> None:
+        settings = MotorSettings()
+        m = MotorController(settings)
+        m.set_mode(MotorMode.HIGH)
+        state = m.tick()
+        m.set_mode(MotorMode.LOW)                       # the machine commands LOW after the tick
+        refreshed = m.refresh_command(state)
+        self.assertEqual(refreshed.mode, MotorMode.LOW)
+        self.assertEqual(refreshed.target_rpm, settings.low_rpm)
+        self.assertEqual(settings.active_mode, MotorMode.LOW)   # the panel readback follows too
+
+    def test_the_measurement_is_left_alone(self) -> None:
+        m = self._locked(MotorMode.LOW)
+        state = m.tick()
+        self.assertTrue(state.locked)
+        m.set_mode(MotorMode.HIGH)
+        refreshed = m.refresh_command(state)
+        self.assertEqual(refreshed.phase, state.phase)                  # what this tick measured,
+        self.assertEqual(refreshed.locked, state.locked)                # and what the playhead saw,
+        self.assertEqual(refreshed.measured_rpm, state.measured_rpm)    # stays as it is
+        self.assertEqual(refreshed.effective_rpm, state.measured_rpm)   # locked → the measured speed
+
+    def test_the_debug_override_still_outranks_the_machine(self) -> None:
+        m = MotorController(MotorSettings())
+        m.set_mode(MotorMode.LOW)
+        state = m.tick()
+        m.set_debug_mode(MotorMode.HIGH)
+        m.set_mode(MotorMode.STOPPED)
+        self.assertEqual(m.refresh_command(state).mode, MotorMode.HIGH)
+
+
 class SimTest(unittest.TestCase):
     """The sim is a physical stand-in, never a decision-maker: it obeys the commanded
     mode (same arbitration as the real motor) and mimics the sensor's silence above

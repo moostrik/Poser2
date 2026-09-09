@@ -6,7 +6,7 @@
   "render_fps": 60.0,
   "light_resolution": 3600,
   "fov": 127.0,
-  "spin_down_seconds": 7.0,
+  "spin_down_seconds": 6.0,
   "camera": {
     "yolo": true,
     "color": false,
@@ -632,7 +632,7 @@
   },
   "statemachine": {
     "spin_up_seconds": 14.0,
-    "intro_idle_bars": 0.5,
+    "intro_idle_bars": 2.0,
     "end_bars": 4.0,
     "count_hold_seconds": 1.0,
     "sync": {
@@ -687,8 +687,8 @@
       "use_history_color": false
     },
     "bar_light_sim": {
-      "beam": 5.0,
-      "blur": 6.0
+      "beam": 2.0,
+      "blur": 4.0
     },
     "colors": {
       "player_0": {
@@ -768,10 +768,10 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M1",
-      "x": 72,
-      "y": 2441,
-      "width": 2039,
-      "height": 1254,
+      "x": 156,
+      "y": 1711,
+      "width": 1969,
+      "height": 1817,
       "secondary_list": [],
       "secondary_fullscreen": true,
       "fullscreen_mode": "WINDOWED"

@@ -18,7 +18,7 @@ Simulate mode (simulate=True):
 """
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import IntEnum, auto
 from threading import Thread, Event, Lock
 from time import monotonic
@@ -288,3 +288,24 @@ class MotorController:
         return MotorState(phase=phase, locked=locked, measured_rpm=measured_rpm, effective_rpm=effective_rpm,
                           mode=target_mode, target_rpm=target_rpm, low_rpm=self._settings.low_rpm,
                           raw_rpm=raw_rpm, fall_age=fall_age)
+
+    def refresh_command(self, state: MotorState) -> MotorState:
+        """Fold a command issued *since* `tick()` into an already-ticked state.
+
+        `tick()` has to run before the state machine — it feeds the playhead the machine reads —
+        so a mode the machine commands during that update would otherwise reach the frame one
+        tick after the mix the same state drew. The two disagreeing is visible: entering S8/S9
+        the frame would carry HIGH's rpm while the mix wrote only bar lights, so the fixture
+        (whose readout mode follows the rpm it receives) would hold ring mode over an empty ring
+        for one frame — a black flash on the wall and in the render.
+
+        Only the commanded half moves. `locked`, `phase` and `measured_rpm` describe what this
+        tick measured and what the playhead already consumed, so they stay untouched.
+        """
+        mode = self._target_mode()
+        if mode == state.mode:
+            return state
+        target_rpm = self._target_rpm(mode)
+        self._settings.active_mode = mode
+        return replace(state, mode=mode, target_rpm=target_rpm,
+                       effective_rpm=state.measured_rpm if state.locked else target_rpm)

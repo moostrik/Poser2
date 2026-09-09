@@ -158,7 +158,8 @@ class Conductor(Thread):
 
         # Advance motor + playhead and publish the playhead BEFORE the update callbacks: the
         # state machine and pose-LERP read it. Phase is NaN while the motor is STOPPED (no
-        # meaningful playhead); the bar counter stays monotonic throughout.
+        # meaningful playhead); the bar counter stays monotonic throughout. The command those
+        # callbacks issue is folded back in below, before the frame is drawn.
         motor = self._motor_controller.tick()
         self._playhead.tick(tick.dt, motor)
         playhead = self._playhead.phase
@@ -167,6 +168,12 @@ class Conductor(Thread):
             ring_formed=self._playhead.ring_formed))
 
         self._notify_update()
+
+        # The state machine commands the motor from inside those callbacks, and on a state's
+        # entry tick it also hands the Compositor that state's mix. Fold the new command into
+        # the frame so the two can never disagree: the rpm the frame is sent with is the rpm
+        # its content was drawn for (see MotorController.refresh_command).
+        motor = self._motor_controller.refresh_command(motor)
 
         frame = Frame(self._config.light_resolution, tick, motor, playhead=playhead)
         self._compositor.render(frame)
