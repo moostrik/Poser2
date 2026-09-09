@@ -8,8 +8,9 @@ the landing look (the playhead line, the sound visuals) underneath at constant w
 this layer fades the wall to nothing and thereby reveals it.
 
 Fade level: ``f = (1 − ease(elapsed / spin_down_seconds)) × (1 − ease(bars since motor
-lock))``. The timed factor is hand-tuned to ride the physical spin-down
-(``statemachine.spin_up_seconds`` is its mirror); the lock factor guarantees the
+lock))``. The timed factor is hand-tuned to ride the physical spin-down — its visible
+slider is ``statemachine.spin_down_seconds`` (next to ``spin_up_seconds``, its mirror),
+shared into this layer's hidden field via the root; the lock factor guarantees the
 remainder is extinguished within exactly one round of the reborn playhead after the
 motor re-locks at LOW — whichever factor is still unfinished, the wall is gone one bar
 after the lock, smoothly and monotonically. ``reset()`` (a show state's entry) restarts
@@ -28,7 +29,7 @@ from ...frame import Frame
 
 class WindDownSettings(LayerSettings):
     level:             Field[float] = Field(1.0,  min=0.0, max=1.0,  step=0.01, description="Wall white level (the fade starts here and lands at 0)")
-    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5,  description="Timed wall fade — hand-tuned to the physical spin-down (spin_up_seconds' mirror)")
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="Timed wall fade (seconds) — shared from statemachine.spin_down_seconds, edit it there")
     progress:          Field[float] = Field(0.0,  min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Fade progress (0 = full wall, 1 = gone)")
 
 

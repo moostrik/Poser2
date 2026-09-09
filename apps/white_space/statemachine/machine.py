@@ -77,11 +77,12 @@ class StateMachineSettings(BaseSettings):
     select:  Field[StateId] = Field(StateId.IDLE, description="State to jump to with the goto button", newline=True)
     goto:    Field[bool]      = Field(False, widget=Widget.button, description="Jump to the selected state now (also when disabled)")
 
-    # Transition-state durations — one per state. END_INTRO/END_IDLE have none: their
-    # fade lives in the wind_down layer (its spin_down_seconds slider is spin_up_seconds'
-    # mirror) and their exit is one playhead bar after the motor re-locks at LOW.
+    # Transition-state durations — one per state. spin_down_seconds is shared (via the
+    # root) into the wind_down layer, which runs the S8/S9 wall fade on it; those states'
+    # exit is one playhead bar after the motor re-locks at LOW.
     intro_idle_bars:       Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="INTRO_IDLE: playhead bars back to IDLE", newline=True)
-    spin_up_seconds:       Field[float] = Field(14.0, min=1.0, max=60.0,  step=0.5, description="INTRO_PLAY: spin-up transition (seconds) — hand-tuned to the physical spin-up (wind_down.spin_down_seconds' mirror)")
+    spin_up_seconds:       Field[float] = Field(14.0, min=1.0, max=60.0,  step=0.5, description="INTRO_PLAY: spin-up transition (seconds) — hand-tuned to the physical spin-up (spin_down_seconds' mirror)")
+    spin_down_seconds:     Field[float] = Field(10.0, min=1.0, max=60.0,  step=0.5, description="END_INTRO/END_IDLE: wall fade towards the line (seconds) — hand-tuned to the physical spin-down (drives the wind_down layer)")
     end_bars:              Field[float] = Field(3.0,  min=0.5, max=20.0,  step=0.5, description="END: wind-down playhead bars (bidirectional ramp)")
 
     # Session-mode timeouts — named for the state they cut short

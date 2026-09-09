@@ -275,7 +275,8 @@ extinguishing completely. The state outlives the spin-down by that final bar.
 the ring→lamps regime flip needs knowledge of both light mechanics, which belongs in
 one robust place — see `LAYERS.md`. And it is timed, not driven by the measured
 deceleration: the sensor's spin-down readings don't resolve a usable ramp — driving a
-fade from them snaps. The layer's `spin_down_seconds` slider is tuned by hand to the
+fade from them snaps. The `statemachine.spin_down_seconds` slider — next to
+`spin_up_seconds`, its mirror; shared into the layer — is tuned by hand to the
 physical spin-down; S5's `spin_up_seconds` is its mirror.)*
 
 - **Participants**: < 3, > 0 · **Duration**: the spin-down + 1 bar · **Motor**: LOW

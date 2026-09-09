@@ -3,9 +3,10 @@
   "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "render_fps": 121.0,
+  "render_fps": 120.0,
   "light_resolution": 3600,
   "fov": 127.0,
+  "spin_down_seconds": 7.0,
   "camera": {
     "yolo": true,
     "color": false,
@@ -464,7 +465,6 @@
       },
       "wind_down": {
         "level": 1.0,
-        "spin_down_seconds": 10.0,
         "blend": "ADD"
       },
       "test_pose_waves": {
@@ -635,12 +635,12 @@
   },
   "statemachine": {
     "enabled": true,
-    "hold": false,
+    "hold": true,
     "session": false,
-    "select": "IDLE",
+    "select": "END_INTRO",
     "intro_idle_bars": 1.0,
     "spin_up_seconds": 14.0,
-    "end_bars": 3.0,
+    "end_bars": 1.0,
     "intro_session_seconds": 60.0,
     "play_session_seconds": 150.0,
     "sync_threshold": 0.75,

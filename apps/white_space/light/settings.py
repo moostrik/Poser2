@@ -64,12 +64,14 @@ class LowLayersSettings(BaseSettings):
 class HighLayersSettings(BaseSettings):
     """Per-layer composition settings — the high (ring-regime) block of the pool, plus
     `wind_down` (cross-regime, classed LowLayer) sitting next to flood, its ending.
-    `fov` is a hidden relay (from the root) into test_player_lines/test_calibration."""
+    `fov` and `spin_down_seconds` are hidden relays (from the root) into their layers —
+    the spin-down slider's visible home is the statemachine panel, next to spin_up."""
     fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, visible=False, description="Camera horizontal FOV — hidden relay to test_player_lines/test_calibration")
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S8/S9 wall-fade seconds — hidden relay from statemachine (via the root) into wind_down")
     pose_instrument:    Group[PoseInstrumentSettings]  = Group(PoseInstrumentSettings)
     playhead_high:      Group[PlayheadHighSettings]    = Group(PlayheadHighSettings)
     flood:              Group[FloodSettings]           = Group(FloodSettings)
-    wind_down:          Group[WindDownSettings]        = Group(WindDownSettings)
+    wind_down:          Group[WindDownSettings]        = Group(WindDownSettings, share=[spin_down_seconds.as_('spin_down_seconds')])
     test_pose_waves:    Group[PoseWavesSettings]       = Group(PoseWavesSettings)
     test_harmonic:      Group[HarmonicSettings]        = Group(HarmonicSettings)
     test_player_lines:  Group[PlayerLinesSettings]     = Group(PlayerLinesSettings, share=[fov.as_('fov')])
@@ -90,8 +92,9 @@ class LightSettings(BaseSettings):
     light_rate:       Field[float] = Field(30.0, min=1,   max=120,  access=Field.INIT, description="Light output frame rate (fps)")
     light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, description="LED strip resolution (pixels)")
     fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV — hidden relay from root to player_lines/calibration")
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S8/S9 wall-fade seconds — hidden relay from statemachine (via the root) into wind_down")
 
-    master:         Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Master brightness (applied to the composite; lamp gamma/floor live in the light sender)", newline=True)
+    master:         Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Master brightness (applied to the composite; lamp gamma/floor live in the light sender)", newline=True, pinned=True)
     light_phase: Field[float]    = Field(0.0, min=0.0, max=1.0, step=0.01, description="High-speed ring offset (0–1 turn), applied to the spun-content layers")
 
     # Debug override — a first-class select ABOVE the state machine: choosing a layer IS
@@ -107,4 +110,4 @@ class LightSettings(BaseSettings):
 
     # The per-layer composition settings pool, grouped by regime (mirrors layers/low|high/).
     low_layers:  Group[LowLayersSettings]  = Group(LowLayersSettings)
-    high_layers: Group[HighLayersSettings] = Group(HighLayersSettings, share=[fov.as_('fov')])
+    high_layers: Group[HighLayersSettings] = Group(HighLayersSettings, share=[fov.as_('fov'), spin_down_seconds.as_('spin_down_seconds')])

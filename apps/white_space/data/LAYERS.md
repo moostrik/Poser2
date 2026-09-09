@@ -99,9 +99,10 @@ to update.
   guarantees complete extinguishing within **exactly one round of the reborn playhead**
   after the motor re-locks at LOW. Whichever factor is still unfinished, the wall is
   gone one bar after the lock, smoothly and monotonically — a clock can't snap.
-- **Settings**: `level`, `spin_down_seconds` (the spin-down slider —
-  `statemachine.spin_up_seconds` is its mirror), `progress` (read-only fade readout
-  0..1: the states' `stage_progress` and S9's sound-visual reveal ride it)
+- **Settings**: `level`, `spin_down_seconds` (hidden — the visible slider is
+  `statemachine.spin_down_seconds`, next to `spin_up_seconds`, shared in via the root),
+  `progress` (read-only fade readout 0..1: the states' `stage_progress` and S9's
+  sound-visual reveal ride it)
 - **Reset**: restarts the fade at the full wall (called from S8/S9 `enter()`)
 - **Open questions**: —
 
