@@ -68,6 +68,11 @@ class StateMachineSettings(BaseSettings):
     """Configuration for the show StateMachine. Every timing is named for the state it
     times, unit in the name (seconds = wall clock, bars = playhead bars)."""
 
+    # Blackout — the installation's big switch. Pinning it is OFF's entry door (from any
+    # state, beating hold and goto); leaving OFF is a normal condition: once unpinned,
+    # OffState exits to INTRO or IDLE depending on presence.
+    blackout: Field[bool] = Field(False, pinned=True, description="Blackout: pin to switch the installation OFF (spinning low, strip dark, /global/state 0); unpin and OFF exits to INTRO (people present) or IDLE (empty)")
+
     # Telemetry (read-only) — the show at a glance
     current:      Field[StateId] = Field(StateId.IDLE, access=Field.READ, description="Current show state")
     progress:     Field[float]     = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Active state progress")

@@ -631,6 +631,7 @@
     }
   },
   "statemachine": {
+    "blackout": false,
     "spin_up_seconds": 14.0,
     "intro_idle_bars": 2.0,
     "end_bars": 4.0,

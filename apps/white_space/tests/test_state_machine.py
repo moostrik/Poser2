@@ -314,20 +314,77 @@ class StateMachineTest(unittest.TestCase):
 
     # -- dev controls ----------------------------------------------------------
 
-    def test_off_state_is_dark_stopped_and_goto_only(self) -> None:
+    def test_blackout_pins_off_from_anywhere(self) -> None:
+        # Pinning blackout is OFF's entry door: pin → OFF immediately (dark strip,
+        # /global/state 0), and OFF stays put while pinned. Dark and silent, but the
+        # rotor keeps sweeping at LOW so the playhead never unlocks.
+        self._to_play()
+        self.config.blackout = True
         self.tick()
-        self.goto(StateId.OFF)
         self.assertEqual(self.current, StateId.OFF)
-        self.assertEqual(self.motors[-1], MotorMode.STOPPED)
+        self.assertEqual(self.motors[-1], MotorMode.LOW)      # still sweeping — no re-acquire
         self.assertEqual(self.mixes[-1], [])                  # dark strip
         self.assertEqual(self.emitted[-1].stage, 0)           # /global/state 0 = off
-        self.set_participants(3)                              # no condition leaves OFF
+        self.set_participants(3)                              # presence alone never leaves OFF
         self.tick(dt=999.0)
         self.assertEqual(self.current, StateId.OFF)
-        self.set_participants(0)
-        self.goto(StateId.IDLE)                               # operator resumes the show
-        self.assertEqual(self.current, StateId.IDLE)
+
+    def test_unpin_wakes_by_presence(self) -> None:
+        # OFF exits like any state: released with people present → INTRO; empty → IDLE.
+        self._to_play()                                       # 3 participants present
+        self.config.blackout = True
+        self.tick()
+        self.assertEqual(self.current, StateId.OFF)
+        self.config.blackout = False
+        self.tick()
+        self.assertEqual(self.current, StateId.INTRO)
         self.assertEqual(self.motors[-1], MotorMode.LOW)
+
+    def test_unpin_wakes_in_idle_when_empty(self) -> None:
+        self.tick()
+        self.config.blackout = True
+        self.tick()
+        self.assertEqual(self.current, StateId.OFF)
+        self.config.blackout = False
+        self.tick()
+        self.assertEqual(self.current, StateId.IDLE)
+
+    def test_blackout_entry_beats_hold_exit_is_a_normal_condition(self) -> None:
+        self.tick()
+        self.config.manual.hold = True
+        self.config.blackout = True
+        self.tick()
+        self.assertEqual(self.current, StateId.OFF)           # entry wins over hold
+        self.config.blackout = False
+        self.tick()
+        self.assertEqual(self.current, StateId.OFF)           # exit is condition-driven → held
+        self.config.manual.hold = False
+        self.tick()
+        self.assertEqual(self.current, StateId.IDLE)          # released → normal exit
+
+    def test_goto_off_behaves_like_any_goto(self) -> None:
+        # OFF is a state like any other: goto + hold parks it dark; without hold its own
+        # exit condition (blackout unpinned) fires immediately, like any bouncing goto.
+        self.tick()
+        self.config.manual.hold = True
+        self.goto(StateId.OFF)
+        self.assertEqual(self.current, StateId.OFF)
+        self.assertEqual(self.motors[-1], MotorMode.LOW)
+        self.config.manual.hold = False
+        self.tick()
+        self.assertEqual(self.current, StateId.IDLE)          # unpinned → wakes right out
+
+    def test_boot_failsafe_clears_blackout(self) -> None:
+        # A preset saved with blackout pinned must never wake the installation dark.
+        config = StateMachineSettings()
+        config.blackout = True
+        machine = StateMachine(config, LightSettings(), board=FakeBoard(),
+                               set_mix=lambda _: None, reset_layers=lambda _: None,
+                               set_motor=lambda _: None, pose_stage=POSE_STAGE)
+        try:
+            self.assertFalse(config.blackout)
+        finally:
+            machine.stop()
 
     def test_goto_jumps_and_commands_motor(self) -> None:
         self.tick()

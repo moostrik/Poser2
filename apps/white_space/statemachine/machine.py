@@ -49,6 +49,8 @@ class StateContext:
     sync_count: int         # participants whose similarity is ≥ sync.threshold
     hit:     bool           # a live participant was passed by the playhead this tick
     session: bool           # session mode active — states consult it in needs_state_change()
+    blackout: bool          # the pinned blackout toggle — OFF stays put while pinned and
+                            # exits (to INTRO or IDLE by presence) once released
     prev: StateId | None    # the state we arrived from (None at boot) — lets a transition
                             # state ramp from where the show actually was (no dips)
     motor_locked: bool      # the playhead has re-synced to the measured rotation at LOW
@@ -80,8 +82,10 @@ class StateMachine:
         # Failsafe: the show ALWAYS starts in IDLE (motor LOW), regardless of the persisted
         # `manual.select` value — that field is only the goto target. A preset saved mid-show
         # must never boot the machine into a HIGH-motor state. And `manual.hold` is forced
-        # off: a preset saved mid-hold must never freeze the power-on show.
+        # off: a preset saved mid-hold must never freeze the power-on show. `blackout` is
+        # forced off too: the installation always wakes in the show, never dark.
         config.manual.hold = False
+        config.blackout = False
         self._current: StateId = StateId.IDLE
         self._active: StateBase = self._states[self._current]
         self._entered: bool = False             # the boot entry into IDLE happens on the first
@@ -184,6 +188,7 @@ class StateMachine:
             sync_count=sync_count,
             hit=hit,
             session=self._config.session.enabled,
+            blackout=self._config.blackout,
             prev=self._prev_state,
             motor_locked=signals.synced,
             ring_formed=signals.ring_formed,
@@ -205,6 +210,12 @@ class StateMachine:
             # Startup failsafe: always enter IDLE (see __init__) — `manual.select` is not consulted.
             self._goto_requested = False
             self._switch(StateId.IDLE, now, dt, signals.bars, participants, hit, signals)
+        elif self._config.blackout and self._current != StateId.OFF:
+            # Pinning blackout is OFF's entry door: highest-priority input, from anywhere,
+            # beating hold and goto. Leaving OFF is a normal condition — OffState exits to
+            # INTRO or IDLE (by presence) once the toggle is released.
+            self._goto_requested = False
+            self._switch(StateId.OFF, now, dt, signals.bars, participants, hit, signals)
         elif self._goto_requested:
             self._goto_requested = False
             self._switch(StateId(int(self._config.manual.select)), now, dt, signals.bars, participants, hit, signals)

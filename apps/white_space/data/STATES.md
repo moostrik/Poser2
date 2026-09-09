@@ -23,7 +23,7 @@ the way up (the lamp bar physically blurring into the ring).
 
 | #  | State      | P        | Duration      | Motor   | White light                      | Blue light                | Pose sound           | Secondary sound                |
 |----|------------|----------|---------------|---------|----------------------------------|---------------------------|----------------------|--------------------------------|
-| S0 | OFF        | —        | ∞             | STOPPED | none                             | none                      | no                   | no                             |
+| S0 | OFF        | —        | ∞ (blackout)  | LOW     | none                             | none                      | no                   | no                             |
 | S1 | IDLE       | 0        | ∞             | LOW     | BRIGHT line                      | sound visuals             | no                   | searchlight soundscape         |
 | S2 | IDLE_INTRO | > 0      | until hit     | LOW     | BRIGHT line                      | sound visuals             | yes (pre-hit)        | searchlight + anticipatory cue |
 | S3 | INTRO      | > 0      | ∞             | LOW     | DIM line + flash on hit          | none                      | yes (only)           | none                           |
@@ -38,8 +38,10 @@ the way up (the lamp bar physically blurring into the ring).
 
 ```mermaid
 stateDiagram-v2
-    OFF: OFF — entered and left only via goto (operator)
+    OFF: OFF — dark and silent, still sweeping at LOW
     [*] --> IDLE
+    OFF --> INTRO: blackout released, P > 0
+    OFF --> IDLE: blackout released, P == 0
     IDLE --> IDLE_INTRO: P > 0
     IDLE_INTRO --> INTRO: hit by light
     IDLE_INTRO --> INTRO_IDLE: P == 0
@@ -56,11 +58,12 @@ stateDiagram-v2
 ```
 
 The machine always **boots into IDLE** (failsafe — the persisted `manual.select` is only
-the goto target, and `manual.hold` is forced off at construction: a power-cycled
-installation resumes the show unattended). **OFF (S0) sits outside
-the automatic graph**: no condition enters or leaves it — only the operator's goto. In
-**session mode** the two open-ended states (INTRO, PLAY) gain timed exits, and END only
-winds down (no return to PLAY), so a session always concludes.
+the goto target, and `manual.hold` and `blackout` are forced off at construction: a
+power-cycled installation resumes the show unattended, never dark). **OFF (S0)** is
+entered from any state by pinning `blackout` (an operator input, so it is not drawn as
+an edge above) and leaves it by condition like any other state. In **session mode** the
+two open-ended states (INTRO, PLAY) gain timed exits, and END only winds down (no return
+to PLAY), so a session always concludes.
 
 **Boot invariant — the motor NEVER powers on into HIGH.** Every path that could command
 HIGH at boot is guarded, and each guard has a unit test:
@@ -119,18 +122,24 @@ returns the show where it would have been).
 
 ## S0 — OFF
 
-The installation is off: the machine stands still and the strip is dark. An operational
-state, not a show beat — end of day, before opening. On the wire, `/global/state` 0
-means off.
+The installation is off: dark and silent. An operational state, not a show beat — end of
+day, before opening. On the wire, `/global/state` 0 means off.
 
-- **Participants**: — (ignored) · **Duration**: ∞ · **Motor**: STOPPED
-- **Transitions**: none — entered and left only via the operator's `goto` (typically
-  goto IDLE to start the show). The machine never enters or leaves OFF on its own.
-- **Mix**: empty (dark strip)
+The rotor keeps sweeping at LOW: OFF is "dark and silent", not "powered down". Stopping
+would silence the fall sensor and unlock the playhead, so waking would need a full
+re-acquire; sweeping on keeps the content clock locked and the wake instant. Quitting the
+app is the true stop.
+
+- **Participants**: — (ignored) · **Duration**: ∞ (as long as `blackout` is pinned) ·
+  **Motor**: LOW
+- **Transitions**: **in** — pinning `statemachine.blackout`, the machine's
+  highest-priority input: from any state, beating `hold` and `goto`. **out** — a normal
+  condition like any other state's: once `blackout` is released, → INTRO if participants
+  are present, else → IDLE.
+- **Mix**: empty (dark strip) — darkness comes from the mix alone, since the bar is
+  turning and the fixture is in slot mode
 - **White / Blue**: none
 - **Pose sound / Secondary sound**: no
-- **Note**: the hardware failsafe (no rotation → lights off) independently guarantees a
-  dark stationary bar even if a mix were composed here.
 - **Open questions**: —
 
 ## S1 — IDLE

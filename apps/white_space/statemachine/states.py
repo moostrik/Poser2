@@ -88,13 +88,21 @@ class StateBase:
 # -- Steady states ---------------------------------------------------------------
 
 class OffState(StateBase):
-    """S0 — the installation is off: the machine stands still and the strip is dark.
-    An operational state, not a show beat — outside the automatic graph entirely:
-    entered and left only via the operator's goto. On the wire, /global/state 0 = off."""
-    MOTOR = MotorMode.STOPPED
+    """S0 — the installation is off: dark and silent, but the rotor keeps sweeping at LOW
+    so the playhead never unlocks (waking needs no re-acquire; quitting the app is the
+    true stop). An operational state with normal exit conditions: entered by pinning
+    ``blackout`` (the machine's highest-priority input — from anywhere, beating hold and
+    goto); while pinned it stays put, and once released it wakes to INTRO (people
+    present) or IDLE (empty space). On the wire, /global/state 0 = off."""
+    MOTOR = MotorMode.LOW
 
     def update(self, ctx: StateContext) -> Mix:
         return []                       # dark strip
+
+    def needs_state_change(self, ctx: StateContext) -> StateId | None:
+        if ctx.blackout:
+            return None
+        return StateId.INTRO if ctx.participants > 0 else StateId.IDLE
 
 
 class IdleState(StateBase):
