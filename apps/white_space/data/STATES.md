@@ -181,7 +181,7 @@ as it crosses each participant.
 - **White**: DIM line + BRIGHT flash on hit
 - **Blue**: none
 - **Pose sound**: yes (only sound)
-- **Ghosts**: an experimentation mode, used by no state — `ghost.ghoster.enabled` off
+- **Ghosts**: an experimentation mode, used by no state — `pose.ghoster.enabled` off
   means no ghosts anywhere (no sound slots, nothing to draw); enabling it plus the
   `playhead_haunted` debug layer brings ghost sound and visuals together for solo testing.
 - **Secondary sound**: none

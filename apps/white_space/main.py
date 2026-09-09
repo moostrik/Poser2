@@ -57,7 +57,7 @@ class WhiteSpaceMain:
         # RECORDING (independent of the show — works stand-alone and during session mode)
         self.session = Session(self.settings.recording.core)
         self.osc_sound_sender = OscSoundSender(self.settings.inout.osc_sound_sender)
-        self.ghoster = Ghoster(self.settings.ghost.ghoster, playhead=self.board.get_playhead)   # live/pool counts shared from root
+        self.ghoster = Ghoster(self.settings.pose.ghoster, playhead=self.board.get_playhead)   # live/pool counts shared from root
         self.video_recorder = VideoRecorder(self.settings.recording.video, data_path=DATA_PATH)
 
         # CAMERA

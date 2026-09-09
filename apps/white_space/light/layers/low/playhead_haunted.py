@@ -1,5 +1,5 @@
 """PlayheadHaunted — the low-speed player/ghost flash (a debug/experimentation layer,
-never in a state's mix; pairs with ``ghost.ghoster.enabled`` for solo ghost sessions).
+never in a state's mix; pairs with ``pose.ghoster.enabled`` for solo ghost sessions).
 
 WHITE (front-lamp) channel: a flash as the rotating playhead crosses each live player (at full
 ``white``), and — when ``ghosts`` is enabled — as it crosses each **active** ghost at its fixed

@@ -34,7 +34,7 @@ right after `flood`, whose ending it is. See its section below.
 Debug layers (never in a state's mix; reached via the `light.debug` select — **choosing a
 layer IS turning debug on**: it shows solo at full weight and the motor auto-follows its
 regime, OFF returns the show): the two low tools `playhead_haunted` (the ghost flash;
-pairs with `ghost.ghoster.enabled` for solo experimentation) and `playhead_test` (direct
+pairs with `pose.ghoster.enabled` for solo experimentation) and `playhead_test` (direct
 levels for the four physical lamps: front/back white, left/right blue — the lamp regime's
 hardware check), plus the high `test_`-prefixed patterns: `test_pose_waves` (the old
 wave/void instrument, kept as a reference/montage visual), `test_harmonic`,

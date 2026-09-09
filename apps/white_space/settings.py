@@ -188,6 +188,7 @@ class SimilarityFeature(BaseSettings):
 
 class PoseGroup(BaseSettings):
     max_poses        : Field[int]       = Field(3, min=1, max=16, access=Field.INIT)
+    ghost_slots      : Field[int]       = Field(8, min=0, max=16, access=Field.INIT, visible=False, description="Ghost id pool size (shared from root num_virtual)")
     model_type       : Field[inference.ModelType] = Field(inference.ModelType.TRT, access=Field.INIT)
     model_path       : Field[str]       = Field("", access=Field.INIT, visible=False)
     verbose          : Field[bool]      = Field(False, access=Field.INIT)
@@ -213,6 +214,9 @@ class PoseGroup(BaseSettings):
     window_smooth   : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_predict  : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_lerp     : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
+    # The ghost subsystem — virtual poses injected into the pipeline (feeds playhead_flash
+    # Dwell, the OSC sound id slots, and the playhead_haunted debug visual).
+    ghoster         : Group[GhosterSettings]                 = Group(GhosterSettings, share=[max_poses.as_('live_players'), ghost_slots.as_('ghost_slots')])
 
 
 # ---------------------------------------------------------------------------
@@ -298,17 +302,6 @@ class RenderSettings(BaseSettings):
 
 
 # ---------------------------------------------------------------------------
-#  Ghost group — the ghost subsystem: the Ghoster and its motor Escalator
-# ---------------------------------------------------------------------------
-
-class GhostGroup(BaseSettings):
-    live_players: Field[int] = Field(4, access=Field.INIT, visible=False, description="Live player count (shared from root num_players)")
-    ghost_slots:  Field[int] = Field(8, min=0, max=16, access=Field.INIT, visible=False, description="Ghost id pool size (shared from root num_virtual)")
-
-    ghoster  : Group[GhosterSettings]        = Group(GhosterSettings, share=[live_players, ghost_slots])
-
-
-# ---------------------------------------------------------------------------
 #  Root settings
 # ---------------------------------------------------------------------------
 
@@ -324,8 +317,7 @@ class Settings(BaseSettings):
 
     camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov])
     inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players'), num_virtual.as_('num_virtual'), light_resolution.as_('resolution')])
-    pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
-    ghost  : Group[GhostGroup]      = Group(GhostGroup, share=[num_players.as_('live_players'), num_virtual.as_('ghost_slots')])
+    pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), num_virtual.as_('ghost_slots'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     light: Group[LightSettings] = Group(LightSettings, share=[num_players.as_('max_poses'), num_cameras.as_('num_cameras'), light_resolution.as_('light_resolution'), fov, spin_down_seconds])
     statemachine: Group[StateMachineSettings] = Group(StateMachineSettings, share=[spin_down_seconds])
     render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams')])
