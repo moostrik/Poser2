@@ -21,7 +21,7 @@ RESOLUTION = 3600
 
 
 def _frame() -> Frame:
-    frame = Frame(RESOLUTION, Tick(0.0, 0.0, 120.0, 0.0, 0))
+    frame = Frame(RESOLUTION, Tick(0.0, 0.0))
     frame.white = np.linspace(0.0, 1.0, RESOLUTION, dtype=np.float32)
     frame.blue = np.linspace(1.0, 0.0, RESOLUTION, dtype=np.float32)
     return frame

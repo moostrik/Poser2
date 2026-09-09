@@ -52,7 +52,7 @@ class Compositor:
         self._config = config
         self._layers = layers              # each layer's SHIFTED flag (HighLayer) grants the ring shift
         self._entries: Mix = []
-        self._scratch = Frame(config.light_resolution, Tick(0.0, 0.0, 0.0, 0.0, 0))
+        self._scratch = Frame(config.light_resolution, Tick(0.0, 0.0))
 
     # -- Mix input (light thread, same thread as render) ----------------------
 

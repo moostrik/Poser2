@@ -35,7 +35,7 @@ class FakeLayer:
 
 
 def frame() -> Frame:
-    return Frame(RES, Tick(0.0, 0.0, 0.0, 0.0, 0))
+    return Frame(RES, Tick(0.0, 0.0))
 
 
 class CompositorTest(unittest.TestCase):

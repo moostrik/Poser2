@@ -1,4 +1,4 @@
-"""Harmonic composition — BPM-locked spatiotemporal LFO/wave-interference sources."""
+"""Harmonic composition — spatiotemporal LFO/wave-interference sources (rates in Hz)."""
 
 import math
 
@@ -13,8 +13,8 @@ from ...frame import Frame
 class HarmonicSourceSettings(BaseSettings):
     """One LFO source contributing to white and/or blue channels."""
     enabled:         Field[bool]  = Field(True,  description="Enable this source")
-    bpm_multiplier:  Field[float] = Field(1.0,  min=0.0, max=32.0, step=0.25,
-                                           description="Oscillations per beat (1.0 = 1 cycle/beat)")
+    hz:              Field[float] = Field(1.0,  min=0.0, max=32.0, step=0.25,
+                                           description="Oscillation rate (Hz)")
     spatial_cycles:  Field[float] = Field(3.0,  min=0.0, max=64.0, step=0.25,
                                            description="Spatial wavelength cycles across the full strip")
     phase_offset:    Field[float] = Field(0.0,  min=0.0, max=1.0,  step=0.01,
@@ -36,14 +36,14 @@ class HarmonicSettings(LayerSettings):
 
 
 class Harmonic(HighLayer):
-    """BPM-locked spatiotemporal LFO and harmonic interference composition.
+    """Spatiotemporal LFO and harmonic interference composition.
 
     Each source generates a 1-D spatial sine wave::
 
         value(x, t) = sin(2π * (spatial_cycles * x + hz * t + phase_offset + spatial_phase))
 
-    where ``hz = bpm_multiplier * bpm / 60``.  Sources accumulate additively
-    into white and blue according to their individual amplitudes.
+    with ``t`` in plain seconds.  Sources accumulate additively into white and blue
+    according to their individual amplitudes.
     """
 
     def __init__(self, resolution: int, config: HarmonicSettings, board) -> None:
@@ -62,10 +62,9 @@ class Harmonic(HighLayer):
         for src in sources:
             if not src.enabled:
                 continue
-            hz = src.bpm_multiplier * frame.tick.bpm / 60.0
             arg = (
                 self._x * src.spatial_cycles
-                + hz * frame.tick.time
+                + src.hz * frame.tick.time
                 + src.phase_offset
                 + src.spatial_phase
             ) * math.tau

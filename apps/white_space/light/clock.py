@@ -2,7 +2,11 @@
 
 `next_tick()` is the single authority for both timing and measurement: it blocks until the next
 frame deadline (high-resolution monotonic `perf_counter`, with a short busy-spin tail for
-sub-millisecond accuracy), then measures `dt`/phase and returns the `Tick`.
+sub-millisecond accuracy), then measures `dt` and returns the `Tick`.
+
+Deliberately carries no musical time: the show's musical clock is the playhead bar (one
+revolution at `low_rpm`) — states count bars, the sound side rides them. Debug patterns
+animate on plain seconds (`tick.time`) with their own rate knobs.
 """
 
 from __future__ import annotations
@@ -18,19 +22,14 @@ _SPIN_MARGIN: float = 0.001
 
 
 class ClockSettings(BaseSettings):
-    bpm:        Field[float] = Field(120.0, min=20.0, max=480.0, step=0.5, description="Master tempo (BPM)")
-    time:       Field[float] = Field(0.0, access=Field.READ, description="Elapsed wall-clock time (s)")
-    beat_phase: Field[float] = Field(0.0, access=Field.READ, description="Beat phase (0–1)")
+    time: Field[float] = Field(0.0, access=Field.READ, description="Elapsed wall-clock time (s)")
 
 
 @dataclass
 class Tick:
     """Immutable clock snapshot produced once per render tick."""
-    time:       float   # monotonic elapsed seconds since the first tick
-    dt:         float   # seconds elapsed since the previous tick
-    bpm:        float   # current master tempo in beats per minute
-    beat_phase: float   # beat phase: 0.0 = beat start, approaching 1.0 = next beat
-    beat:       int     # monotonic beat counter (increments each time beat_phase wraps)
+    time: float   # monotonic elapsed seconds since the first tick
+    dt:   float   # seconds elapsed since the previous tick
 
 
 class Clock:
@@ -45,8 +44,6 @@ class Clock:
         self._start: float | None = None   # baselines set lazily on the first tick
         self._last:  float = 0.0
         self._next:  float = 0.0
-        self._phase_acc: float = 0.0
-        self._beat:      int   = 0
 
     @property
     def interval(self) -> float:
@@ -73,23 +70,9 @@ class Clock:
 
         dt = now - self._last
         self._last = now
-        elapsed = now - self._start
 
-        bpm = self._settings.bpm
-        self._phase_acc += dt * bpm / 60.0
-        if self._phase_acc >= 1.0:
-            full_beats       = int(self._phase_acc)
-            self._beat      += full_beats
-            self._phase_acc -= full_beats
-
-        t = Tick(
-            time       = elapsed,
-            dt         = dt,
-            bpm        = bpm,
-            beat_phase = self._phase_acc,
-            beat       = self._beat,
-        )
-        self._update_readouts(t)
+        t = Tick(time=now - self._start, dt=dt)
+        self._settings.time = t.time
         return t
 
     @staticmethod
@@ -100,7 +83,3 @@ class Clock:
             sleep(coarse)
         while perf_counter() < deadline:
             pass
-
-    def _update_readouts(self, t: Tick) -> None:
-        self._settings.time       = t.time
-        self._settings.beat_phase = t.beat_phase

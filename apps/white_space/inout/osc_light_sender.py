@@ -254,7 +254,7 @@ class OscLightSender:
         all-zero pixel chunks (`/WS/blue2` last commits the dark frame), and rpm 0 once
         more **last** — a lost single rpm datagram must not leave the motor spinning
         until the firmware watchdog."""
-        zero = Frame(settings.resolution, Tick(0.0, 0.0, 0.0, 0.0, 0))
+        zero = Frame(settings.resolution, Tick(0.0, 0.0))
         chunks = OscLightSender._build_chunk_messages(zero, settings, chunk_size, num_chunks) or []
         return [OscLightSender._build_rpm_message(0), *chunks, OscLightSender._build_rpm_message(0)]
 

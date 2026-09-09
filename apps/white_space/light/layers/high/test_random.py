@@ -59,15 +59,15 @@ class Random(HighLayer):
         self._vals_b: np.ndarray = rng.random(_TABLE_SIZE)
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
-        beat_time = frame.tick.beat + frame.tick.beat_phase
+        t = frame.tick.time                 # plain seconds; `speed` scales the rate
         W = self._config.white
         B = self._config.blue
 
         white += self._fbm(self._perm_w, self._vals_w, self._positions,
-                           beat_time, W.scale, W.speed, W.octaves,
+                           t, W.scale, W.speed, W.octaves,
                            W.persistence, W.midpoint, W.gamma, W.threshold, W.level)
         blue  += self._fbm(self._perm_b, self._vals_b, self._positions,
-                           beat_time, B.scale, B.speed, B.octaves,
+                           t, B.scale, B.speed, B.octaves,
                            B.persistence, B.midpoint, B.gamma, B.threshold, B.level)
 
     @staticmethod

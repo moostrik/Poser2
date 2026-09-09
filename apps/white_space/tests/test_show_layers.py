@@ -22,7 +22,7 @@ HALF = RES // 2
 
 
 def frame(time: float = 0.0) -> Frame:
-    return Frame(RES, Tick(time, 1 / 30, 0.0, 0.0, 0))
+    return Frame(RES, Tick(time, 1 / 30))
 
 
 # -- sound_light -----------------------------------------------------------------

@@ -170,7 +170,7 @@
       "use_signed": false,
       "mtu": 1500,
       "lower_edge": 0.32,
-      "curve": 2.0,
+      "curve": 3.0,
       "startup_delay": 2.0,
       "chunk_interval": 0.0,
       "offsets": {
@@ -388,9 +388,7 @@
     "master": 1.0,
     "light_phase": 0.55,
     "debug": "OFF",
-    "clock": {
-      "bpm": 20.0
-    },
+    "clock": {},
     "motor": {
       "simulate": false,
       "low_rpm": 36.0,
@@ -484,7 +482,7 @@
         "blend": "ADD",
         "source_0": {
           "enabled": true,
-          "bpm_multiplier": 1.0,
+          "hz": 0.33,
           "spatial_cycles": 3.0,
           "phase_offset": 0.0,
           "spatial_phase": 0.0,
@@ -493,7 +491,7 @@
         },
         "source_1": {
           "enabled": true,
-          "bpm_multiplier": 2.0,
+          "hz": 0.67,
           "spatial_cycles": 5.0,
           "phase_offset": 0.25,
           "spatial_phase": 0.0,
@@ -502,7 +500,7 @@
         },
         "source_2": {
           "enabled": false,
-          "bpm_multiplier": 3.0,
+          "hz": 1.0,
           "spatial_cycles": 7.0,
           "phase_offset": 0.5,
           "spatial_phase": 0.0,
@@ -511,7 +509,7 @@
         },
         "source_3": {
           "enabled": false,
-          "bpm_multiplier": 4.0,
+          "hz": 1.33,
           "spatial_cycles": 9.0,
           "phase_offset": 0.75,
           "spatial_phase": 0.0,
@@ -561,14 +559,14 @@
         "blend": "ADD",
         "white": {
           "level": 0.5,
-          "speed": 0.5,
+          "speed": 0.17,
           "phase": 0.0,
           "width": 0.5,
           "amount": 36
         },
         "blue": {
           "level": 0.5,
-          "speed": 0.5,
+          "speed": 0.17,
           "phase": 0.5,
           "width": 0.5,
           "amount": 36
@@ -578,14 +576,14 @@
         "blend": "ADD",
         "white": {
           "level": 1.0,
-          "speed": 0.25,
+          "speed": 0.08,
           "phase": 0.0,
           "width": 0.2,
           "amount": 22
         },
         "blue": {
           "level": 0.5,
-          "speed": 0.5,
+          "speed": 0.17,
           "phase": 0.5,
           "width": 0.5,
           "amount": 36
@@ -595,14 +593,14 @@
         "blend": "ADD",
         "white": {
           "level": 1.0,
-          "speed": 1.0,
+          "speed": 0.33,
           "phase": 0.3,
           "width": 0.1,
           "amount": 16
         },
         "blue": {
           "level": 1.0,
-          "speed": -3.56,
+          "speed": -1.19,
           "phase": 0.5,
           "width": 0.1,
           "amount": 16
@@ -612,7 +610,7 @@
         "blend": "ADD",
         "white": {
           "level": 0.5,
-          "speed": 0.5,
+          "speed": 0.17,
           "scale": 4.0,
           "octaves": 3,
           "persistence": 0.5,
@@ -622,7 +620,7 @@
         },
         "blue": {
           "level": 0.5,
-          "speed": 0.5,
+          "speed": 0.17,
           "scale": 4.0,
           "octaves": 3,
           "persistence": 0.5,
@@ -634,17 +632,17 @@
     }
   },
   "statemachine": {
-    "intro_idle_bars": 1.0,
     "spin_up_seconds": 14.0,
-    "end_bars": 1.0,
+    "intro_idle_bars": 0.5,
+    "end_bars": 4.0,
     "count_hold_seconds": 1.0,
     "sync": {
       "threshold": 0.75,
       "mode": "THREE"
     },
     "manual": {
-      "select": "END_INTRO",
-      "hold": false
+      "select": "END",
+      "hold": true
     },
     "session": {
       "enabled": false,
