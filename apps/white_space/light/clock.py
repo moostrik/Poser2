@@ -7,6 +7,11 @@ sub-millisecond accuracy), then measures `dt` and returns the `Tick`.
 Deliberately carries no musical time: the show's musical clock is the playhead bar (one
 revolution at `low_rpm`) — states count bars, the sound side rides them. Debug patterns
 animate on plain seconds (`tick.time`) with their own rate knobs.
+
+Accuracy (measured ~40 µs mean lateness idle) depends on two things outside this file: the
+calling thread's OS priority (the Conductor raises it) and the process-wide GIL switch
+interval (set in the launcher) — a pure-Python thread holding the GIL is what makes a
+sleeping thread late. `late_max_ms` / `dt_max_ms` / `overruns` report the real-world result.
 """
 
 from __future__ import annotations
@@ -21,8 +26,15 @@ from modules.settings import BaseSettings, Field
 _SPIN_MARGIN: float = 0.001
 
 
+# Diagnostics publish interval (s): running maxima are pushed to the settings and reset this often.
+_STATS_INTERVAL: float = 1.0
+
+
 class ClockSettings(BaseSettings):
-    time: Field[float] = Field(0.0, access=Field.READ, description="Elapsed wall-clock time (s)")
+    time:        Field[float] = Field(0.0, access=Field.READ, description="Elapsed wall-clock time (s)")
+    late_max_ms: Field[float] = Field(0.0, access=Field.READ, description="Worst tick lateness vs. its deadline over the last second (ms)")
+    dt_max_ms:   Field[float] = Field(0.0, access=Field.READ, description="Longest tick interval over the last second (ms)")
+    overruns:    Field[int]   = Field(0,   access=Field.READ, description="Ticks that ran more than one interval late and resynced (cumulative)")
 
 
 @dataclass
@@ -44,6 +56,11 @@ class Clock:
         self._start: float | None = None   # baselines set lazily on the first tick
         self._last:  float = 0.0
         self._next:  float = 0.0
+        # Diagnostics: running maxima since the last publish, and the cumulative resync count.
+        self._late_max: float = 0.0
+        self._dt_max:   float = 0.0
+        self._overruns: int   = 0
+        self._stats_at: float = 0.0
 
     @property
     def interval(self) -> float:
@@ -57,23 +74,41 @@ class Clock:
         """
         if self._start is None:
             now = perf_counter()
-            self._start = now
-            self._last  = now
-            self._next  = now
+            self._start    = now
+            self._last     = now
+            self._next     = now
+            self._stats_at = now
         else:
             self._next += self._interval
             self._wait_until(self._next)
-            now = perf_counter()
-            if now - self._next > self._interval:
+            now  = perf_counter()
+            late = now - self._next
+            if late > self._late_max:
+                self._late_max = late
+            if late > self._interval:
                 # Severe overrun — resync rather than burst a run of catch-up frames.
                 self._next = now
+                self._overruns += 1
 
         dt = now - self._last
         self._last = now
+        if dt > self._dt_max:
+            self._dt_max = dt
 
         t = Tick(time=now - self._start, dt=dt)
         self._settings.time = t.time
+        if now - self._stats_at >= _STATS_INTERVAL:
+            self._publish_stats(now)
         return t
+
+    def _publish_stats(self, now: float) -> None:
+        """Push the running maxima to the settings (once per _STATS_INTERVAL) and reset them."""
+        self._settings.late_max_ms = self._late_max * 1000.0
+        self._settings.dt_max_ms   = self._dt_max * 1000.0
+        self._settings.overruns    = self._overruns
+        self._late_max = 0.0
+        self._dt_max   = 0.0
+        self._stats_at = now
 
     @staticmethod
     def _wait_until(deadline: float) -> None:

@@ -2,6 +2,7 @@ import json
 import logging
 import os
 os.environ.setdefault('DEPTHAI_LEVEL', 'error')  # suppress noisy unbooted-device warnings
+import sys
 import time
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
@@ -32,6 +33,10 @@ def _read_launcher_file() -> str:
 if __name__ == '__main__':
     process_id = os.getpid()
     psutil.Process(process_id).nice(psutil.HIGH_PRIORITY_CLASS)  # Prioritize over normal apps, below system processes
+    # GIL handoff latency bounds how late a sleeping real-time thread (the light clock) gets the
+    # GIL back when a pure-Python thread holds it. Measured at 30 Hz: 5/2/1 ms all leave ~10 ms
+    # mean lateness; 0.5 ms drops it to ~65 µs. Process policy, so it lives here, not in the clock.
+    sys.setswitchinterval(0.0005)
     try:
         import torch
         torch.backends.cuda.matmul.allow_tf32 = True  # Use TF32 tensor cores for faster matmul on Ampere+ GPUs

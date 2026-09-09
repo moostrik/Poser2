@@ -10,7 +10,7 @@ forwards the finished Frame to the board and the output callbacks (UDP sender, a
 from threading import Event, Thread
 from typing import Any, Callable
 
-from modules.utils import HotReloadMethods
+from modules.utils import HotReloadMethods, ThreadPriority, set_current_thread_priority
 from modules.gl import FpsCounter
 from modules.tracker.panoramic.settings import DistortionSettings
 
@@ -118,6 +118,10 @@ class Conductor(Thread):
         self._motor_controller.notify_fall()
 
     def run(self) -> None:
+        # Outrank the process's other threads (inference, GL, analytics): measured to take the
+        # clock's lateness under in-process native load from ~4 ms mean to ~60 µs. HIGHEST, not
+        # TIME_CRITICAL — no measurable difference, and this thread busy-spins ~1 ms per tick.
+        set_current_thread_priority(ThreadPriority.HIGHEST)
         while not self._stop_event.is_set():
             try:
                 tick = self._clock.next_tick()   # blocks until the next frame deadline

@@ -1,10 +1,10 @@
-import ctypes
 import socket
 from threading import Thread
 from time import time
 from typing import Callable, Optional
 
 from modules.settings import BaseSettings, Field, Widget
+from modules.utils import ThreadPriority, set_current_thread_priority
 
 import logging
 logger = logging.getLogger(__name__)
@@ -59,11 +59,7 @@ class UdpLightReceiver:
             self._thread = None
 
     def _run(self) -> None:
-        try:
-            handle = ctypes.windll.kernel32.GetCurrentThread()
-            ctypes.windll.kernel32.SetThreadPriority(handle, 15)  # THREAD_PRIORITY_TIME_CRITICAL
-        except Exception:
-            pass
+        set_current_thread_priority(ThreadPriority.TIME_CRITICAL)   # the fall edge must not wait behind inference
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
