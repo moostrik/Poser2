@@ -324,7 +324,7 @@ class Settings(BaseSettings):
     render_fps      : Field[float] = Field(30.0)
     light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="LED strip resolution (pixels)")
     fov             : Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV — shared with tracker and composition")
-    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S8/S9 wall-fade seconds — canonical value tying statemachine (the visible slider) to the wind_down layer")
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — canonical value tying statemachine (the visible slider) to the wind_down layer")
 
     camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov])
     inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players'), num_virtual.as_('num_virtual'), light_resolution.as_('resolution')])

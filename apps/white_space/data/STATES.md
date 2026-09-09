@@ -1,6 +1,6 @@
 # White Space — States
 
-Ten states played by the `StateMachine` (`apps/white_space/statemachine/`).
+Eleven states played by the `StateMachine` (`apps/white_space/statemachine/`).
 This document is the source of truth for the installation's dramaturgy. Each state's description
 is mirrored as the docstring of its class in `statemachine/states.py`; transition lists below
 are in **priority order**, matching each class's `needs_state_change()`. Timing tunables live
@@ -23,25 +23,27 @@ the way up (the lamp bar physically blurring into the ring).
 
 | #  | State      | P        | Duration      | Motor   | White light                      | Blue light                | Pose sound           | Secondary sound                |
 |----|------------|----------|---------------|---------|----------------------------------|---------------------------|----------------------|--------------------------------|
-| S0 | OFF        | —        | ∞ (blackout)  | LOW     | none                             | none                      | no                   | no                             |
-| S1 | IDLE       | 0        | ∞             | LOW     | BRIGHT line                      | sound visuals             | no                   | searchlight soundscape         |
-| S2 | IDLE_INTRO | > 0      | until hit     | LOW     | BRIGHT line                      | sound visuals             | yes (pre-hit)        | searchlight + anticipatory cue |
-| S3 | INTRO      | > 0      | ∞             | LOW     | DIM line + flash on hit          | none                      | yes (only)           | none                           |
-| S4 | INTRO_IDLE | 0        | 1 bar         | LOW     | fade DIM → BRIGHT                | fade-in sound visuals     | no                   | fade-in soundscape             |
-| S5 | INTRO_PLAY | ≥ 3      | 14 s spin-up  | HIGH    | instrument + playhead at un-lock | pose instrument (ease in) | yes (effect?)        | enhance spin-up chaos          |
-| S6 | PLAY       | ≥ 3      | ∞             | HIGH    | pose instrument + playhead       | pose instrument           | yes                  | enhance spin                   |
-| S7 | END        | < 3      | N bars (↔)    | HIGH    | instrument + playhead → full     | fade-out instrument       | distortion?          | fade-out spin + distortion?    |
-| S8 | END_INTRO  | < 3, > 0 | spin-down (fade, then lock) | LOW | wall fades → DIM over the spin-down | none                | fade out distortion? | fade out distortion?           |
-| S9 | END_IDLE   | 0        | spin-down (fade, then lock) | LOW | stays BRIGHT, back lamp fades out | fade-in sound visuals | fade out distortion? | fade out distortion?           |
+| S0 | OFF        | —        | ∞ (blackout) / until lock | LOW | none                         | none                      | no                   | no                             |
+| S1 | OFF_IDLE   | —        | 1 bar         | LOW     | fade dark → BRIGHT line          | fade-in sound visuals     | no                   | fade-in soundscape             |
+| S2 | IDLE       | 0        | ∞             | LOW     | BRIGHT line                      | sound visuals             | no                   | searchlight soundscape         |
+| S3 | IDLE_INTRO | > 0      | until hit     | LOW     | BRIGHT line                      | sound visuals             | yes (pre-hit)        | searchlight + anticipatory cue |
+| S4 | INTRO      | > 0      | ∞             | LOW     | DIM line + flash on hit          | none                      | yes (only)           | none                           |
+| S5 | INTRO_IDLE | 0        | 1 bar         | LOW     | fade DIM → BRIGHT                | fade-in sound visuals     | no                   | fade-in soundscape             |
+| S6 | INTRO_PLAY | ≥ 3      | 14 s spin-up  | HIGH    | instrument + playhead at un-lock | pose instrument (ease in) | yes (effect?)        | enhance spin-up chaos          |
+| S7 | PLAY       | ≥ 3      | ∞             | HIGH    | pose instrument + playhead       | pose instrument           | yes                  | enhance spin                   |
+| S8 | END        | < 3      | N bars (↔)    | HIGH    | instrument + playhead → full     | fade-out instrument       | distortion?          | fade-out spin + distortion?    |
+| S9 | END_INTRO  | < 3, > 0 | spin-down (fade, then lock) | LOW | wall fades → DIM over the spin-down | none                | fade out distortion? | fade out distortion?           |
+| S10| END_IDLE   | 0        | spin-down (fade, then lock) | LOW | stays BRIGHT, back lamp fades out | fade-in sound visuals | fade out distortion? | fade out distortion?           |
 
 ## Transition graph
 
 ```mermaid
 stateDiagram-v2
     OFF: OFF — dark and silent, still sweeping at LOW
-    [*] --> IDLE
-    OFF --> INTRO: blackout released, P > 0
-    OFF --> IDLE: blackout released, P == 0
+    [*] --> OFF
+    OFF --> OFF_IDLE: blackout released and playhead locked
+    OFF_IDLE --> INTRO: hit by light
+    OFF_IDLE --> IDLE: 1 bar
     IDLE --> IDLE_INTRO: P > 0
     IDLE_INTRO --> INTRO: hit by light
     IDLE_INTRO --> INTRO_IDLE: P == 0
@@ -57,20 +59,24 @@ stateDiagram-v2
     END_IDLE --> IDLE: fade done and LOW reacquired
 ```
 
-The machine always **boots into IDLE** (failsafe — the persisted `manual.select` is only
-the goto target, and `manual.hold` and `blackout` are forced off at construction: a
-power-cycled installation resumes the show unattended, never dark). **OFF (S0)** is
-entered from any state by pinning `blackout` (an operator input, so it is not drawn as
-an edge above) and leaves it by condition like any other state. In **session mode** the
+The machine always **boots into OFF** — dark, motor at LOW — and wakes through OFF_IDLE
+by itself once the playhead has locked, so power-on is the same wake as a blackout
+release (failsafe — the persisted `manual.select` is only the goto target, and
+`manual.hold` and `blackout` are forced off at construction: a power-cycled installation
+resumes the show unattended, never stays dark). **OFF (S0)** is also entered from any
+state by pinning `blackout` (an operator input, so it is not drawn as an edge above) and
+leaves it by condition like any other state — through its wake transition, OFF_IDLE, once
+neither the pin nor a missing lock holds it. In **session mode** the
 two open-ended states (INTRO, PLAY) gain timed exits, and END only winds down (no return
 to PLAY), so a session always concludes.
 
 **Boot invariant — the motor NEVER powers on into HIGH.** Every path that could command
 HIGH at boot is guarded, and each guard has a unit test:
 
-1. **State machine**: always boots into IDLE (motor LOW), ignoring the persisted `select`
-   — a preset saved mid-show can never boot into a HIGH state (`statemachine/machine.py`;
-   `test_startup_ignores_persisted_select`).
+1. **State machine**: always boots into OFF (dark, motor LOW) and wakes through OFF_IDLE
+   only once the playhead has locked, ignoring the persisted `select` — a preset saved
+   mid-show can never boot into a HIGH state (`statemachine/machine.py`;
+   `test_startup_ignores_persisted_select`, `test_boot_waits_for_the_lock`).
 2. **Motor**: there is no manual mode field — the arbitration is debug > machine command >
    **STOPPED**, so before the machine's first tick (or with the machine disabled) nothing
    spins (`light/motor.py` `_target_mode`; `test_boot_without_command_is_stopped`).
@@ -123,26 +129,52 @@ returns the show where it would have been).
 ## S0 — OFF
 
 The installation is off: dark and silent. An operational state, not a show beat — end of
-day, before opening. On the wire, `/global/state` 0 means off.
+day, before opening, and the state the machine boots into. On the wire, `/global/state`
+0 means off.
 
 The rotor keeps sweeping at LOW: OFF is "dark and silent", not "powered down". Stopping
 would silence the fall sensor and unlock the playhead, so waking would need a full
 re-acquire; sweeping on keeps the content clock locked and the wake instant. Quitting the
 app is the true stop.
 
-- **Participants**: — (ignored) · **Duration**: ∞ (as long as `blackout` is pinned) ·
-  **Motor**: LOW
-- **Transitions**: **in** — pinning `statemachine.blackout`, the machine's
+Two things can hold it, and the exit waits for both to clear: the operator's pin
+(`blackout`) and the physics (the playhead not yet locked at LOW — at boot the motor
+comes up from a standstill and needs a few revolutions to lock). After a blackout the
+lock is already there, so the wake starts at once.
+
+- **Participants**: — (ignored) · **Duration**: as long as `blackout` is pinned or the
+  playhead is unlocked · **Motor**: LOW
+- **Transitions**: **in** — boot; or pinning `statemachine.blackout`, the machine's
   highest-priority input: from any state, beating `hold` and `goto`. **out** — a normal
-  condition like any other state's: once `blackout` is released, → INTRO if participants
-  are present, else → IDLE.
+  condition like any other state's: `blackout` released *and* motor lock → OFF_IDLE (the
+  wake). A silent sensor holds it dark — the operator `goto` case, as for S9/S10.
 - **Mix**: empty (dark strip) — darkness comes from the mix alone, since the bar is
   turning and the fixture is in slot mode
 - **White / Blue**: none
 - **Pose sound / Secondary sound**: no
 - **Open questions**: —
 
-## S1 — IDLE
+## S1 — OFF_IDLE
+
+The wake — at boot and after a blackout alike. OFF has let go (blackout released, playhead
+locked), so over one bar the searchlight and the soundscape fade up out of the dark into
+IDLE's look. The sweep is already running and locked underneath — only the light returns.
+
+If the sweep crosses a participant mid-fade the intro begins right there (the hit's own
+flash covers the step from the fading level to INTRO's dim line). With people present but
+not yet hit it lands in IDLE and the graph moves straight on to IDLE_INTRO — the identical
+look, so seamless — to wait for the sweep: the room is re-introduced by the light rather
+than dropped into the middle of INTRO.
+
+- **Participants**: — (either way) · **Duration**: `off_idle_bars` (1 bar) ·
+  **Motor**: LOW
+- **Transitions** (priority order): hit → INTRO · fade complete → IDLE
+- **Mix**: `playhead_low` and `sound_light`, both eased 0 → 1 over the bar
+- **White**: fade dark → BRIGHT line · **Blue**: fade-in sound visuals
+- **Pose sound**: no · **Secondary sound**: fade-in soundscape
+- **Open questions**: —
+
+## S2 — IDLE
 
 The white searchlight (playhead) spins slowly through the empty space, supported by an
 atmospheric soundscape that evokes curiosity and plays on both blue lamps.
@@ -157,7 +189,7 @@ atmospheric soundscape that evokes curiosity and plays on both blue lamps.
 - **Secondary sound**: SEARCHLIGHT soundscape
 - **Open questions**: —
 
-## S2 — IDLE_INTRO
+## S3 — IDLE_INTRO
 
 Someone has entered. The searchlight keeps sweeping at full brightness, but the sound is
 already stirring: the pose instrument starts a little *before* the actual hit — this
@@ -177,7 +209,7 @@ intro begins: the line snaps to dim and the soundscape stops.
 - **Secondary sound**: SEARCHLIGHT + anticipatory cue building toward the hit
 - **Open questions**: the anticipatory cue's design (Max side)
 
-## S3 — INTRO
+## S4 — INTRO
 
 The pose instrument is introduced. Neutral poses give a glass ping; arms raised gives a
 heavy bass; all other arm positions give unique sounds. The dim playhead flashes bright
@@ -200,7 +232,7 @@ as it crosses each participant.
 - **Secondary sound**: none
 - **Open questions**: —
 
-## S4 — INTRO_IDLE
+## S5 — INTRO_IDLE
 
 The participants have left mid-intro. Over one bar the dim line fades back to the bright
 searchlight and the soundscape fades back in.
@@ -216,7 +248,7 @@ searchlight and the soundscape fades back in.
 - **Secondary sound**: fade-in SOUNDSCAPE
 - **Open questions**: —
 
-## S5 — INTRO_PLAY
+## S6 — INTRO_PLAY
 
 The participants have synced their poses: the machine spins up. The pose instrument takes
 over from the line during the spin-up, and the sound enhances the accelerating chaos.
@@ -238,7 +270,7 @@ over from the line during the spin-up, and the sound enhances the accelerating c
 - **Secondary sound**: ENHANCE spin-up chaos
 - **Open questions**: the "(effect?)" on pose sound (Max side)
 
-## S6 — PLAY
+## S7 — PLAY
 
 The participants play the instrument, creating music and light patterns. The space
 between participants holding the same pose fills with light.
@@ -257,7 +289,7 @@ between participants holding the same pose fills with light.
   action-gated wind-back in END to match). Kept out for now to keep the graph simple.
 - **Open questions**: —
 
-## S7 — END
+## S8 — END
 
 Fewer than three participants remain: the machine begins its end. Over N bars the light
 crosses to full white and the sound reflects it. If participants return, the white winds
@@ -278,7 +310,7 @@ back and PLAY resumes — the ramp runs both ways, never jumping.
 - **Open questions**: the distortion treatment (Max side; `stage_progress` on OSC is the
   ramp to drive it)
 
-## S8 — END_INTRO
+## S9 — END_INTRO
 
 Participants remain, so the machine returns to the intro: the wall of white **fades
 away during the spin-down**, revealing the dim playhead line underneath. The fade is
@@ -310,7 +342,7 @@ to the physical spin-down.)*
   1 = gone), so the sound-side distortion fade rides the actual fade
 - **Open questions**: distortion fade (Max side)
 
-## S9 — END_IDLE
+## S10 — END_IDLE
 
 The space is empty: the wall of white fades away during the spin-down, revealing the
 bright searchlight line; the distortion disappears and the searchlight soundscape

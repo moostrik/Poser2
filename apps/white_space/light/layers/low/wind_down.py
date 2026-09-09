@@ -1,11 +1,11 @@
-"""WindDown — the dying wall of light: the S8/S9 ending fade.
+"""WindDown — the dying wall of light: the S9/S10 ending fade.
 
 Writes the two white bar lights at a fading level; everything else is physics. The fixture
-is in slot mode from S8's first packet (its readout mode follows the commanded rpm, see
+is in slot mode from S9's first packet (its readout mode follows the commanded rpm, see
 ``inout/osc_light_sender.py``), so the two lamps spin at whatever speed the bar still has:
 a wall of white while it is fast, thinning into two beams as it slows — and the fade rides
 through both. One mechanism, and the layer never needs to know when the bar is slow. The
-S7 → S8 hand-off is seamless at the DACs: the flood at 1.0 in ring mode drives the same two
+S8 → S9 hand-off is seamless at the DACs: the flood at 1.0 in ring mode drives the same two
 white outputs as this layer at 1.0 in slot mode.
 
 Fade level: ``f = 1 − ease(elapsed / spin_down_seconds)``, hand-tuned to ride the physical
@@ -14,7 +14,7 @@ spin-down — its visible slider is ``statemachine.spin_down_seconds`` (next to
 states put the landing look (the playhead line, the sound visuals) underneath at constant
 weight; this layer fades the wall to nothing and thereby reveals it. ``reset()`` (a show
 state's entry) restarts at the full wall. ``progress`` is the read-only fade readout the
-states' exit and stage_progress (and S9's sound-visual reveal) ride.
+states' exit and stage_progress (and S10's sound-visual reveal) ride.
 """
 
 import numpy as np

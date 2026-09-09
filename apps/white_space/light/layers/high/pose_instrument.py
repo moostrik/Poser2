@@ -215,7 +215,7 @@ class PoseInstrument(HighLayer):
         self._pixel = np.arange(1, resolution + 1, dtype=np.float32) / resolution   # offsets 1..R px
 
     def reset(self) -> None:
-        """A fresh instrument (S5 entry): forget every participant. The line phase is a
+        """A fresh instrument (S6 entry): forget every participant. The line phase is a
         world property and keeps running."""
         self._participants.clear()
 

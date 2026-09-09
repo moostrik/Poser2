@@ -4,7 +4,7 @@ Each state owns its outgoing transitions (``needs_state_change``, in priority or
 when several conditions are true the same tick, the first wins) and returns its mix every
 tick (``update``: a weighted layer list the machine forwards to the Compositor). Steady
 states return constant weights; transition states blend by their own ``progress`` — their
-duration *is* the transition duration. S8/S9 are the exception: their fade lives in the
+duration *is* the transition duration. S9/S10 are the exception: their fade lives in the
 ``wind_down`` layer (constant mix; the layer owns the timed fade) and they exit once that
 fade is complete and the motor has locked at LOW.
 
@@ -90,23 +90,26 @@ class StateBase:
 class OffState(StateBase):
     """S0 — the installation is off: dark and silent, but the rotor keeps sweeping at LOW
     so the playhead never unlocks (waking needs no re-acquire; quitting the app is the
-    true stop). An operational state with normal exit conditions: entered by pinning
-    ``blackout`` (the machine's highest-priority input — from anywhere, beating hold and
-    goto); while pinned it stays put, and once released it wakes to INTRO (people
-    present) or IDLE (empty space). On the wire, /global/state 0 = off."""
+    true stop). Also the boot state. An operational state with a normal exit, held by
+    whichever applies — the operator's pin (``blackout``, the machine's highest-priority
+    input: from anywhere, beating hold and goto) or the physics (the playhead not yet
+    locked at LOW: ``ctx.motor_locked``, the same stale-proof lock S9/S10 exit on) — and
+    once neither holds it, it wakes through OFF_IDLE. After a blackout the lock is already
+    there (the rotor never stopped), so the wake starts at once; at boot it waits for the
+    motor to come up and lock. On the wire, /global/state 0 = off."""
     MOTOR = MotorMode.LOW
 
     def update(self, ctx: StateContext) -> Mix:
         return []                       # dark strip
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
-        if ctx.blackout:
+        if ctx.blackout or not ctx.motor_locked:
             return None
-        return StateId.INTRO if ctx.participants > 0 else StateId.IDLE
+        return StateId.OFF_IDLE
 
 
 class IdleState(StateBase):
-    """S1 — IDLE. The white searchlight (playhead) spins slowly through the empty space,
+    """S2 — IDLE. The white searchlight (playhead) spins slowly through the empty space,
     supported by an atmospheric soundscape that evokes curiosity and plays on both blue
     lamps."""
     MOTOR = MotorMode.LOW
@@ -121,7 +124,7 @@ class IdleState(StateBase):
 
 
 class IdleIntroState(StateBase):
-    """S2 — IDLE_INTRO. Someone has entered. The searchlight keeps sweeping at full
+    """S3 — IDLE_INTRO. Someone has entered. The searchlight keeps sweeping at full
     brightness, but the sound is already stirring: the pose instrument starts a little
     *before* the actual hit — this anticipation is the reason the state exists. When the
     bright beam strikes the person the intro begins: the line snaps to dim and the
@@ -140,7 +143,7 @@ class IdleIntroState(StateBase):
 
 
 class IntroState(StateBase):
-    """S3 — INTRO. The pose instrument is introduced. Neutral poses give a glass ping;
+    """S4 — INTRO. The pose instrument is introduced. Neutral poses give a glass ping;
     arms raised gives a heavy bass; all other arm positions give unique sounds. The dim
     playhead flashes bright as it crosses each participant."""
     MOTOR = MotorMode.LOW
@@ -165,7 +168,7 @@ class IntroState(StateBase):
 
 
 class PlayState(StateBase):
-    """S6 — PLAY. The participants play the instrument, creating music and light
+    """S7 — PLAY. The participants play the instrument, creating music and light
     patterns. The space between participants holding the same pose fills with light."""
     MOTOR = MotorMode.HIGH
 
@@ -182,8 +185,35 @@ class PlayState(StateBase):
 
 # -- Transition states (ramps) ----------------------------------------------------
 
+class OffIdleState(StateBase):
+    """S1 — OFF_IDLE. The wake: blackout has been released, so over one bar the
+    searchlight and the soundscape fade up out of the dark into IDLE's look. The rotor
+    never stopped, so the sweep is already running underneath — only the light returns.
+
+    If the sweep crosses a participant mid-fade the intro begins right there (the hit's
+    own flash covers the step from the fading level to INTRO's dim line). With people
+    present but not yet hit it lands in IDLE and the graph moves straight on to
+    IDLE_INTRO — the identical look, so seamless — to wait for the sweep: the room is
+    re-introduced by the light rather than dropped into the middle of INTRO."""
+    MOTOR = MotorMode.LOW
+
+    def update(self, ctx: StateContext) -> Mix:
+        e = _ease(self.progress(ctx))
+        return [(LayerId.playhead_low, e), (LayerId.sound_light, e)]
+
+    def needs_state_change(self, ctx: StateContext) -> StateId | None:
+        if ctx.hit:                     # swept mid-wake → the intro begins
+            return StateId.INTRO
+        if ctx.bars >= self._config.off_idle_bars:
+            return StateId.IDLE
+        return None
+
+    def progress(self, ctx: StateContext) -> float:
+        return _clamp(ctx.bars / self._config.off_idle_bars)
+
+
 class IntroIdleState(StateBase):
-    """S4 — INTRO_IDLE. The participants have left mid-intro. Over one bar the dim line
+    """S5 — INTRO_IDLE. The participants have left mid-intro. Over one bar the dim line
     fades back to the bright searchlight and the soundscape fades back in.
 
     Both channels ramp from where the show actually was on entry: from INTRO the line
@@ -216,7 +246,7 @@ class IntroIdleState(StateBase):
 
 
 class IntroPlayState(StateBase):
-    """S5 — INTRO_PLAY. The participants have synced their poses: the machine spins up.
+    """S6 — INTRO_PLAY. The participants have synced their poses: the machine spins up.
     The pose instrument takes over from the line during the spin-up, and the sound
     enhances the accelerating chaos.
 
@@ -262,7 +292,7 @@ class IntroPlayState(StateBase):
 
 
 class EndState(StateBase):
-    """S7 — END. Fewer than three participants remain: the machine begins its end. Over N
+    """S8 — END. Fewer than three participants remain: the machine begins its end. Over N
     bars the light crosses to full white and the sound reflects it. If participants
     return, the white winds back and PLAY resumes — the ramp runs both ways, never
     jumping (at p = 0 the mix equals PLAY's, so the hand-over is seamless). In session
@@ -298,7 +328,7 @@ class EndState(StateBase):
 
 
 class WindDownStateBase(StateBase):
-    """Shared S8/S9 engine: the dying wall. The mix is constant — the ``wind_down`` layer
+    """Shared S9/S10 engine: the dying wall. The mix is constant — the ``wind_down`` layer
     (reset on entry) owns the whole fade, timed over its ``spin_down_seconds`` — and the
     landing look sits underneath, revealed as the wall dies. Exit: the fade complete and
     the motor locked at LOW (the landing state needs a live playhead). Progress is the
@@ -319,7 +349,7 @@ class WindDownStateBase(StateBase):
 
 
 class EndIntroState(WindDownStateBase):
-    """S8 — END_INTRO. Participants remain, so the machine returns to the intro: the wall
+    """S9 — END_INTRO. Participants remain, so the machine returns to the intro: the wall
     of white fades away during the spin-down, revealing the dim playhead line underneath,
     while the distortion sound disappears; the state hands over once the fade is complete
     and the motor has locked (see ``WindDownStateBase``). The dim line is in the mix from
@@ -331,7 +361,7 @@ class EndIntroState(WindDownStateBase):
 
 
 class EndIdleState(WindDownStateBase):
-    """S9 — END_IDLE. The space is empty: the wall of white fades away during the
+    """S10 — END_IDLE. The space is empty: the wall of white fades away during the
     spin-down, revealing the bright searchlight line — the front lamp stays at full the
     whole way — while the distortion disappears and the searchlight soundscape returns.
     The sound visuals fade in on the wall's own fade readout; the state hands over once
@@ -347,6 +377,7 @@ class EndIdleState(WindDownStateBase):
 
 STATES: dict[StateId, type[StateBase]] = {
     StateId.OFF:        OffState,
+    StateId.OFF_IDLE:   OffIdleState,
     StateId.IDLE:       IdleState,
     StateId.IDLE_INTRO: IdleIntroState,
     StateId.INTRO:      IntroState,

@@ -23,16 +23,16 @@ while the low tools are named as playhead tools (`playhead_haunted`, `playhead_t
 
 | Layer             | Regime | Reads                                                  | Writes                        | Used by |
 |-------------------|--------|--------------------------------------------------------|-------------------------------|---------|
-| `playhead_low`    | low    | — (settings only)                                      | front white lamp              | S1–S5, S8, S9 |
-| `playhead_flash`  | low    | LERP frames (PlayheadOffset, Dwell), tracklets         | front white lamp + blue lamps (blue zeroed in presets — S3 runs blue-none by design) | S3 |
-| `playhead_high`   | high   | frame playhead phase                                   | white ring marker             | S5 (post-un-lock), S6, S7 |
-| `pose_instrument` | high   | LERP frames (Azimuth, BBox, Angles, LegDeviation, TorsoTilt, Similarity), tracklets, playhead bars (PLAYHEAD motion only) | white lines, blue anchor + between-lines | S5 (post-un-lock), S6, S7 |
-| `flood`           | high   | — (settings only)                                      | full-strip white              | S7 |
-| `wind_down`       | low    | tick clock                                             | both white lamps, fading (the wall while the bar is still fast) | S8, S9 |
-| `sound_light`     | low    | sound levels from Max (board)                          | left/right blue lamps         | S1, S2, S4, S9 |
+| `playhead_low`    | low    | — (settings only)                                      | front white lamp              | S1–S6, S9, S10 |
+| `playhead_flash`  | low    | LERP frames (PlayheadOffset, Dwell), tracklets         | front white lamp + blue lamps (blue zeroed in presets — S4 runs blue-none by design) | S4 |
+| `playhead_high`   | high   | frame playhead phase                                   | white ring marker             | S6 (post-un-lock), S7, S8 |
+| `pose_instrument` | high   | LERP frames (Azimuth, BBox, Angles, LegDeviation, TorsoTilt, Similarity), tracklets, playhead bars (PLAYHEAD motion only) | white lines, blue anchor + between-lines | S6 (post-un-lock), S7, S8 |
+| `flood`           | high   | — (settings only)                                      | full-strip white              | S8 |
+| `wind_down`       | low    | tick clock                                             | both white lamps, fading (the wall while the bar is still fast) | S9, S10 |
+| `sound_light`     | low    | sound levels from Max (board)                          | left/right blue lamps         | S1, S2, S3, S5, S10 |
 
 `wind_down` is `flood`'s ending and a plain low layer: the fixture is in slot mode from
-S8's first packet, so the wall while the bar is still fast *is* the two white lamps
+S9's first packet, so the wall while the bar is still fast *is* the two white lamps
 spinning. See its section below.
 
 Debug layers (never in a state's mix; reached via the `light.debug` select — **choosing a
@@ -52,7 +52,7 @@ wave/void instrument, kept as a reference/montage visual), `test_harmonic`,
 The soundscape made visible: the left and right blue lamps breathe with the actual
 sound Max is playing.
 
-- **Used by**: S1 IDLE and S2 IDLE_INTRO at full; S4 INTRO_IDLE and S9 END_IDLE fading in
+- **Used by**: S2 IDLE and S3 IDLE_INTRO at full; S1 OFF_IDLE, S5 INTRO_IDLE and S10 END_IDLE fading in
 - **Input**: `/WS/sound/level` from Max — two floats (left, right), 0..1, real OSC —
   received on the **OSC sound receiver** (`inout.osc_sound_receiver`) and stored on the
   board (sound-level store: levels + received-timestamp). **Max must send this message**
@@ -74,10 +74,10 @@ sound Max is playing.
 
 Constant full-strip white — the END's wall of light. Deliberately the dumbest layer in
 the pool: all dynamics (the cross-to-full) are mix weights set by the states, never
-behavior inside the layer. The *ending* of the wall belongs to `wind_down` — S7's flood
-at 1.0 hands over to S8/S9's wind_down starting at the full wall, seamlessly.
+behavior inside the layer. The *ending* of the wall belongs to `wind_down` — S8's flood
+at 1.0 hands over to S9/S10's wind_down starting at the full wall, seamlessly.
 
-- **Used by**: S7 END (easing in as the instrument fades)
+- **Used by**: S8 END (easing in as the instrument fades)
 - **Input**: none
 - **Behavior**: `white[:] += level`; stateless
 - **Settings**: `level` (white; blue stays 0 — the flood is a white statement)
@@ -86,15 +86,15 @@ at 1.0 hands over to S8/S9's wind_down starting at the full wall, seamlessly.
 
 ## wind_down (LowLayer)
 
-The dying wall of light: owns the S8/S9 ending fade. It writes the two white lamps at a
-fading level; everything else is physics. The fixture is in slot mode from S8's first
+The dying wall of light: owns the S9/S10 ending fade. It writes the two white lamps at a
+fading level; everything else is physics. The fixture is in slot mode from S9's first
 packet (its readout mode follows the commanded rpm), so the two lamps spin at whatever
 speed the bar still has — a wall of white while fast, thinning into two beams as it
 slows — and the fade rides through both. One mechanism; the layer never needs to know
-when the bar is slow. The S7 → S8 hand-off is seamless at the DACs: `flood` at 1.0 in ring
+when the bar is slow. The S8 → S9 hand-off is seamless at the DACs: `flood` at 1.0 in ring
 mode drives the same two white outputs as this layer at 1.0 in slot mode.
 
-- **Used by**: S8/S9 at constant weight 1.0 (reset on state entry). The states put the
+- **Used by**: S9/S10 at constant weight 1.0 (reset on state entry). The states put the
   landing look underneath (`playhead_low` at DIM/BRIGHT, `sound_light`) — it is
   *revealed* as the wall dies, so nothing has to splice or match at the hand-off.
 - **Input**: the tick clock; no pose data, no playhead signals.
@@ -104,9 +104,9 @@ mode drives the same two white outputs as this layer at 1.0 in slot mode.
   motor has locked at LOW.
 - **Settings**: `level`, `spin_down_seconds` (hidden — the visible slider is
   `statemachine.spin_down_seconds`, next to `spin_up_seconds`, shared in via the root),
-  `progress` (read-only fade readout 0..1: the states' exit, `stage_progress` and S9's
+  `progress` (read-only fade readout 0..1: the states' exit, `stage_progress` and S10's
   sound-visual reveal ride it)
-- **Reset**: restarts the fade at the full wall (called from S8/S9 `enter()`)
+- **Reset**: restarts the fade at the full wall (called from S9/S10 `enter()`)
 - **Open questions**: —
 
 ## pose_instrument (HighLayer)
@@ -130,7 +130,7 @@ which can never merge). A fixed global grid was considered and rejected — it c
 symmetric about a person who is not standing on it; syncing the patterns *in the space
 between people* gives symmetry and the seamless join at once.
 
-- **Used by**: S5 (post-un-lock), S6, S7
+- **Used by**: S6 (post-un-lock), S7, S8
 - **Input contract** (six pose parameters, all read into the per-participant state every
   tick whether or not the current mapping draws with them — the composition work happens
   on these): the four arm angles (`Angles`: left/right shoulder, left/right elbow),
@@ -169,7 +169,7 @@ between people* gives symmetry and the seamless join at once.
   `line_phase`, `n_blend`; `extent_min`/`extent_max`, `line_edge`; `line_min`/`line_max`,
   `line_soft`, `harmonics`; `level`, `legs_dim`, `blue_min`/`blue_max`; `anchor_width`,
   `anchor_level`; `sync_threshold`; `attack_seconds`, `release_seconds`
-- **Reset**: forgets every participant (S5's entry — a fresh instrument per cycle); the
+- **Reset**: forgets every participant (S6's entry — a fresh instrument per cycle); the
   line phase is a world property and keeps running
 - **Relation to `pose_waves`**: the old wave/void instrument is **not** renamed or
   extended — it lives on as `test_pose_waves` (debug override), a reference/montage visual.

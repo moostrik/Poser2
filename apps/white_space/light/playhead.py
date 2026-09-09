@@ -119,7 +119,7 @@ class Playhead:
         ``ring_formed`` (spin-up): commanded HIGH and the falls have gone silent — the sensor
         cannot pulse above the ceiling, so silence is the evidence the bar has blurred into
         the ring. The spin-down side anchors on ``synced`` itself (the re-lock): the sensor's
-        spin-down readings don't resolve a usable deceleration ramp, so the S8/S9 fade is
+        spin-down readings don't resolve a usable deceleration ramp, so the S9/S10 fade is
         timed instead (the wind_down layer)."""
         self._ring_formed = command.mode == MotorMode.HIGH and motor.fall_age > _RING_SILENCE_S
 

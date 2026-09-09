@@ -25,11 +25,13 @@ class SyncMode(IntEnum):
 
 
 class StateId(IntEnum):
-    """The states of ``data/STATES.md`` (the source of truth). OFF = 0 is the
-    operational off (outside the automatic graph, goto only; ``/global/state`` 0 means
-    off on the wire). The *_INTRO / *_IDLE / *_PLAY entries are transitions promoted to
-    states: their durations are the transition durations."""
+    """The states of ``data/STATES.md`` (the source of truth), in narrative order — the
+    value is what ``/global/state`` sends. OFF = 0 is the operational off (entered by
+    pinning ``blackout``), followed by its wake transition. The *_INTRO / *_IDLE / *_PLAY
+    entries are transitions promoted to states: their durations are the transition
+    durations."""
     OFF        = 0
+    OFF_IDLE   = auto()
     IDLE       = auto()
     IDLE_INTRO = auto()
     INTRO      = auto()
@@ -74,16 +76,17 @@ class StateMachineSettings(BaseSettings):
     blackout: Field[bool] = Field(False, pinned=True, description="Blackout: pin to switch the installation OFF (spinning low, strip dark, /global/state 0); unpin and OFF exits to INTRO (people present) or IDLE (empty)")
 
     # Telemetry (read-only) — the show at a glance
-    current:      Field[StateId] = Field(StateId.IDLE, access=Field.READ, description="Current show state")
+    current:      Field[StateId] = Field(StateId.OFF, access=Field.READ, description="Current show state")
     progress:     Field[float]     = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Active state progress")
     participants: Field[int]       = Field(0, access=Field.READ, pinned=True, description="Debounced participant count")
 
     # Transition-state durations — one per state. spin_down_seconds is shared (via the
-    # root) into the wind_down layer, which runs the S8/S9 wall fade on it; those states'
+    # root) into the wind_down layer, which runs the S9/S10 wall fade on it; those states'
     # exit is one playhead bar after the motor re-locks at LOW.
     spin_up_seconds:       Field[float] = Field(14.0, min=1.0, max=60.0,  step=0.5, description="INTRO_PLAY: spin-up transition (seconds) — hand-tuned to the physical spin-up (spin_down_seconds' mirror)", newline=True)
     spin_down_seconds:     Field[float] = Field(10.0, min=1.0, max=60.0,  step=0.5, description="END_INTRO/END_IDLE: wall fade towards the line (seconds) — hand-tuned to the physical spin-down (drives the wind_down layer)")
-    intro_idle_bars:       Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="INTRO_IDLE: playhead bars back to IDLE", newline=True)
+    off_idle_bars:         Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="OFF_IDLE: wake fade from dark, in playhead bars", newline=True)
+    intro_idle_bars:       Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="INTRO_IDLE: playhead bars back to IDLE")
     end_bars:              Field[float] = Field(3.0,  min=0.5, max=20.0,  step=0.5, description="END: wind-down playhead bars (bidirectional ramp)")
 
     # Condition tunables

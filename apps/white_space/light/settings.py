@@ -34,7 +34,7 @@ class LayerId(IntEnum):
     # high — the POV ring regime
     pose_instrument     = auto()   # high: the pose instrument — people-anchored line patterns (see LAYERS.md)
     playhead_high       = auto()   # high: bright ring marker visualising the content playhead
-    flood               = auto()   # high: constant full-strip white (S7's wall)
+    flood               = auto()   # high: constant full-strip white (S8's wall)
     test_pose_waves     = auto()   # high: the old wave/void instrument (reference/montage)
     test_harmonic       = auto()
     test_player_lines   = auto()
@@ -81,7 +81,7 @@ class LowLayersSettings(BaseSettings):
     """Per-layer composition settings — the low (lamp-regime) block of the pool.
     `spin_down_seconds` is a hidden relay (from the root) into wind_down — the spin-down
     slider's visible home is the statemachine panel, next to spin_up."""
-    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S8/S9 wall-fade seconds — hidden relay from statemachine (via the root) into wind_down")
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — hidden relay from statemachine (via the root) into wind_down")
     sound_light:        Group[SoundLightSettings]       = Group(SoundLightSettings)
     playhead_low:       Group[PlayheadLowSettings]      = Group(PlayheadLowSettings)
     playhead_flash:     Group[PlayheadFlashSettings]    = Group(PlayheadFlashSettings)
@@ -117,7 +117,7 @@ class LightSettings(BaseSettings):
     light_rate:       Field[float] = Field(30.0, min=1,   max=120,  access=Field.INIT, description="Light output frame rate (fps)")
     light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, description="LED strip resolution (pixels)")
     fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV — hidden relay from root to player_lines/calibration")
-    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S8/S9 wall-fade seconds — hidden relay from statemachine (via the root) into wind_down")
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — hidden relay from statemachine (via the root) into wind_down")
 
     master:         Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Master brightness (applied to the composite; lamp gamma/floor live in the light sender)", newline=True, pinned=True)
     light_phase: Field[float]    = Field(0.0, min=0.0, max=1.0, step=0.01, description="High-speed ring offset (0–1 turn), applied to the spun-content layers")

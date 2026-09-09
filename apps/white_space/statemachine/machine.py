@@ -54,9 +54,9 @@ class StateContext:
     prev: StateId | None    # the state we arrived from (None at boot) — lets a transition
                             # state ramp from where the show actually was (no dips)
     motor_locked: bool      # the playhead has re-synced to the measured rotation at LOW
-                            # (stale-proof "at low speed" — S8/S9 exit one bar after it)
+                            # (stale-proof "at low speed" — S9/S10 exit one bar after it)
     ring_formed: bool       # commanded HIGH and the falls have gone silent — the bar has
-                            # physically blurred into the ring (S5's un-lock anchor)
+                            # physically blurred into the ring (S6's un-lock anchor)
 
 
 class StateMachine:
@@ -79,14 +79,15 @@ class StateMachine:
 
         from .states import StateBase, STATES   # local import: states.py imports from this module
         self._states = {s: cls(config, light, reset_layers) for s, cls in STATES.items()}
-        # Failsafe: the show ALWAYS starts in IDLE (motor LOW), regardless of the persisted
-        # `manual.select` value — that field is only the goto target. A preset saved mid-show
-        # must never boot the machine into a HIGH-motor state. And `manual.hold` is forced
-        # off: a preset saved mid-hold must never freeze the power-on show. `blackout` is
-        # forced off too: the installation always wakes in the show, never dark.
+        # Failsafe: the show ALWAYS starts in OFF (dark, motor LOW) and wakes through OFF_IDLE
+        # once the playhead has locked, regardless of the persisted `manual.select` value —
+        # that field is only the goto target. A preset saved mid-show must never boot the
+        # machine into a HIGH-motor state. `manual.hold` and `blackout` are forced off: a
+        # preset saved mid-hold or mid-blackout must never freeze or strand the power-on
+        # show — the installation always wakes into the show, never stays dark.
         config.manual.hold = False
         config.blackout = False
-        self._current: StateId = StateId.IDLE
+        self._current: StateId = StateId.OFF
         self._active: StateBase = self._states[self._current]
         self._entered: bool = False             # the boot entry into IDLE happens on the first
                                                 # update() tick, with real clock/bars timestamps
@@ -207,9 +208,10 @@ class StateMachine:
         hit = self._detect_hit(live_ids)
 
         if not self._entered:
-            # Startup failsafe: always enter IDLE (see __init__) — `manual.select` is not consulted.
+            # Startup failsafe: always enter OFF (see __init__) — `manual.select` is not
+            # consulted; OFF wakes through OFF_IDLE by itself once the playhead locks.
             self._goto_requested = False
-            self._switch(StateId.IDLE, now, dt, signals.bars, participants, hit, signals)
+            self._switch(StateId.OFF, now, dt, signals.bars, participants, hit, signals)
         elif self._config.blackout and self._current != StateId.OFF:
             # Pinning blackout is OFF's entry door: highest-priority input, from anywhere,
             # beating hold and goto. Leaving OFF is a normal condition — OffState exits to
