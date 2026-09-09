@@ -82,6 +82,12 @@ stalled spin-down can never strand bright lights on a stationary bar. A sensor f
 a machine that *is* still spinning can hold a state (e.g. S8/S9 waiting for lock); that is
 an operator-intervention case (`goto` / the debug select), not a safety one.
 
+**Shutdown**: a clean quit ends with an explicit **blackout from each sender** — the
+light sender sends rpm 0, an all-zero frame, and rpm 0 again (fixture dark and
+decelerating at once); the sound sender sends its zeroed bundle (`/global/state` −1).
+The firmware's Ethernet watchdog (packet silence → motor stop + blank after several
+revolutions) covers only the crash path, where `stop()` never runs.
+
 ## Layers
 
 Each state composes its **mix**: a weighted list of layers, returned every tick

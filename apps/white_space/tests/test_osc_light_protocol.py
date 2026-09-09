@@ -117,5 +117,31 @@ class ConfigMessageTest(unittest.TestCase):
         self.assertEqual(int.from_bytes(rpm[12:16], "big"), 2000)
 
 
+class BlackoutTest(unittest.TestCase):
+    """The shutdown blackout: rpm 0 → six all-zero chunks (blue2 last) → rpm 0 again,
+    so a clean quit leaves the fixture dark and stopped without waiting for the
+    firmware's Ethernet watchdog."""
+
+    def setUp(self) -> None:
+        self.messages = OscLightSender._build_blackout_messages(
+            OscLightSenderSettings(), FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS
+        )
+
+    def test_rpm_zero_brackets_the_dark_frame(self) -> None:
+        self.assertEqual(
+            [m.address for m in self.messages],
+            ["/WS/r/0", "/WS/white0", "/WS/white1", "/WS/white2",
+             "/WS/blue0", "/WS/blue1", "/WS/blue2", "/WS/r/0"],
+        )
+        for rpm in (self.messages[0], self.messages[-1]):
+            self.assertEqual(int.from_bytes(rpm.dgram[12:16], "big"), 0)
+
+    def test_pixel_bodies_are_all_zero(self) -> None:
+        for message in self.messages[1:-1]:
+            body = message.dgram[OSC_PREAMBLE:]
+            self.assertEqual(len(body), FIRMWARE_CHUNK_SIZE, message.address)
+            self.assertEqual(body, bytes(FIRMWARE_CHUNK_SIZE), message.address)
+
+
 if __name__ == "__main__":
     unittest.main()

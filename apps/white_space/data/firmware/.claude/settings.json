@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "PowerShell(& \"C:\\\\Users\\\\moost\\\\.platformio\\\\penv\\\\Scripts\\\\platformio.exe\" test -d \"C:\\\\Users\\\\moost\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Developer-Poser2-apps-white-space-data-firmware\\\\4b7dfcf9-9b21-4857-bf23-52fb5d4ca85c\\\\scratchpad\\\\nativeprobe\" -e native)"
-    ]
-  }
-}

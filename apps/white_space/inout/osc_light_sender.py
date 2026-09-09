@@ -7,7 +7,7 @@ from pythonosc.udp_client import UDPClient
 from pythonosc.osc_message import OscMessage
 from pythonosc.osc_message_builder import OscMessageBuilder
 
-from ..light import Frame
+from ..light import Frame, Tick
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.inout.net_probe import validate_connection
 
@@ -71,6 +71,9 @@ class OscLightSender:
       the burst normally fits. Config messages are kept out of it anyway (they never change), and
       `chunk_interval` can spread the six chunks further if the fixture ever reports dropped
       chunks — a chunk it misses is published as a stale third of the ring for one revolution.
+    * On a clean quit, ``stop()`` ends with a **blackout** — rpm 0, an all-zero frame, rpm 0
+      again — so the fixture goes dark and the motor decelerates immediately. The firmware's
+      Ethernet watchdog (packet silence → motor stop + blank) covers the crash path only.
     """
 
     def __init__(self, settings: OscLightSenderSettings) -> None:
@@ -119,6 +122,7 @@ class OscLightSender:
         self._thread.start()
 
     def stop(self) -> None:
+        started = self._thread is not None
         self._running = False
         self._update_event.set()
         if self._thread is not None:
@@ -128,6 +132,14 @@ class OscLightSender:
         self._config.unbind(OscLightSenderSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
         self._config.unbind(OscLightSenderSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
         self._config.offsets.unbind_all(self._on_offsets_change)
+
+        # Send AFTER the join: guaranteed to be the last thing on the wire (late
+        # send_message() calls only store into the dead thread's slot).
+        if started:
+            try:
+                self._send_blackout()
+            except Exception as e:
+                logger.error(f"Error sending light blackout: {e}")
 
     def send_message(self, output: Frame) -> None:
         with self._output_lock:
@@ -209,6 +221,12 @@ class OscLightSender:
         except Exception as e:
             logger.error(f"OscLightSender send error: {e}")
 
+    def _send_blackout(self) -> None:
+        """Leave the fixture dark and stopped on a clean quit; see the class docstring.
+        Paced like the live burst so the final frame is not the one datagram that drops."""
+        self._send_paced(self._build_blackout_messages(self._config, self._chunk_size, self._num_chunks),
+                         self._config.chunk_interval)
+
     def _on_connection_change(self, _=None) -> None:
         with self._client_lock:
             self._client = UDPClient(self._config.ip_addresses, self._config.port)
@@ -229,6 +247,16 @@ class OscLightSender:
         msgb = OscMessageBuilder("/WS/r/0")
         msgb.add_arg(int(rpm))
         return msgb.build()
+
+    @staticmethod
+    def _build_blackout_messages(settings: OscLightSenderSettings, chunk_size: int, num_chunks: int) -> OscMessageList:
+        """The shutdown blackout: rpm 0 **first** (deceleration starts at once), the six
+        all-zero pixel chunks (`/WS/blue2` last commits the dark frame), and rpm 0 once
+        more **last** — a lost single rpm datagram must not leave the motor spinning
+        until the firmware watchdog."""
+        zero = Frame(settings.resolution, Tick(0.0, 0.0, 0.0, 0.0, 0))
+        chunks = OscLightSender._build_chunk_messages(zero, settings, chunk_size, num_chunks) or []
+        return [OscLightSender._build_rpm_message(0), *chunks, OscLightSender._build_rpm_message(0)]
 
     @staticmethod
     def _build_config_messages(settings: OscLightSenderSettings, motor_rpm: int) -> OscMessageList:
