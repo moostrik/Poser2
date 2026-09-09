@@ -46,10 +46,35 @@ class LayerId(IntEnum):
     test_random         = auto()
 
 
-# The debug select: OFF = debug disarmed (the show runs); any other member = debug on,
-# showing exactly that layer solo while the motor auto-follows its regime. Generated from
-# LayerId so it can never drift from the pool.
-DebugLayer = IntEnum('DebugLayer', {'OFF': 0, **{m.name: m.value for m in LayerId}})
+class DebugLayer(IntEnum):
+    """The debug select: OFF = debug disarmed (the show runs); any other member = debug on,
+    showing exactly that layer solo while the motor auto-follows its regime.
+
+    Mirrors `LayerId` member for member (same names, same values, same order) with OFF = 0
+    in front. Spelled out rather than generated so type checkers see a real enum;
+    `tests/test_debug_layer.py` fails if the two ever drift apart.
+    """
+    OFF                 = 0
+    # low — the lamp regime
+    sound_light         = auto()
+    playhead_low        = auto()
+    playhead_flash      = auto()
+    playhead_haunted    = auto()
+    playhead_test       = auto()
+    # high — the POV ring regime
+    pose_instrument     = auto()
+    playhead_high       = auto()
+    flood               = auto()
+    wind_down           = auto()
+    test_pose_waves     = auto()
+    test_harmonic       = auto()
+    test_player_lines   = auto()
+    test_calibration    = auto()
+    test_fill           = auto()
+    test_pulse          = auto()
+    test_chase          = auto()
+    test_lines          = auto()
+    test_random         = auto()
 
 
 class LowLayersSettings(BaseSettings):

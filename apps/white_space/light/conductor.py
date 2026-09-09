@@ -31,7 +31,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _debug_motor_mode(selection: 'DebugLayer', layers: dict[LayerId, BaseLayer]) -> MotorMode | None:
+def _debug_motor_mode(selection: DebugLayer, layers: dict[LayerId, BaseLayer]) -> MotorMode | None:
     """The debug auto-follow: derive the motor regime from the selected debug layer's
     class — `HighLayer` → HIGH, `LowLayer` → LOW; OFF → None (debug disarmed, the machine
     owns the motor). Selecting a layer is the only gesture: choosing it IS turning debug
@@ -121,6 +121,7 @@ class Conductor(Thread):
         # Outrank the process's other threads (inference, GL, analytics): measured to take the
         # clock's lateness under in-process native load from ~4 ms mean to ~60 µs. HIGHEST, not
         # TIME_CRITICAL — no measurable difference, and this thread busy-spins ~1 ms per tick.
+        # The light sender and UDP receiver run at this same level: one pipeline, one priority.
         set_current_thread_priority(ThreadPriority.HIGHEST)
         while not self._stop_event.is_set():
             try:

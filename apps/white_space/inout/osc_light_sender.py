@@ -10,6 +10,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 from ..light import Frame, Tick
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.inout.net_probe import validate_connection
+from modules.utils import ThreadPriority, set_current_thread_priority
 
 import logging
 logger = logging.getLogger(__name__)
@@ -148,6 +149,11 @@ class OscLightSender:
         self._update_event.set()
 
     def _run(self) -> None:
+        # Same level as the Conductor that feeds it: a late wake here delays the frame on the
+        # wire even when the tick was on time, and (with chunk_interval > 0) a late pacing sleep
+        # sends the next chunks back-to-back — exactly the fixture overflow the pacing prevents.
+        set_current_thread_priority(ThreadPriority.HIGHEST)
+
         if not validate_connection(self._config.ip_addresses, self._config.port, "OscLightSender"):
             self._running = False
             return

@@ -59,7 +59,9 @@ class UdpLightReceiver:
             self._thread = None
 
     def _run(self) -> None:
-        set_current_thread_priority(ThreadPriority.TIME_CRITICAL)   # the fall edge must not wait behind inference
+        # Same level as the Conductor and light sender: the fall edge is a timing measurement
+        # (motor rpm/phase come from the gap between falls), so it must not wait behind inference.
+        set_current_thread_priority(ThreadPriority.HIGHEST)
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
