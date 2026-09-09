@@ -634,18 +634,23 @@
     }
   },
   "statemachine": {
-    "enabled": true,
-    "hold": true,
-    "session": false,
-    "select": "END_INTRO",
     "intro_idle_bars": 1.0,
     "spin_up_seconds": 14.0,
     "end_bars": 1.0,
-    "intro_session_seconds": 60.0,
-    "play_session_seconds": 150.0,
-    "sync_threshold": 0.75,
-    "sync_mode": "THREE",
-    "count_hold_seconds": 1.0
+    "count_hold_seconds": 1.0,
+    "sync": {
+      "threshold": 0.75,
+      "mode": "THREE"
+    },
+    "manual": {
+      "select": "END_INTRO",
+      "hold": false
+    },
+    "session": {
+      "enabled": false,
+      "intro_seconds": 60.0,
+      "play_seconds": 150.0
+    }
   },
   "render": {
     "preview": {

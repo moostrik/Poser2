@@ -1,2 +1,3 @@
-from .machine import StateId, StateMachine, StateMachineSettings, StateContext, SyncMode
+from .settings import StateId, SyncMode, StateMachineSettings
+from .machine import StateMachine, StateContext
 from .states import StateBase, STATES

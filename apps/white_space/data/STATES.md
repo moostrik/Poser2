@@ -51,8 +51,9 @@ stateDiagram-v2
     END_IDLE --> IDLE: 1 bar after LOW reacquired
 ```
 
-The machine always **boots into IDLE** (failsafe — the persisted `select` is only the goto
-target; a power-cycled installation resumes the show unattended). **OFF (S0) sits outside
+The machine always **boots into IDLE** (failsafe — the persisted `manual.select` is only
+the goto target, and `manual.hold` is forced off at construction: a power-cycled
+installation resumes the show unattended). **OFF (S0) sits outside
 the automatic graph**: no condition enters or leaves it — only the operator's goto. In
 **session mode** the two open-ended states (INTRO, PLAY) gain timed exits, and END only
 winds down (no return to PLAY), so a session always concludes.
@@ -172,9 +173,9 @@ as it crosses each participant.
 - **Participants**: > 0 · **Duration**: ∞ · **Motor**: LOW
 - **Transitions**
   1. P == 0 → S4 INTRO_IDLE
-  2. at least `sync_mode` participants in sync (3 / all−1 / all, each ≥ `sync_threshold`)
+  2. at least `sync.mode` participants in sync (3 / all−1 / all, each ≥ `sync.threshold`)
      and P ≥ 3 → S5 INTRO_PLAY
-  3. session: elapsed ≥ `intro_session_seconds` → S5 INTRO_PLAY *(checked after P == 0,
+  3. session: elapsed ≥ `session.intro_seconds` → S5 INTRO_PLAY *(checked after P == 0,
      so an empty room never spins up)*
 - **Mix**: `playhead_low` DIM · `playhead_flash` 1.0 (reset on entry)
 - **White**: DIM line + BRIGHT flash on hit
@@ -232,7 +233,7 @@ between participants holding the same pose fills with light.
 - **Participants**: ≥ 3 · **Duration**: ∞ · **Motor**: HIGH
 - **Transitions**
   1. P < 3 (debounced) → S7 END
-  2. session: elapsed ≥ `play_session_seconds` → S7 END
+  2. session: elapsed ≥ `session.play_seconds` → S7 END
 - **Mix**: `pose_instrument` 1.0 · `playhead_high` 1.0
 - **White**: the pose instrument — patterns per pose plus the sync fill between
   similarly-posed participants — and the playhead line at full white

@@ -25,7 +25,8 @@ from typing import Callable
 import pytweening
 
 from ..light import LightSettings, LayerId, Mix, MotorMode
-from .machine import StateId, StateMachineSettings, StateContext, SyncMode
+from .settings import StateId, SyncMode, StateMachineSettings
+from .machine import StateContext
 
 
 # -- Easing helpers (weight curves over progress p in [0, 1]; pytweening easings) --
@@ -146,11 +147,11 @@ class IntroState(StateBase):
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.participants == 0:       # before the session timeout: an empty room never spins up
             return StateId.INTRO_IDLE
-        # Enough participants in sync (sync_mode: 3 / all−1 / all) launches the spin-up.
-        required = SyncMode(int(self._config.sync_mode)).required(ctx.participants)
+        # Enough participants in sync (sync.mode: 3 / all−1 / all) launches the spin-up.
+        required = SyncMode(int(self._config.sync.mode)).required(ctx.participants)
         if ctx.sync_count >= required and ctx.participants >= 3:
             return StateId.INTRO_PLAY
-        if ctx.session and ctx.elapsed >= self._config.intro_session_seconds:
+        if ctx.session and ctx.elapsed >= self._config.session.intro_seconds:
             return StateId.INTRO_PLAY
         return None
 
@@ -166,7 +167,7 @@ class PlayState(StateBase):
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.participants < 3:
             return StateId.END
-        if ctx.session and ctx.elapsed >= self._config.play_session_seconds:
+        if ctx.session and ctx.elapsed >= self._config.session.play_seconds:
             return StateId.END
         return None
 

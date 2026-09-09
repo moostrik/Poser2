@@ -102,7 +102,7 @@ class StateMachineTest(unittest.TestCase):
         return StateId(int(self.config.current))
 
     def goto(self, state: StateId) -> None:
-        self.config.select = state
+        self.config.manual.select = state
         self.machine._on_goto(True)
         self.tick()
 
@@ -118,8 +118,8 @@ class StateMachineTest(unittest.TestCase):
     def test_startup_ignores_persisted_select(self) -> None:
         # Failsafe: a preset saved mid-show (select = PLAY) must never boot into a
         # HIGH-motor state — the show always starts in IDLE; select is only the goto target.
-        self.config.select = StateId.PLAY
-        self.config.hold = True                 # isolate the boot state from conditions
+        self.config.manual.select = StateId.PLAY
+        self.config.manual.hold = True          # isolate the boot state from conditions
         self.tick()
         self.assertEqual(self.current, StateId.IDLE)
         self.assertEqual(self.motors, [MotorMode.LOW])
@@ -289,23 +289,23 @@ class StateMachineTest(unittest.TestCase):
     # -- session mode ---------------------------------------------------------
 
     def test_session_intro_timeout(self) -> None:
-        self.config.session = True
+        self.config.session.enabled = True
         self._to_intro(participants=1)
-        self.tick(dt=self.config.intro_session_seconds + 1.0)
+        self.tick(dt=self.config.session.intro_seconds + 1.0)
         self.assertEqual(self.current, StateId.INTRO_PLAY)
 
     def test_session_empty_room_never_spins_up(self) -> None:
-        self.config.session = True
+        self.config.session.enabled = True
         self._to_intro(participants=1)
         self.set_participants(0)
-        self.tick(dt=self.config.intro_session_seconds + 1.0)
+        self.tick(dt=self.config.session.intro_seconds + 1.0)
         self.assertNotEqual(self.current, StateId.INTRO_PLAY)
 
     def test_session_play_timeout_and_end_only_winds_down(self) -> None:
-        self.config.session = True
+        self.config.session.enabled = True
         self._to_play()
         self.assertEqual(self.current, StateId.PLAY)   # P == 3: no natural end
-        self.tick(dt=self.config.play_session_seconds + 1.0)
+        self.tick(dt=self.config.session.play_seconds + 1.0)
         self.assertEqual(self.current, StateId.END)
         for _ in range(4):                                # P ≥ 3, but session: no wind-back
             self.tick(dbar=self.config.end_bars / 3)
@@ -330,7 +330,7 @@ class StateMachineTest(unittest.TestCase):
 
     def test_goto_jumps_and_commands_motor(self) -> None:
         self.tick()
-        self.config.hold = True                 # park on the state (goto + hold workflow)
+        self.config.manual.hold = True          # park on the state (goto + hold workflow)
         self.goto(StateId.PLAY)
         self.assertEqual(self.current, StateId.PLAY)
         self.assertEqual(self.motors[-1], MotorMode.HIGH)
@@ -342,24 +342,29 @@ class StateMachineTest(unittest.TestCase):
 
     def test_hold_freezes_transitions(self) -> None:
         self.tick()
-        self.config.hold = True
+        self.config.manual.hold = True
         self.set_participants(2)
         self.assertEqual(self.current, StateId.IDLE)
-        self.config.hold = False
+        self.config.manual.hold = False
         self.tick()
         self.assertEqual(self.current, StateId.IDLE_INTRO)
 
-    def test_disabled_relinquishes_motor_and_stops_transitions(self) -> None:
-        self.tick()
-        self.machine._on_enabled(False)
-        self.config.enabled = False
-        self.assertIsNone(self.motors[-1])
-        self.set_participants(2)
-        self.assertEqual(self.current, StateId.IDLE)
+    def test_boot_failsafe_clears_hold(self) -> None:
+        # A preset saved mid-hold must never freeze the power-on show: the machine forces
+        # manual.hold off at construction.
+        config = StateMachineSettings()
+        config.manual.hold = True
+        machine = StateMachine(config, LightSettings(), board=FakeBoard(),
+                               set_mix=lambda _: None, reset_layers=lambda _: None,
+                               set_motor=lambda _: None, pose_stage=POSE_STAGE)
+        try:
+            self.assertFalse(config.manual.hold)
+        finally:
+            machine.stop()
 
     def test_sync_mode_counts_participants_in_sync(self) -> None:
         from apps.white_space.statemachine import SyncMode
-        self.config.sync_mode = SyncMode.ALL
+        self.config.sync.mode = SyncMode.ALL
         self._to_intro(participants=4)
         # 3 of 4 in sync: enough for THREE, not for ALL
         self.machine.set_similarity(SimpleNamespace(similarity={
@@ -367,7 +372,7 @@ class StateMachineTest(unittest.TestCase):
             2: FakeSimilarity(0.9), 3: FakeSimilarity(0.1)}))
         self.tick()
         self.assertEqual(self.current, StateId.INTRO)
-        self.config.sync_mode = SyncMode.THREE
+        self.config.sync.mode = SyncMode.THREE
         self.tick()
         self.assertEqual(self.current, StateId.INTRO_PLAY)
 
