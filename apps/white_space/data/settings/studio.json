@@ -170,7 +170,8 @@
       "use_signed": false,
       "mtu": 1500,
       "lower_edge": 0.32,
-      "curve": 3.0,
+      "upper_edge": 0.68,
+      "curve": 2.0,
       "startup_delay": 2.0,
       "chunk_interval": 0.0,
       "offsets": {
@@ -409,7 +410,7 @@
         "blend": "ADD"
       },
       "playhead_low": {
-        "level": 0.5,
+        "level": 1.0,
         "blend": "ADD"
       },
       "playhead_flash": {
@@ -454,7 +455,7 @@
       },
       "playhead_high": {
         "level": 1.0,
-        "width": 0.01,
+        "width": 36,
         "blend": "ADD"
       },
       "flood": {
@@ -642,7 +643,7 @@
     },
     "manual": {
       "select": "END",
-      "hold": true
+      "hold": false
     },
     "session": {
       "enabled": false,

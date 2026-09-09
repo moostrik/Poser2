@@ -74,12 +74,32 @@ class ChunkMessageTest(unittest.TestCase):
 
     def test_body_is_the_channel_slice(self) -> None:
         expected = OscLightSender.float_to_uint8(
-            OscLightSender._apply_levels(_frame().white, self.settings.curve, self.settings.lower_edge)
+            OscLightSender._apply_levels(_frame().white, self.settings.curve,
+                                         self.settings.lower_edge, self.settings.upper_edge)
         )
         for i in range(FIRMWARE_NUM_CHUNKS):
             body = self.messages[i].dgram[OSC_PREAMBLE:]
             start = i * FIRMWARE_CHUNK_SIZE
             self.assertEqual(body, expected[start:start + FIRMWARE_CHUNK_SIZE].tobytes())
+
+
+class LevelWindowTest(unittest.TestCase):
+    """The output mapping targets the analog LED driver's usable window: dark below the
+    forward threshold (`lower_edge`), saturated above the ceiling (`upper_edge`)."""
+
+    def test_lit_pixels_map_into_the_usable_window(self) -> None:
+        x = np.array([0.0, 0.001, 0.5, 1.0], dtype=np.float32)
+        out = OscLightSender._apply_levels(x, curve=1.0, lower_edge=0.32, upper_edge=0.78)
+        self.assertEqual(out[0], 0.0)                       # true black stays off
+        self.assertGreater(out[1], 0.32)                    # lit → lifted past the floor
+        self.assertAlmostEqual(float(out[2]), 0.32 + 0.46 * 0.5, places=6)
+        self.assertAlmostEqual(float(out[3]), 0.78, places=6)   # full maps to the ceiling
+        self.assertTrue(np.all(np.diff(out) >= 0.0))        # monotonic
+
+    def test_crossed_edges_collapse_to_the_floor(self) -> None:
+        out = OscLightSender._apply_levels(np.array([1.0], dtype=np.float32),
+                                           curve=1.0, lower_edge=0.4, upper_edge=0.2)
+        self.assertAlmostEqual(float(out[0]), 0.4, places=6)   # never inverts
 
 
 class ConfigMessageTest(unittest.TestCase):

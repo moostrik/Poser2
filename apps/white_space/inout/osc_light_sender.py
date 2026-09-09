@@ -44,7 +44,8 @@ class OscLightSenderSettings(BaseSettings):
     mtu:          Field[int]  = Field(1500, min=576, max=9000,  access=Field.INIT, description="Network MTU (affects chunk size)")
     chunk_size:    Field[int]  = Field(0,    access=Field.READ,  description="Computed chunk size (bytes)")
     num_chunks:   Field[int]  = Field(0,    access=Field.READ,  description="Computed number of chunks")
-    lower_edge:   Field[float] = Field(0.35, min=0.0, max=1.0, step=0.01, description="Lamp turn-on floor: lit pixels lift to at least this; black stays off")
+    lower_edge:   Field[float] = Field(0.35, min=0.0, max=1.0, step=0.01, description="Turn-on floor: the analog LED driver is dark below this — lit pixels lift to at least it; black stays off")
+    upper_edge:   Field[float] = Field(1.0,  min=0.0, max=1.0, step=0.01, description="Brightness ceiling: the analog LED driver saturates here — software 1.0 maps to this")
     curve:        Field[float] = Field(1.0,  min=0.5, max=3.0, step=0.01, description="Output gamma curve; <1 brightens mids, >1 darkens")
     startup_delay: Field[float] = Field(2.0, min=0.0, max=10.0, step=0.5, description="Hold motor rpm at 0 for this long after connect, then release to the commanded speed — forces a 0→target edge the motor controller acts on at boot")
     chunk_interval: Field[float] = Field(0.0,    min=0.0, max=0.005, step=0.0005, description="Seconds between consecutive pixel datagrams (0 = send back-to-back). Only raise this if the fixture reports dropped chunks — it adds output latency")
@@ -287,9 +288,9 @@ class OscLightSender:
         last — the message the firmware treats as the frame's commit trigger.
         """
         try:
-            # Lamp output mapping: gamma curve + turn-on floor (master brightness applied upstream).
-            white_f = OscLightSender._apply_levels(output.white, settings.curve, settings.lower_edge)
-            blue_f  = OscLightSender._apply_levels(output.blue,  settings.curve, settings.lower_edge)
+            # Output mapping: gamma curve + the driver's usable window (master applied upstream).
+            white_f = OscLightSender._apply_levels(output.white, settings.curve, settings.lower_edge, settings.upper_edge)
+            blue_f  = OscLightSender._apply_levels(output.blue,  settings.curve, settings.lower_edge, settings.upper_edge)
             if settings.use_signed:
                 white_channel: np.ndarray = OscLightSender.float_to_int8(white_f)
                 blue_channel:  np.ndarray = OscLightSender.float_to_int8(blue_f)
@@ -336,12 +337,14 @@ class OscLightSender:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _apply_levels(arr: np.ndarray, curve: float, lower_edge: float) -> np.ndarray:
-        """Lamp output mapping: gamma `curve`, then lift lit pixels above the turn-on floor
-        (`lower_edge`); true-black pixels stay off. In/out in [0,1]."""
+    def _apply_levels(arr: np.ndarray, curve: float, lower_edge: float, upper_edge: float = 1.0) -> np.ndarray:
+        """Output mapping: gamma `curve`, then map lit pixels into the analog LED driver's
+        usable window (`lower_edge`..`upper_edge` — dark below the forward threshold,
+        saturated above); true-black pixels stay off. In/out in [0,1]."""
         x = np.clip(arr, 0.0, 1.0)
         s = x ** curve
-        return np.where(s > 0.0, lower_edge + (1.0 - lower_edge) * s, 0.0)
+        hi = max(upper_edge, lower_edge)   # a crossed pair collapses to the floor, never inverts
+        return np.where(s > 0.0, lower_edge + (hi - lower_edge) * s, 0.0)
 
     @staticmethod
     def float_to_uint8(arr: np.ndarray) -> np.ndarray:
