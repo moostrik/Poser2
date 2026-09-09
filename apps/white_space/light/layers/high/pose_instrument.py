@@ -36,14 +36,14 @@ if TYPE_CHECKING:
 
 
 class PoseInstrumentSettings(LayerSettings):
-    band_width:     Field[float] = Field(0.06, min=0.0, max=0.5, step=0.005, description="White band base width (strip fraction; scaled by pose length)")
-    band_level:     Field[float] = Field(0.8,  min=0.0, max=1.0, step=0.01,  description="White band level (modulated by the arm angles)")
-    band_edge:      Field[float] = Field(0.02, min=0.0, max=0.2, step=0.005, description="Band edge softness (strip fraction)")
-    marker_width:   Field[float] = Field(0.02, min=0.0, max=0.2, step=0.005, description="Blue marker width (the person's blue light)", newline=True)
-    marker_level:   Field[float] = Field(0.8,  min=0.0, max=1.0, step=0.01,  description="Blue marker level")
-    fill_threshold: Field[float] = Field(0.75, min=0.0, max=1.0, step=0.01,  description="Pairwise similarity at which the sync fill lights", newline=True)
-    fill_level:     Field[float] = Field(0.5,  min=0.0, max=1.0, step=0.01,  description="Sync fill level (scaled by the pair's similarity)")
-    fill_edge:      Field[float] = Field(0.03, min=0.0, max=0.2, step=0.005, description="Sync fill end softness (strip fraction)")
+    band_width:     Field[float] = Field(21.6, min=0.0, max=180.0, step=0.5, description="White band base width (deg; scaled by pose length)")
+    band_level:     Field[float] = Field(0.8,  min=0.0, max=1.0,  step=0.01, description="White band level (modulated by the arm angles)")
+    band_edge:      Field[float] = Field(7.2,  min=0.0, max=72.0, step=0.1,  description="Band edge softness (deg)")
+    marker_width:   Field[float] = Field(7.2,  min=0.0, max=72.0, step=0.1,  description="Blue marker width (deg — the person's blue light)", newline=True)
+    marker_level:   Field[float] = Field(0.8,  min=0.0, max=1.0,  step=0.01, description="Blue marker level")
+    fill_threshold: Field[float] = Field(0.75, min=0.0, max=1.0,  step=0.01, description="Pairwise similarity at which the sync fill lights", newline=True)
+    fill_level:     Field[float] = Field(0.5,  min=0.0, max=1.0,  step=0.01, description="Sync fill level (scaled by the pair's similarity)")
+    fill_edge:      Field[float] = Field(10.8, min=0.0, max=72.0, step=0.1,  description="Sync fill end softness (deg)")
 
 
 def _shorter_arc(a: float, b: float) -> tuple[float, float]:
@@ -90,10 +90,10 @@ class PoseInstrument(HighLayer):
             raised = [0.5 + 0.5 * math.cos(a) for a in arm if not math.isnan(a)]
             modulation = 0.5 + 0.5 * (sum(raised) / len(raised)) if raised else 0.75
 
-            width = P.band_width * (0.5 + 0.5 * length)
-            edge = int(P.band_edge * self.resolution)
+            width = P.band_width / 360.0 * (0.5 + 0.5 * length)   # deg → strip fraction
+            edge = int(P.band_edge / 360.0 * self.resolution)
             draw_field(white, position, width, P.band_level * modulation, edge, BlendType.MAX)
-            draw_field(blue, position, P.marker_width, P.marker_level, edge, BlendType.MAX)
+            draw_field(blue, position, P.marker_width / 360.0, P.marker_level, edge, BlendType.MAX)
 
         # -- Per pair: the sync fill — a flat arc between similarity-matched pairs ---
         ids = sorted(positions)
@@ -108,5 +108,5 @@ class PoseInstrument(HighLayer):
                 centre, width = _shorter_arc(positions[id_a], positions[id_b])
                 if width <= 0.0:
                     continue
-                edge = int(P.fill_edge * self.resolution)
+                edge = int(P.fill_edge / 360.0 * self.resolution)
                 draw_field(white, centre, width, P.fill_level * sim, edge, BlendType.MAX)

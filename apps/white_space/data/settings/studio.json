@@ -3,7 +3,7 @@
   "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "render_fps": 120.0,
+  "render_fps": 121.0,
   "light_resolution": 3600,
   "fov": 127.0,
   "spin_down_seconds": 7.0,
@@ -443,19 +443,19 @@
     },
     "high_layers": {
       "pose_instrument": {
-        "band_width": 0.06,
+        "band_width": 21.6,
         "band_level": 0.8,
-        "band_edge": 0.02,
-        "marker_width": 0.02,
+        "band_edge": 7.2,
+        "marker_width": 7.2,
         "marker_level": 0.8,
         "fill_threshold": 0.75,
         "fill_level": 0.5,
-        "fill_edge": 0.03,
+        "fill_edge": 10.8,
         "blend": "ADD"
       },
       "playhead_high": {
         "level": 1.0,
-        "width": 36,
+        "width": 1.0,
         "blend": "ADD"
       },
       "flood": {
@@ -642,8 +642,8 @@
       "mode": "THREE"
     },
     "manual": {
-      "select": "END",
-      "hold": false
+      "select": "PLAY",
+      "hold": true
     },
     "session": {
       "enabled": false,

@@ -17,8 +17,8 @@ from ...frame import Frame
 
 
 class PlayheadHighSettings(LayerSettings):
-    level: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Marker brightness")
-    width: Field[int]   = Field(36,  min=1,   max=360, step=1,    description="Marker width (pixels)")
+    level: Field[float] = Field(1.0, min=0.0, max=1.0,  step=0.01, description="Marker brightness")
+    width: Field[float] = Field(3.6, min=0.1, max=36.0, step=0.1,  description="Marker width (deg)")
 
 
 class PlayheadHigh(HighLayer):
@@ -34,7 +34,7 @@ class PlayheadHigh(HighLayer):
             return
         P = self._config
         center = int(angle_to_strip_position(ph) * self.resolution)   # [0, R)
-        w      = max(1, int(P.width))                                 # exact pixel count
+        w      = max(1, round(P.width / 360.0 * self.resolution))     # deg → pixel count
         start  = center - w // 2
         idx    = np.arange(start, start + w) % self.resolution
         white[idx] += P.level
