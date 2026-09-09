@@ -180,6 +180,8 @@ class WhiteSpaceMain:
                 nodes.AngleMotionExtractor(ps.motion.extractor),
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
                 nodes.AngleSymExtractor(),
+                nodes.LegDeviationExtractor(ps.leg_deviation_extractor),
+                nodes.TorsoTiltExtractor(ps.torso_tilt_extractor),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
                 self.similarity_applicator,
@@ -235,6 +237,8 @@ class WhiteSpaceMain:
             i: trackers.FilterPipeline([
                 nodes.DistanceExtractor(ps.distance_extractor),
                 nodes.AngleSymExtractor(),
+                nodes.LegDeviationExtractor(ps.leg_deviation_extractor),
+                nodes.TorsoTiltExtractor(ps.torso_tilt_extractor),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
                 nodes.AngleVelStickyFiller(ps.velocity.sticky),

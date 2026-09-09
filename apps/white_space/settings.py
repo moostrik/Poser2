@@ -204,6 +204,8 @@ class PoseGroup(BaseSettings):
     image_crop      : Group[inference.crop.Settings]         = Group(inference.crop.Settings, share=[max_poses])
     angle_extractor : Group[nodes.AngleExtractorSettings]    = Group(nodes.AngleExtractorSettings)
     distance_extractor: Group[nodes.DistanceExtractorSettings] = Group(nodes.DistanceExtractorSettings)
+    leg_deviation_extractor: Group[nodes.LegDeviationExtractorSettings] = Group(nodes.LegDeviationExtractorSettings)
+    torso_tilt_extractor: Group[nodes.TorsoTiltExtractorSettings] = Group(nodes.TorsoTiltExtractorSettings)
     bbox            : Group[BboxFeature]                     = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                    = Group(PointFeature, share=_feature_share)
     angle           : Group[AngleFeature]                    = Group(AngleFeature, share=_feature_share)

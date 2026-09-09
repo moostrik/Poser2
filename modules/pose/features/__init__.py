@@ -14,11 +14,14 @@ from .MotionTime import     MotionTime
 from .Age import            Age
 from .Azimuth import        Azimuth
 from .Distance import       Distance
+from .LegDeviation import   LegDeviation
+from .TorsoTilt import      TorsoTilt
 
 
 FEATURES: list[type[BaseFeature]] = [
     Age, AngleMotion, Angles, AngleSymmetry, AngleVelocity,
-    Azimuth, BBox, Distance, LeaderScore, MotionGate, MotionTime, Points2D, Similarity,
+    Azimuth, BBox, Distance, LeaderScore, LegDeviation, MotionGate, MotionTime, Points2D,
+    Similarity, TorsoTilt,
 ]
 
 Feature: type[IntEnum] = IntEnum('Feature', {cls.__name__: i for i, cls in enumerate(FEATURES, 1)})  # type: ignore[misc]

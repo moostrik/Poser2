@@ -106,7 +106,7 @@ Each state composes its **mix**: a weighted list of layers, returned every tick
 | `playhead_low`    | low    | the searchlight line — front white lamp |
 | `playhead_flash`  | low    | flash as the playhead crosses a participant |
 | `sound_light`     | low    | soundscape levels on the left/right blue lamps (`/WS/sound/level` from Max) |
-| `pose_instrument` | high   | the pose instrument — each participant in a blue light with a pose-derived pattern, sync fill between matched participants (placeholder for now — see `LAYERS.md`) |
+| `pose_instrument` | high   | the pose instrument — each participant in a blue anchor light with a symmetric pose-derived line pattern; matched participants' patterns grow together across the space between them (see `LAYERS.md`) |
 | `playhead_high`   | high   | the playhead line on the ring — full-white marker |
 | `flood`           | high   | constant full-strip white (S7's wall) |
 | `wind_down`       | low    | the dying wall — both white lamps fading over the spin-down (S8/S9; the wall while the bar is still fast is the lamps spinning, see `LAYERS.md`) |

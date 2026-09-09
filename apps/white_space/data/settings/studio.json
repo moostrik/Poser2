@@ -226,6 +226,15 @@
       "near_y": 0.9,
       "far_y": 0.3
     },
+    "leg_deviation_extractor": {
+      "hip_rad": 1.0471975511965976,
+      "knee_rad": 1.5707963267948966,
+      "n_top": 2
+    },
+    "torso_tilt_extractor": {
+      "tilt_rad": 0.7853981633974483,
+      "aspect_ratio": 0.75
+    },
     "bbox": {},
     "point": {
       "confidence": {
@@ -445,14 +454,29 @@
     },
     "high_layers": {
       "pose_instrument": {
-        "band_width": 21.6,
-        "band_level": 0.8,
-        "band_edge": 7.2,
-        "marker_width": 7.2,
-        "marker_level": 0.8,
-        "fill_threshold": 0.75,
-        "fill_level": 0.5,
-        "fill_edge": 10.8,
+        "line_spacing": 10.0,
+        "line_motion": "STATIC",
+        "line_flow": "SYMMETRIC",
+        "line_speed": 0.0,
+        "lines_per_bar": 1.0,
+        "line_phase": 0.0,
+        "n_blend": 0.1,
+        "extent_min": 10.0,
+        "extent_max": 60.0,
+        "line_edge": 3.0,
+        "line_min": 0.1,
+        "line_max": 0.6,
+        "line_soft": 0.3,
+        "harmonics": 2,
+        "level": 0.8,
+        "legs_dim": 0.3,
+        "blue_min": 0.0,
+        "blue_max": 0.6,
+        "anchor_width": 3.0,
+        "anchor_level": 0.8,
+        "sync_threshold": 0.75,
+        "attack_seconds": 1.0,
+        "release_seconds": 1.5,
         "blend": "ADD"
       },
       "playhead_high": {

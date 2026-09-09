@@ -9,7 +9,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from modules.pose.frame import Frame, FrameDict
-from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, Similarity, MotionGate, LeaderScore, MotionTime, Age, AngleLandmark, BBox
+from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, Similarity, MotionGate, LeaderScore, MotionTime, Age, AngleLandmark, BBox, LegDeviation, TorsoTilt
 
 from modules.session import SequencerState
 from modules.settings import BaseSettings, Field, Widget
@@ -235,6 +235,12 @@ class OscSound:
         sym_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(sym_msg.build()) # type: ignore
 
+        # Reset angle/legs and angle/tilt to 0
+        for address in (f"/pose/{id}/angle/legs", f"/pose/{id}/angle/tilt"):
+            body_reset_msg = OscMessageBuilder(address=address)
+            body_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+            bundle_builder.add_content(body_reset_msg.build()) # type: ignore
+
         # Reset similarity values to 0
         similarity_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
         for _ in range(num_players):
@@ -309,6 +315,18 @@ class OscSound:
         mean_sym_msg = OscMessageBuilder(address=f"/pose/{id}/angle/sym")
         mean_sym_msg.add_arg(float(mean_sym), OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(mean_sym_msg.build()) # type: ignore
+
+        # range [0, 1] - joint-weighted leg deviation from standing straight
+        legs: float = frame[LegDeviation].value if LegDeviation in frame else 0.0
+        legs_msg = OscMessageBuilder(address=f"/pose/{id}/angle/legs")
+        legs_msg.add_arg(float(legs), OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(legs_msg.build()) # type: ignore
+
+        # range [-1, 1] - signed sideways torso lean against the image vertical
+        tilt: float = frame[TorsoTilt].value if TorsoTilt in frame else 0.0
+        tilt_msg = OscMessageBuilder(address=f"/pose/{id}/angle/tilt")
+        tilt_msg.add_arg(float(tilt), OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(tilt_msg.build()) # type: ignore
 
         # range [0, 1] - raw angle similarity
         pose_sim_values: list[float] = frame[Similarity].values.tolist() if Similarity in frame else [0.0] * num_players

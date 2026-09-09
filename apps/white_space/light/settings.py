@@ -32,7 +32,7 @@ class LayerId(IntEnum):
     playhead_haunted    = auto()   # low: player/ghost flash (debug/experimentation)
     playhead_test       = auto()   # low: direct levels for the four physical lamps (debug)
     # high — the POV ring regime
-    pose_instrument     = auto()   # high: the pose instrument (placeholder — see LAYERS.md)
+    pose_instrument     = auto()   # high: the pose instrument — people-anchored line patterns (see LAYERS.md)
     playhead_high       = auto()   # high: bright ring marker visualising the content playhead
     flood               = auto()   # high: constant full-strip white (S7's wall)
     test_pose_waves     = auto()   # high: the old wave/void instrument (reference/montage)

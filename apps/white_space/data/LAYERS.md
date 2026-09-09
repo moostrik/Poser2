@@ -2,9 +2,9 @@
 
 The light layers behind the states' mixes (see `STATES.md` for the choreography; this
 document covers the layers themselves). All show layers are **indexed** below. For
-existing layers the module docstrings stay the source of truth for behavior; the **new**
-layers (`sound_light`, `flood`, and the `pose_instrument` placeholder) get full design
-sections here — they have no code yet, so this is their specification.
+existing layers the module docstrings stay the source of truth for behavior; the layers
+built in the show work packages (`sound_light`, `flood`, `wind_down`, `pose_instrument`)
+keep their full design sections here.
 
 Regimes: **low** layers write the four bar lights by name (`Frame.bar_lights`, indexed by
 `BarLightId`: front/back white, left/right blue) and no pixels; **high** layers draw the
@@ -26,7 +26,7 @@ while the low tools are named as playhead tools (`playhead_haunted`, `playhead_t
 | `playhead_low`    | low    | — (settings only)                                      | front white lamp              | S1–S5, S8, S9 |
 | `playhead_flash`  | low    | LERP frames (PlayheadOffset, Dwell), tracklets         | front white lamp + blue lamps (blue zeroed in presets — S3 runs blue-none by design) | S3 |
 | `playhead_high`   | high   | frame playhead phase                                   | white ring marker             | S5 (post-un-lock), S6, S7 |
-| `pose_instrument` | high   | LERP frames (Azimuth, BBox, Angles, Similarity), tracklets | white bands + sync arcs, blue markers *(placeholder — see below)* | S5 (post-un-lock), S6, S7 |
+| `pose_instrument` | high   | LERP frames (Azimuth, BBox, Angles, LegDeviation, TorsoTilt, Similarity), tracklets, playhead bars (PLAYHEAD motion only) | white lines, blue anchor + between-lines | S5 (post-un-lock), S6, S7 |
 | `flood`           | high   | — (settings only)                                      | full-strip white              | S7 |
 | `wind_down`       | low    | tick clock                                             | both white lamps, fading (the wall while the bar is still fast) | S8, S9 |
 | `sound_light`     | low    | sound levels from Max (board)                          | left/right blue lamps         | S1, S2, S4, S9 |
@@ -109,44 +109,71 @@ mode drives the same two white outputs as this layer at 1.0 in slot mode.
 - **Reset**: restarts the fade at the full wall (called from S8/S9 `enter()`)
 - **Open questions**: —
 
-## pose_instrument (new — HighLayer, **placeholder**)
+## pose_instrument (HighLayer)
 
-The instrument is the heart of the piece and the most complicated layer — it gets its
-own major work package **later, once the rest of the system works**. What we build now
-is a deliberate placeholder: a layer that already **receives the complete input
-contract** the real instrument will need, and visualises each input in the simplest
-legible way. The real instrument then grows inside this layer with all plumbing in place.
+The heart of the piece. Each person **stands in a blue anchor** — a blue line at their
+azimuth, their own presence — and around them a **mirror-symmetric pattern of white and
+blue lines derived from their pose**: the visual analogue of how the sound works, pose →
+pattern as pose → sound. A neutral pose is "boring": one white line each side. Arms up is
+the bass: many thick lines. Everything on the strip is a *line* (the 1-D image becomes
+vertical lines in the room); the vocabulary is *anchor* for the blue at the person and
+*lines* for the pattern — no "spot", "marker" or "centre line".
 
-**Design direction for the real instrument** (the deferred work package):
-- Each person **stands in a blue light** — their spot on the ring.
-- Around them, a **line pattern derived from their pose** — white and blue — the
-  visual analogue of how the sound works: pose → pattern as pose → sound.
-- All patterns live in **one shared phase world**: line spacing and phase are anchored
-  to a global reference, never per-person, so when two people's patterns fill the space
-  between them they **match up seamlessly** — the sync fill is then not an overlay but
-  matched patterns meeting and joining. (Note: the old `pose_waves` phases per player —
-  `left/right_pattern_time` per person — which can never merge; the shared phase world
-  is a foundational difference, not a refinement.)
+**The line world is anchored to the people, not to the ring.** The strip is divided into
+segments between neighbouring participants; each segment fits a whole number of lines
+(`n = round(gap / line_spacing)`), so its actual spacing is `gap / n` — a nudge of at most
+half a spacing spread over the whole gap, invisible. Every person is a mirror point of
+their own pattern, and the run of lines between two people is *the same lines* counted
+from either side. This is the shared phase world: the phase is shared per segment and
+anchored to the people, never per person (the old `pose_waves` drifted a phase per player,
+which can never merge). A fixed global grid was considered and rejected — it cannot be
+symmetric about a person who is not standing on it; syncing the patterns *in the space
+between people* gives symmetry and the seamless join at once.
 
 - **Used by**: S5 (post-un-lock), S6, S7
-- **Input contract** (all wired now, so the future instrument changes only the drawing):
-  - per participant: azimuth strip position, pose length (BBox), the four arm angles,
-    presence/age (tracklets)
-  - per pair: pairwise `Similarity` (the sync fill's driver)
-- **Placeholder visualisation**:
-  - white: a simple band per participant at their azimuth (width from pose length,
-    brightness modulated plainly by the arm angles — enough to see the data move)
-  - white: a flat **arc between each similarity-matched pair** (similarity ≥
-    `fill_threshold`, shorter arc, soft ends) — the simplest version of the sync fill
-  - blue: a plain marker per participant (the "stands in a blue light" spot)
-  - any striping/pattern the placeholder draws is anchored to the **shared phase world**
-    from day one (a global grid, never per-person phase) — validating the foundational
-    idea early, before the real instrument is built on it
-- **Settings**: band width/level, `fill_threshold`, `fill_level`, `fill_edge`
-- **Reset**: clears per-participant state (S5's entry reset covers it)
+- **Input contract** (six pose parameters, all read into the per-participant state every
+  tick whether or not the current mapping draws with them — the composition work happens
+  on these): the four arm angles (`Angles`: left/right shoulder, left/right elbow),
+  `LegDeviation` (joint-weighted hip/knee deviation, 0..1), `TorsoTilt` (signed sideways
+  lean against the image vertical, −1..1 — the one absolute measure; every joint angle is
+  segment-vs-segment); plus pose length (BBox height), presence (tracklets) and the
+  pairwise `Similarity` row. Both new features are also sent to Max
+  (`/pose/{id}/angle/legs`, `/pose/{id}/angle/tilt`) so sound and light read the same values.
+- **Initial mapping** (a starting point to tune and rework — not the design's fixed part):
+  `lift` (mean |shoulder| / π) → reach (`extent_min` → `extent_max`) and line thickness
+  (`line_min` → `line_max`); `bend` (mean |elbow| / π) → density, crossfading the base lines
+  toward harmonic `harmonics` (a subdivision of the same spacing, so joins still match);
+  `legs` → colour balance (blue between-lines `blue_min` → `blue_max`, white dimmed by
+  `legs_dim`); `tilt` read but unused by the first drawing; pose length → anchor width.
+- **Between people**: line parameters (thickness, density, levels) are blended by position
+  along a segment, so a thick pattern thins toward a neutral neighbour with no step at the
+  midpoint. As people walk, a segment's line count steps at each half-spacing; a crossfade
+  band (`n_blend`) slides the mid-gap lines instead of jumping them. Overlapping patterns
+  are **MAX-blended** (identical lines → a seamless union; the old add-vs-MAX question).
+- **Sync**: above `sync_threshold` (mean of both directions' similarity) the two patterns
+  **grow toward each other along the shortest arc** — reach carried across intermediate
+  people segment by segment — until they meet at the arc's midpoint. No arcs or fills: the
+  gap is lined by the same lines both patterns are made of.
+- **Line motion** (`line_motion`): `STATIC` (default), `CONSTANT` (`line_speed` spacings/s),
+  or `PLAYHEAD` (`lines_per_bar` spacings per playhead bar, from the board's bars); plus
+  `line_flow`: `SYMMETRIC` (outward from every person; the flows meet and pass through each
+  other at segment midpoints) or `GLOBAL` (one way round the ring; lines approach a person
+  on one side and depart on the other). Any motion breaks instantaneous symmetry — it holds
+  exactly at phase 0 and ½ — so the moving modes are for evaluation on the machine: the
+  important thing is that people recognise their own presence. Lines are born from the
+  anchor (a whole-line gate over the first half spacing), so no line ever sits on the person.
+- **Presence**: per participant attack (`attack_seconds`) and release (`release_seconds`:
+  the last pose is held while fading; a fading person still bounds segments so neighbours'
+  lines don't re-space at the moment of leaving).
+- **Settings**: `line_spacing`, `line_motion`, `line_flow`, `line_speed`, `lines_per_bar`,
+  `line_phase`, `n_blend`; `extent_min`/`extent_max`, `line_edge`; `line_min`/`line_max`,
+  `line_soft`, `harmonics`; `level`, `legs_dim`, `blue_min`/`blue_max`; `anchor_width`,
+  `anchor_level`; `sync_threshold`; `attack_seconds`, `release_seconds`
+- **Reset**: forgets every participant (S5's entry — a fresh instrument per cycle); the
+  line phase is a world property and keeps running
 - **Relation to `pose_waves`**: the old wave/void instrument is **not** renamed or
-  extended — it moves to the test layers (debug override) as a reference/montage visual;
-  `pose_instrument` is a fresh file with the clean input surface.
-- **Open questions**: the real instrument's full design (the deferred work package —
-  see the design direction above); overlapping fill arcs add vs MAX-blend — decide when
-  the real fill is built
+  extended — it lives on as `test_pose_waves` (debug override), a reference/montage visual.
+- **Open questions**: which line motion reads best on the machine (static join vs the
+  moving modes' midpoint collision); the mapping itself — the composition work; whether
+  `tilt` should drive anything in the light; camera level (a pitched wide-FOV camera reads
+  a small spurious tilt near the frame edges — check a straight person at the edge)
