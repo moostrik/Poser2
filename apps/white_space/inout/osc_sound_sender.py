@@ -86,7 +86,7 @@ class OscSoundSender(BaseOscSound):
         playhead_msg.add_arg(playhead, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(playhead_msg.build())  # type: ignore
 
-        motor_mode: int = 0 if (idle or composition is None) else int(composition.motor.mode)
+        motor_mode: int = 0 if (idle or composition is None) else int(composition.motor_command.mode)
         motor_msg = OscMessageBuilder(address="/global/motor")
         motor_msg.add_arg(motor_mode, OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(motor_msg.build())  # type: ignore

@@ -1,5 +1,5 @@
 """Conductor — the light system's threaded tick loop: owns the 30 Hz time base and the
-fixed per-tick order (motor → playhead → update callbacks → compositor → output).
+fixed per-tick order (motor → playhead → update callbacks → command → compositor → output).
 
 It draws nothing and decides nothing itself: the state machine (an update callback) decides
 looks and motor commands, the layers draw, the Compositor mixes. The Conductor guarantees
@@ -156,12 +156,13 @@ class Conductor(Thread):
         self._motor_controller.set_debug_mode(
             _debug_motor_mode(self._config.debug, self.layers))
 
-        # Advance motor + playhead and publish the playhead BEFORE the update callbacks: the
-        # state machine and pose-LERP read it. Phase is NaN while the motor is STOPPED (no
-        # meaningful playhead); the bar counter stays monotonic throughout. The command those
-        # callbacks issue is folded back in below, before the frame is drawn.
-        motor = self._motor_controller.tick()
-        self._playhead.tick(tick.dt, motor)
+        # Measure the motor, advance the playhead under the command in force over this dt, and
+        # publish the playhead BEFORE the update callbacks: the state machine reads it this tick
+        # (no added latency). Phase is NaN while the motor is STOPPED (no meaningful playhead);
+        # the bar counter stays monotonic throughout.
+        motor   = self._motor_controller.tick()
+        command = self._motor_controller.command
+        self._playhead.tick(tick.dt, motor, command)
         playhead = self._playhead.phase
         self._board.set_playhead(PlayheadSignals(
             phase=playhead, bars=self._playhead.bars, synced=self._playhead.synced,
@@ -170,12 +171,11 @@ class Conductor(Thread):
         self._notify_update()
 
         # The state machine commands the motor from inside those callbacks, and on a state's
-        # entry tick it also hands the Compositor that state's mix. Fold the new command into
-        # the frame so the two can never disagree: the rpm the frame is sent with is the rpm
-        # its content was drawn for (see MotorController.refresh_command).
-        motor = self._motor_controller.refresh_command(motor)
+        # entry tick it also hands the Compositor that state's mix — so the frame takes the
+        # command as it stands now: the rpm it is sent with is the rpm its content is drawn for.
+        command = self._motor_controller.command
 
-        frame = Frame(self._config.light_resolution, tick, motor, playhead=playhead)
+        frame = Frame(self._config.light_resolution, tick, motor, command, playhead=playhead)
         self._compositor.render(frame)
 
         # Master brightness — the ring and the bar lights alike

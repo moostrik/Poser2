@@ -276,7 +276,7 @@ class EndState(StateBase):
         # blue fades out with the instrument (the instrument is the only blue source).
         return [(LayerId.pose_instrument, 1.0 - self._p),
                 (LayerId.playhead_high, 1.0 - self._p),
-                (LayerId.flood, _ease(self._p))]
+                (LayerId.flood, pytweening.easeOutSine(_clamp(self._p)))]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if self._p >= 1.0:

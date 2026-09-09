@@ -4,7 +4,8 @@ import math
 import unittest
 from time import monotonic
 
-from apps.white_space.light.motor import MotorController, MotorSettings, MotorState, MotorMode
+from apps.white_space.light.motor import (MotorController, MotorSettings, MotorMeasurement, MotorCommand,
+                                          MotorMode)
 from apps.white_space.light.playhead import Playhead, PlayheadSettings, _wrap_to_pi
 
 TAU = math.tau
@@ -15,14 +16,11 @@ def wrap(x: float) -> float:
 
 
 def mstate(phase: float, locked: bool, rpm: float,
-           mode: MotorMode = MotorMode.LOW, low_rpm: float = 72.0) -> MotorState:
-    """A MotorState for the playhead: `rpm` is the effective speed to sweep at; measured rpm and phase
-    are valid only when locked."""
-    return MotorState(
-        phase=phase, locked=locked,
-        measured_rpm=rpm if locked else 0.0, effective_rpm=rpm,
-        target_rpm=rpm, mode=mode, low_rpm=low_rpm,
-    )
+           mode: MotorMode = MotorMode.LOW, low_rpm: float = 72.0) -> tuple[MotorMeasurement, MotorCommand]:
+    """The (measurement, command) pair the playhead ticks on: `rpm` is the speed to sweep at —
+    measured (with a valid phase) only when locked, otherwise the commanded target."""
+    return (MotorMeasurement(phase=phase, locked=locked, measured_rpm=rpm if locked else 0.0),
+            MotorCommand(mode=mode, target_rpm=rpm, low_rpm=low_rpm))
 
 
 def running_playhead(settings: "PlayheadSettings | None" = None,
@@ -51,16 +49,17 @@ class MotorTest(unittest.TestCase):
         return m
 
     def test_phase_locked_and_mode_commanded(self) -> None:
-        st = self._locked(MotorMode.LOW).tick()
+        m = self._locked(MotorMode.LOW)
+        st = m.tick()
         self.assertTrue(st.locked)
         self.assertTrue(-math.pi <= st.phase < math.pi)
         self.assertAlmostEqual(st.measured_rpm, 60.0, places=3)
-        self.assertEqual(st.mode, MotorMode.LOW)
-        self.assertEqual(st.target_rpm, 72.0)          # low_rpm default, derived from mode
+        self.assertEqual(m.command.mode, MotorMode.LOW)
+        self.assertEqual(m.command.target_rpm, 72.0)   # low_rpm default, derived from mode
 
     def test_mode_drives_target_rpm(self) -> None:
-        self.assertEqual(self._locked(MotorMode.HIGH).tick().target_rpm, 2000.0)
-        self.assertEqual(self._locked(MotorMode.STOPPED).tick().target_rpm, 0.0)
+        self.assertEqual(self._locked(MotorMode.HIGH).command.target_rpm, 2000.0)
+        self.assertEqual(self._locked(MotorMode.STOPPED).command.target_rpm, 0.0)
 
     def test_unlocked_when_no_falls(self) -> None:
         st = MotorController(MotorSettings()).tick()
@@ -70,9 +69,9 @@ class MotorTest(unittest.TestCase):
     def test_boot_without_command_is_stopped(self) -> None:
         # There is no manual mode: until the machine (or debug) commands one, the motor
         # never spins — no command means STOPPED, so a boot can never start a fast spin.
-        st = MotorController(MotorSettings()).tick()
-        self.assertEqual(st.mode, MotorMode.STOPPED)
-        self.assertEqual(st.target_rpm, 0.0)
+        command = MotorController(MotorSettings()).command
+        self.assertEqual(command.mode, MotorMode.STOPPED)
+        self.assertEqual(command.target_rpm, 0.0)
 
     def test_duplicate_fall_does_not_divide_by_zero(self) -> None:
         # Two falls at the same instant (bouncing sensor / repeated packet) must not crash tick().
@@ -104,10 +103,10 @@ class MotorTest(unittest.TestCase):
         self.assertFalse(m.tick().locked)
 
     def test_mode_is_commanded_immediately(self) -> None:
-        # No stall/stop detection: the reported mode is the commanded mode at once, even before any falls.
+        # No stall/stop detection: the command is the commanded mode at once, even before any falls.
         m = MotorController(MotorSettings())
         m.set_mode(MotorMode.LOW)
-        self.assertEqual(m.tick().mode, MotorMode.LOW)
+        self.assertEqual(m.command.mode, MotorMode.LOW)
 
     def test_long_gap_does_not_unlock(self) -> None:
         # No stall detection: a long silence never zeroes the measurement (fixes spin-down false-stops).
@@ -117,112 +116,109 @@ class MotorTest(unittest.TestCase):
         m._last_fall_time  = monotonic() - 30.0     # 30 s since the last fall — would have stalled before
         st = m.tick()
         self.assertTrue(st.locked)
-        self.assertAlmostEqual(st.effective_rpm, 60.0)
+        self.assertAlmostEqual(st.measured_rpm, 60.0)
 
     def test_high_no_falls_uses_command(self) -> None:
-        # Commanded HIGH with no falls yet (cold start) → trust the command: report HIGH, act on target.
+        # Commanded HIGH with no falls yet (cold start) → no measurement; the command stands on its own.
         m = MotorController(MotorSettings())
         m.set_mode(MotorMode.HIGH)
         st = m.tick()                                   # no falls
         self.assertFalse(st.locked)
         self.assertTrue(math.isnan(st.phase))
-        self.assertEqual(st.mode, MotorMode.HIGH)
-        self.assertEqual(st.effective_rpm, 2000.0)     # commanded speed (no measurement yet)
         self.assertEqual(st.measured_rpm, 0.0)
+        self.assertEqual(m.command.mode, MotorMode.HIGH)
+        self.assertEqual(m.command.target_rpm, 2000.0)  # commanded speed (no measurement yet)
 
-    def test_high_ignores_stale_fall_uses_command(self) -> None:
+    def test_high_ignores_stale_fall(self) -> None:
         # The motor sends no sync pulses above the ceiling, so HIGH ignores any leftover/stale fall
-        # reading and trusts the command (otherwise a frozen pre-HIGH reading would drive the crossfade).
+        # reading (otherwise a frozen pre-HIGH reading would drive the crossfade).
         m = MotorController(MotorSettings())
         m.set_mode(MotorMode.HIGH)
         m._last_fall_time = monotonic() - 0.001; m._measured_period = 1.0   # stale 60 rpm reading
         st = m.tick()
         self.assertFalse(st.locked)
         self.assertEqual(st.measured_rpm, 0.0)        # stale reading not used in HIGH
-        self.assertEqual(st.effective_rpm, 2000.0)    # commanded speed
         self.assertTrue(math.isnan(st.phase))
+        self.assertEqual(m.command.target_rpm, 2000.0)
 
     def test_above_ceiling_measurement_not_trusted(self) -> None:
         # Spinning down from HIGH: commanded LOW but still physically fast → the >ceiling reading
-        # (sensor can't keep up / phase aliases) is not trusted; trust the command instead.
+        # (sensor can't keep up / phase aliases) is not trusted; only the command stands.
         m = MotorController(MotorSettings())
         m.set_mode(MotorMode.LOW)
         m._last_fall_time = monotonic() - 0.001; m._measured_period = 0.040   # 1500 rpm, above ceiling
         st = m.tick()
         self.assertFalse(st.locked)
         self.assertEqual(st.measured_rpm, 0.0)        # >ceiling reading discarded
-        self.assertEqual(st.effective_rpm, 72.0)      # trust the command (low_rpm)
         self.assertTrue(math.isnan(st.phase))
+        self.assertEqual(m.command.target_rpm, 72.0)  # the command (low_rpm)
 
-    def test_effective_rpm_is_measured_when_locked(self) -> None:
-        st = self._locked(MotorMode.LOW, period=1.0).tick()   # 60 rpm measured, below the ceiling
-        self.assertTrue(st.locked)
-        self.assertAlmostEqual(st.effective_rpm, st.measured_rpm, places=6)
-
-    def test_no_falls_uses_commanded_speed(self) -> None:
-        # With no measurement, the effective speed follows the command — there is no 'stopped' state.
+    def test_no_falls_is_unlocked_with_the_command_standing(self) -> None:
+        # With no measurement there is no 'stopped' state — the command stands.
         m = MotorController(MotorSettings())
         m.set_mode(MotorMode.LOW)                      # 72 rpm, below ceiling
         st = m.tick()                                  # no falls
         self.assertFalse(st.locked)
-        self.assertEqual(st.mode, MotorMode.LOW)
-        self.assertEqual(st.effective_rpm, 72.0)
+        self.assertEqual(m.command.mode, MotorMode.LOW)
+        self.assertEqual(m.command.target_rpm, 72.0)
 
     def test_commanded_stopped_is_idle(self) -> None:
-        # Commanded STOPPED is the one deliberate 'off' path: effective speed 0 regardless of falls.
+        # Commanded STOPPED is the one deliberate 'off' path: no lock regardless of falls, rpm 0.
         m = self._locked(MotorMode.STOPPED)            # has falls, but commanded STOPPED
         st = m.tick()
-        self.assertEqual(st.mode, MotorMode.STOPPED)
-        self.assertEqual(st.effective_rpm, 0.0)
         self.assertFalse(st.locked)
+        self.assertEqual(m.command.mode, MotorMode.STOPPED)
+        self.assertEqual(m.command.target_rpm, 0.0)
 
 
-class RefreshCommandTest(unittest.TestCase):
-    """`refresh_command` folds a command issued *after* `tick()` into that tick's state — the
-    Conductor's fix for a mix and its regime disagreeing by one frame — without disturbing the
-    measurement the playhead has already consumed."""
+class CommandTest(unittest.TestCase):
+    """`command` is the arbitration read at the moment it is asked for — the Conductor reads it
+    once for the playhead (the command in force over the dt it advances) and once more after the
+    state machine ran (the command the frame is sent with). `tick()` never touches it."""
 
-    def _locked(self, mode: MotorMode) -> MotorController:
+    def test_reflects_set_mode_immediately(self) -> None:
+        s = MotorSettings()
+        m = MotorController(s)
+        m.set_mode(MotorMode.HIGH)
+        self.assertEqual(m.command, MotorCommand(MotorMode.HIGH, s.high_rpm, s.low_rpm))
+        m.set_mode(MotorMode.LOW)
+        self.assertEqual(m.command, MotorCommand(MotorMode.LOW, s.low_rpm, s.low_rpm))
+
+    def test_a_command_issued_after_tick_is_visible_without_re_ticking(self) -> None:
         m = MotorController(MotorSettings())
-        m.set_mode(mode)
-        m._last_fall_time = monotonic() - 0.25
-        m._measured_period = 1.0
-        return m
-
-    def test_an_unchanged_command_returns_the_state_untouched(self) -> None:
-        m = self._locked(MotorMode.LOW)
-        state = m.tick()
-        self.assertIs(m.refresh_command(state), state)
-
-    def test_a_new_command_lands_in_the_state(self) -> None:
-        settings = MotorSettings()
-        m = MotorController(settings)
         m.set_mode(MotorMode.HIGH)
-        state = m.tick()
+        m.tick()
         m.set_mode(MotorMode.LOW)                       # the machine commands LOW after the tick
-        refreshed = m.refresh_command(state)
-        self.assertEqual(refreshed.mode, MotorMode.LOW)
-        self.assertEqual(refreshed.target_rpm, settings.low_rpm)
-        self.assertEqual(settings.active_mode, MotorMode.LOW)   # the panel readback follows too
+        self.assertEqual(m.command.mode, MotorMode.LOW)
 
-    def test_the_measurement_is_left_alone(self) -> None:
-        m = self._locked(MotorMode.LOW)
-        state = m.tick()
-        self.assertTrue(state.locked)
-        m.set_mode(MotorMode.HIGH)
-        refreshed = m.refresh_command(state)
-        self.assertEqual(refreshed.phase, state.phase)                  # what this tick measured,
-        self.assertEqual(refreshed.locked, state.locked)                # and what the playhead saw,
-        self.assertEqual(refreshed.measured_rpm, state.measured_rpm)    # stays as it is
-        self.assertEqual(refreshed.effective_rpm, state.measured_rpm)   # locked → the measured speed
-
-    def test_the_debug_override_still_outranks_the_machine(self) -> None:
+    def test_tick_leaves_the_command_alone(self) -> None:
         m = MotorController(MotorSettings())
         m.set_mode(MotorMode.LOW)
-        state = m.tick()
+        before = m.command
+        m.tick()
+        self.assertEqual(m.command, before)
+
+    def test_the_debug_override_outranks_the_machine(self) -> None:
+        m = MotorController(MotorSettings())
+        m.set_mode(MotorMode.LOW)
         m.set_debug_mode(MotorMode.HIGH)
+        self.assertEqual(m.command.mode, MotorMode.HIGH)
         m.set_mode(MotorMode.STOPPED)
-        self.assertEqual(m.refresh_command(state).mode, MotorMode.HIGH)
+        self.assertEqual(m.command.mode, MotorMode.HIGH)
+        m.set_debug_mode(None)
+        self.assertEqual(m.command.mode, MotorMode.STOPPED)
+
+    def test_active_mode_readback_follows_the_setters(self) -> None:
+        s = MotorSettings()
+        m = MotorController(s)
+        m.set_mode(MotorMode.LOW)
+        self.assertEqual(s.active_mode, MotorMode.LOW)
+        m.set_debug_mode(MotorMode.HIGH)
+        self.assertEqual(s.active_mode, MotorMode.HIGH)
+        m.set_debug_mode(None)
+        self.assertEqual(s.active_mode, MotorMode.LOW)
+        m.set_mode(None)
+        self.assertEqual(s.active_mode, MotorMode.STOPPED)
 
 
 class SimTest(unittest.TestCase):
@@ -271,13 +267,13 @@ class PlayheadNcoTest(unittest.TestCase):
         mp = 0.0
         for _ in range(200):
             mp = next(gen)
-            p.tick(dt, mstate(mp, True, rpm))
+            p.tick(dt, *mstate(mp, True, rpm))
         self.assertAlmostEqual(wrap(p.phase - mp), 0.0, places=2)
 
     def test_stopped_holds_position(self) -> None:
         p = Playhead(PlayheadSettings()); p._internal = 1.0
         for _ in range(50):
-            p.tick(1 / 60, mstate(0.5, False, 0.0, mode=MotorMode.STOPPED))
+            p.tick(1 / 60, *mstate(0.5, False, 0.0, mode=MotorMode.STOPPED))
         self.assertEqual(p._internal, 1.0)                       # internal sweep frozen — no advance
         self.assertTrue(math.isnan(p.phase))                     # stopped → NaN to consumers
 
@@ -286,7 +282,7 @@ class PlayheadNcoTest(unittest.TestCase):
         p = running_playhead(mode=MotorMode.HIGH)
         before = p.phase
         # motor measured/target at 2000 but mode HIGH → playhead sweeps at low_rpm, ignoring motor.phase
-        p.tick(dt, mstate(2.5, True, 2000.0, mode=MotorMode.HIGH, low_rpm=72.0))
+        p.tick(dt, *mstate(2.5, True, 2000.0, mode=MotorMode.HIGH, low_rpm=72.0))
         self.assertAlmostEqual(wrap(p.phase - before), 72.0 / 60.0 * TAU * dt, places=6)
 
     def test_low_to_high_switch_is_seamless(self) -> None:
@@ -296,10 +292,10 @@ class PlayheadNcoTest(unittest.TestCase):
         for i in range(300):
             if i < 150:                                          # LOW: motor at 72, playhead follows
                 mp = wrap(mp + 72.0 / 60.0 * TAU * dt)
-                p.tick(dt, mstate(mp, True, 72.0, mode=MotorMode.LOW))
+                p.tick(dt, *mstate(mp, True, 72.0, mode=MotorMode.LOW))
             else:                                                # HIGH: motor races at 2000, playhead ignores it
                 mp = wrap(mp + 2000.0 / 60.0 * TAU * dt)
-                p.tick(dt, mstate(mp, True, 2000.0, mode=MotorMode.HIGH))
+                p.tick(dt, *mstate(mp, True, 2000.0, mode=MotorMode.HIGH))
             max_step = max(max_step, abs(wrap(p.phase - prev)))
             prev = p.phase
         # never steps faster than the LOW sweep — no jump at the switch, no speed-up to 2000
@@ -308,13 +304,13 @@ class PlayheadNcoTest(unittest.TestCase):
     def test_phase_nan_without_live_signal(self) -> None:
         dt = 1 / 60
         p = Playhead(PlayheadSettings())
-        p.tick(dt, mstate(0.5, False, 0.0, mode=MotorMode.STOPPED))
+        p.tick(dt, *mstate(0.5, False, 0.0, mode=MotorMode.STOPPED))
         self.assertTrue(math.isnan(p.phase))                    # stopped → NaN
-        p.tick(dt, mstate(0.5, False, 72.0, mode=MotorMode.LOW))
+        p.tick(dt, *mstate(0.5, False, 72.0, mode=MotorMode.LOW))
         self.assertTrue(math.isnan(p.phase))                    # LOW but unlocked (disconnected) → NaN
-        p.tick(dt, mstate(0.5, True, 72.0, mode=MotorMode.LOW))
+        p.tick(dt, *mstate(0.5, True, 72.0, mode=MotorMode.LOW))
         self.assertFalse(math.isnan(p.phase))                   # locked → finite
-        p.tick(dt, mstate(0.5, False, 2000.0, mode=MotorMode.HIGH))
+        p.tick(dt, *mstate(0.5, False, 2000.0, mode=MotorMode.HIGH))
         self.assertFalse(math.isnan(p.phase))                   # HIGH free-runs content (unmeasurable) → finite
 
     def test_offset_applied(self) -> None:
@@ -327,7 +323,7 @@ class PlayheadNcoTest(unittest.TestCase):
         gen = _advancing(rpm, dt)
         prev = p.phase
         for _ in range(100):
-            p.tick(dt, mstate(next(gen), True, rpm))
+            p.tick(dt, *mstate(next(gen), True, rpm))
             self.assertLess(abs(wrap(p.phase - prev)), rpm / 60.0 * TAU * dt + 0.5)
             prev = p.phase
 
@@ -342,7 +338,7 @@ class ReacquireTest(unittest.TestCase):
     def _into_high(self, low_rpm: float = 72.0) -> Playhead:
         """A playhead that has just been in HIGH (so leaving it arms the re-sync)."""
         p = running_playhead(mode=self.HIGH)
-        p.tick(1 / 60, mstate(float("nan"), False, 2000.0, mode=self.HIGH, low_rpm=low_rpm))
+        p.tick(1 / 60, *mstate(float("nan"), False, 2000.0, mode=self.HIGH, low_rpm=low_rpm))
         return p
 
     def test_does_not_relock_while_motor_still_fast(self) -> None:
@@ -351,7 +347,7 @@ class ReacquireTest(unittest.TestCase):
         before = p._internal
         # Back to LOW but the motor is still braking well above low_rpm → keep free-running at low_rpm,
         # do NOT advance at the (faster) measured rpm or snap toward the measured phase.
-        p.tick(dt, mstate(2.5, True, 150.0, mode=self.LOW, low_rpm=72.0))
+        p.tick(dt, *mstate(2.5, True, 150.0, mode=self.LOW, low_rpm=72.0))
         self.assertTrue(p._resyncing)
         self.assertFalse(math.isnan(p.phase))                          # re-syncing sweep is live
         self.assertAlmostEqual(wrap(p._internal - before), 72.0 / 60.0 * TAU * dt, places=6)
@@ -359,15 +355,15 @@ class ReacquireTest(unittest.TestCase):
     def test_relocks_once_motor_reaches_content_speed(self) -> None:
         dt = 1 / 60
         p = self._into_high()
-        p.tick(dt, mstate(2.5, True, 150.0, mode=self.LOW, low_rpm=72.0))   # still fast → re-syncing
+        p.tick(dt, *mstate(2.5, True, 150.0, mode=self.LOW, low_rpm=72.0))   # still fast → re-syncing
         self.assertTrue(p._resyncing)
         # Within tolerance of low_rpm (72 × 1.05 = 75.6) → re-lock and resume tracking the measured phase.
-        p.tick(dt, mstate(2.5, True, 75.0, mode=self.LOW, low_rpm=72.0))
+        p.tick(dt, *mstate(2.5, True, 75.0, mode=self.LOW, low_rpm=72.0))
         self.assertFalse(p._resyncing)
         gen, mp = _advancing(72.0, dt, start=2.5), 2.5                 # now a steadily rotating motor
         for _ in range(200):                                           # tracking pulls onto the measured phase
             mp = next(gen)
-            p.tick(dt, mstate(mp, True, 72.0, mode=self.LOW, low_rpm=72.0))
+            p.tick(dt, *mstate(mp, True, 72.0, mode=self.LOW, low_rpm=72.0))
         # Converges onto the measured phase (within ~1° — the speed EMA eases from the re-lock rpm to 72).
         self.assertAlmostEqual(wrap(p.phase - p._settings.phase * TAU - mp), 0.0, delta=0.02)
 
@@ -381,15 +377,15 @@ class ReacquireTest(unittest.TestCase):
         before = p._internal
         # First LOW ticks: stale content-speed reading, no fast measurement seen yet → stay re-syncing.
         for _ in range(3):
-            p.tick(dt, mstate(2.5, True, 72.0, mode=self.LOW, low_rpm=72.0))
+            p.tick(dt, *mstate(2.5, True, 72.0, mode=self.LOW, low_rpm=72.0))
             self.assertTrue(p._resyncing)
             self.assertFalse(p._seen_fast)
         self.assertAlmostEqual(wrap(p._internal - before), 3 * 72.0 / 60.0 * TAU * dt, places=6)  # free-ran at low
         # Falls resume as the light passes the ceiling (real fast measurement) → still re-syncing.
-        p.tick(dt, mstate(2.5, True, 180.0, mode=self.LOW, low_rpm=72.0))
+        p.tick(dt, *mstate(2.5, True, 180.0, mode=self.LOW, low_rpm=72.0))
         self.assertTrue(p._resyncing); self.assertTrue(p._seen_fast)
         # Now it has settled to content speed → re-lock.
-        p.tick(dt, mstate(2.5, True, 73.0, mode=self.LOW, low_rpm=72.0))
+        p.tick(dt, *mstate(2.5, True, 73.0, mode=self.LOW, low_rpm=72.0))
         self.assertFalse(p._resyncing)
 
     def test_resync_is_live_while_motor_unmeasurable(self) -> None:
@@ -397,7 +393,7 @@ class ReacquireTest(unittest.TestCase):
         p = self._into_high()
         before = p._internal
         # Just after HIGH the motor is still above the sensor ceiling → unlocked, no measurement.
-        p.tick(dt, mstate(float("nan"), False, 0.0, mode=self.LOW, low_rpm=72.0))
+        p.tick(dt, *mstate(float("nan"), False, 0.0, mode=self.LOW, low_rpm=72.0))
         self.assertTrue(p._resyncing)
         self.assertFalse(math.isnan(p.phase))                          # not NaN — a live free-running sweep
         self.assertAlmostEqual(wrap(p._internal - before), 72.0 / 60.0 * TAU * dt, places=6)
@@ -406,7 +402,7 @@ class ReacquireTest(unittest.TestCase):
         dt = 1 / 60
         p = self._into_high()
         p._internal = 1.0
-        p.tick(dt, mstate(0.5, False, 0.0, mode=MotorMode.STOPPED, low_rpm=72.0))
+        p.tick(dt, *mstate(0.5, False, 0.0, mode=MotorMode.STOPPED, low_rpm=72.0))
         self.assertFalse(p._resyncing)
         self.assertEqual(p._internal, 1.0)                             # held
         self.assertTrue(math.isnan(p.phase))
@@ -419,13 +415,13 @@ class SetModeTest(unittest.TestCase):
     def test_command_drives_the_mode(self) -> None:
         m = MotorController(MotorSettings())
         m.set_mode(MotorMode.HIGH)
-        self.assertEqual(m.tick().mode, MotorMode.HIGH)
+        self.assertEqual(m.command.mode, MotorMode.HIGH)
 
     def test_none_relinquishes_to_stopped(self) -> None:
         m = MotorController(MotorSettings())
         m.set_mode(MotorMode.HIGH)
         m.set_mode(None)
-        self.assertEqual(m.tick().mode, MotorMode.STOPPED)
+        self.assertEqual(m.command.mode, MotorMode.STOPPED)
 
 
 
@@ -474,26 +470,26 @@ class BarsTest(unittest.TestCase):
         dt = 1 / 60
         p = running_playhead(mode=MotorMode.HIGH)
         for _ in range(60):
-            p.tick(dt, mstate(2.5, True, 2000.0, mode=MotorMode.HIGH, low_rpm=72.0))
+            p.tick(dt, *mstate(2.5, True, 2000.0, mode=MotorMode.HIGH, low_rpm=72.0))
         self.assertAlmostEqual(p.bars, 72.0 / 60.0, places=6)   # 1 s at 72 rpm = 1.2 bars
 
     def test_locked_low_accumulates_at_measured_rate(self) -> None:
         dt = 1 / 60
         p = running_playhead()
-        p.tick(dt, mstate(0.0, True, 60.0, mode=MotorMode.LOW))
+        p.tick(dt, *mstate(0.0, True, 60.0, mode=MotorMode.LOW))
         self.assertAlmostEqual(p.bars, 60.0 / 60.0 * dt, places=6)
 
     def test_unmeasured_low_advances_at_commanded_rate(self) -> None:
         dt = 1 / 60
         p = Playhead(PlayheadSettings())
-        p.tick(dt, mstate(float("nan"), False, 72.0, mode=MotorMode.LOW))
+        p.tick(dt, *mstate(float("nan"), False, 72.0, mode=MotorMode.LOW))
         self.assertTrue(math.isnan(p.phase))                    # not live…
         self.assertAlmostEqual(p.bars, 72.0 / 60.0 * dt, places=6)   # …but bars never stall
 
     def test_stopped_holds(self) -> None:
         p = Playhead(PlayheadSettings())
         for _ in range(30):
-            p.tick(1 / 60, mstate(0.5, False, 0.0, mode=MotorMode.STOPPED))
+            p.tick(1 / 60, *mstate(0.5, False, 0.0, mode=MotorMode.STOPPED))
         self.assertEqual(p.bars, 0.0)
 
     def test_monotonic_across_mode_changes(self) -> None:
@@ -506,8 +502,8 @@ class BarsTest(unittest.TestCase):
             + [mstate(float("nan"), False, 0.0, mode=MotorMode.LOW)] * 30   # spin-down, unmeasurable
             + [mstate(0.0, True, 72.0, mode=MotorMode.LOW)] * 30
         )
-        for st in sequence:
-            p.tick(dt, st)
+        for motor, command in sequence:
+            p.tick(dt, motor, command)
             self.assertGreaterEqual(p.bars, prev)
             prev = p.bars
         self.assertGreater(p.bars, 0.0)
@@ -522,36 +518,36 @@ class RegimeSignalsTest(unittest.TestCase):
 
     def test_synced_only_while_tracking_at_low(self) -> None:
         p = running_playhead()
-        p.tick(self.DT, mstate(0.0, True, 72.0, mode=MotorMode.LOW))
+        p.tick(self.DT, *mstate(0.0, True, 72.0, mode=MotorMode.LOW))
         self.assertTrue(p.synced)
-        p.tick(self.DT, mstate(2.5, True, 2000.0, mode=MotorMode.HIGH))
+        p.tick(self.DT, *mstate(2.5, True, 2000.0, mode=MotorMode.HIGH))
         self.assertFalse(p.synced)                       # HIGH free-runs — not tracking
 
     def test_ring_formed_needs_high_plus_fall_silence(self) -> None:
         p = running_playhead(mode=MotorMode.HIGH)
-        st = mstate(float("nan"), False, 2000.0, mode=MotorMode.HIGH)
-        st.fall_age = 0.1                                # falls still arriving (climbing below ceiling)
-        p.tick(self.DT, st)
+        motor, command = mstate(float("nan"), False, 2000.0, mode=MotorMode.HIGH)
+        motor.fall_age = 0.1                             # falls still arriving (climbing below ceiling)
+        p.tick(self.DT, motor, command)
         self.assertFalse(p.ring_formed)
-        st.fall_age = 1.0                                # silence beyond the window → ring formed
-        p.tick(self.DT, st)
+        motor.fall_age = 1.0                             # silence beyond the window → ring formed
+        p.tick(self.DT, motor, command)
         self.assertTrue(p.ring_formed)
-        low = mstate(0.0, True, 72.0, mode=MotorMode.LOW)
-        low.fall_age = 999.0                             # silence in LOW is never "ring formed"
-        p.tick(self.DT, low)
+        motor, command = mstate(0.0, True, 72.0, mode=MotorMode.LOW)
+        motor.fall_age = 999.0                           # silence in LOW is never "ring formed"
+        p.tick(self.DT, motor, command)
         self.assertFalse(p.ring_formed)
 
     def test_relock_is_gated_against_stale_readings(self) -> None:
         p = running_playhead(mode=MotorMode.HIGH)
-        p.tick(self.DT, mstate(float("nan"), False, 2000.0, mode=MotorMode.HIGH))
+        p.tick(self.DT, *mstate(float("nan"), False, 2000.0, mode=MotorMode.HIGH))
         # Back to LOW: the stale pre-HIGH reading must NOT re-lock instantly (gate not passed).
-        p.tick(self.DT, mstate(2.5, True, 72.0, mode=MotorMode.LOW))
+        p.tick(self.DT, *mstate(2.5, True, 72.0, mode=MotorMode.LOW))
         self.assertFalse(p.synced)
         # A fresh above-content reading (the real spin-down) passes the gate; still braking.
-        p.tick(self.DT, mstate(2.5, True, 180.0, mode=MotorMode.LOW))
+        p.tick(self.DT, *mstate(2.5, True, 180.0, mode=MotorMode.LOW))
         self.assertFalse(p.synced)
         # Settled at content speed → re-lock.
-        p.tick(self.DT, mstate(2.5, True, 73.0, mode=MotorMode.LOW))
+        p.tick(self.DT, *mstate(2.5, True, 73.0, mode=MotorMode.LOW))
         self.assertTrue(p.synced)
 
 
@@ -567,9 +563,9 @@ class SpeedSmoothingTest(unittest.TestCase):
         dt = 1 / 60
         p = running_playhead(self._settings(0.9))
         for _ in range(120):                                       # warm up: EMA settles at 72 rpm
-            p.tick(dt, mstate(0.0, True, 72.0))
+            p.tick(dt, *mstate(0.0, True, 72.0))
         before = p._internal
-        p.tick(dt, mstate(0.0, True, 720.0))                       # one-tick 10× spike
+        p.tick(dt, *mstate(0.0, True, 720.0))                       # one-tick 10× spike
         step = wrap(p._internal - before)
         self.assertLess(step, 72.0 / 60.0 * TAU * dt * 2.0)        # averaged — nowhere near the 10× raw step
 
@@ -577,17 +573,17 @@ class SpeedSmoothingTest(unittest.TestCase):
         dt = 1 / 60
         p = running_playhead(self._settings(0.0))
         for _ in range(10):
-            p.tick(dt, mstate(0.0, True, 72.0))
+            p.tick(dt, *mstate(0.0, True, 72.0))
         before = p._internal
-        p.tick(dt, mstate(0.0, True, 720.0))                       # spike passes straight through at 0 smoothing
+        p.tick(dt, *mstate(0.0, True, 720.0))                       # spike passes straight through at 0 smoothing
         self.assertAlmostEqual(wrap(p._internal - before), 720.0 / 60.0 * TAU * dt, places=3)
 
     def test_ema_seeds_on_reacquire(self) -> None:
         dt = 1 / 60
         p = running_playhead(self._settings(0.9))
-        p.tick(dt, mstate(float("nan"), False, 72.0, mode=MotorMode.LOW))   # disconnected → hold, not tracking
+        p.tick(dt, *mstate(float("nan"), False, 72.0, mode=MotorMode.LOW))   # disconnected → hold, not tracking
         before = p._internal
-        p.tick(dt, mstate(0.0, True, 100.0, mode=MotorMode.LOW))            # re-acquire → seed EMA to 100, not ramp from 0
+        p.tick(dt, *mstate(0.0, True, 100.0, mode=MotorMode.LOW))            # re-acquire → seed EMA to 100, not ramp from 0
         self.assertAlmostEqual(wrap(p._internal - before), 100.0 / 60.0 * TAU * dt, places=3)
 
 

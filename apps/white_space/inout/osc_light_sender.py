@@ -196,7 +196,7 @@ class OscLightSender:
             # the 0→target edge is what the motor controller acts on. Sending it on change gives
             # exactly one clean edge; the keepalive below covers a lost packet.
             held = self._start_time is not None and (monotonic() - self._start_time) < self._config.startup_delay
-            motor_rpm = 0 if held else int(output.motor.target_rpm)
+            motor_rpm = 0 if held else int(output.motor_command.target_rpm)
             self._send_config(motor_rpm)
 
             # The fixture's readout mode follows the rpm we just sent — so does the slot rebuild.

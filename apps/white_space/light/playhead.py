@@ -1,7 +1,7 @@
 """Playhead — the LOW-speed content clock, derived from the motor.
 
 A numerically-controlled oscillator (NCO/PLL) whose behavior depends on the motor's
-active mode (it is the *content sweep*, which never runs faster than LOW):
+commanded mode (it is the *content sweep*, which never runs faster than LOW):
   - STOPPED → holds its last position (frozen); no playhead (`.phase` is NaN).
   - IDLE / LOW → tracks the measured rotation *while locked*: the sweep rate is the motor speed
     *averaged* over a few revolutions (`speed_smoothing`, so per-revolution timing jitter does not
@@ -12,6 +12,9 @@ active mode (it is the *content sweep*, which never runs faster than LOW):
     unmeasurable by design, so it is always "live" (the content sweep is the playhead).
 This is the **internal** phase; it is never snapped or reset, so it stays continuous across
 mode/speed switches, stalls, and NaN gaps — only the rate changes.
+
+Each tick takes the motor's two halves separately: the `MotorMeasurement` (what the falls say)
+and the `MotorCommand` in force over the dt being advanced (what the bar was told).
 
 **Spin-down re-acquire** (HIGH → LOW/IDLE): leaving HIGH does *not* re-lock onto the measured
 phase right away — the motor is still spinning fast (unmeasurable above the sensor ceiling, then
@@ -35,7 +38,7 @@ import math
 from modules.settings import BaseSettings, Field, Widget
 from modules.utils import EMAFilter
 
-from .motor import MotorState, MotorMode, FIXTURE_SLOW_RPM
+from .motor import MotorMeasurement, MotorCommand, MotorMode, FIXTURE_SLOW_RPM
 
 # Re-lock onto the measured phase once the spinning-down motor reaches content speed, within this
 # relative tolerance of low_rpm (absorbs measurement jitter as it settles at the LOW target).
@@ -79,36 +82,37 @@ class Playhead:
         self._tracking_prev: bool = False            # was the previous tick the locked-tracking branch (to seed the EMA)
         self._ring_formed: bool = False              # regime signal: the bar has physically blurred into the ring
 
-    def tick(self, dt: float, motor: MotorState) -> None:
-        """Advance the internal content clock from the motor's active mode, gating the re-lock onto
-        the measured phase until a spun-down motor has returned to content speed."""
+    def tick(self, dt: float, motor: MotorMeasurement, command: MotorCommand) -> None:
+        """Advance the internal content clock over ``dt`` from the command in force during it and
+        the motor's measurement, gating the re-lock onto the measured phase until a spun-down
+        motor has returned to content speed."""
         self._time += dt
         # Leaving HIGH arms the re-sync: keep free-running until the motor slows back to content speed
         # rather than snapping onto its still-too-fast (or stale, see below) measured phase.
-        if self._prev_mode == MotorMode.HIGH and motor.mode != MotorMode.HIGH:
+        if self._prev_mode == MotorMode.HIGH and command.mode != MotorMode.HIGH:
             self._resyncing, self._seen_fast = True, False
-        self._prev_mode = motor.mode
+        self._prev_mode = command.mode
 
-        if motor.mode == MotorMode.HIGH or motor.mode == MotorMode.STOPPED:
+        if command.mode == MotorMode.HIGH or command.mode == MotorMode.STOPPED:
             self._resyncing = False                       # HIGH free-runs anyway; STOPPED holds
         elif self._resyncing and motor.locked:
             # Two-stage gate: first catch a *fresh* above-content reading (the real spin-down — the
             # motor otherwise keeps reporting its stale pre-HIGH ≈low_rpm measurement), then re-lock
             # only once that has settled back to content speed.
-            if motor.measured_rpm > motor.low_rpm * (1.0 + _RESYNC_RPM_TOL):
+            if motor.measured_rpm > command.low_rpm * (1.0 + _RESYNC_RPM_TOL):
                 self._seen_fast = True
             elif self._seen_fast:
                 self._resyncing = False                   # motor reached content speed → re-lock
 
         # A real playhead exists with a measurement (locked), in HIGH (free-run content sweep), or
         # while re-syncing (a live free-running sweep). IDLE/LOW with no measurement → not live → NaN.
-        self._live = motor.mode == MotorMode.HIGH or motor.locked or self._resyncing
-        self._advance_internal(dt, motor)
-        self._update_regime_signals(motor)
+        self._live = command.mode == MotorMode.HIGH or motor.locked or self._resyncing
+        self._advance_internal(dt, motor, command)
+        self._update_regime_signals(motor, command)
         # Finite continuous position for the UI slider (`.phase` itself is NaN when not live).
         self._settings.playhead = _wrap_to_pi(self._internal + self._settings.phase * math.tau)
 
-    def _update_regime_signals(self, motor: MotorState) -> None:
+    def _update_regime_signals(self, motor: MotorMeasurement, command: MotorCommand) -> None:
         """The physical regime-flip signals the show anchors on (the playhead owns them:
         it holds all the sync/resync/stale-reading knowledge).
 
@@ -116,23 +120,23 @@ class Playhead:
         cannot pulse above the ceiling, so silence is the evidence the bar has blurred into
         the ring. The spin-down side anchors on ``synced`` itself (the re-lock): the sensor's
         spin-down readings don't resolve a usable deceleration ramp, so the S8/S9 fade is
-        timed instead (the wind_down layer) and finishes one bar after the lock."""
-        self._ring_formed = motor.mode == MotorMode.HIGH and motor.fall_age > _RING_SILENCE_S
+        timed instead (the wind_down layer)."""
+        self._ring_formed = command.mode == MotorMode.HIGH and motor.fall_age > _RING_SILENCE_S
 
-    def _advance_internal(self, dt: float, motor: MotorState) -> None:
+    def _advance_internal(self, dt: float, motor: MotorMeasurement, command: MotorCommand) -> None:
         """The mode-based content sweep (STOPPED holds, IDLE/LOW track the measured phase, HIGH and
         the post-HIGH re-sync free-run at the LOW content rate).
 
         The bar counter accumulates alongside: at the sweep's own rate while it advances, and at
         the commanded content rate while unmeasured (IDLE/LOW with no falls) — so bar-denominated
         show durations never stall on a missing sensor. Only STOPPED holds the count."""
-        if motor.mode == MotorMode.STOPPED:
+        if command.mode == MotorMode.STOPPED:
             self._tracking_prev = False                       # hold last position (frozen)
-        elif motor.mode == MotorMode.HIGH or self._resyncing:
+        elif command.mode == MotorMode.HIGH or self._resyncing:
             # Free-run at the LOW content rate: HIGH ignores the fast motor; the re-sync waits out the
             # spin-down without snapping to the still-too-fast measured phase.
-            self._internal = _wrap_to_pi(self._internal + (motor.low_rpm / 60.0) * math.tau * dt)
-            self._bars += (motor.low_rpm / 60.0) * dt
+            self._internal = _wrap_to_pi(self._internal + (command.low_rpm / 60.0) * math.tau * dt)
+            self._bars += (command.low_rpm / 60.0) * dt
             self._tracking_prev = False
         elif motor.locked and not math.isnan(motor.phase):    # LOW — track the measured rotation
             # Feed-forward at the *smoothed* speed: per-revolution measurements jitter, so averaging the
@@ -149,7 +153,7 @@ class Playhead:
         else:
             # LOW with no measurement (disconnected): the sweep holds (`.phase` NaN, not live),
             # but bars advance at the commanded content rate — the best estimate of the rotation.
-            self._bars += (min(motor.target_rpm, motor.low_rpm) / 60.0) * dt
+            self._bars += (min(command.target_rpm, command.low_rpm) / 60.0) * dt
             self._tracking_prev = False
 
     @property
@@ -180,4 +184,3 @@ class Playhead:
         """True while commanded HIGH with the falls gone silent — the bar has physically
         blurred into the ring (the spin-up's un-lock anchor)."""
         return self._ring_formed
-

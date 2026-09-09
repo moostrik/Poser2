@@ -18,7 +18,7 @@ Simulate mode (simulate=True):
 """
 
 import math
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from enum import IntEnum, auto
 from threading import Thread, Event, Lock
 from time import monotonic
@@ -55,20 +55,26 @@ class MotorMode(IntEnum):
 
 
 @dataclass
-class MotorState:
-    """Per-tick motor state: what it measures (phase, rpm) and what it commands (mode, rpm).
-    Offset-agnostic — `phase` is the raw measured angle."""
-    phase:         float     = 0.0                  # measured angular position, radians [-π, π)
-    locked:        bool      = False                # a valid fall measurement exists this tick
-    measured_rpm:  float     = 0.0                  # measured speed (0 when unlocked — sensor silent)
-    effective_rpm: float     = 0.0                  # speed to act on: measured when locked, else the
-                                                    # commanded target above the sensor ceiling, else 0
-    mode:          MotorMode = MotorMode.STOPPED    # the driven (arbitrated) mode
-    target_rpm:    float     = 0.0                  # commanded speed (sent to the motor by the light sender)
-    low_rpm:       float     = 0.0                  # LOW-mode rpm — the playhead's content-sweep rate in HIGH
-    raw_rpm:       float     = float('nan')         # last measured speed, regardless of trust (NaN = no falls yet)
-    fall_age:      float     = float('inf')         # seconds since the last fall (inf = none) — silence above the
+class MotorMeasurement:
+    """What the falls say about the motor this tick — a fact about the last revolution, known at
+    the top of the tick and qualified by the command in force then (above the ceiling the sensor
+    is silent, STOPPED has no meaningful phase). Offset-agnostic — `phase` is the raw angle."""
+    phase:         float = 0.0                      # measured angular position, radians [-π, π); NaN unless locked
+    locked:        bool  = False                    # a trustworthy measurement exists this tick
+    measured_rpm:  float = 0.0                      # measured speed (0 when unlocked — sensor silent)
+    raw_rpm:       float = float('nan')             # last measured speed, regardless of trust (NaN = no falls yet)
+    fall_age:      float = float('inf')             # seconds since the last fall (inf = none) — silence above the
                                                     # ceiling is the un-lock evidence (the ring physically forming)
+
+
+@dataclass(frozen=True)
+class MotorCommand:
+    """What the motor is told — a decision, changed only through `set_mode` / `set_debug_mode`.
+    Read at two moments in a tick: before the playhead advances (the command in force over that
+    dt) and after the state machine ran (the command the frame is sent with)."""
+    mode:       MotorMode = MotorMode.STOPPED       # the driven (arbitrated) mode
+    target_rpm: float     = 0.0                     # commanded speed — sent to the fixture, whose readout mode follows it
+    low_rpm:    float     = 0.0                     # LOW-mode rpm — the playhead's content-sweep rate in HIGH
 
 
 class MotorSettings(BaseSettings):
@@ -82,12 +88,12 @@ class MotorSettings(BaseSettings):
 
 class MotorController:
     """Measures the rotating light's angular position (phase, radians [-π, π)) from
-    falls and relays the commanded target speed.
+    falls, and holds the arbitrated command (debug > state machine > STOPPED).
 
     Call start() / stop() to manage the internal simulation thread.
     Call notify_fall() from external hardware signals (OSC/UDP).
-    Call tick() once per render tick to read the measured state (the commanded rpm is
-    derived from the `mode` setting).
+    Call tick() once per light tick for the measurement; read `command` whenever the command
+    in force is needed — it is a pure read, so it can be taken more than once per tick.
     """
 
     def __init__(self, settings: MotorSettings) -> None:
@@ -124,11 +130,26 @@ class MotorController:
         """State-machine command channel; ``None`` relinquishes — the motor stops (there
         is no manual mode: the machine and the debug select are the only authorities)."""
         self._commanded = mode
+        self._publish_active_mode()
 
     def set_debug_mode(self, mode: MotorMode | None) -> None:
         """Debug override channel (the Conductor's auto-follow of the debug selection):
         outranks the state machine's command while set; ``None`` = debug off."""
         self._debug_mode = mode
+        self._publish_active_mode()
+
+    @property
+    def command(self) -> MotorCommand:
+        """The command in force right now — the arbitration with its rpm. A pure read: the
+        Conductor takes it once before the playhead advances (what the bar was told over that
+        dt) and once more after the state machine ran (what the frame is sent with), so a mode
+        commanded mid-tick reaches the very frame whose mix it drew."""
+        mode = self._target_mode()
+        return MotorCommand(mode=mode, target_rpm=self._target_rpm(mode), low_rpm=self._settings.low_rpm)
+
+    def _publish_active_mode(self) -> None:
+        """The panel readback follows the command the moment it changes."""
+        self._settings.active_mode = self._target_mode()
 
     def notify_fall(self) -> None:
         """External hardware fall signal. No-op while simulating."""
@@ -259,15 +280,14 @@ class MotorController:
         phase = (min(raw, 1.0) * math.tau + math.pi) % math.tau - math.pi
         return True, rpm, phase, rpm, fall_age
 
-    def tick(self) -> MotorState:
-        """Report the motor state from the commanded mode, refined by fall measurements when available.
+    def tick(self) -> MotorMeasurement:
+        """Measure the motor from the falls — phase and rpm — qualified by the command in force.
 
-        Trusts the command: `mode` is always the commanded mode and `target_rpm` its rpm — there is no
-        stall/stop detection (the fall signal is too sparse/late for that). Falls give a measured phase
-        + rpm only while running *in the sensor's range*: below the ceiling (above it no falls arrive)
-        and not commanded STOPPED. When measuring, `effective_rpm` is the real measured speed and the
-        playhead tracks `phase`; otherwise `effective_rpm` falls back to the commanded `target_rpm` and
-        `phase` is NaN (the playhead free-runs).
+        There is no stall/stop detection (the fall signal is too sparse/late for that). Falls give
+        a measured phase + rpm only while running *in the sensor's range*: below the ceiling (above
+        it no falls arrive, and a reading above it — spinning down from HIGH — isn't trusted) and
+        not commanded STOPPED. Otherwise `locked` is False, `measured_rpm` 0 and `phase` NaN, and
+        the playhead free-runs or holds on the command alone (see `command`).
         """
         target_mode = self._target_mode()
         target_rpm  = self._target_rpm(target_mode)
@@ -277,35 +297,11 @@ class MotorController:
         # below the ceiling (no falls above it; a >ceiling reading isn't trusted) — and not STOPPED.
         fast   = target_rpm > FIXTURE_SLOW_RPM or measured > FIXTURE_SLOW_RPM
         locked = have_measurement and not fast and target_mode != MotorMode.STOPPED
-        measured_rpm  = measured if locked else 0.0
-        effective_rpm = measured_rpm if locked else target_rpm
-        phase         = phase if locked else float('nan')
+        measured_rpm = measured if locked else 0.0
+        phase        = phase if locked else float('nan')
 
         # Publish the measurement to the read-back settings.
         self._settings.phase        = phase if locked else 0.0
         self._settings.measured_rpm = measured_rpm
-        self._settings.active_mode  = target_mode
-        return MotorState(phase=phase, locked=locked, measured_rpm=measured_rpm, effective_rpm=effective_rpm,
-                          mode=target_mode, target_rpm=target_rpm, low_rpm=self._settings.low_rpm,
-                          raw_rpm=raw_rpm, fall_age=fall_age)
-
-    def refresh_command(self, state: MotorState) -> MotorState:
-        """Fold a command issued *since* `tick()` into an already-ticked state.
-
-        `tick()` has to run before the state machine — it feeds the playhead the machine reads —
-        so a mode the machine commands during that update would otherwise reach the frame one
-        tick after the mix the same state drew. The two disagreeing is visible: entering S8/S9
-        the frame would carry HIGH's rpm while the mix wrote only bar lights, so the fixture
-        (whose readout mode follows the rpm it receives) would hold ring mode over an empty ring
-        for one frame — a black flash on the wall and in the render.
-
-        Only the commanded half moves. `locked`, `phase` and `measured_rpm` describe what this
-        tick measured and what the playhead already consumed, so they stay untouched.
-        """
-        mode = self._target_mode()
-        if mode == state.mode:
-            return state
-        target_rpm = self._target_rpm(mode)
-        self._settings.active_mode = mode
-        return replace(state, mode=mode, target_rpm=target_rpm,
-                       effective_rpm=state.measured_rpm if state.locked else target_rpm)
+        return MotorMeasurement(phase=phase, locked=locked, measured_rpm=measured_rpm,
+                                raw_rpm=raw_rpm, fall_age=fall_age)

@@ -144,7 +144,7 @@ class Render(RenderBase):
         # Row 3 - WS light strip: the ring, or the bar's lights while the fixture is in slot mode —
         # the same rule the fixture applies to the same command (the frame's target rpm).
         output = self.board.get_composition_output()
-        slot_mode = output is not None and output.motor.target_rpm < FIXTURE_SLOW_RPM
+        slot_mode = output is not None and output.motor_command.target_rpm < FIXTURE_SLOW_RPM
         self._viewport(height, self.subdivision.get_rect('ws_light', 0))
         self.L[Layers.ws_bar if slot_mode else Layers.ws_light][0].draw()
 

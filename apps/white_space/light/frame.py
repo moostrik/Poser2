@@ -1,8 +1,11 @@
 """Frame — the full per-tick render context and output.
 
-Carries the clock snapshot (`tick`), motor state (`motor`), the LED pixel buffer (the POV
-ring) and the four bar lights (the low regime). One object flows into every layer's `_draw`
-and out to every consumer (board, the light/sound senders, render).
+Carries the clock snapshot (`tick`), the motor's two halves (`motor`, the measurement the
+playhead advanced under; `motor_command`, the command this frame is sent with — read after
+the state machine ran, so a mode commanded on a state's entry tick reaches the frame whose
+mix that state drew), the LED pixel buffer (the POV ring) and the four bar lights (the low
+regime). One object flows into every layer's `_draw` and out to every consumer (board, the
+light/sound senders, render).
 
 The bar lights are the discrete lamps on the rotating bar that the fixture drives directly
 while it is in slot mode (commanded below ``FIXTURE_SLOW_RPM``, see ``motor.py``): the low
@@ -19,7 +22,7 @@ from typing import Callable
 import numpy as np
 
 from .clock import Tick
-from .motor import MotorState
+from .motor import MotorMeasurement, MotorCommand
 
 BUFFER_DTYPE = np.float32
 
@@ -47,10 +50,11 @@ BAR_LIGHT_HEADINGS: np.ndarray = np.array([0.0, math.pi, -math.pi / 2.0, math.pi
 class Frame:
     """Per-tick render context + light output. `white`/`blue` are views into `light_img`
     (the ring); `bar_lights` holds the four lamp levels, indexed by `BarLightId`."""
-    resolution: int
-    tick:       Tick
-    motor:      MotorState              = field(default_factory=MotorState)
-    playhead:   float                   = 0.0   # continuous content playhead (radians [-π,π), offset applied)
+    resolution:    int
+    tick:          Tick
+    motor:         MotorMeasurement     = field(default_factory=MotorMeasurement)   # what the playhead advanced under
+    motor_command: MotorCommand         = field(default_factory=MotorCommand)       # what this frame is sent with
+    playhead:      float                = 0.0   # continuous content playhead (radians [-π,π), offset applied)
     light_img:  np.ndarray              = field(init=False)
     bar_lights: np.ndarray              = field(init=False)
 
