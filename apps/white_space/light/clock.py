@@ -8,10 +8,11 @@ Deliberately carries no musical time: the show's musical clock is the playhead b
 revolution at `beam_rpm`) — states count bars, the sound side rides them. Debug patterns
 animate on plain seconds (`tick.time`) with their own rate knobs.
 
-Accuracy (measured ~40 µs mean lateness idle) depends on two things outside this file: the
-calling thread's OS priority (the Conductor raises it) and the process-wide GIL switch
-interval (set in the launcher) — a pure-Python thread holding the GIL is what makes a
-sleeping thread late. `late_max_ms` / `dt_max_ms` / `overruns` report the real-world result.
+Accuracy (measured ~40 µs mean lateness idle) depends on the calling thread's OS priority
+(the Conductor raises it) and on the GIL: a pure-Python thread holding it makes a sleeping
+thread up to one switch interval (5 ms) late. Lowering the switch interval process-wide is
+not an option — it starves the pose pipeline (see launcher.py). `late_max_ms` / `dt_max_ms`
+/ `busy_max_ms` / `overruns` report the real-world result.
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ class ClockSettings(BaseSettings):
     time:        Field[float] = Field(0.0, access=Field.READ, description="Elapsed wall-clock time (s)")
     late_max_ms: Field[float] = Field(0.0, access=Field.READ, description="Worst tick lateness vs. its deadline over the last second (ms)")
     dt_max_ms:   Field[float] = Field(0.0, access=Field.READ, description="Longest tick interval over the last second (ms)")
+    busy_max_ms: Field[float] = Field(0.0, access=Field.READ, description="Longest per-tick work (tick return → next call) over the last second (ms) — the conductor's GIL share is busy/interval")
     overruns:    Field[int]   = Field(0,   access=Field.READ, description="Ticks that ran more than one interval late and resynced (cumulative)")
 
 
@@ -59,6 +61,7 @@ class Clock:
         # Diagnostics: running maxima since the last publish, and the cumulative resync count.
         self._late_max: float = 0.0
         self._dt_max:   float = 0.0
+        self._busy_max: float = 0.0
         self._overruns: int   = 0
         self._stats_at: float = 0.0
 
@@ -79,6 +82,9 @@ class Clock:
             self._next     = now
             self._stats_at = now
         else:
+            busy = perf_counter() - self._last      # the caller's work since the previous tick
+            if busy > self._busy_max:
+                self._busy_max = busy
             self._next += self._interval
             self._wait_until(self._next)
             now  = perf_counter()
@@ -105,9 +111,11 @@ class Clock:
         """Push the running maxima to the settings (once per _STATS_INTERVAL) and reset them."""
         self._settings.late_max_ms = self._late_max * 1000.0
         self._settings.dt_max_ms   = self._dt_max * 1000.0
+        self._settings.busy_max_ms = self._busy_max * 1000.0
         self._settings.overruns    = self._overruns
         self._late_max = 0.0
         self._dt_max   = 0.0
+        self._busy_max = 0.0
         self._stats_at = now
 
     @staticmethod
