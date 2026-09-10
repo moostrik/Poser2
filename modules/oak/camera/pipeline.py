@@ -10,9 +10,11 @@ from .definitions import (
     YOLOV8_WIDE_5S, YOLOV8_WIDE_6S, YOLOV8_WIDE_7S,
     YOLOV8_SQUARE_5S, YOLOV8_SQUARE_6S, YOLOV8_SQUARE_7S,
     YOLO_CONFIDENCE_THRESHOLD, YOLO_OVERLAP_THRESHOLD,
+    DETECTOR_INPUT_WIDE, DETECTOR_INPUT_SQUARE,
     TRACKER_PERSON_LABEL, TRACKER_TYPE,
     DEPTH_TRACKER_BOX_SCALE, DEPTH_TRACKER_LOCATION,
     DEPTH_TRACKER_MIN_DEPTH, DEPTH_TRACKER_MAX_DEPTH,
+    MONO_RESOLUTION, MONO_SIZE, COLOR_SIZES, color_resolution,
 )
 
 logger = logging.getLogger(__name__)
@@ -144,12 +146,8 @@ class SetupColor(Setup):
     def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, perspective: PerspectiveConfig) -> None:
         super().__init__(pipeline, fps)
 
-        if do_720p:
-            self.width, self.height = 1280, 720 # for warping must be devisible by 16
-            self.resolution: dai.ColorCameraProperties.SensorResolution = dai.ColorCameraProperties.SensorResolution.THE_720_P
-        else:
-            self.width, self.height = 1920, 1072 # for warping must be devisible by 16
-            self.resolution: dai.ColorCameraProperties.SensorResolution = dai.ColorCameraProperties.SensorResolution.THE_1080_P
+        self.resolution: dai.ColorCameraProperties.SensorResolution = color_resolution(do_720p)
+        self.width, self.height = COLOR_SIZES[self.resolution]
 
         self.data_size: int = self.width * self.height * 3
 
@@ -193,10 +191,10 @@ class SetupColorYolo(SetupColor):
         self.detection_manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.detection_manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         if square:
-            self.detection_manip.initialConfig.setResize(416, 416)
+            self.detection_manip.initialConfig.setResize(*DETECTOR_INPUT_SQUARE)
             self.detection_manip.initialConfig.setKeepAspectRatio(True)
         else:
-            self.detection_manip.initialConfig.setResize(640,352)
+            self.detection_manip.initialConfig.setResize(*DETECTOR_INPUT_WIDE)
             self.detection_manip.initialConfig.setKeepAspectRatio(False)
         self.color_warp.out.link(self.detection_manip.inputImage)
 
@@ -235,7 +233,9 @@ class SetupColorStereo(SetupColor):
 
         self.color.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
 
-        resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
+        # The depth pair runs at the installation's mono mode, or a low mode when the depth
+        # output is only feeding the detector (`lowres`).
+        resolution: dai.MonoCameraProperties.SensorResolution = MONO_RESOLUTION
         if lowres:
             resolution = dai.MonoCameraProperties.SensorResolution.THE_400_P
 
@@ -290,7 +290,7 @@ class SetupColorStereoYolo(SetupColorStereo):
         super().__init__(pipeline, fps, do_720p, show_stereo, lowres = True)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-        self.manip.initialConfig.setResize(640,352)
+        self.manip.initialConfig.setResize(*DETECTOR_INPUT_WIDE)
         self.manip.initialConfig.setKeepAspectRatio(False)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         self.color.video.link(self.manip.inputImage)
@@ -329,23 +329,24 @@ class SetupMono(Setup):
         super().__init__(pipeline, fps)
 
 
-        self.width, self.height = 1280, 720 # for warping must be devisible by 16
+        self.resolution: dai.MonoCameraProperties.SensorResolution = MONO_RESOLUTION
+        self.width, self.height = MONO_SIZE
         self.data_size = self.width * self.height
 
-        self.resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
         self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
         self.left.setCamera("left")
         self.left.setResolution(self.resolution)
         self.left.setFps(self.fps)
 
         self.left_warp: dai.node.Warp = pipeline.create(dai.node.Warp)
-        warp_p: float = 1280 * 0.5 * perspective.perspective
+        warp_p: float = self.width * 0.5 * perspective.perspective
         mesh_w, mesh_h = 2, 64
 
         if square:
             warp_p: float = self.height * 0.5 * perspective.perspective
             warp_mesh: list[dai.Point2f] = find_perspective_warp_square(self.width, self.height, self.height, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
             self.width = self.height # make square
+            self.data_size = self.width * self.height   # follow the crop, as SetupColor does
         else:
             warp_mesh: list[dai.Point2f] = find_perspective_warp(self.width, self.height, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
 
@@ -370,10 +371,10 @@ class SetupMonoYolo(SetupMono):
         self.detection_manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.detection_manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         if square:
-            self.detection_manip.initialConfig.setResize(416, 416)
+            self.detection_manip.initialConfig.setResize(*DETECTOR_INPUT_SQUARE)
             self.detection_manip.initialConfig.setKeepAspectRatio(True)
         else:
-            self.detection_manip.initialConfig.setResize(640,352)
+            self.detection_manip.initialConfig.setResize(*DETECTOR_INPUT_WIDE)
             self.detection_manip.initialConfig.setKeepAspectRatio(False)
         self.left_warp.out.link(self.detection_manip.inputImage)
 
@@ -452,7 +453,7 @@ class SetupMonoStereoYolo(SetupMonoStereo):
         super().__init__(pipeline, fps, show_stereo)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-        self.manip.initialConfig.setResize(640,352)
+        self.manip.initialConfig.setResize(*DETECTOR_INPUT_WIDE)
         self.manip.initialConfig.setKeepAspectRatio(False)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         self.stereo.rectifiedLeft.link(self.manip.inputImage)
@@ -528,15 +529,15 @@ class SimulationColorStereo(SetupColorStereo):
 
         self.ex_video: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_video.setStreamName("ex_video")
-        self.ex_video.setMaxDataSize(1280*720*3)
+        self.ex_video.setMaxDataSize(self.data_size)
 
         self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_left.setStreamName("ex_left")
-        self.ex_left.setMaxDataSize(1280*720*3)
+        self.ex_left.setMaxDataSize(self.data_size)
 
         self.ex_right: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_right.setStreamName("ex_right")
-        self.ex_right.setMaxDataSize(1280*720*3)
+        self.ex_right.setMaxDataSize(self.data_size)
 
         self.ex_left.out.link(self.stereo.left)
         self.ex_right.out.link(self.stereo.right)
@@ -567,7 +568,7 @@ class SimulationColorStereoYolo(SimulationColorStereo):
         super().__init__(pipeline, fps, do_720p, show_stereo)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-        self.manip.initialConfig.setResize(640,352)
+        self.manip.initialConfig.setResize(*DETECTOR_INPUT_WIDE)
         self.manip.initialConfig.setKeepAspectRatio(False)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         self.ex_video.out.link(self.manip.inputImage)
@@ -613,7 +614,7 @@ class SimulationMono(SetupMono):
 
         self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_left.setStreamName("ex_video")
-        # self.ex_left.setMaxDataSize(1280*720*3) # * 3?
+        # self.ex_left.setMaxDataSize(self.data_size) # * 3?
         self.ex_left.setMaxDataSize(self.data_size)
 
         self.ex_left.out.link(self.output_video.input)
@@ -627,7 +628,7 @@ class SimulationMonoYolo(SetupMonoYolo):
 
         self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_left.setStreamName("ex_video")
-        # self.ex_left.setMaxDataSize(1280*720*3) # * 3?
+        # self.ex_left.setMaxDataSize(self.data_size) # * 3?
         self.ex_left.setMaxDataSize(self.data_size)
 
         self.ex_left.out.link(self.detection_manip.inputImage)
@@ -641,7 +642,9 @@ class SimulationMonoStereo(SetupMonoStereo):
 
         self.color: dai.node.Camera = pipeline.create(dai.node.Camera)
         self.color.setCamera("color")
-        self.color.setSize(1280, 720)
+        # (unreachable — the early return above; a colour node in a mono setup, so it needs a
+        #  colour size, not this class's mono `self.resolution`)
+        self.color.setSize(*COLOR_SIZES[color_resolution(do_720p=True)])
         self.color.setFps(self.fps)
         self.color.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
 
@@ -656,15 +659,15 @@ class SimulationMonoStereo(SetupMonoStereo):
 
         self.ex_video: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_video.setStreamName("ex_video")
-        self.ex_video.setMaxDataSize(1280*720*3)
+        self.ex_video.setMaxDataSize(self.data_size)
 
         self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_left.setStreamName("ex_left")
-        self.ex_left.setMaxDataSize(1280*720*3)
+        self.ex_left.setMaxDataSize(self.data_size)
 
         self.ex_right: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_right.setStreamName("ex_right")
-        self.ex_right.setMaxDataSize(1280*720*3)
+        self.ex_right.setMaxDataSize(self.data_size)
 
         self.ex_left.out.link(self.stereo.left)
         self.ex_right.out.link(self.stereo.right)
@@ -693,7 +696,7 @@ class SimulationMonoStereoYolo(SimulationMonoStereo):
         super().__init__(pipeline, fps, show_stereo)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-        self.manip.initialConfig.setResize(640,352)
+        self.manip.initialConfig.setResize(*DETECTOR_INPUT_WIDE)
         self.manip.initialConfig.setKeepAspectRatio(False)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         self.ex_video.out.link(self.manip.inputImage)
