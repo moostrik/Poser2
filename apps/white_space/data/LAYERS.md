@@ -24,7 +24,7 @@ while the beam tools are named as playhead tools (`playhead_haunted`, `playhead_
 | Layer             | Mode       | Reads                                                  | Writes                        | Used by |
 |-------------------|------------|--------------------------------------------------------|-------------------------------|---------|
 | `searchlight`     | beam       | — (settings only)                                      | front white lamp              | S1–S6, S9, S10 |
-| `playhead_flash`  | beam       | LERP frames (PlayheadOffset, Dwell), tracklets         | front white lamp + blue lamps (blue zeroed in presets — S4 runs blue-none by design) | S4 |
+| `playhead_flash`  | beam       | LERP frames (PlayheadOffset), tracklets                 | front white lamp + blue lamps (blue zeroed in presets — S4 runs blue-none by design) | S4 |
 | `projection_playhead` | projection | frame playhead phase                               | white ring marker             | S6 (post-un-lock), S7, S8 |
 | `pose_instrument` | projection | LERP frames (Azimuth, BBox, Angles, LegDeviation, TorsoTilt, Similarity), tracklets, playhead bars (PLAYHEAD motion only) | white lines, blue anchor + between-lines | S6 (post-un-lock), S7, S8 |
 | `flood`           | projection | — (settings only)                                      | full-strip white              | S8 |

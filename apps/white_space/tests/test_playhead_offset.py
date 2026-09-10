@@ -7,7 +7,7 @@ from modules.pose.frame import Frame
 from modules.pose.features import Azimuth
 from apps.white_space.pose import PlayheadOffset, PlayheadOffsetExtractor
 from apps.white_space.light.layers._utilities import angle_to_strip_position
-from apps.white_space.light.layers.beam.playhead_flash import offset_to_level, stability_lerp
+from apps.white_space.light.layers.beam.playhead_flash import offset_to_level
 
 PI = math.pi
 TAU = math.tau
@@ -89,20 +89,6 @@ class PlayheadFlashWindowTest(unittest.TestCase):
         self.assertEqual(offset_to_level(0.1, 0.4, 0.25), 1.0)   # notch edge (inclusive) → on
         self.assertEqual(offset_to_level(0.3, 0.4, 0.25), 1.0)   # past notch, within width → on
         self.assertEqual(offset_to_level(0.5, 0.4, 0.25), 0.0)   # beyond width → off
-
-
-class StabilityLerpTest(unittest.TestCase):
-    def test_endpoints_and_midpoint(self) -> None:
-        self.assertAlmostEqual(stability_lerp(0.0, 0.2, 1.0), 0.2, places=5)   # stability 0 → lo
-        self.assertAlmostEqual(stability_lerp(1.0, 0.2, 1.0), 1.0, places=5)   # stability 1 → hi
-        self.assertAlmostEqual(stability_lerp(0.5, 0.2, 1.0), 0.6, places=5)   # midpoint
-
-    def test_nan_maps_to_lo(self) -> None:
-        self.assertAlmostEqual(stability_lerp(float("nan"), 0.2, 1.0), 0.2, places=5)
-
-    def test_inverted_endpoints(self) -> None:
-        # lo may exceed hi (e.g. unstable wider than stable); still a straight interpolation
-        self.assertAlmostEqual(stability_lerp(0.5, 1.0, 0.0), 0.5, places=5)
 
 
 if __name__ == "__main__":
