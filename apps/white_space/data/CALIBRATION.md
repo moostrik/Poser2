@@ -85,10 +85,27 @@ The two are independent and each is tuned where it is visible; there is no order
 them. They sit at opposite ends of the pipeline for a reason: the playhead offset corrects a
 measurement **coming in** (the flash, the hit, the state machine and the sound all consume
 the result, so it is applied at the source); the projection offset corrects an image **going
-out** (nothing reads the rotated value back). For the record, the firmware ties them: the two
-offsets add up to a quarter turn plus the loop delay in beam mode. Today's values, 263° and
-198°, add up to 101°, an 11° delay term — about 50 ms at 36 rpm. A consistency check, not a
-step.
+out** (nothing reads the rotated value back).
+
+**The relation between them** — a readout, not a step. Write θ for the front lamp's azimuth at
+the pulse and *d* for the loop's output delay. In projection mode the firmware paints from its
+own counter, so no app delay can move the image and the alignment is pure geometry:
+
+    projection offset = 90° − θ            (the 90° is the firmware's TEST = 900 px of 3600)
+
+In beam mode the flash is computed at the internal playhead and lands one delay later, so
+tuning it to hit the person builds that delay into the number:
+
+    playhead offset = θ + d·rpm·6          (degrees; rpm·6 = degrees per second)
+
+Adding them cancels θ, which is why the sum is a check on both at once:
+
+    playhead offset + projection offset = 90° + d·rpm·6
+
+Today: 262.8° + 198.0° = 100.8°, so **θ = 252°** and the residual 10.8° is the delay — 50 ms
+at 36 rpm. Both were tuned on a slider that stepped 3.6°, so read that as 42–58 ms, which is
+about what a fall message, a 30 Hz tick and a frame on the wire should cost. Two numbers found
+by eye, years apart from this model, agreeing to one slider click.
 
 The fixture switches between the two mechanisms on the **commanded** rpm the moment it
 receives it (`firmware.cpp:475`), regardless of how fast the bar is actually turning.
@@ -261,7 +278,7 @@ changes (`light/playhead.py`):
 - The **interlace** values (`osc_light_sender.interlace`, see Theory). Preset: `white_1` 5,
   `blue_0` −10, `blue_1` 9, range ±10 px. The firmware boots with its own values (`cor2` 3, `cor1` 1);
   ours replace them on connect and once a second, so the firmware side is never where to tune.
-- `light.master` and the sender's `curve` / `lower_edge` / `upper_edge` — brightness, not
+- `light.brightness` and the sender's `curve` / `lower_edge` / `upper_edge` — brightness, not
   position.
 
 **The four lamps**, from the firmware's sampling offsets, relative to the front white in the
@@ -285,8 +302,8 @@ must continue where the beam was.
 ## Layers
 
 **Beam layers** write the four beam lights by name — `front_white`, `back_white`, `left_blue`,
-`right_blue` on `Frame.beam_lights` — and nothing else (`layers/_base_layer.py`, `BeamLayer`;
-`BeamLayer` today). No calibration of their own: the lamp shines where the bar points, and
+`right_blue` on `Frame.beam_lights` — and nothing else (`layers/_base_layer.py`, `BeamLayer`).
+No calibration of their own: the lamp shines where the bar points, and
 where that is *as an azimuth* is the playhead. The sender copies the four values into the
 pixels the firmware reads in beam mode (pixel 0 and 1800 of each channel,
 `FIRMWARE_LIGHT_SLOT_TURNS`); the projection offset and the interlace provably cannot reach them.
@@ -294,9 +311,9 @@ What a beam layer *does* depend on is `PlayheadOffset` when it reacts to people
 (`playhead_flash`, `playhead_haunted`).
 
 **Projection layers** draw the ring at azimuth strip positions — `pose_instrument` at each
-person's `Azimuth`, `projection_playhead` at the playhead (`ProjectionLayer`; `ProjectionLayer`
-today). No calibration of their own either: the compositor rotates the result by the
-projection offset on the way out and the sender applies the interlace.
+person's `Azimuth`, `projection_playhead` at the playhead (`ProjectionLayer`). No calibration
+of their own either: they author in azimuth and the light sender applies the projection offset
+and the interlace on the way out.
 
 ---
 
@@ -309,10 +326,18 @@ azimuth 0 and the speakers numbered counter-clockwise there is nothing to tune o
 side. Check: in IDLE, have Max voice `/global/playhead`; the sound must follow the searchlight
 around the room.
 
-**Intent, not built**: a speaker stand is a fuzzy target, so keep one small correction on
-*our* side — `speaker_offset` in degrees (default 0), sent as its own message (e.g.
-`/global/speaker/offset`, radians on the wire like every azimuth), added by Max in its
-panner. Every azimuth Max receives stays true and the number travels with the preset.
+**Two settings of our own**, in `inout.osc_sound_sender`, sent in every bundle:
+
+- **`speaker_offset`** — where speaker 0 stands, as an azimuth, degrees 0–360 in steps of 1
+  (`/global/speaker/offset`, radians on the wire like every azimuth). A speaker stand is a
+  fuzzy target, so the correction stays on *our* side: every azimuth Max receives stays true,
+  Max adds this one constant in its panner, and the number travels with the preset. Placed by
+  the fixed layout it is **0** and Max needs nothing.
+- **`volume`** — the main sound volume, 0–1 (`/global/volume`).
+
+Neither is show state, so neither is zeroed on a blackout the way the playhead and the motor
+mode are: a fader must read true whenever it is turned, and a calibration must not snap to 0
+between shows.
 
 **The return path**: `/WS/sound/level` (left, right) → `sound_light` → the left and right
 blue lamps (site fact: named after the fixture's blue-left / blue-right; nothing to do with
@@ -374,7 +399,8 @@ and one-line instructions:
 | 4 speakers | `speaker_offset` | IDLE, Max voicing `/global/playhead` | "Speaker 0 on azimuth 0; the sound follows the beam." |
 
 **Units**: degrees for every *angle* an operator reads or turns, 0.1° step (one ring pixel) —
-both offsets, the playhead and motor-phase readouts, and `speaker_offset` when it is built.
+both offsets and the playhead and motor-phase readouts. `speaker_offset` is degrees too, in
+steps of 1: a speaker stand is not placed to a tenth of a degree.
 Radians stay the internal and wire unit. The interlace is **not** an angle and stays in
 pixels: the firmware shifts a pixel index, an integer, one LED step at a time, so pixels are
 its true unit (1 px = 0.1° is a remark, not a conversion), and its ±10 px range stays.
@@ -391,7 +417,9 @@ its true unit (1 px = 0.1° is a remark, not a conversion), and its ±10 px rang
   with a 0.1° step; `offsets` → `interlace` (pixels, ±10, unchanged on the wire); the rotation
   moved from the compositor to the light sender, so the frame on the board is azimuth-true and
   both screen views agree with the tracker row. The wire bytes are unchanged.
-- `speaker_offset` for Max — not built yet (see Sound).
+- ~~`speaker_offset` for Max~~ — **done**, with a main `volume` alongside it: both live in
+  `inout.osc_sound_sender` and go out in every bundle (`/global/speaker/offset` in radians,
+  `/global/volume`). Max adds the offset in its panner.
 - The mono pipeline to `THE_800_P` with `parallax.vfov` 79.5 — deferred until it can be
   tested with the cameras (`ring_radius` 0.36 can go in on its own).
 - **A placement aid for the cameras** (later): since placement *is* the room-side
@@ -418,7 +446,9 @@ its true unit (1 px = 0.1° is a remark, not a conversion), and its ±10 px rang
                   50 cm tripod; IR filter, does not see the light               (spec / site fact)
     drawing:      "White Space Layout Sheet.pdf", two A3 pages, to scale
     blue[0]:      wired to the strip labelled "blue left" / "blue right"       (confirm)
-    playhead offset for this build:   263° (0.73 turn)                         (tuned — re-check with the flash)
-    projection offset for this build: 198° (0.55 turn)                         (tuned — re-check with the projected line)
+    playhead offset for this build:   262.8°                                   (tuned — re-check with the flash)
+    projection offset for this build: 198.0°                                   (tuned — re-check with the projected line)
+    front lamp azimuth at the pulse:  θ = 252°                                 (derived from the two — see Theory)
+    loop delay in beam mode:          ≈ 50 ms (42–58)                          (derived — the 10.8° residual at 36 rpm)
     interlace:    white_1 +5, blue_0 −10, blue_1 +9 px                          (tuned)
     LED strips:   the two arms' LEDs are mounted out of phase and interlace     (site fact)

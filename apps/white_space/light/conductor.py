@@ -178,8 +178,8 @@ class Conductor(Thread):
         frame = Frame(self._config.light_resolution, tick, motor, command, playhead=playhead)
         self._compositor.render(frame)
 
-        # Master brightness — the ring and the beam lights alike
-        m = self._config.master
+        # Main brightness — the ring and the beam lights alike
+        m = self._config.brightness
         if m != 1.0:
             frame.white      *= m
             frame.blue       *= m

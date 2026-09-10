@@ -103,6 +103,8 @@ class OakGroup(BaseSettings):
 class _OscSoundSettings(OscSoundSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage to read poses from")
     virtual_players: Field[int] = Field(0, min=0, max=16, access=Field.INIT, visible=False, description="Extra virtual (ghost) id slots beyond max_players (shared from root num_virtual)")
+    volume: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, newline=True, pinned=True, description="Main sound volume — sent to Max on /global/volume")
+    speaker_offset: Field[float] = Field(0.0, min=0.0, max=360.0, step=1.0, description="Where speaker 0 stands, as an azimuth (degrees) — Max adds it in its panner. 0 when the speakers are placed by the layout")
 
 
 class InOutGroup(BaseSettings):

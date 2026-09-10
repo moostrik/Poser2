@@ -189,7 +189,9 @@
     "osc_sound_sender": {
       "stage": "LERP",
       "ip_addresses": "192.168.1.39",
-      "port": 8000
+      "port": 8000,
+      "volume": 1.0,
+      "speaker_offset": 0.0
     },
     "osc_sound_receiver": {
       "port_in": 6455,
@@ -394,7 +396,7 @@
   },
   "light": {
     "light_rate": 30.0,
-    "master": 1.0,
+    "brightness": 1.0,
     "debug": "OFF",
     "clock": {},
     "motor": {

@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 from pythonosc.osc_message_builder import OscMessageBuilder
@@ -15,14 +17,19 @@ logger = logging.getLogger(__name__)
 
 class OscSoundSender(BaseOscSound):
     """The sound sender — modules' OscSound extended with the rotation playhead
-    (/global/playhead), the motor mode
-    (/global/motor), and the panoramic-only per-pose azimuth, distance, and
-    playhead-offset messages.
+    (/global/playhead), the motor mode (/global/motor), the two operator settings
+    (/global/volume, /global/speaker/offset), and the panoramic-only per-pose azimuth,
+    distance, and playhead-offset messages.
 
     ``/global/state`` carries the show state (``ShowState``, 0–8) from the state machine —
     the address name is kept for backwards compatibility although it now means show state
     (it used to carry the commanded MotorMode as a workaround). The motor mode still goes
     out, on ``/global/motor``.
+
+    ``/global/speaker/offset`` is the one number Max needs of its own: where speaker 0 stands
+    as an azimuth. With the speakers placed by the fixed layout (speaker 0 on the connection
+    side, counter-clockwise from there) it is 0 and Max needs no constant at all — see
+    ``data/CALIBRATION.md``. Radians on the wire, like every other azimuth here.
 
     Also owns the id-slot count: it sends ``max_players`` live slots plus ``virtual_players``
     ghost slots (ids Ghoster injects beyond the tracked players). It overrides the base's
@@ -90,6 +97,17 @@ class OscSoundSender(BaseOscSound):
         motor_msg = OscMessageBuilder(address="/global/motor")
         motor_msg.add_arg(motor_mode, OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(motor_msg.build())  # type: ignore
+
+        # Operator settings, not show state, so they are never zeroed on idle: the fader and
+        # the speaker placement must read true whenever they are turned, show or no show.
+        volume_msg = OscMessageBuilder(address="/global/volume")
+        volume_msg.add_arg(float(self._config.volume), OscMessageBuilder.ARG_TYPE_FLOAT)  # type: ignore[attr-defined]
+        bundle_builder.add_content(volume_msg.build())  # type: ignore
+
+        # Degrees in the panel, radians on the wire — the contract every azimuth here keeps.
+        speaker_msg = OscMessageBuilder(address="/global/speaker/offset")
+        speaker_msg.add_arg(math.radians(self._config.speaker_offset), OscMessageBuilder.ARG_TYPE_FLOAT)  # type: ignore[attr-defined]
+        bundle_builder.add_content(speaker_msg.build())  # type: ignore
 
     def _add_active_frame_messages(self, bundle_builder: OscBundleBuilder, frame: PoseFrame, frames: FrameDict, num_players: int) -> None:
         super()._add_active_frame_messages(bundle_builder, frame, frames, num_players)
