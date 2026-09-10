@@ -32,17 +32,22 @@ FIRMWARE_NUM_CHUNKS: int = 3
 # (lines 266-295). So a slot carries the beam light's level in beam mode and ring content otherwise.
 FIRMWARE_LIGHT_SLOT_TURNS: np.ndarray = np.array([0.0, 0.5, 0.0, 0.5])
 
-# Offsets and rpm are constant for a whole show, so they are sent on change only. This keepalive
+# Interlace and rpm are constant for a whole show, so they are sent on change only. This keepalive
 # re-sends them anyway at a low rate so a lost config packet self-heals; the firmware ignores a
 # repeat of the value it already holds.
 _CONFIG_KEEPALIVE_S: float = 1.0
 
 
-class OscLightOffsetSettings(BaseSettings):
-    white_0: Field[int] = Field(0, min=-10, max=10, description="White strip 0 offset")
-    white_1: Field[int] = Field(0, min=-10, max=10, description="White strip 1 offset")
-    blue_0:  Field[int] = Field(0, min=-10, max=10, description="Blue strip 0 offset")
-    blue_1:  Field[int] = Field(0, min=-10, max=10, description="Blue strip 1 offset")
+class OscLightInterlaceSettings(BaseSettings):
+    """Interlace: the two arms' LEDs have gaps and are mounted out of phase, so one arm's LEDs
+    fill the gaps of the other's and the two halves of a revolution interlace into one image.
+    Shift each lamp (pixels, 1 px = 0.1°) until the two sides paint one image: the whites
+    against each other, the blues against each other, then the blue image onto the white.
+    Projection mode only — the firmware ignores these below FIXTURE_PROJECTION_RPM."""
+    white_0: Field[int] = Field(0, min=-10, max=10, description="Front white lamp shift (pixels)")
+    white_1: Field[int] = Field(0, min=-10, max=10, description="Back white lamp shift (pixels)")
+    blue_0:  Field[int] = Field(0, min=-10, max=10, description="Left blue lamp shift (pixels)")
+    blue_1:  Field[int] = Field(0, min=-10, max=10, description="Right blue lamp shift (pixels)")
 
 
 class OscLightSenderSettings(BaseSettings):
@@ -58,14 +63,15 @@ class OscLightSenderSettings(BaseSettings):
     curve:        Field[float] = Field(1.0,  min=0.5, max=3.0, step=0.01, description="Output gamma curve; <1 brightens mids, >1 darkens")
     startup_delay: Field[float] = Field(2.0, min=0.0, max=10.0, step=0.5, description="Hold motor rpm at 0 for this long after connect, then release to the commanded speed — forces a 0→target edge the motor controller acts on at boot")
     chunk_interval: Field[float] = Field(0.0,    min=0.0, max=0.005, step=0.0005, description="Seconds between consecutive pixel datagrams (0 = send back-to-back). Only raise this if the fixture reports dropped chunks — it adds output latency")
-    offsets:      Group[OscLightOffsetSettings] = Group(OscLightOffsetSettings)
+    projection_offset: Field[float] = Field(0.0, min=0.0, max=360.0, step=0.1, description="Projection offset (degrees): rotates the ring so the authored azimuth lands where it belongs in the room", newline=True)
+    interlace:    Group[OscLightInterlaceSettings] = Group(OscLightInterlaceSettings)
 
 
 class OscLightSender:
     """Sends LED strip data over OSC/UDP to the installation hardware.
 
     OSC address pattern (all under /WS/):
-        /WS/o/0..3        -- offsets: white_0, white_1, blue_0, blue_1 (int)
+        /WS/o/0..3        -- interlace: white_0, white_1, blue_0, blue_1 (int pixels)
         /WS/r/0           -- rotation: RPM (int)
         /WS/white{i}      -- white channel chunk i (blob)
         /WS/blue{i}       -- blue channel chunk i (blob)
@@ -83,6 +89,10 @@ class OscLightSender:
       it steps the ring and ignores the slots. `_rebuild_fixture_pixels` writes the frame's
       explicit beam lights into those slots exactly when the fixture reads them, using the rpm
       this sender actually put on the wire.
+    * This sender owns the fixture's two projection-mode alignments, so the frame on the board
+      stays azimuth-true: `projection_offset` rotates the whole ring on its way out, and the
+      four `interlace` values shift each lamp's readout (`/WS/o/0..3`). Both are ignored by the
+      firmware in beam mode, so `_rebuild_fixture_pixels` never rotates the four slots.
     * Its socket receive buffer is 8 KB against a 7.4 KB frame, and it drains while it fills, so
       the burst normally fits. Config messages are kept out of it anyway (they never change), and
       `chunk_interval` can spread the six chunks further if the fixture ever reports dropped
@@ -113,7 +123,7 @@ class OscLightSender:
         self._update_event:  Event = Event()
         self._client: UDPClient = UDPClient(settings.ip_addresses, settings.port)
 
-        # Config (offsets + rpm) is sent on change instead of every frame; `None` rpm forces the
+        # Config (interlace + rpm) is sent on change instead of every frame; `None` rpm forces the
         # first send. `_config_dirty` is set from the settings callback on whichever thread edits.
         self._config_dirty:   bool = True
         self._sent_rpm:       Optional[int] = None
@@ -124,7 +134,7 @@ class OscLightSender:
 
         self._config.bind(OscLightSenderSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
         self._config.bind(OscLightSenderSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
-        self._config.offsets.bind_all(self._on_offsets_change)
+        self._config.interlace.bind_all(self._on_interlace_change)
 
     @property
     def running(self) -> bool:
@@ -147,7 +157,7 @@ class OscLightSender:
 
         self._config.unbind(OscLightSenderSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
         self._config.unbind(OscLightSenderSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
-        self._config.offsets.unbind_all(self._on_offsets_change)
+        self._config.interlace.unbind_all(self._on_interlace_change)
 
         # Send AFTER the join: guaranteed to be the last thing on the wire (late
         # send_message() calls only store into the dead thread's slot).
@@ -206,7 +216,7 @@ class OscLightSender:
                 self._send_paced(chunks, self._config.chunk_interval)
 
     def _send_config(self, motor_rpm: int) -> None:
-        """Send the offsets and rpm — on change, or when the keepalive interval has elapsed.
+        """Send the interlace and rpm — on change, or when the keepalive interval has elapsed.
 
         Keeping these five datagrams out of the per-frame burst is what buys the fixture's socket
         buffer enough headroom for the six pixel chunks.
@@ -253,11 +263,11 @@ class OscLightSender:
     def _on_connection_change(self, _=None) -> None:
         with self._client_lock:
             self._client = UDPClient(self._config.ip_addresses, self._config.port)
-        self._config_dirty = True   # the new endpoint has not seen the offsets or rpm yet
+        self._config_dirty = True   # the new endpoint has not seen the interlace or rpm yet
         self._sent_rpm     = None
         logger.info(f"reconnected to {self._config.ip_addresses}:{self._config.port}")
 
-    def _on_offsets_change(self, _=None) -> None:
+    def _on_interlace_change(self, _=None) -> None:
         self._config_dirty = True
 
     # ------------------------------------------------------------------
@@ -283,13 +293,13 @@ class OscLightSender:
 
     @staticmethod
     def _build_config_messages(settings: OscLightSenderSettings, motor_rpm: int) -> OscMessageList:
-        """The four lamp-alignment offsets plus the motor speed — constant for a whole show."""
+        """The four interlace shifts plus the motor speed — constant for a whole show."""
         message_list: OscMessageList = []
         for addr, val in (
-            ("/WS/o/0", settings.offsets.white_0),
-            ("/WS/o/1", settings.offsets.white_1),
-            ("/WS/o/2", settings.offsets.blue_0),
-            ("/WS/o/3", settings.offsets.blue_1),
+            ("/WS/o/0", settings.interlace.white_0),
+            ("/WS/o/1", settings.interlace.white_1),
+            ("/WS/o/2", settings.interlace.blue_0),
+            ("/WS/o/3", settings.interlace.blue_1),
         ):
             off_msgb = OscMessageBuilder(addr)
             off_msgb.add_arg(val)
@@ -298,15 +308,22 @@ class OscLightSender:
         return message_list
 
     @staticmethod
-    def _rebuild_fixture_pixels(output: Frame, slow: bool) -> tuple[np.ndarray, np.ndarray]:
+    def _rebuild_fixture_pixels(output: Frame, slow: bool, shift: int) -> tuple[np.ndarray, np.ndarray]:
         """The (white, blue) pixel channels as the fixture will read them.
 
-        In beam mode the firmware reads only the four slots, so each slot is **replaced** by its
-        beam light's level (the ring content there is never seen). In projection mode it never reads a
-        slot, so the ring goes out untouched and the beam lights are dropped — a slot value would
-        only be a one-pixel blip in the ring. Never mutates the shared frame.
+        In projection mode the ring is what the fixture paints, so it goes out rotated by
+        ``shift`` — the projection offset in pixels — and the beam lights are dropped (a slot
+        value would only be a one-pixel blip in the ring).
+
+        In beam mode the firmware reads only the four fixed slots, so each slot is **replaced**
+        by its beam light's level and the rotation is skipped: the slots are pixel positions the
+        firmware indexes directly, and the ring around them is never seen either way.
+
+        Never mutates the shared frame.
         """
         if not slow:
+            if shift:
+                return np.roll(output.white, shift), np.roll(output.blue, shift)
             return output.white, output.blue
         white, blue = output.white.copy(), output.blue.copy()
         slots = (FIRMWARE_LIGHT_SLOT_TURNS * output.resolution).astype(int)
@@ -314,6 +331,11 @@ class OscLightSender:
             channel = white if BEAM_LIGHT_CHANNEL[light] == 0 else blue
             channel[slots[light]] = output.beam_lights[light]
         return white, blue
+
+    @staticmethod
+    def _projection_shift(settings: OscLightSenderSettings) -> int:
+        """The projection offset as a whole number of ring pixels."""
+        return int(round(settings.projection_offset / 360.0 * settings.resolution)) % settings.resolution
 
     @staticmethod
     def _build_chunk_messages(
@@ -330,7 +352,8 @@ class OscLightSender:
         fixture's readout mode for this frame (the rpm sent with it below `FIXTURE_PROJECTION_RPM`).
         """
         try:
-            white_src, blue_src = OscLightSender._rebuild_fixture_pixels(output, slow)
+            shift = OscLightSender._projection_shift(settings)
+            white_src, blue_src = OscLightSender._rebuild_fixture_pixels(output, slow, shift)
             # Output mapping: gamma curve + the driver's usable window (master applied upstream).
             white_f = OscLightSender._apply_levels(white_src, settings.curve, settings.lower_edge, settings.upper_edge)
             blue_f  = OscLightSender._apply_levels(blue_src,  settings.curve, settings.lower_edge, settings.upper_edge)

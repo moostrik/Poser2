@@ -19,6 +19,7 @@ from modules.settings import BaseSettings, Field
 
 from ._utilities import BlendType, blend_values
 from ..frame import Frame, BeamLightId, BUFFER_DTYPE
+from ..motor import MotorMode
 
 if TYPE_CHECKING:
     from ...board import Board
@@ -48,11 +49,11 @@ class BaseLayer(ABC):
     its scratch and its ``_draw`` signature.
 
     Concrete layers subclass one of the two mode bases (`BeamLayer` / `ProjectionLayer`),
-    never BaseLayer directly — the mode drives the light_phase ring shift and the
-    debug auto-follow's motor derivation.
+    never BaseLayer directly — ``MODE`` is what the debug auto-follow reads to command the
+    motor.
     """
 
-    SHIFTED: bool = False   # rides the fast ring → gets the light_phase roll (ProjectionLayer)
+    MODE: MotorMode = MotorMode.STOPPED   # the fixture mode this layer draws for
 
     def __init__(self, resolution: int, settings: LayerSettings, board: Board) -> None:
         self.resolution: int           = resolution
@@ -73,6 +74,8 @@ class BeamLayer(BaseLayer):
     """Beam mode (commanded below ``FIXTURE_PROJECTION_RPM``): the fixture drives the four
     beam lights directly and reads no ring pixels, so a beam layer writes ``beam_lights`` —
     a ``(4,)`` array indexed by ``BeamLightId`` — and nothing else."""
+
+    MODE = MotorMode.BEAM
 
     def __init__(self, resolution: int, settings: LayerSettings, board: Board) -> None:
         super().__init__(resolution, settings, board)
@@ -101,12 +104,12 @@ class BeamLayer(BaseLayer):
 
 class ProjectionLayer(BaseLayer):
     """Projection mode (commanded at or above ``FIXTURE_PROJECTION_RPM``): pixels draw the
-    persistence-of-vision ring, so the content rides the fast spin — ``SHIFTED`` grants the
-    ``light_phase`` ring roll, and the debug auto-follow derives PROJECTION from any selected
-    ProjectionLayer. Subclasses write additively into the ``white`` / ``blue`` scratch arrays
-    (shape ``(resolution,)``, pre-zeroed)."""
+    persistence-of-vision ring, so the content rides the fast spin. A projection layer authors
+    in azimuth and nothing rotates it here — the light sender applies the projection offset on
+    the way out, so the frame on the board stays azimuth-true. Subclasses write additively into
+    the ``white`` / ``blue`` scratch arrays (shape ``(resolution,)``, pre-zeroed)."""
 
-    SHIFTED = True
+    MODE = MotorMode.PROJECTION
 
     def __init__(self, resolution: int, settings: LayerSettings, board: Board) -> None:
         super().__init__(resolution, settings, board)

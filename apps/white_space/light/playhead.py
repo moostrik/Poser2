@@ -29,8 +29,9 @@ fast (the content would then race at the resumed sensor rpm). We therefore wait 
 *fresh* above-content measurement (the real spin-down in progress) and only re-lock once it has since
 settled to `measured_rpm ≤ beam_rpm × (1 + _RESYNC_RPM_TOL)`.
 
-The motor is offset-agnostic; the playhead owns its single content-alignment `offset`
-(constant → does not break continuity). Pixel compositions own their own offsets.
+The motor is offset-agnostic; the playhead owns the single beam-mode calibration,
+`pulse_offset` — the front lamp's azimuth at the sensor pulse, in degrees (constant → does
+not break continuity). The projection offset that aligns the ring lives in the light sender.
 """
 
 import math
@@ -53,15 +54,20 @@ def _wrap_to_pi(x: float) -> float:
     return (x + math.pi) % math.tau - math.pi
 
 
+def _to_degrees(radians: float) -> float:
+    """Radians (any range) → the operator's azimuth unit: degrees, 0–360."""
+    return math.degrees(radians) % 360.0
+
+
 class PlayheadSettings(BaseSettings):
-    phase:          Field[float] = Field(0.0,  min=0.0, max=1.0, step=0.01,
-                                         description="Playhead zero-point alignment (0–1 turn)")
+    pulse_offset:   Field[float] = Field(0.0,  min=0.0, max=360.0, step=0.1,
+                                         description="Playhead offset from the sensor pulse (degrees): the front lamp's azimuth at the pulse")
     tracking:       Field[float] = Field(0.1,  min=0.0, max=1.0, step=0.01,
                                          description="Phase-lock gain — how tightly the playhead's position locks to the measured motor phase (0=free-run, 1=snap)")
     speed_smoothing:Field[float] = Field(0.5,  min=0.0, max=1.0, step=0.01,
                                          description="How much to average the measured motor speed feeding the sweep rate (0=raw, 1=heavy)")
-    playhead:       Field[float] = Field(0.0,  min=-math.pi, max=math.pi, step=0.001,
-                                         access=Field.READ, widget=Widget.slider, description="Continuous playhead (−π…π)")
+    playhead:       Field[float] = Field(0.0,  min=0.0, max=360.0, step=0.1,
+                                         access=Field.READ, widget=Widget.slider, description="Continuous playhead azimuth (degrees)")
 
 
 class Playhead:
@@ -110,7 +116,7 @@ class Playhead:
         self._advance_internal(dt, motor, command)
         self._update_regime_signals(motor, command)
         # Finite continuous position for the UI slider (`.phase` itself is NaN when not live).
-        self._settings.playhead = _wrap_to_pi(self._internal + self._settings.phase * math.tau)
+        self._settings.playhead = _to_degrees(self._internal + math.radians(self._settings.pulse_offset))
 
     def _update_regime_signals(self, motor: MotorMeasurement, command: MotorCommand) -> None:
         """The physical mode-flip signals the show anchors on (the playhead owns them:
@@ -164,7 +170,7 @@ class Playhead:
         stays continuous underneath, and `settings.playhead` keeps the last finite position for the UI."""
         if not self._live:
             return float('nan')
-        return _wrap_to_pi(self._internal + self._settings.phase * math.tau)
+        return _wrap_to_pi(self._internal + math.radians(self._settings.pulse_offset))
 
     @property
     def bars(self) -> float:

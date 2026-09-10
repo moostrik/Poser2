@@ -174,7 +174,8 @@
       "curve": 2.0,
       "startup_delay": 2.0,
       "chunk_interval": 0.0,
-      "offsets": {
+      "projection_offset": 198.0,
+      "interlace": {
         "white_0": 0,
         "white_1": 5,
         "blue_0": -10,
@@ -394,7 +395,6 @@
   "light": {
     "light_rate": 30.0,
     "master": 1.0,
-    "light_phase": 0.55,
     "debug": "OFF",
     "clock": {},
     "motor": {
@@ -403,7 +403,7 @@
       "projection_rpm": 2000.0
     },
     "playhead": {
-      "phase": 0.73,
+      "pulse_offset": 262.8,
       "tracking": 0.12,
       "speed_smoothing": 0.66
     },

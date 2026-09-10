@@ -32,16 +32,16 @@ logger = logging.getLogger(__name__)
 
 
 def _debug_motor_mode(selection: DebugLayer, layers: dict[LayerId, BaseLayer]) -> MotorMode | None:
-    """The debug auto-follow: derive the motor mode from the selected debug layer's
-    class — `ProjectionLayer` → PROJECTION, `BeamLayer` → BEAM; OFF → None (debug disarmed, the machine
-    owns the motor). Selecting a layer is the only gesture: choosing it IS turning debug
-    on, and the speed rides the selection."""
+    """The debug auto-follow: derive the motor mode from the selected debug layer's class —
+    `ProjectionLayer.MODE` → PROJECTION, `BeamLayer.MODE` → BEAM; OFF → None (debug disarmed,
+    the machine owns the motor). Selecting a layer is the only gesture: choosing it IS turning
+    debug on, and the speed rides the selection."""
     if selection == DebugLayer.OFF:
         return None
     layer = layers.get(LayerId(int(selection)))
     if layer is None:
         return None
-    return MotorMode.PROJECTION if layer.SHIFTED else MotorMode.BEAM
+    return layer.MODE
 
 
 class Conductor(Thread):

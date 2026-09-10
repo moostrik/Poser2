@@ -120,7 +120,6 @@ class LightSettings(BaseSettings):
     spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — hidden relay from statemachine (via the root) into wind_down")
 
     master:         Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Master brightness (applied to the composite; lamp gamma/floor live in the light sender)", newline=True, pinned=True)
-    light_phase: Field[float]    = Field(0.0, min=0.0, max=1.0, step=0.01, description="Projection ring offset (0–1 turn), applied to the projection layers")
 
     # Debug override — a first-class select ABOVE the state machine: choosing a layer IS
     # turning debug on. The Compositor draws that one layer solo (full weight) and the

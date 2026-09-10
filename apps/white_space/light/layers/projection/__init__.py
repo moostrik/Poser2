@@ -1,7 +1,7 @@
 """Projection-mode light layers (`ProjectionLayer`) — persistence-of-vision ring content that
-only reads while the bar spins fast; all carry the ``light_phase`` ring shift. Show layers and
-``test_``-prefixed debug layers live side by side — the name carries the role, the folder
-carries the mode.
+only reads while the bar spins fast. Each authors in azimuth and nothing rotates it here; the
+light sender applies the projection offset on the way out. Show layers and ``test_``-prefixed
+debug layers live side by side — the name carries the role, the folder carries the mode.
 """
 
 from .pose_instrument     import PoseInstrument,     PoseInstrumentSettings

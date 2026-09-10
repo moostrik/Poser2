@@ -2,9 +2,12 @@
 
 Renders the look it was handed this tick: a weighted list of layers. Each entry's layer
 draws itself into a private scratch frame (via its own blend mode) and is added
-``weight ×`` into the output frame — the ring pixels of the spun-content layers rolled by
-``light_phase``, the beam lights weighted per channel (white weight on the whites, blue
-weight on the blues) and never rolled.
+``weight ×`` into the output frame — the ring pixels as authored, the beam lights weighted
+per channel (white weight on the whites, blue weight on the blues).
+
+Nothing is rotated here: the frame leaves the Compositor azimuth-true, so the board and the
+screen see the room's own angles. The fixture's projection offset is applied in the light
+sender, next to the interlace, on the way out.
 
 The Compositor holds no timing, easing, transition, or reset logic: weight curves live in
 the show state classes, and layer resets are explicit (``reset_layers``). The one policy it
@@ -57,7 +60,7 @@ class Compositor:
 
     def __init__(self, config: LightSettings, layers: dict[LayerId, BaseLayer]) -> None:
         self._config = config
-        self._layers = layers              # each layer's SHIFTED flag (ProjectionLayer) grants the ring shift
+        self._layers = layers
         self._entries: Mix = []
         self._scratch = Frame(config.light_resolution, Tick(0.0, 0.0))
 
@@ -86,8 +89,6 @@ class Compositor:
             from ..settings import LayerId            # local: settings imports this package
             entries = [(LayerId(int(cfg.debug)), 1.0)]
 
-        shift = int(round(cfg.light_phase * frame.white.shape[0])) % frame.white.shape[0]
-
         s = self._scratch
         s.tick, s.motor, s.playhead = frame.tick, frame.motor, frame.playhead
         for id, weight in entries:
@@ -104,11 +105,8 @@ class Compositor:
             except Exception:
                 logger.exception("Error in %s.render", layer.__class__.__name__)
                 continue
-            sw, sb = s.white, s.blue
-            if shift and layer.SHIFTED:
-                sw, sb = np.roll(sw, shift), np.roll(sb, shift)
             if w_white > 0.0:
-                frame.white += w_white * sw
+                frame.white += w_white * s.white
             if w_blue > 0.0:
-                frame.blue  += w_blue * sb
+                frame.blue  += w_blue * s.blue
             frame.beam_lights += _beam_light_weights(w_white, w_blue) * s.beam_lights

@@ -1,5 +1,6 @@
-"""Tests for the Compositor — weighted blend of the composed look, the light_phase shift
-for spun-content layers, explicit resets, and the manual/debug override."""
+"""Tests for the Compositor — weighted blend of the composed look, explicit resets, and the
+manual/debug override. Nothing is rotated here: the projection offset lives in the light
+sender (see test_osc_light_protocol)."""
 
 import unittest
 from types import SimpleNamespace
@@ -14,14 +15,13 @@ RES = 8
 
 
 def config(**overrides) -> SimpleNamespace:
-    base = dict(light_resolution=RES, light_phase=0.0, debug=DebugLayer.OFF)
+    base = dict(light_resolution=RES, debug=DebugLayer.OFF)
     base.update(overrides)
     return SimpleNamespace(**base)
 
 
 class FakeLayer:
     """Writes a constant into the white channel; records resets."""
-    SHIFTED = False   # beam-mode fake; set True on instances standing in for HighLayers
 
     def __init__(self, value: float) -> None:
         self.value = value
@@ -84,21 +84,19 @@ class CompositorTest(unittest.TestCase):
         self.assertEqual(self.a.resets, 1)
         self.assertEqual(self.b.resets, 0)
 
-    def test_light_phase_shifts_only_spun_content(self) -> None:
+    def test_ring_content_is_not_rotated(self) -> None:
+        """The frame leaves the Compositor azimuth-true — a layer's pixel lands where it drew
+        it, so the board and the screen agree with the tracker row."""
         class Marker(FakeLayer):
             def render(self, frame: Frame) -> None:
                 frame.white[0] += 1.0
 
-        marker = Marker(1.0)
-        marker.SHIFTED = True             # stands in for a ProjectionLayer — rides the ring shift
-        lamp = Marker(1.0)
-        comp = Compositor(config(light_phase=0.25),
-                          {LayerId.test_pose_waves: marker, LayerId.searchlight: lamp})
+        comp = Compositor(config(), {LayerId.test_pose_waves: Marker(1.0)})
         f = frame()
-        comp.set_mix([(LayerId.test_pose_waves, 1.0), (LayerId.searchlight, 1.0)])
+        comp.set_mix([(LayerId.test_pose_waves, 1.0)])
         comp.render(f)
-        self.assertEqual(f.white[RES // 4], 1.0)   # spun content rolled by a quarter turn
-        self.assertEqual(f.white[0], 1.0)          # lamp content not rolled
+        self.assertEqual(f.white[0], 1.0)
+        self.assertEqual(float(f.white.sum()), 1.0)
 
     def test_debug_override_replaces_state_mix(self) -> None:
         # Selecting a layer IS turning debug on: the select replaces the state's mix solo.
@@ -128,12 +126,11 @@ class LampMappingTest(unittest.TestCase):
         self.assertEqual(float(f.light_img.sum()), 0.0)                   # a beam layer writes no pixels
 
 
-class BarLightMixTest(unittest.TestCase):
+class BeamLightMixTest(unittest.TestCase):
     """The Compositor weighs the beam lights per channel (white weight on the whites, blue
-    weight on the blues) and never ring-shifts them."""
+    weight on the blues)."""
 
-    class BarLayer:
-        SHIFTED = False
+    class BeamFakeLayer:
 
         def render(self, f: Frame) -> None:
             f.beam_lights += np.array([1.0, 0.5, 1.0, 0.5], dtype=np.float32)
@@ -142,31 +139,24 @@ class BarLightMixTest(unittest.TestCase):
             pass
 
     def test_per_channel_weights(self) -> None:
-        comp = Compositor(config(), {LayerId.playhead_test: self.BarLayer()})
+        comp = Compositor(config(), {LayerId.playhead_test: self.BeamFakeLayer()})
         f = frame()
         comp.set_mix([(LayerId.playhead_test, (0.5, 0.2))])
         comp.render(f)
         np.testing.assert_allclose(f.beam_lights, [0.5, 0.25, 0.2, 0.1], rtol=1e-6)
         self.assertEqual(float(f.light_img.sum()), 0.0)
 
-    def test_light_phase_leaves_bar_lights_alone(self) -> None:
-        comp = Compositor(config(light_phase=0.25), {LayerId.playhead_test: self.BarLayer()})
-        f = frame()
-        comp.set_mix([(LayerId.playhead_test, 1.0)])
-        comp.render(f)
-        np.testing.assert_allclose(f.beam_lights, [1.0, 0.5, 1.0, 0.5], rtol=1e-6)
-
-    def test_zero_weight_keeps_bar_lights_dark(self) -> None:
-        comp = Compositor(config(), {LayerId.playhead_test: self.BarLayer()})
+    def test_zero_weight_keeps_beam_lights_dark(self) -> None:
+        comp = Compositor(config(), {LayerId.playhead_test: self.BeamFakeLayer()})
         f = frame()
         comp.set_mix([(LayerId.playhead_test, 0.0)])
         comp.render(f)
         self.assertEqual(float(f.beam_lights.sum()), 0.0)
 
-    def test_regime_flags(self) -> None:
-        from apps.white_space.light import BeamLayer, ProjectionLayer
-        self.assertFalse(BeamLayer.SHIFTED)
-        self.assertTrue(ProjectionLayer.SHIFTED)
+    def test_mode_flags(self) -> None:
+        from apps.white_space.light import BeamLayer, ProjectionLayer, MotorMode
+        self.assertEqual(BeamLayer.MODE, MotorMode.BEAM)
+        self.assertEqual(ProjectionLayer.MODE, MotorMode.PROJECTION)
 
 
 if __name__ == "__main__":

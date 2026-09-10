@@ -83,7 +83,7 @@ class MotorSettings(BaseSettings):
     beam_rpm:             Field[float] = Field(72.0,   min=0.0, max=300.0,  step=1.0,  description="Target rpm in BEAM mode", newline=True)
     projection_rpm:       Field[float] = Field(2000.0, min=0.0, max=2400.0, step=1.0,  description="Target rpm in PROJECTION mode")
     measured_rpm:         Field[float] = Field(0.0,   min=0.0, max=FIXTURE_PROJECTION_RPM, step=0.01,  access=Field.READ, description="Current measured RPM", newline=True)
-    phase:                Field[float] = Field(0.0,   min=-math.pi, max=math.pi, step=0.001, access=Field.READ, widget=Widget.slider, description="Measured motor phase (−π…π)")
+    phase:                Field[float] = Field(0.0,   min=0.0, max=360.0, step=0.1, access=Field.READ, widget=Widget.slider, description="Measured motor phase since the sensor pulse (degrees)")
 
 
 class MotorController:
@@ -300,8 +300,8 @@ class MotorController:
         measured_rpm = measured if locked else 0.0
         phase        = phase if locked else float('nan')
 
-        # Publish the measurement to the read-back settings.
-        self._settings.phase        = phase if locked else 0.0
+        # Publish the measurement to the read-back settings (the panel reads degrees).
+        self._settings.phase        = math.degrees(phase) % 360.0 if locked else 0.0
         self._settings.measured_rpm = measured_rpm
         return MotorMeasurement(phase=phase, locked=locked, measured_rpm=measured_rpm,
                                 raw_rpm=raw_rpm, fall_age=fall_age)

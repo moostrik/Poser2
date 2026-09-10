@@ -105,10 +105,10 @@ class LevelWindowTest(unittest.TestCase):
 class ConfigMessageTest(unittest.TestCase):
     def setUp(self) -> None:
         self.settings = OscLightSenderSettings()
-        self.settings.offsets.white_0 = 0
-        self.settings.offsets.white_1 = 5
-        self.settings.offsets.blue_0 = -10
-        self.settings.offsets.blue_1 = 9
+        self.settings.interlace.white_0 = 0
+        self.settings.interlace.white_1 = 5
+        self.settings.interlace.blue_0 = -10
+        self.settings.interlace.blue_1 = 9
         self.messages = OscLightSender._build_config_messages(self.settings, 2000)
 
     def test_config_is_five_datagrams(self) -> None:
@@ -125,7 +125,7 @@ class ConfigMessageTest(unittest.TestCase):
         assert chunks is not None
         self.assertFalse([m for m in chunks if m.address.startswith(("/WS/o/", "/WS/r/"))])
 
-    def test_offset_value_lands_at_the_firmware_byte(self) -> None:
+    def test_interlace_value_lands_at_the_firmware_byte(self) -> None:
         """The firmware reads the int argument's low byte at `hdr[15]` as a signed char."""
         for message, expected in zip(self.messages, (0, 5, -10, 9)):
             self.assertEqual(len(message.dgram), 16)
@@ -139,8 +139,8 @@ class ConfigMessageTest(unittest.TestCase):
 
 class FixtureSlotTest(unittest.TestCase):
     """The fixture's readout mode follows the rpm sent with the frame: in beam mode it reads the
-    four beam lights from pixel 0 and the middle pixel of each channel and nothing else, in ring
-    mode it steps the ring and never reads a slot. The rebuild mirrors that exactly."""
+    four beam lights from pixel 0 and the middle pixel of each channel and nothing else, in
+    projection mode it steps the ring and never reads a slot. The rebuild mirrors that exactly."""
 
     LEVELS = {BeamLightId.FRONT_WHITE: 0.9, BeamLightId.BACK_WHITE: 0.6,
               BeamLightId.LEFT_BLUE: 0.4, BeamLightId.RIGHT_BLUE: 0.2}
@@ -160,31 +160,31 @@ class FixtureSlotTest(unittest.TestCase):
         assert messages is not None
         return [m.dgram[OSC_PREAMBLE:] for m in messages]
 
-    def test_slow_mode_puts_the_bar_lights_in_the_slots(self) -> None:
-        white, blue = OscLightSender._rebuild_fixture_pixels(self._lit_frame(), slow=True)
+    def test_beam_mode_puts_the_beam_lights_in_the_slots(self) -> None:
+        white, blue = OscLightSender._rebuild_fixture_pixels(self._lit_frame(), slow=True, shift=0)
         self.assertAlmostEqual(float(white[0]),         0.9, places=6)   # front white
         self.assertAlmostEqual(float(white[self.HALF]), 0.6, places=6)   # back white
         self.assertAlmostEqual(float(blue[0]),          0.4, places=6)   # left blue
         self.assertAlmostEqual(float(blue[self.HALF]),  0.2, places=6)   # right blue
         np.testing.assert_array_equal(white[1:self.HALF], _frame().white[1:self.HALF])   # the rest is the ring
 
-    def test_slow_mode_replaces_ring_content_at_the_slots(self) -> None:
+    def test_beam_mode_replaces_ring_content_at_the_slots(self) -> None:
         frame = self._lit_frame()
         frame.white[0], frame.blue[self.HALF] = 1.0, 1.0        # ring content the fixture never reads
-        white, blue = OscLightSender._rebuild_fixture_pixels(frame, slow=True)
+        white, blue = OscLightSender._rebuild_fixture_pixels(frame, slow=True, shift=0)
         self.assertAlmostEqual(float(white[0]), 0.9, places=6)
         self.assertAlmostEqual(float(blue[self.HALF]), 0.2, places=6)
 
-    def test_ring_mode_sends_the_ring_and_drops_the_bar_lights(self) -> None:
+    def test_projection_mode_sends_the_ring_and_drops_the_beam_lights(self) -> None:
         frame = self._lit_frame()
-        white, blue = OscLightSender._rebuild_fixture_pixels(frame, slow=False)
+        white, blue = OscLightSender._rebuild_fixture_pixels(frame, slow=False, shift=0)
         np.testing.assert_array_equal(white, frame.white)
         np.testing.assert_array_equal(blue, frame.blue)
 
     def test_rebuild_never_mutates_the_shared_frame(self) -> None:
         frame = self._lit_frame()
         before = frame.light_img.copy()
-        OscLightSender._rebuild_fixture_pixels(frame, slow=True)
+        OscLightSender._rebuild_fixture_pixels(frame, slow=True, shift=0)
         np.testing.assert_array_equal(frame.light_img, before)
 
     def test_wire_is_identical_to_the_baked_in_pixel_model(self) -> None:
@@ -196,10 +196,73 @@ class FixtureSlotTest(unittest.TestCase):
         explicit = self._lit_frame()
         self.assertEqual(self._bodies(explicit, slow=True), self._bodies(baked, slow=False))
 
-    def test_blackout_is_dark_in_slow_mode_too(self) -> None:
+    def test_blackout_is_dark_in_beam_mode_too(self) -> None:
         zero = Frame(RESOLUTION, Tick(0.0, 0.0))
         for body in self._bodies(zero, slow=True):
             self.assertEqual(body, bytes(FIRMWARE_CHUNK_SIZE))
+
+
+class ProjectionOffsetTest(unittest.TestCase):
+    """The projection offset is the fixture's ring alignment, so it is applied here — on the
+    way out — and never to the frame on the board. Beam mode is untouched by it: the firmware
+    indexes four fixed pixels there, so rotating them would move the lamps' levels."""
+
+    HALF = RESOLUTION // 2
+
+    @staticmethod
+    def _settings(degrees: float) -> OscLightSenderSettings:
+        settings = OscLightSenderSettings()
+        settings.projection_offset = degrees
+        return settings
+
+    @staticmethod
+    def _one_lit_pixel() -> Frame:
+        """A dark ring with a single lit pixel at azimuth 0 — the rotation is visible as a move."""
+        frame = Frame(RESOLUTION, Tick(0.0, 0.0))
+        frame.white[0], frame.blue[0] = 1.0, 1.0
+        return frame
+
+    def test_degrees_convert_to_whole_ring_pixels(self) -> None:
+        self.assertEqual(OscLightSender._projection_shift(self._settings(0.0)), 0)
+        self.assertEqual(OscLightSender._projection_shift(self._settings(90.0)), RESOLUTION // 4)
+        self.assertEqual(OscLightSender._projection_shift(self._settings(360.0)), 0)      # a full turn wraps
+        self.assertEqual(OscLightSender._projection_shift(self._settings(0.1)), 1)        # one pixel
+
+    def test_projection_mode_rotates_the_ring(self) -> None:
+        frame = self._one_lit_pixel()
+        shift = RESOLUTION // 4
+        white, blue = OscLightSender._rebuild_fixture_pixels(frame, slow=False, shift=shift)
+        self.assertAlmostEqual(float(white[shift]), 1.0, places=6)
+        self.assertAlmostEqual(float(blue[shift]),  1.0, places=6)
+        self.assertEqual(float(white[0]), 0.0)
+
+    def test_projection_mode_leaves_the_frame_alone(self) -> None:
+        frame = _frame()
+        before = frame.light_img.copy()
+        OscLightSender._rebuild_fixture_pixels(frame, slow=False, shift=RESOLUTION // 4)
+        np.testing.assert_array_equal(frame.light_img, before)
+
+    def test_beam_mode_slots_are_never_rotated(self) -> None:
+        frame = Frame(RESOLUTION, Tick(0.0, 0.0))
+        for light, level in ((BeamLightId.FRONT_WHITE, 0.9), (BeamLightId.BACK_WHITE, 0.6),
+                             (BeamLightId.LEFT_BLUE, 0.4), (BeamLightId.RIGHT_BLUE, 0.2)):
+            frame.beam_lights[light] = level
+        white, blue = OscLightSender._rebuild_fixture_pixels(frame, slow=True, shift=RESOLUTION // 4)
+        self.assertAlmostEqual(float(white[0]),         0.9, places=6)
+        self.assertAlmostEqual(float(white[self.HALF]), 0.6, places=6)
+        self.assertAlmostEqual(float(blue[0]),          0.4, places=6)
+        self.assertAlmostEqual(float(blue[self.HALF]),  0.2, places=6)
+
+    def test_the_burst_carries_the_rotation(self) -> None:
+        frame = self._one_lit_pixel()
+        settings = self._settings(90.0)
+        messages = OscLightSender._build_chunk_messages(
+            frame, settings, FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS, slow=False
+        )
+        assert messages is not None
+        body = b"".join(m.dgram[OSC_PREAMBLE:] for m in messages[:FIRMWARE_NUM_CHUNKS])
+        self.assertEqual(body[0], 0)                                  # nothing left at azimuth 0
+        self.assertGreater(body[RESOLUTION // 4], 0)                  # it moved a quarter turn
 
 
 class BlackoutTest(unittest.TestCase):

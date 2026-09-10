@@ -210,10 +210,10 @@ a calibration input — the playhead offset absorbs it.
 **Role**: the playhead is the content clock in both modes; in beam mode it is *also* the
 bar's heading as an azimuth, because the beams are where the bar points.
 
-**What sets it**: the **playhead offset** (`light.playhead.phase` today, 0–1 turn; intent:
-`playhead.pulse_offset` in degrees — the per-pose feature `PlayheadOffset` is a different thing in a
-different namespace). The playhead NCO tracks the measured motor phase while locked and adds
-the offset (`light/playhead.py`). Today: 0.73 turn = **263°**.
+**What sets it**: the **playhead offset**, `light.playhead.pulse_offset`, in degrees (the
+per-pose feature `PlayheadOffset` is a different thing in a different namespace). The playhead
+NCO tracks the measured motor phase while locked and adds it (`light/playhead.py`). Today:
+**262.8°**.
 
 **What depends on it** — the number with the widest reach:
 - `PlayheadOffset = azimuth − playhead` per pose (`pose/playhead_offset.py`): the flash
@@ -227,8 +227,8 @@ the offset (`light/playhead.py`). Today: 0.73 turn = **263°**.
 the offset until the flash fires exactly as the beam sweeps over them — equivalently
 `/pose/N/playhead/offset` reads 0 at the crossing. The flash, the hit and the sound all read
 the same offset, so this one adjustment aligns all three. The flash window is 11.5° wide in
-the preset, so the offset wants a 0.1° step (today's slider steps 3.6°). Re-tune after
-changing `beam_rpm`: the loop delay inside the offset scales with the speed.
+the preset and the slider steps 0.1°, one ring pixel. Re-tune after changing `beam_rpm`: the
+loop delay inside the offset scales with the speed.
 
 **Across a spin-up and a spin-down.** The playhead is never reset; only its *rate source*
 changes (`light/playhead.py`):
@@ -254,10 +254,10 @@ changes (`light/playhead.py`):
 **Role**: the ring — four strips painting one 3600-pixel image around the room.
 
 **What sets it**:
-- The **projection offset** (`light.light_phase` today, 0–1 turn; intent: degrees) — rotates
-  the whole ring image before it is sent (`layers/compositor.py`, every `ProjectionLayer`). It
-  absorbs the reflective line's position and the firmware's quarter turn; nobody needs to
-  know the 900. Today: 0.55 turn = **198°**.
+- The **projection offset**, `inout.osc_light_sender.projection_offset`, in degrees — rotates
+  the whole ring as it goes on the wire (`inout/osc_light_sender.py`, next to the interlace),
+  so the frame on the board stays azimuth-true. It absorbs the reflective line's position and
+  the firmware's quarter turn; nobody needs to know the 900. Today: **198°**.
 - The **interlace** values (`osc_light_sender.interlace`, see Theory). Preset: `white_1` 5,
   `blue_0` −10, `blue_1` 9, range ±10 px. The firmware boots with its own values (`cor2` 3, `cor1` 1);
   ours replace them on connect and once a second, so the firmware side is never where to tune.
@@ -324,15 +324,13 @@ stereo). No alignment; the lamps turn with the bar.
 
 Two simulations share the `ws_light` row and the render draws whichever matches the
 fixture's mode (`render/render.py`): the **beam view** in beam mode draws the four lamps at
-the playhead heading, an azimuth, so it lines up with the tracker row; the **ring view** in
-projection mode shows the ring buffer as it leaves the compositor, **after** the projection offset.
+the playhead heading; the **ring view** in projection mode shows the ring buffer as it leaves
+the compositor. Both are azimuth-true, because the projection offset is applied in the light
+sender and never touches the frame on the board.
 
-**Known inconsistency, not yet acted on**: the wall is azimuth-true and the ring view on
-screen is rotated by the projection offset (198°) relative to the beam view and the tracker
-row. The check needs no hardware: in projection mode the ring view's playhead line must sit
-under the beam view's front lamp and the tracker row's person. The candidate fix is to
-apply the rotation in the light sender next to the interlace, leaving the frame on the board
-azimuth-true; a decision for later.
+**The check** needs no hardware: in projection mode the ring view's playhead line must sit
+under the beam view's front lamp and the tracker row's person, and a spin-up must not move it.
+The screen shows the room's angles; only the wall shows what the fixture makes of them.
 
 ## Simulation
 
@@ -340,8 +338,7 @@ Nothing here applies to a simulated session, and no separate preset is needed. T
 describe the physical build; a recording carries its own frame. The show never compares a
 physical angle with anything — it compares a person's `Azimuth` from the recording with the
 playhead from the simulated motor, both in one frame — so the flash, the hit, the sound
-offsets and the beam view are self-consistent. The one visible trace of the missing room is
-the ring view's rotation (see Screen); a reason to resolve that, not to keep a second preset.
+offsets and both screen views are self-consistent.
 
 ---
 
@@ -376,25 +373,25 @@ and one-line instructions:
 | 3 projection | `projection_offset`, interlace `white_0/1`, `blue_0/1` | projection mode, `pose_instrument` (static line at the person) | "Same person; turn until the projected line is on them; adjust the interlace until it is single. Then a spin-up: the playhead line continues where the beam was." |
 | 4 speakers | `speaker_offset` | IDLE, Max voicing `/global/playhead` | "Speaker 0 on azimuth 0; the sound follows the beam." |
 
-**Units**: degrees for every *angle* an operator reads or turns, 0.1° step (one ring pixel):
-both offsets (today in turns, 3.6° a click), `speaker_offset`, and the playhead and
-motor-phase readouts (today in radians). Radians stay the internal and wire unit. The
-interlace is **not** an angle and stays in pixels: the firmware shifts a pixel index, an
-integer, one LED step at a time, so pixels are its true unit (1 px = 0.1° is a remark, not a
-conversion), and its ±10 px range stays.
+**Units**: degrees for every *angle* an operator reads or turns, 0.1° step (one ring pixel) —
+both offsets, the playhead and motor-phase readouts, and `speaker_offset` when it is built.
+Radians stay the internal and wire unit. The interlace is **not** an angle and stays in
+pixels: the firmware shifts a pixel index, an integer, one LED step at a time, so pixels are
+its true unit (1 px = 0.1° is a remark, not a conversion), and its ±10 px range stays.
 
 ## Open decisions
 
-- Names: `playhead.phase` → `playhead.pulse_offset`; `light_phase` → `projection_offset` (where it
-  lives — light settings or the sender — follows the ring-view decision); `offsets` →
-  `interlace`, the four lamp fields keep their names, their pixel unit and their ±10 range;
-  `speaker_offset` new.
 - ~~Rename the layers, the motor modes and the bar lights to beam/projection~~ — **done**:
   `BeamLayer` / `ProjectionLayer`, `light.beam_layers` / `light.projection_layers`,
   `searchlight`, `projection_playhead`, `MotorMode.BEAM` / `PROJECTION`, `beam_rpm` /
   `projection_rpm`, `FIXTURE_PROJECTION_RPM`, `BeamLightId` / `Frame.beam_lights`, and the
   render's beam view.
-- The ring view rotation (Screen).
+- ~~The two offsets in degrees, and the ring view's rotation~~ — **done**:
+  `light.playhead.pulse_offset` and `inout.osc_light_sender.projection_offset`, both degrees
+  with a 0.1° step; `offsets` → `interlace` (pixels, ±10, unchanged on the wire); the rotation
+  moved from the compositor to the light sender, so the frame on the board is azimuth-true and
+  both screen views agree with the tracker row. The wire bytes are unchanged.
+- `speaker_offset` for Max — not built yet (see Sound).
 - The mono pipeline to `THE_800_P` with `parallax.vfov` 79.5 — deferred until it can be
   tested with the cameras (`ring_radius` 0.36 can go in on its own).
 - **A placement aid for the cameras** (later): since placement *is* the room-side

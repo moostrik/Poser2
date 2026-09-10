@@ -314,12 +314,18 @@ class PlayheadNcoTest(unittest.TestCase):
         self.assertFalse(math.isnan(p.phase))                   # PROJECTION free-runs content (unmeasurable) → finite
 
     def test_offset_applied(self) -> None:
-        p = running_playhead(); p._settings.phase = 0.25; p._internal = 1.0   # 0.25 turn = π/2 rad
+        p = running_playhead(); p._settings.pulse_offset = 90.0; p._internal = 1.0   # 90° = π/2 rad
         self.assertAlmostEqual(wrap(p.phase - (1.0 + math.pi / 2)), 0.0, places=6)
+
+    def test_offset_readout_is_degrees(self) -> None:
+        p = running_playhead(); p._settings.pulse_offset = 90.0
+        p.tick(1 / 30, *mstate(0.0, True, 72.0))
+        self.assertTrue(0.0 <= p._settings.playhead <= 360.0)
+        self.assertAlmostEqual(p._settings.playhead, math.degrees(p.phase) % 360.0, places=3)
 
     def test_offset_constant_keeps_continuity(self) -> None:
         dt, rpm = 1 / 30, 72.0
-        p = running_playhead(); p._settings.phase = -0.33
+        p = running_playhead(); p._settings.pulse_offset = 360.0 - 118.8   # −0.33 turn
         gen = _advancing(rpm, dt)
         prev = p.phase
         for _ in range(100):
@@ -365,7 +371,7 @@ class ReacquireTest(unittest.TestCase):
             mp = next(gen)
             p.tick(dt, *mstate(mp, True, 72.0, mode=self.BEAM, beam_rpm=72.0))
         # Converges onto the measured phase (within ~1° — the speed EMA eases from the re-lock rpm to 72).
-        self.assertAlmostEqual(wrap(p.phase - p._settings.phase * TAU - mp), 0.0, delta=0.02)
+        self.assertAlmostEqual(wrap(p.phase - math.radians(p._settings.pulse_offset) - mp), 0.0, delta=0.02)
 
     def test_stale_content_speed_reading_does_not_relock(self) -> None:
         # Hardware spin-down: above the sensor ceiling the motor has no fresh falls and keeps reporting
@@ -439,12 +445,12 @@ class DebugOverrideTest(unittest.TestCase):
         m.set_mode(None)                                # machine relinquishes → STOPPED
         self.assertEqual(m._target_mode(), MotorMode.STOPPED)
 
-    def test_auto_follow_derives_regime_from_selection(self) -> None:
+    def test_auto_follow_derives_mode_from_selection(self) -> None:
         from types import SimpleNamespace
         from apps.white_space.light.conductor import _debug_motor_mode
         from apps.white_space.light import DebugLayer, LayerId
-        layers = {LayerId.test_pose_waves: SimpleNamespace(SHIFTED=True),    # ProjectionLayer
-                  LayerId.searchlight:    SimpleNamespace(SHIFTED=False)}   # BeamLayer
+        layers = {LayerId.test_pose_waves: SimpleNamespace(MODE=MotorMode.PROJECTION),
+                  LayerId.searchlight:    SimpleNamespace(MODE=MotorMode.BEAM)}
         self.assertEqual(_debug_motor_mode(DebugLayer.test_pose_waves, layers), MotorMode.PROJECTION)
         self.assertEqual(_debug_motor_mode(DebugLayer.searchlight, layers), MotorMode.BEAM)
         self.assertIsNone(_debug_motor_mode(DebugLayer.OFF, layers))         # debug disarmed
