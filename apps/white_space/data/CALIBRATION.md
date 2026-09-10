@@ -1,0 +1,427 @@
+# White Space — Calibration
+
+How the cameras, the machine in beam mode, the machine in projection mode and the sound come to
+agree on *where* something is. Companion to `STATES.md` (the choreography) and `LAYERS.md`
+(the layers). Everything here is code-verified unless marked **(site fact)** — told by the
+operator — or **(deduction)** — follows from the facts but was not checked on the hardware.
+All operator-facing angles in this document are **degrees, 0–360, counter-clockwise seen
+from above**; the code keeps radians inside and on the wire. **The fixture firmware is not
+changed**: everything here is modelled and corrected on the app side of the wire.
+
+---
+
+## Theory
+
+### One frame: azimuth
+
+Every position in the system is an **azimuth**, an angle around the room. There is exactly
+one azimuth frame and **the machine defines it: azimuth 0 is the centre of the connection
+side** of the cube (see *Fixed layout*). The fixture's two offsets are stated against that
+zero — the pulse offset is where the front lamp points, from the connection side, at the
+sensor pulse; the projection offset puts the ring's pixel 0 on the connection side — so both
+are properties of the build, tuned once and carried in the preset.
+
+In the code the frame is produced by the cameras:
+
+    azimuth = target_fov · cam_id + local_angle − fov_overlap        (modules/tracker/panoramic/geometry.py)
+
+so azimuth 0 is the start of camera 0's own sector, and there is deliberately **no camera
+offset**: the cameras are *placed* so that camera 0's sector starts at the connection side
+(the layout rule). Positioning the cameras with care is the whole of the room-side
+calibration, and it has to be done anyway; a knob for it would only invite skipping that.
+If the flash is ever off in a room, the fix is to move a camera, not to turn an offset.
+
+A person's bearing leaves the tracker as `Azimuth`; the playhead is an azimuth; every layer
+draws at an azimuth's strip position (`angle_to_strip_position`: azimuth / 360 × 3600
+pixels); every angle Max receives is an azimuth.
+
+### Direction
+
+The bar turns **counter-clockwise seen from above** (site fact). The firmware's ring counter
+advances with the bar and a strip index *is* that counter, so azimuth increases with the bar.
+On the camera side azimuth increases with the image column, and every camera has `flip_h`
+set (an `INIT` field), so the flip is part of the contract: with it, the columns must run
+counter-clockwise too, and the cameras are numbered counter-clockwise (deduction — the
+installation works, and an offset can shift a mirrored frame but never un-mirror it). A
+mirror is invisible with one person: one crossing per turn can always be phased in. The
+check for it needs two people, or one person walking along the sweep.
+
+### Two modes, two offsets
+
+The fixture puts light at an azimuth by two mechanisms, and both restart at the same
+reference: the **sensor pulse**, once per revolution, when a reflective line on the head
+passes the sensor.
+
+- **Beam mode** (the fixture at low speed — commanded below `FIXTURE_PROJECTION_RPM` = 200 rpm; the
+  firmware's one flag, `SLOW`, is true): you see the four lamps as beams sweeping the room.
+  The pulse says where the bar is, the **playhead** — the content clock, alive in both modes
+  — tracks it, and one number turns "angle since the pulse" into the front lamp's azimuth:
+  the **playhead offset**. It is observed in beam mode — the flash lands on a person — and it
+  contains whatever delay the loop has at that speed (pulse in, frame out), which is fine,
+  because it is tuned at the speed it runs at.
+- **Projection mode** (the fixture at high speed — commanded at or above 200 rpm, `SLOW`
+  false): the bar is a blur and the image is painted from the firmware's own counter,
+  restarted at the pulse, with a fixed quarter turn built in (`TEST = 900` px,
+  `firmware.cpp:18`, applied at `:277-280`). One number rotates the authored ring into the
+  counter's frame: the **projection offset**. It is observed in projection mode on static
+  content — a line drawn at a person's azimuth lands on the person.
+
+The playhead is the reference in both modes: in beam mode the front lamp beams it one to
+one, in projection mode the same playhead is drawn as a line over the other content
+(`projection_playhead`). It needs no offset of its own in projection mode, and the reason
+is worth knowing. Tuning the pulse offset makes the flash *land* on the person, so the
+internal playhead leads the visible beam by exactly the loop's output delay. The playhead is
+never reset at spin-up, so it keeps that lead; the projected line is drawn at the internal
+playhead and reaches the wall one output delay later — exactly where the beam would have
+been. The hit and the sound fire on the internal playhead in both modes, so their timing
+against the visible light is the same too. That is also why the projection offset must be
+tuned on static content and **not** on the moving playhead line: judged at the moment of the
+crossing, the line is one output delay behind, and tuning it onto the person would rotate the
+whole ring by that delay. (The firmware applies a frame on the next fast revolution, so the
+line may lag up to 30 ms more than the beam did — a degree or two, inside the flash window;
+deduction.) A spin-up is the check: the projected line must continue where the beam was.
+
+The two are independent and each is tuned where it is visible; there is no order between
+them. They sit at opposite ends of the pipeline for a reason: the playhead offset corrects a
+measurement **coming in** (the flash, the hit, the state machine and the sound all consume
+the result, so it is applied at the source); the projection offset corrects an image **going
+out** (nothing reads the rotated value back). For the record, the firmware ties them: the two
+offsets add up to a quarter turn plus the loop delay in beam mode. Today's values, 263° and
+198°, add up to 101°, an 11° delay term — about 50 ms at 36 rpm. A consistency check, not a
+step.
+
+The fixture switches between the two mechanisms on the **commanded** rpm the moment it
+receives it (`firmware.cpp:475`), regardless of how fast the bar is actually turning.
+
+### Interlacing: the two sides of the bar paint one image
+
+In projection mode each channel is painted twice per revolution: by the lamp on one end of the bar
+and, half a turn later, by the lamp on the other end reading the pixel 1800 further on
+(`firmware.cpp:277-280`). The two lamps are not copies of each other: their LEDs have gaps,
+and the two strips are mounted out of phase so that one arm's LEDs sit in the gaps of the
+other's (site fact) — the two halves of a revolution **interlace** into one image, the way
+the two fields of a television frame do. That only works if the two lamps are exactly 180°
+apart and the blue pair exactly a quarter turn from the white pair; a mounting error of a
+degree shows as a doubled line on the wall instead of an interlaced one. The four
+**interlace** values (`osc_light_sender.interlace`, one per lamp, sent as `/WS/o/0..3`,
+firmware `cor0..3`) shift each lamp's readout by a few pixels (1 px = 0.1°) so the two
+whites interlace, the two blues interlace, and the blue image sits on the white one.
+Projection mode only: the firmware ignores them below 200 rpm (`firmware.cpp:297-305`).
+
+### Sound inherits the frame
+
+Every position Max is sent is already an azimuth. Max cannot disagree with the cameras
+through anything in this repository; the only thing left is where speaker 0 stands relative
+to azimuth 0, which the fixed layout settles by placement. Max inherits the *timing* of the
+show from the playhead offset: the hit that starts INTRO is the beam crossing a person.
+
+---
+
+## Fixed layout: the connection side is the reference
+
+The machine's base is a cube holding the motor and the electronics, with every connection on
+one face — the **connection side** (site fact). It is the one physical reference the fixture
+carries everywhere, so the layout is defined from it. Drawing: `White Space Layout Sheet.pdf`
+in this folder (A the room, B the machine).
+
+- **Azimuth 0 is the centre of the connection side**, azimuth increasing counter-clockwise.
+- **Cameras on the corners**, pointing diagonally outward, 15 cm beyond the cube's corner
+  (lens ≈ 36 cm from the axis). **Camera 0 at the corner counter-clockwise of the connection
+  side**, then counter-clockwise. Camera *i* points at 90·*i* + 45; azimuth 0, the start of
+  camera 0's sector, then falls on the connection side. Every seam is a face centre. The
+  15 cm keeps the speakers out of frame: the nearest speaker corner is ≈ 76° off a camera's
+  axis, outside its 63.5° half-field.
+- **Speakers parallel to the faces, 10 cm off them**, pointing outward, not touching the
+  fixture (site fact). **Speaker 0 on the connection side**, then counter-clockwise. Speaker 0
+  stands on azimuth 0, so Max needs no constant.
+- **Everything numbered from 0**, counter-clockwise from the connection side: `cam_0`…,
+  `/pose/0`…, `white_0` / `blue_0`. (The firmware's comments count lamps from 1; internal.)
+
+        face:   spk 0 (az 0) — the connection side · seam cam 3 | cam 0    corner: cam 0 (→ 45)
+        face:   spk 1 (az 90)                     · seam cam 0 | cam 1    corner: cam 1 (→ 135)
+        face:   spk 2 (az 180)                    · seam cam 1 | cam 2    corner: cam 2 (→ 225)
+        face:   spk 3 (az 270)                    · seam cam 2 | cam 3    corner: cam 3 (→ 315)
+
+With four 127° cameras each sector is 90° and the overlap `fov_overlap` = 18.5° on each side
+of every seam. What the layout buys: the two offsets stop being per-venue tunings. The
+playhead offset encodes where the reflective line sits on the head relative to the front
+lamp (plus the loop delay); the projection offset encodes the same plus the firmware's quarter
+turn. Both are properties of the *build*. Assemble by the rule above — the cameras placed
+so that camera 0's sector starts at the connection side, speaker 0 on it — and **everything
+is calibrated by placement**; what remains are the checks at the end. Re-tune the offsets
+only after the head, a strip or a lens has been remounted; in a room, correct placement, not
+offsets.
+
+**Camera height, tilt and the inner circle.** The tripods stay at their 50 cm minimum so the
+cameras shade the light as little as possible (site fact; the light starts at 32 cm), lens
+≈ 50 cm up and 36 cm out. Tilted up about **15°** with the full 800 rows, a 1.9 m person's
+head is in frame from the **Ø 2.7 m** inner circle (site decision) and the feet from Ø 2.9 m;
+set by eye, 12–18° all work. With today's 720-row crop it takes 19° and the feet only appear
+from Ø 4.0 m — one reason to take the 800 rows (see Camera). Near the machine the fields do
+not meet: on each seam a person's centre is outside both cameras until 1.0 m out, so
+**Ø 2.0 m** is the hard floor. Between Ø 2.0 m and Ø 3.5 m a seam person is cut on one side in
+each camera and the box centre shifts toward the visible side, ≈ 3° at Ø 2.7 m — a wobble at
+the handover, not a failure.
+
+---
+
+## Camera
+
+**Role**: defines the azimuth frame. Nothing aligns the cameras; everything aligns to them.
+
+**The hardware** (Luxonis OAK-D Pro W): the app runs `color = false` and uses **the left mono
+camera only** (`modules/oak/camera/pipeline.py`, `SetupMono`): OV9282 W, global shutter,
+1280 × 800, lens **127° × 79.5°**. The 127° is the preset's `fov`. The pipeline requests
+`THE_720_P`, which keeps all columns and crops the rows to 720: horizontal field unchanged,
+vertical 71.6° — the preset's `parallax.vfov`. Switching to `THE_800_P` recovers the full
+79.5° (800 divides by 16 like 720; `parallax.vfov` moves to 79.5; the render's track row
+assumes 16:9 today; old 720-row recordings still play). The left lens sits 37.5 mm off the
+tripod thread: put the *lens* on the corner line. The mono sensors run at fixed exposure
+(`mono_auto_exposure = false`) with the 940 nm flood; they carry an IR filter and do not see
+the light show (site fact). Keep the dot projector off.
+
+**What sets it** (`camera.tracker`, `camera.fov`): `fov` (each camera owns
+`target_fov = 360 / num_cameras`, the excess is shared overlap); `distortion` (zero in the
+preset, and right — the lens is close to linear); `parallax` (`ring_radius` must match the
+lens distance from the axis, ≈ 0.36 m with the corner gap; the preset says 0.25;
+`person_height`, `vfov`); `seam` (tracklet handover in the overlap).
+
+**How to calibrate**: a person walks across a seam; adjust `fov` (and `distortion` if a seam
+still disagrees) until both cameras agree on the azimuth, then `parallax.ring_radius` until
+the handover does not jump. Cameras first — both offsets and the sound are tuned against
+the result.
+
+---
+
+## Motor and sensor
+
+The sensor pulses once per revolution when the reflective line on the head passes it; the
+firmware forwards it as `/WS/sensor/fall` (only while commanded below 200 rpm) and restarts
+its ring counter on it. `MotorController` measures phase and rpm from consecutive pulses
+(`light/motor.py`); the phase is raw, 0 = the pulse, offset-agnostic by design. Above 200 rpm
+the sensor is silent: the show anchors the spin-up on that silence (`ring_formed`) and the
+spin-down on the re-lock (`synced`), see STATES.md. Where the sensor or the line sit is not
+a calibration input — the playhead offset absorbs it.
+
+---
+
+## Beam mode (the fixture at low speed)
+
+**Role**: the playhead is the content clock in both modes; in beam mode it is *also* the
+bar's heading as an azimuth, because the beams are where the bar points.
+
+**What sets it**: the **playhead offset** (`light.playhead.phase` today, 0–1 turn; intent:
+`playhead.pulse_offset` in degrees — the per-pose feature `PlayheadOffset` is a different thing in a
+different namespace). The playhead NCO tracks the measured motor phase while locked and adds
+the offset (`light/playhead.py`). Today: 0.73 turn = **263°**.
+
+**What depends on it** — the number with the widest reach:
+- `PlayheadOffset = azimuth − playhead` per pose (`pose/playhead_offset.py`): the flash
+  layers fire on it, the sound receives it (`/pose/N/playhead/offset`).
+- The **hit** that starts INTRO is `PlayheadOffset` changing sign (`statemachine/machine.py`,
+  `_detect_hit`). A wrong offset fires the intro early or late.
+- The bar simulation on screen draws the four lamps at this heading.
+- Max receives it as `/global/playhead`.
+
+**How to calibrate**: beam mode (IDLE is fine). One person stands still. Adjust
+the offset until the flash fires exactly as the beam sweeps over them — equivalently
+`/pose/N/playhead/offset` reads 0 at the crossing. The flash, the hit and the sound all read
+the same offset, so this one adjustment aligns all three. The flash window is 11.5° wide in
+the preset, so the offset wants a 0.1° step (today's slider steps 3.6°). Re-tune after
+changing `beam_rpm`: the loop delay inside the offset scales with the speed.
+
+**Across a spin-up and a spin-down.** The playhead is never reset; only its *rate source*
+changes (`light/playhead.py`):
+
+- *Spin-up*: the playhead stops tracking the bar and free-runs at `beam_rpm` from wherever it
+  was. Nothing is lost — in projection mode the bar's own position is meaningless, the image
+  is painted from the counter. The beam at azimuth θ becomes the `projection_playhead` ring marker
+  at θ, continuing at the same rate; the projection offset makes the ring azimuth-true.
+  (What the wall shows *during* the acceleration is another matter — the fixture is already
+  in projection mode while the bar is still slow, see STATES.md.)
+- *Spin-down*: the bar decelerates unmeasured and lands at an angle unrelated to the content
+  clock. The playhead keeps free-running at `beam_rpm` until the sensor's readings settle near
+  `beam_rpm` (the two-stage re-lock gate), then `tracking` eases it onto the measured bar over
+  roughly 1 / `tracking` ticks. Up to half a turn of re-alignment is physics, not calibration.
+  The show hides it: S8/S9 keep the wall fading and exit only once the lock is in, so by the
+  time the beam is *seen* as a beam it is the tracked one. The screen's bar simulation does
+  the same.
+
+---
+
+## Projection mode (the fixture at high speed)
+
+**Role**: the ring — four strips painting one 3600-pixel image around the room.
+
+**What sets it**:
+- The **projection offset** (`light.light_phase` today, 0–1 turn; intent: degrees) — rotates
+  the whole ring image before it is sent (`layers/compositor.py`, every `ProjectionLayer`). It
+  absorbs the reflective line's position and the firmware's quarter turn; nobody needs to
+  know the 900. Today: 0.55 turn = **198°**.
+- The **interlace** values (`osc_light_sender.interlace`, see Theory). Preset: `white_1` 5,
+  `blue_0` −10, `blue_1` 9, range ±10 px. The firmware boots with its own values (`cor2` 3, `cor1` 1);
+  ours replace them on connect and once a second, so the firmware side is never where to tune.
+- `light.master` and the sender's `curve` / `lower_edge` / `upper_edge` — brightness, not
+  position.
+
+**The four lamps**, from the firmware's sampling offsets, relative to the front white in the
+bar's direction: back white +180°, `blue[0]` −90°, `blue[R/2]` +90°. This is what
+`BEAM_LIGHT_HEADINGS` (`light/frame.py`) encodes for the beam lights too. Standing at the
+fixture facing along the front beam, `blue[0]` is on the right; the code and the fixture's
+labels call it "left" (site fact), which reads from the wall looking *at* the fixture. Which
+physical strip is wired to `blue[0]` is a wiring fact — worth one look.
+
+**How to calibrate**: projection mode with a layer that draws *static* content at a person's
+azimuth — `pose_instrument` (its anchor line) or a test layer. One person stands still.
+Adjust the projection offset until that line is on them. Not the moving playhead line: it
+trails the internal playhead by the output delay (see Theory), and tuning on it would rotate
+the whole ring by that delay. Then the interlace, with any thin line: adjust until it is
+single on the wall, not doubled — the whites against each other, the blues against each
+other, then the blue image onto the white. Finally a spin-up: the projected playhead line
+must continue where the beam was.
+
+---
+
+## Layers
+
+**Beam layers** write the four beam lights by name — `front_white`, `back_white`, `left_blue`,
+`right_blue` on `Frame.beam_lights` — and nothing else (`layers/_base_layer.py`, `BeamLayer`;
+`BeamLayer` today). No calibration of their own: the lamp shines where the bar points, and
+where that is *as an azimuth* is the playhead. The sender copies the four values into the
+pixels the firmware reads in beam mode (pixel 0 and 1800 of each channel,
+`FIRMWARE_LIGHT_SLOT_TURNS`); the projection offset and the interlace provably cannot reach them.
+What a beam layer *does* depend on is `PlayheadOffset` when it reacts to people
+(`playhead_flash`, `playhead_haunted`).
+
+**Projection layers** draw the ring at azimuth strip positions — `pose_instrument` at each
+person's `Azimuth`, `projection_playhead` at the playhead (`ProjectionLayer`; `ProjectionLayer`
+today). No calibration of their own either: the compositor rotates the result by the
+projection offset on the way out and the sender applies the interlace.
+
+---
+
+## Sound (Max)
+
+Max spatialises over the four speakers (site fact). It receives, all azimuths produced here:
+`/global/playhead`, `/pose/N/azimuth`, `/pose/N/distance`, `/pose/N/playhead/offset`, plus
+the state (`inout/osc_sound_sender.py`, `modules/inout/osc_sound.py`). With speaker 0 on
+azimuth 0 and the speakers numbered counter-clockwise there is nothing to tune on the Max
+side. Check: in IDLE, have Max voice `/global/playhead`; the sound must follow the searchlight
+around the room.
+
+**Intent, not built**: a speaker stand is a fuzzy target, so keep one small correction on
+*our* side — `speaker_offset` in degrees (default 0), sent as its own message (e.g.
+`/global/speaker/offset`, radians on the wire like every azimuth), added by Max in its
+panner. Every azimuth Max receives stays true and the number travels with the preset.
+
+**The return path**: `/WS/sound/level` (left, right) → `sound_light` → the left and right
+blue lamps (site fact: named after the fixture's blue-left / blue-right; nothing to do with
+stereo). No alignment; the lamps turn with the bar.
+
+---
+
+## Screen (the render's light row)
+
+Two simulations share the `ws_light` row and the render draws whichever matches the
+fixture's mode (`render/render.py`): the **beam view** in beam mode draws the four lamps at
+the playhead heading, an azimuth, so it lines up with the tracker row; the **ring view** in
+projection mode shows the ring buffer as it leaves the compositor, **after** the projection offset.
+
+**Known inconsistency, not yet acted on**: the wall is azimuth-true and the ring view on
+screen is rotated by the projection offset (198°) relative to the beam view and the tracker
+row. The check needs no hardware: in projection mode the ring view's playhead line must sit
+under the beam view's front lamp and the tracker row's person. The candidate fix is to
+apply the rotation in the light sender next to the interlace, leaving the frame on the board
+azimuth-true; a decision for later.
+
+## Simulation
+
+Nothing here applies to a simulated session, and no separate preset is needed. The offsets
+describe the physical build; a recording carries its own frame. The show never compares a
+physical angle with anything — it compares a person's `Azimuth` from the recording with the
+playhead from the simulated motor, both in one frame — so the flash, the hit, the sound
+offsets and the beam view are self-consistent. The one visible trace of the missing room is
+the ring view's rotation (see Screen); a reason to resolve that, not to keep a second preset.
+
+---
+
+## Procedure
+
+1. **Cameras** — `fov`, `distortion`, `parallax.ring_radius`, `seam`: a person walks across a
+   seam until both cameras agree and the handover does not jump. First, always.
+2. **Playhead offset** — beam mode, one person stands still, the beam is on them as the
+   playhead crosses them (the flash).
+3. **Projection offset** — projection mode, the same person, a static line drawn at their
+   azimuth (`pose_instrument`) is on them — not the moving playhead line, which trails by the
+   output delay; then the interlace until the line is single; then a spin-up, the playhead
+   line continues where the beam was.
+4. **Speakers** — placed by the layout; nothing to tune. Listen in IDLE.
+
+Steps 2 and 3 in either order. **Re-check without re-tuning**: a spin-up — the projected
+line continues where the beam was; the flash on the first person at IDLE → INTRO; the sound
+on the beam.
+
+## Where the settings live
+
+No gathered calibration panel: camera calibration is involved enough to stay in the camera
+tab, and each offset stays with the code that applies it — the pulse offset with the
+playhead under `light`, the projection offset and the interlace with the sender under
+`inout`, `speaker_offset` with the sound sender. The steps above, with their settings, tools
+and one-line instructions:
+
+| step | settings | tool / readout | instruction |
+|---|---|---|---|
+| 1 cameras | `fov`, `distortion.*`, `parallax.*`, `seam.*` | tracker row, seam handover | "Walk across a seam; both cameras agree, no jump." |
+| 2 playhead | `playhead.pulse_offset` (with `tracking`, `speed_smoothing`) | beam mode, `playhead_flash`; `/pose/N/playhead/offset` live | "One person stands still; turn until the beam is on them at the crossing." |
+| 3 projection | `projection_offset`, interlace `white_0/1`, `blue_0/1` | projection mode, `pose_instrument` (static line at the person) | "Same person; turn until the projected line is on them; adjust the interlace until it is single. Then a spin-up: the playhead line continues where the beam was." |
+| 4 speakers | `speaker_offset` | IDLE, Max voicing `/global/playhead` | "Speaker 0 on azimuth 0; the sound follows the beam." |
+
+**Units**: degrees for every *angle* an operator reads or turns, 0.1° step (one ring pixel):
+both offsets (today in turns, 3.6° a click), `speaker_offset`, and the playhead and
+motor-phase readouts (today in radians). Radians stay the internal and wire unit. The
+interlace is **not** an angle and stays in pixels: the firmware shifts a pixel index, an
+integer, one LED step at a time, so pixels are its true unit (1 px = 0.1° is a remark, not a
+conversion), and its ±10 px range stays.
+
+## Open decisions
+
+- Names: `playhead.phase` → `playhead.pulse_offset`; `light_phase` → `projection_offset` (where it
+  lives — light settings or the sender — follows the ring-view decision); `offsets` →
+  `interlace`, the four lamp fields keep their names, their pixel unit and their ±10 range;
+  `speaker_offset` new.
+- ~~Rename the layers, the motor modes and the bar lights to beam/projection~~ — **done**:
+  `BeamLayer` / `ProjectionLayer`, `light.beam_layers` / `light.projection_layers`,
+  `searchlight`, `projection_playhead`, `MotorMode.BEAM` / `PROJECTION`, `beam_rpm` /
+  `projection_rpm`, `FIXTURE_PROJECTION_RPM`, `BeamLightId` / `Frame.beam_lights`, and the
+  render's beam view.
+- The ring view rotation (Screen).
+- The mono pipeline to `THE_800_P` with `parallax.vfov` 79.5 — deferred until it can be
+  tested with the cameras (`ring_radius` 0.36 can go in on its own).
+- **A placement aid for the cameras** (later): since placement *is* the room-side
+  calibration, it deserves a good way of doing it — probably projection layers that put
+  the sector boundaries and centres on the wall so each camera can be aimed against them,
+  and a readout that says where a person at the connection side lands. Out of scope for now.
+
+## Site facts
+
+    reference:    the connection side of the cube                              (site fact)
+    direction:    counter-clockwise seen from above                            (site fact)
+    azimuth 0:    the centre of the connection side                            (rule — follows from the cameras)
+    cameras:      on the corners, 15 cm beyond the cube, pointing diagonally;
+                  camera 0 at the corner counter-clockwise of the connection
+                  side, then counter-clockwise; lens ≈ 50 cm up, ≈ 15° up      (rule)
+    speakers:     parallel to the faces, 10 cm off, pointing out; speaker 0
+                  on the connection side, then counter-clockwise               (rule)
+    play zone:    Ø 2.7 m to Ø 7 m; hard floor Ø 2.0 m                          (site decision)
+    room:         8 × 8 m, machine in the middle                                (site fact)
+    fixture:      cube 25 × 25 × 28 cm; rings Ø 25 / Ø 20 × 3.5 cm; tube Ø 20 × 154 cm;
+                  head 9 × 9 cm; light from ≈ 32 cm                            (site fact)
+    speakers:     25 × 25 × 33 cm, centres 35 cm from the axis                  (site fact)
+    camera:       OAK-D Pro W left mono, 127° × 79.5°; 10 × 3.5 × 3.5 cm body on a
+                  50 cm tripod; IR filter, does not see the light               (spec / site fact)
+    drawing:      "White Space Layout Sheet.pdf", two A3 pages, to scale
+    blue[0]:      wired to the strip labelled "blue left" / "blue right"       (confirm)
+    playhead offset for this build:   263° (0.73 turn)                         (tuned — re-check with the flash)
+    projection offset for this build: 198° (0.55 turn)                         (tuned — re-check with the projected line)
+    interlace:    white_1 +5, blue_0 −10, blue_1 +9 px                          (tuned)
+    LED strips:   the two arms' LEDs are mounted out of phase and interlace     (site fact)
