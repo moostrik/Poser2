@@ -12,10 +12,10 @@ import numpy as np
 from modules.board import SoundLevels
 from modules.pose import features
 
-from apps.white_space.light import Tick, BarLightId
+from apps.white_space.light import Tick, BeamLightId
 from apps.white_space.light.frame import Frame
-from apps.white_space.light.layers.low.sound_light import SoundLight, SoundLightSettings, SoundFallback
-from apps.white_space.light.layers.high.pose_instrument import (
+from apps.white_space.light.layers.beam.sound_light import SoundLight, SoundLightSettings, SoundFallback
+from apps.white_space.light.layers.projection.pose_instrument import (
     PoseInstrument, PoseInstrumentSettings, LineMotion, LineFlow,
     _signed_offset, _segment_counts, _line_distance, _between_distance)
 
@@ -48,10 +48,10 @@ class SoundLightTest(unittest.TestCase):
         self._fresh(0.8, 0.3)
         f = frame()
         self.layer.render(f)
-        self.assertAlmostEqual(f.bar_lights[BarLightId.LEFT_BLUE],  0.8, places=5)
-        self.assertAlmostEqual(f.bar_lights[BarLightId.RIGHT_BLUE], 0.3, places=5)
-        self.assertEqual(float(f.bar_lights[BarLightId.FRONT_WHITE]), 0.0)   # whites untouched
-        self.assertEqual(float(f.bar_lights[BarLightId.BACK_WHITE]),  0.0)
+        self.assertAlmostEqual(f.beam_lights[BeamLightId.LEFT_BLUE],  0.8, places=5)
+        self.assertAlmostEqual(f.beam_lights[BeamLightId.RIGHT_BLUE], 0.3, places=5)
+        self.assertEqual(float(f.beam_lights[BeamLightId.FRONT_WHITE]), 0.0)   # whites untouched
+        self.assertEqual(float(f.beam_lights[BeamLightId.BACK_WHITE]),  0.0)
         self.assertEqual(float(f.light_img.sum()), 0.0)                       # no pixels written
 
     def test_gain_scales(self) -> None:
@@ -60,7 +60,7 @@ class SoundLightTest(unittest.TestCase):
         self._fresh(0.8, 0.4)
         f = frame()
         self.layer.render(f)
-        self.assertAlmostEqual(f.bar_lights[BarLightId.LEFT_BLUE], 0.4, places=5)
+        self.assertAlmostEqual(f.beam_lights[BeamLightId.LEFT_BLUE], 0.4, places=5)
 
     def test_smoothing_window_bridges_jitter(self) -> None:
         self.cfg.smoothing_frames = 2
@@ -69,20 +69,20 @@ class SoundLightTest(unittest.TestCase):
         self._fresh(0.0, 0.0)
         f = frame()
         self.layer.render(f)                                  # average of the last 2 frames
-        self.assertAlmostEqual(f.bar_lights[BarLightId.LEFT_BLUE], 0.5, places=5)
+        self.assertAlmostEqual(f.beam_lights[BeamLightId.LEFT_BLUE], 0.5, places=5)
 
     def test_stale_input_off_fallback(self) -> None:
         self.board.levels = SoundLevels(left=1.0, right=1.0, timestamp=monotonic() - 60.0)
         f = frame()
         self.layer.render(f)
-        self.assertEqual(float(f.bar_lights.sum()), 0.0)      # never freezes at a stuck level
+        self.assertEqual(float(f.beam_lights.sum()), 0.0)      # never freezes at a stuck level
 
     def test_stale_input_pulse_fallback(self) -> None:
         self.cfg.fallback = SoundFallback.PULSE
         self.board.levels = SoundLevels()                      # never received
         f = frame(time=1.25)                                   # quarter period of the 0.2 Hz pulse
         self.layer.render(f)
-        left, right = f.bar_lights[BarLightId.LEFT_BLUE], f.bar_lights[BarLightId.RIGHT_BLUE]
+        left, right = f.beam_lights[BeamLightId.LEFT_BLUE], f.beam_lights[BeamLightId.RIGHT_BLUE]
         self.assertGreater(left, 0.0)
         self.assertAlmostEqual(left, right, places=5)
         self.assertLessEqual(left, self.cfg.fallback_level + 1e-6)
@@ -95,18 +95,18 @@ class WindDownTest(unittest.TestCase):
     pixels; progress is the readout."""
 
     def setUp(self) -> None:
-        from apps.white_space.light.layers.low.wind_down import WindDown, WindDownSettings
+        from apps.white_space.light.layers.beam.wind_down import WindDown, WindDownSettings
         self.cfg = WindDownSettings()
         self.layer = WindDown(RES, self.cfg, board=None)
 
     def _wall(self) -> float:
         f = frame()
         self.layer.render(f)
-        self.assertAlmostEqual(f.bar_lights[BarLightId.FRONT_WHITE],
-                               f.bar_lights[BarLightId.BACK_WHITE], places=6)   # both whites alike
-        self.assertEqual(float(f.bar_lights[BarLightId.LEFT_BLUE]), 0.0)
+        self.assertAlmostEqual(f.beam_lights[BeamLightId.FRONT_WHITE],
+                               f.beam_lights[BeamLightId.BACK_WHITE], places=6)   # both whites alike
+        self.assertEqual(float(f.beam_lights[BeamLightId.LEFT_BLUE]), 0.0)
         self.assertEqual(float(f.light_img.sum()), 0.0)                        # no pixels written
-        return float(f.bar_lights[BarLightId.FRONT_WHITE])
+        return float(f.beam_lights[BeamLightId.FRONT_WHITE])
 
     def test_timed_fade_reaches_zero(self) -> None:
         self.cfg.spin_down_seconds = 1.0

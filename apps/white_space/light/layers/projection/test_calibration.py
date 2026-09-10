@@ -19,7 +19,7 @@ import numpy as np
 from modules.settings import Field
 from modules.tracker.panoramic.settings import DistortionSettings, DistortAlgorithm
 
-from .._base_layer import HighLayer, LayerSettings
+from .._base_layer import ProjectionLayer, LayerSettings
 from ...frame import Frame
 
 if TYPE_CHECKING:
@@ -50,7 +50,7 @@ class CameraLightSettings(LayerSettings):
     fov:           Field[float]        = Field(110.0, min=60.0, max=180.0, step=0.5,  description="Camera horizontal FOV (shared from compositor)", access=Field.READ)
 
 
-class CameraLight(HighLayer):
+class CameraLight(ProjectionLayer):
     """Projects horizontal camera slices onto the LED strip for distortion calibration."""
 
     def __init__(

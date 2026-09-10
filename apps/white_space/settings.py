@@ -53,8 +53,8 @@ class Layers(IntEnum):
     poser        = auto()
     # WS visualization
     ws_tracker   = auto()
-    ws_light     = auto()   # the ring (fixture in ring mode)
-    ws_bar       = auto()   # the bar's four lights (fixture in slot mode); shares ws_light's row
+    ws_light     = auto()   # the ring (fixture in projection mode)
+    ws_beam       = auto()   # the bar's four lights (fixture in beam mode); shares ws_light's row
     # data
     data_W       = auto()
     data_F       = auto()
@@ -293,10 +293,10 @@ class PlayheadDataLayerSettings(BaseSettings):
     use_history_color: Field[bool]                = Field(False)
 
 
-class BarLightSimSettings(BaseSettings):
-    """The render's simulation of the bar at low speed: the four bar lights as lines on the
-    walls (drawn while the fixture is in slot mode)."""
-    beam: Field[float] = Field(15.0, min=0.0, max=90.0, step=0.5, description="Solid width of a bar light's line on the wall (deg)")
+class BeamLightSimSettings(BaseSettings):
+    """The render's simulation of the bar in beam mode: the four beam lights as lines on the
+    walls."""
+    width: Field[float] = Field(15.0, min=0.0, max=90.0, step=0.5, description="Solid width of a beam light's line on the wall (deg)")
     blur: Field[float] = Field(6.0,  min=0.0, max=45.0, step=0.5, description="Soft falloff on each side of the line (deg); 0 = a hard edge")
 
 
@@ -307,7 +307,7 @@ class RenderSettings(BaseSettings):
     data_time:   Group[_MTimeSettings]      = Group(_MTimeSettings)
     data:        Group[_DataLayerSettings]  = Group(_DataLayerSettings)
     playhead_data: Group[PlayheadDataLayerSettings] = Group(PlayheadDataLayerSettings)
-    bar_light_sim: Group[BarLightSimSettings] = Group(BarLightSimSettings)
+    beam_light_sim: Group[BeamLightSimSettings] = Group(BeamLightSimSettings)
     colors:      Group[ColorSettings]       = Group(ColorSettings)
     window:      Group[WindowSettings]      = Group(WindowSettings)
 

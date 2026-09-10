@@ -82,7 +82,7 @@ class StateMachineSettings(BaseSettings):
 
     # Transition-state durations — one per state. spin_down_seconds is shared (via the
     # root) into the wind_down layer, which runs the S9/S10 wall fade on it; those states'
-    # exit is one playhead bar after the motor re-locks at LOW.
+    # exit is one playhead bar after the motor re-locks at BEAM.
     spin_up_seconds:       Field[float] = Field(14.0, min=1.0, max=60.0,  step=0.5, description="INTRO_PLAY: spin-up transition (seconds) — hand-tuned to the physical spin-up (spin_down_seconds' mirror)", newline=True)
     spin_down_seconds:     Field[float] = Field(10.0, min=1.0, max=60.0,  step=0.5, description="END_INTRO/END_IDLE: wall fade towards the line (seconds) — hand-tuned to the physical spin-down (drives the wind_down layer)")
     off_idle_bars:         Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="OFF_IDLE: wake fade from dark, in playhead bars", newline=True)

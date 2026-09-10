@@ -1,4 +1,4 @@
-"""PlayheadHaunted — the low-speed player/ghost flash (a debug/experimentation layer,
+"""PlayheadHaunted — the beam-mode player/ghost flash (a debug/experimentation layer,
 never in a state's mix; pairs with ``pose.ghoster.enabled`` for solo ghost sessions).
 
 WHITE (front-lamp) channel: a flash as the rotating playhead crosses each live player (at full
@@ -23,7 +23,7 @@ import numpy as np
 
 from modules.settings import Field
 
-from .._base_layer import LowLayer, LayerSettings
+from .._base_layer import BeamLayer, LayerSettings
 from .playhead_flash import offset_to_level
 from ...frame import Frame
 from ....pose import GhostElement, GhostFeature, GhostStateValue, PlayheadOffset, ghost_state
@@ -60,7 +60,7 @@ class PlayheadHauntedSettings(LayerSettings):
     ghosts:     Field[bool]  = Field(True, description="Enable ghost flashes")
 
 
-class PlayheadHaunted(LowLayer):
+class PlayheadHaunted(BeamLayer):
     """White flash as the playhead crosses each live player (full ``white``) and each **active** ghost
     (dimmed by Fade), plus a blue flash a quarter-turn later for each **verified** passive ghost (Dwell
     & Motion both 1). Ghost flashes are gated by ``ghosts``."""
@@ -80,7 +80,7 @@ class PlayheadHaunted(LowLayer):
         self._prev_ghost.clear()
         self._prev_blue.clear()
 
-    def _draw(self, frame: Frame, bar_lights: np.ndarray) -> None:
+    def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
         P = self._config
         centre: float = _PHASE_OFFSET * math.tau   # blue fires 0.25 turn past the passive ghost
         half_rad: float = math.radians(P.width / 2.0)
@@ -136,4 +136,4 @@ class PlayheadHaunted(LowLayer):
         self._prev_live, self._prev_ghost, self._prev_blue = prev_live, prev_ghost, prev_blue
 
         # Constant front-lamp floor brightened by the white flash; the blue flash on the left lamp.
-        self._add_bar_lights(bar_lights, front_white=P.base_white + flash_white, left_blue=flash_blue)
+        self._add_beam_lights(beam_lights, front_white=P.base_white + flash_white, left_blue=flash_blue)

@@ -1,4 +1,4 @@
-"""Tests for the show StateMachine — the CSV transition graph in both regimes,
+"""Tests for the show StateMachine — the CSV transition graph in both modes,
 participant debounce, bar-denominated durations, goto/hold, motor commands, and looks."""
 
 import unittest
@@ -32,7 +32,7 @@ class FakeBoard:
     def __init__(self) -> None:
         self.tracklets: dict[int, FakeTracklet] = {}
         self.bars: float = 0.0
-        self.synced: bool = False        # playhead re-locked at LOW (motor lock)
+        self.synced: bool = False        # playhead re-locked at BEAM (motor lock)
         self.ring_formed: bool = False   # bar blurred into the ring (un-lock)
         self.frames: dict[int, FakeFrame] = {}
 
@@ -109,7 +109,7 @@ class StateMachineTest(unittest.TestCase):
     def boot(self) -> None:
         """Power on and wake into IDLE: the machine boots into OFF, the (fake) playhead
         locks, OFF hands over to the wake, and the wake's bar completes. The lock stays
-        asserted afterwards — IDLE is locked at LOW."""
+        asserted afterwards — IDLE is locked at BEAM."""
         self.board.synced = True
         self.tick()                                             # OFF, locked → OFF_IDLE
         self.tick(dbar=self.config.off_idle_bars + 0.1)         # wake complete → IDLE
@@ -118,16 +118,16 @@ class StateMachineTest(unittest.TestCase):
     # -- startup ------------------------------------------------------------
 
     def test_first_tick_boots_into_off_and_commands_low(self) -> None:
-        # Boot failsafe #1: the show starts dark at LOW, never in a lit or HIGH state.
+        # Boot failsafe #1: the show starts dark at BEAM, never in a lit or PROJECTION state.
         self.tick()
         self.assertEqual(self.current, StateId.OFF)
-        self.assertEqual(self.motors, [MotorMode.LOW])
+        self.assertEqual(self.motors, [MotorMode.BEAM])
         self.assertEqual(self.mixes[-1], [])
         self.assertEqual(self.emitted[-1].stage, 0)
 
     def test_boot_waits_for_the_lock(self) -> None:
         # Booting is the same wake as a blackout release, gated on the physics: OFF holds
-        # until the playhead has locked at LOW, then fades in through OFF_IDLE.
+        # until the playhead has locked at BEAM, then fades in through OFF_IDLE.
         self.tick()
         self.tick(dt=999.0, dbar=50.0)                          # time and bars alone: still dark
         self.assertEqual(self.current, StateId.OFF)
@@ -140,13 +140,13 @@ class StateMachineTest(unittest.TestCase):
 
     def test_startup_ignores_persisted_select(self) -> None:
         # Failsafe: a preset saved mid-show (select = PLAY) must never boot into a
-        # HIGH-motor state — the show always starts in OFF; select is only the goto target.
+        # PROJECTION-motor state — the show always starts in OFF; select is only the goto target.
         self.config.manual.select = StateId.PLAY
         self.config.manual.hold = True          # isolate the boot state from conditions
         self.board.synced = True
         self.tick()
         self.assertEqual(self.current, StateId.OFF)
-        self.assertEqual(self.motors, [MotorMode.LOW])
+        self.assertEqual(self.motors, [MotorMode.BEAM])
 
     # -- the stand-alone CSV graph -------------------------------------------
 
@@ -171,7 +171,7 @@ class StateMachineTest(unittest.TestCase):
         self.set_participants(0)
         self.assertEqual(self.current, StateId.INTRO_IDLE)
         # Arrived from IDLE_INTRO (already bright): both channels ramp from 1.0 — no dip/blink
-        self.assertEqual(self.mixes[-1], [(LayerId.playhead_low, 1.0), (LayerId.sound_light, 1.0)])
+        self.assertEqual(self.mixes[-1], [(LayerId.searchlight, 1.0), (LayerId.sound_light, 1.0)])
         self.tick(dbar=self.config.intro_idle_bars + 0.1)
         self.assertEqual(self.current, StateId.IDLE)
 
@@ -214,9 +214,9 @@ class StateMachineTest(unittest.TestCase):
             0: FakeSimilarity(0.9), 1: FakeSimilarity(0.8), 2: FakeSimilarity(0.9)}))
         self.tick()
         self.assertEqual(self.current, StateId.INTRO_PLAY)
-        self.assertEqual(self.motors[-1], MotorMode.HIGH)
+        self.assertEqual(self.motors[-1], MotorMode.PROJECTION)
         # Still physically lamps: the dim line holds unchanged from INTRO.
-        self.assertEqual(self.mixes[-1], [(LayerId.playhead_low, 0.4)])
+        self.assertEqual(self.mixes[-1], [(LayerId.searchlight, 0.4)])
         # The ring forms → hard mix: instrument (white full, blue easing) + playhead line.
         self.board.ring_formed = True
         self.tick()
@@ -224,16 +224,16 @@ class StateMachineTest(unittest.TestCase):
         white, blue = mix[LayerId.pose_instrument]
         self.assertEqual(white, 1.0)                          # hard
         self.assertLess(blue, 1.0)                            # easing in from the un-lock
-        self.assertEqual(mix[LayerId.playhead_high], 1.0)
-        self.assertNotIn(LayerId.playhead_low, mix)
+        self.assertEqual(mix[LayerId.projection_playhead], 1.0)
+        self.assertNotIn(LayerId.searchlight, mix)
         self.tick(dt=self.config.spin_up_seconds)
         self.assertEqual(self.current, StateId.PLAY)
         self.assertEqual(self.mixes[-1], [(LayerId.pose_instrument, 1.0),
-                                          (LayerId.playhead_high, 1.0)])
+                                          (LayerId.projection_playhead, 1.0)])
 
     def _to_play(self) -> None:
         self.test_intro_to_intro_play_on_sync_and_through_to_play()
-        self.board.synced = False       # HIGH: the sweep free-runs, the LOW lock is gone
+        self.board.synced = False       # PROJECTION: the sweep free-runs, the BEAM lock is gone
 
     def test_play_to_end_and_end_idle(self) -> None:
         self._to_play()
@@ -243,13 +243,13 @@ class StateMachineTest(unittest.TestCase):
         for _ in range(4):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_IDLE)
-        self.assertEqual(self.motors[-1], MotorMode.LOW)
+        self.assertEqual(self.motors[-1], MotorMode.BEAM)
         self.tick(dt=999.0)                            # time alone never exits a spin-down
         self.assertEqual(self.current, StateId.END_IDLE)
-        self.board.synced = True                       # LOW reacquired — but the fade is not done
+        self.board.synced = True                       # BEAM reacquired — but the fade is not done
         self.tick()
         self.assertEqual(self.current, StateId.END_IDLE)
-        self.light.low_layers.wind_down.progress = 1.0   # fade complete + lock → hand over
+        self.light.beam_layers.wind_down.progress = 1.0   # fade complete + lock → hand over
         self.tick()
         self.assertEqual(self.current, StateId.IDLE)
 
@@ -261,7 +261,7 @@ class StateMachineTest(unittest.TestCase):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_INTRO)
         self.board.synced = True
-        self.light.low_layers.wind_down.progress = 1.0
+        self.light.beam_layers.wind_down.progress = 1.0
         self.tick()                                    # fade complete + lock → hand over
         self.assertEqual(self.current, StateId.INTRO)
 
@@ -275,13 +275,13 @@ class StateMachineTest(unittest.TestCase):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_INTRO)
         self.assertIn([LayerId.wind_down], self.resets)          # fade restarted at the full wall
-        self.assertEqual(self.mixes[-1], [(LayerId.wind_down, 1.0), (LayerId.playhead_low, 0.4)])
-        self.light.low_layers.wind_down.progress = 0.5                # the layer's fade readout
+        self.assertEqual(self.mixes[-1], [(LayerId.wind_down, 1.0), (LayerId.searchlight, 0.4)])
+        self.light.beam_layers.wind_down.progress = 0.5                # the layer's fade readout
         self.tick()
         self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.5)
         self.tick(dt=999.0, dbar=5.0)                  # time and bars alone never exit
         self.assertEqual(self.current, StateId.END_INTRO)
-        self.light.low_layers.wind_down.progress = 1.0                # fade complete — but no lock yet
+        self.light.beam_layers.wind_down.progress = 1.0                # fade complete — but no lock yet
         self.tick(dbar=2.0)
         self.assertEqual(self.current, StateId.END_INTRO)
         self.board.synced = True                       # lock + fade complete → hand over
@@ -295,9 +295,9 @@ class StateMachineTest(unittest.TestCase):
         for _ in range(4):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_IDLE)
-        self.light.low_layers.wind_down.progress = 0.25
+        self.light.beam_layers.wind_down.progress = 0.25
         self.tick()
-        self.assertEqual(self.mixes[-1], [(LayerId.wind_down, 1.0), (LayerId.playhead_low, 1.0),
+        self.assertEqual(self.mixes[-1], [(LayerId.wind_down, 1.0), (LayerId.searchlight, 1.0),
                                           (LayerId.sound_light, 0.25)])
 
     def test_end_winds_back_to_play_never_jumps(self) -> None:
@@ -342,12 +342,12 @@ class StateMachineTest(unittest.TestCase):
     def test_blackout_pins_off_from_anywhere(self) -> None:
         # Pinning blackout is OFF's entry door: pin → OFF immediately (dark strip,
         # /global/state 0), and OFF stays put while pinned. Dark and silent, but the
-        # rotor keeps sweeping at LOW so the playhead never unlocks.
+        # rotor keeps sweeping at BEAM so the playhead never unlocks.
         self._to_play()
         self.config.blackout = True
         self.tick()
         self.assertEqual(self.current, StateId.OFF)
-        self.assertEqual(self.motors[-1], MotorMode.LOW)      # still sweeping — no re-acquire
+        self.assertEqual(self.motors[-1], MotorMode.BEAM)      # still sweeping — no re-acquire
         self.assertEqual(self.mixes[-1], [])                  # dark strip
         self.assertEqual(self.emitted[-1].stage, 0)           # /global/state 0 = off
         self.set_participants(3)                              # presence alone never leaves OFF
@@ -364,11 +364,11 @@ class StateMachineTest(unittest.TestCase):
         # lands in IDLE — even with people present (the graph re-introduces them).
         self._to_play()                                       # 3 participants present
         self._to_off()
-        self.board.synced = True                              # spun down to LOW and re-locked
+        self.board.synced = True                              # spun down to BEAM and re-locked
         self.config.blackout = False
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)
-        self.assertEqual(self.motors[-1], MotorMode.LOW)
+        self.assertEqual(self.motors[-1], MotorMode.BEAM)
         self.tick(dbar=self.config.off_idle_bars + 0.1)
         self.assertEqual(self.current, StateId.IDLE)
 
@@ -394,9 +394,9 @@ class StateMachineTest(unittest.TestCase):
             self.assertAlmostEqual(weight, 0.0, places=6)     # still dark on entry
         self.tick(dbar=self.config.off_idle_bars / 2)
         mix = dict(self.mixes[-1])
-        self.assertGreater(mix[LayerId.playhead_low], 0.0)    # searchlight fading up
-        self.assertLess(mix[LayerId.playhead_low], 1.0)
-        self.assertEqual(mix[LayerId.playhead_low], mix[LayerId.sound_light])
+        self.assertGreater(mix[LayerId.searchlight], 0.0)    # searchlight fading up
+        self.assertLess(mix[LayerId.searchlight], 1.0)
+        self.assertEqual(mix[LayerId.searchlight], mix[LayerId.sound_light])
 
     def test_hit_mid_wake_goes_straight_to_intro(self) -> None:
         self.boot()
@@ -443,7 +443,7 @@ class StateMachineTest(unittest.TestCase):
         self.config.manual.hold = True
         self.goto(StateId.OFF)
         self.assertEqual(self.current, StateId.OFF)
-        self.assertEqual(self.motors[-1], MotorMode.LOW)
+        self.assertEqual(self.motors[-1], MotorMode.BEAM)
         self.config.manual.hold = False
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)      # unpinned → wakes right out
@@ -465,7 +465,7 @@ class StateMachineTest(unittest.TestCase):
         self.config.manual.hold = True          # park on the state (goto + hold workflow)
         self.goto(StateId.PLAY)
         self.assertEqual(self.current, StateId.PLAY)
-        self.assertEqual(self.motors[-1], MotorMode.HIGH)
+        self.assertEqual(self.motors[-1], MotorMode.PROJECTION)
 
     def test_goto_without_hold_keeps_evaluating_conditions(self) -> None:
         self.boot()

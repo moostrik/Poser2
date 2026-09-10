@@ -3,14 +3,14 @@
 The motor is measured and the playhead advanced at the top of the tick (the state machine
 reads that playhead the same tick), the machine commands the motor and hands over its mix
 from the update callbacks, and the frame takes the command as it stands *after* them. The
-fixture's readout mode follows the rpm it receives, so a frame whose rpm said ring mode
-while its mix wrote only bar lights would be a black one.
+fixture's readout mode follows the rpm it receives, so a frame whose rpm said projection mode
+while its mix wrote only beam lights would be a black one.
 """
 
 import unittest
 
 from apps.white_space.board import Board
-from apps.white_space.light import Conductor, Frame, LayerId, MotorMode, FIXTURE_SLOW_RPM
+from apps.white_space.light import Conductor, Frame, LayerId, MotorMode, FIXTURE_PROJECTION_RPM
 from apps.white_space.light.clock import Tick
 from apps.white_space.settings import Settings, Stage
 
@@ -34,39 +34,39 @@ class RegimeSwitchTest(unittest.TestCase):
 
     def _enter_wind_down(self) -> None:
         """What a show state's entry does: the new motor command and the new mix, together."""
-        self.conductor.set_motor_mode(MotorMode.LOW)
+        self.conductor.set_motor_mode(MotorMode.BEAM)
         self.conductor.set_mix([(LayerId.wind_down, 1.0)])
 
     def test_a_command_from_an_update_callback_reaches_the_same_frame(self) -> None:
-        self.conductor.set_motor_mode(MotorMode.HIGH)
+        self.conductor.set_motor_mode(MotorMode.PROJECTION)
         self.conductor.set_mix([(LayerId.flood, 1.0)])
-        self.assertGreaterEqual(self._tick().motor_command.target_rpm, FIXTURE_SLOW_RPM)
+        self.assertGreaterEqual(self._tick().motor_command.target_rpm, FIXTURE_PROJECTION_RPM)
 
         self.conductor.add_update_callback(self._enter_wind_down)
         frame = self._tick()
-        self.assertEqual(frame.motor_command.mode, MotorMode.LOW)
-        self.assertLess(frame.motor_command.target_rpm, FIXTURE_SLOW_RPM)
+        self.assertEqual(frame.motor_command.mode, MotorMode.BEAM)
+        self.assertLess(frame.motor_command.target_rpm, FIXTURE_PROJECTION_RPM)
 
     def test_the_switch_frame_is_not_black(self) -> None:
-        # END's wall (a ring layer at HIGH) handing over to END_INTRO's wall (bar lights at LOW):
-        # the frame the fixture is sent must be readable in the regime its own rpm selects —
-        # here slot mode, with the bar lights lit.
-        self.conductor.set_motor_mode(MotorMode.HIGH)
+        # END's wall (a ring layer at PROJECTION) handing over to END_INTRO's wall (beam lights at BEAM):
+        # the frame the fixture is sent must be readable in the mode its own rpm selects —
+        # here beam mode, with the beam lights lit.
+        self.conductor.set_motor_mode(MotorMode.PROJECTION)
         self.conductor.set_mix([(LayerId.flood, 1.0)])
         self.assertGreater(float(self._tick().white.sum()), 0.0)      # END: a lit ring
 
         self.conductor.add_update_callback(self._enter_wind_down)
         frame = self._tick()
-        self.assertLess(frame.motor_command.target_rpm, FIXTURE_SLOW_RPM)   # the fixture reads the slots …
-        self.assertGreater(float(frame.bar_lights.sum()), 0.0)              # … and they are lit
+        self.assertLess(frame.motor_command.target_rpm, FIXTURE_PROJECTION_RPM)   # the fixture reads the slots …
+        self.assertGreater(float(frame.beam_lights.sum()), 0.0)              # … and they are lit
 
     def test_a_steady_state_is_unaffected(self) -> None:
-        self.conductor.set_motor_mode(MotorMode.LOW)
-        self.conductor.set_mix([(LayerId.playhead_low, 1.0)])
+        self.conductor.set_motor_mode(MotorMode.BEAM)
+        self.conductor.set_mix([(LayerId.searchlight, 1.0)])
         for _ in range(3):
             frame = self._tick()
-            self.assertEqual(frame.motor_command.mode, MotorMode.LOW)
-            self.assertGreater(float(frame.bar_lights.sum()), 0.0)
+            self.assertEqual(frame.motor_command.mode, MotorMode.BEAM)
+            self.assertGreater(float(frame.beam_lights.sum()), 0.0)
 
 
 if __name__ == '__main__':

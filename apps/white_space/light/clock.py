@@ -5,7 +5,7 @@ frame deadline (high-resolution monotonic `perf_counter`, with a short busy-spin
 sub-millisecond accuracy), then measures `dt` and returns the `Tick`.
 
 Deliberately carries no musical time: the show's musical clock is the playhead bar (one
-revolution at `low_rpm`) — states count bars, the sound side rides them. Debug patterns
+revolution at `beam_rpm`) — states count bars, the sound side rides them. Debug patterns
 animate on plain seconds (`tick.time`) with their own rate knobs.
 
 Accuracy (measured ~40 µs mean lateness idle) depends on two things outside this file: the

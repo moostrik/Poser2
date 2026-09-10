@@ -399,15 +399,15 @@
     "clock": {},
     "motor": {
       "simulate": false,
-      "low_rpm": 36.0,
-      "high_rpm": 2000.0
+      "beam_rpm": 36.0,
+      "projection_rpm": 2000.0
     },
     "playhead": {
       "phase": 0.73,
       "tracking": 0.12,
       "speed_smoothing": 0.66
     },
-    "low_layers": {
+    "beam_layers": {
       "sound_light": {
         "gain": 1.0,
         "smoothing_frames": 2,
@@ -416,7 +416,7 @@
         "fallback_level": 0.15,
         "blend": "ADD"
       },
-      "playhead_low": {
+      "searchlight": {
         "level": 1.0,
         "blend": "ADD"
       },
@@ -452,7 +452,7 @@
         "blend": "ADD"
       }
     },
-    "high_layers": {
+    "projection_layers": {
       "pose_instrument": {
         "line_spacing": 10.0,
         "line_motion": "STATIC",
@@ -479,7 +479,7 @@
         "release_seconds": 1.5,
         "blend": "ADD"
       },
-      "playhead_high": {
+      "projection_playhead": {
         "level": 1.0,
         "width": 1.0,
         "blend": "ADD"
@@ -659,14 +659,14 @@
     "spin_up_seconds": 14.0,
     "off_idle_bars": 1.0,
     "intro_idle_bars": 2.0,
-    "end_bars": 4.0,
+    "end_bars": 8.0,
     "count_hold_seconds": 1.0,
     "sync": {
       "threshold": 0.75,
       "mode": "THREE"
     },
     "manual": {
-      "select": "END_INTRO",
+      "select": "PLAY",
       "hold": true
     },
     "session": {
@@ -712,8 +712,8 @@
       "render_labels": true,
       "use_history_color": false
     },
-    "bar_light_sim": {
-      "beam": 2.0,
+    "beam_light_sim": {
+      "width": 2.0,
       "blur": 4.0
     },
     "colors": {

@@ -3,14 +3,14 @@
 Renders the look it was handed this tick: a weighted list of layers. Each entry's layer
 draws itself into a private scratch frame (via its own blend mode) and is added
 ``weight ×`` into the output frame — the ring pixels of the spun-content layers rolled by
-``light_phase``, the bar lights weighted per channel (white weight on the whites, blue
+``light_phase``, the beam lights weighted per channel (white weight on the whites, blue
 weight on the blues) and never rolled.
 
 The Compositor holds no timing, easing, transition, or reset logic: weight curves live in
 the show state classes, and layer resets are explicit (``reset_layers``). The one policy it
 owns is its half of the debug override: while ``light.debug`` selects a layer, that one
 layer (solo, full weight) replaces the state's entries (the Conductor owns the other half —
-the motor auto-following the selected layer's regime).
+the motor auto-following the selected layer's mode).
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import numpy as np
 
 from ._base_layer import BaseLayer
 from ..clock import Tick
-from ..frame import Frame, BAR_LIGHT_CHANNEL
+from ..frame import Frame, BEAM_LIGHT_CHANNEL
 
 if TYPE_CHECKING:
     from ..settings import LightSettings, LayerId
@@ -43,9 +43,9 @@ def _channel_weights(weight: 'float | tuple[float, float]') -> tuple[float, floa
     return (weight, weight)
 
 
-def _bar_light_weights(w_white: float, w_blue: float) -> np.ndarray:
-    """The per-channel weights spread over the four bar lights (index = BarLightId)."""
-    return np.where(BAR_LIGHT_CHANNEL == 0, w_white, w_blue)
+def _beam_light_weights(w_white: float, w_blue: float) -> np.ndarray:
+    """The per-channel weights spread over the four beam lights (index = BeamLightId)."""
+    return np.where(BEAM_LIGHT_CHANNEL == 0, w_white, w_blue)
 
 
 class Compositor:
@@ -57,7 +57,7 @@ class Compositor:
 
     def __init__(self, config: LightSettings, layers: dict[LayerId, BaseLayer]) -> None:
         self._config = config
-        self._layers = layers              # each layer's SHIFTED flag (HighLayer) grants the ring shift
+        self._layers = layers              # each layer's SHIFTED flag (ProjectionLayer) grants the ring shift
         self._entries: Mix = []
         self._scratch = Frame(config.light_resolution, Tick(0.0, 0.0))
 
@@ -98,7 +98,7 @@ class Compositor:
             if layer is None:
                 continue
             s.light_img.fill(0.0)
-            s.bar_lights.fill(0.0)
+            s.beam_lights.fill(0.0)
             try:
                 layer.render(s)   # blends into the private scratch via its own blend mode
             except Exception:
@@ -111,4 +111,4 @@ class Compositor:
                 frame.white += w_white * sw
             if w_blue > 0.0:
                 frame.blue  += w_blue * sb
-            frame.bar_lights += _bar_light_weights(w_white, w_blue) * s.bar_lights
+            frame.beam_lights += _beam_light_weights(w_white, w_blue) * s.beam_lights

@@ -21,7 +21,7 @@ from .playhead import Playhead
 from .settings import LightSettings, LayerId, DebugLayer
 from .layers import (BaseLayer, Compositor, Mix, PoseWaves, Fill, Pulse, Chase, Lines, Random,
                      Harmonic, PlayerLines, CameraLight, PlayheadFlash, PlayheadHaunted,
-                     PlayheadLow, PlayheadHigh, PlayheadTest, SoundLight, PoseInstrument, Flood,
+                     Searchlight, ProjectionPlayhead, PlayheadTest, SoundLight, PoseInstrument, Flood,
                      WindDown)
 from modules.board import PlayheadSignals
 
@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 
 
 def _debug_motor_mode(selection: DebugLayer, layers: dict[LayerId, BaseLayer]) -> MotorMode | None:
-    """The debug auto-follow: derive the motor regime from the selected debug layer's
-    class — `HighLayer` → HIGH, `LowLayer` → LOW; OFF → None (debug disarmed, the machine
+    """The debug auto-follow: derive the motor mode from the selected debug layer's
+    class — `ProjectionLayer` → PROJECTION, `BeamLayer` → BEAM; OFF → None (debug disarmed, the machine
     owns the motor). Selecting a layer is the only gesture: choosing it IS turning debug
     on, and the speed rides the selection."""
     if selection == DebugLayer.OFF:
@@ -41,7 +41,7 @@ def _debug_motor_mode(selection: DebugLayer, layers: dict[LayerId, BaseLayer]) -
     layer = layers.get(LayerId(int(selection)))
     if layer is None:
         return None
-    return MotorMode.HIGH if layer.SHIFTED else MotorMode.LOW
+    return MotorMode.PROJECTION if layer.SHIFTED else MotorMode.BEAM
 
 
 class Conductor(Thread):
@@ -55,8 +55,8 @@ class Conductor(Thread):
         self._config: LightSettings = config
         self._board: Board          = board
         self._pose_stage: int       = pose_stage
-        # Boot failsafe #3: a preset saved mid-debug (a high layer selected) must never
-        # auto-derive HIGH at power-on — the installation always wakes in the show.
+        # Boot failsafe #3: a preset saved mid-debug (a projection layer selected) must never
+        # auto-derive PROJECTION at power-on — the installation always wakes in the show.
         config.debug = DebugLayer.OFF
         self._motor_controller      = MotorController(config.motor)
         self._playhead              = Playhead(config.playhead)
@@ -66,18 +66,18 @@ class Conductor(Thread):
         num_players: int            = config.max_poses
 
         # The unified layer pool — one instance per LayerId, each reading its own settings
-        # group (low_layers / high_layers, mirroring the folder taxonomy); each layer's
-        # regime lives in its class (LowLayer/HighLayer).
-        LO, HI = config.low_layers, config.high_layers
+        # group (beam_layers / projection_layers, mirroring the folder taxonomy); each layer's
+        # mode lives in its class (BeamLayer/ProjectionLayer).
+        LO, HI = config.beam_layers, config.projection_layers
         self.layers: dict[LayerId, BaseLayer] = {
             LayerId.sound_light:        SoundLight     (resolution, LO.sound_light,      board),
-            LayerId.playhead_low:       PlayheadLow    (resolution, LO.playhead_low,     board),
+            LayerId.searchlight:       Searchlight    (resolution, LO.searchlight,     board),
             LayerId.playhead_flash:     PlayheadFlash  (resolution, LO.playhead_flash,   board, pose_stage),
             LayerId.wind_down:          WindDown       (resolution, LO.wind_down,        board),
             LayerId.playhead_haunted:   PlayheadHaunted(resolution, LO.playhead_haunted, board, pose_stage),
             LayerId.playhead_test:      PlayheadTest   (resolution, LO.playhead_test,    board),
             LayerId.pose_instrument:    PoseInstrument (resolution, HI.pose_instrument,  board, pose_stage),
-            LayerId.playhead_high:      PlayheadHigh   (resolution, HI.playhead_high,    board),
+            LayerId.projection_playhead:      ProjectionPlayhead   (resolution, HI.projection_playhead,    board),
             LayerId.flood:              Flood          (resolution, HI.flood,            board),
             LayerId.test_pose_waves:    PoseWaves      (resolution, num_players, HI.test_pose_waves, self._clock.interval, board, pose_stage),
             LayerId.test_harmonic:      Harmonic       (resolution, HI.test_harmonic,    board),
@@ -151,7 +151,7 @@ class Conductor(Thread):
     # ------------------------------------------------------------------
 
     def _update(self, tick: Tick) -> None:
-        # Debug auto-follow: while a debug layer is selected, the motor follows its regime
+        # Debug auto-follow: while a debug layer is selected, the motor follows its mode
         # (outranking the machine); OFF relinquishes back to the machine.
         self._motor_controller.set_debug_mode(
             _debug_motor_mode(self._config.debug, self.layers))
@@ -178,12 +178,12 @@ class Conductor(Thread):
         frame = Frame(self._config.light_resolution, tick, motor, command, playhead=playhead)
         self._compositor.render(frame)
 
-        # Master brightness — the ring and the bar lights alike
+        # Master brightness — the ring and the beam lights alike
         m = self._config.master
         if m != 1.0:
             frame.white      *= m
             frame.blue       *= m
-            frame.bar_lights *= m
+            frame.beam_lights *= m
 
         self._board.set_composition_output(frame)
         self._notify_render(frame)

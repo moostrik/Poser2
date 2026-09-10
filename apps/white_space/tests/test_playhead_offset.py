@@ -7,7 +7,7 @@ from modules.pose.frame import Frame
 from modules.pose.features import Azimuth
 from apps.white_space.pose import PlayheadOffset, PlayheadOffsetExtractor
 from apps.white_space.light.layers._utilities import angle_to_strip_position
-from apps.white_space.light.layers.low.playhead_flash import offset_to_level, stability_lerp
+from apps.white_space.light.layers.beam.playhead_flash import offset_to_level, stability_lerp
 
 PI = math.pi
 TAU = math.tau

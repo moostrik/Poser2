@@ -1,10 +1,10 @@
 """Layer base classes and shared settings primitives.
 
-Two regimes, two bases, one axis: a ``HighLayer`` draws pixels — the persistence-of-vision
-ring — and a ``LowLayer`` writes the four bar lights by name. The split is structural
-because it is the fixture's truth: in slot mode (commanded below ``FIXTURE_SLOW_RPM``) the
-firmware drives the lamps from four values and ignores the ring, in ring mode it steps the
-ring and ignores the lamps (see ``inout/osc_light_sender.py`` for the wire contract). A low
+Two modes, two bases, one axis: a ``ProjectionLayer`` draws pixels — the persistence-of-vision
+ring — and a ``BeamLayer`` writes the four beam lights by name. The split is structural
+because it is the fixture's truth: in beam mode (commanded below ``FIXTURE_PROJECTION_RPM``) the
+firmware drives the lamps from four values and ignores the ring, in projection mode it steps the
+ring and ignores the lamps (see ``inout/osc_light_sender.py`` for the wire contract). A beam
 layer therefore has no pixel buffers to write to at all.
 """
 
@@ -18,7 +18,7 @@ import numpy as np
 from modules.settings import BaseSettings, Field
 
 from ._utilities import BlendType, blend_values
-from ..frame import Frame, BarLightId, BUFFER_DTYPE
+from ..frame import Frame, BeamLightId, BUFFER_DTYPE
 
 if TYPE_CHECKING:
     from ...board import Board
@@ -44,15 +44,15 @@ class BaseLayer(ABC):
 
     ``render`` is a template method called once per tick by the Compositor: zero the
     layer's own scratch, call ``_draw`` (the subclass writes additively into it), blend the
-    scratch into the frame with the layer's own ``blend`` setting. Each regime base owns
+    scratch into the frame with the layer's own ``blend`` setting. Each mode base owns
     its scratch and its ``_draw`` signature.
 
-    Concrete layers subclass one of the two regime bases (`LowLayer` / `HighLayer`),
-    never BaseLayer directly — the regime drives the light_phase ring shift and the
+    Concrete layers subclass one of the two mode bases (`BeamLayer` / `ProjectionLayer`),
+    never BaseLayer directly — the mode drives the light_phase ring shift and the
     debug auto-follow's motor derivation.
     """
 
-    SHIFTED: bool = False   # rides the fast ring → gets the light_phase roll (HighLayer)
+    SHIFTED: bool = False   # rides the fast ring → gets the light_phase roll (ProjectionLayer)
 
     def __init__(self, resolution: int, settings: LayerSettings, board: Board) -> None:
         self.resolution: int           = resolution
@@ -61,7 +61,7 @@ class BaseLayer(ABC):
 
     @abstractmethod
     def render(self, frame: Frame) -> None:
-        """Draw this tick into ``frame`` (the regime base's template method)."""
+        """Draw this tick into ``frame`` (the mode base's template method)."""
         ...
 
     def reset(self) -> None:
@@ -69,41 +69,41 @@ class BaseLayer(ABC):
         Compositor) when the layer should start fresh. Default: no-op."""
 
 
-class LowLayer(BaseLayer):
-    """The lamp regime (commanded below ``FIXTURE_SLOW_RPM``): the fixture drives the four
-    bar lights directly and reads no ring pixels, so a low layer writes ``bar_lights`` —
-    a ``(4,)`` array indexed by ``BarLightId`` — and nothing else."""
+class BeamLayer(BaseLayer):
+    """Beam mode (commanded below ``FIXTURE_PROJECTION_RPM``): the fixture drives the four
+    beam lights directly and reads no ring pixels, so a beam layer writes ``beam_lights`` —
+    a ``(4,)`` array indexed by ``BeamLightId`` — and nothing else."""
 
     def __init__(self, resolution: int, settings: LayerSettings, board: Board) -> None:
         super().__init__(resolution, settings, board)
-        self._scratch_bar_lights: np.ndarray = np.zeros(len(BarLightId), dtype=BUFFER_DTYPE)
+        self._scratch_beam_lights: np.ndarray = np.zeros(len(BeamLightId), dtype=BUFFER_DTYPE)
 
     def render(self, frame: Frame) -> None:
-        self._scratch_bar_lights.fill(0.0)
-        self._draw(frame, self._scratch_bar_lights)
-        blend_values(frame.bar_lights, self._scratch_bar_lights, 0, self._settings.blend)
+        self._scratch_beam_lights.fill(0.0)
+        self._draw(frame, self._scratch_beam_lights)
+        blend_values(frame.beam_lights, self._scratch_beam_lights, 0, self._settings.blend)
 
     @abstractmethod
-    def _draw(self, frame: Frame, bar_lights: np.ndarray) -> None:
-        """Additively write the four bar lights (pre-zeroed, indexed by ``BarLightId``)."""
+    def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
+        """Additively write the four beam lights (pre-zeroed, indexed by ``BeamLightId``)."""
         ...
 
     @staticmethod
-    def _add_bar_lights(bar_lights: np.ndarray, *,
-                        front_white: float = 0.0, back_white: float = 0.0,
-                        left_blue: float = 0.0, right_blue: float = 0.0) -> None:
-        """Additively write the bar lights by name."""
-        bar_lights[BarLightId.FRONT_WHITE] += front_white
-        bar_lights[BarLightId.BACK_WHITE]  += back_white
-        bar_lights[BarLightId.LEFT_BLUE]   += left_blue
-        bar_lights[BarLightId.RIGHT_BLUE]  += right_blue
+    def _add_beam_lights(beam_lights: np.ndarray, *,
+                         front_white: float = 0.0, back_white: float = 0.0,
+                         left_blue: float = 0.0, right_blue: float = 0.0) -> None:
+        """Additively write the beam lights by name."""
+        beam_lights[BeamLightId.FRONT_WHITE] += front_white
+        beam_lights[BeamLightId.BACK_WHITE]  += back_white
+        beam_lights[BeamLightId.LEFT_BLUE]   += left_blue
+        beam_lights[BeamLightId.RIGHT_BLUE]  += right_blue
 
 
-class HighLayer(BaseLayer):
-    """The ring regime (commanded at or above ``FIXTURE_SLOW_RPM``): pixels draw the
+class ProjectionLayer(BaseLayer):
+    """Projection mode (commanded at or above ``FIXTURE_PROJECTION_RPM``): pixels draw the
     persistence-of-vision ring, so the content rides the fast spin — ``SHIFTED`` grants the
-    ``light_phase`` ring roll, and the debug auto-follow derives HIGH from any selected
-    HighLayer. Subclasses write additively into the ``white`` / ``blue`` scratch arrays
+    ``light_phase`` ring roll, and the debug auto-follow derives PROJECTION from any selected
+    ProjectionLayer. Subclasses write additively into the ``white`` / ``blue`` scratch arrays
     (shape ``(resolution,)``, pre-zeroed)."""
 
     SHIFTED = True

@@ -27,16 +27,16 @@ from modules.settings import BaseSettings, Field, Widget
 
 # The fixture's one threshold (firmware.cpp: `RPM < 200`, lines 231 and 475), applied to the
 # *commanded* rpm on receipt of `/WS/r/0`, regardless of the bar's actual speed. Below it the
-# fixture is in slot mode — the four bar lights are driven directly and fall pulses are sent —
+# fixture is in beam mode — the four beam lights are driven directly and fall pulses are sent —
 # at or above it steps the ring and the sensor is silent. So a measurement only exists below it,
-# and a reading above it (spinning down from HIGH) isn't trusted either — outside this range we
+# and a reading above it (spinning down from PROJECTION) isn't trusted either — outside this range we
 # trust the commanded speed. The light sender and the render apply the same rule to the same command.
-FIXTURE_SLOW_RPM: float = 200.0
+FIXTURE_PROJECTION_RPM: float = 200.0
 
 # A real revolution can't be faster than the sensor ceiling allows (60 / ceiling). A fall closer than
 # this to the previous one is a repeated/duplicate signal (the one-sided sensor pulsed twice) — ignore
 # it so it can't corrupt the measured period.
-_MIN_FALL_INTERVAL_S: float = 60.0 / FIXTURE_SLOW_RPM
+_MIN_FALL_INTERVAL_S: float = 60.0 / FIXTURE_PROJECTION_RPM
 
 # Simulation loop cadence (s). The ramp + fall timing are sub-tick accurate regardless.
 _SIM_TICK: float = 1.0 / 30.0 # same as the motor
@@ -49,9 +49,9 @@ _SIM_DECEL: float = _SIM_ACCEL * 3.0
 
 class MotorMode(IntEnum):
     """Commanded operating mode (the system sets it; target rpm is derived from it)."""
-    STOPPED = auto()  # not spinning
-    LOW     = auto()  # playhead sweep speed
-    HIGH    = auto()  # fast spin (pixel content)
+    STOPPED    = auto()  # not spinning
+    BEAM       = auto()  # the four lamps sweeping the room
+    PROJECTION = auto()  # fast spin — the ring painted from the firmware's counter
 
 
 @dataclass
@@ -74,15 +74,15 @@ class MotorCommand:
     dt) and after the state machine ran (the command the frame is sent with)."""
     mode:       MotorMode = MotorMode.STOPPED       # the driven (arbitrated) mode
     target_rpm: float     = 0.0                     # commanded speed — sent to the fixture, whose readout mode follows it
-    low_rpm:    float     = 0.0                     # LOW-mode rpm — the playhead's content-sweep rate in HIGH
+    beam_rpm:   float     = 0.0                     # BEAM-mode rpm — the playhead's content-sweep rate in PROJECTION
 
 
 class MotorSettings(BaseSettings):
     simulate:             Field[bool] = Field(False,                              description="Simulate the motor + fall sensor (no hardware): obeys the commanded mode with modeled inertia")
     active_mode:          Field[MotorMode] = Field(MotorMode.STOPPED, access=Field.READ, description="Active mode — the arbitrated mode actually driven (debug > state machine; no command = STOPPED)")
-    low_rpm:              Field[float] = Field(72.0,   min=0.0, max=300.0,  step=1.0,  description="Target rpm in LOW mode", newline=True)
-    high_rpm:             Field[float] = Field(2000.0, min=0.0, max=2400.0, step=1.0,  description="Target rpm in HIGH mode")
-    measured_rpm:         Field[float] = Field(0.0,   min=0.0, max=FIXTURE_SLOW_RPM, step=0.01,  access=Field.READ, description="Current measured RPM", newline=True)
+    beam_rpm:             Field[float] = Field(72.0,   min=0.0, max=300.0,  step=1.0,  description="Target rpm in BEAM mode", newline=True)
+    projection_rpm:       Field[float] = Field(2000.0, min=0.0, max=2400.0, step=1.0,  description="Target rpm in PROJECTION mode")
+    measured_rpm:         Field[float] = Field(0.0,   min=0.0, max=FIXTURE_PROJECTION_RPM, step=0.01,  access=Field.READ, description="Current measured RPM", newline=True)
     phase:                Field[float] = Field(0.0,   min=-math.pi, max=math.pi, step=0.001, access=Field.READ, widget=Widget.slider, description="Measured motor phase (−π…π)")
 
 
@@ -145,7 +145,7 @@ class MotorController:
         dt) and once more after the state machine ran (what the frame is sent with), so a mode
         commanded mid-tick reaches the very frame whose mix it drew."""
         mode = self._target_mode()
-        return MotorCommand(mode=mode, target_rpm=self._target_rpm(mode), low_rpm=self._settings.low_rpm)
+        return MotorCommand(mode=mode, target_rpm=self._target_rpm(mode), beam_rpm=self._settings.beam_rpm)
 
     def _publish_active_mode(self) -> None:
         """The panel readback follows the command the moment it changes."""
@@ -220,7 +220,7 @@ class MotorController:
             # Fire a synthetic fall per revolution — but only within the sensor's range: the real
             # sensor is silent above the ceiling, and the sim must be too, so measurement-driven
             # behavior (lock, un-lock, deceleration) is identical in sim and reality.
-            if 0.0 < current_rpm <= FIXTURE_SLOW_RPM:
+            if 0.0 < current_rpm <= FIXTURE_PROJECTION_RPM:
                 revs += current_rpm / 60.0 * dt
                 # Fire every completed revolution — not just one — so that when the fall rate
                 # exceeds the loop rate (high rpm), revs stays in [0,1) and the latest fall
@@ -241,8 +241,8 @@ class MotorController:
     def _target_rpm(self, mode: MotorMode) -> float:
         """Commanded rpm derived from the active mode."""
         match mode:
-            case MotorMode.LOW:  return self._settings.low_rpm
-            case MotorMode.HIGH: return self._settings.high_rpm
+            case MotorMode.BEAM:  return self._settings.beam_rpm
+            case MotorMode.PROJECTION: return self._settings.projection_rpm
             case _:              return 0.0   # STOPPED → 0
 
     def _target_mode(self) -> MotorMode:
@@ -265,7 +265,7 @@ class MotorController:
         Pure read of the fall state; writes nothing. No falls yet → (False, 0.0, NaN, NaN, inf).
         There is no stall/stop detection: a long silence is never treated as "stopped" (the fall
         signal is too sparse/late for that) — the last measurement simply persists until a new
-        fall updates it. `raw_rpm`/`fall_age` carry the untrusted raw evidence for regime
+        fall updates it. `raw_rpm`/`fall_age` carry the untrusted raw evidence for mode
         detection (silence above the ceiling = the ring forming)."""
         with self._fall_lock:
             last_fall_time  = self._last_fall_time
@@ -285,7 +285,7 @@ class MotorController:
 
         There is no stall/stop detection (the fall signal is too sparse/late for that). Falls give
         a measured phase + rpm only while running *in the sensor's range*: below the ceiling (above
-        it no falls arrive, and a reading above it — spinning down from HIGH — isn't trusted) and
+        it no falls arrive, and a reading above it — spinning down from PROJECTION — isn't trusted) and
         not commanded STOPPED. Otherwise `locked` is False, `measured_rpm` 0 and `phase` NaN, and
         the playhead free-runs or holds on the command alone (see `command`).
         """
@@ -295,7 +295,7 @@ class MotorController:
         have_measurement, measured, phase, raw_rpm, fall_age = self._measure(monotonic())
         # A measurement is usable only in the sensor's range — both the commanded and the measured speed
         # below the ceiling (no falls above it; a >ceiling reading isn't trusted) — and not STOPPED.
-        fast   = target_rpm > FIXTURE_SLOW_RPM or measured > FIXTURE_SLOW_RPM
+        fast   = target_rpm > FIXTURE_PROJECTION_RPM or measured > FIXTURE_PROJECTION_RPM
         locked = have_measurement and not fast and target_mode != MotorMode.STOPPED
         measured_rpm = measured if locked else 0.0
         phase        = phase if locked else float('nan')

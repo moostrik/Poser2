@@ -15,7 +15,7 @@ import numpy as np
 
 from modules.settings import Field
 
-from .._base_layer import LowLayer, LayerSettings
+from .._base_layer import BeamLayer, LayerSettings
 from ...frame import Frame
 from ....pose import GhostElement, GhostFeature, PlayheadOffset
 
@@ -56,7 +56,7 @@ class PlayheadFlashSettings(LayerSettings):
     gap:        Field[float] = Field(0.25, min=0.0, max=1.0,    step=0.01, description="Fraction of the window centre that stays dark — a notch at the crossing (0 = solid)", newline=True)
 
 
-class PlayheadFlash(LowLayer):
+class PlayheadFlash(BeamLayer):
     """Continuous base level plus an on/off flash window tracking the playhead's approach to
     each active player, read from ``PlayheadOffset``. Each pose's window width and flash
     intensity are interpolated by its ``GhostFeature`` Dwell from the ``min_*`` endpoints
@@ -68,7 +68,7 @@ class PlayheadFlash(LowLayer):
         self._config = config
         self._pose_stage = pose_stage
 
-    def _draw(self, frame: Frame, bar_lights: np.ndarray) -> None:
+    def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
         P = self._config
 
         tracklets = self._board.get_tracklets()
@@ -87,7 +87,7 @@ class PlayheadFlash(LowLayer):
             flash_blue  = max(flash_blue,  level * stability_lerp(dwell, P.min_blue,  P.max_blue))
 
         # The flash is the front white lamp plus both blue lamps, on a constant base.
-        self._add_bar_lights(bar_lights,
+        self._add_beam_lights(beam_lights,
                              front_white=P.base_white + flash_white,
                              left_blue=P.base_blue + flash_blue,
                              right_blue=P.base_blue + flash_blue)

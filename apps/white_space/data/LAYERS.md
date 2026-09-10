@@ -6,48 +6,48 @@ existing layers the module docstrings stay the source of truth for behavior; the
 built in the show work packages (`sound_light`, `flood`, `wind_down`, `pose_instrument`)
 keep their full design sections here.
 
-Regimes: **low** layers write the four bar lights by name (`Frame.bar_lights`, indexed by
-`BarLightId`: front/back white, left/right blue) and no pixels; **high** layers draw the
-persistence-of-vision ring. The fixture's readout mode follows the *commanded* rpm — slot
-mode below 200, ring mode at or above, switching on receipt of the rpm regardless of the
-bar's actual speed (`firmware.cpp` line 475). The light sender maps the bar lights to the
+Modes: **beam** layers write the four beam lights by name (`Frame.beam_lights`, indexed by
+`BeamLightId`: front/back white, left/right blue) and no pixels; **projection** layers draw the
+persistence-of-vision ring. The fixture's readout mode follows the *commanded* rpm — beam
+mode below 200, projection mode at or above, switching on receipt of the rpm regardless of the
+bar's actual speed (`firmware.cpp` line 475). The light sender maps the beam lights to the
 firmware's pixel slots exactly when the fixture reads them (`inout/osc_light_sender.py`),
-and the render simulates the bar at low speed in its own layer (`render/layers/
-bar_light_simulation_layer.py`). Base classes `LowLayer` / `HighLayer` encode this, and the
-folders and settings groups follow the same single axis (`layers/low/` ↔ `light.low_layers`,
-`layers/high/` ↔ `light.high_layers` — no separate test folder). Debug-only layers state
-that role in their docstrings; the high block's generic patterns keep a `test_` prefix,
-while the low tools are named as playhead tools (`playhead_haunted`, `playhead_test`).
+and the render simulates the beams in its own layer (`render/layers/
+beam_light_simulation_layer.py`). Base classes `BeamLayer` / `ProjectionLayer` encode this, and the
+folders and settings groups follow the same single axis (`layers/beam/` ↔ `light.beam_layers`,
+`layers/projection/` ↔ `light.projection_layers` — no separate test folder). Debug-only layers state
+that role in their docstrings; the projection block's generic patterns keep a `test_` prefix,
+while the beam tools are named as playhead tools (`playhead_haunted`, `playhead_test`).
 
 ## Index — show layers
 
-| Layer             | Regime | Reads                                                  | Writes                        | Used by |
-|-------------------|--------|--------------------------------------------------------|-------------------------------|---------|
-| `playhead_low`    | low    | — (settings only)                                      | front white lamp              | S1–S6, S9, S10 |
-| `playhead_flash`  | low    | LERP frames (PlayheadOffset, Dwell), tracklets         | front white lamp + blue lamps (blue zeroed in presets — S4 runs blue-none by design) | S4 |
-| `playhead_high`   | high   | frame playhead phase                                   | white ring marker             | S6 (post-un-lock), S7, S8 |
-| `pose_instrument` | high   | LERP frames (Azimuth, BBox, Angles, LegDeviation, TorsoTilt, Similarity), tracklets, playhead bars (PLAYHEAD motion only) | white lines, blue anchor + between-lines | S6 (post-un-lock), S7, S8 |
-| `flood`           | high   | — (settings only)                                      | full-strip white              | S8 |
-| `wind_down`       | low    | tick clock                                             | both white lamps, fading (the wall while the bar is still fast) | S9, S10 |
-| `sound_light`     | low    | sound levels from Max (board)                          | left/right blue lamps         | S1, S2, S3, S5, S10 |
+| Layer             | Mode       | Reads                                                  | Writes                        | Used by |
+|-------------------|------------|--------------------------------------------------------|-------------------------------|---------|
+| `searchlight`     | beam       | — (settings only)                                      | front white lamp              | S1–S6, S9, S10 |
+| `playhead_flash`  | beam       | LERP frames (PlayheadOffset, Dwell), tracklets         | front white lamp + blue lamps (blue zeroed in presets — S4 runs blue-none by design) | S4 |
+| `projection_playhead` | projection | frame playhead phase                               | white ring marker             | S6 (post-un-lock), S7, S8 |
+| `pose_instrument` | projection | LERP frames (Azimuth, BBox, Angles, LegDeviation, TorsoTilt, Similarity), tracklets, playhead bars (PLAYHEAD motion only) | white lines, blue anchor + between-lines | S6 (post-un-lock), S7, S8 |
+| `flood`           | projection | — (settings only)                                      | full-strip white              | S8 |
+| `wind_down`       | beam       | tick clock                                             | both white lamps, fading (the wall while the bar is still fast) | S9, S10 |
+| `sound_light`     | beam       | sound levels from Max (board)                          | left/right blue lamps         | S1, S2, S3, S5, S10 |
 
-`wind_down` is `flood`'s ending and a plain low layer: the fixture is in slot mode from
+`wind_down` is `flood`'s ending and a plain beam layer: the fixture is in beam mode from
 S9's first packet, so the wall while the bar is still fast *is* the two white lamps
 spinning. See its section below.
 
 Debug layers (never in a state's mix; reached via the `light.debug` select — **choosing a
 layer IS turning debug on**: it shows solo at full weight and the motor auto-follows its
-regime, OFF returns the show): the two low tools `playhead_haunted` (the ghost flash;
+mode, OFF returns the show): the two beam tools `playhead_haunted` (the ghost flash;
 pairs with `pose.ghoster.enabled` for solo experimentation) and `playhead_test` (direct
-levels for the four physical lamps: front/back white, left/right blue — the lamp regime's
-hardware check), plus the high `test_`-prefixed patterns: `test_pose_waves` (the old
+levels for the four physical lamps: front/back white, left/right blue — beam mode's
+hardware check), plus the projection `test_`-prefixed patterns: `test_pose_waves` (the old
 wave/void instrument, kept as a reference/montage visual), `test_harmonic`,
 `test_player_lines`, `test_calibration`, `test_fill`, `test_pulse`, `test_chase`,
 `test_lines`, `test_random`.
 
 ---
 
-## sound_light (new — LowLayer)
+## sound_light (new — BeamLayer)
 
 The soundscape made visible: the left and right blue lamps breathe with the actual
 sound Max is playing.
@@ -70,7 +70,7 @@ sound Max is playing.
 - **Open questions**: fallback choice (off vs idle pulse); exact `/WS/sound/level`
   scaling agreed with Max (linear 0..1 vs dB)
 
-## flood (new — HighLayer)
+## flood (new — ProjectionLayer)
 
 Constant full-strip white — the END's wall of light. Deliberately the dumbest layer in
 the pool: all dynamics (the cross-to-full) are mix weights set by the states, never
@@ -84,24 +84,24 @@ at 1.0 hands over to S9/S10's wind_down starting at the full wall, seamlessly.
 - **Reset**: no-op
 - **Open questions**: —
 
-## wind_down (LowLayer)
+## wind_down (BeamLayer)
 
 The dying wall of light: owns the S9/S10 ending fade. It writes the two white lamps at a
-fading level; everything else is physics. The fixture is in slot mode from S9's first
+fading level; everything else is physics. The fixture is in beam mode from S9's first
 packet (its readout mode follows the commanded rpm), so the two lamps spin at whatever
 speed the bar still has — a wall of white while fast, thinning into two beams as it
 slows — and the fade rides through both. One mechanism; the layer never needs to know
 when the bar is slow. The S8 → S9 hand-off is seamless at the DACs: `flood` at 1.0 in ring
-mode drives the same two white outputs as this layer at 1.0 in slot mode.
+mode drives the same two white outputs as this layer at 1.0 in beam mode.
 
 - **Used by**: S9/S10 at constant weight 1.0 (reset on state entry). The states put the
-  landing look underneath (`playhead_low` at DIM/BRIGHT, `sound_light`) — it is
+  landing look underneath (`searchlight` at DIM/BRIGHT, `sound_light`) — it is
   *revealed* as the wall dies, so nothing has to splice or match at the hand-off.
 - **Input**: the tick clock; no pose data, no playhead signals.
 - **Behavior**: both white lamps at `f × level`, `f = 1 − ease(elapsed / spin_down_seconds)`,
   hand-tuned to ride the physical spin-down (the sensor is silent above 200 rpm, so the
   deceleration is not measurable). The states exit once `progress` reaches 1 and the
-  motor has locked at LOW.
+  motor has locked at BEAM.
 - **Settings**: `level`, `spin_down_seconds` (hidden — the visible slider is
   `statemachine.spin_down_seconds`, next to `spin_up_seconds`, shared in via the root),
   `progress` (read-only fade readout 0..1: the states' exit, `stage_progress` and S10's
@@ -109,7 +109,7 @@ mode drives the same two white outputs as this layer at 1.0 in slot mode.
 - **Reset**: restarts the fade at the full wall (called from S9/S10 `enter()`)
 - **Open questions**: —
 
-## pose_instrument (HighLayer)
+## pose_instrument (ProjectionLayer)
 
 The heart of the piece. Each person **stands in a blue anchor** — a blue line at their
 azimuth, their own presence — and around them a **mirror-symmetric pattern of white and

@@ -1,10 +1,10 @@
-"""BarLightSimulationLayer — the image the installation projects while the fixture is in slot
-mode: the four bar lights as beams on the walls, unrolled over 360° like the ring.
+"""BeamLightSimulationLayer — the image the installation projects while the fixture is in beam
+mode: the four beam lights on the walls, unrolled over 360° like the ring.
 
 The sibling of ``LightSimulationLayer`` (the ring): both read the composition output from
-the board and push a Frame-shaped image through the same shader, so the two regimes share
-one look. This one builds its image from the frame's explicit ``bar_lights``
-and its playhead heading (``bar_light_projection``). The render draws whichever of the two
+the board and push a Frame-shaped image through the same shader, so the two modes share
+one look. This one builds its image from the frame's explicit ``beam_lights``
+and its playhead heading (``beam_light_projection``). The render draws whichever of the two
 layers matches the fixture's readout mode for the frame.
 """
 
@@ -21,15 +21,15 @@ from modules.utils import HotReloadMethods
 from apps.white_space.light import BUFFER_DTYPE
 from apps.white_space.render.shaders.light_simulation import LightSimulation
 
-from .bar_light_projection import project_bar_lights
-from ...settings import BarLightSimSettings
+from .beam_light_projection import project_beam_lights
+from ...settings import BeamLightSimSettings
 
 
-class BarLightSimulationLayer(LayerBase):
+class BeamLightSimulationLayer(LayerBase):
 
-    def __init__(self, board: HasCompositionOutput, config: BarLightSimSettings) -> None:
+    def __init__(self, board: HasCompositionOutput, config: BeamLightSimSettings) -> None:
         self.board: HasCompositionOutput = board
-        self._config: BarLightSimSettings = config
+        self._config: BeamLightSimSettings = config
         self.fbo_angles: Fbo = Fbo()
         self.image: Image = Image()
         self._shader: LightSimulation = LightSimulation()
@@ -61,8 +61,8 @@ class BarLightSimulationLayer(LayerBase):
 
         if self._projection is None or self._projection.shape != output.light_img.shape:
             self._projection = np.zeros(output.light_img.shape, dtype=BUFFER_DTYPE)
-        project_bar_lights(output.bar_lights, self._heading, math.radians(self._config.beam),
-                           math.radians(self._config.blur), self._projection)
+        project_beam_lights(output.beam_lights, self._heading, math.radians(self._config.width),
+                            math.radians(self._config.blur), self._projection)
 
         self.image.set_image(self._projection)
         self.image.update()

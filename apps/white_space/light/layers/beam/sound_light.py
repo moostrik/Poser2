@@ -20,7 +20,7 @@ import numpy as np
 
 from modules.settings import Field
 
-from .._base_layer import LowLayer, LayerSettings
+from .._base_layer import BeamLayer, LayerSettings
 from ...frame import Frame
 
 if TYPE_CHECKING:
@@ -44,7 +44,7 @@ class SoundLightSettings(LayerSettings):
     fallback_level:   Field[float]         = Field(0.15, min=0.0, max=1.0, step=0.01, description="Idle pulse peak level")
 
 
-class SoundLight(LowLayer):
+class SoundLight(BeamLayer):
     """Left level → left blue lamp, right level → right blue lamp; see the module docstring."""
 
     def __init__(self, resolution: int, config: SoundLightSettings, board: Board) -> None:
@@ -56,7 +56,7 @@ class SoundLight(LowLayer):
         """Clear the smoothing window — the lamps re-attack from the live levels."""
         self._window.clear()
 
-    def _draw(self, frame: Frame, bar_lights: np.ndarray) -> None:
+    def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
         P = self._config
         levels = self._board.get_sound_levels()
 
@@ -64,7 +64,7 @@ class SoundLight(LowLayer):
             self._window.clear()
             if P.fallback == SoundFallback.PULSE:
                 pulse = P.fallback_level * (0.5 - 0.5 * math.cos(math.tau * _PULSE_HZ * frame.tick.time))
-                self._add_bar_lights(bar_lights, left_blue=pulse, right_blue=pulse)
+                self._add_beam_lights(beam_lights, left_blue=pulse, right_blue=pulse)
             return
 
         self._window.append((levels.left, levels.right))
@@ -72,4 +72,4 @@ class SoundLight(LowLayer):
         recent = list(self._window)[-n:]
         left  = sum(v[0] for v in recent) / n
         right = sum(v[1] for v in recent) / n
-        self._add_bar_lights(bar_lights, left_blue=left * P.gain, right_blue=right * P.gain)
+        self._add_beam_lights(beam_lights, left_blue=left * P.gain, right_blue=right * P.gain)

@@ -9,7 +9,7 @@ from .layers import (
     PoseWavesSettings, FillSettings, PulseSettings,
     ChaseSettings, LinesSettings, RandomSettings, HarmonicSettings,
     PlayerLinesSettings, CameraLightSettings, PlayheadFlashSettings,
-    PlayheadHauntedSettings, PlayheadLowSettings, PlayheadHighSettings,
+    PlayheadHauntedSettings, SearchlightSettings, ProjectionPlayheadSettings,
     PlayheadTestSettings, SoundLightSettings, PoseInstrumentSettings, FloodSettings,
     WindDownSettings,
 )
@@ -18,24 +18,24 @@ from .layers import (
 class LayerId(IntEnum):
     """The unified layer pool: everything a state (or the debug select) can put in a mix.
 
-    One instance per layer; each layer's regime (low = lamps, high = ring) lives in its
-    class (`LowLayer`/`HighLayer`). Member order is the low block then the high block —
-    it drives the `DebugLayer` dropdown order and mirrors the low/high settings groups.
+    One instance per layer; each layer's mode (beam = lamps, projection = ring) lives in its
+    class (`BeamLayer`/`ProjectionLayer`). Member order is the beam block then the projection
+    block — it drives the `DebugLayer` dropdown order and mirrors the settings groups.
     Debug-only layers (never in a state's mix) state that role in their docstrings; the
-    high block's generic patterns keep the ``test_`` prefix.
+    projection block's generic patterns keep the ``test_`` prefix.
     """
-    # low — the lamp regime
-    sound_light         = auto()   # low: soundscape levels on the left/right blue lamps
-    playhead_low        = auto()   # low: front white lamp (the searchlight line)
-    playhead_flash      = auto()   # low: flash as the playhead crosses a participant
-    wind_down           = auto()   # low: flood's ending — the two white lamps fading over the spin-down (the wall while fast)
-    playhead_haunted    = auto()   # low: player/ghost flash (debug/experimentation)
-    playhead_test       = auto()   # low: direct levels for the four physical lamps (debug)
-    # high — the POV ring regime
-    pose_instrument     = auto()   # high: the pose instrument — people-anchored line patterns (see LAYERS.md)
-    playhead_high       = auto()   # high: bright ring marker visualising the content playhead
-    flood               = auto()   # high: constant full-strip white (S8's wall)
-    test_pose_waves     = auto()   # high: the old wave/void instrument (reference/montage)
+    # beam mode — the lamps
+    sound_light         = auto()   # beam: soundscape levels on the left/right blue lamps
+    searchlight         = auto()   # beam: front white lamp (the searchlight line)
+    playhead_flash      = auto()   # beam: flash as the playhead crosses a participant
+    wind_down           = auto()   # beam: flood's ending — the two white lamps fading over the spin-down (the wall while fast)
+    playhead_haunted    = auto()   # beam: player/ghost flash (debug/experimentation)
+    playhead_test       = auto()   # beam: direct levels for the four physical lamps (debug)
+    # projection mode — the POV ring
+    pose_instrument     = auto()   # projection: the pose instrument — people-anchored line patterns (see LAYERS.md)
+    projection_playhead = auto()   # projection: bright ring marker visualising the content playhead
+    flood               = auto()   # projection: constant full-strip white (S8's wall)
+    test_pose_waves     = auto()   # projection: the old wave/void instrument (reference/montage)
     test_harmonic       = auto()
     test_player_lines   = auto()
     test_calibration    = auto()
@@ -48,23 +48,23 @@ class LayerId(IntEnum):
 
 class DebugLayer(IntEnum):
     """The debug select: OFF = debug disarmed (the show runs); any other member = debug on,
-    showing exactly that layer solo while the motor auto-follows its regime.
+    showing exactly that layer solo while the motor auto-follows its mode.
 
     Mirrors `LayerId` member for member (same names, same values, same order) with OFF = 0
     in front. Spelled out rather than generated so type checkers see a real enum;
     `tests/test_debug_layer.py` fails if the two ever drift apart.
     """
     OFF                 = 0
-    # low — the lamp regime
+    # beam mode — the lamps
     sound_light         = auto()
-    playhead_low        = auto()
+    searchlight         = auto()
     playhead_flash      = auto()
     wind_down           = auto()
     playhead_haunted    = auto()
     playhead_test       = auto()
-    # high — the POV ring regime
+    # projection mode — the POV ring
     pose_instrument     = auto()
-    playhead_high       = auto()
+    projection_playhead = auto()
     flood               = auto()
     test_pose_waves     = auto()
     test_harmonic       = auto()
@@ -77,25 +77,25 @@ class DebugLayer(IntEnum):
     test_random         = auto()
 
 
-class LowLayersSettings(BaseSettings):
-    """Per-layer composition settings — the low (lamp-regime) block of the pool.
+class BeamLayersSettings(BaseSettings):
+    """Per-layer composition settings — the beam-mode block of the pool.
     `spin_down_seconds` is a hidden relay (from the root) into wind_down — the spin-down
     slider's visible home is the statemachine panel, next to spin_up."""
     spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — hidden relay from statemachine (via the root) into wind_down")
     sound_light:        Group[SoundLightSettings]       = Group(SoundLightSettings)
-    playhead_low:       Group[PlayheadLowSettings]      = Group(PlayheadLowSettings)
+    searchlight:        Group[SearchlightSettings]      = Group(SearchlightSettings)
     playhead_flash:     Group[PlayheadFlashSettings]    = Group(PlayheadFlashSettings)
     wind_down:          Group[WindDownSettings]         = Group(WindDownSettings, share=[spin_down_seconds.as_('spin_down_seconds')])
     playhead_haunted:   Group[PlayheadHauntedSettings]  = Group(PlayheadHauntedSettings)
     playhead_test:      Group[PlayheadTestSettings]     = Group(PlayheadTestSettings)
 
 
-class HighLayersSettings(BaseSettings):
-    """Per-layer composition settings — the high (ring-regime) block of the pool.
+class ProjectionLayersSettings(BaseSettings):
+    """Per-layer composition settings — the projection-mode block of the pool.
     `fov` is a hidden relay (from the root) into the calibration layers."""
     fov: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, visible=False, description="Camera horizontal FOV — hidden relay to test_player_lines/test_calibration")
-    pose_instrument:    Group[PoseInstrumentSettings]  = Group(PoseInstrumentSettings)
-    playhead_high:      Group[PlayheadHighSettings]    = Group(PlayheadHighSettings)
+    pose_instrument:    Group[PoseInstrumentSettings]        = Group(PoseInstrumentSettings)
+    projection_playhead: Group[ProjectionPlayheadSettings]   = Group(ProjectionPlayheadSettings)
     flood:              Group[FloodSettings]           = Group(FloodSettings)
     test_pose_waves:    Group[PoseWavesSettings]       = Group(PoseWavesSettings)
     test_harmonic:      Group[HarmonicSettings]        = Group(HarmonicSettings)
@@ -120,19 +120,19 @@ class LightSettings(BaseSettings):
     spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — hidden relay from statemachine (via the root) into wind_down")
 
     master:         Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Master brightness (applied to the composite; lamp gamma/floor live in the light sender)", newline=True, pinned=True)
-    light_phase: Field[float]    = Field(0.0, min=0.0, max=1.0, step=0.01, description="High-speed ring offset (0–1 turn), applied to the spun-content layers")
+    light_phase: Field[float]    = Field(0.0, min=0.0, max=1.0, step=0.01, description="Projection ring offset (0–1 turn), applied to the projection layers")
 
     # Debug override — a first-class select ABOVE the state machine: choosing a layer IS
     # turning debug on. The Compositor draws that one layer solo (full weight) and the
-    # motor auto-follows its regime (HighLayer → HIGH, LowLayer → LOW); OFF returns the
+    # motor auto-follows its mode (ProjectionLayer → PROJECTION, BeamLayer → BEAM); OFF returns the
     # show where it would have been. Forced OFF at startup (boot failsafe: a preset saved
     # mid-debug must never spin at power-on).
-    debug: Field[DebugLayer] = Field(DebugLayer.OFF, description="Debug override: select a layer to show it solo and auto-follow the motor to its regime (OFF = show runs)", newline=True)
+    debug: Field[DebugLayer] = Field(DebugLayer.OFF, description="Debug override: select a layer to show it solo and auto-follow the motor to its mode (OFF = show runs)", newline=True)
 
     clock:        Group[ClockSettings]        = Group(ClockSettings)
     motor:        Group[MotorSettings]        = Group(MotorSettings)
     playhead:     Group[PlayheadSettings]     = Group(PlayheadSettings)
 
-    # The per-layer composition settings pool, grouped by regime (mirrors layers/low|high/).
-    low_layers:  Group[LowLayersSettings]  = Group(LowLayersSettings, share=[spin_down_seconds.as_('spin_down_seconds')])
-    high_layers: Group[HighLayersSettings] = Group(HighLayersSettings, share=[fov.as_('fov')])
+    # The per-layer composition settings pool, grouped by mode (mirrors layers/beam|projection/).
+    beam_layers:       Group[BeamLayersSettings]       = Group(BeamLayersSettings, share=[spin_down_seconds.as_('spin_down_seconds')])
+    projection_layers: Group[ProjectionLayersSettings] = Group(ProjectionLayersSettings, share=[fov.as_('fov')])

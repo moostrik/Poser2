@@ -1,14 +1,14 @@
-"""The bar lights on the light side and in the render's model: the named writes of a
-LowLayer, and the projection of the four lights as lines on the walls."""
+"""The beam lights on the light side and in the render's model: the named writes of a
+BeamLayer, and the projection of the four lights as lines on the walls."""
 
 import math
 import unittest
 
 import numpy as np
 
-from apps.white_space.light import Frame, Tick, BarLightId, BAR_LIGHT_HEADINGS, BUFFER_DTYPE
+from apps.white_space.light import Frame, Tick, BeamLightId, BEAM_LIGHT_HEADINGS, BUFFER_DTYPE
 from apps.white_space.light.layers import PlayheadTest, PlayheadTestSettings
-from apps.white_space.render.layers.bar_light_projection import beam_profile, project_bar_lights
+from apps.white_space.render.layers.beam_light_projection import beam_profile, project_beam_lights
 
 R = 360   # one pixel per degree keeps the expected indices readable
 
@@ -25,15 +25,15 @@ class LowLayerWritesTest(unittest.TestCase):
         cfg.left_blue,   cfg.right_blue = 0.3, 0.4
         f = _frame()
         PlayheadTest(R, cfg, board=None).render(f)
-        np.testing.assert_allclose(f.bar_lights, [0.1, 0.2, 0.3, 0.4], rtol=1e-6)
+        np.testing.assert_allclose(f.beam_lights, [0.1, 0.2, 0.3, 0.4], rtol=1e-6)
         self.assertEqual(float(f.light_img.sum()), 0.0)
 
     def test_headings_follow_the_firmware_sampling_offsets(self) -> None:
         # white 2 at +1800, blue 1 (the blue[0] slot, LEFT) at +2700, blue 2 (RIGHT) at +900 of 3600.
-        self.assertAlmostEqual(BAR_LIGHT_HEADINGS[BarLightId.FRONT_WHITE], 0.0)
-        self.assertAlmostEqual(BAR_LIGHT_HEADINGS[BarLightId.BACK_WHITE],  math.pi)
-        self.assertAlmostEqual(BAR_LIGHT_HEADINGS[BarLightId.LEFT_BLUE],  -math.pi / 2)
-        self.assertAlmostEqual(BAR_LIGHT_HEADINGS[BarLightId.RIGHT_BLUE],  math.pi / 2)
+        self.assertAlmostEqual(BEAM_LIGHT_HEADINGS[BeamLightId.FRONT_WHITE], 0.0)
+        self.assertAlmostEqual(BEAM_LIGHT_HEADINGS[BeamLightId.BACK_WHITE],  math.pi)
+        self.assertAlmostEqual(BEAM_LIGHT_HEADINGS[BeamLightId.LEFT_BLUE],  -math.pi / 2)
+        self.assertAlmostEqual(BEAM_LIGHT_HEADINGS[BeamLightId.RIGHT_BLUE],  math.pi / 2)
 
 
 class BeamProfileTest(unittest.TestCase):
@@ -83,15 +83,15 @@ class ProjectionTest(unittest.TestCase):
 
     @staticmethod
     def _all(level: float) -> np.ndarray:
-        return np.full(len(BarLightId), level, dtype=BUFFER_DTYPE)
+        return np.full(len(BeamLightId), level, dtype=BUFFER_DTYPE)
 
-    def _one(self, light: BarLightId, level: float = 1.0) -> np.ndarray:
-        v = np.zeros(len(BarLightId), dtype=BUFFER_DTYPE)
+    def _one(self, light: BeamLightId, level: float = 1.0) -> np.ndarray:
+        v = np.zeros(len(BeamLightId), dtype=BUFFER_DTYPE)
         v[light] = level
         return v
 
-    def _project(self, bar_lights: np.ndarray, heading: float = 0.0) -> None:
-        project_bar_lights(bar_lights, heading, self.beam, self.blur, self.out)
+    def _project(self, beam_lights: np.ndarray, heading: float = 0.0) -> None:
+        project_beam_lights(beam_lights, heading, self.beam, self.blur, self.out)
 
     def test_lights_land_at_their_headings_from_heading_zero(self) -> None:
         self._project(self._all(1.0))
@@ -105,19 +105,19 @@ class ProjectionTest(unittest.TestCase):
         self.assertTrue(np.all(self.out[0, :, 2] == 0.0))         # reserved channel untouched
 
     def test_lines_follow_the_heading(self) -> None:
-        self._project(self._one(BarLightId.FRONT_WHITE), math.radians(90.0))
+        self._project(self._one(BeamLightId.FRONT_WHITE), math.radians(90.0))
         lit = np.flatnonzero(self.out[0, :, 0] > 0.0)      # the core is a plateau — take its centre
         self.assertEqual(int(round(float(lit.mean()))), R // 4)
 
     def test_line_is_symmetric_around_its_centre(self) -> None:
-        self._project(self._one(BarLightId.BACK_WHITE))
+        self._project(self._one(BeamLightId.BACK_WHITE))
         white = self.out[0, :, 0]
         centre = R // 2
         for d in range(1, 31):
             self.assertAlmostEqual(white[centre - d], white[centre + d], places=6, msg=f"offset {d}")
 
     def test_line_wraps_across_the_strip_edge(self) -> None:
-        self._project(self._one(BarLightId.FRONT_WHITE), math.radians(-2.0))
+        self._project(self._one(BeamLightId.FRONT_WHITE), math.radians(-2.0))
         white = self.out[0, :, 0]
         self.assertAlmostEqual(white[R - 2], 1.0, places=5)   # centre, just before the seam
         self.assertAlmostEqual(white[R - 1], 1.0, places=5)   # core carries on …
@@ -126,7 +126,7 @@ class ProjectionTest(unittest.TestCase):
         self.assertAlmostEqual(white[21], 0.0, places=6)      # and out (core 10 + blur 10 from centre)
 
     def test_core_and_fade_have_the_requested_widths(self) -> None:
-        self._project(self._one(BarLightId.FRONT_WHITE))
+        self._project(self._one(BeamLightId.FRONT_WHITE))
         white = self.out[0, :, 0]
         self.assertAlmostEqual(white[10], 1.0, places=5)      # solid to the core's edge
         self.assertGreater(white[10], white[15])              # then falls off

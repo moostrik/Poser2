@@ -6,7 +6,7 @@ import numpy as np
 
 from modules.settings import BaseSettings, Field, Group
 
-from .._base_layer import HighLayer, LayerSettings
+from .._base_layer import ProjectionLayer, LayerSettings
 from ...frame import Frame
 
 
@@ -35,7 +35,7 @@ class HarmonicSettings(LayerSettings):
     source_3: Group[HarmonicSourceSettings] = Group(HarmonicSourceSettings)
 
 
-class Harmonic(HighLayer):
+class Harmonic(ProjectionLayer):
     """Spatiotemporal LFO and harmonic interference composition.
 
     Each source generates a 1-D spatial sine wave::

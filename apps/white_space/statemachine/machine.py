@@ -4,7 +4,7 @@ A condition-driven state machine that plays the states designed in ``data/STATES
 (the source of truth): a sequencer hybrid, progress-driven *within* a state and
 condition-driven *between* states. Each tick (on the Conductor's light thread) it builds a
 ``StateContext`` from the board (participants, sync, hit-by-light, the playhead's content
-clock and regime signals), lets the active state return its mix, evaluates that state's
+clock and mode signals), lets the active state return its mix, evaluates that state's
 transition conditions, and emits a ``SequencerState`` snapshot for the board and OSC sound.
 
 The machine is the only component that talks to the Conductor, through three explicit
@@ -53,9 +53,9 @@ class StateContext:
                             # exits (to INTRO or IDLE by presence) once released
     prev: StateId | None    # the state we arrived from (None at boot) — lets a transition
                             # state ramp from where the show actually was (no dips)
-    motor_locked: bool      # the playhead has re-synced to the measured rotation at LOW
-                            # (stale-proof "at low speed" — S9/S10 exit one bar after it)
-    ring_formed: bool       # commanded HIGH and the falls have gone silent — the bar has
+    motor_locked: bool      # the playhead has re-synced to the measured rotation at BEAM
+                            # (stale-proof "back in beam mode" — S9/S10 exit one bar after it)
+    ring_formed: bool       # commanded PROJECTION and the falls have gone silent — the bar has
                             # physically blurred into the ring (S6's un-lock anchor)
 
 
@@ -79,10 +79,10 @@ class StateMachine:
 
         from .states import StateBase, STATES   # local import: states.py imports from this module
         self._states = {s: cls(config, light, reset_layers) for s, cls in STATES.items()}
-        # Failsafe: the show ALWAYS starts in OFF (dark, motor LOW) and wakes through OFF_IDLE
+        # Failsafe: the show ALWAYS starts in OFF (dark, motor BEAM) and wakes through OFF_IDLE
         # once the playhead has locked, regardless of the persisted `manual.select` value —
         # that field is only the goto target. A preset saved mid-show must never boot the
-        # machine into a HIGH-motor state. `manual.hold` and `blackout` are forced off: a
+        # machine into a PROJECTION-motor state. `manual.hold` and `blackout` are forced off: a
         # preset saved mid-hold or mid-blackout must never freeze or strand the power-on
         # show — the installation always wakes into the show, never stays dark.
         config.manual.hold = False

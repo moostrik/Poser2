@@ -1,11 +1,11 @@
-"""High-regime light layers (`HighLayer`) — persistence-of-vision ring content that only
-reads while the bar spins fast; all carry the ``light_phase`` ring shift. Show layers and
+"""Projection-mode light layers (`ProjectionLayer`) — persistence-of-vision ring content that
+only reads while the bar spins fast; all carry the ``light_phase`` ring shift. Show layers and
 ``test_``-prefixed debug layers live side by side — the name carries the role, the folder
-carries the regime.
+carries the mode.
 """
 
-from .pose_instrument     import PoseInstrument, PoseInstrumentSettings
-from .playhead_high       import PlayheadHigh,   PlayheadHighSettings
+from .pose_instrument     import PoseInstrument,     PoseInstrumentSettings
+from .projection_playhead import ProjectionPlayhead, ProjectionPlayheadSettings
 from .flood               import Flood,          FloodSettings
 from .test_pose_waves     import PoseWaves,      PoseWavesSettings
 from .test_harmonic       import Harmonic,       HarmonicSettings, HarmonicSourceSettings

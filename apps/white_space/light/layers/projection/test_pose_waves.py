@@ -11,7 +11,7 @@ from modules.tracker import Tracklet
 from modules.pose import features
 from modules.settings import Field
 
-from .._base_layer import HighLayer, LayerSettings
+from .._base_layer import ProjectionLayer, LayerSettings
 from ...frame import Frame, BUFFER_DTYPE
 from .._utilities import BlendType, draw_waves, draw_field, angle_to_strip_position
 
@@ -73,7 +73,7 @@ class PlayerState:
         self.age       = 0.0
 
 
-class PoseWaves(HighLayer):
+class PoseWaves(ProjectionLayer):
     """Pose-driven void + wave pattern layer.
 
     Ported 1-to-1 from the original Compositor._draw / make_voids / make_patterns.

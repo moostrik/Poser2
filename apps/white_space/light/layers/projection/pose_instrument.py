@@ -41,7 +41,7 @@ import pytweening
 from modules.pose import features
 from modules.settings import Field
 
-from .._base_layer import HighLayer, LayerSettings
+from .._base_layer import ProjectionLayer, LayerSettings
 from .._utilities import BlendType, angle_to_strip_position, draw_field
 from ...frame import Frame
 
@@ -202,7 +202,7 @@ def _value(x: float, fallback: float) -> float:
     return fallback if math.isnan(x) else float(x)
 
 
-class PoseInstrument(HighLayer):
+class PoseInstrument(ProjectionLayer):
     """The pose instrument; see the module docstring."""
 
     def __init__(self, resolution: int, config: PoseInstrumentSettings,

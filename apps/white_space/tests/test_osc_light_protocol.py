@@ -12,7 +12,7 @@ import numpy as np
 from apps.white_space.inout.osc_light_sender import (
     FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS, OscLightSender, OscLightSenderSettings,
 )
-from apps.white_space.light import Frame, Tick, BarLightId
+from apps.white_space.light import Frame, Tick, BeamLightId
 
 # The firmware reads a fixed-size OSC preamble before the pixel body: 12-byte padded address,
 # 4-byte typetag, 4-byte blob length.
@@ -138,18 +138,18 @@ class ConfigMessageTest(unittest.TestCase):
 
 
 class FixtureSlotTest(unittest.TestCase):
-    """The fixture's readout mode follows the rpm sent with the frame: in slow mode it reads the
-    four bar lights from pixel 0 and the middle pixel of each channel and nothing else, in ring
+    """The fixture's readout mode follows the rpm sent with the frame: in beam mode it reads the
+    four beam lights from pixel 0 and the middle pixel of each channel and nothing else, in ring
     mode it steps the ring and never reads a slot. The rebuild mirrors that exactly."""
 
-    LEVELS = {BarLightId.FRONT_WHITE: 0.9, BarLightId.BACK_WHITE: 0.6,
-              BarLightId.LEFT_BLUE: 0.4, BarLightId.RIGHT_BLUE: 0.2}
+    LEVELS = {BeamLightId.FRONT_WHITE: 0.9, BeamLightId.BACK_WHITE: 0.6,
+              BeamLightId.LEFT_BLUE: 0.4, BeamLightId.RIGHT_BLUE: 0.2}
     HALF = RESOLUTION // 2
 
     def _lit_frame(self) -> Frame:
         frame = _frame()
         for light, level in self.LEVELS.items():
-            frame.bar_lights[light] = level
+            frame.beam_lights[light] = level
         return frame
 
     @staticmethod
@@ -188,7 +188,7 @@ class FixtureSlotTest(unittest.TestCase):
         np.testing.assert_array_equal(frame.light_img, before)
 
     def test_wire_is_identical_to_the_baked_in_pixel_model(self) -> None:
-        """Regression against the previous data model, where the low layers wrote the lamp
+        """Regression against the previous data model, where the beam layers wrote the lamp
         levels straight into the slot pixels: the same look must produce the same bytes."""
         baked = _frame()
         baked.white[0], baked.white[self.HALF] = 0.9, 0.6
