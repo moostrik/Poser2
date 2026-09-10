@@ -71,7 +71,7 @@ class Render(RenderBase):
         self.L[Layers.ws_beam][0]     = BeamLightSimulationLayer(board, settings.beam_light_sim)
 
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name='track',      columns=self.num_cams,    rows=1, src_aspect_ratio=16/9, padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name='track',      columns=self.num_cams,    rows=1, src_aspect_ratio=1280/800, padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name='panoramic',  columns=1,                rows=1, src_aspect_ratio=10.0, padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name='ws_light',   columns=1,                rows=1, src_aspect_ratio=3.0, padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name='pose',       columns=self.num_players, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0)),

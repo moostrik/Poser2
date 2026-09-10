@@ -1,13 +1,19 @@
 
+import logging
+
 import numpy as np
 from depthai import Pipeline
 from ..camera.camera import *
+from ..camera import frame_size
 from ..camera.settings import CameraSettings
 from .settings import SimulatorSettings
 from .player import Player
 from cv2 import resize, COLOR_RGB2GRAY, cvtColor
 from time import process_time
 from datetime import timedelta
+
+logger = logging.getLogger(__name__)
+
 
 class Simulator(Camera):
 
@@ -24,6 +30,9 @@ class Simulator(Camera):
         self.ex_right:  dai.DataInputQueue
 
         self.passthrough: bool = player_settings.sim_passthrough
+
+        # Last clip size reported by _check_frame_size, so the warning fires once per size.
+        self._warned_frame_size: tuple[int, int] | None = None
 
     def start(self) -> None: # override
         if self.passthrough:
@@ -73,6 +82,7 @@ class Simulator(Camera):
         frame_time = timedelta(seconds = process_time())
         height, width = frame.shape[:2]
         if id == self.id:
+            self._check_frame_size(width, height)
             if frame_type == FrameType.VIDEO and Input.VIDEO_FRAME_IN in self.inputs:
                 img = dai.ImgFrame()
                 # img.setInstanceNum(int(dai.CameraBoardSocket.CAM_A))
@@ -108,6 +118,24 @@ class Simulator(Camera):
                 img.setWidth(width)
                 img.setHeight(height)
                 self.inputs[Input.RIGHT_FRAME_IN].send(img)
+
+    def _check_frame_size(self, width: int, height: int) -> None:
+        """Warn once per size when a clip's frames differ from what the pipeline was built for.
+
+        Nothing breaks mechanically: XLinkIn's max data size is a ceiling, the ImgFrame carries
+        the clip's own dimensions, and the detector resizes whatever arrives. But every
+        frame-relative setting is tuned for the configured size and is silently off by the
+        ratio — the tracker's vfov and height gates, and the pose distance thresholds.
+        """
+        expected: tuple[int, int] = frame_size(self.do_color, self.do_720p, self.square)
+        if (width, height) == expected or (width, height) == self._warned_frame_size:
+            return
+        self._warned_frame_size = (width, height)
+        logger.warning(
+            "cam %d: clip frames are %dx%d, pipeline is built for %dx%d — frame-relative "
+            "settings (vfov, tracker height gates, pose distance) are tuned for the latter",
+            self.id, width, height, expected[0], expected[1],
+        )
 
     def _passthrough_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray) -> None:
         if id != self.id:

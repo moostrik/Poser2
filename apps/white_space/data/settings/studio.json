@@ -134,13 +134,13 @@
     },
     "tracker": {
       "min_age": 5,
-      "min_height": 0.25,
+      "min_height": 0.2,
       "timeout": 2.0,
       "seam": {
         "reject": 0.35,
         "reach": 1.1,
         "hysteresis": 0.6,
-        "max_height_diff": 0.2,
+        "max_height_diff": 0.18,
         "angles": {}
       },
       "distortion": {
@@ -157,7 +157,7 @@
       "parallax": {
         "ring_radius": 0.25,
         "person_height": 1.7,
-        "vfov": 71.6
+        "vfov": 79.5
       }
     },
     "frame_sync": {},
@@ -226,8 +226,8 @@
       "aspect_ratio": 0.75
     },
     "distance_extractor": {
-      "near_y": 0.9,
-      "far_y": 0.3
+      "near_y": 0.86,
+      "far_y": 0.32
     },
     "leg_deviation_extractor": {
       "hip_rad": 1.0471975511965976,

@@ -31,7 +31,15 @@ MONO_SIZES: dict[MonoCameraProperties.SensorResolution, tuple[int, int]] = {
 # THE_720_P is a pure vertical crop of it, so the horizontal field — and with it the
 # whole column-to-azimuth mapping — is identical either way. Change this one line to
 # change the resolution everywhere.
-MONO_RESOLUTION: MonoCameraProperties.SensorResolution = MonoCameraProperties.SensorResolution.THE_720_P
+#
+# NOT derived from it, and to be edited by hand alongside it, because they are set by eye
+# against the frame rather than computed:
+#   camera.tracker.parallax.vfov          fov * rows / columns  (127 * 800/1280 = 79.5)
+#   camera.tracker.min_height             a fraction of frame height, so it scales
+#   camera.tracker.seam.max_height_diff   idem
+#   pose.distance_extractor.near_y/far_y  positions in the frame, so they scale and shift
+#   render.py's 'track' row src_aspect_ratio
+MONO_RESOLUTION: MonoCameraProperties.SensorResolution = MonoCameraProperties.SensorResolution.THE_800_P
 MONO_SIZE: tuple[int, int] = MONO_SIZES[MONO_RESOLUTION]
 
 # Colour preview sizes, already trimmed to the warp's alignment: 1080 is not divisible
