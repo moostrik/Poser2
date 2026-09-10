@@ -3,7 +3,7 @@
 The light layers behind the states' mixes (see `STATES.md` for the choreography; this
 document covers the layers themselves). All show layers are **indexed** below. For
 existing layers the module docstrings stay the source of truth for behavior; the layers
-built in the show work packages (`sound_light`, `flood`, `wind_down`, `pose_instrument`)
+built in the show work packages (`beam_blue_sound`, `flood`, `beam_wind_down`, `pose_instrument`)
 keep their full design sections here.
 
 Modes: **beam** layers write the four beam lights by name (`Frame.beam_lights`, indexed by
@@ -17,28 +17,28 @@ beam_light_simulation_layer.py`). Base classes `BeamLayer` / `ProjectionLayer` e
 folders and settings groups follow the same single axis (`layers/beam/` ↔ `light.beam_layers`,
 `layers/projection/` ↔ `light.projection_layers` — no separate test folder). Debug-only layers state
 that role in their docstrings; the projection block's generic patterns keep a `test_` prefix,
-while the beam tools are named as playhead tools (`playhead_haunted`, `playhead_test`).
+while the beam tools are named as playhead tools (`beam_haunted`, `beam_test`).
 
 ## Index — show layers
 
 | Layer             | Mode       | Reads                                                  | Writes                        | Used by |
 |-------------------|------------|--------------------------------------------------------|-------------------------------|---------|
-| `searchlight`     | beam       | — (settings only)                                      | front white lamp              | S1–S6, S9, S10 |
-| `playhead_flash`  | beam       | LERP frames (PlayheadOffset), tracklets                 | front white lamp + blue lamps (blue zeroed in presets — S4 runs blue-none by design) | S4 |
+| `beam_playhead`     | beam       | — (settings only)                                      | front white lamp              | S1–S6, S9, S10 |
+| `beam_flash`  | beam       | LERP frames (PlayheadOffset), tracklets                 | front white lamp + blue lamps (blue zeroed in presets — S4 runs blue-none by design) | S4 |
 | `projection_playhead` | projection | frame playhead phase                               | white ring marker             | S6 (post-un-lock), S7, S8 |
 | `pose_instrument` | projection | LERP frames (Azimuth, BBox, Angles, LegDeviation, TorsoTilt, Similarity), tracklets, playhead bars (PLAYHEAD motion only) | white lines, blue anchor + between-lines | S6 (post-un-lock), S7, S8 |
 | `flood`           | projection | — (settings only)                                      | full-strip white              | S8 |
-| `wind_down`       | beam       | tick clock                                             | both white lamps, fading (the wall while the bar is still fast) | S9, S10 |
-| `sound_light`     | beam       | sound levels from Max (board)                          | left/right blue lamps         | S1, S2, S3, S5, S10 |
+| `beam_wind_down`       | beam       | tick clock                                             | both white lamps, fading (the wall while the bar is still fast) | S9, S10 |
+| `beam_blue_sound`     | beam       | sound levels from Max (board)                          | left/right blue lamps         | S1, S2, S3, S5, S10 |
 
-`wind_down` is `flood`'s ending and a plain beam layer: the fixture is in beam mode from
+`beam_wind_down` is `flood`'s ending and a plain beam layer: the fixture is in beam mode from
 S9's first packet, so the wall while the bar is still fast *is* the two white lamps
 spinning. See its section below.
 
 Debug layers (never in a state's mix; reached via the `light.debug` select — **choosing a
 layer IS turning debug on**: it shows solo at full weight and the motor auto-follows its
-mode, OFF returns the show): the two beam tools `playhead_haunted` (the ghost flash;
-pairs with `pose.ghoster.enabled` for solo experimentation) and `playhead_test` (direct
+mode, OFF returns the show): the two beam tools `beam_haunted` (the ghost flash;
+pairs with `pose.ghoster.enabled` for solo experimentation) and `beam_test` (direct
 levels for the four physical lamps: front/back white, left/right blue — beam mode's
 hardware check), plus the projection `test_`-prefixed patterns: `test_pose_waves` (the old
 wave/void instrument, kept as a reference/montage visual), `test_harmonic`,
@@ -47,7 +47,7 @@ wave/void instrument, kept as a reference/montage visual), `test_harmonic`,
 
 ---
 
-## sound_light (new — BeamLayer)
+## beam_blue_sound (BeamLayer)
 
 The soundscape made visible: the left and right blue lamps breathe with the actual
 sound Max is playing.
@@ -74,7 +74,7 @@ sound Max is playing.
 
 Constant full-strip white — the END's wall of light. Deliberately the dumbest layer in
 the pool: all dynamics (the cross-to-full) are mix weights set by the states, never
-behavior inside the layer. The *ending* of the wall belongs to `wind_down` — S8's flood
+behavior inside the layer. The *ending* of the wall belongs to `beam_wind_down` — S8's flood
 at 1.0 hands over to S9/S10's wind_down starting at the full wall, seamlessly.
 
 - **Used by**: S8 END (easing in as the instrument fades)
@@ -84,7 +84,7 @@ at 1.0 hands over to S9/S10's wind_down starting at the full wall, seamlessly.
 - **Reset**: no-op
 - **Open questions**: —
 
-## wind_down (BeamLayer)
+## beam_wind_down (BeamLayer)
 
 The dying wall of light: owns the S9/S10 ending fade. It writes the two white lamps at a
 fading level; everything else is physics. The fixture is in beam mode from S9's first
@@ -95,7 +95,7 @@ when the bar is slow. The S8 → S9 hand-off is seamless at the DACs: `flood` at
 mode drives the same two white outputs as this layer at 1.0 in beam mode.
 
 - **Used by**: S9/S10 at constant weight 1.0 (reset on state entry). The states put the
-  landing look underneath (`searchlight` at DIM/BRIGHT, `sound_light`) — it is
+  landing look underneath (`beam_playhead` at DIM/BRIGHT, `beam_blue_sound`) — it is
   *revealed* as the wall dies, so nothing has to splice or match at the hand-off.
 - **Input**: the tick clock; no pose data, no playhead signals.
 - **Behavior**: both white lamps at `f × level`, `f = 1 − ease(elapsed / spin_down_seconds)`,

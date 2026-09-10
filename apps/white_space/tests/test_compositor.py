@@ -42,25 +42,25 @@ class CompositorTest(unittest.TestCase):
     def setUp(self) -> None:
         self.a = FakeLayer(1.0)
         self.b = FakeLayer(2.0)
-        self.layers = {LayerId.searchlight: self.a, LayerId.test_pose_waves: self.b}
+        self.layers = {LayerId.beam_playhead: self.a, LayerId.test_pose_waves: self.b}
         self.cfg = config()
         self.comp = Compositor(self.cfg, self.layers)
 
     def test_weighted_blend(self) -> None:
-        self.comp.set_mix([(LayerId.searchlight, 0.5), (LayerId.test_pose_waves, 0.25)])
+        self.comp.set_mix([(LayerId.beam_playhead, 0.5), (LayerId.test_pose_waves, 0.25)])
         f = frame()
         self.comp.render(f)
         np.testing.assert_allclose(f.white, 0.5 * 1.0 + 0.25 * 2.0)
 
     def test_zero_weight_is_silent_but_never_resets(self) -> None:
-        self.comp.set_mix([(LayerId.searchlight, 0.0)])
+        self.comp.set_mix([(LayerId.beam_playhead, 0.0)])
         f = frame()
         self.comp.render(f)
         np.testing.assert_allclose(f.white, 0.0)
         self.assertEqual(self.a.resets, 0)
 
     def test_absent_layer_is_not_reset_implicitly(self) -> None:
-        self.comp.set_mix([(LayerId.searchlight, 1.0)])
+        self.comp.set_mix([(LayerId.beam_playhead, 1.0)])
         self.comp.render(frame())
         self.comp.set_mix([(LayerId.test_pose_waves, 1.0)])   # lamp dropped from the look
         self.comp.render(frame())
@@ -80,7 +80,7 @@ class CompositorTest(unittest.TestCase):
         np.testing.assert_allclose(f.blue, 0.25)
 
     def test_explicit_reset_layers(self) -> None:
-        self.comp.reset_layers([LayerId.searchlight])
+        self.comp.reset_layers([LayerId.beam_playhead])
         self.assertEqual(self.a.resets, 1)
         self.assertEqual(self.b.resets, 0)
 
@@ -101,7 +101,7 @@ class CompositorTest(unittest.TestCase):
     def test_debug_override_replaces_state_mix(self) -> None:
         # Selecting a layer IS turning debug on: the select replaces the state's mix solo.
         self.cfg.debug = DebugLayer.test_pose_waves
-        self.comp.set_mix([(LayerId.searchlight, 1.0)])
+        self.comp.set_mix([(LayerId.beam_playhead, 1.0)])
         f = frame()
         self.comp.render(f)
         np.testing.assert_allclose(f.white, 2.0)   # only the debug layer, full weight
@@ -109,14 +109,14 @@ class CompositorTest(unittest.TestCase):
 
 class LampMappingTest(unittest.TestCase):
     """BeamLayer's named writes land on the frame's explicit beam lights and touch no pixel —
-    verified through playhead_test, beam mode's direct test tool."""
+    verified through beam_test, beam mode's direct test tool."""
 
     def test_named_lamps_land_on_the_bar_lights(self) -> None:
-        from apps.white_space.light.layers.beam.playhead_test import PlayheadTest, PlayheadTestSettings
-        cfg = PlayheadTestSettings()
+        from apps.white_space.light.layers.beam.test import BeamTest, BeamTestSettings
+        cfg = BeamTestSettings()
         cfg.front_white, cfg.back_white = 0.9, 0.6
         cfg.left_blue, cfg.right_blue = 0.4, 0.2
-        layer = PlayheadTest(RES, cfg, board=None)
+        layer = BeamTest(RES, cfg, board=None)
         f = frame()
         layer.render(f)
         self.assertAlmostEqual(f.beam_lights[BeamLightId.FRONT_WHITE], 0.9, places=6)
@@ -139,17 +139,17 @@ class BeamLightMixTest(unittest.TestCase):
             pass
 
     def test_per_channel_weights(self) -> None:
-        comp = Compositor(config(), {LayerId.playhead_test: self.BeamFakeLayer()})
+        comp = Compositor(config(), {LayerId.beam_test: self.BeamFakeLayer()})
         f = frame()
-        comp.set_mix([(LayerId.playhead_test, (0.5, 0.2))])
+        comp.set_mix([(LayerId.beam_test, (0.5, 0.2))])
         comp.render(f)
         np.testing.assert_allclose(f.beam_lights, [0.5, 0.25, 0.2, 0.1], rtol=1e-6)
         self.assertEqual(float(f.light_img.sum()), 0.0)
 
     def test_zero_weight_keeps_beam_lights_dark(self) -> None:
-        comp = Compositor(config(), {LayerId.playhead_test: self.BeamFakeLayer()})
+        comp = Compositor(config(), {LayerId.beam_test: self.BeamFakeLayer()})
         f = frame()
-        comp.set_mix([(LayerId.playhead_test, 0.0)])
+        comp.set_mix([(LayerId.beam_test, 0.0)])
         comp.render(f)
         self.assertEqual(float(f.beam_lights.sum()), 0.0)
 

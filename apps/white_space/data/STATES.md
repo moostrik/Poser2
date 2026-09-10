@@ -109,15 +109,15 @@ Each state composes its **mix**: a weighted list of layers, returned every tick
 
 | Layer             | Mode       | Draws |
 |-------------------|------------|-------|
-| `searchlight`     | beam       | the searchlight line — front white lamp |
-| `playhead_flash`  | beam       | flash as the playhead crosses a participant |
-| `sound_light`     | beam       | soundscape levels on the left/right blue lamps (`/WS/sound/level` from Max) |
+| `beam_playhead`     | beam       | the searchlight line — front white lamp |
+| `beam_flash`  | beam       | flash as the playhead crosses a participant |
+| `beam_blue_sound`     | beam       | soundscape levels on the left/right blue lamps (`/WS/sound/level` from Max) |
 | `pose_instrument` | projection | the pose instrument — each participant in a blue anchor light with a symmetric pose-derived line pattern; matched participants' patterns grow together across the space between them (see `LAYERS.md`) |
 | `projection_playhead` | projection | the playhead line on the ring — full-white marker |
 | `flood`           | projection | constant full-strip white (S7's wall) |
-| `wind_down`       | beam       | the dying wall — both white lamps fading over the spin-down (S8/S9; the wall while the bar is still fast is the lamps spinning, see `LAYERS.md`) |
+| `beam_wind_down`       | beam       | the dying wall — both white lamps fading over the spin-down (S8/S9; the wall while the bar is still fast is the lamps spinning, see `LAYERS.md`) |
 
-Per-layer design, inputs, and settings: see `LAYERS.md`. `searchlight` and
+Per-layer design, inputs, and settings: see `LAYERS.md`. `beam_playhead` and
 `projection_playhead` are deliberately two layers: the light data protocol differs between
 beam mode and projection mode. Debug layers (see the roster in `LAYERS.md`)
 are never in a state's mix — they are reached via the `light.debug` select: choosing a
@@ -169,7 +169,7 @@ than dropped into the middle of INTRO.
 - **Participants**: — (either way) · **Duration**: `off_idle_bars` (1 bar) ·
   **Motor**: BEAM
 - **Transitions** (priority order): hit → INTRO · fade complete → IDLE
-- **Mix**: `searchlight` and `sound_light`, both eased 0 → 1 over the bar
+- **Mix**: `beam_playhead` and `beam_blue_sound`, both eased 0 → 1 over the bar
 - **White**: fade dark → BRIGHT line · **Blue**: fade-in sound visuals
 - **Pose sound**: no · **Secondary sound**: fade-in soundscape
 - **Open questions**: —
@@ -182,9 +182,9 @@ atmospheric soundscape that evokes curiosity and plays on both blue lamps.
 - **Participants**: 0 · **Duration**: ∞ · **Motor**: BEAM
 - **Transitions**
   1. P > 0 → S2 IDLE_INTRO
-- **Mix**: `searchlight` 1.0 · `sound_light` 1.0
-- **White**: BRIGHT line — `searchlight` full
-- **Blue**: sound visuals — `sound_light`
+- **Mix**: `beam_playhead` 1.0 · `beam_blue_sound` 1.0
+- **White**: BRIGHT line — `beam_playhead` full
+- **Blue**: sound visuals — `beam_blue_sound`
 - **Pose sound**: no
 - **Secondary sound**: SEARCHLIGHT soundscape
 - **Open questions**: —
@@ -202,9 +202,9 @@ intro begins: the line snaps to dim and the soundscape stops.
   2. P == 0 → S4 INTRO_IDLE *(if the person leaves before being hit, wind back to idle
      via the normal transition — INTRO_IDLE ramps from its entry brightness, so this
      pass-through causes no dip)*
-- **Mix**: `searchlight` 1.0 · `sound_light` 1.0
-- **White**: BRIGHT line — `searchlight` full
-- **Blue**: sound visuals — `sound_light`
+- **Mix**: `beam_playhead` 1.0 · `beam_blue_sound` 1.0
+- **White**: BRIGHT line — `beam_playhead` full
+- **Blue**: sound visuals — `beam_blue_sound`
 - **Pose sound**: yes — deliberately audible before the hit (the anticipation)
 - **Secondary sound**: SEARCHLIGHT + anticipatory cue building toward the hit
 - **Open questions**: the anticipatory cue's design (Max side)
@@ -222,13 +222,13 @@ as it crosses each participant.
      and P ≥ 3 → S5 INTRO_PLAY
   3. session: elapsed ≥ `session.intro_seconds` → S5 INTRO_PLAY *(checked after P == 0,
      so an empty room never spins up)*
-- **Mix**: `searchlight` DIM · `playhead_flash` 1.0 (reset on entry)
+- **Mix**: `beam_playhead` DIM · `beam_flash` 1.0 (reset on entry)
 - **White**: DIM line + BRIGHT flash on hit
 - **Blue**: none
 - **Pose sound**: yes (only sound)
 - **Ghosts**: an experimentation mode, used by no state — `pose.ghoster.enabled` off
   means no ghosts anywhere (no sound slots, nothing to draw); enabling it plus the
-  `playhead_haunted` debug layer brings ghost sound and visuals together for solo testing.
+  `beam_haunted` debug layer brings ghost sound and visuals together for solo testing.
 - **Secondary sound**: none
 - **Open questions**: —
 
@@ -240,7 +240,7 @@ searchlight and the soundscape fades back in.
 - **Participants**: 0 · **Duration**: 1 bar (`intro_idle_bars`) · **Motor**: BEAM
 - **Transitions**
   1. bars ≥ `intro_idle_bars` → S1 IDLE
-- **Mix**: `searchlight` ramp(entry level → 1.0) · `sound_light` ramp(entry level → 1.0)
+- **Mix**: `beam_playhead` ramp(entry level → 1.0) · `beam_blue_sound` ramp(entry level → 1.0)
 - **White**: fade DIM → BRIGHT (from wherever the lamp actually was on entry — no dip)
 - **Blue**: fade-in sound visuals — also from the entry level (0 arriving from INTRO,
   already 1.0 on the IDLE_INTRO pass-through — no blink)
@@ -257,7 +257,7 @@ over from the line during the spin-up, and the sound enhances the accelerating c
 - **Transitions**
   1. elapsed ≥ `spin_up_seconds` → S6 PLAY *(stands in for "at motor top speed" —
      the sensor is blind above 200 RPM, so time approximates it)*
-- **Mix**: `searchlight` DIM until motor **un-lock**, then `pose_instrument` white 1.0
+- **Mix**: `beam_playhead` DIM until motor **un-lock**, then `pose_instrument` white 1.0
   (hard) / blue ease-in · `projection_playhead` 1.0 — per-channel weights; pose_instrument
   reset on entry (fresh instrument per cycle)
 - **White**: **hard mix at un-lock** — the dim line holds unchanged from INTRO while the
@@ -317,7 +317,7 @@ away during the spin-down**, revealing the dim playhead line underneath. The fad
 purely timed; the state hands over once it is complete and the motor has found its lock
 at BEAM (the landing state needs a live playhead).
 
-*(The fade lives in the `wind_down` layer, not in mix weights. The fixture switches to
+*(The fade lives in the `beam_wind_down` layer, not in mix weights. The fixture switches to
 beam mode on the first packet commanding BEAM, so from S8's first tick the two white
 lamps are driven directly: while the bar is still fast they spin into a wall, as it
 slows they thin into beams — one mechanism, so the layer needs no knowledge of the
@@ -329,8 +329,8 @@ to the physical spin-down.)*
 - **Participants**: < 3, > 0 · **Duration**: the spin-down (fade complete, then the lock) · **Motor**: BEAM
 - **Transitions**
   1. fade complete (`progress` ≥ 1) and motor lock → S3 INTRO
-- **Mix**: `wind_down` 1.0 · `searchlight` DIM — **constant weights**; the dynamics
-  live inside `wind_down` (reset on entry). The dim line sits underneath from the
+- **Mix**: `beam_wind_down` 1.0 · `beam_playhead` DIM — **constant weights**; the dynamics
+  live inside `beam_wind_down` (reset on entry). The dim line sits underneath from the
   start and is *revealed* as the wall dies — no splice, no seam into INTRO (the front
   sums past full and clips until the wall drops away; monotonic to DIM)
 - **White**: both white lamps fade BRIGHT → gone over `spin_down_seconds`; the front
@@ -346,14 +346,14 @@ to the physical spin-down.)*
 
 The space is empty: the wall of white fades away during the spin-down, revealing the
 bright searchlight line; the distortion disappears and the searchlight soundscape
-returns with it. The same engine as S8 — `wind_down` owns the timed fade, the state
+returns with it. The same engine as S8 — `beam_wind_down` owns the timed fade, the state
 hands over once it is complete and the motor has locked — landing on the BRIGHT line
 instead of the dim one.
 
 - **Participants**: 0 · **Duration**: the spin-down (fade complete, then the lock) · **Motor**: BEAM
 - **Transitions**
   1. fade complete (`progress` ≥ 1) and motor lock → S1 IDLE
-- **Mix**: `wind_down` 1.0 · `searchlight` 1.0 · `sound_light` p — the line at
+- **Mix**: `beam_wind_down` 1.0 · `beam_playhead` 1.0 · `beam_blue_sound` p — the line at
   constant full underneath the dying wall (the front lamp clips at full throughout:
   constant BRIGHT, no seam into IDLE); the sound visuals fade in on p = the layer's
   fade readout

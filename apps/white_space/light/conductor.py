@@ -20,8 +20,8 @@ from .motor import MotorController, MotorMode
 from .playhead import Playhead
 from .settings import LightSettings, LayerId, DebugLayer
 from .layers import (BaseLayer, Compositor, Mix, PoseWaves, Fill, Pulse, Chase, Lines, Random,
-                     Harmonic, PlayerLines, CameraLight, PlayheadFlash, PlayheadHaunted,
-                     Searchlight, ProjectionPlayhead, PlayheadTest, SoundLight, PoseInstrument, Flood,
+                     Harmonic, PlayerLines, CameraLight, Flash, Haunted,
+                     BeamPlayhead, ProjectionPlayhead, BeamTest, BlueSound, PoseInstrument, Flood,
                      WindDown)
 from modules.board import PlayheadSignals
 
@@ -70,24 +70,24 @@ class Conductor(Thread):
         # mode lives in its class (BeamLayer/ProjectionLayer).
         LO, HI = config.beam_layers, config.projection_layers
         self.layers: dict[LayerId, BaseLayer] = {
-            LayerId.sound_light:        SoundLight     (resolution, LO.sound_light,      board),
-            LayerId.searchlight:       Searchlight    (resolution, LO.searchlight,     board),
-            LayerId.playhead_flash:     PlayheadFlash  (resolution, LO.playhead_flash,   board, pose_stage),
-            LayerId.wind_down:          WindDown       (resolution, LO.wind_down,        board),
-            LayerId.playhead_haunted:   PlayheadHaunted(resolution, LO.playhead_haunted, board, pose_stage),
-            LayerId.playhead_test:      PlayheadTest   (resolution, LO.playhead_test,    board),
-            LayerId.pose_instrument:    PoseInstrument (resolution, HI.pose_instrument,  board, pose_stage),
-            LayerId.projection_playhead:      ProjectionPlayhead   (resolution, HI.projection_playhead,    board),
-            LayerId.flood:              Flood          (resolution, HI.flood,            board),
-            LayerId.test_pose_waves:    PoseWaves      (resolution, num_players, HI.test_pose_waves, self._clock.interval, board, pose_stage),
-            LayerId.test_harmonic:      Harmonic       (resolution, HI.test_harmonic,    board),
-            LayerId.test_player_lines:  PlayerLines    (resolution, HI.test_player_lines, board, pose_stage),
-            LayerId.test_calibration:   CameraLight    (resolution, HI.test_calibration, distortion, config.num_cameras, board),
+            LayerId.beam_blue_sound:     BlueSound   (resolution, LO.beam_blue_sound,   board),
+            LayerId.beam_playhead:       BeamPlayhead(resolution, LO.beam_playhead,     board),
+            LayerId.beam_flash:          Flash       (resolution, LO.beam_flash,        board, pose_stage),
+            LayerId.beam_wind_down:      WindDown    (resolution, LO.beam_wind_down,    board),
+            LayerId.beam_haunted:        Haunted     (resolution, LO.beam_haunted,      board, pose_stage),
+            LayerId.beam_test:           BeamTest    (resolution, LO.beam_test,         board),
+            LayerId.pose_instrument:     PoseInstrument     (resolution, HI.pose_instrument,     board, pose_stage),
+            LayerId.projection_playhead: ProjectionPlayhead (resolution, HI.projection_playhead, board),
+            LayerId.flood:               Flood              (resolution, HI.flood,               board),
+            LayerId.test_player_lines:   PlayerLines (resolution, HI.test_player_lines, board, pose_stage),
+            LayerId.test_calibration:    CameraLight (resolution, HI.test_calibration, distortion, config.num_cameras, board),
             LayerId.test_fill:   Fill  (resolution, HI.test_fill,   board),
             LayerId.test_pulse:  Pulse (resolution, HI.test_pulse,  board),
             LayerId.test_chase:  Chase (resolution, HI.test_chase,  board),
             LayerId.test_lines:  Lines (resolution, HI.test_lines,  board),
             LayerId.test_random: Random(resolution, HI.test_random, board),
+            LayerId.test_pose_waves: PoseWaves(resolution, num_players, HI.test_pose_waves, self._clock.interval, board, pose_stage),
+            LayerId.test_harmonic:   Harmonic (resolution, HI.test_harmonic, board),
         }
 
         self._compositor = Compositor(config, self.layers)

@@ -171,7 +171,7 @@ class StateMachineTest(unittest.TestCase):
         self.set_participants(0)
         self.assertEqual(self.current, StateId.INTRO_IDLE)
         # Arrived from IDLE_INTRO (already bright): both channels ramp from 1.0 — no dip/blink
-        self.assertEqual(self.mixes[-1], [(LayerId.searchlight, 1.0), (LayerId.sound_light, 1.0)])
+        self.assertEqual(self.mixes[-1], [(LayerId.beam_playhead, 1.0), (LayerId.beam_blue_sound, 1.0)])
         self.tick(dbar=self.config.intro_idle_bars + 0.1)
         self.assertEqual(self.current, StateId.IDLE)
 
@@ -198,7 +198,7 @@ class StateMachineTest(unittest.TestCase):
         # INTRO resets the flash layer; INTRO_PLAY resets the instrument (fresh patterns +
         # fill per cycle); PLAY inherits the running instrument — no reset on END → PLAY.
         self._to_intro(participants=3)
-        self.assertIn([LayerId.playhead_flash], self.resets)
+        self.assertIn([LayerId.beam_flash], self.resets)
         self.machine.set_similarity(SimpleNamespace(similarity={
             0: FakeSimilarity(0.9), 1: FakeSimilarity(0.9), 2: FakeSimilarity(0.9)}))
         self.tick()
@@ -216,7 +216,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.INTRO_PLAY)
         self.assertEqual(self.motors[-1], MotorMode.PROJECTION)
         # Still physically lamps: the dim line holds unchanged from INTRO.
-        self.assertEqual(self.mixes[-1], [(LayerId.searchlight, 0.4)])
+        self.assertEqual(self.mixes[-1], [(LayerId.beam_playhead, 0.4)])
         # The ring forms → hard mix: instrument (white full, blue easing) + playhead line.
         self.board.ring_formed = True
         self.tick()
@@ -225,7 +225,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(white, 1.0)                          # hard
         self.assertLess(blue, 1.0)                            # easing in from the un-lock
         self.assertEqual(mix[LayerId.projection_playhead], 1.0)
-        self.assertNotIn(LayerId.searchlight, mix)
+        self.assertNotIn(LayerId.beam_playhead, mix)
         self.tick(dt=self.config.spin_up_seconds)
         self.assertEqual(self.current, StateId.PLAY)
         self.assertEqual(self.mixes[-1], [(LayerId.pose_instrument, 1.0),
@@ -249,7 +249,7 @@ class StateMachineTest(unittest.TestCase):
         self.board.synced = True                       # BEAM reacquired — but the fade is not done
         self.tick()
         self.assertEqual(self.current, StateId.END_IDLE)
-        self.light.beam_layers.wind_down.progress = 1.0   # fade complete + lock → hand over
+        self.light.beam_layers.beam_wind_down.progress = 1.0   # fade complete + lock → hand over
         self.tick()
         self.assertEqual(self.current, StateId.IDLE)
 
@@ -261,7 +261,7 @@ class StateMachineTest(unittest.TestCase):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_INTRO)
         self.board.synced = True
-        self.light.beam_layers.wind_down.progress = 1.0
+        self.light.beam_layers.beam_wind_down.progress = 1.0
         self.tick()                                    # fade complete + lock → hand over
         self.assertEqual(self.current, StateId.INTRO)
 
@@ -274,14 +274,14 @@ class StateMachineTest(unittest.TestCase):
         for _ in range(4):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_INTRO)
-        self.assertIn([LayerId.wind_down], self.resets)          # fade restarted at the full wall
-        self.assertEqual(self.mixes[-1], [(LayerId.wind_down, 1.0), (LayerId.searchlight, 0.4)])
-        self.light.beam_layers.wind_down.progress = 0.5                # the layer's fade readout
+        self.assertIn([LayerId.beam_wind_down], self.resets)          # fade restarted at the full wall
+        self.assertEqual(self.mixes[-1], [(LayerId.beam_wind_down, 1.0), (LayerId.beam_playhead, 0.4)])
+        self.light.beam_layers.beam_wind_down.progress = 0.5                # the layer's fade readout
         self.tick()
         self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.5)
         self.tick(dt=999.0, dbar=5.0)                  # time and bars alone never exit
         self.assertEqual(self.current, StateId.END_INTRO)
-        self.light.beam_layers.wind_down.progress = 1.0                # fade complete — but no lock yet
+        self.light.beam_layers.beam_wind_down.progress = 1.0                # fade complete — but no lock yet
         self.tick(dbar=2.0)
         self.assertEqual(self.current, StateId.END_INTRO)
         self.board.synced = True                       # lock + fade complete → hand over
@@ -295,10 +295,10 @@ class StateMachineTest(unittest.TestCase):
         for _ in range(4):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_IDLE)
-        self.light.beam_layers.wind_down.progress = 0.25
+        self.light.beam_layers.beam_wind_down.progress = 0.25
         self.tick()
-        self.assertEqual(self.mixes[-1], [(LayerId.wind_down, 1.0), (LayerId.searchlight, 1.0),
-                                          (LayerId.sound_light, 0.25)])
+        self.assertEqual(self.mixes[-1], [(LayerId.beam_wind_down, 1.0), (LayerId.beam_playhead, 1.0),
+                                          (LayerId.beam_blue_sound, 0.25)])
 
     def test_end_winds_back_to_play_never_jumps(self) -> None:
         self._to_play()
@@ -394,9 +394,9 @@ class StateMachineTest(unittest.TestCase):
             self.assertAlmostEqual(weight, 0.0, places=6)     # still dark on entry
         self.tick(dbar=self.config.off_idle_bars / 2)
         mix = dict(self.mixes[-1])
-        self.assertGreater(mix[LayerId.searchlight], 0.0)    # searchlight fading up
-        self.assertLess(mix[LayerId.searchlight], 1.0)
-        self.assertEqual(mix[LayerId.searchlight], mix[LayerId.sound_light])
+        self.assertGreater(mix[LayerId.beam_playhead], 0.0)    # searchlight fading up
+        self.assertLess(mix[LayerId.beam_playhead], 1.0)
+        self.assertEqual(mix[LayerId.beam_playhead], mix[LayerId.beam_blue_sound])
 
     def test_hit_mid_wake_goes_straight_to_intro(self) -> None:
         self.boot()

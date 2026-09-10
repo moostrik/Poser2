@@ -7,7 +7,7 @@ from modules.pose.frame import Frame
 from modules.pose.features import Azimuth
 from apps.white_space.pose import PlayheadOffset, PlayheadOffsetExtractor
 from apps.white_space.light.layers._utilities import angle_to_strip_position
-from apps.white_space.light.layers.beam.playhead_flash import offset_to_level
+from apps.white_space.light.layers.beam.flash import offset_to_level
 
 PI = math.pi
 TAU = math.tau
@@ -68,7 +68,7 @@ class PlayheadOffsetExtractorTest(unittest.TestCase):
         self.assertNotIn(PlayheadOffset, PlayheadOffsetExtractor(lambda: float("nan")).process(_frame(0.5)))
 
 
-class PlayheadFlashWindowTest(unittest.TestCase):
+class FlashWindowTest(unittest.TestCase):
     def test_on_within_window(self) -> None:
         self.assertEqual(offset_to_level(0.0, 0.5), 1.0)     # on the playhead
         self.assertEqual(offset_to_level(0.25, 0.5), 1.0)    # ahead, within width

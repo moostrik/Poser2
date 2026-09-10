@@ -11,13 +11,12 @@ indexed by ``BeamLightId``) and nothing else; the light sender maps them to the 
 pixel slots on the way out, and the render simulates them as beams on the walls. Commanded at
 or above the threshold the fixture steps the ring and the projection layers take over — the
 states choose per mode. Show layers and debug layers live side by side; each layer's docstring
-states its role (``playhead_haunted`` and ``playhead_test`` are debug tools, never in a
-state's mix).
+states its role (``beam_haunted`` and ``beam_test`` are debug tools, never in a state's mix).
 """
 
-from .searchlight       import Searchlight,     SearchlightSettings
-from .playhead_flash    import PlayheadFlash,   PlayheadFlashSettings, offset_to_level
-from .sound_light       import SoundLight,      SoundLightSettings
-from .wind_down         import WindDown,        WindDownSettings
-from .playhead_haunted  import PlayheadHaunted, PlayheadHauntedSettings
-from .playhead_test     import PlayheadTest,    PlayheadTestSettings
+from .blue_sound    import BlueSound,    BlueSoundSettings
+from .playhead      import BeamPlayhead, BeamPlayheadSettings
+from .flash         import Flash,        FlashSettings, offset_to_level
+from .wind_down     import WindDown,     WindDownSettings
+from .haunted       import Haunted,      HauntedSettings
+from .test          import BeamTest,     BeamTestSettings

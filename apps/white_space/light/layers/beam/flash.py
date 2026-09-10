@@ -1,4 +1,4 @@
-"""PlayheadFlash — the INTRO flash: the beam lights strike on while the rotating playhead
+"""Flash — the INTRO flash: the beam lights strike on while the rotating playhead
 crosses each player, driven by the continuous ``PlayheadOffset``.
 
 Each pose's signed offset to the playhead defines an on/off window around the crossing: the
@@ -6,7 +6,7 @@ flash switches on while the playhead is within the ``width``° window (±``width
 save a dark ``gap`` notch straddling the crossing itself. Every hit flashes the same — the
 brightness is plain ``white`` / ``blue``, one level for everyone. The ghost-driven variant,
 where active ghosts flash dimmed by their Fade and verified passive ghosts flash blue a
-quarter-turn late, is the separate ``playhead_haunted`` debug layer.
+quarter-turn late, is the separate ``beam_haunted`` debug layer.
 
 When the sweep steps clean over a narrow window (a fast crossing, or a person who just
 repositioned), ``_closest_pass`` still guarantees one flash on the frame nearest the pose —
@@ -14,7 +14,7 @@ so a hit is never silently skipped. It is bypassed when a ``gap`` notch is confi
 that asks for darkness at exactly the crossing the guarantee would fire on.
 
 This module owns both flash kernels (``offset_to_level``, ``_closest_pass``);
-``playhead_haunted`` imports them.
+``beam_haunted`` imports them.
 """
 
 import math
@@ -60,7 +60,7 @@ def _closest_pass(prev: float, cur: float) -> bool:
     return abs(cur) <= abs(prev) and abs(cur) <= abs(nxt)
 
 
-class PlayheadFlashSettings(LayerSettings):
+class FlashSettings(LayerSettings):
     base_white: Field[float] = Field(0.0, min=0.0, max=1.0,    step=0.01, description="Base brightness of the front white lamp")
     base_blue:  Field[float] = Field(0.0, min=0.0, max=1.0,    step=0.01, description="Base brightness of both blue lamps")
     white:      Field[float] = Field(1.0, min=0.0, max=1.0,    step=0.01, description="White flash brightness", newline=True)
@@ -69,11 +69,11 @@ class PlayheadFlashSettings(LayerSettings):
     gap:        Field[float] = Field(0.0, min=0.0, max=1.0,    step=0.01, description="Fraction of the window centre that stays dark — a notch at the crossing (0 = solid; any notch disables the closest-pass guarantee)")
 
 
-class PlayheadFlash(BeamLayer):
+class Flash(BeamLayer):
     """Continuous base level plus an on/off flash window tracking the playhead's approach to
     each active player, read from ``PlayheadOffset``; see the module docstring."""
 
-    def __init__(self, resolution: int, config: PlayheadFlashSettings, board, pose_stage: int) -> None:
+    def __init__(self, resolution: int, config: FlashSettings, board, pose_stage: int) -> None:
         super().__init__(resolution, config, board)
         self._config = config
         self._pose_stage = pose_stage

@@ -1,4 +1,4 @@
-"""Tests for the show layers: sound_light (levels → blue lamps, jitter window, stale
+"""Tests for the show layers: beam_blue_sound (levels → blue lamps, jitter window, stale
 fallback), wind_down (the dying wall), and the pose_instrument (symmetric people-anchored
 line patterns, the seamless join, sync growth, line motion, presence envelope)."""
 
@@ -14,7 +14,7 @@ from modules.pose import features
 
 from apps.white_space.light import Tick, BeamLightId
 from apps.white_space.light.frame import Frame
-from apps.white_space.light.layers.beam.sound_light import SoundLight, SoundLightSettings, SoundFallback
+from apps.white_space.light.layers.beam.blue_sound import BlueSound, BlueSoundSettings, SoundFallback
 from apps.white_space.light.layers.projection.pose_instrument import (
     PoseInstrument, PoseInstrumentSettings, LineMotion, LineFlow,
     _signed_offset, _segment_counts, _line_distance, _between_distance)
@@ -27,18 +27,18 @@ def frame(time: float = 0.0) -> Frame:
     return Frame(RES, Tick(time, 1 / 30))
 
 
-# -- sound_light -----------------------------------------------------------------
+# -- beam_blue_sound -----------------------------------------------------------------
 
 class SoundBoard(SimpleNamespace):
     def get_sound_levels(self) -> SoundLevels:
         return self.levels
 
 
-class SoundLightTest(unittest.TestCase):
+class BlueSoundTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.cfg = SoundLightSettings()
+        self.cfg = BlueSoundSettings()
         self.board = SoundBoard(levels=SoundLevels())
-        self.layer = SoundLight(RES, self.cfg, self.board)
+        self.layer = BlueSound(RES, self.cfg, self.board)
 
     def _fresh(self, left: float, right: float) -> None:
         self.board.levels = SoundLevels(left=left, right=right, timestamp=monotonic())

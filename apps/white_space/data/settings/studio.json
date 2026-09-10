@@ -410,7 +410,7 @@
       "speed_smoothing": 0.66
     },
     "beam_layers": {
-      "sound_light": {
+      "beam_blue_sound": {
         "gain": 1.0,
         "smoothing_frames": 2,
         "stale_seconds": 2.0,
@@ -418,11 +418,11 @@
         "fallback_level": 0.15,
         "blend": "ADD"
       },
-      "searchlight": {
+      "beam_playhead": {
         "level": 1.0,
         "blend": "ADD"
       },
-      "playhead_flash": {
+      "beam_flash": {
         "base_white": 0.0,
         "base_blue": 0.0,
         "white": 1.0,
@@ -431,11 +431,11 @@
         "gap": 0.0,
         "blend": "ADD"
       },
-      "wind_down": {
+      "beam_wind_down": {
         "level": 1.0,
         "blend": "ADD"
       },
-      "playhead_haunted": {
+      "beam_haunted": {
         "white": 1.0,
         "base_white": 0.33,
         "blue": 0.0,
@@ -443,7 +443,7 @@
         "ghosts": true,
         "blend": "ADD"
       },
-      "playhead_test": {
+      "beam_test": {
         "front_white": 1.0,
         "back_white": 0.5,
         "left_blue": 0.5,

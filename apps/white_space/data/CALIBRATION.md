@@ -308,7 +308,7 @@ where that is *as an azimuth* is the playhead. The sender copies the four values
 pixels the firmware reads in beam mode (pixel 0 and 1800 of each channel,
 `FIRMWARE_LIGHT_SLOT_TURNS`); the projection offset and the interlace provably cannot reach them.
 What a beam layer *does* depend on is `PlayheadOffset` when it reacts to people
-(`playhead_flash`, `playhead_haunted`).
+(`beam_flash`, `beam_haunted`).
 
 **Projection layers** draw the ring at azimuth strip positions — `pose_instrument` at each
 person's `Azimuth`, `projection_playhead` at the playhead (`ProjectionLayer`). No calibration
@@ -339,7 +339,7 @@ Neither is show state, so neither is zeroed on a blackout the way the playhead a
 mode are: a fader must read true whenever it is turned, and a calibration must not snap to 0
 between shows.
 
-**The return path**: `/WS/sound/level` (left, right) → `sound_light` → the left and right
+**The return path**: `/WS/sound/level` (left, right) → `beam_blue_sound` → the left and right
 blue lamps (site fact: named after the fixture's blue-left / blue-right; nothing to do with
 stereo). No alignment; the lamps turn with the bar.
 
@@ -394,7 +394,7 @@ and one-line instructions:
 | step | settings | tool / readout | instruction |
 |---|---|---|---|
 | 1 cameras | `fov`, `distortion.*`, `parallax.*`, `seam.*` | tracker row, seam handover | "Walk across a seam; both cameras agree, no jump." |
-| 2 playhead | `playhead.pulse_offset` (with `tracking`, `speed_smoothing`) | beam mode, `playhead_flash`; `/pose/N/playhead/offset` live | "One person stands still; turn until the beam is on them at the crossing." |
+| 2 playhead | `playhead.pulse_offset` (with `tracking`, `speed_smoothing`) | beam mode, `beam_flash`; `/pose/N/playhead/offset` live | "One person stands still; turn until the beam is on them at the crossing." |
 | 3 projection | `projection_offset`, interlace `white_0/1`, `blue_0/1` | projection mode, `pose_instrument` (static line at the person) | "Same person; turn until the projected line is on them; adjust the interlace until it is single. Then a spin-up: the playhead line continues where the beam was." |
 | 4 speakers | `speaker_offset` | IDLE, Max voicing `/global/playhead` | "Speaker 0 on azimuth 0; the sound follows the beam." |
 
@@ -409,7 +409,7 @@ its true unit (1 px = 0.1° is a remark, not a conversion), and its ±10 px rang
 
 - ~~Rename the layers, the motor modes and the bar lights to beam/projection~~ — **done**:
   `BeamLayer` / `ProjectionLayer`, `light.beam_layers` / `light.projection_layers`,
-  `searchlight`, `projection_playhead`, `MotorMode.BEAM` / `PROJECTION`, `beam_rpm` /
+  `beam_playhead`, `projection_playhead`, `MotorMode.BEAM` / `PROJECTION`, `beam_rpm` /
   `projection_rpm`, `FIXTURE_PROJECTION_RPM`, `BeamLightId` / `Frame.beam_lights`, and the
   render's beam view.
 - ~~The two offsets in degrees, and the ring view's rotation~~ — **done**:

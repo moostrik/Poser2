@@ -2,7 +2,7 @@
 
 The width window can be stepped clean over on a fast crossing; ``_closest_pass`` guarantees one flash
 on the frame where the playhead is *nearest* the pose — the local minimum of |offset| — firing in real
-time on that sample whether it sits just before or just after the zero-crossing. ``PlayheadHaunted``
+time on that sample whether it sits just before or just after the zero-crossing. ``Haunted``
 imports the same kernel.
 """
 
@@ -14,8 +14,8 @@ import numpy as np
 
 from apps.white_space.light import Tick
 from apps.white_space.light.frame import Frame, BeamLightId
-from apps.white_space.light.layers.beam.playhead_flash import (
-    PlayheadFlash, PlayheadFlashSettings, _closest_pass)
+from apps.white_space.light.layers.beam.flash import (
+    Flash, FlashSettings, _closest_pass)
 from apps.white_space.pose import PlayheadOffset
 
 R = math.radians
@@ -81,12 +81,12 @@ class FlashBoard(SimpleNamespace):
         return self.frames
 
 
-class PlayheadFlashTest(unittest.TestCase):
+class FlashTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.cfg = PlayheadFlashSettings()
+        self.cfg = FlashSettings()
         self.cfg.width = 20.0                       # ±10°
         self.board = FlashBoard(frames={}, tracklets={})
-        self.layer = PlayheadFlash(RES, self.cfg, self.board, pose_stage=4)
+        self.layer = Flash(RES, self.cfg, self.board, pose_stage=4)
 
     def _sweep(self, *offsets_deg: float, id: int = 0) -> list[float]:
         """Run one pose through a sequence of offsets; return the front white lamp per tick."""

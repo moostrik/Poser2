@@ -7,7 +7,7 @@ import unittest
 import numpy as np
 
 from apps.white_space.light import Frame, Tick, BeamLightId, BEAM_LIGHT_HEADINGS, BUFFER_DTYPE
-from apps.white_space.light.layers import PlayheadTest, PlayheadTestSettings
+from apps.white_space.light.layers import BeamTest, BeamTestSettings
 from apps.white_space.render.layers.beam_light_projection import beam_profile, project_beam_lights
 
 R = 360   # one pixel per degree keeps the expected indices readable
@@ -20,11 +20,11 @@ def _frame() -> Frame:
 class LowLayerWritesTest(unittest.TestCase):
 
     def test_named_writes_land_on_the_bar_lights_and_nowhere_else(self) -> None:
-        cfg = PlayheadTestSettings()
+        cfg = BeamTestSettings()
         cfg.front_white, cfg.back_white = 0.1, 0.2
         cfg.left_blue,   cfg.right_blue = 0.3, 0.4
         f = _frame()
-        PlayheadTest(R, cfg, board=None).render(f)
+        BeamTest(R, cfg, board=None).render(f)
         np.testing.assert_allclose(f.beam_lights, [0.1, 0.2, 0.3, 0.4], rtol=1e-6)
         self.assertEqual(float(f.light_img.sum()), 0.0)
 

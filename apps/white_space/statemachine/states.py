@@ -115,7 +115,7 @@ class IdleState(StateBase):
     MOTOR = MotorMode.BEAM
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.searchlight, 1.0), (LayerId.sound_light, 1.0)]
+        return [(LayerId.beam_playhead, 1.0), (LayerId.beam_blue_sound, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.participants > 0:
@@ -132,7 +132,7 @@ class IdleIntroState(StateBase):
     MOTOR = MotorMode.BEAM
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.searchlight, 1.0), (LayerId.sound_light, 1.0)]
+        return [(LayerId.beam_playhead, 1.0), (LayerId.beam_blue_sound, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.hit:
@@ -150,10 +150,10 @@ class IntroState(StateBase):
     DIM = 0.4                           # the DIM line level (INTRO_IDLE fades back up from it)
 
     def enter(self, ctx: StateContext) -> None:
-        self._reset_layers([LayerId.playhead_flash])   # no stale flash decay from a previous cycle
+        self._reset_layers([LayerId.beam_flash])   # no stale flash decay from a previous cycle
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.searchlight, self.DIM), (LayerId.playhead_flash, 1.0)]
+        return [(LayerId.beam_playhead, self.DIM), (LayerId.beam_flash, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.participants == 0:       # before the session timeout: an empty room never spins up
@@ -199,7 +199,7 @@ class OffIdleState(StateBase):
 
     def update(self, ctx: StateContext) -> Mix:
         e = _ease(self.progress(ctx))
-        return [(LayerId.searchlight, e), (LayerId.sound_light, e)]
+        return [(LayerId.beam_playhead, e), (LayerId.beam_blue_sound, e)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.hit:                     # swept mid-wake → the intro begins
@@ -233,8 +233,8 @@ class IntroIdleState(StateBase):
 
     def update(self, ctx: StateContext) -> Mix:
         e = _ease(self.progress(ctx))
-        return [(LayerId.searchlight, _lerp(self._start_lamp, 1.0, e)),
-                (LayerId.sound_light, _lerp(self._start_sound, 1.0, e))]
+        return [(LayerId.beam_playhead, _lerp(self._start_lamp, 1.0, e)),
+                (LayerId.beam_blue_sound, _lerp(self._start_sound, 1.0, e))]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.bars >= self._config.intro_idle_bars:
@@ -257,7 +257,7 @@ class IntroPlayState(StateBase):
 
     Firmware note: the fixture switches to projection mode on the first packet commanding PROJECTION,
     before the bar is fast (its readout mode follows the commanded rpm, see
-    ``inout/osc_light_sender.py``), so the held ``searchlight`` beam light is not read
+    ``inout/osc_light_sender.py``), so the held ``beam_playhead`` beam light is not read
     during the spin-up — the strip is dark until the ring forms. Kept as designed; whether
     to draw a line as ring content during the spin-up is an open show question."""
     MOTOR = MotorMode.PROJECTION
@@ -277,7 +277,7 @@ class IntroPlayState(StateBase):
         if self._unlock_elapsed is None and ctx.ring_formed:
             self._unlock_elapsed = ctx.elapsed          # the ring physically formed — hard mix now
         if self._unlock_elapsed is None:
-            return [(LayerId.searchlight, IntroState.DIM)]   # still lamps: hold INTRO's dim line
+            return [(LayerId.beam_playhead, IntroState.DIM)]   # still lamps: hold INTRO's dim line
         remaining = max(self._config.spin_up_seconds - self._unlock_elapsed, 1e-6)
         blue = _ease((ctx.elapsed - self._unlock_elapsed) / remaining)
         return [(LayerId.pose_instrument, (1.0, blue)), (LayerId.projection_playhead, 1.0)]
@@ -337,7 +337,7 @@ class WindDownStateBase(StateBase):
     TARGET: StateId
 
     def enter(self, ctx: StateContext) -> None:
-        self._reset_layers([LayerId.wind_down])  # restart the fade at the full wall
+        self._reset_layers([LayerId.beam_wind_down])  # restart the fade at the full wall
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.motor_locked and self.progress(ctx) >= 1.0:
@@ -345,7 +345,7 @@ class WindDownStateBase(StateBase):
         return None
 
     def progress(self, ctx: StateContext) -> float:
-        return self._light.beam_layers.wind_down.progress
+        return self._light.beam_layers.beam_wind_down.progress
 
 
 class EndIntroState(WindDownStateBase):
@@ -357,7 +357,7 @@ class EndIntroState(WindDownStateBase):
     TARGET = StateId.INTRO
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.wind_down, 1.0), (LayerId.searchlight, IntroState.DIM)]
+        return [(LayerId.beam_wind_down, 1.0), (LayerId.beam_playhead, IntroState.DIM)]
 
 
 class EndIdleState(WindDownStateBase):
@@ -369,8 +369,8 @@ class EndIdleState(WindDownStateBase):
     TARGET = StateId.IDLE
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.wind_down, 1.0), (LayerId.searchlight, 1.0),
-                (LayerId.sound_light, self.progress(ctx))]
+        return [(LayerId.beam_wind_down, 1.0), (LayerId.beam_playhead, 1.0),
+                (LayerId.beam_blue_sound, self.progress(ctx))]
 
 
 # -- Registry (total over StateId) ----------------------------------------------

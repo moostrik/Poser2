@@ -1,7 +1,7 @@
 """Playhead (high) — visualises the content playhead as a bright marker on the pixel ring.
 
 Draws a marker at the strip position of ``frame.playhead`` (the continuous content playhead,
-radians [-π, π); NaN → nothing drawn). Distinct from the beam-mode ``Searchlight`` and the motor/content ``Playhead``
+radians [-π, π); NaN → nothing drawn). Distinct from the beam-mode ``BeamPlayhead`` and the motor/content ``Playhead``
 (the NCO in ``light/playhead.py``).
 """
 

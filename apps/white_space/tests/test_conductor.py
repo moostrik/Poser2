@@ -35,7 +35,7 @@ class RegimeSwitchTest(unittest.TestCase):
     def _enter_wind_down(self) -> None:
         """What a show state's entry does: the new motor command and the new mix, together."""
         self.conductor.set_motor_mode(MotorMode.BEAM)
-        self.conductor.set_mix([(LayerId.wind_down, 1.0)])
+        self.conductor.set_mix([(LayerId.beam_wind_down, 1.0)])
 
     def test_a_command_from_an_update_callback_reaches_the_same_frame(self) -> None:
         self.conductor.set_motor_mode(MotorMode.PROJECTION)
@@ -62,7 +62,7 @@ class RegimeSwitchTest(unittest.TestCase):
 
     def test_a_steady_state_is_unaffected(self) -> None:
         self.conductor.set_motor_mode(MotorMode.BEAM)
-        self.conductor.set_mix([(LayerId.searchlight, 1.0)])
+        self.conductor.set_mix([(LayerId.beam_playhead, 1.0)])
         for _ in range(3):
             frame = self._tick()
             self.assertEqual(frame.motor_command.mode, MotorMode.BEAM)

@@ -131,7 +131,7 @@ class WhiteSpaceMain:
         self.udp_light_receiver = UdpLightReceiver(self.settings.inout.udp_light_receiver)
         self.osc_sound_receiver = OscReceiver(self.settings.inout.osc_sound_receiver)
         self.udp_light_receiver.bind("/WS/sensor/fall", self.conductor.notify_fall)
-        # Sound levels from Max (left, right 0..1) → board → the sound_light layer.
+        # Sound levels from Max (left, right 0..1) → board → the beam_blue_sound layer.
         self.osc_sound_receiver.bind("/WS/sound/level", self._on_sound_level)
         for camera in self.cameras:
             camera.add_frame_callback(self._store_video_frame)

@@ -219,8 +219,8 @@ class PoseGroup(BaseSettings):
     window_smooth   : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_predict  : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_lerp     : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
-    # The ghost subsystem — virtual poses injected into the pipeline (feeds playhead_flash
-    # Dwell, the OSC sound id slots, and the playhead_haunted debug visual).
+    # The ghost subsystem — virtual poses injected into the pipeline (feeds the OSC sound
+    # id slots and the beam_haunted debug visual; the show's beam_flash is independent of it).
     ghoster         : Group[GhosterSettings]                 = Group(GhosterSettings, share=[max_poses.as_('live_players'), ghost_slots.as_('ghost_slots')])
 
 

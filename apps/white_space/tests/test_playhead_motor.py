@@ -450,9 +450,9 @@ class DebugOverrideTest(unittest.TestCase):
         from apps.white_space.light.conductor import _debug_motor_mode
         from apps.white_space.light import DebugLayer, LayerId
         layers = {LayerId.test_pose_waves: SimpleNamespace(MODE=MotorMode.PROJECTION),
-                  LayerId.searchlight:    SimpleNamespace(MODE=MotorMode.BEAM)}
+                  LayerId.beam_playhead:    SimpleNamespace(MODE=MotorMode.BEAM)}
         self.assertEqual(_debug_motor_mode(DebugLayer.test_pose_waves, layers), MotorMode.PROJECTION)
-        self.assertEqual(_debug_motor_mode(DebugLayer.searchlight, layers), MotorMode.BEAM)
+        self.assertEqual(_debug_motor_mode(DebugLayer.beam_playhead, layers), MotorMode.BEAM)
         self.assertIsNone(_debug_motor_mode(DebugLayer.OFF, layers))         # debug disarmed
 
     def test_boot_failsafe_clears_debug(self) -> None:
