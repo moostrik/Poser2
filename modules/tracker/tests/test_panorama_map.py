@@ -1,0 +1,224 @@
+"""The panorama map is the inverse of the tracker's forward geometry — prove it, with no GL.
+
+The point of these tests is that the stitch shader is a transcription of `panorama_map`, and
+`panorama_map` is checked against `Geometry` itself, not against a second copy of the arithmetic.
+If the tracker's forward chain ever changes, the round trip breaks here rather than on the wall.
+"""
+
+import math
+import unittest
+
+from modules.tracker import azimuth_to_camera_x, camera_azimuth, focus_distance, fov_overlap, \
+    panorama_coverage, wrap180
+from modules.tracker.panoramic.geometry import Geometry
+from modules.utils import Rect
+
+
+# The White Space rig, as measured: four OAK-D Pro W on a 0.36 m ring, 127 degrees each.
+NUM_CAMERAS: int = 4
+CAM_FOV: float = 127.0
+TARGET_FOV: float = 360.0 / NUM_CAMERAS
+RING_RADIUS: float = 0.36
+FOCUS_DIAMETER: float = 4.5
+
+
+def _geometry(ring_radius: float = RING_RADIUS) -> Geometry:
+    geometry = Geometry(NUM_CAMERAS, CAM_FOV, TARGET_FOV)
+    geometry.set_ring_radius(ring_radius)
+    return geometry
+
+
+def _cylinder_distance(theta_degrees: float, ring_radius: float, focus_radius: float) -> float:
+    """Camera distance to the focus cylinder, from the camera's **own** bearing.
+
+    `focus_distance` answers the same question from the centre's bearing, which is what the
+    panorama has. This is the other parameterisation, needed to drive the forward model: the
+    point is at K + d*(cos t, sin t) with |K| = r, and it lies on the cylinder when
+    d^2 + 2*r*d*cos(t) + r^2 = R^2.
+    """
+    t: float = math.radians(theta_degrees)
+    return -ring_radius * math.cos(t) + math.sqrt(
+        focus_radius * focus_radius - (ring_radius * math.sin(t)) ** 2
+    )
+
+
+class TestFocusDistance(unittest.TestCase):
+    def test_seam_person_is_about_two_metres_out(self) -> None:
+        """A person on a seam at play-zone middle: 45 degrees off axis on a 2.25 m cylinder."""
+        self.assertAlmostEqual(
+            focus_distance(45.0, RING_RADIUS, FOCUS_DIAMETER / 2.0), 2.01, places=2
+        )
+
+    def test_symmetric_about_the_camera_axis(self) -> None:
+        for bearing in (5.0, 20.0, 45.0, 63.5):
+            self.assertAlmostEqual(
+                focus_distance(bearing, RING_RADIUS, FOCUS_DIAMETER / 2.0),
+                focus_distance(-bearing, RING_RADIUS, FOCUS_DIAMETER / 2.0),
+                places=12,
+            )
+
+    def test_closest_straight_ahead_farthest_behind(self) -> None:
+        """The camera is pushed toward the wall it faces, so its own axis is the *short* ray: the
+        cylinder is `focus_radius - ring_radius` dead ahead and `+ ring_radius` behind."""
+        ahead: float = focus_distance(0.0, RING_RADIUS, FOCUS_DIAMETER / 2.0)
+        side: float = focus_distance(63.5, RING_RADIUS, FOCUS_DIAMETER / 2.0)
+        behind: float = focus_distance(180.0, RING_RADIUS, FOCUS_DIAMETER / 2.0)
+        self.assertAlmostEqual(ahead, FOCUS_DIAMETER / 2.0 - RING_RADIUS, places=12)
+        self.assertAlmostEqual(behind, FOCUS_DIAMETER / 2.0 + RING_RADIUS, places=12)
+        self.assertLess(ahead, side)
+        self.assertLess(side, behind)
+
+    def test_no_ring_means_one_distance_everywhere(self) -> None:
+        for bearing in (0.0, 30.0, 63.5):
+            self.assertAlmostEqual(
+                focus_distance(bearing, 0.0, FOCUS_DIAMETER / 2.0), FOCUS_DIAMETER / 2.0, places=12
+            )
+
+
+class TestRoundTripAgainstGeometry(unittest.TestCase):
+    """Forward through the tracker, back through the map, land on the column you started from."""
+
+    def _forward(self, geometry: Geometry, x: float, cam_id: int, focus_radius: float) -> float:
+        """The world azimuth the tracker gives a box centred at column `x`, standing on the
+        focus cylinder. Uses `Geometry`'s own methods, not a re-implementation."""
+        local: float = geometry._calc_local_angle(Rect(x, 0.0, 0.0, 0.0))
+        distance: float = _cylinder_distance(local - CAM_FOV / 2.0, geometry._ring_radius, focus_radius)
+        corrected: float = geometry._parallax_corrected_local(local, distance)
+        return geometry._calc_world_angle(corrected, cam_id)
+
+    def test_every_column_of_every_camera_round_trips(self) -> None:
+        geometry: Geometry = _geometry()
+        for cam_id in range(NUM_CAMERAS):
+            for step in range(21):
+                x: float = step / 20.0
+                azimuth: float = self._forward(geometry, x, cam_id, FOCUS_DIAMETER / 2.0)
+                back: float | None = azimuth_to_camera_x(
+                    azimuth, cam_id, CAM_FOV, TARGET_FOV, RING_RADIUS, FOCUS_DIAMETER
+                )
+                self.assertIsNotNone(back, f'cam {cam_id} column {x} fell outside its own field')
+                assert back is not None
+                self.assertAlmostEqual(back, x, places=9, msg=f'cam {cam_id} column {x}')
+
+    def test_round_trips_at_other_depths_too(self) -> None:
+        """The map is exact at whatever depth it is given; Ø 4.5 is a choice, not a constraint."""
+        geometry: Geometry = _geometry()
+        for diameter in (3.0, 7.0, 12.0):
+            for step in range(11):
+                x: float = step / 10.0
+                azimuth: float = self._forward(geometry, x, 2, diameter / 2.0)
+                back: float | None = azimuth_to_camera_x(
+                    azimuth, 2, CAM_FOV, TARGET_FOV, RING_RADIUS, diameter
+                )
+                assert back is not None
+                self.assertAlmostEqual(back, x, places=9, msg=f'Ø{diameter} column {x}')
+
+    def test_round_trips_with_the_correction_off(self) -> None:
+        geometry: Geometry = _geometry(ring_radius=0.0)
+        for step in range(11):
+            x: float = step / 10.0
+            azimuth: float = self._forward(geometry, x, 1, FOCUS_DIAMETER / 2.0)
+            back: float | None = azimuth_to_camera_x(
+                azimuth, 1, CAM_FOV, TARGET_FOV, 0.0, FOCUS_DIAMETER
+            )
+            assert back is not None
+            self.assertAlmostEqual(back, x, places=12)
+
+    def _seam_ghost(self, diameter: float) -> float:
+        """How far (degrees of azimuth) the Ø 4.5 map misplaces a seam person who is really at
+        `diameter`. This is the ghost the stitch shows, and the whole content of step 4.3."""
+        geometry: Geometry = _geometry()
+        true_column: float | None = azimuth_to_camera_x(
+            90.0, 0, CAM_FOV, TARGET_FOV, RING_RADIUS, diameter
+        )
+        assert true_column is not None
+        drawn: float = self._forward(geometry, true_column, 0, FOCUS_DIAMETER / 2.0)
+        return drawn - 90.0
+
+    def test_wrong_depth_is_wrong_by_a_bounded_amount(self) -> None:
+        """The play zone is Ø 3 – Ø 7 and the image is aligned for its middle, so the ends ghost.
+        Bounded, and in opposite directions — which is what makes the ghost readable rather than
+        just wrong: nearer than the focus depth leans one way, farther the other."""
+        near: float = self._seam_ghost(3.0)
+        far: float = self._seam_ghost(7.0)
+        self.assertGreater(near, 0.0)
+        self.assertLess(far, 0.0)
+        self.assertLess(abs(near), 4.0, f'Ø3 ghosts by {near:.2f} deg')
+        self.assertLess(abs(far), 3.0, f'Ø7 ghosts by {far:.2f} deg')
+
+    def test_no_ghost_at_the_focus_depth(self) -> None:
+        self.assertAlmostEqual(self._seam_ghost(FOCUS_DIAMETER), 0.0, places=9)
+
+
+class TestNoRingIsLinear(unittest.TestCase):
+    def test_map_collapses_to_the_offset(self) -> None:
+        overlap: float = fov_overlap(CAM_FOV, TARGET_FOV)
+        for cam_id in range(NUM_CAMERAS):
+            for azimuth in (cam_id * TARGET_FOV + d for d in (0.0, 30.0, 89.0)):
+                expected: float = (azimuth - TARGET_FOV * cam_id + overlap) / CAM_FOV
+                back: float | None = azimuth_to_camera_x(
+                    azimuth, cam_id, CAM_FOV, TARGET_FOV, 0.0, FOCUS_DIAMETER
+                )
+                assert back is not None
+                self.assertAlmostEqual(back, expected, places=12)
+
+    def test_overlap_is_eighteen_and_a_half_degrees(self) -> None:
+        self.assertAlmostEqual(fov_overlap(CAM_FOV, TARGET_FOV), 18.5, places=12)
+
+
+class TestCameraAzimuth(unittest.TestCase):
+    def test_axes_sit_between_the_seams(self) -> None:
+        self.assertEqual(
+            [camera_azimuth(i, TARGET_FOV) for i in range(NUM_CAMERAS)], [45.0, 135.0, 225.0, 315.0]
+        )
+
+    def test_agrees_with_the_forward_model_at_frame_centre(self) -> None:
+        geometry: Geometry = _geometry(ring_radius=0.0)
+        for cam_id in range(NUM_CAMERAS):
+            centre: float = geometry._calc_world_angle(CAM_FOV / 2.0, cam_id)
+            self.assertAlmostEqual(centre, camera_azimuth(cam_id, TARGET_FOV), places=12)
+
+    def test_three_and_six_cameras(self) -> None:
+        self.assertAlmostEqual(camera_azimuth(0, 120.0), 60.0, places=12)
+        self.assertAlmostEqual(camera_azimuth(5, 60.0), 330.0, places=12)
+
+
+class TestCoverage(unittest.TestCase):
+    def _coverage(self, azimuth: float, ring_radius: float = RING_RADIUS) -> int:
+        return panorama_coverage(azimuth, NUM_CAMERAS, CAM_FOV, TARGET_FOV,
+                                 ring_radius, FOCUS_DIAMETER)
+
+    def test_two_on_the_seams_one_on_the_axes_without_parallax(self) -> None:
+        overlap: float = fov_overlap(CAM_FOV, TARGET_FOV)
+        for seam in (0.0, 90.0, 180.0, 270.0):
+            self.assertEqual(self._coverage(seam, 0.0), 2, f'seam {seam}')
+            self.assertEqual(self._coverage(seam + overlap - 0.5, 0.0), 2)
+            self.assertEqual(self._coverage(seam + overlap + 0.5, 0.0), 1)
+        for axis in (45.0, 135.0, 225.0, 315.0):
+            self.assertEqual(self._coverage(axis, 0.0), 1, f'axis {axis}')
+
+    def test_parallax_narrows_the_overlap_but_keeps_its_shape(self) -> None:
+        """A camera pushed 0.36 m outward covers less of the cylinder, measured from the centre —
+        so the band where two cameras see the same place is narrower than the bare field says."""
+        overlap: float = fov_overlap(CAM_FOV, TARGET_FOV)
+        self.assertEqual(self._coverage(90.0), 2)
+        self.assertEqual(self._coverage(45.0), 1)
+        self.assertEqual(self._coverage(90.0 + overlap - 0.5), 1,
+                         'the raw overlap band is not all doubly covered once parallax is on')
+
+    def test_never_a_gap(self) -> None:
+        for step in range(360):
+            self.assertGreaterEqual(self._coverage(float(step)), 1, f'azimuth {step} uncovered')
+
+    def test_wrap_is_symmetric_around_zero(self) -> None:
+        self.assertEqual(self._coverage(359.0), self._coverage(1.0))
+
+
+class TestWrap180(unittest.TestCase):
+    def test_folds_into_range(self) -> None:
+        for angle, expected in ((0.0, 0.0), (180.0, -180.0), (181.0, -179.0),
+                                (359.0, -1.0), (-1.0, -1.0), (720.0 + 45.0, 45.0)):
+            self.assertAlmostEqual(wrap180(angle), expected, places=12)
+
+
+if __name__ == '__main__':
+    unittest.main()

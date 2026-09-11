@@ -208,20 +208,40 @@ apply it to a recording shot at `tilt = 0` (`camera.simulator.apply_warp`). `key
 same camera is the other installations' full-frame correction and stays 0 here — the two are
 exclusive.
 
-**What sets it** (`camera.tracker`, `camera.fov`): `fov` (each camera owns
-`target_fov = 360 / num_cameras`, the excess is shared overlap); `distortion` (zero in the
-preset, and right — the lens is close to linear); `parallax` (`ring_radius` must match the
-lens distance from the axis, ≈ 0.36 m with the corner gap; the preset says 0.25;
-`person_height`; `vfov` is derived, not set); `seam` (tracklet handover in the overlap);
-and per camera, `tilt`.
+**What sets it** (`camera.tracker`, `camera.fov`, `camera.tilt`): `fov` (each camera owns
+`target_fov = 360 / num_cameras`, the excess is shared overlap); `parallax` (`ring_radius`, the
+lens distance from the axis, **0.36 m** measured, and `camera_height`, the lens height above the
+floor, **0.5 m** measured — both taped, neither tuned; `vfov` is derived, not set); `seam`
+(tracklet handover in the overlap); and `tilt`, shared across all four cameras. There is no
+distortion correction and there is no `person_height`: the projection is fixed in the warp and
+the distance comes off the floor plane.
 
-**How to calibrate**: today there is no readout of camera disagreement — the tracker fuses
-both views of a seam person before anything draws them, so "walk across a seam until both
-cameras agree" cannot actually be followed. The stitched panorama (planned) makes the overlap
-visible: right geometry coincides, wrong geometry ghosts, and how it ghosts says which number
-is wrong. Until then `fov` and `tilt` are lens and mount constants set in the preset, and
-`ring_radius` must be the measured 0.36 m. Cameras first — both offsets and the sound are tuned
-against the result.
+**How to calibrate**: turn on `render.panorama.enabled`. The per-camera row is replaced by the
+four images unwrapped into one 360° strip — azimuth 0 at the left edge, the same scale as the
+observation strip directly below it, with a degree grid and the sector seams and camera axes
+picked out. The overlaps are where the two neighbouring cameras are drawn on top of each other,
+at the azimuth each one claims, so the check that could not be run before is simply *look at the
+overlap*:
+
+| what you see | what is wrong |
+|---|---|
+| the overlap coincides | nothing — go on to the offsets |
+| aligns at head height but not at knee height | `tilt` |
+| a constant sideways offset across the whole overlap | `fov` |
+| a residual that grows toward the frame edges | not the equidistant lens the spec describes; no knob, and it would be news |
+| the image coincides but a person's two boxes below do not | the distance model — re-measure `ring_radius` and `camera_height`, do not tune them |
+| both coincide and the primary still jumps at the seam | `seam` (`reject`, `reach`, `hysteresis`) |
+
+The image is stitched for one assumed depth, `render.panorama.focus_diameter` — **Ø 4.5 m**, the
+middle of the play zone. It is exact there and ghosts by a bounded amount elsewhere: **+3.9° at
+Ø 3 and −2.5° at Ø 7**, the span the correction has to cover. So judge alignment with someone
+standing near the middle of the room, and read a ghost at the wall or at the rig as expected.
+Nothing about a person feeds the image — no box, no pose, no estimate — so nothing can fool it;
+only the *boxes* carry the tracker's per-person distance.
+
+`fov` and `tilt` are `INIT`: they are baked into the warp when the device opens, so they are
+tuned by editing the preset and relaunching, not by dragging a slider. Cameras first — both
+offsets and the sound are tuned against the result.
 
 ---
 
@@ -429,9 +449,13 @@ its true unit (1 px = 0.1° is a remark, not a conversion), and its ±10 px rang
 
 - **Done**: beam/projection naming throughout; both offsets in degrees with the ring rotation
   in the light sender; `speaker_offset` + `volume`; 800 rows; `fov` per app, `tilt` in degrees
-  on the real lens model, `keystone` kept for the other installations, `vfov` derived.
-- **The stitched panorama** (next): the camera check described under Camera. With it,
-  `ring_radius` 0.36 and `person_height` 1.9 go into the preset.
+  on the real lens model, `keystone` kept for the other installations, `vfov` derived; the
+  stitched panorama and the observation strip — the camera check described under Camera.
+- **Hardware verification** (next): the stitch has only been checked against the arithmetic, not
+  against a wall. It needs footage shot at 800 rows — the old 1280 × 720 clips are vertically
+  mis-scaled and can confirm the layout but not `tilt` or `fov`. Confirm the sign of `tilt`
+  first: positive should *improve* an up-aimed camera. Then record the four `tilt` values, `fov`
+  and `ring_radius` here as build constants beside the two light offsets.
 - **A placement aid for the cameras** (later): since placement *is* the room-side
   calibration, it deserves a good way of doing it — probably projection layers that put
   the sector boundaries and centres on the wall so each camera can be aimed against them,

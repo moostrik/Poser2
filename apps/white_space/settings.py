@@ -52,6 +52,7 @@ class Layers(IntEnum):
     tracker      = auto()
     poser        = auto()
     # WS visualization
+    cam_panorama = auto()   # the stitched 360° calibration view; shares the tracker row
     ws_tracker   = auto()
     ws_light     = auto()   # the ring (fixture in projection mode)
     ws_beam       = auto()   # the bar's four lights (fixture in beam mode); shares ws_light's row
@@ -312,6 +313,7 @@ class RenderSettings(BaseSettings):
     data:        Group[_DataLayerSettings]  = Group(_DataLayerSettings)
     playhead_data: Group[PlayheadDataLayerSettings] = Group(PlayheadDataLayerSettings)
     beam_light_sim: Group[BeamLightSimSettings] = Group(BeamLightSimSettings)
+    panorama:    Group[layers.PanoramaLayerSettings] = Group(layers.PanoramaLayerSettings)
     colors:      Group[ColorSettings]       = Group(ColorSettings)
     window:      Group[WindowSettings]      = Group(WindowSettings)
 

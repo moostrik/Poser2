@@ -3,4 +3,5 @@ from .HDTPrepare import             HDTPrepare
 from .HDTBlend import               HDTBlend
 from .MotionLayer import            MotionLayer
 from .MSColorMaskLayer import       MSColorMaskLayer, ColorMaskLayerSettings
+from .PanoramicCameraLayer import   PanoramicCameraLayer, PanoramaLayerSettings, PanoramaBlend
 from .PanoramicTrackerLayer import  PanoramicTrackerLayer

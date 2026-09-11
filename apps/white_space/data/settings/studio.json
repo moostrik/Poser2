@@ -125,8 +125,8 @@
       "video_frame_types": [
         "VIDEO"
       ],
-      "folder": "20260702-161442_flabber",
       "apply_warp": true,
+      "folder": "20260702-161442_flabber",
       "sim_passthrough": false,
       "start_norm": 0.0,
       "end_norm": 1.0
@@ -177,10 +177,10 @@
     },
     "osc_sound_sender": {
       "stage": "LERP",
-      "ip_addresses": "192.168.1.39",
-      "port": 8000,
       "volume": 1.0,
-      "speaker_offset": 0.0
+      "speaker_offset": 0.0,
+      "ip_addresses": "192.168.1.39",
+      "port": 8000
     },
     "osc_sound_receiver": {
       "port_in": 6455,
@@ -476,57 +476,6 @@
         "level": 1.0,
         "blend": "ADD"
       },
-      "test_pose_waves": {
-        "void_width": 0.05,
-        "void_edge": 0.01,
-        "use_void": true,
-        "pattern_width": 0.2,
-        "pattern_edge": 0.2,
-        "line_sharpness": 1.5,
-        "line_speed": 1.5,
-        "line_width": 0.1,
-        "line_amount": 20.0,
-        "blend": "ADD"
-      },
-      "test_harmonic": {
-        "blend": "ADD",
-        "source_0": {
-          "enabled": true,
-          "hz": 0.33,
-          "spatial_cycles": 3.0,
-          "phase_offset": 0.0,
-          "spatial_phase": 0.0,
-          "amplitude_white": 0.5,
-          "amplitude_blue": 0.0
-        },
-        "source_1": {
-          "enabled": true,
-          "hz": 0.67,
-          "spatial_cycles": 5.0,
-          "phase_offset": 0.25,
-          "spatial_phase": 0.0,
-          "amplitude_white": 0.0,
-          "amplitude_blue": 0.5
-        },
-        "source_2": {
-          "enabled": false,
-          "hz": 1.0,
-          "spatial_cycles": 7.0,
-          "phase_offset": 0.5,
-          "spatial_phase": 0.0,
-          "amplitude_white": 0.3,
-          "amplitude_blue": 0.0
-        },
-        "source_3": {
-          "enabled": false,
-          "hz": 1.33,
-          "spatial_cycles": 9.0,
-          "phase_offset": 0.75,
-          "spatial_phase": 0.0,
-          "amplitude_white": 0.0,
-          "amplitude_blue": 0.3
-        }
-      },
       "test_player_lines": {
         "center_width": 0.05,
         "flank_width": 0.01,
@@ -638,6 +587,57 @@
           "gamma": 1.0,
           "threshold": 0.0
         }
+      },
+      "test_pose_waves": {
+        "void_width": 0.05,
+        "void_edge": 0.01,
+        "use_void": true,
+        "pattern_width": 0.2,
+        "pattern_edge": 0.2,
+        "line_sharpness": 1.5,
+        "line_speed": 1.5,
+        "line_width": 0.1,
+        "line_amount": 20.0,
+        "blend": "ADD"
+      },
+      "test_harmonic": {
+        "blend": "ADD",
+        "source_0": {
+          "enabled": true,
+          "hz": 0.33,
+          "spatial_cycles": 3.0,
+          "phase_offset": 0.0,
+          "spatial_phase": 0.0,
+          "amplitude_white": 0.5,
+          "amplitude_blue": 0.0
+        },
+        "source_1": {
+          "enabled": true,
+          "hz": 0.67,
+          "spatial_cycles": 5.0,
+          "phase_offset": 0.25,
+          "spatial_phase": 0.0,
+          "amplitude_white": 0.0,
+          "amplitude_blue": 0.5
+        },
+        "source_2": {
+          "enabled": false,
+          "hz": 1.0,
+          "spatial_cycles": 7.0,
+          "phase_offset": 0.5,
+          "spatial_phase": 0.0,
+          "amplitude_white": 0.3,
+          "amplitude_blue": 0.0
+        },
+        "source_3": {
+          "enabled": false,
+          "hz": 1.33,
+          "spatial_cycles": 9.0,
+          "phase_offset": 0.75,
+          "spatial_phase": 0.0,
+          "amplitude_white": 0.0,
+          "amplitude_blue": 0.3
+        }
       }
     }
   },
@@ -654,7 +654,7 @@
     },
     "manual": {
       "select": "PLAY",
-      "hold": true
+      "hold": false
     },
     "session": {
       "enabled": false,
@@ -702,6 +702,15 @@
     "beam_light_sim": {
       "width": 2.0,
       "blur": 4.0
+    },
+    "panorama": {
+      "enabled": true,
+      "blend": "MAX",
+      "focus_diameter": 4.5,
+      "grid": true,
+      "grid_degrees": 10.0,
+      "strip_aspect": 6.5,
+      "show_all_observations": true
     },
     "colors": {
       "player_0": {

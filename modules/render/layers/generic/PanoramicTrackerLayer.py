@@ -13,6 +13,7 @@ from modules.tracker import Tracklet, TrackingStatus, PanoramicAnnotation, Panor
 
 from modules.board import HasObservations, HasTracklets
 from ..LayerBase import LayerBase
+from .PanoramicCameraLayer import PanoramaLayerSettings
 
 from modules.utils import HotReloadMethods
 
@@ -35,11 +36,13 @@ class PanoramicTrackerLayer(LayerBase):
     """
 
     def __init__(self, board: PanoramicTrackerBoard, num_cams: int, color_settings: ColorSettings,
-                 tracker: PanoramicTrackerSettings) -> None:
+                 tracker: PanoramicTrackerSettings, settings: PanoramaLayerSettings) -> None:
         self.board: PanoramicTrackerBoard = board
         self.num_cams: int = num_cams
         self._color_settings: ColorSettings = color_settings
         self._tracker: PanoramicTrackerSettings = tracker
+        # Shared with the stitched image above: the two are one display.
+        self._settings: PanoramaLayerSettings = settings
         self.fbo: Fbo = Fbo()
         self._text: Text = Text()
         self._rect_shader: DrawColoredRectangle = DrawColoredRectangle()
@@ -65,10 +68,14 @@ class PanoramicTrackerLayer(LayerBase):
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
 
-        observations: list[Tracklet] = self.board.get_observations()
         # Which observation the tracker chose per world, so the winner can be marked. Keyed by
         # the host-owned observation id, the only thing that identifies one uniquely.
-        primaries: set[int] = {t.obs_id for t in self.board.get_tracklets().values() if t is not None}
+        chosen: list[Tracklet] = [t for t in self.board.get_tracklets().values() if t is not None]
+        primaries: set[int] = {t.obs_id for t in chosen}
+        # Every camera's own opinion, or only the fused one. The disagreement is the whole point,
+        # so all of them by default; primaries-only is the fallback for reading a busy room.
+        observations: list[Tracklet] = \
+            self.board.get_observations() if self._settings.show_all_observations else chosen
 
         colors = self._color_settings.track_color_tuples
 

@@ -8,3 +8,4 @@ from .EdgeSketch import      EdgeSketch
 from .DetailThreshold import DetailThreshold
 from .CelShade import        CelShade
 from .HueShift import        HueShift
+from .PanoramicStitch import PanoramicStitch
