@@ -127,7 +127,7 @@ def degrees_per_pixel(fov_h: float, mode_width: int) -> float:
     return fov_h / float(mode_width)
 
 
-# Mesh resolution for the tilt warp. See `tilt_mesh_points` for why 2 is not enough and
+# Mesh resolution for the equirectangular warp. See `equirect_mesh_points` for why 2 is not enough and
 # why 32 is where this stops mattering.
 WARP_MESH: int = 32
 
@@ -144,7 +144,7 @@ def frame_fov(fov_h: float, mode_width: int, out_size: tuple[int, int]) -> tuple
     return dpp * width, dpp * height
 
 
-def tilt_mesh_points(
+def equirect_mesh_points(
     src_size: tuple[int, int],
     out_size: tuple[int, int],
     mode_width: int,
@@ -155,15 +155,27 @@ def tilt_mesh_points(
     mesh_w: int = WARP_MESH,
     mesh_h: int = WARP_MESH,
 ) -> list[tuple[float, float]]:
-    """Warp mesh that undoes a camera's up-tilt: the source pixel each output grid point reads.
+    """Warp mesh that makes a column one azimuth and undoes the camera's up-tilt: the source
+    pixel each output grid point reads.
 
-    WHY THIS IS NOT A HOMOGRAPHY. These lenses are near-equidistant — distance from the frame
-    centre is proportional to the ANGLE off the optical axis, not to its tangent. A pinhole
-    lens uses the tangent, and that stretch is exactly what makes a tilted pinhole view a
-    trapezoid with straight edges, which `cv2.getPerspectiveTransform` reproduces. With no
-    stretch nothing cancels: tilting bends straight lines into curves. At 15 deg on a 127 deg
-    frame the centre of a row moves 151 px while its ends move 74 px, a 77 px bow. So the mesh
-    is built by unprojecting each output pixel to a ray, rotating the ray, and reprojecting.
+    THE OUTPUT IS EQUIRECTANGULAR, NOT THE LENS'S OWN PROJECTION. These lenses are
+    near-equidistant: distance from the frame centre is proportional to the ANGLE off the
+    optical axis (the published 127 x 79.5 field fits that to 0.2 %). That projection has a
+    property the tracker cannot live with — a column is one azimuth only on the horizontal
+    centre line. Off it, a vertical pole bows toward the centre, so a standing person's box
+    centre reads short of the true bearing: 5 deg at 45 deg bearing 1.35 m out, 8 deg at the
+    seam. No 1-D correction on x can fix that; it is a property of the projection. So the
+    output pixel (x, y) is read as (bearing, elevation), both linear in degrees-per-pixel —
+    the layout of a world map — and every column is one azimuth at every height, every row
+    one elevation. Equirectangular rather than cylindrical because the linear vertical keeps
+    `vfov = fov * rows / cols` exact, which the distance estimate relies on.
+
+    WHY THIS IS NOT A HOMOGRAPHY. A pinhole lens uses the tangent, and that stretch is exactly
+    what makes a tilted pinhole view a trapezoid with straight edges, which
+    `cv2.getPerspectiveTransform` reproduces. On an equidistant lens nothing cancels: tilting
+    bends straight lines into curves. At 15 deg on a 127 deg frame the centre of a row moves
+    151 px while its ends move 74 px, a 77 px bow. So the mesh is built by unprojecting each
+    output pixel to a ray, rotating the ray, and reprojecting into the equidistant source.
 
     WHY THE MESH IS 32 x 32. The Warp node interpolates linearly between mesh points, so
     2 columns can only express a straight source line per row — which is the very family the
@@ -177,8 +189,9 @@ def tilt_mesh_points(
     width `fov_h` is quoted against. Positive `tilt` means the camera is aimed UP, so the
     corrected view reads from lower in the source frame.
 
-    At `tilt == 0` the result is exactly the identity grid (or an exact mirror under the
-    flips), with no floating-point round-trip. Nothing changes until an angle is set.
+    At `tilt == 0` the result is NOT the identity: it is the equidistant -> equirectangular
+    reprojection. What stays fixed is the centre pixel, the centre row and the centre column
+    (exactly, by construction); the corners move, because a fisheye's corners bow.
     """
     src_w, src_h = src_size
     out_w, out_h = out_size
@@ -189,7 +202,6 @@ def tilt_mesh_points(
     cx, cy = (src_w - 1) / 2.0, (src_h - 1) / 2.0
 
     dpp: float = np.radians(degrees_per_pixel(fov_h, mode_width))
-    identity: bool = tilt == 0.0 or dpp <= 0.0
     t: float = np.radians(-tilt)                   # undo the tilt, so negate it
     cos_t, sin_t = float(np.cos(t)), float(np.sin(t))
 
@@ -199,15 +211,18 @@ def tilt_mesh_points(
             ox: float = (out_w - 1.0 - gx) if flip_h else float(gx)
             oy: float = (out_h - 1.0 - gy) if flip_v else float(gy)
             x, y = x_off + ox, y_off + oy
-            if identity:
+            if dpp <= 0.0:
                 points.append((x, y))
                 continue
-            dx, dy = x - cx, y - cy
-            phi: float = float(np.hypot(dx, dy)) * dpp
-            psi: float = float(np.arctan2(dy, dx))
-            sin_p: float = float(np.sin(phi))
-            d0, d1, d2 = sin_p * np.cos(psi), sin_p * np.sin(psi), float(np.cos(phi))
+            # Output pixel -> ray, equirectangular: bearing from the column, elevation from
+            # the row (image y is down, so d1 is the downward component).
+            bearing: float = (x - cx) * dpp
+            elev: float = (y - cy) * dpp
+            cos_e: float = float(np.cos(elev))
+            d0, d1, d2 = cos_e * float(np.sin(bearing)), float(np.sin(elev)), cos_e * float(np.cos(bearing))
+            # Undo the tilt: rotate about the horizontal axis.
             d1, d2 = cos_t * d1 - sin_t * d2, sin_t * d1 + cos_t * d2
+            # Ray -> source pixel, equidistant: radius is the polar angle off the axis.
             r2: float = float(np.arccos(np.clip(d2, -1.0, 1.0))) / dpp
             psi2: float = float(np.arctan2(d1, d0))
             points.append((cx + r2 * float(np.cos(psi2)), cy + r2 * float(np.sin(psi2))))

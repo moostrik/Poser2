@@ -129,12 +129,21 @@ class BuildWarpMeshSelectsTest(unittest.TestCase):
         self.assertEqual((mw, mh), (WARP_MESH, WARP_MESH))
         self.assertEqual(len(mesh), WARP_MESH * WARP_MESH)
 
-    def test_both_zero_is_the_exact_identity(self) -> None:
+    def test_both_zero_is_the_equirectangular_reprojection_not_identity(self) -> None:
+        # No keystone and no tilt still goes through the tilt path, which reprojects the
+        # equidistant frame to equirectangular. The centre pixel is the fixed point; the corners
+        # are not, because a fisheye's corners bow.
         mesh, mw, mh = build_warp_mesh((1280, 800), (1280, 800), 1280, self._mount(0.0, 0.0, flip_h=False))
-        xs = np.linspace(0.0, 1279.0, mw)
-        ys = np.linspace(0.0, 799.0, mh)
-        want = [(float(x), float(y)) for y in ys for x in xs]
-        _assert_same(self, _as_tuples(mesh), _ref32(want))
+        pts = _as_tuples(mesh).reshape(mh, mw, 2)
+        cx, cy = 1279.0 / 2.0, 799.0 / 2.0
+        # An even grid has no point ON the centre; the reprojection is symmetric about it, so
+        # the mean of the four middle points is exactly the centre.
+        h, w = mh // 2, mw // 2
+        centre = pts[h - 1:h + 1, w - 1:w + 1].reshape(-1, 2).mean(axis=0)
+        self.assertAlmostEqual(float(centre[0]), cx, places=2)
+        self.assertAlmostEqual(float(centre[1]), cy, places=2)
+        top_left = pts[0, 0]
+        self.assertGreater(float(np.hypot(top_left[0] - 0.0, top_left[1] - 0.0)), 1.0)
 
     def test_both_set_warns_and_takes_tilt(self) -> None:
         with self.assertLogs("modules.oak.camera.pipeline", level="WARNING") as log:

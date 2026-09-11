@@ -79,8 +79,10 @@ class OakGroup(BaseSettings):
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, description="Model files directory")
     ir_flood_light    : Field[float]           = Field(0.8, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
+    tilt              : Field[float]           = Field(0.0, access=Field.INIT, description="Camera up-tilt (degrees), positive = aimed upward, the same for all four cameras. Baked into the warp when the devices open.")
+    mono_auto_exposure: Field[bool]            = Field(True, widget=Widget.switch, description="Mono auto exposure, all four cameras. Off: each camera keeps its own manual exposure and ISO.")
 
-    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path, ir_flood_light, fov]
+    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path, ir_flood_light, fov, tilt, mono_auto_exposure]
 
     cam_0     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_1     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)

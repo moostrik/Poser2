@@ -11,8 +11,8 @@ class SimulatorSettings(BaseSettings):
     video_decoder:      Field[CoderType]        = Field(CoderType.iGPU, access=Field.INIT, description="Video decoder type")
     video_format:       Field[CoderFormat]      = Field(CoderFormat.H264, access=Field.INIT, description="Video format")
     video_frame_types:  Field[list[FrameType]]  = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record", visible=False)
-    apply_tilt:         Field[bool]             = Field(False, access=Field.INIT,
-                                                        description="Run recordings through the camera's tilt warp, to try tilt values against footage. ONLY valid for clips captured at tilt 0, because recordings are saved AFTER the warp and would otherwise be corrected twice. Turn off once anything is recorded with a tilt set.")
+    apply_warp:         Field[bool]             = Field(False, access=Field.INIT,
+                                                        description="Run recordings through the camera's warp — the equirectangular reprojection plus the tilt — to see what the cameras will deliver. ONLY valid for RAW clips: recordings made before the reprojection existed, at tilt 0. Anything recorded since is already warped and would be warped twice.")
 
     # ── Playback controls ─────────────────────────────────────────────
     start:              Field[bool]             = Field(False, widget=Widget.button, description="Start playback", newline=True)

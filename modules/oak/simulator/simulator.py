@@ -30,7 +30,7 @@ class Simulator(Camera):
         self.ex_right:  dai.DataInputQueue
 
         self.passthrough: bool = player_settings.sim_passthrough
-        self.warp_clips: bool = player_settings.apply_tilt
+        self.warp_clips: bool = player_settings.apply_warp
 
         # Last clip size reported by _check_frame_size, so the warning fires once per size.
         self._warned_frame_size: tuple[int, int] | None = None

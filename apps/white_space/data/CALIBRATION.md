@@ -173,8 +173,7 @@ offsets.
 cameras shade the light as little as possible (site fact; the light starts at 32 cm), lens
 ≈ 50 cm up and 36 cm out. Tilted up about **15°** with the full 800 rows, a 1.9 m person's
 head is in frame from the **Ø 2.7 m** inner circle (site decision) and the feet from Ø 2.9 m;
-set by eye, 12–18° all work. With today's 720-row crop it takes 19° and the feet only appear
-from Ø 4.0 m — one reason to take the 800 rows (see Camera). Near the machine the fields do
+set by eye, 12–18° all work. Near the machine the fields do
 not meet: on each seam a person's centre is outside both cameras until 1.0 m out, so
 **Ø 2.0 m** is the hard floor. Between Ø 2.0 m and Ø 3.5 m a seam person is cut on one side in
 each camera and the box centre shifts toward the visible side, ≈ 3° at Ø 2.7 m — a wobble at
@@ -188,9 +187,11 @@ the handover, not a failure.
 
 **The hardware** (Luxonis OAK-D Pro W): the app runs `color = false` and uses **the left mono
 camera only** (`modules/oak/camera/pipeline.py`, `SetupMono`): OV9282 W, global shutter,
-1280 × 800, lens **127° × 79.5°**. The 127° is the preset's `fov`, and it is the only field
-angle stored: the pipeline requests `THE_800_P`, the full readout, and the vertical field is
-*derived* from `fov` and the frame's shape (`parallax.vfov` is read-only, 79.4°). The lens maps
+1280 × 800, lens **127° × 79.5°**. The 127° is the preset's `fov` — an `INIT` value, because it
+feeds the warp mesh that is baked when the device opens, so like `tilt` it is set in the preset
+and applied at relaunch — and it is the only field angle stored: the pipeline requests
+`THE_800_P`, the full readout, and the vertical field is *derived* from `fov` and the frame's
+shape (`parallax.vfov` is read-only, 79.4°). The lens maps
 angle linearly to radius, which is what makes that derivation hold and what the published
 spec confirms. The sensor reference table for every OAK variant in use, with the Luxonis
 links, lives beside the resolution tables in `modules/oak/camera/definitions.py`; opening a
@@ -203,7 +204,7 @@ the light show (site fact). Keep the dot projector off.
 so an image column reads as one azimuth, which is what the tracker assumes; it costs the frame
 edges (≈ 20 % at 15°, because it asks for a view the sensor never imaged) and is baked into the
 device when it opens, so it is tuned by editing the preset and relaunching. The simulator can
-apply it to a recording shot at `tilt = 0` (`camera.simulator.apply_tilt`). `keystone` on the
+apply it to a recording shot at `tilt = 0` (`camera.simulator.apply_warp`). `keystone` on the
 same camera is the other installations' full-frame correction and stays 0 here — the two are
 exclusive.
 
@@ -214,10 +215,13 @@ lens distance from the axis, ≈ 0.36 m with the corner gap; the preset says 0.2
 `person_height`; `vfov` is derived, not set); `seam` (tracklet handover in the overlap);
 and per camera, `tilt`.
 
-**How to calibrate**: a person walks across a seam; adjust `fov` (and `distortion` if a seam
-still disagrees) until both cameras agree on the azimuth, then `parallax.ring_radius` until
-the handover does not jump. Cameras first — both offsets and the sound are tuned against
-the result.
+**How to calibrate**: today there is no readout of camera disagreement — the tracker fuses
+both views of a seam person before anything draws them, so "walk across a seam until both
+cameras agree" cannot actually be followed. The stitched panorama (planned) makes the overlap
+visible: right geometry coincides, wrong geometry ghosts, and how it ghosts says which number
+is wrong. Until then `fov` and `tilt` are lens and mount constants set in the preset, and
+`ring_radius` must be the measured 0.36 m. Cameras first — both offsets and the sound are tuned
+against the result.
 
 ---
 
@@ -374,14 +378,19 @@ Nothing here applies to a simulated session, and no separate preset is needed. T
 describe the physical build; a recording carries its own frame. The show never compares a
 physical angle with anything — it compares a person's `Azimuth` from the recording with the
 playhead from the simulated motor, both in one frame — so the flash, the hit, the sound
-offsets and both screen views are self-consistent.
+offsets and both screen views are self-consistent. The simulator can apply `tilt` to a
+recording shot at `tilt = 0` (`camera.simulator.apply_warp`), which is how a tilt value is
+tried against footage. Existing recordings are 720 rows and are being retired: they run through
+the 800 pipeline mechanically, but their geometry is not tuned.
 
 ---
 
 ## Procedure
 
-1. **Cameras** — `fov`, `distortion`, `parallax.ring_radius`, `seam`: a person walks across a
-   seam until both cameras agree and the handover does not jump. First, always.
+1. **Cameras** — placed by the layout (camera 0's sector starts at the connection side); `fov`
+   and `tilt` set in the preset as lens and mount constants; `ring_radius` the measured 0.36 m.
+   Whether the cameras agree is not visible today; the stitched panorama (planned) is the
+   check. First, always.
 2. **Playhead offset** — beam mode, one person stands still, the beam is on them as the
    playhead crosses them (the flash).
 3. **Projection offset** — projection mode, the same person, a static line drawn at their
@@ -404,7 +413,7 @@ and one-line instructions:
 
 | step | settings | tool / readout | instruction |
 |---|---|---|---|
-| 1 cameras | `fov`, `distortion.*`, `parallax.*`, `seam.*` | tracker row, seam handover | "Walk across a seam; both cameras agree, no jump." |
+| 1 cameras | `fov`, `cam_N.tilt`, `distortion.*`, `parallax.*`, `seam.*` | placement; the stitched panorama (planned) | "Place by the layout; set `fov` and `tilt` in the preset; the stitch shows the rest." |
 | 2 playhead | `playhead.pulse_offset` (with `tracking`, `speed_smoothing`) | beam mode, `beam_flash`; `/pose/N/playhead/offset` live | "One person stands still; turn until the beam is on them at the crossing." |
 | 3 projection | `projection_offset`, interlace `white_0/1`, `blue_0/1` | projection mode, `pose_instrument` (static line at the person) | "Same person; turn until the projected line is on them; adjust the interlace until it is single. Then a spin-up: the playhead line continues where the beam was." |
 | 4 speakers | `speaker_offset` | IDLE, Max voicing `/global/playhead` | "Speaker 0 on azimuth 0; the sound follows the beam." |
@@ -418,21 +427,11 @@ its true unit (1 px = 0.1° is a remark, not a conversion), and its ±10 px rang
 
 ## Open decisions
 
-- ~~Rename the layers, the motor modes and the bar lights to beam/projection~~ — **done**:
-  `BeamLayer` / `ProjectionLayer`, `light.beam_layers` / `light.projection_layers`,
-  `beam_playhead`, `projection_playhead`, `MotorMode.BEAM` / `PROJECTION`, `beam_rpm` /
-  `projection_rpm`, `FIXTURE_PROJECTION_RPM`, `BeamLightId` / `Frame.beam_lights`, and the
-  render's beam view.
-- ~~The two offsets in degrees, and the ring view's rotation~~ — **done**:
-  `light.playhead.pulse_offset` and `inout.osc_light_sender.projection_offset`, both degrees
-  with a 0.1° step; `offsets` → `interlace` (pixels, ±10, unchanged on the wire); the rotation
-  moved from the compositor to the light sender, so the frame on the board is azimuth-true and
-  both screen views agree with the tracker row. The wire bytes are unchanged.
-- ~~`speaker_offset` for Max~~ — **done**, with a main `volume` alongside it: both live in
-  `inout.osc_sound_sender` and go out in every bundle (`/global/speaker/offset` in radians,
-  `/global/volume`). Max adds the offset in its panner.
-- ~~The mono pipeline to `THE_800_P`~~ — **done**, and `parallax.vfov` is now derived rather
-  than stored, so it cannot go stale again. `ring_radius` 0.36 still to go in.
+- **Done**: beam/projection naming throughout; both offsets in degrees with the ring rotation
+  in the light sender; `speaker_offset` + `volume`; 800 rows; `fov` per app, `tilt` in degrees
+  on the real lens model, `keystone` kept for the other installations, `vfov` derived.
+- **The stitched panorama** (next): the camera check described under Camera. With it,
+  `ring_radius` 0.36 and `person_height` 1.9 go into the preset.
 - **A placement aid for the cameras** (later): since placement *is* the room-side
   calibration, it deserves a good way of doing it — probably projection layers that put
   the sector boundaries and centres on the wall so each camera can be aimed against them,

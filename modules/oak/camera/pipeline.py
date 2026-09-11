@@ -17,7 +17,7 @@ from .definitions import (
     DEPTH_TRACKER_BOX_SCALE, DEPTH_TRACKER_LOCATION,
     DEPTH_TRACKER_MIN_DEPTH, DEPTH_TRACKER_MAX_DEPTH,
     MONO_RESOLUTION, MONO_SIZE, COLOR_SIZES, color_resolution,
-    WARP_MESH, tilt_mesh_points,
+    WARP_MESH, equirect_mesh_points,
 )
 
 logger = logging.getLogger(__name__)
@@ -511,7 +511,7 @@ class SimulationColor(SetupColor):
         self.ex_video.setMaxDataSize(self.data_size)
 
         if warp_clips:
-            self.color_warp.setWarpMesh(*clip_tilt_mesh((self.width, self.height), self.mode_width, mount))
+            self.color_warp.setWarpMesh(*clip_equirect_mesh((self.width, self.height), self.mode_width, mount))
             self.ex_video.out.link(self.color_warp.inputImage)
         else:
             pipeline.remove(self.color_warp)
@@ -529,7 +529,7 @@ class SimulationColorYolo(SetupColorYolo):
         self.ex_video.setMaxDataSize(self.data_size)
 
         if warp_clips:
-            self.color_warp.setWarpMesh(*clip_tilt_mesh((self.width, self.height), self.mode_width, mount))
+            self.color_warp.setWarpMesh(*clip_equirect_mesh((self.width, self.height), self.mode_width, mount))
             self.ex_video.out.link(self.color_warp.inputImage)
         else:
             pipeline.remove(self.color_warp)
@@ -642,7 +642,7 @@ class SimulationMono(SetupMono):
         self.ex_left.setMaxDataSize(self.data_size)
 
         if warp_clips:
-            self.left_warp.setWarpMesh(*clip_tilt_mesh((self.width, self.height), self.mode_width, mount))
+            self.left_warp.setWarpMesh(*clip_equirect_mesh((self.width, self.height), self.mode_width, mount))
             self.ex_left.out.link(self.left_warp.inputImage)
         else:
             self.ex_left.out.link(self.output_video.input)
@@ -660,7 +660,7 @@ class SimulationMonoYolo(SetupMonoYolo):
         self.ex_left.setMaxDataSize(self.data_size)
 
         if warp_clips:
-            self.left_warp.setWarpMesh(*clip_tilt_mesh((self.width, self.height), self.mode_width, mount))
+            self.left_warp.setWarpMesh(*clip_equirect_mesh((self.width, self.height), self.mode_width, mount))
             self.ex_left.out.link(self.left_warp.inputImage)
         else:
             self.ex_left.out.link(self.detection_manip.inputImage)
@@ -765,7 +765,7 @@ class SimulationMonoStereoYolo(SimulationMonoStereo):
         pipeline.remove(self.output_left)
         pipeline.remove(self.output_right)
 
-def find_tilt_warp(
+def find_equirect_warp(
     src_size: tuple[int, int],
     out_size: tuple[int, int],
     mode_width: int,
@@ -775,16 +775,16 @@ def find_tilt_warp(
 ) -> list[dai.Point2f]:
     """The Warp node's mesh for undoing `mount.tilt`, as depthai points.
 
-    All of the geometry lives in `definitions.tilt_mesh_points`, which has no depthai or
+    All of the geometry lives in `definitions.equirect_mesh_points`, which has no depthai or
     OpenCV dependency and carries the explanation of the lens model and the mesh density.
     This is only the adapter. For the *other* correction, `keystone`, see `find_keystone_warp`.
     """
-    return [dai.Point2f(float(x), float(y)) for x, y in tilt_mesh_points(
+    return [dai.Point2f(float(x), float(y)) for x, y in equirect_mesh_points(
         src_size, out_size, mode_width, mount.fov_h, mount.tilt,
         mount.flip_h, mount.flip_v, mesh_w, mesh_h)]
 
 
-def clip_tilt_mesh(
+def clip_equirect_mesh(
     frame_size: tuple[int, int],
     mode_width: int,
     mount: WarpConfig,
@@ -801,16 +801,16 @@ def clip_tilt_mesh(
     - the tilt's sign flips under `flip_v`, because a vertical mirror reverses a rotation about
       the horizontal axis, while a horizontal mirror commutes with it and needs no correction.
 
-    ASSUMES THE CLIP WAS SHOT AT `tilt = 0`. That holds for every recording made before `tilt`
-    existed, but capture-time geometry is still not stored beside clips — see the plan's
-    "save the preset alongside each recording". Feeding a clip shot at a non-zero tilt through
-    this gives the sum of the two, not the one you set.
+    ASSUMES THE CLIP IS RAW: equidistant, shot at `tilt = 0`, before the warp reprojected its
+    output. That holds for every recording made before `tilt` existed. A clip recorded since
+    is already equirectangular and would be reprojected twice; capture-time geometry is still
+    not stored beside clips — see the plan's "save the preset alongside each recording".
     """
     clip_mount = WarpConfig(flip_h=False, flip_v=False,
                             tilt=-mount.tilt if mount.flip_v else mount.tilt,
                             keystone=0.0,           # a recording is already post-keystone
                             fov_h=mount.fov_h)
-    mesh: list[dai.Point2f] = find_tilt_warp(frame_size, frame_size, mode_width, clip_mount)
+    mesh: list[dai.Point2f] = find_equirect_warp(frame_size, frame_size, mode_width, clip_mount)
     return mesh, WARP_MESH, WARP_MESH
 
 
@@ -820,7 +820,7 @@ def clip_tilt_mesh(
 # These two builders are the original `find_perspective_warp` / `_square`, unchanged apart
 # from the name, at their original 2 x 64 mesh. They build a homography that pins all four
 # corners of the output to the frame corners: a rotation composed with a stretch-to-fit. That
-# is the wrong model for re-aiming a wide lens (see `definitions.tilt_mesh_points`), but it is
+# is the wrong model for re-aiming a wide lens (see `definitions.equirect_mesh_points`), but it is
 # exactly what hd_trio and deep_flow rely on — a person seen from a down-tilted camera gets
 # normal proportions while the whole frame is kept. Two columns suffice because the map is
 # affine in x per row; the vertical curvature is what the 64 rows are for. Nothing here may
@@ -925,13 +925,15 @@ def build_warp_mesh(
     `tilt` and `keystone` are exclusive: a keystone spreads columns by height, which is exactly
     what tilt removes so a column can mean one azimuth, and tilt shifts the frame, which is what
     keystone exists to avoid. Both non-zero is not a valid state for any camera, so it warns and
-    takes `tilt`. Both zero is the exact identity, through the tilt path.
+    takes `tilt`. Both zero goes through the tilt path, which is NOT the identity: it is the
+    equidistant -> equirectangular reprojection that makes a column one azimuth (see
+    `definitions.equirect_mesh_points`). Only a non-zero `keystone` reaches the old builder.
     """
     if mount.tilt != 0.0 and mount.keystone != 0.0:
         logger.warning("tilt (%.1f) and keystone (%.2f) are both set; they are exclusive — using tilt",
                        mount.tilt, mount.keystone)
     if mount.tilt != 0.0 or mount.keystone == 0.0:
-        return find_tilt_warp(src_size, out_size, mode_width, mount), WARP_MESH, WARP_MESH
+        return find_equirect_warp(src_size, out_size, mode_width, mount), WARP_MESH, WARP_MESH
 
     src_w, src_h = src_size
     out_w, out_h = out_size
