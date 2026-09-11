@@ -1,4 +1,5 @@
 # Standard library imports
+import math
 from enum import IntEnum, auto
 
 # Third-party imports
@@ -37,8 +38,8 @@ class PanoramaLayerSettings(BaseSettings):
                               description="Draw the azimuth and elevation grid, with the sector seams and camera axes picked out.")
     grid_degrees: Field[float] = Field(10.0, min=1.0, max=90.0, step=1.0,
                                        description="Grid spacing (°), the same on both axes. Horizontal lines are what let the overlap be compared at head height against knee height — the tilt signature.")
-    strip_aspect: Field[float] = Field(6.5, min=3.0, max=16.0, step=0.5,
-                                       description="Width:height of the stitched row. 4.5 is square degrees — the whole 800-row frame at its true scale — but a padded clip wastes part of that height and the row is then taller than it needs to be. Higher squashes it vertically, which costs nothing here: the check is whether the overlap lines up horizontally at two different heights.")
+    tilt: Field[float] = Field(0.0, access=Field.INIT,
+                               description="The cameras' up-tilt (°), shared from the camera group. Not used to move anything — the warp has already levelled the frame — but it says which rows of that frame the sensor never imaged, so the strip can be sized to the picture that exists instead of to an empty band.")
     show_all_observations: Field[bool] = Field(True, widget=Widget.switch,
                                               description="Draw every camera's own opinion in the strip below, not just the one the tracker picked. Off falls back to one box per person.")
 
@@ -103,6 +104,52 @@ class PanoramicCameraLayer(LayerBase):
         """The sector one camera owns — the tracker's own `360 / num_cameras`."""
         return 360.0 / self.num_cams
 
+    @property
+    def vfov(self) -> float:
+        """One camera's vertical field (degrees) — derived by the tracker from `fov`."""
+        return max(1.0, self._tracker.parallax.vfov)
+
+    @property
+    def populated_band(self) -> tuple[float, float]:
+        """The elevations the delivered frames actually carry, measured at the camera.
+
+        The warp hands back a *levelled* frame spanning +/- vfov/2 whatever the mount does, but a
+        camera aimed up by `tilt` never imaged the bottom of that: it saw
+        `[tilt - vfov/2, tilt + vfov/2]`, and the rows outside the intersection are empty. At
+        tilt 15 that is the bottom 18.5% of the frame — the black band.
+        """
+        half: float = self.vfov / 2.0
+        tilt: float = self._settings.tilt
+        return (max(-half, tilt - half), min(half, tilt + half))
+
+    @property
+    def elevation_window(self) -> tuple[float, float]:
+        """(top, bottom) elevation of the strip, measured at the RIG CENTRE.
+
+        The populated band converted to the centre's point of view, at the bearing where the
+        conversion is tightest. `tan(e_centre) = tan(e_cam) * d / focus_radius`, and `d` is
+        smallest straight ahead (`focus_radius - ring_radius`), so taking the window there
+        guarantees every column of the strip is filled rather than fading to black near the
+        camera axes.
+        """
+        focus_radius: float = max(1e-6, self._settings.focus_diameter / 2.0)
+        ratio: float = max(0.0, focus_radius - self._tracker.parallax.ring_radius) / focus_radius
+        low, high = self.populated_band
+        return (math.degrees(math.atan(math.tan(math.radians(high)) * ratio)),
+                math.degrees(math.atan(math.tan(math.radians(low)) * ratio)))
+
+    @property
+    def aspect_ratio(self) -> float:
+        """Width:height of the strip, for the row that holds it.
+
+        360 degrees of azimuth over however many degrees of elevation the window spans — square
+        degrees, which is now the *right* answer because both axes are re-projected to the rig
+        centre. Nothing here is a preference: change `tilt`, `fov` or `focus_diameter` and the
+        row follows.
+        """
+        top, bottom = self.elevation_window
+        return 360.0 / max(1.0, top - bottom)
+
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
         self._text.allocate()
@@ -126,9 +173,12 @@ class PanoramicCameraLayer(LayerBase):
         self._stitch.use(
             self._cam_textures,
             self._tracker.fov,
+            self.vfov,
             self.target_fov,
             self._tracker.parallax.ring_radius,
             self._settings.focus_diameter,
+            self.elevation_window,
+            self.populated_band,
             self._settings.blend == PanoramaBlend.AVERAGE,
         )
 
@@ -163,15 +213,17 @@ class PanoramicCameraLayer(LayerBase):
             self._vertical(camera_azimuth(cam_id, self.target_fov), 2.0 * px_x, _AXIS_COLOR)
             self._vertical(self.target_fov * cam_id, 2.0 * px_x, _SEAM_COLOR)
 
-        # Horizontal lines: one elevation each, from the horizon out. The frame is
-        # equirectangular, so a row *is* an elevation and this is a linear scale — the same
-        # degrees-per-pixel as the azimuth axis.
-        vfov: float = max(1.0, self._tracker.parallax.vfov)
-        self._horizontal(0.0, vfov, 2.0 * px_y, _HORIZON_COLOR)
+        # Horizontal lines: one elevation each, from the horizon out. Both axes of the strip are
+        # centre-referenced and linear, so this is the same degrees-per-pixel as the azimuth
+        # axis — which is what makes the grid square and the head-versus-knee comparison fair.
+        top, bottom = self.elevation_window
+        self._horizontal(0.0, px_y, _HORIZON_COLOR)
         elevation: float = spacing
-        while elevation < vfov / 2.0:
-            self._horizontal(elevation, vfov, px_y, _GRID_COLOR)
-            self._horizontal(-elevation, vfov, px_y, _GRID_COLOR)
+        while elevation < max(abs(top), abs(bottom)):
+            if elevation < top:
+                self._horizontal(elevation, px_y, _GRID_COLOR)
+            if -elevation > bottom:
+                self._horizontal(-elevation, px_y, _GRID_COLOR)
             elevation += spacing
 
         self._draw_labels(spacing)
@@ -179,11 +231,12 @@ class PanoramicCameraLayer(LayerBase):
     def _vertical(self, azimuth: float, width: float, color: tuple[float, float, float, float]) -> None:
         self._rect_shader.use((azimuth % 360.0) / 360.0, 0.0, width, 1.0, *color)
 
-    def _horizontal(self, elevation: float, vfov: float, height: float,
+    def _horizontal(self, elevation: float, height: float,
                     color: tuple[float, float, float, float]) -> None:
-        # Row 0 is the top of the frame and elevation grows upward, so the horizon is the centre
-        # row and positive elevations sit above it.
-        y: float = 0.5 - elevation / vfov
+        # Rect y is top-down, and the window's top elevation is the strip's top row. The horizon
+        # is only at mid-height when the window is symmetric, which a tilted camera's is not.
+        top, bottom = self.elevation_window
+        y: float = (top - elevation) / max(1e-6, top - bottom)
         self._rect_shader.use(0.0, y, 1.0, height, *color)
 
     def _draw_labels(self, spacing: float) -> None:
@@ -200,6 +253,8 @@ class PanoramicCameraLayer(LayerBase):
             azimuth += stride
 
         blend: str = 'avg' if self._settings.blend == PanoramaBlend.AVERAGE else 'max'
-        footer: str = f'Ø{self._settings.focus_diameter:.1f}m  fov {self._tracker.fov:.0f}  {blend}'
+        top, bottom = self.elevation_window
+        footer: str = (f'Ø{self._settings.focus_diameter:.1f}m  fov {self._tracker.fov:.0f}  '
+                       f'tilt {self._settings.tilt:.0f}  elev {bottom:.0f}..{top:.0f}  {blend}')
         self._text.draw_box_text(3, self.fbo.height - 22, footer, _LABEL_FG, _LABEL_BG,
                                  self.fbo.width, self.fbo.height)

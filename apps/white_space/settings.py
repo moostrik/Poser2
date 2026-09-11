@@ -308,12 +308,15 @@ class BeamLightSimSettings(BaseSettings):
 class RenderSettings(BaseSettings):
     num_cams:    Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of players")
+    tilt:        Field[float] = Field(0.0, access=Field.INIT, visible=False, description="Camera up-tilt (°), shared from the root — relayed to the panorama layer")
     preview:     Group[PreviewGroup]        = Group(PreviewGroup)
     data_time:   Group[_MTimeSettings]      = Group(_MTimeSettings)
     data:        Group[_DataLayerSettings]  = Group(_DataLayerSettings)
     playhead_data: Group[PlayheadDataLayerSettings] = Group(PlayheadDataLayerSettings)
     beam_light_sim: Group[BeamLightSimSettings] = Group(BeamLightSimSettings)
-    panorama:    Group[layers.PanoramaLayerSettings] = Group(layers.PanoramaLayerSettings)
+    # Shared down from the root so the panorama can size itself to the picture the mount
+    # actually delivers; it moves nothing, the warp has already levelled the frame.
+    panorama:    Group[layers.PanoramaLayerSettings] = Group(layers.PanoramaLayerSettings, share=[tilt])
     colors:      Group[ColorSettings]       = Group(ColorSettings)
     window:      Group[WindowSettings]      = Group(WindowSettings)
 
@@ -330,13 +333,14 @@ class Settings(BaseSettings):
     render_fps      : Field[float] = Field(30.0)
     light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="LED strip resolution (pixels)")
     fov             : Field[float] = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-D Pro W, OV9282 mono, 1280x800 native. A lens constant, baked into the warp at device open; shared to the tracker and composition, and the vertical field derives from it.")
+    tilt            : Field[float] = Field(0.0, access=Field.INIT, description="Camera up-tilt (°), positive = aimed upward, the same for all four cameras. A mount constant: the warp levels the frame with it at device open, and the render needs it to know which rows of that frame the sensor never imaged.")
     spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — canonical value tying statemachine (the visible slider) to the wind_down layer")
 
-    camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov])
+    camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov, tilt])
     inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players'), num_virtual.as_('num_virtual'), light_resolution.as_('resolution')])
     pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), num_virtual.as_('ghost_slots'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     light: Group[LightSettings] = Group(LightSettings, share=[num_players.as_('max_poses'), num_cameras.as_('num_cameras'), light_resolution.as_('light_resolution'), fov, spin_down_seconds])
     statemachine: Group[StateMachineSettings] = Group(StateMachineSettings, share=[spin_down_seconds])
-    render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams')])
+    render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams'), tilt])
     server : Group[NiceSettings]    = Group(NiceSettings)
     recording: Group[RecordingGroup] = Group(RecordingGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])

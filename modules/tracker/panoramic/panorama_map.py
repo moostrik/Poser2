@@ -100,6 +100,32 @@ def azimuth_to_camera_x(azimuth: float, cam_id: int, cam_fov: float, target_fov:
     return max(0.0, min(1.0, local / cam_fov))
 
 
+def camera_elevation(elevation: float, bearing: float, ring_radius: float,
+                     focus_radius: float) -> float:
+    """The elevation (degrees) a camera sees for a point the rig centre sees at `elevation`.
+
+    The vertical half of the same triangle `azimuth_to_camera_x` solves horizontally, and it has
+    to be solved too: a camera `ring_radius` out from the centre is *closer* to the near wall of
+    the focus cylinder, so it sees the same standing person at a wider bearing AND a higher
+    elevation. A point on the cylinder stands `h` above the lens plane at horizontal distance
+    `focus_radius` from the centre and `d` from the camera, so
+
+        tan(e_camera) = h / d  and  tan(e_centre) = h / focus_radius
+        ->  tan(e_camera) = tan(e_centre) * focus_radius / d
+
+    and the height cancels: only the ratio of the two horizontal distances survives. The factor
+    is `R / (R - r)` straight ahead — 1.19 at Ø 4.5 — falling toward 1 at the sides, exactly
+    matching the horizontal compression, which is why re-projecting one axis without the other
+    leaves everything in the panorama too tall for its width.
+
+    `bearing` is measured at the centre, as `focus_distance` takes it.
+    """
+    distance: float = focus_distance(bearing, ring_radius, focus_radius)
+    if distance <= 1e-9:
+        return elevation
+    return math.degrees(math.atan(math.tan(math.radians(elevation)) * focus_radius / distance))
+
+
 def panorama_coverage(azimuth: float, num_cameras: int, cam_fov: float, target_fov: float,
                       ring_radius: float, focus_diameter: float) -> int:
     """How many cameras see this azimuth — the divisor an averaging blend needs.

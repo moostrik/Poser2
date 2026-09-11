@@ -8,8 +8,8 @@ If the tracker's forward chain ever changes, the round trip breaks here rather t
 import math
 import unittest
 
-from modules.tracker import azimuth_to_camera_x, camera_azimuth, focus_distance, fov_overlap, \
-    panorama_coverage, wrap180
+from modules.tracker import azimuth_to_camera_x, camera_azimuth, camera_elevation, \
+    focus_distance, fov_overlap, panorama_coverage, wrap180
 from modules.tracker.panoramic.geometry import Geometry
 from modules.utils import Rect
 
@@ -147,6 +147,66 @@ class TestRoundTripAgainstGeometry(unittest.TestCase):
 
     def test_no_ghost_at_the_focus_depth(self) -> None:
         self.assertAlmostEqual(self._seam_ghost(FOCUS_DIAMETER), 0.0, places=9)
+
+
+class TestCameraElevation(unittest.TestCase):
+    """Checked against a point placed in 3-D and projected from the camera directly.
+
+    Rig centre at the origin, camera `c` at `ring_radius` out along its own axis. A point on the
+    focus cylinder at azimuth `a` and height `h` above the lens plane is at
+    `(R cos a, R sin a, h)`; the centre sees it at elevation `atan(h/R)` and the camera at
+    `atan(h/d)` with `d` the horizontal distance between them. No formula from the module is
+    reused to build the expectation.
+    """
+
+    def _direct(self, azimuth: float, height: float, cam_id: int,
+                focus_radius: float) -> tuple[float, float]:
+        centre: float = math.radians(camera_azimuth(cam_id, TARGET_FOV))
+        a: float = math.radians(azimuth)
+        dx: float = focus_radius * math.cos(a) - RING_RADIUS * math.cos(centre)
+        dy: float = focus_radius * math.sin(a) - RING_RADIUS * math.sin(centre)
+        horizontal: float = math.hypot(dx, dy)
+        return (math.degrees(math.atan(height / focus_radius)),      # seen from the centre
+                math.degrees(math.atan(height / horizontal)))        # seen from the camera
+
+    def test_matches_a_point_projected_in_three_dimensions(self) -> None:
+        focus_radius: float = FOCUS_DIAMETER / 2.0
+        for cam_id in range(NUM_CAMERAS):
+            axis: float = camera_azimuth(cam_id, TARGET_FOV)
+            for offset in (-50.0, -25.0, 0.0, 25.0, 50.0):
+                for height in (-0.5, 0.4, 1.4):
+                    from_centre, from_camera = self._direct(
+                        axis + offset, height, cam_id, focus_radius)
+                    self.assertAlmostEqual(
+                        camera_elevation(from_centre, offset, RING_RADIUS, focus_radius),
+                        from_camera, places=9,
+                        msg=f'cam {cam_id} offset {offset} height {height}')
+
+    def test_the_horizon_never_moves(self) -> None:
+        for offset in (-60.0, 0.0, 60.0):
+            self.assertAlmostEqual(
+                camera_elevation(0.0, offset, RING_RADIUS, FOCUS_DIAMETER / 2.0), 0.0, places=12)
+
+    def test_compression_matches_the_horizontal_on_the_axis(self) -> None:
+        """The point of doing both axes: on the camera's own axis the two factors are the same
+        `R / (R - r)`, so a person keeps their proportions."""
+        focus_radius: float = FOCUS_DIAMETER / 2.0
+        expected: float = focus_radius / (focus_radius - RING_RADIUS)
+        small: float = 1e-4
+        vertical: float = camera_elevation(small, 0.0, RING_RADIUS, focus_radius) / small
+        horizontal: float = (
+            azimuth_to_camera_x(camera_azimuth(0, TARGET_FOV) + small, 0, CAM_FOV, TARGET_FOV,
+                                RING_RADIUS, FOCUS_DIAMETER)      # type: ignore[operator]
+            - azimuth_to_camera_x(camera_azimuth(0, TARGET_FOV), 0, CAM_FOV, TARGET_FOV,
+                                  RING_RADIUS, FOCUS_DIAMETER)    # type: ignore[operator]
+        ) * CAM_FOV / small
+        self.assertAlmostEqual(vertical, expected, places=6)
+        self.assertAlmostEqual(horizontal, expected, places=4)
+
+    def test_no_ring_is_the_identity(self) -> None:
+        for elevation in (-30.0, 0.0, 12.5, 39.0):
+            self.assertAlmostEqual(
+                camera_elevation(elevation, 40.0, 0.0, FOCUS_DIAMETER / 2.0), elevation, places=12)
 
 
 class TestNoRingIsLinear(unittest.TestCase):

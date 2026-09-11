@@ -17,14 +17,20 @@ class PanoramicStitch(Shader):
     approximation, and no blend state has to be set up and torn down.
     """
 
-    def use(self, textures: list[Texture], cam_fov: float, target_fov: float,
-            ring_radius: float, focus_diameter: float, average: bool) -> None:
+    def use(self, textures: list[Texture], cam_fov: float, vfov: float, target_fov: float,
+            ring_radius: float, focus_diameter: float,
+            elevation_window: tuple[float, float], populated_band: tuple[float, float],
+            average: bool) -> None:
         """Args:
             textures: one per camera, in camera-id order; camera 0 owns azimuth 0 upward
             cam_fov: one camera's horizontal field (degrees)
+            vfov: one camera's vertical field (degrees)
             target_fov: the sector one camera owns, 360 / num_cameras (degrees)
             ring_radius: camera distance from the rig centre (m); 0 disables the parallax term
             focus_diameter: the play-zone cylinder the image is aligned for (m)
+            elevation_window: (top, bottom) elevation of the strip, measured at the rig centre
+            populated_band: (low, high) elevation the frames actually carry, at the camera —
+                a tilted camera never imaged the rest, and those rows are empty
             average: True averages the overlap, False takes the brighter of the two
         """
         if not self.allocated or not self.shader_program:
@@ -46,9 +52,14 @@ class PanoramicStitch(Shader):
 
         glUniform1i(self.get_uniform_loc("numCams"), num_cams)
         glUniform1f(self.get_uniform_loc("camFov"), cam_fov)
+        glUniform1f(self.get_uniform_loc("vfov"), vfov)
         glUniform1f(self.get_uniform_loc("targetFov"), target_fov)
         glUniform1f(self.get_uniform_loc("ringRadius"), ring_radius)
         glUniform1f(self.get_uniform_loc("focusRadius"), focus_diameter / 2.0)
+        glUniform1f(self.get_uniform_loc("elevTop"), elevation_window[0])
+        glUniform1f(self.get_uniform_loc("elevBottom"), elevation_window[1])
+        glUniform1f(self.get_uniform_loc("camElevLo"), populated_band[0])
+        glUniform1f(self.get_uniform_loc("camElevHi"), populated_band[1])
         glUniform1i(self.get_uniform_loc("blendMode"), 1 if average else 0)
 
         draw_quad()

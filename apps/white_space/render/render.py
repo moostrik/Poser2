@@ -99,7 +99,9 @@ class Render(RenderBase):
         # on whichever thread wrote the setting, so it raises a flag and `update()` acts on it.
         self._layout_dirty: bool = False
         settings.panorama.bind(PanoramaLayerSettings.enabled, self._on_layout_setting)
-        settings.panorama.bind(PanoramaLayerSettings.strip_aspect, self._on_layout_setting)
+        # The strip's height follows the focus depth: a nearer cylinder is seen over a narrower
+        # band of elevation from the centre, so dragging this reshapes the row.
+        settings.panorama.bind(PanoramaLayerSettings.focus_diameter, self._on_layout_setting)
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
@@ -110,21 +112,14 @@ class Render(RenderBase):
     def _track_row(self) -> SubdivisionRow:
         """Row 1: either one view per camera, or the whole ring stitched into one strip.
 
-        The strip's *true* aspect comes straight off the frames: a camera is `MONO_SIZE[0]` px
-        across `fov` degrees, so a degree is `MONO_SIZE[0] / fov` px, the ring is 360 of them —
-        3628 px — and the strip is one frame tall, giving 4.54. The overlaps are drawn on top of
-        each other rather than laid side by side, so they are not in that width: four 1280 px
-        frames are 5120 px, less 4 x 37 degrees of overlap at 1492 px.
-
-        But that is the height the row *would* need if every row of the frame carried picture,
-        and it is not what the row has to be. A clip padded into the 800-row frame wastes part of
-        it, and the vertical scale is not what this view is read for — the seam check is a
-        horizontal comparison made at two different heights, which survives a squash. So the
-        height is `panorama.strip_aspect`, a knob, with 4.54 recorded here as what it means.
+        Stitched, the aspect is the layer's own — 360 degrees of azimuth over the elevations it
+        can actually fill, both measured at the rig centre. It is not a preference: `tilt`, `fov`
+        and `focus_diameter` all move it, and the layer is the only thing that knows how.
         """
         if self.panorama_enabled:
+            panorama: PanoramicCameraLayer = self.L[Layers.cam_panorama][0]  # type: ignore[assignment]
             return SubdivisionRow(name='track', columns=1, rows=1,
-                                  src_aspect_ratio=max(1.0, self.settings.panorama.strip_aspect),
+                                  src_aspect_ratio=panorama.aspect_ratio,
                                   padding=Point2f(0.0, 1.0))
         return SubdivisionRow(name='track', columns=self.num_cams, rows=1,
                               src_aspect_ratio=MONO_SIZE[0] / MONO_SIZE[1], padding=Point2f(1.0, 1.0))
@@ -171,7 +166,7 @@ class Render(RenderBase):
 
     def deallocate(self) -> None:
         self.settings.panorama.unbind(PanoramaLayerSettings.enabled, self._on_layout_setting)
-        self.settings.panorama.unbind(PanoramaLayerSettings.strip_aspect, self._on_layout_setting)
+        self.settings.panorama.unbind(PanoramaLayerSettings.focus_diameter, self._on_layout_setting)
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()
