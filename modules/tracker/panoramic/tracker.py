@@ -6,7 +6,7 @@ from queue import Empty, Queue
 from threading import Lock, Thread, Event
 
 # Local application imports
-from modules.oak import DepthTracklet
+from modules.oak import DepthTracklet, MONO_SIZE
 from .. import (
     BaseTracker, TrackerAnnotation,
     Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback,
@@ -69,7 +69,7 @@ class Tracker(Thread, BaseTracker):
         self.geometry: Geometry = Geometry(num_cameras, config.fov, 90.0)
 
         # Wire fov, distortion and parallax changes to geometry
-        TrackerSettings.fov.bind(config, lambda v: (self.geometry.set_fov(v), self._update_seam_angles()))
+        TrackerSettings.fov.bind(config, lambda v: (self._set_fov(v), self._update_seam_angles()))
         DistortionSettings.algorithm.bind(config.distortion, lambda v: self.geometry.set_algorithm(v))
         TanhSettings.slope.bind(config.distortion.tanh, lambda v: self.geometry.set_tanh_slope(v))
         TanhSettings.cubic.bind(config.distortion.tanh, lambda v: self.geometry.set_tanh_cubic(v))
@@ -77,7 +77,6 @@ class Tracker(Thread, BaseTracker):
         PolySettings.k2.bind(config.distortion.poly, lambda v: self.geometry.set_poly_k2(v))
         ParallaxSettings.ring_radius.bind(config.parallax, lambda v: self.geometry.set_ring_radius(v))
         ParallaxSettings.person_height.bind(config.parallax, lambda v: self.geometry.set_person_height(v))
-        ParallaxSettings.vfov.bind(config.parallax, lambda v: self.geometry.set_vfov(v))
 
         # bind() does not fire with the current value, and the preset is loaded
         # before this tracker is constructed — push config into geometry once now.
@@ -98,7 +97,7 @@ class Tracker(Thread, BaseTracker):
         """Apply current config values to geometry. Needed at construction
         because ``bind`` does not fire with the initial value and the preset is
         loaded before the tracker exists."""
-        self.geometry.set_fov(self.config.fov)
+        self._set_fov(self.config.fov)
         self.geometry.set_algorithm(self.config.distortion.algorithm)
         self.geometry.set_tanh_slope(self.config.distortion.tanh.slope)
         self.geometry.set_tanh_cubic(self.config.distortion.tanh.cubic)
@@ -106,7 +105,13 @@ class Tracker(Thread, BaseTracker):
         self.geometry.set_poly_k2(self.config.distortion.poly.k2)
         self.geometry.set_ring_radius(self.config.parallax.ring_radius)
         self.geometry.set_person_height(self.config.parallax.person_height)
-        self.geometry.set_vfov(self.config.parallax.vfov)
+
+    def _set_fov(self, fov: float) -> None:
+        """The vertical field is fov x rows / columns — same degrees per pixel on both axes."""
+        self.geometry.set_fov(fov)
+        vfov: float = fov * MONO_SIZE[1] / MONO_SIZE[0]
+        self.geometry.set_vfov(vfov)
+        self.config.parallax.vfov = vfov
 
     def _update_seam_angles(self) -> None:
         a = self.config.seam.angles

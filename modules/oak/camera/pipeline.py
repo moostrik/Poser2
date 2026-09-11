@@ -3,7 +3,9 @@ from datetime import timedelta
 from pathlib import Path
 import logging
 
+import cv2
 import depthai as dai
+import numpy as np
 
 from .definitions import (
     FrameType,
@@ -15,16 +17,27 @@ from .definitions import (
     DEPTH_TRACKER_BOX_SCALE, DEPTH_TRACKER_LOCATION,
     DEPTH_TRACKER_MIN_DEPTH, DEPTH_TRACKER_MAX_DEPTH,
     MONO_RESOLUTION, MONO_SIZE, COLOR_SIZES, color_resolution,
+    WARP_MESH, tilt_mesh_points,
 )
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class PerspectiveConfig:
+class WarpConfig:
+    """How a camera is mounted, as the warp needs it.
+
+    `tilt` (degrees, positive = aimed up) re-aims the camera so a column reads as one azimuth,
+    at the cost of the frame edges. `keystone` (fraction of the frame) squares up a person seen
+    from a tilted camera while keeping the whole frame. They are exclusive per camera — see
+    `build_warp_mesh`. `fov_h` is the horizontal field of the un-cropped sensor mode, which is
+    what turns the tilt angle into pixels.
+    """
     flip_h: bool
     flip_v: bool
-    perspective: float
+    tilt: float
+    keystone: float
+    fov_h: float
 
 def get_frame_types(do_color: bool, do_stereo: bool, show_stereo: bool, simulate: bool) -> list[FrameType]:
     frame_types: list[FrameType] = [FrameType.NONE_]
@@ -69,8 +82,9 @@ def setup_pipeline(
     do_yolo: bool = True,
     do_720p: bool = False,
     show_stereo: bool = False,
-    perspective: PerspectiveConfig = PerspectiveConfig(False, False, 0.0),
-    simulate: bool = False
+    mount: WarpConfig = WarpConfig(False, False, 0.0, 0.0, 127.0),
+    simulate: bool = False,
+    warp_clips: bool = False
     ) -> None:
 
     if square and do_stereo:
@@ -98,9 +112,9 @@ def setup_pipeline(
                     SetupColorStereo(pipeline, fps, do_720p, show_stereo = True)
             else:
                 if do_yolo:
-                    SetupColorYolo(pipeline, fps, do_720p, square, perspective, nn_path)
+                    SetupColorYolo(pipeline, fps, do_720p, square, mount, nn_path)
                 else:
-                    SetupColor(pipeline, fps, do_720p, square, perspective)
+                    SetupColor(pipeline, fps, do_720p, square, mount)
         else:
             if do_stereo:
                 if do_yolo:
@@ -109,9 +123,9 @@ def setup_pipeline(
                     SetupMonoStereo(pipeline, fps, show_stereo = True)
             else:
                 if do_yolo:
-                    SetupMonoYolo(pipeline, fps, square, perspective, nn_path)
+                    SetupMonoYolo(pipeline, fps, square, mount, nn_path)
                 else:
-                    SetupMono(pipeline, fps, square, perspective)
+                    SetupMono(pipeline, fps, square, mount)
     else:
         if do_color:
             if do_stereo:
@@ -121,9 +135,9 @@ def setup_pipeline(
                     SimulationColorStereo(pipeline, fps, do_720p, show_stereo)
             else:
                 if do_yolo:
-                    SimulationColorYolo(pipeline, fps, do_720p, square, nn_path)
+                    SimulationColorYolo(pipeline, fps, do_720p, square, mount, nn_path, warp_clips)
                 else:
-                    SimulationColor(pipeline, fps, do_720p, square)
+                    SimulationColor(pipeline, fps, do_720p, square, mount, warp_clips)
         else:
             if do_stereo:
                 if do_yolo:
@@ -132,9 +146,9 @@ def setup_pipeline(
                     SimulationMonoStereo(pipeline, fps, show_stereo)
             else:
                 if do_yolo:
-                    SimulationMonoYolo(pipeline, fps, square, nn_path)
+                    SimulationMonoYolo(pipeline, fps, square, mount, nn_path, warp_clips)
                 else:
-                    SimulationMono(pipeline, fps, square)
+                    SimulationMono(pipeline, fps, square, mount, warp_clips)
 
 
 class Setup():
@@ -143,7 +157,7 @@ class Setup():
         self.fps: float = fps
 
 class SetupColor(Setup):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, perspective: PerspectiveConfig) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, mount: WarpConfig) -> None:
         super().__init__(pipeline, fps)
 
         self.resolution: dai.ColorCameraProperties.SensorResolution = color_resolution(do_720p)
@@ -159,16 +173,15 @@ class SetupColor(Setup):
         self.color.setPreviewSize(self.width, self.height)
 
         self.color_warp: dai.node.Warp = pipeline.create(dai.node.Warp)
-        warp_p: float = self.width * 0.5 * perspective.perspective
-        mesh_w, mesh_h = 2, 64
+        self.mode_width: int = self.width   # `fov_h` is quoted for the un-cropped width
+        self.mount: WarpConfig = mount
 
         if square:
-            warp_p: float = self.height * 0.5 * perspective.perspective
-            warp_mesh: list[dai.Point2f] = find_perspective_warp_square(self.width, self.height, self.height, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
-            self.width = self.height # make square
+            self.width = self.height        # make square
             self.data_size = self.width * self.height * 3
-        else:
-            warp_mesh: list[dai.Point2f] = find_perspective_warp(self.width, self.height, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
+
+        warp_mesh, mesh_w, mesh_h = build_warp_mesh(
+            (self.mode_width, self.height), (self.width, self.height), self.mode_width, mount)
 
         self.color_warp.setMaxOutputFrameSize(self.data_size)
         self.color_warp.setOutputSize(self.width, self.height)
@@ -185,8 +198,8 @@ class SetupColor(Setup):
         self.color_control.out.link(self.color.inputControl)
 
 class SetupColorYolo(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, perspective: PerspectiveConfig, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, do_720p, square, perspective)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, mount: WarpConfig, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, do_720p, square, mount)
 
         self.detection_manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.detection_manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
@@ -325,7 +338,7 @@ class SetupColorStereoYolo(SetupColorStereo):
 
 
 class SetupMono(Setup):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, perspective: PerspectiveConfig) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, mount: WarpConfig) -> None:
         super().__init__(pipeline, fps)
 
 
@@ -339,16 +352,15 @@ class SetupMono(Setup):
         self.left.setFps(self.fps)
 
         self.left_warp: dai.node.Warp = pipeline.create(dai.node.Warp)
-        warp_p: float = self.width * 0.5 * perspective.perspective
-        mesh_w, mesh_h = 2, 64
+        self.mode_width: int = self.width   # `fov_h` is quoted for the un-cropped width
+        self.mount: WarpConfig = mount
 
         if square:
-            warp_p: float = self.height * 0.5 * perspective.perspective
-            warp_mesh: list[dai.Point2f] = find_perspective_warp_square(self.width, self.height, self.height, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
-            self.width = self.height # make square
+            self.width = self.height        # make square
             self.data_size = self.width * self.height   # follow the crop, as SetupColor does
-        else:
-            warp_mesh: list[dai.Point2f] = find_perspective_warp(self.width, self.height, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
+
+        warp_mesh, mesh_w, mesh_h = build_warp_mesh(
+            (self.mode_width, self.height), (self.width, self.height), self.mode_width, mount)
 
         self.left_warp.setMaxOutputFrameSize(self.data_size)
         self.left_warp.setOutputSize(self.width, self.height)
@@ -365,8 +377,8 @@ class SetupMono(Setup):
         self.mono_control.out.link(self.left.inputControl)
 
 class SetupMonoYolo(SetupMono):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, perspective: PerspectiveConfig, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, square, perspective)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, mount: WarpConfig, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, square, mount)
 
         self.detection_manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.detection_manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
@@ -488,29 +500,41 @@ class SetupMonoStereoYolo(SetupMonoStereo):
 
 
 class SimulationColor(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool) -> None:
-        super().__init__(pipeline, fps, do_720p, square, PerspectiveConfig(False, False, 0.0))
+    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, mount: WarpConfig,
+                 warp_clips: bool = False) -> None:
+        super().__init__(pipeline, fps, do_720p, square, mount)
 
         pipeline.remove(self.color)
-        pipeline.remove(self.color_warp)
 
         self.ex_video: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_video.setStreamName("ex_video")
         self.ex_video.setMaxDataSize(self.data_size)
 
-        self.ex_video.out.link(self.output_video.input)
+        if warp_clips:
+            self.color_warp.setWarpMesh(*clip_tilt_mesh((self.width, self.height), self.mode_width, mount))
+            self.ex_video.out.link(self.color_warp.inputImage)
+        else:
+            pipeline.remove(self.color_warp)
+            self.ex_video.out.link(self.output_video.input)
 
 class SimulationColorYolo(SetupColorYolo):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, do_720p, square, PerspectiveConfig(False, False, 0.0), nn_path)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, mount: WarpConfig,
+                 nn_path: Path, warp_clips: bool = False) -> None:
+        super().__init__(pipeline, fps, do_720p, square, mount, nn_path)
 
         pipeline.remove(self.color)
-        pipeline.remove(self.color_warp)
 
         self.ex_video: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_video.setStreamName("ex_video")
         self.ex_video.setMaxDataSize(self.data_size)
-        self.ex_video.out.link(self.detection_manip.inputImage)
+
+        if warp_clips:
+            self.color_warp.setWarpMesh(*clip_tilt_mesh((self.width, self.height), self.mode_width, mount))
+            self.ex_video.out.link(self.color_warp.inputImage)
+        else:
+            pipeline.remove(self.color_warp)
+            self.ex_video.out.link(self.detection_manip.inputImage)
+            self.ex_video.out.link(self.output_video.input)
         self.ex_video.out.link(self.output_video.input)
 
 class SimulationColorStereo(SetupColorStereo):
@@ -606,33 +630,42 @@ class SimulationColorStereoYolo(SimulationColorStereo):
 
 
 class SimulationMono(SetupMono):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool) -> None:
-        super().__init__(pipeline, fps, square, PerspectiveConfig(False, False, 0.0))
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, mount: WarpConfig,
+                 warp_clips: bool = False) -> None:
+        super().__init__(pipeline, fps, square, mount)
 
         pipeline.remove(self.left)
         pipeline.remove(self.mono_control)
 
         self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_left.setStreamName("ex_video")
-        # self.ex_left.setMaxDataSize(self.data_size) # * 3?
         self.ex_left.setMaxDataSize(self.data_size)
 
-        self.ex_left.out.link(self.output_video.input)
+        if warp_clips:
+            self.left_warp.setWarpMesh(*clip_tilt_mesh((self.width, self.height), self.mode_width, mount))
+            self.ex_left.out.link(self.left_warp.inputImage)
+        else:
+            self.ex_left.out.link(self.output_video.input)
 
 class SimulationMonoYolo(SetupMonoYolo):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, square, PerspectiveConfig(False, False, 0.0), nn_path)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, mount: WarpConfig,
+                 nn_path: Path, warp_clips: bool = False) -> None:
+        super().__init__(pipeline, fps, square, mount, nn_path)
 
         pipeline.remove(self.left)
         pipeline.remove(self.mono_control)
 
         self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_left.setStreamName("ex_video")
-        # self.ex_left.setMaxDataSize(self.data_size) # * 3?
         self.ex_left.setMaxDataSize(self.data_size)
 
-        self.ex_left.out.link(self.detection_manip.inputImage)
-        self.ex_left.out.link(self.output_video.input)
+        if warp_clips:
+            self.left_warp.setWarpMesh(*clip_tilt_mesh((self.width, self.height), self.mode_width, mount))
+            self.ex_left.out.link(self.left_warp.inputImage)
+        else:
+            self.ex_left.out.link(self.detection_manip.inputImage)
+            self.ex_left.out.link(self.output_video.input)
+        # self.ex_left.out.link(self.output_video.input)
 
 class SimulationMonoStereo(SetupMonoStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool) -> None:
@@ -732,10 +765,72 @@ class SimulationMonoStereoYolo(SimulationMonoStereo):
         pipeline.remove(self.output_left)
         pipeline.remove(self.output_right)
 
-import cv2
-import numpy as np
+def find_tilt_warp(
+    src_size: tuple[int, int],
+    out_size: tuple[int, int],
+    mode_width: int,
+    mount: WarpConfig,
+    mesh_w: int = WARP_MESH,
+    mesh_h: int = WARP_MESH,
+) -> list[dai.Point2f]:
+    """The Warp node's mesh for undoing `mount.tilt`, as depthai points.
 
-def find_perspective_warp(width, height, width_offset, flip_h, flip_v, mesh_w, mesh_h)  -> list[dai.Point2f]:
+    All of the geometry lives in `definitions.tilt_mesh_points`, which has no depthai or
+    OpenCV dependency and carries the explanation of the lens model and the mesh density.
+    This is only the adapter. For the *other* correction, `keystone`, see `find_keystone_warp`.
+    """
+    return [dai.Point2f(float(x), float(y)) for x, y in tilt_mesh_points(
+        src_size, out_size, mode_width, mount.fov_h, mount.tilt,
+        mount.flip_h, mount.flip_v, mesh_w, mesh_h)]
+
+
+def clip_tilt_mesh(
+    frame_size: tuple[int, int],
+    mode_width: int,
+    mount: WarpConfig,
+) -> tuple[list[dai.Point2f], int, int]:
+    """The warp mesh for a RECORDING rather than a sensor, ready to splat into `setWarpMesh`.
+
+    Recordings come off `output_video`, which is **after** the warp, so a clip already carries
+    the flips — and the square crop — that were applied when it was shot. Re-applying the live
+    mesh would do all of that a second time, un-mirroring the image and cropping an already
+    cropped frame. What is wanted is only the *difference*, which is the tilt on its own:
+
+    - the flips come off, because they are already in the pixels;
+    - the frame is its own source, because the crop is already in the pixels;
+    - the tilt's sign flips under `flip_v`, because a vertical mirror reverses a rotation about
+      the horizontal axis, while a horizontal mirror commutes with it and needs no correction.
+
+    ASSUMES THE CLIP WAS SHOT AT `tilt = 0`. That holds for every recording made before `tilt`
+    existed, but capture-time geometry is still not stored beside clips — see the plan's
+    "save the preset alongside each recording". Feeding a clip shot at a non-zero tilt through
+    this gives the sum of the two, not the one you set.
+    """
+    clip_mount = WarpConfig(flip_h=False, flip_v=False,
+                            tilt=-mount.tilt if mount.flip_v else mount.tilt,
+                            keystone=0.0,           # a recording is already post-keystone
+                            fov_h=mount.fov_h)
+    mesh: list[dai.Point2f] = find_tilt_warp(frame_size, frame_size, mode_width, clip_mount)
+    return mesh, WARP_MESH, WARP_MESH
+
+
+# ---------------------------------------------------------------------------
+#  Keystone — the pre-existing correction, kept verbatim
+# ---------------------------------------------------------------------------
+# These two builders are the original `find_perspective_warp` / `_square`, unchanged apart
+# from the name, at their original 2 x 64 mesh. They build a homography that pins all four
+# corners of the output to the frame corners: a rotation composed with a stretch-to-fit. That
+# is the wrong model for re-aiming a wide lens (see `definitions.tilt_mesh_points`), but it is
+# exactly what hd_trio and deep_flow rely on — a person seen from a down-tilted camera gets
+# normal proportions while the whole frame is kept. Two columns suffice because the map is
+# affine in x per row; the vertical curvature is what the 64 rows are for. Nothing here may
+# change without those installations changing with it.
+
+KEYSTONE_MESH_W: int = 2
+KEYSTONE_MESH_H: int = 64
+
+
+def find_keystone_warp(width, height, width_offset, flip_h, flip_v, mesh_w, mesh_h) -> list[dai.Point2f]:
     src_points: np.ndarray = np.array([
         [0, 0],             # Top-left
         [width, 0],         # Top-right
@@ -771,7 +866,8 @@ def find_perspective_warp(width, height, width_offset, flip_h, flip_v, mesh_w, m
 
     return mesh_points
 
-def find_perspective_warp_square(src_width, src_height, square_size, width_offset, flip_h, flip_v, mesh_w, mesh_h) -> list[dai.Point2f]:
+
+def find_keystone_warp_square(src_width, src_height, square_size, width_offset, flip_h, flip_v, mesh_w, mesh_h) -> list[dai.Point2f]:
     """Create a warp mesh that includes both perspective transformation and cropping to square with optional rotation"""
 
     square_size = square_size - 1 # -1 to avoid yellow bottom line
@@ -816,3 +912,35 @@ def find_perspective_warp_square(src_width, src_height, square_size, width_offse
             mesh_points.append(dai.Point2f(float(src[0]), float(src[1])))
 
     return mesh_points
+
+
+def build_warp_mesh(
+    src_size: tuple[int, int],
+    out_size: tuple[int, int],
+    mode_width: int,
+    mount: WarpConfig,
+) -> tuple[list[dai.Point2f], int, int]:
+    """Pick the one correction a camera uses and return (mesh, mesh_w, mesh_h) for `setWarpMesh`.
+
+    `tilt` and `keystone` are exclusive: a keystone spreads columns by height, which is exactly
+    what tilt removes so a column can mean one azimuth, and tilt shifts the frame, which is what
+    keystone exists to avoid. Both non-zero is not a valid state for any camera, so it warns and
+    takes `tilt`. Both zero is the exact identity, through the tilt path.
+    """
+    if mount.tilt != 0.0 and mount.keystone != 0.0:
+        logger.warning("tilt (%.1f) and keystone (%.2f) are both set; they are exclusive — using tilt",
+                       mount.tilt, mount.keystone)
+    if mount.tilt != 0.0 or mount.keystone == 0.0:
+        return find_tilt_warp(src_size, out_size, mode_width, mount), WARP_MESH, WARP_MESH
+
+    src_w, src_h = src_size
+    out_w, out_h = out_size
+    if out_w == src_w:                                          # wide: output is the whole frame
+        width_offset: float = src_w * 0.5 * mount.keystone
+        mesh = find_keystone_warp(src_w, src_h, width_offset, mount.flip_h, mount.flip_v,
+                                  KEYSTONE_MESH_W, KEYSTONE_MESH_H)
+    else:                                                       # square: cut from the centre
+        width_offset = src_h * 0.5 * mount.keystone
+        mesh = find_keystone_warp_square(src_w, src_h, out_h, width_offset, mount.flip_h, mount.flip_v,
+                                         KEYSTONE_MESH_W, KEYSTONE_MESH_H)
+    return mesh, KEYSTONE_MESH_W, KEYSTONE_MESH_H

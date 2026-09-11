@@ -68,7 +68,7 @@ class Layers(IntEnum):
 # ---------------------------------------------------------------------------
 
 class OakGroup(BaseSettings):
-    fov               : Field[float]           = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV")
+    fov               : Field[float]           = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-D Pro W, OV9282 mono, 1280x800 native. Quoted for the full sensor width; the vertical field is derived from it.")
     num_cameras       : Field[int]             = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     fps               : Field[float]           = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
     yolo              : Field[bool]            = Field(True, access=Field.INIT, description="Enable YOLO person detection")
@@ -80,7 +80,7 @@ class OakGroup(BaseSettings):
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, description="Model files directory")
     ir_flood_light    : Field[float]           = Field(0.8, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
 
-    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path, ir_flood_light]
+    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path, ir_flood_light, fov]
 
     cam_0     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_1     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
@@ -325,7 +325,7 @@ class Settings(BaseSettings):
     input_fps       : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     render_fps      : Field[float] = Field(30.0)
     light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="LED strip resolution (pixels)")
-    fov             : Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV — shared with tracker and composition")
+    fov             : Field[float] = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-D Pro W, OV9282 mono, 1280x800 native. A lens constant, baked into the warp at device open; shared to the tracker and composition, and the vertical field derives from it.")
     spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — canonical value tying statemachine (the visible slider) to the wind_down layer")
 
     camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov])

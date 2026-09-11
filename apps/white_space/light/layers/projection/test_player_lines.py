@@ -39,7 +39,7 @@ class PlayerLinesSettings(LayerSettings):
     level_center:  Field[float] = Field(1.0,   min=0.0, max=1.0,   step=0.01, description="Centre line level")
     level_flank:   Field[float] = Field(1.0,   min=0.0, max=1.0,   step=0.01, description="Flank line level")
     anchor_nose:   Field[bool]  = Field(False,                                 description="Anchor centre line to nose instead of bbox centre", newline=True)
-    fov:           Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5,  description="Camera horizontal FOV (shared from compositor)", access=Field.READ)
+    fov:           Field[float] = Field(110.0, description="Camera horizontal FOV (shared from compositor)", access=Field.INIT)
 
 
 @dataclass

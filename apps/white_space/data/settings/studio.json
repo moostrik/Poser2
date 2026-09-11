@@ -21,7 +21,8 @@
       "show_stereo": false,
       "flip_h": true,
       "flip_v": false,
-      "perspective": 0.0,
+      "tilt": 15.0,
+      "keystone": 0.0,
       "color_exposure": 30001,
       "color_iso": 1599,
       "color_auto_exposure": true,
@@ -47,7 +48,8 @@
       "show_stereo": false,
       "flip_h": true,
       "flip_v": false,
-      "perspective": 0.0,
+      "tilt": 15.0,
+      "keystone": 0.0,
       "color_exposure": 30001,
       "color_iso": 1599,
       "color_auto_exposure": true,
@@ -73,7 +75,8 @@
       "show_stereo": false,
       "flip_h": true,
       "flip_v": false,
-      "perspective": 0.0,
+      "tilt": 15.0,
+      "keystone": 0.0,
       "color_exposure": 0,
       "color_iso": 0,
       "color_auto_exposure": true,
@@ -99,7 +102,8 @@
       "show_stereo": false,
       "flip_h": true,
       "flip_v": false,
-      "perspective": 0.0,
+      "tilt": 15.0,
+      "keystone": 0.0,
       "color_exposure": 0,
       "color_iso": 0,
       "color_auto_exposure": true,
@@ -128,6 +132,7 @@
         "VIDEO"
       ],
       "folder": "20260702-161442_flabber",
+      "apply_tilt": true,
       "sim_passthrough": false,
       "start_norm": 0.0,
       "end_norm": 1.0
@@ -156,8 +161,7 @@
       },
       "parallax": {
         "ring_radius": 0.25,
-        "person_height": 1.7,
-        "vfov": 79.5
+        "person_height": 1.7
       }
     },
     "frame_sync": {},

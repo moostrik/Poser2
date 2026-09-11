@@ -188,20 +188,31 @@ the handover, not a failure.
 
 **The hardware** (Luxonis OAK-D Pro W): the app runs `color = false` and uses **the left mono
 camera only** (`modules/oak/camera/pipeline.py`, `SetupMono`): OV9282 W, global shutter,
-1280 × 800, lens **127° × 79.5°**. The 127° is the preset's `fov`. The pipeline requests
-`THE_720_P`, which keeps all columns and crops the rows to 720: horizontal field unchanged,
-vertical 71.6° — the preset's `parallax.vfov`. Switching to `THE_800_P` recovers the full
-79.5° (800 divides by 16 like 720; `parallax.vfov` moves to 79.5; the render's track row
-assumes 16:9 today; old 720-row recordings still play). The left lens sits 37.5 mm off the
-tripod thread: put the *lens* on the corner line. The mono sensors run at fixed exposure
+1280 × 800, lens **127° × 79.5°**. The 127° is the preset's `fov`, and it is the only field
+angle stored: the pipeline requests `THE_800_P`, the full readout, and the vertical field is
+*derived* from `fov` and the frame's shape (`parallax.vfov` is read-only, 79.4°). The lens maps
+angle linearly to radius, which is what makes that derivation hold and what the published
+spec confirms. The sensor reference table for every OAK variant in use, with the Luxonis
+links, lives beside the resolution tables in `modules/oak/camera/definitions.py`; opening a
+device logs the sensor behind each socket. The left lens sits 37.5 mm off the tripod thread:
+put the *lens* on the corner line. The mono sensors run at fixed exposure
 (`mono_auto_exposure = false`) with the 940 nm flood; they carry an IR filter and do not see
 the light show (site fact). Keep the dot projector off.
+
+**Tilt.** Each camera has a `tilt` in degrees, positive = aimed up. The warp re-aims the camera
+so an image column reads as one azimuth, which is what the tracker assumes; it costs the frame
+edges (≈ 20 % at 15°, because it asks for a view the sensor never imaged) and is baked into the
+device when it opens, so it is tuned by editing the preset and relaunching. The simulator can
+apply it to a recording shot at `tilt = 0` (`camera.simulator.apply_tilt`). `keystone` on the
+same camera is the other installations' full-frame correction and stays 0 here — the two are
+exclusive.
 
 **What sets it** (`camera.tracker`, `camera.fov`): `fov` (each camera owns
 `target_fov = 360 / num_cameras`, the excess is shared overlap); `distortion` (zero in the
 preset, and right — the lens is close to linear); `parallax` (`ring_radius` must match the
 lens distance from the axis, ≈ 0.36 m with the corner gap; the preset says 0.25;
-`person_height`, `vfov`); `seam` (tracklet handover in the overlap).
+`person_height`; `vfov` is derived, not set); `seam` (tracklet handover in the overlap);
+and per camera, `tilt`.
 
 **How to calibrate**: a person walks across a seam; adjust `fov` (and `distortion` if a seam
 still disagrees) until both cameras agree on the azimuth, then `parallax.ring_radius` until
@@ -420,8 +431,8 @@ its true unit (1 px = 0.1° is a remark, not a conversion), and its ±10 px rang
 - ~~`speaker_offset` for Max~~ — **done**, with a main `volume` alongside it: both live in
   `inout.osc_sound_sender` and go out in every bundle (`/global/speaker/offset` in radians,
   `/global/volume`). Max adds the offset in its panner.
-- The mono pipeline to `THE_800_P` with `parallax.vfov` 79.5 — deferred until it can be
-  tested with the cameras (`ring_radius` 0.36 can go in on its own).
+- ~~The mono pipeline to `THE_800_P`~~ — **done**, and `parallax.vfov` is now derived rather
+  than stored, so it cannot go stale again. `ring_radius` 0.36 still to go in.
 - **A placement aid for the cameras** (later): since placement *is* the room-side
   calibration, it deserves a good way of doing it — probably projection layers that put
   the sector boundaries and centres on the wall so each camera can be aimed against them,

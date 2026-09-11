@@ -270,13 +270,14 @@ class TestInitialGeometrySync(unittest.TestCase):
         # the tracker exists, so construction must push config into geometry.
         config = PanoramicTrackerSettings(fov=PARALLAX_FOV)
         config.parallax.ring_radius = RING_RADIUS
-        config.parallax.vfov = 70.0
         config.distortion.poly.k2 = 0.1
         tracker = PanoramicTracker(config, num_players=4, num_cameras=4)
         self.assertEqual(tracker.geometry.cam_fov, PARALLAX_FOV)
         self.assertEqual(tracker.geometry._ring_radius, RING_RADIUS)
-        self.assertEqual(tracker.geometry._vfov, 70.0)
         self.assertEqual(tracker.geometry._poly_k2, 0.1)
+        # vfov is derived from fov and the frame shape, and shown in the read-only field
+        self.assertAlmostEqual(tracker.geometry._vfov, PARALLAX_FOV * 800 / 1280, places=9)
+        self.assertAlmostEqual(config.parallax.vfov, PARALLAX_FOV * 800 / 1280, places=9)
 
 
 if __name__ == "__main__":

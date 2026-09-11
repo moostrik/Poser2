@@ -47,7 +47,7 @@ class CameraLightSettings(LayerSettings):
     show_overlap:  Field[bool]         = Field(True,                                  description="Highlight geometric overlap zones", newline=True)
     show_centre:   Field[bool]         = Field(False,                                 description="Highlight camera centre lines")
     white_markers: Field[bool]         = Field(False,                                 description="Show markers in white instead of blue")
-    fov:           Field[float]        = Field(110.0, min=60.0, max=180.0, step=0.5,  description="Camera horizontal FOV (shared from compositor)", access=Field.READ)
+    fov:           Field[float]        = Field(110.0, description="Camera horizontal FOV (shared from compositor)", access=Field.INIT)
 
 
 class CameraLight(ProjectionLayer):

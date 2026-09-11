@@ -29,7 +29,13 @@ class CameraSettings(BaseSettings):
     show_stereo:    Field[bool]  = Field(False, access=Field.INIT, description="Show stereo visualization")
     flip_h:         Field[bool]  = Field(False, access=Field.INIT, description="Flip horizontal")
     flip_v:         Field[bool]  = Field(False, access=Field.INIT, description="Flip vertical")
-    perspective:    Field[float] = Field(0.0, min=-1.0, max=1.0, access=Field.INIT, description="Perspective correction")
+    tilt:           Field[float] = Field(0.0, access=Field.INIT,
+                                         description="Camera up-tilt (degrees), positive = aimed upward. Re-aims the camera so a column reads as one azimuth; costs the frame edges. Exclusive with keystone.")
+    keystone:       Field[float] = Field(0.0, access=Field.INIT,
+                                         description="Keystone (fraction of frame). Squares up a person seen from a tilted camera while keeping the whole frame. Exclusive with tilt.")
+    # Relayed down from the camera group so the warp can turn `tilt` into pixels.
+    fov:            Field[float] = Field(127.0, access=Field.INIT,
+                                         description="Camera horizontal FOV (°) of the full sensor readout.")
 
     # --- Color controls ---
     color_exposure:     Field[int]  = Field(EXPOSURE_RANGE[0], min=EXPOSURE_RANGE[0], max=EXPOSURE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Exposure (µs)", newline=True)

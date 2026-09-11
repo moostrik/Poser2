@@ -30,6 +30,7 @@ class Simulator(Camera):
         self.ex_right:  dai.DataInputQueue
 
         self.passthrough: bool = player_settings.sim_passthrough
+        self.warp_clips: bool = player_settings.apply_tilt
 
         # Last clip size reported by _check_frame_size, so the warning fires once per size.
         self._warned_frame_size: tuple[int, int] | None = None
@@ -48,7 +49,7 @@ class Simulator(Camera):
             super().run()
 
     def _setup_pipeline(self, pipeline: Pipeline) -> None: # override
-        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.do_720p, self.show_stereo, self.perspective, simulate=True)
+        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.do_720p, self.show_stereo, self.mount, simulate=True, warp_clips=self.warp_clips)
 
 
     def _setup_queues(self) -> None: # override

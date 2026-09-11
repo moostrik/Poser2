@@ -141,8 +141,9 @@ class OakGroup(BaseSettings):
     hd_ready          : Field[bool]            = Field(False, access=Field.INIT, description="Use HD resolution")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
+    fov               : Field[float]           = Field(95.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-1 W, IMX378 colour, 16:9 modes. Quoted for the full frame width; the square crop keeps the same degrees per pixel.")
 
-    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path]
+    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path, fov]
 
     cam_0        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_1        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)

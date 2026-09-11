@@ -86,12 +86,12 @@ class ParallaxSettings(BaseSettings):
                                       description="Camera distance from rig center (m). 0 disables parallax correction.")
     person_height: Field[float] = Field(1.7, min=1.0, max=2.2, step=0.05,
                                         description="Assumed person height (m) for distance-from-bbox estimation.")
-    vfov: Field[float] = Field(71.6, min=40.0, max=110.0, step=0.1,
-                              description="Vertical FOV (°) of the detection frame, for distance estimation.")
+    vfov: Field[float] = Field(79.5, access=Field.READ,
+                              description="Vertical field (°) of the detection frame, for distance estimation. Derived from the camera's horizontal FOV and the frame's shape, so it follows every resolution and crop change on its own.")
 
 
 class TrackerSettings(BaseSettings):
-    fov: Field[float] = Field(110.0, min=90.0, max=130.0, step=0.5, visible=False)
+    fov: Field[float] = Field(110.0, access=Field.INIT)
     min_age: Field[int] = Field(5, min=0, max=9, step=1,
                                 description="Minimum age in frames before a tracklet is considered.")
     min_height: Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05,

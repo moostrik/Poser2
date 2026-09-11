@@ -81,7 +81,7 @@ PowerShell 5.1 wraps a native command's stderr in `NativeCommandError` and sets
 passing run reads as a failure.
 
     python -m unittest discover -s apps/white_space/tests -t .
-    python -m unittest modules.pose.tests.test_distance_extractor modules.pose.tests.test_motion_time_extractor modules.settings.tests.test_reactive modules.tracker.tests.test_panoramic_tracker
+    python -m unittest modules.oak.tests.test_tilt_mesh modules.oak.tests.test_keystone_warp modules.pose.tests.test_distance_extractor modules.pose.tests.test_motion_time_extractor modules.settings.tests.test_reactive modules.tracker.tests.test_panoramic_tracker
 
 `modules/` is a namespace root with no `__init__.py`, so `discover -s modules`
 fails with `ImportError: Start directory is not importable` — name the

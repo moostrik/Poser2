@@ -34,11 +34,11 @@ MONO_SIZES: dict[MonoCameraProperties.SensorResolution, tuple[int, int]] = {
 #
 # NOT derived from it, and to be edited by hand alongside it, because they are set by eye
 # against the frame rather than computed:
-#   camera.tracker.parallax.vfov          fov * rows / columns  (127 * 800/1280 = 79.5)
 #   camera.tracker.min_height             a fraction of frame height, so it scales
 #   camera.tracker.seam.max_height_diff   idem
 #   pose.distance_extractor.near_y/far_y  positions in the frame, so they scale and shift
 #   render.py's 'track' row src_aspect_ratio
+# (The vertical field is NOT in that list — see `frame_fov` below, which derives it.)
 MONO_RESOLUTION: MonoCameraProperties.SensorResolution = MonoCameraProperties.SensorResolution.THE_800_P
 MONO_SIZE: tuple[int, int] = MONO_SIZES[MONO_RESOLUTION]
 
@@ -75,6 +75,143 @@ def frame_size(color: bool, do_720p: bool = False, square: bool = False) -> tupl
     needs the camera's aspect ratio — the render's layout, a texture allocation — asks here
     instead of restating it."""
     return color_frame_size(do_720p, square) if color else mono_frame_size(square)
+
+
+def mode_size(color: bool, do_720p: bool = False) -> tuple[int, int]:
+    """The frame size BEFORE any square crop — the size the sensor mode actually produces.
+    This is the width the `fov` setting is quoted against, so it is what `degrees_per_pixel`
+    must be given."""
+    return frame_size(color, do_720p, square=False)
+
+
+# ---------------------------------------------------------------------------
+#  Lens geometry — one stored number per camera, everything else derived
+# ---------------------------------------------------------------------------
+# Sensor reference, for choosing the `fov` setting. EVERY figure below is for the sensor's
+# FULL readout, so it is true only in the mode that reads every line. Pairing a field with
+# the wrong mode is how `vfov` went stale at 720 rows.
+#
+#   device        sensor                   native        DFOV  HFOV  VFOV
+#   OAK-D Pro W   OV9282 mono pair         1280 x 800     150   127  79.5
+#   OAK-D Pro W   IMX378 colour (stock)    4056 x 3040    120    95  72
+#   OAK-D Pro W   OV9782 colour (upgrade)  1280 x 800     150   127  79.5
+#   OAK-1 W       IMX378 colour            4056 x 3040    120    95  72
+#   OAK-1 W       OV9782 colour            1280 x 800     150   127  79.5
+#
+#   https://docs.luxonis.com/hardware/products/OAK-D%20Pro%20W
+#   https://docs.luxonis.com/hardware/products/OAK-1%20W
+#
+# `get_device_list(verbose=True)` logs the sensor behind each socket, so the hardware
+# answers the "which variant is this?" question itself rather than it being inferred.
+#
+# Both lenses are near-equidistant — angle maps linearly to radius — so degrees-per-pixel
+# is the same on both axes and the vertical field never needs storing. The two published
+# triples confirm that independently of each other:
+#
+#   OV9282   127 * 800/1280  = 79.4   published 79.5
+#   IMX378    95 * 3040/4056 = 71.2   published 72
+#
+# So only the horizontal field is a setting. Everything else comes off the frame.
+
+
+def degrees_per_pixel(fov_h: float, mode_width: int) -> float:
+    """Angular size of one pixel (degrees).
+
+    ``mode_width`` must be the width of the UN-cropped frame the sensor mode produces,
+    because ``fov_h`` is quoted for that full width. A later crop — the square crop, or the
+    1080 -> 1072 trim — removes pixels without changing this scale, which is exactly why the
+    scale rather than a field angle is the thing worth deriving from.
+    """
+    if mode_width <= 0:
+        return 0.0
+    return fov_h / float(mode_width)
+
+
+# Mesh resolution for the tilt warp. See `tilt_mesh_points` for why 2 is not enough and
+# why 32 is where this stops mattering.
+WARP_MESH: int = 32
+
+
+def frame_fov(fov_h: float, mode_width: int, out_size: tuple[int, int]) -> tuple[float, float]:
+    """The horizontal and vertical field (degrees) a delivered frame actually covers.
+
+    ``mode_width`` is the un-cropped width ``fov_h`` was quoted against; ``out_size`` is the
+    frame as it leaves the pipeline. Crops shrink the field in proportion, so this holds
+    across the square crop and every resolution change without a second stored number.
+    """
+    dpp: float = degrees_per_pixel(fov_h, mode_width)
+    width, height = out_size
+    return dpp * width, dpp * height
+
+
+def tilt_mesh_points(
+    src_size: tuple[int, int],
+    out_size: tuple[int, int],
+    mode_width: int,
+    fov_h: float,
+    tilt: float,
+    flip_h: bool = False,
+    flip_v: bool = False,
+    mesh_w: int = WARP_MESH,
+    mesh_h: int = WARP_MESH,
+) -> list[tuple[float, float]]:
+    """Warp mesh that undoes a camera's up-tilt: the source pixel each output grid point reads.
+
+    WHY THIS IS NOT A HOMOGRAPHY. These lenses are near-equidistant — distance from the frame
+    centre is proportional to the ANGLE off the optical axis, not to its tangent. A pinhole
+    lens uses the tangent, and that stretch is exactly what makes a tilted pinhole view a
+    trapezoid with straight edges, which `cv2.getPerspectiveTransform` reproduces. With no
+    stretch nothing cancels: tilting bends straight lines into curves. At 15 deg on a 127 deg
+    frame the centre of a row moves 151 px while its ends move 74 px, a 77 px bow. So the mesh
+    is built by unprojecting each output pixel to a ray, rotating the ray, and reprojecting.
+
+    WHY THE MESH IS 32 x 32. The Warp node interpolates linearly between mesh points, so
+    2 columns can only express a straight source line per row — which is the very family the
+    homography already spanned, and the bow above is what the correction IS. This is a
+    threshold, not a spectrum: 2 is unusable, ~16 is already sub-pixel, and 32 x 32 differs
+    from 64 x 64 by under 0.3 px even at 30 deg. Error grows linearly with frame width and
+    falls with the square of the mesh count, so 32 still holds to 0.23 px on a 4056 px frame.
+
+    `src_size` is the frame the sensor delivers and `out_size` the warp's output, which is
+    smaller only for the square crop (taken from the centre). `mode_width` is the un-cropped
+    width `fov_h` is quoted against. Positive `tilt` means the camera is aimed UP, so the
+    corrected view reads from lower in the source frame.
+
+    At `tilt == 0` the result is exactly the identity grid (or an exact mirror under the
+    flips), with no floating-point round-trip. Nothing changes until an angle is set.
+    """
+    src_w, src_h = src_size
+    out_w, out_h = out_size
+    x_off: float = (src_w - out_w) / 2.0          # the square crop is cut from the centre
+    y_off: float = (src_h - out_h) / 2.0
+    # Pixel-index convention: a frame of width W spans 0..W-1, so its optical axis sits at
+    # (W-1)/2, not W/2. The half pixel matters — it is what keeps the centre exactly on axis.
+    cx, cy = (src_w - 1) / 2.0, (src_h - 1) / 2.0
+
+    dpp: float = np.radians(degrees_per_pixel(fov_h, mode_width))
+    identity: bool = tilt == 0.0 or dpp <= 0.0
+    t: float = np.radians(-tilt)                   # undo the tilt, so negate it
+    cos_t, sin_t = float(np.cos(t)), float(np.sin(t))
+
+    points: list[tuple[float, float]] = []
+    for gy in np.linspace(0.0, out_h - 1.0, mesh_h):
+        for gx in np.linspace(0.0, out_w - 1.0, mesh_w):
+            ox: float = (out_w - 1.0 - gx) if flip_h else float(gx)
+            oy: float = (out_h - 1.0 - gy) if flip_v else float(gy)
+            x, y = x_off + ox, y_off + oy
+            if identity:
+                points.append((x, y))
+                continue
+            dx, dy = x - cx, y - cy
+            phi: float = float(np.hypot(dx, dy)) * dpp
+            psi: float = float(np.arctan2(dy, dx))
+            sin_p: float = float(np.sin(phi))
+            d0, d1, d2 = sin_p * np.cos(psi), sin_p * np.sin(psi), float(np.cos(phi))
+            d1, d2 = cos_t * d1 - sin_t * d2, sin_t * d1 + cos_t * d2
+            r2: float = float(np.arccos(np.clip(d2, -1.0, 1.0))) / dpp
+            psi2: float = float(np.arctan2(d1, d0))
+            points.append((cx + r2 * float(np.cos(psi2)), cy + r2 * float(np.sin(psi2))))
+    return points
 
 
 YOLOV8_WIDE_5S: str = "yolov8n_coco_640x352_5S.blob"
@@ -180,3 +317,19 @@ def get_device_list(verbose: bool = False) -> list[str]:
     if verbose:
         logger.info('-------------------------------------------------------------')
     return device_list
+
+
+def log_connected_sensors(device: Device, device_id: str = '') -> None:
+    """Log the sensor behind each socket of an already-open device.
+
+    Which sensor a device carries decides its field of view, and the OAK-D Pro W and OAK-1 W
+    both ship in two variants whose lenses differ by 32 degrees horizontally (see the sensor
+    reference above). Reading it off the hardware beats inferring it from which resolutions a
+    preset happens to request.
+    """
+    try:
+        for feature in device.getConnectedCameraFeatures():
+            logger.info(f'{device_id} sensor {feature.socket.name}: {feature.sensorName} '
+                        f'{feature.width}x{feature.height}')
+    except Exception as exc:                        # never let diagnostics break an open
+        logger.debug(f'{device_id} could not read sensor features: {exc}')

@@ -12,8 +12,8 @@ from numpy import ndarray
 
 from modules.utils import FPS
 
-from .definitions import FrameType, Input, Output, Tracklet, FrameCallback, SyncCallback, TrackerCallback, get_device_list
-from .pipeline import setup_pipeline, get_frame_types, PerspectiveConfig
+from .definitions import FrameType, Input, Output, Tracklet, FrameCallback, SyncCallback, TrackerCallback, get_device_list, log_connected_sensors
+from .pipeline import setup_pipeline, get_frame_types, WarpConfig
 from .settings import CameraSettings
 
 logger = logging.getLogger(__name__)
@@ -46,10 +46,12 @@ class Camera(Thread):
         self.do_720p: bool =            core_settings.hd_ready
         self.show_stereo: bool =        core_settings.show_stereo
 
-        self.perspective: PerspectiveConfig = PerspectiveConfig(
-            core_settings.flip_h,
-            core_settings.flip_v,
-            core_settings.perspective
+        self.mount: WarpConfig = WarpConfig(
+            flip_h=core_settings.flip_h,
+            flip_v=core_settings.flip_v,
+            tilt=core_settings.tilt,
+            keystone=core_settings.keystone,
+            fov_h=core_settings.fov,
         )
 
         # DAI
@@ -111,12 +113,13 @@ class Camera(Thread):
         self._setup_queues()
 
         logger.info(f'{self.device_id} OPEN')
+        log_connected_sensors(self.device, self.device_id)
         self.running = True
         self.settings.connect(self.device, self.inputs, self.do_color)
         return True
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
-            setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.do_720p, self.show_stereo, self.perspective, simulate=False)
+            setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.do_720p, self.show_stereo, self.mount, simulate=False)
 
     def _setup_queues(self) -> None:
         if self.do_stereo:

@@ -91,8 +91,9 @@ class OakGroup(BaseSettings):
     hd_ready:           Field[bool]              = Field(False, access=Field.INIT, description="Use HD resolution")
     sim_enabled:        Field[bool]              = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path:         Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
+    fov:                Field[float]             = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-D Pro W, OV9782 colour, 1280x800 native. 720p is a vertical crop, so the full width and this figure both hold.")
 
-    _cam_share = [fps, color, square, stereo, yolo, hd_ready, model_path]
+    _cam_share = [fps, color, square, stereo, yolo, hd_ready, model_path, fov]
     cam_0         = Group(CameraSettings, share=_cam_share)
     simulator     = Group(SimulatorSettings, share=[num_cameras, fps])
     recorder      = Group(RecorderSettings, share=[num_cameras, fps, keyframe_interval])
