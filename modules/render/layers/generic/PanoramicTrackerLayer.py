@@ -9,7 +9,7 @@ from modules.gl import Fbo, Texture, Text
 from ...shaders import DrawColoredRectangle
 from ...color_settings import ColorSettings
 
-from modules.tracker import Tracklet, TrackingStatus, PanoramicAnnotation
+from modules.tracker import Tracklet, TrackingStatus, PanoramicAnnotation, PanoramicTrackerSettings
 
 from modules.board import HasObservations, HasTracklets
 from ..LayerBase import LayerBase
@@ -34,10 +34,12 @@ class PanoramicTrackerLayer(LayerBase):
     Same x mapping as the stitched camera panorama in the row above, so the two line up.
     """
 
-    def __init__(self, board: PanoramicTrackerBoard, num_cams: int, color_settings: ColorSettings) -> None:
+    def __init__(self, board: PanoramicTrackerBoard, num_cams: int, color_settings: ColorSettings,
+                 tracker: PanoramicTrackerSettings) -> None:
         self.board: PanoramicTrackerBoard = board
         self.num_cams: int = num_cams
         self._color_settings: ColorSettings = color_settings
+        self._tracker: PanoramicTrackerSettings = tracker
         self.fbo: Fbo = Fbo()
         self._text: Text = Text()
         self._rect_shader: DrawColoredRectangle = DrawColoredRectangle()
@@ -82,7 +84,11 @@ class PanoramicTrackerLayer(LayerBase):
             is_primary: bool = tracklet.obs_id in primaries
             lost: bool = tracklet.status == TrackingStatus.LOST
 
-            roi_width: float = tracklet.roi.width / self.num_cams
+            # A box of normalized width w spans w * fov degrees of the world, so as a fraction of
+            # the 360-degree strip it is w * fov / 360. It is NOT w / num_cams: that would only
+            # be right with no overlap between the cameras, and at fov 127 with four cameras it
+            # draws every box 29 per cent too narrow.
+            roi_width: float = tracklet.roi.width * self._tracker.fov / 360.0
             roi_height: float = tracklet.roi.height
             roi_x: float = world_angle / 360.0 - roi_width / 2.0
             roi_y: float = tracklet.roi.y
@@ -113,9 +119,13 @@ class PanoramicTrackerLayer(LayerBase):
             bg = (0.0, 0.0, 0.0, 0.6)
             text_x: float = (roi_x * self.fbo.width) + 9
             text_y: float = (roi_y * self.fbo.height) + 22
-            self._text.draw_box_text(text_x, text_y, f'{tracklet.id}:{tracklet.cam_id} W {world_angle:.1f}',
-                                     fg, bg, self.fbo.width, self.fbo.height)
-            text_y += 22
-            self._text.draw_box_text(text_x, text_y, f'L {local_angle:.1f}  {distance:.2f}m',
-                                     fg, bg, self.fbo.width, self.fbo.height)
+            # One value per line, each labelled. `az` is the room azimuth this box is drawn at,
+            # `loc` the angle within this camera's own field, `dis` the estimated distance from
+            # that camera. Two boxes of one person share `#id` and differ in `cam`.
+            for line in (f'#{tracklet.id} cam{tracklet.cam_id}',
+                         f'az {world_angle:.0f}',
+                         f'loc {local_angle:.0f}',
+                         f'dis {distance:.1f}m'):
+                self._text.draw_box_text(text_x, text_y, line, fg, bg, self.fbo.width, self.fbo.height)
+                text_y += 22
         self.fbo.end()

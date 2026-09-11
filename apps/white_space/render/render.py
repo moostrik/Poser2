@@ -8,6 +8,7 @@ from modules.render.layers import ImageSourceLayer, MaskSourceLayer, CropSourceL
 from modules.render.layers import TrackerCompositor, PoseCompositor
 from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer
 from modules.render.layers.generic.PanoramicTrackerLayer import PanoramicTrackerLayer
+from modules.tracker import PanoramicTrackerSettings
 from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
 from apps.white_space.render.layers.beam_light_simulation_layer import BeamLightSimulationLayer
 from apps.white_space.light import FIXTURE_PROJECTION_RPM
@@ -28,11 +29,15 @@ PLAYHEAD_FEATURE_MAP = {
 
 
 class Render(RenderBase):
-    def __init__(self, board: Board, settings: RenderSettings) -> None:
+    def __init__(self, board: Board, settings: RenderSettings,
+                 tracker: PanoramicTrackerSettings) -> None:
         super().__init__(settings.window)
         self.num_players: int = settings.num_players
         self.num_cams: int = settings.num_cams
         self.settings: RenderSettings = settings
+        # The tracker's own geometry, live. Anything drawing the tracker's world has to use the
+        # numbers the tracker used, or the display invents an error of its own.
+        self.tracker_settings: PanoramicTrackerSettings = tracker
         self.board: Board = board
 
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
@@ -66,7 +71,7 @@ class Render(RenderBase):
             self.L[Layers.data_playhead_F][i] = FeatureFrameLayer( i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
 
         # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready
-        self.L[Layers.ws_tracker][0] = PanoramicTrackerLayer(board, self.num_cams, settings.colors)
+        self.L[Layers.ws_tracker][0] = PanoramicTrackerLayer(board, self.num_cams, settings.colors, tracker)
         self.L[Layers.ws_light][0]   = LightSimulationLayer(board)
         self.L[Layers.ws_beam][0]     = BeamLightSimulationLayer(board, settings.beam_light_sim)
 

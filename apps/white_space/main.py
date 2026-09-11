@@ -268,7 +268,7 @@ class WhiteSpaceMain:
         self.ghoster.add_sound_callback(partial(self.osc_sound_sender.set_frames, int(Stage.LERP)))
 
         # RENDER
-        self.render = WindowRender(self.board, self.settings.render)
+        self.render = WindowRender(self.board, self.settings.render, self.settings.camera.tracker)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
         self.conductor.add_update_callback(self.state_machine.update)
         self.conductor.add_update_callback(self.interpolators_lerp.update)

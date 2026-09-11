@@ -58,6 +58,14 @@ class Geometry:
         raised, legs pulled up and bending over all change a box's *height*, and none of them
         move the feet.
 
+        TWO CAMERA FACTS, HANDLED IN TWO DIFFERENT PLACES. The lens *height* is here, as
+        ``camera_height``. The *tilt* is not: this assumes the frame's centre row is the horizon,
+        which is true only because the camera's warp has already levelled it
+        (``equirect_mesh_points``). That assumption cannot be checked from here and it is not a
+        small one — on an un-levelled frame from a camera aimed up 15 deg, a person truly 3.26 m
+        away reads as 1.14 m. So the distance, and therefore the parallax correction that depends
+        on it, is meaningless on footage that has not been through the warp.
+
         The frame's own geometry bounds this nicely: its bottom row sits at about 39.7° of
         depression, which is 0.60 m out, just inside the Ø 2.0 m hard floor.
 
