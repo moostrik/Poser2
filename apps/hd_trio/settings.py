@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 from typing import Any
 
 from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
-from modules.oak import CameraSettings, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.oak import CameraSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
 from modules.utils import Color
@@ -138,12 +138,12 @@ class OakGroup(BaseSettings):
     color             : Field[bool]            = Field(True, access=Field.INIT, description="Color camera (False = mono)")
     square            : Field[bool]            = Field(True, access=Field.INIT, description="Use square aspect ratio")
     stereo            : Field[bool]            = Field(False, access=Field.INIT, description="Enable stereo mode")
-    hd_ready          : Field[bool]            = Field(False, access=Field.INIT, description="Use HD resolution")
+    resolution        : Field[CameraResolution] = Field(CameraResolution.P1080, access=Field.INIT, description="Sensor mode. P720 and P800 on both sensors, P1080 colour only.")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
     fov               : Field[float]           = Field(95.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-1 W, IMX378 colour, 16:9 modes. Quoted for the full frame width; the square crop keeps the same degrees per pixel.")
 
-    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path, fov]
+    _cam_share: list = [fps, color, square, stereo, yolo, resolution, model_path, fov]
 
     cam_0        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_1        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)

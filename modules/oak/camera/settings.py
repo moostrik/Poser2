@@ -4,7 +4,7 @@ from .definitions import (
     EXPOSURE_RANGE, ISO_RANGE, BALANCE_RANGE, CONTRAST_RANGE, BRIGHTNESS_RANGE,
     LUMA_DENOISE_RANGE, SATURATION_RANGE, SHARPNESS_RANGE,
     STEREO_DEPTH_RANGE, STEREO_BRIGHTNESS_RANGE, StereoMedianFilterType,
-    Input,
+    CameraResolution, Input,
 )
 from .pipeline import get_stereo_config
 from modules.settings import BaseSettings, Field, Widget
@@ -24,7 +24,7 @@ class CameraSettings(BaseSettings):
     square:         Field[bool]  = Field(True, access=Field.INIT)
     stereo:         Field[bool]  = Field(False, access=Field.INIT)
     yolo:           Field[bool]  = Field(True, access=Field.INIT)
-    hd_ready:       Field[bool]  = Field(False, access=Field.INIT)
+    resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode. P720 and P800 on both sensors, P1080 colour only — a mono camera asked for P1080 falls back to P800 and says so.")
     model_path:     Field[str]   = Field("data/models", access=Field.INIT)
     show_stereo:    Field[bool]  = Field(False, access=Field.INIT, description="Show stereo visualization")
     flip_h:         Field[bool]  = Field(False, access=Field.INIT, description="Flip horizontal")

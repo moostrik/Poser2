@@ -12,7 +12,8 @@ import numpy as np
 
 from modules.oak import (
     WARP_MESH, degrees_per_pixel, frame_fov, equirect_mesh_points,
-    mono_frame_size, mode_size, frame_size,
+    CameraResolution, resolve_resolution, mono_mode, color_mode,
+    mono_frame_size, color_frame_size, mode_size, frame_size,
 )
 
 
@@ -225,9 +226,71 @@ class FrameSizeTest(unittest.TestCase):
     """`mode_size` is the un-cropped frame; `frame_size` is what is delivered."""
 
     def test_mode_size_ignores_the_square_crop(self) -> None:
-        self.assertEqual(mode_size(color=False), mono_frame_size(square=False))
-        self.assertEqual(frame_size(False, square=True), (MONO_H, MONO_H))
-        self.assertEqual(mode_size(color=False)[0], MONO_W)
+        P800 = CameraResolution.P800
+        self.assertEqual(mode_size(False, P800), mono_frame_size(P800, square=False))
+        self.assertEqual(frame_size(False, P800, square=True), (MONO_H, MONO_H))
+        self.assertEqual(mode_size(False, P800)[0], MONO_W)
+
+    def test_every_label_has_its_size(self) -> None:
+        self.assertEqual(mono_frame_size(CameraResolution.P720), (1280, 720))
+        self.assertEqual(mono_frame_size(CameraResolution.P800), (1280, 800))
+        # 1080 is not divisible by the warp's 16-px alignment, so the preview is 1072 rows.
+        self.assertEqual(color_frame_size(CameraResolution.P1080), (1920, 1072))
+
+    def test_the_square_crop_follows_the_label(self) -> None:
+        for label, height in ((CameraResolution.P720, 720), (CameraResolution.P800, 800)):
+            self.assertEqual(frame_size(False, label, square=True), (height, height))
+
+
+class ResolutionTest(unittest.TestCase):
+    """One label spanning two sensors, and what happens when it cannot."""
+
+    def test_shared_labels_map_to_both_sensors(self) -> None:
+        for label in (CameraResolution.P720, CameraResolution.P800):
+            self.assertEqual(resolve_resolution(color=False, resolution=label), label)
+            self.assertEqual(resolve_resolution(color=True, resolution=label), label)
+            self.assertIsNotNone(mono_mode(label))
+            self.assertIsNotNone(color_mode(label))
+
+    def test_mono_falls_back_from_a_colour_only_label(self) -> None:
+        from modules.oak.camera.definitions import _warned_resolutions
+        _warned_resolutions.discard((False, CameraResolution.P1080))
+        with self.assertLogs('modules.oak.camera.definitions', level='WARNING') as captured:
+            resolved = resolve_resolution(color=False, resolution=CameraResolution.P1080)
+        self.assertEqual(resolved, CameraResolution.P800)
+        self.assertIn('P1080', captured.output[0])
+        self.assertIn('mono', captured.output[0])
+
+    def test_the_fallback_warns_once_not_once_a_frame(self) -> None:
+        """`frame_size` is called per frame by the simulator's size check."""
+        from modules.oak.camera.definitions import _warned_resolutions
+        _warned_resolutions.discard((False, CameraResolution.P1080))
+        with self.assertLogs('modules.oak.camera.definitions', level='WARNING') as captured:
+            for _ in range(50):
+                frame_size(False, CameraResolution.P1080)
+        self.assertEqual(len(captured.output), 1)
+
+    def test_colour_keeps_its_own_label(self) -> None:
+        self.assertEqual(
+            resolve_resolution(color=True, resolution=CameraResolution.P1080),
+            CameraResolution.P1080,
+        )
+
+    def test_the_vertical_field_follows_the_label_from_one_fov(self) -> None:
+        """The whole point of deriving rather than storing: one `fov`, right at every mode."""
+        for label, expected in ((CameraResolution.P800, 79.375), (CameraResolution.P720, 71.4375)):
+            width, height = mono_frame_size(label)
+            _, vfov = frame_fov(MONO_FOV_H, width, (width, height))
+            self.assertAlmostEqual(vfov, expected, places=4)
+
+    def test_the_horizontal_field_is_the_same_at_both_mono_labels(self) -> None:
+        """P720 is a pure vertical crop, so the column-to-azimuth mapping is untouched."""
+        fields = []
+        for label in (CameraResolution.P720, CameraResolution.P800):
+            width, height = mono_frame_size(label)
+            fields.append(frame_fov(MONO_FOV_H, width, (width, height))[0])
+        self.assertAlmostEqual(fields[0], fields[1], places=9)
+        self.assertAlmostEqual(fields[0], MONO_FOV_H, places=9)
 
 
 if __name__ == "__main__":

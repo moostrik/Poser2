@@ -12,7 +12,7 @@ The root class is ``Settings``.
 from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
-from modules.oak import CameraSettings, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.oak import CameraSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
 from modules.render.layers import LayerMode
 from modules.inout import OscSoundSettings, OscReceiverSettings
@@ -76,21 +76,21 @@ class OakGroup(BaseSettings):
     color             : Field[bool]            = Field(False, access=Field.INIT, description="Color camera (False = mono)")
     square            : Field[bool]            = Field(True, access=Field.INIT, description="Use square aspect ratio")
     stereo            : Field[bool]            = Field(False, access=Field.INIT, description="Enable stereo mode")
-    hd_ready          : Field[bool]            = Field(False, access=Field.INIT, description="Use HD resolution")
+    resolution        : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode, all four cameras. P800 is the OV9282 W's full readout; P720 is a pure vertical crop of it, which is what a 720-row recording needs for the whole chain to derive correctly.")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, description="Model files directory")
     ir_flood_light    : Field[float]           = Field(0.8, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
     tilt              : Field[float]           = Field(0.0, access=Field.INIT, description="Camera up-tilt (degrees), positive = aimed upward, the same for all four cameras. Baked into the warp when the devices open.")
     mono_auto_exposure: Field[bool]            = Field(True, widget=Widget.switch, description="Mono auto exposure, all four cameras. Off: each camera keeps its own manual exposure and ISO.")
 
-    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path, ir_flood_light, fov, tilt, mono_auto_exposure]
+    _cam_share: list = [fps, color, square, stereo, yolo, resolution, model_path, ir_flood_light, fov, tilt, mono_auto_exposure]
 
     cam_0     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_1     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_2     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_3     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     simulator : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cameras, fps])
-    tracker   : Group[PanoramicTrackerSettings]  = Group(PanoramicTrackerSettings, share=[fov])
+    tracker   : Group[PanoramicTrackerSettings]  = Group(PanoramicTrackerSettings, share=[fov, resolution])
     frame_sync: Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
     tracklet_sync: Group[SyncSettings]           = Group(SyncSettings, share=[num_cameras, fps])
 
@@ -309,6 +309,7 @@ class RenderSettings(BaseSettings):
     num_cams:    Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of players")
     tilt:        Field[float] = Field(0.0, access=Field.INIT, visible=False, description="Camera up-tilt (°), shared from the root — relayed to the panorama layer")
+    resolution:  Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, visible=False, description="Sensor mode, shared from the root — the camera row's aspect follows it")
     preview:     Group[PreviewGroup]        = Group(PreviewGroup)
     data_time:   Group[_MTimeSettings]      = Group(_MTimeSettings)
     data:        Group[_DataLayerSettings]  = Group(_DataLayerSettings)
@@ -333,14 +334,15 @@ class Settings(BaseSettings):
     render_fps      : Field[float] = Field(30.0)
     light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="LED strip resolution (pixels)")
     fov             : Field[float] = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-D Pro W, OV9282 mono, 1280x800 native. A lens constant, baked into the warp at device open; shared to the tracker and composition, and the vertical field derives from it.")
+    resolution      : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode for all cameras. Shared into the camera group and into the render, which needs the frame's shape for its layout.")
     tilt            : Field[float] = Field(0.0, access=Field.INIT, description="Camera up-tilt (°), positive = aimed upward, the same for all four cameras. A mount constant: the warp levels the frame with it at device open, and the render needs it to know which rows of that frame the sensor never imaged.")
     spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — canonical value tying statemachine (the visible slider) to the wind_down layer")
 
-    camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov, tilt])
+    camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov, tilt, resolution])
     inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players'), num_virtual.as_('num_virtual'), light_resolution.as_('resolution')])
     pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), num_virtual.as_('ghost_slots'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     light: Group[LightSettings] = Group(LightSettings, share=[num_players.as_('max_poses'), num_cameras.as_('num_cameras'), light_resolution.as_('light_resolution'), fov, spin_down_seconds])
     statemachine: Group[StateMachineSettings] = Group(StateMachineSettings, share=[spin_down_seconds])
-    render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams'), tilt])
+    render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams'), tilt, resolution])
     server : Group[NiceSettings]    = Group(NiceSettings)
     recording: Group[RecordingGroup] = Group(RecordingGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])

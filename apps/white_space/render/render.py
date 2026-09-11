@@ -8,7 +8,7 @@ from modules.render.layers import ImageSourceLayer, MaskSourceLayer, CropSourceL
 from modules.render.layers import TrackerCompositor, PoseCompositor
 from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer
 from modules.render.layers import PanoramicCameraLayer, PanoramaLayerSettings, PanoramicTrackerLayer
-from modules.oak import MONO_SIZE
+from modules.oak import mono_frame_size
 from modules.tracker import PanoramicTrackerSettings
 from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
 from apps.white_space.render.layers.beam_light_simulation_layer import BeamLightSimulationLayer
@@ -85,7 +85,7 @@ class Render(RenderBase):
         self.subdivision_rows: list[SubdivisionRow] = [
             self._track_row(),
             SubdivisionRow(name='panoramic',  columns=1,                rows=1, src_aspect_ratio=10.0, padding=Point2f(0.0, 1.0)),
-            SubdivisionRow(name='ws_light',   columns=1,                rows=1, src_aspect_ratio=3.0, padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name='ws_light',   columns=1,                rows=1, src_aspect_ratio=6.0, padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name='pose',       columns=self.num_players, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0)),
         ]
         self._window_size: tuple[int, int] = (settings.window.width, settings.window.height)
@@ -121,8 +121,11 @@ class Render(RenderBase):
             return SubdivisionRow(name='track', columns=1, rows=1,
                                   src_aspect_ratio=panorama.aspect_ratio,
                                   padding=Point2f(0.0, 1.0))
+        # Mono and landscape, as this app has always been; the frame's shape follows the
+        # configured sensor mode, so switching resolution reshapes the row with it.
+        frame_w, frame_h = mono_frame_size(self.settings.resolution)
         return SubdivisionRow(name='track', columns=self.num_cams, rows=1,
-                              src_aspect_ratio=MONO_SIZE[0] / MONO_SIZE[1], padding=Point2f(1.0, 1.0))
+                              src_aspect_ratio=frame_w / frame_h, padding=Point2f(1.0, 1.0))
 
     def _on_layout_setting(self, _value: object) -> None:
         self._layout_dirty = True

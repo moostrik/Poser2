@@ -16,72 +16,124 @@ logger = logging.getLogger(__name__)
 # The sensor mode is the only knob; every width, height, aspect ratio and buffer
 # size in the pipeline and in the render derives from it. Nothing downstream may
 # restate a frame dimension as a literal — that is how the two silently drift.
+#
+# The knob is the `resolution` SETTING, not a constant here. It used to be a constant, which put
+# it in a different place from every preset value that depends on it; they could disagree and
+# nothing noticed.
 
 # `dai.node.Warp` needs both output dimensions divisible by this.
 WARP_ALIGNMENT: int = 16
 
-MONO_SIZES: dict[MonoCameraProperties.SensorResolution, tuple[int, int]] = {
-    MonoCameraProperties.SensorResolution.THE_400_P: ( 640, 400),
-    MonoCameraProperties.SensorResolution.THE_480_P: ( 640, 480),
-    MonoCameraProperties.SensorResolution.THE_720_P: (1280, 720),
-    MonoCameraProperties.SensorResolution.THE_800_P: (1280, 800),
+
+class CameraResolution(IntEnum):
+    """The sensor mode, as one label spanning both sensors — the `resolution` setting.
+
+    Named `CameraResolution` rather than `Resolution` because `modules/pose` has a `resolution`
+    of its own and the apps import both.
+
+    It is a *setting* and not a constant on purpose. Everything frame-relative in the preset is
+    tuned against a particular frame, and a constant in code with the values that depend on it in
+    a preset is two sources that can disagree. It is also what lets a recording be played back
+    honestly: a clip shot at 720 rows runs through an 800-row pipeline with `vfov`, the distance
+    estimate and the panorama's geometry all silently wrong, and a playback preset saying `P720`
+    fixes every one of them at once.
+
+    NOT derived from it, and to be re-tuned on the rig alongside it, because they are set by eye
+    against the frame rather than computed (P800 -> P720 scales them by 800/720 = 1.111):
+      camera.tracker.min_height             a fraction of frame height, so it scales
+      camera.tracker.seam.max_height_diff   idem
+      pose.distance_extractor.near_y/far_y  positions in the frame, so they scale and shift
+    (The vertical field is NOT in that list — see `frame_fov` below, which derives it. Neither is
+    the render's panorama row, which derives its own aspect.)
+    """
+    P720  = 0       # 1280 x 720   both sensors
+    P800  = auto()  # 1280 x 800   both sensors; the OV9282 W's full readout
+    P1080 = auto()  # 1920 x 1072  colour only
+
+
+# The delivered size of each mode, already trimmed to the warp's alignment: 1080 is not
+# divisible by 16, so the 1080p preview is cropped to 1072 rows.
+RESOLUTION_SIZES: dict[CameraResolution, tuple[int, int]] = {
+    CameraResolution.P720:  (1280,  720),
+    CameraResolution.P800:  (1280,  800),
+    CameraResolution.P1080: (1920, 1072),
 }
 
-# The mono sensor mode the installation runs. OV9282 W is natively 1280x800;
-# THE_720_P is a pure vertical crop of it, so the horizontal field — and with it the
-# whole column-to-azimuth mapping — is identical either way. Change this one line to
-# change the resolution everywhere.
-#
-# NOT derived from it, and to be edited by hand alongside it, because they are set by eye
-# against the frame rather than computed:
-#   camera.tracker.min_height             a fraction of frame height, so it scales
-#   camera.tracker.seam.max_height_diff   idem
-#   pose.distance_extractor.near_y/far_y  positions in the frame, so they scale and shift
-#   render.py's 'track' row src_aspect_ratio
-# (The vertical field is NOT in that list — see `frame_fov` below, which derives it.)
-MONO_RESOLUTION: MonoCameraProperties.SensorResolution = MonoCameraProperties.SensorResolution.THE_800_P
-MONO_SIZE: tuple[int, int] = MONO_SIZES[MONO_RESOLUTION]
-
-# Colour preview sizes, already trimmed to the warp's alignment: 1080 is not divisible
-# by 16, so the 1080p preview is cropped to 1072 rows.
-COLOR_SIZES: dict[ColorCameraProperties.SensorResolution, tuple[int, int]] = {
-    ColorCameraProperties.SensorResolution.THE_720_P:  (1280,  720),
-    ColorCameraProperties.SensorResolution.THE_1080_P: (1920, 1072),
+# Which modes each sensor actually has. Checked against depthai 2.30: both MonoCamera and
+# ColorCamera expose THE_720_P and THE_800_P, which is what lets one label span them. Mono also
+# has THE_400_P, THE_480_P and THE_1200_P — the last is for AR0234-class sensors, not the
+# OV9282 W in use — and colour has 4 K upward; none are offered until something needs them.
+MONO_MODES: dict[CameraResolution, MonoCameraProperties.SensorResolution] = {
+    CameraResolution.P720: MonoCameraProperties.SensorResolution.THE_720_P,
+    CameraResolution.P800: MonoCameraProperties.SensorResolution.THE_800_P,
 }
 
+COLOR_MODES: dict[CameraResolution, ColorCameraProperties.SensorResolution] = {
+    CameraResolution.P720:  ColorCameraProperties.SensorResolution.THE_720_P,
+    CameraResolution.P800:  ColorCameraProperties.SensorResolution.THE_800_P,
+    CameraResolution.P1080: ColorCameraProperties.SensorResolution.THE_1080_P,
+}
 
-def mono_frame_size(square: bool = False) -> tuple[int, int]:
+# What a mono camera falls back to when asked for a mode it does not have.
+_FALLBACK_RESOLUTION: CameraResolution = CameraResolution.P800
+
+# Pairs already reported, so the warning says its piece once. `frame_size` runs per frame on the
+# simulator's size check, and a misconfigured preset must not turn that into a log flood.
+_warned_resolutions: set[tuple[bool, CameraResolution]] = set()
+
+
+def resolve_resolution(color: bool, resolution: CameraResolution) -> CameraResolution:
+    """The mode this sensor will actually run, which is not always the one asked for.
+
+    `P1080` is colour-only, and a preset can ask a mono camera for it. Rather than raising in the
+    middle of pipeline construction, fall back and say so once — the frame is still coherent,
+    just not the requested size."""
+    available = COLOR_MODES if color else MONO_MODES
+    if resolution in available:
+        return resolution
+    if (color, resolution) not in _warned_resolutions:
+        _warned_resolutions.add((color, resolution))
+        logger.warning(
+            "%s is not available on the %s sensor — falling back to %s",
+            resolution.name, 'colour' if color else 'mono', _FALLBACK_RESOLUTION.name,
+        )
+    return _FALLBACK_RESOLUTION
+
+
+def mono_mode(resolution: CameraResolution) -> MonoCameraProperties.SensorResolution:
+    """The depthai mono sensor mode for this label."""
+    return MONO_MODES[resolve_resolution(False, resolution)]
+
+
+def color_mode(resolution: CameraResolution) -> ColorCameraProperties.SensorResolution:
+    """The depthai colour sensor mode for this label."""
+    return COLOR_MODES[resolve_resolution(True, resolution)]
+
+
+def mono_frame_size(resolution: CameraResolution, square: bool = False) -> tuple[int, int]:
     """The mono frame as it leaves the pipeline. `square` crops it to height x height."""
-    width, height = MONO_SIZE
+    width, height = RESOLUTION_SIZES[resolve_resolution(False, resolution)]
     return (height, height) if square else (width, height)
 
 
-def color_resolution(do_720p: bool = False) -> ColorCameraProperties.SensorResolution:
-    """The colour sensor mode. Unlike mono this is chosen at runtime, by the `hd_ready`
-    setting — a shared camera-module setting, so it stays a setting. The choice itself lives
-    here, once, so the pipeline and the size helpers cannot disagree about it."""
-    return (ColorCameraProperties.SensorResolution.THE_720_P if do_720p
-            else ColorCameraProperties.SensorResolution.THE_1080_P)
-
-
-def color_frame_size(do_720p: bool = False, square: bool = False) -> tuple[int, int]:
+def color_frame_size(resolution: CameraResolution, square: bool = False) -> tuple[int, int]:
     """The colour frame as it leaves the pipeline. `square` crops it to height x height."""
-    width, height = COLOR_SIZES[color_resolution(do_720p)]
+    width, height = RESOLUTION_SIZES[resolve_resolution(True, resolution)]
     return (height, height) if square else (width, height)
 
 
-def frame_size(color: bool, do_720p: bool = False, square: bool = False) -> tuple[int, int]:
+def frame_size(color: bool, resolution: CameraResolution, square: bool = False) -> tuple[int, int]:
     """The frame size a camera configuration produces, whichever path it takes. Anything that
     needs the camera's aspect ratio — the render's layout, a texture allocation — asks here
     instead of restating it."""
-    return color_frame_size(do_720p, square) if color else mono_frame_size(square)
+    return color_frame_size(resolution, square) if color else mono_frame_size(resolution, square)
 
 
-def mode_size(color: bool, do_720p: bool = False) -> tuple[int, int]:
+def mode_size(color: bool, resolution: CameraResolution) -> tuple[int, int]:
     """The frame size BEFORE any square crop — the size the sensor mode actually produces.
     This is the width the `fov` setting is quoted against, so it is what `degrees_per_pixel`
     must be given."""
-    return frame_size(color, do_720p, square=False)
+    return frame_size(color, resolution, square=False)
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +292,23 @@ YOLO_OVERLAP_THRESHOLD: float = 0.5
 
 # The detector's input, fixed by the blob it was compiled for — the names above carry it.
 # Not a camera dimension: the frame is resized into this whatever the sensor mode is.
+#
+# THE WIDE BLOB DOES NOT MATCH THE FRAME, AND THAT IS FINE. 640 x 352 is 1.818; a 1280 x 800
+# frame is 1.600, a 12% mismatch. The resize is `setKeepAspectRatio(False)` (see the Yolo setups
+# in pipeline.py), so the frame is STRETCHED into the blob, never cropped and never letterboxed.
+# Two consequences, and they are what make the mismatch harmless:
+#   - nothing is lost at the frame edges, so nobody goes undetected there;
+#   - detections come back in normalized coordinates of the detector input, and a pure stretch
+#     preserves normalized coordinates, so they map 1:1 onto the full frame.
+# The mismatch costs detection *quality* and never *geometry* — which is why the tracker's
+# azimuths are right. Per mode: P800 -12.0%, P720 -2.2%.
+#
+# So P720 is NOT worth choosing for the blob's sake: it is a pure vertical crop, and it would buy
+# the better fit with 4 degrees off the BOTTOM of the frame — where the feet are, and the feet are
+# the only input the floor-plane distance model has (nearest feet 1.09 m -> 1.32 m at tilt 15).
+# A 640 x 384 blob would be the real fix (-4.0%, full 800 rows kept, and 384 is divisible by 32 so
+# it is a valid YOLO input; 640 x 400 would be exact but 400 is not). That needs a blobconverter
+# run — the link is at the top of this file — and is not available today.
 DETECTOR_INPUT_WIDE:   tuple[int, int] = (640, 352)
 DETECTOR_INPUT_SQUARE: tuple[int, int] = (416, 416)
 

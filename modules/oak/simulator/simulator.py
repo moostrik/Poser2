@@ -49,7 +49,7 @@ class Simulator(Camera):
             super().run()
 
     def _setup_pipeline(self, pipeline: Pipeline) -> None: # override
-        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.do_720p, self.show_stereo, self.mount, simulate=True, warp_clips=self.warp_clips)
+        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.resolution, self.show_stereo, self.mount, simulate=True, warp_clips=self.warp_clips)
 
 
     def _setup_queues(self) -> None: # override
@@ -127,8 +127,11 @@ class Simulator(Camera):
         the clip's own dimensions, and the detector resizes whatever arrives. But every
         frame-relative setting is tuned for the configured size and is silently off by the
         ratio — the tracker's vfov and height gates, and the pose distance thresholds.
+
+        The fix is in the preset, not here: set `camera.resolution` to the label the clip was
+        shot at and the whole chain derives correctly again.
         """
-        expected: tuple[int, int] = frame_size(self.do_color, self.do_720p, self.square)
+        expected: tuple[int, int] = frame_size(self.do_color, self.resolution, self.square)
         if (width, height) == expected or (width, height) == self._warned_frame_size:
             return
         self._warned_frame_size = (width, height)

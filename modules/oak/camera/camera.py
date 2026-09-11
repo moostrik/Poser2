@@ -12,7 +12,7 @@ from numpy import ndarray
 
 from modules.utils import FPS
 
-from .definitions import FrameType, Input, Output, Tracklet, FrameCallback, SyncCallback, TrackerCallback, get_device_list, log_connected_sensors
+from .definitions import CameraResolution, FrameType, Input, Output, Tracklet, FrameCallback, SyncCallback, TrackerCallback, get_device_list, log_connected_sensors
 from .pipeline import setup_pipeline, get_frame_types, WarpConfig
 from .settings import CameraSettings
 
@@ -43,7 +43,7 @@ class Camera(Thread):
         self.do_color: bool =           core_settings.color
         self.do_stereo: bool =          core_settings.stereo
         self.do_yolo: bool =            core_settings.yolo
-        self.do_720p: bool =            core_settings.hd_ready
+        self.resolution: CameraResolution = core_settings.resolution
         self.show_stereo: bool =        core_settings.show_stereo
 
         self.mount: WarpConfig = WarpConfig(
@@ -119,7 +119,7 @@ class Camera(Thread):
         return True
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
-            setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.do_720p, self.show_stereo, self.mount, simulate=False)
+            setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.resolution, self.show_stereo, self.mount, simulate=False)
 
     def _setup_queues(self) -> None:
         if self.do_stereo:

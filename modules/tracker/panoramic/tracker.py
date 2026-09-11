@@ -8,7 +8,7 @@ from threading import Lock, Thread, Event
 from typing import Callable
 
 # Local application imports
-from modules.oak import DepthTracklet, MONO_SIZE
+from modules.oak import DepthTracklet, mono_frame_size
 from .. import (
     BaseTracker, TrackerAnnotation,
     Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback,
@@ -113,9 +113,14 @@ class Tracker(Thread, BaseTracker):
         self.geometry.set_camera_height(self.config.parallax.camera_height)
 
     def _set_fov(self, fov: float) -> None:
-        """The vertical field is fov x rows / columns — same degrees per pixel on both axes."""
+        """The vertical field is fov x rows / columns — same degrees per pixel on both axes.
+
+        The frame shape comes from the configured `resolution`, so changing the sensor mode in
+        the preset carries `vfov` with it. Mono and landscape, which is what this tracker has
+        always assumed."""
         self.geometry.set_fov(fov)
-        vfov: float = fov * MONO_SIZE[1] / MONO_SIZE[0]
+        width, height = mono_frame_size(self.config.resolution)
+        vfov: float = fov * height / width
         self.geometry.set_vfov(vfov)
         self.config.parallax.vfov = vfov
 

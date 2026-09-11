@@ -1,3 +1,4 @@
+from modules.oak import CameraResolution
 from modules.settings import BaseSettings, Field, Group
 
 
@@ -45,6 +46,8 @@ class ParallaxSettings(BaseSettings):
 
 class TrackerSettings(BaseSettings):
     fov: Field[float] = Field(110.0, access=Field.INIT)
+    resolution: Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT,
+                                                description="Sensor mode, shared from the camera group. Only the frame's shape is used, to derive the vertical field.")
     min_age: Field[int] = Field(5, min=0, max=9, step=1,
                                 description="Minimum age in frames before a tracklet is considered.")
     min_height: Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05,

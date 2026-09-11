@@ -16,7 +16,7 @@ from .definitions import (
     TRACKER_PERSON_LABEL, TRACKER_TYPE,
     DEPTH_TRACKER_BOX_SCALE, DEPTH_TRACKER_LOCATION,
     DEPTH_TRACKER_MIN_DEPTH, DEPTH_TRACKER_MAX_DEPTH,
-    MONO_RESOLUTION, MONO_SIZE, COLOR_SIZES, color_resolution,
+    CameraResolution, mono_mode, color_mode, mono_frame_size, color_frame_size,
     WARP_MESH, equirect_mesh_points,
 )
 
@@ -80,7 +80,7 @@ def setup_pipeline(
     do_color: bool = True,
     do_stereo: bool = True,
     do_yolo: bool = True,
-    do_720p: bool = False,
+    resolution: CameraResolution = CameraResolution.P800,
     show_stereo: bool = False,
     mount: WarpConfig = WarpConfig(False, False, 0.0, 0.0, 127.0),
     simulate: bool = False,
@@ -107,48 +107,48 @@ def setup_pipeline(
         if do_color:
             if do_stereo:
                 if do_yolo:
-                    SetupColorStereoYolo(pipeline, fps, do_720p, show_stereo, nn_path)
+                    SetupColorStereoYolo(pipeline, fps, resolution, show_stereo, nn_path)
                 else:
-                    SetupColorStereo(pipeline, fps, do_720p, show_stereo = True)
+                    SetupColorStereo(pipeline, fps, resolution, show_stereo = True)
             else:
                 if do_yolo:
-                    SetupColorYolo(pipeline, fps, do_720p, square, mount, nn_path)
+                    SetupColorYolo(pipeline, fps, resolution, square, mount, nn_path)
                 else:
-                    SetupColor(pipeline, fps, do_720p, square, mount)
+                    SetupColor(pipeline, fps, resolution, square, mount)
         else:
             if do_stereo:
                 if do_yolo:
-                    SetupMonoStereoYolo(pipeline, fps, show_stereo, nn_path)
+                    SetupMonoStereoYolo(pipeline, fps, resolution, show_stereo, nn_path)
                 else:
-                    SetupMonoStereo(pipeline, fps, show_stereo = True)
+                    SetupMonoStereo(pipeline, fps, resolution, show_stereo = True)
             else:
                 if do_yolo:
-                    SetupMonoYolo(pipeline, fps, square, mount, nn_path)
+                    SetupMonoYolo(pipeline, fps, resolution, square, mount, nn_path)
                 else:
-                    SetupMono(pipeline, fps, square, mount)
+                    SetupMono(pipeline, fps, resolution, square, mount)
     else:
         if do_color:
             if do_stereo:
                 if do_yolo:
-                    SimulationColorStereoYolo(pipeline, fps, do_720p, show_stereo, nn_path)
+                    SimulationColorStereoYolo(pipeline, fps, resolution, show_stereo, nn_path)
                 else:
-                    SimulationColorStereo(pipeline, fps, do_720p, show_stereo)
+                    SimulationColorStereo(pipeline, fps, resolution, show_stereo)
             else:
                 if do_yolo:
-                    SimulationColorYolo(pipeline, fps, do_720p, square, mount, nn_path, warp_clips)
+                    SimulationColorYolo(pipeline, fps, resolution, square, mount, nn_path, warp_clips)
                 else:
-                    SimulationColor(pipeline, fps, do_720p, square, mount, warp_clips)
+                    SimulationColor(pipeline, fps, resolution, square, mount, warp_clips)
         else:
             if do_stereo:
                 if do_yolo:
-                    SimulationMonoStereoYolo(pipeline, fps, show_stereo, nn_path)
+                    SimulationMonoStereoYolo(pipeline, fps, resolution, show_stereo, nn_path)
                 else:
-                    SimulationMonoStereo(pipeline, fps, show_stereo)
+                    SimulationMonoStereo(pipeline, fps, resolution, show_stereo)
             else:
                 if do_yolo:
-                    SimulationMonoYolo(pipeline, fps, square, mount, nn_path, warp_clips)
+                    SimulationMonoYolo(pipeline, fps, resolution, square, mount, nn_path, warp_clips)
                 else:
-                    SimulationMono(pipeline, fps, square, mount, warp_clips)
+                    SimulationMono(pipeline, fps, resolution, square, mount, warp_clips)
 
 
 class Setup():
@@ -157,17 +157,18 @@ class Setup():
         self.fps: float = fps
 
 class SetupColor(Setup):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, mount: WarpConfig) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution, square: bool, mount: WarpConfig) -> None:
         super().__init__(pipeline, fps)
 
-        self.resolution: dai.ColorCameraProperties.SensorResolution = color_resolution(do_720p)
-        self.width, self.height = COLOR_SIZES[self.resolution]
+        self.resolution: CameraResolution = resolution
+        self.sensor_mode: dai.ColorCameraProperties.SensorResolution = color_mode(resolution)
+        self.width, self.height = color_frame_size(resolution)
 
         self.data_size: int = self.width * self.height * 3
 
 
         self.color: dai.node.ColorCamera = pipeline.create(dai.node.ColorCamera)
-        self.color.setResolution(self.resolution)
+        self.color.setResolution(self.sensor_mode)
         self.color.setFps(self.fps)
         self.color.setInterleaved(False)
         self.color.setPreviewSize(self.width, self.height)
@@ -198,8 +199,8 @@ class SetupColor(Setup):
         self.color_control.out.link(self.color.inputControl)
 
 class SetupColorYolo(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, mount: WarpConfig, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, do_720p, square, mount)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution, square: bool, mount: WarpConfig, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, resolution, square, mount)
 
         self.detection_manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.detection_manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
@@ -236,10 +237,10 @@ class SetupColorYolo(SetupColor):
 
 
 class SetupColorStereo(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, show_stereo:bool, lowres: bool = False) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution, show_stereo:bool, lowres: bool = False) -> None:
         logger.warning("Color Stereo not implemented")
         return
-        super().__init__(pipeline, fps, square = False)
+        super().__init__(pipeline, fps, resolution, square = False)
         self.show_stereo: bool = show_stereo
 
         pipeline.remove(self.output_video)
@@ -248,18 +249,18 @@ class SetupColorStereo(SetupColor):
 
         # The depth pair runs at the installation's mono mode, or a low mode when the depth
         # output is only feeding the detector (`lowres`).
-        resolution: dai.MonoCameraProperties.SensorResolution = MONO_RESOLUTION
+        sensor_mode: dai.MonoCameraProperties.SensorResolution = mono_mode(resolution)
         if lowres:
-            resolution = dai.MonoCameraProperties.SensorResolution.THE_400_P
+            sensor_mode = dai.MonoCameraProperties.SensorResolution.THE_400_P
 
         self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
         self.left.setCamera("left")
-        self.left.setResolution(resolution)
+        self.left.setResolution(sensor_mode)
         self.left.setFps(fps)
 
         self.right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
         self.right.setCamera("right")
-        self.right.setResolution(resolution)
+        self.right.setResolution(sensor_mode)
         self.right.setFps(fps)
 
         self.stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
@@ -297,10 +298,10 @@ class SetupColorStereo(SetupColor):
         self.stereo_control.out.link(self.stereo.inputConfig)
 
 class SetupColorStereoYolo(SetupColorStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, show_stereo: bool, nn_path: Path) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution, show_stereo: bool, nn_path: Path) -> None:
         logger.warning("Color Stereo not implemented")
         return
-        super().__init__(pipeline, fps, do_720p, show_stereo, lowres = True)
+        super().__init__(pipeline, fps, resolution, show_stereo, lowres = True)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.manip.initialConfig.setResize(*DETECTOR_INPUT_WIDE)
@@ -338,17 +339,19 @@ class SetupColorStereoYolo(SetupColorStereo):
 
 
 class SetupMono(Setup):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, mount: WarpConfig) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution,
+                 square: bool, mount: WarpConfig) -> None:
         super().__init__(pipeline, fps)
 
 
-        self.resolution: dai.MonoCameraProperties.SensorResolution = MONO_RESOLUTION
-        self.width, self.height = MONO_SIZE
+        self.resolution: CameraResolution = resolution
+        self.sensor_mode: dai.MonoCameraProperties.SensorResolution = mono_mode(resolution)
+        self.width, self.height = mono_frame_size(resolution)
         self.data_size = self.width * self.height
 
         self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
         self.left.setCamera("left")
-        self.left.setResolution(self.resolution)
+        self.left.setResolution(self.sensor_mode)
         self.left.setFps(self.fps)
 
         self.left_warp: dai.node.Warp = pipeline.create(dai.node.Warp)
@@ -377,8 +380,9 @@ class SetupMono(Setup):
         self.mono_control.out.link(self.left.inputControl)
 
 class SetupMonoYolo(SetupMono):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, mount: WarpConfig, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, square, mount)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution,
+                 square: bool, mount: WarpConfig, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, resolution, square, mount)
 
         self.detection_manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.detection_manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
@@ -415,10 +419,11 @@ class SetupMonoYolo(SetupMono):
 
 
 class SetupMonoStereo(SetupMono):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution,
+                 show_stereo: bool) -> None:
         logger.warning("Mono Stereo not implemented")
         return
-        super().__init__(pipeline, fps, square = False)
+        super().__init__(pipeline, fps, resolution, square = False)
         self.show_stereo: bool = show_stereo
         pipeline.remove(self.output_video)
 
@@ -459,7 +464,8 @@ class SetupMonoStereo(SetupMono):
         self.stereo_control.out.link(self.stereo.inputConfig)
 
 class SetupMonoStereoYolo(SetupMonoStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool, nn_path: Path) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution,
+                 show_stereo: bool, nn_path: Path) -> None:
         logger.warning("Mono Stereo not implemented")
         return
         super().__init__(pipeline, fps, show_stereo)
@@ -500,9 +506,9 @@ class SetupMonoStereoYolo(SetupMonoStereo):
 
 
 class SimulationColor(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, mount: WarpConfig,
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution, square: bool, mount: WarpConfig,
                  warp_clips: bool = False) -> None:
-        super().__init__(pipeline, fps, do_720p, square, mount)
+        super().__init__(pipeline, fps, resolution, square, mount)
 
         pipeline.remove(self.color)
 
@@ -518,9 +524,9 @@ class SimulationColor(SetupColor):
             self.ex_video.out.link(self.output_video.input)
 
 class SimulationColorYolo(SetupColorYolo):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, mount: WarpConfig,
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution, square: bool, mount: WarpConfig,
                  nn_path: Path, warp_clips: bool = False) -> None:
-        super().__init__(pipeline, fps, do_720p, square, mount, nn_path)
+        super().__init__(pipeline, fps, resolution, square, mount, nn_path)
 
         pipeline.remove(self.color)
 
@@ -538,7 +544,7 @@ class SimulationColorYolo(SetupColorYolo):
         self.ex_video.out.link(self.output_video.input)
 
 class SimulationColorStereo(SetupColorStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, show_stereo: bool) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution, show_stereo: bool) -> None:
         logger.warning("Color Stereo not implemented")
         return
         super().__init__(pipeline, fps, show_stereo)
@@ -586,10 +592,10 @@ class SimulationColorStereo(SetupColorStereo):
             self.stereo.disparity.link(self.output_stereo.input)
 
 class SimulationColorStereoYolo(SimulationColorStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: float,  do_720p: bool, show_stereo: bool, nn_path: Path) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float,  resolution: CameraResolution, show_stereo: bool, nn_path: Path) -> None:
         logger.warning("Color Stereo not implemented")
         return
-        super().__init__(pipeline, fps, do_720p, show_stereo)
+        super().__init__(pipeline, fps, resolution, show_stereo)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.manip.initialConfig.setResize(*DETECTOR_INPUT_WIDE)
@@ -630,9 +636,9 @@ class SimulationColorStereoYolo(SimulationColorStereo):
 
 
 class SimulationMono(SetupMono):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, mount: WarpConfig,
-                 warp_clips: bool = False) -> None:
-        super().__init__(pipeline, fps, square, mount)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution,
+                 square: bool, mount: WarpConfig, warp_clips: bool = False) -> None:
+        super().__init__(pipeline, fps, resolution, square, mount)
 
         pipeline.remove(self.left)
         pipeline.remove(self.mono_control)
@@ -648,9 +654,9 @@ class SimulationMono(SetupMono):
             self.ex_left.out.link(self.output_video.input)
 
 class SimulationMonoYolo(SetupMonoYolo):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, mount: WarpConfig,
-                 nn_path: Path, warp_clips: bool = False) -> None:
-        super().__init__(pipeline, fps, square, mount, nn_path)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution,
+                 square: bool, mount: WarpConfig, nn_path: Path, warp_clips: bool = False) -> None:
+        super().__init__(pipeline, fps, resolution, square, mount, nn_path)
 
         pipeline.remove(self.left)
         pipeline.remove(self.mono_control)
@@ -668,7 +674,8 @@ class SimulationMonoYolo(SetupMonoYolo):
         # self.ex_left.out.link(self.output_video.input)
 
 class SimulationMonoStereo(SetupMonoStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution,
+                 show_stereo: bool) -> None:
         logger.warning("Mono Stereo not implemented")
         return
         super().__init__(pipeline, fps, show_stereo)
@@ -677,7 +684,7 @@ class SimulationMonoStereo(SetupMonoStereo):
         self.color.setCamera("color")
         # (unreachable — the early return above; a colour node in a mono setup, so it needs a
         #  colour size, not this class's mono `self.resolution`)
-        self.color.setSize(*COLOR_SIZES[color_resolution(do_720p=True)])
+        self.color.setSize(*color_frame_size(CameraResolution.P720))
         self.color.setFps(self.fps)
         self.color.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
 
@@ -723,7 +730,8 @@ class SimulationMonoStereo(SetupMonoStereo):
             self.stereo.disparity.link(self.output_stereo.input)
 
 class SimulationMonoStereoYolo(SimulationMonoStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: float,  show_stereo: bool, nn_path: Path) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution,
+                 show_stereo: bool, nn_path: Path) -> None:
         logger.warning("Mono Stereo not implemented")
         return
         super().__init__(pipeline, fps, show_stereo)

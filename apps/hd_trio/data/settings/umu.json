@@ -7,7 +7,7 @@
     "color": true,
     "square": true,
     "stereo": false,
-    "hd_ready": false,
+    "resolution": "P1080",
     "sim_enabled": false,
     "model_path": "data/models",
     "fov": 95.0,
