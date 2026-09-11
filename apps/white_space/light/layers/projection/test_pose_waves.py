@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 class PoseWavesSettings(LayerSettings):
     """Settings for the pose-driven void and wave pattern composition."""
-    fov_degrees: Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5,
-                                      description="Camera horizontal FOV — must match PanoramicTracker.fov")
+    fov_degrees: Field[float] = Field(110.0, access=Field.INIT,
+                                      description="Camera horizontal FOV — shared from the root, the same value the tracker and the warp use")
 
     # Void zones
     void_width:    Field[float] = Field(0.05,  min=0.0, max=1.0,   step=0.01,  description="Void width (normalised)")

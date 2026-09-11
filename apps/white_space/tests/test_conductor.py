@@ -21,8 +21,7 @@ class RegimeSwitchTest(unittest.TestCase):
 
     def setUp(self) -> None:
         settings = Settings()
-        self.conductor = Conductor(settings.light, distortion=settings.camera.tracker.distortion,
-                                   board=Board(), pose_stage=int(Stage.LERP))
+        self.conductor = Conductor(settings.light, board=Board(), pose_stage=int(Stage.LERP))
         self.frames: list[Frame] = []
         self.conductor.add_render_callback(self.frames.append)
         self.time: float = 0.0

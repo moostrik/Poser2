@@ -1,9 +1,11 @@
 # Standard library imports
 import logging
+import time
 from dataclasses import dataclass, replace
 from itertools import combinations
 from queue import Empty, Queue
 from threading import Lock, Thread, Event
+from typing import Callable
 
 # Local application imports
 from modules.oak import DepthTracklet, MONO_SIZE
@@ -12,8 +14,10 @@ from .. import (
     Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback,
 )
 from .store import TrackletStore
-from .geometry import Geometry, DistortAlgorithm
-from .settings import SeamSettings, TanhSettings, PolySettings, DistortionSettings, ParallaxSettings, TrackerSettings
+from .geometry import Geometry
+from .settings import SeamSettings, ParallaxSettings, TrackerSettings
+
+TrackletListCallback = Callable[[list[Tracklet]], None]
 
 logger = logging.getLogger(__name__)
 
@@ -33,16 +37,21 @@ class Tracker(Thread, BaseTracker):
     Each camera runs its own on-device YOLO tracker and emits per-camera tracklets
     with stable local IDs. This class fuses those streams into world-space
     identities. Per-camera tracklet observations are stored as immutable records
-    keyed by ``(cam_id, external_id)``: their ``cam_id``, ``external_id``,
-    ``roi``, and ``annotation`` are never rewritten by fusion. A separate world
-    id (drawn from the pool) groups one or more observations into a single
-    identity emitted to callbacks.
+    with host-owned ids (see ``TrackletStore``): their ``cam_id``,
+    ``external_id``, ``roi``, and ``annotation`` are never rewritten by fusion.
+    A separate world id (drawn from the pool) groups one or more observations
+    into a single identity emitted to callbacks.
 
     - **Cross-camera continuity**: when a brand-new observation arrives inside
       an overlap zone, it is linked into the existing world whose other-camera
       observation matches it best in world angle (recently LOST observations
       still anchor). No merge, no rewrite — the person keeps the same id as
       they cross.
+    - **Same-camera continuity**: the device tracker has no appearance model, so
+      a person it loses and re-acquires comes back under a *new* id. A new
+      observation close to a lost one in the same camera rejoins its world, which
+      puts that continuity under our control instead of leaving it to the
+      device's habit of reusing numbers.
     - **View selection (primary)**: per world, the tracker emits one primary
       observation each tick. Selection is sticky with hysteresis (governed by
       ``seam.hysteresis``): the current primary stays primary unless a
@@ -52,7 +61,10 @@ class Tracker(Thread, BaseTracker):
       own world, a per-tick scan can collapse them into one via ``merge_worlds``.
 
     Processing runs in a background thread. Camera data is submitted via
-    ``submit_cam_tracklets`` and results are delivered via registered callbacks.
+    ``submit_cam_tracklets``. Two output channels: ``add_tracklet_callback``
+    delivers one primary per world — the show's input, one pose per person — and
+    ``add_observation_callback`` delivers every live observation, which is the
+    only way to see the two cameras' separate opinions of a person on a seam.
     """
 
     def __init__(self, config: TrackerSettings, num_players: int, num_cameras: int) -> None:
@@ -66,17 +78,14 @@ class Tracker(Thread, BaseTracker):
         self.store: TrackletStore = TrackletStore(num_players)
 
         self.config: TrackerSettings = config
-        self.geometry: Geometry = Geometry(num_cameras, config.fov, 90.0)
+        # Each camera owns 360/num_cameras degrees of the ring; whatever its field has beyond
+        # that is the overlap it shares with its neighbours.
+        self.geometry: Geometry = Geometry(num_cameras, config.fov, 360.0 / num_cameras)
 
-        # Wire fov, distortion and parallax changes to geometry
+        # Wire fov and parallax changes to geometry
         TrackerSettings.fov.bind(config, lambda v: (self._set_fov(v), self._update_seam_angles()))
-        DistortionSettings.algorithm.bind(config.distortion, lambda v: self.geometry.set_algorithm(v))
-        TanhSettings.slope.bind(config.distortion.tanh, lambda v: self.geometry.set_tanh_slope(v))
-        TanhSettings.cubic.bind(config.distortion.tanh, lambda v: self.geometry.set_tanh_cubic(v))
-        PolySettings.k1.bind(config.distortion.poly, lambda v: self.geometry.set_poly_k1(v))
-        PolySettings.k2.bind(config.distortion.poly, lambda v: self.geometry.set_poly_k2(v))
         ParallaxSettings.ring_radius.bind(config.parallax, lambda v: self.geometry.set_ring_radius(v))
-        ParallaxSettings.person_height.bind(config.parallax, lambda v: self.geometry.set_person_height(v))
+        ParallaxSettings.camera_height.bind(config.parallax, lambda v: self.geometry.set_camera_height(v))
 
         # bind() does not fire with the current value, and the preset is loaded
         # before this tracker is constructed — push config into geometry once now.
@@ -87,24 +96,21 @@ class Tracker(Thread, BaseTracker):
         SeamSettings.reach.bind(config.seam, lambda _: self._update_seam_angles())
         self._update_seam_angles()
 
-        # Last emitted primary per world id — view-selection state, used for hysteresis
-        self._primary_for_world: dict[int, tuple[int, int]] = {}
+        # Last emitted primary per world id, as an observation id — view-selection state,
+        # used for hysteresis
+        self._primary_for_world: dict[int, int] = {}
 
         self._callback_lock = Lock()
         self._tracklet_callbacks: set[TrackletDictCallback] = set()
+        self._observation_callbacks: set[TrackletListCallback] = set()
 
     def _sync_geometry_from_config(self) -> None:
         """Apply current config values to geometry. Needed at construction
         because ``bind`` does not fire with the initial value and the preset is
         loaded before the tracker exists."""
         self._set_fov(self.config.fov)
-        self.geometry.set_algorithm(self.config.distortion.algorithm)
-        self.geometry.set_tanh_slope(self.config.distortion.tanh.slope)
-        self.geometry.set_tanh_cubic(self.config.distortion.tanh.cubic)
-        self.geometry.set_poly_k1(self.config.distortion.poly.k1)
-        self.geometry.set_poly_k2(self.config.distortion.poly.k2)
         self.geometry.set_ring_radius(self.config.parallax.ring_radius)
-        self.geometry.set_person_height(self.config.parallax.person_height)
+        self.geometry.set_camera_height(self.config.parallax.camera_height)
 
     def _set_fov(self, fov: float) -> None:
         """The vertical field is fov x rows / columns — same degrees per pixel on both axes."""
@@ -159,8 +165,18 @@ class Tracker(Thread, BaseTracker):
         cam_id: int = new_tracklet.cam_id
         ext_id: int = new_tracklet.external_id
 
-        # LOST/REMOVED: mark the observation lost and let timeout + cleanup handle removal
-        if new_tracklet.is_lost or new_tracklet.is_removed:
+        # The device has finished with this track: its id is now free to be handed to a
+        # different person, so the observation leaves the live index. It stays LOST and keeps
+        # anchoring until `timeout`, which is what lets a far camera link across a seam after
+        # the near one gave up.
+        if new_tracklet.is_removed:
+            if self.store.get_world_id(cam_id, ext_id) is not None:
+                self.store.end_device_track(cam_id, ext_id)
+            return
+
+        # No detection this frame, but the device still holds the track: the same id will come
+        # back, so the observation stays live.
+        if new_tracklet.is_lost:
             if self.store.get_world_id(cam_id, ext_id) is not None:
                 self.store.lose_tracklet(cam_id, ext_id)
             return
@@ -182,10 +198,19 @@ class Tracker(Thread, BaseTracker):
             self.store.replace_tracklet(new_tracklet)
             return
 
+        if not new_tracklet.is_active:
+            return
+
+        # A re-acquisition in the same camera is a continuation, not an arrival, so it is
+        # allowed anywhere in frame — including the edge dead zone, which only exists to stop
+        # *new* people being born on a seam.
+        anchor_world: int | None = self._find_same_camera_anchor(new_tracklet)
+        if anchor_world is not None:
+            self.store.add_tracklet(new_tracklet, world_id=anchor_world)
+            return
+
         # Brand-new observations are ignored too close to the FOV edge
         if self.geometry.angle_in_edge(local_angle, self.config.seam.reject):
-            return
-        if not new_tracklet.is_active:
             return
         if _overlap:
             candidate_world: int | None = self._find_world_candidate(new_tracklet)
@@ -193,6 +218,35 @@ class Tracker(Thread, BaseTracker):
                 self.store.add_tracklet(new_tracklet, world_id=candidate_world)
                 return
         self.store.add_tracklet(new_tracklet)
+
+    def _find_same_camera_anchor(self, new_tracklet: Tracklet) -> int | None:
+        """The world of a lost observation in the SAME camera that this new one continues.
+
+        The device tracker is zero-term: no appearance model, association from box overlap
+        alone. A person it drops — an occlusion, a missed detection — returns under a different
+        id, and without this they would become a new world mid-field. Matching on position and
+        height makes that continuity an explicit rule of ours, rather than an accident of the
+        device reusing its numbers. Bounded by ``seam.relink_angle``, kept small because two
+        people standing closer than that could be confused for one another.
+        """
+        assert isinstance(new_tracklet.annotation, Annotation)
+        new_angle: float = new_tracklet.annotation.local_angle
+        best_world: int | None = None
+        best_diff: float = float('inf')
+        for t in self.store.all_tracklets():
+            if t.cam_id != new_tracklet.cam_id or t.is_active or t.is_removed:
+                continue
+            if not isinstance(t.annotation, Annotation):
+                continue
+            diff: float = abs(t.annotation.local_angle - new_angle)
+            if diff > self.config.seam.relink_angle:
+                continue
+            if abs(t.roi.height - new_tracklet.roi.height) > self.config.seam.max_height_diff:
+                continue
+            if diff < best_diff:
+                best_diff = diff
+                best_world = t.id
+        return best_world
 
     def _observations_match(self, a: Tracklet, b: Tracklet) -> bool:
         """True if two observations from different cameras are close enough in
@@ -232,7 +286,7 @@ class Tracker(Thread, BaseTracker):
         # Expire timed-out observations
         for t in self.store.all_tracklets():
             if t.is_expired(self.config.timeout):
-                self.store.retire_tracklet(t.cam_id, t.external_id)
+                self.store.retire_tracklet(t.obs_id)
 
         # Late safety net: collapse worlds whose observations match each other
         # (handles ambiguous simultaneous arrivals that each got their own world).
@@ -240,18 +294,33 @@ class Tracker(Thread, BaseTracker):
             if self.store.merge_worlds(keep_id, drop_id):
                 self._primary_for_world.pop(drop_id, None)
 
-        # Emit one primary per world
+        # Emit one primary per world, while it is still being seen. `emit_hold` is shorter than
+        # `timeout` on purpose: an observation keeps anchoring a seam crossing long after the
+        # person it describes should stop driving the light, the sound and the hit detector.
+        now: float = time.time()
+        hold: float = self.config.emit_hold
         emitted: TrackletDict = {}
         for world_id in self.store.all_world_ids():
             primary: Tracklet | None = self._pick_primary(world_id)
-            if primary is not None:
-                emitted[world_id] = primary
+            if primary is None:
+                continue
+            # `_pick_primary` returns the most recently active member, so one test covers the
+            # whole world: if even that one is stale, nobody has seen this person lately.
+            if now - primary.last_active > hold:
+                continue
+            emitted[world_id] = primary
         self._notify_callback(emitted)
+
+        # Every live observation, for the calibration view: the two cameras' separate opinions
+        # of a person on a seam, which the primaries above deliberately reduce to one.
+        self._notify_observation_callback(
+            [t for t in self.store.all_tracklets() if not t.is_removed]
+        )
 
         # Drop REMOVED observations and prune stale primary entries
         for t in self.store.all_tracklets():
             if t.status == TrackingStatus.REMOVED:
-                self.store.remove_tracklet(t.cam_id, t.external_id)
+                self.store.remove_tracklet(t.obs_id)
         live_worlds: set[int] = set(self.store.all_world_ids())
         for world_id in list(self._primary_for_world):
             if world_id not in live_worlds:
@@ -272,17 +341,17 @@ class Tracker(Thread, BaseTracker):
         active: list[Tracklet] = [t for t in members if t.is_active and isinstance(t.annotation, Annotation)]
         if not active:
             chosen: Tracklet = max(members, key=lambda t: t.last_active)
-            self._primary_for_world[world_id] = (chosen.cam_id, chosen.external_id)
+            self._primary_for_world[world_id] = chosen.obs_id
             return chosen
 
         def edge(t: Tracklet) -> float:
             assert isinstance(t.annotation, Annotation)
             return self.geometry.angle_from_edge(t.annotation.local_angle)
 
-        current_key: tuple[int, int] | None = self._primary_for_world.get(world_id)
+        current_key: int | None = self._primary_for_world.get(world_id)
         current: Tracklet | None = next(
             (t for t in members
-             if (t.cam_id, t.external_id) == current_key
+             if t.obs_id == current_key
              and not t.is_removed
              and isinstance(t.annotation, Annotation)),
             None,
@@ -297,7 +366,7 @@ class Tracker(Thread, BaseTracker):
                 hysteresis: float = self.config.seam.hysteresis
                 chosen = best_competitor if edge(best_competitor) >= edge(current) / hysteresis else current
 
-        self._primary_for_world[world_id] = (chosen.cam_id, chosen.external_id)
+        self._primary_for_world[world_id] = chosen.obs_id
         return chosen
 
     def _find_world_collapse_pairs(self) -> list[tuple[int, int]]:
@@ -360,9 +429,20 @@ class Tracker(Thread, BaseTracker):
             for c in self._tracklet_callbacks:
                 c(tracklets)
 
+    def _notify_observation_callback(self, observations: list[Tracklet]) -> None:
+        with self._callback_lock:
+            for c in self._observation_callbacks:
+                c(observations)
+
     def add_tracklet_callback(self, callback: TrackletDictCallback) -> None:
         with self._callback_lock:
             self._tracklet_callbacks.add(callback)
+
+    def add_observation_callback(self, callback: TrackletListCallback) -> None:
+        """Every live observation each tick, one per camera that can see a person — not one per
+        person. For the calibration view; the show reads ``add_tracklet_callback``."""
+        with self._callback_lock:
+            self._observation_callbacks.add(callback)
 
     def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[DepthTracklet]) -> None:
         for t in cam_tracklets:

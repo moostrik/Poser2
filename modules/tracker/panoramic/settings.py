@@ -1,5 +1,4 @@
 from modules.settings import BaseSettings, Field, Group
-from .geometry import DistortAlgorithm
 
 
 class SeamAngles(BaseSettings):
@@ -17,57 +16,10 @@ class SeamSettings(BaseSettings):
     hysteresis: Field[float] = Field(0.9, min=0.1, max=1.0, step=0.05,
                                      description="Lower values make active camera stickier.")
     max_height_diff: Field[float] = Field(0.15, min=0.0, max=0.5, step=0.01,
-                                          description="Maximum ROI height difference for cross-camera matching.")
+                                          description="Maximum ROI height difference for matching two observations.")
+    relink_angle: Field[float] = Field(5.0, min=0.0, max=20.0, step=0.5,
+                                       description="How far (°) a new observation may be from a lost one in the SAME camera and still be judged the same person. The device tracker has no appearance model, so a person it drops and re-acquires arrives under a new id; this is what keeps their identity. Small: two people standing closer than this could be confused.")
     angles: Group[SeamAngles] = Group(SeamAngles)
-
-
-class TanhSettings(BaseSettings):
-    """
-    S-curve (sigmoid) undistortion via tanh.
-
-    Maps the normalised x position through:
-        x' = 0.5 * (1 + tanh(slope * (2x-1) + cubic * (2x-1)³))
-
-    Use this to correct barrel/pincushion distortion where the deviation
-    follows a smooth symmetric S-shape. ``slope`` controls how steeply the
-    correction ramps at the centre; ``cubic`` adds an asymmetric higher-order
-    bend. Start by tuning ``slope`` alone (typical range 1–3) and only add
-    ``cubic`` if the residual error is asymmetric across the frame.
-
-    At slope=0 and cubic=0 the output equals 0.5 for all inputs — this is
-    NOT an identity. Set algorithm to NONE when no correction is needed.
-    """
-    slope: Field[float] = Field(0.0, min=0.0, max=5.0, step=0.1,
-                                description="Sigmoid slope. Higher values sharpen the S-curve.")
-    cubic: Field[float] = Field(0.0, min=-2.0, max=2.0, step=0.05,
-                                description="Cubic modifier added to the sigmoid input.")
-
-
-class PolySettings(BaseSettings):
-    D = """
-    Polynomial undistortion.
-
-    Maps the normalised x position through:
-        x' = x + k1*(x-0.5) + k2*(x-0.5)³
-
-    Use this for classic lens radial distortion where displacement from
-    centre grows roughly linearly (k1) with a cubic roll-off (k2). Positive
-    k1 stretches the edges outward; negative pulls them inward. k2 refines
-    the correction at the extremes without affecting the centre.
-
-    At k1=0 and k2=0 the transform is an exact identity, so this mode is
-    safe to leave active during tuning.
-    """
-    k1: Field[float] = Field(0.0, min=-0.5, max=0.5, step=0.01,
-                             description="Linear coefficient. Positive stretches edges outward, negative pulls inward.")
-    k2: Field[float] = Field(0.0, min=-2.0, max=2.0, step=0.05,
-                             description="Cubic coefficient. Refines correction at the frame extremes.")
-
-
-class DistortionSettings(BaseSettings):
-    algorithm: Field[DistortAlgorithm] = Field(DistortAlgorithm.NONE)
-    poly: Group[PolySettings] = Group(PolySettings)
-    tanh: Group[TanhSettings] = Group(TanhSettings)
 
 
 class ParallaxSettings(BaseSettings):
@@ -76,18 +28,19 @@ class ParallaxSettings(BaseSettings):
     centre. Each camera is ``ring_radius`` metres from the rig centre, so the
     same person is seen at different world angles by neighbouring cameras — a
     disagreement of several degrees at the seams. Distance to the person is
-    estimated from the bounding-box height (assuming ``person_height`` and the
-    detection frame's ``vfov``), which is enough to re-project each observation
-    to the shared centre.
+    estimated from where their feet meet the floor, which needs only the lens
+    height above it, and that is enough to re-project each observation to the
+    shared centre.
 
-    At ``ring_radius = 0`` the correction is disabled (identity).
+    Both numbers are *measured with a tape*, not tuned. At ``ring_radius = 0``
+    the correction is disabled (identity).
     """
     ring_radius: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01,
-                                      description="Camera distance from rig center (m). 0 disables parallax correction.")
-    person_height: Field[float] = Field(1.7, min=1.0, max=2.2, step=0.05,
-                                        description="Assumed person height (m) for distance-from-bbox estimation.")
+                                      description="Camera distance from rig centre (m), measured. 0 disables parallax correction.")
+    camera_height: Field[float] = Field(0.5, min=0.1, max=3.0, step=0.01,
+                                        description="Lens height above the floor (m), measured. The only constant the distance estimate needs — nothing about the person enters it.")
     vfov: Field[float] = Field(79.5, access=Field.READ,
-                              description="Vertical field (°) of the detection frame, for distance estimation. Derived from the camera's horizontal FOV and the frame's shape, so it follows every resolution and crop change on its own.")
+                              description="Vertical field (°) of the detection frame, for the distance estimate. Derived from the camera's horizontal FOV and the frame's shape, so it follows every resolution and crop change on its own.")
 
 
 class TrackerSettings(BaseSettings):
@@ -97,7 +50,8 @@ class TrackerSettings(BaseSettings):
     min_height: Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05,
                                      description="Minimum ROI height to accept a tracklet.")
     timeout: Field[float] = Field(2.0, min=1.0, max=5.0, step=0.1,
-                                  description="Seconds before an inactive tracklet is retired.")
+                                  description="Seconds a lost observation keeps anchoring before it is retired. It must outlast a seam crossing: the far camera has to pick a person up before the near one's observation is gone.")
+    emit_hold: Field[float] = Field(0.3, min=0.0, max=2.0, step=0.05,
+                                    description="Seconds a world keeps being emitted after its last detection. Shorter than `timeout` on purpose: a person who walks out should stop driving the light and the sound long before their observation stops anchoring.")
     seam: Group[SeamSettings] = Group(SeamSettings)
-    distortion: Group[DistortionSettings] = Group(DistortionSettings)
     parallax: Group[ParallaxSettings] = Group(ParallaxSettings)

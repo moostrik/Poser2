@@ -10,7 +10,8 @@ from .. import Tracklet, TrackingStatus
 logger = logging.getLogger(__name__)
 
 
-TrackletKey = tuple[int, int]  # (cam_id, external_id)
+ObsId = int
+DeviceKey = tuple[int, int]  # (cam_id, external_id) — only meaningful while a device track lives
 
 
 class TrackletIdPool:
@@ -58,25 +59,50 @@ class TrackletStore:
     """
     Stores per-camera tracklet observations and groups them into world identities.
 
-    Observations are immutable per (cam_id, external_id) and never rewritten by
-    cross-camera fusion: each observation's `cam_id`, `external_id`, `roi`, and
-    `annotation` always reflect the camera it was actually seen by.
+    Observations are **host-owned**, keyed by an ``obs_id`` this store hands out and never
+    reuses. A device tracklet id is only a token for the life of one device track: once the
+    device reports ``REMOVED`` that number is dead, and the next tracklet carrying it is a
+    different person. So ``(cam_id, external_id)`` is kept only in a *live* index, dropped the
+    moment the device track ends (``end_device_track``). A reused device number then lands on a
+    new observation, while the old one lives on as a ``LOST`` anchor until the tracker times it
+    out — which is what lets a far camera still link across a seam after the near one gave up.
+    Without that split, a newcomer inheriting a departed person's device id would be refreshed
+    into the departed person's world.
 
-    World identities (ids drawn from the pool) own one or more observations. A
-    person visible in two cameras simultaneously has two observations linked to
-    the same world id; one is selected as "primary" by the tracker's view policy.
-    Crossing a seam is handled by linking the new camera's observation into the
-    existing world id — no merge, no rewrite, no flicker.
+    Observations are immutable and never rewritten by cross-camera fusion: each one's
+    ``cam_id``, ``external_id``, ``roi`` and ``annotation`` always reflect the camera it was
+    actually seen by.
+
+    World identities (ids drawn from the pool) own one or more observations. A person visible in
+    two cameras simultaneously has two observations linked to the same world id; one is selected
+    as "primary" by the tracker's view policy. Crossing a seam is handled by linking the new
+    camera's observation into the existing world id — no merge, no rewrite, no flicker.
     """
 
     def __init__(self, max_players: int) -> None:
-        self._tracklets: dict[TrackletKey, Tracklet] = {}
-        self._world_members: dict[int, set[TrackletKey]] = {}
-        self._world_for: dict[TrackletKey, int] = {}
+        self._obs: dict[ObsId, Tracklet] = {}
+        self._live: dict[DeviceKey, ObsId] = {}
+        self._world_members: dict[int, set[ObsId]] = {}
+        self._world_for: dict[ObsId, int] = {}
+        self._next_obs_id: ObsId = 0
         self._id_pool = TrackletIdPool(max_players)
 
     def __contains__(self, tracklet: Tracklet) -> bool:
         return self.get_world_id(tracklet.cam_id, tracklet.external_id) is not None
+
+    # ── live-index lookups ─────────────────────────────────────────────
+
+    def get_world_id(self, cam_id: int, external_id: int) -> int | None:
+        """The world of the LIVE device track with this id, or None. A device track that has
+        ended is deliberately invisible here, even while its observation still anchors."""
+        obs_id: ObsId | None = self._live.get((cam_id, external_id))
+        return None if obs_id is None else self._world_for.get(obs_id)
+
+    def get_live_observation(self, cam_id: int, external_id: int) -> Tracklet | None:
+        obs_id: ObsId | None = self._live.get((cam_id, external_id))
+        return None if obs_id is None else self._obs.get(obs_id)
+
+    # ── mutation ───────────────────────────────────────────────────────
 
     def add_tracklet(self, tracklet: Tracklet, world_id: int | None = None) -> int | None:
         """
@@ -84,10 +110,10 @@ class TrackletStore:
         is acquired from the pool; otherwise the observation is linked into the
         existing world. Returns the world id, or None if the pool is exhausted.
         """
-        key: TrackletKey = (tracklet.cam_id, tracklet.external_id)
-        if key in self._tracklets:
-            logger.warning(f"add_tracklet on existing key {key}; use replace_tracklet.")
-            return self._world_for.get(key)
+        key: DeviceKey = (tracklet.cam_id, tracklet.external_id)
+        if key in self._live:
+            logger.warning(f"add_tracklet on live key {key}; use replace_tracklet.")
+            return self._world_for.get(self._live[key])
 
         if world_id is None:
             try:
@@ -99,22 +125,26 @@ class TrackletStore:
             logger.warning(f"add_tracklet linking to unknown world {world_id}.")
             return None
 
-        self._tracklets[key] = replace(tracklet, id=world_id, status=TrackingStatus.NEW)
-        self._world_members.setdefault(world_id, set()).add(key)
-        self._world_for[key] = world_id
+        obs_id: ObsId = self._next_obs_id
+        self._next_obs_id += 1
+
+        self._obs[obs_id] = replace(tracklet, id=world_id, obs_id=obs_id, status=TrackingStatus.NEW)
+        self._live[key] = obs_id
+        self._world_members.setdefault(world_id, set()).add(obs_id)
+        self._world_for[obs_id] = world_id
         return world_id
 
     def replace_tracklet(self, new_tracklet: Tracklet) -> int:
         """
-        Refresh an existing observation, keyed by (cam_id, external_id).
-        Preserves `created_at`. On LOST, `last_active` keeps the maximum to
-        avoid rolling time backward. The observation's identity (cam_id /
-        external_id) is the key and is never changed.
+        Refresh the live observation for this device track. Preserves `created_at` and the
+        observation's identity. On LOST, `last_active` keeps the maximum to avoid rolling time
+        backward.
         """
-        key: TrackletKey = (new_tracklet.cam_id, new_tracklet.external_id)
-        old_tracklet: Tracklet | None = self._tracklets.get(key)
-        if old_tracklet is None:
-            logger.warning(f"Attempted to replace non-existent tracklet {key}.")
+        key: DeviceKey = (new_tracklet.cam_id, new_tracklet.external_id)
+        obs_id: ObsId | None = self._live.get(key)
+        old_tracklet: Tracklet | None = None if obs_id is None else self._obs.get(obs_id)
+        if obs_id is None or old_tracklet is None:
+            logger.warning(f"Attempted to replace non-live tracklet {key}.")
             return -1
 
         status: TrackingStatus = new_tracklet.status
@@ -125,10 +155,11 @@ class TrackletStore:
         if new_tracklet.status == TrackingStatus.LOST:
             last_active = max(old_tracklet.last_active, new_tracklet.last_active)
 
-        world_id: int = self._world_for[key]
-        self._tracklets[key] = replace(
+        world_id: int = self._world_for[obs_id]
+        self._obs[obs_id] = replace(
             new_tracklet,
             id=world_id,
+            obs_id=obs_id,
             created_at=old_tracklet.created_at,
             last_active=last_active,
             status=status,
@@ -136,32 +167,44 @@ class TrackletStore:
         return world_id
 
     def lose_tracklet(self, cam_id: int, external_id: int) -> None:
-        key: TrackletKey = (cam_id, external_id)
-        tracklet: Tracklet | None = self._tracklets.get(key)
-        if tracklet is None:
-            logger.warning(f"Attempted to lose non-existent tracklet {key}.")
+        """The device has no detection this frame but still holds the track: mark LOST and keep
+        it live, because the same device id legitimately comes back."""
+        obs_id: ObsId | None = self._live.get((cam_id, external_id))
+        if obs_id is None or obs_id not in self._obs:
+            logger.warning(f"Attempted to lose non-live tracklet {(cam_id, external_id)}.")
             return
-        self._tracklets[key] = replace(tracklet, status=TrackingStatus.LOST)
+        self._obs[obs_id] = replace(self._obs[obs_id], status=TrackingStatus.LOST)
 
-    def retire_tracklet(self, cam_id: int, external_id: int) -> None:
-        key: TrackletKey = (cam_id, external_id)
-        tracklet: Tracklet | None = self._tracklets.get(key)
-        if tracklet is None:
-            logger.warning(f"Attempted to retire non-existent tracklet {key}.")
+    def end_device_track(self, cam_id: int, external_id: int) -> None:
+        """The device has dropped the track for good. The observation stays as a LOST anchor
+        until the tracker times it out, but leaves the live index so the device is free to hand
+        that id to someone else without the newcomer inheriting this world."""
+        key: DeviceKey = (cam_id, external_id)
+        obs_id: ObsId | None = self._live.pop(key, None)
+        if obs_id is None or obs_id not in self._obs:
+            logger.warning(f"Attempted to end non-live tracklet {key}.")
             return
-        self._tracklets[key] = replace(tracklet, status=TrackingStatus.REMOVED)
+        self._obs[obs_id] = replace(self._obs[obs_id], status=TrackingStatus.LOST)
 
-    def remove_tracklet(self, cam_id: int, external_id: int) -> None:
+    def retire_tracklet(self, obs_id: ObsId) -> None:
+        """Timed out: mark REMOVED so the next tick deletes it."""
+        if obs_id not in self._obs:
+            logger.warning(f"Attempted to retire non-existent observation {obs_id}.")
+            return
+        self._obs[obs_id] = replace(self._obs[obs_id], status=TrackingStatus.REMOVED)
+
+    def remove_tracklet(self, obs_id: ObsId) -> None:
         """Delete an observation. Releases its world id if it was the last member."""
-        key: TrackletKey = (cam_id, external_id)
-        if self._tracklets.pop(key, None) is None:
-            logger.warning(f"Attempted to remove non-existent tracklet {key}.")
+        tracklet: Tracklet | None = self._obs.pop(obs_id, None)
+        if tracklet is None:
+            logger.warning(f"Attempted to remove non-existent observation {obs_id}.")
             return
-        world_id: int | None = self._world_for.pop(key, None)
+        self._live.pop((tracklet.cam_id, tracklet.external_id), None)
+        world_id: int | None = self._world_for.pop(obs_id, None)
         if world_id is None:
             return
-        members: set[TrackletKey] = self._world_members.get(world_id, set())
-        members.discard(key)
+        members: set[ObsId] = self._world_members.get(world_id, set())
+        members.discard(obs_id)
         if not members:
             self._world_members.pop(world_id, None)
             self._id_pool.release(world_id)
@@ -173,24 +216,22 @@ class TrackletStore:
         if keep_id not in self._world_members or drop_id not in self._world_members:
             logger.warning(f"merge_worlds with unknown world id (keep={keep_id}, drop={drop_id}).")
             return False
-        for key in self._world_members[drop_id]:
-            self._world_for[key] = keep_id
-            t: Tracklet = self._tracklets[key]
-            self._tracklets[key] = replace(t, id=keep_id)
-            self._world_members[keep_id].add(key)
+        for obs_id in self._world_members[drop_id]:
+            self._world_for[obs_id] = keep_id
+            self._obs[obs_id] = replace(self._obs[obs_id], id=keep_id)
+            self._world_members[keep_id].add(obs_id)
         del self._world_members[drop_id]
         self._id_pool.release(drop_id)
         return True
 
-    def get_world_id(self, cam_id: int, external_id: int) -> int | None:
-        return self._world_for.get((cam_id, external_id))
+    # ── reads ──────────────────────────────────────────────────────────
 
     def get_tracklets(self, world_id: int) -> list[Tracklet]:
-        keys: set[TrackletKey] = self._world_members.get(world_id, set())
-        return [self._tracklets[k] for k in keys if k in self._tracklets]
+        obs_ids: set[ObsId] = self._world_members.get(world_id, set())
+        return [self._obs[o] for o in obs_ids if o in self._obs]
 
     def all_tracklets(self) -> list[Tracklet]:
-        return list(self._tracklets.values())
+        return list(self._obs.values())
 
     def all_world_ids(self) -> list[int]:
         return list(self._world_members.keys())

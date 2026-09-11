@@ -1,41 +1,39 @@
 import math
-from enum import IntEnum
-
-import numpy as np
 
 from modules.utils import Rect
 
 
-# Distance estimation is clamped to a plausible range so a degenerate bounding
-# box can never produce a nonsensical parallax correction.
-_MIN_DISTANCE: float = 0.5
-_MAX_DISTANCE: float = 10.0
-
-
-class DistortAlgorithm(IntEnum):
-    NONE = 0   # identity — no distortion correction
-    POLY = 1   # polynomial: x + k1*(x-0.5) + k2*(x-0.5)^3
-    TANH = 2   # S-curve:  0.5 * (1 + tanh(k1*(2x-1) + k2*(2x-1)^3))
+# The play zone with its hard floor, as a distance from a camera: Ø 2 m to Ø 7 m is roughly
+# 0.6 m to 4.0 m out. Clamping here means a mangled bounding box can only move the parallax
+# correction within the band people are actually in, never to a nonsensical depth.
+_MIN_DISTANCE: float = 0.6
+_MAX_DISTANCE: float = 4.0
 
 
 class Geometry:
+    """Turns a camera's bounding box into a world azimuth.
+
+    Two properties of the delivered frame make this simple, and both are produced by the
+    camera's warp (`modules/oak/camera/definitions.py`, `equirect_mesh_points`), not assumed
+    here: the frame is **level** (the tilt is undone) and **equirectangular** (a column is one
+    azimuth at every height, a row is one elevation at every column). On the raw fisheye neither
+    holds — a standing person's box centre reads several degrees short of their true bearing,
+    worst near the seams — which is why there is no distortion correction in this class: the
+    projection is fixed upstream rather than patched here.
+    """
+
     def __init__(self, num_cameras: int, cam_fov: float, target_fov: float) -> None:
         self.num_cameras: int = num_cameras
         self.cam_fov: float = cam_fov
         self.target_fov: float = target_fov
         self.fov_overlap: float = (self.cam_fov - self.target_fov) / 2.0
 
-        self._tanh_slope: float = 0.0
-        self._tanh_cubic: float = 0.0
-        self._poly_k1: float = 0.0
-        self._poly_k2: float = 0.0
-        self.algorithm: DistortAlgorithm = DistortAlgorithm.NONE
-
         # Parallax: cameras sit on a ring of this radius (m), not at the shared
         # centre the world-angle model assumes. 0 disables the correction.
         self._ring_radius: float = 0.0
-        self._person_height: float = 1.7
-        self._vfov: float = 71.6
+        # Lens height above the floor (m) — the one measured constant the distance estimate needs.
+        self._camera_height: float = 0.5
+        self._vfov: float = 79.4
 
     def get_angles_and_overlap(self, roi: Rect, cam_id: int, expansion: float) -> tuple[float, float, bool, float]:
         local_angle, world_angle, distance = self.calc_angle(roi, cam_id)
@@ -52,14 +50,31 @@ class Geometry:
         return local_angle, world_angle, distance
 
     def estimate_distance(self, roi: Rect) -> float:
-        """Estimate distance from the camera (m) from the bounding-box height,
-        assuming a person of ``person_height`` filling ``roi.height`` of a frame
-        with vertical field of view ``vfov``. Clamped to a plausible range."""
-        angular_height: float = roi.height * self._vfov
-        if angular_height <= 0.0:
+        """Distance from the camera (m), from where the feet meet the floor.
+
+        The frame is equirectangular and level, so a row *is* an elevation: the box's bottom edge
+        is a depression angle below the horizon, and the floor plane turns that into a distance
+        with one measured constant, the lens height. Nothing about the person enters it — arms
+        raised, legs pulled up and bending over all change a box's *height*, and none of them
+        move the feet.
+
+        The frame's own geometry bounds this nicely: its bottom row sits at about 39.7° of
+        depression, which is 0.60 m out, just inside the Ø 2.0 m hard floor.
+
+        **A box may extend outside the frame.** The device tracker extrapolates the extent of a
+        partly-visible person, and nothing clamps it on the way in (`Tracklet.from_depthcam`), so
+        a close person's `bottom` legitimately exceeds 1.0 and that is real information about how
+        close they are. It is used, not discarded: the formula is continuous across the frame edge
+        and the final clamp is what bounds the answer. (At `bottom == 1.0` the formula already
+        gives 0.60 m, so there was never a boundary to special-case.) Past 90° of depression the
+        tangent turns negative, which the clamp also catches.
+        """
+        bottom: float = roi.y + roi.height
+        depression: float = math.radians((bottom - 0.5) * self._vfov)
+        if depression <= 0.0:
+            # Feet at or above the horizon: not standing on this floor.
             return _MAX_DISTANCE
-        half_angle: float = math.radians(angular_height / 2.0)
-        distance: float = (self._person_height / 2.0) / math.tan(half_angle)
+        distance: float = self._camera_height / math.tan(depression)
         return max(_MIN_DISTANCE, min(_MAX_DISTANCE, distance))
 
     def _parallax_corrected_local(self, local_angle: float, distance: float) -> float:
@@ -77,10 +92,10 @@ class Geometry:
         return math.degrees(math.atan2(y, x)) + self.cam_fov / 2.0
 
     def _calc_local_angle(self, roi: Rect) -> float:
+        """The bearing of the box centre within this camera's field. Exact, not approximate:
+        the frame is equirectangular, so a column is one azimuth at every height."""
         normalized_x: float = roi.x + roi.width / 2.0
-        normalized_x = self.undistort_x(normalized_x)
-        local_angle: float = normalized_x * self.cam_fov
-        return local_angle
+        return normalized_x * self.cam_fov
 
     def _calc_world_angle(self, local_angle: float, cam_id: int) -> float:
         world_angle: float = self.target_fov * cam_id + local_angle - self.fov_overlap
@@ -111,40 +126,16 @@ class Geometry:
             diff = 360.0 - diff
         return diff
 
-    def undistort_x(self, x: float) -> float:
-        if self.algorithm == DistortAlgorithm.NONE:
-            return x
-        elif self.algorithm == DistortAlgorithm.TANH:
-            return 0.5 * (1.0 + np.tanh(self._tanh_slope * (2*x - 1) + self._tanh_cubic * (2*x - 1)**3))
-        else:  # poly
-            d = x - 0.5
-            return x + self._poly_k1 * d + self._poly_k2 * d**3
-
     # SET
     def set_fov(self, cam_fov: float) -> None:
         self.cam_fov = cam_fov
         self.fov_overlap = (self.cam_fov - self.target_fov) / 2.0
 
-    def set_tanh_slope(self, slope: float) -> None:
-        self._tanh_slope = slope
-
-    def set_tanh_cubic(self, cubic: float) -> None:
-        self._tanh_cubic = cubic
-
-    def set_poly_k1(self, k1: float) -> None:
-        self._poly_k1 = k1
-
-    def set_poly_k2(self, k2: float) -> None:
-        self._poly_k2 = k2
-
-    def set_algorithm(self, algorithm: DistortAlgorithm) -> None:
-        self.algorithm = algorithm
-
     def set_ring_radius(self, ring_radius: float) -> None:
         self._ring_radius = ring_radius
 
-    def set_person_height(self, person_height: float) -> None:
-        self._person_height = person_height
+    def set_camera_height(self, camera_height: float) -> None:
+        self._camera_height = camera_height
 
     def set_vfov(self, vfov: float) -> None:
         self._vfov = vfov

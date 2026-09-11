@@ -1,5 +1,5 @@
-"""Calibration composition — projects live camera slices onto the LED strip
-for visual distortion tuning.
+"""Calibration composition — projects live camera slices onto the LED strip, so a camera's
+columns can be checked on the wall against the azimuths the tracker assigns them.
 
 Each camera contributes a horizontal luminance slice (rows slice_top..slice_bottom).
 Columns that pass the brightness threshold are projected as a hard ON marker at
@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from modules.settings import Field
-from modules.tracker.panoramic.settings import DistortionSettings, DistortAlgorithm
 
 from .._base_layer import ProjectionLayer, LayerSettings
 from ...frame import Frame
@@ -51,19 +50,18 @@ class CameraLightSettings(LayerSettings):
 
 
 class CameraLight(ProjectionLayer):
-    """Projects horizontal camera slices onto the LED strip for distortion calibration."""
+    """Projects horizontal camera slices onto the LED strip, to check on the wall that a camera's
+    columns land at the azimuths the tracker thinks they do."""
 
     def __init__(
         self,
         resolution:  int,
         config:      CameraLightSettings,
-        distortion:  DistortionSettings,
         num_cameras: int,
         board:       Board,
     ) -> None:
         super().__init__(resolution, config, board)
         self._config      = config
-        self._distortion  = distortion
         self._num_cameras = num_cameras
 
     # ------------------------------------------------------------------
@@ -77,14 +75,6 @@ class CameraLight(ProjectionLayer):
         res  = self.resolution
 
         images = {cam_id: self._board.get_video_image(cam_id) for cam_id in range(nc)}
-
-        # DistortionSettings snapshot (live from tracker)
-        dist    = self._distortion
-        algo    = dist.algorithm
-        tanh_s  = dist.tanh.slope
-        tanh_c  = dist.tanh.cubic
-        poly_k1 = dist.poly.k1
-        poly_k2 = dist.poly.k2
 
         # Geometry constants
         target_fov  = 360.0 / nc
@@ -131,21 +121,15 @@ class CameraLight(ProjectionLayer):
                 continue
 
             # ----------------------------------------------------------
-            # Inline undistort + project ON columns onto strip
+            # Project ON columns onto the strip. The camera's warp delivers an
+            # equirectangular frame, so a column IS an azimuth: the mapping is linear and
+            # there is nothing to undistort. (It used to carry an inlined copy of the
+            # tracker's `undistort_x`, which the projection change made redundant.)
             # ----------------------------------------------------------
             cam_x = np.linspace(0.0, 1.0, w, endpoint=False, dtype=np.float32)
             on_x  = cam_x[on_mask]
 
-            if algo == DistortAlgorithm.POLY:
-                d   = on_x - 0.5
-                ux  = on_x + poly_k1 * d + poly_k2 * (d ** 3)
-            elif algo == DistortAlgorithm.TANH:
-                t   = 2.0 * on_x - 1.0
-                ux  = 0.5 * (1.0 + np.tanh(tanh_s * t + tanh_c * (t ** 3)))
-            else:
-                ux  = on_x
-
-            world_angle = (target_fov * cam_id + ux * fov - fov_overlap) % 360.0
+            world_angle = (target_fov * cam_id + on_x * fov - fov_overlap) % 360.0
             strip_pos   = world_angle / 360.0
             strip_idx   = (strip_pos * res).astype(np.int32) % res
 

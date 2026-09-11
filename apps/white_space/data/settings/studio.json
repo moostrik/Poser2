@@ -135,27 +135,18 @@
       "min_age": 5,
       "min_height": 0.2,
       "timeout": 2.0,
+      "emit_hold": 0.3,
       "seam": {
         "reject": 0.35,
         "reach": 1.1,
         "hysteresis": 0.6,
         "max_height_diff": 0.18,
+        "relink_angle": 5.0,
         "angles": {}
       },
-      "distortion": {
-        "algorithm": "POLY",
-        "poly": {
-          "k1": 0.0,
-          "k2": 0.0
-        },
-        "tanh": {
-          "slope": 0.0,
-          "cubic": 0.0
-        }
-      },
       "parallax": {
-        "ring_radius": 0.25,
-        "person_height": 1.7
+        "ring_radius": 0.36,
+        "camera_height": 0.5
       }
     },
     "frame_sync": {},
@@ -486,7 +477,6 @@
         "blend": "ADD"
       },
       "test_pose_waves": {
-        "fov_degrees": 110.0,
         "void_width": 0.05,
         "void_edge": 0.01,
         "use_void": true,

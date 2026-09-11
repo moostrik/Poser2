@@ -104,7 +104,7 @@ class ProjectionLayersSettings(BaseSettings):
     test_chase:         Group[ChaseSettings]           = Group(ChaseSettings)
     test_lines:         Group[LinesSettings]           = Group(LinesSettings)
     test_random:        Group[RandomSettings]          = Group(RandomSettings)
-    test_pose_waves:    Group[PoseWavesSettings]       = Group(PoseWavesSettings)
+    test_pose_waves:    Group[PoseWavesSettings]       = Group(PoseWavesSettings, share=[fov.as_('fov_degrees')])
     test_harmonic:      Group[HarmonicSettings]        = Group(HarmonicSettings)
 
 

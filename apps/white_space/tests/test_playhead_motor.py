@@ -460,10 +460,9 @@ class DebugOverrideTest(unittest.TestCase):
         # power-on: the Conductor forces the select back to OFF at construction.
         from apps.white_space.light import Conductor, DebugLayer, LightSettings
         from apps.white_space.board import Board
-        from modules.tracker.panoramic.settings import DistortionSettings
         cfg = LightSettings()
         cfg.debug = DebugLayer.test_pose_waves
-        Conductor(cfg, DistortionSettings(), Board(), pose_stage=4)
+        Conductor(cfg, Board(), pose_stage=4)
         self.assertEqual(DebugLayer(int(cfg.debug)), DebugLayer.OFF)
 
 

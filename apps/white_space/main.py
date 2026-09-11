@@ -94,6 +94,9 @@ class WhiteSpaceMain:
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracker.add_tracklet_callback(self.board.set_tracklets)
+        # The unfused view, for the calibration display only — two observations of one person on
+        # a seam, which the line above reduces to one.
+        self.tracker.add_observation_callback(self.board.set_observations)
         self.tracklet_sync_bang.add_sync_callback(self.tracker.notify_update)
         self.frame_sync_bang.add_sync_callback(self.poses_from_tracklets.process)
 
@@ -122,7 +125,7 @@ class WhiteSpaceMain:
 
         # WS PIPELINE — light output
         ws_input: Stage = Stage(int(ps.ws_input_stage))
-        self.conductor = Conductor(self.settings.light, distortion=self.settings.camera.tracker.distortion, board=self.board, pose_stage=int(ws_input))
+        self.conductor = Conductor(self.settings.light, board=self.board, pose_stage=int(ws_input))
         # One receiver per domain, matching each source's actual transport: the fixture
         # firmware sends the fall as a plain UDP text packet (not OSC) to the light
         # receiver's port; Max sends /WS/sound/level as real OSC (the UDP receiver could

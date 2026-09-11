@@ -12,7 +12,6 @@ from typing import Any, Callable
 
 from modules.utils import HotReloadMethods, ThreadPriority, set_current_thread_priority
 from modules.gl import FpsCounter
-from modules.tracker.panoramic.settings import DistortionSettings
 
 from .clock import Clock, Tick
 from .frame import Frame, FrameCallback
@@ -47,7 +46,7 @@ def _debug_motor_mode(selection: DebugLayer, layers: dict[LayerId, BaseLayer]) -
 class Conductor(Thread):
     """Runs the light loop at a fixed rate (light_rate Hz); see the module docstring."""
 
-    def __init__(self, config: LightSettings, distortion: DistortionSettings, board: Board, pose_stage: int) -> None:
+    def __init__(self, config: LightSettings, board: Board, pose_stage: int) -> None:
         super().__init__(daemon=True, name="LightConductor")
 
         self._stop_event = Event()
@@ -80,7 +79,7 @@ class Conductor(Thread):
             LayerId.projection_playhead: ProjectionPlayhead (resolution, HI.projection_playhead, board),
             LayerId.flood:               Flood              (resolution, HI.flood,               board),
             LayerId.test_player_lines:   PlayerLines (resolution, HI.test_player_lines, board, pose_stage),
-            LayerId.test_calibration:    CameraLight (resolution, HI.test_calibration, distortion, config.num_cameras, board),
+            LayerId.test_calibration:    CameraLight (resolution, HI.test_calibration, config.num_cameras, board),
             LayerId.test_fill:   Fill  (resolution, HI.test_fill,   board),
             LayerId.test_pulse:  Pulse (resolution, HI.test_pulse,  board),
             LayerId.test_chase:  Chase (resolution, HI.test_chase,  board),

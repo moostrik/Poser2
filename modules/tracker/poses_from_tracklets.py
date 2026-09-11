@@ -15,6 +15,12 @@ class PosesFromTracklets(FrameDictCallbackMixin):
 
     def __init__(self, num_tracks: int) -> None:
         super().__init__()
+        # World ids are used directly as slot indices below, so this must match the tracker's
+        # id pool exactly: a world id at or above `num_tracks` would vanish here without a
+        # trace. Both come from `num_players` in main.py — an invariant spanning two modules,
+        # so it is worth stating.
+        if num_tracks <= 0:
+            raise ValueError(f"PosesFromTracklets needs at least one track slot, got {num_tracks}")
         self._num_tracks = num_tracks
         # Store submitted tracklets per track ID
         self._tracklets: dict[int, Tracklet | None] = {
@@ -29,6 +35,12 @@ class PosesFromTracklets(FrameDictCallbackMixin):
         Args:
             tracklet_dict: Dictionary of track_id -> Tracklet
         """
+        dropped: list[int] = [k for k in tracklet_dict if k >= self._num_tracks]
+        if dropped:
+            logger.warning(
+                f"PosesFromTracklets: world ids {dropped} are beyond {self._num_tracks} slots "
+                f"and produce no pose — the tracker's id pool is larger than num_tracks."
+            )
         with self._lock:
             # Update all track slots
             for track_id in range(self._num_tracks):
