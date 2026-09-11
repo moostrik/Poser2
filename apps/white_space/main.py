@@ -6,7 +6,7 @@ from functools import partial
 import numpy as np
 
 from modules.utils import Broadcast
-from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType
+from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType, MountCheck
 from modules.settings import presets, NiceServer
 from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, PosesFromTracklets
@@ -267,9 +267,14 @@ class WhiteSpaceMain:
         self.ghoster.add_ghosts_callback(self.board.set_ghosts)
         self.ghoster.add_sound_callback(partial(self.osc_sound_sender.set_frames, int(Stage.LERP)))
 
+        # MOUNT CHECK — compares each camera's own IMU reading against the preset it was warped
+        # for, and summarises it on one pinned line. A setup aid; nothing downstream reads it.
+        self.mount_check = MountCheck(self.settings.camera.cameras, self.settings.camera.mount)
+
         # RENDER
         self.render = WindowRender(self.board, self.settings.render, self.settings.camera.tracker)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
+        self.render.add_update_callback(self.mount_check.update)
         self.conductor.add_update_callback(self.state_machine.update)
         self.conductor.add_update_callback(self.interpolators_lerp.update)
         self.render.add_exit_callback(self.stop)

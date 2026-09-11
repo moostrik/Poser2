@@ -1,5 +1,7 @@
 # https://blobconverter.luxonis.com/
 
+import math
+
 import numpy as np
 from enum import Enum, IntEnum, auto
 from typing import Callable, TypeAlias
@@ -389,6 +391,7 @@ class Output(IntEnum):
     STEREO_FRAME_OUT = auto()
     SYNC_FRAMES_OUT = auto()
     TRACKLETS_OUT = auto()
+    IMU_OUT = auto()
 
 def get_device_list(verbose: bool = False) -> list[str]:
     device_list: list[str] = []
@@ -417,3 +420,147 @@ def log_connected_sensors(device: Device, device_id: str = '') -> None:
                         f'{feature.width}x{feature.height}')
     except Exception as exc:                        # never let diagnostics break an open
         logger.debug(f'{device_id} could not read sensor features: {exc}')
+
+
+# ---------------------------------------------------------------------------
+#  Mount readout — what the camera can say about its own orientation
+# ---------------------------------------------------------------------------
+# Every camera constant in this installation is either measured with a tape (the ring radius,
+# the lens height) or taken from a datasheet (`fov`). Two are neither: `tilt` depends on a hand
+# adjustment on a tripod head, and ROLL is not modelled anywhere at all — `equirect_mesh_points`
+# takes a tilt and assumes the camera is level about its optical axis. A rolled camera tilts the
+# horizon, which in the stitched panorama looks exactly like a wrong `tilt`, so the image cannot
+# tell the two apart. The IMU can.
+#
+# This is a setup aid and nothing in the show may read it: a few hertz, and every value is
+# allowed to be missing.
+
+IMU_RATE_HZ: int = 5
+
+# How hard each new sample pulls the running average. The camera is bolted to a tripod, so a
+# single reading is almost entirely noise and there is no motion to track.
+IMU_SMOOTHING: float = 0.1
+
+# The IMU does not share the camera's axes: it sits a quarter turn about the optical axis, and
+# `getImuToCameraExtrinsics` does not encode that rotation.
+#
+# MEASURED, NOT ASSUMED. On the rig all four cameras reported a roll of -90 degrees while their
+# tilt read correctly, and that combination has exactly one cause: a rotation about the optical
+# axis (z) leaves `gz` untouched and `hypot(gx, gy)` invariant, so tilt survives it intact while
+# roll is displaced by a constant. Any other misalignment would have corrupted the tilt too.
+#
+# It is a property of the board, not of an installation, so it is a constant here rather than a
+# setting — four separately adjusted tripods cannot agree on a quarter turn by coincidence.
+#
+# THIS CONSTANT CLAIMS THE QUARTER TURN AND NOTHING MORE. Calibrating against a spirit level left
+# a residual of about -0.85 degrees shared by three of four units, and it is tempting to fold that
+# in and call the constant -90.85. It is not folded in: -90 is a board *layout*, exact and
+# evidenced, whereas -0.85 is the mean of three samples with no evidence a different set of boards
+# shares it. Everything below a degree is per-unit and belongs in `CameraReadings.roll_offset`,
+# where it is a measurement of one specific camera rather than an extrapolation from three. The
+# fourth unit on this rig needs -2.25 while sitting level — a sensor fault, probably from a fall —
+# which no shared constant could ever have absorbed.
+IMU_BOARD_ROLL: float = -90.0
+
+
+def orientation_from_gravity(gx: float, gy: float, gz: float) -> tuple[float, float]:
+    """Tilt and roll (degrees) of a camera, from the gravity vector in ITS OWN frame.
+
+    depthai's camera frame is x right, y down, z forward, so a level camera sees gravity at
+    ``(0, 1, 0)`` and one aimed straight up sees it at ``(0, 0, -1)``. Tilt is positive aimed
+    up, matching the `tilt` setting; roll is positive rolled toward +x.
+
+    The decomposition is **separable**: pure tilt returns roll 0 and pure roll returns tilt 0,
+    at any magnitude. That is the property worth having — it is what lets a mount error be
+    attributed to one axis or the other instead of arriving as one combined number, which is
+    exactly the ambiguity the panorama already suffers from.
+
+    Returns NaN for both if the vector has no length (a dead sensor reads all zeros, and a
+    zero-length vector has no orientation to report).
+    """
+    magnitude: float = math.sqrt(gx * gx + gy * gy + gz * gz)
+    if magnitude < 1e-6:
+        return (float('nan'), float('nan'))
+    tilt: float = math.degrees(math.atan2(-gz, math.hypot(gx, gy)))
+    roll: float = math.degrees(math.atan2(gx, gy))
+    return (tilt, roll)
+
+
+def imu_to_camera(vector: tuple[float, float, float],
+                  extrinsics: list[list[float]] | None) -> tuple[float, float, float]:
+    """Rotate a vector from the IMU's frame into a camera's.
+
+    ``extrinsics`` is the 4x4 from ``CalibrationHandler.getImuToCameraExtrinsics``; only its
+    rotation block is used, since a direction has no position. A missing or malformed matrix
+    falls through as the identity — on a board where the two frames happen to agree that is
+    right, and where they do not it is at least not silently wrong in an invented direction.
+    """
+    if not extrinsics or len(extrinsics) < 3:
+        return vector
+    try:
+        return tuple(                                       # type: ignore[return-value]
+            sum(extrinsics[row][col] * vector[col] for col in range(3))
+            for row in range(3)
+        )
+    except (IndexError, TypeError):
+        return vector
+
+
+def unroll_imu_frame(vector: tuple[float, float, float],
+                     board_roll: float = IMU_BOARD_ROLL) -> tuple[float, float, float]:
+    """Undo the IMU's mounting rotation about the optical axis.
+
+    A rotation about z, so it corrects the roll and cannot disturb the tilt — which is the reason
+    the tilt readout was already trustworthy before this existed. See ``IMU_BOARD_ROLL``.
+    """
+    # Under this matrix a rotation by `angle` maps a roll of phi to phi - angle, so the angle to
+    # apply IS the offset being removed, not its negation.
+    angle: float = math.radians(board_roll)
+    cos_a, sin_a = math.cos(angle), math.sin(angle)
+    x, y, z = vector
+    return (x * cos_a - y * sin_a, x * sin_a + y * cos_a, z)
+
+
+def log_device_calibration(device: Device, socket, device_id: str = '') -> float:
+    """Log what the unit says about its own lens, and return its spec field of view.
+
+    Two different numbers, and the gap between them is the interesting part. ``useSpec=True`` is
+    the field the board declares — a cross-check that we picked the right sensor variant, since
+    the OAK-D Pro W ships with lenses 32 degrees apart. ``useSpec=False`` is derived from the
+    calibrated intrinsics, i.e. from a pinhole model, which **cannot represent a 127 degree
+    lens**: it will disagree, and by how much is a measure of how non-pinhole the lens is. The
+    warp is not built from either — it uses the `fov` setting on an equidistant model — so these
+    are read for knowledge and never to drive geometry.
+
+    Returns NaN when the device carries no calibration, which is not an error.
+    """
+    try:
+        calibration = device.readCalibration()
+        spec_fov: float = float(calibration.getFov(socket, useSpec=True))
+        lens_fov: float = float(calibration.getFov(socket, useSpec=False))
+        model = calibration.getDistortionModel(socket)
+        logger.info(f'{device_id} lens {socket.name}: spec fov {spec_fov:.1f} deg, '
+                    f'from intrinsics {lens_fov:.1f} deg, model {model}')
+        return spec_fov
+    except Exception as exc:                        # never let diagnostics break an open
+        logger.debug(f'{device_id} could not read calibration: {exc}')
+        return float('nan')
+
+
+def imu_rotation_to_camera(device: Device, socket, device_id: str = '') -> list[list[float]] | None:
+    """The IMU-to-camera matrix for this socket, or None if the board does not relate them.
+
+    Logged rather than swallowed: whether this matrix exists decides whether the readout is
+    running on the board's own figures or on `IMU_BOARD_ROLL`, and that is worth knowing from the
+    log instead of inferring it from a suspicious roll reading — which is how the quarter turn was
+    found in the first place.
+    """
+    try:
+        matrix = device.readCalibration().getImuToCameraExtrinsics(socket)
+        rotation = [[round(value, 4) for value in row[:3]] for row in matrix[:3]]
+        logger.info(f'{device_id} IMU-to-camera rotation {rotation}')
+        return matrix
+    except Exception as exc:
+        logger.info(f'{device_id} no IMU-to-camera extrinsics ({exc}) — '
+                    f'falling back to the board constant, roll offset {IMU_BOARD_ROLL:.0f} deg')
+        return None

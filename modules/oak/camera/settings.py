@@ -7,15 +7,94 @@ from .definitions import (
     CameraResolution, Input,
 )
 from .pipeline import get_stereo_config
-from modules.settings import BaseSettings, Field, Widget
+from modules.settings import BaseSettings, Field, Group, Widget
 
 
-class CameraSettings(BaseSettings):
-    """Per-camera runtime settings. Instantiated N times via Child(count=num_cameras)."""
+class MountCheckSettings(BaseSettings):
+    """One pinned line saying whether the cameras are mounted the way the preset assumes.
 
+    The per-camera readings live on each `CameraSettings`, four groups deep in the panel, which
+    is where a readout goes to be ignored. The point of measuring is to be *told*, so this is the
+    summary: the average deviation always, and a warning when any one camera drifts past
+    `tolerance`.
+
+    Only `tolerance` is a real setting; the rest is read-only output. `Field(color=...)` is a
+    declaration-time hint and cannot change with the value, so the text carries the severity.
+    """
+    tolerance:      Field[float] = Field(2.0, min=0.5, max=10.0, step=0.5,
+                                         description="Deviation (°) a camera may have before the status line warns")
+    status:         Field[str]   = Field('mount not measured', access=Field.READ, pinned=True,
+                                         description="Mount check: average deviation, and a warning naming the worst camera")
+    tilt_deviation: Field[float] = Field(0.0, access=Field.READ,
+                                         description="Mean tilt deviation (°) over the cameras that reported")
+    roll_deviation: Field[float] = Field(0.0, access=Field.READ,
+                                         description="Mean roll (°) over the cameras that reported")
+
+
+class CameraReadings(BaseSettings):
+    """What the camera reports back about itself, and the one number that corrects it.
+
+    Nothing in the show reads any of this — it exists for whoever is setting the rig up. All of it
+    is read-only except `roll_offset`, which lives here rather than with the mount constants
+    because it is the thing you reach for while looking at the roll it corrects.
+    """
     video_fps:      Field[float] = Field(0.0, access=Field.READ, description="Video FPS", pinned=True)
     tracker_fps:    Field[float] = Field(0.0, access=Field.READ, description="Tracker updates/s")
     tracklets:      Field[int]   = Field(0, access=Field.READ, description="Active tracklets")
+    # How the camera is actually mounted, as the board reports it — NaN until measured, which is
+    # the honest default for a board with no IMU.
+    tilt_measured:  Field[float] = Field(float('nan'), access=Field.READ, description="Up-tilt (°) from the camera's own IMU — compare with `tilt`")
+    roll_measured:  Field[float] = Field(float('nan'), access=Field.READ, description="Roll (°) about the optical axis, `roll_offset` subtracted. Should be 0")
+    # No min/max: `Widget.resolve` sends a bounded float to a slider and an unbounded one to a
+    # number box, and this is typed in or filled by the zero button, never dragged.
+    roll_offset:    Field[float] = Field(0.0, description="What this camera reads when level (°). Corrects the reading, not the image")
+    fov_factory:    Field[float] = Field(float('nan'), access=Field.READ, description="Horizontal field (°) this unit declares — a check on the sensor variant")
+
+
+class ColorSensorSettings(BaseSettings):
+    """The colour sensor's exposure, balance and image controls. Inert on a mono camera."""
+    exposure:       Field[int]  = Field(EXPOSURE_RANGE[0], min=EXPOSURE_RANGE[0], max=EXPOSURE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Exposure (µs)", newline=True)
+    iso:            Field[int]  = Field(ISO_RANGE[0], min=ISO_RANGE[0], max=ISO_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="ISO")
+    auto_exposure:  Field[bool] = Field(True, widget=Widget.switch, description="Auto exposure")
+    balance:        Field[int]  = Field(BALANCE_RANGE[0], min=BALANCE_RANGE[0], max=BALANCE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="White balance", newline=True)
+    auto_balance:   Field[bool] = Field(True, widget=Widget.switch, description="Auto white balance")
+    brightness:     Field[int]  = Field(0, min=BRIGHTNESS_RANGE[0], max=BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Brightness", newline=True)
+    contrast:       Field[int]  = Field(0, min=CONTRAST_RANGE[0], max=CONTRAST_RANGE[1], widget=Widget.slider, description="Contrast")
+    saturation:     Field[int]  = Field(0, min=SATURATION_RANGE[0], max=SATURATION_RANGE[1], widget=Widget.slider, description="Saturation")
+    denoise:        Field[int]  = Field(0, min=LUMA_DENOISE_RANGE[0], max=LUMA_DENOISE_RANGE[1], widget=Widget.slider, description="Luma denoise")
+    sharpness:      Field[int]  = Field(0, min=SHARPNESS_RANGE[0], max=SHARPNESS_RANGE[1], widget=Widget.slider, description="Sharpness")
+
+
+class MonoSensorSettings(BaseSettings):
+    """The mono sensor's exposure, and the IR illumination that goes with it — the flood lamp and
+    the dot projector are only ever used by a mono camera, and are ignored on a colour one."""
+    exposure:       Field[int]   = Field(EXPOSURE_RANGE[0], min=EXPOSURE_RANGE[0], max=EXPOSURE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Mono exposure (µs)", newline=True)
+    iso:            Field[int]   = Field(ISO_RANGE[0], min=ISO_RANGE[0], max=ISO_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Mono ISO")
+    auto_exposure:  Field[bool]  = Field(True, widget=Widget.switch, description="Mono auto exposure")
+    ir_grid_light:  Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR dot projector", newline=True)
+    ir_flood_light: Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
+
+
+class DepthSettings(BaseSettings):
+    """The stereo depth pair. Unused by every installation so far — no app consumes a depth
+    frame, and every preset runs `stereo = false` — so this is kept collapsed and out of the way
+    rather than deleted, in case a future rig wants the pair."""
+    show:           Field[bool] = Field(False, access=Field.INIT, description="Show the stereo depth visualization")
+    depth_min:      Field[int]  = Field(STEREO_DEPTH_RANGE[0], min=STEREO_DEPTH_RANGE[0], max=STEREO_DEPTH_RANGE[1], widget=Widget.slider, description="Depth min (mm)", newline=True)
+    depth_max:      Field[int]  = Field(STEREO_DEPTH_RANGE[1], min=STEREO_DEPTH_RANGE[0], max=STEREO_DEPTH_RANGE[1], widget=Widget.slider, description="Depth max (mm)")
+    median_filter:  Field[StereoMedianFilterType] = Field(StereoMedianFilterType.OFF, widget=Widget.select, description="Stereo median filter")
+    bright_min:     Field[int]  = Field(0, min=STEREO_BRIGHTNESS_RANGE[0], max=STEREO_BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Stereo brightness min", newline=True)
+    bright_max:     Field[int]  = Field(STEREO_BRIGHTNESS_RANGE[1], min=STEREO_BRIGHTNESS_RANGE[0], max=STEREO_BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Stereo brightness max")
+
+
+class CameraSettings(BaseSettings):
+    """Per-camera runtime settings. Instantiated N times via Child(count=num_cameras).
+
+    The tunables live in four subgroups — `readings`, `color_sensor`, `mono_sensor`, `depth` —
+    because forty flat fields in one panel is not something anyone reads. What stays at this level
+    is what shapes the pipeline (`color`, `square`, `stereo`, `yolo`, `resolution`) or describes
+    the mount (`flip_*`, `tilt`, `keystone`, `fov`), which are the fields a person actually sets.
+    """
 
     # Initial settings
     device_id:      Field[str]   = Field("", access=Field.INIT, description="Camera device ID (MxID)")
@@ -24,44 +103,28 @@ class CameraSettings(BaseSettings):
     square:         Field[bool]  = Field(True, access=Field.INIT)
     stereo:         Field[bool]  = Field(False, access=Field.INIT)
     yolo:           Field[bool]  = Field(True, access=Field.INIT)
-    resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode. P720 and P800 on both sensors, P1080 colour only — a mono camera asked for P1080 falls back to P800 and says so.")
+    resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode. P1080 is colour only; mono falls back to P800")
     model_path:     Field[str]   = Field("data/models", access=Field.INIT)
-    show_stereo:    Field[bool]  = Field(False, access=Field.INIT, description="Show stereo visualization")
     flip_h:         Field[bool]  = Field(False, access=Field.INIT, description="Flip horizontal")
     flip_v:         Field[bool]  = Field(False, access=Field.INIT, description="Flip vertical")
     tilt:           Field[float] = Field(0.0, access=Field.INIT,
-                                         description="Camera up-tilt (degrees), positive = aimed upward. Re-aims the camera so a column reads as one azimuth; costs the frame edges. Exclusive with keystone.")
+                                         description="Camera up-tilt (°), positive = aimed up. Exclusive with keystone")
     keystone:       Field[float] = Field(0.0, access=Field.INIT,
-                                         description="Keystone (fraction of frame). Squares up a person seen from a tilted camera while keeping the whole frame. Exclusive with tilt.")
+                                         description="Keystone (fraction of frame). Exclusive with tilt")
     # Relayed down from the camera group so the warp can turn `tilt` into pixels.
     fov:            Field[float] = Field(127.0, access=Field.INIT,
-                                         description="Camera horizontal FOV (°) of the full sensor readout.")
+                                         description="Camera horizontal FOV (°) of the full sensor readout")
 
-    # --- Color controls ---
-    color_exposure:     Field[int]  = Field(EXPOSURE_RANGE[0], min=EXPOSURE_RANGE[0], max=EXPOSURE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Exposure (µs)", newline=True)
-    color_iso:          Field[int]  = Field(ISO_RANGE[0], min=ISO_RANGE[0], max=ISO_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="ISO")
-    color_auto_exposure:Field[bool] = Field(True, widget=Widget.switch, description="Auto exposure")
-    color_balance:      Field[int]  = Field(BALANCE_RANGE[0], min=BALANCE_RANGE[0], max=BALANCE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="White balance", newline=True)
-    color_auto_balance: Field[bool] = Field(True, widget=Widget.switch, description="Auto white balance")
-    color_brightness:   Field[int]  = Field(0, min=BRIGHTNESS_RANGE[0], max=BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Brightness", newline=True)
-    color_contrast:     Field[int]  = Field(0, min=CONTRAST_RANGE[0], max=CONTRAST_RANGE[1], widget=Widget.slider, description="Contrast")
-    color_saturation:   Field[int]  = Field(0, min=SATURATION_RANGE[0], max=SATURATION_RANGE[1], widget=Widget.slider, description="Saturation")
-    color_denoise:      Field[int]  = Field(0, min=LUMA_DENOISE_RANGE[0], max=LUMA_DENOISE_RANGE[1], widget=Widget.slider, description="Luma denoise")
-    color_sharpness:    Field[int]  = Field(0, min=SHARPNESS_RANGE[0], max=SHARPNESS_RANGE[1], widget=Widget.slider, description="Sharpness")
+    # Two values arrive shared from the camera group and are relayed one level further into
+    # `mono_sensor`, so the panel shows them where the rest of the mono controls are rather than
+    # stranded at this level. Invisible here: they are plumbing, not a second copy to set.
+    mono_auto_exposure: Field[bool]  = Field(True, visible=False, description="Relayed to mono_sensor.auto_exposure")
+    ir_flood_light:     Field[float] = Field(0.0, min=0.0, max=1.0, visible=False, description="Relayed to mono_sensor.ir_flood_light")
 
-    # --- Mono controls ---
-    mono_exposure:      Field[int]  = Field(EXPOSURE_RANGE[0], min=EXPOSURE_RANGE[0], max=EXPOSURE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Mono exposure (µs)", newline=True)
-    mono_iso:           Field[int]  = Field(ISO_RANGE[0], min=ISO_RANGE[0], max=ISO_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Mono ISO")
-    mono_auto_exposure: Field[bool] = Field(True, widget=Widget.switch, description="Mono auto exposure")
-    ir_grid_light:      Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR grid projector")
-    ir_flood_light:     Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
-
-    # --- Stereo controls ---
-    stereo_depth_min:       Field[int]  = Field(STEREO_DEPTH_RANGE[0], min=STEREO_DEPTH_RANGE[0], max=STEREO_DEPTH_RANGE[1], widget=Widget.slider, description="Depth min (mm)", newline=True)
-    stereo_depth_max:       Field[int]  = Field(STEREO_DEPTH_RANGE[1], min=STEREO_DEPTH_RANGE[0], max=STEREO_DEPTH_RANGE[1], widget=Widget.slider, description="Depth max (mm)")
-    stereo_median_filter:   Field[StereoMedianFilterType] = Field(StereoMedianFilterType.OFF, widget=Widget.select, description="Stereo median filter")
-    stereo_bright_min:      Field[int]  = Field(0, min=STEREO_BRIGHTNESS_RANGE[0], max=STEREO_BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Stereo brightness min", newline=True)
-    stereo_bright_max:      Field[int]  = Field(STEREO_BRIGHTNESS_RANGE[1], min=STEREO_BRIGHTNESS_RANGE[0], max=STEREO_BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Stereo brightness max")
+    readings:     Group[CameraReadings]     = Group(CameraReadings)
+    color_sensor: Group[ColorSensorSettings] = Group(ColorSensorSettings)
+    mono_sensor:  Group[MonoSensorSettings]  = Group(MonoSensorSettings, share=[mono_auto_exposure.as_('auto_exposure'), ir_flood_light])
+    depth:        Group[DepthSettings]       = Group(DepthSettings)
 
     # ── Hardware connection ────────────────────────────────────────────
 
@@ -82,75 +145,75 @@ class CameraSettings(BaseSettings):
 
     def _bind(self) -> None:
         # Color controls
-        self.bind(CameraSettings.color_auto_exposure, self._on_color_auto_exposure)
-        self.bind(CameraSettings.color_exposure, self._on_color_exposure)
-        self.bind(CameraSettings.color_iso, self._on_color_iso)
-        self.bind(CameraSettings.color_auto_balance, self._on_color_auto_balance)
-        self.bind(CameraSettings.color_balance, self._on_color_balance)
-        self.bind(CameraSettings.color_brightness, self._on_color_brightness)
-        self.bind(CameraSettings.color_contrast, self._on_color_contrast)
-        self.bind(CameraSettings.color_saturation, self._on_color_saturation)
-        self.bind(CameraSettings.color_denoise, self._on_color_luma_denoise)
-        self.bind(CameraSettings.color_sharpness, self._on_color_sharpness)
+        self.color_sensor.bind(ColorSensorSettings.auto_exposure, self._on_color_auto_exposure)
+        self.color_sensor.bind(ColorSensorSettings.exposure, self._on_color_exposure)
+        self.color_sensor.bind(ColorSensorSettings.iso, self._on_color_iso)
+        self.color_sensor.bind(ColorSensorSettings.auto_balance, self._on_color_auto_balance)
+        self.color_sensor.bind(ColorSensorSettings.balance, self._on_color_balance)
+        self.color_sensor.bind(ColorSensorSettings.brightness, self._on_color_brightness)
+        self.color_sensor.bind(ColorSensorSettings.contrast, self._on_color_contrast)
+        self.color_sensor.bind(ColorSensorSettings.saturation, self._on_color_saturation)
+        self.color_sensor.bind(ColorSensorSettings.denoise, self._on_color_luma_denoise)
+        self.color_sensor.bind(ColorSensorSettings.sharpness, self._on_color_sharpness)
 
         # Mono controls
-        self.bind(CameraSettings.mono_auto_exposure, self._on_mono_auto_exposure)
-        self.bind(CameraSettings.mono_exposure, self._on_mono_exposure)
-        self.bind(CameraSettings.mono_iso, self._on_mono_iso)
+        self.mono_sensor.bind(MonoSensorSettings.auto_exposure, self._on_mono_auto_exposure)
+        self.mono_sensor.bind(MonoSensorSettings.exposure, self._on_mono_exposure)
+        self.mono_sensor.bind(MonoSensorSettings.iso, self._on_mono_iso)
 
         # IR controls
-        self.bind(CameraSettings.ir_flood_light, self._on_ir_flood_light)
-        self.bind(CameraSettings.ir_grid_light, self._on_ir_grid_light)
+        self.mono_sensor.bind(MonoSensorSettings.ir_flood_light, self._on_ir_flood_light)
+        self.mono_sensor.bind(MonoSensorSettings.ir_grid_light, self._on_ir_grid_light)
 
         # Stereo controls
-        self.bind(CameraSettings.stereo_depth_min, self._on_stereo_config)
-        self.bind(CameraSettings.stereo_depth_max, self._on_stereo_config)
-        self.bind(CameraSettings.stereo_bright_min, self._on_stereo_config)
-        self.bind(CameraSettings.stereo_bright_max, self._on_stereo_config)
-        self.bind(CameraSettings.stereo_median_filter, self._on_stereo_config)
+        self.depth.bind(DepthSettings.depth_min, self._on_stereo_config)
+        self.depth.bind(DepthSettings.depth_max, self._on_stereo_config)
+        self.depth.bind(DepthSettings.bright_min, self._on_stereo_config)
+        self.depth.bind(DepthSettings.bright_max, self._on_stereo_config)
+        self.depth.bind(DepthSettings.median_filter, self._on_stereo_config)
 
     def _unbind(self) -> None:
-        self.unbind(CameraSettings.color_auto_exposure, self._on_color_auto_exposure)
-        self.unbind(CameraSettings.color_exposure, self._on_color_exposure)
-        self.unbind(CameraSettings.color_iso, self._on_color_iso)
-        self.unbind(CameraSettings.color_auto_balance, self._on_color_auto_balance)
-        self.unbind(CameraSettings.color_balance, self._on_color_balance)
-        self.unbind(CameraSettings.color_brightness, self._on_color_brightness)
-        self.unbind(CameraSettings.color_contrast, self._on_color_contrast)
-        self.unbind(CameraSettings.color_saturation, self._on_color_saturation)
-        self.unbind(CameraSettings.color_denoise, self._on_color_luma_denoise)
-        self.unbind(CameraSettings.color_sharpness, self._on_color_sharpness)
-        self.unbind(CameraSettings.mono_auto_exposure, self._on_mono_auto_exposure)
-        self.unbind(CameraSettings.mono_exposure, self._on_mono_exposure)
-        self.unbind(CameraSettings.mono_iso, self._on_mono_iso)
-        self.unbind(CameraSettings.ir_flood_light, self._on_ir_flood_light)
-        self.unbind(CameraSettings.ir_grid_light, self._on_ir_grid_light)
-        self.unbind(CameraSettings.stereo_depth_min, self._on_stereo_config)
-        self.unbind(CameraSettings.stereo_depth_max, self._on_stereo_config)
-        self.unbind(CameraSettings.stereo_bright_min, self._on_stereo_config)
-        self.unbind(CameraSettings.stereo_bright_max, self._on_stereo_config)
-        self.unbind(CameraSettings.stereo_median_filter, self._on_stereo_config)
+        self.color_sensor.unbind(ColorSensorSettings.auto_exposure, self._on_color_auto_exposure)
+        self.color_sensor.unbind(ColorSensorSettings.exposure, self._on_color_exposure)
+        self.color_sensor.unbind(ColorSensorSettings.iso, self._on_color_iso)
+        self.color_sensor.unbind(ColorSensorSettings.auto_balance, self._on_color_auto_balance)
+        self.color_sensor.unbind(ColorSensorSettings.balance, self._on_color_balance)
+        self.color_sensor.unbind(ColorSensorSettings.brightness, self._on_color_brightness)
+        self.color_sensor.unbind(ColorSensorSettings.contrast, self._on_color_contrast)
+        self.color_sensor.unbind(ColorSensorSettings.saturation, self._on_color_saturation)
+        self.color_sensor.unbind(ColorSensorSettings.denoise, self._on_color_luma_denoise)
+        self.color_sensor.unbind(ColorSensorSettings.sharpness, self._on_color_sharpness)
+        self.mono_sensor.unbind(MonoSensorSettings.auto_exposure, self._on_mono_auto_exposure)
+        self.mono_sensor.unbind(MonoSensorSettings.exposure, self._on_mono_exposure)
+        self.mono_sensor.unbind(MonoSensorSettings.iso, self._on_mono_iso)
+        self.mono_sensor.unbind(MonoSensorSettings.ir_flood_light, self._on_ir_flood_light)
+        self.mono_sensor.unbind(MonoSensorSettings.ir_grid_light, self._on_ir_grid_light)
+        self.depth.unbind(DepthSettings.depth_min, self._on_stereo_config)
+        self.depth.unbind(DepthSettings.depth_max, self._on_stereo_config)
+        self.depth.unbind(DepthSettings.bright_min, self._on_stereo_config)
+        self.depth.unbind(DepthSettings.bright_max, self._on_stereo_config)
+        self.depth.unbind(DepthSettings.median_filter, self._on_stereo_config)
 
     def _apply(self) -> None:
         """Push all current field values to hardware (called once after open)."""
-        self._on_color_auto_exposure(self.color_auto_exposure)
-        if not self.color_auto_exposure:
-            self._send_color_exposure_iso(self.color_exposure, self.color_iso)
-        self._on_color_auto_balance(self.color_auto_balance)
-        if not self.color_auto_balance:
-            self._on_color_balance(self.color_balance)
-        self._on_color_brightness(self.color_brightness)
-        self._on_color_contrast(self.color_contrast)
-        self._on_color_saturation(self.color_saturation)
-        self._on_color_luma_denoise(self.color_denoise)
-        self._on_color_sharpness(self.color_sharpness)
-        self._on_mono_auto_exposure(self.mono_auto_exposure)
-        if not self.mono_auto_exposure:
-            self._send_mono_exposure_iso(self.mono_exposure, self.mono_iso)
+        self._on_color_auto_exposure(self.color_sensor.auto_exposure)
+        if not self.color_sensor.auto_exposure:
+            self._send_color_exposure_iso(self.color_sensor.exposure, self.color_sensor.iso)
+        self._on_color_auto_balance(self.color_sensor.auto_balance)
+        if not self.color_sensor.auto_balance:
+            self._on_color_balance(self.color_sensor.balance)
+        self._on_color_brightness(self.color_sensor.brightness)
+        self._on_color_contrast(self.color_sensor.contrast)
+        self._on_color_saturation(self.color_sensor.saturation)
+        self._on_color_luma_denoise(self.color_sensor.denoise)
+        self._on_color_sharpness(self.color_sensor.sharpness)
+        self._on_mono_auto_exposure(self.mono_sensor.auto_exposure)
+        if not self.mono_sensor.auto_exposure:
+            self._send_mono_exposure_iso(self.mono_sensor.exposure, self.mono_sensor.iso)
         self._on_stereo_config()
         if not self._do_color:
-            self._on_ir_flood_light(self.ir_flood_light)
-            self._on_ir_grid_light(self.ir_grid_light)
+            self._on_ir_flood_light(self.mono_sensor.ir_flood_light)
+            self._on_ir_grid_light(self.mono_sensor.ir_grid_light)
 
     # ── Helpers ────────────────────────────────────────────────────────
 
@@ -164,12 +227,12 @@ class CameraSettings(BaseSettings):
 
     def _on_color_auto_exposure(self, value=None) -> None:
         if self._device is None: return
-        if self.color_auto_exposure:
+        if self.color_sensor.auto_exposure:
             ctrl = dai.CameraControl()
             ctrl.setAutoExposureEnable()
             self._send_control(Input.COLOR_CONTROL, ctrl)
         else:
-            self._send_color_exposure_iso(self.color_exposure, self.color_iso)
+            self._send_color_exposure_iso(self.color_sensor.exposure, self.color_sensor.iso)
 
     def _send_color_exposure_iso(self, exposure: int, iso: int) -> None:
         if self._device is None: return
@@ -178,68 +241,68 @@ class CameraSettings(BaseSettings):
         self._send_control(Input.COLOR_CONTROL, ctrl)
 
     def _on_color_exposure(self, value: int = 0) -> None:
-        if not self.color_auto_exposure:
-            self._send_color_exposure_iso(self.color_exposure, self.color_iso)
+        if not self.color_sensor.auto_exposure:
+            self._send_color_exposure_iso(self.color_sensor.exposure, self.color_sensor.iso)
 
     def _on_color_iso(self, value: int = 0) -> None:
-        if not self.color_auto_exposure:
-            self._send_color_exposure_iso(self.color_exposure, self.color_iso)
+        if not self.color_sensor.auto_exposure:
+            self._send_color_exposure_iso(self.color_sensor.exposure, self.color_sensor.iso)
 
     def _on_color_auto_balance(self, value=None) -> None:
         if self._device is None: return
-        if self.color_auto_balance:
+        if self.color_sensor.auto_balance:
             ctrl = dai.CameraControl()
             ctrl.setAutoWhiteBalanceMode(dai.CameraControl.AutoWhiteBalanceMode.AUTO)
             self._send_control(Input.COLOR_CONTROL, ctrl)
         else:
-            self._on_color_balance(self.color_balance)
+            self._on_color_balance(self.color_sensor.balance)
 
     def _on_color_balance(self, value: int = 0) -> None:
-        if self._device is None or self.color_auto_balance: return
+        if self._device is None or self.color_sensor.auto_balance: return
         ctrl = dai.CameraControl()
-        ctrl.setManualWhiteBalance(self.color_balance)
+        ctrl.setManualWhiteBalance(self.color_sensor.balance)
         self._send_control(Input.COLOR_CONTROL, ctrl)
 
     def _on_color_brightness(self, value: int = 0) -> None:
         if self._device is None: return
         ctrl = dai.CameraControl()
-        ctrl.setBrightness(self.color_brightness)
+        ctrl.setBrightness(self.color_sensor.brightness)
         self._send_control(Input.COLOR_CONTROL, ctrl)
 
     def _on_color_contrast(self, value: int = 0) -> None:
         if self._device is None: return
         ctrl = dai.CameraControl()
-        ctrl.setContrast(self.color_contrast)
+        ctrl.setContrast(self.color_sensor.contrast)
         self._send_control(Input.COLOR_CONTROL, ctrl)
 
     def _on_color_saturation(self, value: int = 0) -> None:
         if self._device is None: return
         ctrl = dai.CameraControl()
-        ctrl.setSaturation(self.color_saturation)
+        ctrl.setSaturation(self.color_sensor.saturation)
         self._send_control(Input.COLOR_CONTROL, ctrl)
 
     def _on_color_luma_denoise(self, value: int = 0) -> None:
         if self._device is None: return
         ctrl = dai.CameraControl()
-        ctrl.setLumaDenoise(self.color_denoise)
+        ctrl.setLumaDenoise(self.color_sensor.denoise)
         self._send_control(Input.COLOR_CONTROL, ctrl)
 
     def _on_color_sharpness(self, value: int = 0) -> None:
         if self._device is None: return
         ctrl = dai.CameraControl()
-        ctrl.setSharpness(self.color_sharpness)
+        ctrl.setSharpness(self.color_sensor.sharpness)
         self._send_control(Input.COLOR_CONTROL, ctrl)
 
     # ── Mono callbacks ────────────────────────────────────────────────
 
     def _on_mono_auto_exposure(self, value=None) -> None:
         if self._device is None: return
-        if self.mono_auto_exposure:
+        if self.mono_sensor.auto_exposure:
             ctrl = dai.CameraControl()
             ctrl.setAutoExposureEnable()
             self._send_control(Input.MONO_CONTROL, ctrl)
         else:
-            self._send_mono_exposure_iso(self.mono_exposure, self.mono_iso)
+            self._send_mono_exposure_iso(self.mono_sensor.exposure, self.mono_sensor.iso)
 
     def _send_mono_exposure_iso(self, exposure: int, iso: int) -> None:
         if self._device is None: return
@@ -248,32 +311,32 @@ class CameraSettings(BaseSettings):
         self._send_control(Input.MONO_CONTROL, ctrl)
 
     def _on_mono_exposure(self, value: int = 0) -> None:
-        if not self.mono_auto_exposure:
-            self._send_mono_exposure_iso(self.mono_exposure, self.mono_iso)
+        if not self.mono_sensor.auto_exposure:
+            self._send_mono_exposure_iso(self.mono_sensor.exposure, self.mono_sensor.iso)
 
     def _on_mono_iso(self, value: int = 0) -> None:
-        if not self.mono_auto_exposure:
-            self._send_mono_exposure_iso(self.mono_exposure, self.mono_iso)
+        if not self.mono_sensor.auto_exposure:
+            self._send_mono_exposure_iso(self.mono_sensor.exposure, self.mono_sensor.iso)
 
     # ── IR callbacks ──────────────────────────────────────────────────
 
     def _on_ir_flood_light(self, value: float = 0.0) -> None:
         if self._device is None or self._do_color: return
-        self._device.setIrFloodLightIntensity(self.ir_flood_light)
+        self._device.setIrFloodLightIntensity(self.mono_sensor.ir_flood_light)
 
     def _on_ir_grid_light(self, value: float = 0.0) -> None:
         if self._device is None or self._do_color: return
-        self._device.setIrLaserDotProjectorIntensity(self.ir_grid_light)
+        self._device.setIrLaserDotProjectorIntensity(self.mono_sensor.ir_grid_light)
 
     # ── Stereo callback ───────────────────────────────────────────────
 
     def _on_stereo_config(self, value=None) -> None:
         if self._device is None: return
-        self._stereo_config.postProcessing.thresholdFilter.minRange = self.stereo_depth_min
-        self._stereo_config.postProcessing.thresholdFilter.maxRange = self.stereo_depth_max
-        self._stereo_config.postProcessing.brightnessFilter.minBrightness = self.stereo_bright_min
-        self._stereo_config.postProcessing.brightnessFilter.maxBrightness = self.stereo_bright_max
-        mf = self.stereo_median_filter
+        self._stereo_config.postProcessing.thresholdFilter.minRange = self.depth.depth_min
+        self._stereo_config.postProcessing.thresholdFilter.maxRange = self.depth.depth_max
+        self._stereo_config.postProcessing.brightnessFilter.minBrightness = self.depth.bright_min
+        self._stereo_config.postProcessing.brightnessFilter.maxBrightness = self.depth.bright_max
+        mf = self.depth.median_filter
         if mf == StereoMedianFilterType.OFF:
             self._stereo_config.postProcessing.median = dai.MedianFilter.MEDIAN_OFF
         elif mf == StereoMedianFilterType.KERNEL_3x3:
@@ -287,16 +350,16 @@ class CameraSettings(BaseSettings):
     # ── Readback (called by Core from camera frames) ──────────────────
 
     def update_color_readback(self, frame: dai.ImgFrame) -> None:
-        if self.color_auto_exposure:
-            self.color_exposure = int(frame.getExposureTime().total_seconds() * 1000000)
-            self.color_iso = frame.getSensitivity()
-        if self.color_auto_balance:
-            self.color_balance = frame.getColorTemperature()
+        if self.color_sensor.auto_exposure:
+            self.color_sensor.exposure = int(frame.getExposureTime().total_seconds() * 1000000)
+            self.color_sensor.iso = frame.getSensitivity()
+        if self.color_sensor.auto_balance:
+            self.color_sensor.balance = frame.getColorTemperature()
 
     def update_mono_readback(self, frame: dai.ImgFrame) -> None:
-        if self.mono_auto_exposure:
-            self.mono_exposure = int(frame.getExposureTime().total_seconds() * 1000000)
-            self.mono_iso = frame.getSensitivity()
+        if self.mono_sensor.auto_exposure:
+            self.mono_sensor.exposure = int(frame.getExposureTime().total_seconds() * 1000000)
+            self.mono_sensor.iso = frame.getSensitivity()
 
 
 

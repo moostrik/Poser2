@@ -19,7 +19,7 @@ class SeamSettings(BaseSettings):
     max_height_diff: Field[float] = Field(0.15, min=0.0, max=0.5, step=0.01,
                                           description="Maximum ROI height difference for matching two observations.")
     relink_angle: Field[float] = Field(5.0, min=0.0, max=20.0, step=0.5,
-                                       description="How far (°) a new observation may be from a lost one in the SAME camera and still be judged the same person. The device tracker has no appearance model, so a person it drops and re-acquires arrives under a new id; this is what keeps their identity. Small: two people standing closer than this could be confused.")
+                                       description="How far (°) a re-acquired person may be from the lost one and still be them")
     angles: Group[SeamAngles] = Group(SeamAngles)
 
 
@@ -37,24 +37,24 @@ class ParallaxSettings(BaseSettings):
     the correction is disabled (identity).
     """
     ring_radius: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01,
-                                      description="Camera distance from rig centre (m), measured. 0 disables parallax correction.")
+                                      description="Camera distance from rig centre (m), measured. 0 disables the correction")
     camera_height: Field[float] = Field(0.5, min=0.1, max=3.0, step=0.01,
-                                        description="Lens height above the floor (m), measured. The only constant the distance estimate needs — nothing about the person enters it.")
+                                        description="Lens height above the floor (m), measured")
     vfov: Field[float] = Field(79.5, access=Field.READ,
-                              description="Vertical field (°) of the detection frame, for the distance estimate. Derived from the camera's horizontal FOV and the frame's shape, so it follows every resolution and crop change on its own.")
+                              description="Vertical field (°) of the frame, derived from fov and resolution")
 
 
 class TrackerSettings(BaseSettings):
     fov: Field[float] = Field(110.0, access=Field.INIT)
     resolution: Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT,
-                                                description="Sensor mode, shared from the camera group. Only the frame's shape is used, to derive the vertical field.")
+                                                description="Sensor mode, shared — only the frame shape is used, for the vertical field")
     min_age: Field[int] = Field(5, min=0, max=9, step=1,
                                 description="Minimum age in frames before a tracklet is considered.")
     min_height: Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05,
                                      description="Minimum ROI height to accept a tracklet.")
     timeout: Field[float] = Field(2.0, min=1.0, max=5.0, step=0.1,
-                                  description="Seconds a lost observation keeps anchoring before it is retired. It must outlast a seam crossing: the far camera has to pick a person up before the near one's observation is gone.")
+                                  description="Seconds a lost observation keeps anchoring — must outlast a seam crossing")
     emit_hold: Field[float] = Field(0.3, min=0.0, max=2.0, step=0.05,
-                                    description="Seconds a world keeps being emitted after its last detection. Shorter than `timeout` on purpose: a person who walks out should stop driving the light and the sound long before their observation stops anchoring.")
+                                    description="Seconds a world keeps being emitted after its last detection")
     seam: Group[SeamSettings] = Group(SeamSettings)
     parallax: Group[ParallaxSettings] = Group(ParallaxSettings)

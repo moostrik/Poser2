@@ -17,7 +17,7 @@ from .definitions import (
     DEPTH_TRACKER_BOX_SCALE, DEPTH_TRACKER_LOCATION,
     DEPTH_TRACKER_MIN_DEPTH, DEPTH_TRACKER_MAX_DEPTH,
     CameraResolution, mono_mode, color_mode, mono_frame_size, color_frame_size,
-    WARP_MESH, equirect_mesh_points,
+    WARP_MESH, equirect_mesh_points, IMU_RATE_HZ,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,6 +57,29 @@ def get_stereo_config(do_color: bool) -> dai.RawStereoDepthConfig:
     else:
         stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT
     return stereoConfig
+
+def add_imu_node(pipeline: dai.Pipeline) -> dai.node.IMU:
+    """A slow accelerometer feed, so the camera can report how it is actually mounted.
+
+    `ACCELEROMETER_RAW` rather than `GRAVITY`: gravity is a fused output that needs the IMU's own
+    DSP, which the BNO086 boards have and the raw BMI270 ones do not. A camera on a tripod is
+    static, so the raw accelerometer *is* the gravity vector once it is averaged, and this works
+    on every board.
+
+    A few hertz is plenty — nothing in the show reads this, it exists for whoever is aiming the
+    cameras. The node is created unconditionally; a board without an IMU simply never sends, and
+    `Camera._setup_queues` only subscribes when `getConnectedIMU` names a sensor.
+    """
+    imu: dai.node.IMU = pipeline.create(dai.node.IMU)
+    imu.enableIMUSensor(dai.IMUSensor.ACCELEROMETER_RAW, IMU_RATE_HZ)
+    imu.setBatchReportThreshold(1)
+    imu.setMaxBatchReports(10)
+
+    imu_out: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+    imu_out.setStreamName('imu')
+    imu.out.link(imu_out.input)
+    return imu
+
 
 def get_model_path(model_path: str, square: bool, stereo: bool, simulate: bool) -> Path:
     if square:
@@ -197,6 +220,8 @@ class SetupColor(Setup):
         self.color_control: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.color_control.setStreamName('color_control')
         self.color_control.out.link(self.color.inputControl)
+
+        self.imu: dai.node.IMU = add_imu_node(pipeline)
 
 class SetupColorYolo(SetupColor):
     def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution, square: bool, mount: WarpConfig, nn_path: Path) -> None:
@@ -379,6 +404,8 @@ class SetupMono(Setup):
         self.mono_control.setStreamName('mono_control')
         self.mono_control.out.link(self.left.inputControl)
 
+        self.imu: dai.node.IMU = add_imu_node(pipeline)
+
 class SetupMonoYolo(SetupMono):
     def __init__(self, pipeline : dai.Pipeline, fps: float, resolution: CameraResolution,
                  square: bool, mount: WarpConfig, nn_path: Path) -> None:
@@ -511,6 +538,9 @@ class SimulationColor(SetupColor):
         super().__init__(pipeline, fps, resolution, square, mount)
 
         pipeline.remove(self.color)
+        # Simulation still runs on a real device, so its IMU would report the orientation
+        # of a box on a bench — nothing to do with the recording. Better absent than wrong.
+        pipeline.remove(self.imu)
 
         self.ex_video: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_video.setStreamName("ex_video")
@@ -529,6 +559,9 @@ class SimulationColorYolo(SetupColorYolo):
         super().__init__(pipeline, fps, resolution, square, mount, nn_path)
 
         pipeline.remove(self.color)
+        # Simulation still runs on a real device, so its IMU would report the orientation
+        # of a box on a bench — nothing to do with the recording. Better absent than wrong.
+        pipeline.remove(self.imu)
 
         self.ex_video: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_video.setStreamName("ex_video")
@@ -642,6 +675,9 @@ class SimulationMono(SetupMono):
 
         pipeline.remove(self.left)
         pipeline.remove(self.mono_control)
+        # Simulation still runs on a real device, so its IMU would report the orientation
+        # of a box on a bench — nothing to do with the recording. Better absent than wrong.
+        pipeline.remove(self.imu)
 
         self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_left.setStreamName("ex_video")
@@ -660,6 +696,9 @@ class SimulationMonoYolo(SetupMonoYolo):
 
         pipeline.remove(self.left)
         pipeline.remove(self.mono_control)
+        # Simulation still runs on a real device, so its IMU would report the orientation
+        # of a box on a bench — nothing to do with the recording. Better absent than wrong.
+        pipeline.remove(self.imu)
 
         self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_left.setStreamName("ex_video")

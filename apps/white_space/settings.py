@@ -12,7 +12,7 @@ The root class is ``Settings``.
 from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
-from modules.oak import CameraSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.oak import CameraSettings, CameraResolution, MountCheckSettings, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
 from modules.render.layers import LayerMode
 from modules.inout import OscSoundSettings, OscReceiverSettings
@@ -69,19 +69,19 @@ class Layers(IntEnum):
 # ---------------------------------------------------------------------------
 
 class OakGroup(BaseSettings):
-    fov               : Field[float]           = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-D Pro W, OV9282 mono, 1280x800 native. Quoted for the full sensor width; the vertical field is derived from it.")
+    fov               : Field[float]           = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°), quoted for the full sensor width")
     num_cameras       : Field[int]             = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     fps               : Field[float]           = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
     yolo              : Field[bool]            = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color             : Field[bool]            = Field(False, access=Field.INIT, description="Color camera (False = mono)")
     square            : Field[bool]            = Field(True, access=Field.INIT, description="Use square aspect ratio")
     stereo            : Field[bool]            = Field(False, access=Field.INIT, description="Enable stereo mode")
-    resolution        : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode, all four cameras. P800 is the OV9282 W's full readout; P720 is a pure vertical crop of it, which is what a 720-row recording needs for the whole chain to derive correctly.")
+    resolution        : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode, all four cameras. P800 is the full readout, P720 a vertical crop")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, description="Model files directory")
     ir_flood_light    : Field[float]           = Field(0.8, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
     tilt              : Field[float]           = Field(0.0, access=Field.INIT, description="Camera up-tilt (degrees), positive = aimed upward, the same for all four cameras. Baked into the warp when the devices open.")
-    mono_auto_exposure: Field[bool]            = Field(True, widget=Widget.switch, description="Mono auto exposure, all four cameras. Off: each camera keeps its own manual exposure and ISO.")
+    mono_auto_exposure: Field[bool]            = Field(True, widget=Widget.switch, description="Mono auto exposure, all four cameras")
 
     _cam_share: list = [fps, color, square, stereo, yolo, resolution, model_path, ir_flood_light, fov, tilt, mono_auto_exposure]
 
@@ -89,6 +89,7 @@ class OakGroup(BaseSettings):
     cam_1     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_2     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_3     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
+    mount     : Group[MountCheckSettings]        = Group(MountCheckSettings)
     simulator : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cameras, fps])
     tracker   : Group[PanoramicTrackerSettings]  = Group(PanoramicTrackerSettings, share=[fov, resolution])
     frame_sync: Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
@@ -333,9 +334,9 @@ class Settings(BaseSettings):
     input_fps       : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     render_fps      : Field[float] = Field(30.0)
     light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="LED strip resolution (pixels)")
-    fov             : Field[float] = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-D Pro W, OV9282 mono, 1280x800 native. A lens constant, baked into the warp at device open; shared to the tracker and composition, and the vertical field derives from it.")
-    resolution      : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode for all cameras. Shared into the camera group and into the render, which needs the frame's shape for its layout.")
-    tilt            : Field[float] = Field(0.0, access=Field.INIT, description="Camera up-tilt (°), positive = aimed upward, the same for all four cameras. A mount constant: the warp levels the frame with it at device open, and the render needs it to know which rows of that frame the sensor never imaged.")
+    fov             : Field[float] = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°) — a lens constant, baked into the warp at open")
+    resolution      : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode for all cameras")
+    tilt            : Field[float] = Field(0.0, access=Field.INIT, description="Camera up-tilt (°), positive = aimed up, the same for all four")
     spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — canonical value tying statemachine (the visible slider) to the wind_down layer")
 
     camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov, tilt, resolution])

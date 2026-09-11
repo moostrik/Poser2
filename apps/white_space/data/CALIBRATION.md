@@ -171,13 +171,85 @@ offsets.
 
 **Camera height, tilt and the inner circle.** The tripods stay at their 50 cm minimum so the
 cameras shade the light as little as possible (site fact; the light starts at 32 cm), lens
-≈ 50 cm up and 36 cm out. Tilted up about **15°** with the full 800 rows, a 1.9 m person's
-head is in frame from the **Ø 2.7 m** inner circle (site decision) and the feet from Ø 2.9 m;
-set by eye, 12–18° all work. Near the machine the fields do
-not meet: on each seam a person's centre is outside both cameras until 1.0 m out, so
-**Ø 2.0 m** is the hard floor. Between Ø 2.0 m and Ø 3.5 m a seam person is cut on one side in
-each camera and the box centre shifts toward the visible side, ≈ 3° at Ø 2.7 m — a wobble at
-the handover, not a failure.
+**50 cm up** and **36 cm out** — both taped. `tilt` is then *derived* from those two numbers and
+the **Ø 2.7 m** inner circle (site decision), not set by eye.
+
+**The geometry.** The reference person is **1.8 m**, with an overhead fingertip reach of about
+**2.2 m** — raised arms are content the pose reads, so they count. Relative to a lens 50 cm up
+that is 1.70 m to the fingertips, 1.30 m to the head and 0.50 m down to the feet. On the Ø 2.7 m
+circle, on a camera's axis, they stand 1.35 − 0.36 = **0.99 m** from that lens, so
+
+    fingertips  atan( 1.70 / 0.99) = +59.8°     head  +52.7°     feet  atan(-0.50 / 0.99) = -26.8°
+
+The warp delivers a *levelled* frame spanning ±`vfov`/2 whatever the mount does, but only the
+part the sensor saw carries picture: a camera aimed up by `tilt` images
+`[tilt − vfov/2, tilt + vfov/2]`. Every height above needs `tilt ≥ its elevation − vfov/2`, and
+the feet need `tilt ≤ −26.8 + vfov/2` — bounds closing from opposite sides. Since
+`vfov = fov · rows / columns`, **how much room lies between them depends on `resolution`**, and
+there is not enough of it: fitting fingertips *and* feet at Ø 2.7 needs `vfov` ≥ 120°, against
+the 79.4° this sensor has at full readout.
+
+**So the tilt is a trade, and it is resolved in favour of the top.** Losing the feet costs the
+floor-plane distance estimate, which then works from an extrapolated box bottom — degraded, but
+the device extrapolates it, the formula is continuous across the frame edge and the clamp bounds
+the result. Losing the arms costs a gesture outright. **The binding rule: the feet are in frame
+from Ø 3.0 m, the inner edge of the play zone the depth model is calibrated for (Ø 3 – Ø 7, see
+the panorama's `focus_diameter`); nearer than that is outside the band anyway. Under that rule,
+take all the headroom available.**
+
+| `resolution` | vfov | tilt | fingertips from | head from | feet from |
+|---|---|---|---|---|---|
+| **P800** | 79.4° | 13 | Ø 3.31 | Ø 2.70 | Ø 2.71 |
+| | | **16** ← use this | Ø 3.04 | Ø 2.49 | **Ø 3.00** |
+| | | 18 | Ø 2.87 | Ø 2.36 | Ø 3.23 |
+| | | 20 | Ø 2.71 | Ø 2.24 | Ø 3.51 |
+| **P720** | 71.4° | **12** ← use this | Ø 3.81 | Ø 3.08 | **Ø 3.00** |
+| | | 14 | Ø 3.60 | Ø 2.92 | Ø 3.23 |
+| | | 16 | Ø 3.40 | Ø 2.77 | Ø 3.51 |
+
+**P800 → 16°.** Feet exactly at the play-zone edge, head from Ø 2.49 — comfortably inside the
+inner circle — and fingertips from Ø 3.04. **P720 → 12°**, which is the same rule: feet at Ø 3.00.
+That P720 needs less tilt is not a contradiction; its field is 8° narrower, so the feet run out
+of frame sooner and the feet are what the rule pins.
+
+Two things the table also says. Full raised arms *at the inner circle* would need 20.1° at P800,
+and that costs the feet out to Ø 3.53 — past the play zone, so it is not taken. And the trade
+steepens with tilt: 13→16 gains 0.27 m of reach for 0.29 m of feet, 18→20 gains 0.16 m for
+0.28 m. Sixteen is where it stops being worth it, independently of the play-zone rule.
+
+Head clipping inside about Ø 3.1 is expected at P720 and is not a fault — that mode cannot reach
+the Ø 2.7 inner circle at any tilt. Everything else transfers between the two modes untouched,
+because P720 is a pure vertical crop: the horizontal field, and with it the whole
+column-to-azimuth mapping, is identical.
+
+**The horizontal field sets its own distances, and `resolution` does not touch them.** The two
+tables above are the *vertical* field deciding when a person is tall enough to fit. The
+*horizontal* field — `fov` itself, 127°, identical at P720 and P800 because the crop is vertical —
+decides something different: whether a person is inside any camera's sector at all. It binds at
+the **seams**, where a person sits 45° off both neighbouring axes.
+
+Because each camera is 36 cm out from the centre rather than at it, its 127° covers *less* than
+127° of the room as measured from the centre, and the shortfall is worst up close:
+
+| Ø | one camera's azimuth span | overlap at each seam | |
+|---|---|---|---|
+| 2.0 m | 89.4° | **−0.6°** | the sectors do not meet — a gap on every seam |
+| 2.7 m | 99.4° | +9.4° | |
+| 3.0 m | 102.2° | +12.2° | |
+| 4.5 m | 110.5° | +20.5° | the focus depth; this is the overlap the stitch shows |
+| 7.0 m | 116.4° | +26.4° | |
+
+Two radii follow, both for a 1.8 m person about 50 cm across the shoulders:
+
+- **Ø 2.03 m** — a seam person's *centre* enters one camera. Below it they are in the gap and
+  invisible, which is why **Ø 2.0 m is the hard floor**; it is a consequence of the ring radius,
+  not a choice.
+- **Ø 3.53 m** — their *whole body* fits inside one camera. Between those two they are cut on one
+  side in each camera and the box centre shifts toward the visible side, ≈ 3° at Ø 2.7 m — a
+  wobble at the handover, not a failure.
+
+On a camera's own axis the horizontal field is never the limit (a whole body fits from Ø 0.97 m,
+inside the hard floor), so these numbers are entirely a seam property.
 
 ---
 
@@ -189,8 +261,8 @@ the handover, not a failure.
 camera only** (`modules/oak/camera/pipeline.py`, `SetupMono`): OV9282 W, global shutter,
 1280 × 800, lens **127° × 79.5°**. The 127° is the preset's `fov` — an `INIT` value, because it
 feeds the warp mesh that is baked when the device opens, so like `tilt` it is set in the preset
-and applied at relaunch — and it is the only field angle stored: the pipeline requests
-`THE_800_P`, the full readout, and the vertical field is *derived* from `fov` and the frame's
+and applied at relaunch — and it is the only field angle stored: the sensor mode is the preset's
+**`resolution`** (`P720` or `P800` on this sensor), and the vertical field is *derived* from `fov` and the frame's
 shape (`parallax.vfov` is read-only, 79.4°). The lens maps
 angle linearly to radius, which is what makes that derivation hold and what the published
 spec confirms. The sensor reference table for every OAK variant in use, with the Luxonis
@@ -208,13 +280,14 @@ apply it to a recording shot at `tilt = 0` (`camera.simulator.apply_warp`). `key
 same camera is the other installations' full-frame correction and stays 0 here — the two are
 exclusive.
 
-**What sets it** (`camera.tracker`, `camera.fov`, `camera.tilt`): `fov` (each camera owns
-`target_fov = 360 / num_cameras`, the excess is shared overlap); `parallax` (`ring_radius`, the
-lens distance from the axis, **0.36 m** measured, and `camera_height`, the lens height above the
-floor, **0.5 m** measured — both taped, neither tuned; `vfov` is derived, not set); `seam`
-(tracklet handover in the overlap); and `tilt`, shared across all four cameras. There is no
-distortion correction and there is no `person_height`: the projection is fixed in the warp and
-the distance comes off the floor plane.
+**What sets it** (`fov`, `tilt`, `resolution` at the root; `camera.tracker`): `fov` (each camera
+owns `target_fov = 360 / num_cameras`, the excess is shared overlap); `resolution` (the sensor
+mode, `P720` or `P800` — it sets `vfov`, and with it the right `tilt`, see the table above);
+`parallax` (`ring_radius`, the lens distance from the axis, **0.36 m** measured, and
+`camera_height`, the lens height above the floor, **0.5 m** measured — both taped, neither tuned;
+`vfov` is derived, not set); `seam` (tracklet handover in the overlap); and `tilt`, shared across
+all four cameras. There is no distortion correction and there is no `person_height`: the
+projection is fixed in the warp and the distance comes off the floor plane.
 
 **How to calibrate**: turn on `render.panorama.enabled`. The per-camera row is replaced by the
 four images unwrapped into one 360° strip — azimuth 0 at the left edge, the same scale as the
@@ -226,7 +299,7 @@ overlap*:
 | what you see | what is wrong |
 |---|---|
 | the overlap coincides | nothing — go on to the offsets |
-| aligns at head height but not at knee height | `tilt` |
+| aligns at head height but not at knee height | `tilt` **or roll** — see the caveat below |
 | a constant sideways offset across the whole overlap | `fov` |
 | a residual that grows toward the frame edges | not the equidistant lens the spec describes; no knob, and it would be news |
 | the image coincides but a person's two boxes below do not | the distance model — re-measure `ring_radius` and `camera_height`, do not tune them |
@@ -239,9 +312,29 @@ standing near the middle of the room, and read a ghost at the wall or at the rig
 Nothing about a person feeds the image — no box, no pose, no estimate — so nothing can fool it;
 only the *boxes* carry the tracker's per-person distance.
 
-`fov` and `tilt` are `INIT`: they are baked into the warp when the device opens, so they are
-tuned by editing the preset and relaunching, not by dragging a slider. Cameras first — both
-offsets and the sound are tuned against the result.
+**The roll caveat, and the readout that settles it.** The warp models `tilt` only — it assumes
+the camera is not rolled about its optical axis, and the image cannot check that: a rolled camera
+tilts the horizon, which looks exactly like the second row of the table. So "aligns at one height
+but not another" means *the mount*, and the panorama alone cannot say which axis.
+
+The cameras answer it themselves. Each board's IMU reports its own tilt and roll
+(`cam_N.tilt_measured`, `cam_N.roll_measured`), and **`camera.mount.status`** — pinned, so it is
+always on screen — summarises all four: the average deviation from the preset, and a warning
+naming the worst camera when any exceeds `camera.mount.tolerance` (2°). Read that line first. If
+roll is near zero and the overlap still misaligns with height, the mount is right and the fault
+is `tilt` or the lens. If a board has no IMU the line says *not measured* rather than pretending;
+then check roll by eye against a vertical edge before turning `tilt`.
+
+**A free check of the whole azimuth chain**, no rig needed: each camera should span **110.5°** of
+the strip at Ø 4.5 m and `ring_radius` 0.36 — not its bare 127°, because a camera pushed 36 cm
+outward covers less of the room as seen from the centre (the horizontal table above). Set
+`parallax.ring_radius` to 0 and every image should snap out to exactly 127° with 37° overlaps.
+That is a live slider, so it is two drags and it exercises the entire forward-and-inverse
+geometry.
+
+`fov`, `tilt` and `resolution` are `INIT`: they are baked into the warp when the device opens, so
+they are tuned by editing the preset and relaunching, not by dragging a slider. Cameras first —
+both offsets and the sound are tuned against the result.
 
 ---
 
@@ -400,8 +493,10 @@ physical angle with anything — it compares a person's `Azimuth` from the recor
 playhead from the simulated motor, both in one frame — so the flash, the hit, the sound
 offsets and both screen views are self-consistent. The simulator can apply `tilt` to a
 recording shot at `tilt = 0` (`camera.simulator.apply_warp`), which is how a tilt value is
-tried against footage. Existing recordings are 720 rows and are being retired: they run through
-the 800 pipeline mechanically, but their geometry is not tuned.
+tried against footage. Existing recordings are 1280 × 720; set `resolution` to **P720** in the
+playback preset and the whole chain derives correctly for them — `vfov`, the distance estimate and
+the panorama's geometry all follow the label. Left at P800 they play mechanically but every
+frame-relative number is off by 800/720, which the simulator warns about once.
 
 ---
 
@@ -409,8 +504,8 @@ the 800 pipeline mechanically, but their geometry is not tuned.
 
 1. **Cameras** — placed by the layout (camera 0's sector starts at the connection side); `fov`
    and `tilt` set in the preset as lens and mount constants; `ring_radius` the measured 0.36 m.
-   Whether the cameras agree is not visible today; the stitched panorama (planned) is the
-   check. First, always.
+   Whether the cameras agree is read off the stitched panorama
+   (`render.panorama.enabled`) — see "How to calibrate" above. First, always.
 2. **Playhead offset** — beam mode, one person stands still, the beam is on them as the
    playhead crosses them (the flash).
 3. **Projection offset** — projection mode, the same person, a static line drawn at their
@@ -433,7 +528,7 @@ and one-line instructions:
 
 | step | settings | tool / readout | instruction |
 |---|---|---|---|
-| 1 cameras | `fov`, `cam_N.tilt`, `distortion.*`, `parallax.*`, `seam.*` | placement; the stitched panorama (planned) | "Place by the layout; set `fov` and `tilt` in the preset; the stitch shows the rest." |
+| 1 cameras | `fov`, `tilt`, `resolution`, `parallax.*`, `seam.*` | placement; the stitched panorama (`render.panorama.enabled`) | "Place by the layout; set `fov`, `resolution` and `tilt` in the preset; the stitch shows the rest." |
 | 2 playhead | `playhead.pulse_offset` (with `tracking`, `speed_smoothing`) | beam mode, `beam_flash`; `/pose/N/playhead/offset` live | "One person stands still; turn until the beam is on them at the crossing." |
 | 3 projection | `projection_offset`, interlace `white_0/1`, `blue_0/1` | projection mode, `pose_instrument` (static line at the person) | "Same person; turn until the projected line is on them; adjust the interlace until it is single. Then a spin-up: the playhead line continues where the beam was." |
 | 4 speakers | `speaker_offset` | IDLE, Max voicing `/global/playhead` | "Speaker 0 on azimuth 0; the sound follows the beam." |
@@ -448,14 +543,19 @@ its true unit (1 px = 0.1° is a remark, not a conversion), and its ±10 px rang
 ## Open decisions
 
 - **Done**: beam/projection naming throughout; both offsets in degrees with the ring rotation
-  in the light sender; `speaker_offset` + `volume`; 800 rows; `fov` per app, `tilt` in degrees
-  on the real lens model, `keystone` kept for the other installations, `vfov` derived; the
-  stitched panorama and the observation strip — the camera check described under Camera.
-- **Hardware verification** (next): the stitch has only been checked against the arithmetic, not
-  against a wall. It needs footage shot at 800 rows — the old 1280 × 720 clips are vertically
-  mis-scaled and can confirm the layout but not `tilt` or `fov`. Confirm the sign of `tilt`
-  first: positive should *improve* an up-aimed camera. Then record the four `tilt` values, `fov`
-  and `ring_radius` here as build constants beside the two light offsets.
+  in the light sender; `speaker_offset` + `volume`; `fov` per app, `tilt` in degrees on the real
+  lens model, `keystone` kept for the other installations, `vfov` derived; the sensor mode as a
+  preset field (`resolution`), so a 720-row recording plays with its own geometry instead of the
+  pipeline's; the stitched panorama and the observation strip — the camera check described under
+  Camera; and `tilt` derived from the build rather than set by eye (the table under Camera).
+  The sign of `tilt` is confirmed on hardware: positive is aimed up, and at 15° the bottom 18.5 %
+  of the frame is empty, against 18.9 % predicted.
+- **What the cameras cannot yet tell us** (next): `tilt` is the one constant set by a hand
+  adjustment on site, and **roll is not modelled at all** — a rolled camera reads as a wrong
+  `tilt` in the panorama and nothing separates them. Both are readable from the boards' IMU, and
+  the units' own `getFov` and distortion model would test the datasheet `fov` and the
+  equidistant-lens assumption per lens. Until then, check roll by eye against a vertical edge.
+  Record the four measured tilts and rolls here when they exist.
 - **A placement aid for the cameras** (later): since placement *is* the room-side
   calibration, it deserves a good way of doing it — probably projection layers that put
   the sector boundaries and centres on the wall so each camera can be aimed against them,

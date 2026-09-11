@@ -13,87 +13,114 @@
     "fov": 95.0,
     "cam_0": {
       "device_id": "19443010D153874800",
-      "show_stereo": false,
       "flip_h": false,
       "flip_v": true,
-      "tilt": 0.0,
       "keystone": -0.22,
-      "color_exposure": 30001,
-      "color_iso": 1599,
-      "color_auto_exposure": true,
-      "color_balance": 3796,
-      "color_auto_balance": true,
-      "color_brightness": 0,
-      "color_contrast": 0,
-      "color_saturation": 0,
-      "color_denoise": 0,
-      "color_sharpness": 0,
-      "mono_exposure": 1000,
-      "mono_iso": 100,
+      "readings": {
+        "roll_offset": 0.0
+      },
+      "color_sensor": {
+        "exposure": 30001,
+        "iso": 1599,
+        "auto_exposure": true,
+        "balance": 3796,
+        "auto_balance": true,
+        "brightness": 0,
+        "contrast": 0,
+        "saturation": 0,
+        "denoise": 0,
+        "sharpness": 0
+      },
+      "mono_sensor": {
+        "exposure": 1000,
+        "iso": 100,
+        "ir_grid_light": 0.0
+      },
+      "depth": {
+        "show": false,
+        "depth_min": 500,
+        "depth_max": 15000,
+        "median_filter": "OFF",
+        "bright_min": 0,
+        "bright_max": 255
+      },
+      "tilt": 0.0,
       "mono_auto_exposure": true,
-      "ir_grid_light": 0.0,
-      "ir_flood_light": 0.0,
-      "stereo_depth_min": 500,
-      "stereo_depth_max": 15000,
-      "stereo_median_filter": "OFF",
-      "stereo_bright_min": 0,
-      "stereo_bright_max": 255
+      "ir_flood_light": 0.0
     },
     "cam_1": {
       "device_id": "19443010D1E4974800",
-      "show_stereo": false,
       "flip_h": false,
       "flip_v": true,
-      "tilt": 0.0,
       "keystone": -0.22,
-      "color_exposure": 30001,
-      "color_iso": 1599,
-      "color_auto_exposure": true,
-      "color_balance": 3800,
-      "color_auto_balance": true,
-      "color_brightness": 0,
-      "color_contrast": 0,
-      "color_saturation": 0,
-      "color_denoise": 0,
-      "color_sharpness": 0,
-      "mono_exposure": 1000,
-      "mono_iso": 100,
+      "readings": {
+        "roll_offset": 0.0
+      },
+      "color_sensor": {
+        "exposure": 30001,
+        "iso": 1599,
+        "auto_exposure": true,
+        "balance": 3800,
+        "auto_balance": true,
+        "brightness": 0,
+        "contrast": 0,
+        "saturation": 0,
+        "denoise": 0,
+        "sharpness": 0
+      },
+      "mono_sensor": {
+        "exposure": 1000,
+        "iso": 100,
+        "ir_grid_light": 0.0
+      },
+      "depth": {
+        "show": false,
+        "depth_min": 500,
+        "depth_max": 15000,
+        "median_filter": "OFF",
+        "bright_min": 0,
+        "bright_max": 255
+      },
+      "tilt": 0.0,
       "mono_auto_exposure": true,
-      "ir_grid_light": 0.0,
-      "ir_flood_light": 0.0,
-      "stereo_depth_min": 500,
-      "stereo_depth_max": 15000,
-      "stereo_median_filter": "OFF",
-      "stereo_bright_min": 0,
-      "stereo_bright_max": 255
+      "ir_flood_light": 0.0
     },
     "cam_2": {
       "device_id": "19443010D14C874800",
-      "show_stereo": false,
       "flip_h": false,
       "flip_v": true,
-      "tilt": 0.0,
       "keystone": -0.22,
-      "color_exposure": 29994,
-      "color_iso": 1569,
-      "color_auto_exposure": true,
-      "color_balance": 3932,
-      "color_auto_balance": true,
-      "color_brightness": 0,
-      "color_contrast": 0,
-      "color_saturation": 0,
-      "color_denoise": 0,
-      "color_sharpness": 0,
-      "mono_exposure": 1000,
-      "mono_iso": 100,
+      "readings": {
+        "roll_offset": 0.0
+      },
+      "color_sensor": {
+        "exposure": 29994,
+        "iso": 1569,
+        "auto_exposure": true,
+        "balance": 3932,
+        "auto_balance": true,
+        "brightness": 0,
+        "contrast": 0,
+        "saturation": 0,
+        "denoise": 0,
+        "sharpness": 0
+      },
+      "mono_sensor": {
+        "exposure": 1000,
+        "iso": 100,
+        "ir_grid_light": 0.0
+      },
+      "depth": {
+        "show": false,
+        "depth_min": 500,
+        "depth_max": 15000,
+        "median_filter": "OFF",
+        "bright_min": 0,
+        "bright_max": 255
+      },
+      "tilt": 0.0,
       "mono_auto_exposure": true,
-      "ir_grid_light": 0.0,
-      "ir_flood_light": 0.0,
-      "stereo_depth_min": 500,
-      "stereo_depth_max": 15000,
-      "stereo_median_filter": "OFF",
-      "stereo_bright_min": 0,
-      "stereo_bright_max": 255
+      "ir_flood_light": 0.0
     },
     "simulator": {
       "video_path": "test_video",

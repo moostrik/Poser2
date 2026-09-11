@@ -29,19 +29,19 @@ class PanoramaLayerSettings(BaseSettings):
     model is.
     """
     enabled: Field[bool] = Field(False, widget=Widget.switch,
-                                 description="Replace the per-camera row with the stitched 360° panorama. A calibration view, not a show view — the window layout reflows when it is switched.")
+                                 description="Replace the per-camera row with the stitched 360° panorama")
     blend: Field[PanoramaBlend] = Field(PanoramaBlend.MAX,
-                                        description="How overlapping cameras combine. MAX keeps the brighter pixel, so a misalignment shows as a doubled bright edge; AVERAGE shows it as a soft double image.")
+                                        description="How overlapping cameras combine")
     focus_diameter: Field[float] = Field(4.5, min=1.0, max=12.0, step=0.5,
-                                         description="Play-zone diameter (m) the image is aligned for. Cameras 0.36 m apart genuinely disagree about where things are, by more the nearer they are, so an image can only be stitched for one depth. The middle of the play zone: exact there, ±4° at Ø3 and Ø7.")
+                                         description="Play-zone diameter (m) the image is stitched for — exact there, ghosts elsewhere")
     grid: Field[bool] = Field(True, widget=Widget.switch,
-                              description="Draw the azimuth and elevation grid, with the sector seams and camera axes picked out.")
+                              description="Draw the azimuth and elevation grid")
     grid_degrees: Field[float] = Field(10.0, min=1.0, max=90.0, step=1.0,
-                                       description="Grid spacing (°), the same on both axes. Horizontal lines are what let the overlap be compared at head height against knee height — the tilt signature.")
+                                       description="Grid spacing (°), the same on both axes")
     tilt: Field[float] = Field(0.0, access=Field.INIT,
-                               description="The cameras' up-tilt (°), shared from the camera group. Not used to move anything — the warp has already levelled the frame — but it says which rows of that frame the sensor never imaged, so the strip can be sized to the picture that exists instead of to an empty band.")
+                               description="Camera up-tilt (°), shared — says which rows the sensor never imaged")
     show_all_observations: Field[bool] = Field(True, widget=Widget.switch,
-                                              description="Draw every camera's own opinion in the strip below, not just the one the tracker picked. Off falls back to one box per person.")
+                                              description="Draw every camera's own opinion, not just the one the tracker picked")
 
 
 # Grid colours. Not in ColorSettings: those are per-player track colours, and these are fixed

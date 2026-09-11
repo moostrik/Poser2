@@ -12,7 +12,7 @@ from numpy import ndarray
 
 from modules.utils import FPS
 
-from .definitions import CameraResolution, FrameType, Input, Output, Tracklet, FrameCallback, SyncCallback, TrackerCallback, get_device_list, log_connected_sensors
+from .definitions import CameraResolution, FrameType, Input, Output, Tracklet, FrameCallback, SyncCallback, TrackerCallback, get_device_list, log_connected_sensors, log_device_calibration, imu_rotation_to_camera, imu_to_camera, unroll_imu_frame, orientation_from_gravity, IMU_SMOOTHING
 from .pipeline import setup_pipeline, get_frame_types, WarpConfig
 from .settings import CameraSettings
 
@@ -44,7 +44,7 @@ class Camera(Thread):
         self.do_stereo: bool =          core_settings.stereo
         self.do_yolo: bool =            core_settings.yolo
         self.resolution: CameraResolution = core_settings.resolution
-        self.show_stereo: bool =        core_settings.show_stereo
+        self.show_stereo: bool =        core_settings.depth.show
 
         self.mount: WarpConfig = WarpConfig(
             flip_h=core_settings.flip_h,
@@ -73,6 +73,12 @@ class Camera(Thread):
         self.frame_callbacks: Set[FrameCallback] = set()
         self.sync_callbacks: Set[SyncCallback] = set()
         self.tracker_callbacks: Set[TrackerCallback] = set()
+
+        # MOUNT READOUT — the gravity vector, smoothed, and how to get it into the camera's frame.
+        # A tripod does not move, so a single sample is almost all noise; the average is the
+        # signal. State lives here and not on the settings object, which stays pure data.
+        self._imu_rotation: list[list[float]] | None = None
+        self._gravity: tuple[float, float, float] | None = None
 
         # PREVIEW
         self.preview_type =             FrameType.VIDEO
@@ -114,6 +120,7 @@ class Camera(Thread):
 
         logger.info(f'{self.device_id} OPEN')
         log_connected_sensors(self.device, self.device_id)
+        self._read_mount_calibration()
         self.running = True
         self.settings.connect(self.device, self.inputs, self.do_color)
         return True
@@ -121,7 +128,53 @@ class Camera(Thread):
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
             setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.resolution, self.show_stereo, self.mount, simulate=False)
 
+    def _read_mount_calibration(self) -> None:
+        """One-shot at open: what this unit says about its own lens and its IMU's orientation."""
+        socket = dai.CameraBoardSocket.CAM_A if self.do_color else dai.CameraBoardSocket.CAM_B
+        self.settings.readings.fov_factory = log_device_calibration(self.device, socket, self.device_id)
+        self._imu_rotation = imu_rotation_to_camera(self.device, socket, self.device_id)
+
+    def _setup_imu_queue(self) -> None:
+        """Subscribe to the IMU, if the board has one. Board revisions differ, so absence is
+        normal and leaves `tilt_measured` / `roll_measured` at NaN."""
+        try:
+            sensor: str = self.device.getConnectedIMU()
+        except Exception as exc:
+            logger.debug(f'{self.device_id} could not query the IMU: {exc}')
+            return
+        if not sensor or sensor.upper() == 'NONE':
+            logger.info(f'{self.device_id} has no IMU — mount orientation will not be measured')
+            return
+        try:
+            self.outputs[Output.IMU_OUT] = self.device.getOutputQueue(name='imu', maxSize=1, blocking=False)  # type: ignore
+            self.outputs[Output.IMU_OUT].addCallback(self._imu_callback)
+            logger.info(f'{self.device_id} IMU {sensor} reporting mount orientation')
+        except Exception as exc:                    # the stream is absent in simulation
+            logger.debug(f'{self.device_id} no IMU stream: {exc}')
+
+    def _imu_callback(self, msg) -> None:
+        for packet in msg.packets:
+            raw = packet.acceleroMeter
+            vector: tuple[float, float, float] = unroll_imu_frame(
+                imu_to_camera((raw.x, raw.y, raw.z), self._imu_rotation))
+            if self._gravity is None:
+                self._gravity = vector
+            else:
+                a: float = IMU_SMOOTHING
+                self._gravity = tuple(                          # type: ignore[assignment]
+                    previous + a * (current - previous)
+                    for previous, current in zip(self._gravity, vector)
+                )
+        if self._gravity is None:
+            return
+        tilt, roll = orientation_from_gravity(*self._gravity)
+        # Tilt gets no offset: there is no way to measure true tilt on site, so there would be
+        # nothing to calibrate it against.
+        self.settings.readings.tilt_measured = tilt
+        self.settings.readings.roll_measured = roll - self.settings.readings.roll_offset
+
     def _setup_queues(self) -> None:
+        self._setup_imu_queue()
         if self.do_stereo:
             if self.do_color:
                 self.inputs[Input.COLOR_CONTROL] =  self.device.getInputQueue('color_control')
@@ -220,18 +273,18 @@ class Camera(Thread):
         self._update_tps()
         Ts: list[Tracklet] = msg.tracklets
         self.num_tracklets = len(Ts)
-        self.settings.tracklets = self.num_tracklets
+        self.settings.readings.tracklets = self.num_tracklets
         self._update_tracker_callbacks(Ts)
 
     # FPS
     def _update_fps(self, fps_type: FrameType) -> None:
         self.fps_counters[fps_type].processed()
         if fps_type == FrameType.VIDEO:
-            self.settings.video_fps = self.fps_counters[fps_type].get_rate_average()
+            self.settings.readings.video_fps = self.fps_counters[fps_type].get_rate_average()
 
     def _update_tps(self) -> None:
         self.tps_counter.processed()
-        self.settings.tracker_fps = self.tps_counter.get_rate_average()
+        self.settings.readings.tracker_fps = self.tps_counter.get_rate_average()
 
     # CALLBACKS
     def _update_frame_callbacks(self, frame_type: FrameType, frame: ndarray) -> None:

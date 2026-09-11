@@ -20,7 +20,7 @@ class Simulator(Camera):
     def __init__(self, syncplayer: Player, core_settings: CameraSettings, player_settings: SimulatorSettings) -> None:
 
         if core_settings.stereo and not core_settings.yolo:
-            core_settings.show_stereo = True  # stereo pipeline needs to be connected (in case of no person detection)
+            core_settings.depth.show = True  # stereo pipeline needs to be connected (in case of no person detection)
 
         super().__init__(core_settings)
 
