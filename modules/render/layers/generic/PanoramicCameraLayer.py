@@ -47,7 +47,8 @@ class PanoramaLayerSettings(BaseSettings):
 # Grid colours. Not in ColorSettings: those are per-player track colours, and these are fixed
 # meanings that never want tuning — the reader has to be able to tell a seam from a tick.
 _GRID_COLOR:   tuple[float, float, float, float] = (1.0, 1.0, 1.0, 0.18)
-_HORIZON_COLOR: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 0.45)
+_HORIZON_COLOR: tuple[float, float, float, float] = (0.3, 1.0, 0.3, 1.0)    # its own hue, opaque
+_HORIZON_PX:   float = 1.0                                                 # the colour sets it apart, not the width
 _SEAM_COLOR:   tuple[float, float, float, float] = (1.0, 0.35, 0.0, 0.75)   # sector boundary
 _AXIS_COLOR:   tuple[float, float, float, float] = (0.0, 0.7, 1.0, 0.6)     # camera optical axis
 _LABEL_FG:     tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
@@ -217,7 +218,6 @@ class PanoramicCameraLayer(LayerBase):
         # centre-referenced and linear, so this is the same degrees-per-pixel as the azimuth
         # axis — which is what makes the grid square and the head-versus-knee comparison fair.
         top, bottom = self.elevation_window
-        self._horizontal(0.0, px_y, _HORIZON_COLOR)
         elevation: float = spacing
         while elevation < max(abs(top), abs(bottom)):
             if elevation < top:
@@ -225,6 +225,11 @@ class PanoramicCameraLayer(LayerBase):
             if -elevation > bottom:
                 self._horizontal(-elevation, px_y, _GRID_COLOR)
             elevation += spacing
+
+        # The horizon last, so no grid, seam or axis line is drawn over it. It is the reference the
+        # levelling check is read against (tape at lens height must sit on it), so it has to be
+        # unmistakable rather than one more line.
+        self._horizontal(0.0, _HORIZON_PX * px_y, _HORIZON_COLOR)
 
         self._draw_labels(spacing)
 
@@ -235,9 +240,13 @@ class PanoramicCameraLayer(LayerBase):
                     color: tuple[float, float, float, float]) -> None:
         # Rect y is top-down, and the window's top elevation is the strip's top row. The horizon
         # is only at mid-height when the window is symmetric, which a tilted camera's is not.
+        # Centred on the elevation, so a thicker line does not drift below the row it marks.
+        self._rect_shader.use(0.0, self._elevation_y(elevation) - height / 2.0, 1.0, height, *color)
+
+    def _elevation_y(self, elevation: float) -> float:
+        """Normalised, top-down y of an elevation in the strip."""
         top, bottom = self.elevation_window
-        y: float = (top - elevation) / max(1e-6, top - bottom)
-        self._rect_shader.use(0.0, y, 1.0, height, *color)
+        return (top - elevation) / max(1e-6, top - bottom)
 
     def _draw_labels(self, spacing: float) -> None:
         """Degree labels along the top, and the focus depth in the corner.
@@ -251,6 +260,11 @@ class PanoramicCameraLayer(LayerBase):
             self._text.draw_box_text(x, 3, f'{azimuth:.0f}', _LABEL_FG, _LABEL_BG,
                                      self.fbo.width, self.fbo.height)
             azimuth += stride
+
+        # Name the horizon at the left end, just above the line, in the line's own colour.
+        horizon_px: float = self._elevation_y(0.0) * self.fbo.height
+        self._text.draw_box_text(3, max(3.0, horizon_px - 24), 'horizon', _HORIZON_COLOR, _LABEL_BG,
+                                 self.fbo.width, self.fbo.height)
 
         blend: str = 'avg' if self._settings.blend == PanoramaBlend.AVERAGE else 'max'
         top, bottom = self.elevation_window
