@@ -50,8 +50,8 @@ class CameraResolution(IntEnum):
     NOT derived from it, and to be re-tuned on the rig alongside it, because they are set by eye
     against the frame rather than computed (P800 -> P720 scales them by 800/720 = 1.111):
       camera.tracker.min_height             a fraction of frame height, so it scales
-      camera.tracker.seam.max_height_diff   idem
       pose.distance_extractor.near_y/far_y  positions in the frame, so they scale and shift
+    (`camera.tracker.seam.*` is NOT in that list either: it is in degrees and percent.)
     (The vertical field is NOT in that list — see `frame_fov` below, which derives it. Neither is
     the render's panorama row, which derives its own aspect.)
     """
@@ -577,7 +577,7 @@ YOLOV8_WIDE_7S: str = "yolov8n_coco_512x448_7S.blob"
 YOLOV8_SQUARE_5S: str = "yolov8n_coco_416x416_5S.blob"
 YOLOV8_SQUARE_6S: str = "yolov8n_coco_416x416_6S.blob"
 YOLOV8_SQUARE_7S: str = "yolov8n_coco_416x416_7S.blob"
-YOLO_CONFIDENCE_THRESHOLD: float = 0.66
+YOLO_CONFIDENCE_THRESHOLD: float = 0.5
 YOLO_OVERLAP_THRESHOLD: float = 0.5
 
 

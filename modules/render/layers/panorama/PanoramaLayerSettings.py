@@ -32,9 +32,9 @@ class Part(IntEnum):
     strip without disturbing the others.
     """
     image        = 0      # StitchRenderer — the four camera frames
-    seams        = auto()  # SeamRenderer — the sector and axis lines, and the reject/reach bands
-    grid         = auto()  # GridRenderer — the degree lattice, the horizon, the labels, the footer
-    observations = auto()  # ObservationRenderer — a line and a foot tick per observation
+    seams        = auto()  # SeamRenderer — the seam rules that live in image space
+    grid         = auto()  # GridRenderer — every reference mark in the strip's own two axes
+    observations = auto()  # ObservationRenderer — a line per observation inside its tolerance
     labels       = auto()  # LabelRenderer — the per-person text
 
 
@@ -66,7 +66,23 @@ HORIZON_COLOR: tuple[float, float, float, float] = (0.3, 1.0, 0.3, 1.0)    # its
 HORIZON_PX:    float = 1.0                        # the colour sets it apart, not the width
 SEAM_COLOR:    tuple[float, float, float, float] = (1.0, 0.35, 0.0, 0.75)  # sector boundary
 AXIS_COLOR:    tuple[float, float, float, float] = (0.0, 0.7, 1.0, 0.6)    # camera optical axis
-BAND_COLOR:    tuple[float, float, float, float] = (1.0, 0.35, 0.0, 0.07)  # a seam zone's fill
-BAND_BAR_COLOR: tuple[float, float, float, float] = (1.0, 0.35, 0.0, 0.75)  # its bar on the bottom
+# The two seam zones get their own hues, because they say opposite things and used to share one.
+# Yellow is permissive (a second camera sees here), red prohibitive (no new person is born here).
+# Their SHAPES and their HOMES differ too, and that is the point: yellow is a pair of lines in
+# `GridRenderer`, because the overlap is a statement about azimuth and the degree grid measures it;
+# red is a fill in `SeamRenderer`, because the dead zone is a band of one camera's image
+# columns and only the picture can be read against it.
+OVERLAP_COLOR:  tuple[float, float, float, float] = (1.0, 0.85, 0.0, 0.65)  # two cameras see it
+DEAD_ZONE_COLOR: tuple[float, float, float, float] = (1.0, 0.15, 0.1, 0.10)  # no births here
+# The tracked floor, as one band between the two diameters. The overlap's yellow, on purpose:
+# together they say where the tracker works — the overlap bounds it in azimuth, the zone in
+# distance — and shape tells them apart, the overlap a pair of verticals and the zone a horizontal
+# field. Yellow also keeps both clear of the camera axes, which are the blue ones.
+#
+# A FIELD RATHER THAN TWO LINES, and the clipping is why it reads better: the zone reaches below
+# what the strip can show at some presets, and a fill running off the bottom edge says "continues
+# past here" by itself, where a line pinned to the boundary would have claimed a row that is not
+# its own.
+ZONE_COLOR:     tuple[float, float, float, float] = (1.0, 0.85, 0.0, 0.10)
 LABEL_FG:      tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
 LABEL_BG:      tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.6)

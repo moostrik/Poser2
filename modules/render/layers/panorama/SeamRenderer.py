@@ -2,31 +2,43 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.tracker import PanoramicTrackerSettings, camera_azimuth
+from modules.tracker import PanoramicTrackerSettings, camera_local_to_azimuth, strip_spans, wrap180
 
 from ...shaders import DrawColoredRectangle
 from ..LayerBase import LayerBase
-from .PanoramaLayerSettings import PanoramaLayerSettings, \
-    AXIS_COLOR, BAND_BAR_COLOR, BAND_COLOR, SEAM_COLOR
+from .PanoramaLayerSettings import PanoramaLayerSettings, DEAD_ZONE_COLOR
 
 
 class SeamRenderer(LayerBase):
-    """Everything about where one camera ends and the next begins.
+    """The seam rules that live in **image space** — what has to be read against the picture.
 
-    The lines — each sector boundary in orange, each camera's optical axis in blue — and the two
-    zones the tracker's fusion rules define, read straight off `camera.tracker.seam.angles`, which
-    the tracker keeps up to date as READ degrees:
+    The split from `GridRenderer` is by coordinate system, not by subject. Anything expressible in
+    the strip's own two axes — centre azimuth and centre elevation — is a lattice mark and lives
+    there, where the degree labels can measure it: the sector boundaries, the camera axes, the
+    overlap. What lands here instead is anything defined on a camera's **own** frame, because one
+    image column has no single azimuth — it maps to a different bearing at every depth, so there is
+    nothing on the grid to read it against.
 
-    - **reach** (`angles.reach`) — within this of a camera's field edge, an observation may be
-      matched with a neighbouring camera's and fused into one person. It is *wider* than the
-      overlap (`reach` is a ratio ≥ 1), so it crosses the seam.
-    - **reject** (`angles.reject`) — the dead zone inside it, where no *new* person may be born.
-      A person already tracked is still refreshed here; only arrivals are refused, so that nobody
-      is created twice on a seam.
+    Today that is the **dead zone**: `seam.dead_zone` degrees in from each camera's field edges, two
+    bands per camera, where *that* camera refuses to start a new person. Someone already tracked is
+    still refreshed there and a re-acquisition is still allowed; only *arrivals* are refused, so
+    that nobody is created twice on a seam.
 
-    Both are measured inward from a camera's own field edge, which is `fov_overlap` outside the
-    seam, so the pair of bands a seam carries sits asymmetrically about it — that is the geometry,
-    not a drawing error.
+    **Why a band here works where a line on the grid would not.** The rule reads the raw local angle
+    — the bearing within that camera's frame, before the parallax re-projection — and the stitch
+    places the picture through the same map at the same depth. So **band and pixels agree by
+    construction at every depth**: a person whose pixels fall inside the red is a person that camera
+    will not start, wherever they are standing. That is what makes it checkable against the image
+    anywhere rather than only at the focus diameter.
+
+    **Its cost is the region where two bands overlap.** A person is born as long as **one** camera
+    accepts them, so nobody can be born only where both refuse: at Ø 2.7 the two bands do overlap on
+    the seam, and a person arriving exactly there is not picked up until they move. From about Ø 3
+    they no longer do. Each band's *outer* edge sits exactly on its camera's field edge, so the pair
+    also delimits where the two pictures reach — no separate overlap fill is needed to show that.
+
+    How close two views must be to count as one person is `seam.link_angle`, a property of a *pair*
+    rather than of a place, so it is drawn as a field around each observation instead.
 
     Drawn beneath the grid so the lattice stays legible over a band, and faintly, so the image
     underneath still reads.
@@ -57,45 +69,37 @@ class SeamRenderer(LayerBase):
         pass
 
     def draw(self) -> None:
-        angles = self._tracker.seam.angles
-        # Widest first: reach is drawn under reject, so the dead zone reads as the darker core.
-        self._bands(angles.reach)
-        self._bands(angles.reject)
+        self._dead_zone_bands()
 
-        px_x: float = 1.0 / self._width
-        for cam_id in range(self._num_cams):
-            self._vertical(camera_azimuth(cam_id, self._target_fov), 2.0 * px_x, AXIS_COLOR)
-            self._vertical(self._target_fov * cam_id, 2.0 * px_x, SEAM_COLOR)
-
-    def _bands(self, width_degrees: float) -> None:
-        """One band inward from each end of every camera's field."""
-        if width_degrees <= 0.0:
+    def _dead_zone_bands(self) -> None:
+        """`seam.dead_zone` in from both ends of every camera's own field — its own rule, so one
+        band per edge rather than one per seam."""
+        fov: float = self._tracker.fov
+        width: float = min(self._tracker.seam.dead_zone, fov / 2.0)
+        if width <= 0.0:
             return
-        overlap: float = self._tracker.seam.angles.overlap
         for cam_id in range(self._num_cams):
-            # A camera's field runs from `target_fov * cam_id - overlap` for `fov` degrees:
-            # `Geometry._calc_world_angle` with local 0 and local `cam_fov`.
-            start: float = self._target_fov * cam_id - overlap
-            end: float = start + self._tracker.fov
-            self._band(start, width_degrees)
-            self._band(end - width_degrees, width_degrees)
+            self._band(self._azimuth(cam_id, 0.0), self._azimuth(cam_id, width), DEAD_ZONE_COLOR)
+            self._band(self._azimuth(cam_id, fov - width), self._azimuth(cam_id, fov),
+                       DEAD_ZONE_COLOR)
 
-    def _band(self, azimuth: float, width_degrees: float) -> None:
-        """A faint full-height fill plus a solid bar along the bottom edge, wrapped at 360."""
-        px_y: float = 1.0 / self._height
-        bar_h: float = 3.0 * px_y
-        left: float = azimuth % 360.0
-        width: float = width_degrees / 360.0
-        # Wrapping past the right edge: draw the remainder at the left, so a band on the azimuth-0
-        # seam is not silently clipped.
-        spans: list[tuple[float, float]] = [(left / 360.0, width)]
-        if left / 360.0 + width > 1.0:
-            spans = [(left / 360.0, 1.0 - left / 360.0),
-                     (0.0, width - (1.0 - left / 360.0))]
-        for x, w in spans:
-            self._rect.use(x, 0.0, w, 1.0, *BAND_COLOR)
-            self._rect.use(x, 1.0 - bar_h, w, bar_h, *BAND_BAR_COLOR)
+    def _band(self, left: float, right: float, fill: tuple[float, float, float, float]) -> None:
+        """An azimuth range as a faint full-height fill.
 
-    def _vertical(self, azimuth: float, width: float,
-                  color: tuple[float, float, float, float]) -> None:
-        self._rect.use((azimuth % 360.0) / 360.0, 0.0, width, 1.0, *color)
+        The width is folded into ±180 rather than taken modulo 360 so that a degenerate range draws
+        nothing instead of a band spanning almost the whole ring. `strip_spans` then splits the band
+        that straddles the strip's 0/360 join, so the one on the azimuth-0 seam is drawn whole
+        rather than clipped.
+        """
+        span: float = wrap180(right - left)
+        if span <= 0.0:
+            return
+        for x, w in strip_spans(left / 360.0, span / 360.0):
+            self._rect.use(x, 0.0, w, 1.0, *fill)
+
+    def _azimuth(self, cam_id: int, local: float) -> float:
+        """A camera's own local angle to the strip x its pixels land on, at the focus depth — the
+        stitch's own chain, which is what keeps a band on the columns it describes."""
+        return camera_local_to_azimuth(local, cam_id, self._tracker.fov, self._target_fov,
+                                       max(0.0, self._tracker.rig.camera_diameter) / 2.0,
+                                       self._settings.focus_diameter)

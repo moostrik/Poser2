@@ -14,8 +14,8 @@ from .. import (
     Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback,
 )
 from .store import TrackletStore
-from .geometry import Geometry
-from .settings import SeamSettings, ParallaxSettings, TrackerSettings
+from .geometry import Geometry, height_is_measured
+from .settings import RigSettings, TrackerSettings
 
 TrackletListCallback = Callable[[list[Tracklet]], None]
 
@@ -88,18 +88,19 @@ class Tracker(Thread, BaseTracker):
         # that is the overlap it shares with its neighbours.
         self.geometry: Geometry = Geometry(num_cameras, config.fov, 360.0 / num_cameras)
 
-        # Wire fov and parallax changes to geometry
+        # Wire fov and rig changes to geometry. The three that move the overlap band must also
+        # republish it, or the readout and the panorama's lines go stale on a live drag.
         TrackerSettings.fov.bind(config, lambda v: (self._set_frame(v), self._update_seam_angles()))
-        ParallaxSettings.ring_radius.bind(config.parallax, lambda v: self.geometry.set_ring_radius(v))
-        ParallaxSettings.camera_height.bind(config.parallax, lambda v: self.geometry.set_camera_height(v))
+        RigSettings.camera_diameter.bind(config.rig, lambda v: (self.geometry.set_camera_diameter(v),
+                                                                self._update_seam_angles()))
+        RigSettings.camera_height.bind(config.rig, lambda v: self.geometry.set_camera_height(v))
+        RigSettings.zone_min_diameter.bind(config.rig, lambda _: self._set_zone())
+        RigSettings.zone_max_diameter.bind(config.rig, lambda _: self._set_zone())
 
         # bind() does not fire with the current value, and the preset is loaded
         # before this tracker is constructed — push config into geometry once now.
         self._sync_geometry_from_config()
 
-        # Wire seam ratio changes to the angles display
-        SeamSettings.reject.bind(config.seam, lambda _: self._update_seam_angles())
-        SeamSettings.reach.bind(config.seam, lambda _: self._update_seam_angles())
         self._update_seam_angles()
 
         # Last emitted primary per world id, as an observation id — view-selection state,
@@ -111,12 +112,21 @@ class Tracker(Thread, BaseTracker):
         self._observation_callbacks: set[TrackletListCallback] = set()
 
     def _sync_geometry_from_config(self) -> None:
-        """Apply current config values to geometry. Needed at construction
-        because ``bind`` does not fire with the initial value and the preset is
-        loaded before the tracker exists."""
+        """Apply current config values to geometry. Needed at construction because ``bind`` does
+        not fire with the initial value and the preset is loaded before the tracker exists.
+
+        The rig goes first: the overlap band is derived from the ring and the zone, so pushing
+        `fov` before them would derive it once against the defaults."""
+        r: RigSettings = self.config.rig
+        self.geometry.set_camera_diameter(r.camera_diameter)
+        self.geometry.set_camera_height(r.camera_height)
+        self._set_zone()
         self._set_frame(self.config.fov)
-        self.geometry.set_ring_radius(self.config.parallax.ring_radius)
-        self.geometry.set_camera_height(self.config.parallax.camera_height)
+
+    def _set_zone(self) -> None:
+        r: RigSettings = self.config.rig
+        self.geometry.set_zone(r.zone_min_diameter, r.zone_max_diameter)
+        self._update_seam_angles()
 
     def _set_frame(self, fov: float) -> None:
         """The delivered frame's geometry, from the same functions the camera's warp is built
@@ -124,9 +134,9 @@ class Tracker(Thread, BaseTracker):
 
         Rows are tangents of elevation with the horizon at `horizon_px`, not linear about the
         centre row, so the row model is a window rather than a `vfov`. Derived here, once, from
-        the shared camera fields, and published as read-only fields on `parallax` so the
-        panorama draws with exactly the numbers the tracker tracks with. Mono and landscape,
-        which is what this tracker has always assumed."""
+        the shared camera fields, and published as read-only fields on `rig` so the panorama draws
+        with exactly the numbers the tracker tracks with. Mono and landscape, which is what this
+        tracker has always assumed."""
         self.geometry.set_fov(fov)
         c: TrackerSettings = self.config
         lens_centre: tuple[float, float] = (c.lens_centre_x, c.lens_centre_y)
@@ -134,7 +144,7 @@ class Tracker(Thread, BaseTracker):
         rows: int = delivered_height(False, c.resolution, fov, c.tilt, c.lens_fov, lens_centre, c.frame_height)
         window = frame_window(src, (src[0], rows), src[0], fov, c.tilt, c.lens_fov, lens_centre)
         self.geometry.set_window(window, rows)
-        p: ParallaxSettings = c.parallax
+        p: RigSettings = c.rig
         p.vfov = window.elevation_top - window.elevation_bottom
         p.elevation_bottom = window.elevation_bottom
         p.elevation_top = window.elevation_top
@@ -142,11 +152,16 @@ class Tracker(Thread, BaseTracker):
         p.focal_rows = window.focal / (rows - 1)
 
     def _update_seam_angles(self) -> None:
+        """The frame's own spans, for the panorama. Moved by `fov`, by the ring and by the zone's
+        far edge — the three inputs the overlap is derived from — so every one of them rebinds to
+        this. The fusion settings are not here: they are already in the units they are drawn in.
+
+        `overlap` is published in **world azimuth**, which is what can be measured against the
+        panorama's degree grid and what the overlap lines are drawn from. The local-angle band
+        `angle_in_overlap` tests stays inside `Geometry`."""
         a = self.config.seam.angles
         a.fov = self.geometry.cam_fov
-        a.overlap = self.geometry.fov_overlap
-        a.reject = self.geometry.fov_overlap * self.config.seam.reject
-        a.reach = self.geometry.fov_overlap * self.config.seam.reach
+        a.overlap = self.geometry.overlap_world
 
     def start(self) -> None:
         if self._running:
@@ -189,8 +204,8 @@ class Tracker(Thread, BaseTracker):
 
         # The device has finished with this track: its id is now free to be handed to a
         # different person, so the observation leaves the live index. It stays LOST and keeps
-        # anchoring until `timeout`, which is what lets a far camera link across a seam after
-        # the near one gave up.
+        # anchoring until `lost_timeout`, which is what lets a far camera link across a seam
+        # after the near one gave up.
         if new_tracklet.is_removed:
             if self.store.get_world_id(cam_id, ext_id) is not None:
                 self.store.end_device_track(cam_id, ext_id)
@@ -210,11 +225,11 @@ class Tracker(Thread, BaseTracker):
             return
 
         # Annotate with local/world angles, overlap flag, estimated distance and height
-        local_angle, world_angle, _overlap, distance, height = self.geometry.get_angles_and_overlap(new_tracklet.roi, cam_id, self.config.seam.reject)
+        local_angle, world_angle, _overlap, distance, height = self.geometry.get_angles_and_overlap(new_tracklet.roi, cam_id)
         new_tracklet = replace(new_tracklet, annotation=Annotation(local_angle, world_angle, _overlap, distance, height))
 
         # Existing observation — refresh in place, even inside the edge dead
-        # zone: starving it would freeze its angles and expire it via timeout
+        # zone: starving it would freeze its angles and expire it via lost_timeout
         # while the camera still tracks the person.
         if self.store.get_world_id(cam_id, ext_id) is not None:
             self.store.replace_tracklet(new_tracklet)
@@ -232,7 +247,7 @@ class Tracker(Thread, BaseTracker):
             return
 
         # Brand-new observations are ignored too close to the FOV edge
-        if self.geometry.angle_in_edge(local_angle, self.config.seam.reject):
+        if self.geometry.angle_in_edge(local_angle, self.config.seam.dead_zone):
             return
         if _overlap:
             candidate_world: int | None = self._find_world_candidate(new_tracklet)
@@ -246,10 +261,12 @@ class Tracker(Thread, BaseTracker):
 
         The device tracker is zero-term: no appearance model, association from box overlap
         alone. A person it drops — an occlusion, a missed detection — returns under a different
-        id, and without this they would become a new world mid-field. Matching on position and
-        height makes that continuity an explicit rule of ours, rather than an accident of the
-        device reusing its numbers. Bounded by ``seam.relink_angle``, kept small because two
-        people standing closer than that could be confused for one another.
+        id, and without this they would become a new world mid-field. Matching on position makes
+        that continuity an explicit rule of ours, rather than an accident of the device reusing
+        its numbers. Bounded by ``reacquire_angle``, kept small because two people standing
+        closer than that could be confused for one another — and by nothing else: the reason a
+        person was dropped is usually that something changed about their box, so gating the
+        re-acquisition on the box still agreeing asks the wrong question.
         """
         assert isinstance(new_tracklet.annotation, Annotation)
         new_angle: float = new_tracklet.annotation.local_angle
@@ -261,9 +278,7 @@ class Tracker(Thread, BaseTracker):
             if not isinstance(t.annotation, Annotation):
                 continue
             diff: float = abs(t.annotation.local_angle - new_angle)
-            if diff > self.config.seam.relink_angle:
-                continue
-            if abs(t.roi.height - new_tracklet.roi.height) > self.config.seam.max_height_diff:
+            if diff > self.config.reacquire_angle:
                 continue
             if diff < best_diff:
                 best_diff = diff
@@ -271,22 +286,37 @@ class Tracker(Thread, BaseTracker):
         return best_world
 
     def _observations_match(self, a: Tracklet, b: Tracklet) -> bool:
-        """True if two observations from different cameras are close enough in
-        world angle and height to be considered the same person."""
+        """True if two observations from DIFFERENT cameras are one person.
+
+        Two gates, both in real units. **Azimuth** is the decisive one: within
+        ``seam.link_angle`` degrees of world bearing, which is the quantity the panorama check
+        verifies, and which is wide enough to cover the disagreement a body of real width
+        produces at a seam. **Height** is a veto, as a percentage of the larger of the two
+        measured heights (``seam.link_height``) — scale-free, so two cameras at genuinely
+        different distances from the same person still agree, where their box heights in pixels
+        do not. It is skipped unless both readings are measurements (`height_is_measured`), so a
+        jump, a mangled box or feet off the floor cannot refuse a link that the azimuth supports.
+        """
         if a.cam_id == b.cam_id:
             return False
         if not isinstance(a.annotation, Annotation) or not isinstance(b.annotation, Annotation):
             return False
-        if self.geometry.angle_diff(a.annotation.world_angle, b.annotation.world_angle) > self.geometry.fov_overlap * self.config.seam.reach:
+        if self.geometry.angle_diff(a.annotation.world_angle, b.annotation.world_angle) > self.config.seam.link_angle:
             return False
-        if abs(a.roi.height - b.roi.height) > self.config.seam.max_height_diff:
-            return False
-        return True
+        return self._heights_match(a.annotation.height, b.annotation.height)
+
+    def _heights_match(self, height_a: float, height_b: float) -> bool:
+        """The scale-free height veto: `|a - b| / max(a, b)` against ``seam.link_height``
+        percent. Passes whenever either side has no usable reading — see `_observations_match`."""
+        if not (height_is_measured(height_a) and height_is_measured(height_b)):
+            return True
+        largest: float = max(height_a, height_b)
+        return abs(height_a - height_b) / largest * 100.0 <= self.config.seam.link_height
 
     def _find_world_candidate(self, new_tracklet: Tracklet) -> int | None:
         """Return the world id whose other-camera observation best matches
         ``new_tracklet`` in angle and height; None if none match. LOST
-        observations still anchor (removal is bounded by ``timeout``) so the
+        observations still anchor (removal is bounded by ``lost_timeout``) so the
         link survives the previous camera losing the person first. Among
         multiple matching worlds the closest in world angle wins."""
         assert isinstance(new_tracklet.annotation, Annotation)
@@ -307,7 +337,7 @@ class Tracker(Thread, BaseTracker):
     def _update_and_notify(self) -> None:
         # Expire timed-out observations
         for t in self.store.all_tracklets():
-            if t.is_expired(self.config.timeout):
+            if t.is_expired(self.config.lost_timeout):
                 self.store.retire_tracklet(t.obs_id)
 
         # Late safety net: collapse worlds whose observations match each other
@@ -316,11 +346,14 @@ class Tracker(Thread, BaseTracker):
             if self.store.merge_worlds(keep_id, drop_id):
                 self._primary_for_world.pop(drop_id, None)
 
-        # Emit one primary per world, while it is still being seen. `emit_hold` is shorter than
-        # `timeout` on purpose: an observation keeps anchoring a seam crossing long after the
-        # person it describes should stop driving the light, the sound and the hit detector.
+        # Emit one primary per world, while it is still being seen. `emit_timeout` is shorter
+        # than `lost_timeout` on purpose: an observation keeps anchoring a seam crossing long
+        # after the person it describes should stop driving the light, the sound and the hit
+        # detector. It is not zero, though — inside it a person the device has dropped is still
+        # emitted from their last known box, so a missed detection of a frame or two neither
+        # interrupts their pose nor resets the filters downstream of it.
         now: float = time.time()
-        hold: float = self.config.emit_hold
+        emit_timeout: float = self.config.emit_timeout
         emitted: TrackletDict = {}
         for world_id in self.store.all_world_ids():
             primary: Tracklet | None = self._pick_primary(world_id)
@@ -328,7 +361,7 @@ class Tracker(Thread, BaseTracker):
                 continue
             # `_pick_primary` returns the most recently active member, so one test covers the
             # whole world: if even that one is stale, nobody has seen this person lately.
-            if now - primary.last_active > hold:
+            if now - primary.last_active > emit_timeout:
                 continue
             emitted[world_id] = primary
         self._notify_callback(emitted)
@@ -354,7 +387,7 @@ class Tracker(Thread, BaseTracker):
         The incumbent is held through transient LOST states: takeover
         candidates must be active, but a LOST incumbent only yields once a
         competitor beats its last-known edge distance by the hysteresis
-        ratio. Truly departed observations are bounded by the timeout-based
+        ratio. Truly departed observations are bounded by the ``lost_timeout``
         retirement in ``_update_and_notify``.
         """
         members: list[Tracklet] = self.store.get_tracklets(world_id)
@@ -402,7 +435,9 @@ class Tracker(Thread, BaseTracker):
             t for t in self.store.all_tracklets()
             if not t.is_removed
             and isinstance(t.annotation, Annotation)
-            and self.geometry.angle_in_overlap(t.annotation.local_angle, self.config.seam.reach - 1.0)
+            # Eligible where a second opinion exists at all: the picture's overlap, not a tuned
+            # zone. Whether two eligible observations are one person is `_observations_match`.
+            and self.geometry.angle_in_overlap(t.annotation.local_angle)
         ]
 
         def nearest_match(t: Tracklet) -> Tracklet | None:

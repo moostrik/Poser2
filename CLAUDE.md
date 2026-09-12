@@ -81,11 +81,16 @@ PowerShell 5.1 wraps a native command's stderr in `NativeCommandError` and sets
 passing run reads as a failure.
 
     python -m unittest discover -s apps/white_space/tests -t .
-    python -m unittest modules.oak.tests.test_warp_mesh modules.oak.tests.test_lens_image modules.oak.tests.test_keystone_warp modules.pose.tests.test_distance_extractor modules.pose.tests.test_motion_time_extractor modules.settings.tests.test_reactive modules.tracker.tests.test_panoramic_tracker
+    python -m unittest modules.oak.tests.test_warp_mesh modules.oak.tests.test_lens_image modules.oak.tests.test_keystone_warp modules.pose.tests.test_distance_extractor modules.pose.tests.test_motion_time_extractor modules.render.tests.test_marks modules.settings.tests.test_reactive modules.tracker.tests.test_panoramic_tracker modules.tracker.tests.test_panorama_map
 
 `modules/` is a namespace root with no `__init__.py`, so `discover -s modules`
 fails with `ImportError: Start directory is not importable` — name the
 sub-packages explicitly.
+
+GL code cannot be tested without a context, but the arithmetic beside it can:
+`modules/render/layers/panorama/marks.py` holds no GL and imports cleanly, which
+is why `modules.render.tests.test_marks` exists. Keep that split — geometry in a
+plain module, drawing in the renderer — rather than testing renderers.
 
 ## API evolution
 

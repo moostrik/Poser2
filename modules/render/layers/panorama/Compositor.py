@@ -7,7 +7,8 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.board import HasObservations, HasTracklets
 from modules.gl import Fbo, Texture, clear_color
-from modules.tracker import PanoramicTrackerSettings, Tracklet, elevation_window, strip_aspect_ratio
+from modules.tracker import PanoramicTrackerSettings, Tracklet, elevation_window, \
+    strip_aspect_ratio
 from modules.utils import HotReloadMethods
 
 from ..LayerBase import LayerBase
@@ -18,7 +19,7 @@ from .ObservationRenderer import ObservationRenderer
 from .PanoramaLayerSettings import PanoramaLayerSettings, Part
 from .SeamRenderer import SeamRenderer
 from .StitchRenderer import StitchRenderer
-from .marks import Mark, build_marks
+from .marks import Mark, StripGeometry, build_marks
 
 
 class PanoramaBoard(HasTracklets, HasObservations, Protocol):
@@ -38,7 +39,7 @@ class Compositor(LayerBase):
     every other number in the installation is expressed in, and the distance model rides on top of
     them. Drawn apart, on two vertical scales, the two could not be compared; drawn together, a
     person's pixels and a person's numbers are read in the same place — and which of the two is
-    wrong tells you whether to reach for `fov`/`tilt` or for `ring_radius`/`camera_height`.
+    wrong tells you whether to reach for `fov`/`tilt` or for the `rig` group's metres.
 
     **This class owns the strip's geometry**, and hands it down: the elevation window is derived
     once here and passed to whichever renderer needs it, so nothing can drift. `aspect_ratio` is
@@ -62,12 +63,13 @@ class Compositor(LayerBase):
 
         self._stitch: StitchRenderer = StitchRenderer(cam_textures, tracker, settings)
         self._seams: SeamRenderer = SeamRenderer(self.num_cams, tracker, settings)
-        self._grid: GridRenderer = GridRenderer(tracker, settings)
+        self._grid: GridRenderer = GridRenderer(self.num_cams, tracker, settings)
         self._observations: ObservationRenderer = ObservationRenderer()
         self._labels: LabelRenderer = LabelRenderer()
 
-        # Bottom to top. The image first because everything else is read against it; the seams under
-        # the grid so the lattice stays legible over a band; the text last so nothing covers it.
+        # Bottom to top. The image first because everything else is read against it; the seams
+        # under the grid so the lattice stays legible over a band; the text last so nothing
+        # covers it.
         self._order: list[tuple[Part, LayerBase]] = [
             (Part.image,        self._stitch),
             (Part.seams,        self._seams),
@@ -90,24 +92,29 @@ class Compositor(LayerBase):
         return 360.0 / self.num_cams
 
     @property
+    def ring_radius(self) -> float:
+        """Half of `rig.camera_diameter`. The settings are all diameters, matching the doc's Ø
+        convention; every triangle below takes a radius, so the halving happens once, here."""
+        return max(0.0, self._tracker.rig.camera_diameter) / 2.0
+
+    @property
     def row_model(self) -> tuple[float, float]:
         """(horizon_row, focal_rows): the delivered frame's rows as the tracker published them.
         Rows are tangents of elevation — see `panorama_map.row_from_elevation`."""
-        p = self._tracker.parallax
+        p = self._tracker.rig
         return (p.horizon_row, max(1e-6, p.focal_rows))
 
     @property
     def populated_band(self) -> tuple[float, float]:
         """The elevations the delivered frames carry, measured at the camera: the window's
         bottom and top rows, as the tracker published them."""
-        p = self._tracker.parallax
+        p = self._tracker.rig
         return (p.elevation_bottom, p.elevation_top)
 
     @property
     def elevation_window(self) -> tuple[float, float]:
         """(top, bottom) elevation of the strip, measured at the rig centre."""
-        return elevation_window(self.populated_band,
-                                self._tracker.parallax.ring_radius,
+        return elevation_window(self.populated_band, self.ring_radius,
                                 max(1e-6, self._settings.focus_diameter / 2.0))
 
     @property
@@ -163,12 +170,16 @@ class Compositor(LayerBase):
         observations: list[Tracklet] = \
             self._board.get_observations() if self._settings.show_all_observations else chosen
 
-        marks: list[Mark] = build_marks(
-            observations, primaries,
-            self._color_settings.track_color_tuples,
-            self._tracker.fov, self.row_model,
-            self._tracker.parallax.ring_radius,
-            window,
+        geometry: StripGeometry = StripGeometry(
+            cam_fov=self._tracker.fov,
+            target_fov=self.target_fov,
+            ring_radius=self.ring_radius,
+            row_model=self.row_model,
+            elevation_window=window,
+            link_angle=self._tracker.seam.link_angle,
+            reacquire_angle=self._tracker.reacquire_angle,
         )
+        marks: list[Mark] = build_marks(
+            observations, primaries, self._color_settings.track_color_tuples, geometry)
         self._observations.set_marks(marks)
         self._labels.set_marks(marks)

@@ -71,7 +71,9 @@ def focus_distance(bearing: float, ring_radius: float, focus_radius: float) -> f
 
     `bearing` is measured **at the rig centre**, which is what an output column of the panorama
     gives directly. The law of cosines on the centre/camera/cylinder triangle. Symmetric about the
-    camera's axis, largest straight ahead, smallest to the sides.
+    camera's axis, and **smallest straight ahead** — the camera is pushed toward the wall it faces,
+    so its own axis is the short ray: `focus_radius - ring_radius` dead ahead against
+    `+ ring_radius` behind (`test_closest_straight_ahead_farthest_behind`).
     """
     b: float = math.radians(bearing)
     d2: float = ring_radius * ring_radius + focus_radius * focus_radius \
@@ -100,6 +102,59 @@ def azimuth_to_camera_x(azimuth: float, cam_id: int, cam_fov: float, target_fov:
     if local < -_EDGE_TOLERANCE or local > cam_fov + _EDGE_TOLERANCE:
         return None
     return max(0.0, min(1.0, local / cam_fov))
+
+
+def camera_local_to_azimuth(local: float, cam_id: int, cam_fov: float, target_fov: float,
+                            ring_radius: float, focus_diameter: float) -> float:
+    """The world azimuth a camera's own column points at, at the focus depth.
+
+    The inverse of `azimuth_to_camera_x` (times `cam_fov`), and the one thing that lets the
+    display draw a camera-frame quantity — a field edge, a dead zone, a lost person's last local
+    angle — **where its pixels actually are**. Drawn at `camera_azimuth + local - cam_fov/2`
+    instead, a band would sit up to several degrees away from the picture it describes, which is
+    exactly the mistake the parallax correction exists to remove.
+
+    The camera sits `ring_radius` out along its own axis, so a point at camera bearing
+    `θ = local - cam_fov/2` on the focus cylinder of radius `R` is `d` away, and
+
+        d = -r·cos θ + √(R² - r²·sin² θ)        (the cylinder, by the law of cosines)
+        φ = atan2(d·sin θ, d·cos θ + r)          (that point's bearing from the centre)
+
+    At `ring_radius = 0` this collapses to `φ = θ` and the whole thing to `Geometry`'s forward
+    `_calc_world_angle`. The depth is the same assumption the stitch makes and nothing else:
+    per-person depth belongs to the marks (`centre_elevation`), not to a band.
+    """
+    theta: float = math.radians(local - cam_fov / 2.0)
+    phi: float = local - cam_fov / 2.0
+    radius: float = max(0.0, focus_diameter / 2.0)
+    if ring_radius > 0.0 and radius > 0.0:
+        sin_t, cos_t = math.sin(theta), math.cos(theta)
+        root: float = radius * radius - ring_radius * ring_radius * sin_t * sin_t
+        distance: float = -ring_radius * cos_t + math.sqrt(max(0.0, root))
+        if distance > 1e-9:
+            phi = math.degrees(math.atan2(distance * sin_t, distance * cos_t + ring_radius))
+    return (camera_azimuth(cam_id, target_fov) + phi) % 360.0
+
+
+def strip_spans(x: float, width: float) -> list[tuple[float, float]]:
+    """Normalised x spans of a band `width` wide with its LEFT edge at `x`, wrapped at the join.
+
+    The strip's left and right edges are the same azimuth, so a band that runs off one comes back
+    on the other and has to be drawn as two quads. One function because four things need it — the
+    seam bands, the two tolerance bars and the foot tick — and a band silently clipped at azimuth
+    0 is invisible precisely where two cameras meet, which is where a reader is looking hardest.
+
+    `x` may be any real number (a band centred just past 0 starts negative); a `width` at or past
+    the whole strip is one full span, and a non-positive one draws nothing.
+    """
+    if width <= 0.0:
+        return []
+    if width >= 1.0:
+        return [(0.0, 1.0)]
+    left: float = x % 1.0
+    if left + width <= 1.0:
+        return [(left, width)]
+    return [(left, 1.0 - left), (0.0, left + width - 1.0)]
 
 
 def camera_elevation(elevation: float, bearing: float, ring_radius: float,
@@ -143,6 +198,26 @@ def centre_distance(bearing: float, cam_distance: float, ring_radius: float) -> 
     return math.hypot(x, y)
 
 
+def centre_bearing(bearing: float, cam_distance: float, ring_radius: float) -> float:
+    """The bearing (degrees) the RIG CENTRE sees for a point a camera sees at `bearing` off its own
+    axis, `cam_distance` away — the angular partner of `centre_distance`, which solves the same
+    triangle for its length.
+
+    This is the **forward** direction, the one `Geometry._parallax_corrected_local` takes, and the
+    identity that ties the two together is exact:
+
+        world_angle = camera_azimuth(cam_id, target_fov) + centre_bearing(local - cam_fov/2, ...)
+
+    It is here so that anything drawing a camera-frame angle *at a known distance* — the width of
+    a local-angle rule, say — lands in the same frame as the tracker's own `world_angle`, instead
+    of borrowing `camera_local_to_azimuth`, which assumes the focus cylinder's depth rather than
+    the person's.
+    """
+    theta: float = math.radians(bearing)
+    return math.degrees(math.atan2(cam_distance * math.sin(theta),
+                                   cam_distance * math.cos(theta) + ring_radius))
+
+
 def centre_elevation(cam_elevation: float, cam_distance: float, centre_dist: float) -> float:
     """The elevation (degrees) the rig centre sees for a point a camera sees at `cam_elevation`.
 
@@ -179,7 +254,7 @@ def row_from_elevation(elevation: float, horizon_row: float, focal_rows: float) 
     The delivered frame's rows are the tangent of elevation: `row = horizon_row - focal_rows *
     tan(e)`, with `horizon_row` the normalised row of elevation 0 (which may fall outside 0..1)
     and `focal_rows` the focal length in frame heights. Both come off the tracker's published
-    window (`ParallaxSettings`). Transcribed into `panoramicstitch.frag`; keep the two in step.
+    window (`RigSettings`). Transcribed into `panoramicstitch.frag`; keep the two in step.
     """
     return horizon_row - focal_rows * math.tan(math.radians(elevation))
 

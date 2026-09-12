@@ -7,7 +7,7 @@
   "light_resolution": 3600,
   "fov": 127.0,
   "resolution": "P720",
-  "frame_height": 0,
+  "frame_height": 960,
   "tilt": 15.0,
   "lens_fov": 128.9,
   "lens_centre_x": -10.5,
@@ -18,7 +18,7 @@
     "color": false,
     "square": false,
     "stereo": false,
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "ir_flood_light": 0.75,
     "mono_auto_exposure": true,
@@ -43,8 +43,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 29992,
-        "iso": 129,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -77,8 +77,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 29992,
-        "iso": 215,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -111,8 +111,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 29992,
-        "iso": 196,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -145,8 +145,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 29992,
-        "iso": 160,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -177,19 +177,21 @@
     "tracker": {
       "min_age": 5,
       "min_height": 0.2,
-      "timeout": 2.0,
-      "emit_hold": 0.3,
+      "reacquire_angle": 5.0,
+      "lost_timeout": 2.0,
+      "emit_timeout": 1.0,
       "seam": {
-        "reject": 0.35,
-        "reach": 1.1,
+        "dead_zone": 6.5,
+        "link_angle": 10.0,
+        "link_height": 25.0,
         "hysteresis": 0.6,
-        "max_height_diff": 0.18,
-        "relink_angle": 5.0,
         "angles": {}
       },
-      "parallax": {
-        "ring_radius": 0.36,
-        "camera_height": 0.5
+      "rig": {
+        "camera_diameter": 0.72,
+        "camera_height": 0.5,
+        "zone_min_diameter": 3.0,
+        "zone_max_diameter": 7.0
       }
     },
     "frame_sync": {},
@@ -750,6 +752,7 @@
     "panorama": {
       "parts": [
         "image",
+        "seams",
         "grid",
         "observations",
         "labels"
@@ -767,32 +770,32 @@
         "a": 1.0
       },
       "player_1": {
-        "r": 0.0,
-        "g": 0.0,
-        "b": 1.0,
+        "r": 1.0,
+        "g": 1.0,
+        "b": 0.0,
         "a": 1.0
       },
       "player_2": {
-        "r": 0.0,
+        "r": 0.2,
         "g": 1.0,
-        "b": 0.0,
+        "b": 0.6,
         "a": 1.0
       },
       "player_3": {
-        "r": 1.0,
-        "g": 1.0,
-        "b": 0.0,
+        "r": 0.2,
+        "g": 0.6,
+        "b": 1.0,
         "a": 1.0
       },
       "player_4": {
-        "r": 1.0,
-        "g": 0.0,
+        "r": 0.6,
+        "g": 0.2,
         "b": 1.0,
         "a": 1.0
       },
       "player_5": {
-        "r": 0.0,
-        "g": 1.0,
+        "r": 1.0,
+        "g": 0.2,
         "b": 1.0,
         "a": 1.0
       },
@@ -837,8 +840,8 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M1",
-      "x": 59,
-      "y": 2146,
+      "x": 45,
+      "y": 2162,
       "width": 2073,
       "height": 1611,
       "secondary_list": [],

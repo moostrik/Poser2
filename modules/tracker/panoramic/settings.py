@@ -3,43 +3,71 @@ from modules.settings import BaseSettings, Field, Group
 
 
 class SeamAngles(BaseSettings):
+    """The frame's own azimuth spans, published by the tracker for whatever draws with them.
+
+    Not settings: `fov` is the camera's field and `overlap` the azimuth two neighbours share, both
+    fixed by the lens, the mount and the zone. Everything the fusion rules are tuned with is on
+    `SeamSettings` in degrees or percent, so nothing here is a ratio of anything.
+
+    `overlap` is in **world azimuth**, which is the number measurable against the panorama's degree
+    grid and the one the overlap lines are drawn from. `angle_in_overlap` tests the *local*-angle
+    equivalent, which `Geometry` derives alongside it and keeps to itself — the two differ because
+    the local-to-azimuth map compresses.
+    """
     fov: Field[float] = Field(0.0, access=Field.READ, description="Camera FOV (°)")
-    overlap: Field[float] = Field(0.0, access=Field.READ, description="Camera FOV overlap zone (°)")
-    reject: Field[float] = Field(0.0, access=Field.READ, description="Dead zone at camera edges (°)")
-    reach: Field[float] = Field(0.0, access=Field.READ, description="Cross-camera matching zone from camera edges (°)")
+    overlap: Field[float] = Field(0.0, access=Field.READ,
+                                  description="Azimuth (°) two neighbours share, at the zone's far edge")
 
 
 class SeamSettings(BaseSettings):
-    reject: Field[float] = Field(0.5, min=0.0, max=0.75, step=0.05,
-                                 description="Dead zone size as a fraction of the overlap zone.")
-    reach: Field[float] = Field(1.3, min=1.0, max=1.5, step=0.05,
-                                description="Matching zone size as a fraction of the overlap zone.")
+    """When two cameras' views of a seam are one person, and where a person may be born.
+
+    All in real units — degrees of world azimuth and a percentage of a measured height — rather
+    than fractions of the overlap zone, so a number here means the same thing after a change of
+    `fov`, mount or lens. Azimuth is the quantity the panorama check verifies; the distance
+    estimate is not, so it is deliberately not a gate.
+    """
+    dead_zone: Field[float] = Field(5.0, min=0.0, max=20.0, step=0.5,
+                                    description="No new person is born within this many ° of a camera's field edge")
+    link_angle: Field[float] = Field(8.0, min=0.0, max=40.0, step=0.5,
+                                     description="Two cameras' observations within this many ° of azimuth are one person")
+    link_height: Field[float] = Field(15.0, min=0.0, max=100.0, step=1.0,
+                                      description="Maximum % the two measured heights may differ when linking")
     hysteresis: Field[float] = Field(0.9, min=0.1, max=1.0, step=0.05,
                                      description="Lower values make active camera stickier.")
-    max_height_diff: Field[float] = Field(0.15, min=0.0, max=0.5, step=0.01,
-                                          description="Maximum ROI height difference for matching two observations.")
-    relink_angle: Field[float] = Field(5.0, min=0.0, max=20.0, step=0.5,
-                                       description="How far (°) a re-acquired person may be from the lost one and still be them")
     angles: Group[SeamAngles] = Group(SeamAngles)
 
 
-class ParallaxSettings(BaseSettings):
-    """
-    Corrects for the cameras sitting on a ring rather than at a shared optical
-    centre. Each camera is ``ring_radius`` metres from the rig centre, so the
-    same person is seen at different world angles by neighbouring cameras — a
-    disagreement of several degrees at the seams. Distance to the person is
-    estimated from where their feet meet the floor, which needs only the lens
-    height above it, and that is enough to re-project each observation to the
-    shared centre.
+class RigSettings(BaseSettings):
+    """The installation in metres: where the lenses are, and where people are tracked.
 
-    Both numbers are *measured with a tape*, not tuned. At ``ring_radius = 0``
-    the correction is disabled (identity).
+    **Two circles, so two prefixes.** ``camera_`` is the ring the lenses sit on; ``zone_`` is the
+    floor people are tracked on. Everything is a **diameter**, as every figure in CALIBRATION.md
+    is, so the group reads in one unit — radii exist only inside `Geometry`, which halves on the
+    way in exactly as the render halves ``focus_diameter``.
+
+    Nothing here is tuned. The camera pair is *measured with a tape*; the zone is *decided* and
+    then taped on the floor. Three things depend on them:
+
+    - **The parallax correction.** The cameras sit on a ring rather than at a shared optical
+      centre, so the same person is seen at different world angles by neighbours — several degrees
+      of disagreement at a seam. The distance to the person comes from where their feet meet the
+      floor, which needs only the lens height, and that is enough to re-project every observation
+      to the shared centre. At ``camera_diameter = 0`` the correction is disabled (identity).
+    - **The overlap band** (`Geometry.angle_in_overlap`), derived at ``zone_max_diameter``: the
+      widest band two cameras can share anywhere inside the zone, and so the most generous
+      depth-free bound that never under-reports where people actually are.
+    - **The distance clamp**, from both diameters: a mangled bounding box can then only move the
+      parallax correction within the band people are in, never to a nonsensical depth.
     """
-    ring_radius: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01,
-                                      description="Camera distance from rig centre (m), measured. 0 disables the correction")
+    camera_diameter: Field[float] = Field(0.0, min=0.0, max=2.0, step=0.01,
+                                          description="Ø (m) of the ring the lenses sit on, measured. 0 disables the parallax correction")
     camera_height: Field[float] = Field(0.5, min=0.1, max=3.0, step=0.01,
                                         description="Lens height above the floor (m), measured")
+    zone_min_diameter: Field[float] = Field(3.0, min=0.5, max=20.0, step=0.1,
+                                            description="Ø (m) of the tracked floor's near edge — the nearest distance claimed")
+    zone_max_diameter: Field[float] = Field(7.0, min=1.0, max=30.0, step=0.1,
+                                            description="Ø (m) of its far edge — sets the overlap band and the distance clamp")
     # The delivered frame's row model, published by the tracker for whatever draws with its
     # numbers (the panorama). Rows are tangents of elevation: row = horizon_row - focal_rows * tan(e).
     vfov: Field[float] = Field(79.5, access=Field.READ,
@@ -70,9 +98,18 @@ class TrackerSettings(BaseSettings):
                                 description="Minimum age in frames before a tracklet is considered.")
     min_height: Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05,
                                      description="Minimum ROI height to accept a tracklet.")
-    timeout: Field[float] = Field(2.0, min=1.0, max=5.0, step=0.1,
-                                  description="Seconds a lost observation keeps anchoring — must outlast a seam crossing")
-    emit_hold: Field[float] = Field(0.3, min=0.0, max=2.0, step=0.05,
-                                    description="Seconds a world keeps being emitted after its last detection")
+    # Not under `seam`: this is the same camera re-finding a person it dropped, anywhere in its
+    # field, and has nothing to do with two cameras meeting.
+    reacquire_angle: Field[float] = Field(5.0, min=0.0, max=20.0, step=0.5,
+                                          description="How far (°) a re-acquired person may be from the lost one and still be them")
+    # The two windows a lost person lives in, adjacent because each is only clear beside the
+    # other. `emit_timeout` is the shorter on purpose: a person stops driving the show well
+    # before the tracker forgets them, which is what keeps a seam crossing linkable after the
+    # near camera has given up. Inside it, a lost person still gets a pose from their last box —
+    # which is how a dropped detection of a frame or two costs nothing.
+    lost_timeout: Field[float] = Field(2.0, min=1.0, max=5.0, step=0.1,
+                                       description="Seconds a lost person is remembered, for seam links and re-acquisition")
+    emit_timeout: Field[float] = Field(0.3, min=0.0, max=2.0, step=0.05,
+                                       description="Seconds a lost person is still emitted, so a pose survives a detection glitch")
     seam: Group[SeamSettings] = Group(SeamSettings)
-    parallax: Group[ParallaxSettings] = Group(ParallaxSettings)
+    rig: Group[RigSettings] = Group(RigSettings)

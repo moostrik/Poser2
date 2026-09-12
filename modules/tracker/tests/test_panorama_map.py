@@ -10,9 +10,9 @@ import unittest
 
 from modules.oak import frame_window
 from modules.tracker import azimuth_to_camera_x, camera_azimuth, camera_elevation, \
-    centre_distance, centre_elevation, elevation_window, focus_distance, fov_overlap, \
-    panorama_coverage, populated_band, row_from_elevation, elevation_from_row, \
-    strip_y, strip_elevation, strip_aspect_ratio, wrap180
+    camera_local_to_azimuth, centre_bearing, centre_distance, centre_elevation, elevation_window, \
+    focus_distance, fov_overlap, panorama_coverage, populated_band, row_from_elevation, \
+    elevation_from_row, strip_spans, strip_y, strip_elevation, strip_aspect_ratio, wrap180
 from modules.tracker.panoramic.geometry import Geometry
 from modules.utils import Rect
 
@@ -27,7 +27,7 @@ FOCUS_DIAMETER: float = 4.5
 
 def _geometry(ring_radius: float = RING_RADIUS) -> Geometry:
     geometry = Geometry(NUM_CAMERAS, CAM_FOV, TARGET_FOV)
-    geometry.set_ring_radius(ring_radius)
+    geometry.set_camera_diameter(ring_radius * 2.0)
     return geometry
 
 
@@ -240,6 +240,54 @@ class TestCentreDistance(unittest.TestCase):
                                    focus_radius, places=9, msg=f'bearing {centre_bearing}')
 
 
+class TestCentreBearing(unittest.TestCase):
+    """The forward parallax correction, which is what the marks are drawn with."""
+
+    def test_reproduces_the_trackers_world_angle(self) -> None:
+        """The identity the display depends on: a camera-frame angle at a known distance lands on
+        exactly the azimuth `Geometry` would give it. Anything drawing a local-angle rule beside a
+        mark has to use this, not `camera_local_to_azimuth`, whose depth is the cylinder's."""
+        geometry: Geometry = _geometry()
+        for cam_id in range(NUM_CAMERAS):
+            for local in (0.0, 30.0, 63.5, 100.0, CAM_FOV):
+                for distance in (1.2, 2.25, 4.0):
+                    with self.subTest(cam=cam_id, local=local, distance=distance):
+                        expected: float = geometry._calc_world_angle(
+                            geometry._parallax_corrected_local(local, distance), cam_id)
+                        got: float = (camera_azimuth(cam_id, TARGET_FOV)
+                                      + centre_bearing(local - CAM_FOV / 2.0, distance,
+                                                       RING_RADIUS)) % 360.0
+                        self.assertAlmostEqual(got, expected, places=9)
+
+    def test_straight_ahead_is_straight_ahead(self) -> None:
+        for distance in (0.5, 2.0, 9.0):
+            self.assertAlmostEqual(centre_bearing(0.0, distance, RING_RADIUS), 0.0, places=12)
+
+    def test_no_ring_is_the_identity(self) -> None:
+        for bearing in (-63.5, -20.0, 0.0, 20.0, 63.5):
+            self.assertAlmostEqual(centre_bearing(bearing, 3.0, 0.0), bearing, places=12)
+
+    def test_the_ring_pushes_a_bearing_outward(self) -> None:
+        # The camera sits ahead of the centre, so it sees a person at a WIDER angle than the
+        # centre does; correcting to the centre must pull the bearing back in.
+        for bearing in (20.0, 45.0, 63.5):
+            self.assertLess(centre_bearing(bearing, 2.0, RING_RADIUS), bearing)
+            self.assertGreater(centre_bearing(-bearing, 2.0, RING_RADIUS), -bearing)
+
+    def test_agrees_with_the_cylinder_map_at_the_cylinder(self) -> None:
+        """The two maps are the same triangle at two depths, so on the focus cylinder itself they
+        must give the same answer — which is what makes their disagreement elsewhere a statement
+        about depth and nothing more."""
+        for local in (0.0, 40.0, 80.0, CAM_FOV):
+            bearing: float = local - CAM_FOV / 2.0
+            distance: float = _cylinder_distance(bearing, RING_RADIUS, FOCUS_DIAMETER / 2.0)
+            through_cylinder: float = camera_local_to_azimuth(
+                local, 1, CAM_FOV, TARGET_FOV, RING_RADIUS, FOCUS_DIAMETER)
+            through_distance: float = (camera_azimuth(1, TARGET_FOV)
+                                       + centre_bearing(bearing, distance, RING_RADIUS)) % 360.0
+            self.assertAlmostEqual(through_distance, through_cylinder, places=9)
+
+
 class TestCentreElevation(unittest.TestCase):
     """The vertical re-projection for a point whose distance is known, not assumed."""
 
@@ -424,6 +472,103 @@ class TestNoRingIsLinear(unittest.TestCase):
 
     def test_overlap_is_eighteen_and_a_half_degrees(self) -> None:
         self.assertAlmostEqual(fov_overlap(CAM_FOV, TARGET_FOV), 18.5, places=12)
+
+
+class TestCameraLocalToAzimuth(unittest.TestCase):
+    """The other direction, which is what the display draws bands and bars with: a camera's own
+    local angle to the world azimuth its pixels land on."""
+
+    def test_inverts_azimuth_to_camera_x(self) -> None:
+        for cam_id in range(NUM_CAMERAS):
+            for step in range(21):
+                local: float = CAM_FOV * step / 20.0
+                azimuth: float = camera_local_to_azimuth(
+                    local, cam_id, CAM_FOV, TARGET_FOV, RING_RADIUS, FOCUS_DIAMETER)
+                back: float | None = azimuth_to_camera_x(
+                    azimuth, cam_id, CAM_FOV, TARGET_FOV, RING_RADIUS, FOCUS_DIAMETER)
+                self.assertIsNotNone(back, f'cam {cam_id} local {local} left its own field')
+                assert back is not None
+                self.assertAlmostEqual(back * CAM_FOV, local, places=9,
+                                       msg=f'cam {cam_id} local {local}')
+
+    def test_a_camera_spans_less_than_its_field_at_the_focus_depth(self) -> None:
+        """The free check in CALIBRATION.md, in one call: 127 degrees of lens covers 110.5
+        degrees of the strip at Ø 4.5, because the camera sits 0.36 m outside the centre."""
+        for cam_id in range(NUM_CAMERAS):
+            left: float = camera_local_to_azimuth(0.0, cam_id, CAM_FOV, TARGET_FOV,
+                                                  RING_RADIUS, FOCUS_DIAMETER)
+            right: float = camera_local_to_azimuth(CAM_FOV, cam_id, CAM_FOV, TARGET_FOV,
+                                                   RING_RADIUS, FOCUS_DIAMETER)
+            # cam 0's left edge is below azimuth 0, so the span is a wrapped difference — the
+            # same modulo the renderer takes before handing the band to `strip_spans`.
+            self.assertAlmostEqual((right - left) % 360.0, 110.5, delta=0.1)
+            bare: float = (
+                camera_local_to_azimuth(CAM_FOV, cam_id, CAM_FOV, TARGET_FOV, 0.0,
+                                        FOCUS_DIAMETER)
+                - camera_local_to_azimuth(0.0, cam_id, CAM_FOV, TARGET_FOV, 0.0, FOCUS_DIAMETER)
+            ) % 360.0
+            self.assertAlmostEqual(bare, CAM_FOV, places=9)  # ring_radius 0: the bare field
+
+    def test_no_ring_is_the_forward_model(self) -> None:
+        geometry: Geometry = _geometry(ring_radius=0.0)
+        for cam_id in range(NUM_CAMERAS):
+            for local in (0.0, 18.5, 63.5, 108.5, CAM_FOV):
+                self.assertAlmostEqual(
+                    camera_local_to_azimuth(local, cam_id, CAM_FOV, TARGET_FOV, 0.0,
+                                            FOCUS_DIAMETER),
+                    geometry._calc_world_angle(local, cam_id), places=9)
+
+    def test_the_axis_lands_on_the_axis(self) -> None:
+        # Straight ahead the parallax triangle is degenerate, whatever the ring or the depth.
+        for diameter in (3.0, 4.5, 7.0):
+            self.assertAlmostEqual(
+                camera_local_to_azimuth(CAM_FOV / 2.0, 2, CAM_FOV, TARGET_FOV,
+                                        RING_RADIUS, diameter),
+                camera_azimuth(2, TARGET_FOV), places=9)
+
+    def test_monotonic_across_the_field(self) -> None:
+        previous: float = -1.0
+        for step in range(101):
+            azimuth: float = camera_local_to_azimuth(CAM_FOV * step / 100.0, 1, CAM_FOV,
+                                                     TARGET_FOV, RING_RADIUS, FOCUS_DIAMETER)
+            self.assertGreater(azimuth, previous)
+            previous = azimuth
+
+
+class TestStripSpans(unittest.TestCase):
+    """The 0/360 join, in one place: a band that runs off one edge comes back on the other, and
+    a silently clipped band would be invisible exactly where two cameras meet."""
+
+    def test_a_band_inside_the_strip_is_one_span(self) -> None:
+        self.assertEqual(strip_spans(0.25, 0.5), [(0.25, 0.5)])
+
+    def test_a_band_that_wraps_is_two_spans_that_sum(self) -> None:
+        spans = strip_spans(0.9, 0.2)
+        self.assertEqual(len(spans), 2)
+        self.assertAlmostEqual(sum(w for _x, w in spans), 0.2, places=12)
+        self.assertAlmostEqual(spans[0][0], 0.9, places=12)
+        self.assertAlmostEqual(spans[1][0], 0.0, places=12)
+
+    def test_a_negative_left_edge_wraps_in(self) -> None:
+        # A bar centred just past azimuth 0 starts at a negative x, which is the common case.
+        spans = strip_spans(-0.05, 0.1)
+        self.assertAlmostEqual(sum(w for _x, w in spans), 0.1, places=12)
+        self.assertAlmostEqual(spans[0][0], 0.95, places=12)
+
+    def test_a_band_ending_exactly_on_the_edge_stays_one_span(self) -> None:
+        self.assertEqual(strip_spans(0.8, 0.2), [(0.8, 0.2)])
+
+    def test_nothing_and_everything(self) -> None:
+        self.assertEqual(strip_spans(0.3, 0.0), [])
+        self.assertEqual(strip_spans(0.3, -0.1), [])
+        self.assertEqual(strip_spans(0.3, 1.0), [(0.0, 1.0)])
+        self.assertEqual(strip_spans(0.3, 2.0), [(0.0, 1.0)])
+
+    def test_total_width_is_preserved_wherever_it_starts(self) -> None:
+        for start in (0.0, 0.15, 0.5, 0.97, 1.0, 1.4, -1.2):
+            with self.subTest(start=start):
+                self.assertAlmostEqual(sum(w for _x, w in strip_spans(start, 0.3)), 0.3,
+                                       places=12)
 
 
 class TestCameraAzimuth(unittest.TestCase):

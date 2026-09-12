@@ -65,7 +65,7 @@ class StitchRenderer(LayerBase):
             self._tracker.fov,
             self._row_model,
             self._target_fov,
-            self._tracker.parallax.ring_radius,
+            max(0.0, self._tracker.rig.camera_diameter) / 2.0,
             self._settings.focus_diameter,
             self._elevation_window,
             self._populated_band,
