@@ -8,9 +8,11 @@ If the tracker's forward chain ever changes, the round trip breaks here rather t
 import math
 import unittest
 
+from modules.oak import frame_window
 from modules.tracker import azimuth_to_camera_x, camera_azimuth, camera_elevation, \
     centre_distance, centre_elevation, elevation_window, focus_distance, fov_overlap, \
-    panorama_coverage, populated_band, wrap180
+    panorama_coverage, populated_band, row_from_elevation, elevation_from_row, \
+    strip_y, strip_elevation, strip_aspect_ratio, wrap180
 from modules.tracker.panoramic.geometry import Geometry
 from modules.utils import Rect
 
@@ -284,41 +286,128 @@ class TestCentreElevation(unittest.TestCase):
                 places=12)
 
 
+def _window(rows: int, tilt: float, src: tuple[int, int] = (1280, 720)):
+    """The frame the camera delivers: `frame_window` with the ideal lens, as the tracker builds it."""
+    return frame_window(src, (src[0], rows), src[0], CAM_FOV, tilt)
+
+
 class TestElevationWindow(unittest.TestCase):
     """The strip's vertical extent: what the frames carry, converted to the centre's view."""
 
-    def test_tilt_clips_the_bottom_of_the_frame(self) -> None:
-        """P720's field is 71.4 degrees, so a camera aimed up 12 imaged 12 +/- 35.7 while the frame
-        spans +/- 35.7: the picture is -23.7 .. 35.7 and the rows below are empty."""
-        low, high = populated_band(71.4, 12.0)
-        self.assertAlmostEqual(low, -23.7, places=9)
-        self.assertAlmostEqual(high, 35.7, places=9)
+    def test_the_band_is_the_frames_window(self) -> None:
+        """P720 aimed up 12 on 720 rows: the bottom row is the sensor's lowest reach on the centre
+        column, 12 - 35.7 = -23.7, and the rows run up from there as tangents to 38.9."""
+        low, high = populated_band(_window(720, 12.0))
+        self.assertAlmostEqual(low, -23.66, delta=0.01)
+        self.assertAlmostEqual(high, 38.9, delta=0.05)
 
-    def test_no_tilt_is_the_whole_frame(self) -> None:
-        low, high = populated_band(79.4, 0.0)
-        self.assertAlmostEqual(low, -39.7, places=9)
-        self.assertAlmostEqual(high, 39.7, places=9)
+    def test_no_tilt_pins_the_bottom_at_the_sensor_reach(self) -> None:
+        low, high = populated_band(_window(800, 0.0, (1280, 800)))
+        self.assertAlmostEqual(low, -39.64, delta=0.01)
+        self.assertLess(high, 39.64)                     # tangent rows do not reach the sensor's top
+        self.assertGreater(high, 29.0)
 
-    def test_window_is_the_row_the_strip_already_draws(self) -> None:
-        """P720 at tilt 12 on the Ø 4.5 cylinder — the shape the panorama has been drawing."""
-        top, bottom = elevation_window(populated_band(71.4, 12.0), RING_RADIUS,
+    def test_window_is_the_row_the_strip_draws(self) -> None:
+        """P720 at tilt 12 on the Ø 4.5 cylinder, seen from the centre."""
+        top, bottom = elevation_window(populated_band(_window(720, 12.0)), RING_RADIUS,
                                        FOCUS_DIAMETER / 2.0)
-        self.assertAlmostEqual(top, 31.1, delta=0.1)
-        self.assertAlmostEqual(bottom, -20.2, delta=0.1)
+        self.assertAlmostEqual(top, 34.1, delta=0.15)
+        self.assertAlmostEqual(bottom, -20.2, delta=0.15)
 
     def test_the_window_is_narrower_than_the_band(self) -> None:
         """The centre is farther from the cylinder than a camera is, so it sees the same content
         over a smaller angle. Both ends must move inward, never outward."""
-        band: tuple[float, float] = populated_band(71.4, 12.0)
+        band: tuple[float, float] = populated_band(_window(720, 12.0))
         top, bottom = elevation_window(band, RING_RADIUS, FOCUS_DIAMETER / 2.0)
         self.assertLess(top, band[1])
         self.assertGreater(bottom, band[0])
 
     def test_no_ring_leaves_the_band_alone(self) -> None:
-        band: tuple[float, float] = populated_band(79.4, 16.0)
+        band: tuple[float, float] = populated_band(_window(1152, 16.0, (1280, 800)))
         top, bottom = elevation_window(band, 0.0, FOCUS_DIAMETER / 2.0)
         self.assertAlmostEqual(top, band[1], places=12)
         self.assertAlmostEqual(bottom, band[0], places=12)
+
+
+class TestRowModel(unittest.TestCase):
+    """The frames' rows are tangents of elevation; the two functions here are what the stitch
+    shader transcribes and what the marks invert."""
+
+    def _model(self, rows: int, tilt: float) -> tuple[float, float]:
+        w = _window(rows, tilt)
+        return w.horizon_px / (rows - 1), w.focal / (rows - 1)
+
+    def test_round_trip(self) -> None:
+        horizon_row, focal_rows = self._model(960, 15.0)
+        for elevation in (-20.0, -5.0, 0.0, 12.5, 40.0, 52.0):
+            row: float = row_from_elevation(elevation, horizon_row, focal_rows)
+            self.assertAlmostEqual(elevation_from_row(row, horizon_row, focal_rows), elevation, places=9)
+
+    def test_the_ends_of_the_window_are_the_ends_of_the_frame(self) -> None:
+        w = _window(960, 15.0)
+        horizon_row, focal_rows = self._model(960, 15.0)
+        self.assertAlmostEqual(row_from_elevation(w.elevation_bottom, horizon_row, focal_rows), 1.0, places=9)
+        self.assertAlmostEqual(row_from_elevation(w.elevation_top, horizon_row, focal_rows), 0.0, places=9)
+        self.assertAlmostEqual(row_from_elevation(0.0, horizon_row, focal_rows), horizon_row, places=12)
+
+    def test_rows_agree_with_the_window(self) -> None:
+        w = _window(960, 15.0)
+        horizon_row, focal_rows = self._model(960, 15.0)
+        for row in (0.0, 0.25, 0.5, 0.778, 1.0):
+            self.assertAlmostEqual(elevation_from_row(row, horizon_row, focal_rows),
+                                   w.elevation(row * 959.0), places=9)
+
+    def test_no_focal_is_flat(self) -> None:
+        self.assertEqual(elevation_from_row(0.3, 0.5, 0.0), 0.0)
+
+
+class TestStripRows(unittest.TestCase):
+    """The strip's rows are tangents of centre elevation, the same shape as the frames' rows."""
+
+    WINDOW = (45.0, -18.0)          # (top, bottom) at the rig centre, as `elevation_window` gives it
+
+    def test_round_trip(self) -> None:
+        for e in (-18.0, -10.0, 0.0, 12.5, 30.0, 45.0):
+            self.assertAlmostEqual(strip_elevation(strip_y(e, self.WINDOW), self.WINDOW), e, places=9)
+
+    def test_the_window_ends_are_the_strip_ends(self) -> None:
+        top, bottom = self.WINDOW
+        self.assertAlmostEqual(strip_y(top, self.WINDOW), 0.0, places=12)
+        self.assertAlmostEqual(strip_y(bottom, self.WINDOW), 1.0, places=12)
+
+    def test_rows_are_tangents(self) -> None:
+        # Equal steps in tangent are equal steps in y; equal steps in degrees are not.
+        top, bottom = self.WINDOW
+        span = math.tan(math.radians(top)) - math.tan(math.radians(bottom))
+        for e in (-10.0, 0.0, 20.0, 40.0):
+            self.assertAlmostEqual(strip_y(e, self.WINDOW),
+                                   (math.tan(math.radians(top)) - math.tan(math.radians(e))) / span, places=12)
+        ten_low = strip_y(0.0, self.WINDOW) - strip_y(10.0, self.WINDOW)
+        ten_high = strip_y(30.0, self.WINDOW) - strip_y(40.0, self.WINDOW)
+        # tan(40) - tan(30) is 1.49 x tan(10) - tan(0): the top spends more rows per degree.
+        self.assertAlmostEqual(ten_high / ten_low, 1.49, delta=0.02)
+
+    def test_same_shape_as_the_frame_rows(self) -> None:
+        # A frame window and a strip window with the same ends map an elevation to the same
+        # normalised row: the two row mappings are one mapping.
+        top, bottom = self.WINDOW
+        rows = 1000
+        focal = (rows - 1) / (math.tan(math.radians(top)) - math.tan(math.radians(bottom)))
+        horizon_row = focal * math.tan(math.radians(top)) / (rows - 1)
+        focal_rows = focal / (rows - 1)
+        for e in (-15.0, 0.0, 25.0, 44.0):
+            self.assertAlmostEqual(strip_y(e, self.WINDOW), row_from_elevation(e, horizon_row, focal_rows), places=9)
+
+    def test_aspect_is_a_full_turn_over_the_tangent_span(self) -> None:
+        top, bottom = self.WINDOW
+        span = math.tan(math.radians(top)) - math.tan(math.radians(bottom))
+        self.assertAlmostEqual(strip_aspect_ratio(self.WINDOW), 2.0 * math.pi / span, places=12)
+        # Taller than the old linear strip would have been, since the tangent spends rows at the top.
+        self.assertLess(strip_aspect_ratio(self.WINDOW), 360.0 / (top - bottom))
+
+    def test_degenerate_window_does_not_divide_by_zero(self) -> None:
+        self.assertEqual(strip_y(3.0, (5.0, 5.0)), 0.5)
+        self.assertGreater(strip_aspect_ratio((5.0, 5.0)), 1.0)
 
 
 class TestNoRingIsLinear(unittest.TestCase):

@@ -321,15 +321,16 @@ circle (site decision).
 The reference person is **1.8 m**, with an overhead fingertip reach of **2.2 m** — raised arms are
 content the pose reads. On the Ø 2.7 m circle, on a camera's axis, they stand 0.99 m from the lens,
 which puts their fingertips at +59.8°, head at +52.7° and feet at −26.8°. A camera aimed up by
-`tilt` sees `[tilt − vfov/2, tilt + vfov/2]`; fitting fingertips *and* feet at Ø 2.7 would need
-120° of vertical field, against 79.4°. So the tilt is a trade, and **it is resolved in favour of
-the top**: losing the feet degrades the distance estimate (it extrapolates the box bottom), losing
-the arms loses a gesture outright.
+`tilt` sees from `tilt − 39.2°` to `tilt + 41.3°` on its centre column (P800 with the shared lens;
+35.1° and 37.3° at P720 — the sensor's own vertical field, which the frame delivers in full at the
+derived `frame_height`); fitting fingertips *and* feet at Ø 2.7 would need 120° of it, against
+80°. So the tilt is a trade, and **it is resolved in favour of the top**: losing the feet degrades
+the distance estimate (it extrapolates the box bottom), losing the arms loses a gesture outright.
 
 **The rule:** the feet are in frame from **Ø 3.0 m** — the inner edge of the calibrated play zone
 (Ø 3 – Ø 7) — and all remaining room goes to headroom.
 
-| `resolution` | vfov | tilt | fingertips from | head from | feet from |
+| `resolution` | sensor field | tilt | fingertips from | head from | feet from |
 |---|---|---|---|---|---|
 | **P800** | 79.4° | 13 | Ø 3.31 | Ø 2.70 | Ø 2.71 |
 | | | **16** ← use | Ø 3.04 | Ø 2.49 | **Ø 3.00** |
@@ -388,8 +389,13 @@ are purely seam properties.
 
 ### Reading the panorama
 
-The second row is the whole ring as one 360° strip: azimuth 0 at the left edge, elevation up the
-side, both measured at the rig centre and both linear, so a degree is the same size either way. The
+The second row is the whole ring as one 360° strip: azimuth 0 at the left edge, linear in degrees,
+elevation up the side, both measured at the rig centre. The rows are the **tangent** of elevation,
+as the camera frames' are, so a person or a ceiling edge has the same shape in the strip as in the
+frames above it, and the only difference between the two is the azimuth re-projection to the rig
+centre. A degree at the horizon is the same size either way; the grid's elevation lines spread
+toward the top. (The strip is stitched from the frames through the tracker's published row model;
+`panorama_map.strip_y` owns the strip's own rows.) The
 four images are drawn on top of each other at the azimuth each camera claims, and **the tracker's
 own view of the same people is drawn over them on the same vertical scale** — which is the point:
 image right and marks wrong means the distance model, not the camera.
@@ -402,11 +408,15 @@ image right and marks wrong means the distance model, not the camera.
 | `seams` | the sector boundaries (orange), the camera axes (blue), and the two fusion zones |
 | `grid` | the degree lattice, the green horizon, the azimuth labels, the footer |
 | `observations` | a line per observation, head elevation to foot elevation, with a foot tick |
-| `labels` | `#id cam az R distance` per observation |
+| `labels` | `#id cam az R distance H height` per observation |
 
 A **line, not a box**: the box's width said nothing its azimuth does not. The line spans the
 person's own height in the room and the tick marks the row the distance was read from, so what
-feeds `R` is visible. The primary is opaque and 2 px; another camera's view of the same person is
+feeds `R` is visible. `H` is that person's height in metres (see *The tracker's height*), and it
+is **the one number on the strip that checks itself**: a seam's two observations are at different
+distances and so have different box heights in pixels, but their `H` must agree. Two labels of one
+colour showing different `H` means the distance model, the levelling or a camera's roll, before any
+of it reaches the azimuth. The primary is opaque and 2 px; another camera's view of the same person is
 half-lit and 1 px; a LOST one is fainter still. A label's *height* is its id — the same index its
 colour comes from — so labels never collide and never move as people do, and its x always sits on
 its own line.
@@ -458,11 +468,6 @@ lands on it at *any* distance — the parallax correction scales elevations, and
 so it is the one row in the panorama that is exact everywhere, not only at the focus diameter.
 It is also the zero the tracker measures distance from (see *The tracker's distance*).
 
-**Until the panorama adopts `frame_window`** (see *Open*) its green line is drawn where the old,
-horizon-centred rows put it, not where the frame now has it. Read the tape against the horizon row
-the open log's `frame:` line prints (row 747 of 960 at P720 and tilt 15) in each camera's own image
-instead.
-
 **Tape at 50 cm on the wall in front of each camera** and read it against the line:
 
 | the tape | what is wrong |
@@ -507,10 +512,11 @@ cancel. The offset corrects the *reading*, not the image.
 
 ### The tracker's distance
 
-Floor plane: `camera_height / tan(depression of the box bottom)`. **Stale until it adopts
-`frame_window`** (see *Open*): it still turns a row into a depression as if the rows were linear
-and the horizon at the centre row, and both stopped being true with the cylindrical frame. On the
-new rows it becomes simpler — `camera_height · focal / (bottom_px − horizon_px)`. Two limits:
+Floor plane, on tangent rows: `camera_height · focal / (bottom_px − horizon_px)` — the rows below
+the horizon *are* the tangent of the depression, so nothing is converted. The row model is the
+frame's own (`frame_window`, derived by the tracker from the same camera fields the warp used)
+and published as read-only fields under `camera.tracker.parallax` (`horizon_row`, `focal_rows`,
+`elevation_bottom/top`), which the panorama draws with. Two limits:
 
 - **It cannot see nearer than the picture reaches.** At the recommended tilt — 16° at P800 or 12° at
   P720 — the lowest row with picture is 23.7° below the horizon: 1.14 m from the lens, which is
@@ -521,6 +527,29 @@ new rows it becomes simpler — `camera_height · focal / (bottom_px − horizon
 
 It is meant for filtering and, later, for the distance sent to Max — both measured from the **rig
 centre**, not the camera. It currently reads 5 m as 1.9 m; see *Open*.
+
+### The tracker's height
+
+`Geometry.estimate_height`, on the same rows, is a **pure pixel ratio**:
+
+    height = camera_height · box height / (rows from the horizon down to the feet)
+
+The focal length, the field, the tilt and the distance all cancel, because the person and the
+camera stand on one floor — the single-view horizon ratio, which only takes this form because the
+rows are tangents. Three properties follow, and they are why it is worth having:
+
+- **Scale-free.** The same person at 2 m and at 6 m reads the same metres from box heights that
+  differ by more than a factor of two.
+- **Parallax-free.** One camera sees the feet and the head, so nothing is re-projected to the rig
+  centre. Two cameras at a seam therefore *must* agree, which is the check the label carries.
+- **It reads reach, not stature.** The box top is the highest pixel, so arms up read ≈2.2 m where
+  the same person reads 1.8 m with arms down. That is the number the tilt table is built around.
+
+Accuracy is the distance's, in relative terms, since it is the same denominator: a pixel of box
+noise is a centimetre, a degree of horizon error is 9 cm at 1.5 m and 35 cm at 7 m. It reads 0 when
+the feet sit at or above the horizon, and is capped at 3 m — above anything a person can measure,
+so the cap only ever catches a mangled box. Nothing in the show consumes it yet; it rides on the
+annotation and prints on the label. See *Open* for what it could replace.
 
 ---
 
@@ -652,9 +681,9 @@ from the recording with the playhead from the simulated motor, both in one frame
 hit, the sound and both screen views are self-consistent.
 
 - Existing recordings are 1280 × 720 raw clips, shot at `tilt = 0`. Set `resolution` to **P720** in
-  the playback preset and the whole chain derives correctly — `vfov`, the distance estimate and the
-  panorama's geometry. Left at P800 every frame-relative number is off by 800/720 (the simulator
-  warns once).
+  the playback preset and the whole chain derives correctly — the frame height, the window and the
+  horizon row, the distance estimate and the panorama's geometry. Left at P800 the warp expects an
+  800-row clip and every frame-relative number is off (the simulator warns once).
 - `camera.simulator.apply_warp` applies `tilt` to a raw clip. It assumes the clip was shot at exactly
   that tilt; capture-time tilt is not stored with clips, so old footage can carry a horizon error.
 
@@ -662,14 +691,27 @@ hit, the sound and both screen views are self-consistent.
 
 ## Open
 
-- **Downstream still assumes the old rows.** The frame is now cylindrical with the horizon at
-  `frame_window(...).horizon_px`, but four consumers still read rows as linear elevations about the
-  centre row: `Geometry.estimate_distance` (`modules/tracker/panoramic/geometry.py`),
-  `PanoramicTracker._set_fov` (`vfov = fov · h / w`), `populated_band` / `elevation_window`
-  (`modules/tracker/panoramic/panorama_map.py`, via `modules/render/layers/panorama/Compositor.py`)
-  and the panorama's row-to-elevation in `marks.py`. Each needs `frame_window` (rows) and
-  `frame_coverage` (where the black is). Until then the tracker's distance and the panorama's
-  vertical placement are off by the tilt and the tangent, and the green line is not the horizon.
+- **The frame fractions were tuned on 720 rows.** `camera.tracker.min_height`,
+  `camera.tracker.seam.max_height_diff` and `pose.distance_extractor.near_y` / `far_y` are
+  fractions of the frame, and the frame is now taller and its rows tangents. Re-tune on the rig.
+- **Two of those three want to be metres, not fractions** (see *The tracker's height*).
+  `seam.max_height_diff` compares two cameras' box heights in frame fractions to decide whether
+  they are the same person, but the two cameras are at different distances, so one 1.8 m person
+  off the seam centre at Ø 2.7 already differs by 0.158 against a gate of 0.18 — nearly failing to
+  link — while their measured heights agree exactly. On metres the gate is scale-free, can be much
+  tighter, and so also tells two different people apart better. `min_height` is a frame fraction
+  whose meaning changes with every frame or tilt change; in metres it says what it means
+  ("at least a 1 m person"). Not changed yet: both are tuned values, and swapping their units is a
+  rig session, not a code change.
+- **The panorama counts the black arch as covered.** The stitch culls by the frame's window (the
+  centre column's reach), not per column, so in the top corners of a camera's field the comparing
+  blends (`AVERAGE`, `DIFFERENCE`, `SPLIT`, `STRIPE`) mix black into the count. `MAX`, the mode the
+  procedure uses, is unaffected: black loses to the neighbour. Exact culling would take a
+  per-column coverage texture per camera from `frame_coverage`, published by each `Camera`.
+- **A virtual camera per person for the pose** (maybe): the cylindrical crop is a level pinhole
+  panned to the person; re-projecting the crop as a pinhole *pitched at* the person would be the
+  most typical photograph the pose model could get. A per-crop warp in the crop extractor, no
+  change to the shared frame. Worth an A/B on keypoint confidence at raised arms and close range.
 - **Roll is not modelled by the warp.** `warp_mesh_points` takes `tilt` only, so a camera that
   is genuinely rolled still ghosts at its seams (≈2.2° vertical per 1.2° of roll). The mount readout
   says whether that is happening; the fix, if it is, is the tripod or a second rotation in the mesh.
@@ -677,12 +719,15 @@ hit, the sound and both screen views are self-consistent.
   Tape at lens height on the far wall sits only a few degrees off the panorama's horizon line, so
   levelling is part of it, not all. The lens read (see *The lens*) found the horizon 10 px ≈ 1°
   too high under the old model, worth ≈ 1 m at 5 m by the table above — part of it, not all of it.
-  **Test on location**, live rig, once downstream is on `frame_window`:
+  The tracker now reads the tangent rows with the real horizon, so the 9° is expected to have
+  shrunk; the number is unmeasured since. **Test on location**, live rig:
   1. *The horizon check*, per camera, on the far wall — its offset from the line is the levelling
      error.
   2. Floor marks at 1.5, 2, 3, 4, 5 m along one camera's axis; a person on each; read `dis`. With
-     (1) subtracted, an error that grows with distance points at `camera_height` or `vfov`; one that
-     shrinks with distance points at the box bottom not sitting on the feet.
+     (1) subtracted, an error that grows with distance points at `camera_height` or the lens numbers
+     (`lens_fov`, `lens_centre_y`); one that shrinks with distance points at the box bottom not
+     sitting on the feet. The label's `H` is the cross-check: a wrong horizon moves `R` and `H`
+     together, a wrong `camera_height` scales both, a box that misses the feet moves `R` alone.
   3. The same on a recording made there, to know whether clips can be trusted for this.
 - **A placement aid** (maybe): since placement *is* the room-side calibration, projection layers
   that put the sector boundaries and centres on the wall would make it easier. The IMU cannot help

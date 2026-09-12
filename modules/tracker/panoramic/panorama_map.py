@@ -35,6 +35,8 @@ the plan. Nothing about a person, a box or a pose feeds it, so nothing can fool 
 
 import math
 
+from modules.oak import FrameWindow
+
 
 # The field test is a closed interval, and a column that lands exactly on the frame edge — the
 # seam-most pixel of a camera, which is precisely where the stitch is read — comes out of the
@@ -160,16 +162,66 @@ def centre_elevation(cam_elevation: float, cam_distance: float, centre_dist: flo
         math.tan(math.radians(cam_elevation)) * cam_distance / centre_dist))
 
 
-def populated_band(vfov: float, tilt: float) -> tuple[float, float]:
-    """(low, high) elevations the delivered frames actually carry, measured AT THE CAMERA.
+def populated_band(window: FrameWindow) -> tuple[float, float]:
+    """(low, high) elevations the delivered frames carry, measured AT THE CAMERA.
 
-    The warp hands back a *levelled* frame spanning +/- vfov/2 whatever the mount does, but a camera
-    aimed up by `tilt` never imaged the bottom of that: it saw `[tilt - vfov/2, tilt + vfov/2]`, and
-    the rows outside the intersection are empty. At tilt 15 that is the bottom 18.5% of the frame —
-    the black band.
+    The frame's window: its bottom row is the sensor's lowest reach on the centre column and its
+    top row whatever the rows reach. Off the centre column the sensor reaches less at the top
+    (the black arch), and that is in the pixels as black rather than in this band; a stitch that
+    counts coverage exactly per column would need `frame_coverage` (see CALIBRATION.md, *Open*).
     """
-    half: float = max(1.0, vfov) / 2.0
-    return (max(-half, tilt - half), min(half, tilt + half))
+    return (window.elevation_bottom, window.elevation_top)
+
+
+def row_from_elevation(elevation: float, horizon_row: float, focal_rows: float) -> float:
+    """Normalised frame row (0 = top) of an elevation (degrees) at the camera.
+
+    The delivered frame's rows are the tangent of elevation: `row = horizon_row - focal_rows *
+    tan(e)`, with `horizon_row` the normalised row of elevation 0 (which may fall outside 0..1)
+    and `focal_rows` the focal length in frame heights. Both come off the tracker's published
+    window (`ParallaxSettings`). Transcribed into `panoramicstitch.frag`; keep the two in step.
+    """
+    return horizon_row - focal_rows * math.tan(math.radians(elevation))
+
+
+def elevation_from_row(row: float, horizon_row: float, focal_rows: float) -> float:
+    """The inverse of `row_from_elevation`: a normalised frame row to an elevation (degrees)."""
+    if focal_rows <= 0.0:
+        return 0.0
+    return math.degrees(math.atan((horizon_row - row) / focal_rows))
+
+
+def strip_y(elevation: float, elevation_window: tuple[float, float]) -> float:
+    """Normalised, top-down y of a centre elevation (degrees) in the 360-degree STRIP.
+
+    The strip's rows are tangents of elevation, like the camera frames' — a photograph's vertical,
+    not a degree scale — so a person or a ceiling edge has the same shape in the strip as in the
+    frames, and the vertical parallax term is a plain scale per column. `elevation_window` is the
+    strip's (top, bottom) at the rig centre (`elevation_window`). Transcribed into
+    `panoramicstitch.frag`; keep the two in step.
+    """
+    top, bottom = elevation_window
+    tan_top, tan_bottom = math.tan(math.radians(top)), math.tan(math.radians(bottom))
+    span: float = tan_top - tan_bottom
+    if abs(span) < 1e-9:
+        return 0.5
+    return (tan_top - math.tan(math.radians(elevation))) / span
+
+
+def strip_elevation(y: float, elevation_window: tuple[float, float]) -> float:
+    """The inverse of `strip_y`: a normalised strip y to a centre elevation (degrees)."""
+    top, bottom = elevation_window
+    tan_top, tan_bottom = math.tan(math.radians(top)), math.tan(math.radians(bottom))
+    return math.degrees(math.atan(tan_top - y * (tan_top - tan_bottom)))
+
+
+def strip_aspect_ratio(elevation_window: tuple[float, float]) -> float:
+    """Width over height of the strip: 360 degrees of azimuth at the same focal as the tangent
+    rows, so a degree at the horizon is the same size either way and the rows above spend more,
+    exactly as the camera frames do. `2π / (tan(top) − tan(bottom))`."""
+    top, bottom = elevation_window
+    span: float = math.tan(math.radians(top)) - math.tan(math.radians(bottom))
+    return 2.0 * math.pi / max(1e-6, span)
 
 
 def elevation_window(band: tuple[float, float], ring_radius: float,

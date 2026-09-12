@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 # Local application imports
 from modules.tracker import PanoramicAnnotation, Tracklet, TrackingStatus, \
-    centre_distance, centre_elevation
+    centre_distance, centre_elevation, elevation_from_row, strip_y
 
 
 @dataclass(frozen=True)
@@ -35,20 +35,15 @@ class Mark:
     label: str
 
 
-def elevation_y(elevation: float, elevation_window: tuple[float, float]) -> float:
-    """Normalised, top-down y of an elevation in the strip."""
-    top, bottom = elevation_window
-    return (top - elevation) / max(1e-6, top - bottom)
-
-
 def build_marks(observations: list[Tracklet], primaries: set[int],
                 colors: list[tuple[float, float, float, float]],
-                cam_fov: float, vfov: float, ring_radius: float,
+                cam_fov: float, row_model: tuple[float, float], ring_radius: float,
                 elevation_window: tuple[float, float]) -> list[Mark]:
-    """A mark per usable observation, primaries last so they are drawn over their candidates."""
+    """A mark per usable observation, primaries last so they are drawn over their candidates.
+    `row_model` is (horizon_row, focal_rows), the frames' rows as the tracker published them."""
     marks: list[Mark] = []
     for tracklet in observations:
-        mark: Mark | None = _mark(tracklet, primaries, colors, cam_fov, vfov, ring_radius,
+        mark: Mark | None = _mark(tracklet, primaries, colors, cam_fov, row_model, ring_radius,
                                   elevation_window)
         if mark is not None:
             marks.append(mark)
@@ -58,7 +53,7 @@ def build_marks(observations: list[Tracklet], primaries: set[int],
 
 def _mark(tracklet: Tracklet, primaries: set[int],
           colors: list[tuple[float, float, float, float]],
-          cam_fov: float, vfov: float, ring_radius: float,
+          cam_fov: float, row_model: tuple[float, float], ring_radius: float,
           elevation_window: tuple[float, float]) -> Mark | None:
     if tracklet is None or tracklet.is_removed:
         return None
@@ -71,8 +66,8 @@ def _mark(tracklet: Tracklet, primaries: set[int],
     cam_distance: float = max(1e-6, annotation.distance)
     centre_dist: float = centre_distance(bearing, cam_distance, ring_radius)
 
-    top_y: float = _row_y(tracklet.roi.y, vfov, cam_distance, centre_dist, elevation_window)
-    bottom_y: float = _row_y(tracklet.roi.y + tracklet.roi.height, vfov, cam_distance,
+    top_y: float = _row_y(tracklet.roi.y, row_model, cam_distance, centre_dist, elevation_window)
+    bottom_y: float = _row_y(tracklet.roi.y + tracklet.roi.height, row_model, cam_distance,
                              centre_dist, elevation_window)
 
     is_primary: bool = tracklet.obs_id in primaries
@@ -97,21 +92,25 @@ def _mark(tracklet: Tracklet, primaries: set[int],
         # Fixed width, so the right-edge flip threshold is the same for everybody and cannot wobble
         # as the digits change. `R` is the drafting radius: this distance is from the rig centre,
         # where the footer's `Ø` is a diameter — the two differ by a factor of two and must not be
-        # read as the same kind of number.
+        # read as the same kind of number. `H` is the person's own height, measured at the camera
+        # and so already absolute: a seam's two observations must print the same `H` while their
+        # box heights in pixels do not, which is the one number on the strip that reads as a check
+        # on itself.
         label=f'#{tracklet.id} c{tracklet.cam_id} '
-              f'az{annotation.world_angle % 360.0:03.0f} R{centre_dist:.1f}m',
+              f'az{annotation.world_angle % 360.0:03.0f} R{centre_dist:.1f}m '
+              f'H{annotation.height:.1f}m',
     )
 
 
-def _row_y(row: float, vfov: float, cam_distance: float, centre_dist: float,
+def _row_y(row: float, row_model: tuple[float, float], cam_distance: float, centre_dist: float,
            elevation_window: tuple[float, float]) -> float:
     """A normalised frame row to a normalised strip y.
 
-    The delivered frame is equirectangular and levelled, so a row *is* an elevation measured at the
-    camera: `e_cam = (0.5 - row) * vfov`, positive upward. A row may legitimately fall outside
-    [0, 1] — the device tracker extrapolates a partly visible person, and that is real information
-    about how close they are — so nothing is clamped here; the renderer clips when it draws.
+    The delivered frame is cylindrical and levelled, so a row is the tangent of an elevation
+    measured at the camera, below the horizon row (`elevation_from_row`). A row may legitimately
+    fall outside [0, 1] — the device tracker extrapolates a partly visible person, and that is
+    real information about how close they are — so nothing is clamped here; the renderer clips
+    when it draws.
     """
-    cam_elevation: float = (0.5 - row) * vfov
-    return elevation_y(centre_elevation(cam_elevation, cam_distance, centre_dist),
-                       elevation_window)
+    cam_elevation: float = elevation_from_row(row, *row_model)
+    return strip_y(centre_elevation(cam_elevation, cam_distance, centre_dist), elevation_window)

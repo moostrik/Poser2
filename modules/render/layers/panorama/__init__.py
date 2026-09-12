@@ -5,4 +5,4 @@ from .LabelRenderer import     LabelRenderer
 from .ObservationRenderer import ObservationRenderer
 from .SeamRenderer import      SeamRenderer
 from .StitchRenderer import    StitchRenderer
-from .marks import             Mark, build_marks, elevation_y
+from .marks import             Mark, build_marks

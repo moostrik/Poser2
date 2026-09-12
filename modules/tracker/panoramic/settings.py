@@ -40,14 +40,32 @@ class ParallaxSettings(BaseSettings):
                                       description="Camera distance from rig centre (m), measured. 0 disables the correction")
     camera_height: Field[float] = Field(0.5, min=0.1, max=3.0, step=0.01,
                                         description="Lens height above the floor (m), measured")
+    # The delivered frame's row model, published by the tracker for whatever draws with its
+    # numbers (the panorama). Rows are tangents of elevation: row = horizon_row - focal_rows * tan(e).
     vfov: Field[float] = Field(79.5, access=Field.READ,
-                              description="Vertical field (°) of the frame, derived from fov and resolution")
+                              description="Elevation span (°) of the delivered frame, bottom row to top row")
+    elevation_bottom: Field[float] = Field(-39.7, access=Field.READ,
+                                          description="Elevation (°) of the frame's bottom row, at the camera")
+    elevation_top: Field[float] = Field(39.7, access=Field.READ,
+                                       description="Elevation (°) of the frame's top row, at the camera")
+    horizon_row: Field[float] = Field(0.5, access=Field.READ,
+                                     description="Normalised row (0 = top) of the horizon; may fall outside 0..1")
+    focal_rows: Field[float] = Field(0.72, access=Field.READ,
+                                    description="Focal length in frame heights: rows below the horizon = focal_rows · tan(depression)")
 
 
 class TrackerSettings(BaseSettings):
     fov: Field[float] = Field(110.0, access=Field.INIT)
+    # The frame geometry, shared from the camera group: what the warp was built with, so the
+    # tracker's row model is the frame's.
     resolution: Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT,
-                                                description="Sensor mode, shared — only the frame shape is used, for the vertical field")
+                                                description="Sensor mode, shared — the frame's shape")
+    frame_height: Field[int] = Field(0, access=Field.INIT,
+                                    description="Delivered frame height (px), shared; 0 = derived from the tilt")
+    tilt: Field[float] = Field(0.0, access=Field.INIT, description="Camera up-tilt (°), shared")
+    lens_fov: Field[float] = Field(0.0, access=Field.INIT, description="Lens field (°) across the sensor width, shared; 0 = fov")
+    lens_centre_x: Field[float] = Field(0.0, access=Field.INIT, description="Optical centre offset (px), shared")
+    lens_centre_y: Field[float] = Field(0.0, access=Field.INIT, description="Optical centre offset (px), shared")
     min_age: Field[int] = Field(5, min=0, max=9, step=1,
                                 description="Minimum age in frames before a tracklet is considered.")
     min_height: Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05,

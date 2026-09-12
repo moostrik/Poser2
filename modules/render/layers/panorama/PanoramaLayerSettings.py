@@ -54,7 +54,7 @@ class PanoramaLayerSettings(BaseSettings):
     grid_degrees: Field[float] = Field(10.0, min=1.0, max=90.0, step=1.0,
                                        description="Grid spacing (°), the same on both axes")
     tilt: Field[float] = Field(0.0, access=Field.INIT,
-                               description="Camera up-tilt (°), shared — says which rows the sensor never imaged")
+                               description="Camera up-tilt (°), shared — shown in the footer; the rows come from the tracker")
     show_all_observations: Field[bool] = Field(True, widget=Widget.switch,
                                               description="Draw every camera's own opinion, not just the one the tracker picked")
 

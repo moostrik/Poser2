@@ -1,5 +1,6 @@
 import math
 
+from modules.oak import FrameWindow, frame_window
 from modules.utils import Rect
 
 
@@ -9,17 +10,24 @@ from modules.utils import Rect
 _MIN_DISTANCE: float = 0.6
 _MAX_DISTANCE: float = 4.0
 
+# Tallest reading `estimate_height` will report (m). A box whose feet land a pixel below the
+# horizon divides by almost nothing, so the ratio needs a ceiling. Set above anything a person
+# can measure — a tall one with both arms up reaches ~2.4 — so the cap only ever catches a
+# mangled box, never a real reading it might otherwise flatten.
+_MAX_HEIGHT: float = 3.0
+
 
 class Geometry:
     """Turns a camera's bounding box into a world azimuth.
 
     Two properties of the delivered frame make this simple, and both are produced by the
     camera's warp (`modules/oak/camera/definitions.py`, `warp_mesh_points`), not assumed
-    here: the frame is **level** (the tilt is undone) and **equirectangular** (a column is one
-    azimuth at every height, a row is one elevation at every column). On the raw fisheye neither
-    holds — a standing person's box centre reads several degrees short of their true bearing,
-    worst near the seams — which is why there is no distortion correction in this class: the
-    projection is fixed upstream rather than patched here.
+    here: the frame is **level** (the tilt is undone) and **cylindrical** (a column is one
+    azimuth at every height, a row is one elevation at every column, spaced by the tangent of
+    the elevation). On the raw fisheye neither holds — a standing person's box centre reads
+    several degrees short of their true bearing, worst near the seams — which is why there is no
+    distortion correction in this class: the projection is fixed upstream rather than patched
+    here. The row model (`FrameWindow`) is handed in by `set_window`.
     """
 
     def __init__(self, num_cameras: int, cam_fov: float, target_fov: float) -> None:
@@ -33,12 +41,17 @@ class Geometry:
         self._ring_radius: float = 0.0
         # Lens height above the floor (m) — the one measured constant the distance estimate needs.
         self._camera_height: float = 0.5
-        self._vfov: float = 79.4
+        # The frame's rows: where the horizon is (px) and how many px a unit of tangent spans.
+        # Until `set_window`, an untilted 1280 x 800 frame with the ideal lens.
+        self.set_window(frame_window((1280, 800), (1280, 800), 1280, cam_fov, 0.0), 800)
 
-    def get_angles_and_overlap(self, roi: Rect, cam_id: int, expansion: float) -> tuple[float, float, bool, float]:
+    def get_angles_and_overlap(self, roi: Rect, cam_id: int,
+                               expansion: float) -> tuple[float, float, bool, float, float]:
+        """Everything one box says about one person, in the order `Annotation` holds it:
+        local angle, world angle, overlap flag, distance (m) and height (m)."""
         local_angle, world_angle, distance = self.calc_angle(roi, cam_id)
         overlap: bool = self.angle_in_overlap(local_angle, expansion)
-        return (local_angle, world_angle, overlap, distance)
+        return (local_angle, world_angle, overlap, distance, self.estimate_height(roi))
 
     def calc_angle(self, roi: Rect, cam_id: int) -> tuple[float, float, float]:
         local_angle: float = self._calc_local_angle(roi)
@@ -52,38 +65,72 @@ class Geometry:
     def estimate_distance(self, roi: Rect) -> float:
         """Distance from the camera (m), from where the feet meet the floor.
 
-        The frame is equirectangular and level, so a row *is* an elevation: the box's bottom edge
-        is a depression angle below the horizon, and the floor plane turns that into a distance
-        with one measured constant, the lens height. Nothing about the person enters it — arms
-        raised, legs pulled up and bending over all change a box's *height*, and none of them
-        move the feet.
+        The frame is cylindrical and level, so the rows below the horizon are the TANGENT of the
+        depression: `tan(depression) = (bottom_px - horizon_px) / focal`. The floor plane turns
+        that into a distance with one measured constant, the lens height, and the tangent
+        cancels: `distance = camera_height * focal / (bottom_px - horizon_px)`. Nothing about
+        the person enters it — arms raised, legs pulled up and bending over all change a box's
+        *height*, and none of them move the feet.
 
         TWO CAMERA FACTS, HANDLED IN TWO DIFFERENT PLACES. The lens *height* is here, as
-        ``camera_height``. The *tilt* is not: this assumes the frame's centre row is the horizon,
-        which is true only because the camera's warp has already levelled it
-        (``warp_mesh_points``). That assumption cannot be checked from here and it is not a
-        small one — on an un-levelled frame from a camera aimed up 15 deg, a person truly 3.26 m
-        away reads as 1.14 m. So the distance, and therefore the parallax correction that depends
-        on it, is meaningless on footage that has not been through the warp.
+        ``camera_height``. The *tilt* is not: it is inside the window (`set_window`), which the
+        camera's warp and this class derive with the same function (`frame_window`). The horizon
+        is NOT the centre row — the window is pinned at the sensor's bottom reach, so on a camera
+        aimed up 15 deg the horizon sits at row 0.78 of the frame — and reading a row as if it
+        were is how a person truly 3.3 m away used to read as 1.1 m. The distance, and therefore
+        the parallax correction that depends on it, is meaningless on footage that has not been
+        through the warp.
 
-        The frame's own geometry bounds this nicely: its bottom row sits at about 39.7° of
-        depression, which is 0.60 m out, just inside the Ø 2.0 m hard floor.
+        The frame's own geometry bounds this: its bottom row is the sensor's lowest reach on the
+        centre column, `-elevation_bottom` of depression — 1.37 m out at P720 and tilt 15,
+        1.16 m at P800 and tilt 16 — and anyone closer has their feet below the frame.
 
         **A box may extend outside the frame.** The device tracker extrapolates the extent of a
         partly-visible person, and nothing clamps it on the way in (`Tracklet.from_depthcam`), so
         a close person's `bottom` legitimately exceeds 1.0 and that is real information about how
         close they are. It is used, not discarded: the formula is continuous across the frame edge
-        and the final clamp is what bounds the answer. (At `bottom == 1.0` the formula already
-        gives 0.60 m, so there was never a boundary to special-case.) Past 90° of depression the
-        tangent turns negative, which the clamp also catches.
+        and the final clamp is what bounds the answer.
         """
-        bottom: float = roi.y + roi.height
-        depression: float = math.radians((bottom - 0.5) * self._vfov)
-        if depression <= 0.0:
+        bottom_px: float = (roi.y + roi.height) * (self._rows - 1)
+        below: float = bottom_px - self._horizon_px          # px below the horizon
+        if below <= 0.0:
             # Feet at or above the horizon: not standing on this floor.
             return _MAX_DISTANCE
-        distance: float = self._camera_height / math.tan(depression)
+        distance: float = self._camera_height * self._focal / below
         return max(_MIN_DISTANCE, min(_MAX_DISTANCE, distance))
+
+    def estimate_height(self, roi: Rect) -> float:
+        """How tall the person is (m), from the box's top and bottom rows.
+
+        A PURE PIXEL RATIO, which is the gift of the cylindrical frame: the rows below the
+        horizon *are* the tangent of the depression, so
+
+            height = camera_height * (bottom_px - top_px) / (bottom_px - horizon_px)
+
+        The focal length, the field of view, the tilt and the distance all cancel, because the
+        person and the camera stand on the same floor — the classic single-view horizon ratio.
+        On rows linear in elevation it would have taken the distance and two arctangents.
+
+        SCALE-FREE AND PARALLAX-FREE. One camera sees both the feet and the head, so unlike the
+        azimuth this needs no ring correction, and two cameras at different distances from the
+        same person agree in metres while their *pixel* box heights differ by tens of percent.
+        That makes it the honest quantity to match observations on across a seam, where
+        ``seam.max_height_diff`` compares frame fractions that genuinely disagree.
+
+        IT READS REACH, NOT STATURE. The box top is the highest pixel, so raised arms read
+        about 2.2 m where the same person reads 1.8 m with their arms down, at any distance.
+        Here that is the useful number: overhead reach is what the tilt is chosen around.
+
+        Accuracy is the distance estimate's in relative terms, since it is the same denominator:
+        a pixel of box noise is a centimetre, while a degree of horizon error is 9 cm at 1.5 m
+        and 35 cm at 7 m. Reads 0.0 when the feet sit at or above the horizon — nobody standing
+        on this floor — and is capped at ``_MAX_HEIGHT``.
+        """
+        rows: int = self._rows - 1
+        below: float = (roi.y + roi.height) * rows - self._horizon_px
+        if below <= 0.0:
+            return 0.0
+        return min(_MAX_HEIGHT, self._camera_height * roi.height * rows / below)
 
     def _parallax_corrected_local(self, local_angle: float, distance: float) -> float:
         """Re-project a local angle so it reads as if seen from the rig centre.
@@ -145,5 +192,10 @@ class Geometry:
     def set_camera_height(self, camera_height: float) -> None:
         self._camera_height = camera_height
 
-    def set_vfov(self, vfov: float) -> None:
-        self._vfov = vfov
+    def set_window(self, window: FrameWindow, rows: int) -> None:
+        """The delivered frame's row model: `rows` tall, horizon at `window.horizon_px`,
+        `window.focal` px per unit of tangent."""
+        self._window: FrameWindow = window
+        self._rows: int = max(2, rows)
+        self._horizon_px: float = window.horizon_px
+        self._focal: float = max(1e-6, window.focal)

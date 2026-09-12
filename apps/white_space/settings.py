@@ -39,6 +39,19 @@ class Stage(IntEnum):
     LERP    = auto()
 
 
+class CameraView(IntEnum):
+    """Which of the two camera-derived rows the window shows.
+
+    They show the same pixels in two projections — the frames as each camera delivers them, and
+    all four stitched into one 360° strip at the rig centre — so which one you want depends on
+    what you are doing: aiming a camera, or reading the calibration. Hiding one gives its height
+    to the other and skips its compositing entirely.
+    """
+    BOTH     = 0
+    CAMERAS  = auto()   # the four delivered frames only
+    PANORAMA = auto()   # the 360° strip only
+
+
 # ---------------------------------------------------------------------------
 #  Layers enum
 # ---------------------------------------------------------------------------
@@ -95,7 +108,8 @@ class OakGroup(BaseSettings):
     cam_3     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     mount     : Group[MountCheckSettings]        = Group(MountCheckSettings)
     simulator : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cameras, fps])
-    tracker   : Group[PanoramicTrackerSettings]  = Group(PanoramicTrackerSettings, share=[fov, resolution])
+    tracker   : Group[PanoramicTrackerSettings]  = Group(PanoramicTrackerSettings, share=[fov, resolution, frame_height, tilt,
+                                                                                         lens_fov, lens_centre_x, lens_centre_y])
     frame_sync: Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
     tracklet_sync: Group[SyncSettings]           = Group(SyncSettings, share=[num_cameras, fps])
 
@@ -311,6 +325,8 @@ class BeamLightSimSettings(BaseSettings):
 
 
 class RenderSettings(BaseSettings):
+    camera_view: Field[CameraView] = Field(CameraView.BOTH, widget=Widget.select,
+                                           description="Which camera row to show: the delivered frames, the 360° strip, or both")
     num_cams:    Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of players")
     tilt:        Field[float] = Field(0.0, access=Field.INIT, visible=False, description="Camera up-tilt (°), shared from the root — relayed to the panorama layer")

@@ -8,7 +8,7 @@ from threading import Lock, Thread, Event
 from typing import Callable
 
 # Local application imports
-from modules.oak import DepthTracklet, mono_frame_size
+from modules.oak import DepthTracklet, mode_size, frame_window, delivered_height
 from .. import (
     BaseTracker, TrackerAnnotation,
     Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback,
@@ -24,10 +24,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class Annotation(TrackerAnnotation):
+    """What one camera's box says about one person, all of it derived in `Geometry`.
+
+    `distance` is from that camera (m); `height` is absolute (m) and needs no re-projection,
+    since the same camera sees the person's feet and head.
+    """
     local_angle: float
     world_angle: float
     overlap: bool
     distance: float = 0.0
+    height: float = 0.0
 
 
 class Tracker(Thread, BaseTracker):
@@ -83,7 +89,7 @@ class Tracker(Thread, BaseTracker):
         self.geometry: Geometry = Geometry(num_cameras, config.fov, 360.0 / num_cameras)
 
         # Wire fov and parallax changes to geometry
-        TrackerSettings.fov.bind(config, lambda v: (self._set_fov(v), self._update_seam_angles()))
+        TrackerSettings.fov.bind(config, lambda v: (self._set_frame(v), self._update_seam_angles()))
         ParallaxSettings.ring_radius.bind(config.parallax, lambda v: self.geometry.set_ring_radius(v))
         ParallaxSettings.camera_height.bind(config.parallax, lambda v: self.geometry.set_camera_height(v))
 
@@ -108,21 +114,32 @@ class Tracker(Thread, BaseTracker):
         """Apply current config values to geometry. Needed at construction
         because ``bind`` does not fire with the initial value and the preset is
         loaded before the tracker exists."""
-        self._set_fov(self.config.fov)
+        self._set_frame(self.config.fov)
         self.geometry.set_ring_radius(self.config.parallax.ring_radius)
         self.geometry.set_camera_height(self.config.parallax.camera_height)
 
-    def _set_fov(self, fov: float) -> None:
-        """The vertical field is fov x rows / columns — same degrees per pixel on both axes.
+    def _set_frame(self, fov: float) -> None:
+        """The delivered frame's geometry, from the same functions the camera's warp is built
+        with: `fov` for the columns, `frame_window` for the rows.
 
-        The frame shape comes from the configured `resolution`, so changing the sensor mode in
-        the preset carries `vfov` with it. Mono and landscape, which is what this tracker has
-        always assumed."""
+        Rows are tangents of elevation with the horizon at `horizon_px`, not linear about the
+        centre row, so the row model is a window rather than a `vfov`. Derived here, once, from
+        the shared camera fields, and published as read-only fields on `parallax` so the
+        panorama draws with exactly the numbers the tracker tracks with. Mono and landscape,
+        which is what this tracker has always assumed."""
         self.geometry.set_fov(fov)
-        width, height = mono_frame_size(self.config.resolution)
-        vfov: float = fov * height / width
-        self.geometry.set_vfov(vfov)
-        self.config.parallax.vfov = vfov
+        c: TrackerSettings = self.config
+        lens_centre: tuple[float, float] = (c.lens_centre_x, c.lens_centre_y)
+        src: tuple[int, int] = mode_size(False, c.resolution)
+        rows: int = delivered_height(False, c.resolution, fov, c.tilt, c.lens_fov, lens_centre, c.frame_height)
+        window = frame_window(src, (src[0], rows), src[0], fov, c.tilt, c.lens_fov, lens_centre)
+        self.geometry.set_window(window, rows)
+        p: ParallaxSettings = c.parallax
+        p.vfov = window.elevation_top - window.elevation_bottom
+        p.elevation_bottom = window.elevation_bottom
+        p.elevation_top = window.elevation_top
+        p.horizon_row = window.horizon_px / (rows - 1)
+        p.focal_rows = window.focal / (rows - 1)
 
     def _update_seam_angles(self) -> None:
         a = self.config.seam.angles
@@ -192,9 +209,9 @@ class Tracker(Thread, BaseTracker):
         if new_tracklet.roi.height < self.config.min_height:
             return
 
-        # Annotate with local/world angles, overlap flag and estimated distance
-        local_angle, world_angle, _overlap, distance = self.geometry.get_angles_and_overlap(new_tracklet.roi, cam_id, self.config.seam.reject)
-        new_tracklet = replace(new_tracklet, annotation=Annotation(local_angle, world_angle, _overlap, distance))
+        # Annotate with local/world angles, overlap flag, estimated distance and height
+        local_angle, world_angle, _overlap, distance, height = self.geometry.get_angles_and_overlap(new_tracklet.roi, cam_id, self.config.seam.reject)
+        new_tracklet = replace(new_tracklet, annotation=Annotation(local_angle, world_angle, _overlap, distance, height))
 
         # Existing observation — refresh in place, even inside the edge dead
         # zone: starving it would freeze its angles and expire it via timeout

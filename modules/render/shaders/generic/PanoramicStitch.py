@@ -17,20 +17,21 @@ class PanoramicStitch(Shader):
     approximation, and no blend state has to be set up and torn down.
     """
 
-    def use(self, textures: list[Texture], cam_fov: float, vfov: float, target_fov: float,
-            ring_radius: float, focus_diameter: float,
+    def use(self, textures: list[Texture], cam_fov: float, row_model: tuple[float, float],
+            target_fov: float, ring_radius: float, focus_diameter: float,
             elevation_window: tuple[float, float], populated_band: tuple[float, float],
             blend: int) -> None:
         """Args:
             textures: one per camera, in camera-id order; camera 0 owns azimuth 0 upward
             cam_fov: one camera's horizontal field (degrees)
-            vfov: one camera's vertical field (degrees)
+            row_model: (horizon_row, focal_rows) — the frames' rows are tangents of elevation,
+                `row = horizon_row - focal_rows * tan(e)` (`panorama_map.row_from_elevation`)
             target_fov: the sector one camera owns, 360 / num_cameras (degrees)
             ring_radius: camera distance from the rig centre (m); 0 disables the parallax term
             focus_diameter: the play-zone cylinder the image is aligned for (m)
             elevation_window: (top, bottom) elevation of the strip, measured at the rig centre
-            populated_band: (low, high) elevation the frames actually carry, at the camera —
-                a tilted camera never imaged the rest, and those rows are empty
+            populated_band: (low, high) elevation the frames carry, at the camera — the window's
+                bottom and top rows; beyond it there is no row to read
             blend: how the overlap combines — a `PanoramaBlend` value, which IS the shader's
                 `blendMode` uniform, so the two must stay in step
         """
@@ -53,7 +54,8 @@ class PanoramicStitch(Shader):
 
         glUniform1i(self.get_uniform_loc("numCams"), num_cams)
         glUniform1f(self.get_uniform_loc("camFov"), cam_fov)
-        glUniform1f(self.get_uniform_loc("vfov"), vfov)
+        glUniform1f(self.get_uniform_loc("horizonRow"), row_model[0])
+        glUniform1f(self.get_uniform_loc("focalRows"), row_model[1])
         glUniform1f(self.get_uniform_loc("targetFov"), target_fov)
         glUniform1f(self.get_uniform_loc("ringRadius"), ring_radius)
         glUniform1f(self.get_uniform_loc("focusRadius"), focus_diameter / 2.0)

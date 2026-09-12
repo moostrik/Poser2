@@ -19,7 +19,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 from ..board import Board
 from ..pose import PlayheadOffset, GhostFeature
-from ..settings import Layers, RenderSettings, PlayheadFeatureSelect
+from ..settings import Layers, RenderSettings, PlayheadFeatureSelect, CameraView
 
 # Maps the app-local feature dropdown to the concrete app features. Kept here (not in
 # settings, which stays data-only) and handed to the generic data layers via feature_map.
@@ -32,6 +32,13 @@ PLAYHEAD_FEATURE_MAP = {
 # black — an unlit camera, the panorama outside its elevation window — reads as content rather than
 # as a hole in the window, and the gaps between rows show where one ends.
 _BACKGROUND: tuple[float, float, float, float] = (0.15, 0.15, 0.15, 1.0)
+
+# The two rows `camera_view` switches between, and the layer whose compositing each one needs.
+# A hidden row's layers are not updated at all — hiding the strip skips a whole stitch per frame.
+_SWITCHED_ROWS: dict[str, Layers] = {
+    'track':     Layers.tracker,
+    'panoramic': Layers.cam_panorama,
+}
 
 
 class Render(RenderBase):
@@ -87,12 +94,7 @@ class Render(RenderBase):
         self.L[Layers.ws_light][0]   = LightSimulationLayer(board)
         self.L[Layers.ws_beam][0]     = BeamLightSimulationLayer(board, settings.beam_light_sim)
 
-        self.subdivision_rows: list[SubdivisionRow] = [
-            self._track_row(),
-            self._panorama_row(),
-            SubdivisionRow(name='ws_light',   columns=1,                rows=1, src_aspect_ratio=6.0, padding=Point2f(0.0, 1.0)),
-            SubdivisionRow(name='pose',       columns=self.num_players, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0)),
-        ]
+        self.subdivision_rows: list[SubdivisionRow] = self._build_rows()
         self._window_size: tuple[int, int] = (settings.window.width, settings.window.height)
         self._align_center: bool = False
         self.subdivision: Subdivision = make_subdivision(
@@ -105,8 +107,30 @@ class Render(RenderBase):
         # thread wrote the setting, so it raises a flag and `update()` acts on it.
         self._layout_dirty: bool = False
         settings.panorama.bind(PanoramaLayerSettings.focus_diameter, self._on_layout_setting)
+        RenderSettings.camera_view.bind(settings, self._on_layout_setting)
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
+
+    def _build_rows(self) -> list[SubdivisionRow]:
+        """The rows the window shows, top to bottom.
+
+        `camera_view` decides which of the two camera rows are among them. Every row's height is
+        its content's aspect over the shared width, so leaving one out hands its height to the
+        others rather than leaving a gap — which is the point of the switch.
+        """
+        view: CameraView = self.settings.camera_view
+        rows: list[SubdivisionRow] = []
+        if view in (CameraView.CAMERAS, CameraView.BOTH):
+            rows.append(self._track_row())
+        if view in (CameraView.PANORAMA, CameraView.BOTH):
+            rows.append(self._panorama_row())
+        rows.append(SubdivisionRow(name='ws_light', columns=1,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(0.0, 1.0)))
+        rows.append(SubdivisionRow(name='pose',     columns=self.num_players, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0)))
+        return rows
+
+    def _hidden_layers(self) -> set[Layers]:
+        """The layers belonging to rows this layout leaves out — neither composited nor drawn."""
+        return {layer for name, layer in _SWITCHED_ROWS.items() if not self.subdivision.has(name)}
 
     def _track_row(self) -> SubdivisionRow:
         """Row 1: one view per camera, always — the raw frames the strip below is derived from.
@@ -134,7 +158,7 @@ class Render(RenderBase):
         self._layout_dirty = True
 
     def _rebuild_layout(self) -> None:
-        self.subdivision_rows[1] = self._panorama_row()
+        self.subdivision_rows = self._build_rows()
         self.subdivision = make_subdivision(
             self.subdivision_rows, *self._window_size, self._align_center
         )
@@ -153,12 +177,16 @@ class Render(RenderBase):
         self.allocate_window_renders()
 
     def allocate_window_renders(self) -> None:
-        for i in range(self.num_cams):
-            w, h = self.subdivision.get_allocation_size('track', i)
-            self.L[Layers.tracker][i].allocate(w, h, GL_RGBA)
+        # Only the rows this layout holds: a hidden row keeps whatever it had and is never drawn,
+        # so allocating it to the fallback rect would be wasted memory at the wrong shape.
+        if self.subdivision.has('track'):
+            for i in range(self.num_cams):
+                w, h = self.subdivision.get_allocation_size('track', i)
+                self.L[Layers.tracker][i].allocate(w, h, GL_RGBA)
 
-        w, h = self.subdivision.get_allocation_size('panoramic', 0)
-        self.L[Layers.cam_panorama][0].allocate(w, h, GL_RGBA)
+        if self.subdivision.has('panoramic'):
+            w, h = self.subdivision.get_allocation_size('panoramic', 0)
+            self.L[Layers.cam_panorama][0].allocate(w, h, GL_RGBA)
 
         for i in range(self.num_players):
             w, h = self.subdivision.get_allocation_size('pose', i)
@@ -166,6 +194,7 @@ class Render(RenderBase):
 
     def deallocate(self) -> None:
         self.settings.panorama.unbind(PanoramaLayerSettings.focus_diameter, self._on_layout_setting)
+        RenderSettings.camera_view.unbind(self.settings, self._on_layout_setting)
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()
@@ -180,7 +209,10 @@ class Render(RenderBase):
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
+        hidden: set[Layers] = self._hidden_layers()
         for layer_type, cam_dict in self.L.items():
+            if layer_type in hidden:
+                continue
             for layer in cam_dict.values():
                 layer.update()
 
@@ -197,14 +229,17 @@ class Render(RenderBase):
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
-        # Row 1 — one tracker compositor per camera: the raw frames.
-        for i in range(self.num_cams):
-            self._viewport(height, self.subdivision.get_rect('track', i))
-            self.L[Layers.tracker][i].draw()
+        # Row 1 — one tracker compositor per camera: the raw frames. Absent under PANORAMA.
+        if self.subdivision.has('track'):
+            for i in range(self.num_cams):
+                self._viewport(height, self.subdivision.get_rect('track', i))
+                self.L[Layers.tracker][i].draw()
 
         # Row 2 — the whole ring as one 360° strip, image and tracker data on one vertical scale.
-        self._viewport(height, self.subdivision.get_rect('panoramic', 0))
-        self.L[Layers.cam_panorama][0].draw()
+        # Absent under CAMERAS.
+        if self.subdivision.has('panoramic'):
+            self._viewport(height, self.subdivision.get_rect('panoramic', 0))
+            self.L[Layers.cam_panorama][0].draw()
 
         # Row 3 - WS light strip: the ring, or the bar's lights while the fixture is in beam mode —
         # the same rule the fixture applies to the same command (the frame's target rpm).

@@ -3,7 +3,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl import Text
-from modules.tracker import PanoramicTrackerSettings
+from modules.tracker import PanoramicTrackerSettings, strip_y
 
 from ...shaders import DrawColoredRectangle
 from ..LayerBase import LayerBase
@@ -24,9 +24,9 @@ _BLEND_NAMES: dict[PanoramaBlend, str] = {
 class GridRenderer(LayerBase):
     """The measuring lattice: degree lines both ways, the horizon, the labels and the footer.
 
-    Both axes of the strip are centre-referenced and linear, so this is the same degrees per pixel
-    horizontally and vertically — which is what makes the grid square and the head-versus-knee
-    comparison fair.
+    Both axes are centre-referenced. Azimuth is linear, so the vertical lines are evenly spaced;
+    the rows are tangents of elevation (`strip_y`), so the horizontal lines spread toward the top
+    exactly as the camera frames' rows do. The horizon stays one straight row.
 
     The seam and axis lines are **not** here; they belong to `SeamRenderer`, so that turning the
     seams off leaves nothing of them behind and this stays purely a lattice.
@@ -100,8 +100,7 @@ class GridRenderer(LayerBase):
         self._rect.use(0.0, self._elevation_y(elevation) - height / 2.0, 1.0, height, *color)
 
     def _elevation_y(self, elevation: float) -> float:
-        top, bottom = self._elevation_window
-        return (top - elevation) / max(1e-6, top - bottom)
+        return strip_y(elevation, self._elevation_window)
 
     def _draw_labels(self, spacing: float) -> None:
         """Degree labels along the top, the horizon named, and the geometry in the corner.

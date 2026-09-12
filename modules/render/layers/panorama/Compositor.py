@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.board import HasObservations, HasTracklets
 from modules.gl import Fbo, Texture, clear_color
-from modules.tracker import PanoramicTrackerSettings, Tracklet, elevation_window, populated_band
+from modules.tracker import PanoramicTrackerSettings, Tracklet, elevation_window, strip_aspect_ratio
 from modules.utils import HotReloadMethods
 
 from ..LayerBase import LayerBase
@@ -28,8 +28,11 @@ class PanoramaBoard(HasTracklets, HasObservations, Protocol):
 class Compositor(LayerBase):
     """The 360-degree calibration display: one strip, one FBO, five renderers in a fixed order.
 
-    x is azimuth, 0 at the left edge; y is elevation, both measured at the rig centre and both
-    linear, so the grid is square and a degree is a degree either way.
+    x is azimuth, 0 at the left edge, linear in degrees — the ring's own unit. y is the TANGENT of
+    elevation, both measured at the rig centre: the strip's vertical is a photograph's, like the
+    camera frames', so a person has the same shape in both and only the azimuth re-projection
+    to the centre tells them apart. A degree at the horizon is the same size either way; above it
+    the rows spend more (`strip_y`).
 
     **Why the image and the data are one display.** The camera constants define the azimuth frame
     every other number in the installation is expressed in, and the distance model rides on top of
@@ -87,14 +90,18 @@ class Compositor(LayerBase):
         return 360.0 / self.num_cams
 
     @property
-    def vfov(self) -> float:
-        """One camera's vertical field (degrees) — derived by the tracker from `fov`."""
-        return max(1.0, self._tracker.parallax.vfov)
+    def row_model(self) -> tuple[float, float]:
+        """(horizon_row, focal_rows): the delivered frame's rows as the tracker published them.
+        Rows are tangents of elevation — see `panorama_map.row_from_elevation`."""
+        p = self._tracker.parallax
+        return (p.horizon_row, max(1e-6, p.focal_rows))
 
     @property
     def populated_band(self) -> tuple[float, float]:
-        """The elevations the delivered frames actually carry, measured at the camera."""
-        return populated_band(self.vfov, self._settings.tilt)
+        """The elevations the delivered frames carry, measured at the camera: the window's
+        bottom and top rows, as the tracker published them."""
+        p = self._tracker.parallax
+        return (p.elevation_bottom, p.elevation_top)
 
     @property
     def elevation_window(self) -> tuple[float, float]:
@@ -107,12 +114,11 @@ class Compositor(LayerBase):
     def aspect_ratio(self) -> float:
         """Width:height of the strip, for the row that holds it.
 
-        360 degrees of azimuth over however many degrees of elevation the window spans — square
-        degrees, which is the right answer because both axes are re-projected to the rig centre.
-        Nothing here is a preference.
+        360 degrees of azimuth at the same focal as the tangent rows: a degree at the horizon is
+        the same size either way, and the window's tangent span is the height. Nothing here is a
+        preference — `tilt`, `fov`, `frame_height` and `focus_diameter` all move it.
         """
-        top, bottom = self.elevation_window
-        return 360.0 / max(1.0, top - bottom)
+        return strip_aspect_ratio(self.elevation_window)
 
     # -- lifecycle -----------------------------------------------------------
 
@@ -133,7 +139,7 @@ class Compositor(LayerBase):
         parts: list[Part] = self._settings.parts
         window: tuple[float, float] = self.elevation_window
 
-        self._stitch.set_geometry(self.target_fov, self.vfov, window, self.populated_band)
+        self._stitch.set_geometry(self.target_fov, self.row_model, window, self.populated_band)
         self._grid.set_geometry(window)
 
         if Part.observations in parts or Part.labels in parts:
@@ -160,7 +166,7 @@ class Compositor(LayerBase):
         marks: list[Mark] = build_marks(
             observations, primaries,
             self._color_settings.track_color_tuples,
-            self._tracker.fov, self.vfov,
+            self._tracker.fov, self.row_model,
             self._tracker.parallax.ring_radius,
             window,
         )

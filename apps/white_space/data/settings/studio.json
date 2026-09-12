@@ -706,6 +706,7 @@
     }
   },
   "render": {
+    "camera_view": "BOTH",
     "preview": {
       "tracker": {
         "stage": "LERP",

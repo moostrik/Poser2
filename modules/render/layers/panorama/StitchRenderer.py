@@ -38,15 +38,15 @@ class StitchRenderer(LayerBase):
 
         # Handed down by the compositor, which owns the one copy of the strip's geometry.
         self._target_fov: float = 90.0
-        self._vfov: float = 79.4
+        self._row_model: tuple[float, float] = (0.5, 0.72)      # (horizon_row, focal_rows)
         self._elevation_window: tuple[float, float] = (0.0, 0.0)
         self._populated_band: tuple[float, float] = (0.0, 0.0)
 
-    def set_geometry(self, target_fov: float, vfov: float,
+    def set_geometry(self, target_fov: float, row_model: tuple[float, float],
                      elevation_window: tuple[float, float],
                      populated_band: tuple[float, float]) -> None:
         self._target_fov = target_fov
-        self._vfov = vfov
+        self._row_model = row_model
         self._elevation_window = elevation_window
         self._populated_band = populated_band
 
@@ -63,7 +63,7 @@ class StitchRenderer(LayerBase):
         self._stitch.use(
             self._cam_textures,
             self._tracker.fov,
-            self._vfov,
+            self._row_model,
             self._target_fov,
             self._tracker.parallax.ring_radius,
             self._settings.focus_diameter,

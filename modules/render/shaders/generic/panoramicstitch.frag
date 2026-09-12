@@ -1,7 +1,8 @@
 #version 460 core
 
 // The four camera frames unwrapped into one 360-degree strip as the RIG CENTRE would see them:
-// x is azimuth, y is elevation, both measured at the centre, both linear.
+// x is azimuth, linear in degrees; y is the TANGENT of elevation (panorama_map.strip_y), so the
+// strip's vertical is a photograph's, the same shape as the camera frames' rows.
 //
 // A transcription of modules/tracker/panoramic/panorama_map.py, which is round-tripped against
 // the tracker's own Geometry in modules/tracker/tests/test_panorama_map.py. Keep the two in step:
@@ -35,14 +36,15 @@
 uniform sampler2D tex[MAX_CAMS];
 uniform int   numCams;
 uniform float camFov;      // one camera's horizontal field (degrees)
-uniform float vfov;        // one camera's vertical field (degrees)
+uniform float horizonRow;  // the frames' rows are TANGENTS of elevation: row = horizonRow -
+uniform float focalRows;   //   focalRows * tan(e), normalised, 0 = top (panorama_map.row_from_elevation)
 uniform float targetFov;   // the sector one camera owns, 360 / numCams (degrees)
 uniform float ringRadius;  // camera distance from the rig centre (m)
 uniform float focusRadius; // half the focus diameter: the cylinder the image is aligned for (m)
 uniform float elevTop;     // elevation of this strip's top row, at the centre (degrees)
 uniform float elevBottom;  // elevation of its bottom row, at the centre (degrees)
-uniform float camElevLo;   // the frames' POPULATED elevation band, at the camera (degrees).
-uniform float camElevHi;   // Tilt empties the rest: an up-aimed camera never imaged the floor.
+uniform float camElevLo;   // the frames' window, at the camera (degrees): the bottom row is the
+uniform float camElevHi;   //   sensor's lowest reach, the top row whatever the rows reach
 uniform int   blendMode;
 
 in vec2 texCoord;
@@ -79,13 +81,18 @@ vec2 cameraUV(int cam, float azimuth, float elevation) {
     float eCam = degrees(atan(tan(radians(elevation)) * focusRadius / d));
     if (eCam < camElevLo || eCam > camElevHi) return vec2(-1.0);
 
-    // The delivered frame is equirectangular, so a row IS an elevation, linearly.
-    return vec2(local / camFov, 0.5 + eCam / vfov);
+    // The delivered frame is cylindrical: a row is the tangent of its elevation below the
+    // horizon row (`row_from_elevation`, top-down, 0 = the top row). The texture's v runs
+    // bottom-up, so the row is flipped into it. The black arch at the top of the side columns
+    // is in the pixels themselves.
+    float row = horizonRow - focalRows * tan(radians(eCam));
+    return vec2(local / camFov, 1.0 - row);
 }
 
 void main() {
     float azimuth   = texCoord.x * 360.0;
-    float elevation = mix(elevBottom, elevTop, texCoord.y);
+    // Rows are tangents of centre elevation: linear between tan(bottom) and tan(top).
+    float elevation = degrees(atan(mix(tan(radians(elevBottom)), tan(radians(elevTop)), texCoord.y)));
 
     vec3  peak   = vec3(0.0);
     vec3  low    = vec3(0.0);

@@ -7,11 +7,12 @@ import time
 import unittest
 from dataclasses import replace
 
+from modules.oak import frame_window, delivered_height
 from modules.tracker import (
     PanoramicTracker, PanoramicTrackerSettings, PanoramicAnnotation,
-    Tracklet, TrackingStatus, TrackletDict,
+    Tracklet, TrackingStatus, TrackletDict, row_from_elevation,
 )
-from modules.tracker.panoramic.geometry import Geometry
+from modules.tracker.panoramic.geometry import Geometry, _MAX_HEIGHT
 from modules.tracker.panoramic.store import TrackletIdPool
 from modules.utils import Rect
 
@@ -302,18 +303,41 @@ PARALLAX_FOV = 127.0
 TARGET_FOV = 90.0
 RING_RADIUS = 0.36
 CAMERA_HEIGHT = 0.5
-VFOV = 79.4
+# The delivered frame: P800 aimed up 16 on the sensor's full reach (1152 rows), the ideal lens.
+# Rows are tangents of elevation below the horizon row (`FrameWindow`), so a depression angle
+# is a row through `row_from_elevation`, never `0.5 + angle / vfov`.
+ROWS = 1152
+WINDOW = frame_window((1280, 800), (1280, ROWS), 1280, PARALLAX_FOV, 16.0)
+HORIZON_ROW = WINDOW.horizon_px / (ROWS - 1)
+FOCAL_ROWS = WINDOW.focal / (ROWS - 1)
 
 
-def synth_observation(cam_id: int, world_azimuth: float, radius: float) -> tuple[Rect, float]:
+def feet_row(distance: float) -> float:
+    """The normalised row where the feet of someone `distance` m out meet the floor."""
+    depression = math.degrees(math.atan(CAMERA_HEIGHT / distance))
+    return row_from_elevation(-depression, HORIZON_ROW, FOCAL_ROWS)
+
+
+def head_row(height_m: float, distance: float) -> float:
+    """The normalised row of the top of someone `height_m` tall, `distance` m out."""
+    elevation = math.degrees(math.atan((height_m - CAMERA_HEIGHT) / distance))
+    return row_from_elevation(elevation, HORIZON_ROW, FOCAL_ROWS)
+
+
+def synth_observation(cam_id: int, world_azimuth: float, radius: float,
+                      person_height: float | None = None) -> tuple[Rect, float]:
     """Build the ROI a camera on the ring would report for a person standing at
     ``world_azimuth`` degrees, ``radius`` m from the rig centre. Returns the ROI and the true
     camera->person distance.
 
     Inverts the tracker's own projection so the parallax correction can be checked against
-    ground truth. The frame is equirectangular and level, so the column is the bearing and the
-    row is the elevation, both linear — and the box *bottom* is where the feet meet the floor,
-    which is the only thing the distance estimate reads.
+    ground truth. The frame is cylindrical and level, so the column is the bearing, linearly,
+    and the row is the tangent of the elevation — and the box *bottom* is where the feet meet
+    the floor, which is the only thing the distance estimate reads.
+
+    ``person_height`` puts the box *top* on the head of a person that tall, which is what the
+    height estimate reads; without it the box keeps a fixed fraction of the frame, which is
+    what the parallax tests want.
     """
     fov_overlap = (PARALLAX_FOV - TARGET_FOV) / 2.0
     facing = TARGET_FOV * cam_id + PARALLAX_FOV / 2.0 - fov_overlap  # world angle the camera faces
@@ -327,11 +351,10 @@ def synth_observation(cam_id: int, world_azimuth: float, radius: float) -> tuple
     theta = (bearing - facing + 180.0) % 360.0 - 180.0  # offset from camera facing
     local_angle = theta + PARALLAX_FOV / 2.0
     # Feet on the floor, CAMERA_HEIGHT below the lens: a depression angle, hence a row.
-    depression = math.degrees(math.atan(CAMERA_HEIGHT / distance))
-    bottom = 0.5 + depression / VFOV
+    bottom = feet_row(distance)
     width = 0.05
     center_x = local_angle / PARALLAX_FOV
-    height = 0.4
+    height = 0.4 if person_height is None else bottom - head_row(person_height, distance)
     return Rect(x=center_x - width / 2.0, y=bottom - height, width=width, height=height), distance
 
 
@@ -341,7 +364,7 @@ class TestGeometryParallax(unittest.TestCase):
         g = Geometry(num_cameras=4, cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
         g.set_ring_radius(ring_radius)
         g.set_camera_height(CAMERA_HEIGHT)
-        g.set_vfov(VFOV)
+        g.set_window(WINDOW, ROWS)
         return g
 
     def test_recovers_true_azimuth_from_both_sides_of_seam(self) -> None:
@@ -383,8 +406,9 @@ class TestGeometryParallax(unittest.TestCase):
         # The whole point of the floor-plane model: arms up, legs pulled up and bending over all
         # change a box's height and none of them move the feet, so the estimate must not care.
         g = self.make_geometry()
-        bottom = 0.75
+        bottom = feet_row(2.0)
         base = g.estimate_distance(Rect(y=bottom - 0.4, height=0.4))
+        self.assertAlmostEqual(base, 2.0, places=6)
         for height in (0.1, 0.25, 0.6):
             with self.subTest(height=height):
                 self.assertAlmostEqual(g.estimate_distance(Rect(y=bottom - height, height=height)),
@@ -392,18 +416,25 @@ class TestGeometryParallax(unittest.TestCase):
 
     def test_estimate_distance_matches_the_floor_geometry(self) -> None:
         g = self.make_geometry()
-        for want in (1.0, 2.0, 3.0):
+        for want in (1.5, 2.0, 3.0, 3.9):
             with self.subTest(distance=want):
-                depression = math.degrees(math.atan(CAMERA_HEIGHT / want))
-                bottom = 0.5 + depression / VFOV
-                got = g.estimate_distance(Rect(y=bottom - 0.4, width=0.05, height=0.4))
+                got = g.estimate_distance(Rect(y=feet_row(want) - 0.4, width=0.05, height=0.4))
                 self.assertAlmostEqual(got, want, places=6)
+
+    def test_the_bottom_row_is_the_nearest_readable_distance(self) -> None:
+        # The window is pinned at the sensor's bottom reach, so feet on the last row are as close
+        # as the frame can read: camera_height / tan(-elevation_bottom), 1.14 m at P800 and tilt 16.
+        g = self.make_geometry()
+        nearest = CAMERA_HEIGHT / math.tan(math.radians(-WINDOW.elevation_bottom))
+        self.assertAlmostEqual(g.estimate_distance(Rect(y=0.6, height=0.4)), nearest, places=6)
+        self.assertAlmostEqual(nearest, 1.14, delta=0.01)
 
     def test_estimate_distance_clamps_degenerate_box(self) -> None:
         g = self.make_geometry()
         # Feet at or above the horizon: nobody standing on this floor.
+        self.assertEqual(g.estimate_distance(Rect(y=HORIZON_ROW - 0.5, height=0.5)), 4.0)
         self.assertEqual(g.estimate_distance(Rect(y=0.0, height=0.5)), 4.0)
-        d = g.estimate_distance(Rect(y=0.35, height=0.4))
+        d = g.estimate_distance(Rect(y=0.55, height=0.4))
         self.assertGreaterEqual(d, 0.6)
         self.assertLessEqual(d, 4.0)
 
@@ -425,9 +456,92 @@ class TestGeometryParallax(unittest.TestCase):
         # A tall person close in: head extrapolated above the top. Only the bottom is read, so
         # the estimate is unaffected by how far above 0 the box starts.
         g = self.make_geometry()
-        cut = g.estimate_distance(Rect(y=-0.3, height=1.1))            # bottom 0.8
-        whole = g.estimate_distance(Rect(y=0.4, height=0.4))           # bottom 0.8
+        cut = g.estimate_distance(Rect(y=-0.3, height=1.2))            # bottom 0.9
+        whole = g.estimate_distance(Rect(y=0.5, height=0.4))           # bottom 0.9
         self.assertAlmostEqual(cut, whole, places=9)
+        self.assertLess(cut, 4.0)                                       # a real reading, not the clamp
+
+
+class TestGeometryHeight(unittest.TestCase):
+    """A person's height is a pure pixel ratio on cylindrical rows: camera_height times the box
+    height over the rows from the horizon down to the feet. No focal, no field, no distance."""
+
+    def make_geometry(self) -> Geometry:
+        g = Geometry(num_cameras=4, cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
+        g.set_camera_height(CAMERA_HEIGHT)
+        g.set_window(WINDOW, ROWS)
+        return g
+
+    def box(self, height_m: float, distance: float) -> Rect:
+        bottom: float = feet_row(distance)
+        return Rect(x=0.5, y=head_row(height_m, distance), width=0.05,
+                    height=bottom - head_row(height_m, distance))
+
+    def test_recovers_the_height_at_every_distance(self) -> None:
+        g = self.make_geometry()
+        for want in (1.5, 1.8, 2.0):
+            for distance in (1.5, 2.0, 3.0, 5.0, 7.0):
+                with self.subTest(height=want, distance=distance):
+                    self.assertAlmostEqual(g.estimate_height(self.box(want, distance)), want, places=6)
+
+    def test_is_independent_of_distance(self) -> None:
+        # The pixel box shrinks with distance; the metres must not move. This is what the pixel
+        # `max_height_diff` gate cannot do.
+        g = self.make_geometry()
+        near: Rect = self.box(1.8, 2.0)
+        far: Rect = self.box(1.8, 6.0)
+        self.assertGreater(near.height, far.height * 2.0)           # the pixels differ a lot
+        self.assertAlmostEqual(g.estimate_height(near), g.estimate_height(far), places=6)
+
+    def test_reads_reach_when_the_arms_go_up(self) -> None:
+        # The box top is the highest pixel, so this is overhead reach, not stature — the number
+        # the tilt table is chosen around.
+        g = self.make_geometry()
+        for distance in (2.0, 4.0):
+            with self.subTest(distance=distance):
+                self.assertAlmostEqual(g.estimate_height(self.box(1.8, distance)), 1.8, places=6)
+                self.assertAlmostEqual(g.estimate_height(self.box(2.2, distance)), 2.2, places=6)
+
+    def test_zero_when_the_feet_are_not_on_this_floor(self) -> None:
+        g = self.make_geometry()
+        self.assertEqual(g.estimate_height(Rect(y=0.0, height=HORIZON_ROW)), 0.0)   # feet on the horizon
+        self.assertEqual(g.estimate_height(Rect(y=0.0, height=0.2)), 0.0)           # and above it
+
+    def test_capped_for_a_box_that_barely_clears_the_horizon(self) -> None:
+        # Feet a pixel below the horizon divide by almost nothing; the cap is what bounds it, and
+        # it sits above any height a person can measure so it only ever catches a mangled box.
+        g = self.make_geometry()
+        one_px: float = 1.0 / (ROWS - 1)
+        self.assertEqual(g.estimate_height(Rect(y=0.1, height=HORIZON_ROW - 0.1 + one_px)), _MAX_HEIGHT)
+        self.assertGreater(_MAX_HEIGHT, 2.4)                # a tall person with both arms up
+
+    def test_the_feet_on_the_bottom_row_still_measure(self) -> None:
+        # The nearest the frame can read, which is where the distance estimate saturates too.
+        g = self.make_geometry()
+        nearest: float = CAMERA_HEIGHT / math.tan(math.radians(-WINDOW.elevation_bottom))
+        self.assertAlmostEqual(g.estimate_height(self.box(1.8, nearest)), 1.8, places=6)
+
+    def test_two_cameras_at_a_seam_agree_in_metres(self) -> None:
+        """The point of measuring in metres. A person in an overlap but off the seam centre is at
+        genuinely different distances from the two cameras, so their pixel box heights differ by
+        up to 0.16 of the frame — against a `max_height_diff` gate of 0.18 — while the heights
+        agree exactly."""
+        g = self.make_geometry()
+        for azimuth in (80.0, 75.0, 72.0):
+            for radius in (1.35, 2.25, 3.5):
+                with self.subTest(azimuth=azimuth, radius=radius):
+                    roi0, d0 = synth_observation(0, azimuth, radius, person_height=1.8)
+                    roi1, d1 = synth_observation(1, azimuth, radius, person_height=1.8)
+                    self.assertNotAlmostEqual(d0, d1, places=2)          # different distances
+                    self.assertAlmostEqual(g.estimate_height(roi0), 1.8, places=6)
+                    self.assertAlmostEqual(g.estimate_height(roi1), 1.8, places=6)
+
+    def test_the_annotation_carries_it(self) -> None:
+        g = self.make_geometry()
+        roi, _distance = synth_observation(0, 45.0, 2.25, person_height=1.8)
+        *_rest, distance, height = g.get_angles_and_overlap(roi, 0, 0.5)
+        self.assertAlmostEqual(height, 1.8, places=6)
+        self.assertGreater(distance, 0.6)
 
 
 class TestInitialGeometrySync(unittest.TestCase):
@@ -447,9 +561,22 @@ class TestInitialGeometrySync(unittest.TestCase):
         self.assertAlmostEqual(
             PanoramicTracker(config, num_players=4, num_cameras=3).geometry.target_fov,
             120.0, places=9)
-        # vfov is derived from fov and the frame shape, and shown in the read-only field
-        self.assertAlmostEqual(tracker.geometry._vfov, PARALLAX_FOV * 800 / 1280, places=9)
-        self.assertAlmostEqual(config.parallax.vfov, PARALLAX_FOV * 800 / 1280, places=9)
+        # The row model is derived from the shared camera fields with the warp's own functions —
+        # frame_height 0 resolving to the sensor's full reach at this tilt — and published as
+        # read-only fields for the panorama.
+        rows = delivered_height(False, config.resolution, PARALLAX_FOV, config.tilt,
+                                config.lens_fov, (config.lens_centre_x, config.lens_centre_y),
+                                config.frame_height)
+        window = frame_window((1280, 800), (1280, rows), 1280, PARALLAX_FOV, config.tilt,
+                              config.lens_fov, (config.lens_centre_x, config.lens_centre_y))
+        self.assertAlmostEqual(tracker.geometry._horizon_px, window.horizon_px, places=9)
+        self.assertAlmostEqual(tracker.geometry._focal, window.focal, places=9)
+        self.assertEqual(tracker.geometry._rows, rows)
+        self.assertAlmostEqual(config.parallax.horizon_row, window.horizon_px / (rows - 1), places=9)
+        self.assertAlmostEqual(config.parallax.focal_rows, window.focal / (rows - 1), places=9)
+        self.assertAlmostEqual(config.parallax.vfov, window.elevation_top - window.elevation_bottom, places=9)
+        self.assertAlmostEqual(config.parallax.elevation_bottom, window.elevation_bottom, places=9)
+        self.assertAlmostEqual(config.parallax.elevation_top, window.elevation_top, places=9)
 
 
 if __name__ == "__main__":

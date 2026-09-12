@@ -6,7 +6,7 @@ from functools import partial
 import numpy as np
 
 from modules.utils import Broadcast
-from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType, MountCheck, mode_size, full_frame_height
+from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType, MountCheck, delivered_height
 from modules.settings import presets, NiceServer
 from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, PosesFromTracklets
@@ -49,9 +49,8 @@ class WhiteSpaceMain:
         # 16). Derived once, here, before anything sizes itself by it; a non-zero preset value
         # is an explicit override. See CALIBRATION.md, "The camera frame".
         if self.settings.frame_height == 0:
-            sensor: tuple[int, int] = mode_size(self.settings.camera.color, self.settings.resolution)
-            self.settings.frame_height = full_frame_height(
-                sensor, sensor[0], self.settings.fov, self.settings.tilt,
+            self.settings.frame_height = delivered_height(
+                self.settings.camera.color, self.settings.resolution, self.settings.fov, self.settings.tilt,
                 self.settings.lens_fov, (self.settings.lens_centre_x, self.settings.lens_centre_y))
             logging.info("frame_height derived: %d rows for %s at tilt %.1f", self.settings.frame_height,
                          self.settings.resolution.name, self.settings.tilt)

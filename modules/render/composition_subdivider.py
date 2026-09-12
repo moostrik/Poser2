@@ -38,6 +38,12 @@ class Subdivision:
     height: int
     _rows:dict[str, list[Rect]]
 
+    def has(self, key: str) -> bool:
+        """Whether this layout holds that row at all. A row a composition leaves out has no rect
+        to draw into, so its owner should skip both its compositing and its draw rather than
+        render into the fallback below."""
+        return key in self._rows
+
     def get_rect(self, key: str, index: int = 0) -> Rect:
         if key not in self._rows or index >= len(self._rows[key]):
             return Rect(0, 0, 128, 128)

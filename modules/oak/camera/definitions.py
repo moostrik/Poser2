@@ -162,6 +162,22 @@ def frame_size(color: bool, resolution: CameraResolution, square: bool = False,
             else mono_frame_size(resolution, square, height))
 
 
+def delivered_height(color: bool, resolution: CameraResolution, fov_h: float, tilt: float,
+                     lens_fov: float = 0.0, lens_centre: tuple[float, float] = (0.0, 0.0),
+                     frame_height: int = 0) -> int:
+    """The `frame_height` setting resolved: the explicit value (aligned) when it is non-zero,
+    otherwise the sensor's full reach at this tilt (`full_frame_height`).
+
+    The one place 0 is given its meaning. The app fills the shared root field with this at
+    startup so every consumer sees the same number, and the tracker calls it too, so it is
+    right whether or not the app has done that yet.
+    """
+    if frame_height > 0:
+        return aligned_height(frame_height)
+    src: tuple[int, int] = mode_size(color, resolution)
+    return full_frame_height(src, src[0], fov_h, tilt, lens_fov, lens_centre)
+
+
 def full_frame_height(src_size: tuple[int, int], mode_width: int, fov_h: float, tilt: float,
                       lens_fov: float = 0.0,
                       lens_centre: tuple[float, float] = (0.0, 0.0)) -> int:
