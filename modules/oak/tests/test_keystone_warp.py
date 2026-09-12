@@ -129,19 +129,17 @@ class BuildWarpMeshSelectsTest(unittest.TestCase):
         self.assertEqual((mw, mh), (WARP_MESH, WARP_MESH))
         self.assertEqual(len(mesh), WARP_MESH * WARP_MESH)
 
-    def test_both_zero_is_the_equirectangular_reprojection_not_identity(self) -> None:
+    def test_both_zero_is_the_reprojection_not_identity(self) -> None:
         # No keystone and no tilt still goes through the tilt path, which reprojects the
-        # equidistant frame to equirectangular. The centre pixel is the fixed point; the corners
-        # are not, because a fisheye's corners bow.
+        # equidistant frame to the cylindrical contract. The mesh is mirror-symmetric about the
+        # centre column (an even grid has no point ON it, so the two middle columns average to
+        # it); the corners are not the identity, because a fisheye's corners bow.
         mesh, mw, mh = build_warp_mesh((1280, 800), (1280, 800), 1280, self._mount(0.0, 0.0, flip_h=False))
         pts = _as_tuples(mesh).reshape(mh, mw, 2)
-        cx, cy = 1279.0 / 2.0, 799.0 / 2.0
-        # An even grid has no point ON the centre; the reprojection is symmetric about it, so
-        # the mean of the four middle points is exactly the centre.
-        h, w = mh // 2, mw // 2
-        centre = pts[h - 1:h + 1, w - 1:w + 1].reshape(-1, 2).mean(axis=0)
-        self.assertAlmostEqual(float(centre[0]), cx, places=2)
-        self.assertAlmostEqual(float(centre[1]), cy, places=2)
+        cx = 1279.0 / 2.0
+        w = mw // 2
+        np.testing.assert_allclose(pts[:, w - 1:w + 1, 0].mean(axis=1), cx, atol=1e-2)
+        np.testing.assert_allclose(pts[:, :, 0], 2.0 * cx - pts[:, ::-1, 0], atol=1e-2)
         top_left = pts[0, 0]
         self.assertGreater(float(np.hypot(top_left[0] - 0.0, top_left[1] - 0.0)), 1.0)
 

@@ -4,7 +4,7 @@ import logging
 import numpy as np
 from depthai import Pipeline
 from ..camera.camera import *
-from ..camera import frame_size
+from ..camera import frame_size, mode_size
 from ..camera.settings import CameraSettings
 from .settings import SimulatorSettings
 from .player import Player
@@ -49,7 +49,7 @@ class Simulator(Camera):
             super().run()
 
     def _setup_pipeline(self, pipeline: Pipeline) -> None: # override
-        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.resolution, self.show_stereo, self.mount, simulate=True, warp_clips=self.warp_clips)
+        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.resolution, self.show_stereo, self.mount, simulate=True, warp_clips=self.warp_clips, frame_height=self.frame_height)
 
 
     def _setup_queues(self) -> None: # override
@@ -130,8 +130,12 @@ class Simulator(Camera):
 
         The fix is in the preset, not here: set `camera.resolution` to the label the clip was
         shot at and the whole chain derives correctly again.
+
+        A clip that is being warped (`apply_warp`) feeds the warp's INPUT, so it must be the
+        sensor's size; one that passes through must be the delivered size, `frame_height` and all.
         """
-        expected: tuple[int, int] = frame_size(self.do_color, self.resolution, self.square)
+        expected: tuple[int, int] = (mode_size(self.do_color, self.resolution) if self.warp_clips
+                                     else frame_size(self.do_color, self.resolution, self.square, self.frame_height))
         if (width, height) == expected or (width, height) == self._warned_frame_size:
             return
         self._warned_frame_size = (width, height)

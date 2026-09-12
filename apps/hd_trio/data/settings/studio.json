@@ -16,6 +16,10 @@
       "flip_h": true,
       "flip_v": false,
       "keystone": -0.22,
+      "frame_height": 0,
+      "lens_fov": 0.0,
+      "lens_centre_x": 0.0,
+      "lens_centre_y": 0.0,
       "readings": {
         "roll_offset": 0.0
       },
@@ -53,6 +57,10 @@
       "flip_h": true,
       "flip_v": false,
       "keystone": -0.22,
+      "frame_height": 0,
+      "lens_fov": 0.0,
+      "lens_centre_x": 0.0,
+      "lens_centre_y": 0.0,
       "readings": {
         "roll_offset": 0.0
       },
@@ -90,6 +98,10 @@
       "flip_h": true,
       "flip_v": false,
       "keystone": -0.22,
+      "frame_height": 0,
+      "lens_fov": 0.0,
+      "lens_centre_x": 0.0,
+      "lens_centre_y": 0.0,
       "readings": {
         "roll_offset": 0.0
       },

@@ -12,7 +12,7 @@ from numpy import ndarray
 
 from modules.utils import FPS
 
-from .definitions import CameraResolution, FrameType, Input, Output, Tracklet, FrameCallback, SyncCallback, TrackerCallback, get_device_list, log_connected_sensors, log_device_calibration, imu_rotation_to_camera, imu_to_camera, unroll_imu_frame, orientation_from_gravity, IMU_SMOOTHING
+from .definitions import CameraResolution, FrameType, Input, Output, Tracklet, FrameCallback, SyncCallback, TrackerCallback, get_device_list, log_connected_sensors, read_lens_calibration, imu_rotation_to_camera, imu_to_camera, unroll_imu_frame, orientation_from_gravity, IMU_SMOOTHING, mode_size, frame_size, frame_window, frame_coverage, coverage_summary, full_frame_height, lens_field, lens_deviation
 from .pipeline import setup_pipeline, get_frame_types, WarpConfig
 from .settings import CameraSettings
 
@@ -44,6 +44,7 @@ class Camera(Thread):
         self.do_stereo: bool =          core_settings.stereo
         self.do_yolo: bool =            core_settings.yolo
         self.resolution: CameraResolution = core_settings.resolution
+        self.frame_height: int =        core_settings.frame_height
         self.show_stereo: bool =        core_settings.depth.show
 
         self.mount: WarpConfig = WarpConfig(
@@ -52,6 +53,9 @@ class Camera(Thread):
             tilt=core_settings.tilt,
             keystone=core_settings.keystone,
             fov_h=core_settings.fov,
+            lens_fov=core_settings.lens_fov,
+            lens_centre_x=core_settings.lens_centre_x,
+            lens_centre_y=core_settings.lens_centre_y,
         )
 
         # DAI
@@ -109,6 +113,7 @@ class Camera(Thread):
         if Camera._pipeline is None:
             Camera._pipeline = dai.Pipeline()
             self._setup_pipeline(Camera._pipeline)
+            self._log_frame_geometry()
 
         try:
             self.device = self._try_device(self.device_id, Camera._pipeline, num_tries=1)
@@ -126,12 +131,46 @@ class Camera(Thread):
         return True
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
-            setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.resolution, self.show_stereo, self.mount, simulate=False)
+            setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.resolution, self.show_stereo, self.mount, simulate=False, frame_height=self.frame_height)
+
+    def _log_frame_geometry(self) -> None:
+        """Once per pipeline: the window the warp delivers and where the sensor covers it.
+
+        Pure geometry from the preset — no device needed — logged so the rig check can read
+        the horizon row and the arch off the log rather than infer them from the picture.
+        Not meaningful on the keystone path, which keeps the raw frame."""
+        if self.mount.keystone != 0.0 and self.mount.tilt == 0.0:
+            return
+        src: tuple[int, int] = mode_size(self.do_color, self.resolution)
+        out: tuple[int, int] = frame_size(self.do_color, self.resolution, self.square, self.frame_height)
+        window = frame_window(src, out, src[0], self.mount.fov_h, self.mount.tilt,
+                              self.mount.lens_fov, self.mount.lens_centre)
+        coverage = frame_coverage(src, out, src[0], self.mount.fov_h, self.mount.tilt,
+                                  self.mount.flip_h, self.mount.flip_v,
+                                  self.mount.lens_fov, self.mount.lens_centre)
+        full: int = full_frame_height(src, src[0], self.mount.fov_h, self.mount.tilt,
+                                      self.mount.lens_fov, self.mount.lens_centre)
+        logger.info(f'frame {out[0]}x{out[1]}: elevation {window.elevation_bottom:+.1f} to '
+                    f'{window.elevation_top:+.1f} deg, horizon at row {window.horizon_px:.1f}, '
+                    f'{window.focal:.1f} px/rad; '
+                    f'{coverage_summary(coverage, out, src[0], self.mount.fov_h, self.mount.flip_h)}; '
+                    f'the sensor\'s full reach needs frame_height {full}')
 
     def _read_mount_calibration(self) -> None:
         """One-shot at open: what this unit says about its own lens and its IMU's orientation."""
         socket = dai.CameraBoardSocket.CAM_A if self.do_color else dai.CameraBoardSocket.CAM_B
-        self.settings.readings.fov_factory = log_device_calibration(self.device, socket, self.device_id)
+        src: tuple[int, int] = mode_size(self.do_color, self.resolution)
+        lens = read_lens_calibration(self.device, socket, src, self.device_id)
+        if lens is not None:
+            focal, cx, cy = lens
+            field: float = lens_field(focal, src[0])
+            error: float = lens_deviation(focal, cx, cy, src, src[0], self.mount.fov_h,
+                                          self.mount.lens_fov, self.mount.lens_centre)
+            self.settings.readings.fov_factory = field
+            self.settings.readings.lens_error = error
+            logger.info(f'{self.device_id} lens: field {field:.1f} deg across {src[0]} px, '
+                        f'centre offset ({cx - (src[0] - 1) / 2.0:+.1f}, {cy - (src[1] - 1) / 2.0:+.1f}) px; '
+                        f'{error:.2f} deg off the shared lens')
         self._imu_rotation = imu_rotation_to_camera(self.device, socket, self.device_id)
 
     def _setup_imu_queue(self) -> None:

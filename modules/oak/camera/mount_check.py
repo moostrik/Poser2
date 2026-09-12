@@ -12,14 +12,14 @@ class MountCheck:
 
     - **tilt** — ``|tilt_measured - tilt|``. `tilt` is the value the warp mesh was baked with, so
       a camera that does not sit at it is being un-tilted by the wrong amount.
-    - **roll** — ``|roll_measured|``. There is no configured roll: `equirect_mesh_points` has no
+    - **roll** — ``|roll_measured|``. There is no configured roll: `warp_mesh_points` has no
       roll term at all, so the only correct value is zero, and any roll tips the horizon in a way
       the panorama cannot distinguish from a wrong tilt.
 
-    `fov_factory` is deliberately *not* checked. It comes from the unit's calibration, whose
-    pinhole model cannot represent a 127 degree lens, so it disagrees by design — alarming on it
-    would mean a warning every launch, which is the fastest way to teach someone to ignore
-    warnings.
+    `fov_factory` and `lens_error` are deliberately *not* checked. They describe the unit's lens
+    against the shared one, which is a property of the build, not of how the tripod was set
+    this morning — alarming on them would mean a warning every launch, which is the fastest way
+    to teach someone to ignore warnings.
     """
 
     def __init__(self, cameras: list[CameraSettings], settings: MountCheckSettings) -> None:

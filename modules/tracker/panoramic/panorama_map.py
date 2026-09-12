@@ -10,7 +10,7 @@ Every step inverts exactly, with no approximation:
 
 `_calc_local_angle` is `x * cam_fov`, so `x = local / cam_fov`. That is only exact because the
 delivered frame is **equirectangular** (`modules/oak/camera/definitions.py`,
-`equirect_mesh_points`): a column is one azimuth at every height. There is no distortion term
+`warp_mesh_points`): a column is one azimuth at every height. There is no distortion term
 left to invert.
 
 `_calc_world_angle` is an offset, so it subtracts.

@@ -22,8 +22,13 @@ Calibrate in this order. Cameras first: everything else is tuned against the fra
    it; all numbered counter-clockwise. Placement *is* the room-side calibration — there is no
    camera offset to turn instead. See *Layout*.
 1. **Cameras.**
-   - Set `fov`, `resolution` and `tilt` in the preset (`tilt` from the table under *Camera*), then
-     relaunch — all three are baked in when the devices open.
+   - Set `fov`, `resolution`, `tilt` and the three lens numbers (`lens_fov`, `lens_centre_x`,
+     `lens_centre_y`) in the preset — `tilt` from the table under *Camera*, the lens from *The
+     lens* — and leave `frame_height` at 0; then relaunch. All of them are baked in when the
+     devices open, and the frame height is derived from the tilt at startup.
+   - Read the open log: the `frame_height` line (the derived height), then per camera one
+     `lens:` line (its field, centre offset and `lens_error`, which must match the table under
+     *The lens*) and one `frame:` line (the elevation window, the horizon row, the rows covered).
    - Read the pinned `camera.mount.status`. It must say *mount OK*.
    - Level each camera against a spirit level, read its roll, type it into
      `camera.cam_N.readings.roll_offset`.
@@ -48,7 +53,7 @@ was); the flash on the first person at IDLE → INTRO; the sound on the beam.
 
 | step | settings | readout | passes when |
 |---|---|---|---|
-| 1 cameras | `fov`, `resolution`, `tilt`, `camera.cam_N.readings.roll_offset`, `camera.tracker.parallax.*`, `camera.tracker.seam.*` | `camera.mount.status`; the panorama row | mount OK; overlaps coincide at head and knee height; tape on the horizon line |
+| 1 cameras | `fov`, `resolution`, `frame_height`, `tilt`, `lens_fov`, `lens_centre_x`, `lens_centre_y`, `camera.cam_N.readings.roll_offset`, `camera.tracker.parallax.*`, `camera.tracker.seam.*` | the open log's `lens:` and `frame:` lines; `camera.mount.status`; the panorama row | lens errors as tabled; mount OK; overlaps coincide at head and knee height; tape on the horizon line |
 | 2 playhead | `light.playhead.pulse_offset` | beam mode, `beam_flash`; `/pose/N/playhead/offset` | flash on the person; offset reads 0 at the crossing |
 | 3 projection | `inout.osc_light_sender.projection_offset`, `.interlace` | projection mode, `pose_instrument` | static line on the person; single line on the wall |
 | 4 speakers | `inout.osc_sound_sender.speaker_offset` (0) | IDLE, Max voicing `/global/playhead` | sound follows the beam |
@@ -204,10 +209,11 @@ correct the placement, not the offsets.
 
 Luxonis OAK-D Pro W; the app runs `color = false` and uses **the left mono camera only**
 (`SetupMono`, `modules/oak/camera/pipeline.py`): OV9282 W, global shutter, 1280 × 800, lens
-**127° × 79.5°**. The lens maps angle linearly to radius (equidistant), which the published spec
-confirms and the warp relies on. The sensor table for every OAK variant in use, with Luxonis links,
-lives beside the resolution tables in `modules/oak/camera/definitions.py`; opening a device logs
-the sensor behind each socket.
+**127° × 79.5°** by the spec, a little more by the units' own calibrations (see *The lens*). The
+lens maps angle linearly to radius (equidistant): the factory calibrations confirm it to 0.5 %
+out to 75° off axis, and the warp relies on it. The sensor table for every OAK variant in use,
+with Luxonis links, lives beside the resolution tables in `modules/oak/camera/definitions.py`;
+opening a device logs the sensor behind each socket and its lens.
 
 The mono sensors carry an IR filter and do not see the light show (site fact); they use the 940 nm
 flood (`camera.ir_flood_light`). Keep the dot projector off. `camera.mono_auto_exposure` applies
@@ -215,23 +221,92 @@ to all four.
 
 ### The camera frame
 
-The warp (`equirect_mesh_points`, `modules/oak/camera/definitions.py`) delivers a **levelled,
-equirectangular** frame: a column is one azimuth at every height, a row is one elevation. That is
-what the tracker assumes. Three constants at the preset root define it, all `INIT` — baked in when
-the devices open, so changed by editing the preset and relaunching:
+The warp (`warp_mesh_points`, `modules/oak/camera/definitions.py`) delivers a **levelled,
+cylindrical** frame: a column is one azimuth at every height, a row is one elevation at every
+column, and the rows are spaced by the **tangent** of the elevation. Column = azimuth is what the
+tracker assumes. Tangent rows are for the pose: a narrow band of columns is then exactly a level
+pinhole camera panned to that bearing, which is the kind of picture the detector and the pose model
+were trained on, and a body keeps its proportions at any height in the frame. (Rows linear in
+elevation, as before, shrink a metre at 40° up by 41 % against eye level, 67 % at 55°.)
 
-- **`fov`** — 127°, the lens's horizontal field, quoted for the full sensor width. Each camera owns
-  `target_fov = 360 / num_cameras`; the excess is overlap shared with its neighbours.
+**A straight line is curved unless it is vertical or at the horizon.** A ceiling edge `H` above the
+lens on a wall `D` away sits at elevation `atan(H · cos b / D)` at bearing `b`: highest straight
+ahead, falling toward the sides by tens of degrees. That is the projection, not a fault. The checks
+are a vertical edge (one column, anywhere) and tape at lens height (one row).
+
+Seven constants at the preset root define the frame, all `INIT` — baked in when the devices open,
+so changed by editing the preset and relaunching:
+
+- **`fov`** — 127°, **the azimuth span of the delivered frame**, quoted for the full sensor width.
+  A contract, not a lens fact: the tracker's `cam_fov`, the overlaps and the azimuth of a column
+  all follow from it. Each camera owns `target_fov = 360 / num_cameras`; the excess is overlap
+  shared with its neighbours. It must not exceed the lens's field (`lens_fov`) or the edge columns
+  read past the sensor and go black; the warp warns.
+- **`lens_fov`, `lens_centre_x`, `lens_centre_y`** — the lens itself; see *The lens*.
 - **`resolution`** — `P720` or `P800`. P720 is a pure vertical crop of the 800-row sensor, so the
-  horizontal field and the whole column-to-azimuth mapping are identical; only the vertical field
-  changes. `camera.tracker.parallax.vfov` is derived from the two (79.4° at P800, 71.4° at P720),
-  never set.
+  horizontal field and the whole column-to-azimuth mapping are identical; only the bottom of the
+  window moves (4° higher, so the feet run out of frame sooner).
+- **`frame_height`** — the delivered frame's rows, a multiple of 16. **0 means derived**: at
+  startup `main.py` sets it to the sensor's full reach for the preset's mode, tilt and lens
+  (`full_frame_height`), and logs it — 848 at P720 and tilt 0, **960** at P720 and tilt 15,
+  **1152** at P800 and tilt 16. The rows are tangents, so the full reach needs more of them than
+  the sensor has. A number in the preset is an explicit override, for when the tilt is final and
+  a detector blob matching the frame is worth making. Getting it wrong costs, per direction: too
+  many rows give a flat black bar of dead pixels across the top (113 rows at tilt 0 with 960);
+  too few cut the **centre** of the top, the raised-arm zone on each camera's axis (4.5°, 45
+  sensor rows, at tilt 15 with 848), while the sides, which never reached that high, lose nothing.
 - **`tilt`** — up-tilt in degrees, positive = aimed up, shared by all four. The warp re-aims the
-  camera by it. The sensor never imaged the part of the levelled frame it was not pointed at, so
-  the bottom `tilt / vfov` of the frame is empty (≈19 % at 15°).
+  camera by it.
+
+**The window is pinned at the bottom.** The last row is the sensor's lowest reach on the centre
+column — `tilt − 35.1°` at P720, `tilt − 39.2°` at P800, with the lens centre 10.5 px low — and the
+rows run upward from there for as many as `frame_height` gives. Pinned there because the feet are
+what the tilt rule pins — the floor-plane distance reads off the feet — and because the tangent
+spends its rows at the top. At the full-reach height the top row is the sensor's top on the centre
+column: **−20.1° to +52.3°** at P720 and tilt 15 on 960 rows, **−23.2° to +57.3°** at P800 and
+tilt 16 on 1152. The horizon is therefore **not the centre row**: row 747 of 960 and row 894 of
+1152 respectively (`horizon_row` ≈ 0.78), and `frame_window` (`definitions.py`) is the one place
+that turns a row into an elevation or back. The open log prints the window per camera.
+
+**Black is where the sensor did not look.** The sensor is a rectangle in the lens's own projection,
+and that is not a rectangle in azimuth/elevation, so no rectangular window fills without cutting.
+Tilting up lifts the centre column by the full tilt but the edge columns by less, so the sensor's
+reach falls toward the sides (the table under *Tilt*), and the tangent rows magnify the difference
+at the top: at P720, tilt 15, 960 rows the centre column is covered top to bottom, the seam columns
+(45° off axis) from row **139**, the edge columns from row **256** — a black arch across the top,
+deepest at the sides. `frame_coverage` says exactly which rows each column carries, and the open
+log summarises it (centre, seams, edges). Downstream must ask it rather than assume the frame's top
+row: a raised arm near a seam is judged against what the camera could see there.
 
 `keystone` is the other installations' full-frame correction; it stays 0 here, and is exclusive
 with `tilt`.
+
+### The lens
+
+Read off the four units' factory calibrations (mono CAM_B, 1280 × 800; the factory model is a
+pinhole with a rational distortion polynomial, and on these lenses that polynomial keeps radius
+linear in angle to 0.5 % out to 75°, so its focal and centre are the equidistant lens):
+
+| unit | focal px/rad | centre x | centre y | field across 1280 px | `lens_error` |
+|---|---|---|---|---|---|
+| cam …F124D9D600 | 575.4 | 615.2 | 409.9 | 127.5° | **1.4°** |
+| cam …110AD3D200 | 567.2 | 634.3 | 407.6 | 129.3° | 0.5° |
+| cam …31DDD2D200 | 566.7 | 632.6 | 411.7 | 129.4° | 0.5° |
+| cam …1136D1D200 | 565.0 | 634.5 | 410.3 | 129.8° | 0.6° |
+| the `fov = 127` model | 577.5 | 639.5 | 399.5 | 127.0° | — |
+
+Modelling the lens as `fov` read bearings ~1° short toward the seams — the "constant sideways
+offset in the overlap" of the table under *Reading the panorama* — and put the horizon 10 px ≈ 1°
+too high, which is ≈ 1 m of distance error at 5 m (see *The tracker's distance*).
+
+**One lens for all four**, the mean, in the preset: `lens_fov` **128.9** (568.6 px/rad across
+1280 px), `lens_centre_x` **−10.5**, `lens_centre_y` **+10.5** (px from the frame centre, at the
+full sensor mode; the 720-row crop keeps the offset). Per unit rather than shared would have
+removed the residuals in the last column; shared was the deliberate trade, and the residual stays
+visible: at open each camera logs its own lens and `camera.cam_N.readings.lens_error`, the largest
+bearing error it has under the shared lens. Unit F124's optical centre sits 24 px left of the frame
+centre, so it keeps 1.4° at its azimuth zero; the other three are within 0.6°. Re-read the numbers
+only after a lens or a unit is replaced.
 
 The tracker's other constants, under `camera.tracker`: `parallax.ring_radius` (0.36 m) and
 `parallax.camera_height` (0.50 m) — both **measured with a tape, never tuned** — and `seam.*`
@@ -268,6 +343,23 @@ P720 needs less tilt because its field is 8° narrower, so the feet run out of f
 the feet are what the rule pins. P720 cannot reach the Ø 2.7 inner circle at any tilt: head
 clipping inside about Ø 3.1 is expected there, not a fault. Beyond 16° at P800 each extra degree
 costs more feet than it gains reach.
+
+**The table is on-axis, and the reach falls toward the seams.** The sensor's top edge lifts by
+less than the tilt off axis, so what a camera sees at tilt 16 (P800, the shared lens) by bearing:
+
+| bearing off the camera axis | top | bottom | fingertips from | head from | feet from |
+|---|---|---|---|---|---|
+| 0° (axis) | 56.3° | −24.3° | Ø 3.0 | Ø 2.5 | Ø 2.9 |
+| 30° | 53.8° | −24.6° | Ø 3.2 | Ø 2.6 | Ø 2.9 |
+| 45° (seam) | 50.5° | −24.9° | Ø 3.5 | Ø 2.9 | Ø 2.9 |
+| 63.5° (frame edge) | 44.1° | −25.3° | Ø 4.2 | Ø 3.4 | Ø 2.8 |
+
+The feet rule holds all round; the overhead reach is a four-leaf pattern, Ø 3.0 on the axes and
+Ø 3.5 at the seams. That is the mount, the same in any projection or frame height: a shorter frame
+can only equalise it by cutting the middle. The frame delivers all of it at the full-reach
+`frame_height` (1152 rows at P800 and tilt 16); at the sensor's own 800 rows the tangent rows would
+cap the top at 43.7° everywhere — fingertips from Ø 4.2, head from Ø 3.4 — which is why the frame
+is taller than the sensor.
 
 ### What the horizontal field allows
 
@@ -323,8 +415,9 @@ its own line.
 |---|---|
 | the overlap coincides | nothing |
 | aligns at head height but not at knee height | the mount — `tilt` or roll; read `camera.mount.status` to tell which |
-| a constant sideways offset across the whole overlap | `fov` |
-| a residual growing toward the frame edges | the lens is not the equidistant one the spec describes — no knob |
+| a constant sideways offset across the whole overlap | `lens_fov` (the lens, not `fov`, which is the frame's span) |
+| a residual on one camera's seams only | that unit's `lens_error` — the shared lens's residual; F124 is expected to show ≈ 1.4° |
+| a residual growing toward the frame edges on every camera | the lens is not equidistant after all — re-read the calibrations |
 | two lines in one colour, side by side, on a seam | the gap between them is the azimuth error — `fov`, `tilt` or `ring_radius` |
 | the image coincides but a person's **line** sits above or below their own pixels | the distance model — re-measure `ring_radius` and `camera_height`, do not tune them |
 | both coincide but the primary still jumps at the seam | `camera.tracker.seam` (`reject`, `reach`, `hysteresis`) |
@@ -365,6 +458,11 @@ lands on it at *any* distance — the parallax correction scales elevations, and
 so it is the one row in the panorama that is exact everywhere, not only at the focus diameter.
 It is also the zero the tracker measures distance from (see *The tracker's distance*).
 
+**Until the panorama adopts `frame_window`** (see *Open*) its green line is drawn where the old,
+horizon-centred rows put it, not where the frame now has it. Read the tape against the horizon row
+the open log's `frame:` line prints (row 747 of 960 at P720 and tilt 15) in each camera's own image
+instead.
+
 **Tape at 50 cm on the wall in front of each camera** and read it against the line:
 
 | the tape | what is wrong |
@@ -395,9 +493,12 @@ tell them apart. The cameras can:
   and never shared: it absorbs each unit's own sensor error, and those differ (cam_2 reads −2.25°
   sitting level; see *Site facts*). Tilt has no offset — there is no reference to calibrate it
   against on site.
-- **`camera.cam_N.readings.fov_factory`** — the field the unit declares in its factory calibration.
-  A check that the sensor variant is the one `fov` assumes (127°, not 95°), never alarmed on: the
-  factory model is a pinhole fit that cannot represent a 127° lens.
+- **`camera.cam_N.readings.fov_factory`** — the field this unit's own calibration spans across the
+  frame (127.5–129.8° on this rig). A check that the sensor variant is the wide one (not ~97°),
+  never alarmed on.
+- **`camera.cam_N.readings.lens_error`** — the largest bearing error this unit has under the shared
+  lens (see *The lens*). A property of the build, so also never alarmed on; it is expected to read
+  1.4° on F124 and under 0.6° on the others, and a different number means a unit was swapped.
 
 **Roll matters more than it looks: it doubles at the seams.** Neighbouring cameras see a seam on
 opposite sides of their own centres, so the same roll moves the shared content in opposite vertical
@@ -406,7 +507,10 @@ cancel. The offset corrects the *reading*, not the image.
 
 ### The tracker's distance
 
-Floor plane: `camera_height / tan(depression of the box bottom)`. Two limits:
+Floor plane: `camera_height / tan(depression of the box bottom)`. **Stale until it adopts
+`frame_window`** (see *Open*): it still turns a row into a depression as if the rows were linear
+and the horizon at the centre row, and both stopped being true with the cylindrical frame. On the
+new rows it becomes simpler — `camera_height · focal / (bottom_px − horizon_px)`. Two limits:
 
 - **It cannot see nearer than the picture reaches.** At the recommended tilt — 16° at P800 or 12° at
   P720 — the lowest row with picture is 23.7° below the horizon: 1.14 m from the lens, which is
@@ -558,12 +662,22 @@ hit, the sound and both screen views are self-consistent.
 
 ## Open
 
-- **Roll is not modelled by the warp.** `equirect_mesh_points` takes `tilt` only, so a camera that
+- **Downstream still assumes the old rows.** The frame is now cylindrical with the horizon at
+  `frame_window(...).horizon_px`, but four consumers still read rows as linear elevations about the
+  centre row: `Geometry.estimate_distance` (`modules/tracker/panoramic/geometry.py`),
+  `PanoramicTracker._set_fov` (`vfov = fov · h / w`), `populated_band` / `elevation_window`
+  (`modules/tracker/panoramic/panorama_map.py`, via `modules/render/layers/panorama/Compositor.py`)
+  and the panorama's row-to-elevation in `marks.py`. Each needs `frame_window` (rows) and
+  `frame_coverage` (where the black is). Until then the tracker's distance and the panorama's
+  vertical placement are off by the tilt and the tangent, and the green line is not the horizon.
+- **Roll is not modelled by the warp.** `warp_mesh_points` takes `tilt` only, so a camera that
   is genuinely rolled still ghosts at its seams (≈2.2° vertical per 1.2° of roll). The mount readout
   says whether that is happening; the fix, if it is, is the tripod or a second rotation in the mesh.
 - **The tracker's distance reads short at range.** 5 m reads 1.9 m — the feet are placed 9° too low.
   Tape at lens height on the far wall sits only a few degrees off the panorama's horizon line, so
-  levelling is part of it, not all. **Test on location**, live rig:
+  levelling is part of it, not all. The lens read (see *The lens*) found the horizon 10 px ≈ 1°
+  too high under the old model, worth ≈ 1 m at 5 m by the table above — part of it, not all of it.
+  **Test on location**, live rig, once downstream is on `frame_window`:
   1. *The horizon check*, per camera, on the far wall — its offset from the line is the levelling
      error.
   2. Floor marks at 1.5, 2, 3, 4, 5 m along one camera's axis; a person on each; read `dis`. With
@@ -594,6 +708,9 @@ hit, the sound and both screen views are self-consistent.
     speakers:         25 × 25 × 33 cm, centres 35 cm from the axis                (site fact)
     camera:           OAK-D Pro W left mono, 127° × 79.5°; 10 × 3.5 × 3.5 cm body on a
                       50 cm tripod; IR filter, does not see the light             (spec / site fact)
+    lens, shared:     lens_fov 128.9 (568.6 px/rad), centre (-10.5, +10.5) px    (mean of the four calibrations)
+    lens, per unit:   see the table under The lens; F124 is the outlier (1.4°)   (read 2026-09-12)
+    frame_height:     0 = derived at startup: 960 at P720 / tilt 15, 1152 at P800 / tilt 16 (the open log names it)
     drawing:          "White Space Layout Sheet.pdf", two A3 pages, to scale
     blue[0]:          wired to the strip labelled "blue left" / "blue right"     (confirm)
     LED strips:       the two arms' LEDs are mounted out of phase and interlace   (site fact)
@@ -604,8 +721,8 @@ hit, the sound and both screen views are self-consistent.
     loop delay, beam:   ≈ 50 ms (42–58) at 36 rpm                (derived — the 10.8° residual)
     interlace:          white_1 +5, blue_0 −10, blue_1 +9 px     (tuned)
     resolution / tilt:  target P800, tilt 16°                    (the table under Camera; next recording)
-                        the preset's P720 is for playing back the old 720-row footage,
-                        whose capture tilt is unknown
+                        the preset's P720 / tilt 15 is for playing back the old 720-row footage,
+                        whose capture tilt is unknown; frame_height follows either at startup
     tilt, measured:     reads as configured on all four          (IMU)
     roll offsets:       cam_0 −1.00, cam_1 −0.91,
                         cam_2 −2.25, cam_3 −0.70                 (against a level; cam_2 is a sensor error)

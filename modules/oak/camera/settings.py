@@ -48,7 +48,8 @@ class CameraReadings(BaseSettings):
     # No min/max: `Widget.resolve` sends a bounded float to a slider and an unbounded one to a
     # number box, and this is typed in or filled by the zero button, never dragged.
     roll_offset:    Field[float] = Field(0.0, description="What this camera reads when level (°). Corrects the reading, not the image")
-    fov_factory:    Field[float] = Field(float('nan'), access=Field.READ, description="Horizontal field (°) this unit declares — a check on the sensor variant")
+    fov_factory:    Field[float] = Field(float('nan'), access=Field.READ, description="Horizontal field (°) this unit's own calibration spans across the frame")
+    lens_error:     Field[float] = Field(float('nan'), access=Field.READ, description="Largest bearing error (°) this unit has under the shared lens")
 
 
 class ColorSensorSettings(BaseSettings):
@@ -104,6 +105,8 @@ class CameraSettings(BaseSettings):
     stereo:         Field[bool]  = Field(False, access=Field.INIT)
     yolo:           Field[bool]  = Field(True, access=Field.INIT)
     resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode. P1080 is colour only; mono falls back to P800")
+    frame_height:   Field[int]   = Field(0, access=Field.INIT, step=16,
+                                         description="Delivered frame height (px, multiple of 16); 0 = the sensor mode's rows")
     model_path:     Field[str]   = Field("data/models", access=Field.INIT)
     flip_h:         Field[bool]  = Field(False, access=Field.INIT, description="Flip horizontal")
     flip_v:         Field[bool]  = Field(False, access=Field.INIT, description="Flip vertical")
@@ -113,7 +116,15 @@ class CameraSettings(BaseSettings):
                                          description="Keystone (fraction of frame). Exclusive with tilt")
     # Relayed down from the camera group so the warp can turn `tilt` into pixels.
     fov:            Field[float] = Field(127.0, access=Field.INIT,
-                                         description="Camera horizontal FOV (°) of the full sensor readout")
+                                         description="Azimuth span (°) of the delivered frame, quoted for the full sensor width")
+    # The lens itself — see the lens geometry notes in `definitions.py`. Shared by an
+    # installation's cameras; 0 / 0 / 0 is the old model, the lens taken to be `fov`.
+    lens_fov:       Field[float] = Field(0.0, access=Field.INIT, step=0.1,
+                                         description="Field (°) the lens spans across the full sensor width; 0 = same as fov")
+    lens_centre_x:  Field[float] = Field(0.0, access=Field.INIT, step=0.5,
+                                         description="Optical centre offset from the frame centre (px), full sensor mode")
+    lens_centre_y:  Field[float] = Field(0.0, access=Field.INIT, step=0.5,
+                                         description="Optical centre offset from the frame centre (px), positive = down")
 
     # Two values arrive shared from the camera group and are relayed one level further into
     # `mono_sensor`, so the panel shows them where the rest of the mono controls are rather than

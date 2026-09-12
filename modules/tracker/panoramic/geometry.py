@@ -14,7 +14,7 @@ class Geometry:
     """Turns a camera's bounding box into a world azimuth.
 
     Two properties of the delivered frame make this simple, and both are produced by the
-    camera's warp (`modules/oak/camera/definitions.py`, `equirect_mesh_points`), not assumed
+    camera's warp (`modules/oak/camera/definitions.py`, `warp_mesh_points`), not assumed
     here: the frame is **level** (the tilt is undone) and **equirectangular** (a column is one
     azimuth at every height, a row is one elevation at every column). On the raw fisheye neither
     holds — a standing person's box centre reads several degrees short of their true bearing,
@@ -61,7 +61,7 @@ class Geometry:
         TWO CAMERA FACTS, HANDLED IN TWO DIFFERENT PLACES. The lens *height* is here, as
         ``camera_height``. The *tilt* is not: this assumes the frame's centre row is the horizon,
         which is true only because the camera's warp has already levelled it
-        (``equirect_mesh_points``). That assumption cannot be checked from here and it is not a
+        (``warp_mesh_points``). That assumption cannot be checked from here and it is not a
         small one — on an un-levelled frame from a camera aimed up 15 deg, a person truly 3.26 m
         away reads as 1.14 m. So the distance, and therefore the parallax correction that depends
         on it, is meaningless on footage that has not been through the warp.

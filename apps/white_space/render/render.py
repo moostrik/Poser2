@@ -112,9 +112,9 @@ class Render(RenderBase):
         """Row 1: one view per camera, always — the raw frames the strip below is derived from.
 
         Mono and landscape, as this app has always been; the frame's shape follows the configured
-        sensor mode, so switching resolution reshapes the row with it.
+        sensor mode and the delivered height, so switching either reshapes the row with it.
         """
-        frame_w, frame_h = mono_frame_size(self.settings.resolution)
+        frame_w, frame_h = mono_frame_size(self.settings.resolution, height=self.settings.frame_height)
         return SubdivisionRow(name='track', columns=self.num_cams, rows=1,
                               src_aspect_ratio=frame_w / frame_h, padding=Point2f(1.0, 1.0))
 
