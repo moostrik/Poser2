@@ -69,8 +69,11 @@ class FontAtlas:
             logger.error("Failed to load font: %s", e)
             return False
 
-        # Printable ASCII characters
-        chars = [chr(i) for i in range(32, 127)]
+        # Printable ASCII, plus the few symbols this codebase actually draws. A character outside
+        # this set has no glyph, and `Text.draw_text` skips it while `measure_text` counts it as
+        # zero width — it vanishes silently rather than showing a box, so anything drawn must be
+        # listed here (the panorama footer's `Ø 4.5 m` is why these two are).
+        chars = [chr(i) for i in range(32, 127)] + ['°', 'Ø']
 
         # First pass: measure all glyphs to determine atlas size
         max_height = 0

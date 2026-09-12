@@ -27,8 +27,9 @@ Calibrate in this order. Cameras first: everything else is tuned against the fra
    - Read the pinned `camera.mount.status`. It must say *mount OK*.
    - Level each camera against a spirit level, read its roll, type it into
      `camera.cam_N.readings.roll_offset`.
-   - Turn on `render.panorama.enabled`. With someone standing near the middle of the room, the
-     overlaps must coincide at head *and* knee height. If not, see *Reading the panorama*.
+   - Look at the panorama row (always on; `render.panorama.parts` says which pieces draw). With
+     someone standing near the middle of the room, the overlaps must coincide at head *and* knee
+     height. If not, see *Reading the panorama*.
    - Tape at 50 cm on the wall in front of each camera: it must sit on the green horizon line. See
      *The horizon check*.
 2. **Playhead offset** — `light.playhead.pulse_offset`. Beam mode (IDLE is fine), one person stands
@@ -47,7 +48,7 @@ was); the flash on the first person at IDLE → INTRO; the sound on the beam.
 
 | step | settings | readout | passes when |
 |---|---|---|---|
-| 1 cameras | `fov`, `resolution`, `tilt`, `camera.cam_N.readings.roll_offset`, `camera.tracker.parallax.*`, `camera.tracker.seam.*` | `camera.mount.status`; the panorama | mount OK; overlaps coincide at head and knee height |
+| 1 cameras | `fov`, `resolution`, `tilt`, `camera.cam_N.readings.roll_offset`, `camera.tracker.parallax.*`, `camera.tracker.seam.*` | `camera.mount.status`; the panorama row | mount OK; overlaps coincide at head and knee height; tape on the horizon line |
 | 2 playhead | `light.playhead.pulse_offset` | beam mode, `beam_flash`; `/pose/N/playhead/offset` | flash on the person; offset reads 0 at the crossing |
 | 3 projection | `inout.osc_light_sender.projection_offset`, `.interlace` | projection mode, `pose_instrument` | static line on the person; single line on the wall |
 | 4 speakers | `inout.osc_sound_sender.speaker_offset` (0) | IDLE, Max voicing `/global/playhead` | sound follows the beam |
@@ -295,10 +296,28 @@ are purely seam properties.
 
 ### Reading the panorama
 
-`render.panorama.enabled` replaces the per-camera row with the four images unwrapped into one 360°
-strip — azimuth 0 at the left edge, the same scale as the observation strip below it, with a degree
-grid, the sector seams and camera axes marked, and a bright horizon line. In the overlaps the two
-neighbouring cameras are drawn on top of each other at the azimuth each one claims.
+The second row is the whole ring as one 360° strip: azimuth 0 at the left edge, elevation up the
+side, both measured at the rig centre and both linear, so a degree is the same size either way. The
+four images are drawn on top of each other at the azimuth each camera claims, and **the tracker's
+own view of the same people is drawn over them on the same vertical scale** — which is the point:
+image right and marks wrong means the distance model, not the camera.
+
+`render.panorama.parts` is a checklist of the pieces, each independent:
+
+| part | what it draws |
+|---|---|
+| `image` | the four camera frames, stitched |
+| `seams` | the sector boundaries (orange), the camera axes (blue), and the two fusion zones |
+| `grid` | the degree lattice, the green horizon, the azimuth labels, the footer |
+| `observations` | a line per observation, head elevation to foot elevation, with a foot tick |
+| `labels` | `#id cam az R distance` per observation |
+
+A **line, not a box**: the box's width said nothing its azimuth does not. The line spans the
+person's own height in the room and the tick marks the row the distance was read from, so what
+feeds `R` is visible. The primary is opaque and 2 px; another camera's view of the same person is
+half-lit and 1 px; a LOST one is fainter still. A label's *height* is its id — the same index its
+colour comes from — so labels never collide and never move as people do, and its x always sits on
+its own line.
 
 | what you see | what is wrong |
 |---|---|
@@ -306,18 +325,60 @@ neighbouring cameras are drawn on top of each other at the azimuth each one clai
 | aligns at head height but not at knee height | the mount — `tilt` or roll; read `camera.mount.status` to tell which |
 | a constant sideways offset across the whole overlap | `fov` |
 | a residual growing toward the frame edges | the lens is not the equidistant one the spec describes — no knob |
-| the image coincides but a person's two boxes below do not | the distance model — re-measure `ring_radius` and `camera_height`, do not tune them |
+| two lines in one colour, side by side, on a seam | the gap between them is the azimuth error — `fov`, `tilt` or `ring_radius` |
+| the image coincides but a person's **line** sits above or below their own pixels | the distance model — re-measure `ring_radius` and `camera_height`, do not tune them |
 | both coincide but the primary still jumps at the seam | `camera.tracker.seam` (`reject`, `reach`, `hysteresis`) |
 
 The image is stitched for one assumed depth, `render.panorama.focus_diameter` — **Ø 4.5 m**, the
 middle of the play zone. It is exact there and ghosts by a bounded amount elsewhere (+3.9° at Ø 3,
 −2.5° at Ø 7), so judge alignment with someone near the middle of the room. Nothing about a person
-feeds the image, so nothing can fool it; only the *boxes* carry the tracker's per-person distance.
+feeds the image, so nothing can fool it; the *marks* are the half that carries the tracker's
+per-person distance, re-projected through each person's own estimate rather than the cylinder.
+
+**The two seam zones** (`seams`) are drawn inward from each camera's field edge, so the pair a seam
+carries sits asymmetrically about it — that is the geometry, not a drawing error. The wide, faint
+band is `reach`: within it two cameras' observations may be fused into one person, and it is wider
+than the overlap, so it crosses the seam. The band inside it is `reject`, where no *new* person may
+be born — someone already tracked still gets refreshed there, only arrivals are refused, so nobody
+is created twice on a seam.
+
+**`render.panorama.blend` — how the overlap combines.** `MAX` is the default and what the rest of
+this procedure assumes; the others are second opinions on the same seam:
+
+| mode | read it for |
+|---|---|
+| `MAX` / `MIN` | the plain picture; a ghost as a doubled bright edge, or a doubled dark one on bright content |
+| `AVERAGE` | a ghost as a soft double image |
+| `DIFFERENCE` | tune for **black** — the most sensitive. Each camera runs its own auto-exposure, so a brightness mismatch lifts the whole band off black: read the edges, not the level |
+| `SPLIT` | **which way** it is wrong — one camera to red, the other to green; the leading fringe is the left camera |
+| `STRIPE` | alternating columns, so a straight edge zigzags. Blind to exposure differences — use it when the two cameras disagree on brightness |
 
 **A free check of the whole azimuth chain:** at Ø 4.5 m each camera should span **110.5°** of the
 strip, not 127°. Set `camera.tracker.parallax.ring_radius` to 0 and every image should snap to
 exactly 127° with 37° overlaps. It is a live slider, so this exercises the entire geometry in two
 drags.
+
+### The horizon check
+
+The green line is elevation 0: the level plane at lens height, 0.50 m. Anything at that height
+lands on it at *any* distance — the parallax correction scales elevations, and zero stays zero —
+so it is the one row in the panorama that is exact everywhere, not only at the focus diameter.
+It is also the zero the tracker measures distance from (see *The tracker's distance*).
+
+**Tape at 50 cm on the wall in front of each camera** and read it against the line:
+
+| the tape | what is wrong |
+|---|---|
+| on the line, all the way round | nothing |
+| below the line in every camera | the cameras aim higher than `tilt` — raise it |
+| above the line in every camera | the cameras aim lower than `tilt` — lower it |
+| slants across one camera's image | that camera is rolled |
+| on the line in one camera, off in its neighbour | those two disagree; that seam ghosts vertically |
+
+**Without tape:** a standing person's knees are at about lens height. Standing still at a few
+distances along one camera's axis, a gap that stays **constant** is the levelling error; a gap that
+**grows as they come closer** is only their knee not being at 50 cm (5 cm is ≈3° at 1 m, ≈0.6° at
+5 m). Judge standing still — a stride moves the knee.
 
 ### The mount readout
 
@@ -503,7 +564,7 @@ hit, the sound and both screen views are self-consistent.
 - **The tracker's distance reads short at range.** 5 m reads 1.9 m — the feet are placed 9° too low.
   Tape at lens height on the far wall sits only a few degrees off the panorama's horizon line, so
   levelling is part of it, not all. **Test on location**, live rig:
-  1. Tape at 50 cm on the far wall, per camera — its offset from the horizon line is the levelling
+  1. *The horizon check*, per camera, on the far wall — its offset from the line is the levelling
      error.
   2. Floor marks at 1.5, 2, 3, 4, 5 m along one camera's axis; a person on each; read `dis`. With
      (1) subtracted, an error that grows with distance points at `camera_height` or `vfov`; one that

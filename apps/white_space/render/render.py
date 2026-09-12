@@ -7,7 +7,7 @@ from modules.render.layers import LayerBase
 from modules.render.layers import ImageSourceLayer, MaskSourceLayer, CropSourceLayer
 from modules.render.layers import TrackerCompositor, PoseCompositor
 from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer
-from modules.render.layers import PanoramicCameraLayer, PanoramaLayerSettings, PanoramicTrackerLayer
+from modules.render.layers import Compositor, PanoramaLayerSettings
 from modules.oak import mono_frame_size
 from modules.tracker import PanoramicTrackerSettings
 from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
@@ -27,6 +27,11 @@ PLAYHEAD_FEATURE_MAP = {
     PlayheadFeatureSelect.PlayheadOffset: PlayheadOffset,
     PlayheadFeatureSelect.GhostFeature:   GhostFeature,
 }
+
+# The window's ground, behind and between the rows. Dark grey rather than black so a row's own
+# black — an unlit camera, the panorama outside its elevation window — reads as content rather than
+# as a hole in the window, and the gaps between rows show where one ends.
+_BACKGROUND: tuple[float, float, float, float] = (0.15, 0.15, 0.15, 1.0)
 
 
 class Render(RenderBase):
@@ -71,20 +76,20 @@ class Render(RenderBase):
             self.L[Layers.data_playhead_W][i] = FeatureWindowLayer(i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
             self.L[Layers.data_playhead_F][i] = FeatureFrameLayer( i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
 
-        # Rows 1–4 — shared panoramic layers; constructed after cam layers so textures are ready.
-        # The stitch is row 1's other occupant: it consumes all four camera images at once and
-        # replaces the per-camera compositors rather than sitting beside them.
-        self.L[Layers.cam_panorama][0] = PanoramicCameraLayer(
+        # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready.
+        # The calibration strip owns row 2 by itself: it consumes all four camera images at once and
+        # draws the tracker's own view of the same people over them, on one vertical scale.
+        self.L[Layers.cam_panorama][0] = Compositor(
+            board,
             [self.L[Layers.cam_image][i].texture for i in range(self.num_cams)],
-            self.num_cams, tracker, settings.panorama,
+            self.num_cams, settings.colors, tracker, settings.panorama,
         )
-        self.L[Layers.ws_tracker][0] = PanoramicTrackerLayer(board, self.num_cams, settings.colors, tracker, settings.panorama)
         self.L[Layers.ws_light][0]   = LightSimulationLayer(board)
         self.L[Layers.ws_beam][0]     = BeamLightSimulationLayer(board, settings.beam_light_sim)
 
         self.subdivision_rows: list[SubdivisionRow] = [
             self._track_row(),
-            SubdivisionRow(name='panoramic',  columns=1,                rows=1, src_aspect_ratio=10.0, padding=Point2f(0.0, 1.0)),
+            self._panorama_row(),
             SubdivisionRow(name='ws_light',   columns=1,                rows=1, src_aspect_ratio=6.0, padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name='pose',       columns=self.num_players, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0)),
         ]
@@ -94,44 +99,42 @@ class Render(RenderBase):
             self.subdivision_rows, *self._window_size, self._align_center
         )
 
-        # The panorama takes over the whole camera row, so switching it changes the layout, and
-        # that means GL reallocation — which only the render thread may do. The callback arrives
-        # on whichever thread wrote the setting, so it raises a flag and `update()` acts on it.
-        self._layout_dirty: bool = False
-        settings.panorama.bind(PanoramaLayerSettings.enabled, self._on_layout_setting)
         # The strip's height follows the focus depth: a nearer cylinder is seen over a narrower
-        # band of elevation from the centre, so dragging this reshapes the row.
+        # band of elevation from the centre, so dragging this reshapes the row — and reshaping means
+        # GL reallocation, which only the render thread may do. The callback arrives on whichever
+        # thread wrote the setting, so it raises a flag and `update()` acts on it.
+        self._layout_dirty: bool = False
         settings.panorama.bind(PanoramaLayerSettings.focus_diameter, self._on_layout_setting)
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
-    @property
-    def panorama_enabled(self) -> bool:
-        return self.settings.panorama.enabled
-
     def _track_row(self) -> SubdivisionRow:
-        """Row 1: either one view per camera, or the whole ring stitched into one strip.
+        """Row 1: one view per camera, always — the raw frames the strip below is derived from.
 
-        Stitched, the aspect is the layer's own — 360 degrees of azimuth over the elevations it
-        can actually fill, both measured at the rig centre. It is not a preference: `tilt`, `fov`
-        and `focus_diameter` all move it, and the layer is the only thing that knows how.
+        Mono and landscape, as this app has always been; the frame's shape follows the configured
+        sensor mode, so switching resolution reshapes the row with it.
         """
-        if self.panorama_enabled:
-            panorama: PanoramicCameraLayer = self.L[Layers.cam_panorama][0]  # type: ignore[assignment]
-            return SubdivisionRow(name='track', columns=1, rows=1,
-                                  src_aspect_ratio=panorama.aspect_ratio,
-                                  padding=Point2f(0.0, 1.0))
-        # Mono and landscape, as this app has always been; the frame's shape follows the
-        # configured sensor mode, so switching resolution reshapes the row with it.
         frame_w, frame_h = mono_frame_size(self.settings.resolution)
         return SubdivisionRow(name='track', columns=self.num_cams, rows=1,
                               src_aspect_ratio=frame_w / frame_h, padding=Point2f(1.0, 1.0))
+
+    def _panorama_row(self) -> SubdivisionRow:
+        """Row 2: the whole ring as one 360° strip, under the raw frames.
+
+        The aspect is the compositor's own — 360 degrees of azimuth over the elevations it can
+        actually fill, both measured at the rig centre. It is not a preference: `tilt`, `fov` and
+        `focus_diameter` all move it, and the compositor is the only thing that knows how.
+        """
+        panorama: Compositor = self.L[Layers.cam_panorama][0]  # type: ignore[assignment]
+        return SubdivisionRow(name='panoramic', columns=1, rows=1,
+                              src_aspect_ratio=panorama.aspect_ratio,
+                              padding=Point2f(0.0, 1.0))
 
     def _on_layout_setting(self, _value: object) -> None:
         self._layout_dirty = True
 
     def _rebuild_layout(self) -> None:
-        self.subdivision_rows[0] = self._track_row()
+        self.subdivision_rows[1] = self._panorama_row()
         self.subdivision = make_subdivision(
             self.subdivision_rows, *self._window_size, self._align_center
         )
@@ -150,25 +153,18 @@ class Render(RenderBase):
         self.allocate_window_renders()
 
     def allocate_window_renders(self) -> None:
-        # The track row has one column when the panorama owns it, so asking for column 3 would
-        # silently hand back the 128x128 fallback rect: allocate whichever occupant is drawing.
-        if self.panorama_enabled:
-            w, h = self.subdivision.get_allocation_size('track', 0)
-            self.L[Layers.cam_panorama][0].allocate(w, h, GL_RGBA)
-        else:
-            for i in range(self.num_cams):
-                w, h = self.subdivision.get_allocation_size('track', i)
-                self.L[Layers.tracker][i].allocate(w, h, GL_RGBA)
+        for i in range(self.num_cams):
+            w, h = self.subdivision.get_allocation_size('track', i)
+            self.L[Layers.tracker][i].allocate(w, h, GL_RGBA)
 
         w, h = self.subdivision.get_allocation_size('panoramic', 0)
-        self.L[Layers.ws_tracker][0].allocate(w, h, GL_RGBA)
+        self.L[Layers.cam_panorama][0].allocate(w, h, GL_RGBA)
 
         for i in range(self.num_players):
             w, h = self.subdivision.get_allocation_size('pose', i)
             self.L[Layers.poser][i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
-        self.settings.panorama.unbind(PanoramaLayerSettings.enabled, self._on_layout_setting)
         self.settings.panorama.unbind(PanoramaLayerSettings.focus_diameter, self._on_layout_setting)
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
@@ -184,11 +180,7 @@ class Render(RenderBase):
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
-        # Row 1's two occupants are exclusive; updating the hidden one is wasted GPU work.
-        hidden: Layers = Layers.tracker if self.panorama_enabled else Layers.cam_panorama
         for layer_type, cam_dict in self.L.items():
-            if layer_type is hidden:
-                continue
             for layer in cam_dict.values():
                 layer.update()
 
@@ -201,23 +193,18 @@ class Render(RenderBase):
         )
 
     def draw_main(self, width: int, height: int) -> None:
-        clear_color()
+        clear_color(*_BACKGROUND)
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
-        # Row 1 — either one tracker compositor per camera, or the whole ring stitched into one
-        # 360° strip aligned with the observation strip below it.
-        if self.panorama_enabled:
-            self._viewport(height, self.subdivision.get_rect('track', 0))
-            self.L[Layers.cam_panorama][0].draw()
-        else:
-            for i in range(self.num_cams):
-                self._viewport(height, self.subdivision.get_rect('track', i))
-                self.L[Layers.tracker][i].draw()
+        # Row 1 — one tracker compositor per camera: the raw frames.
+        for i in range(self.num_cams):
+            self._viewport(height, self.subdivision.get_rect('track', i))
+            self.L[Layers.tracker][i].draw()
 
-        # Row 2 — panoramic tracker standin (single wide viewport)
+        # Row 2 — the whole ring as one 360° strip, image and tracker data on one vertical scale.
         self._viewport(height, self.subdivision.get_rect('panoramic', 0))
-        self.L[Layers.ws_tracker][0].draw()
+        self.L[Layers.cam_panorama][0].draw()
 
         # Row 3 - WS light strip: the ring, or the bar's lights while the fixture is in beam mode —
         # the same rule the fixture applies to the same command (the frame's target rpm).

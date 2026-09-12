@@ -52,8 +52,7 @@ class Layers(IntEnum):
     tracker      = auto()
     poser        = auto()
     # WS visualization
-    cam_panorama = auto()   # the stitched 360° calibration view; shares the tracker row
-    ws_tracker   = auto()
+    cam_panorama = auto()   # the 360° calibration strip: the stitch with the tracker data over it
     ws_light     = auto()   # the ring (fixture in projection mode)
     ws_beam       = auto()   # the bar's four lights (fixture in beam mode); shares ws_light's row
     # data

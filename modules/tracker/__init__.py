@@ -3,6 +3,7 @@ from .tracklet import Tracklet, TrackingStatus, TrackletCallback, TrackletDict, 
 from .panoramic.tracker import Tracker as PanoramicTracker, Annotation as PanoramicAnnotation
 from .panoramic.settings import TrackerSettings as PanoramicTrackerSettings
 from .panoramic.panorama_map import azimuth_to_camera_x, camera_azimuth, camera_elevation, \
-    focus_distance, fov_overlap, panorama_coverage, wrap180
+    centre_distance, centre_elevation, elevation_window, focus_distance, fov_overlap, \
+    panorama_coverage, populated_band, wrap180
 from .onepercam.tracker import Tracker as OnePerCamTracker, TrackerSettings as OnePerCamTrackerSettings
 from .poses_from_tracklets import PosesFromTracklets

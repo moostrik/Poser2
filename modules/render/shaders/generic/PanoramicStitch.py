@@ -20,7 +20,7 @@ class PanoramicStitch(Shader):
     def use(self, textures: list[Texture], cam_fov: float, vfov: float, target_fov: float,
             ring_radius: float, focus_diameter: float,
             elevation_window: tuple[float, float], populated_band: tuple[float, float],
-            average: bool) -> None:
+            blend: int) -> None:
         """Args:
             textures: one per camera, in camera-id order; camera 0 owns azimuth 0 upward
             cam_fov: one camera's horizontal field (degrees)
@@ -31,7 +31,8 @@ class PanoramicStitch(Shader):
             elevation_window: (top, bottom) elevation of the strip, measured at the rig centre
             populated_band: (low, high) elevation the frames actually carry, at the camera —
                 a tilted camera never imaged the rest, and those rows are empty
-            average: True averages the overlap, False takes the brighter of the two
+            blend: how the overlap combines — a `PanoramaBlend` value, which IS the shader's
+                `blendMode` uniform, so the two must stay in step
         """
         if not self.allocated or not self.shader_program:
             logger.warning("PanoramicStitch shader not allocated or shader program missing.")
@@ -60,7 +61,7 @@ class PanoramicStitch(Shader):
         glUniform1f(self.get_uniform_loc("elevBottom"), elevation_window[1])
         glUniform1f(self.get_uniform_loc("camElevLo"), populated_band[0])
         glUniform1f(self.get_uniform_loc("camElevHi"), populated_band[1])
-        glUniform1i(self.get_uniform_loc("blendMode"), 1 if average else 0)
+        glUniform1i(self.get_uniform_loc("blendMode"), int(blend))
 
         draw_quad()
 

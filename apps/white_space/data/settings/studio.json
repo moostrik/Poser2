@@ -743,10 +743,14 @@
       "blur": 4.0
     },
     "panorama": {
-      "enabled": true,
+      "parts": [
+        "image",
+        "grid",
+        "observations",
+        "labels"
+      ],
       "blend": "MAX",
       "focus_diameter": 4.5,
-      "grid": true,
       "grid_degrees": 10.0,
       "show_all_observations": true
     },

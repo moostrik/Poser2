@@ -14,7 +14,8 @@ from .flow import     FlowLayer, FlowLayerSettings, FlowSettings, FlowDrawMode, 
                       Fluid3DLayer, Fluid3DLayerSettings, Fluid3DDrawMode, UnifiedFluidLayer
 from .generic import  CompositeLayer, CompositeLayerSettings, LutSettings, \
                       HDTPrepare, HDTBlend, MotionLayer, \
-                      MSColorMaskLayer, ColorMaskLayerSettings, \
-                      PanoramicCameraLayer, PanoramaLayerSettings, PanoramaBlend, \
-                      PanoramicTrackerLayer
+                      MSColorMaskLayer, ColorMaskLayerSettings
+from .panorama import Compositor, PanoramaLayerSettings, PanoramaBlend, Part, \
+                      GridRenderer, LabelRenderer, ObservationRenderer, SeamRenderer, \
+                      StitchRenderer, Mark, build_marks
 from .source import   CropSourceLayer, DFlowSourceLayer, FrgSourceLayer, ImageSourceLayer, MaskSourceLayer

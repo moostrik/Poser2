@@ -20,8 +20,17 @@
 
 #define MAX_CAMS 8
 
-#define BLEND_MAX     0
-#define BLEND_AVERAGE 1
+// Must stay in step with PanoramaBlend in modules/render/layers/panorama/PanoramaLayerSettings.py:
+// the enum's value IS this uniform.
+#define BLEND_MAX        0
+#define BLEND_AVERAGE    1
+#define BLEND_MIN        2
+#define BLEND_DIFFERENCE 3
+#define BLEND_SPLIT      4
+#define BLEND_STRIPE     5
+
+// Column width (output pixels) of one BLEND_STRIPE band.
+#define STRIPE_PX 8.0
 
 uniform sampler2D tex[MAX_CAMS];
 uniform int   numCams;
@@ -78,9 +87,14 @@ void main() {
     float azimuth   = texCoord.x * 360.0;
     float elevation = mix(elevBottom, elevTop, texCoord.y);
 
-    vec3  peak  = vec3(0.0);
-    vec3  total = vec3(0.0);
-    float count = 0.0;
+    vec3  peak   = vec3(0.0);
+    vec3  low    = vec3(0.0);
+    vec3  total  = vec3(0.0);
+    // The first two covering cameras, in id order. Every mode that compares the two views rather
+    // than merging them needs them kept apart, which peak/total have already thrown away.
+    vec3  first  = vec3(0.0);
+    vec3  second = vec3(0.0);
+    float count  = 0.0;
 
     for (int cam = 0; cam < MAX_CAMS; ++cam) {
         if (cam >= numCams) break;
@@ -90,7 +104,10 @@ void main() {
 
         vec3 rgb = texture(tex[cam], uv).rgb;
         peak  = max(peak, rgb);
+        low   = (count == 0.0) ? rgb : min(low, rgb);
         total += rgb;
+        if      (count == 0.0) first  = rgb;
+        else if (count == 1.0) second = rgb;
         count += 1.0;
     }
 
@@ -99,6 +116,22 @@ void main() {
         return;
     }
 
-    vec3 rgb = (blendMode == BLEND_AVERAGE) ? total / count : peak;
+    // Outside an overlap there is only one view, so the comparing modes have nothing to say: they
+    // fall back to the plain picture, except DIFFERENCE which goes black so only overlaps light up.
+    vec3 rgb = peak;
+    if (blendMode == BLEND_AVERAGE) {
+        rgb = total / count;
+    } else if (blendMode == BLEND_MIN) {
+        rgb = low;
+    } else if (blendMode == BLEND_DIFFERENCE) {
+        rgb = (count < 2.0) ? vec3(0.0) : abs(first - second);
+    } else if (blendMode == BLEND_SPLIT) {
+        // The frames are mono, so the channels are free: one camera into red, its neighbour into
+        // green. Which fringe leads says which camera is left of the other.
+        rgb = (count < 2.0) ? peak : vec3(first.r, second.r, 0.0);
+    } else if (blendMode == BLEND_STRIPE) {
+        bool even = mod(floor(gl_FragCoord.x / STRIPE_PX), 2.0) < 1.0;
+        rgb = (count < 2.0) ? first : (even ? first : second);
+    }
     fragColor = vec4(rgb, 1.0);
 }

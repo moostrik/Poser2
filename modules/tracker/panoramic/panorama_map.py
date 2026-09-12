@@ -126,6 +126,68 @@ def camera_elevation(elevation: float, bearing: float, ring_radius: float,
     return math.degrees(math.atan(math.tan(math.radians(elevation)) * focus_radius / distance))
 
 
+def centre_distance(bearing: float, cam_distance: float, ring_radius: float) -> float:
+    """A person's horizontal distance from the RIG CENTRE (m).
+
+    `bearing` is measured at the camera, off its own optical axis — what the tracker's
+    `local_angle - cam_fov / 2` gives. The camera faces radially outward with the centre
+    `ring_radius` behind it, so the person sits at `(d*cos(b) + r, d*sin(b))` from the centre. The
+    same triangle `Geometry._parallax_corrected_local` solves for the bearing, solved here for the
+    length instead.
+    """
+    theta: float = math.radians(bearing)
+    x: float = cam_distance * math.cos(theta) + ring_radius
+    y: float = cam_distance * math.sin(theta)
+    return math.hypot(x, y)
+
+
+def centre_elevation(cam_elevation: float, cam_distance: float, centre_dist: float) -> float:
+    """The elevation (degrees) the rig centre sees for a point a camera sees at `cam_elevation`.
+
+    The inverse of `camera_elevation`, for a point whose distance is actually known — a *person*,
+    measured by the tracker, rather than the focus cylinder an image has to assume. One height, two
+    horizontal distances, so the height cancels exactly as it does there:
+
+        tan(e_centre) = tan(e_camera) * cam_distance / centre_dist
+
+    Drawing a person through this and the image through `camera_elevation` is deliberate: the data
+    lands where the tracker believes the person is, the pixels where the cylinder says, and a
+    vertical gap between the two is the distance model being wrong.
+    """
+    if centre_dist <= 1e-9:
+        return cam_elevation
+    return math.degrees(math.atan(
+        math.tan(math.radians(cam_elevation)) * cam_distance / centre_dist))
+
+
+def populated_band(vfov: float, tilt: float) -> tuple[float, float]:
+    """(low, high) elevations the delivered frames actually carry, measured AT THE CAMERA.
+
+    The warp hands back a *levelled* frame spanning +/- vfov/2 whatever the mount does, but a camera
+    aimed up by `tilt` never imaged the bottom of that: it saw `[tilt - vfov/2, tilt + vfov/2]`, and
+    the rows outside the intersection are empty. At tilt 15 that is the bottom 18.5% of the frame —
+    the black band.
+    """
+    half: float = max(1.0, vfov) / 2.0
+    return (max(-half, tilt - half), min(half, tilt + half))
+
+
+def elevation_window(band: tuple[float, float], ring_radius: float,
+                     focus_radius: float) -> tuple[float, float]:
+    """(top, bottom) elevation of the 360-degree strip, measured AT THE RIG CENTRE.
+
+    The populated band converted to the centre's point of view, at the bearing where the conversion
+    is tightest. `tan(e_centre) = tan(e_cam) * d / focus_radius`, and `d` is smallest straight ahead
+    (`focus_radius - ring_radius`), so taking the window there guarantees every column of the strip
+    is filled rather than fading to black near the camera axes.
+    """
+    radius: float = max(1e-6, focus_radius)
+    ratio: float = max(0.0, radius - ring_radius) / radius
+    low, high = band
+    return (math.degrees(math.atan(math.tan(math.radians(high)) * ratio)),
+            math.degrees(math.atan(math.tan(math.radians(low)) * ratio)))
+
+
 def panorama_coverage(azimuth: float, num_cameras: int, cam_fov: float, target_fov: float,
                       ring_radius: float, focus_diameter: float) -> int:
     """How many cameras see this azimuth — the divisor an averaging blend needs.
