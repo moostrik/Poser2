@@ -506,30 +506,73 @@ class TestOverlapBand(unittest.TestCase):
 
 class TestGeometryParallax(unittest.TestCase):
 
-    def make_geometry(self, ring_radius: float = RING_RADIUS) -> Geometry:
+    def make_geometry(self, ring_radius: float = RING_RADIUS,
+                      zone: tuple[float, float] = (ZONE_MIN_DIAMETER, ZONE_MAX_DIAMETER)) -> Geometry:
         g = Geometry(num_cameras=4, cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
         g.set_camera_diameter(ring_radius * 2.0)
         g.set_camera_height(CAMERA_HEIGHT)
-        g.set_zone(ZONE_MIN_DIAMETER, ZONE_MAX_DIAMETER)
+        g.set_zone(*zone)
         g.set_window(WINDOW, ROWS)
         return g
 
-    def test_recovers_true_azimuth_from_both_sides_of_seam(self) -> None:
+    def test_recovers_true_azimuth_on_the_corrected_cylinder(self) -> None:
+        # The correction assumes ONE depth — `parallax_diameter`, derived from the zone — so that
+        # is where it is exact. A person standing on it is recovered to the degree from either
+        # side of the seam, which is the property the whole fusion rests on.
         g = self.make_geometry()
-        # A person at the cam0/cam1 seam (world azimuth 90) at 2 m: both cameras
-        # must report the same true azimuth once parallax is corrected.
+        radius: float = g.parallax_diameter / 2.0
         for cam_id in (0, 1):
-            roi, _distance = synth_observation(cam_id, world_azimuth=90.0, radius=2.0)
+            roi, _distance = synth_observation(cam_id, world_azimuth=90.0, radius=radius)
             _local, world, _dist = g.calc_angle(roi, cam_id)
             self.assertAlmostEqual(world, 90.0, delta=0.05,
-                                   msg=f"cam {cam_id} did not recover 90 deg")
+                                   msg=f"cam {cam_id} did not recover 90 deg on the cylinder")
 
-    def test_recovers_true_azimuth_across_distances(self) -> None:
+    def test_off_the_cylinder_the_error_is_bounded_and_symmetric(self) -> None:
+        """Away from the assumed depth each camera errs, and — because they see the person on
+        opposite sides of their own axes — in opposite directions, so the *seam disagreement* is
+        twice one camera's error. It has to stay inside `link_angle` everywhere in the zone, or a
+        crossing splits. Bounded, and zero on the cylinder.
+
+        On the STUDIO zone (Ø 3 – Ø 7), because that is the configuration whose bound is quoted in
+        CALIBRATION.md — the surrounding fixture deliberately uses a wider Ø 2 – Ø 8 so the distance
+        clamp stays clear of the frame's own nearest readable row, and a wider zone necessarily has
+        a worse worst case (14.4° at Ø 2 – Ø 8, which is the honest cost of claiming that much
+        floor)."""
+        g = self.make_geometry(zone=(3.0, 7.0))
+        self.assertAlmostEqual(g.parallax_diameter, 4.2, places=9)
+        worst: float = 0.0
+        for diameter in (3.0, 4.0, g.parallax_diameter, 6.0, 7.0):
+            with self.subTest(diameter=diameter):
+                reported = []
+                for cam_id in (0, 1):
+                    roi, _d = synth_observation(cam_id, world_azimuth=90.0, radius=diameter / 2.0)
+                    reported.append(g.calc_angle(roi, cam_id)[1])
+                gap: float = abs(reported[1] - reported[0])
+                worst = max(worst, gap)
+                # Each camera is off by half the gap, and they straddle the truth.
+                self.assertAlmostEqual((reported[0] + reported[1]) / 2.0, 90.0, delta=0.1)
+                if abs(diameter - g.parallax_diameter) < 1e-6:
+                    self.assertLess(gap, 0.1)       # exact on the cylinder
+        self.assertLess(worst, 6.8, f'seam disagreement {worst:.2f} deg over Ø 3 – Ø 7')
+
+    def test_the_azimuth_ignores_the_box_bottom(self) -> None:
+        """The point of taking the measured distance out. The device's box bottom sits below the
+        feet, which is why `estimate_distance` reads short — and while that number fed the parallax
+        triangle, the bias moved every person's *bearing*, in opposite directions at a seam. Now
+        the same person with the box bottom dragged anywhere reports the same azimuth."""
         g = self.make_geometry()
-        for radius in (2.0, 3.0, 4.0):
-            roi, _distance = synth_observation(0, world_azimuth=90.0, radius=radius)
-            _local, world, _dist = g.calc_angle(roi, 0)
-            self.assertAlmostEqual(world, 90.0, delta=0.05)
+        for cam_id in (0, 1):
+            roi, _d = synth_observation(cam_id, world_azimuth=90.0, radius=2.0)
+            angles, distances = [], []
+            for delta in (0.0, 0.05, 0.15, 0.4):        # box bottom dragged down the frame
+                dragged = replace(roi, height=roi.height + delta)
+                _local, world, distance = g.calc_angle(dragged, cam_id)
+                angles.append(world)
+                distances.append(distance)
+            self.assertAlmostEqual(max(angles), min(angles), places=9,
+                                   msg=f'cam {cam_id} azimuth still moves with the box bottom')
+            # ... while the reported metres do move, which is what makes this a real test.
+            self.assertGreater(max(distances) - min(distances), 0.2)
 
     def test_uncorrected_model_disagrees_at_seam(self) -> None:
         # Sanity check that the correction is actually doing something: with

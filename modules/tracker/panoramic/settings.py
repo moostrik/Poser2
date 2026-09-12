@@ -57,8 +57,12 @@ class RigSettings(BaseSettings):
     - **The overlap band** (`Geometry.angle_in_overlap`), derived at ``zone_max_diameter``: the
       widest band two cameras can share anywhere inside the zone, and so the most generous
       depth-free bound that never under-reports where people actually are.
+    - **The parallax depth** (``parallax_diameter``, published below), derived at the zone's
+      *harmonic* mean: the one depth every world azimuth is corrected at. Two depths from one zone
+      on purpose — a flag must never under-report, so it takes the far edge; a correction wants its
+      worst case smallest, so it takes the middle.
     - **The distance clamp**, from both diameters: a mangled bounding box can then only move the
-      parallax correction within the band people are in, never to a nonsensical depth.
+      reported metres within the band people are in, never to a nonsensical depth.
     """
     camera_diameter: Field[float] = Field(0.0, min=0.0, max=2.0, step=0.01,
                                           description="Ø (m) of the ring the lenses sit on, measured. 0 disables the parallax correction")
@@ -68,6 +72,11 @@ class RigSettings(BaseSettings):
                                             description="Ø (m) of the tracked floor's near edge — the nearest distance claimed")
     zone_max_diameter: Field[float] = Field(7.0, min=1.0, max=30.0, step=0.1,
                                             description="Ø (m) of its far edge — sets the overlap band and the distance clamp")
+    # Derived from the zone and published for the panorama, which places its marks on the same
+    # cylinder the tracker corrects the azimuth at. The harmonic mean, because the correction is
+    # linear in 1/d — see `Geometry._update_parallax_depth`.
+    parallax_diameter: Field[float] = Field(4.2, access=Field.READ,
+                                            description="Ø (m) the world azimuth is corrected at — derived, the zone's harmonic mean")
     # The delivered frame's row model, published by the tracker for whatever draws with its
     # numbers (the panorama). Rows are tangents of elevation: row = horizon_row - focal_rows * tan(e).
     vfov: Field[float] = Field(79.5, access=Field.READ,

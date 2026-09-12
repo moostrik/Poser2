@@ -20,11 +20,13 @@ from modules.utils import Rect
 CAM_FOV: float = 127.0
 TARGET_FOV: float = 90.0
 RING_RADIUS: float = 0.36
+PARALLAX_DIAMETER: float = 4.2      # the zone's harmonic mean, what the tracker corrects at
 LINK_ANGLE: float = 18.0
 REACQUIRE_ANGLE: float = 5.0
 
 GEOMETRY: StripGeometry = StripGeometry(
     cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
+    parallax_diameter=PARALLAX_DIAMETER,
     row_model=(0.78, 0.58), elevation_window=(40.0, -30.0),
     link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE,
 )
@@ -90,18 +92,27 @@ class TestToleranceField(unittest.TestCase):
         self.assertAlmostEqual((low + high) / 2.0, 96.0, places=9)
 
     def test_outside_an_overlap_it_is_the_reacquire_angle(self) -> None:
-        # A local-angle rule, so it converts to azimuth through the person's own distance: the
-        # rig centre is further from them than the camera is, which narrows it by d / (d + r).
-        m: Mark = mark(observation(0, 63.5, 45.0, overlap=False, distance=3.0))
+        # A local-angle rule, converted to azimuth through the SAME cylinder the tracker corrects
+        # the azimuth at. The centre is further from the cylinder than the camera is, so the field
+        # measures less than the rule: 5 deg of local angle is about 4.1 deg of azimuth at Ø 4.2
+        # on the camera's own axis.
+        m: Mark = mark(observation(0, 63.5, 45.0, overlap=False))
         low, high = span(m)
-        self.assertAlmostEqual(high - low, REACQUIRE_ANGLE * 3.0 / 3.36, delta=0.02)
+        radius: float = PARALLAX_DIAMETER / 2.0
+        expected: float = REACQUIRE_ANGLE * (radius - RING_RADIUS) / radius
+        self.assertAlmostEqual(high - low, expected, delta=0.05)
         self.assertAlmostEqual((low + high) / 2.0, 45.0, delta=0.01)
+        self.assertLess(high - low, REACQUIRE_ANGLE)    # never wider than the rule itself
 
-    def test_the_conversion_relaxes_with_distance(self) -> None:
-        near, far = (mark(observation(0, 63.5, 45.0, overlap=False, distance=d)).tolerance_w
-                     for d in (2.0, 8.0))
-        self.assertLess(near, far)
-        self.assertLess(far, REACQUIRE_ANGLE / 360.0)   # never wider than the rule itself
+    def test_the_field_no_longer_depends_on_the_measured_distance(self) -> None:
+        """The point of moving the azimuth onto a fixed depth. The field used to convert through
+        each observation's own `estimate_distance`, so it breathed as that biased number moved and
+        two observations of one person converted by different factors. Now it is the same width
+        whatever the box bottom says, which is what makes the pair test exact rather than
+        approximate."""
+        widths = {mark(observation(0, 63.5, 45.0, overlap=False, distance=d)).tolerance_w
+                  for d in (0.6, 2.0, 3.0, 8.0, 40.0)}
+        self.assertEqual(len(widths), 1, f'field width still varies with distance: {widths}')
 
     def test_the_reacquire_field_is_clamped_to_the_camera_field(self) -> None:
         # Past a field edge there are no pixels for a returning person to come back in through,
@@ -114,6 +125,7 @@ class TestToleranceField(unittest.TestCase):
     def test_a_zero_tolerance_draws_nothing(self) -> None:
         blank: StripGeometry = StripGeometry(
             cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
+            parallax_diameter=PARALLAX_DIAMETER,
             row_model=(0.78, 0.58), elevation_window=(40.0, -30.0),
             link_angle=0.0, reacquire_angle=0.0)
         for overlap in (True, False):
@@ -225,6 +237,7 @@ class TestZoneLines(unittest.TestCase):
         copy of it."""
         geometry = StripGeometry(
             cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=0.0,
+            parallax_diameter=PARALLAX_DIAMETER,
             row_model=GEOMETRY.row_model, elevation_window=self.WINDOW,
             link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE)
         near_y = strip_y(self.elevation(3.0), self.WINDOW)

@@ -1,5 +1,3 @@
-import math
-
 from modules.oak import FrameWindow, frame_window
 from modules.utils import Rect
 
@@ -42,10 +40,10 @@ class Geometry:
         self.num_cameras: int = num_cameras
         self.cam_fov: float = cam_fov
         self.target_fov: float = target_fov
-        # How far local 0 sits before this camera's own sector starts — the offset in
-        # `_calc_world_angle`, and half of what the field has spare. Depth-free and exact: it is a
-        # mounting fact, not a width. Do not confuse it with `overlap_band` below, which is the
-        # *width* two cameras share and is nearly four times larger here.
+        # How far local 0 sits before this camera's own sector starts — half of what the field has
+        # spare. Depth-free and exact: it is a mounting fact, not a width. Do not confuse it with
+        # `overlap_band` below, which is the *width* two cameras share and is nearly four times
+        # larger here.
         self.fov_overlap: float = (self.cam_fov - self.target_fov) / 2.0
 
         # Parallax: cameras sit on a ring of this radius (m), not at the shared
@@ -64,6 +62,9 @@ class Geometry:
         # so it runs after it exists rather than beside `fov_overlap`.
         self.overlap_band: float = self.cam_fov - self.target_fov
         self.overlap_world: float = self.cam_fov - self.target_fov
+        # The one depth the azimuth is corrected at. Must exist before `set_zone` runs, which is
+        # what derives it — the same ordering trap `overlap_band` fell into above.
+        self.parallax_diameter: float = self._min_radius + self._max_radius
         self.set_zone(self._min_radius * 2.0, self._max_radius * 2.0)
 
         # The frame's rows: where the horizon is (px) and how many px a unit of tangent spans.
@@ -83,13 +84,23 @@ class Geometry:
         return (local_angle, world_angle, overlap, distance, self.estimate_height(roi))
 
     def calc_angle(self, roi: Rect, cam_id: int) -> tuple[float, float, float]:
+        """Local angle, world azimuth and distance (m) for one box.
+
+        **The world azimuth does not use the distance.** It goes through
+        `camera_local_to_azimuth` at `parallax_diameter` — the stitch's own chain, so the tracker's
+        forward direction and `azimuth_to_camera_x` are one exact inverse pair. The distance comes
+        back beside it for the display and `seam.link_height`, and is deliberately not fed into the
+        bearing; `_update_parallax_depth` explains why at length.
+
+        Edge, overlap, dead-zone, hysteresis and re-acquisition tests all stay in the raw camera
+        frame (`local_angle`); only the world azimuth is re-projected to the shared centre, because
+        that is the only quantity two cameras can compare.
+        """
         local_angle: float = self._calc_local_angle(roi)
-        distance: float = self.estimate_distance(roi)
-        # Edge/overlap/hysteresis tests stay in the raw camera frame; only the
-        # world angle is re-projected to the shared centre for cross-camera fusion.
-        corrected_local: float = self._parallax_corrected_local(local_angle, distance)
-        world_angle: float = self._calc_world_angle(corrected_local, cam_id)
-        return local_angle, world_angle, distance
+        world_angle: float = camera_local_to_azimuth(
+            local_angle, cam_id, self.cam_fov, self.target_fov,
+            self._ring_radius, self.parallax_diameter)
+        return local_angle, world_angle, self.estimate_distance(roi)
 
     def estimate_distance(self, roi: Rect) -> float:
         """Distance from the camera (m), from where the feet meet the floor.
@@ -120,14 +131,25 @@ class Geometry:
         close they are. It is used, not discarded: the formula is continuous across the frame edge
         and the final clamp is what bounds the answer.
 
+        **THIS DOES NOT FEED THE AZIMUTH, AND ITS ABSOLUTE VALUE IS BIASED LOW.** The device
+        tracker's box bottom sits *below* the feet, so `below` is too large and the reading too
+        short — a person at 5 m reads about 1.9 m on this rig, and the same error makes a 1.8 m
+        person's `estimate_height` read 1.1–1.4. The bias is the box's, not the model's: nothing in
+        our code touches the ROI (`Tracklet.from_depthcam` is a field-for-field copy), and the
+        floor-plane model itself is exact. It is left uncorrected because it no longer matters where
+        it used to: `calc_angle` corrects the bearing at a fixed depth instead
+        (`_update_parallax_depth`), so no box bottom can move a person's azimuth. What is left
+        consumes it is the panorama's `R` label, the mark rows, and `seam.link_height` — and that
+        last one compares two readings of the *same* person, which survives a shared bias (1–2%
+        across a seam, measured). See CALIBRATION.md, *Open*, for the optional calibration that
+        would make the metres read true.
+
         **THE CLAMP IS A GUARD, NOT A FILTER.** Nothing is rejected for falling outside it; only
-        the reading is pinned. It matters because the denominator can go to almost nothing (feet a
-        pixel below the horizon reads as infinitely far) or the box can be extrapolated far below
-        the frame (reads as zero), and this distance feeds the parallax correction, which rotates
-        the world azimuth. Unclamped, one mangled box swings a person's bearing arbitrarily; the
-        bounds mean it can only move within the band people are actually in. They are derived from
-        the tracked zone by `set_zone`, so they follow the ring instead of being hand-computed for
-        one.
+        the reading is pinned. The denominator can go to almost nothing (feet a pixel below the
+        horizon would read as infinitely far) or the box can be extrapolated far below the frame
+        (reads as zero), and the bounds keep the answer inside the band people are actually in.
+        They are derived from the tracked zone by `set_zone`, so they follow the ring instead of
+        being hand-computed for one.
         """
         bottom_px: float = (roi.y + roi.height) * (self._rows - 1)
         below: float = bottom_px - self._horizon_px          # px below the horizon
@@ -159,6 +181,14 @@ class Geometry:
         about 2.2 m where the same person reads 1.8 m with their arms down, at any distance.
         Here that is the useful number: overhead reach is what the tilt is chosen around.
 
+        AND ITS ABSOLUTE VALUE IS BIASED LOW, for the same reason `estimate_distance` is: `below`
+        is the shared denominator, so a box bottom placed under the feet shortens both. A 1.8 m
+        person reads 1.1–1.4 on this rig, and — the signature that identifies the cause — the
+        reading *falls* as they walk away, where it should be distance-invariant. What survives the
+        bias is the *comparison* `seam.link_height` makes between two views of one person, which is
+        why that gate is a percentage. Do not read the metres as a person's height until the
+        calibration in CALIBRATION.md, *Open*, has been done.
+
         Accuracy is the distance estimate's in relative terms, since it is the same denominator:
         a pixel of box noise is a centimetre, while a degree of horizon error is 9 cm at 1.5 m
         and 35 cm at 7 m. Reads 0.0 when the feet sit at or above the horizon — nobody standing
@@ -170,30 +200,11 @@ class Geometry:
             return 0.0
         return min(_MAX_HEIGHT, self._camera_height * roi.height * rows / below)
 
-    def _parallax_corrected_local(self, local_angle: float, distance: float) -> float:
-        """Re-project a local angle so it reads as if seen from the rig centre.
-
-        The camera faces radially outward, so the centre sits ``ring_radius``
-        behind it. Placing the person at (distance, angle) in the camera frame
-        and re-measuring the bearing from the centre removes the cross-camera
-        seam disagreement caused by the off-centre mounting."""
-        if self._ring_radius <= 0.0:
-            return local_angle
-        theta: float = math.radians(local_angle - self.cam_fov / 2.0)
-        x: float = distance * math.cos(theta) + self._ring_radius
-        y: float = distance * math.sin(theta)
-        return math.degrees(math.atan2(y, x)) + self.cam_fov / 2.0
-
     def _calc_local_angle(self, roi: Rect) -> float:
         """The bearing of the box centre within this camera's field. Exact, not approximate:
-        the frame is equirectangular, so a column is one azimuth at every height."""
+        the frame is cylindrical, so a column is one azimuth at every height."""
         normalized_x: float = roi.x + roi.width / 2.0
         return normalized_x * self.cam_fov
-
-    def _calc_world_angle(self, local_angle: float, cam_id: int) -> float:
-        world_angle: float = self.target_fov * cam_id + local_angle - self.fov_overlap
-        world_angle = world_angle % 360.0  # Ensure the angle is within 0 to 360 degrees
-        return world_angle
 
     def angle_in_overlap(self, local_angle: float) -> bool:
         """Is this column inside the band a neighbouring camera also sees?
@@ -227,22 +238,74 @@ class Geometry:
             diff = 360.0 - diff
         return diff
 
+    def _update_parallax_depth(self) -> None:
+        """The one depth the world azimuth is corrected at: the zone's **harmonic mean**.
+
+        **Why a fixed depth and not each person's own.** The correction needs a length, and the only
+        length available per person is `estimate_distance`, read off the box bottom — which the
+        device tracker places *below* the feet, so it reads badly short. That would be survivable if
+        it were merely noisy, but the two cameras at a seam err in OPPOSITE directions (each pulls
+        its bearing toward its own axis), so the disagreement doubles. Measured, for one person,
+        seam disagreement in degrees:
+
+            distance used            Ø 3     Ø 4.5    Ø 7    worst
+            no correction at all    23.1     14.5     9.0     23.1
+            per-person, 50% short   16.5     11.6     7.8     16.5
+            fixed, Ø 4.2             6.1      1.4     6.3      6.3
+            per-person, exact        0.0      0.0     0.0      0.0
+
+        A real body's own seam disagreement — one camera on the chest, the other on a shoulder — is
+        5.9 / 2.3 / 0.85 at those diameters. So a fixed depth already sits at the irreducible floor,
+        while the estimate we can actually make costs 10 degrees more than doing nothing clever.
+        The bias is calibratable; the per-person *variance* is not, because a detector's box bottom
+        is not a physical landmark. So the distance stays out of the bearing.
+
+        **Why the harmonic mean.** The correction's term is `r·sin(θ)/d`, linear in `1/d`, and the
+        minimax of a linear function over an interval sits at the midpoint of its argument — here
+        the midpoint of `1/d`, which is the harmonic mean `2·min·max/(min+max)`. Ø 4.2 for a
+        Ø 3–Ø 7 zone. The true optimum is Ø 4.12 (6.33 worst against 6.66); the third of a degree
+        buys a number anyone can re-derive from the two taped diameters.
+
+        **TWO DEPTHS DERIVED FROM ONE ZONE, ON PURPOSE.** `_update_overlap_band` takes the zone's
+        FAR edge, because a flag that gates whether a link is even attempted must never
+        under-report — too wide costs nothing, too narrow splits a person. This one takes the
+        middle, because a correction wants its worst case smallest. Different questions.
+        """
+        self.parallax_diameter = (2.0 * self._min_radius * self._max_radius * 2.0
+                                  / max(1e-6, self._min_radius + self._max_radius))
+
     def _update_overlap_band(self) -> None:
-        """Derive both overlap widths, at the tracked zone's far edge. The one place either moves.
+        """The overlap threshold, in the two frames it is needed in. The one place either moves.
 
-        A camera `r` out from the centre covers less of the room than its bare field suggests, and
-        how much less depends on the depth. Take the depth where the coverage is widest — the
-        zone's outer circle — and the geometry closes:
+        **`overlap_band` is a LOCAL angle, derived at the zone's FAR edge.** A camera `r` out from
+        the centre covers less of the room than its bare field suggests, and how much less depends
+        on the depth; the coverage is widest at the zone's outer circle, so that is where the
+        threshold is taken. The geometry closes:
 
-            half_span      = the azimuth, at the centre, from a camera's axis to its field edge
-            overlap_world  = 2 * half_span - target_fov          (what two neighbours share)
+            half_span = the azimuth, at the centre, from a camera's axis to its field edge
+            shared    = 2 * half_span - target_fov
 
         and the neighbour's field begins `target_fov - half_span` off this camera's axis, which
-        `azimuth_to_camera_x` turns back into a local angle — the threshold `angle_in_overlap`
-        needs. The two differ (28.3° local against 26.4° of azimuth on this rig) because the
-        local-to-azimuth map compresses toward a field edge.
+        `azimuth_to_camera_x` turns back into the local angle `angle_in_overlap` tests. The far
+        edge because a flag that gates whether a link is even *attempted* must never under-report:
+        too wide costs nothing (`_find_world_candidate` finds no partner within `link_angle`), too
+        narrow splits one person into two worlds at a seam.
 
-        At `camera_diameter = 0` the depth question disappears with the parallax correction, and
+        **`overlap_azimuth` is that same threshold in AZIMUTH, at `parallax_diameter`** — not at
+        the far edge. A local angle has no single position on the ring: where it lands depends on
+        the depth it is projected through. The panorama draws its marks at `parallax_diameter`, so
+        drawing the threshold at any other depth would put the line somewhere a mark's tolerance
+        does *not* change width — 2.3° away, on this rig. Same threshold, the display's frame, so
+        the line predicts the display exactly.
+
+        Two consequences to hold onto. This is **not** the geometric overlap at
+        `parallax_diameter` (19.4° here against `overlap_azimuth`'s 31.0°) — the flag is
+        deliberately generous, and the line inherits that, so it sits outside where the two
+        pictures actually meet. And `overlap_azimuth` comes out *wider* than `overlap_band` here,
+        where the far-edge version was narrower: nearer depths pull a bearing toward the camera's
+        own axis, hence away from the seam the band is measured from.
+
+        At `camera_diameter = 0` the depth question disappears with the parallax correction and
         both collapse to `cam_fov - target_fov`. The local band is clamped to `[0, cam_fov/2]`:
         zero is right below the diameter where the sectors stop meeting at all, and the ceiling
         keeps `angle_in_overlap` from becoming always-true on a ring of more, narrower sectors.
@@ -283,16 +346,19 @@ class Geometry:
     def set_zone(self, min_diameter: float, max_diameter: float) -> None:
         """The tracked floor, as the two **diameters** the settings carry.
 
-        Two things follow. The overlap band, at the far edge (`_update_overlap_band`). And the
-        distance clamp, as camera distances: the on-axis extremes, since a camera is pushed
-        `ring_radius` toward the circle it faces and away from the one behind it — so the nearest
-        anyone in the zone can be is `min_radius - ring_radius`, and the furthest
-        `max_radius + ring_radius`. Ø 3 to Ø 7 on a Ø 0.72 ring gives 1.14 m to 3.86 m.
+        Three things follow. The **overlap band**, at the far edge (`_update_overlap_band`). The
+        **parallax depth**, at the harmonic mean (`_update_parallax_depth`) — the one length the
+        world azimuth is corrected with. And the **distance clamp**, as camera distances: the
+        on-axis extremes, since a camera is pushed `ring_radius` toward the circle it faces and away
+        from the one behind it — so the nearest anyone in the zone can be is
+        `min_radius - ring_radius`, and the furthest `max_radius + ring_radius`. Ø 3 to Ø 7 on a
+        Ø 0.72 ring gives 1.14 m to 3.86 m.
         """
         self._min_radius = max(0.0, min_diameter) / 2.0
         self._max_radius = max(self._min_radius, max_diameter / 2.0)
         self._min_distance = max(0.01, self._min_radius - self._ring_radius)
         self._max_distance = max(self._min_distance, self._max_radius + self._ring_radius)
+        self._update_parallax_depth()
         self._update_overlap_band()
 
     def set_window(self, window: FrameWindow, rows: int) -> None:

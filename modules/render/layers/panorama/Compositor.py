@@ -174,6 +174,7 @@ class Compositor(LayerBase):
             cam_fov=self._tracker.fov,
             target_fov=self.target_fov,
             ring_radius=self.ring_radius,
+            parallax_diameter=self._tracker.rig.parallax_diameter,
             row_model=self.row_model,
             elevation_window=window,
             link_angle=self._tracker.seam.link_angle,

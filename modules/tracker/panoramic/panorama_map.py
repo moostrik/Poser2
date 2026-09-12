@@ -1,36 +1,32 @@
-"""The 360-degree panorama map: azimuth back to the column of one camera.
+"""The 360-degree panorama map: azimuth to the column of one camera, and back.
 
-This is the **inverse** of the forward chain in `geometry.py`, and it lives here rather than in
-the render so the two can never drift apart. The forward direction turns a camera column into a
-world azimuth (`_calc_local_angle`, `_parallax_corrected_local`, `_calc_world_angle`); the stitch
-needs the other direction — given an output column of a 360-degree strip, which column of which
-camera does it show.
+**One pair of functions, used in both directions by both sides.** `camera_local_to_azimuth` is the
+forward direction — a camera's own column to a world azimuth — and it is what `Geometry.calc_angle`
+calls, so the *tracker's* azimuth and the *stitch's* placement are the same arithmetic rather than
+two copies of it. `azimuth_to_camera_x` is its exact inverse, which is what the stitch needs: given
+an output column of the strip, which column of which camera does it show. The round-trip tests
+prove they invert, and that is the guard against the two drifting apart.
 
-Every step inverts exactly, with no approximation:
+`local = x * cam_fov` exactly, because the delivered frame is **cylindrical**
+(`modules/oak/camera/definitions.py`, `warp_mesh_points`): a column is one azimuth at every height.
+There is no distortion term left to invert.
 
-`_calc_local_angle` is `x * cam_fov`, so `x = local / cam_fov`. That is only exact because the
-delivered frame is **equirectangular** (`modules/oak/camera/definitions.py`,
-`warp_mesh_points`): a column is one azimuth at every height. There is no distortion term
-left to invert.
-
-`_calc_world_angle` is an offset, so it subtracts.
-
-`_parallax_corrected_local` is a triangle, and inverting it is where the depth comes in. The
-camera sits `ring_radius` out from the rig centre, aimed radially outward. A point at camera
-bearing ``theta`` and camera distance ``d`` is seen from the centre at bearing ``phi``, and the
-law of sines on the centre/camera/person triangle gives
+The rest is one triangle. The camera sits `ring_radius` out from the rig centre, aimed radially
+outward. A point at camera bearing ``theta`` and camera distance ``d`` is seen from the centre at
+bearing ``phi``, and the law of sines on the centre/camera/point triangle gives
 
     sin(theta - phi) = ring_radius * sin(phi) / d      ->   theta = phi + asin(r * sin(phi) / d)
 
 exact, not a small-angle expansion.
 
-**But `d` is the one thing an image cannot know.** The tracker estimates it per person from where
-their feet meet the floor; a stitch has no person, only pixels, so it assumes one depth for the
-whole image: a **cylinder** of diameter ``focus_diameter`` around the rig, the middle of the play
-zone. The distance from a camera to that cylinder varies with bearing, and that is `focus_distance`
-below — the law of cosines with the ring radius. So the image is exactly aligned at the focus
-diameter and drifts, by a bounded amount, nearer and farther. That is the design: see step 4.3 of
-the plan. Nothing about a person, a box or a pose feeds it, so nothing can fool it.
+**And `d` is assumed, never measured — by both sides, for the same reason.** A stitch has no person,
+only pixels, so it must assume a depth: a **cylinder** of diameter ``focus_diameter`` around the rig.
+The tracker *could* measure a person's distance, and deliberately does not: the device's box bottom
+sits below the feet, and the two cameras at a seam err in opposite directions, so feeding that in
+cost about 10° more seam disagreement than assuming a depth (`Geometry._update_parallax_depth` has
+the table). So the tracker assumes one too — its own `parallax_diameter`, the tracked zone's
+harmonic mean. Both are exactly aligned at their assumed diameter and drift by a bounded amount
+nearer and farther. Nothing about a person, a box or a pose feeds either, so nothing can fool them.
 """
 
 import math
@@ -53,8 +49,9 @@ def fov_overlap(cam_fov: float, target_fov: float) -> float:
 def camera_azimuth(cam_id: int, target_fov: float) -> float:
     """World azimuth (degrees) a camera's optical axis points at.
 
-    Falls out of `_calc_world_angle` at the frame centre: `target_fov * cam_id + cam_fov / 2 -
-    fov_overlap` collapses to `target_fov * (cam_id + 0.5)`, independent of the lens. With four
+    Falls out of the azimuth frame's own definition at the frame centre:
+    `target_fov * cam_id + cam_fov / 2 - fov_overlap` collapses to `target_fov * (cam_id + 0.5)`,
+    independent of the lens. With four
     cameras the axes are at 45, 135, 225 and 315, and the sector boundaries they meet on — the
     seams — at 0, 90, 180 and 270.
     """
@@ -120,9 +117,11 @@ def camera_local_to_azimuth(local: float, cam_id: int, cam_fov: float, target_fo
         d = -r·cos θ + √(R² - r²·sin² θ)        (the cylinder, by the law of cosines)
         φ = atan2(d·sin θ, d·cos θ + r)          (that point's bearing from the centre)
 
-    At `ring_radius = 0` this collapses to `φ = θ` and the whole thing to `Geometry`'s forward
-    `_calc_world_angle`. The depth is the same assumption the stitch makes and nothing else:
-    per-person depth belongs to the marks (`centre_elevation`), not to a band.
+    At `ring_radius = 0` this collapses to `φ = θ` and the whole thing to the plain offset
+    `target_fov * cam_id + local - fov_overlap` that defines the azimuth frame. **This is the
+    tracker's forward chain as well as the stitch's** — `Geometry.calc_angle` calls it at
+    `parallax_diameter`, the stitch at `focus_diameter` — so a caller has to say which depth it
+    means, and no caller passes a person's measured distance.
     """
     theta: float = math.radians(local - cam_fov / 2.0)
     phi: float = local - cam_fov / 2.0
@@ -189,33 +188,13 @@ def centre_distance(bearing: float, cam_distance: float, ring_radius: float) -> 
     `bearing` is measured at the camera, off its own optical axis — what the tracker's
     `local_angle - cam_fov / 2` gives. The camera faces radially outward with the centre
     `ring_radius` behind it, so the person sits at `(d*cos(b) + r, d*sin(b))` from the centre. The
-    same triangle `Geometry._parallax_corrected_local` solves for the bearing, solved here for the
-    length instead.
+    same triangle `camera_local_to_azimuth` solves for the bearing, solved here for the length
+    instead. Used only for the panorama label's `R` — a readout, never a placement.
     """
     theta: float = math.radians(bearing)
     x: float = cam_distance * math.cos(theta) + ring_radius
     y: float = cam_distance * math.sin(theta)
     return math.hypot(x, y)
-
-
-def centre_bearing(bearing: float, cam_distance: float, ring_radius: float) -> float:
-    """The bearing (degrees) the RIG CENTRE sees for a point a camera sees at `bearing` off its own
-    axis, `cam_distance` away — the angular partner of `centre_distance`, which solves the same
-    triangle for its length.
-
-    This is the **forward** direction, the one `Geometry._parallax_corrected_local` takes, and the
-    identity that ties the two together is exact:
-
-        world_angle = camera_azimuth(cam_id, target_fov) + centre_bearing(local - cam_fov/2, ...)
-
-    It is here so that anything drawing a camera-frame angle *at a known distance* — the width of
-    a local-angle rule, say — lands in the same frame as the tracker's own `world_angle`, instead
-    of borrowing `camera_local_to_azimuth`, which assumes the focus cylinder's depth rather than
-    the person's.
-    """
-    theta: float = math.radians(bearing)
-    return math.degrees(math.atan2(cam_distance * math.sin(theta),
-                                   cam_distance * math.cos(theta) + ring_radius))
 
 
 def centre_elevation(cam_elevation: float, cam_distance: float, centre_dist: float) -> float:

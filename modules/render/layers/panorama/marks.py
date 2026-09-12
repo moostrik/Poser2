@@ -4,19 +4,29 @@ Kept out of the renderers because two of them draw the same marks: `ObservationR
 lines, `LabelRenderer` the text beside them, and if each worked the geometry out for itself the two
 could disagree about where a person is. The compositor builds the list once and hands it to both.
 
-**A mark is the tracker's own belief, and nothing else.** Its x is the fused `world_angle` — the
-number the light, the sound and the hit detector all act on — and its rows are re-projected to the
-rig centre through that person's own estimated distance. The image underneath is placed where the
-*focus cylinder* says (`camera_elevation`), so a mark generally does **not** sit on its own pixels,
-and that displacement is not a measurement of anything: it is the difference between two depth
-assumptions, zero only for a person standing at `focus_diameter` and zero on a camera axis at any
-depth. The person's distance is already printed on the label as `R`, which is the honest way to
-read it.
+**A mark is the tracker's own belief, and all of it sits at one depth.** Its x is the fused
+`world_angle` — the number the light, the sound and the hit detector all act on — and the tracker
+derives that at a **fixed** depth, `rig`'s `parallax_diameter` (the harmonic mean of the tracked
+zone, Ø 4.2 on this rig), never from a person's measured distance. See
+`Geometry._update_parallax_depth` for why: the measured distance is biased by the device's box
+bottom, and the two cameras at a seam err in opposite directions, so feeding it in cost about 10°
+more than assuming a depth. The rows and the tolerance follow onto the same cylinder, so x and y
+describe a person at one place rather than two.
 
-What the marks *are* for is the one check nothing else in the app can show: **two marks of one
-colour, at a seam, must coincide.** Each camera corrects through its own distance estimate, so that
-holds at any depth, and the gap between them is the fused azimuth being wrong — `fov`, `tilt`,
-`ring_radius`, or the distance that feeds the correction.
+Two things follow that a reader has to know:
+
+- **A mark sits a small constant distance from its own pixels.** The image is stitched at
+  `render.panorama.focus_diameter` (Ø 4.5) and the marks at Ø 4.2, so they are drawn on two nearby
+  cylinders. That offset is a chosen consequence — the parallax depth is derived from the zone so it
+  minimises the worst-case *seam* error, not so it matches a render slider — and it is not a fault.
+- **Two marks of one colour at a seam no longer have to coincide exactly.** They disagree by the
+  known geometric residual for that person's depth: zero at Ø 4.2, up to about 6.6° at the zone's
+  edges. So the gap is now a **depth indicator**, not an error signal. It is a weaker diagnostic
+  than the old one, and an honest one — the old one was reading the detector's bias.
+
+`R` and `H` on the label are the only things here still derived from the measured distance, and they
+are readouts, never placements. Both read low; `H` also *falls* as a person walks away, which is the
+signature of a box bottom under the feet.
 
 Each mark also carries the **joining tolerance that governs its place on the ring** as a width
 (`_tolerance`), so the rule the tracker is about to apply to it is on screen next to it rather than
@@ -28,7 +38,8 @@ from dataclasses import dataclass
 
 # Local application imports
 from modules.tracker import PanoramicAnnotation, Tracklet, TrackingStatus, \
-    camera_azimuth, centre_bearing, centre_distance, centre_elevation, elevation_from_row, strip_y
+    camera_azimuth, camera_local_to_azimuth, centre_distance, centre_elevation, \
+    elevation_from_row, focus_distance, strip_y, wrap180
 
 
 @dataclass(frozen=True)
@@ -38,14 +49,22 @@ class StripGeometry:
     Owned by the compositor and rebuilt each tick from the tracker's published numbers; nothing
     here is a preference. `row_model` is (horizon_row, focal_rows) — the delivered frames' rows as
     the tracker published them — and `elevation_window` the strip's (top, bottom) at the rig centre.
+
+    `parallax_diameter` is the one depth the tracker corrects the azimuth at, mirrored here so a
+    mark's rows and its tolerance land on the same cylinder its x does.
     """
     cam_fov: float
     target_fov: float
     ring_radius: float
+    parallax_diameter: float
     row_model: tuple[float, float]
     elevation_window: tuple[float, float]
     link_angle: float
     reacquire_angle: float
+
+    @property
+    def parallax_radius(self) -> float:
+        return max(1e-6, self.parallax_diameter / 2.0)
 
 
 @dataclass(frozen=True)
@@ -85,15 +104,17 @@ def _mark(tracklet: Tracklet, primaries: set[int],
         return None
 
     annotation: PanoramicAnnotation = tracklet.annotation
-    # The bearing off this camera's own axis, which is what the parallax triangle takes.
-    bearing: float = annotation.local_angle - g.cam_fov / 2.0
-    cam_distance: float = max(1e-6, annotation.distance)
-    centre_dist: float = centre_distance(bearing, cam_distance, g.ring_radius)
+    # The whole mark sits on the SAME cylinder the tracker corrects the azimuth at, so x, the rows
+    # and the tolerance all describe a person at one depth. `phi` is the bearing at the rig centre
+    # that this camera's column lands on there; `cylinder_distance` how far the camera is from the
+    # cylinder along it — the stitch's own pair of numbers.
+    phi: float = wrap180(annotation.world_angle - camera_azimuth(tracklet.cam_id, g.target_fov))
+    cylinder_distance: float = focus_distance(phi, g.ring_radius, g.parallax_radius)
 
-    top_y: float = _row_y(tracklet.roi.y, g, cam_distance, centre_dist)
-    bottom_y: float = _row_y(tracklet.roi.y + tracklet.roi.height, g, cam_distance, centre_dist)
+    top_y: float = _row_y(tracklet.roi.y, g, cylinder_distance)
+    bottom_y: float = _row_y(tracklet.roi.y + tracklet.roi.height, g, cylinder_distance)
 
-    tolerance_lo, tolerance_hi = _tolerance(annotation, tracklet.cam_id, bearing, cam_distance, g)
+    tolerance_lo, tolerance_hi = _tolerance(annotation, tracklet.cam_id, g)
 
     is_primary: bool = tracklet.obs_id in primaries
     r, gr, b, a = colors[tracklet.id % len(colors)] if colors else (1.0, 1.0, 1.0, 1.0)
@@ -116,19 +137,20 @@ def _mark(tracklet: Tracklet, primaries: set[int],
         color=(r, gr, b, a),
         is_primary=is_primary,
         # Fixed width, so the right-edge flip threshold is the same for everybody and cannot wobble
-        # as the digits change. `R` is the drafting radius: this distance is from the rig centre,
-        # where the footer's `Ø` is a diameter — the two differ by a factor of two and must not be
-        # read as the same kind of number. `H` is the person's own height, measured at the camera
-        # and so already absolute: a seam's two observations must print the same `H` while their
-        # box heights in pixels do not, which is the one number on the strip that reads as a check
-        # on itself, and the quantity `seam.link_height` gates on.
+        # as the digits change. `R` and `H` are the ONLY things on the strip still derived from the
+        # tracker's measured distance, and they are readouts, never placements — the mark's x, rows
+        # and tolerance all come off the cylinder above. Both read **low**, because the device's box
+        # bottom sits under the feet (a 1.8 m person prints H 1.1-1.4, and H falls as they walk
+        # away, which is the signature of that cause). `R` is a radius from the rig centre where the
+        # footer's Ø is a diameter — a factor of two apart, not the same kind of number.
         label=f'#{tracklet.id} c{tracklet.cam_id} '
-              f'az{annotation.world_angle % 360.0:03.0f} R{centre_dist:.1f}m '
+              f'az{annotation.world_angle % 360.0:03.0f} '
+              f'R{centre_distance(annotation.local_angle - g.cam_fov / 2.0, max(1e-6, annotation.distance), g.ring_radius):.1f}m '
               f'H{annotation.height:.1f}m',
     )
 
 
-def _tolerance(annotation: PanoramicAnnotation, cam_id: int, bearing: float, cam_distance: float,
+def _tolerance(annotation: PanoramicAnnotation, cam_id: int,
                g: StripGeometry) -> tuple[float, float]:
     """(low, high) azimuth of the rule that decides what this observation may be joined to.
 
@@ -151,37 +173,39 @@ def _tolerance(annotation: PanoramicAnnotation, cam_id: int, bearing: float, cam
         centre: float = annotation.world_angle
         return (centre - half, centre + half)
 
-    # A LOCAL-angle gate, so it is carried into the strip's frame through the same triangle the
-    # tracker corrected the person with — `centre_bearing` at their own distance, not the focus
-    # cylinder's. That conversion is what keeps the pair test valid once drawn: the two positions
-    # AND the two widths all go through the same map, so their overlap still answers the gate. It
-    # is why the field measures visibly less than `reacquire_angle` against the degree grid — the
-    # centre is further from the person than the camera is, by `d / (d + r)` on axis, so 5 deg of
-    # local angle is 4.5 deg of azimuth at 3 m and 4.7 at 6. (Two observations at different
-    # estimated distances convert by slightly different factors, which makes the test approximate
-    # by a fraction of a degree.) Clamped to the camera's own field, because past its edge there
+    # A LOCAL-angle gate, carried into the strip's frame through the same map the tracker's own
+    # azimuth goes through — `camera_local_to_azimuth` at `parallax_diameter`. That is what keeps
+    # the pair test valid once drawn: the two positions AND the two widths take the same map, so
+    # their overlap still answers the gate, exactly rather than approximately (it used to depend on
+    # each observation's own estimated distance, so two of them converted by slightly different
+    # factors). It is also why the field measures visibly less than `reacquire_angle` against the
+    # degree grid: the centre is further from the person than the camera is, so 5 deg of local angle
+    # is about 4.5 deg of azimuth. Clamped to the camera's own field, because past its edge there
     # are no pixels for anyone to come back in through; the clamp cannot hide a real pair, since
     # both observations' centres lie inside the field and so does their overlap.
-    axis: float = camera_azimuth(cam_id, g.target_fov)
     half_local: float = g.reacquire_angle / 2.0
-    lo: float = centre_bearing(max(-g.cam_fov / 2.0, bearing - half_local), cam_distance,
-                               g.ring_radius)
-    hi: float = centre_bearing(min(g.cam_fov / 2.0, bearing + half_local), cam_distance,
-                               g.ring_radius)
-    return (axis + lo, axis + hi)
+    local: float = annotation.local_angle
+    lo: float = camera_local_to_azimuth(max(0.0, local - half_local), cam_id, g.cam_fov,
+                                        g.target_fov, g.ring_radius, g.parallax_diameter)
+    hi: float = camera_local_to_azimuth(min(g.cam_fov, local + half_local), cam_id, g.cam_fov,
+                                        g.target_fov, g.ring_radius, g.parallax_diameter)
+    return (lo, hi)
 
 
-def _row_y(row: float, g: StripGeometry, cam_distance: float, centre_dist: float) -> float:
+def _row_y(row: float, g: StripGeometry, cylinder_distance: float) -> float:
     """A normalised frame row to a normalised strip y.
 
     The delivered frame is cylindrical and levelled, so a row is the tangent of an elevation
     measured at the camera, below the horizon row (`elevation_from_row`). Converting that to the
-    rig centre uses the **person's own** distance, as the x does, so the whole mark is one
-    consistent statement of where the tracker believes they are.
+    rig centre needs a distance, and it is the **cylinder's** at this bearing — the same depth the
+    mark's x is corrected at — so the whole mark is one consistent statement at one depth. It used
+    to be the person's own estimated distance, which put x and y on two different depths once the
+    azimuth stopped using it.
 
     A row may legitimately fall outside [0, 1] — the device tracker extrapolates a partly visible
     person, and that is real information about how close they are — so nothing is clamped here; the
     renderer clips when it draws.
     """
     cam_elevation: float = elevation_from_row(row, *g.row_model)
-    return strip_y(centre_elevation(cam_elevation, cam_distance, centre_dist), g.elevation_window)
+    return strip_y(centre_elevation(cam_elevation, cylinder_distance, g.parallax_radius),
+                   g.elevation_window)

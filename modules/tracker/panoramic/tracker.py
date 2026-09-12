@@ -92,7 +92,7 @@ class Tracker(Thread, BaseTracker):
         # republish it, or the readout and the panorama's lines go stale on a live drag.
         TrackerSettings.fov.bind(config, lambda v: (self._set_frame(v), self._update_seam_angles()))
         RigSettings.camera_diameter.bind(config.rig, lambda v: (self.geometry.set_camera_diameter(v),
-                                                                self._update_seam_angles()))
+                                                                self._set_zone()))
         RigSettings.camera_height.bind(config.rig, lambda v: self.geometry.set_camera_height(v))
         RigSettings.zone_min_diameter.bind(config.rig, lambda _: self._set_zone())
         RigSettings.zone_max_diameter.bind(config.rig, lambda _: self._set_zone())
@@ -126,6 +126,9 @@ class Tracker(Thread, BaseTracker):
     def _set_zone(self) -> None:
         r: RigSettings = self.config.rig
         self.geometry.set_zone(r.zone_min_diameter, r.zone_max_diameter)
+        # Published so the panorama draws its marks on the same cylinder the azimuth is corrected
+        # at; derived from the zone, never set.
+        r.parallax_diameter = self.geometry.parallax_diameter
         self._update_seam_angles()
 
     def _set_frame(self, fov: float) -> None:
