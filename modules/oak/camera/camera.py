@@ -168,9 +168,9 @@ class Camera(Thread):
                                           self.mount.lens_fov, self.mount.lens_centre)
             self.settings.readings.fov_factory = field
             self.settings.readings.lens_error = error
-            logger.info(f'{self.device_id} lens: field {field:.1f} deg across {src[0]} px, '
-                        f'centre offset ({cx - (src[0] - 1) / 2.0:+.1f}, {cy - (src[1] - 1) / 2.0:+.1f}) px; '
-                        f'{error:.2f} deg off the shared lens')
+            logger.debug(f'{self.device_id} lens: field {field:.1f} deg across {src[0]} px, '
+                         f'centre offset ({cx - (src[0] - 1) / 2.0:+.1f}, {cy - (src[1] - 1) / 2.0:+.1f}) px; '
+                         f'{error:.2f} deg off the shared lens')
         self._imu_rotation = imu_rotation_to_camera(self.device, socket, self.device_id)
 
     def _setup_imu_queue(self) -> None:

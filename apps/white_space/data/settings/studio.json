@@ -3,7 +3,7 @@
   "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "render_fps": 60.0,
+  "render_fps": 58.0,
   "light_resolution": 3600,
   "fov": 127.0,
   "resolution": "P720",
@@ -44,7 +44,7 @@
     "playhead_data": {
       "stage": "LERP",
       "mode": "WINDOW",
-      "feature_field": "GhostFeature",
+      "feature_field": "PlayheadOffset",
       "line_width": 10.0,
       "line_smooth": 0.0,
       "use_scores": false,
@@ -381,17 +381,16 @@
     "tracklet_sync": {}
   },
   "track": {
-    "age_filter": 5,
+    "age_filter": 3,
     "height_filter": 0.2,
     "zone_filter": true,
     "foot_offset": 0.03,
-    "reacquire_angle": 5.0,
+    "reacquire_angle": 7.0,
     "lost_timeout": 2.0,
-    "emit_timeout": 1.0,
     "seam": {
       "dead_zone": 6.5,
       "link_angle": 15.0,
-      "link_height": 0.25,
+      "link_height": 0.2,
       "hysteresis": 0.6
     },
     "rig": {
@@ -410,24 +409,17 @@
       "enabled": true,
       "resolution": "STANDARD"
     },
-    "segmentation": {
-      "resolution": "STANDARD",
-      "enabled": false,
-      "reset_interval": 240
+    "tracklets": {
+      "detection_timeout": 1.0
     },
     "image_crop": {
-      "expansion_width": 0.1,
-      "expansion_height": 0.1,
-      "output_width": 768,
-      "output_height": 1024,
+      "padding": 0.25,
+      "output_width": 192,
+      "output_height": 256,
       "enable_prev_crop": false
     },
     "angle_extractor": {
       "aspect_ratio": 0.75
-    },
-    "distance_extractor": {
-      "near_y": 0.86,
-      "far_y": 0.32
     },
     "leg_deviation_extractor": {
       "hip_rad": 1.0471975511965976,

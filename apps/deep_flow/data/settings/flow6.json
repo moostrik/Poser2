@@ -104,9 +104,11 @@
       "resolution": "STANDARD",
       "enabled": false
     },
+    "tracklets": {
+      "detection_timeout": 2.0
+    },
     "image_crop": {
-      "expansion_width": 0.1,
-      "expansion_height": 0.1,
+      "padding": 0.1,
       "output_width": 768,
       "output_height": 1024,
       "enable_prev_crop": false

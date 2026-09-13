@@ -6,7 +6,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 
 from modules.inout import OscSound as BaseOscSound, OscSoundSettings
 from modules.pose.frame import Frame as PoseFrame, FrameDict
-from modules.pose.features import Azimuth, Distance
+from modules.pose.features import Azimuth
 from modules.session import SequencerState
 from ..light import Frame
 from ..pose import GhostElement, GhostFeature, PlayheadOffset
@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 class OscSoundSender(BaseOscSound):
     """The sound sender — modules' OscSound extended with the rotation playhead
     (/global/playhead), the motor mode (/global/motor), the two operator settings
-    (/global/volume, /global/speaker/offset), and the panoramic-only per-pose azimuth,
-    distance, and playhead-offset messages.
+    (/global/volume, /global/speaker/offset), and the panoramic-only per-pose azimuth and
+    playhead-offset messages.
 
     ``/global/state`` carries the show state (``ShowState``, 0–8) from the state machine —
     the address name is kept for backwards compatibility although it now means show state
@@ -118,11 +118,6 @@ class OscSoundSender(BaseOscSound):
         azimuth_msg.add_arg(azimuth, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(azimuth_msg.build())  # type: ignore
 
-        distance: float = frame[Distance].value if Distance in frame else np.nan
-        distance_msg = OscMessageBuilder(address=f"/pose/{id}/distance")
-        distance_msg.add_arg(distance, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(distance_msg.build())  # type: ignore
-
         playhead_offset: float = frame[PlayheadOffset].value if PlayheadOffset in frame else np.nan
         offset_msg = OscMessageBuilder(address=f"/pose/{id}/playhead/offset")
         offset_msg.add_arg(playhead_offset, OscMessageBuilder.ARG_TYPE_FLOAT)
@@ -136,7 +131,7 @@ class OscSoundSender(BaseOscSound):
 
     def _add_inactive_frame_messages(self, bundle_builder: OscBundleBuilder, id: int, num_players: int) -> None:
         super()._add_inactive_frame_messages(bundle_builder, id, num_players)
-        for address in (f"/pose/{id}/azimuth", f"/pose/{id}/distance", f"/pose/{id}/playhead/offset", f"/pose/{id}/playhead/fade"):
+        for address in (f"/pose/{id}/azimuth", f"/pose/{id}/playhead/offset", f"/pose/{id}/playhead/fade"):
             msg = OscMessageBuilder(address=address)
             msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
             bundle_builder.add_content(msg.build())  # type: ignore

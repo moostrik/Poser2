@@ -42,7 +42,6 @@ exit /b 0
 echo.
 echo white_space
 call :build "python modules\inference\tools\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output apps\white_space\data\models\rtmpose-l_256x192.trt --opt-batch 6 --max-batch 8"
-call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192.onnx --output apps\white_space\data\models\rvm_mobilenetv3_256x192.trt --opt-batch 6 --max-batch 8"
 exit /b 0
 
 :section_deep_flow

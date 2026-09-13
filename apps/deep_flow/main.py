@@ -73,7 +73,7 @@ class DeepFlowMain:
             camera.add_tracker_callback(self.tracklet_sync_bang.submit_frame)
 
         # DETECTION
-        self.poses_from_tracklets = PosesFromTracklets(num_players)
+        self.poses_from_tracklets = PosesFromTracklets(p.tracklets, num_players)
         self.pose_predictor = pose.Predictor(p.pose)
         self.segmentation_predictor  = segmentation.Predictor(p.segmentation)
         self.optical_flow_predictor  = optical_flow.Predictor(p.optical_flow)

@@ -35,8 +35,13 @@ ImageCallback: TypeAlias = Callable[[FrameDict, ImageDict], None]
 
 class Settings(BaseSettings):
     """Configuration for GPU-based image cropping."""
-    expansion_width:  Field[float] = Field(0.0, min=0.0, max=1.0, access=Field.INIT)
-    expansion_height: Field[float] = Field(0.0, min=0.0, max=1.0, access=Field.INIT)
+    # Padding around the person's box, as a fraction of it, on both axes. Live: it only moves the
+    # crop window. One value, not one per axis: the crop is then grown to the output's aspect, which
+    # recomputes one axis from the other, so only one padding ever counts — the height for a narrow
+    # (standing) box, the width for a wide one (arms out, crouching). RTMPose was trained on boxes
+    # padded by 0.25, scale-jittered around that.
+    padding:          Field[float] = Field(0.0, min=0.0, max=1.0, step=0.05,
+                                           description="Margin added around the box before cropping (fraction; RTMPose uses 0.25)")
     output_width:     Field[int]   = Field(384, access=Field.INIT)
     output_height:    Field[int]   = Field(512, access=Field.INIT)
     max_poses:        Field[int]   = Field(4, min=1, max=16, access=Field.INIT)
@@ -74,6 +79,8 @@ class Extractor:
         cropped_poses: FrameDict = {}
         crop_images: ImageDict = {}
         pose_count = 0
+        # Live settings, read once so every pose in this batch is cropped with the same padding.
+        zoom: float = 1.0 + self._config.padding
 
         with torch.cuda.stream(self._stream):
             for pose_id, pose in poses.items():
@@ -90,9 +97,7 @@ class Extractor:
                 try:
                     gpu_image = images[cam_id]
                     img_height, img_width = gpu_image.shape[1:3]
-                    bbox_rect = pose[BBox].to_rect().zoom(
-                        Point2f(1.0 + self._config.expansion_width, 1.0 + self._config.expansion_height)
-                    )
+                    bbox_rect = pose[BBox].to_rect().zoom(zoom)
                     crop_roi = self._calculate_crop_roi(bbox_rect, img_width, img_height)
                     crop_tensor = self._gpu_crop_resize(gpu_image, crop_roi, img_width, img_height)
 
@@ -151,11 +156,14 @@ class Extractor:
 
         crop_h, crop_w = crop_chw.shape[1], crop_chw.shape[2]
         if crop_h != self._config.output_height or crop_w != self._config.output_width:
+            # Antialiased: a crop is usually larger than the output, and plain bilinear would sample
+            # only a 2×2 neighbourhood of each output pixel and alias. No effect when enlarging.
             crop_chw = F.interpolate(
                 crop_chw.unsqueeze(0),
                 size=(self._config.output_height, self._config.output_width),
                 mode='bilinear',
                 align_corners=False,
+                antialias=True,
             ).squeeze(0)
 
         return crop_chw

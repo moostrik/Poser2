@@ -8,7 +8,6 @@ from .extractors.AngleMotionExtractor import    AngleMotionExtractor, AngleMotio
 from .extractors.AngleSymExtractor import       AngleSymExtractor
 from .extractors.AgeExtractor import            AgeExtractor
 from .extractors.MotionTimeExtractor import     MotionTimeExtractor
-from .extractors.DistanceExtractor import       DistanceExtractor, DistanceExtractorSettings
 from .extractors.LegDeviationExtractor import   LegDeviationExtractor, LegDeviationExtractorSettings
 from .extractors.TorsoTiltExtractor import      TorsoTiltExtractor, TorsoTiltExtractorSettings
 

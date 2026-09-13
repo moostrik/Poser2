@@ -527,7 +527,7 @@ labels never collide and never move as people do, and its x always sits on its o
 - **A line fading to grey, its field fading out, is an identity the tracker holds but no longer
   counts** — a LOST observation: the device missed them, or they walked past the far edge (the label
   then ends in `past R3.5`). How far it has faded says how close it is to being forgotten: their
-  pose leaves the show after `emit_timeout`, the identity at `lost_timeout`, the moment the line is
+  pose leaves the show after `pose.tracklets.detection_timeout`, the identity at `lost_timeout`, the moment the line is
   fully grey and the field gone.
 - **A grey line with no field is a detection the tracker dropped**, with the filter named at its
   top:
@@ -837,8 +837,8 @@ handled exactly like a missed detection. On the panorama they show as a grey lin
 | situation | what happens |
 |---|---|
 | someone first seen past the edge | never started — not born, not re-acquired, not linked at a seam |
-| a tracked person steps past it briefly (a jump, feet hidden for a moment) | nothing visible: still emitted for `emit_timeout` |
-| a tracked person walks out | stops driving the show after `emit_timeout`, forgotten after `lost_timeout` |
+| a tracked person steps past it briefly (a jump, feet hidden for a moment) | nothing visible: still posed from their last box for `pose.tracklets.detection_timeout` |
+| a tracked person walks out | stops driving the show after `pose.tracklets.detection_timeout`, forgotten after `lost_timeout` |
 | they step back inside before that | the same person, same colour, same id |
 
 No new setting: the timeouts are the ones a missed detection already uses, and `zone_max_radius` is
@@ -867,7 +867,7 @@ The far edge is the weak side, and angle errors dominate — roll doubles at the
 cameras (*The horizon check*, *The mount readout*) before trusting it.
 
 **Where it costs.** A jump or feet hidden behind someone make a person read *further*. Brief, that
-is invisible. But a person near the far edge whose feet stay hidden for longer than `emit_timeout`
+is invisible. But a person near the far edge whose feet stay hidden for longer than `pose.tracklets.detection_timeout`
 drops out of the show while still in view, and at a seam a second camera's view of someone jumping
 is not linked until they land (the first camera still carries them).
 
@@ -1054,7 +1054,7 @@ they author in azimuth, and the sender applies the projection offset and interla
 ## Sound (Max)
 
 Max spatialises over the four speakers (site fact). It receives, all azimuths produced here:
-`/global/playhead`, `/pose/N/azimuth`, `/pose/N/distance`, `/pose/N/playhead/offset`, plus the
+`/global/playhead`, `/pose/N/azimuth`, `/pose/N/playhead/offset`, plus the
 state (`inout/osc_sound_sender.py`, `modules/inout/osc_sound.py`). With the speakers placed by the
 layout there is nothing to tune on the Max side.
 
@@ -1106,9 +1106,8 @@ hit, the sound and both screen views are self-consistent.
 
 ## Open
 
-- **The frame fractions were tuned on 720 rows.** `track.height_filter` and
-  `pose.distance_extractor.near_y` / `far_y` are fractions of the frame, and the frame is now
-  taller and its rows tangents. Re-tune on the rig. (The seam rules are no longer among them — see
+- **The frame fractions were tuned on 720 rows.** `track.height_filter` is a fraction of the
+  frame, and the frame is now taller and its rows tangents. Re-tune on the rig. (The seam rules are no longer among them — see
   *Linking on a seam* — but `height_filter` still is: a frame fraction whose meaning changes with
   every frame or tilt change, where in metres it would say what it means, "at least a 1 m person".
   Not changed yet, because it is a tuned value and swapping its unit is a rig session.)
@@ -1159,7 +1158,7 @@ hit, the sound and both screen views are self-consistent.
   whose `BBox` the crop extractor has already overwritten with the crop ROI — zoomed 1.1× and
   aspect-filled to 3:4 — so its bottom sits **10–27 px below** the tracker's real ROI bottom, and by
   a distance-dependent amount. Judging "the box is below the feet" up there therefore partly
-  measures the crop expansion, not the detector. Not touched: it is a render concern, the crop box
+  measures the crop padding, not the detector. Not touched: it is a render concern, the crop box
   is the honest thing to draw for a crop, and the pose skeleton already draws the ankles if pixel
   truth about the feet is wanted. Tune `foot_offset` from `H` on the panorama instead, where the
   number being corrected is the number being shown.
@@ -1180,10 +1179,6 @@ hit, the sound and both screen views are self-consistent.
   normalized ROI row stops mapping linearly onto a delivered row — which is the one assumption
   `estimate_distance` makes about the ROI. The current preset is `square: false`, and the flag is
   there for other apps.
-- **`pose.distance_extractor` has its own, separate bias.** It reads the **crop** bbox, which the
-  crop extractor has already zoomed 1.1× and aspect-filled to 3:4, so the `/pose/N/distance` sent to
-  Max is biased downward from a different cause than the tracker's metres, and by a different
-  amount. It is a unitless 0–1 screen ramp, not metres, and nothing else reads it.
 - **A placement aid** (maybe): since placement *is* the room-side calibration, projection layers
   that put the sector boundaries and centres on the wall would make it easier. The IMU cannot help
   with azimuth — its magnetometer is useless next to the motor and the LED strips.
@@ -1221,7 +1216,7 @@ the doc harder to check against the parts, not easier. Leave them.
     parallax depth:   R 2.1 = the zone's harmonic mean 2·1.5·3.5/(1.5+3.5). The one depth
                       the world azimuth is corrected at; exact there, 6.7° of seam
                       disagreement worst-case over R 1.5 – R 3.5                    (derived)
-    far edge:         past zone_max_radius a person is not seen; emit_timeout,
+    far edge:         past zone_max_radius a person is not seen; detection_timeout,
                       then lost_timeout, as for a missed detection                (rule)
     seam births:      none on a seam inside ≈ R 1.5 at dead_zone 6.5           (chosen consequence)
     room:             8 × 8 m, machine in the middle                              (site fact)

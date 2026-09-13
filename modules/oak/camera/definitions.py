@@ -51,7 +51,6 @@ class CameraResolution(IntEnum):
     against the frame rather than computed (P800 -> P720 scales them by 800/720 = 1.111):
       track.height_filter                   a fraction of frame height, so it scales
       track.foot_offset                     likewise: the detector's pad measures in pixels
-      pose.distance_extractor.near_y/far_y  positions in the frame, so they scale and shift
     (`track.seam.*` is NOT in that list either: it is in degrees and fractions of a height.)
     (The vertical field is NOT in that list — see `frame_fov` below, which derives it. Neither is
     the render's panorama row, which derives its own aspect.)
@@ -703,8 +702,8 @@ def log_connected_sensors(device: Device, device_id: str = '') -> None:
     """
     try:
         for feature in device.getConnectedCameraFeatures():
-            logger.info(f'{device_id} sensor {feature.socket.name}: {feature.sensorName} '
-                        f'{feature.width}x{feature.height}')
+            logger.debug(f'{device_id} sensor {feature.socket.name}: {feature.sensorName} '
+                         f'{feature.width}x{feature.height}')
     except Exception as exc:                        # never let diagnostics break an open
         logger.debug(f'{device_id} could not read sensor features: {exc}')
 
@@ -832,9 +831,9 @@ def read_lens_calibration(device: Device, socket, mode_size: tuple[int, int],
         spec_fov: float = float(calibration.getFov(socket, useSpec=True))
         fx, fy = float(matrix[0][0]), float(matrix[1][1])
         cx, cy = float(matrix[0][2]), float(matrix[1][2])
-        logger.info(f'{device_id} calibration {socket.name}: model {model}, spec fov {spec_fov:.1f} deg, '
-                    f'fx {fx:.1f} fy {fy:.1f} px/rad, centre ({cx:.1f}, {cy:.1f}) '
-                    f'at {mode_size[0]}x{mode_size[1]}')
+        logger.debug(f'{device_id} calibration {socket.name}: model {model}, spec fov {spec_fov:.1f} deg, '
+                     f'fx {fx:.1f} fy {fy:.1f} px/rad, centre ({cx:.1f}, {cy:.1f}) '
+                     f'at {mode_size[0]}x{mode_size[1]}')
         return fx, cx, cy
     except Exception as exc:                        # never let diagnostics break an open
         logger.debug(f'{device_id} could not read calibration: {exc}')
@@ -852,9 +851,9 @@ def imu_rotation_to_camera(device: Device, socket, device_id: str = '') -> list[
     try:
         matrix = device.readCalibration().getImuToCameraExtrinsics(socket)
         rotation = [[round(value, 4) for value in row[:3]] for row in matrix[:3]]
-        logger.info(f'{device_id} IMU-to-camera rotation {rotation}')
+        logger.debug(f'{device_id} IMU-to-camera rotation {rotation}')
         return matrix
     except Exception as exc:
-        logger.info(f'{device_id} no IMU-to-camera extrinsics ({exc}) — '
-                    f'falling back to the board constant, roll offset {IMU_BOARD_ROLL:.0f} deg')
+        logger.debug(f'{device_id} no IMU-to-camera extrinsics ({exc}) — '
+                     f'falling back to the board constant, roll offset {IMU_BOARD_ROLL:.0f} deg')
         return None

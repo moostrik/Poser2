@@ -15,7 +15,7 @@ from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
 from modules.oak import CameraSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
-from modules.tracker import OnePerCamTrackerSettings
+from modules.tracker import OnePerCamTrackerSettings, PosesFromTrackletsSettings
 from modules.pose import nodes, trackers, window
 from modules import inference
 from modules.gl import WindowSettings
@@ -182,6 +182,7 @@ class PoseGroup(BaseSettings):
     pose         = Group(inference.pose.Settings, share=_batch_share)
     segmentation = Group(inference.segmentation.Settings, share=_batch_share)
     optical_flow = Group(inference.optical_flow.Settings, share=_batch_share)
+    tracklets    = Group(PosesFromTrackletsSettings)
     image_crop   = Group(inference.crop.Settings, share=[max_poses])
     angle_extractor = Group(nodes.AngleExtractorSettings)
     bbox         = Group(BboxFeature, share=_feature_share)

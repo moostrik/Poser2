@@ -1,5 +1,5 @@
 """Tests for the panoramic tracker: seam hysteresis, dead-zone handling,
-cross-camera linking, same-camera re-acquisition, device id reuse, emission hold,
+cross-camera linking, same-camera re-acquisition, device id reuse, emission of lost worlds,
 world id reuse, and ring parallax correction."""
 
 import math
@@ -148,16 +148,24 @@ class TestDeviceIdReuse(PanoramicTrackerCase):
         self.assertNotEqual(first.obs_id, second.obs_id)
 
 
-class TestEmitTimeout(PanoramicTrackerCase):
-    """`lost_timeout` and `emit_timeout` do two different jobs, so they are two settings: an
-    observation must keep anchoring long after the person it describes should stop driving the
-    show."""
+class TestEmitsWhatItRemembers(PanoramicTrackerCase):
+    """The tracker emits every world it still remembers, stale or not, until `lost_timeout`: how old
+    a box may be before it stops counting is the consumer's call (pose's `detection_timeout`)."""
 
-    def test_a_stale_world_stops_being_emitted_but_keeps_anchoring(self) -> None:
+    def test_a_stale_world_is_still_emitted_and_keeps_anchoring(self) -> None:
         stale = replace(make_tracklet(0, 1, 50.0), last_active=time.time() - 1.0)
         out = self.submit(stale)
-        self.assertEqual(out, {})                                      # 1.0 s > emit_timeout 0.3
-        self.assertEqual(self.tracker.store.get_world_id(0, 1), 0)     # 1.0 s < lost_timeout 2.0
+        self.assertEqual(set(out.keys()), {0})                         # 1.0 s < lost_timeout 2.0
+        self.assertEqual(self.tracker.store.get_world_id(0, 1), 0)
+
+    def test_a_forgotten_world_is_not_emitted(self) -> None:
+        # Last seen 1.5 s ago: remembered at 2.0. Lowering `lost_timeout` below that stands in for
+        # time passing; the tick that retires the world must not emit it one last time.
+        out = self.submit(replace(make_tracklet(0, 1, 50.0), last_active=time.time() - 1.5))
+        self.assertEqual(set(out.keys()), {0})
+        self.config.lost_timeout = 1.2
+        self.tracker._update_and_notify()
+        self.assertEqual(self.emitted[-1], {})
 
     def test_a_fresh_world_is_emitted(self) -> None:
         out = self.submit(make_tracklet(0, 1, 50.0))
@@ -752,7 +760,6 @@ class RigTrackerCase(unittest.TestCase):
         self.config = PanoramicTrackerSettings(fov=PARALLAX_FOV)
         self.config.rig.camera_radius = RING_RADIUS
         self.config.rig.camera_height = CAMERA_HEIGHT
-        self.config.emit_timeout = 1.0
         self.config.lost_timeout = 2.0
         self.tracker = PanoramicTracker(self.config, num_players=8, num_cameras=4)
         self.tracker.geometry.set_window(WINDOW, ROWS)
@@ -795,7 +802,8 @@ class TestFarEdge(RigTrackerCase):
         self.assertEqual(set(self.seen(3.0).keys()), {0})             # inside: started
 
     def test_a_brief_excursion_changes_nothing_visible(self) -> None:
-        # A jump, or feet hidden for a moment: LOST, but still emitted inside `emit_timeout`.
+        # A jump, or feet hidden for a moment: LOST, but still emitted (and posed, inside pose's
+        # `detection_timeout`).
         self.seen(3.0)
         out = self.seen(4.0)
         self.assertEqual(set(out.keys()), {0})
@@ -814,7 +822,7 @@ class TestFarEdge(RigTrackerCase):
         assert after is not None and isinstance(after.annotation, PanoramicAnnotation)
         self.assertEqual(after.last_active, before.last_active)
         self.assertAlmostEqual(after.annotation.distance, 4.0 - RING_RADIUS, delta=0.01)
-        self.assertEqual(out, {})                                      # 1.5 s > emit_timeout
+        self.assertEqual(set(out.keys()), {0})                         # remembered: 1.5 s < lost_timeout
 
     def test_someone_who_stays_out_is_forgotten(self) -> None:
         # Last inside 1.5 s ago: alive at that tick (< lost_timeout 2.0). Lowering the timeout
@@ -897,11 +905,11 @@ class TestFilteredDetections(RigTrackerCase):
         self.assertEqual(self.rejected(), {})
 
     def test_a_camera_that_stops_reporting_does_not_leave_it_behind(self) -> None:
-        # Last reported 0.9 s ago: still fresh at 1.0 s. Lowering `emit_timeout` below that stands in
+        # Last reported 1.5 s ago: still kept at `lost_timeout` 2.0. Lowering it below that stands in
         # for time passing with no further report from the camera — no LOST, no REMOVED.
-        self.seen(4.0, seconds_ago=0.9)
+        self.seen(4.0, seconds_ago=1.5)
         self.assertEqual(self.rejected(), {Rejection.PAST_EDGE: 1})
-        self.config.emit_timeout = 0.5
+        self.config.lost_timeout = 1.2
         self.tracker._update_and_notify()
         self.assertEqual(self.rejected(), {})
 

@@ -16,7 +16,7 @@ from modules.oak import CameraSettings, CameraResolution, MountCheckSettings, Si
 from modules.render import layers, ColorSettings
 from modules.render.layers import LayerMode
 from modules.inout import OscSoundSettings, OscReceiverSettings
-from modules.tracker import PanoramicTrackerSettings
+from modules.tracker import PanoramicTrackerSettings, PosesFromTrackletsSettings
 from modules.pose import nodes, trackers, window, analytics
 from modules import inference
 from modules.session import SessionSettings
@@ -59,7 +59,6 @@ class CameraView(IntEnum):
 class Layers(IntEnum):
     # source layers
     cam_image    = 0
-    cam_mask     = auto()
     cam_crop     = auto()
     # composite
     tracker      = auto()
@@ -222,10 +221,9 @@ class PoseGroup(BaseSettings):
     _feature_share: list = [frequency, output_frequency]
 
     pose            : Group[inference.pose.Settings]         = Group(inference.pose.Settings, share=[max_poses, model_type, model_path, verbose])
-    segmentation    : Group[inference.segmentation.Settings] = Group(inference.segmentation.Settings, share=[max_poses, model_type, model_path, verbose])
+    tracklets       : Group[PosesFromTrackletsSettings]      = Group(PosesFromTrackletsSettings)
     image_crop      : Group[inference.crop.Settings]         = Group(inference.crop.Settings, share=[max_poses])
     angle_extractor : Group[nodes.AngleExtractorSettings]    = Group(nodes.AngleExtractorSettings)
-    distance_extractor: Group[nodes.DistanceExtractorSettings] = Group(nodes.DistanceExtractorSettings)
     leg_deviation_extractor: Group[nodes.LegDeviationExtractorSettings] = Group(nodes.LegDeviationExtractorSettings)
     torso_tilt_extractor: Group[nodes.TorsoTiltExtractorSettings] = Group(nodes.TorsoTiltExtractorSettings)
     bbox            : Group[BboxFeature]                     = Group(BboxFeature, share=_feature_share)

@@ -117,7 +117,8 @@ class Tracker(Thread, BaseTracker):
 
     Processing runs in a background thread. Camera data is submitted via
     ``submit_cam_tracklets``. Two output channels: ``add_tracklet_callback``
-    delivers one primary per world — the show's input, one pose per person — and
+    delivers one primary per world still remembered, LOST ones included — freshness
+    is the consumer's to judge (pose by box age, the show by ``is_active``) — and
     ``add_observation_callback`` delivers every live observation, which is the
     only way to see the two cameras' separate opinions of a person on a seam.
     """
@@ -349,8 +350,9 @@ class Tracker(Thread, BaseTracker):
 
         # Past the zone's far edge the tracker does not see this person — handled exactly like a
         # missed detection, before every branch below, so it cannot be born, re-acquired or linked
-        # there. Someone already tracked goes LOST: still emitted for `emit_timeout`, so a jump or a
-        # moment of hidden feet changes nothing visible; forgotten after `lost_timeout`; the same
+        # there. Someone already tracked goes LOST: their pose carries on from their last box for
+        # `pose.tracklets.detection_timeout`, so a jump or a moment of hidden feet changes nothing
+        # visible; forgotten after `lost_timeout`; the same
         # person again if they step back inside before that. Their latest position is kept, tagged,
         # so the panorama's mark follows them out and says why it is fading.
         if self.config.zone_filter and self.geometry.beyond_zone(local_angle, distance):
@@ -493,29 +495,23 @@ class Tracker(Thread, BaseTracker):
             if self.store.merge_worlds(keep_id, drop_id):
                 self._primary_for_world.pop(drop_id, None)
 
-        # Emit one primary per world, while it is still being seen. `emit_timeout` is shorter
-        # than `lost_timeout` on purpose: an observation keeps anchoring a seam crossing long
-        # after the person it describes should stop driving the light, the sound and the hit
-        # detector. It is not zero, though — inside it a person the device has dropped is still
-        # emitted from their last known box, so a missed detection of a frame or two neither
-        # interrupts their pose nor resets the filters downstream of it.
-        now: float = time.time()
-        emit_timeout: float = self.config.emit_timeout
+        # Emit one primary per world the tracker still remembers, LOST or not, until `lost_timeout`
+        # retires it. How stale is too stale is each consumer's call, not this one's: pose stops
+        # posing a person after `pose.tracklets.detection_timeout`, and the show counts only active
+        # tracklets. Filtering here instead would decide for all of them with one number. A world
+        # retired just above is still in the store until the end of this tick; it is not emitted.
         emitted: TrackletDict = {}
         for world_id in self.store.all_world_ids():
             primary: Tracklet | None = self._pick_primary(world_id)
-            if primary is None:
-                continue
-            # `_pick_primary` returns the most recently active member, so one test covers the
-            # whole world: if even that one is stale, nobody has seen this person lately.
-            if now - primary.last_active > emit_timeout:
-                continue
-            emitted[world_id] = primary
+            if primary is not None and not primary.is_removed:
+                emitted[world_id] = primary
         self._notify_callback(emitted)
 
         # Dropped detections a camera has stopped reporting: a device track normally ends with LOST
         # or REMOVED, which clears its entry, but a camera that simply goes quiet does not.
-        for key in [k for k, t in self._rejected.items() if now - t.last_active > emit_timeout]:
+        now: float = time.time()
+        lost_timeout: float = self.config.lost_timeout
+        for key in [k for k, t in self._rejected.items() if now - t.last_active > lost_timeout]:
             del self._rejected[key]
 
         # Every live observation, for the calibration view: the two cameras' separate opinions

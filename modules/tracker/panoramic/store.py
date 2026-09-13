@@ -173,7 +173,7 @@ class TrackletStore:
         `latest` is for a person the camera *does* see but the tracker does not count — beyond the
         zone's far edge. Their newest `roi` and `annotation` are kept, so the observation (and the
         panorama's mark) follows them walking out, but `last_active` is **not** advanced: that is
-        the clock `emit_timeout` and `lost_timeout` run on, and restarting it would keep them
+        the clock `lost_timeout` and pose's `detection_timeout` run on, and restarting it would keep them
         forever. (`replace_tracklet` with a LOST copy cannot do this — it takes the newer time.)
         """
         obs_id: ObsId | None = self._live.get((cam_id, external_id))

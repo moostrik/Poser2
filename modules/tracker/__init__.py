@@ -8,4 +8,4 @@ from .panoramic.panorama_map import azimuth_to_camera_x, camera_azimuth, camera_
     focus_distance, fov_overlap, panorama_coverage, populated_band, reach_radius, row_from_elevation, \
     row_model, elevation_from_row, strip_spans, strip_y, strip_elevation, strip_aspect_ratio, wrap180
 from .onepercam.tracker import Tracker as OnePerCamTracker, TrackerSettings as OnePerCamTrackerSettings
-from .poses_from_tracklets import PosesFromTracklets
+from .poses_from_tracklets import PosesFromTracklets, PosesFromTrackletsSettings

@@ -144,14 +144,10 @@ class TrackerSettings(BaseSettings):
     # field, and has nothing to do with two cameras meeting.
     reacquire_angle: Field[float] = Field(5.0, min=0.0, max=20.0, step=0.5,
                                           description="How far (°) a re-acquired person may be from the lost one and still be them")
-    # The two windows a lost person lives in, adjacent because each is only clear beside the
-    # other. `emit_timeout` is the shorter on purpose: a person stops driving the show well
-    # before the tracker forgets them, which is what keeps a seam crossing linkable after the
-    # near camera has given up. Inside it, a lost person still gets a pose from their last box —
-    # which is how a dropped detection of a frame or two costs nothing.
+    # How long a lost person is remembered — and emitted — which is what keeps a seam crossing
+    # linkable after the near camera has given up. How long they keep a pose from their last box
+    # is a shorter window on the pose side, `pose.tracklets.detection_timeout`.
     lost_timeout: Field[float] = Field(2.0, min=1.0, max=5.0, step=0.1,
                                        description="Seconds a lost person is remembered, for seam links and re-acquisition")
-    emit_timeout: Field[float] = Field(0.3, min=0.0, max=2.0, step=0.05,
-                                       description="Seconds a lost person is still emitted, so a pose survives a detection glitch")
     seam: Group[SeamSettings] = Group(SeamSettings)
     rig: Group[RigSettings] = Group(RigSettings)

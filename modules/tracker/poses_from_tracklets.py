@@ -4,17 +4,29 @@ from threading import Lock
 
 from modules.pose.frame import Frame, FrameDict, FrameDictCallbackMixin
 from modules.pose.features import BBox, Azimuth
+from modules.settings import BaseSettings, Field
 from .tracklet import Tracklet
 from . import PanoramicAnnotation
 
 logger = logging.getLogger(__name__)
 
 
+class PosesFromTrackletsSettings(BaseSettings):
+    # How long after their last detection a person is still cropped from their last box. Judged here
+    # rather than in the tracker, which emits everyone it still remembers: inside this window a
+    # person the detector dropped keeps their pose, so a missed detection neither interrupts it nor
+    # resets the filters downstream. Not below a few frames: a fresh detection is already some
+    # milliseconds old by the time the frame bang crops it, so at 0 nobody would ever be posed.
+    detection_timeout: Field[float] = Field(2.0, min=0.1, max=5.0, step=0.05,
+                                            description="Seconds after the last detection a person still gets a pose")
+
+
 class PosesFromTracklets(FrameDictCallbackMixin):
     """Generates poses from tracklets, maintaining state per track."""
 
-    def __init__(self, num_tracks: int) -> None:
+    def __init__(self, config: PosesFromTrackletsSettings, num_tracks: int) -> None:
         super().__init__()
+        self._config: PosesFromTrackletsSettings = config
         # World ids are used directly as slot indices below, so this must match the tracker's
         # id pool exactly: a world id at or above `num_tracks` would vanish here without a
         # trace. Both come from `num_players` in main.py — an invariant spanning two modules,
@@ -61,9 +73,12 @@ class PosesFromTracklets(FrameDictCallbackMixin):
             self._batch_id_counter += 1
 
         generated_poses: FrameDict = {}
+        # Checked on every frame, not when the tracker last published: a latched box goes stale
+        # between tracker ticks, and a stale one is left out so downstream filters reset for it.
+        detection_timeout: float = self._config.detection_timeout
 
         for track_id, tracklet in tracklets_snapshot.items():
-            if tracklet is None:
+            if tracklet is None or tracklet.is_expired(detection_timeout):
                 continue
 
             try:
@@ -91,8 +106,10 @@ class PosesFromTracklets(FrameDictCallbackMixin):
 
     def is_ready(self) -> bool:
         """Return True if at least one tracklet is ready for generation."""
+        detection_timeout: float = self._config.detection_timeout
         with self._lock:
-            return any(tracklet is not None for tracklet in self._tracklets.values())
+            return any(tracklet is not None and not tracklet.is_expired(detection_timeout)
+                       for tracklet in self._tracklets.values())
 
     def reset(self) -> None:
         """Reset all tracklets."""

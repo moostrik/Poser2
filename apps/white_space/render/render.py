@@ -4,7 +4,7 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, clear_color, Style
 from modules.render.layers import LayerBase
-from modules.render.layers import ImageSourceLayer, MaskSourceLayer, CropSourceLayer
+from modules.render.layers import ImageSourceLayer, CropSourceLayer
 from modules.render.layers import TrackerCompositor, PoseCompositor
 from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer
 from modules.render.layers import Compositor, PanoramaLayerSettings
@@ -58,7 +58,6 @@ class Render(RenderBase):
         # Row 1 — per-camera: source layers + tracker compositor
         for i in range(self.num_cams):
             self.L[Layers.cam_image][i] = ImageSourceLayer(i, board)
-            self.L[Layers.cam_mask][i]  = MaskSourceLayer(i, board)
             self.L[Layers.cam_crop][i]  = CropSourceLayer(i, board)
             self.L[Layers.tracker][i]   = TrackerCompositor(
                 i, board,

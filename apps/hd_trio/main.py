@@ -101,7 +101,7 @@ class HDTrioMain:
         # DETECTION
         features.configure_features(num_players)
 
-        self.poses_from_tracklets = PosesFromTracklets(num_players)
+        self.poses_from_tracklets = PosesFromTracklets(ps.tracklets, num_players)
         self.pose_predictor = pose.Predictor(ps.pose)
         self.segmentation_predictor  = segmentation.Predictor(ps.segmentation)
 

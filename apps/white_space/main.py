@@ -11,7 +11,7 @@ from modules.settings import presets, NiceServer
 from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
-from modules.inference import source, crop, pose, segmentation
+from modules.inference import source, crop, pose
 from modules.session import Session
 from modules.gl import WindowSettings
 
@@ -54,6 +54,12 @@ class WhiteSpaceMain:
                 self.settings.lens_fov, (self.settings.lens_centre_x, self.settings.lens_centre_y))
             logging.info("frame_height derived: %d rows for %s at tilt %.1f", self.settings.frame_height,
                          self.settings.resolution.name, self.settings.tilt)
+        # The crop is the pose model's input, so it is cut at that size: one antialiased resample
+        # from the camera frame, rather than a larger crop the runner scales down again. Derived
+        # from the model so a change of pose resolution cannot silently reintroduce the second one.
+        crop_settings = self.settings.pose.image_crop
+        crop_settings.output_width = self.settings.pose.pose.width
+        crop_settings.output_height = self.settings.pose.pose.height
         self.settings.initialize()
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
@@ -98,10 +104,9 @@ class WhiteSpaceMain:
         # DETECTION
         features.configure_features(num_players)
 
-        self.poses_from_tracklets = PosesFromTracklets(num_players)
+        self.poses_from_tracklets = PosesFromTracklets(ps.tracklets, num_players)
 
         self.pose_predictor = pose.Predictor(ps.pose)
-        self.segmentation_predictor  = segmentation.Predictor(ps.segmentation)
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracker.add_tracklet_callback(self.board.set_tracklets)
@@ -113,8 +118,6 @@ class WhiteSpaceMain:
 
         self.crop_extractor.add_image_callback(self.pose_predictor.process)
         self.crop_extractor.add_image_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
-        self.crop_extractor.add_image_callback(self.segmentation_predictor.process)
-        self.segmentation_predictor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
         self.poses_from_tracklets.add_frames_callback(self._process_poses)
 
@@ -249,7 +252,6 @@ class WhiteSpaceMain:
         })
         self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
-                nodes.DistanceExtractor(ps.distance_extractor),
                 nodes.AngleSymExtractor(),
                 nodes.LegDeviationExtractor(ps.leg_deviation_extractor),
                 nodes.TorsoTiltExtractor(ps.torso_tilt_extractor),
@@ -298,7 +300,6 @@ class WhiteSpaceMain:
 
         self.tracker.start()
         self.pose_predictor.start()
-        self.segmentation_predictor.start()
         self.window_similator.start()
         self.window_correlator.start()
         self.conductor.start()
@@ -354,7 +355,6 @@ class WhiteSpaceMain:
         self.conductor.stop()
 
         self.pose_predictor.stop()
-        self.segmentation_predictor.stop()
         self.window_similator.stop()
         self.window_correlator.stop()
 
