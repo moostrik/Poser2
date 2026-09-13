@@ -1,4 +1,4 @@
-"""PoseInstrument — the heart of the piece (see ``data/LAYERS.md``).
+"""PoseInstrument — the heart of the piece (see ``docs/LAYERS.md``).
 
 Each person stands in a blue **anchor** line at their azimuth, and around them a
 mirror-symmetric pattern of white and blue **lines** derived from their pose — the visual

@@ -1,6 +1,6 @@
 """StateMachine — the installation's single decision maker.
 
-A condition-driven state machine that plays the states designed in ``data/STATES.md``
+A condition-driven state machine that plays the states designed in ``docs/STATES.md``
 (the source of truth): a sequencer hybrid, progress-driven *within* a state and
 condition-driven *between* states. Each tick (on the Conductor's light thread) it builds a
 ``StateContext`` from the board (participants, sync, hit-by-light, the playhead's content

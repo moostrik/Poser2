@@ -27,7 +27,7 @@ class OscSoundSender(BaseOscSound):
     ``/global/speaker/offset`` is the one number Max needs of its own: where speaker 0 stands
     as an azimuth. With the speakers placed by the fixed layout (speaker 0 on the connection
     side, counter-clockwise from there) it is 0 and Max needs no constant at all — see
-    ``data/CALIBRATION.md``. Radians on the wire, like every other azimuth here.
+    ``docs/CALIBRATION.md``. Radians on the wire, like every other azimuth here.
 
     Also owns the id-slot count: it sends ``max_players`` live slots plus ``virtual_players``
     ghost slots (ids Ghoster injects beyond the tracked players). It overrides the base's

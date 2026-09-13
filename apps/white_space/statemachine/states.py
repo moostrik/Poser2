@@ -1,4 +1,4 @@
-"""The states — one class per StateId, from ``data/STATES.md`` (the source of truth).
+"""The states — one class per StateId, from ``docs/STATES.md`` (the source of truth).
 
 Each state owns its outgoing transitions (``needs_state_change``, in priority order:
 when several conditions are true the same tick, the first wins) and returns its mix every
@@ -88,7 +88,7 @@ class StateBase:
 # -- Steady states ---------------------------------------------------------------
 
 class OffState(StateBase):
-    """S0 — OFF. See data/STATES.md."""
+    """S0 — OFF. See docs/STATES.md."""
     MOTOR = MotorMode.BEAM
 
     def update(self, ctx: StateContext) -> Mix:
@@ -101,7 +101,7 @@ class OffState(StateBase):
 
 
 class IdleState(StateBase):
-    """S2 — IDLE. See data/STATES.md."""
+    """S2 — IDLE. See docs/STATES.md."""
     MOTOR = MotorMode.BEAM
 
     def update(self, ctx: StateContext) -> Mix:
@@ -114,7 +114,7 @@ class IdleState(StateBase):
 
 
 class IdleIntroState(StateBase):
-    """S3 — IDLE_INTRO. See data/STATES.md."""
+    """S3 — IDLE_INTRO. See docs/STATES.md."""
     MOTOR = MotorMode.BEAM
 
     def update(self, ctx: StateContext) -> Mix:
@@ -129,7 +129,7 @@ class IdleIntroState(StateBase):
 
 
 class IntroState(StateBase):
-    """S4 — INTRO. See data/STATES.md."""
+    """S4 — INTRO. See docs/STATES.md."""
     MOTOR = MotorMode.BEAM
     DIM = 0.4                           # the DIM line level (INTRO_IDLE fades back up from it)
 
@@ -152,7 +152,7 @@ class IntroState(StateBase):
 
 
 class PlayState(StateBase):
-    """S7 — PLAY. See data/STATES.md."""
+    """S7 — PLAY. See docs/STATES.md."""
     MOTOR = MotorMode.PROJECTION
 
     def update(self, ctx: StateContext) -> Mix:
@@ -169,7 +169,7 @@ class PlayState(StateBase):
 # -- Transition states (ramps) ----------------------------------------------------
 
 class OffIdleState(StateBase):
-    """S1 — OFF_IDLE. See data/STATES.md."""
+    """S1 — OFF_IDLE. See docs/STATES.md."""
     MOTOR = MotorMode.BEAM
 
     def update(self, ctx: StateContext) -> Mix:
@@ -188,7 +188,7 @@ class OffIdleState(StateBase):
 
 
 class IntroIdleState(StateBase):
-    """S5 — INTRO_IDLE. See data/STATES.md."""
+    """S5 — INTRO_IDLE. See docs/STATES.md."""
     MOTOR = MotorMode.BEAM
 
     def __init__(self, *args) -> None:
@@ -218,7 +218,7 @@ class IntroIdleState(StateBase):
 
 
 class IntroPlayState(StateBase):
-    """S6 — INTRO_PLAY. See data/STATES.md."""
+    """S6 — INTRO_PLAY. See docs/STATES.md."""
     MOTOR = MotorMode.PROJECTION
 
     def __init__(self, *args) -> None:
@@ -251,7 +251,7 @@ class IntroPlayState(StateBase):
 
 
 class EndState(StateBase):
-    """S8 — END. See data/STATES.md."""
+    """S8 — END. See docs/STATES.md."""
     MOTOR = MotorMode.PROJECTION
 
     def __init__(self, config: StateMachineSettings, light: LightSettings,
@@ -304,7 +304,7 @@ class WindDownStateBase(StateBase):
 
 
 class EndIntroState(WindDownStateBase):
-    """S9 — END_INTRO. See data/STATES.md."""
+    """S9 — END_INTRO. See docs/STATES.md."""
     TARGET = StateId.INTRO
 
     def update(self, ctx: StateContext) -> Mix:
@@ -312,7 +312,7 @@ class EndIntroState(WindDownStateBase):
 
 
 class EndIdleState(WindDownStateBase):
-    """S10 — END_IDLE. See data/STATES.md."""
+    """S10 — END_IDLE. See docs/STATES.md."""
     TARGET = StateId.IDLE
 
     def update(self, ctx: StateContext) -> Mix:

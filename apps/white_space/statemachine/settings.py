@@ -1,7 +1,7 @@
 """StateMachine settings — the show's identity enums and configuration tree.
 
 Pure data (fields, groups, enums), mirroring ``light/settings.py``'s role for its
-package: ``StateId`` is the state vocabulary of ``data/STATES.md``, ``SyncMode`` the
+package: ``StateId`` is the state vocabulary of ``docs/STATES.md``, ``SyncMode`` the
 INTRO → INTRO_PLAY sync condition, and ``StateMachineSettings`` the panel — telemetry
 first, then the show timings, with the sync / manual / session corners as nested groups.
 """
@@ -25,7 +25,7 @@ class SyncMode(IntEnum):
 
 
 class StateId(IntEnum):
-    """The states of ``data/STATES.md`` (the source of truth), in narrative order — the
+    """The states of ``docs/STATES.md`` (the source of truth), in narrative order — the
     value is what ``/global/state`` sends. OFF = 0 is the operational off (entered by
     pinning ``blackout``), followed by its wake transition. The *_INTRO / *_IDLE / *_PLAY
     entries are transitions promoted to states: their durations are the transition
