@@ -9,14 +9,19 @@ from .observations import ObservationStore
 from .rig import Rig, height_is_measured
 from .settings import TrackerSettings
 
+# How far past `seam.link_angle` two active views of one world may drift before they are split. Above
+# the link rule, so a pair hovering at the link angle is not split and re-collapsed every tick.
+_SPLIT_FACTOR: float = 1.5
+
 
 class Seams:
     """Where two cameras' fields meet: the rules of `SeamSettings`.
 
-    Which world a new observation inside the overlap links to (`linked_world`), which worlds
-    turn out to be one person seen twice (`collapse_worlds`), and which camera's view a world is
-    emitted as, handing over between cameras without flicker (`pick_primary`). The dead zone is the
-    tracker intake's. Owns the handover state, and runs on the tracker thread only.
+    Which world a new observation inside the overlap links to (`linked_world`), which worlds turn out
+    to be two people wrongly joined (`split_worlds`) or one person seen twice (`collapse_worlds`),
+    which camera's view a world is emitted as, handing over between cameras without flicker
+    (`pick_primary`), and at which azimuth (`world_azimuth`). The dead zone is the tracker intake's. Owns the handover state, and runs on the
+    tracker thread only.
     """
 
     def __init__(self, observations: ObservationStore, rig: Rig, config: TrackerSettings) -> None:
@@ -51,6 +56,39 @@ class Seams:
                 best_world = t.id
         return best_world
 
+    def split_worlds(self) -> None:
+        """Detach a view that no longer agrees with the rest of its world.
+
+        A seam link can join the wrong pair: two people arrive together and one camera counts the
+        second person before the other camera does. Nothing about that link is wrong at the moment it
+        is made, so it is repaired when the evidence changes — an active view whose azimuth is more
+        than `_SPLIT_FACTOR × seam.link_angle` from every other active view of its world moves to a
+        world of its own (the youngest first), and `collapse_worlds` then joins it to its own person.
+        Two active views from one camera are two people whatever their angle (the device
+        de-duplicates): a re-acquisition or link off a LOST anchor whose device track comes back.
+        Only active views count: a LOST anchor left behind by someone walking on is not a disagreement.
+        """
+        limit: float = _SPLIT_FACTOR * self._config.seam.link_angle
+        for world_id in self._observations.world_ids():
+            while True:
+                active: list[Tracklet] = [t for t in self._observations.members(world_id)
+                                          if t.is_active and isinstance(t.annotation, Annotation)]
+                if len(active) < 2:
+                    break
+                inconsistent: list[Tracklet] = [t for t in active if any(
+                    o.cam_id == t.cam_id for o in active if o is not t) or all(
+                    self._rig.angle_diff(t.annotation.world_angle, o.annotation.world_angle) > limit  # type: ignore[union-attr]
+                    for o in active if o is not t)]
+                if not inconsistent:
+                    break
+                # Observation ids are handed out in order and never reused: the highest is the youngest.
+                youngest: Tracklet = max(inconsistent, key=lambda t: t.obs_id)
+                if self._observations.detach(youngest.obs_id) is None:
+                    break
+                if self._primary_for_world.get(world_id) == youngest.obs_id:
+                    self._primary_for_world.pop(world_id, None)
+                    self._handed_over_at.pop(world_id, None)
+
     def collapse_worlds(self) -> None:
         """Late safety net: merge worlds whose observations match each other (ambiguous
         simultaneous arrivals that each got their own world). Older world wins."""
@@ -65,8 +103,8 @@ class Seams:
         """The one view a world is emitted as: sticky, but never a LOST view while another is active.
 
         - **No member active**: the most recently seen one.
-        - **The primary lost the person**: the best-placed active view takes over at once. The show
-          reads `is_active`, so holding a LOST primary would drop a person a camera still sees.
+        - **The primary lost the person**: the best-placed active view takes over at once. A LOST
+          primary's `last_active` is frozen, so pose would drop a person a camera still sees.
         - **Otherwise** the primary yields only to a view whose distance from its field edge beats
           its own by the ``seam.hysteresis`` ratio.
 
@@ -103,6 +141,37 @@ class Seams:
 
         self._primary_for_world[world_id] = chosen.obs_id
         return chosen
+
+    def world_azimuth(self, world_id: int, primary: Tracklet) -> float:
+        """The azimuth a world is emitted at: its active views blended, each weighted by how far it
+        sits inside its camera's dead zone.
+
+        One view is its own azimuth. Two views at a seam disagree by the parallax residual — up to
+        ~6.6° at the zone's edges, in opposite directions — so emitting only the primary's would
+        step by that much whenever the primary changes camera. A view's weight is its distance from
+        its field edge less `seam.dead_zone`: a new view can only link once it is that far in, so it
+        arrives weighing nothing, and one walking out weighs nothing before it is lost. The blend then
+        moves continuously through appearance, handover and disappearance, and near the seam it lies
+        between the two errors. A circular mean, so views either side of 0° blend across it. The
+        primary's own azimuth when fewer than two views carry weight.
+        """
+        assert isinstance(primary.annotation, Annotation)
+        active: list[Tracklet] = [t for t in self._observations.members(world_id)
+                                  if t.is_active and isinstance(t.annotation, Annotation)]
+        if len(active) < 2:
+            return primary.annotation.world_angle
+        dead_zone: float = self._config.seam.dead_zone
+        x: float = 0.0
+        y: float = 0.0
+        for t in active:
+            assert isinstance(t.annotation, Annotation)
+            weight: float = max(0.0, self._rig.angle_from_edge(t.annotation.local_angle) - dead_zone)
+            angle: float = math.radians(t.annotation.world_angle)
+            x += weight * math.cos(angle)
+            y += weight * math.sin(angle)
+        if math.hypot(x, y) < 1e-9:
+            return primary.annotation.world_angle
+        return math.degrees(math.atan2(y, x)) % 360.0
 
     def prune(self, live_worlds: set[int]) -> None:
         """Forget the handover state of worlds that no longer exist."""

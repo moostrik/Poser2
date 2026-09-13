@@ -23,7 +23,7 @@ so ``STATIC`` is the default and the moving modes are for evaluation on the mach
 
 **Input contract** (all six pose parameters are read into ``_Participant`` every tick,
 whether or not the current mapping draws with them): the four arm angles, ``LegDeviation``,
-``TorsoTilt``; plus BBox length, presence (tracklets) and pairwise ``Similarity``. The
+``TorsoTilt``; plus BBox length, presence (the pose frame itself) and pairwise ``Similarity``. The
 mapping in ``_Participant.lift`` / ``.bend`` and the colour balance is an initial proposal —
 the composition work happens here, on settings.
 """
@@ -248,14 +248,10 @@ class PoseInstrument(ProjectionLayer):
 
     def _update_participants(self, dt: float) -> None:
         P = self._config
-        tracklets = self._board.get_tracklets()
         frames = self._board.get_frames(self._pose_stage)
         for p in self._participants.values():
             p.present = False
         for id, pose in frames.items():
-            tracklet = tracklets.get(id)
-            if tracklet is None or not tracklet.is_active:
-                continue
             azimuth = pose[features.Azimuth].value
             if math.isnan(azimuth):
                 continue

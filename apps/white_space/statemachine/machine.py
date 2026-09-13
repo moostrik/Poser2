@@ -137,10 +137,10 @@ class StateMachine:
         with self._sync_lock:
             self._sync_values = values
 
-    def _debounced_participants(self, now: float) -> int:
-        """Live participant count from the tracker, debounced by count_hold_seconds so
+    def _debounced_participants(self, now: float, live_ids: set[int]) -> int:
+        """Live participant count — the people with a pose — debounced by count_hold_seconds so
         occlusion/re-acquisition flicker can't fire transitions."""
-        raw = sum(1 for t in self._board.get_tracklets().values() if t.is_active)
+        raw = len(live_ids)
         if self._eff_participants is None:
             self._eff_participants = raw            # first tick: no startup delay
             self._pending_count = raw
@@ -203,8 +203,9 @@ class StateMachine:
         self._prev_time = now
         signals = self._board.get_playhead_signals()
 
-        live_ids = {id for id, t in self._board.get_tracklets().items() if t.is_active}
-        participants = self._debounced_participants(now)
+        # The people present are the people with a pose: `pose.tracklets.detection_timeout` decides.
+        live_ids = set(self._board.get_frames(self._pose_stage).keys())
+        participants = self._debounced_participants(now, live_ids)
         hit = self._detect_hit(live_ids)
 
         if not self._entered:

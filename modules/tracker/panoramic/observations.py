@@ -207,6 +207,23 @@ class ObservationStore:
             self._world_members.pop(world_id, None)
             self._id_pool.release(world_id)
 
+    def detach(self, obs_id: ObsId) -> int | None:
+        """Move one observation out of its world into a new world of its own. Returns the new world
+        id, or None when the pool is exhausted or the observation is already alone."""
+        world_id: int | None = self._world_for.get(obs_id)
+        if world_id is None or len(self._world_members.get(world_id, ())) < 2:
+            return None
+        try:
+            new_world: int = self._id_pool.acquire()
+        except Exception as e:
+            logger.info(f"No world id to detach observation {obs_id} into: {e}")
+            return None
+        self._world_members[world_id].discard(obs_id)
+        self._world_members[new_world] = {obs_id}
+        self._world_for[obs_id] = new_world
+        self._obs[obs_id] = replace(self._obs[obs_id], id=new_world)
+        return new_world
+
     def merge_worlds(self, keep_id: int, drop_id: int) -> bool:
         """Move all observations from `drop_id` into `keep_id` and release `drop_id`."""
         if keep_id == drop_id:
@@ -232,8 +249,7 @@ class ObservationStore:
         """Whether this camera already actively tracks someone in this world.
 
         One camera never sees one person twice — the device de-duplicates — so a second id from it
-        is a second person, and no rule may join the two. A merge would be sticky: nothing splits a
-        world again."""
+        is a second person, and no rule may join the two."""
         return any(t.cam_id == cam_id and t.is_active for t in self.members(world_id))
 
     def members(self, world_id: int) -> list[Tracklet]:

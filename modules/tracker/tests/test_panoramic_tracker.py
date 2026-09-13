@@ -10,9 +10,9 @@ from dataclasses import replace
 from modules.oak import CameraResolution, delivered_height, frame_coverage, frame_window
 from modules.tracker import (
     PanoramicTracker, PanoramicTrackerSettings, PanoramicAnnotation, Rejection,
-    Tracklet, TrackingStatus, TrackletDict, camera_local_to_azimuth, row_from_elevation, row_model,
+    Tracklet, TrackingStatus, TrackletDict, camera_bearing, camera_local_to_azimuth, focus_distance,
+    row_from_elevation, row_model, wrap180,
 )
-from modules.tracker import camera_bearing, focus_distance
 from modules.tracker.panoramic.observations import WorldIdPool
 from modules.tracker.panoramic.rig import Rig, _MAX_HEIGHT, height_is_measured
 from modules.tracker.panoramic.rig_sync import HANDS_HEIGHT, reach_radius
@@ -246,7 +246,7 @@ class TestPrimaryHysteresis(PanoramicTrackerCase):
         self.assertEqual(set(out.keys()), {0})  # linked into the same world
         self.assertEqual(out[0].cam_id, 0)      # cam0 stays primary
 
-        # The show reads `is_active`: a person a camera still sees must never be emitted as LOST,
+        # A person a camera still sees must never be emitted as LOST (pose would time them out),
         # so the primary losing them hands over at once, hysteresis or not.
         out = self.submit(make_tracklet(0, 1, 98.0, status=TrackingStatus.LOST))
         self.assertEqual(out[0].cam_id, 1)
@@ -425,7 +425,7 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
 
 class TestOneCameraOnePerson(PanoramicTrackerCase):
     """Two ids from one camera are two people: the device already de-duplicates, so no rule may put
-    both in one world — a merge is sticky, and nothing splits it again."""
+    both in one world, and a world that ends up with two active views from one camera is split."""
 
     def annotated(self, tracklet: Tracklet) -> Tracklet:
         return replace(tracklet, annotation=self.tracker.rig.annotate(tracklet.roi, tracklet.cam_id))
@@ -445,6 +445,28 @@ class TestOneCameraOnePerson(PanoramicTrackerCase):
         self.assertEqual(self.tracker.observations.world_of(0, 2), 0)
         self.assertEqual(self.tracker.observations.world_of(0, 3), 1)
 
+    def test_a_lost_anchor_whose_track_returns_splits_off_the_newcomer(self) -> None:
+        # A is LOST but the device still holds the track (past the far edge, a missed frame); C
+        # passes close by under a new id and re-acquires A's world. When A's id comes back, the
+        # world has two active views from one camera: C, the younger, gets a world of its own.
+        self.submit(make_tracklet(0, 1, 50.0))                        # A: world 0
+        self.submit(make_tracklet(0, 1, 50.0, status=TrackingStatus.LOST))
+        self.submit(make_tracklet(0, 2, 53.0))                        # C: re-acquires world 0
+        self.assertEqual(self.tracker.observations.world_of(0, 2), 0)
+        out = self.submit(make_tracklet(0, 1, 50.0), make_tracklet(0, 2, 53.0))
+        self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
+        self.assertEqual(self.tracker.observations.world_of(0, 2), 1)
+        self.assertEqual(set(out.keys()), {0, 1})
+
+    def test_a_re_acquisition_whose_old_track_ends_is_not_split(self) -> None:
+        # The device handing a person a new id while the old one is still LOST: the old one ends.
+        self.submit(make_tracklet(0, 1, 50.0))
+        self.submit(make_tracklet(0, 1, 50.0, status=TrackingStatus.LOST))
+        self.submit(make_tracklet(0, 2, 51.0))
+        out = self.submit(make_tracklet(0, 1, 50.0, status=TrackingStatus.REMOVED), make_tracklet(0, 2, 51.0))
+        self.assertEqual(self.tracker.observations.world_of(0, 2), 0)
+        self.assertEqual(set(out.keys()), {0})
+
     def test_worlds_this_camera_sees_apart_are_never_collapsed(self) -> None:
         # Cam 1's view (azimuth 89) sits in the world of cam 0's person at 84, and is the mutual
         # nearest match of cam 0's person at 88 — a pair the collapse net would merge.
@@ -454,6 +476,32 @@ class TestOneCameraOnePerson(PanoramicTrackerCase):
         observations.add(self.annotated(make_tracklet(1, 1, 9.0)), world_id=world)
         self.submit()
         self.assertNotEqual(observations.world_of(0, 1), observations.world_of(0, 2))
+
+
+class TestSplitWorlds(PanoramicTrackerCase):
+    """A seam link can join the wrong pair when two people arrive together; the world is split again
+    once its views stop agreeing, and the detached view rejoins its own person."""
+
+    def test_a_wrong_seam_merge_repairs_itself_when_the_two_separate(self) -> None:
+        self.submit(make_tracklet(0, 1, 96.0))              # A, azimuth 86: world 0
+        self.submit(make_tracklet(1, 1, 9.0))               # B seen by cam 1 first, azimuth 89: joins A
+        self.submit(make_tracklet(0, 2, 99.0))              # B counted by cam 0: cam 0 already sees world 0
+        observations = self.tracker.observations
+        self.assertEqual(observations.world_of(1, 1), 0)    # the wrong merge
+        self.assertEqual(observations.world_of(0, 2), 1)
+
+        # A walks away to azimuth 70; B stays at 89 in both cameras.
+        self.submit(make_tracklet(0, 1, 80.0), make_tracklet(1, 1, 9.0), make_tracklet(0, 2, 99.0))
+        self.assertEqual(observations.world_of(0, 1), 0)                        # A keeps their world
+        self.assertNotEqual(observations.world_of(1, 1), 0)                     # B's cam-1 view left it
+        self.assertEqual(observations.world_of(1, 1), observations.world_of(0, 2))   # and rejoined B
+
+    def test_views_that_drift_within_the_margin_stay_together(self) -> None:
+        self.submit(make_tracklet(0, 1, 96.0))              # azimuth 86
+        self.submit(make_tracklet(1, 1, 8.0))               # azimuth 88: world 0
+        self.submit(make_tracklet(0, 1, 94.0), make_tracklet(1, 1, 14.0))   # 84 and 94: 10° apart
+        self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
+        self.assertEqual(self.tracker.observations.world_of(1, 1), 0)
 
 
 class TestWorldIdPool(unittest.TestCase):
@@ -960,7 +1008,7 @@ class TestFarEdge(RigTrackerCase):
 
 class TestRejectedDetections(RigTrackerCase):
     """Every detection a filter rejects is published on the observation channel with its reason —
-    so the panorama can draw it — and never on the primary channel the show reads."""
+    so the panorama can draw it — and never on the primary channel poses come from."""
 
     def rejected(self) -> dict[Rejection, int]:
         """The reasons on the latest observation channel, counted."""
@@ -981,7 +1029,7 @@ class TestRejectedDetections(RigTrackerCase):
             with self.subTest(reason=reason):
                 self.setUp()
                 out = self.seen(**kwargs)
-                self.assertEqual(out, {})                                  # the show sees nobody
+                self.assertEqual(out, {})                                  # nobody is emitted
                 self.assertEqual(self.rejected(), {reason: 1})             # the strip sees why
                 self.assertEqual(self.tracker.observations.world_ids(), [])
 
@@ -1072,6 +1120,56 @@ class TestUnknownStatus(PanoramicTrackerCase):
         before = self.tracker.observations.live(0, 1)
         self.submit(make_tracklet(0, 1, 60.0, status=TrackingStatus.NONE))
         self.assertEqual(self.tracker.observations.live(0, 1), before)
+
+
+class TestWorldAzimuth(PanoramicTrackerCase):
+    """The emitted azimuth blends the active views, each weighted by its distance from its own field
+    edge less the dead zone (5° here), so it does not step when the primary changes camera."""
+
+    def azimuth(self, out: TrackletDict, world_id: int = 0) -> float:
+        annotation = out[world_id].annotation
+        assert isinstance(annotation, PanoramicAnnotation)
+        return annotation.world_angle
+
+    def test_a_single_view_is_emitted_as_seen(self) -> None:
+        self.assertEqual(self.azimuth(self.submit(make_tracklet(0, 1, 50.0))), 40.0)
+
+    def test_two_views_are_weighted_by_distance_from_their_field_edge(self) -> None:
+        self.submit(make_tracklet(0, 1, 98.0))                                  # azimuth 88, weight 12 - 5
+        out = self.submit(make_tracklet(0, 1, 98.0), make_tracklet(1, 1, 14.0))  # azimuth 94, weight 14 - 5
+        self.assertAlmostEqual(self.azimuth(out), (88.0 * 7.0 + 94.0 * 9.0) / 16.0, delta=0.05)
+
+    def test_views_either_side_of_zero_blend_across_it(self) -> None:
+        self.submit(make_tracklet(3, 1, 98.0))                                  # azimuth 358, edge 12
+        out = self.submit(make_tracklet(3, 1, 98.0), make_tracklet(0, 1, 12.0))  # azimuth 2, edge 12
+        self.assertLess(abs(wrap180(self.azimuth(out))), 0.01)
+
+
+class TestNoStepAtHandover(RigTrackerCase):
+    """On the real ring, off the parallax depth, the two cameras disagree by the seam residual. Walking
+    across the seam, the emitted azimuth must move with the person, not jump when the primary changes."""
+
+    def test_walking_across_a_seam_at_the_zone_edge(self) -> None:
+        emitted: list[float] = []
+        primaries: set[int] = set()
+        for azimuth in range(70, 111):
+            for cam_id in (0, 1):
+                roi, _distance = synth_observation(cam_id, float(azimuth), 3.4, person_height=1.8)
+                # Out of a camera's field the device reports the track LOST, as the ObjectTracker does.
+                in_field: bool = 0.0 < roi.x + roi.width / 2.0 < 1.0
+                self.tracker._add_tracklet(Tracklet(
+                    cam_id=cam_id, roi=roi, external_id=1, external_age_in_frames=10,
+                    status=TrackingStatus.TRACKED if in_field else TrackingStatus.LOST))
+            self.tracker._update_and_notify()
+            out = self.emitted[-1]
+            self.assertEqual(set(out.keys()), {0})
+            annotation = out[0].annotation
+            assert isinstance(annotation, PanoramicAnnotation)
+            emitted.append(annotation.world_angle)
+            primaries.add(out[0].cam_id)
+        self.assertEqual(primaries, {0, 1})                     # the primary did change camera
+        steps = [abs(wrap180(b - a)) for a, b in zip(emitted, emitted[1:])]
+        self.assertLess(max(steps), 2.0, f'largest step {max(steps):.2f}°')
 
 
 class TestLifecycle(unittest.TestCase):

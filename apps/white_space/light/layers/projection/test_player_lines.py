@@ -18,7 +18,6 @@ import numpy as np
 
 from modules.settings import BaseSettings, Field
 from modules.utils import HotReloadMethods
-from modules.tracker import Tracklet
 from modules.pose import frame as pose_frame
 from modules.pose import features
 
@@ -62,15 +61,11 @@ class PlayerLines(ProjectionLayer):
     # Layer interface
     # ------------------------------------------------------------------
 
-    def _update_states(self, frames: list[pose_frame.Frame], tracklets: dict[int, Tracklet]) -> None:
+    def _update_states(self, frames: list[pose_frame.Frame]) -> None:
         seen: set[int] = set()
 
         for pose in frames:
             track_id = pose.track_id
-            tracklet = tracklets.get(track_id)
-            if tracklet is None or not tracklet.is_active:
-                continue
-
             strip_pos: float = angle_to_strip_position(pose[features.Azimuth].value)
 
             bottom_y: float = pose[features.BBox].to_rect().bottom
@@ -88,9 +83,8 @@ class PlayerLines(ProjectionLayer):
                 state.active = False
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
-        frames    = list(self._board.get_frames(self._pose_stage).values())
-        tracklets = self._board.get_tracklets()
-        self._update_states(frames, tracklets)
+        frames = list(self._board.get_frames(self._pose_stage).values())
+        self._update_states(frames)
 
         P = self._config
         depth_scale:   float = P.depth_scale

@@ -74,8 +74,7 @@ class FlashPose:
 
 
 class FlashBoard(SimpleNamespace):
-    def get_tracklets(self):
-        return self.tracklets
+    """Poses only: the flash never reads tracklets."""
 
     def get_frames(self, stage: int):
         return self.frames
@@ -85,7 +84,7 @@ class FlashTest(unittest.TestCase):
     def setUp(self) -> None:
         self.cfg = FlashSettings()
         self.cfg.width = 20.0                       # ±10°
-        self.board = FlashBoard(frames={}, tracklets={})
+        self.board = FlashBoard(frames={})
         self.layer = Flash(RES, self.cfg, self.board, pose_stage=4)
 
     def _sweep(self, *offsets_deg: float, id: int = 0) -> list[float]:
@@ -93,7 +92,6 @@ class FlashTest(unittest.TestCase):
         out: list[float] = []
         for deg in offsets_deg:
             self.board.frames = {id: FlashPose(id, deg)}
-            self.board.tracklets = {id: SimpleNamespace(is_active=True)}
             f = Frame(RES, Tick(0.0, 1 / 30))
             self.layer.render(f)
             out.append(float(f.beam_lights[BeamLightId.FRONT_WHITE]))
@@ -110,7 +108,6 @@ class FlashTest(unittest.TestCase):
         pose = FlashPose(0, 0.0)
         pose._offset = float("nan")
         self.board.frames = {0: pose}
-        self.board.tracklets = {0: SimpleNamespace(is_active=True)}
         f = Frame(RES, Tick(0.0, 1 / 30))
         self.layer.render(f)
         self.assertEqual(float(f.beam_lights[BeamLightId.FRONT_WHITE]), 0.0)
@@ -125,9 +122,8 @@ class FlashTest(unittest.TestCase):
         self.cfg.gap = 0.5
         self.assertEqual(self._sweep(40.0, -38.0), [0.0, 0.0])
 
-    def test_inactive_poses_are_ignored(self) -> None:
-        self.board.frames = {0: FlashPose(0, 0.0)}
-        self.board.tracklets = {0: SimpleNamespace(is_active=False)}
+    def test_nobody_with_a_pose_no_flash(self) -> None:
+        self.board.frames = {}
         f = Frame(RES, Tick(0.0, 1 / 30))
         self.layer.render(f)
         self.assertEqual(float(f.beam_lights[BeamLightId.FRONT_WHITE]), 0.0)

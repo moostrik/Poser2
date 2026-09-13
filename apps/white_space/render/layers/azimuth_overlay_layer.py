@@ -8,7 +8,7 @@ the light it drives. Drawn over both the ring and the beam simulation, which sha
 import math
 from typing import Protocol
 
-from modules.board import HasFrames, HasTracklets
+from modules.board import HasFrames
 from modules.render import ColorSettings
 from modules.render.layers import LayerBase, strip_spans
 from modules.render.shaders import DrawColoredRectangle
@@ -22,7 +22,7 @@ _BBOX_ALPHA: float = 0.5
 _CONNECTOR_PX: float = 2.0
 
 
-class AzimuthOverlayBoard(HasFrames, HasTracklets, Protocol):
+class AzimuthOverlayBoard(HasFrames, Protocol):
     ...
 
 
@@ -60,7 +60,6 @@ class AzimuthOverlayLayer(LayerBase):
         marks: list[AzimuthMark] = build_azimuth_marks(
             self._board.get_frames(int(Stage.LERP)),
             self._board.get_frames(int(Stage.PREDICT)),
-            self._board.get_tracklets(),
         )
         if not marks:
             return

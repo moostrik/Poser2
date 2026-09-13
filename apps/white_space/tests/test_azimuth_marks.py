@@ -2,7 +2,6 @@
 
 import math
 import unittest
-from types import SimpleNamespace
 
 from modules.pose.frame import Frame
 from modules.pose.features import Azimuth
@@ -13,33 +12,28 @@ def _frame(track_id: int, azimuth: float) -> Frame:
     return Frame(track_id=track_id, cam_id=0, features={Azimuth: Azimuth.from_value(azimuth)})
 
 
-def _tracklet(active: bool = True) -> SimpleNamespace:
-    return SimpleNamespace(is_active=active)
-
-
 class BuildAzimuthMarksTest(unittest.TestCase):
     def test_both_azimuths_map_to_strip_positions(self) -> None:
-        marks = build_azimuth_marks({0: _frame(0, math.pi / 2)}, {0: _frame(0, -math.pi / 2)}, {0: _tracklet()})
+        marks = build_azimuth_marks({0: _frame(0, math.pi / 2)}, {0: _frame(0, -math.pi / 2)})
         self.assertEqual(len(marks), 1)
         self.assertAlmostEqual(marks[0].eye_x, 0.25, places=5)
         self.assertAlmostEqual(marks[0].bbox_x, 0.75, places=5)
 
     def test_missing_side_is_nan(self) -> None:
-        marks = build_azimuth_marks({0: _frame(0, 0.0)}, {}, {0: _tracklet()})
+        marks = build_azimuth_marks({0: _frame(0, 0.0)}, {})
         self.assertAlmostEqual(marks[0].eye_x, 0.0, places=5)
         self.assertTrue(math.isnan(marks[0].bbox_x))
 
     def test_nan_azimuth_is_nan(self) -> None:
-        marks = build_azimuth_marks({0: _frame(0, math.nan)}, {0: _frame(0, 1.0)}, {0: _tracklet()})
+        marks = build_azimuth_marks({0: _frame(0, math.nan)}, {0: _frame(0, 1.0)})
         self.assertTrue(math.isnan(marks[0].eye_x))
 
     def test_neither_azimuth_is_left_out(self) -> None:
-        self.assertEqual(build_azimuth_marks({0: _frame(0, math.nan)}, {}, {0: _tracklet()}), [])
+        self.assertEqual(build_azimuth_marks({0: _frame(0, math.nan)}, {}), [])
 
-    def test_inactive_or_untracked_is_skipped(self) -> None:
+    def test_one_mark_per_person_with_a_pose(self) -> None:
         frames = {0: _frame(0, 0.0), 1: _frame(1, 0.0)}
-        marks = build_azimuth_marks(frames, frames, {0: _tracklet(active=False)})
-        self.assertEqual(marks, [])
+        self.assertEqual([m.track_id for m in build_azimuth_marks(frames, frames)], [0, 1])
 
 
 class SignedStripGapTest(unittest.TestCase):

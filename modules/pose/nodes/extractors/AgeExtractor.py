@@ -5,10 +5,9 @@ from ...frame import Frame, replace
 
 
 class AgeExtractor(FilterNode):
-    """Takes the absolute value of all deltas and adds them to the movement_time field."""
+    """How long this track has had a pose (s): the time since its first frame after a reset."""
 
     def __init__(self) -> None:
-        self.motion_time: float = 0.0
         self.oldest_time_stamp: float | None = None
 
 
@@ -24,5 +23,4 @@ class AgeExtractor(FilterNode):
         return replace(pose, {Age: Age.from_value(age)})
 
     def reset(self) -> None:
-        self.motion_time = 0.0
-        self.prev_time_stamp = None
+        self.oldest_time_stamp = None

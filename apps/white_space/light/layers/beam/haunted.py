@@ -66,7 +66,6 @@ class Haunted(BeamLayer):
         centre: float = _PHASE_OFFSET * math.tau   # blue fires 0.25 turn past the passive ghost
         half_rad: float = math.radians(P.width / 2.0)
 
-        tracklets = self._board.get_tracklets()
         flash_white: float = 0.0
         flash_blue:  float = 0.0
         prev_live:  dict[int, float] = {}
@@ -76,9 +75,6 @@ class Haunted(BeamLayer):
         # WHITE — live players flash at the crossing (live poses are fully present; no fade). The width
         # window lights the near frames; _closest_pass guarantees the nearest one if the window is skipped.
         for pose in self._board.get_frames(self._pose_stage).values():
-            tracklet = tracklets.get(pose.track_id)
-            if tracklet is None or not tracklet.is_active:
-                continue
             offset = pose[PlayheadOffset].value
             level = offset_to_level(offset, half_rad)
             if _closest_pass(self._prev_live.get(pose.track_id, math.nan), offset):

@@ -89,14 +89,10 @@ class Flash(BeamLayer):
         half_rad: float = math.radians(P.width / 2.0)
         guarantee: bool = P.gap <= 0.0     # a notch asks for darkness exactly where this would fire
 
-        tracklets = self._board.get_tracklets()
         flash_white: float = 0.0
         flash_blue:  float = 0.0
         prev_offsets: dict[int, float] = {}
         for pose in self._board.get_frames(self._pose_stage).values():
-            tracklet = tracklets.get(pose.track_id)
-            if tracklet is None or not tracklet.is_active:
-                continue
             offset = pose[PlayheadOffset].value
             level = offset_to_level(offset, half_rad, P.gap)
             if guarantee and _closest_pass(self._prev_offsets.get(pose.track_id, math.nan), offset):

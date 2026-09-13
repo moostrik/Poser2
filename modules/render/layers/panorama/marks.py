@@ -6,8 +6,9 @@ its **label**. Built once by the compositor for both `MarkRenderer` (line, tick,
 
 **A mark is the tracker's belief, and its two axes use two different depths on purpose.**
 
-- **x** is the fused `world_angle` — what the light, sound and hit detector act on — which the
-  tracker derives at the fixed `rig.parallax_radius`. The field goes through the same depth, since
+- **x** is the view's own `world_angle`, which the tracker derives at the fixed
+  `rig.parallax_radius`. What the tracker emits is a blend of a person's active views
+  (`Seams.world_azimuth`); the show's azimuth is drawn by the azimuth overlay. The field goes through the same depth, since
   it is a statement about the same azimuth. So a mark sits a small constant distance from its own
   pixels (the image is stitched at `focus_radius`), and two views of one person at a seam differ by
   the residual for their depth: a depth indicator, not an error.

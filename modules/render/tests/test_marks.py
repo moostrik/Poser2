@@ -73,8 +73,8 @@ def span(m: Mark) -> tuple[float, float]:
 
 class TestPlacement(unittest.TestCase):
 
-    def test_x_is_the_fused_world_angle(self) -> None:
-        # Not the local angle, and not the picture: the number the rest of the app receives.
+    def test_x_is_the_world_angle(self) -> None:
+        # Not the local angle, and not the picture: this view's azimuth, as the tracker derived it.
         self.assertAlmostEqual(mark(observation(0, 120.0, 96.0, overlap=True)).x,
                                96.0 / 360.0, places=9)
 

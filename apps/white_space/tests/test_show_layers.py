@@ -169,8 +169,7 @@ def _pose(azimuth_pos: float, sims: dict[int, float] | None = None, shoulders: f
 
 
 class InstrumentBoard(SimpleNamespace):
-    def get_tracklets(self):
-        return self.tracklets
+    """Poses only: the instrument never reads tracklets."""
 
     def get_frames(self, stage: int):
         return self.frames
@@ -190,12 +189,11 @@ class PoseInstrumentTest(unittest.TestCase):
     def setUp(self) -> None:
         self.cfg = PoseInstrumentSettings()
         self.cfg.attack_seconds = 0.0            # present at once — geometry tests read one frame
-        self.board = InstrumentBoard(tracklets={}, frames={}, bars=0.0)
+        self.board = InstrumentBoard(frames={}, bars=0.0)
         self.layer = PoseInstrument(IRES, self.cfg, self.board, pose_stage=4)
 
     def _people(self, poses: dict[int, FakePose]) -> None:
         self.board.frames = poses
-        self.board.tracklets = {id: SimpleNamespace(is_active=True) for id in poses}
 
     def _render(self, time: float = 0.0) -> Frame:
         f = Frame(IRES, Tick(time, 1 / 30))
@@ -401,9 +399,8 @@ class PoseInstrumentTest(unittest.TestCase):
         f = self._render()
         self.assertEqual(float(f.white.max()) + float(f.blue.max()), 0.0)
 
-    def test_inactive_participants_are_ignored(self) -> None:
-        self.board.frames = {0: _pose(0.5)}
-        self.board.tracklets = {0: SimpleNamespace(is_active=False)}
+    def test_nobody_with_a_pose_draws_nothing(self) -> None:
+        self.board.frames = {}
         f = self._render()
         self.assertAlmostEqual(float(f.white.sum()) + float(f.blue.sum()), 0.0)
 

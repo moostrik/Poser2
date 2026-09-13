@@ -493,8 +493,9 @@ image right and marks wrong means the distance model, not the camera.
 | `labels` | each mark's **label**: `#id cam az R distance H height`, or the rejection at the top of a grey line |
 
 **A mark is the tracker's belief, not the picture, and its two axes use two depths on purpose.** Its
-**x** is the fused `world_angle` — the number the light, the sound and the hit detector all receive
-— which the tracker derives at `rig.parallax_radius` (R 2.1), never from a person's measured
+**x** is the view's own `world_angle` — what the tracker emits blends a person's active views
+between their marks, and the show's azimuth is on the azimuth overlay — which the tracker derives
+at `rig.parallax_radius` (R 2.1), never from a person's measured
 distance; its field follows x onto that cylinder. Its **rows** go through the person's own
 distance instead, which is what makes the foot tick exact against the zone band (*Two axes, and the
 depth that varies*). The image under it is stitched at `focus_radius` (R 2.25), so a line sits a

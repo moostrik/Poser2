@@ -1,6 +1,7 @@
 """Tests for the show StateMachine — the CSV transition graph in both modes,
 participant debounce, bar-denominated durations, goto/hold, motor commands, and looks."""
 
+import math
 import unittest
 from types import SimpleNamespace
 
@@ -11,17 +12,9 @@ from apps.white_space.statemachine import machine as machine_module
 POSE_STAGE = 4
 
 
-class FakeTracklet(SimpleNamespace):
-    pass
-
-
-def tracklet(active: bool = True) -> FakeTracklet:
-    return FakeTracklet(is_active=active)
-
-
 class FakeFrame:
-    """frame[PlayheadOffset].value → the stored offset."""
-    def __init__(self, offset: float) -> None:
+    """frame[PlayheadOffset].value → the stored offset. A pose frame is a present participant."""
+    def __init__(self, offset: float = math.nan) -> None:
         self._offset = offset
 
     def __getitem__(self, _key) -> SimpleNamespace:
@@ -30,14 +23,10 @@ class FakeFrame:
 
 class FakeBoard:
     def __init__(self) -> None:
-        self.tracklets: dict[int, FakeTracklet] = {}
         self.bars: float = 0.0
         self.synced: bool = False        # playhead re-locked at BEAM (motor lock)
         self.ring_formed: bool = False   # bar blurred into the ring (un-lock)
         self.frames: dict[int, FakeFrame] = {}
-
-    def get_tracklets(self):
-        return self.tracklets
 
     def get_playhead_signals(self):
         return SimpleNamespace(phase=float("nan"), bars=self.bars, synced=self.synced,
@@ -91,8 +80,8 @@ class StateMachineTest(unittest.TestCase):
         self.machine.update()
 
     def set_participants(self, n: int, settle: bool = True) -> None:
-        """Set the raw tracklet count; when settle, tick past the debounce hold."""
-        self.board.tracklets = {i: tracklet() for i in range(n)}
+        """Set the raw pose count (no playhead offset yet); when settle, tick past the debounce hold."""
+        self.board.frames = {i: FakeFrame() for i in range(n)}
         if settle:
             self.tick()   # register the pending count
             self.tick(dt=self.config.count_hold_seconds + 0.01)
@@ -158,9 +147,9 @@ class StateMachineTest(unittest.TestCase):
     def test_idle_intro_to_intro_on_hit(self) -> None:
         self.boot()
         self.set_participants(1)
-        self.board.frames = {0: FakeFrame(0.3)}   # playhead approaching
+        self.board.frames[0] = FakeFrame(0.3)     # playhead approaching
         self.tick()
-        self.board.frames = {0: FakeFrame(-0.1)}  # just passed → hit
+        self.board.frames[0] = FakeFrame(-0.1)    # just passed → hit
         self.tick()
         self.assertEqual(self.current, StateId.INTRO)
 
@@ -178,21 +167,21 @@ class StateMachineTest(unittest.TestCase):
     def test_wrap_flip_is_not_a_hit(self) -> None:
         self.boot()
         self.set_participants(1)
-        self.board.frames = {0: FakeFrame(3.0)}    # far side, positive
+        self.board.frames[0] = FakeFrame(3.0)      # far side, positive
         self.tick()
-        self.board.frames = {0: FakeFrame(-3.0)}   # wrapped past ±π, not a pass
+        self.board.frames[0] = FakeFrame(-3.0)     # wrapped past ±π, not a pass
         self.tick()
         self.assertEqual(self.current, StateId.IDLE_INTRO)
 
     def _to_intro(self, participants: int = 3) -> None:
         self.boot()
         self.set_participants(participants)
-        self.board.frames = {0: FakeFrame(0.3)}
+        self.board.frames[0] = FakeFrame(0.3)
         self.tick()
-        self.board.frames = {0: FakeFrame(-0.1)}
+        self.board.frames[0] = FakeFrame(-0.1)
         self.tick()
         self.assertEqual(self.current, StateId.INTRO)
-        self.board.frames = {}
+        self.board.frames[0] = FakeFrame()          # the crossing is over; the people stay
 
     def test_enter_resets_are_explicit_and_targeted(self) -> None:
         # INTRO resets the flash layer; INTRO_PLAY resets the instrument (fresh patterns +
@@ -405,10 +394,10 @@ class StateMachineTest(unittest.TestCase):
         self.config.blackout = False
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)
-        self.board.frames = {0: FakeFrame(0.3)}               # playhead approaching
+        self.board.frames[0] = FakeFrame(0.3)                 # playhead approaching
         self.tick(dbar=self.config.off_idle_bars / 4)
         self.assertEqual(self.current, StateId.OFF_IDLE)
-        self.board.frames = {0: FakeFrame(-0.1)}              # swept past → hit, mid-fade
+        self.board.frames[0] = FakeFrame(-0.1)                # swept past → hit, mid-fade
         self.tick(dbar=self.config.off_idle_bars / 4)
         self.assertEqual(self.current, StateId.INTRO)
 
@@ -510,10 +499,10 @@ class StateMachineTest(unittest.TestCase):
 
     def test_participant_flicker_is_debounced(self) -> None:
         self.boot()
-        self.board.tracklets = {0: tracklet()}
+        self.board.frames = {0: FakeFrame()}
         self.tick()                                   # pending, not yet effective
         self.assertEqual(self.current, StateId.IDLE)
-        self.board.tracklets = {}
+        self.board.frames = {}
         self.tick()                                   # flicker back before the hold expired
         self.tick(dt=self.config.count_hold_seconds + 0.1)
         self.assertEqual(self.current, StateId.IDLE)

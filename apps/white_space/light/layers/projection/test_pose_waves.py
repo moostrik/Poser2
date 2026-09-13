@@ -7,7 +7,6 @@ from time import time
 from typing import TYPE_CHECKING
 
 from modules.utils import OneEuroFilter
-from modules.tracker import Tracklet
 from modules.pose import features
 from modules.settings import Field
 
@@ -55,11 +54,10 @@ class PlayerState:
         self.left_pattern_time:  float = 0.0
         self.right_pattern_time: float = 0.0
 
-    def update_presence(self, tracklet: Tracklet) -> None:
-        if tracklet.is_removed:
-            self.reset()
-            return
-        if tracklet.is_active and tracklet.age_in_seconds > 2.0:
+    def update_presence(self, pose_age: float) -> None:
+        """Present once the pose has existed for 2 s; `pose_age` is its `Age` feature (NaN on the
+        first frame)."""
+        if pose_age > 2.0:
             if self.start_age == 0.0:
                 self.start_age = time()
             self.present = True
@@ -114,19 +112,21 @@ class PoseWaves(ProjectionLayer):
         P = self._config
         dt: float = frame.tick.dt
 
-        frames    = list(self._board.get_frames(self._pose_stage).values())
-        tracklets = self._board.get_tracklets()
+        frames = list(self._board.get_frames(self._pose_stage).values())
+
+        # A player without a pose this tick has left: presence and age start over when they return.
+        seen: set[int] = {pose.track_id for pose in frames}
+        for track_id, state in self._player_states.items():
+            if track_id not in seen:
+                state.reset()
 
         for pose in frames:
             track_id = pose.track_id
             if track_id not in self._player_states:
                 continue
-            tracklet = tracklets.get(track_id)
-            if tracklet is None:
-                continue
 
             state = self._player_states[track_id]
-            state.update_presence(tracklet)
+            state.update_presence(pose[features.Age].value)
             if not state.present:
                 continue
 

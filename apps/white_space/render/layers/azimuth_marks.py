@@ -10,7 +10,6 @@ from dataclasses import dataclass
 
 from modules.pose.frame import Frame
 from modules.pose.features import Azimuth
-from modules.tracker import Tracklet
 
 from apps.white_space.light.layers import angle_to_strip_position
 
@@ -28,17 +27,12 @@ def _strip_x(frame: Frame | None) -> float:
     return angle_to_strip_position(frame[Azimuth].value)
 
 
-def build_azimuth_marks(eye_frames: dict[int, Frame], bbox_frames: dict[int, Frame],
-                        tracklets: dict[int, Tracklet]) -> list[AzimuthMark]:
-    """One mark per actively tracked person present in either frame set, ordered by track id.
-
-    Only active tracklets, as the light layers count people; a person with neither azimuth is left out.
+def build_azimuth_marks(eye_frames: dict[int, Frame], bbox_frames: dict[int, Frame]) -> list[AzimuthMark]:
+    """One mark per person with a pose in either frame set, ordered by track id — the same people
+    the light layers draw. A person with neither azimuth is left out.
     """
     marks: list[AzimuthMark] = []
     for track_id in sorted(eye_frames.keys() | bbox_frames.keys()):
-        tracklet: Tracklet | None = tracklets.get(track_id)
-        if tracklet is None or not tracklet.is_active:
-            continue
         eye_x: float = _strip_x(eye_frames.get(track_id))
         bbox_x: float = _strip_x(bbox_frames.get(track_id))
         if math.isnan(eye_x) and math.isnan(bbox_x):

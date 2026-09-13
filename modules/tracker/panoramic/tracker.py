@@ -22,16 +22,19 @@ logger = logging.getLogger(__name__)
 class Tracker(Thread, BaseTracker):
     """Tracks people across a ring of cameras sharing a 360° field of view.
 
-    Each camera's on-device tracker sends per-camera tracklets; this joins them into world
-    identities. The parts:
+    **The second of two tiers.** Each camera runs YOLO into depthai's `ObjectTracker`
+    (`modules/oak/camera/pipeline.py`): detection, per-frame association, short misses bridged as
+    LOST under the same id, de-duplication and device ids all happen there. This class joins those
+    per-camera tracks into world identities across seams — it adds no motion model and no per-frame
+    assignment of its own. The parts:
 
     - `Rig` models the installation and turns a box into an `Annotation` (local angle, world
       azimuth, distance, height); `RigSync` keeps it and the published read-outs in step with
       `RigSettings`.
     - `ObservationStore` holds the per-camera observations — immutable, host-owned ids — grouped
       into world ids.
-    - `Seams` applies `SeamSettings`: linking a new view across a seam, collapsing worlds that are
-      one person, and handing the primary view over between cameras.
+    - `Seams` applies `SeamSettings`: linking a new view across a seam, splitting and collapsing
+      worlds, handing the primary view over between cameras, and blending a world's azimuth.
 
     This class runs the thread: the intake (filters, same-camera re-acquisition, the dead zone, then
     the seam link), the per-tick expiry and emission, and the callbacks. Two output channels:
@@ -278,19 +281,23 @@ class Tracker(Thread, BaseTracker):
             if t.is_expired(self.config.lost_timeout):
                 self.observations.retire(t.obs_id)
 
+        self.seams.split_worlds()
         self.seams.collapse_worlds()
 
         # Emit one primary per world the tracker still remembers until `lost_timeout` retires it —
-        # LOST only when no camera sees the person. How stale is too stale is each consumer's call,
-        # not this one's: pose stops posing a person after `pose.tracklets.detection_timeout`, and
-        # the show counts only active tracklets. Filtering here instead would decide for all of them
-        # with one number. A world retired just above is still in the store until the end of this
-        # tick; it is not emitted.
+        # LOST only when no camera sees the person. How stale is too stale is the consumer's call:
+        # pose stops posing a person after `pose.tracklets.detection_timeout`, and the show reads
+        # poses. A world retired just above is still in the store until the end of this tick; it is
+        # not emitted.
+        # The primary supplies the box and the camera (the crop); the azimuth is the world's blend of
+        # its active views, so it does not step when the primary changes camera.
         emitted: TrackletDict = {}
         for world_id in self.observations.world_ids():
             primary: Tracklet | None = self.seams.pick_primary(world_id, now)
             if primary is not None:
-                emitted[world_id] = primary
+                assert isinstance(primary.annotation, Annotation)
+                azimuth: float = self.seams.world_azimuth(world_id, primary)
+                emitted[world_id] = replace(primary, annotation=replace(primary.annotation, world_angle=azimuth))
         self._notify_callback(emitted)
 
         # Dropped detections a camera has stopped reporting: a device track normally ends with LOST
@@ -329,7 +336,7 @@ class Tracker(Thread, BaseTracker):
 
     def add_observation_callback(self, callback: TrackletListCallback) -> None:
         """Every live observation each tick, one per camera that can see a person — not one per
-        person. For the calibration view; the show reads ``add_tracklet_callback``."""
+        person. For the calibration view; poses come from ``add_tracklet_callback``."""
         with self._callback_lock:
             self._observation_callbacks.add(callback)
 
