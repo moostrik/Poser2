@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 from typing import Any
 
 from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
-from modules.oak import CameraSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.oak import CameraSettings, CameraCheckSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
 from modules.utils import Color
@@ -97,6 +97,7 @@ class Layers(IntEnum):
     # composite layers
     tracker =       auto()
     poser =         auto()
+    cam_readings =  auto()   # each camera's frame rate, tilt and roll error, over its own view
     # centre layers
     centre_geom=    auto()
     centre_cam =    auto()
@@ -148,6 +149,7 @@ class OakGroup(BaseSettings):
     cam_0        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_1        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_2        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
+    camera_check : Group[CameraCheckSettings]       = Group(CameraCheckSettings)
     simulator    : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cameras, fps])
     tracker      : Group[OnePerCamTrackerSettings]  = Group(OnePerCamTrackerSettings)
     frame_sync   : Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])

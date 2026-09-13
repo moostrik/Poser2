@@ -10,17 +10,19 @@ from .pipeline import get_stereo_config
 from modules.settings import BaseSettings, Field, Group, Widget
 
 
-class MountCheckSettings(BaseSettings):
-    """One pinned verdict saying whether the cameras are mounted the way the preset assumes.
+class CameraCheckSettings(BaseSettings):
+    """Pinned verdicts saying whether the cameras are mounted and running the way the preset assumes.
 
-    The per-camera readings live on each `CameraSettings`, four groups deep in the panel, which
-    is where a readout goes to be ignored. The pinned indicator says good or bad; which camera and
-    which axis is drawn on that camera's own view in the renderer.
+    The per-camera readings live on each `CameraSettings`, groups deep in the panel, which is
+    where a readout goes to be ignored. The pinned indicators say good or bad; which camera and
+    which value is drawn on that camera's own view in the renderer.
     """
-    tolerance:      Field[float] = Field(2.0, min=0.5, max=10.0, step=0.5,
-                                         description="Deviation (°) a camera may have before the mount warns")
-    mount:          Field[bool]  = Field(False, access=Field.READ, pinned=True, widget=Widget.status,
-                                         description="Camera tilt and roll within tolerance; the camera row shows each camera's error")
+    mount_tolerance: Field[float] = Field(2.0, min=0.5, max=10.0, step=0.5,
+                                          description="Tilt or roll deviation (°) a camera may have before the mount warns")
+    mount:           Field[bool]  = Field(True, access=Field.READ, pinned=True, widget=Widget.status,
+                                          description="Camera tilt and roll within tolerance; each camera view shows its error")
+    camera_fps:      Field[bool]  = Field(False, access=Field.READ, pinned=True, widget=Widget.status,
+                                          description="Camera frame rates within 5 % of fps; each camera view shows its rate")
 
 
 class CameraReadings(BaseSettings):
@@ -30,7 +32,7 @@ class CameraReadings(BaseSettings):
     is read-only except `roll_offset`, which lives here rather than with the mount constants
     because it is the thing you reach for while looking at the roll it corrects.
     """
-    video_fps:      Field[float] = Field(0.0, access=Field.READ, description="Video FPS", pinned=True)
+    video_fps:      Field[float] = Field(0.0, access=Field.READ, description="Video FPS")
     tracker_fps:    Field[float] = Field(0.0, access=Field.READ, description="Tracker updates/s")
     tracklets:      Field[int]   = Field(0, access=Field.READ, description="Active tracklets")
     # How the camera is actually mounted, as the board reports it — NaN until measured, which is

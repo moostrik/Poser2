@@ -1,6 +1,6 @@
-"""The mount readout: gravity to angles, and the verdict that summarises it.
+"""The camera readout: gravity to angles, and the verdicts that summarise the readings.
 
-Neither needs a device. The gravity conversion is a pure function, and `MountCheck` reads plain
+Neither needs a device. The gravity conversion is a pure function, and `CameraCheck` reads plain
 settings objects, so the interesting cases — a rig with no IMU, one camera out of four off — are
 all reachable without hardware.
 """
@@ -8,8 +8,8 @@ all reachable without hardware.
 import math
 import unittest
 
-from modules.oak import MountCheck, MountCheckSettings, imu_to_camera, unroll_imu_frame, \
-    orientation_from_gravity, mount_deviation
+from modules.oak import CameraCheck, CameraCheckSettings, imu_to_camera, unroll_imu_frame, \
+    orientation_from_gravity, mount_deviation, fps_deviation
 from modules.oak.camera.settings import CameraReadings, CameraSettings
 
 
@@ -140,10 +140,22 @@ def _cameras(readings: list[tuple[float, float]], configured_tilt: float = 12.0)
 
 
 def _mount(readings: list[tuple[float, float]], tolerance: float = 2.0) -> bool:
-    settings = MountCheckSettings()
-    settings.tolerance = tolerance
-    MountCheck(_cameras(readings), settings).update()
+    settings = CameraCheckSettings()
+    settings.mount_tolerance = tolerance
+    CameraCheck(_cameras(readings), settings).update()
     return settings.mount
+
+
+def _camera_fps(rates: list[float], configured_fps: float = 30.0) -> bool:
+    cameras: list[CameraSettings] = []
+    for rate in rates:
+        camera = CameraSettings()
+        camera.fps = configured_fps
+        camera.readings.video_fps = rate
+        cameras.append(camera)
+    settings = CameraCheckSettings()
+    CameraCheck(cameras, settings).update()
+    return settings.camera_fps
 
 
 class TestMountCheck(unittest.TestCase):
@@ -159,8 +171,8 @@ class TestMountCheck(unittest.TestCase):
         self.assertTrue(math.isnan(tilt))
         self.assertTrue(math.isnan(roll))
 
-    def test_no_readings_is_a_warning(self) -> None:
-        self.assertFalse(_mount([(self.NAN, self.NAN)] * 4))
+    def test_no_imu_anywhere_is_not_a_warning(self) -> None:
+        self.assertTrue(_mount([(self.NAN, self.NAN)] * 4))
 
     def test_all_within_tolerance_is_ok(self) -> None:
         self.assertTrue(_mount([(12.5, 0.4), (11.0, -1.9), (12.0, 0.0), (13.9, 1.0)]))
@@ -173,6 +185,26 @@ class TestMountCheck(unittest.TestCase):
 
     def test_a_camera_without_imu_does_not_spoil_ok(self) -> None:
         self.assertTrue(_mount([(12.0, 0.0), (self.NAN, self.NAN), (12.3, 0.5), (12.0, -0.2)]))
+
+
+class TestCameraFpsCheck(unittest.TestCase):
+    def test_deviation_is_a_signed_fraction(self) -> None:
+        camera = CameraSettings()
+        camera.fps = 30.0
+        camera.readings.video_fps = 27.0
+        self.assertAlmostEqual(fps_deviation(camera), -0.1)
+
+    def test_within_five_percent_is_ok(self) -> None:
+        self.assertTrue(_camera_fps([30.0, 28.6, 31.4]))
+
+    def test_one_camera_slow_is_a_warning(self) -> None:
+        self.assertFalse(_camera_fps([30.0, 28.4, 30.0]))
+
+    def test_one_camera_fast_is_a_warning(self) -> None:
+        self.assertFalse(_camera_fps([30.0, 31.6, 30.0]))
+
+    def test_no_frames_is_a_warning(self) -> None:
+        self.assertFalse(_camera_fps([0.0]))
 
 
 class TestRollOffsetIsABox(unittest.TestCase):

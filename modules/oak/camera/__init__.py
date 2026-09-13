@@ -9,5 +9,5 @@ from .definitions import    FrameType, CoderFormat, CoderType, StereoMedianFilte
                             output_focal, source_lens, lens_field, lens_deviation, detector_input_size, \
                             orientation_from_gravity, imu_to_camera, unroll_imu_frame, \
                             IMU_RATE_HZ, IMU_SMOOTHING, IMU_BOARD_ROLL
-from .settings import CameraSettings, MountCheckSettings
-from .mount_check import MountCheck, mount_deviation
+from .settings import CameraSettings, CameraCheckSettings
+from .camera_check import CameraCheck, FPS_TOLERANCE, mount_deviation, fps_deviation

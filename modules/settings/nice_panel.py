@@ -288,20 +288,30 @@ def _build_switch(settings, name, field, polls):
 @widget_builder(Widget.status)
 def _build_status(settings, name, field, polls):
     """Read-only good/bad indicator: one badge carrying the field's label, green with OK or red
-    with WARNING."""
+    with WARNING.
+
+    Both texts sit in the same grid cell and only one is visible, so the badge is always as wide as
+    the longer one and does not jump in size when the value flips.
+    """
     value = getattr(settings, name)
     label = generate_label(name)
     desc = _wiring_tooltip(settings, name, field.description)
 
-    def _apply_style(badge, ok: bool):
-        badge.set_text(f"{label} {'OK' if ok else 'WARNING'}")
+    with ui.badge().classes("text-weight-bold px-2 py-1").style("display: inline-grid") as badge:
+        ok_text = ui.label(f"{label} OK").classes("text-center").style("grid-area: 1 / 1")
+        warning_text = ui.label(f"{label} WARNING").classes("text-center").style("grid-area: 1 / 1")
+    _attach_description_tooltip(badge, desc)
+
+    def _apply_style(ok: bool):
+        shown, hidden = (ok_text, warning_text) if ok else (warning_text, ok_text)
+        shown.classes(remove="invisible")
+        hidden.classes(add="invisible")
         badge._props["color"] = "positive" if ok else "negative"
         badge.update()
 
-    badge = _attach_description_tooltip(ui.badge().classes("text-sm text-weight-bold px-2 py-1"), desc)
-    _apply_style(badge, value)
+    _apply_style(value)
 
-    polls.append((settings, name, [value], lambda v, b=badge: _apply_style(b, v)))
+    polls.append((settings, name, [value], lambda v: _apply_style(v)))
 
 
 @widget_builder(Widget.toggle)
@@ -1035,6 +1045,33 @@ def _build_rect(settings, name, field, polls):
         polls.append((settings, name, [value], _rect_setter))
 
 
+# -- Pinned read-outs ----------------------------------------------------------
+
+def _format_readout(value) -> str:
+    """A read-only value as short text for a pinned chip."""
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    if isinstance(value, Enum):
+        return value.name
+    if isinstance(value, float):
+        return f"{value:.1f}"
+    return str(value)
+
+
+def _build_pinned_readout(settings, name, field, polls):
+    """A read-only pinned field as one compact chip, "<Label> <value>", instead of a locked input."""
+    value = getattr(settings, name)
+    label = generate_label(name)
+    desc = _wiring_tooltip(settings, name, field.description)
+
+    chip = _attach_description_tooltip(
+        ui.label(f"{label} {_format_readout(value)}").classes("bg-grey-8 rounded px-2 py-1"),
+        desc,
+    )
+    polls.append((settings, name, [value],
+                  lambda v, c=chip: c.set_text(f"{label} {_format_readout(v)}")))
+
+
 # -- Fallback for unregistered / unsupported types --------------------------
 
 def _build_fallback(settings, name, field, polls):
@@ -1441,6 +1478,8 @@ def create_settings_panel(
 
     .poser-source { border-left: 2px solid #26a69a; padding-left: 6px; }
     .poser-synced { border-left: 2px solid #ffa726; padding-left: 6px; }
+
+    .poser-pinned { zoom: 0.8; }
     ''')
 
     # -- Shutdown overlay (client-side JS) ---------------------------------
@@ -1553,21 +1592,27 @@ def create_settings_panel(
 
         _collect_pinned(root)
 
-        # Render pinned fields and actions in a compact row above the tabs
+        # Render pinned fields above the tabs, scaled down: a controls row (what can be changed)
+        # and a status row (what can only be read), status indicators first.
         if pinned_fields or pinned_actions:
             pinned_polls: list[tuple] = []
-            with ui.row().classes("w-full gap-4 flex-wrap items-end bg-grey-9 rounded px-3 py-2 mt-2"):
-                for settings, field_name, field in pinned_fields:
-                    if field.access is Access.INIT:
-                        with ui.row().classes("items-center gap-1"):
-                            ui.label(generate_label(field_name))
-                            ui.label(str(getattr(settings, field_name))).classes(
-                                "text-secondary italic"
-                            )
-                    else:
-                        _build_field_control(settings, field_name, field, pinned_polls)
-                for settings, action_name, action_field in pinned_actions:
-                    _build_action_button(settings, action_name, action_field)
+            controls = [p for p in pinned_fields if p[2].access in (Access.WRITE, Access.READWRITE)]
+            readouts = [p for p in pinned_fields if p[2].access in (Access.READ, Access.INIT)]
+            readouts.sort(key=lambda p: p[2].widget is not Widget.status)   # stable: tree order otherwise
+            with ui.column().classes("poser-pinned w-full gap-2 bg-grey-9 rounded px-3 py-2 mt-2"):
+                if controls or pinned_actions:
+                    with ui.row().classes("w-full gap-4 flex-wrap items-end"):
+                        for settings, field_name, field in controls:
+                            _build_field_control(settings, field_name, field, pinned_polls)
+                        for settings, action_name, action_field in pinned_actions:
+                            _build_action_button(settings, action_name, action_field)
+                if readouts:
+                    with ui.row().classes("w-full gap-3 flex-wrap items-center"):
+                        for settings, field_name, field in readouts:
+                            if field.widget is Widget.status:
+                                _build_field_control(settings, field_name, field, pinned_polls)
+                            else:
+                                _build_pinned_readout(settings, field_name, field, pinned_polls)
             _register_polls(pinned_polls, all_polls)
 
         # Tabs inside the sticky header

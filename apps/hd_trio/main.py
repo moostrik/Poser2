@@ -5,7 +5,7 @@ from typing import Optional
 from functools import partial
 
 from modules.utils import Broadcast
-from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder
+from modules.oak import Camera, CameraCheck, Simulator, Player, Sync, Recorder as VideoRecorder
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
@@ -240,9 +240,14 @@ class HDTrioMain:
         self.filters_lerp.add_frames_callback(self.gate_lerp.process)
         self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
 
+        # CAMERA CHECK — each camera's IMU reading and frame rate against the preset, as pinned indicators
+        self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
+
         # RENDER
-        self.render = HDTrioRender(self.board, self.settings.render, data_path=DATA_PATH)
+        self.render = HDTrioRender(self.board, self.settings.render, self.settings.camera.cameras,
+                                   self.settings.camera.camera_check, data_path=DATA_PATH)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
+        self.render.add_update_callback(self.camera_check.update)
         self.render.add_update_callback(self.sequencer.update)
         self.render.add_update_callback(self.interpolators_lerp.update)
         self.render.add_exit_callback(self.stop)

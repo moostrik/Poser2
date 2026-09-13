@@ -4,7 +4,7 @@ from typing import Optional
 from functools import partial
 
 from modules.utils import Broadcast
-from modules.oak import Camera, Simulator, Player, Recorder, Sync
+from modules.oak import Camera, CameraCheck, Simulator, Player, Recorder, Sync
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
@@ -192,9 +192,14 @@ class DeepFlowMain:
         self.filters_lerp.add_frames_callback(self.gate_lerp.process)
         self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
 
+        # CAMERA CHECK — the camera's IMU reading and frame rate against the preset, as pinned indicators
+        self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
+
         # RENDER
-        self.render = DeepFlowRender(self.board, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
+        self.render = DeepFlowRender(self.board, self.settings.render, self.settings.camera.cameras,
+                                     self.settings.camera.camera_check, num_cams=len(self.cameras), num_players=num_players)
         self.render.add_exit_callback(self.stop)
+        self.render.add_update_callback(self.camera_check.update)
 
         # IN/OUT
         self.render.add_update_callback(self.interpolators_lerp.update)

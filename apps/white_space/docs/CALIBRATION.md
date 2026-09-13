@@ -10,7 +10,7 @@ choreography) and `LAYERS.md` (the layers).
 - Operator-facing angles are degrees, 0–360, counter-clockwise seen from above. The code keeps
   radians internally and on the wire.
 - The fixture firmware is never changed. Everything is modelled and corrected app-side.
-- Setting paths are written as they appear in the preset (`camera.mount_check.mount`); `cam_N` means
+- Setting paths are written as they appear in the preset (`camera.camera_check.mount`); `cam_N` means
   each of `cam_0`…`cam_3`.
 
 ---
@@ -30,7 +30,7 @@ Calibrate in this order. Cameras first: everything else is tuned against the fra
    - Read the open log: the `frame_height` line (the derived height), then per camera one `lens:`
      line (its field, centre offset and `lens_error`, which must match the table under *The lens*)
      and one `frame:` line (the elevation window, the horizon row, the rows covered).
-   - Read the pinned indicator (`camera.mount_check.mount`). It must be a green `Mount OK`. On a red
+   - Read the pinned indicator (`camera.camera_check.mount`). It must be a green `Mount OK`. On a red
      `Mount WARNING` the camera row names the camera and the axis: each view shows its tilt and roll
      error, red past the tolerance.
    - Level each camera against a spirit level, read its roll, type it into
@@ -672,13 +672,15 @@ camera tilts the horizon, which looks exactly like a wrong `tilt` in the panoram
 tell them apart. The cameras can:
 
 - **`camera.cam_N.readings.tilt_measured` / `roll_measured`** — from each board's IMU.
-- **`camera.mount_check.mount`** — pinned, always on screen: a green `Mount OK` when every
-  measured tilt and roll deviation is within `camera.mount_check.tolerance` (2°), a red
-  `Mount WARNING` otherwise. It also warns when no board reports an IMU reading; then check roll by eye against a
-  vertical edge.
-- **The camera row** — each camera's view carries its tilt error (measured − `tilt`, signed) and its
-  roll, each red past the tolerance, or `no IMU` for a board without one. It is what names the camera
-  and the axis on a `WARNING`.
+- **`camera.camera_check.mount`** — pinned, always on screen: a green `Mount OK` when every
+  measured tilt and roll deviation is within `camera.camera_check.mount_tolerance` (2°), a red
+  `Mount WARNING` otherwise. A board without an IMU is left out and never warns; check its roll by
+  eye against a vertical edge.
+- **The camera row** — each camera's view carries its video frame rate, its tilt error (measured −
+  `tilt`, signed) and its roll, each red past its tolerance, with `no IMU` in place of tilt and roll
+  for a board without one. It is what names the camera and the axis on a `WARNING`. The frame rate
+  has its own pinned indicator, `camera.camera_check.camera_fps`, red when any camera is more than
+  5 % off `fps`.
 - **`camera.cam_N.readings.roll_offset`** — what that camera reads when level. Subtracted from the raw
   reading, so the roll shown is how far the camera has moved since it was levelled. Per camera and
   never shared: it absorbs each unit's own sensor error, and those differ (cam_2 reads −2.25° sitting

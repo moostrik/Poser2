@@ -134,6 +134,9 @@
       "mono_auto_exposure": true,
       "ir_flood_light": 0.0
     },
+    "camera_check": {
+      "mount_tolerance": 2.0
+    },
     "simulator": {
       "video_path": "test_video",
       "video_decoder": "iGPU",

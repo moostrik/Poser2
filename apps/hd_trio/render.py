@@ -3,6 +3,7 @@
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, WindowSettings
+from modules.oak import CameraSettings, CameraCheckSettings
 from modules.render.layers import LayerBase
 from modules.render import layers as ls, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
@@ -34,6 +35,7 @@ UPDATE_LAYERS: list[Layers] = [
 
 INTERFACE_LAYERS: list[Layers] = [
     Layers.poser,
+    Layers.cam_readings,
 ]
 
 LARGE_LAYERS: list[Layers] = [
@@ -44,7 +46,8 @@ LARGE_LAYERS: list[Layers] = [
 
 
 class HDTrioRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings, data_path: str = "") -> None:
+    def __init__(self, board: RenderBoard, settings: RenderSettings,
+                 cameras: list[CameraSettings], camera_check: CameraCheckSettings, data_path: str = "") -> None:
         super().__init__(settings.window)
         self.num_players: int = settings.num_players
         self.num_cams: int = settings.num_cams
@@ -81,6 +84,7 @@ class HDTrioRender(RenderBase):
 
             cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.board,      cam_image.texture,          settings.preview.tracker,   settings.colors)
             track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.board,      cam_image.texture,          settings.preview.poser,     settings.colors)
+            self.L[Layers.cam_readings][i] =                 ls.CameraReadingsLayer( cameras[i], camera_check)
 
             centre_gmtry=   self.L[Layers.centre_geom][i] = ls.CentreGeometry(      i, self.board,                                  settings.centre.geometry)
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(     i, centre_gmtry,    cam_mask.texture,           settings.centre.mask)
@@ -157,7 +161,8 @@ class HDTrioRender(RenderBase):
     def allocate_window_renders(self) -> None:
         for i in range(self.num_cams):
             w, h = self.subdivision.get_allocation_size('track', i)
-            self.L[Layers.poser][i].allocate(w, h, GL_RGBA)
+            for layer_type in INTERFACE_LAYERS:
+                self.L[layer_type][i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
         for cam_dict in self.L.values():

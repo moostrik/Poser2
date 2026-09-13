@@ -1,6 +1,6 @@
 from .LayerBase import LayerBase, Rect, DataCache, Blit
 
-from .cam import      BBoxRenderer, BBoxRendererSettings, CropLayer, CropSettings, \
+from .cam import      BBoxRenderer, BBoxRendererSettings, CameraReadingsLayer, CropLayer, CropSettings, \
                       PoseRenderer, PoseRendererSettings, PoseCompositor, PoseCompSettings, \
                       TrackerCompositor, TrackerCompSettings, TrackletRenderer
 from .centre import   CentreGeometry, CentreGeomSettings, SnapPoint, CentreCamLayer, CentreCamSettings, \

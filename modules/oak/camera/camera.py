@@ -187,7 +187,7 @@ class Camera(Thread):
         try:
             self.outputs[Output.IMU_OUT] = self.device.getOutputQueue(name='imu', maxSize=1, blocking=False)  # type: ignore
             self.outputs[Output.IMU_OUT].addCallback(self._imu_callback)
-            logger.info(f'{self.device_id} IMU {sensor} reporting mount orientation')
+            logger.debug(f'{self.device_id} IMU {sensor} reporting mount orientation')
         except Exception as exc:                    # the stream is absent in simulation
             logger.debug(f'{self.device_id} no IMU stream: {exc}')
 

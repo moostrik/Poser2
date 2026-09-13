@@ -362,8 +362,8 @@
         "bright_max": 255
       }
     },
-    "mount_check": {
-      "tolerance": 2.0
+    "camera_check": {
+      "mount_tolerance": 2.0
     },
     "simulator": {
       "video_path": "recordings",

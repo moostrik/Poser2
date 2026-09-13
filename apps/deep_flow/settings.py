@@ -12,7 +12,7 @@ The root class is ``Settings``.
 from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
-from modules.oak import CameraSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.oak import CameraSettings, CameraCheckSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings, PosesFromTrackletsSettings
@@ -46,6 +46,7 @@ class Layers(IntEnum):
     # composite layers
     tracker =       auto()
     poser =         auto()
+    cam_readings =  auto()   # the camera's frame rate, tilt and roll error; draw it over poser
     # centre layers
     centre_geom =   auto()
     centre_cam =    auto()
@@ -95,6 +96,7 @@ class OakGroup(BaseSettings):
 
     _cam_share = [fps, color, square, stereo, yolo, resolution, model_path, fov]
     cam_0         = Group(CameraSettings, share=_cam_share)
+    camera_check  = Group(CameraCheckSettings)
     simulator     = Group(SimulatorSettings, share=[num_cameras, fps])
     recorder      = Group(RecorderSettings, share=[num_cameras, fps, keyframe_interval])
     tracker       = Group(OnePerCamTrackerSettings)
