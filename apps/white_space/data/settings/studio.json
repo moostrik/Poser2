@@ -406,7 +406,6 @@
     "model_type": "TRT",
     "model_path": "apps/white_space/data/models",
     "verbose": false,
-    "ws_input_stage": "LERP",
     "pose": {
       "enabled": true,
       "resolution": "STANDARD"
@@ -851,10 +850,12 @@
     "off_idle_bars": 1.0,
     "intro_idle_bars": 2.0,
     "end_bars": 8.0,
+    "dim_level": 0.4,
     "count_hold_seconds": 1.0,
     "sync": {
       "threshold": 0.75,
-      "mode": "THREE"
+      "mode": "THREE",
+      "source": "SIMILARITY"
     },
     "manual": {
       "select": "PLAY",

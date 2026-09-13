@@ -139,8 +139,8 @@ class WhiteSpaceMain:
             ])
 
         # WS PIPELINE — light output
-        ws_input: Stage = Stage(int(ps.ws_input_stage))
-        self.conductor = Conductor(self.settings.light, board=self.board, pose_stage=int(ws_input))
+        # The show reads LERP poses: the only stage with the eye azimuth and PlayheadOffset.
+        self.conductor = Conductor(self.settings.light, board=self.board, pose_stage=int(Stage.LERP))
         # One receiver per domain, matching each source's actual transport: the fixture
         # firmware sends the fall as a plain UDP text packet (not OSC) to the light
         # receiver's port; Max sends /WS/sound/level as real OSC (the UDP receiver could
@@ -223,7 +223,7 @@ class WhiteSpaceMain:
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_correlator.submit)
         self.window_correlator.add_similarity_callback(self.similarity_applicator.set)
         self.window_correlator.add_similarity_callback(self.leader_applicator.set)
-        self.window_correlator.add_similarity_callback(self.state_machine.set_similarity)
+        self.window_correlator.add_similarity_callback(self.state_machine.set_correlation)
 
         # POSE STAGE PREDICT
         self.filters_predict = trackers.FilterTracker({

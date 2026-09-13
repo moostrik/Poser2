@@ -1,4 +1,4 @@
-"""BlueSound — the soundscape made visible: the left and right blue lamps follow the
+"""BeamBlueSound — the soundscape made visible: the left and right blue lamps follow the
 actual levels Max is playing (``/WS/sound/level`` → the board's sound-level store).
 
 Latency first: no envelope shaping — Max owns the envelope, the lamps follow. The only
@@ -36,7 +36,7 @@ class SoundFallback(IntEnum):
     PULSE = auto()
 
 
-class BlueSoundSettings(LayerSettings):
+class BeamBlueSoundSettings(LayerSettings):
     gain:             Field[float]         = Field(1.0, min=0.0, max=2.0, step=0.01, description="Level → lamp gain")
     smoothing_frames: Field[int]           = Field(2,   min=0,   max=3,   step=1,    description="Jitter bridge only: average over at most this many light frames (0 = raw)")
     stale_seconds:    Field[float]         = Field(2.0, min=0.1, max=30.0, step=0.1, description="No message for this long → fall back", newline=True)
@@ -44,10 +44,10 @@ class BlueSoundSettings(LayerSettings):
     fallback_level:   Field[float]         = Field(0.15, min=0.0, max=1.0, step=0.01, description="Idle pulse peak level")
 
 
-class BlueSound(BeamLayer):
+class BeamBlueSound(BeamLayer):
     """Left level → left blue lamp, right level → right blue lamp; see the module docstring."""
 
-    def __init__(self, resolution: int, config: BlueSoundSettings, board: Board) -> None:
+    def __init__(self, resolution: int, config: BeamBlueSoundSettings, board: Board) -> None:
         super().__init__(resolution, config, board)
         self._config = config
         self._window: deque[tuple[float, float]] = deque(maxlen=3)

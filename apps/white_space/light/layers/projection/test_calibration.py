@@ -36,7 +36,7 @@ class SampleMethod(IntEnum):
     AVG = auto()
 
 
-class CameraLightSettings(LayerSettings):
+class TestCalibrationSettings(LayerSettings):
     """Settings for the Calibration composition."""
     slice_centre:  Field[float]        = Field(0.5,  min=0.0,  max=1.0,   step=0.01, description="Vertical centre of the sample band (0=top, 1=bottom)")
     slice_height:  Field[float]        = Field(0.2,  min=0.01, max=1.0,   step=0.01, description="Height of the sample band as a fraction of frame height")
@@ -49,14 +49,14 @@ class CameraLightSettings(LayerSettings):
     fov:           Field[float]        = Field(110.0, description="Camera horizontal FOV (shared from compositor)", access=Field.INIT)
 
 
-class CameraLight(ProjectionLayer):
+class TestCalibration(ProjectionLayer):
     """Projects horizontal camera slices onto the LED strip, to check on the wall that a camera's
     columns land at the azimuths the tracker thinks they do."""
 
     def __init__(
         self,
         resolution:  int,
-        config:      CameraLightSettings,
+        config:      TestCalibrationSettings,
         num_cameras: int,
         board:       Board,
     ) -> None:

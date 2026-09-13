@@ -27,9 +27,9 @@ FIRMWARE_NUM_CHUNKS: int = 3
 # The firmware's readout mode follows the *commanded* rpm, switching on receipt of `/WS/r/0`
 # regardless of the bar's actual speed (firmware.cpp line 475). Below FIXTURE_PROJECTION_RPM it is in
 # beam mode: the four DACs are copied from four fixed pixels — these slots, as a fraction of the
-# ring per beam light (index = BeamLightId; the channel is BEAM_LIGHT_CHANNEL) — and the rest of the
-# ring is never read (lines 297-305). At or above it steps the ring and never reads a fixed slot
-# (lines 266-295). So a slot carries the beam light's level in beam mode and ring content otherwise.
+# strip per beam light (index = BeamLightId; the channel is BEAM_LIGHT_CHANNEL) — and the rest of the
+# strip is never read (lines 297-305). At or above it steps the strip and never reads a fixed slot
+# (lines 266-295). So a slot carries the beam light's level in beam mode and projection content otherwise.
 FIRMWARE_LIGHT_SLOT_TURNS: np.ndarray = np.array([0.0, 0.5, 0.0, 0.5])
 
 # Interlace and rpm are constant for a whole show, so they are sent on change only. This keepalive
@@ -63,7 +63,7 @@ class OscLightSenderSettings(BaseSettings):
     curve:        Field[float] = Field(1.0,  min=0.5, max=3.0, step=0.01, description="Output gamma curve; <1 brightens mids, >1 darkens")
     startup_delay: Field[float] = Field(2.0, min=0.0, max=10.0, step=0.5, description="Hold motor rpm at 0 for this long after connect, then release to the commanded speed — forces a 0→target edge the motor controller acts on at boot")
     chunk_interval: Field[float] = Field(0.0,    min=0.0, max=0.005, step=0.0005, description="Seconds between consecutive pixel datagrams (0 = send back-to-back). Only raise this if the fixture reports dropped chunks — it adds output latency")
-    projection_offset: Field[float] = Field(0.0, min=0.0, max=360.0, step=0.1, description="Projection offset (degrees): rotates the ring so the authored azimuth lands where it belongs in the room", newline=True)
+    projection_offset: Field[float] = Field(0.0, min=0.0, max=360.0, step=0.1, description="Projection offset (degrees): rotates the projection image so the authored azimuth lands where it belongs in the room", newline=True)
     interlace:    Group[OscLightInterlaceSettings] = Group(OscLightInterlaceSettings)
 
 
@@ -85,18 +85,18 @@ class OscLightSender:
     * The firmware commits a frame when `/WS/blue2` arrives, so that message must be sent **last**.
     * Its readout mode follows the **commanded** rpm (`/WS/r/0`), not the bar's speed: below
       `FIXTURE_PROJECTION_RPM` it drives the four lamps from four fixed pixel slots (pixel 0 and the
-      middle pixel of each channel, `FIRMWARE_LIGHT_SLOT_TURNS`) and ignores the ring; at or above
-      it steps the ring and ignores the slots. `_rebuild_fixture_pixels` writes the frame's
+      middle pixel of each channel, `FIRMWARE_LIGHT_SLOT_TURNS`) and ignores the rest of the strip; at or
+      above it steps the whole strip and ignores the slots. `_rebuild_fixture_pixels` writes the frame's
       explicit beam lights into those slots exactly when the fixture reads them, using the rpm
       this sender actually put on the wire.
     * This sender owns the fixture's two projection-mode alignments, so the frame on the board
-      stays azimuth-true: `projection_offset` rotates the whole ring on its way out, and the
+      stays azimuth-true: `projection_offset` rotates the whole projection image on its way out, and the
       four `interlace` values shift each lamp's readout (`/WS/o/0..3`). Both are ignored by the
       firmware in beam mode, so `_rebuild_fixture_pixels` never rotates the four slots.
     * Its socket receive buffer is 8 KB against a 7.4 KB frame, and it drains while it fills, so
       the burst normally fits. Config messages are kept out of it anyway (they never change), and
       `chunk_interval` can spread the six chunks further if the fixture ever reports dropped
-      chunks — a chunk it misses is published as a stale third of the ring for one revolution.
+      chunks — a chunk it misses is published as a stale third of the projection image for one revolution.
     * On a clean quit, ``stop()`` ends with a **blackout** — rpm 0, an all-zero frame, rpm 0
       again — so the fixture goes dark and the motor decelerates immediately. The firmware's
       Ethernet watchdog (packet silence → motor stop + blank) covers the crash path only.
@@ -311,13 +311,13 @@ class OscLightSender:
     def _rebuild_fixture_pixels(output: Frame, slow: bool, shift: int) -> tuple[np.ndarray, np.ndarray]:
         """The (white, blue) pixel channels as the fixture will read them.
 
-        In projection mode the ring is what the fixture paints, so it goes out rotated by
-        ``shift`` — the projection offset in pixels — and the beam lights are dropped (a slot
-        value would only be a one-pixel blip in the ring).
+        In projection mode the projection image is what the fixture paints, so it goes out rotated
+        by ``shift`` — the projection offset in pixels — and the beam lights are dropped (a slot
+        value would only be a one-pixel blip in the image).
 
         In beam mode the firmware reads only the four fixed slots, so each slot is **replaced**
         by its beam light's level and the rotation is skipped: the slots are pixel positions the
-        firmware indexes directly, and the ring around them is never seen either way.
+        firmware indexes directly, and the pixels around them are never seen either way.
 
         Never mutates the shared frame.
         """
@@ -334,7 +334,7 @@ class OscLightSender:
 
     @staticmethod
     def _projection_shift(settings: OscLightSenderSettings) -> int:
-        """The projection offset as a whole number of ring pixels."""
+        """The projection offset as a whole number of strip pixels."""
         return int(round(settings.projection_offset / 360.0 * settings.resolution)) % settings.resolution
 
     @staticmethod

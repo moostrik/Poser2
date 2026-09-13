@@ -1,4 +1,4 @@
-"""PlayheadTest — beam mode's direct test tool: four settings levels drive the four
+"""BeamTest — beam mode's direct test tool: four settings levels drive the four
 beam lights (front/back white, left/right blue) by name. Stateless; a debug layer
 (``beam_test``), never in a state's mix — and the immediate hardware check for the lamp
 wiring itself.

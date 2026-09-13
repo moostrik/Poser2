@@ -13,24 +13,26 @@ POSE_STAGE = 4
 
 
 class FakeFrame:
-    """frame[PlayheadOffset].value → the stored offset. A pose frame is a present participant."""
-    def __init__(self, offset: float = math.nan) -> None:
+    """frame[PlayheadOffset].value → the stored offset; frame[Similarity].overall_similarity()
+    → the stored similarity. A pose frame is a present participant."""
+    def __init__(self, offset: float = math.nan, similarity: float = math.nan) -> None:
         self._offset = offset
+        self._similarity = similarity
 
     def __getitem__(self, _key) -> SimpleNamespace:
-        return SimpleNamespace(value=self._offset)
+        return SimpleNamespace(value=self._offset, overall_similarity=lambda: self._similarity)
 
 
 class FakeBoard:
     def __init__(self) -> None:
         self.bars: float = 0.0
-        self.synced: bool = False        # playhead re-locked at BEAM (motor lock)
-        self.ring_formed: bool = False   # bar blurred into the ring (un-lock)
+        self.is_locked: bool = False       # the playhead lock at BEAM
+        self.is_projecting: bool = False   # fast enough for the projection image
         self.frames: dict[int, FakeFrame] = {}
 
     def get_playhead_signals(self):
-        return SimpleNamespace(phase=float("nan"), bars=self.bars, synced=self.synced,
-                               ring_formed=self.ring_formed)
+        return SimpleNamespace(phase=float("nan"), bars=self.bars, is_locked=self.is_locked,
+                               is_projecting=self.is_projecting)
 
     def get_frames(self, stage: int):
         assert stage == POSE_STAGE
@@ -99,7 +101,7 @@ class StateMachineTest(unittest.TestCase):
         """Power on and wake into IDLE: the machine boots into OFF, the (fake) playhead
         locks, OFF hands over to the wake, and the wake's bar completes. The lock stays
         asserted afterwards — IDLE is locked at BEAM."""
-        self.board.synced = True
+        self.board.is_locked = True
         self.tick()                                             # OFF, locked → OFF_IDLE
         self.tick(dbar=self.config.off_idle_bars + 0.1)         # wake complete → IDLE
         self.assertEqual(self.current, StateId.IDLE)
@@ -120,7 +122,7 @@ class StateMachineTest(unittest.TestCase):
         self.tick()
         self.tick(dt=999.0, dbar=50.0)                          # time and bars alone: still dark
         self.assertEqual(self.current, StateId.OFF)
-        self.board.synced = True
+        self.board.is_locked = True
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)
         self.assertEqual(self.emitted[-1].stage, int(StateId.OFF_IDLE))
@@ -132,7 +134,7 @@ class StateMachineTest(unittest.TestCase):
         # PROJECTION-motor state — the show always starts in OFF; select is only the goto target.
         self.config.manual.select = StateId.PLAY
         self.config.manual.hold = True          # isolate the boot state from conditions
-        self.board.synced = True
+        self.board.is_locked = True
         self.tick()
         self.assertEqual(self.current, StateId.OFF)
         self.assertEqual(self.motors, [MotorMode.BEAM])
@@ -206,13 +208,13 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.motors[-1], MotorMode.PROJECTION)
         # Still physically lamps: the dim line holds unchanged from INTRO.
         self.assertEqual(self.mixes[-1], [(LayerId.beam_playhead, 0.4)])
-        # The ring forms → hard mix: instrument (white full, blue easing) + playhead line.
-        self.board.ring_formed = True
+        # Projecting → hard mix: instrument (white full, blue easing) + playhead line.
+        self.board.is_projecting = True
         self.tick()
         mix = dict(self.mixes[-1])
         white, blue = mix[LayerId.pose_instrument]
         self.assertEqual(white, 1.0)                          # hard
-        self.assertLess(blue, 1.0)                            # easing in from the un-lock
+        self.assertLess(blue, 1.0)                            # easing in from projecting
         self.assertEqual(mix[LayerId.projection_playhead], 1.0)
         self.assertNotIn(LayerId.beam_playhead, mix)
         self.tick(dt=self.config.spin_up_seconds)
@@ -222,7 +224,7 @@ class StateMachineTest(unittest.TestCase):
 
     def _to_play(self) -> None:
         self.test_intro_to_intro_play_on_sync_and_through_to_play()
-        self.board.synced = False       # PROJECTION: the sweep free-runs, the BEAM lock is gone
+        self.board.is_locked = False       # PROJECTION: the sweep free-runs, the BEAM lock is gone
 
     def test_play_to_end_and_end_idle(self) -> None:
         self._to_play()
@@ -235,7 +237,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.motors[-1], MotorMode.BEAM)
         self.tick(dt=999.0)                            # time alone never exits a spin-down
         self.assertEqual(self.current, StateId.END_IDLE)
-        self.board.synced = True                       # BEAM reacquired — but the fade is not done
+        self.board.is_locked = True                       # BEAM reacquired — but the fade is not done
         self.tick()
         self.assertEqual(self.current, StateId.END_IDLE)
         self.light.beam_layers.beam_wind_down.progress = 1.0   # fade complete + lock → hand over
@@ -249,7 +251,7 @@ class StateMachineTest(unittest.TestCase):
         for _ in range(4):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_INTRO)
-        self.board.synced = True
+        self.board.is_locked = True
         self.light.beam_layers.beam_wind_down.progress = 1.0
         self.tick()                                    # fade complete + lock → hand over
         self.assertEqual(self.current, StateId.INTRO)
@@ -257,7 +259,7 @@ class StateMachineTest(unittest.TestCase):
     def test_wind_down_states_hold_a_constant_mix_and_ride_the_layer(self) -> None:
         # S9/S10's fade lives in the wind_down layer: the mix is constant (the landing look
         # underneath the dying wall), the layer is reset on entry, stage_progress is the
-        # layer's own readout, and the exit is the fade complete plus the motor lock.
+        # layer's own readout, and the exit is the fade complete plus the playhead lock.
         self._to_play()
         self.set_participants(2)
         for _ in range(4):
@@ -273,7 +275,7 @@ class StateMachineTest(unittest.TestCase):
         self.light.beam_layers.beam_wind_down.progress = 1.0                # fade complete — but no lock yet
         self.tick(dbar=2.0)
         self.assertEqual(self.current, StateId.END_INTRO)
-        self.board.synced = True                       # lock + fade complete → hand over
+        self.board.is_locked = True                       # lock + fade complete → hand over
         self.tick()
         self.assertEqual(self.current, StateId.INTRO)
 
@@ -353,7 +355,7 @@ class StateMachineTest(unittest.TestCase):
         # lands in IDLE — even with people present (the graph re-introduces them).
         self._to_play()                                       # 3 participants present
         self._to_off()
-        self.board.synced = True                              # spun down to BEAM and re-locked
+        self.board.is_locked = True                              # spun down to BEAM and re-locked
         self.config.blackout = False
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)
@@ -366,11 +368,11 @@ class StateMachineTest(unittest.TestCase):
         # in the normal case, since the rotor never stopped.
         self.boot()
         self._to_off()
-        self.board.synced = False                             # e.g. a silent sensor
+        self.board.is_locked = False                             # e.g. a silent sensor
         self.config.blackout = False
         self.tick(dt=999.0, dbar=50.0)
         self.assertEqual(self.current, StateId.OFF)           # held dark
-        self.board.synced = True
+        self.board.is_locked = True
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)
 
@@ -496,6 +498,34 @@ class StateMachineTest(unittest.TestCase):
         self.config.sync.mode = SyncMode.THREE
         self.tick()
         self.assertEqual(self.current, StateId.INTRO_PLAY)
+
+    def test_sync_source_selects_one_writer(self) -> None:
+        from apps.white_space.statemachine import SyncSource
+        in_sync = SimpleNamespace(similarity={i: FakeSimilarity(0.9) for i in range(3)})
+        apart = SimpleNamespace(similarity={i: FakeSimilarity(0.1) for i in range(3)})
+        self._to_intro(participants=3)
+        # Default SIMILARITY: the correlation writer has no effect.
+        self.machine.set_similarity(apart)
+        self.machine.set_correlation(in_sync)
+        self.tick()
+        self.assertEqual(self.current, StateId.INTRO)
+        self.assertEqual(self.config.sync.in_sync, 0)
+        # CORRELATION: now the similarity writer is ignored.
+        self.config.sync.source = SyncSource.CORRELATION
+        self.config.manual.hold = True
+        self.tick()
+        self.assertEqual(self.config.sync.in_sync, 3)
+        # POSE_FRAMES: the Similarity feature of the pose frames.
+        self.config.sync.source = SyncSource.POSE_FRAMES
+        self.board.frames = {0: FakeFrame(similarity=0.9), 1: FakeFrame(similarity=0.9),
+                             2: FakeFrame(similarity=0.2)}
+        self.tick()
+        self.assertEqual(self.config.sync.in_sync, 2)
+
+    def test_dim_level_is_the_intro_line(self) -> None:
+        self.config.dim_level = 0.25
+        self._to_intro(participants=1)
+        self.assertEqual(dict(self.mixes[-1])[LayerId.beam_playhead], 0.25)
 
     def test_participant_flicker_is_debounced(self) -> None:
         self.boot()

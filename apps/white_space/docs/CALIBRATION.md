@@ -733,7 +733,7 @@ The sensor pulses once per revolution when the reflective line on the head passe
 forwards it as `/WS/sensor/fall` (only while commanded below 200 rpm) and restarts its ring counter on
 it. `MotorController` measures phase and rpm from consecutive pulses (`light/motor.py`); the phase is
 raw, 0 = the pulse, offset-agnostic by design. Above 200 rpm the sensor is silent: the show anchors the
-spin-up on that silence (`ring_formed`) and the spin-down on the re-lock (`synced`) — see `STATES.md`.
+spin-up on that silence (`is_projecting`) and the spin-down on the playhead lock (`is_locked`) — see `STATES.md`.
 Where the sensor or the line sit is not a calibration input; the playhead offset absorbs it.
 
 ---

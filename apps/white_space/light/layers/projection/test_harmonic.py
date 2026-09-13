@@ -1,4 +1,4 @@
-"""Harmonic composition — spatiotemporal LFO/wave-interference sources (rates in Hz)."""
+"""TestHarmonic composition — spatiotemporal LFO/wave-interference sources (rates in Hz)."""
 
 import math
 
@@ -10,7 +10,7 @@ from .._base_layer import ProjectionLayer, LayerSettings
 from ...frame import Frame
 
 
-class HarmonicSourceSettings(BaseSettings):
+class TestHarmonicSourceSettings(BaseSettings):
     """One LFO source contributing to white and/or blue channels."""
     enabled:         Field[bool]  = Field(True,  description="Enable this source")
     hz:              Field[float] = Field(1.0,  min=0.0, max=32.0, step=0.25,
@@ -27,15 +27,15 @@ class HarmonicSourceSettings(BaseSettings):
                                            description="Contribution to blue channel")
 
 
-class HarmonicSettings(LayerSettings):
+class TestHarmonicSettings(LayerSettings):
     """Settings for the LFO/harmonic-interference composition."""
-    source_0: Group[HarmonicSourceSettings] = Group(HarmonicSourceSettings)
-    source_1: Group[HarmonicSourceSettings] = Group(HarmonicSourceSettings)
-    source_2: Group[HarmonicSourceSettings] = Group(HarmonicSourceSettings)
-    source_3: Group[HarmonicSourceSettings] = Group(HarmonicSourceSettings)
+    source_0: Group[TestHarmonicSourceSettings] = Group(TestHarmonicSourceSettings)
+    source_1: Group[TestHarmonicSourceSettings] = Group(TestHarmonicSourceSettings)
+    source_2: Group[TestHarmonicSourceSettings] = Group(TestHarmonicSourceSettings)
+    source_3: Group[TestHarmonicSourceSettings] = Group(TestHarmonicSourceSettings)
 
 
-class Harmonic(ProjectionLayer):
+class TestHarmonic(ProjectionLayer):
     """Spatiotemporal LFO and harmonic interference composition.
 
     Each source generates a 1-D spatial sine wave::
@@ -46,7 +46,7 @@ class Harmonic(ProjectionLayer):
     according to their individual amplitudes.
     """
 
-    def __init__(self, resolution: int, config: HarmonicSettings, board) -> None:
+    def __init__(self, resolution: int, config: TestHarmonicSettings, board) -> None:
         super().__init__(resolution, config, board)
         self._config = config
         # Normalised position per pixel: 0.0 → 1.0 (exclusive)

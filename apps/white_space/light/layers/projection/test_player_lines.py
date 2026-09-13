@@ -1,4 +1,4 @@
-"""PlayerLines composition — visualises each tracked player as a coloured triplet on the LED strip.
+"""TestPlayerLines composition — visualises each tracked player as a coloured triplet on the LED strip.
 
 Each active player produces three lines at their world position:
   - A centre line (blue by default, white when inverted)
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from ....board import Board
 
 
-class PlayerLinesSettings(LayerSettings):
+class TestPlayerLinesSettings(LayerSettings):
     center_width:  Field[float] = Field(0.02,  min=0.0, max=0.2,   step=0.01, description="Centre line width (strip fraction)")
     flank_width:   Field[float] = Field(0.03,  min=0.0, max=0.2,   step=0.01, description="Flank line width (strip fraction)")
     depth_scale:   Field[float] = Field(0.0,   min=0.0, max=1.0,   step=0.01, description="Depth scaling: 0=flat, 1=far player vanishes (centre_width is max)")
@@ -45,10 +45,10 @@ class _PlayerState:
     active:    bool  = False
 
 
-class PlayerLines(ProjectionLayer):
+class TestPlayerLines(ProjectionLayer):
     """Draws a centre line + two flanking lines for each tracked player."""
 
-    def __init__(self, resolution: int, config: PlayerLinesSettings, board: Board, pose_stage: int) -> None:
+    def __init__(self, resolution: int, config: TestPlayerLinesSettings, board: Board, pose_stage: int) -> None:
         super().__init__(resolution, config, board)
         self._config = config
         self._pose_stage = pose_stage

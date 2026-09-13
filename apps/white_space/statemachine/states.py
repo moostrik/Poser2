@@ -6,7 +6,7 @@ tick (``update``: a weighted layer list the machine forwards to the Compositor).
 states return constant weights; transition states blend by their own ``progress`` — their
 duration *is* the transition duration. S9/S10 are the exception: their fade lives in the
 ``beam_wind_down`` layer (constant mix; the layer owns the timed fade) and they exit once that
-fade is complete and the motor has locked at BEAM.
+fade is complete and the playhead lock holds.
 
 Mix-authoring rules:
 - A layer at weight 0.0 stays *in* the returned list while it is still part of the look;
@@ -95,7 +95,7 @@ class OffState(StateBase):
         return []                       # dark strip
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
-        if ctx.blackout or not ctx.motor_locked:
+        if ctx.blackout or not ctx.is_playhead_locked:
             return None
         return StateId.OFF_IDLE
 
@@ -131,13 +131,12 @@ class IdleIntroState(StateBase):
 class IntroState(StateBase):
     """S4 — INTRO. See docs/STATES.md."""
     MOTOR = MotorMode.BEAM
-    DIM = 0.4                           # the DIM line level (INTRO_IDLE fades back up from it)
 
     def enter(self, ctx: StateContext) -> None:
         self._reset_layers([LayerId.beam_flash])   # no stale flash decay from a previous cycle
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.beam_playhead, self.DIM), (LayerId.beam_flash, 1.0)]
+        return [(LayerId.beam_playhead, self._config.dim_level), (LayerId.beam_flash, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.participants == 0:       # before the session timeout: an empty room never spins up
@@ -193,14 +192,14 @@ class IntroIdleState(StateBase):
 
     def __init__(self, *args) -> None:
         super().__init__(*args)
-        self._start_lamp: float = IntroState.DIM
+        self._start_lamp: float = self._config.dim_level
         self._start_sound: float = 0.0
 
     def enter(self, ctx: StateContext) -> None:
         # Ramp from where the show was: DIM line and no sound visuals from INTRO, both
         # already full on the IDLE_INTRO pass-through.
         from_intro = ctx.prev == StateId.INTRO
-        self._start_lamp = IntroState.DIM if from_intro else 1.0
+        self._start_lamp = self._config.dim_level if from_intro else 1.0
         self._start_sound = 0.0 if from_intro else 1.0
 
     def update(self, ctx: StateContext) -> Mix:
@@ -223,22 +222,22 @@ class IntroPlayState(StateBase):
 
     def __init__(self, *args) -> None:
         super().__init__(*args)
-        self._unlock_elapsed: float | None = None
+        self._projecting_elapsed: float | None = None
 
     def enter(self, ctx: StateContext) -> None:
         # A new show cycle's instrument starts clean (patterns and sync fill alike).
         # Deliberately NOT in PLAY's enter — PLAY is re-entered from END's wind-back
         # and must inherit the running instrument.
         self._reset_layers([LayerId.pose_instrument])
-        self._unlock_elapsed = None
+        self._projecting_elapsed = None
 
     def update(self, ctx: StateContext) -> Mix:
-        if self._unlock_elapsed is None and ctx.ring_formed:
-            self._unlock_elapsed = ctx.elapsed          # the ring physically formed — hard mix now
-        if self._unlock_elapsed is None:
-            return [(LayerId.beam_playhead, IntroState.DIM)]   # still lamps: hold INTRO's dim line
-        remaining = max(self._config.spin_up_seconds - self._unlock_elapsed, 1e-6)
-        blue = _ease((ctx.elapsed - self._unlock_elapsed) / remaining)
+        if self._projecting_elapsed is None and ctx.is_projecting:
+            self._projecting_elapsed = ctx.elapsed      # the projection image shows — hard mix now
+        if self._projecting_elapsed is None:
+            return [(LayerId.beam_playhead, self._config.dim_level)]   # not projecting yet: hold INTRO's dim line
+        remaining = max(self._config.spin_up_seconds - self._projecting_elapsed, 1e-6)
+        blue = _ease((ctx.elapsed - self._projecting_elapsed) / remaining)
         return [(LayerId.pose_instrument, (1.0, blue)), (LayerId.projection_playhead, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
@@ -286,7 +285,7 @@ class WindDownStateBase(StateBase):
     """Shared S9/S10 engine: the dying wall. The mix is constant — the ``beam_wind_down`` layer
     (reset on entry) owns the whole fade, timed over its ``spin_down_seconds`` — and the
     landing look sits underneath, revealed as the wall dies. Exit: the fade complete and
-    the motor locked at BEAM (the landing state needs a live playhead). Progress is the
+    the playhead lock (the landing state needs a live playhead). Progress is the
     layer's own fade readout, so OSC stage_progress rides the actual fade."""
     MOTOR = MotorMode.BEAM
     TARGET: StateId
@@ -295,7 +294,7 @@ class WindDownStateBase(StateBase):
         self._reset_layers([LayerId.beam_wind_down])  # restart the fade at the full wall
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
-        if ctx.motor_locked and self.progress(ctx) >= 1.0:
+        if ctx.is_playhead_locked and self.progress(ctx) >= 1.0:
             return self.TARGET
         return None
 
@@ -308,7 +307,7 @@ class EndIntroState(WindDownStateBase):
     TARGET = StateId.INTRO
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.beam_wind_down, 1.0), (LayerId.beam_playhead, IntroState.DIM)]
+        return [(LayerId.beam_wind_down, 1.0), (LayerId.beam_playhead, self._config.dim_level)]
 
 
 class EndIdleState(WindDownStateBase):

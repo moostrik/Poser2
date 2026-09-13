@@ -21,7 +21,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class PoseWavesSettings(LayerSettings):
+class TestPoseWavesSettings(LayerSettings):
     """Settings for the pose-driven void and wave pattern composition."""
 
     # Void zones
@@ -69,7 +69,7 @@ class PlayerState:
         self.age       = 0.0
 
 
-class PoseWaves(ProjectionLayer):
+class TestPoseWaves(ProjectionLayer):
     """Pose-driven void + wave pattern layer.
 
     Ported 1-to-1 from the original Compositor._draw / make_voids / make_patterns.
@@ -79,7 +79,7 @@ class PoseWaves(ProjectionLayer):
         self,
         resolution: int,
         num_players: int,
-        config: PoseWavesSettings,
+        config: TestPoseWavesSettings,
         tick_interval: float,
         board: Board,
         pose_stage: int,
@@ -151,8 +151,8 @@ class PoseWaves(ProjectionLayer):
         self._Wh_R.fill(0.0)
         self._blue.fill(0.0)
 
-        PoseWaves._make_voids(self._void, self._player_states, P, dt)
-        PoseWaves._make_patterns(
+        TestPoseWaves._make_voids(self._void, self._player_states, P, dt)
+        TestPoseWaves._make_patterns(
             self._Wh_L, self._Wh_R, self._blue,
             self._player_states, smooth_active, P, dt,
         )
@@ -175,7 +175,7 @@ class PoseWaves(ProjectionLayer):
     def _make_voids(
         array: np.ndarray,
         player_states: dict[int, PlayerState],
-        P: PoseWavesSettings,
+        P: TestPoseWavesSettings,
         interval: float,
     ) -> None:
         array -= interval * 4.0
@@ -200,7 +200,7 @@ class PoseWaves(ProjectionLayer):
         blues: np.ndarray,
         player_states: dict[int, PlayerState],
         smooth_num_active: float,
-        P: PoseWavesSettings,
+        P: TestPoseWavesSettings,
         interval: float,
     ) -> None:
         resolution: int = len(W_L)

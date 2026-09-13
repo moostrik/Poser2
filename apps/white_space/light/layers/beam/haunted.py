@@ -1,4 +1,4 @@
-"""Haunted — the beam-mode player/ghost flash (a debug/experimentation layer,
+"""BeamHaunted — the beam-mode player/ghost flash (a debug/experimentation layer,
 never in a state's mix; pairs with ``pose.ghoster.enabled`` for solo ghost sessions).
 
 WHITE (front-lamp) channel: a flash as the rotating playhead crosses each live player (at full
@@ -14,7 +14,7 @@ A single ``width`` sizes every window; ``white`` / ``blue`` set the two flash br
 ``base_white`` a constant front-lamp floor the white flash rides on. Dwell/Motion no longer shape
 the flash. When the sweep steps clean over a narrow window (fast crossings — e.g. a person just
 repositioned), ``_closest_pass`` still guarantees one flash on the frame nearest the pose. Reuses
-``Flash``'s ``offset_to_level`` and ``_closest_pass`` kernels. No gap.
+``BeamFlash``'s ``offset_to_level`` and ``_closest_pass`` kernels. No gap.
 """
 
 import math
@@ -33,7 +33,7 @@ from ....pose import GhostElement, GhostFeature, GhostStateValue, PlayheadOffset
 _PHASE_OFFSET: float = 0.25
 
 
-class HauntedSettings(LayerSettings):
+class BeamHauntedSettings(LayerSettings):
     white:      Field[float] = Field(1.0, min=0.0, max=1.0,    step=0.01, description="White flash brightness (live players + active ghosts)")
     base_white: Field[float] = Field(0.0, min=0.0, max=1.0,    step=0.01, description="White base brightness of the front lamps when not flashing")
     blue:       Field[float] = Field(1.0, min=0.0, max=1.0,    step=0.01, description="Blue flash brightness (verified passive ghosts)")
@@ -41,12 +41,12 @@ class HauntedSettings(LayerSettings):
     ghosts:     Field[bool]  = Field(True, description="Enable ghost flashes")
 
 
-class Haunted(BeamLayer):
+class BeamHaunted(BeamLayer):
     """White flash as the playhead crosses each live player (full ``white``) and each **active** ghost
     (dimmed by Fade), plus a blue flash a quarter-turn later for each **verified** passive ghost (Dwell
     & Motion both 1). Ghost flashes are gated by ``ghosts``."""
 
-    def __init__(self, resolution: int, config: HauntedSettings, board, pose_stage: int) -> None:
+    def __init__(self, resolution: int, config: BeamHauntedSettings, board, pose_stage: int) -> None:
         super().__init__(resolution, config, board)
         self._config = config
         self._pose_stage = pose_stage

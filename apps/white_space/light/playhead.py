@@ -31,7 +31,7 @@ settled to `measured_rpm ≤ beam_rpm × (1 + _RESYNC_RPM_TOL)`.
 
 The motor is offset-agnostic; the playhead owns the single beam-mode calibration,
 `pulse_offset` — the front lamp's azimuth at the sensor pulse, in degrees (constant → does
-not break continuity). The projection offset that aligns the ring lives in the light sender.
+not break continuity). The projection offset that aligns the projection image lives in the light sender.
 """
 
 import math
@@ -45,9 +45,9 @@ from .motor import MotorMeasurement, MotorCommand, MotorMode, FIXTURE_PROJECTION
 # relative tolerance of beam_rpm (absorbs measurement jitter as it settles at the BEAM target).
 _RESYNC_RPM_TOL: float = 0.05
 
-# Falls silent for this long while commanded PROJECTION → the bar has physically blurred into the ring
-# (the sensor cannot pulse above the ceiling; 2.5 ceiling-periods absorbs the last slow pulses).
-_RING_SILENCE_S: float = 2.5 * 60.0 / FIXTURE_PROJECTION_RPM
+# Falls silent for this long while commanded PROJECTION → the bar spins fast enough for the projection
+# image (the sensor cannot pulse above the ceiling; 2.5 ceiling-periods absorbs the last slow pulses).
+_PROJECTING_SILENCE_S: float = 2.5 * 60.0 / FIXTURE_PROJECTION_RPM
 
 
 def _wrap_to_pi(x: float) -> float:
@@ -86,7 +86,7 @@ class Playhead:
         self._rpm_ema = EMAFilter(freq=30.0)         # averages the per-revolution measured speed (feed-forward)
         self._time:    float = 0.0                   # accumulated time for the EMA's dt-correction
         self._tracking_prev: bool = False            # was the previous tick the locked-tracking branch (to seed the EMA)
-        self._ring_formed: bool = False              # mode signal: the bar has physically blurred into the ring
+        self._is_projecting: bool = False            # mode signal: the bar spins fast enough for the projection image
 
     def tick(self, dt: float, motor: MotorMeasurement, command: MotorCommand) -> None:
         """Advance the internal content clock over ``dt`` from the command in force during it and
@@ -122,12 +122,12 @@ class Playhead:
         """The physical mode-flip signals the show anchors on (the playhead owns them:
         it holds all the sync/resync/stale-reading knowledge).
 
-        ``ring_formed`` (spin-up): commanded PROJECTION and the falls have gone silent — the sensor
-        cannot pulse above the ceiling, so silence is the evidence the bar has blurred into
-        the ring. The spin-down side anchors on ``synced`` itself (the re-lock): the sensor's
-        spin-down readings don't resolve a usable deceleration ramp, so the S9/S10 fade is
-        timed instead (the wind_down layer)."""
-        self._ring_formed = command.mode == MotorMode.PROJECTION and motor.fall_age > _RING_SILENCE_S
+        ``is_projecting`` (spin-up): commanded PROJECTION and the falls have gone silent — the sensor
+        cannot pulse above the ceiling, so silence is the evidence the bar spins fast enough for
+        the projection image. The spin-down side anchors on ``is_locked`` itself (the playhead
+        lock): the sensor's spin-down readings don't resolve a usable deceleration ramp, so the
+        S9/S10 fade is timed instead (the beam_wind_down layer)."""
+        self._is_projecting = command.mode == MotorMode.PROJECTION and motor.fall_age > _PROJECTING_SILENCE_S
 
     def _advance_internal(self, dt: float, motor: MotorMeasurement, command: MotorCommand) -> None:
         """The mode-based content sweep (STOPPED holds, IDLE/BEAM track the measured phase, PROJECTION and
@@ -180,13 +180,13 @@ class Playhead:
         return self._bars
 
     @property
-    def synced(self) -> bool:
-        """True while the sweep is actively tracking the measured rotation at BEAM — the
-        stale-proof "motor lock" the show anchors on (re-lock gate passed)."""
+    def is_locked(self) -> bool:
+        """The playhead lock: true while the sweep is actively tracking the measured rotation at
+        BEAM — stale-proof after a spin-down (re-lock gate passed)."""
         return self._tracking_prev
 
     @property
-    def ring_formed(self) -> bool:
-        """True while commanded PROJECTION with the falls gone silent — the bar has physically
-        blurred into the ring (the spin-up's un-lock anchor)."""
-        return self._ring_formed
+    def is_projecting(self) -> bool:
+        """True while commanded PROJECTION with the falls gone silent — the bar spins fast enough
+        for the projection image (S6's swap to the instrument)."""
+        return self._is_projecting

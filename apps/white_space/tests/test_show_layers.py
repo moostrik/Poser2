@@ -14,7 +14,7 @@ from modules.pose import features
 
 from apps.white_space.light import Tick, BeamLightId
 from apps.white_space.light.frame import Frame
-from apps.white_space.light.layers.beam.blue_sound import BlueSound, BlueSoundSettings, SoundFallback
+from apps.white_space.light.layers.beam.blue_sound import BeamBlueSound, BeamBlueSoundSettings, SoundFallback
 from apps.white_space.light.layers.projection.pose_instrument import (
     PoseInstrument, PoseInstrumentSettings, LineMotion, LineFlow,
     _signed_offset, _segment_counts, _line_distance, _between_distance)
@@ -34,11 +34,11 @@ class SoundBoard(SimpleNamespace):
         return self.levels
 
 
-class BlueSoundTest(unittest.TestCase):
+class BeamBlueSoundTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.cfg = BlueSoundSettings()
+        self.cfg = BeamBlueSoundSettings()
         self.board = SoundBoard(levels=SoundLevels())
-        self.layer = BlueSound(RES, self.cfg, self.board)
+        self.layer = BeamBlueSound(RES, self.cfg, self.board)
 
     def _fresh(self, left: float, right: float) -> None:
         self.board.levels = SoundLevels(left=left, right=right, timestamp=monotonic())
@@ -90,14 +90,14 @@ class BlueSoundTest(unittest.TestCase):
 
 # -- wind_down ---------------------------------------------------------------------
 
-class WindDownTest(unittest.TestCase):
+class BeamWindDownTest(unittest.TestCase):
     """The dying wall: both white lamps fading over spin_down_seconds, monotonic, no
     pixels; progress is the readout."""
 
     def setUp(self) -> None:
-        from apps.white_space.light.layers.beam.wind_down import WindDown, WindDownSettings
-        self.cfg = WindDownSettings()
-        self.layer = WindDown(RES, self.cfg, board=None)
+        from apps.white_space.light.layers.beam.wind_down import BeamWindDown, BeamWindDownSettings
+        self.cfg = BeamWindDownSettings()
+        self.layer = BeamWindDown(RES, self.cfg, board=None)
 
     def _wall(self) -> float:
         f = frame()

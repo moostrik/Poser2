@@ -65,7 +65,7 @@ class Layers(IntEnum):
     poser        = auto()
     # WS visualization
     cam_panorama = auto()   # the 360° calibration strip: the stitch with the tracker data over it
-    ws_light     = auto()   # the ring (fixture in projection mode)
+    ws_light     = auto()   # the projection image (fixture in projection mode)
     ws_beam       = auto()   # the bar's four lights (fixture in beam mode); shares ws_light's row
     ws_azimuth   = auto()   # eye and bbox-centre azimuth lines, over whichever of the two is shown
     # data
@@ -217,7 +217,6 @@ class PoseGroup(BaseSettings):
     verbose          : Field[bool]      = Field(False, access=Field.INIT)
     frequency        : Field[float]     = Field(30.0, access=Field.INIT)
     output_frequency : Field[float]     = Field(30.0)
-    ws_input_stage   : Field[Stage]     = Field(Stage.LERP, description="Pipeline stage that feeds the WS light pipeline")
 
     _feature_share: list = [frequency, output_frequency]
 

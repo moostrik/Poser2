@@ -1,4 +1,4 @@
-"""Playhead (high) — visualises the content playhead as a bright marker on the pixel ring.
+"""ProjectionPlayhead — visualises the content playhead as a bright marker in the projection image.
 
 Draws a marker at the strip position of ``frame.playhead`` (the continuous content playhead,
 radians [-π, π); NaN → nothing drawn). Distinct from the beam-mode ``BeamPlayhead`` and the motor/content ``Playhead``
@@ -22,7 +22,7 @@ class ProjectionPlayheadSettings(LayerSettings):
 
 
 class ProjectionPlayhead(ProjectionLayer):
-    """A bright marker at the playhead's position on the pixel ring (visualises the content playhead)."""
+    """A bright marker at the playhead's position in the projection image (visualises the content playhead)."""
 
     def __init__(self, resolution: int, config: ProjectionPlayheadSettings, board) -> None:
         super().__init__(resolution, config, board)

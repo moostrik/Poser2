@@ -1,4 +1,4 @@
-"""Chase composition — sine wave scrolling around the strip."""
+"""TestChase composition — sine wave scrolling around the strip."""
 
 import math
 
@@ -10,15 +10,15 @@ from .._base_layer import ProjectionLayer, ChannelSettings, LayerSettings
 from ...frame import Frame
 
 
-class ChaseSettings(LayerSettings):
+class TestChaseSettings(LayerSettings):
     white: Group[ChannelSettings] = Group(ChannelSettings)
     blue:  Group[ChannelSettings] = Group(ChannelSettings)
 
 
-class Chase(ProjectionLayer):
+class TestChase(ProjectionLayer):
     """Sine wave chase pattern scrolling continuously around the strip."""
 
-    def __init__(self, resolution: int, config: ChaseSettings, board) -> None:
+    def __init__(self, resolution: int, config: TestChaseSettings, board) -> None:
         super().__init__(resolution, config, board)
         self._config = config
         self._indices: np.ndarray = np.arange(resolution, dtype=np.float32)

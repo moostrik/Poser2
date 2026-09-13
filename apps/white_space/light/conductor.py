@@ -18,10 +18,11 @@ from .frame import Frame, FrameCallback
 from .motor import MotorController, MotorMode
 from .playhead import Playhead
 from .settings import LightSettings, LayerId, DebugLayer
-from .layers import (BaseLayer, Compositor, Mix, PoseWaves, Fill, Pulse, Chase, Lines, Random,
-                     Harmonic, PlayerLines, CameraLight, Flash, Haunted,
-                     BeamPlayhead, ProjectionPlayhead, BeamTest, BlueSound, PoseInstrument, Flood,
-                     WindDown)
+from .layers import (BaseLayer, Compositor, Mix,
+                     BeamBlueSound, BeamPlayhead, BeamFlash, BeamWindDown, BeamHaunted, BeamTest,
+                     PoseInstrument, ProjectionPlayhead, Flood,
+                     TestPlayerLines, TestCalibration, TestFill, TestPulse, TestChase, TestLines,
+                     TestRandom, TestPoseWaves, TestHarmonic)
 from modules.board import PlayheadSignals
 
 from ..board import Board
@@ -69,24 +70,24 @@ class Conductor(Thread):
         # mode lives in its class (BeamLayer/ProjectionLayer).
         LO, HI = config.beam_layers, config.projection_layers
         self.layers: dict[LayerId, BaseLayer] = {
-            LayerId.beam_blue_sound:     BlueSound   (resolution, LO.beam_blue_sound,   board),
-            LayerId.beam_playhead:       BeamPlayhead(resolution, LO.beam_playhead,     board),
-            LayerId.beam_flash:          Flash       (resolution, LO.beam_flash,        board, pose_stage),
-            LayerId.beam_wind_down:      WindDown    (resolution, LO.beam_wind_down,    board),
-            LayerId.beam_haunted:        Haunted     (resolution, LO.beam_haunted,      board, pose_stage),
-            LayerId.beam_test:           BeamTest    (resolution, LO.beam_test,         board),
+            LayerId.beam_blue_sound:     BeamBlueSound      (resolution, LO.beam_blue_sound,     board),
+            LayerId.beam_playhead:       BeamPlayhead       (resolution, LO.beam_playhead,       board),
+            LayerId.beam_flash:          BeamFlash          (resolution, LO.beam_flash,          board, pose_stage),
+            LayerId.beam_wind_down:      BeamWindDown       (resolution, LO.beam_wind_down,      board),
+            LayerId.beam_haunted:        BeamHaunted        (resolution, LO.beam_haunted,        board, pose_stage),
+            LayerId.beam_test:           BeamTest           (resolution, LO.beam_test,           board),
             LayerId.pose_instrument:     PoseInstrument     (resolution, HI.pose_instrument,     board, pose_stage),
             LayerId.projection_playhead: ProjectionPlayhead (resolution, HI.projection_playhead, board),
             LayerId.flood:               Flood              (resolution, HI.flood,               board),
-            LayerId.test_player_lines:   PlayerLines (resolution, HI.test_player_lines, board, pose_stage),
-            LayerId.test_calibration:    CameraLight (resolution, HI.test_calibration, config.num_cameras, board),
-            LayerId.test_fill:   Fill  (resolution, HI.test_fill,   board),
-            LayerId.test_pulse:  Pulse (resolution, HI.test_pulse,  board),
-            LayerId.test_chase:  Chase (resolution, HI.test_chase,  board),
-            LayerId.test_lines:  Lines (resolution, HI.test_lines,  board),
-            LayerId.test_random: Random(resolution, HI.test_random, board),
-            LayerId.test_pose_waves: PoseWaves(resolution, num_players, HI.test_pose_waves, self._clock.interval, board, pose_stage),
-            LayerId.test_harmonic:   Harmonic (resolution, HI.test_harmonic, board),
+            LayerId.test_player_lines:   TestPlayerLines    (resolution, HI.test_player_lines,   board, pose_stage),
+            LayerId.test_calibration:    TestCalibration    (resolution, HI.test_calibration,    config.num_cameras, board),
+            LayerId.test_fill:           TestFill           (resolution, HI.test_fill,           board),
+            LayerId.test_pulse:          TestPulse          (resolution, HI.test_pulse,          board),
+            LayerId.test_chase:          TestChase          (resolution, HI.test_chase,          board),
+            LayerId.test_lines:          TestLines          (resolution, HI.test_lines,          board),
+            LayerId.test_random:         TestRandom         (resolution, HI.test_random,         board),
+            LayerId.test_pose_waves:     TestPoseWaves      (resolution, num_players, HI.test_pose_waves, self._clock.interval, board, pose_stage),
+            LayerId.test_harmonic:       TestHarmonic       (resolution, HI.test_harmonic,       board),
         }
 
         self._compositor = Compositor(config, self.layers)
@@ -164,8 +165,8 @@ class Conductor(Thread):
         self._playhead.tick(tick.dt, motor, command)
         playhead = self._playhead.phase
         self._board.set_playhead(PlayheadSignals(
-            phase=playhead, bars=self._playhead.bars, synced=self._playhead.synced,
-            ring_formed=self._playhead.ring_formed))
+            phase=playhead, bars=self._playhead.bars, is_locked=self._playhead.is_locked,
+            is_projecting=self._playhead.is_projecting))
 
         self._notify_update()
 
@@ -177,7 +178,7 @@ class Conductor(Thread):
         frame = Frame(self._config.light_resolution, tick, motor, command, playhead=playhead)
         self._compositor.render(frame)
 
-        # Main brightness — the ring and the beam lights alike
+        # Main brightness — the projection pixels and the beam lights alike
         m = self._config.brightness
         if m != 1.0:
             frame.white      *= m

@@ -2,7 +2,7 @@
 
 The light places people at their eyes (``EyeAzimuthExtractor``); this shows that position beside
 the tracker's bbox-centre azimuth it was shifted from, so the correction can be judged live against
-the light it drives. Drawn over both the ring and the beam simulation, which share one 360° x axis.
+the light it drives. Drawn over both the projection simulation and the beam simulation, which share one 360° x axis.
 """
 
 import math

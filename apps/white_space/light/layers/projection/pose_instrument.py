@@ -5,7 +5,7 @@ mirror-symmetric pattern of white and blue **lines** derived from their pose —
 analogue of how the sound works: pose → pattern as pose → sound. A neutral pose is
 "boring": one white line each side. Arms up is the bass: many thick lines.
 
-**The line world is anchored to the people, not to the ring.** The strip is divided into
+**The line world is anchored to the people, not to the strip.** The strip is divided into
 segments between neighbouring participants; each segment fits a whole number of lines
 (``n = round(gap / line_spacing)``), so its actual spacing is ``gap / n``. Every person is a
 mirror point of their own pattern, and the run of lines between two people is *the same
@@ -59,13 +59,13 @@ class LineMotion(IntEnum):
 class LineFlow(IntEnum):
     """Which way a moving φ carries the lines."""
     SYMMETRIC = 0        # outward from (or inward to) every person; flows meet at midpoints
-    GLOBAL    = auto()   # all lines move one way round the ring
+    GLOBAL    = auto()   # all lines move one way round the strip
 
 
 class PoseInstrumentSettings(LayerSettings):
     line_spacing:   Field[float]      = Field(10.0, min=1.0,  max=90.0,  step=0.5,  description="Nominal line spacing (deg); each segment between neighbours fits a whole number of lines")
     line_motion:    Field[LineMotion] = Field(LineMotion.STATIC,                    description="Line phase drive: static, constant rate, or the playhead bars")
-    line_flow:      Field[LineFlow]   = Field(LineFlow.SYMMETRIC,                   description="Moving lines flow outward from every person (symmetric) or one way round the ring (global)")
+    line_flow:      Field[LineFlow]   = Field(LineFlow.SYMMETRIC,                   description="Moving lines flow outward from every person (symmetric) or one way round the strip (global)")
     line_speed:     Field[float]      = Field(0.0,  min=-2.0, max=2.0,   step=0.01, description="CONSTANT: spacings per second (negative = inward / the other way)")
     lines_per_bar:  Field[float]      = Field(1.0,  min=0.0,  max=36.0,  step=0.5,  description="PLAYHEAD: spacings travelled per playhead bar")
     line_phase:     Field[float]      = Field(0.0,  min=0.0,  max=1.0,   step=0.01, description="Phase offset (spacings) added to the motion; the first line sits (1 + phase) spacings out")
@@ -91,7 +91,7 @@ class PoseInstrumentSettings(LayerSettings):
 # -- Geometry helpers (strip positions and offsets are turns in [0, 1)) ---------------
 
 def _signed_offset(a: float, b: float) -> float:
-    """Signed shortest offset a → b on the ring (turns, in [-0.5, 0.5))."""
+    """Signed shortest offset a → b on the strip (turns, in [-0.5, 0.5))."""
     return ((b - a + 0.5) % 1.0) - 0.5
 
 

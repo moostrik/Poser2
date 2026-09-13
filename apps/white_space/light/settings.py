@@ -6,19 +6,19 @@ from .clock import ClockSettings
 from .motor import MotorSettings
 from .playhead import PlayheadSettings
 from .layers import (
-    PoseWavesSettings, FillSettings, PulseSettings,
-    ChaseSettings, LinesSettings, RandomSettings, HarmonicSettings,
-    PlayerLinesSettings, CameraLightSettings, FlashSettings,
-    HauntedSettings, BeamPlayheadSettings, ProjectionPlayheadSettings,
-    BeamTestSettings, BlueSoundSettings, PoseInstrumentSettings, FloodSettings,
-    WindDownSettings,
+    BeamBlueSoundSettings, BeamPlayheadSettings, BeamFlashSettings, BeamWindDownSettings,
+    BeamHauntedSettings, BeamTestSettings,
+    PoseInstrumentSettings, ProjectionPlayheadSettings, FloodSettings,
+    TestPlayerLinesSettings, TestCalibrationSettings, TestFillSettings, TestPulseSettings,
+    TestChaseSettings, TestLinesSettings, TestRandomSettings, TestPoseWavesSettings,
+    TestHarmonicSettings,
 )
 
 
 class LayerId(IntEnum):
     """The unified layer pool: everything a state (or the debug select) can put in a mix.
 
-    One instance per layer; each layer's mode (beam = lamps, projection = ring) lives in its
+    One instance per layer; each layer's mode (beam = lamps, projection = pixels) lives in its
     class (`BeamLayer`/`ProjectionLayer`). Member order is the beam block then the projection
     block — it drives the `DebugLayer` dropdown order and mirrors the settings groups.
     Debug-only layers (never in a state's mix) state that role in their docstrings; the
@@ -31,9 +31,9 @@ class LayerId(IntEnum):
     beam_wind_down      = auto()   # beam: flood's ending — the two white lamps fading over the spin-down (the wall while fast)
     beam_haunted        = auto()   # beam: player/ghost flash (debug/experimentation)
     beam_test           = auto()   # beam: direct levels for the four physical lamps (debug)
-    # projection mode — the POV ring
+    # projection mode — the projection image
     pose_instrument     = auto()   # projection: the pose instrument — people-anchored line patterns (see LAYERS.md)
-    projection_playhead = auto()   # projection: bright ring marker visualising the content playhead
+    projection_playhead = auto()   # projection: bright marker visualising the content playhead
     flood               = auto()   # projection: constant full-strip white (S8's wall)
     test_player_lines   = auto()
     test_calibration    = auto()
@@ -62,7 +62,7 @@ class DebugLayer(IntEnum):
     beam_wind_down      = auto()
     beam_haunted        = auto()
     beam_test           = auto()
-    # projection mode — the POV ring
+    # projection mode — the projection image
     pose_instrument     = auto()
     projection_playhead = auto()
     flood               = auto()
@@ -82,11 +82,11 @@ class BeamLayersSettings(BaseSettings):
     `spin_down_seconds` is a hidden relay (from the root) into wind_down — the spin-down
     slider's visible home is the states panel, next to spin_up."""
     spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — hidden relay from states (via the root) into wind_down")
-    beam_blue_sound:    Group[BlueSoundSettings]        = Group(BlueSoundSettings)
+    beam_blue_sound:    Group[BeamBlueSoundSettings]    = Group(BeamBlueSoundSettings)
     beam_playhead:      Group[BeamPlayheadSettings]     = Group(BeamPlayheadSettings)
-    beam_flash:         Group[FlashSettings]            = Group(FlashSettings)
-    beam_wind_down:     Group[WindDownSettings]         = Group(WindDownSettings, share=[spin_down_seconds.as_('spin_down_seconds')])
-    beam_haunted:       Group[HauntedSettings]          = Group(HauntedSettings)
+    beam_flash:         Group[BeamFlashSettings]        = Group(BeamFlashSettings)
+    beam_wind_down:     Group[BeamWindDownSettings]     = Group(BeamWindDownSettings, share=[spin_down_seconds.as_('spin_down_seconds')])
+    beam_haunted:       Group[BeamHauntedSettings]      = Group(BeamHauntedSettings)
     beam_test:          Group[BeamTestSettings]         = Group(BeamTestSettings)
 
 
@@ -97,15 +97,15 @@ class ProjectionLayersSettings(BaseSettings):
     pose_instrument:    Group[PoseInstrumentSettings]        = Group(PoseInstrumentSettings)
     projection_playhead: Group[ProjectionPlayheadSettings]   = Group(ProjectionPlayheadSettings)
     flood:              Group[FloodSettings]           = Group(FloodSettings)
-    test_player_lines:  Group[PlayerLinesSettings]     = Group(PlayerLinesSettings)
-    test_calibration:   Group[CameraLightSettings]     = Group(CameraLightSettings, share=[fov.as_('fov')])
-    test_fill:          Group[FillSettings]            = Group(FillSettings)
-    test_pulse:         Group[PulseSettings]           = Group(PulseSettings)
-    test_chase:         Group[ChaseSettings]           = Group(ChaseSettings)
-    test_lines:         Group[LinesSettings]           = Group(LinesSettings)
-    test_random:        Group[RandomSettings]          = Group(RandomSettings)
-    test_pose_waves:    Group[PoseWavesSettings]       = Group(PoseWavesSettings)
-    test_harmonic:      Group[HarmonicSettings]        = Group(HarmonicSettings)
+    test_player_lines:  Group[TestPlayerLinesSettings] = Group(TestPlayerLinesSettings)
+    test_calibration:   Group[TestCalibrationSettings] = Group(TestCalibrationSettings, share=[fov.as_('fov')])
+    test_fill:          Group[TestFillSettings]        = Group(TestFillSettings)
+    test_pulse:         Group[TestPulseSettings]       = Group(TestPulseSettings)
+    test_chase:         Group[TestChaseSettings]       = Group(TestChaseSettings)
+    test_lines:         Group[TestLinesSettings]       = Group(TestLinesSettings)
+    test_random:        Group[TestRandomSettings]      = Group(TestRandomSettings)
+    test_pose_waves:    Group[TestPoseWavesSettings]   = Group(TestPoseWavesSettings)
+    test_harmonic:      Group[TestHarmonicSettings]    = Group(TestHarmonicSettings)
 
 
 class LightSettings(BaseSettings):

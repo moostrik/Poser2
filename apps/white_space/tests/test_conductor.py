@@ -47,12 +47,12 @@ class RegimeSwitchTest(unittest.TestCase):
         self.assertLess(frame.motor_command.target_rpm, FIXTURE_PROJECTION_RPM)
 
     def test_the_switch_frame_is_not_black(self) -> None:
-        # END's wall (a ring layer at PROJECTION) handing over to END_INTRO's wall (beam lights at BEAM):
+        # END's wall (a projection layer at PROJECTION) handing over to END_INTRO's wall (beam lights at BEAM):
         # the frame the fixture is sent must be readable in the mode its own rpm selects —
         # here beam mode, with the beam lights lit.
         self.conductor.set_motor_mode(MotorMode.PROJECTION)
         self.conductor.set_mix([(LayerId.flood, 1.0)])
-        self.assertGreater(float(self._tick().white.sum()), 0.0)      # END: a lit ring
+        self.assertGreater(float(self._tick().white.sum()), 0.0)      # END: a lit projection image
 
         self.conductor.add_update_callback(self._enter_wind_down)
         frame = self._tick()

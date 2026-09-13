@@ -2,7 +2,7 @@
 It is the searchlight the show sweeps through the space in IDLE and dims in INTRO.
 
 Distinct from the projection-mode ``ProjectionPlayhead`` (the same content playhead drawn as a
-ring marker) and the motor/content ``Playhead`` (the NCO in ``light/playhead.py``).
+projection marker) and the motor/content ``Playhead`` (the NCO in ``light/playhead.py``).
 """
 
 import numpy as np

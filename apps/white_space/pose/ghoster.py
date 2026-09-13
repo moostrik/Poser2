@@ -57,7 +57,7 @@ from .playhead_offset import PlayheadOffset
 logger = logging.getLogger(__name__)
 
 # Beat-crossing guard: only treat a PlayheadOffset sign change as a hit when both samples are within a
-# quarter-turn of the playhead, so the ±π wrap (opposite side of the ring) never counts.
+# quarter-turn of the playhead, so the ±π wrap (opposite side of the circle) never counts.
 _HALF_PI: float = math.pi / 2.0
 _TWO_PI:  float = 2.0 * math.pi
 

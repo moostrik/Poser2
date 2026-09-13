@@ -21,7 +21,7 @@ class PlayheadOffset(SingleAngle):
     """Signed angular offset in radians [-π, π) of a pose's azimuth relative to the playhead.
 
     ``0`` = playhead on the pose, ``>0`` = playhead approaching (pose ahead in the sweep
-    direction), ``<0`` = playhead just passed, ``±π`` = opposite side of the ring.
+    direction), ``<0`` = playhead just passed, ``±π`` = opposite side of the circle.
     Absent (NaN, score 0.0) when no playhead or azimuth is available.
     """
 

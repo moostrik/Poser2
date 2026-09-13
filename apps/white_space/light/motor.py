@@ -14,7 +14,7 @@ Simulate mode (simulate=True):
     thread ramps a simulated rpm toward whatever mode is *commanded* (same arbitration as
     the real motor) with modeled spin-up/down inertia, and fires synthetic falls — going
     silent above the sensor ceiling exactly like the real sensor, so measurement-driven
-    behavior (lock, un-lock, deceleration) is identical in sim and reality.
+    behavior (measurement lock and its loss, deceleration) is identical in sim and reality.
 """
 
 import math
@@ -28,7 +28,7 @@ from modules.settings import BaseSettings, Field, Widget
 # The fixture's one threshold (firmware.cpp: `RPM < 200`, lines 231 and 475), applied to the
 # *commanded* rpm on receipt of `/WS/r/0`, regardless of the bar's actual speed. Below it the
 # fixture is in beam mode — the four beam lights are driven directly and fall pulses are sent —
-# at or above it steps the ring and the sensor is silent. So a measurement only exists below it,
+# at or above it steps the projection pixels and the sensor is silent. So a measurement only exists below it,
 # and a reading above it (spinning down from PROJECTION) isn't trusted either — outside this range we
 # trust the commanded speed. The light sender and the render apply the same rule to the same command.
 FIXTURE_PROJECTION_RPM: float = 200.0
@@ -51,7 +51,7 @@ class MotorMode(IntEnum):
     """Commanded operating mode (the system sets it; target rpm is derived from it)."""
     STOPPED    = auto()  # not spinning
     BEAM       = auto()  # the four lamps sweeping the room
-    PROJECTION = auto()  # fast spin — the ring painted from the firmware's counter
+    PROJECTION = auto()  # fast spin — the projection image painted from the firmware's counter
 
 
 @dataclass
@@ -64,7 +64,7 @@ class MotorMeasurement:
     measured_rpm:  float = 0.0                      # measured speed (0 when unlocked — sensor silent)
     raw_rpm:       float = float('nan')             # last measured speed, regardless of trust (NaN = no falls yet)
     fall_age:      float = float('inf')             # seconds since the last fall (inf = none) — silence above the
-                                                    # ceiling is the un-lock evidence (the ring physically forming)
+                                                    # ceiling is the projecting evidence (Playhead.is_projecting)
 
 
 @dataclass(frozen=True)
@@ -219,7 +219,7 @@ class MotorController:
 
             # Fire a synthetic fall per revolution — but only within the sensor's range: the real
             # sensor is silent above the ceiling, and the sim must be too, so measurement-driven
-            # behavior (lock, un-lock, deceleration) is identical in sim and reality.
+            # behavior (measurement lock and its loss, deceleration) is identical in sim and reality.
             if 0.0 < current_rpm <= FIXTURE_PROJECTION_RPM:
                 revs += current_rpm / 60.0 * dt
                 # Fire every completed revolution — not just one — so that when the fall rate
@@ -266,7 +266,7 @@ class MotorController:
         There is no stall/stop detection: a long silence is never treated as "stopped" (the fall
         signal is too sparse/late for that) — the last measurement simply persists until a new
         fall updates it. `raw_rpm`/`fall_age` carry the untrusted raw evidence for mode
-        detection (silence above the ceiling = the ring forming)."""
+        detection (silence above the ceiling = projecting)."""
         with self._fall_lock:
             last_fall_time  = self._last_fall_time
             measured_period = self._measured_period

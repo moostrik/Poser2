@@ -1,8 +1,8 @@
 """Flood — constant full-strip white: the END's wall of light.
 
-Deliberately the dumbest layer in the pool: all dynamics (the cross-to-full, the
-spin-down hand-off where its fade takes the back lamp to 0) are mix weights set by the
-states, never behavior inside the layer. Stateless.
+Deliberately the dumbest layer in the pool: its one dynamic, the cross-to-full, is a mix
+weight set by the states, never behavior inside the layer. The wall's ending belongs to
+``beam_wind_down``. Stateless.
 """
 
 import numpy as np

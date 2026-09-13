@@ -3,9 +3,10 @@
 A condition-driven state machine that plays the states designed in ``docs/STATES.md``
 (the source of truth): a sequencer hybrid, progress-driven *within* a state and
 condition-driven *between* states. Each tick (on the Conductor's light thread) it builds a
-``StateContext`` from the board (participants, sync, hit-by-light, the playhead's content
-clock and mode signals), lets the active state return its mix, evaluates that state's
-transition conditions, and emits a ``SequencerState`` snapshot for the board and OSC sound.
+``StateContext`` from the board (participants, hit-by-light, the playhead's content clock and
+lock signals) and the selected pose-similarity source (sync), lets the active state return its
+mix, evaluates that state's transition conditions, and emits a ``SequencerState`` snapshot for
+the board and OSC sound.
 
 The machine is the only component that talks to the Conductor, through three explicit
 command callables: ``set_mix`` (the mix), ``reset_layers`` (explicit layer resets), and
@@ -22,19 +23,25 @@ import math
 import time
 from dataclasses import dataclass
 from threading import Lock
-from typing import Callable
+from typing import Callable, Iterable
 
 from modules.session import SequencerState
-from modules.pose.analytics import SimilarityResult
+from modules.pose import analytics, features, FrameDict
 from modules.utils import HotReloadMethods
 
 from ..board import Board
 from ..light import LightSettings, LayerId, Mix, MotorMode
 from ..pose import PlayheadOffset
-from .settings import StateId, StateMachineSettings, ManualSettings
+from .settings import StateId, StateMachineSettings, ManualSettings, SyncSource
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+def _overall_similarities(similarities: Iterable[features.Similarity]) -> list[float]:
+    """Each participant's overall similarity to the others, NaN (no data) dropped."""
+    values = (s.overall_similarity() for s in similarities)
+    return [v for v in values if not math.isnan(v)]
 
 
 @dataclass
@@ -50,19 +57,20 @@ class StateContext:
     hit:     bool           # a live participant was passed by the playhead this tick
     session: bool           # session mode active — states consult it in needs_state_change()
     blackout: bool          # the pinned blackout toggle — OFF stays put while pinned and
-                            # exits (to INTRO or IDLE by presence) once released
+                            # wakes through OFF_IDLE once released and the playhead lock holds
     prev: StateId | None    # the state we arrived from (None at boot) — lets a transition
                             # state ramp from where the show actually was (no dips)
-    motor_locked: bool      # the playhead has re-synced to the measured rotation at BEAM
-                            # (stale-proof "back in beam mode" — S9/S10 exit one bar after it)
-    ring_formed: bool       # commanded PROJECTION and the falls have gone silent — the bar has
-                            # physically blurred into the ring (S6's un-lock anchor)
+    is_playhead_locked: bool  # playhead lock: the sweep tracks the measured rotation at BEAM
+                              # (stale-proof after a spin-down — OFF and S9/S10 exit on it)
+    is_projecting: bool     # PROJECTION commanded and the sensor silent: the bar is fast enough
+                            # for the projection image to show (S6's swap to the instrument)
 
 
 class StateMachine:
     """Plays the show; see the module docstring. ``update()`` is ticked from
     ``conductor.add_update_callback`` — everything runs on the light thread, so composing
-    needs no locking (``set_similarity`` is the one cross-thread input and is locked)."""
+    needs no locking (``set_similarity`` / ``set_correlation`` are the cross-thread inputs
+    and are locked)."""
 
     def __init__(self, config: StateMachineSettings, light: LightSettings, board: Board,
                  set_mix: Callable[[Mix], None],
@@ -89,7 +97,7 @@ class StateMachine:
         config.blackout = False
         self._current: StateId = StateId.OFF
         self._active: StateBase = self._states[self._current]
-        self._entered: bool = False             # the boot entry into IDLE happens on the first
+        self._entered: bool = False             # the boot entry into OFF happens on the first
                                                 # update() tick, with real clock/bars timestamps
 
         self._state_callbacks: set[Callable[[SequencerState], None]] = set()
@@ -107,7 +115,9 @@ class StateMachine:
         self._pending_since: float = 0.0
         self._prev_offsets: dict[int, float] = {}   # per-id PlayheadOffset for hit detection
         self._sync_lock = Lock()
-        self._sync_values: list[float] = []
+        self._similarity_values: list[float] = []
+        self._correlation_values: list[float] = []
+        self._tick_sync_values: list[float] = []    # this tick's values from the selected source
 
         self._goto_requested: bool = False
         config.manual.bind(ManualSettings.goto, self._on_goto)
@@ -130,12 +140,25 @@ class StateMachine:
 
     # -- Inputs --------------------------------------------------------------
 
-    def set_similarity(self, result: SimilarityResult) -> None:
-        """Store the per-participant similarities; thread-safe (called from the analytics thread)."""
-        values = [s.overall_similarity() for s in result.similarity.values()]
-        values = [v for v in values if not math.isnan(v)]
+    def set_similarity(self, result: analytics.SimilarityResult) -> None:
+        """Store WindowSimilarity's per-participant similarities; thread-safe (analytics thread)."""
+        values = _overall_similarities(result.similarity.values())
         with self._sync_lock:
-            self._sync_values = values
+            self._similarity_values = values
+
+    def set_correlation(self, result: analytics.SimilarityResult) -> None:
+        """Store WindowCorrelation's per-participant similarities; thread-safe (analytics thread)."""
+        values = _overall_similarities(result.similarity.values())
+        with self._sync_lock:
+            self._correlation_values = values
+
+    def _sync_values(self, frames: FrameDict) -> list[float]:
+        """The per-participant similarities from the selected ``sync.source``."""
+        source = SyncSource(int(self._config.sync.source))
+        if source == SyncSource.POSE_FRAMES:
+            return _overall_similarities(frame[features.Similarity] for frame in frames.values())
+        with self._sync_lock:
+            return self._correlation_values if source == SyncSource.CORRELATION else self._similarity_values
 
     def _debounced_participants(self, now: float, live_ids: set[int]) -> int:
         """Live participant count — the people with a pose — debounced by count_hold_seconds so
@@ -153,16 +176,12 @@ class StateMachine:
             self._eff_participants = raw            # candidate held long enough
         return self._eff_participants
 
-    def _detect_hit(self, live_ids: set[int]) -> bool:
+    def _detect_hit(self, frames: FrameDict) -> bool:
         """True when a live participant's PlayheadOffset sign-flipped + → − this tick
         (the playhead swept past them). The ±π wrap flips − → +, so it never false-fires."""
-        frames = self._board.get_frames(self._pose_stage)
         hit = False
         offsets: dict[int, float] = {}
-        for id in live_ids:
-            frame = frames.get(id)
-            if frame is None:
-                continue
+        for id, frame in frames.items():
             off = frame[PlayheadOffset].value
             if math.isnan(off):
                 continue
@@ -175,8 +194,7 @@ class StateMachine:
 
     def _build_context(self, now: float, dt: float, signals,
                        participants: int, hit: bool) -> StateContext:
-        with self._sync_lock:
-            values = self._sync_values
+        values = self._tick_sync_values
         sync = sum(values) / len(values) if values else 0.0
         sync_count = sum(1 for v in values if v >= self._config.sync.threshold)
         return StateContext(
@@ -191,8 +209,8 @@ class StateMachine:
             session=self._config.session.enabled,
             blackout=self._config.blackout,
             prev=self._prev_state,
-            motor_locked=signals.synced,
-            ring_formed=signals.ring_formed,
+            is_playhead_locked=signals.is_locked,
+            is_projecting=signals.is_projecting,
         )
 
     # -- Tick (light thread, via conductor.add_update_callback) ---------------
@@ -204,9 +222,10 @@ class StateMachine:
         signals = self._board.get_playhead_signals()
 
         # The people present are the people with a pose: `pose.tracklets.detection_timeout` decides.
-        live_ids = set(self._board.get_frames(self._pose_stage).keys())
-        participants = self._debounced_participants(now, live_ids)
-        hit = self._detect_hit(live_ids)
+        frames = self._board.get_frames(self._pose_stage)
+        participants = self._debounced_participants(now, set(frames.keys()))
+        hit = self._detect_hit(frames)
+        self._tick_sync_values = self._sync_values(frames)
 
         if not self._entered:
             # Startup failsafe: always enter OFF (see __init__) — `manual.select` is not
@@ -215,8 +234,8 @@ class StateMachine:
             self._switch(StateId.OFF, now, dt, signals.bars, participants, hit, signals)
         elif self._config.blackout and self._current != StateId.OFF:
             # Pinning blackout is OFF's entry door: highest-priority input, from anywhere,
-            # beating hold and goto. Leaving OFF is a normal condition — OffState exits to
-            # INTRO or IDLE (by presence) once the toggle is released.
+            # beating hold and goto. Leaving OFF is a normal condition — OffState wakes
+            # through OFF_IDLE once the toggle is released and the playhead lock holds.
             self._goto_requested = False
             self._switch(StateId.OFF, now, dt, signals.bars, participants, hit, signals)
         elif self._goto_requested:

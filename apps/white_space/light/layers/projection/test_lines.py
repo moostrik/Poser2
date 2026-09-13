@@ -1,4 +1,4 @@
-"""Lines composition — discrete scrolling line pattern."""
+"""TestLines composition — discrete scrolling line pattern."""
 
 import math
 
@@ -10,15 +10,15 @@ from .._base_layer import ProjectionLayer, ChannelSettings, LayerSettings
 from ...frame import Frame
 
 
-class LinesSettings(LayerSettings):
+class TestLinesSettings(LayerSettings):
     white: Group[ChannelSettings] = Group(ChannelSettings)
     blue:  Group[ChannelSettings] = Group(ChannelSettings)
 
 
-class Lines(ProjectionLayer):
+class TestLines(ProjectionLayer):
     """Discrete bright lines scrolling around the strip."""
 
-    def __init__(self, resolution: int, config: LinesSettings, board) -> None:
+    def __init__(self, resolution: int, config: TestLinesSettings, board) -> None:
         super().__init__(resolution, config, board)
         self._config = config
         self._indices: np.ndarray = np.arange(resolution, dtype=np.float32)

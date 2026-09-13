@@ -1,4 +1,4 @@
-"""Flash — the INTRO flash: the beam lights strike on while the rotating playhead
+"""BeamFlash — the INTRO flash: the beam lights strike on while the rotating playhead
 crosses each player, driven by the continuous ``PlayheadOffset``.
 
 Each pose's signed offset to the playhead defines an on/off window around the crossing: the
@@ -27,7 +27,7 @@ from .._base_layer import BeamLayer, LayerSettings
 from ...frame import Frame
 from ....pose import PlayheadOffset
 
-# Only guarantee a flash on the near half of the ring; the far side (|offset| → π) never triggers.
+# Only guarantee a flash on the near half of the sweep; the far side (|offset| → π) never triggers.
 _HALF_PI: float = math.pi / 2.0
 
 
@@ -60,7 +60,7 @@ def _closest_pass(prev: float, cur: float) -> bool:
     return abs(cur) <= abs(prev) and abs(cur) <= abs(nxt)
 
 
-class FlashSettings(LayerSettings):
+class BeamFlashSettings(LayerSettings):
     base_white: Field[float] = Field(0.0, min=0.0, max=1.0,    step=0.01, description="Base brightness of the front white lamp")
     base_blue:  Field[float] = Field(0.0, min=0.0, max=1.0,    step=0.01, description="Base brightness of both blue lamps")
     white:      Field[float] = Field(1.0, min=0.0, max=1.0,    step=0.01, description="White flash brightness", newline=True)
@@ -69,11 +69,11 @@ class FlashSettings(LayerSettings):
     gap:        Field[float] = Field(0.0, min=0.0, max=1.0,    step=0.01, description="Fraction of the window centre that stays dark — a notch at the crossing (0 = solid; any notch disables the closest-pass guarantee)")
 
 
-class Flash(BeamLayer):
+class BeamFlash(BeamLayer):
     """Continuous base level plus an on/off flash window tracking the playhead's approach to
     each active player, read from ``PlayheadOffset``; see the module docstring."""
 
-    def __init__(self, resolution: int, config: FlashSettings, board, pose_stage: int) -> None:
+    def __init__(self, resolution: int, config: BeamFlashSettings, board, pose_stage: int) -> None:
         super().__init__(resolution, config, board)
         self._config = config
         self._pose_stage = pose_stage

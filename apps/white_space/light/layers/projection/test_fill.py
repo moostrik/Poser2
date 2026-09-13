@@ -1,4 +1,4 @@
-"""Fill composition — uniform flat colour per channel."""
+"""TestFill composition — uniform flat colour per channel."""
 
 import numpy as np
 
@@ -8,15 +8,15 @@ from .._base_layer import ProjectionLayer, ChannelSettings, LayerSettings
 from ...frame import Frame
 
 
-class FillSettings(LayerSettings):
+class TestFillSettings(LayerSettings):
     white: Group[ChannelSettings] = Group(ChannelSettings)
     blue:  Group[ChannelSettings] = Group(ChannelSettings)
 
 
-class Fill(ProjectionLayer):
+class TestFill(ProjectionLayer):
     """Fills the entire strip with a flat brightness value on each channel."""
 
-    def __init__(self, resolution: int, config: FillSettings, board) -> None:
+    def __init__(self, resolution: int, config: TestFillSettings, board) -> None:
         super().__init__(resolution, config, board)
         self._config = config
 

@@ -1,8 +1,8 @@
 """StateMachine settings — the show's identity enums and configuration tree.
 
 Pure data (fields, groups, enums), mirroring ``light/settings.py``'s role for its
-package: ``StateId`` is the state vocabulary of ``docs/STATES.md``, ``SyncMode`` the
-INTRO → INTRO_PLAY sync condition, and ``StateMachineSettings`` the panel — telemetry
+package: ``StateId`` is the state vocabulary of ``docs/STATES.md``, ``SyncMode`` and ``SyncSource``
+the INTRO → INTRO_PLAY sync condition, and ``StateMachineSettings`` the panel — telemetry
 first, then the show timings, with the sync / manual / session corners as nested groups.
 """
 
@@ -22,6 +22,13 @@ class SyncMode(IntEnum):
             case SyncMode.THREE:         return 3
             case SyncMode.ALL_MINUS_ONE: return max(participants - 1, 2)
             case _:                      return participants
+
+
+class SyncSource(IntEnum):
+    """Where the per-participant pose similarity behind the sync count comes from."""
+    SIMILARITY  = 0        # WindowSimilarity over the SMOOTH windows (set_similarity)
+    CORRELATION = auto()   # WindowCorrelation over the SMOOTH windows (set_correlation)
+    POSE_FRAMES = auto()   # the Similarity feature of the pose frames the machine reads
 
 
 class StateId(IntEnum):
@@ -56,6 +63,7 @@ class SyncSettings(BaseSettings):
     in_sync:    Field[int]      = Field(0, access=Field.READ, pinned=True, description="Participants currently at or above threshold")
     threshold:  Field[float]    = Field(0.75, min=0.0, max=1.0, step=0.01, widget=Widget.slider, description="A participant counts as in sync at this pose similarity")
     mode:       Field[SyncMode] = Field(SyncMode.THREE, description="INTRO → INTRO_PLAY: how many participants must be in sync (3 / all−1 / all)")
+    source:     Field[SyncSource] = Field(SyncSource.SIMILARITY, description="Pose similarity source: window similarity, window correlation, or the pose frames")
 
 
 class SessionModeSettings(BaseSettings):
@@ -72,7 +80,7 @@ class StateMachineSettings(BaseSettings):
 
     # Blackout — the installation's big switch. Pinning it is OFF's entry door (from any
     # state, beating hold and goto); leaving OFF is a normal condition: once unpinned and
-    # the playhead is locked, OffState wakes through OFF_IDLE.
+    # the playhead lock holds, OffState wakes through OFF_IDLE.
     blackout: Field[bool] = Field(False, pinned=True, description="Switch the installation OFF: dark and silent, still sweeping at BEAM")
 
     # Telemetry (read-only) — the show at a glance
@@ -82,12 +90,15 @@ class StateMachineSettings(BaseSettings):
 
     # Transition-state durations — one per state. spin_down_seconds is shared (via the
     # root) into the beam_wind_down layer, which runs the S9/S10 wall fade on it; those
-    # states exit once the fade is complete and the motor has re-locked at BEAM.
+    # states exit once the fade is complete and the playhead lock holds.
     spin_up_seconds:       Field[float] = Field(14.0, min=1.0, max=60.0,  step=0.5, description="INTRO_PLAY: spin-up transition (seconds) — hand-tuned to the physical spin-up (spin_down_seconds' mirror)", newline=True)
     spin_down_seconds:     Field[float] = Field(10.0, min=1.0, max=60.0,  step=0.5, description="END_INTRO/END_IDLE: wall fade towards the line (seconds) — hand-tuned to the physical spin-down (drives the beam_wind_down layer)")
     off_idle_bars:         Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="OFF_IDLE: wake fade from dark, in playhead bars", newline=True)
     intro_idle_bars:       Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="INTRO_IDLE: playhead bars back to IDLE")
     end_bars:              Field[float] = Field(3.0,  min=0.5, max=20.0,  step=0.5, description="END: wind-down playhead bars (bidirectional ramp)")
+
+    # Looks
+    dim_level: Field[float] = Field(0.4, min=0.0, max=1.0, step=0.01, description="DIM line level: the front white lamp in INTRO, and where INTRO_PLAY and END_INTRO hold it", newline=True)
 
     # Condition tunables
     count_hold_seconds: Field[float] = Field(1.0,  min=0.0, max=10.0, step=0.1, description="Participant-count debounce: a new count must persist this long before conditions see it", newline=True)

@@ -3,7 +3,7 @@
 Carries the clock snapshot (`tick`), the motor's two halves (`motor`, the measurement the
 playhead advanced under; `motor_command`, the command this frame is sent with — read after
 the state machine ran, so a mode commanded on a state's entry tick reaches the frame whose
-mix that state drew), the LED pixel buffer (the POV ring) and the four beam lights. One object
+mix that state drew), the LED pixel buffer (the projection image) and the four beam lights. One object
 flows into every layer's `_draw` and out to every consumer (board, the light/sound senders,
 render).
 
@@ -49,7 +49,7 @@ BEAM_LIGHT_HEADINGS: np.ndarray = np.array([0.0, math.pi, -math.pi / 2.0, math.p
 @dataclass
 class Frame:
     """Per-tick render context + light output. `white`/`blue` are views into `light_img`
-    (the ring); `beam_lights` holds the four lamp levels, indexed by `BeamLightId`."""
+    (the projection image); `beam_lights` holds the four lamp levels, indexed by `BeamLightId`."""
     resolution:    int
     tick:          Tick
     motor:         MotorMeasurement     = field(default_factory=MotorMeasurement)   # what the playhead advanced under

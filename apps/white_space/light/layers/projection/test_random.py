@@ -1,4 +1,4 @@
-"""Random composition - 2D fBm noise: spatial x time, no directional scrolling."""
+"""TestRandom composition - 2D fBm noise: spatial x time, no directional scrolling."""
 
 import math
 
@@ -26,7 +26,7 @@ def _apply_gamma(x: np.ndarray, midpoint: float, gamma: float) -> np.ndarray:
     return np.where(x <= m, below, above)
 
 
-class RandomChannelSettings(BaseSettings):
+class TestRandomChannelSettings(BaseSettings):
     level:       Field[float] = Field(0.5, min=0.0, max=1.0,  step=0.01, description="Output amplitude")
     speed:       Field[float] = Field(0.5, min=0.0, max=16.0, step=0.01, description="Temporal evolution rate (beats per noise period)")
     scale:       Field[float] = Field(4.0, min=0.5, max=32.0, step=0.1,  description="Spatial feature size (low=large blobs, high=fine grain)")
@@ -37,17 +37,17 @@ class RandomChannelSettings(BaseSettings):
     threshold:   Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.01, description="Hard gate: 0=smooth gradient, >0=lit pixels above this level only")
 
 
-class RandomSettings(LayerSettings):
-    white: Group[RandomChannelSettings] = Group(RandomChannelSettings)
-    blue:  Group[RandomChannelSettings] = Group(RandomChannelSettings)
+class TestRandomSettings(LayerSettings):
+    white: Group[TestRandomChannelSettings] = Group(TestRandomChannelSettings)
+    blue:  Group[TestRandomChannelSettings] = Group(TestRandomChannelSettings)
 
 
-class Random(ProjectionLayer):
+class TestRandom(ProjectionLayer):
     """2D fBm value noise: noise(pixel * scale, beat_time * speed).
     Each pixel evolves independently over time - no directional motion.
     """
 
-    def __init__(self, resolution: int, config: RandomSettings, board) -> None:
+    def __init__(self, resolution: int, config: TestRandomSettings, board) -> None:
         super().__init__(resolution, config, board)
         self._config    = config
         self._positions = np.linspace(0.0, 1.0, resolution, endpoint=False, dtype=np.float64)

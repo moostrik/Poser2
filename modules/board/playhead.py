@@ -9,12 +9,12 @@ from typing import Protocol
 class PlayheadSignals:
     """The playhead's published clock + regime signals (pure data; producers define the
     semantics — for white_space: phase in radians [-π, π) or NaN, bars = monotonic
-    content-clock cycles, synced = tracking the measured rotation at content speed,
-    ring_formed = the bar has physically blurred into the POV ring)."""
-    phase:       float = float("nan")
-    bars:        float = 0.0
-    synced:      bool  = False
-    ring_formed: bool  = False
+    content-clock cycles, is_locked = the playhead lock (tracking the measured rotation at
+    content speed), is_projecting = the bar spins fast enough for the projection image)."""
+    phase:         float = float("nan")
+    bars:          float = 0.0
+    is_locked:     bool  = False
+    is_projecting: bool  = False
 
 
 class HasPlayhead(Protocol):

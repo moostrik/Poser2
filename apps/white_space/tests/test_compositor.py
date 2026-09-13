@@ -84,7 +84,7 @@ class CompositorTest(unittest.TestCase):
         self.assertEqual(self.a.resets, 1)
         self.assertEqual(self.b.resets, 0)
 
-    def test_ring_content_is_not_rotated(self) -> None:
+    def test_projection_content_is_not_rotated(self) -> None:
         """The frame leaves the Compositor azimuth-true — a layer's pixel lands where it drew
         it, so the board and the screen agree with the tracker row."""
         class Marker(FakeLayer):

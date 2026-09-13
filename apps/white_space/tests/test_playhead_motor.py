@@ -515,45 +515,45 @@ class BarsTest(unittest.TestCase):
 
 
 class RegimeSignalsTest(unittest.TestCase):
-    """The playhead's mode-flip signals: `synced` (re-locked at BEAM — the stale-proof
-    motor lock, which the S9/S10 exit anchors on) and
-    `ring_formed` (PROJECTION + fall silence — the bar blurred into the ring)."""
+    """The playhead's mode-flip signals: `is_locked` (the playhead lock at BEAM — stale-proof
+    after a spin-down, which the S9/S10 exit anchors on) and
+    `is_projecting` (PROJECTION + fall silence — fast enough for the projection image)."""
 
     DT = 1 / 60
 
-    def test_synced_only_while_tracking_at_low(self) -> None:
+    def test_is_locked_only_while_tracking_at_low(self) -> None:
         p = running_playhead()
         p.tick(self.DT, *mstate(0.0, True, 72.0, mode=MotorMode.BEAM))
-        self.assertTrue(p.synced)
+        self.assertTrue(p.is_locked)
         p.tick(self.DT, *mstate(2.5, True, 2000.0, mode=MotorMode.PROJECTION))
-        self.assertFalse(p.synced)                       # PROJECTION free-runs — not tracking
+        self.assertFalse(p.is_locked)                    # PROJECTION free-runs — not tracking
 
-    def test_ring_formed_needs_high_plus_fall_silence(self) -> None:
+    def test_is_projecting_needs_high_plus_fall_silence(self) -> None:
         p = running_playhead(mode=MotorMode.PROJECTION)
         motor, command = mstate(float("nan"), False, 2000.0, mode=MotorMode.PROJECTION)
         motor.fall_age = 0.1                             # falls still arriving (climbing below ceiling)
         p.tick(self.DT, motor, command)
-        self.assertFalse(p.ring_formed)
-        motor.fall_age = 1.0                             # silence beyond the window → ring formed
+        self.assertFalse(p.is_projecting)
+        motor.fall_age = 1.0                             # silence beyond the window → projecting
         p.tick(self.DT, motor, command)
-        self.assertTrue(p.ring_formed)
+        self.assertTrue(p.is_projecting)
         motor, command = mstate(0.0, True, 72.0, mode=MotorMode.BEAM)
-        motor.fall_age = 999.0                           # silence in BEAM is never "ring formed"
+        motor.fall_age = 999.0                           # silence in BEAM is never projecting
         p.tick(self.DT, motor, command)
-        self.assertFalse(p.ring_formed)
+        self.assertFalse(p.is_projecting)
 
     def test_relock_is_gated_against_stale_readings(self) -> None:
         p = running_playhead(mode=MotorMode.PROJECTION)
         p.tick(self.DT, *mstate(float("nan"), False, 2000.0, mode=MotorMode.PROJECTION))
         # Back to BEAM: the stale pre-PROJECTION reading must NOT re-lock instantly (gate not passed).
         p.tick(self.DT, *mstate(2.5, True, 72.0, mode=MotorMode.BEAM))
-        self.assertFalse(p.synced)
+        self.assertFalse(p.is_locked)
         # A fresh above-content reading (the real spin-down) passes the gate; still braking.
         p.tick(self.DT, *mstate(2.5, True, 180.0, mode=MotorMode.BEAM))
-        self.assertFalse(p.synced)
+        self.assertFalse(p.is_locked)
         # Settled at content speed → re-lock.
         p.tick(self.DT, *mstate(2.5, True, 73.0, mode=MotorMode.BEAM))
-        self.assertTrue(p.synced)
+        self.assertTrue(p.is_locked)
 
 
 class SpeedSmoothingTest(unittest.TestCase):

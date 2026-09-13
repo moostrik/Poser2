@@ -245,7 +245,7 @@ class Render(RenderBase):
             self._viewport(height, self.subdivision.get_rect('panoramic', 0))
             self.L[Layers.cam_panorama][0].draw()
 
-        # Row 3 - WS light strip: the ring, or the bar's lights while the fixture is in beam mode —
+        # Row 3 - WS light strip: the projection image, or the bar's lights while the fixture is in beam mode —
         # the same rule the fixture applies to the same command (the frame's target rpm).
         output = self.board.get_composition_output()
         beam_mode = output is not None and output.motor_command.target_rpm < FIXTURE_PROJECTION_RPM

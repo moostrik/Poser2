@@ -1,4 +1,4 @@
-"""Pulse composition — whole-strip brightness oscillating at a uniform rate."""
+"""TestPulse composition — whole-strip brightness oscillating at a uniform rate."""
 
 import math
 
@@ -10,15 +10,15 @@ from .._base_layer import ProjectionLayer, ChannelSettings, LayerSettings
 from ...frame import Frame
 
 
-class PulseSettings(LayerSettings):
+class TestPulseSettings(LayerSettings):
     white: Group[ChannelSettings] = Group(ChannelSettings)
     blue:  Group[ChannelSettings] = Group(ChannelSettings)
 
 
-class Pulse(ProjectionLayer):
+class TestPulse(ProjectionLayer):
     """Pulses the whole strip at a uniform sine rate per channel."""
 
-    def __init__(self, resolution: int, config: PulseSettings, board) -> None:
+    def __init__(self, resolution: int, config: TestPulseSettings, board) -> None:
         super().__init__(resolution, config, board)
         self._config = config
 

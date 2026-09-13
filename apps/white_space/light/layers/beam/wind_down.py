@@ -1,4 +1,4 @@
-"""WindDown — the dying wall of light: the S9/S10 ending fade.
+"""BeamWindDown — the dying wall of light: the S9/S10 ending fade.
 
 Writes the two white beam lights at a fading level; everything else is physics. The fixture
 is in beam mode from S9's first packet (its readout mode follows the commanded rpm, see
@@ -26,16 +26,16 @@ from .._base_layer import BeamLayer, LayerSettings
 from ...frame import Frame
 
 
-class WindDownSettings(LayerSettings):
+class BeamWindDownSettings(LayerSettings):
     level:             Field[float] = Field(1.0,  min=0.0, max=1.0,  step=0.01, description="Wall white level (the fade starts here and lands at 0)")
     spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="Timed wall fade (seconds) — shared from states.spin_down_seconds, edit it there")
     progress:          Field[float] = Field(0.0,  min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Fade progress (0 = full wall, 1 = gone)")
 
 
-class WindDown(BeamLayer):
+class BeamWindDown(BeamLayer):
     """The two white beam lights at the current fade level; see the module docstring."""
 
-    def __init__(self, resolution: int, config: WindDownSettings, board) -> None:
+    def __init__(self, resolution: int, config: BeamWindDownSettings, board) -> None:
         super().__init__(resolution, config, board)
         self._config = config
         self._elapsed: float = 0.0
