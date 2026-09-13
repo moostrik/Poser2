@@ -101,9 +101,10 @@ zone); why a fixed depth and not the measured distance is in `TRACKING.md`, *Why
 not use the measured distance*.
 
 A person's bearing leaves the tracker as their world azimuth (at a seam, a blend of both cameras'
-views: `TRACKING.md`, *Each tick*), becomes the pose's `Azimuth`, and is moved to the eyes by
-`EyeAzimuthExtractor`. The playhead is an azimuth; every layer draws at a normalized azimuth
-(`normalize_azimuth`: azimuth / 360, × 3600 gives the pixel); every angle Max receives is an azimuth.
+views: `TRACKING.md`, *Each tick*) and becomes the pose's `BBoxAzimuth`; `AzimuthExtractor` derives
+from it the pose's `Azimuth`, at the eyes, which is what the show places a person at. The playhead is
+an azimuth; every layer draws at a normalized azimuth (`normalize_azimuth`: azimuth / 360, × 3600
+gives the pixel); every angle Max receives is an azimuth.
 
 ### Direction
 

@@ -139,7 +139,7 @@ class WhiteSpaceMain:
             ])
 
         # WS PIPELINE — light output
-        # The show reads LERP poses: the only stage with the eye azimuth and PlayheadOffset.
+        # The show reads LERP poses: the stable eye azimuth, and the only stage with PlayheadOffset.
         self.conductor = Conductor(self.settings.light, board=self.board, pose_stage=int(Stage.LERP))
         # One receiver per domain, matching each source's actual transport: the fixture
         # firmware sends the fall as a plain UDP text packet (not OSC) to the light
@@ -176,6 +176,9 @@ class WhiteSpaceMain:
             i: trackers.FilterPipeline([
                 nodes.PointDualConfFilter(ps.point.confidence),
                 nodes.PointStickyFiller(ps.point.sticky),
+                # Here, not later: the keypoints are still normalised in the crop they came from, so
+                # the box's jitter cancels out of the eye azimuth. A held eye moves with the box.
+                nodes.AzimuthExtractor(self._column_to_azimuth),
                 nodes.AngleExtractor(ps.angle_extractor),
                 nodes.AngleVelExtractor(ps.velocity.extractor),
             ])
@@ -195,6 +198,7 @@ class WhiteSpaceMain:
                 nodes.AngleVelExtractor(ps.velocity.extractor),
                 nodes.AngleVelEuroSmoother(ps.velocity.smoother),
                 nodes.AngleEuroSmoother(ps.angle.smoother),
+                nodes.AzimuthEuroSmoother(ps.azimuth.smoother),
                 nodes.AngleMotionExtractor(ps.motion.extractor),
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
                 nodes.AngleSymExtractor(),
@@ -231,6 +235,7 @@ class WhiteSpaceMain:
                 nodes.PointPredictor(ps.point.prediction),
                 nodes.AnglePredictor(ps.angle.prediction),
                 nodes.AngleVelPredictor(ps.velocity.prediction),
+                nodes.AzimuthPredictor(ps.azimuth.prediction),
                 nodes.AngleStickyFiller(ps.angle.sticky),
                 nodes.SimilarityStickyFiller(ps.similarity.sticky),
             ])
@@ -248,16 +253,12 @@ class WhiteSpaceMain:
                 nodes.AngleChaseInterpolator(ps.angle.interpolator),
                 nodes.AngleVelChaseInterpolator(ps.velocity.interpolator),
                 nodes.SimilarityChaseInterpolator(ps.similarity.interpolator),
+                nodes.AzimuthChaseInterpolator(ps.azimuth.interpolator),
             ])
             for i in range(num_players)
         })
-        # EyeAzimuthExtractor first, so everything from here on — PlayheadOffset, the ghoster, the
-        # light and the sound — places a person at their eyes. Only here: LERP frames are rebuilt
-        # from PREDICT each tick, so the tracker's bbox-centre azimuth arrives fresh and is shifted
-        # once; stages up to PREDICT keep it, which the render's azimuth overlay relies on.
         self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
-                nodes.EyeAzimuthExtractor(self._column_to_azimuth),
                 nodes.AngleSymExtractor(),
                 nodes.LegDeviationExtractor(ps.leg_deviation_extractor),
                 nodes.TorsoTiltExtractor(ps.torso_tilt_extractor),

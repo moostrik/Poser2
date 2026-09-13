@@ -27,8 +27,10 @@ Show layers and the state machine read pose frames from the board, never the tra
 A person is present while their pose exists: the pose pipeline stops posing a person
 `pose.tracklets.detection_timeout` (1.0 s) after their last detection, and every filter downstream
 resets a track the moment its pose is missing. A layer adds no presence test of its own. A person's
-azimuth is the pose's `Azimuth`, moved to the eyes at LERP; their age is the pose's `Age`. Ghosts are
-published to their own board store (`get_ghosts`), not among the poses. How the tracker produces the
+azimuth is the pose's `Azimuth`, at their eyes: raw from CLEAN, smoothed at SMOOTH, predicted at
+PREDICT and interpolated at LERP. Show layers and the state machine read LERP poses, the stable eye
+azimuth and its `PlayheadOffset`. Their age is the pose's `Age`. Ghosts are published to their own
+board store (`get_ghosts`), not among the poses. How the tracker produces the
 poses is in `TRACKING.md`, *Downstream*.
 
 ## Index — show layers

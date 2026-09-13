@@ -4,7 +4,7 @@ import math
 import time
 import unittest
 
-from modules.pose.features import Azimuth, BBox
+from modules.pose.features import Azimuth, BBox, BBoxAzimuth
 from modules.tracker import PanoramicAnnotation, PosesFromTracklets, PosesFromTrackletsSettings, Tracklet
 from modules.utils import Rect
 
@@ -53,7 +53,8 @@ class TestFrameContents(PosesFromTrackletsCase):
         frame = self.poses.process()[2]
         rect = frame[BBox].to_rect()
         self.assertAlmostEqual(rect.bottom, 0.8, places=5)
-        self.assertAlmostEqual(frame[Azimuth].value, math.pi / 2.0, places=5)
+        self.assertAlmostEqual(frame[BBoxAzimuth].value, math.pi / 2.0, places=5)
+        self.assertNotIn(Azimuth, frame)          # the eye azimuth is derived downstream
 
     def test_an_id_beyond_the_slots_warns_and_is_not_posed(self) -> None:
         with self.assertLogs('modules.tracker.poses_from_tracklets', level='WARNING'):

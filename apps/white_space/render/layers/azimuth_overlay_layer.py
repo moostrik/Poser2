@@ -1,8 +1,9 @@
-"""AzimuthOverlayLayer — each person's eye and bbox-centre azimuth over the projection row.
+"""AzimuthOverlayLayer — each person's eye and bbox azimuth over the projection row.
 
-The light places people at their eyes (``EyeAzimuthExtractor``); this shows that position beside
-the tracker's bbox-centre azimuth it was shifted from, so the correction can be judged live against
-the light it drives. Drawn over both the projection and the beam simulation, which share one 360° x axis.
+The light places people at their eyes (``Azimuth``); this shows that position beside the tracker's
+box azimuth it was derived from (``BBoxAzimuth``), both from the LERP frame, so the correction and
+the smoothing can be judged live against the projection they drive. Drawn over both the projection
+and the beam simulation, which share one 360° x axis.
 """
 
 import math
@@ -28,7 +29,7 @@ class AzimuthOverlayBoard(HasFrames, Protocol):
 
 class AzimuthOverlayLayer(LayerBase):
     """Per person, in their track colour: a solid line at the eye azimuth, a faint line at the
-    bbox-centre azimuth, and a bar joining them at mid-height so a small offset still reads.
+    bbox azimuth, and a bar joining them at mid-height so a small offset still reads.
 
     Owns no FBO: it draws into whatever viewport is current when `draw()` is called, which must be
     the projection row's, sized by the last `allocate`.
@@ -57,10 +58,7 @@ class AzimuthOverlayLayer(LayerBase):
         pass
 
     def draw(self) -> None:
-        marks: list[AzimuthMark] = build_azimuth_marks(
-            self._board.get_frames(int(Stage.LERP)),
-            self._board.get_frames(int(Stage.PREDICT)),
-        )
+        marks: list[AzimuthMark] = build_azimuth_marks(self._board.get_frames(int(Stage.LERP)))
         if not marks:
             return
 

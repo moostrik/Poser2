@@ -3,7 +3,7 @@ import math
 from threading import Lock
 
 from modules.pose.frame import Frame, FrameDict, FrameDictCallbackMixin
-from modules.pose.features import BBox, Azimuth
+from modules.pose.features import BBox, BBoxAzimuth
 from modules.settings import BaseSettings, Field
 from .tracklet import Tracklet
 from .panoramic.annotation import Annotation as PanoramicAnnotation
@@ -87,7 +87,7 @@ class PosesFromTracklets(FrameDictCallbackMixin):
                 features: dict = {BBox: bounding_box}
                 if world_angle is not None:
                     # SingleAngle.from_value wraps degrees-as-radians to [-π, π).
-                    features[Azimuth] = Azimuth.from_value(math.radians(float(world_angle)))
+                    features[BBoxAzimuth] = BBoxAzimuth.from_value(math.radians(float(world_angle)))
 
                 generated_poses[track_id] = Frame(
                     track_id=tracklet.id,

@@ -3,11 +3,11 @@
   "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "render_fps": 58.0,
+  "render_fps": 59.0,
   "light_resolution": 3600,
   "fov": 127.0,
   "resolution": "P720",
-  "frame_height": 0,
+  "frame_height": 960,
   "tilt": 15.0,
   "lens_fov": 128.9,
   "lens_centre_x": -10.5,
@@ -475,6 +475,20 @@
         "hold_scores": true
       }
     },
+    "azimuth": {
+      "smoother": {
+        "min_cutoff": 1.0,
+        "beta": 10.0,
+        "d_cutoff": 1.0
+      },
+      "prediction": {
+        "method": "LINEAR"
+      },
+      "interpolator": {
+        "responsiveness": 0.5,
+        "friction": 0.05
+      }
+    },
     "velocity": {
       "extractor": {},
       "smoother": {
@@ -593,7 +607,7 @@
     "debug": "OFF",
     "clock": {},
     "motor": {
-      "simulate": false,
+      "simulate": true,
       "beam_rpm": 36.0,
       "projection_rpm": 2000.0
     },

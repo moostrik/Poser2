@@ -117,8 +117,8 @@ so the blend lies between them.
 
 | consumer                   | what it takes                                                   |
 |----------------------------|-----------------------------------------------------------------|
-| `PosesFromTracklets`       | per world: `BBox` from the primary, `Azimuth` of the world      |
-| `EyeAzimuthExtractor`      | shifts `Azimuth` to the eyes, in the primary's camera           |
+| `PosesFromTracklets`       | per world: `BBox` from the primary, `BBoxAzimuth` of the world  |
+| `AzimuthExtractor`         | `Azimuth` at the eyes from `BBoxAzimuth`, in the primary camera |
 | show layers, state machine | pose frames only (`LAYERS.md`, *Inputs*)                        |
 | panorama                   | every observation and rejected detection; primaries by `obs_id` |
 

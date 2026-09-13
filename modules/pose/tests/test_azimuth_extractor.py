@@ -1,4 +1,4 @@
-"""Tests for EyeAzimuthExtractor — shifting a pose's azimuth from the bbox centre to the eyes."""
+"""Tests for AzimuthExtractor — deriving a pose's eye azimuth from its bbox azimuth."""
 
 import math
 import unittest
@@ -6,8 +6,8 @@ import unittest
 import numpy as np
 
 from modules.pose.frame import Frame
-from modules.pose.features import Azimuth, BBox, Points2D, PointLandmark
-from modules.pose.nodes import EyeAzimuthExtractor
+from modules.pose.features import Azimuth, BBox, BBoxAzimuth, Points2D, PointLandmark
+from modules.pose.nodes import AzimuthExtractor
 from modules.utils import Rect
 
 # A fake projection: one image width spans K radians, offset per camera so cam_id is honoured.
@@ -18,7 +18,7 @@ def _column_to_azimuth(cam_id: int, x: float) -> float:
     return cam_id * 10.0 + x * K
 
 
-def _frame(azimuth: float = 0.5, rect: Rect | None = Rect(0.2, 0.1, 0.4, 0.8),
+def _frame(bbox_azimuth: float = 0.5, rect: Rect | None = Rect(0.2, 0.1, 0.4, 0.8),
            left_eye_x: float | None = 0.5, right_eye_x: float | None = 0.5,
            cam_id: int = 1, score: float = 0.7) -> Frame:
     n = len(PointLandmark)
@@ -28,20 +28,20 @@ def _frame(azimuth: float = 0.5, rect: Rect | None = Rect(0.2, 0.1, 0.4, 0.8),
         if x is not None:
             values[lm] = (x, 0.2)
             scores[lm] = 1.0
-    features: dict = {Points2D: Points2D(values, scores), Azimuth: Azimuth.from_value(azimuth, score)}
+    features: dict = {Points2D: Points2D(values, scores), BBoxAzimuth: BBoxAzimuth.from_value(bbox_azimuth, score)}
     if rect is not None:
         features[BBox] = BBox.from_rect(rect)
     return Frame(track_id=0, cam_id=cam_id, features=features)
 
 
-class EyeAzimuthExtractorTest(unittest.TestCase):
+class AzimuthExtractorTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.extractor = EyeAzimuthExtractor(_column_to_azimuth)
+        self.extractor = AzimuthExtractor(_column_to_azimuth)
 
     def _azimuth(self, frame: Frame) -> float:
         return self.extractor.process(frame)[Azimuth].value
 
-    def test_eyes_on_box_centre_leave_azimuth(self) -> None:
+    def test_eyes_on_box_centre_equal_bbox_azimuth(self) -> None:
         self.assertAlmostEqual(self._azimuth(_frame()), 0.5, places=5)
 
     def test_shift_is_eye_midpoint_offset_through_projection(self) -> None:
@@ -53,23 +53,30 @@ class EyeAzimuthExtractorTest(unittest.TestCase):
         out = self._azimuth(_frame(left_eye_x=None, right_eye_x=0.25))
         self.assertAlmostEqual(out, 0.5 - 0.25 * 0.4 * K, places=5)
 
-    def test_no_eyes_leaves_frame_unchanged(self) -> None:
-        frame = _frame(left_eye_x=None, right_eye_x=None)
-        self.assertIs(self.extractor.process(frame), frame)
+    def test_no_eyes_fall_back_to_bbox_azimuth(self) -> None:
+        self.assertAlmostEqual(self._azimuth(_frame(left_eye_x=None, right_eye_x=None)), 0.5, places=5)
 
-    def test_nan_azimuth_leaves_frame_unchanged(self) -> None:
-        frame = _frame(azimuth=math.nan, left_eye_x=0.9, right_eye_x=0.9)
-        self.assertIs(self.extractor.process(frame), frame)
+    def test_missing_box_falls_back_to_bbox_azimuth(self) -> None:
+        self.assertAlmostEqual(self._azimuth(_frame(rect=None, left_eye_x=0.9, right_eye_x=0.9)), 0.5, places=5)
 
-    def test_missing_box_leaves_frame_unchanged(self) -> None:
-        frame = _frame(rect=None, left_eye_x=0.9, right_eye_x=0.9)
+    def test_nan_bbox_azimuth_leaves_frame_unchanged(self) -> None:
+        frame = _frame(bbox_azimuth=math.nan, left_eye_x=0.9, right_eye_x=0.9)
         self.assertIs(self.extractor.process(frame), frame)
+        self.assertTrue(math.isnan(frame[Azimuth].value))
+
+    def test_bbox_azimuth_is_kept(self) -> None:
+        out = self.extractor.process(_frame(left_eye_x=0.9, right_eye_x=0.9))
+        self.assertAlmostEqual(out[BBoxAzimuth].value, 0.5, places=5)
+
+    def test_rerun_does_not_shift_again(self) -> None:
+        once = self.extractor.process(_frame(left_eye_x=0.9, right_eye_x=0.9))
+        self.assertAlmostEqual(self.extractor.process(once)[Azimuth].value, once[Azimuth].value, places=6)
 
     def test_shift_wraps_across_pi(self) -> None:
-        out = self._azimuth(_frame(azimuth=math.pi - 0.05, left_eye_x=1.0, right_eye_x=1.0))
+        out = self._azimuth(_frame(bbox_azimuth=math.pi - 0.05, left_eye_x=1.0, right_eye_x=1.0))
         self.assertAlmostEqual(out, -math.pi - 0.05 + 0.5 * 0.4 * K, places=5)
 
-    def test_score_is_kept(self) -> None:
+    def test_score_is_bbox_azimuth_score(self) -> None:
         out = self.extractor.process(_frame(left_eye_x=0.7, right_eye_x=0.7))
         self.assertAlmostEqual(out[Azimuth].score, 0.7, places=5)
 

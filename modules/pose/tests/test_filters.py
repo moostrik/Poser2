@@ -7,15 +7,15 @@ import numpy as np
 
 from modules.pose.analytics import SimilarityResult
 from modules.pose.features import (
-    FEATURES, AngleLandmark, AngleMotion, Angles, AngleVelocity, Azimuth, BBox, LeaderScore, MotionGate,
-    Points2D, PointLandmark, Similarity,
+    FEATURES, AngleLandmark, AngleMotion, Angles, AngleVelocity, Azimuth, BBox, BBoxAzimuth, LeaderScore,
+    MotionGate, Points2D, PointLandmark, Similarity,
 )
 from modules.pose.frame import Frame
 from modules.pose.nodes import (
     AgeExtractor, AngleEuroSmoother, AngleExtractor, AngleMotionExtractor, AngleMotionMovingAverageSmoother,
     AnglePredictor, AngleStickyFiller, AngleSymExtractor, AngleVelEuroSmoother, AngleVelExtractor,
-    AngleVelPredictor, AngleVelStickyFiller, DualConfFilterSettings, EuroSmootherSettings, EyeAzimuthExtractor,
-    FilterNode, LeaderScoreApplicator, LegDeviationExtractor, MotionGateApplicator, MotionTimeExtractor,
+    AngleVelPredictor, AngleVelStickyFiller, AzimuthEuroSmoother, AzimuthExtractor, AzimuthPredictor,
+    DualConfFilterSettings, EuroSmootherSettings, FilterNode, LeaderScoreApplicator, LegDeviationExtractor, MotionGateApplicator, MotionTimeExtractor,
     MovingAverageSettings, PointDualConfFilter, PointEuroSmoother, PointPredictor, PointStickyFiller,
     PredictionMethod, PredictorSettings, SimilarityApplicator, SimilarityEuroSmoother, SimilarityStickyFiller,
     StickyFillerSettings, TorsoTiltExtractor, WindowType,
@@ -33,11 +33,13 @@ def _stage_nodes() -> list[FilterNode]:
     return [
         PointDualConfFilter(DualConfFilterSettings()),
         PointStickyFiller(StickyFillerSettings()),
+        AzimuthExtractor(lambda _cam, x: x),
         AngleExtractor(),
         AngleVelExtractor(),
         PointEuroSmoother(EuroSmootherSettings()),
         AngleVelEuroSmoother(EuroSmootherSettings()),
         AngleEuroSmoother(EuroSmootherSettings()),
+        AzimuthEuroSmoother(EuroSmootherSettings()),
         AngleMotionExtractor(),
         AngleMotionMovingAverageSmoother(MovingAverageSettings()),
         AngleSymExtractor(),
@@ -51,20 +53,21 @@ def _stage_nodes() -> list[FilterNode]:
         PointPredictor(PredictorSettings()),
         AnglePredictor(PredictorSettings()),
         AngleVelPredictor(PredictorSettings()),
+        AzimuthPredictor(PredictorSettings()),
         AngleStickyFiller(StickyFillerSettings()),
         SimilarityStickyFiller(StickyFillerSettings()),
         AngleVelStickyFiller(StickyFillerSettings()),
-        EyeAzimuthExtractor(lambda _cam, x: x),
         MotionGateApplicator(),
     ]
 
 
 def _full_frame(i: int) -> Frame:
-    """A realistic RAW-stage frame: moving skeleton, box and azimuth."""
+    """A realistic CLEAN-stage frame: moving skeleton, box, bbox azimuth and a drifting eye azimuth."""
     return frame(track_id=1, cam_id=0, t=i / FPS, features={
         Points2D: skeleton(left_elbow=0.05 * i),
         BBox: BBox.from_rect(Rect(0.3, 0.1, 0.4, 0.8)),
-        Azimuth: Azimuth.from_value(0.5),
+        BBoxAzimuth: BBoxAzimuth.from_value(0.5),
+        Azimuth: Azimuth.from_value(0.5 + 0.01 * i),
     })
 
 

@@ -15,7 +15,7 @@ class StitchRenderer(LayerBase):
 
     **What it is for.** `fov` and `tilt` define the azimuth frame every other number in the
     installation is expressed in, and nothing else in the app shows whether they are right — the
-    tracker fuses both cameras' views of a seam person into one `Azimuth` before anything draws it,
+    tracker fuses both cameras' views of a seam person into one `BBoxAzimuth` before anything draws it,
     destroying the disagreement that would reveal the error. Here the two cameras' pixels are drawn
     on top of each other at the azimuth each one claims. Right geometry: content in an overlap
     coincides. Wrong geometry: it ghosts, and *what* ghosts says *which* number is wrong.

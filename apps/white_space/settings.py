@@ -68,7 +68,7 @@ class Layers(IntEnum):
     cam_panorama = auto()   # the 360° calibration strip: the stitch with the tracker data over it
     ws_light     = auto()   # the projection (fixture in projection mode)
     ws_beam       = auto()   # the bar's four lights (fixture in beam mode); shares ws_light's row
-    ws_azimuth   = auto()   # eye and bbox-centre azimuth lines, over whichever of the two is shown
+    ws_azimuth   = auto()   # eye and bbox azimuth lines, over whichever of the two is shown
     # data
     data_W       = auto()
     data_F       = auto()
@@ -174,6 +174,15 @@ class AngleFeature(BaseSettings):
     sticky      : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
 
 
+class AzimuthFeature(BaseSettings):
+    frequency       : Field[float] = Field(30.0, access=Field.INIT)
+    output_frequency: Field[float] = Field(30.0)
+
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
+    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
+    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+
+
 class VelocityFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(30.0)
@@ -230,6 +239,7 @@ class PoseGroup(BaseSettings):
     bbox            : Group[BboxFeature]                     = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                    = Group(PointFeature, share=_feature_share)
     angle           : Group[AngleFeature]                    = Group(AngleFeature, share=_feature_share)
+    azimuth         : Group[AzimuthFeature]                  = Group(AzimuthFeature, share=_feature_share)
     velocity        : Group[VelocityFeature]                 = Group(VelocityFeature, share=_feature_share)
     motion          : Group[MotionFeature]                   = Group(MotionFeature)
     similarity      : Group[SimilarityFeature]               = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
@@ -324,7 +334,7 @@ class BeamLightSimSettings(BaseSettings):
 class RenderSettings(BaseSettings):
     camera_view: Field[CameraView] = Field(CameraView.BOTH, widget=Widget.select,
                                            description="Which camera row to show: the delivered frames, the 360° strip, or both")
-    azimuth_overlay: Field[bool] = Field(True, description="Eye (solid) and bbox-centre (faint) azimuth lines over the projection row")
+    azimuth_overlay: Field[bool] = Field(True, description="Eye (solid) and bbox (faint) azimuth lines over the projection row")
     num_cams:    Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of players")
     tilt:        Field[float] = Field(0.0, access=Field.INIT, visible=False, description="Camera up-tilt (°), shared from the root — relayed to the panorama layer")

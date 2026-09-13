@@ -14,16 +14,17 @@ import numpy as np
 
 from modules.pose.analytics import SimilarityResult
 from modules.pose.features import (
-    FEATURES, Age, AngleLandmark, AngleMotion, Angles, AngleSymmetry, AngleVelocity, Azimuth, BBox, LeaderScore,
-    LegDeviation, MotionGate, MotionTime, PointLandmark, Points2D, Similarity, TorsoTilt,
+    FEATURES, Age, AngleLandmark, AngleMotion, Angles, AngleSymmetry, AngleVelocity, Azimuth, BBox, BBoxAzimuth,
+    LeaderScore, LegDeviation, MotionGate, MotionTime, PointLandmark, Points2D, Similarity, TorsoTilt,
 )
 from modules.pose.frame import FrameDict
 from modules.pose.nodes import (
     AgeExtractor, AngleChaseInterpolator, AngleEuroSmoother, AngleExtractor, AngleExtractorSettings,
     AngleMotionExtractor, AngleMotionExtractorSettings, AngleMotionMovingAverageSmoother, AnglePredictor,
     AngleStickyFiller, AngleSymExtractor, AngleVelChaseInterpolator, AngleVelEuroSmoother, AngleVelExtractor,
-    AngleVelExtractorSettings, AngleVelPredictor, AngleVelStickyFiller, ChaseInterpolatorSettings,
-    DualConfFilterSettings, EuroSmootherSettings, EyeAzimuthExtractor, LeaderScoreApplicator,
+    AngleVelExtractorSettings, AngleVelPredictor, AngleVelStickyFiller, AzimuthChaseInterpolator,
+    AzimuthEuroSmoother, AzimuthExtractor, AzimuthPredictor, ChaseInterpolatorSettings,
+    DualConfFilterSettings, EuroSmootherSettings, LeaderScoreApplicator,
     LegDeviationExtractor, LegDeviationExtractorSettings, MotionGateApplicator, MotionTimeExtractor,
     MovingAverageSettings, PointChaseInterpolator, PointDualConfFilter, PointEuroSmoother, PointPredictor,
     PointStickyFiller, PredictorSettings, SimilarityApplicator, SimilarityChaseInterpolator,
@@ -52,6 +53,7 @@ class _Settings:
         self.point_smoother = EuroSmootherSettings()
         self.velocity_smoother = EuroSmootherSettings()
         self.angle_smoother = EuroSmootherSettings()
+        self.azimuth_smoother = EuroSmootherSettings()
         self.motion_extractor = AngleMotionExtractorSettings()
         self.motion_average = MovingAverageSettings()
         self.leg_deviation = LegDeviationExtractorSettings()
@@ -60,6 +62,7 @@ class _Settings:
         self.point_prediction = PredictorSettings()
         self.angle_prediction = PredictorSettings()
         self.velocity_prediction = PredictorSettings()
+        self.azimuth_prediction = PredictorSettings()
         self.angle_sticky = StickyFillerSettings()
         self.similarity_sticky = StickyFillerSettings()
         self.velocity_sticky = StickyFillerSettings()
@@ -67,6 +70,7 @@ class _Settings:
         self.angle_interpolator = ChaseInterpolatorSettings()
         self.velocity_interpolator = ChaseInterpolatorSettings()
         self.similarity_interpolator = ChaseInterpolatorSettings()
+        self.azimuth_interpolator = ChaseInterpolatorSettings()
 
 
 class _Stages:
@@ -77,6 +81,7 @@ class _Stages:
         self.clean = FilterTracker({i: FilterPipeline([
             PointDualConfFilter(ps.confidence),
             PointStickyFiller(ps.point_sticky),
+            AzimuthExtractor(lambda _cam, x: x),
             AngleExtractor(ps.angle_extractor),
             AngleVelExtractor(ps.velocity_extractor),
         ]) for i in tracks})
@@ -89,6 +94,7 @@ class _Stages:
             AngleVelExtractor(ps.velocity_extractor),
             AngleVelEuroSmoother(ps.velocity_smoother),
             AngleEuroSmoother(ps.angle_smoother),
+            AzimuthEuroSmoother(ps.azimuth_smoother),
             AngleMotionExtractor(ps.motion_extractor),
             AngleMotionMovingAverageSmoother(ps.motion_average),
             AngleSymExtractor(),
@@ -105,6 +111,7 @@ class _Stages:
             PointPredictor(ps.point_prediction),
             AnglePredictor(ps.angle_prediction),
             AngleVelPredictor(ps.velocity_prediction),
+            AzimuthPredictor(ps.azimuth_prediction),
             AngleStickyFiller(ps.angle_sticky),
             SimilarityStickyFiller(ps.similarity_sticky),
         ]) for i in tracks})
@@ -114,10 +121,10 @@ class _Stages:
             AngleChaseInterpolator(ps.angle_interpolator),
             AngleVelChaseInterpolator(ps.velocity_interpolator),
             SimilarityChaseInterpolator(ps.similarity_interpolator),
+            AzimuthChaseInterpolator(ps.azimuth_interpolator),
         ]) for i in tracks})
 
         self.lerp = FilterTracker({i: FilterPipeline([
-            EyeAzimuthExtractor(lambda _cam, x: x),
             AngleSymExtractor(),
             LegDeviationExtractor(ps.leg_deviation),
             TorsoTiltExtractor(ps.torso_tilt),
@@ -177,7 +184,7 @@ def _raw(tick: int) -> FrameDict:
         frames[tid] = frame(track_id=tid, cam_id=tid, t=t, features={
             Points2D: points(coords, scores),
             BBox: BBox.from_rect(Rect(0.2 + 0.3 * tid, 0.1, 0.25, 0.8)),
-            Azimuth: Azimuth.from_value(0.5 + tid),
+            BBoxAzimuth: BBoxAzimuth.from_value(0.5 + tid),
         })
     return frames
 
@@ -238,10 +245,20 @@ class PipelineStagesTest(unittest.TestCase):
                     self.assertEqual(set(frames), present, f"tick {tick} stage {stage}")
 
     def test_smooth_stage_has_every_feature(self) -> None:
-        expected = {Points2D, BBox, Azimuth, Angles, AngleVelocity, AngleMotion, AngleSymmetry, LegDeviation,
+        expected = {Points2D, BBox, BBoxAzimuth, Azimuth, Angles, AngleVelocity, AngleMotion, AngleSymmetry, LegDeviation,
                     TorsoTilt, MotionTime, Age, Similarity, LeaderScore}
         _, _, f = list(self._frames('smooth'))[-1]
         self.assertEqual({ft for ft in FEATURES if ft in f}, expected)
+
+    def test_azimuth_is_derived_at_clean_and_carried_to_lerp(self) -> None:
+        # The skeleton's eyes sit on the box centre and the test projection is the identity, so the eye
+        # azimuth equals the bbox azimuth wherever it exists.
+        for _, _, f in self._frames('raw'):
+            self.assertNotIn(Azimuth, f)
+        for stage in ('clean', 'smooth', 'predict', 'lerp'):
+            with self.subTest(stage=stage):
+                for tick, tid, f in self._frames(stage):
+                    self.assertAlmostEqual(f[Azimuth].value, 0.5 + tid, places=4, msg=f"tick {tick} track {tid}")
 
     def test_gate_stage_adds_motion_gate(self) -> None:
         _, _, f = list(self._frames('gate'))[-1]

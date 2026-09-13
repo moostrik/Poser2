@@ -10,7 +10,7 @@ from .extractors.AgeExtractor import            AgeExtractor
 from .extractors.MotionTimeExtractor import     MotionTimeExtractor
 from .extractors.LegDeviationExtractor import   LegDeviationExtractor, LegDeviationExtractorSettings
 from .extractors.TorsoTiltExtractor import      TorsoTiltExtractor, TorsoTiltExtractorSettings
-from .extractors.EyeAzimuthExtractor import     EyeAzimuthExtractor
+from .extractors.AzimuthExtractor import        AzimuthExtractor
 
 from .applicators.SimilarityApplicator import   SimilarityApplicator, SimilarityApplicatorSettings
 from .applicators.LeaderScoreApplicator import  LeaderScoreApplicator, LeaderScoreApplicatorSettings
@@ -18,9 +18,9 @@ from .applicators.MotionGateApplicator import   MotionGateApplicator, MotionGate
 
 from .filters.ConfidenceFilters import          ConfidenceFilterSettings,     BBoxConfidenceFilter,   PointConfidenceFilter,  AngleConfidenceFilter,  AngleVelConfidenceFilter,   AngleSymConfFilter
 from .filters.DualConfidenceFilters import      DualConfFilterSettings,       BBoxDualConfFilter,     PointDualConfFilter,    AngleDualConfFilter,    AngleVelDualConfFilter,     AngleSymDualConfidenceFilter
-from .filters.Predictors import                 PredictorSettings,    PredictionMethod,   BBoxPredictor,     PointPredictor,     AnglePredictor,     AngleVelPredictor,      AngleSymPredictor
+from .filters.Predictors import                 PredictorSettings,    PredictionMethod,   BBoxPredictor,     PointPredictor,     AnglePredictor,     AngleVelPredictor,      AngleSymPredictor,      AzimuthPredictor
 from .filters.EmaSmoothers import               EmaSmootherSettings,  BBoxEmaSmoother,    PointEmaSmoother,   AngleEmaSmoother,   AngleVelEmaSmoother,    AngleSymEmaSmoother,    SimilarityEmaSmoother,  AngleMotionEmaSmoother
-from .filters.EuroSmoothers import              EuroSmootherSettings, BBoxEuroSmoother,   PointEuroSmoother,  AngleEuroSmoother,  AngleVelEuroSmoother,   AngleSymEuroSmoother,   SimilarityEuroSmoother
+from .filters.EuroSmoothers import              EuroSmootherSettings, BBoxEuroSmoother,   PointEuroSmoother,  AngleEuroSmoother,  AngleVelEuroSmoother,   AngleSymEuroSmoother,   SimilarityEuroSmoother, AzimuthEuroSmoother
 from .filters.MovingAverageSmoothers import     MovingAverageSettings, WindowType, AngleMotionMovingAverageSmoother, SimilarityMovingAverageSmoother
 from .filters.StickyFillers import              StickyFillerSettings, BBoxStickyFiller,   PointStickyFiller,  AngleStickyFiller,  AngleVelStickyFiller,   AngleSymStickyFiller,   SimilarityStickyFiller
 from .filters.RateLimiters import               RateLimiterSettings,  BBoxRateLimiter,    PointRateLimiter,   AngleRateLimiter,   AngleVelRateLimiter,    AngleSymRateLimiter,    SimilarityRateLimiter,  AngleMotionRateLimiter
@@ -28,7 +28,7 @@ from .filters.EasingNode import                 EasingSettings,       EasingNode
 from .filters.TemporalFilters import            TemporalStabilizerSettings,   BBoxTemporalStabilizer, PointTemporalStabilizer,    AngleTemporalStabilizer,    AngleVelTemporalStabilizer, AngleSymTemporalStabilizer
 from .filters.Validators import                 ValidatorSettings,    BBoxValidator,      PointValidator,     AngleValidator,     AngleVelValidator,      AngleSymValidator,      PoseValidator
 
-from .interpolators.ChaseInterpolators import   ChaseInterpolatorSettings,    BBoxChaseInterpolator,  PointChaseInterpolator, AngleChaseInterpolator, AngleVelChaseInterpolator,  AngleSymChaseInterpolator,  SimilarityChaseInterpolator
+from .interpolators.ChaseInterpolators import   ChaseInterpolatorSettings,    BBoxChaseInterpolator,  PointChaseInterpolator, AngleChaseInterpolator, AngleVelChaseInterpolator,  AngleSymChaseInterpolator,  SimilarityChaseInterpolator,    AzimuthChaseInterpolator
 from .interpolators.LerpInterpolators import    LerpInterpolatorSettings,     BBoxLerpInterpolator,   PointLerpInterpolator,  AngleLerpInterpolator,  AngleVelLerpInterpolator,   AngleSymLerpInterpolator
 
 from ..frame import                             FeatureWindow

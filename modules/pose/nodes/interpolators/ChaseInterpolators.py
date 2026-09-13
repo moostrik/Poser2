@@ -23,7 +23,7 @@ from typing import cast
 import numpy as np
 
 # Pose imports
-from ...features import Angles, BBox, Points2D, AngleVelocity, AngleSymmetry, Similarity, BaseFeature
+from ...features import Angles, AngleVelocity, AngleSymmetry, Azimuth, BBox, Points2D, Similarity, BaseFeature
 from .._utils.ArrayChase import AngleChase, PointChase, Chase
 from .BaseInterpolator import FeatureInterpolatorBase, InterpolatorSettingsBase
 from ...frame import Frame
@@ -43,6 +43,7 @@ class FeatureChaseInterpolator(FeatureInterpolatorBase[ChaseInterpolatorSettings
         lambda: Chase,
         {
             Angles: AngleChase,
+            Azimuth: AngleChase,
             Points2D: PointChase,
         }
     )
@@ -100,3 +101,8 @@ class AngleSymChaseInterpolator(FeatureChaseInterpolator):
 class SimilarityChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, config: ChaseInterpolatorSettings) -> None:
         super().__init__(config, Similarity)
+
+
+class AzimuthChaseInterpolator(FeatureChaseInterpolator):
+    def __init__(self, config: ChaseInterpolatorSettings) -> None:
+        super().__init__(config, Azimuth)

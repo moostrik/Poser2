@@ -54,7 +54,6 @@ class Conductor(Thread):
 
         self._config: LightSettings = config
         self._board: Board          = board
-        self._pose_stage: int       = pose_stage
         # Boot failsafe #3: a preset saved mid-debug (a projection layer selected) must never
         # auto-derive PROJECTION at power-on — the installation always wakes in the show.
         config.debug = DebugLayer.OFF

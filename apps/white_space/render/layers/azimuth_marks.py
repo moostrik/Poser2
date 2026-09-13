@@ -1,16 +1,16 @@
 """Where the projection-row overlay puts each person — the pure geometry, no GL, so it is unit-testable.
 
-Two azimuths per person, as normalized azimuths in [0, 1): the **eye** azimuth the light is placed at
-(LERP frames, after ``EyeAzimuthExtractor``) and the tracker's **bbox-centre** azimuth it was
-shifted from (PREDICT frames, upstream of the extractor). The gap between them is the correction.
-The row spans one turn, so a normalized azimuth is also the row's x.
+Two azimuths per person, as normalized azimuths in [0, 1), read from the same frame: the **eye**
+azimuth the light is placed at (``Azimuth``) and the tracker's box azimuth it was derived from
+(``BBoxAzimuth``). The gap between them is the correction. The row spans one turn, so a normalized
+azimuth is also the row's x.
 """
 
 import math
 from dataclasses import dataclass
 
 from modules.pose.frame import Frame
-from modules.pose.features import Azimuth
+from modules.pose.features import Azimuth, BBoxAzimuth
 
 from apps.white_space.light.layers import normalize_azimuth
 
@@ -18,24 +18,19 @@ from apps.white_space.light.layers import normalize_azimuth
 @dataclass(frozen=True)
 class AzimuthMark:
     track_id: int
-    eye_x: float    # normalized azimuth of the eye; NaN when there is none
-    bbox_x: float   # normalized azimuth of the bbox centre; NaN when there is none
+    eye_x: float    # normalized Azimuth; NaN when there is none
+    bbox_x: float   # normalized BBoxAzimuth; NaN when there is none
 
 
-def _normalized_azimuth(frame: Frame | None) -> float:
-    if frame is None:
-        return math.nan
-    return normalize_azimuth(frame[Azimuth].value)
-
-
-def build_azimuth_marks(eye_frames: dict[int, Frame], bbox_frames: dict[int, Frame]) -> list[AzimuthMark]:
-    """One mark per person with a pose in either frame set, ordered by track id — the same people
-    the light layers draw. A person with neither azimuth is left out.
+def build_azimuth_marks(frames: dict[int, Frame]) -> list[AzimuthMark]:
+    """One mark per person with a pose, ordered by track id — the same people the light layers
+    draw. A person with neither azimuth is left out.
     """
     marks: list[AzimuthMark] = []
-    for track_id in sorted(eye_frames.keys() | bbox_frames.keys()):
-        eye_x: float = _normalized_azimuth(eye_frames.get(track_id))
-        bbox_x: float = _normalized_azimuth(bbox_frames.get(track_id))
+    for track_id in sorted(frames):
+        frame: Frame = frames[track_id]
+        eye_x: float = normalize_azimuth(frame[Azimuth].value)
+        bbox_x: float = normalize_azimuth(frame[BBoxAzimuth].value)
         if math.isnan(eye_x) and math.isnan(bbox_x):
             continue
         marks.append(AzimuthMark(track_id, eye_x, bbox_x))
