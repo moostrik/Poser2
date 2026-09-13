@@ -328,6 +328,19 @@ class StateMachineTest(unittest.TestCase):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_INTRO)
 
+    def test_session_play_ignores_the_count(self) -> None:
+        # A small session that timed out into the spin-up gets its full PLAY: only play_seconds ends it.
+        self.config.session.enabled = True
+        self._to_intro(participants=1)
+        self.tick(dt=self.config.session.intro_seconds + 1.0)
+        self.assertEqual(self.current, StateId.INTRO_PLAY)
+        self.tick(dt=self.config.spin_up_seconds + 0.1)
+        self.assertEqual(self.current, StateId.PLAY)
+        self.tick(dt=self.config.session.play_seconds / 2)
+        self.assertEqual(self.current, StateId.PLAY)       # P == 1 does not end a session
+        self.tick(dt=self.config.session.play_seconds)
+        self.assertEqual(self.current, StateId.END)
+
     # -- dev controls ----------------------------------------------------------
 
     def test_blackout_pins_off_from_anywhere(self) -> None:

@@ -33,8 +33,8 @@ class SyncSource(IntEnum):
 
 class StateId(IntEnum):
     """The states of ``docs/STATES.md`` (the source of truth), in narrative order — the
-    value is what ``/global/state`` sends. OFF = 0 is the operational off (entered by
-    pinning ``blackout``), followed by its wake transition. The *_INTRO / *_IDLE / *_PLAY
+    value is what ``/global/state`` sends. OFF = 0 is the operational off (the boot state,
+    also entered by pinning ``blackout``), followed by its wake transition. The *_INTRO / *_IDLE / *_PLAY
     entries are transitions promoted to states: their durations are the transition
     durations."""
     OFF        = 0

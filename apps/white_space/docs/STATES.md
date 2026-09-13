@@ -6,7 +6,7 @@ tunables live in the `states` settings group; each state returns its mix from `u
 
 Vocabulary:
 
-- **P** — the live participant count: the poses at the machine's stage (`LAYERS.md`, *Inputs*), debounced
+- **P** — the live participant count: the LERP poses (`LAYERS.md`, *Inputs*), debounced
   by `states.count_hold_seconds`
 - **bar** — one full playhead cycle, the content clock
 - **hit** — the playhead sweeps past a participant
@@ -39,7 +39,9 @@ Vocabulary:
 | S10 | END_IDLE   | 0   | `spin_down_seconds`, then lock | BEAM       | wall → BRIGHT line                 | none → sound visuals | open       | open                          |
 
 Durations name settings in the `states` group; `studio.json` sets `off_idle_bars` 1, `intro_idle_bars` 2,
-`spin_up_seconds` 14, `end_bars` 8 and `spin_down_seconds` 6. `open` cells are listed under *Open*.
+`spin_up_seconds` 14, `end_bars` 8 and `spin_down_seconds` 6. `open` cells are listed under *Open*. The
+P column is the stand-alone show; in session mode S6 is entered with any P > 0 and S7 and S8 run on time
+whatever the count (see below).
 
 ## Transition graph
 
@@ -57,7 +59,7 @@ stateDiagram-v2
     INTRO --> INTRO_PLAY: sync ≥ threshold & P ≥ 3\n(session - after fixed time)
     INTRO_IDLE --> IDLE: intro_idle_bars
     INTRO_PLAY --> PLAY: spin_up_seconds
-    PLAY --> END: P < 3\n(session - after fixed time)
+    PLAY --> END: P < 3 (stand-alone)\n(session - after fixed time)
     END --> PLAY: P ≥ 3 — winds back first\n(stand-alone only)
     END --> END_INTRO: wound down, P > 0
     END --> END_IDLE: wound down, P == 0
@@ -71,8 +73,9 @@ the playhead has locked, so power-on is the same wake as a blackout release. The
 a power-cycled installation resumes the show unattended and never stays dark. **OFF (S0)** is also
 entered from any state by pinning `blackout` (an operator input, so it is not drawn as an edge above), and
 leaves by condition like any other state — through OFF_IDLE, once neither the pin nor a missing lock
-holds it. In **session mode** the two open-ended states (INTRO, PLAY) gain timed exits, and END only winds
-down (no return to PLAY), so a session always concludes.
+holds it. In **session mode** the two open-ended states run on time: INTRO spins up after `session.intro_seconds`
+with anyone present, PLAY runs `session.play_seconds` whatever the count, and END only winds down (no
+return to PLAY), so a session always concludes.
 
 **Boot invariant — the motor never powers on into PROJECTION.** Every path that could command PROJECTION
 at boot is guarded, and each guard has a unit test:
@@ -97,7 +100,8 @@ must preserve this invariant.**
 **Hardware failsafe**: if the machine does not rotate, it turns the lights off **(site fact)**, so a
 stalled spin-down cannot strand bright lights on a stationary bar. A sensor failure on a machine that is
 still spinning can hold a state (S9/S10 waiting for the lock); that is an operator-intervention case
-(`goto` or the debug select), not a safety one.
+(`goto` or the debug select), not a safety one. A debug layer soloed during S9/S10 also holds it: the
+`beam_wind_down` fade pauses while the layer is not drawn (`LAYERS.md`, *beam_wind_down*).
 
 **Shutdown**: a clean quit ends with an explicit **blackout from each sender**. The light sender sends
 rpm 0, an all-zero frame and rpm 0 again, so the fixture goes dark and decelerates at once; the sound
@@ -227,7 +231,7 @@ the soundscape fades back in.
 The participants have synced their poses: the machine spins up. The pose instrument takes over from the
 line during the spin-up, and the sound enhances the accelerating chaos.
 
-- **Participants**: ≥ 3 · **Duration**: spin-up (`spin_up_seconds`) · **Motor**: PROJECTION
+- **Participants**: ≥ 3 (session: > 0) · **Duration**: spin-up (`spin_up_seconds`) · **Motor**: PROJECTION
 - **Transitions**
   1. elapsed ≥ `spin_up_seconds` → S7 PLAY *(stands in for "at motor top speed": the sensor is blind above
      200 rpm, so time approximates it)*
@@ -248,10 +252,11 @@ line during the spin-up, and the sound enhances the accelerating chaos.
 The participants play the instrument, creating music and light patterns. The space between participants
 holding the same pose fills with light.
 
-- **Participants**: ≥ 3 · **Duration**: ∞ · **Motor**: PROJECTION
+- **Participants**: ≥ 3 (session: any) · **Duration**: ∞ (session: `session.play_seconds`) · **Motor**: PROJECTION
 - **Transitions**
-  1. P < 3 (debounced) → S8 END
-  2. session: elapsed ≥ `session.play_seconds` → S8 END
+  1. stand-alone: P < 3 (debounced) → S8 END
+  2. session: elapsed ≥ `session.play_seconds` → S8 END *(the count is not checked: a session plays out
+     its time)*
 - **Mix**: `pose_instrument` 1.0 · `projection_playhead` 1.0
 - **White**: the pose instrument — patterns per pose plus the sync fill between similarly-posed
   participants — and the playhead line at full white
@@ -300,7 +305,7 @@ It is timed rather than driven by the measured deceleration because the sensor i
 - **Blue**: none
 - **Pose sound**: fade out distortion?
 - **Secondary sound**: fade out distortion?
-- **Progress** (OSC `stage_progress`): the layer's own fade readout (0 = full wall, 1 = gone), so the
+- **Progress** (OSC `/global/state/progress`): the layer's own fade readout (0 = full wall, 1 = gone), so the
   sound-side distortion fade rides the actual fade
 
 ## S10 — END_IDLE
@@ -321,7 +326,7 @@ holds — landing on the BRIGHT line instead of the dim one.
 - **Blue**: sound visuals fade in with the wall's fade
 - **Pose sound**: fade out distortion?
 - **Secondary sound**: fade out distortion?
-- **Progress** (OSC `stage_progress`): the layer's own fade readout, so the sound-side fades ride the
+- **Progress** (OSC `/global/state/progress`): the layer's own fade readout, so the sound-side fades ride the
   actual fade
 
 ---
@@ -333,4 +338,4 @@ holds — landing on the BRIGHT line instead of the dim one.
 - **S6**: whether to draw a line in the projection while it is still dark during the spin-up
 - **S7**: an inactivity exit — "no action for x bars → END", with an action-gated wind-back in END to
   match; left out to keep the graph simple
-- **S8–S10**: the distortion treatment (Max side); `stage_progress` on OSC is the ramp that drives it
+- **S8–S10**: the distortion treatment (Max side); `/global/state/progress` is the ramp that drives it

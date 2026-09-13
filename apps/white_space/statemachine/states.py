@@ -158,9 +158,11 @@ class PlayState(StateBase):
         return [(LayerId.pose_instrument, 1.0), (LayerId.projection_playhead, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
+        if ctx.session:                 # a session plays out its time, whatever the count
+            if ctx.elapsed >= self._config.session.play_seconds:
+                return StateId.END
+            return None
         if ctx.participants < 3:
-            return StateId.END
-        if ctx.session and ctx.elapsed >= self._config.session.play_seconds:
             return StateId.END
         return None
 

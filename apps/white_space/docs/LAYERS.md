@@ -114,10 +114,11 @@ mode drives the same two white outputs as this layer at 1.0 in beam mode.
 - **Behavior**: both white lamps at `f × level`, `f = 1 − ease(elapsed / spin_down_seconds)`,
   hand-tuned to ride the physical spin-down (the sensor is silent above 200 rpm, so the
   deceleration is not measurable). The states exit once `progress` reaches 1 and the
-  playhead lock holds (`STATES.md`).
+  playhead lock holds (`STATES.md`). The fade advances only while the layer is drawn, so a
+  debug solo pauses it.
 - **Settings**: `level`, `spin_down_seconds` (hidden — the visible slider is
   `states.spin_down_seconds`, next to `spin_up_seconds`, shared in via the root),
-  `progress` (read-only fade readout 0..1: the states' exit, `stage_progress` and S10's
+  `progress` (read-only fade readout 0..1: the states' exit, `/global/state/progress` and S10's
   sound-visual reveal ride it)
 - **Reset**: restarts the fade at the full wall (called from S9/S10 `enter()`)
 
@@ -176,7 +177,8 @@ between people* gives symmetry and the seamless join at once.
   anchor (a whole-line gate over the first half spacing), so no line ever sits on the person.
 - **Presence**: per participant attack (`attack_seconds`) and release (`release_seconds`:
   the last pose is held while fading; a fading person still bounds segments so neighbours'
-  lines don't re-space at the moment of leaving).
+  lines don't re-space at the moment of leaving). A pose with a NaN azimuth has no place in the
+  projection and counts as absent (it releases) — the one exception to *Inputs*' no-presence-test rule.
 - **Settings**: `line_spacing`, `line_motion`, `line_flow`, `line_speed`, `lines_per_bar`,
   `line_phase`, `n_blend`; `extent_min`/`extent_max`, `line_edge`; `line_min`/`line_max`,
   `line_soft`, `harmonics`; `level`, `legs_dim`, `blue_min`/`blue_max`; `anchor_width`,
