@@ -2,7 +2,8 @@
 
 How the cameras' detections become people with an azimuth, and why the tracker decides what it
 decides. Companion to `CALIBRATION.md` (tuning the cameras and reading the panorama), `STATES.md`
-and `LAYERS.md`. The code-side rules are in `.claude/rules/tracking.md`.
+and `LAYERS.md`. The code-side rules are in `.claude/rules/tracking.md` and
+`.claude/rules/tracker-panoramic.md`.
 
 This document covers the panoramic tracker (`modules/tracker/panoramic/`), the one White Space runs.
 The one-per-camera tracker (`modules/tracker/onepercam/`) is not described here.
