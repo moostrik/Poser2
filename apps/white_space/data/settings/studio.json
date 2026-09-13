@@ -7,7 +7,7 @@
   "light_resolution": 3600,
   "fov": 127.0,
   "resolution": "P720",
-  "frame_height": 960,
+  "frame_height": 0,
   "tilt": 15.0,
   "lens_fov": 128.9,
   "lens_centre_x": -10.5,
