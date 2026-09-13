@@ -4,7 +4,7 @@ Eleven states played by the `StateMachine` (`apps/white_space/statemachine/`).
 This document is the source of truth for the installation's dramaturgy. Each state's description
 is mirrored as the docstring of its class in `statemachine/states.py`; transition lists below
 are in **priority order**, matching each class's `needs_state_change()`. Timing tunables live
-in the `statemachine` settings group; layer choices in each state's `update()`.
+in the `states` settings group; layer choices in each state's `update()`.
 
 Vocabulary: **P** = debounced live participant count · **bar** = one full playhead cycle
 (the content clock) · **hit** = the playhead sweeps past a participant · **beam layers**
@@ -144,7 +144,7 @@ lock is already there, so the wake starts at once.
 
 - **Participants**: — (ignored) · **Duration**: as long as `blackout` is pinned or the
   playhead is unlocked · **Motor**: BEAM
-- **Transitions**: **in** — boot; or pinning `statemachine.blackout`, the machine's
+- **Transitions**: **in** — boot; or pinning `states.blackout`, the machine's
   highest-priority input: from any state, beating `hold` and `goto`. **out** — a normal
   condition like any other state's: `blackout` released *and* motor lock → OFF_IDLE (the
   wake). A silent sensor holds it dark — the operator `goto` case, as for S9/S10.
@@ -322,7 +322,7 @@ beam mode on the first packet commanding BEAM, so from S8's first tick the two w
 lamps are driven directly: while the bar is still fast they spin into a wall, as it
 slows they thin into beams — one mechanism, so the layer needs no knowledge of the
 bar's speed — see `LAYERS.md`. The fade is timed, not driven by the measured
-deceleration: the sensor is silent above 200 rpm. The `statemachine.spin_down_seconds`
+deceleration: the sensor is silent above 200 rpm. The `states.spin_down_seconds`
 slider — next to `spin_up_seconds`, its mirror; shared into the layer — is tuned by hand
 to the physical spin-down.)*
 

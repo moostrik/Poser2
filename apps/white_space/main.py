@@ -66,10 +66,10 @@ class WhiteSpaceMain:
         self.board = Board()
 
         # RECORDING (independent of the show — works stand-alone and during session mode)
-        self.session = Session(self.settings.recording.core)
+        self.session = Session(self.settings.record.core)
         self.osc_sound_sender = OscSoundSender(self.settings.inout.osc_sound_sender)
         self.ghoster = Ghoster(self.settings.pose.ghoster, playhead=self.board.get_playhead)   # live/pool counts shared from root
-        self.video_recorder = VideoRecorder(self.settings.recording.video, data_path=DATA_PATH)
+        self.video_recorder = VideoRecorder(self.settings.record.video, data_path=DATA_PATH)
 
         # CAMERA
         self.cameras: list[Camera | Simulator] = []
@@ -82,7 +82,7 @@ class WhiteSpaceMain:
             for i in range(num_cameras):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
-        self.tracker = PanoramicTracker(self.settings.camera.tracker, num_players, num_cameras)
+        self.tracker = PanoramicTracker(self.settings.track, num_players, num_cameras)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.source_uploader = source.Uploader()
         self.crop_extractor = crop.Extractor(ps.image_crop)
@@ -155,7 +155,7 @@ class WhiteSpaceMain:
         # STATE MACHINE — the show's single decision maker; commands the Conductor through
         # its three channels (look, layer resets, motor) and emits state to board + OSC.
         self.state_machine = StateMachine(
-            self.settings.statemachine, self.settings.light, board=self.board,
+            self.settings.states, self.settings.light, board=self.board,
             set_mix=self.conductor.set_mix,
             reset_layers=self.conductor.reset_layers,
             set_motor=self.conductor.set_motor_mode,
@@ -283,7 +283,7 @@ class WhiteSpaceMain:
         self.mount_check = MountCheck(self.settings.camera.cameras, self.settings.camera.mount)
 
         # RENDER
-        self.render = WindowRender(self.board, self.settings.render, self.settings.camera.tracker)
+        self.render = WindowRender(self.board, self.settings.render, self.settings.track)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
         self.render.add_update_callback(self.mount_check.update)
         self.conductor.add_update_callback(self.state_machine.update)

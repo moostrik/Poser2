@@ -38,7 +38,7 @@ Calibrate in this order. Cameras first: everything else is tuned against the fra
    - Tape at 50 cm on the wall in front of each camera: it must sit on the green horizon line. See
      *The horizon check*.
    - **The metres**, last of the camera step and the only part needing a person to walk: turn
-     `camera.tracker.foot_offset` until the label's `H` stops drifting as they walk out, then read
+     `track.foot_offset` until the label's `H` stops drifting as they walk out, then read
      `H`'s value to check `rig.camera_height`. Tape confirms it: standing on R 1.5 or R 3.5, the mark's
      foot tick must land on that edge of the zone field. See *Calibrating the metres*. Nothing in
      the show depends on this — only the readouts — so it may be deferred.
@@ -58,7 +58,7 @@ was); the flash on the first person at IDLE → INTRO; the sound on the beam.
 
 | step | settings | readout | passes when |
 |---|---|---|---|
-| 1 cameras | `fov`, `resolution`, `frame_height`, `tilt`, `lens_fov`, `lens_centre_x`, `lens_centre_y`, `camera.cam_N.readings.roll_offset`, `camera.tracker.rig.*`, `camera.tracker.seam.*`, `camera.tracker.reacquire_angle`, `camera.tracker.foot_offset` | the open log's `lens:` and `frame:` lines; `camera.mount.status`; the panorama row | lens errors as tabled; mount OK; overlaps coincide at head and knee height; tape on the horizon line; `H` flat as a person walks out, then their real height; standing on taped R 1.5 and R 3.5 the foot tick lands on that zone edge; one person crossing a seam keeps one id and two overlapping fields |
+| 1 cameras | `fov`, `resolution`, `frame_height`, `tilt`, `lens_fov`, `lens_centre_x`, `lens_centre_y`, `camera.cam_N.readings.roll_offset`, `track.rig.*`, `track.seam.*`, `track.reacquire_angle`, `track.foot_offset` | the open log's `lens:` and `frame:` lines; `camera.mount.status`; the panorama row | lens errors as tabled; mount OK; overlaps coincide at head and knee height; tape on the horizon line; `H` flat as a person walks out, then their real height; standing on taped R 1.5 and R 3.5 the foot tick lands on that zone edge; one person crossing a seam keeps one id and two overlapping fields |
 | 2 playhead | `light.playhead.pulse_offset` | beam mode, `beam_flash`; `/pose/N/playhead/offset` | flash on the person; offset reads 0 at the crossing |
 | 3 projection | `inout.osc_light_sender.projection_offset`, `.interlace` | projection mode, `pose_instrument` | static line on the person; single line on the wall |
 | 4 speakers | `inout.osc_sound_sender.speaker_offset` (0) | IDLE, Max voicing `/global/playhead` | sound follows the beam |
@@ -122,7 +122,7 @@ while the number we can actually measure costs about 10° more than assuming one
 calibrated away; the per-person **variance** could not, because a detector's box bottom is not a
 physical landmark.
 
-So the tracker assumes one depth, **`camera.tracker.rig.parallax_radius`** — derived, never set:
+So the tracker assumes one depth, **`track.rig.parallax_radius`** — derived, never set:
 the tracked zone's *harmonic* mean (`2·min·max/(min+max)` = R 2.1 for R 1.5 – R 3.5), because the
 correction's term is linear in `1/d` and the minimax of that over an interval sits at the midpoint
 of `1/d`. It is exact at R 2.1 and bounded by 6.7° everywhere in the zone.
@@ -361,7 +361,7 @@ bearing error it has under the shared lens. Unit F124's optical centre sits 24 p
 centre, so it keeps 1.4° at its azimuth zero; the other three are within 0.6°. Re-read the numbers
 only after a lens or a unit is replaced.
 
-The tracker's other constants, under `camera.tracker.rig`: `camera_radius` (**R 0.36 m** — how far
+The tracker's other constants, under `track.rig`: `camera_radius` (**R 0.36 m** — how far
 each lens sits from the fixture axis, like every figure here), `camera_height`
 (0.50 m), and the tracked zone `zone_min_radius` / `zone_max_radius` (R 1.5 – R 3.5). The first two
 are **measured with a tape**, the zone is **decided and then taped**; none is tuned. Plus `seam.*`
@@ -418,7 +418,7 @@ cap the top at 43.7° everywhere — hands from R 2.1, head from R 1.7 — which
 is taller than the sensor.
 
 **The panel shows this live, for the configuration actually running.** The tables above are the
-design reference; `camera.tracker.rig` is the check. After `hfov`, `vfov`, `tilt` and the frame's
+design reference; `track.rig` is the check. After `hfov`, `vfov`, `tilt` and the frame's
 two edge angles it publishes, as radii from the fixture:
 
 | read-out | what it is |
@@ -532,10 +532,10 @@ labels never collide and never move as people do, and its x always sits on its o
 
 | tag | dropped because | the setting |
 |---|---|---|
-| `young` | the device has not held the track long enough | `camera.tracker.age_filter` |
-| `small` | the box is shorter than the minimum | `camera.tracker.height_filter` |
-| `dead zone` | a new person arriving right at a camera's field edge | `camera.tracker.seam.dead_zone` |
-| `past R3.5` | standing past the far edge | `camera.tracker.zone_filter`, at `camera.tracker.rig.zone_max_radius` |
+| `young` | the device has not held the track long enough | `track.age_filter` |
+| `small` | the box is shorter than the minimum | `track.height_filter` |
+| `dead zone` | a new person arriving right at a camera's field edge | `track.seam.dead_zone` |
+| `past R3.5` | standing past the far edge | `track.zone_filter`, at `track.rig.zone_max_radius` |
 
 So a person walking out keeps their own mark, fading, and when it has gone grey a grey box tagged
 `past R3.5` takes its place for as long as the camera still sees them.
@@ -550,7 +550,7 @@ So a person walking out keeps their own mark, fading, and when it has gone grey 
 | two lines in one colour, side by side on a seam, opening and closing as they walk | nothing — that is the depth indicator; it closes at R 2.1 and opens to 6.7° at the zone's edges |
 | two lines in one colour further apart than 6.7°, anywhere | the azimuth chain — `fov`, `tilt` or `camera_radius` |
 | every line sits the same small distance beside its own pixels | nothing — the image is stitched at R 2.25 and the marks at R 2.1 (see above) |
-| the lines coincide but the primary still jumps at the seam | `camera.tracker.seam.hysteresis` |
+| the lines coincide but the primary still jumps at the seam | `track.seam.hysteresis` |
 
 The image is stitched for one assumed depth, `render.panorama.focus_radius` — **R 2.25 m**, the
 middle of the play zone. It is exact there and ghosts by a bounded amount elsewhere (+3.9° at R 1.5,
@@ -648,7 +648,7 @@ this procedure assumes; the others are second opinions on the same seam:
 | `STRIPE` | alternating columns, so a straight edge zigzags. Blind to exposure differences — use it when the two cameras disagree on brightness |
 
 **A free check of the whole azimuth chain:** at R 2.25 m each camera should span **110.5°** of the
-strip, not 127°. Set `camera.tracker.rig.camera_radius` to 0 and every image should snap to
+strip, not 127°. Set `track.rig.camera_radius` to 0 and every image should snap to
 exactly 127° with 37° overlaps. It is a live slider, so this exercises the entire geometry in two
 drags.
 
@@ -807,7 +807,7 @@ cancel. The offset corrects the *reading*, not the image.
 Floor plane, on tangent rows: `camera_height · focal / (bottom_px − horizon_px)` — the rows below
 the horizon *are* the tangent of the depression, so nothing is converted. The row model is the
 frame's own (`frame_window`, derived by the tracker from the same camera fields the warp used)
-and published under `camera.tracker.rig` as the frame's two edge angles, `angle_bottom` and
+and published under `track.rig` as the frame's two edge angles, `angle_bottom` and
 `angle_top` — from which `panorama_map.row_model` rebuilds the row form exactly, so the panel shows
 degrees and the panorama still draws with the tracker's own rows. Two limits:
 
@@ -827,7 +827,7 @@ standing on it. Feet at or above the horizon read as infinitely far: not standin
 
 ### The far edge
 
-**Past `rig.zone_max_radius` the tracker does not see a person** — while `camera.tracker.zone_filter`
+**Past `rig.zone_max_radius` the tracker does not see a person** — while `track.zone_filter`
 is on (the switch sits with the tracker's other filters, `age_filter` and `height_filter`; off means
 off: nothing is filtered at the far edge and nothing mentions it). That is the whole rule, and it is
 handled exactly like a missed detection. On the panorama they show as a grey box tagged `past R3.5`:
@@ -874,7 +874,7 @@ nearer, so the filter barely acts — nobody is wrongly dropped. Tune `foot_offs
 flat (*Calibrating the metres*), never by overshooting: too much makes people inside the zone read
 past the edge.
 
-**The box bottom is not the feet, and `camera.tracker.foot_offset` is the correction.** The device
+**The box bottom is not the feet, and `track.foot_offset` is the correction.** The device
 tracker puts its box bottom *below* the feet, by what measures as a fixed pad in pixels (≈94 px on
 the studio frame, 0.098 of frame height). Uncorrected, `below` is too large and both readouts read
 short. The bias is the box's, not the model's: nothing in our code touches the ROI
@@ -934,7 +934,7 @@ nothing in the show consumes it yet.
 The two stages fix different things and do not interact: stage 1 removes the **drift**, stage 2 the
 **scale**. Do them in order, with `image` + `grid` + `observations` + `labels` on the panorama.
 
-**1. Walk one person out and turn `camera.tracker.foot_offset` until `H` stops drifting.** `H` is
+**1. Walk one person out and turn `track.foot_offset` until `H` stops drifting.** `H` is
 distance-invariant by construction, so any drift is the detector's pad and nothing else. With the
 offset at 0 a 1.8 m person on the studio rig prints:
 
@@ -1104,7 +1104,7 @@ hit, the sound and both screen views are self-consistent.
 
 ## Open
 
-- **The frame fractions were tuned on 720 rows.** `camera.tracker.height_filter` and
+- **The frame fractions were tuned on 720 rows.** `track.height_filter` and
   `pose.distance_extractor.near_y` / `far_y` are fractions of the frame, and the frame is now
   taller and its rows tangents. Re-tune on the rig. (The seam rules are no longer among them — see
   *Linking on a seam* — but `height_filter` still is: a frame fraction whose meaning changes with
@@ -1132,7 +1132,7 @@ hit, the sound and both screen views are self-consistent.
 - **Roll is not modelled by the warp.** `warp_mesh_points` takes `tilt` only, so a camera that
   is genuinely rolled still ghosts at its seams (≈2.2° vertical per 1.2° of roll). The mount readout
   says whether that is happening; the fix, if it is, is the tripod or a second rotation in the mesh.
-- **`camera.tracker.foot_offset` is built but still 0 — it is a measurement, waiting on rig time.**
+- **`track.foot_offset` is built but still 0 — it is a measurement, waiting on rig time.**
   The mechanism is in place (`Geometry._foot_px`, shared by both readouts) and the instrument to
   tune it is on the panorama; what has not happened is a person walking out on the real rig. Until
   it does, `R` and `H` read short — the studio table under *The tracker's height* has the numbers.

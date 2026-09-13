@@ -49,10 +49,10 @@ class CameraResolution(IntEnum):
 
     NOT derived from it, and to be re-tuned on the rig alongside it, because they are set by eye
     against the frame rather than computed (P800 -> P720 scales them by 800/720 = 1.111):
-      camera.tracker.height_filter          a fraction of frame height, so it scales
-      camera.tracker.foot_offset            likewise: the detector's pad measures in pixels
+      track.height_filter                   a fraction of frame height, so it scales
+      track.foot_offset                     likewise: the detector's pad measures in pixels
       pose.distance_extractor.near_y/far_y  positions in the frame, so they scale and shift
-    (`camera.tracker.seam.*` is NOT in that list either: it is in degrees and percent.)
+    (`track.seam.*` is NOT in that list either: it is in degrees and fractions of a height.)
     (The vertical field is NOT in that list — see `frame_fov` below, which derives it. Neither is
     the render's panorama row, which derives its own aspect.)
     """

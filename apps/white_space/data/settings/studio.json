@@ -13,6 +13,209 @@
   "lens_centre_x": -10.5,
   "lens_centre_y": 10.5,
   "spin_down_seconds": 6.0,
+  "render": {
+    "camera_view": "BOTH",
+    "preview": {
+      "tracker": {
+        "stage": "LERP",
+        "pose_line_width": 2.0,
+        "bbox_line_width": 2
+      },
+      "poser": {
+        "stage": "LERP",
+        "line_width": 2.0,
+        "line_smooth": 0.0,
+        "use_gpu_crop": true
+      }
+    },
+    "data_time": {
+      "stage": "LERP"
+    },
+    "data": {
+      "stage": "LERP",
+      "mode": "NONE",
+      "feature_field": "MotionGate",
+      "line_width": 3.0,
+      "line_smooth": 10.0,
+      "use_scores": false,
+      "render_labels": true,
+      "use_history_color": false
+    },
+    "playhead_data": {
+      "stage": "LERP",
+      "mode": "WINDOW",
+      "feature_field": "GhostFeature",
+      "line_width": 10.0,
+      "line_smooth": 0.0,
+      "use_scores": false,
+      "render_labels": true,
+      "use_history_color": false
+    },
+    "beam_light_sim": {
+      "width": 2.0,
+      "blur": 4.0
+    },
+    "panorama": {
+      "parts": [
+        "image",
+        "seams",
+        "grid",
+        "observations",
+        "labels"
+      ],
+      "blend": "MAX",
+      "focus_radius": 2.1,
+      "grid_degrees": 10.0,
+      "show_all_observations": true
+    },
+    "colors": {
+      "player_0": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_1": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_2": {
+        "r": 0.2,
+        "g": 1.0,
+        "b": 0.6,
+        "a": 1.0
+      },
+      "player_3": {
+        "r": 0.2,
+        "g": 0.6,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_4": {
+        "r": 0.6,
+        "g": 0.2,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_5": {
+        "r": 1.0,
+        "g": 0.2,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_6": {
+        "r": 1.0,
+        "g": 0.5,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_7": {
+        "r": 0.5,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "pose_left": {
+        "r": 1.0,
+        "g": 0.5,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "pose_right": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "pose_center": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "history": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      }
+    },
+    "window": {
+      "title": "Poser",
+      "v_sync": true,
+      "monitor": "M1",
+      "x": 45,
+      "y": 2162,
+      "width": 2073,
+      "height": 1611,
+      "secondary_list": [],
+      "secondary_fullscreen": true,
+      "fullscreen_mode": "WINDOWED"
+    }
+  },
+  "record": {
+    "output_path": "recordings",
+    "name": "flabber",
+    "split_seconds": 10,
+    "osc": {
+      "port_in": 9000,
+      "return_messages": true,
+      "port_out": 9001,
+      "ip_address_out": "127.0.0.1",
+      "verbose": false
+    },
+    "core": {},
+    "video": {
+      "keyframe_interval": 0,
+      "temp_path": "temp",
+      "video_encoder": "iGPU",
+      "video_format": "H264",
+      "video_frame_types": [
+        "VIDEO"
+      ],
+      "enabled": true
+    }
+  },
+  "inout": {
+    "osc_light_sender": {
+      "ip_addresses": "192.168.1.177",
+      "port": 6454,
+      "use_signed": false,
+      "mtu": 1500,
+      "lower_edge": 0.32,
+      "upper_edge": 0.68,
+      "curve": 2.0,
+      "startup_delay": 2.0,
+      "chunk_interval": 0.0,
+      "projection_offset": 198.0,
+      "interlace": {
+        "white_0": 0,
+        "white_1": 5,
+        "blue_0": -10,
+        "blue_1": 9
+      }
+    },
+    "udp_light_receiver": {
+      "port": 6454,
+      "verbose": false
+    },
+    "osc_sound_sender": {
+      "stage": "LERP",
+      "volume": 1.0,
+      "speaker_offset": 0.0,
+      "ip_addresses": "192.168.1.39",
+      "port": 8000
+    },
+    "osc_sound_receiver": {
+      "port_in": 6455,
+      "return_messages": false,
+      "port_out": 9001,
+      "ip_address_out": "192.168.0.0",
+      "verbose": true
+    }
+  },
   "camera": {
     "yolo": true,
     "color": false,
@@ -174,66 +377,28 @@
       "start_norm": 0.0,
       "end_norm": 1.0
     },
-    "tracker": {
-      "age_filter": 5,
-      "height_filter": 0.2,
-      "zone_filter": true,
-      "foot_offset": 0.03,
-      "reacquire_angle": 5.0,
-      "lost_timeout": 2.0,
-      "emit_timeout": 1.0,
-      "seam": {
-        "dead_zone": 6.5,
-        "link_angle": 15.0,
-        "link_height": 0.25,
-        "hysteresis": 0.6
-      },
-      "rig": {
-        "camera_radius": 0.36,
-        "camera_height": 0.5,
-        "zone_min_radius": 1.5,
-        "zone_max_radius": 3.5
-      }
-    },
     "frame_sync": {},
     "tracklet_sync": {}
   },
-  "inout": {
-    "osc_light_sender": {
-      "ip_addresses": "192.168.1.177",
-      "port": 6454,
-      "use_signed": false,
-      "mtu": 1500,
-      "lower_edge": 0.32,
-      "upper_edge": 0.68,
-      "curve": 2.0,
-      "startup_delay": 2.0,
-      "chunk_interval": 0.0,
-      "projection_offset": 198.0,
-      "interlace": {
-        "white_0": 0,
-        "white_1": 5,
-        "blue_0": -10,
-        "blue_1": 9
-      }
+  "track": {
+    "age_filter": 5,
+    "height_filter": 0.2,
+    "zone_filter": true,
+    "foot_offset": 0.03,
+    "reacquire_angle": 5.0,
+    "lost_timeout": 2.0,
+    "emit_timeout": 1.0,
+    "seam": {
+      "dead_zone": 6.5,
+      "link_angle": 15.0,
+      "link_height": 0.25,
+      "hysteresis": 0.6
     },
-    "udp_light_receiver": {
-      "port": 6454,
-      "verbose": false
-    },
-    "osc_sound_sender": {
-      "stage": "LERP",
-      "volume": 1.0,
-      "speaker_offset": 0.0,
-      "ip_addresses": "192.168.1.39",
-      "port": 8000
-    },
-    "osc_sound_receiver": {
-      "port_in": 6455,
-      "return_messages": false,
-      "port_out": 9001,
-      "ip_address_out": "192.168.0.0",
-      "verbose": true
+    "rig": {
+      "camera_radius": 0.36,
+      "camera_height": 0.5,
+      "zone_min_radius": 1.5,
+      "zone_max_radius": 3.5
     }
   },
   "pose": {
@@ -687,7 +852,7 @@
       }
     }
   },
-  "statemachine": {
+  "states": {
     "blackout": false,
     "spin_up_seconds": 14.0,
     "off_idle_bars": 1.0,
@@ -708,173 +873,8 @@
       "play_seconds": 150.0
     }
   },
-  "render": {
-    "camera_view": "BOTH",
-    "preview": {
-      "tracker": {
-        "stage": "LERP",
-        "pose_line_width": 2.0,
-        "bbox_line_width": 2
-      },
-      "poser": {
-        "stage": "LERP",
-        "line_width": 2.0,
-        "line_smooth": 0.0,
-        "use_gpu_crop": true
-      }
-    },
-    "data_time": {
-      "stage": "LERP"
-    },
-    "data": {
-      "stage": "LERP",
-      "mode": "NONE",
-      "feature_field": "MotionGate",
-      "line_width": 3.0,
-      "line_smooth": 10.0,
-      "use_scores": false,
-      "render_labels": true,
-      "use_history_color": false
-    },
-    "playhead_data": {
-      "stage": "LERP",
-      "mode": "WINDOW",
-      "feature_field": "GhostFeature",
-      "line_width": 10.0,
-      "line_smooth": 0.0,
-      "use_scores": false,
-      "render_labels": true,
-      "use_history_color": false
-    },
-    "beam_light_sim": {
-      "width": 2.0,
-      "blur": 4.0
-    },
-    "panorama": {
-      "parts": [
-        "image",
-        "seams",
-        "grid",
-        "observations",
-        "labels"
-      ],
-      "blend": "MAX",
-      "focus_radius": 2.1,
-      "grid_degrees": 10.0,
-      "show_all_observations": true
-    },
-    "colors": {
-      "player_0": {
-        "r": 1.0,
-        "g": 0.0,
-        "b": 0.0,
-        "a": 1.0
-      },
-      "player_1": {
-        "r": 1.0,
-        "g": 1.0,
-        "b": 0.0,
-        "a": 1.0
-      },
-      "player_2": {
-        "r": 0.2,
-        "g": 1.0,
-        "b": 0.6,
-        "a": 1.0
-      },
-      "player_3": {
-        "r": 0.2,
-        "g": 0.6,
-        "b": 1.0,
-        "a": 1.0
-      },
-      "player_4": {
-        "r": 0.6,
-        "g": 0.2,
-        "b": 1.0,
-        "a": 1.0
-      },
-      "player_5": {
-        "r": 1.0,
-        "g": 0.2,
-        "b": 1.0,
-        "a": 1.0
-      },
-      "player_6": {
-        "r": 1.0,
-        "g": 0.5,
-        "b": 0.0,
-        "a": 1.0
-      },
-      "player_7": {
-        "r": 0.5,
-        "g": 0.0,
-        "b": 1.0,
-        "a": 1.0
-      },
-      "pose_left": {
-        "r": 1.0,
-        "g": 0.5,
-        "b": 0.0,
-        "a": 1.0
-      },
-      "pose_right": {
-        "r": 0.0,
-        "g": 1.0,
-        "b": 1.0,
-        "a": 1.0
-      },
-      "pose_center": {
-        "r": 1.0,
-        "g": 1.0,
-        "b": 1.0,
-        "a": 1.0
-      },
-      "history": {
-        "r": 0.5,
-        "g": 0.5,
-        "b": 0.5,
-        "a": 1.0
-      }
-    },
-    "window": {
-      "title": "Poser",
-      "v_sync": true,
-      "monitor": "M1",
-      "x": 45,
-      "y": 2162,
-      "width": 2073,
-      "height": 1611,
-      "secondary_list": [],
-      "secondary_fullscreen": true,
-      "fullscreen_mode": "WINDOWED"
-    }
-  },
   "server": {
     "title": "White Space",
     "port": 666
-  },
-  "recording": {
-    "output_path": "recordings",
-    "name": "flabber",
-    "split_seconds": 10,
-    "osc": {
-      "port_in": 9000,
-      "return_messages": true,
-      "port_out": 9001,
-      "ip_address_out": "127.0.0.1",
-      "verbose": false
-    },
-    "core": {},
-    "video": {
-      "keyframe_interval": 0,
-      "temp_path": "temp",
-      "video_encoder": "iGPU",
-      "video_format": "H264",
-      "video_frame_types": [
-        "VIDEO"
-      ],
-      "enabled": true
-    }
   }
 }

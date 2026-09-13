@@ -80,8 +80,8 @@ class DebugLayer(IntEnum):
 class BeamLayersSettings(BaseSettings):
     """Per-layer composition settings — the beam-mode block of the pool.
     `spin_down_seconds` is a hidden relay (from the root) into wind_down — the spin-down
-    slider's visible home is the statemachine panel, next to spin_up."""
-    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — hidden relay from statemachine (via the root) into wind_down")
+    slider's visible home is the states panel, next to spin_up."""
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — hidden relay from states (via the root) into wind_down")
     beam_blue_sound:    Group[BlueSoundSettings]        = Group(BlueSoundSettings)
     beam_playhead:      Group[BeamPlayheadSettings]     = Group(BeamPlayheadSettings)
     beam_flash:         Group[FlashSettings]            = Group(FlashSettings)
@@ -117,7 +117,7 @@ class LightSettings(BaseSettings):
     light_rate:       Field[float] = Field(30.0, min=1,   max=120,  access=Field.INIT, description="Light output frame rate (fps)")
     light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, description="LED strip resolution (pixels)")
     fov: Field[float] = Field(110.0, access=Field.INIT, description="Camera horizontal FOV — relay from root to player_lines/calibration; its visible home is the camera panel")
-    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — hidden relay from statemachine (via the root) into wind_down")
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — hidden relay from states (via the root) into wind_down")
 
     brightness:     Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Main brightness — applied to the composite; the lamp gamma and floor live in the light sender", newline=True, pinned=True)
 

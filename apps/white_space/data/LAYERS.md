@@ -103,7 +103,7 @@ mode drives the same two white outputs as this layer at 1.0 in beam mode.
   deceleration is not measurable). The states exit once `progress` reaches 1 and the
   motor has locked at BEAM.
 - **Settings**: `level`, `spin_down_seconds` (hidden — the visible slider is
-  `statemachine.spin_down_seconds`, next to `spin_up_seconds`, shared in via the root),
+  `states.spin_down_seconds`, next to `spin_up_seconds`, shared in via the root),
   `progress` (read-only fade readout 0..1: the states' exit, `stage_progress` and S10's
   sound-visual reveal ride it)
 - **Reset**: restarts the fade at the full wall (called from S9/S10 `enter()`)

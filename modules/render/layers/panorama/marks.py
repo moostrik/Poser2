@@ -233,7 +233,7 @@ def _label(tracklet: Tracklet, annotation: PanoramicAnnotation, centre_dist: flo
     the digits change. `R` is the same radius the foot tick is drawn at — the tick is the picture of
     this number — so a tick on the R 3.5 zone line and an `R` of 3.5 say the same thing twice, and
     `rig.zone_max_radius` says 3.5 as well. Both `R` and `H` read low until
-    `camera.tracker.foot_offset` is measured; `H` falling as a person walks away is the signature
+    `track.foot_offset` is measured; `H` falling as a person walks away is the signature
     that it has not been. A tracked person the far edge has stopped counting says so after it.
     """
     tag: str = '' if annotation.rejected is None else rejection_label(annotation.rejected, g.zone_max_radius)

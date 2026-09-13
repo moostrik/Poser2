@@ -108,8 +108,6 @@ class OakGroup(BaseSettings):
     cam_3     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     mount     : Group[MountCheckSettings]        = Group(MountCheckSettings)
     simulator : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cameras, fps])
-    tracker   : Group[PanoramicTrackerSettings]  = Group(PanoramicTrackerSettings, share=[fov, resolution, frame_height, tilt,
-                                                                                         lens_fov, lens_centre_x, lens_centre_y])
     frame_sync: Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
     tracklet_sync: Group[SyncSettings]           = Group(SyncSettings, share=[num_cameras, fps])
 
@@ -363,14 +361,20 @@ class Settings(BaseSettings):
     lens_fov        : Field[float] = Field(0.0, access=Field.INIT, step=0.1, description="Field (°) the lens spans across the full sensor width; 0 = same as fov")
     lens_centre_x   : Field[float] = Field(0.0, access=Field.INIT, step=0.5, description="Optical centre offset from the frame centre (px), full sensor mode")
     lens_centre_y   : Field[float] = Field(0.0, access=Field.INIT, step=0.5, description="Optical centre offset from the frame centre (px), positive = down")
-    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — canonical value tying statemachine (the visible slider) to the wind_down layer")
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — canonical value tying states (the visible slider) to the wind_down layer")
 
+    # In panel order: what you look at, what you capture, the wires out, the sensors, what is made of
+    # them, and what the show does with it.
+    render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams'), tilt, resolution, frame_height])
+    record : Group[RecordingGroup]  = Group(RecordingGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])
+    inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players'), num_virtual.as_('num_virtual'), light_resolution.as_('resolution')])
     camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov, tilt, resolution, frame_height,
                                                              lens_fov, lens_centre_x, lens_centre_y])
-    inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players'), num_virtual.as_('num_virtual'), light_resolution.as_('resolution')])
+    # Its own group, not under `camera`: the tracker fuses the cameras' output, as `pose` does, and
+    # nothing in it is a camera setting. The frame's shape is shared in straight from the root.
+    track  : Group[PanoramicTrackerSettings] = Group(PanoramicTrackerSettings, share=[fov, resolution, frame_height, tilt,
+                                                                                      lens_fov, lens_centre_x, lens_centre_y])
     pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), num_virtual.as_('ghost_slots'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
-    light: Group[LightSettings] = Group(LightSettings, share=[num_players.as_('max_poses'), num_cameras.as_('num_cameras'), light_resolution.as_('light_resolution'), fov, spin_down_seconds])
-    statemachine: Group[StateMachineSettings] = Group(StateMachineSettings, share=[spin_down_seconds])
-    render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams'), tilt, resolution, frame_height])
+    light  : Group[LightSettings]   = Group(LightSettings, share=[num_players.as_('max_poses'), num_cameras.as_('num_cameras'), light_resolution.as_('light_resolution'), fov, spin_down_seconds])
+    states : Group[StateMachineSettings] = Group(StateMachineSettings, share=[spin_down_seconds])
     server : Group[NiceSettings]    = Group(NiceSettings)
-    recording: Group[RecordingGroup] = Group(RecordingGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])
