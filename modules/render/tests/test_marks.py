@@ -177,8 +177,13 @@ class TestLostFade(unittest.TestCase):
         self.assertEqual(self.lost(LOST_TIMEOUT).field_color, (1.0, 0.0, 0.0, 0.0))
         self.assertEqual(self.lost(LOST_TIMEOUT, TrackingStatus.TRACKED).field_color, (1.0, 0.0, 0.0, 1.0))
 
+    def test_a_lost_field_is_outlined_even_as_primary(self) -> None:
+        t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, status=TrackingStatus.LOST),
+                              id=0, last_active=NOW)
+        self.assertTrue(build_marks([t], {t.obs_id}, RED, GREY, GEOMETRY)[0].field_outline)
+
     def test_fresh_is_the_world_colour(self) -> None:
-        self.assertEqual(self.colour(0.0), (1.0, 0.0, 0.0, 0.5))
+        self.assertEqual(self.colour(0.0), (1.0, 0.0, 0.0, 0.8))
 
     def test_at_the_timeout_it_is_grey(self) -> None:
         r, g, b, a = self.colour(LOST_TIMEOUT)
@@ -189,11 +194,24 @@ class TestLostFade(unittest.TestCase):
         r, g, b, a = self.colour(LOST_TIMEOUT / 2.0)
         self.assertAlmostEqual(r, (1.0 + GREY[0]) / 2.0)
         self.assertAlmostEqual(g, GREY[1] / 2.0)
-        self.assertAlmostEqual(a, 0.5)
+        self.assertAlmostEqual(a, 0.8)
 
     def test_a_tracked_observation_does_not_fade(self) -> None:
-        # Only LOST fades; an active candidate keeps its colour at half alpha however old.
-        self.assertEqual(self.colour(LOST_TIMEOUT, status=TrackingStatus.TRACKED), (1.0, 0.0, 0.0, 0.5))
+        # Only LOST fades; an active candidate keeps its colour at the passive alpha however old.
+        self.assertEqual(self.colour(LOST_TIMEOUT, status=TrackingStatus.TRACKED), (1.0, 0.0, 0.0, 0.8))
+
+
+class TestPassiveField(unittest.TestCase):
+    """The primary's field is filled; a view the tracker did not pick is outlined, at full visibility."""
+
+    def test_primary_filled_passive_outlined(self) -> None:
+        t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=True), id=0)
+        primary: Mark = build_marks([t], {t.obs_id}, RED, GREY, GEOMETRY)[0]
+        passive: Mark = build_marks([t], set(), RED, GREY, GEOMETRY)[0]
+        self.assertFalse(primary.field_outline)
+        self.assertTrue(passive.field_outline)
+        self.assertEqual(primary.field_color, passive.field_color)
+        self.assertEqual((primary.color[3], passive.color[3]), (1.0, 0.8))
 
 
 class TestToleranceField(unittest.TestCase):

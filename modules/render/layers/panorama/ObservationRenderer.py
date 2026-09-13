@@ -21,10 +21,12 @@ _CANDIDATE_PX: float = 1.0
 _TICK_PX: float = 17.0
 _TICK_HEIGHT_PX: float = 3.0
 
-# The tolerance field's opacity, and it is NOT scaled by the line's confidence alpha: the line
-# already says candidate / primary. Only a LOST mark's field dims, by its own `field_color` alpha,
-# fading out as the identity runs toward `lost_timeout`.
+# The tolerance field's opacity: the primary's fill, and the outline of a view the tracker did not
+# pick. Both scaled by `field_color`'s alpha, which fades a LOST identity out toward `lost_timeout`.
+# The outline sits below a candidate's line (`marks._PASSIVE`), so its sides do not read as a
+# second observation beside the line.
 _FIELD_ALPHA: float = 0.2
+_OUTLINE_ALPHA: float = 0.6
 
 
 class ObservationRenderer(LayerBase):
@@ -59,9 +61,11 @@ class ObservationRenderer(LayerBase):
       `reacquire_angle` where none does (`marks._tolerance`). Read it as a **pair test** — two
       fields of one colour that overlap are two observations the tracker will join, and two colours
       that overlap are two people it might confuse. A field is drawn the tolerance wide rather than
-      either side of the line precisely so that overlapping *is* the gate.
+      either side of the line precisely so that overlapping *is* the gate. The primary's field is
+      filled; another camera's view of the same person gets only its **outline**, so at a seam the
+      passive field's edges stay visible inside or beyond the primary's fill.
 
-    **A LOST mark** keeps its line and field, and fades: the line to grey, the field out.
+    **A LOST mark** keeps its line and its outlined field, and fades: the line to grey, the field out.
 
     **A detection the tracker dropped** is drawn in grey as its line and its foot tick, with no field
     — no rule can join it to anything. Its tag names the filter (`LabelRenderer`). So a person never
@@ -106,8 +110,12 @@ class ObservationRenderer(LayerBase):
             r, g, b, visible = mark.field_color
             if visible <= 0.0:
                 continue
-            self._spans(mark.tolerance_x, mark.tolerance_w, top, bottom - top,
-                        (r, g, b, _FIELD_ALPHA * visible))
+            if mark.field_outline:
+                self._outline(mark.tolerance_x, mark.tolerance_w, top, bottom, px_x, px_y,
+                              (r, g, b, _OUTLINE_ALPHA * visible))
+            else:
+                self._spans(mark.tolerance_x, mark.tolerance_w, top, bottom - top,
+                            (r, g, b, _FIELD_ALPHA * visible))
 
         for mark in self._marks:
             top, bottom = self._rows(mark, px_y)
@@ -129,6 +137,19 @@ class ObservationRenderer(LayerBase):
         height: float = _TICK_HEIGHT_PX * px_y
         self._spans(mark.x - _TICK_PX * px_x / 2.0, _TICK_PX * px_x,
                     mark.bottom_y - height / 2.0, height, mark.color)
+
+    def _outline(self, x: float, width: float, top: float, bottom: float, px_x: float, px_y: float,
+                 color: tuple[float, float, float, float]) -> None:
+        """A 1 px frame around a field, drawn inside its bounds so it covers the same pixels a fill
+        would, and its overlap with another field still reads as the pair test. Edges only, so the
+        sides do not double the corners' alpha."""
+        width = max(width, 2.0 * px_x)
+        height: float = bottom - top
+        self._spans(x, width, top, px_y, color)                                  # top
+        if height > 2.0 * px_y:
+            self._spans(x, width, bottom - px_y, px_y, color)                    # bottom
+            self._spans(x, px_x, top + px_y, height - 2.0 * px_y, color)         # left
+            self._spans(x + width - px_x, px_x, top + px_y, height - 2.0 * px_y, color)  # right
 
     def _rows(self, mark: Mark, px_y: float) -> tuple[float, float]:
         """The mark's (top, bottom) as the strip can draw them.

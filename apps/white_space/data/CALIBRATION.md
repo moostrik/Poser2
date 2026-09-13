@@ -518,7 +518,8 @@ seam's two observations are at different distances and so have different box hei
 their `H` must agree — it is also exactly what `seam.link_height` compares. Two labels of one
 colour showing different `H` means the distance model, the levelling or a camera's roll, before any
 of it reaches the azimuth. The primary is opaque and 2 px; another camera's view of the same person
-is half-lit and 1 px. A label's *height* is its id — the same index its colour comes from — so
+is slightly dimmer and 1 px, its field only outlined — so at a seam the passive field's edges show inside
+or beyond the primary's fill. A label's *height* is its id — the same index its colour comes from — so
 labels never collide and never move as people do, and its x always sits on its own line.
 
 **Nobody leaves the strip without a reason.**

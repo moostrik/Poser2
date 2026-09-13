@@ -68,6 +68,9 @@ from modules.tracker import PanoramicAnnotation, Tracklet, TrackingStatus, camer
 
 Color = tuple[float, float, float, float]
 
+# How lit the line of a view the tracker did not pick is, against the primary's 1.
+_PASSIVE: float = 0.8
+
 
 @dataclass(frozen=True)
 class StripGeometry:
@@ -114,6 +117,7 @@ class Mark:
     tolerance_w: float                              # ... and its width; both normalised strip x
     color: tuple[float, float, float, float]        # the line's colour, alpha carrying confidence
     field_color: tuple[float, float, float, float]  # the field's world colour; alpha = how visible
+    field_outline: bool                             # a view the tracker did not pick: outlined, not filled
     is_primary: bool
     rejected: bool                                  # a detection a filter dropped: no world, grey
     label: str
@@ -189,6 +193,7 @@ def _mark(tracklet: Tracklet, primaries: set[int],
         tolerance_w=((tolerance_hi - tolerance_lo) % 360.0) / 360.0,
         color=color,
         field_color=field_color,
+        field_outline=not is_primary or tracklet.status == TrackingStatus.LOST,
         is_primary=is_primary,
         rejected=rejected,
         label=_label(tracklet, annotation, centre_dist, rejected, g),
@@ -207,20 +212,21 @@ def _colors(tracklet: Tracklet, is_primary: bool, colors: list[Color], grey: Col
             g: StripGeometry) -> tuple[Color, Color]:
     """(line, field) colours: the world colour, alpha saying how much to trust it.
 
-    A loser at a seam is dimmed so the primary reads as the one in charge. A **LOST** observation is
-    still an identity the tracker holds — anchoring a seam crossing, or a person walking past the far
-    edge — so it keeps its mark, and the mark says how close it is to being forgotten: over
-    `lost_timeout` its **line fades to grey**, at the candidate's alpha, and its **field fades out**,
-    keeping its colour. Fully grey is exactly the moment a dropped detection's grey line takes over,
-    so a person walking out never vanishes; the field going first says the rule it stood for — who
-    it may be joined to — is running out with it.
+    A loser at a seam has its line dimmed so the primary reads as the one in charge; its field is
+    told apart by shape instead (`Mark.field_outline`), since a fill too faint to see says nothing. A
+    **LOST** observation is still an identity the tracker holds — anchoring a seam crossing, or a
+    person walking past the far edge — so it keeps its mark, dimmed like a candidate, and the mark
+    says how close it is to being forgotten: over `lost_timeout` its **line fades to grey** and its
+    **field fades out**, keeping its colour. Fully grey is exactly the moment a dropped detection's
+    grey line takes over, so a person walking out never vanishes; the field going first says the rule
+    it stood for — who it may be joined to — is running out with it.
     """
     r, gr, b, a = colors[tracklet.id % len(colors)] if colors else (1.0, 1.0, 1.0, 1.0)
     if tracklet.status == TrackingStatus.LOST:
         t: float = _fade(tracklet, g)
-        line: Color = (r + (grey[0] - r) * t, gr + (grey[1] - gr) * t, b + (grey[2] - b) * t, a * 0.5)
+        line: Color = (r + (grey[0] - r) * t, gr + (grey[1] - gr) * t, b + (grey[2] - b) * t, a * _PASSIVE)
         return line, (r, gr, b, 1.0 - t)
-    return (r, gr, b, a if is_primary else a * 0.5), (r, gr, b, 1.0)
+    return (r, gr, b, a if is_primary else a * _PASSIVE), (r, gr, b, 1.0)
 
 
 def _label(tracklet: Tracklet, annotation: PanoramicAnnotation, centre_dist: float,
