@@ -18,7 +18,7 @@ from .applicators.MotionGateApplicator import   MotionGateApplicator, MotionGate
 
 from .filters.ConfidenceFilters import          ConfidenceFilterSettings,     BBoxConfidenceFilter,   PointConfidenceFilter,  AngleConfidenceFilter,  AngleVelConfidenceFilter,   AngleSymConfFilter
 from .filters.DualConfidenceFilters import      DualConfFilterSettings,       BBoxDualConfFilter,     PointDualConfFilter,    AngleDualConfFilter,    AngleVelDualConfFilter,     AngleSymDualConfidenceFilter
-from .filters.Predictors import                 PredictorSettings,    BBoxPredictor,      PointPredictor,     AnglePredictor,     AngleVelPredictor,      AngleSymPredictor
+from .filters.Predictors import                 PredictorSettings,    PredictionMethod,   BBoxPredictor,     PointPredictor,     AnglePredictor,     AngleVelPredictor,      AngleSymPredictor
 from .filters.EmaSmoothers import               EmaSmootherSettings,  BBoxEmaSmoother,    PointEmaSmoother,   AngleEmaSmoother,   AngleVelEmaSmoother,    AngleSymEmaSmoother,    SimilarityEmaSmoother,  AngleMotionEmaSmoother
 from .filters.EuroSmoothers import              EuroSmootherSettings, BBoxEuroSmoother,   PointEuroSmoother,  AngleEuroSmoother,  AngleVelEuroSmoother,   AngleSymEuroSmoother,   SimilarityEuroSmoother
 from .filters.MovingAverageSmoothers import     MovingAverageSettings, WindowType, AngleMotionMovingAverageSmoother, SimilarityMovingAverageSmoother
