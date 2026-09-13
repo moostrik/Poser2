@@ -6,7 +6,7 @@ import unittest
 from modules.pose.frame import Frame
 from modules.pose.features import Azimuth
 from apps.white_space.pose import PlayheadOffset, PlayheadOffsetExtractor
-from apps.white_space.light.layers._utilities import angle_to_strip_position
+from apps.white_space.light.layers._utilities import normalize_azimuth
 from apps.white_space.light.layers.beam.flash import offset_to_level
 
 PI = math.pi
@@ -35,12 +35,12 @@ class SingleAngleTest(unittest.TestCase):
         self.assertTrue(math.isnan(dummy.value))
 
 
-class AngleToStripPositionTest(unittest.TestCase):
+class NormalizeAzimuthTest(unittest.TestCase):
     def test_round_trip_inverts_producer(self) -> None:
         # producer: world_angle (deg) -> Azimuth radians; layer: -> [0,1) == world_angle/360
         for deg in (0.0, 45.0, 179.0, 200.0, 359.0):
             az = Azimuth.from_value(math.radians(deg)).value
-            self.assertAlmostEqual(angle_to_strip_position(az), (deg / 360.0) % 1.0, places=4)
+            self.assertAlmostEqual(normalize_azimuth(az), (deg / 360.0) % 1.0, places=4)
 
 
 class PlayheadOffsetExtractorTest(unittest.TestCase):

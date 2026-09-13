@@ -36,12 +36,12 @@ def strip_spans(x: float, width: float) -> list[tuple[float, float]]:
     return [(left, 1.0 - left), (0.0, left + width - 1.0)]
 
 
-def camera_elevation(elevation: float, bearing: float, ring_radius: float,
+def camera_elevation(elevation: float, bearing: float, camera_radius: float,
                      depth_radius: float) -> float:
     """The elevation (degrees) a camera sees for a point the rig centre sees at `elevation`.
 
     The vertical half of the same triangle `azimuth_to_camera_x` solves horizontally, and it has
-    to be solved too: a camera `ring_radius` out from the centre is *closer* to the near wall of
+    to be solved too: a camera `camera_radius` out from the centre is *closer* to the near wall of
     the assumed cylinder, so it sees the same standing person at a wider bearing AND a higher
     elevation. A point on that cylinder stands `h` above the lens plane at horizontal distance
     `depth_radius` from the centre and `d` from the camera, so
@@ -57,7 +57,7 @@ def camera_elevation(elevation: float, bearing: float, ring_radius: float,
     `depth_radius` is the caller's depth, as everywhere here; `bearing` is measured at the centre,
     as `focus_distance` takes it.
     """
-    distance: float = focus_distance(bearing, ring_radius, depth_radius)
+    distance: float = focus_distance(bearing, camera_radius, depth_radius)
     if distance <= 1e-9:
         return elevation
     return math.degrees(math.atan(math.tan(math.radians(elevation)) * depth_radius / distance))
@@ -115,14 +115,14 @@ def strip_aspect_ratio(elevation_window: tuple[float, float]) -> float:
     return 2.0 * math.pi / max(1e-6, span)
 
 
-def elevation_window(band: tuple[float, float], ring_radius: float,
+def elevation_window(band: tuple[float, float], camera_radius: float,
                      focus_radius: float) -> tuple[float, float]:
     """(top, bottom) elevation of the 360-degree strip, measured AT THE RIG CENTRE.
 
     `band` is the (bottom, top) the delivered frames carry, measured at the camera — the tracker's
     published `angle_bottom` and `angle_top`. Converted to the centre's point of view, at the
     bearing where the conversion is tightest. `tan(e_centre) = tan(e_cam) * d / focus_radius`, and
-    `d` is smallest straight ahead (`focus_radius - ring_radius`), so taking the window there
+    `d` is smallest straight ahead (`focus_radius - camera_radius`), so taking the window there
     guarantees every column of the strip is filled rather than fading to black near the camera axes.
 
     **`focus_radius`, not `depth_radius`** — the one function here that names its depth, because it
@@ -134,17 +134,17 @@ def elevation_window(band: tuple[float, float], ring_radius: float,
     comparisons.
     """
     radius: float = max(1e-6, focus_radius)
-    ratio: float = max(0.0, radius - ring_radius) / radius
+    ratio: float = max(0.0, radius - camera_radius) / radius
     low, high = band
     return (math.degrees(math.atan(math.tan(math.radians(high)) * ratio)),
             math.degrees(math.atan(math.tan(math.radians(low)) * ratio)))
 
 
 def panorama_coverage(azimuth: float, num_cameras: int, cam_fov: float, target_fov: float,
-                      ring_radius: float, depth_radius: float) -> int:
+                      camera_radius: float, depth_radius: float) -> int:
     """How many cameras see this azimuth — the divisor an averaging blend needs.
 
-    At `ring_radius = 0` this is 2 within `(cam_fov - target_fov) / 2` of every seam and 1
+    At `camera_radius = 0` this is 2 within `(cam_fov - target_fov) / 2` of every seam and 1
     elsewhere. With the parallax correction on, the bands are narrower (a camera pushed outward
     covers less of the cylinder as measured from the centre) but the shape is the same, and it is
     never 0 as long as the cameras' fields sum past 360.
@@ -152,5 +152,5 @@ def panorama_coverage(azimuth: float, num_cameras: int, cam_fov: float, target_f
     return sum(
         1 for cam_id in range(num_cameras)
         if azimuth_to_camera_x(azimuth, cam_id, cam_fov, target_fov,
-                               ring_radius, depth_radius) is not None
+                               camera_radius, depth_radius) is not None
     )

@@ -1,6 +1,6 @@
 """Tests for the panoramic tracker: seam hysteresis, dead-zone handling,
 cross-camera linking, same-camera re-acquisition, device id reuse, emission of lost worlds,
-world id reuse, and ring parallax correction."""
+world id reuse, and the rig's parallax correction."""
 
 import math
 import time
@@ -46,7 +46,7 @@ class PanoramicTrackerCase(unittest.TestCase):
         # These tests are about identity — hysteresis, linking, id reuse — not about where on the
         # floor anyone stands, and `make_tracklet`'s boxes put the feet wherever their `top` and
         # `height` land. Open the far edge as wide as it goes so the floor position never decides
-        # them; the far-edge filter has its own tests (`TestFarEdge`). With no ring, the zone moves
+        # them; the far-edge filter has its own tests (`TestFarEdge`). At camera radius 0, the zone moves
         # nothing else here: the overlap band is the bare field at any zone.
         self.config.rig.zone_max_radius = 15.0
         self.tracker = PanoramicTracker(self.config, num_players=8, num_cameras=4)
@@ -221,7 +221,7 @@ class TestObservationChannel(PanoramicTrackerCase):
         # What makes the display a calibration tool: each camera's own reading survives the
         # fusion instead of being replaced by the winner's. Here the two agree, because the
         # geometry is consistent — cam0's local 98 and cam1's local 8 are the same azimuth 88.
-        # A disagreement is precisely what a wrong `fov`, `tilt` or `ring_radius` produces, and
+        # A disagreement is precisely what a wrong `fov`, `tilt` or `camera_radius` produces, and
         # what the stitched view draws as a ghost.
         self.submit(make_tracklet(0, 1, 98.0))
         self.submit(make_tracklet(1, 1, 8.0))
@@ -538,7 +538,7 @@ class TestWorldIdPool(unittest.TestCase):
 # Rig geometry for the parallax tests: 4 cameras, fov 127, lens 0.36 m out and 0.5 m up.
 PARALLAX_FOV = 127.0
 TARGET_FOV = 90.0
-RING_RADIUS = 0.36
+CAMERA_RADIUS = 0.36
 CAMERA_HEIGHT = 0.5
 # The tracked zone, deliberately WIDER than the studio preset's R 1.5 – R 3.5. It was chosen when
 # the distance was clamped to the zone, to keep that clamp clear of the frame's own nearest
@@ -569,7 +569,7 @@ def head_row(height_m: float, distance: float) -> float:
 
 def synth_observation(cam_id: int, world_azimuth: float, radius: float,
                       person_height: float | None = None) -> tuple[Rect, float]:
-    """Build the ROI a camera on the ring would report for a person standing at
+    """Build the ROI a camera on the rig would report for a person standing at
     ``world_azimuth`` degrees, ``radius`` m from the rig centre. Returns the ROI and the true
     camera->person distance.
 
@@ -584,8 +584,8 @@ def synth_observation(cam_id: int, world_azimuth: float, radius: float,
     """
     fov_overlap = (PARALLAX_FOV - TARGET_FOV) / 2.0
     facing = TARGET_FOV * cam_id + PARALLAX_FOV / 2.0 - fov_overlap  # world angle the camera faces
-    cx = RING_RADIUS * math.cos(math.radians(facing))
-    cy = RING_RADIUS * math.sin(math.radians(facing))
+    cx = CAMERA_RADIUS * math.cos(math.radians(facing))
+    cy = CAMERA_RADIUS * math.sin(math.radians(facing))
     px = radius * math.cos(math.radians(world_azimuth))
     py = radius * math.sin(math.radians(world_azimuth))
     dx, dy = px - cx, py - cy
@@ -611,7 +611,7 @@ class TestOverlapBand(unittest.TestCase):
     is the failure that matters, because it splits one person into two worlds at a seam.
     """
 
-    def make_rig(self, camera_radius: float = RING_RADIUS,
+    def make_rig(self, camera_radius: float = CAMERA_RADIUS,
                       zone: tuple[float, float] = (1.5, 3.5)) -> Rig:
         g = Rig(cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
         g.set_camera_radius(camera_radius)
@@ -619,7 +619,7 @@ class TestOverlapBand(unittest.TestCase):
         return g
 
     def test_the_rig_band(self) -> None:
-        # R 0.36 ring, R 1.5 – R 3.5 zone, 127 deg fields on 90 deg sectors.
+        # R 0.36 camera radius, R 1.5 – R 3.5 zone, 127 deg fields on 90 deg sectors.
         g = self.make_rig()
         self.assertAlmostEqual(g.overlap_band, 28.3, delta=0.05)     # local angle: the threshold
         # The same threshold in azimuth, at the depth the marks are drawn on — which is what the
@@ -629,7 +629,7 @@ class TestOverlapBand(unittest.TestCase):
         # own axis and so away from the seam the band is measured from.
         self.assertGreater(g.overlap_azimuth, g.overlap_band)
 
-    def test_no_ring_is_the_bare_field_at_any_zone(self) -> None:
+    def test_zero_camera_radius_is_the_bare_field_at_any_zone(self) -> None:
         # With the cameras at the centre there is no depth question left to ask, so the band is
         # exact and the whole derivation collapses. This is why the FOV-110 fixtures above, which
         # leave `camera_radius` at 0, are untouched by any of this.
@@ -668,17 +668,17 @@ class TestOverlapBand(unittest.TestCase):
         """What `overlap_azimuth` exists for. The panorama draws two verticals per seam at
         ±`overlap_azimuth`/2 and switches a mark's field width on `angle_in_overlap`. Those are
         the same threshold, but one is a local angle and the other a strip position, and a local
-        angle has no single position on the ring — project it at the wrong depth and the line sits
+        angle has no single azimuth — project it at the wrong depth and the line sits
         where nothing happens. Pinned here because the two live in different files."""
         g = self.make_rig()
         line: float = g.target_fov - g.overlap_azimuth / 2.0
         # The last local angle still inside the flag, carried to the strip the way a mark is.
         flips: float = camera_local_to_azimuth(g.cam_fov - g.overlap_band, 0, g.cam_fov,
-                                               g.target_fov, g._ring_radius, g.parallax_radius)
+                                               g.target_fov, g._camera_radius, g.parallax_radius)
         self.assertAlmostEqual(line, flips, places=9)
         # And it is genuinely a different place from the far-edge projection it used to be.
         far_edge: float = camera_local_to_azimuth(g.cam_fov - g.overlap_band, 0, g.cam_fov,
-                                                  g.target_fov, g._ring_radius,
+                                                  g.target_fov, g._camera_radius,
                                                   g._max_radius)
         self.assertGreater(abs(far_edge - flips), 1.0)
 
@@ -690,10 +690,10 @@ class TestOverlapBand(unittest.TestCase):
 
 class TestRigParallax(unittest.TestCase):
 
-    def make_rig(self, ring_radius: float = RING_RADIUS,
+    def make_rig(self, camera_radius: float = CAMERA_RADIUS,
                       zone: tuple[float, float] = (ZONE_MIN_RADIUS, ZONE_MAX_RADIUS)) -> Rig:
         g = Rig(cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
-        g.set_camera_radius(ring_radius)
+        g.set_camera_radius(camera_radius)
         g.set_camera_height(CAMERA_HEIGHT)
         g.set_zone(*zone)
         g.set_window(WINDOW, ROWS)
@@ -760,7 +760,7 @@ class TestRigParallax(unittest.TestCase):
     def test_uncorrected_model_disagrees_at_seam(self) -> None:
         # Sanity check that the correction is actually doing something: with
         # parallax disabled the two cameras disagree by several degrees.
-        g = self.make_rig(ring_radius=0.0)
+        g = self.make_rig(camera_radius=0.0)
         roi0, _ = synth_observation(0, world_azimuth=90.0, radius=2.0)
         roi1, _ = synth_observation(1, world_azimuth=90.0, radius=2.0)
         _l0, world0, _d0 = g.calc_angle(roi0, 0)
@@ -768,7 +768,7 @@ class TestRigParallax(unittest.TestCase):
         self.assertGreater(abs(world0 - world1), 5.0)
 
     def test_disabled_matches_raw_model(self) -> None:
-        g = self.make_rig(ring_radius=0.0)
+        g = self.make_rig(camera_radius=0.0)
         roi = Rect(x=0.6, y=0.1, width=0.05, height=0.5)
         local, world, _dist = g.calc_angle(roi, 2)
         fov_overlap = (PARALLAX_FOV - TARGET_FOV) / 2.0
@@ -869,7 +869,7 @@ class TestSeamBirths(unittest.TestCase):
 
     def setUp(self) -> None:
         self.config = PanoramicTrackerSettings(fov=PARALLAX_FOV)
-        self.config.rig.camera_radius = RING_RADIUS
+        self.config.rig.camera_radius = CAMERA_RADIUS
         self.config.rig.camera_height = CAMERA_HEIGHT
         self.config.seam.dead_zone = 6.5
         self.tracker = PanoramicTracker(self.config, num_players=8, num_cameras=4)
@@ -902,14 +902,14 @@ class TestSeamBirths(unittest.TestCase):
 
 
 class RigTrackerCase(unittest.TestCase):
-    """A tracker on the rig's geometry (R 0.36 ring, R 1.5 – R 3.5 zone) with the fixture's own
+    """A tracker on the rig's geometry (R 0.36 camera radius, R 1.5 – R 3.5 zone) with the fixture's own
     frame, so a synthesised box puts the feet where the person really stands. No tests of its own."""
 
     AXIS: float = 45.0            # camera 0's optical axis, in world azimuth
 
     def setUp(self) -> None:
         self.config = PanoramicTrackerSettings(fov=PARALLAX_FOV)
-        self.config.rig.camera_radius = RING_RADIUS
+        self.config.rig.camera_radius = CAMERA_RADIUS
         self.config.rig.camera_height = CAMERA_HEIGHT
         self.config.lost_timeout = 2.0
         self.tracker = PanoramicTracker(self.config, num_players=8, num_cameras=4)
@@ -938,13 +938,13 @@ class TestFarEdge(RigTrackerCase):
     """Past `zone_max_radius` a person is not seen: handled exactly like a missed detection."""
 
     def test_the_edge_is_a_radius_not_a_camera_distance(self) -> None:
-        """A camera sits `ring_radius` out toward the person, so it reads them nearer than their
+        """A camera sits `camera_radius` out toward the person, so it reads them nearer than their
         radius: on its axis at R 3.6 it reads 3.24 m, which a camera-distance test against 3.5
         would wrongly accept."""
         g = self.tracker.rig
         on_axis: float = PARALLAX_FOV / 2.0
-        self.assertTrue(g.beyond_zone(on_axis, 3.6 - RING_RADIUS))
-        self.assertFalse(g.beyond_zone(on_axis, 3.4 - RING_RADIUS))
+        self.assertTrue(g.beyond_zone(on_axis, 3.6 - CAMERA_RADIUS))
+        self.assertFalse(g.beyond_zone(on_axis, 3.4 - CAMERA_RADIUS))
         self.assertTrue(g.beyond_zone(on_axis, math.inf))            # feet not on this floor
 
     def test_a_new_arrival_past_the_edge_is_not_started(self) -> None:
@@ -972,7 +972,7 @@ class TestFarEdge(RigTrackerCase):
         after = self.tracker.observations.live(0, 1)
         assert after is not None and isinstance(after.annotation, PanoramicAnnotation)
         self.assertEqual(after.last_active, before.last_active)
-        self.assertAlmostEqual(after.annotation.distance, 4.0 - RING_RADIUS, delta=0.01)
+        self.assertAlmostEqual(after.annotation.distance, 4.0 - CAMERA_RADIUS, delta=0.01)
         self.assertEqual(set(out.keys()), {0})                         # remembered: 1.5 s < lost_timeout
 
     def test_someone_who_stays_out_is_forgotten(self) -> None:
@@ -1146,7 +1146,7 @@ class TestWorldAzimuth(PanoramicTrackerCase):
 
 
 class TestNoStepAtHandover(RigTrackerCase):
-    """On the real ring, off the parallax depth, the two cameras disagree by the seam residual. Walking
+    """On the real rig, off the parallax depth, the two cameras disagree by the seam residual. Walking
     across the seam, the emitted azimuth must move with the person, not jump when the primary changes."""
 
     def test_walking_across_a_seam_at_the_zone_edge(self) -> None:
@@ -1269,7 +1269,7 @@ class TestFootOffset(unittest.TestCase):
 
     def make_rig(self, foot_offset: float = 0.0) -> Rig:
         g = Rig(cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
-        g.set_camera_radius(RING_RADIUS)
+        g.set_camera_radius(CAMERA_RADIUS)
         g.set_camera_height(CAMERA_HEIGHT)
         g.set_zone(ZONE_MIN_RADIUS, ZONE_MAX_RADIUS)
         g.set_window(WINDOW, ROWS)
@@ -1350,31 +1350,31 @@ class TestReachRadius(unittest.TestCase):
     HANDS: float = 2.2
 
     def test_on_axis_it_is_the_closed_form(self) -> None:
-        # (height - h) / tan(limit) + ring — the doc's own tilt-table arithmetic.
-        for ring in (0.0, 0.36):
+        # (height - h) / tan(limit) + camera_radius — the doc's own tilt-table arithmetic.
+        for camera_radius in (0.0, 0.36):
             for top in (30.0, 45.0, 51.23):
-                with self.subTest(ring=ring, top=top):
-                    got: float = reach_radius(self.HANDS, 0.0, self.CAMERA_HEIGHT, ring, lambda _b: top)
-                    want: float = (self.HANDS - self.CAMERA_HEIGHT) / math.tan(math.radians(top)) + ring
+                with self.subTest(camera_radius=camera_radius, top=top):
+                    got: float = reach_radius(self.HANDS, 0.0, self.CAMERA_HEIGHT, camera_radius, lambda _b: top)
+                    want: float = (self.HANDS - self.CAMERA_HEIGHT) / math.tan(math.radians(top)) + camera_radius
                     self.assertAlmostEqual(got, want, delta=1e-6)
 
     def test_below_the_lens_it_reads_the_bottom(self) -> None:
-        for ring in (0.0, 0.36):
+        for camera_radius in (0.0, 0.36):
             for bottom in (-15.0, -21.2, -30.0):
-                with self.subTest(ring=ring, bottom=bottom):
-                    got: float = reach_radius(0.0, 0.0, self.CAMERA_HEIGHT, ring, lambda _b: bottom)
-                    want: float = self.CAMERA_HEIGHT / math.tan(math.radians(-bottom)) + ring
+                with self.subTest(camera_radius=camera_radius, bottom=bottom):
+                    got: float = reach_radius(0.0, 0.0, self.CAMERA_HEIGHT, camera_radius, lambda _b: bottom)
+                    want: float = self.CAMERA_HEIGHT / math.tan(math.radians(-bottom)) + camera_radius
                     self.assertAlmostEqual(got, want, delta=1e-6)
 
-    def test_without_a_ring_the_seam_is_the_axis(self) -> None:
+    def test_zero_camera_radius_makes_the_seam_the_axis(self) -> None:
         # No parallax: a line 45 deg off the axis is seen at 45 deg, at the same distance.
         axis: float = reach_radius(self.HANDS, 0.0, self.CAMERA_HEIGHT, 0.0, lambda _b: 45.0)
         seam: float = reach_radius(self.HANDS, 45.0, self.CAMERA_HEIGHT, 0.0, lambda _b: 45.0)
         self.assertAlmostEqual(seam, axis, delta=1e-6)
 
     def test_a_top_that_falls_off_axis_pushes_the_seam_out(self) -> None:
-        """The four-leaf pattern: the sensor's top edge is lower toward the frame edge, and on a
-        ring the seam line is seen even further out than its own bearing — so the seam is worse."""
+        """The four-leaf pattern: the sensor's top edge is lower toward the frame edge, and with a
+        camera radius the seam line is seen even further out than its own bearing — so the seam is worse."""
         def falling(bearing: float) -> float:
             return 51.0 - 0.2 * abs(bearing)
         axis: float = reach_radius(self.HANDS, 0.0, self.CAMERA_HEIGHT, 0.36, falling)
@@ -1425,11 +1425,11 @@ class TestReachReadouts(unittest.TestCase):
         config = PanoramicTrackerSettings(fov=PARALLAX_FOV, resolution=resolution,
                                           tilt=self.TILT, frame_height=self.ROWS, lens_fov=self.LENS_FOV,
                                           lens_centre_x=lens_centre[0], lens_centre_y=lens_centre[1])
-        config.rig.camera_radius = RING_RADIUS
+        config.rig.camera_radius = CAMERA_RADIUS
         config.rig.camera_height = CAMERA_HEIGHT
         return config
 
-    def brute_force(self, height: float, centre_bearing: float, ring: float, lens_height: float,
+    def brute_force(self, height: float, centre_bearing: float, camera_radius: float, lens_height: float,
                     edge: int) -> float:
         """The first radius, in 1 mm steps, at which a point on the line is inside the picture."""
         window = frame_window(self.SRC, (self.SRC[0], self.ROWS), self.SRC[0], PARALLAX_FOV,
@@ -1439,9 +1439,9 @@ class TestReachReadouts(unittest.TestCase):
         dpp: float = PARALLAX_FOV / self.SRC[0]
         centre: float = (self.SRC[0] - 1) / 2.0
         phi: float = math.radians(centre_bearing)
-        for step in range(int(ring * 1000) + 1, 10000):
+        for step in range(int(camera_radius * 1000) + 1, 10000):
             radius: float = step / 1000.0
-            dx, dy = radius * math.cos(phi) - ring, radius * math.sin(phi)     # camera at (ring, 0)
+            dx, dy = radius * math.cos(phi) - camera_radius, radius * math.sin(phi)     # camera at (camera_radius, 0)
             distance: float = math.hypot(dx, dy)
             x: float = centre + math.degrees(math.atan2(dy, dx)) / dpp
             if distance <= 0.0 or x < -0.5 or x > self.SRC[0] - 0.5:
@@ -1460,11 +1460,11 @@ class TestReachReadouts(unittest.TestCase):
         PanoramicTracker(config, num_players=4, num_cameras=4)
         r = config.rig
         self.assertAlmostEqual(r.feet_from,
-                               self.brute_force(0.0, 0.0, RING_RADIUS, CAMERA_HEIGHT, 1), delta=0.0015)
+                               self.brute_force(0.0, 0.0, CAMERA_RADIUS, CAMERA_HEIGHT, 1), delta=0.0015)
         self.assertAlmostEqual(r.hands_from,
-                               self.brute_force(HANDS_HEIGHT, 0.0, RING_RADIUS, CAMERA_HEIGHT, 0),
+                               self.brute_force(HANDS_HEIGHT, 0.0, CAMERA_RADIUS, CAMERA_HEIGHT, 0),
                                delta=0.0015)
-        seam: float = max(self.brute_force(HANDS_HEIGHT, side, RING_RADIUS, CAMERA_HEIGHT, 0)
+        seam: float = max(self.brute_force(HANDS_HEIGHT, side, CAMERA_RADIUS, CAMERA_HEIGHT, 0)
                           for side in (-45.0, 45.0))
         self.assertAlmostEqual(r.hands_seam, seam, delta=0.0015)
 
@@ -1482,7 +1482,7 @@ class TestReachReadouts(unittest.TestCase):
     def test_when_the_rows_end_the_picture_the_seam_barely_differs(self) -> None:
         """The opposite case, and the studio configuration: P800 with the shared lens's centre
         offset reaches 1136 rows at tilt 15, so 960 rows cap the top at the same angle on every
-        column. The seam is then only worse by the ring's parallax — centimetres — which is why the
+        column. The seam is then only worse by the rig's parallax — centimetres — which is why the
         two hands read-outs are worth having side by side: their gap says which of the two limits
         the frame is running into. Feet are in frame inside the zone's R 1.5 edge here."""
         config = self.make_config(CameraResolution.P800, lens_centre=(-10.5, 10.5))
@@ -1492,15 +1492,15 @@ class TestReachReadouts(unittest.TestCase):
         self.assertGreaterEqual(r.hands_seam, r.hands_from)
         self.assertLess(r.hands_seam - r.hands_from, 0.05)
 
-    def test_the_ring_and_the_lens_height_update_it_live(self) -> None:
+    def test_the_camera_radius_and_the_lens_height_update_it_live(self) -> None:
         # Both are live settings and both move the reach; neither needs the coverage redone.
         # A live change is applied on the tracker's own thread; `_apply_settings` stands in for its tick.
         config = self.make_config()
         tracker = PanoramicTracker(config, num_players=4, num_cameras=4)
         feet, hands = config.rig.feet_from, config.rig.hands_from
-        config.rig.camera_radius = RING_RADIUS + 0.1
+        config.rig.camera_radius = CAMERA_RADIUS + 0.1
         tracker._apply_settings()
-        # On the axis the ring only shifts the answer outward by itself.
+        # On the axis the camera radius only shifts the answer outward by itself.
         self.assertAlmostEqual(config.rig.feet_from, feet + 0.1, delta=1e-6)
         self.assertAlmostEqual(config.rig.hands_from, hands + 0.1, delta=1e-6)
         config.rig.camera_height = CAMERA_HEIGHT + 0.2
@@ -1520,7 +1520,7 @@ class TestInitialRigSync(unittest.TestCase):
         somewhere to show up.
         """
         config = PanoramicTrackerSettings(fov=PARALLAX_FOV)
-        config.rig.camera_radius = RING_RADIUS
+        config.rig.camera_radius = CAMERA_RADIUS
         for zone in ((1.5, 3.5), (1.0, 4.0), (2.0, 2.0)):
             with self.subTest(zone=zone):
                 config.rig.zone_min_radius, config.rig.zone_max_radius = zone
@@ -1537,13 +1537,13 @@ class TestInitialRigSync(unittest.TestCase):
         # bind() does not fire with the initial value and presets load before
         # the tracker exists, so construction must push config into the rig.
         config = PanoramicTrackerSettings(fov=PARALLAX_FOV)
-        config.rig.camera_radius = RING_RADIUS
+        config.rig.camera_radius = CAMERA_RADIUS
         config.rig.camera_height = CAMERA_HEIGHT
         tracker = PanoramicTracker(config, num_players=4, num_cameras=4)
         self.assertEqual(tracker.rig.cam_fov, PARALLAX_FOV)
-        self.assertEqual(tracker.rig._ring_radius, RING_RADIUS)
+        self.assertEqual(tracker.rig._camera_radius, CAMERA_RADIUS)
         self.assertEqual(tracker.rig._camera_height, CAMERA_HEIGHT)
-        # Each camera owns 360/num_cameras of the ring, not a hardcoded 90
+        # Each camera owns 360/num_cameras of the turn, not a hardcoded 90
         self.assertAlmostEqual(tracker.rig.target_fov, 90.0, places=9)
         self.assertAlmostEqual(
             PanoramicTracker(config, num_players=4, num_cameras=3).rig.target_fov,

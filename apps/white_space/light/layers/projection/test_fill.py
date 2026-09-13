@@ -14,7 +14,7 @@ class TestFillSettings(LayerSettings):
 
 
 class TestFill(ProjectionLayer):
-    """Fills the entire strip with a flat brightness value on each channel."""
+    """Fills the entire projection with a flat brightness value on each channel."""
 
     def __init__(self, resolution: int, config: TestFillSettings, board) -> None:
         super().__init__(resolution, config, board)

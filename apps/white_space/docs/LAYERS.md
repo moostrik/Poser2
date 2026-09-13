@@ -8,7 +8,7 @@ full design sections here.
 
 Modes: **beam** layers write the four beam lights by name (`Frame.beam_lights`, indexed by
 `BeamLightId`: front/back white, left/right blue) and no pixels; **projection** layers draw the
-persistence-of-vision projection image. The fixture's readout mode follows the *commanded* rpm — beam
+persistence-of-vision projection. The fixture's readout mode follows the *commanded* rpm — beam
 mode below 200, projection mode at or above, switching on receipt of the rpm regardless of the
 bar's actual speed (`loop` in `firmware.cpp` sets `SLOW` from `RPM`). The light sender maps the beam lights to the
 firmware's pixel slots exactly when the fixture reads them (`inout/osc_light_sender.py`),
@@ -39,7 +39,7 @@ poses is in `TRACKING.md`, *Downstream*.
 | `beam_flash`          | beam       | LERP frames (PlayheadOffset)  | front white lamp + blue lamps            | S4                        |
 | `projection_playhead` | projection | frame playhead phase          | white playhead marker                    | S6 (projecting), S7, S8   |
 | `pose_instrument`     | projection | LERP frames, playhead bars    | white lines, blue anchor + between-lines | S6 (projecting), S7, S8   |
-| `flood`               | projection | — (settings only)             | full-strip white                         | S8                        |
+| `flood`               | projection | — (settings only)             | whole projection white                   | S8                        |
 | `beam_wind_down`      | beam       | tick clock                    | both white lamps, fading                 | S9, S10                   |
 | `beam_blue_sound`     | beam       | sound levels from Max (board) | left/right blue lamps                    | S1, S2, S3, S5, S10       |
 
@@ -86,7 +86,7 @@ sound Max is playing.
 
 ## flood (ProjectionLayer)
 
-Constant full-strip white — the END's wall of light. Deliberately the dumbest layer in
+The whole projection constant white — the END's wall of light. Deliberately the dumbest layer in
 the pool: all dynamics (the cross-to-full) are mix weights set by the states, never
 behavior inside the layer. The *ending* of the wall belongs to `beam_wind_down` — S8's flood
 at 1.0 hands over to S9/S10's wind_down starting at the full wall, seamlessly.
@@ -127,11 +127,11 @@ The heart of the piece. Each person **stands in a blue anchor** — a blue line 
 azimuth, their own presence — and around them a **mirror-symmetric pattern of white and
 blue lines derived from their pose**: the visual analogue of how the sound works, pose →
 pattern as pose → sound. A neutral pose is "boring": one white line each side. Arms up is
-the bass: many thick lines. Everything on the strip is a *line* (the 1-D image becomes
+the bass: many thick lines. Everything in the projection is a *line* (the 1-D image becomes
 vertical lines in the room); the vocabulary is *anchor* for the blue at the person and
 *lines* for the pattern — no "spot", "marker" or "centre line".
 
-**The line world is anchored to the people, not to the strip.** The strip is divided into
+**The line world is anchored to the people, not to the projection.** The projection is divided into
 segments between neighbouring participants; each segment fits a whole number of lines
 (`n = round(gap / line_spacing)`), so its actual spacing is `gap / n` — a nudge of at most
 half a spacing spread over the whole gap, invisible. Every person is a mirror point of
@@ -169,7 +169,7 @@ between people* gives symmetry and the seamless join at once.
 - **Line motion** (`line_motion`): `STATIC` (default), `CONSTANT` (`line_speed` spacings/s),
   or `PLAYHEAD` (`lines_per_bar` spacings per playhead bar, from the board's bars); plus
   `line_flow`: `SYMMETRIC` (outward from every person; the flows meet and pass through each
-  other at segment midpoints) or `GLOBAL` (one way round the strip; lines approach a person
+  other at segment midpoints) or `GLOBAL` (one way round the projection; lines approach a person
   on one side and depart on the other). Any motion breaks instantaneous symmetry — it holds
   exactly at phase 0 and ½ — so the moving modes are for evaluation on the machine: the
   important thing is that people recognise their own presence. Lines are born from the

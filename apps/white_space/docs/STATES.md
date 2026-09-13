@@ -18,7 +18,7 @@ Vocabulary:
   measurement above `beam_rpm` and then one settled within tolerance of it: being under the 200 rpm
   sensor ceiling is not enough, and stale readings from before the spin-up do not count.
 - **projecting** — PROJECTION is commanded and the sensor has been silent for 2.5 ceiling periods, so the
-  bar spins fast enough for the projection image to show (`Playhead.is_projecting`). Distinct from
+  bar spins fast enough for the projection to show (`Playhead.is_projecting`). Distinct from
   *projection mode*, the fixture's readout, which switches on the commanded rpm.
 - **DIM** — the dimmed line level, `states.dim_level`; **BRIGHT** is the line at full.
 
@@ -330,7 +330,7 @@ holds — landing on the BRIGHT line instead of the dim one.
 
 - **S3**: the anticipatory cue's design (Max side)
 - **S6**: the "(effect?)" on pose sound (Max side)
-- **S6**: whether to draw a line as projection content while the strip is dark during the spin-up
+- **S6**: whether to draw a line in the projection while it is still dark during the spin-up
 - **S7**: an inactivity exit — "no action for x bars → END", with an action-gated wind-back in END to
   match; left out to keep the graph simple
 - **S8–S10**: the distortion treatment (Max side); `stage_progress` on OSC is the ramp that drives it

@@ -10,7 +10,7 @@
 // the whole value of this display is that it draws with the numbers the tracker tracks with, so
 // a wrong camera constant shows up as a ghost instead of being silently absorbed.
 //
-// BOTH AXES ARE RE-PROJECTED, and they have to be. A camera sits `ringRadius` out from the
+// BOTH AXES ARE RE-PROJECTED, and they have to be. A camera sits `cameraRadius` out from the
 // centre, so it sees a point on the focus cylinder at a wider bearing AND a higher elevation
 // than the centre does — by the same factor, R/d, which is 1.19 straight ahead at R 2.25 and
 // 1.08 at a seam. Re-projecting only the azimuth (which is all the tracker needs) would leave
@@ -40,7 +40,7 @@ uniform float camFov;      // one camera's horizontal field (degrees)
 uniform float horizonRow;  // the frames' rows are TANGENTS of elevation: row = horizonRow -
 uniform float focalRows;   //   focalRows * tan(e), normalised, 0 = top (projection.row_from_elevation)
 uniform float targetFov;   // the sector one camera owns, 360 / numCams (degrees)
-uniform float ringRadius;  // camera distance from the rig centre (m)
+uniform float cameraRadius;  // camera distance from the rig centre (m)
 uniform float focusRadius; // radius of the cylinder the image is aligned for (m), from the fixture axis
 uniform float elevTop;     // elevation of this strip's top row, at the centre (degrees)
 uniform float elevBottom;  // elevation of its bottom row, at the centre (degrees)
@@ -61,15 +61,15 @@ vec2 cameraUV(int cam, float azimuth, float elevation) {
     float p = radians(phi);
 
     // Distance from this camera to the focus cylinder at this bearing (law of cosines).
-    float d = sqrt(max(0.0, ringRadius * ringRadius + focusRadius * focusRadius
-                            - 2.0 * ringRadius * focusRadius * cos(p)));
+    float d = sqrt(max(0.0, cameraRadius * cameraRadius + focusRadius * focusRadius
+                            - 2.0 * cameraRadius * focusRadius * cos(p)));
     if (d < 1e-6) return vec2(-1.0);
 
-    // The camera sits ringRadius behind the centre, so its own bearing to the same point is
+    // The camera sits cameraRadius behind the centre, so its own bearing to the same point is
     // wider than the centre's: theta = phi + asin(r * sin(phi) / d). Exact, not an expansion.
     float theta = phi;
-    if (ringRadius > 0.0) {
-        theta = phi + degrees(asin(clamp(ringRadius * sin(p) / d, -1.0, 1.0)));
+    if (cameraRadius > 0.0) {
+        theta = phi + degrees(asin(clamp(cameraRadius * sin(p) / d, -1.0, 1.0)));
     }
 
     float local = theta + camFov * 0.5;

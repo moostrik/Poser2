@@ -12,7 +12,7 @@ from modules.settings import Field
 
 from .._base_layer import ProjectionLayer, LayerSettings
 from ...frame import Frame, BUFFER_DTYPE
-from .._utilities import BlendType, draw_waves, draw_field, angle_to_strip_position
+from .._utilities import BlendType, draw_waves, draw_field, normalize_azimuth
 
 if TYPE_CHECKING:
     from ....board import Board
@@ -25,16 +25,16 @@ class TestPoseWavesSettings(LayerSettings):
     """Settings for the pose-driven void and wave pattern composition."""
 
     # Void zones
-    void_width:    Field[float] = Field(0.05,  min=0.0, max=1.0,   step=0.01,  description="Void width (normalised)")
-    void_edge:     Field[float] = Field(0.01,  min=0.0, max=1.0,   step=0.005, description="Void edge softness")
+    void_width:    Field[float] = Field(18.0,  min=0.0, max=360.0, step=0.5,   description="Void width (deg)")
+    void_edge:     Field[float] = Field(3.6,   min=0.0, max=360.0, step=0.5,   description="Void edge softness (deg)")
     use_void:      Field[bool]  = Field(True,                                   description="Enable void zones")
 
     # Wave pattern
-    pattern_width:  Field[float] = Field(0.2,  min=0.0, max=1.0,   step=0.01, description="Pattern width (normalised)")
-    pattern_edge:   Field[float] = Field(0.2,  min=0.0, max=1.0,   step=0.01, description="Pattern edge softness")
+    pattern_width:  Field[float] = Field(72.0, min=0.0, max=360.0, step=0.5,  description="Pattern width (deg)")
+    pattern_edge:   Field[float] = Field(72.0, min=0.0, max=360.0, step=0.5,  description="Pattern edge softness (deg)")
     line_sharpness: Field[float] = Field(1.5,  min=0.0, max=10.0,  step=0.1,  description="Line sharpness")
     line_speed:     Field[float] = Field(1.5,  min=0.0, max=10.0,  step=0.1,  description="Line speed")
-    line_width:     Field[float] = Field(0.1,  min=0.0, max=1.0,   step=0.01, description="Line width (normalised)")
+    line_width:     Field[float] = Field(0.1,  min=0.0, max=1.0,   step=0.01, description="Line thickness (fraction of a wave)")
     line_amount:    Field[float] = Field(20.0, min=0.0, max=100.0, step=1.0,  description="Number of lines")
 
 
@@ -130,8 +130,8 @@ class TestPoseWaves(ProjectionLayer):
             if not state.present:
                 continue
 
-            azimuth: float = angle_to_strip_position(pose[features.Azimuth].value)
-            state.world_position = float((azimuth - 0.5) * 2 * np.pi)
+            position: float = normalize_azimuth(pose[features.Azimuth].value)
+            state.world_position = float((position - 0.5) * 2 * np.pi)
 
             bbox_height: float = pose[features.BBox][features.BBoxElement.height]
             state.pose_length = (
@@ -188,9 +188,9 @@ class TestPoseWaves(ProjectionLayer):
             length:     float = state.pose_length
             age:        float = state.age
             strength:   float = pow(min(age * 1.8, 1.0), 1.5)
-            void_width: float = P.void_width * 0.5
+            void_width: float = P.void_width / 360.0 * 0.5
             width:      float = void_width + length * void_width
-            edge:       int   = int(P.void_edge * len(array))
+            edge:       int   = int(P.void_edge / 360.0 * len(array))
             draw_field(array, centre, width, strength, edge, BlendType.MAX)
 
     @staticmethod
@@ -209,8 +209,9 @@ class TestPoseWaves(ProjectionLayer):
         blues.fill(0.0)
 
         num_player_width: float = 1.0 / max(smooth_num_active, 1)
+        pattern_normalized: float     = P.pattern_width / 360.0
         pattern_width: float    = (
-            P.pattern_width * 0.25 + num_player_width * P.pattern_width * 0.25
+            pattern_normalized * 0.25 + num_player_width * pattern_normalized * 0.25
         )
 
         for state in player_states.values():
@@ -246,8 +247,9 @@ class TestPoseWaves(ProjectionLayer):
             left_time: float = state.left_pattern_time
             rigt_time: float = state.right_pattern_time
 
-            outer_edge: int   = int(P.pattern_edge * resolution)
-            void_width: float = P.void_width * 0.5 + length * P.void_width * 0.5
+            outer_edge: int   = int(P.pattern_edge / 360.0 * resolution)
+            void_normalized:  float = P.void_width / 360.0
+            void_width: float = void_normalized * 0.5 + length * void_normalized * 0.5
             inner_edge: int   = int(void_width * resolution * 0.7)
 
             blend: BlendType = BlendType.MAX

@@ -5,7 +5,7 @@ mirror-symmetric pattern of white and blue **lines** derived from their pose —
 analogue of how the sound works: pose → pattern as pose → sound. A neutral pose is
 "boring": one white line each side. Arms up is the bass: many thick lines.
 
-**The line world is anchored to the people, not to the strip.** The strip is divided into
+**The line world is anchored to the people, not to the projection.** The projection is divided into
 segments between neighbouring participants; each segment fits a whole number of lines
 (``n = round(gap / line_spacing)``), so its actual spacing is ``gap / n``. Every person is a
 mirror point of their own pattern, and the run of lines between two people is *the same
@@ -42,7 +42,7 @@ from modules.pose import features
 from modules.settings import Field
 
 from .._base_layer import ProjectionLayer, LayerSettings
-from .._utilities import BlendType, angle_to_strip_position, draw_field
+from .._utilities import BlendType, normalize_azimuth, draw_field
 from ...frame import Frame
 
 if TYPE_CHECKING:
@@ -59,13 +59,13 @@ class LineMotion(IntEnum):
 class LineFlow(IntEnum):
     """Which way a moving φ carries the lines."""
     SYMMETRIC = 0        # outward from (or inward to) every person; flows meet at midpoints
-    GLOBAL    = auto()   # all lines move one way round the strip
+    GLOBAL    = auto()   # all lines move one way round the projection
 
 
 class PoseInstrumentSettings(LayerSettings):
     line_spacing:   Field[float]      = Field(10.0, min=1.0,  max=90.0,  step=0.5,  description="Nominal line spacing (deg); each segment between neighbours fits a whole number of lines")
     line_motion:    Field[LineMotion] = Field(LineMotion.STATIC,                    description="Line phase drive: static, constant rate, or the playhead bars")
-    line_flow:      Field[LineFlow]   = Field(LineFlow.SYMMETRIC,                   description="Moving lines flow outward from every person (symmetric) or one way round the strip (global)")
+    line_flow:      Field[LineFlow]   = Field(LineFlow.SYMMETRIC,                   description="Moving lines flow outward from every person (symmetric) or one way round the projection (global)")
     line_speed:     Field[float]      = Field(0.0,  min=-2.0, max=2.0,   step=0.01, description="CONSTANT: spacings per second (negative = inward / the other way)")
     lines_per_bar:  Field[float]      = Field(1.0,  min=0.0,  max=36.0,  step=0.5,  description="PLAYHEAD: spacings travelled per playhead bar")
     line_phase:     Field[float]      = Field(0.0,  min=0.0,  max=1.0,   step=0.01, description="Phase offset (spacings) added to the motion; the first line sits (1 + phase) spacings out")
@@ -88,15 +88,15 @@ class PoseInstrumentSettings(LayerSettings):
     release_seconds:Field[float]      = Field(1.5,  min=0.0,  max=10.0,  step=0.1,  description="Fade-out after a person is gone (s; the last pose is held)")
 
 
-# -- Geometry helpers (strip positions and offsets are turns in [0, 1)) ---------------
+# -- Geometry helpers (positions and offsets are normalized azimuth) ------------------
 
 def _signed_offset(a: float, b: float) -> float:
-    """Signed shortest offset a → b on the strip (turns, in [-0.5, 0.5))."""
+    """Signed shortest offset a → b around the projection (normalized azimuth, in [-0.5, 0.5))."""
     return ((b - a + 0.5) % 1.0) - 0.5
 
 
 def _segment_counts(gap: float, spacing: float, n_blend: float) -> tuple[int, int, float]:
-    """How many lines a segment of ``gap`` turns fits at the nominal ``spacing``: the two
+    """How many lines a segment of ``gap`` (normalized azimuth) fits at the nominal ``spacing``: the two
     candidate counts and the crossfade weight toward the higher one. Away from the
     half-spacing boundary the count is simply the rounded ratio (weight 0); within
     ±``n_blend`` of the boundary the two counts crossfade so lines slide instead of jump."""
@@ -161,7 +161,7 @@ def _ease(t: float) -> float:
 @dataclass
 class _Participant:
     """One person's input state (the six-parameter contract) plus presence and reach."""
-    position:       float = 0.0     # strip position (turns)
+    position:       float = 0.0     # normalized azimuth
     length:         float = 1.0     # BBox height (pose length)
     left_shoulder:  float = 0.0     # the four arm angles (rad, 0 = neutral)
     right_shoulder: float = 0.0
@@ -172,7 +172,7 @@ class _Participant:
     similarity:     np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float32))
     present:        bool  = False   # seen this tick
     envelope:       float = 0.0     # presence 0..1 (attack / release)
-    extent_left:    float = 0.0     # this tick's reach each side (turns)
+    extent_left:    float = 0.0     # this tick's reach each side (normalized azimuth)
     extent_right:   float = 0.0
 
     # -- The initial mapping (a proposal; the composition work lives here) --
@@ -189,10 +189,10 @@ class _Participant:
 
 @dataclass
 class _Segment:
-    """The strip between two neighbouring participants, walking in increasing position."""
+    """The stretch of projection between two neighbouring participants, walking in increasing position."""
     start: int          # participant id at the low-position end
     end:   int          # participant id at the high-position end (== start when alone)
-    gap:   float        # turns
+    gap:   float        # normalized azimuth
     n_low: int          # candidate line counts (crossfaded by ``blend``)
     n_high: int
     blend: float
@@ -257,7 +257,7 @@ class PoseInstrument(ProjectionLayer):
                 continue
             p = self._participants.setdefault(id, _Participant())
             p.present = True
-            p.position = angle_to_strip_position(azimuth)
+            p.position = normalize_azimuth(azimuth)
             height = pose[features.BBox][features.BBoxElement.height]
             p.length = height if not math.isnan(height) and height > 0.0 else p.length
             angles = pose[features.Angles].values
@@ -330,7 +330,7 @@ class PoseInstrument(ProjectionLayer):
                 self._grow(ids, segments, j, -direction, amount)
 
     def _grow(self, ids: list[int], segments: list[_Segment], index: int, direction: int, amount: float) -> None:
-        """Extend the reach from ``ids[index]`` by ``amount`` turns in ``direction`` (+1 =
+        """Extend the reach from ``ids[index]`` by ``amount`` (normalized azimuth) in ``direction`` (+1 =
         increasing position), handing the remainder to each intermediate person."""
         remaining = amount
         for _ in range(len(ids)):
@@ -370,7 +370,7 @@ class PoseInstrument(ProjectionLayer):
             return
         base = int(round(p.position * R))
         idx = (base + sign * np.arange(1, count + 1)) % R
-        offset = self._pixel[:count] + sign * (base / R - p.position)     # turns from the person, ≥ 0
+        offset = self._pixel[:count] + sign * (base / R - p.position)     # normalized azimuth from the person, ≥ 0
 
         # Parameters blended along the segment toward the neighbour (f = 0 at the person).
         f = np.clip(offset / max(seg.gap, 1e-6), 0.0, 1.0).astype(np.float32)

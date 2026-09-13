@@ -3,7 +3,7 @@
 Carries the clock snapshot (`tick`), the motor's two halves (`motor`, the measurement the
 playhead advanced under; `motor_command`, the command this frame is sent with — read after
 the state machine ran, so a mode commanded on a state's entry tick reaches the frame whose
-mix that state drew), the LED pixel buffer (the projection image) and the four beam lights. One object
+mix that state drew), the projection's pixels and the four beam lights. One object
 flows into every layer's `_draw` and out to every consumer (board, the light/sound senders,
 render).
 
@@ -28,7 +28,7 @@ BUFFER_DTYPE = np.float32
 
 
 class BeamLightId(IntEnum):
-    """The four fixed lights on the bar, by strip position and colour."""
+    """The four fixed lights on the bar, by heading and colour."""
     FRONT_WHITE = 0
     BACK_WHITE  = auto()
     LEFT_BLUE   = auto()
@@ -41,7 +41,7 @@ BEAM_LIGHT_CHANNEL: np.ndarray = np.array([0, 0, 1, 1], dtype=np.int64)
 # Beam heading of each beam light relative to the front white (radians, index = BeamLightId),
 # read off the firmware's fast-mode sampling offsets (firmware.cpp lines 277-280, of 3600):
 # white 2 at +1800, blue 1 (the ``blue[0]`` slot, LEFT) at +2700, blue 2 (``blue[R//2]``,
-# RIGHT) at +900. A strip index is an angle, so left trails the front by a quarter turn and
+# RIGHT) at +900. A pixel index is an azimuth, so left trails the front by a quarter turn and
 # right leads it by one. The ±10 px alignment corrections are not modelled.
 BEAM_LIGHT_HEADINGS: np.ndarray = np.array([0.0, math.pi, -math.pi / 2.0, math.pi / 2.0], dtype=np.float64)
 
@@ -49,7 +49,7 @@ BEAM_LIGHT_HEADINGS: np.ndarray = np.array([0.0, math.pi, -math.pi / 2.0, math.p
 @dataclass
 class Frame:
     """Per-tick render context + light output. `white`/`blue` are views into `light_img`
-    (the projection image); `beam_lights` holds the four lamp levels, indexed by `BeamLightId`."""
+    (the projection); `beam_lights` holds the four lamp levels, indexed by `BeamLightId`."""
     resolution:    int
     tick:          Tick
     motor:         MotorMeasurement     = field(default_factory=MotorMeasurement)   # what the playhead advanced under

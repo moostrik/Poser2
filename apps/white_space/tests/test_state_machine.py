@@ -27,7 +27,7 @@ class FakeBoard:
     def __init__(self) -> None:
         self.bars: float = 0.0
         self.is_locked: bool = False       # the playhead lock at BEAM
-        self.is_projecting: bool = False   # fast enough for the projection image
+        self.is_projecting: bool = False   # fast enough for the projection to show
         self.frames: dict[int, FakeFrame] = {}
 
     def get_playhead_signals(self):
@@ -331,7 +331,7 @@ class StateMachineTest(unittest.TestCase):
     # -- dev controls ----------------------------------------------------------
 
     def test_blackout_pins_off_from_anywhere(self) -> None:
-        # Pinning blackout is OFF's entry door: pin → OFF immediately (dark strip,
+        # Pinning blackout is OFF's entry door: pin → OFF immediately (dark,
         # /global/state 0), and OFF stays put while pinned. Dark and silent, but the
         # rotor keeps sweeping at BEAM so the playhead never unlocks.
         self._to_play()
@@ -339,7 +339,7 @@ class StateMachineTest(unittest.TestCase):
         self.tick()
         self.assertEqual(self.current, StateId.OFF)
         self.assertEqual(self.motors[-1], MotorMode.BEAM)      # still sweeping — no re-acquire
-        self.assertEqual(self.mixes[-1], [])                  # dark strip
+        self.assertEqual(self.mixes[-1], [])                  # empty mix: dark
         self.assertEqual(self.emitted[-1].stage, 0)           # /global/state 0 = off
         self.set_participants(3)                              # presence alone never leaves OFF
         self.tick(dt=999.0)

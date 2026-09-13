@@ -28,7 +28,7 @@ from modules.settings import BaseSettings, Field, Widget
 # The fixture's one threshold (firmware.cpp: `RPM < 200`, lines 231 and 475), applied to the
 # *commanded* rpm on receipt of `/WS/r/0`, regardless of the bar's actual speed. Below it the
 # fixture is in beam mode — the four beam lights are driven directly and fall pulses are sent —
-# at or above it steps the projection pixels and the sensor is silent. So a measurement only exists below it,
+# at or above it paints the projection and the sensor is silent. So a measurement only exists below it,
 # and a reading above it (spinning down from PROJECTION) isn't trusted either — outside this range we
 # trust the commanded speed. The light sender and the render apply the same rule to the same command.
 FIXTURE_PROJECTION_RPM: float = 200.0
@@ -51,7 +51,7 @@ class MotorMode(IntEnum):
     """Commanded operating mode (the system sets it; target rpm is derived from it)."""
     STOPPED    = auto()  # not spinning
     BEAM       = auto()  # the four lamps sweeping the room
-    PROJECTION = auto()  # fast spin — the projection image painted from the firmware's counter
+    PROJECTION = auto()  # fast spin — the projection painted from the firmware's counter
 
 
 @dataclass

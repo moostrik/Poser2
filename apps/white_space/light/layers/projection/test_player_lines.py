@@ -1,4 +1,4 @@
-"""TestPlayerLines composition — visualises each tracked player as a coloured triplet on the LED strip.
+"""TestPlayerLines composition — visualises each tracked player as a coloured triplet in the projection.
 
 Each active player produces three lines at their world position:
   - A centre line (blue by default, white when inverted)
@@ -23,15 +23,15 @@ from modules.pose import features
 
 from .._base_layer import ProjectionLayer, LayerSettings
 from ...frame import Frame
-from .._utilities import BlendType, apply_circular, angle_to_strip_position
+from .._utilities import BlendType, apply_circular, normalize_azimuth
 
 if TYPE_CHECKING:
     from ....board import Board
 
 
 class TestPlayerLinesSettings(LayerSettings):
-    center_width:  Field[float] = Field(0.02,  min=0.0, max=0.2,   step=0.01, description="Centre line width (strip fraction)")
-    flank_width:   Field[float] = Field(0.03,  min=0.0, max=0.2,   step=0.01, description="Flank line width (strip fraction)")
+    center_width:  Field[float] = Field(7.2,   min=0.0, max=72.0,  step=0.5,  description="Centre line width (deg)")
+    flank_width:   Field[float] = Field(10.8,  min=0.0, max=72.0,  step=0.5,  description="Flank line width (deg)")
     depth_scale:   Field[float] = Field(0.0,   min=0.0, max=1.0,   step=0.01, description="Depth scaling: 0=flat, 1=far player vanishes (centre_width is max)")
     invert:        Field[bool]  = Field(False,                                 description="Swap centre/flank colours", newline=True)
     level_center:  Field[float] = Field(1.0,   min=0.0, max=1.0,   step=0.01, description="Centre line level")
@@ -40,7 +40,7 @@ class TestPlayerLinesSettings(LayerSettings):
 
 @dataclass
 class _PlayerState:
-    strip_pos: float = 0.5
+    position:  float = 0.5   # normalized azimuth
     feet_y:    float = 0.5   # BBox bottom (feet) [0=top/far, 1=bottom/close]
     active:    bool  = False
 
@@ -66,14 +66,14 @@ class TestPlayerLines(ProjectionLayer):
 
         for pose in frames:
             track_id = pose.track_id
-            strip_pos: float = angle_to_strip_position(pose[features.Azimuth].value)
+            position: float = normalize_azimuth(pose[features.Azimuth].value)
 
             bottom_y: float = pose[features.BBox].to_rect().bottom
             if np.isnan(bottom_y):
                 bottom_y = 0.5
 
             state = self._states.setdefault(track_id, _PlayerState())
-            state.strip_pos = strip_pos
+            state.position  = position
             state.feet_y    = float(np.clip(bottom_y, 0.0, 1.0))
             state.active    = True
             seen.add(track_id)
@@ -99,14 +99,14 @@ class TestPlayerLines(ProjectionLayer):
         for state in self._states.values():
             if not state.active:
                 continue
-            w_center: float = P.center_width * (1.0 - depth_scale * (1.0 - state.feet_y))
-            w_flank:  float = P.flank_width
+            w_center: float = P.center_width / 360.0 * (1.0 - depth_scale * (1.0 - state.feet_y))
+            w_flank:  float = P.flank_width / 360.0
             half_gap: float = (w_center + w_flank) / 2.0
             players.append((
-                state.strip_pos,
+                state.position,
                 w_center,
-                (state.strip_pos - half_gap) % 1.0,
-                (state.strip_pos + half_gap) % 1.0,
+                (state.position - half_gap) % 1.0,
+                (state.position + half_gap) % 1.0,
                 w_flank,
             ))
 
@@ -117,7 +117,7 @@ class TestPlayerLines(ProjectionLayer):
         flank_arr  = blue  if invert else white
 
         # --- draw all flanks into a temp buffer ---
-        fw: int = int(P.flank_width * resolution)
+        fw: int = int(P.flank_width / 360.0 * resolution)
         lv: np.ndarray | None = np.full(fw, level_flank, dtype=np.float32) if fw > 0 else None
         self._flank_buf[:] = 0.0
         if lv is not None:

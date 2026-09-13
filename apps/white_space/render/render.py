@@ -146,7 +146,7 @@ class Render(RenderBase):
                               src_aspect_ratio=frame_w / frame_h, padding=Point2f(1.0, 1.0))
 
     def _panorama_row(self) -> SubdivisionRow:
-        """Row 2: the whole ring as one 360° strip, under the raw frames.
+        """Row 2: the whole rig as one 360° strip, under the raw frames.
 
         The aspect is the compositor's own — 360 degrees of azimuth over the elevations it can
         actually fill, both measured at the rig centre. It is not a preference: `tilt`, `fov` and
@@ -244,13 +244,13 @@ class Render(RenderBase):
                 self.L[Layers.tracker][i].draw()
                 self.L[Layers.cam_readings][i].draw()
 
-        # Row 2 — the whole ring as one 360° strip, image and tracker data on one vertical scale.
+        # Row 2 — the whole rig as one 360° strip, image and tracker data on one vertical scale.
         # Absent under CAMERAS.
         if self.subdivision.has('panoramic'):
             self._viewport(height, self.subdivision.get_rect('panoramic', 0))
             self.L[Layers.cam_panorama][0].draw()
 
-        # Row 3 - WS light strip: the projection image, or the bar's lights while the fixture is in beam mode —
+        # Row 3 - WS light: the projection, or the bar's lights while the fixture is in beam mode —
         # the same rule the fixture applies to the same command (the frame's target rpm).
         output = self.board.get_composition_output()
         beam_mode = output is not None and output.motor_command.target_rpm < FIXTURE_PROJECTION_RPM

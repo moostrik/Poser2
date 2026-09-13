@@ -31,7 +31,7 @@ settled to `measured_rpm ≤ beam_rpm × (1 + _RESYNC_RPM_TOL)`.
 
 The motor is offset-agnostic; the playhead owns the single beam-mode calibration,
 `pulse_offset` — the front lamp's azimuth at the sensor pulse, in degrees (constant → does
-not break continuity). The projection offset that aligns the projection image lives in the light sender.
+not break continuity). The projection offset that aligns the projection lives in the light sender.
 """
 
 import math
@@ -86,7 +86,7 @@ class Playhead:
         self._rpm_ema = EMAFilter(freq=30.0)         # averages the per-revolution measured speed (feed-forward)
         self._time:    float = 0.0                   # accumulated time for the EMA's dt-correction
         self._tracking_prev: bool = False            # was the previous tick the locked-tracking branch (to seed the EMA)
-        self._is_projecting: bool = False            # mode signal: the bar spins fast enough for the projection image
+        self._is_projecting: bool = False            # mode signal: the bar spins fast enough for the projection to show
 
     def tick(self, dt: float, motor: MotorMeasurement, command: MotorCommand) -> None:
         """Advance the internal content clock over ``dt`` from the command in force during it and
@@ -124,7 +124,7 @@ class Playhead:
 
         ``is_projecting`` (spin-up): commanded PROJECTION and the falls have gone silent — the sensor
         cannot pulse above the ceiling, so silence is the evidence the bar spins fast enough for
-        the projection image. The spin-down side anchors on ``is_locked`` itself (the playhead
+        the projection to show. The spin-down side anchors on ``is_locked`` itself (the playhead
         lock): the sensor's spin-down readings don't resolve a usable deceleration ramp, so the
         S9/S10 fade is timed instead (the beam_wind_down layer)."""
         self._is_projecting = command.mode == MotorMode.PROJECTION and motor.fall_age > _PROJECTING_SILENCE_S
@@ -188,5 +188,5 @@ class Playhead:
     @property
     def is_projecting(self) -> bool:
         """True while commanded PROJECTION with the falls gone silent — the bar spins fast enough
-        for the projection image (S6's swap to the instrument)."""
+        for the projection to show (S6's swap to the instrument)."""
         return self._is_projecting

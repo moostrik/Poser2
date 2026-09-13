@@ -16,7 +16,7 @@ class TestHarmonicSourceSettings(BaseSettings):
     hz:              Field[float] = Field(1.0,  min=0.0, max=32.0, step=0.25,
                                            description="Oscillation rate (Hz)")
     spatial_cycles:  Field[float] = Field(3.0,  min=0.0, max=64.0, step=0.25,
-                                           description="Spatial wavelength cycles across the full strip")
+                                           description="Spatial wavelength cycles around the whole projection")
     phase_offset:    Field[float] = Field(0.0,  min=0.0, max=1.0,  step=0.01,
                                            description="Temporal phase offset (0–1)")
     spatial_phase:   Field[float] = Field(0.0,  min=0.0, max=1.0,  step=0.01,
@@ -49,7 +49,7 @@ class TestHarmonic(ProjectionLayer):
     def __init__(self, resolution: int, config: TestHarmonicSettings, board) -> None:
         super().__init__(resolution, config, board)
         self._config = config
-        # Normalised position per pixel: 0.0 → 1.0 (exclusive)
+        # Normalized azimuth per pixel: 0.0 → 1.0 (exclusive)
         self._x: np.ndarray = np.linspace(0.0, 1.0, resolution, endpoint=False, dtype=np.float32)
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:

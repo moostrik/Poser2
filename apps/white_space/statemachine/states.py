@@ -92,7 +92,7 @@ class OffState(StateBase):
     MOTOR = MotorMode.BEAM
 
     def update(self, ctx: StateContext) -> Mix:
-        return []                       # dark strip
+        return []                       # empty mix: dark
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.blackout or not ctx.is_playhead_locked:
@@ -233,7 +233,7 @@ class IntroPlayState(StateBase):
 
     def update(self, ctx: StateContext) -> Mix:
         if self._projecting_elapsed is None and ctx.is_projecting:
-            self._projecting_elapsed = ctx.elapsed      # the projection image shows — hard mix now
+            self._projecting_elapsed = ctx.elapsed      # the projection shows — hard mix now
         if self._projecting_elapsed is None:
             return [(LayerId.beam_playhead, self._config.dim_level)]   # not projecting yet: hold INTRO's dim line
         remaining = max(self._config.spin_up_seconds - self._projecting_elapsed, 1e-6)

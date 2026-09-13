@@ -101,9 +101,9 @@ class Compositor(LayerBase):
         return 360.0 / self.num_cams
 
     @property
-    def ring_radius(self) -> float:
+    def camera_radius(self) -> float:
         """`rig.camera_radius`, clamped. Every setting, every triangle below and the shader's
-        `ringRadius` are all radii from the fixture axis, so nothing is converted here."""
+        `cameraRadius` are all radii from the fixture axis, so nothing is converted here."""
         return max(0.0, self._tracker.rig.camera_radius)
 
     @property
@@ -125,7 +125,7 @@ class Compositor(LayerBase):
     @property
     def elevation_window(self) -> tuple[float, float]:
         """(top, bottom) elevation of the strip, measured at the rig centre."""
-        return elevation_window(self.populated_band, self.ring_radius,
+        return elevation_window(self.populated_band, self.camera_radius,
                                 max(1e-6, self._settings.focus_radius))
 
     @property
@@ -184,7 +184,7 @@ class Compositor(LayerBase):
         context: MarkContext = MarkContext(
             cam_fov=self._tracker.fov,
             target_fov=self.target_fov,
-            ring_radius=self.ring_radius,
+            camera_radius=self.camera_radius,
             parallax_radius=self._tracker.rig.parallax_radius,
             camera_height=self._tracker.rig.camera_height,
             row_model=self.row_model,

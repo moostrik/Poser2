@@ -1,4 +1,8 @@
-"""Low-level 1-D LED drawing primitives — used by all layer implementations."""
+"""Low-level 1-D drawing primitives for the projection — used by all layer implementations.
+
+Positions and widths are normalized azimuth: azimuth / 2π in [0, 1). Multiplying by the
+resolution gives the pixel index, and only the drawing does that.
+"""
 
 from enum import Enum
 
@@ -19,10 +23,9 @@ TWOPI:  float = 2.0 * np.pi
 HALFPI: float = np.pi / 2.0
 
 
-def angle_to_strip_position(rad: float) -> float:
-    """Map an azimuth angle (radians) to its [0,1) position along the circular strip.
-
-    Multiply by the strip resolution to get a pixel index. NaN-preserving.
+def normalize_azimuth(rad: float) -> float:
+    """Azimuth in radians → normalized azimuth in [0, 1). Multiply by the resolution to get the
+    pixel index. NaN-preserving.
     """
     return (rad / TWOPI) % 1.0
 

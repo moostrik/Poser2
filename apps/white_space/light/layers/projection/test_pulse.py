@@ -1,4 +1,4 @@
-"""TestPulse composition — whole-strip brightness oscillating at a uniform rate."""
+"""TestPulse composition — the whole projection's brightness oscillating at a uniform rate."""
 
 import math
 
@@ -16,7 +16,7 @@ class TestPulseSettings(LayerSettings):
 
 
 class TestPulse(ProjectionLayer):
-    """Pulses the whole strip at a uniform sine rate per channel."""
+    """Pulses the whole projection at a uniform sine rate per channel."""
 
     def __init__(self, resolution: int, config: TestPulseSettings, board) -> None:
         super().__init__(resolution, config, board)

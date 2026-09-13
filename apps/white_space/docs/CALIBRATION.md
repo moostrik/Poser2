@@ -72,7 +72,7 @@ There is no gathered calibration panel. Each setting stays with the code that ap
 offset with the playhead under `light`, the projection offset and interlace with the sender under
 `inout`, `speaker_offset` with the sound sender, the camera constants under `camera`.
 
-**Units.** Degrees for every angle an operator reads or turns, in 0.1° steps (one ring pixel);
+**Units.** Degrees for every angle an operator reads or turns, in 0.1° steps (one projection pixel);
 `speaker_offset` in steps of 1, since a speaker stand is not placed to a tenth of a degree. The
 interlace is not an angle: the firmware shifts an integer pixel index, so it stays in pixels (±10 px;
 1 px is 0.1°).
@@ -102,13 +102,13 @@ not use the measured distance*.
 
 A person's bearing leaves the tracker as their world azimuth (at a seam, a blend of both cameras'
 views: `TRACKING.md`, *Each tick*), becomes the pose's `Azimuth`, and is moved to the eyes by
-`EyeAzimuthExtractor`. The playhead is an azimuth; every layer draws at an azimuth's strip position
-(`angle_to_strip_position`: azimuth / 360 × 3600 pixels); every angle Max receives is an azimuth.
+`EyeAzimuthExtractor`. The playhead is an azimuth; every layer draws at a normalized azimuth
+(`normalize_azimuth`: azimuth / 360, × 3600 gives the pixel); every angle Max receives is an azimuth.
 
 ### Direction
 
-The bar turns counter-clockwise seen from above (site fact). The firmware's ring counter advances
-with the bar and a strip index is that counter, so azimuth increases with the bar.
+The bar turns counter-clockwise seen from above (site fact). The firmware's sample counter advances
+with the bar and a pixel index is that counter, so azimuth increases with the bar.
 
 On the camera side azimuth increases with the image column, and every camera has `flip_h` set
 (`INIT`) — so the columns run counter-clockwise too, and the cameras are numbered counter-clockwise
@@ -129,7 +129,7 @@ sensor pulse, once per revolution, when a reflective line on the head passes the
 - **Projection mode** — commanded at or above 200 rpm. The bar is a blur and the image is painted
   from the firmware's own counter, restarted at the pulse, with a fixed quarter turn built in
   (`TEST = 900` px in `firmware.cpp`, applied in `loop1`). The projection offset rotates the authored
-  ring into that counter's frame. It is tuned on static content.
+  projection into that counter's frame. It is tuned on static content.
 
 The fixture switches mechanism on the commanded rpm the moment it receives it (`loop` sets `SLOW`
 from `RPM`), regardless of the bar's actual speed.
@@ -139,7 +139,7 @@ makes the flash land on the person, so the internal playhead leads the visible b
 loop's output delay. The playhead is never reset at spin-up, so it keeps that lead, and the projected
 playhead line reaches the wall one output delay later — exactly where the beam would have been. So
 the playhead needs no offset of its own in projection mode, and tuning the projection offset onto the
-moving line would rotate the whole ring by that delay. (The firmware applies a frame on the next fast
+moving line would rotate the whole projection by that delay. (The firmware applies a frame on the next fast
 revolution, so the line may lag up to 30 ms more — a degree or two, inside the flash window;
 deduction.) The hit and the sound fire on the internal playhead in both modes, so their timing
 against the light matches too.
@@ -327,7 +327,7 @@ the warp, and distance comes off the floor plane.
 
 ### Tilt — derived from the build
 
-`tilt` is derived, not set by eye, from the lens height, the ring radius and the R 1.35 m inner circle
+`tilt` is derived, not set by eye, from the lens height, the camera radius and the R 1.35 m inner circle
 (site decision).
 
 The reference person is 1.8 m, with an overhead hand reach of 2.2 m — raised arms are content the pose
@@ -387,7 +387,7 @@ All three are measured against what the sensor fills per column (`frame_coverage
 rows, so the black arch counts. The gap between the two hands read-outs says which limit the frame is
 running into. Wide: the rows reach past the sensor, so the top is the sensor's own edge, falling
 toward the seams. Near zero: the rows run out first and cap the top at one angle on every column,
-leaving only the ring's parallax. The studio preset (P720, tilt 15, the derived 960 rows) is the
+leaving only the rig's parallax. The studio preset (P720, tilt 15, the derived 960 rows) is the
 first: feet from R 1.72, hands from R 1.67 on the axis and R 2.0 on the seam. The seam line is
 searched, not read off the 45° column: a person on it near the fixture is seen by the camera ≈9°
 wider than the seam's own bearing, because the camera sits 0.36 m out.
@@ -415,7 +415,7 @@ person is 45° off both neighbouring axes. Because each camera sits 0.36 m out f
 | 3.5 m  | 116.4°                    | +26.4°                                |
 
 - **R 1.015 m** — a seam person's centre enters one camera. Below it they are in the gap and
-  invisible, which is why R 1 m is the hard floor: a consequence of the ring radius, not a choice.
+  invisible, which is why R 1 m is the hard floor: a consequence of the camera radius, not a choice.
 - **R 1.765 m** — a whole body (50 cm shoulders) fits inside one camera. Between the two, a seam person
   is cut on one side in each camera and the box centre leans toward the visible side, ≈3° at R 1.35 m
   — a wobble at the handover, not a failure.
@@ -425,7 +425,7 @@ are seam properties only.
 
 ### Reading the panorama
 
-The second row is the whole ring as one 360° strip: azimuth 0 at the left edge, linear in degrees,
+The second row is the whole rig as one 360° strip: azimuth 0 at the left edge, linear in degrees,
 elevation up the side, both measured at the rig centre. The rows are the tangent of elevation, as the
 camera frames' are, so a person or a ceiling edge has the same shape in the strip as in the frames
 above it, and the only difference between the two is the azimuth re-projection to the rig centre. A
@@ -565,7 +565,7 @@ against the zone band, because going through the person's own distance makes the
   `reacquire_angle` outside. It is `angle_in_overlap`'s own threshold — a local angle of 28.3°,
   derived at the zone's far edge so the flag never under-reports (`TRACKING.md`, *Linking on a seam*)
   — projected at `rig.parallax_radius`, the depth the marks are drawn at. A local angle has no single
-  position on the ring, and the same threshold drawn at the far edge instead would land 2.3° away,
+  azimuth, and the same threshold drawn at the far edge instead would land 2.3° away,
   where nothing happens. It is not where the two pictures meet, which is 19.3° at R 2.1 and which the
   frames show for themselves: the flag is generous, so the yellow lines sit outside the visible
   overlap. It goes to zero below about R 1, where the sectors stop meeting (*What the horizontal field
@@ -615,7 +615,7 @@ live slider, so this exercises the entire geometry in two drags.
 Each observation's line sits inside a translucent field of its own colour, the same height as the
 line, as wide as the rule that decides what that observation may be joined to: `seam.link_angle`
 where a second camera also sees it, `reacquire_angle` where none does. So the width says which rule
-owns that part of the ring, and walking one person from mid-field to a seam visibly widens their field
+owns that part of the turn, and walking one person from mid-field to a seam visibly widens their field
 as the second camera picks them up. The rules themselves are in `TRACKING.md`, *Identity* and
 *Linking on a seam*.
 
@@ -738,7 +738,7 @@ truth about the feet is wanted.
 ## Motor and sensor
 
 The sensor pulses once per revolution when the reflective line on the head passes it; the firmware
-forwards it as `/WS/sensor/fall` (only while commanded below 200 rpm) and restarts its ring counter on
+forwards it as `/WS/sensor/fall` (only while commanded below 200 rpm) and restarts its sample counter on
 it. `MotorController` measures phase and rpm from consecutive pulses (`light/motor.py`); the phase is
 raw, 0 = the pulse, offset-agnostic by design. Above 200 rpm the sensor is silent: the show anchors the
 spin-up on that silence (`is_projecting`) and the spin-down on the playhead lock (`is_locked`) — see `STATES.md`.
@@ -781,10 +781,10 @@ Across a spin-up and a spin-down the playhead is never reset; only its rate sour
 
 ## Projection mode
 
-**Role:** the ring — four strips painting one 3600-pixel image around the room.
+**Role:** the projection — four strips painting one 3600-pixel image around the room.
 
 **What sets it:**
-- The projection offset, `inout.osc_light_sender.projection_offset`, degrees — rotates the whole ring
+- The projection offset, `inout.osc_light_sender.projection_offset`, degrees — rotates the whole projection
   as it goes on the wire (`inout/osc_light_sender.py`), so the frame on the board stays azimuth-true.
   It absorbs the reflective line's position and the firmware's quarter turn.
 - The interlace, `inout.osc_light_sender.interlace` (see *Interlacing*), ±10 px. The firmware boots
@@ -807,10 +807,10 @@ it "left" (site fact), reading from the wall looking at the fixture. Which physi
 `right_blue` on `Frame.beam_lights` — and nothing else (`layers/_base_layer.py`, `BeamLayer`). No
 calibration of their own: the lamp shines where the bar points, and where that is as an azimuth is the
 playhead. The sender copies them into the pixels the firmware reads in beam mode (pixel 0 and 1800 of
-each channel, `FIRMWARE_LIGHT_SLOT_TURNS`), which the projection offset and interlace cannot reach. A
+each channel, `FIRMWARE_LIGHT_SLOT_AZIMUTHS`), which the projection offset and interlace cannot reach. A
 beam layer that reacts to people (`beam_flash`, `beam_haunted`) depends on `PlayheadOffset`.
 
-**Projection layers** draw the ring at azimuth strip positions — `pose_instrument` at each person's
+**Projection layers** draw the projection at normalized azimuths — `pose_instrument` at each person's
 `Azimuth`, `projection_playhead` at the playhead (`ProjectionLayer`). No calibration of their own: they
 author in azimuth, and the sender applies the projection offset and interlace on the way out.
 
@@ -842,11 +842,11 @@ lamps turn with the bar.
 ## Screen
 
 Two simulations share the `ws_light` row, and the render draws whichever matches the fixture's mode
-(`render/render.py`): the beam view in beam mode draws the four lamps at the playhead heading; the ring
-view in projection mode shows the ring buffer as it leaves the compositor. Both are azimuth-true,
+(`render/render.py`): the beam view in beam mode draws the four lamps at the playhead heading; the projection
+view in projection mode shows the projection as it leaves the compositor. Both are azimuth-true,
 because the projection offset is applied in the sender and never touches the frame on the board.
 
-**The check, no hardware needed:** in projection mode the ring view's playhead line must sit under the
+**The check, no hardware needed:** in projection mode the projection view's playhead line must sit under the
 beam view's front lamp and the tracker row's person, and a spin-up must not move it. The screen shows
 the room's angles; only the wall shows what the fixture makes of them.
 

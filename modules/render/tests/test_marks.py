@@ -21,7 +21,7 @@ from modules.utils import Rect
 # The White Space rig: four cameras, 127 degrees each, lenses 0.36 m out from the centre.
 CAM_FOV: float = 127.0
 TARGET_FOV: float = 90.0
-RING_RADIUS: float = 0.36
+CAMERA_RADIUS: float = 0.36
 PARALLAX_RADIUS: float = 2.1        # the zone's harmonic mean, what the tracker corrects at
 CAMERA_HEIGHT: float = 0.5
 LINK_ANGLE: float = 18.0
@@ -31,7 +31,7 @@ LOST_TIMEOUT: float = 2.0
 NOW: float = 1_000_000.0            # a fixed clock, so a LOST mark's fade is deterministic
 
 CONTEXT: MarkContext = MarkContext(
-    cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
+    cam_fov=CAM_FOV, target_fov=TARGET_FOV, camera_radius=CAMERA_RADIUS,
     parallax_radius=PARALLAX_RADIUS, camera_height=CAMERA_HEIGHT,
     row_model=(0.78, 0.58), elevation_window=(40.0, -30.0),
     link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE,
@@ -100,7 +100,7 @@ class TestPlacement(unittest.TestCase):
         above the zone's R 3.5 row — which on the strip is what "no longer seen" looks like —
         instead of being piled up at the edge with everyone else beyond it."""
         on_axis: float = CAM_FOV / 2.0
-        m: Mark = mark(observation(0, on_axis, 45.0, overlap=False, distance=5.0 - RING_RADIUS))
+        m: Mark = mark(observation(0, on_axis, 45.0, overlap=False, distance=5.0 - CAMERA_RADIUS))
         self.assertIn('R5.0m', m.label)
         far_edge_y: float = strip_y(-math.degrees(math.atan(CAMERA_HEIGHT / 3.5)),
                                     CONTEXT.elevation_window)
@@ -217,7 +217,7 @@ class TestPassiveField(unittest.TestCase):
 
 
 class TestFieldWidth(unittest.TestCase):
-    """The width says which rule owns this part of the ring, and it is the rule's angle wide rather
+    """The width says which rule owns this part of the turn, and it is the rule's angle wide rather
     than either side of the line, so that two fields overlapping *is* the rule."""
 
     def test_in_an_overlap_it_is_the_link_angle_centred_on_the_mark(self) -> None:
@@ -234,7 +234,7 @@ class TestFieldWidth(unittest.TestCase):
         m: Mark = mark(observation(0, 63.5, 45.0, overlap=False))
         low, high = span(m)
         radius: float = PARALLAX_RADIUS
-        expected: float = REACQUIRE_ANGLE * (radius - RING_RADIUS) / radius
+        expected: float = REACQUIRE_ANGLE * (radius - CAMERA_RADIUS) / radius
         self.assertAlmostEqual(high - low, expected, delta=0.05)
         self.assertAlmostEqual((low + high) / 2.0, 45.0, delta=0.01)
         self.assertLess(high - low, REACQUIRE_ANGLE)    # never wider than the rule itself
@@ -251,7 +251,7 @@ class TestFieldWidth(unittest.TestCase):
 
     def test_the_reacquire_field_is_clamped_to_the_camera_field(self) -> None:
         # Past a field edge there are no pixels for a returning person to come back in through,
-        # so the window stops there rather than claiming ring the camera cannot see.
+        # so the window stops there rather than claiming azimuth the camera cannot see.
         at_edge: Mark = mark(observation(0, CAM_FOV, 100.2, overlap=False))
         inside: Mark = mark(observation(0, CAM_FOV - REACQUIRE_ANGLE, 96.0, overlap=False))
         self.assertLess(at_edge.field_w, inside.field_w)
@@ -259,7 +259,7 @@ class TestFieldWidth(unittest.TestCase):
 
     def test_a_zero_angle_draws_no_field(self) -> None:
         blank: MarkContext = MarkContext(
-            cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
+            cam_fov=CAM_FOV, target_fov=TARGET_FOV, camera_radius=CAMERA_RADIUS,
             parallax_radius=PARALLAX_RADIUS, camera_height=CAMERA_HEIGHT,
             row_model=(0.78, 0.58), elevation_window=(40.0, -30.0),
             link_angle=0.0, reacquire_angle=0.0,
@@ -283,7 +283,7 @@ class TestFieldsOverlapExactlyWhenTheTrackerLinks(unittest.TestCase):
     def setUp(self) -> None:
         self.config = PanoramicTrackerSettings(fov=CAM_FOV)
         self.config.seam.link_angle = LINK_ANGLE
-        self.config.rig.camera_radius = RING_RADIUS
+        self.config.rig.camera_radius = CAMERA_RADIUS
         self.tracker = PanoramicTracker(self.config, num_players=8, num_cameras=4)
 
     def fields_overlap(self, a: Mark, b: Mark) -> bool:
@@ -372,7 +372,7 @@ class TestZoneLines(unittest.TestCase):
         has that end between the two. Checked through the marks' own row model rather than a second
         copy of it."""
         context = MarkContext(
-            cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=0.0,
+            cam_fov=CAM_FOV, target_fov=TARGET_FOV, camera_radius=0.0,
             parallax_radius=PARALLAX_RADIUS, camera_height=self.CAMERA_HEIGHT,
             row_model=CONTEXT.row_model, elevation_window=self.WINDOW,
             link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE,
@@ -382,7 +382,7 @@ class TestZoneLines(unittest.TestCase):
         horizon_row, focal_rows = context.row_model
         for radius in (2.0, 2.25, 3.0):
             with self.subTest(radius=radius):
-                # Feet on the floor at this radius, with the camera at the centre (ring 0, so the
+                # Feet on the floor at this radius, with the camera at the centre (camera radius 0, so the
                 # camera distance and the centre radius are the same number).
                 feet: float = row_from_elevation(self.elevation(radius), horizon_row, focal_rows)
                 t = observation(0, 63.5, 45.0, overlap=False, distance=radius,
@@ -406,7 +406,7 @@ class TestZoneLines(unittest.TestCase):
         That is what this test exists to catch.
         """
         context = MarkContext(
-            cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
+            cam_fov=CAM_FOV, target_fov=TARGET_FOV, camera_radius=CAMERA_RADIUS,
             parallax_radius=PARALLAX_RADIUS, camera_height=self.CAMERA_HEIGHT,
             row_model=CONTEXT.row_model, elevation_window=self.WINDOW,
             link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE,
@@ -418,9 +418,9 @@ class TestZoneLines(unittest.TestCase):
                     # A person on that circle, as the camera sees them: the bearing off its axis
                     # fixes the camera distance, and the feet then fix the row.
                     bearing: float = math.radians(local_angle - CAM_FOV / 2.0)
-                    # Camera `RING_RADIUS` out, aimed radially: solve for its distance to the circle.
-                    cam_distance: float = -RING_RADIUS * math.cos(bearing) + math.sqrt(
-                        radius ** 2 - (RING_RADIUS * math.sin(bearing)) ** 2)
+                    # Camera `CAMERA_RADIUS` out, aimed radially: solve for its distance to the circle.
+                    cam_distance: float = -CAMERA_RADIUS * math.cos(bearing) + math.sqrt(
+                        radius ** 2 - (CAMERA_RADIUS * math.sin(bearing)) ** 2)
                     depression: float = math.degrees(math.atan(self.CAMERA_HEIGHT / cam_distance))
                     feet: float = row_from_elevation(-depression, horizon_row, focal_rows)
                     m: Mark = mark(observation(0, local_angle, 45.0, overlap=False,

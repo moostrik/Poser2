@@ -1,4 +1,4 @@
-"""Flood — constant full-strip white: the END's wall of light.
+"""Flood — the whole projection constant white: the END's wall of light.
 
 Deliberately the dumbest layer in the pool: its one dynamic, the cross-to-full, is a mix
 weight set by the states, never behavior inside the layer. The wall's ending belongs to
@@ -14,7 +14,7 @@ from ...frame import Frame
 
 
 class FloodSettings(LayerSettings):
-    level: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Full-strip white level")
+    level: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="White level over the whole projection")
 
 
 class Flood(ProjectionLayer):

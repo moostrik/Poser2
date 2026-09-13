@@ -1,7 +1,7 @@
 """BeamLightSimulationLayer — the image the installation projects while the fixture is in beam
-mode: the four beam lights on the walls, unrolled over 360° like the projection image.
+mode: the four beam lights on the walls, unrolled over 360° like the projection.
 
-The sibling of ``LightSimulationLayer`` (the projection image): both read the composition output from
+The sibling of ``LightSimulationLayer`` (the projection): both read the composition output from
 the board and push a Frame-shaped image through the same shader, so the two modes share
 one look. This one builds its image from the frame's explicit ``beam_lights``
 and its playhead heading (``beam_light_projection``). The render draws whichever of the two

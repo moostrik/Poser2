@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class Tracker(Thread, BaseTracker):
-    """Tracks people across a ring of cameras sharing a 360° field of view.
+    """Tracks people across a rig of cameras sharing a 360° field of view.
 
     **The second of two tiers.** Each camera runs YOLO into depthai's `ObjectTracker`
     (`modules/oak/camera/pipeline.py`): detection, per-frame association, short misses bridged as
@@ -54,7 +54,7 @@ class Tracker(Thread, BaseTracker):
         self.observations: ObservationStore = ObservationStore(num_players)
 
         self.config: TrackerSettings = config
-        # Each camera owns 360/num_cameras degrees of the ring; whatever its field has beyond
+        # Each camera owns 360/num_cameras degrees of the turn; whatever its field has beyond
         # that is the overlap it shares with its neighbours.
         self.rig: Rig = Rig(config.fov, 360.0 / num_cameras)
         self.rig_sync: RigSync = RigSync(config, self.rig)

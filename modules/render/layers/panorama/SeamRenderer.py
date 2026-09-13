@@ -67,7 +67,7 @@ class SeamRenderer(LayerBase):
         """An azimuth range as a faint full-height fill.
 
         The width is folded into ±180 rather than taken modulo 360 so that a degenerate range draws
-        nothing instead of a band spanning almost the whole ring. `strip_spans` then splits the band
+        nothing instead of a band spanning almost the whole turn. `strip_spans` then splits the band
         that straddles the strip's 0/360 join, so the one on the azimuth-0 seam is drawn whole
         rather than clipped.
         """

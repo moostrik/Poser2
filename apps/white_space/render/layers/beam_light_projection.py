@@ -3,7 +3,7 @@
 No GL here, so it is unit-testable on its own; ``BeamLightSimulationLayer`` wraps it for the
 screen.
 
-A strip index is an angle: the front white points along the playhead heading and the other
+A pixel index is an azimuth: the front white points along the playhead heading and the other
 three lights sit at ``BEAM_LIGHT_HEADINGS`` from it. Each lit light is a line of ``width``
 degrees at its level, fading to nothing over ``blur`` degrees on each side — a raised cosine,
 so the edge meets both the solid core and the darkness around it without a kink.
@@ -14,7 +14,7 @@ import math
 import numpy as np
 
 from apps.white_space.light import BeamLightId, BEAM_LIGHT_CHANNEL, BEAM_LIGHT_HEADINGS
-from apps.white_space.light.layers import BlendType, angle_to_strip_position, apply_circular
+from apps.white_space.light.layers import BlendType, normalize_azimuth, apply_circular
 
 
 def beam_profile(width: float, blur: float, resolution: int) -> np.ndarray:
@@ -22,7 +22,7 @@ def beam_profile(width: float, blur: float, resolution: int) -> np.ndarray:
     over ``blur`` on each side (both angles in radians; ``blur`` 0 = a hard edge).
 
     Always odd-length with a single centre pixel — integer pixel geometry throughout, so a
-    line's centre never lands a pixel off — and never longer than the strip.
+    line's centre never lands a pixel off — and never longer than the full turn.
     """
     span_max: int = (resolution - 1) // 2
     core: int = min(max(0, round(width / 2.0 / math.tau * resolution)), span_max)
@@ -49,6 +49,6 @@ def project_beam_lights(beam_lights: np.ndarray, heading: float, width: float, b
         level = float(beam_lights[light])
         if not level > 0.0:                                            # NaN and ≤ 0 paint nothing
             continue
-        centre = round(angle_to_strip_position(heading + BEAM_LIGHT_HEADINGS[light]) * resolution)
+        centre = round(normalize_azimuth(heading + BEAM_LIGHT_HEADINGS[light]) * resolution)
         channel = out[0, :, BEAM_LIGHT_CHANNEL[light]]
         apply_circular(channel, (level * profile).astype(out.dtype), centre - half, BlendType.MAX)

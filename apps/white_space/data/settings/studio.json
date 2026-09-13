@@ -681,8 +681,8 @@
         "blend": "ADD"
       },
       "test_player_lines": {
-        "center_width": 0.05,
-        "flank_width": 0.01,
+        "center_width": 18.0,
+        "flank_width": 3.6,
         "depth_scale": 2.0,
         "invert": false,
         "level_center": 0.5,
@@ -792,11 +792,11 @@
         }
       },
       "test_pose_waves": {
-        "void_width": 0.05,
-        "void_edge": 0.01,
+        "void_width": 18.0,
+        "void_edge": 3.6,
         "use_void": true,
-        "pattern_width": 0.2,
-        "pattern_edge": 0.2,
+        "pattern_width": 72.0,
+        "pattern_edge": 72.0,
         "line_sharpness": 1.5,
         "line_speed": 1.5,
         "line_width": 0.1,

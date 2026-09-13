@@ -14,11 +14,11 @@ from modules.tracker import azimuth_to_camera_x, camera_azimuth, centre_distance
     row_from_elevation
 
 
-# The White Space rig, as measured: four OAK-D Pro W on a 0.36 m ring, 127 degrees each.
+# The White Space rig, as measured: four OAK-D Pro W 0.36 m out from the centre, 127 degrees each.
 NUM_CAMERAS: int = 4
 CAM_FOV: float = 127.0
 TARGET_FOV: float = 360.0 / NUM_CAMERAS
-RING_RADIUS: float = 0.36
+CAMERA_RADIUS: float = 0.36
 FOCUS_RADIUS: float = 2.25
 # How far local 0 sits before a camera's own sector starts: half the field's spare.
 FIELD_OFFSET: float = (CAM_FOV - TARGET_FOV) / 2.0
@@ -38,7 +38,7 @@ def _band(rows: int, tilt: float, src: tuple[int, int] = (1280, 720)) -> tuple[f
 class TestCameraElevation(unittest.TestCase):
     """Checked against a point placed in 3-D and projected from the camera directly.
 
-    Rig centre at the origin, camera `c` at `ring_radius` out along its own axis. A point on the
+    Rig centre at the origin, camera `c` at `camera_radius` out along its own axis. A point on the
     focus cylinder at azimuth `a` and height `h` above the lens plane is at
     `(R cos a, R sin a, h)`; the centre sees it at elevation `atan(h/R)` and the camera at
     `atan(h/d)` with `d` the horizontal distance between them. No formula from the module is
@@ -49,8 +49,8 @@ class TestCameraElevation(unittest.TestCase):
                 focus_radius: float) -> tuple[float, float]:
         centre: float = math.radians(camera_azimuth(cam_id, TARGET_FOV))
         a: float = math.radians(azimuth)
-        dx: float = focus_radius * math.cos(a) - RING_RADIUS * math.cos(centre)
-        dy: float = focus_radius * math.sin(a) - RING_RADIUS * math.sin(centre)
+        dx: float = focus_radius * math.cos(a) - CAMERA_RADIUS * math.cos(centre)
+        dy: float = focus_radius * math.sin(a) - CAMERA_RADIUS * math.sin(centre)
         horizontal: float = math.hypot(dx, dy)
         return (math.degrees(math.atan(height / focus_radius)),      # seen from the centre
                 math.degrees(math.atan(height / horizontal)))        # seen from the camera
@@ -64,32 +64,32 @@ class TestCameraElevation(unittest.TestCase):
                     from_centre, from_camera = self._direct(
                         axis + offset, height, cam_id, focus_radius)
                     self.assertAlmostEqual(
-                        camera_elevation(from_centre, offset, RING_RADIUS, focus_radius),
+                        camera_elevation(from_centre, offset, CAMERA_RADIUS, focus_radius),
                         from_camera, places=9,
                         msg=f'cam {cam_id} offset {offset} height {height}')
 
     def test_the_horizon_never_moves(self) -> None:
         for offset in (-60.0, 0.0, 60.0):
             self.assertAlmostEqual(
-                camera_elevation(0.0, offset, RING_RADIUS, FOCUS_RADIUS), 0.0, places=12)
+                camera_elevation(0.0, offset, CAMERA_RADIUS, FOCUS_RADIUS), 0.0, places=12)
 
     def test_compression_matches_the_horizontal_on_the_axis(self) -> None:
         """The point of doing both axes: on the camera's own axis the two factors are the same
         `R / (R - r)`, so a person keeps their proportions."""
         focus_radius: float = FOCUS_RADIUS
-        expected: float = focus_radius / (focus_radius - RING_RADIUS)
+        expected: float = focus_radius / (focus_radius - CAMERA_RADIUS)
         small: float = 1e-4
-        vertical: float = camera_elevation(small, 0.0, RING_RADIUS, focus_radius) / small
+        vertical: float = camera_elevation(small, 0.0, CAMERA_RADIUS, focus_radius) / small
         horizontal: float = (
             azimuth_to_camera_x(camera_azimuth(0, TARGET_FOV) + small, 0, CAM_FOV, TARGET_FOV,
-                                RING_RADIUS, FOCUS_RADIUS)      # type: ignore[operator]
+                                CAMERA_RADIUS, FOCUS_RADIUS)      # type: ignore[operator]
             - azimuth_to_camera_x(camera_azimuth(0, TARGET_FOV), 0, CAM_FOV, TARGET_FOV,
-                                  RING_RADIUS, FOCUS_RADIUS)    # type: ignore[operator]
+                                  CAMERA_RADIUS, FOCUS_RADIUS)    # type: ignore[operator]
         ) * CAM_FOV / small
         self.assertAlmostEqual(vertical, expected, places=6)
         self.assertAlmostEqual(horizontal, expected, places=4)
 
-    def test_no_ring_is_the_identity(self) -> None:
+    def test_zero_camera_radius_is_the_identity(self) -> None:
         for elevation in (-30.0, 0.0, 12.5, 39.0):
             self.assertAlmostEqual(
                 camera_elevation(elevation, 40.0, 0.0, FOCUS_RADIUS), elevation, places=12)
@@ -103,15 +103,15 @@ class TestCentreElevation(unittest.TestCase):
         centre's view to the camera's, and this takes it back, given that point's real distances."""
         focus_radius: float = FOCUS_RADIUS
         for bearing in (-60.0, -25.0, 0.0, 25.0, 60.0):
-            cam_distance: float = focus_distance(bearing, RING_RADIUS, focus_radius)
+            cam_distance: float = focus_distance(bearing, CAMERA_RADIUS, focus_radius)
             for elevation in (-20.0, -5.0, 8.0, 31.0):
-                at_camera: float = camera_elevation(elevation, bearing, RING_RADIUS, focus_radius)
+                at_camera: float = camera_elevation(elevation, bearing, CAMERA_RADIUS, focus_radius)
                 self.assertAlmostEqual(
                     centre_elevation(at_camera, cam_distance, focus_radius), elevation, places=9,
                     msg=f'bearing {bearing} elevation {elevation}')
 
     def test_matches_a_point_projected_in_three_dimensions(self) -> None:
-        """Camera at the origin facing +x with the centre `ring_radius` behind it, a person `d` out
+        """Camera at the origin facing +x with the centre `camera_radius` behind it, a person `d` out
         at camera bearing `theta`, standing `h` above the lens plane. The expectation is built from
         the two horizontal distances directly, reusing no formula from the module."""
         for theta in (-50.0, 0.0, 35.0):
@@ -122,18 +122,18 @@ class TestCentreElevation(unittest.TestCase):
                     py: float = d * math.sin(t)
                     from_camera: float = math.degrees(math.atan(h / math.hypot(px, py)))
                     expected: float = math.degrees(
-                        math.atan(h / math.hypot(px + RING_RADIUS, py)))
+                        math.atan(h / math.hypot(px + CAMERA_RADIUS, py)))
                     self.assertAlmostEqual(
                         centre_elevation(from_camera, d,
-                                         centre_distance(theta, d, RING_RADIUS)),
+                                         centre_distance(theta, d, CAMERA_RADIUS)),
                         expected, places=9, msg=f'theta {theta} d {d} h {h}')
 
     def test_the_horizon_never_moves(self) -> None:
         for d in (1.2, 4.0):
             self.assertAlmostEqual(
-                centre_elevation(0.0, d, centre_distance(30.0, d, RING_RADIUS)), 0.0, places=12)
+                centre_elevation(0.0, d, centre_distance(30.0, d, CAMERA_RADIUS)), 0.0, places=12)
 
-    def test_no_ring_is_the_identity(self) -> None:
+    def test_zero_camera_radius_is_the_identity(self) -> None:
         d: float = 2.5
         for elevation in (-30.0, 0.0, 12.5, 39.0):
             self.assertAlmostEqual(
@@ -159,7 +159,7 @@ class TestElevationWindow(unittest.TestCase):
 
     def test_window_is_the_row_the_strip_draws(self) -> None:
         """P720 at tilt 12 on the R 2.25 cylinder, seen from the centre."""
-        top, bottom = elevation_window(_band(720, 12.0), RING_RADIUS, FOCUS_RADIUS)
+        top, bottom = elevation_window(_band(720, 12.0), CAMERA_RADIUS, FOCUS_RADIUS)
         self.assertAlmostEqual(top, 34.1, delta=0.15)
         self.assertAlmostEqual(bottom, -20.2, delta=0.15)
 
@@ -167,11 +167,11 @@ class TestElevationWindow(unittest.TestCase):
         """The centre is farther from the cylinder than a camera is, so it sees the same content
         over a smaller angle. Both ends must move inward, never outward."""
         band: tuple[float, float] = _band(720, 12.0)
-        top, bottom = elevation_window(band, RING_RADIUS, FOCUS_RADIUS)
+        top, bottom = elevation_window(band, CAMERA_RADIUS, FOCUS_RADIUS)
         self.assertLess(top, band[1])
         self.assertGreater(bottom, band[0])
 
-    def test_no_ring_leaves_the_band_alone(self) -> None:
+    def test_zero_camera_radius_leaves_the_band_alone(self) -> None:
         band: tuple[float, float] = _band(1152, 16.0, (1280, 800))
         top, bottom = elevation_window(band, 0.0, FOCUS_RADIUS)
         self.assertAlmostEqual(top, band[1], places=12)
@@ -264,9 +264,9 @@ class TestStripSpans(unittest.TestCase):
 
 
 class TestCoverage(unittest.TestCase):
-    def _coverage(self, azimuth: float, ring_radius: float = RING_RADIUS) -> int:
+    def _coverage(self, azimuth: float, camera_radius: float = CAMERA_RADIUS) -> int:
         return panorama_coverage(azimuth, NUM_CAMERAS, CAM_FOV, TARGET_FOV,
-                                 ring_radius, FOCUS_RADIUS)
+                                 camera_radius, FOCUS_RADIUS)
 
     def test_two_on_the_seams_one_on_the_axes_without_parallax(self) -> None:
         for seam in (0.0, 90.0, 180.0, 270.0):

@@ -1,6 +1,6 @@
-"""ProjectionPlayhead — visualises the content playhead as a bright marker in the projection image.
+"""ProjectionPlayhead — visualises the content playhead as a bright marker in the projection.
 
-Draws a marker at the strip position of ``frame.playhead`` (the continuous content playhead,
+Draws a marker at the normalized azimuth of ``frame.playhead`` (the continuous content playhead,
 radians [-π, π); NaN → nothing drawn). Distinct from the beam-mode ``BeamPlayhead`` and the motor/content ``Playhead``
 (the NCO in ``light/playhead.py``).
 """
@@ -12,7 +12,7 @@ import numpy as np
 from modules.settings import Field
 
 from .._base_layer import ProjectionLayer, LayerSettings
-from .._utilities import angle_to_strip_position
+from .._utilities import normalize_azimuth
 from ...frame import Frame
 
 
@@ -22,7 +22,7 @@ class ProjectionPlayheadSettings(LayerSettings):
 
 
 class ProjectionPlayhead(ProjectionLayer):
-    """A bright marker at the playhead's position in the projection image (visualises the content playhead)."""
+    """A bright marker at the playhead's position in the projection (visualises the content playhead)."""
 
     def __init__(self, resolution: int, config: ProjectionPlayheadSettings, board) -> None:
         super().__init__(resolution, config, board)
@@ -33,7 +33,7 @@ class ProjectionPlayhead(ProjectionLayer):
         if math.isnan(ph):
             return
         P = self._config
-        center = int(angle_to_strip_position(ph) * self.resolution)   # [0, R)
+        center = int(normalize_azimuth(ph) * self.resolution)   # [0, R)
         w      = max(1, round(P.width / 360.0 * self.resolution))     # deg → pixel count
         start  = center - w // 2
         idx    = np.arange(start, start + w) % self.resolution

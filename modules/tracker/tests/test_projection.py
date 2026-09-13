@@ -15,19 +15,19 @@ from modules.tracker.panoramic.rig import Rig
 from modules.utils import Rect
 
 
-# The White Space rig, as measured: four OAK-D Pro W on a 0.36 m ring, 127 degrees each.
+# The White Space rig, as measured: four OAK-D Pro W 0.36 m out from the centre, 127 degrees each.
 NUM_CAMERAS: int = 4
 CAM_FOV: float = 127.0
 TARGET_FOV: float = 360.0 / NUM_CAMERAS
-RING_RADIUS: float = 0.36
+CAMERA_RADIUS: float = 0.36
 FOCUS_RADIUS: float = 2.25
 # How far local 0 sits before a camera's own sector starts: half the field's spare.
 FIELD_OFFSET: float = (CAM_FOV - TARGET_FOV) / 2.0
 
 
-def _rig(ring_radius: float = RING_RADIUS) -> Rig:
+def _rig(camera_radius: float = CAMERA_RADIUS) -> Rig:
     rig = Rig(CAM_FOV, TARGET_FOV)
-    rig.set_camera_radius(ring_radius)
+    rig.set_camera_radius(camera_radius)
     return rig
 
 
@@ -40,29 +40,29 @@ class TestFocusDistance(unittest.TestCase):
     def test_seam_person_is_about_two_metres_out(self) -> None:
         """A person on a seam at play-zone middle: 45 degrees off axis on a 2.25 m cylinder."""
         self.assertAlmostEqual(
-            focus_distance(45.0, RING_RADIUS, FOCUS_RADIUS), 2.01, places=2
+            focus_distance(45.0, CAMERA_RADIUS, FOCUS_RADIUS), 2.01, places=2
         )
 
     def test_symmetric_about_the_camera_axis(self) -> None:
         for bearing in (5.0, 20.0, 45.0, 63.5):
             self.assertAlmostEqual(
-                focus_distance(bearing, RING_RADIUS, FOCUS_RADIUS),
-                focus_distance(-bearing, RING_RADIUS, FOCUS_RADIUS),
+                focus_distance(bearing, CAMERA_RADIUS, FOCUS_RADIUS),
+                focus_distance(-bearing, CAMERA_RADIUS, FOCUS_RADIUS),
                 places=12,
             )
 
     def test_closest_straight_ahead_farthest_behind(self) -> None:
         """The camera is pushed toward the wall it faces, so its own axis is the *short* ray: the
-        cylinder is `focus_radius - ring_radius` dead ahead and `+ ring_radius` behind."""
-        ahead: float = focus_distance(0.0, RING_RADIUS, FOCUS_RADIUS)
-        side: float = focus_distance(63.5, RING_RADIUS, FOCUS_RADIUS)
-        behind: float = focus_distance(180.0, RING_RADIUS, FOCUS_RADIUS)
-        self.assertAlmostEqual(ahead, FOCUS_RADIUS - RING_RADIUS, places=12)
-        self.assertAlmostEqual(behind, FOCUS_RADIUS + RING_RADIUS, places=12)
+        cylinder is `focus_radius - camera_radius` dead ahead and `+ camera_radius` behind."""
+        ahead: float = focus_distance(0.0, CAMERA_RADIUS, FOCUS_RADIUS)
+        side: float = focus_distance(63.5, CAMERA_RADIUS, FOCUS_RADIUS)
+        behind: float = focus_distance(180.0, CAMERA_RADIUS, FOCUS_RADIUS)
+        self.assertAlmostEqual(ahead, FOCUS_RADIUS - CAMERA_RADIUS, places=12)
+        self.assertAlmostEqual(behind, FOCUS_RADIUS + CAMERA_RADIUS, places=12)
         self.assertLess(ahead, side)
         self.assertLess(side, behind)
 
-    def test_no_ring_means_one_distance_everywhere(self) -> None:
+    def test_zero_camera_radius_means_one_distance_everywhere(self) -> None:
         for bearing in (0.0, 30.0, 63.5):
             self.assertAlmostEqual(
                 focus_distance(bearing, 0.0, FOCUS_RADIUS), FOCUS_RADIUS, places=12
@@ -90,7 +90,7 @@ class TestRoundTripAgainstRig(unittest.TestCase):
                 x: float = step / 20.0
                 azimuth: float = self._forward(rig, x, cam_id, FOCUS_RADIUS)
                 back: float | None = azimuth_to_camera_x(
-                    azimuth, cam_id, CAM_FOV, TARGET_FOV, RING_RADIUS, FOCUS_RADIUS
+                    azimuth, cam_id, CAM_FOV, TARGET_FOV, CAMERA_RADIUS, FOCUS_RADIUS
                 )
                 self.assertIsNotNone(back, f'cam {cam_id} column {x} fell outside its own field')
                 assert back is not None
@@ -104,13 +104,13 @@ class TestRoundTripAgainstRig(unittest.TestCase):
                 x: float = step / 10.0
                 azimuth: float = self._forward(rig, x, 2, radius)
                 back: float | None = azimuth_to_camera_x(
-                    azimuth, 2, CAM_FOV, TARGET_FOV, RING_RADIUS, radius
+                    azimuth, 2, CAM_FOV, TARGET_FOV, CAMERA_RADIUS, radius
                 )
                 assert back is not None
                 self.assertAlmostEqual(back, x, places=9, msg=f'R{radius} column {x}')
 
     def test_round_trips_with_the_correction_off(self) -> None:
-        rig: Rig = _rig(ring_radius=0.0)
+        rig: Rig = _rig(camera_radius=0.0)
         for step in range(11):
             x: float = step / 10.0
             azimuth: float = self._forward(rig, x, 1, FOCUS_RADIUS)
@@ -125,7 +125,7 @@ class TestRoundTripAgainstRig(unittest.TestCase):
         at `radius`. This is the ghost the stitch shows."""
         rig: Rig = _rig()
         true_column: float | None = azimuth_to_camera_x(
-            90.0, 0, CAM_FOV, TARGET_FOV, RING_RADIUS, radius
+            90.0, 0, CAM_FOV, TARGET_FOV, CAMERA_RADIUS, radius
         )
         assert true_column is not None
         drawn: float = self._forward(rig, true_column, 0, FOCUS_RADIUS)
@@ -149,15 +149,15 @@ class TestRoundTripAgainstRig(unittest.TestCase):
 class TestCentreDistance(unittest.TestCase):
     """A person's distance from the rig centre, given their distance from a camera."""
 
-    def test_straight_ahead_adds_the_ring(self) -> None:
-        self.assertAlmostEqual(centre_distance(0.0, 3.0, RING_RADIUS), 3.0 + RING_RADIUS, places=12)
+    def test_straight_ahead_adds_the_camera_radius(self) -> None:
+        self.assertAlmostEqual(centre_distance(0.0, 3.0, CAMERA_RADIUS), 3.0 + CAMERA_RADIUS, places=12)
 
     def test_symmetric_about_the_axis(self) -> None:
         for bearing in (5.0, 30.0, 63.5):
-            self.assertAlmostEqual(centre_distance(bearing, 2.0, RING_RADIUS),
-                                   centre_distance(-bearing, 2.0, RING_RADIUS), places=12)
+            self.assertAlmostEqual(centre_distance(bearing, 2.0, CAMERA_RADIUS),
+                                   centre_distance(-bearing, 2.0, CAMERA_RADIUS), places=12)
 
-    def test_no_ring_changes_nothing(self) -> None:
+    def test_zero_camera_radius_changes_nothing(self) -> None:
         for bearing in (0.0, 45.0, 90.0):
             self.assertAlmostEqual(centre_distance(bearing, 2.0, 0.0), 2.0, places=12)
 
@@ -166,11 +166,11 @@ class TestCentreDistance(unittest.TestCase):
         centre-distance. Feed one the other's answer and the focus radius must come back."""
         focus_radius: float = FOCUS_RADIUS
         for centre_bearing in (0.0, 20.0, 55.0):
-            d: float = focus_distance(centre_bearing, RING_RADIUS, focus_radius)
+            d: float = focus_distance(centre_bearing, CAMERA_RADIUS, focus_radius)
             phi: float = math.radians(centre_bearing)
             theta: float = phi + math.asin(
-                max(-1.0, min(1.0, RING_RADIUS * math.sin(phi) / d)))
-            self.assertAlmostEqual(centre_distance(math.degrees(theta), d, RING_RADIUS),
+                max(-1.0, min(1.0, CAMERA_RADIUS * math.sin(phi) / d)))
+            self.assertAlmostEqual(centre_distance(math.degrees(theta), d, CAMERA_RADIUS),
                                    focus_radius, places=9, msg=f'bearing {centre_bearing}')
 
 
@@ -249,9 +249,9 @@ class TestCameraLocalToAzimuth(unittest.TestCase):
             for step in range(21):
                 local: float = CAM_FOV * step / 20.0
                 azimuth: float = camera_local_to_azimuth(
-                    local, cam_id, CAM_FOV, TARGET_FOV, RING_RADIUS, FOCUS_RADIUS)
+                    local, cam_id, CAM_FOV, TARGET_FOV, CAMERA_RADIUS, FOCUS_RADIUS)
                 back: float | None = azimuth_to_camera_x(
-                    azimuth, cam_id, CAM_FOV, TARGET_FOV, RING_RADIUS, FOCUS_RADIUS)
+                    azimuth, cam_id, CAM_FOV, TARGET_FOV, CAMERA_RADIUS, FOCUS_RADIUS)
                 self.assertIsNotNone(back, f'cam {cam_id} local {local} left its own field')
                 assert back is not None
                 self.assertAlmostEqual(back * CAM_FOV, local, places=9,
@@ -262,9 +262,9 @@ class TestCameraLocalToAzimuth(unittest.TestCase):
         110.5 degrees of the strip at R 2.25, because the camera sits 0.36 m outside the centre."""
         for cam_id in range(NUM_CAMERAS):
             left: float = camera_local_to_azimuth(0.0, cam_id, CAM_FOV, TARGET_FOV,
-                                                  RING_RADIUS, FOCUS_RADIUS)
+                                                  CAMERA_RADIUS, FOCUS_RADIUS)
             right: float = camera_local_to_azimuth(CAM_FOV, cam_id, CAM_FOV, TARGET_FOV,
-                                                   RING_RADIUS, FOCUS_RADIUS)
+                                                   CAMERA_RADIUS, FOCUS_RADIUS)
             # cam 0's left edge is below azimuth 0, so the span is a wrapped difference — the
             # same modulo the renderer takes before handing the band to `strip_spans`.
             self.assertAlmostEqual((right - left) % 360.0, 110.5, delta=0.1)
@@ -273,9 +273,9 @@ class TestCameraLocalToAzimuth(unittest.TestCase):
                                         FOCUS_RADIUS)
                 - camera_local_to_azimuth(0.0, cam_id, CAM_FOV, TARGET_FOV, 0.0, FOCUS_RADIUS)
             ) % 360.0
-            self.assertAlmostEqual(bare, CAM_FOV, places=9)  # ring_radius 0: the bare field
+            self.assertAlmostEqual(bare, CAM_FOV, places=9)  # camera_radius 0: the bare field
 
-    def test_no_ring_is_the_plain_offset(self) -> None:
+    def test_zero_camera_radius_is_the_plain_offset(self) -> None:
         # With the cameras at the centre there is no triangle left: the projection collapses to
         # `target_fov * cam_id + local - (cam_fov - target_fov) / 2`, which is how the azimuth frame
         # is defined (CALIBRATION.md, *One frame: azimuth*).
@@ -287,18 +287,18 @@ class TestCameraLocalToAzimuth(unittest.TestCase):
                     (TARGET_FOV * cam_id + local - FIELD_OFFSET) % 360.0, places=9)
 
     def test_the_axis_lands_on_the_axis(self) -> None:
-        # Straight ahead the parallax triangle is degenerate, whatever the ring or the depth.
+        # Straight ahead the parallax triangle is degenerate, whatever the camera radius or the depth.
         for radius in (1.5, 2.25, 3.5):
             self.assertAlmostEqual(
                 camera_local_to_azimuth(CAM_FOV / 2.0, 2, CAM_FOV, TARGET_FOV,
-                                        RING_RADIUS, radius),
+                                        CAMERA_RADIUS, radius),
                 camera_azimuth(2, TARGET_FOV), places=9)
 
     def test_monotonic_across_the_field(self) -> None:
         previous: float = -1.0
         for step in range(101):
             azimuth: float = camera_local_to_azimuth(CAM_FOV * step / 100.0, 1, CAM_FOV,
-                                                     TARGET_FOV, RING_RADIUS, FOCUS_RADIUS)
+                                                     TARGET_FOV, CAMERA_RADIUS, FOCUS_RADIUS)
             self.assertGreater(azimuth, previous)
             previous = azimuth
 
@@ -310,7 +310,7 @@ class TestCameraAzimuth(unittest.TestCase):
         )
 
     def test_agrees_with_the_forward_model_at_frame_centre(self) -> None:
-        # The frame centre is the camera's axis at any ring and any depth — the one bearing the
+        # The frame centre is the camera's axis at any camera radius and any depth — the one bearing the
         # parallax triangle leaves alone.
         rig: Rig = _rig()
         for cam_id in range(NUM_CAMERAS):

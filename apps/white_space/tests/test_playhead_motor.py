@@ -517,7 +517,7 @@ class BarsTest(unittest.TestCase):
 class RegimeSignalsTest(unittest.TestCase):
     """The playhead's mode-flip signals: `is_locked` (the playhead lock at BEAM — stale-proof
     after a spin-down, which the S9/S10 exit anchors on) and
-    `is_projecting` (PROJECTION + fall silence — fast enough for the projection image)."""
+    `is_projecting` (PROJECTION + fall silence — fast enough for the projection to show)."""
 
     DT = 1 / 60
 

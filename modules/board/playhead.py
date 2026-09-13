@@ -10,7 +10,7 @@ class PlayheadSignals:
     """The playhead's published clock + regime signals (pure data; producers define the
     semantics — for white_space: phase in radians [-π, π) or NaN, bars = monotonic
     content-clock cycles, is_locked = the playhead lock (tracking the measured rotation at
-    content speed), is_projecting = the bar spins fast enough for the projection image)."""
+    content speed), is_projecting = the bar spins fast enough for the projection to show)."""
     phase:         float = float("nan")
     bars:          float = 0.0
     is_locked:     bool  = False

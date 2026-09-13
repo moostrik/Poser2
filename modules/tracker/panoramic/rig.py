@@ -25,7 +25,7 @@ def height_is_measured(height: float) -> bool:
 
 
 class Rig:
-    """The installation as the tracker models it — the camera ring, the lens height, the tracked
+    """The installation as the tracker models it — the camera radius, the lens height, the tracked
     zone and the delivered frame — and what a camera's box means in it: world azimuth, distance and
     height (`annotate`), and where a column falls relative to the field edges, the overlap and the
     zone.
@@ -41,7 +41,7 @@ class Rig:
         self.target_fov: float = target_fov
 
         # Lens distance from the fixture axis (m); 0 disables the parallax correction.
-        self._ring_radius: float = 0.0
+        self._camera_radius: float = 0.0
         # How far below the feet the detector's box bottom sits, in frame heights (`_foot_px`).
         self._foot_offset: float = 0.0
         # Lens height above the floor (m) — the one measured constant the distance estimate needs.
@@ -92,7 +92,7 @@ class Rig:
 
     def _local_to_azimuth(self, local_angle: float, cam_id: int) -> float:
         return camera_local_to_azimuth(local_angle, cam_id, self.cam_fov, self.target_fov,
-                                       self._ring_radius, self.parallax_radius)
+                                       self._camera_radius, self.parallax_radius)
 
     def _foot_px(self, roi: Rect) -> float:
         """The row (px) the feet are on: the box bottom less `foot_offset`.
@@ -130,7 +130,7 @@ class Rig:
     def beyond_zone(self, local_angle: float, distance: float) -> bool:
         """Whether a person at this column and camera distance stands past the zone's far edge.
 
-        Tested as a **radius from the fixture**, not a camera distance: a camera sits `ring_radius`
+        Tested as a **radius from the fixture**, not a camera distance: a camera sits `camera_radius`
         out toward the person, so on its own axis at R 3.6 it reads 3.24 m, which a camera-distance
         test against 3.5 would accept. The radius is also what two cameras at a seam agree on.
 
@@ -138,7 +138,7 @@ class Rig:
         the detector's guess. No margin: brief errors are absorbed by the tracker's timeouts, steady
         ones are calibration. An uncalibrated `foot_offset` reads everyone nearer, so this fails open.
         """
-        radius: float = centre_distance(local_angle - self.cam_fov / 2.0, distance, self._ring_radius)
+        radius: float = centre_distance(local_angle - self.cam_fov / 2.0, distance, self._camera_radius)
         return radius > self._max_radius
 
     def estimate_height(self, roi: Rect) -> float:
@@ -148,7 +148,7 @@ class Rig:
 
             height = camera_height * (foot_px - top_px) / (foot_px - horizon_px)
 
-        Focal, field, tilt and distance all cancel, and so does the ring: one camera sees both feet
+        Focal, field, tilt and distance all cancel, and so does the camera radius: one camera sees both feet
         and head, so two cameras at different distances agree in metres. That is what
         ``seam.link_height`` compares, as a fraction of the larger reading.
 
@@ -239,10 +239,10 @@ class Rig:
         and the line inherits that.
 
         At `camera_radius = 0` both are `cam_fov - target_fov`. The local band is clamped to
-        `[0, cam_fov/2]`, so it cannot become always-true on a ring of more, narrower sectors.
+        `[0, cam_fov/2]`, so it cannot become always-true on a rig of more, narrower sectors.
         """
         bare: float = max(0.0, self.cam_fov - self.target_fov)
-        if self._ring_radius <= 0.0 or self._max_radius <= 0.0:
+        if self._camera_radius <= 0.0 or self._max_radius <= 0.0:
             self.overlap_band = bare
             self.overlap_azimuth = bare
             return
@@ -250,10 +250,10 @@ class Rig:
         # The local threshold, at the zone's far edge.
         axis: float = camera_azimuth(0, self.target_fov)
         edge: float = camera_local_to_azimuth(self.cam_fov, 0, self.cam_fov, self.target_fov,
-                                              self._ring_radius, self._max_radius)
+                                              self._camera_radius, self._max_radius)
         half_span: float = wrap180(edge - axis)
         x: float | None = azimuth_to_camera_x(axis + self.target_fov - half_span, 0, self.cam_fov,
-                                              self.target_fov, self._ring_radius, self._max_radius)
+                                              self.target_fov, self._camera_radius, self._max_radius)
         band: float = self.cam_fov - x * self.cam_fov if x is not None else 0.0
         self.overlap_band = min(max(0.0, band), self.cam_fov / 2.0)
 
@@ -265,7 +265,7 @@ class Rig:
             self.overlap_azimuth = 0.0
             return
         inner: float = camera_local_to_azimuth(self.cam_fov - self.overlap_band, 0, self.cam_fov,
-                                               self.target_fov, self._ring_radius,
+                                               self.target_fov, self._camera_radius,
                                                self.parallax_radius)
         self.overlap_azimuth = max(0.0, 2.0 * wrap180(self.target_fov - inner))
 
@@ -276,8 +276,8 @@ class Rig:
 
     def set_camera_radius(self, camera_radius: float) -> None:
         """How far each lens sits from the fixture axis (m). Re-derives the zone, which depends on
-        the ring too."""
-        self._ring_radius = max(0.0, camera_radius)
+        it too."""
+        self._camera_radius = max(0.0, camera_radius)
         self.set_zone(self._min_radius, self._max_radius)
 
     def set_camera_height(self, camera_height: float) -> None:

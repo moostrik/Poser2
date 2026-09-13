@@ -1,6 +1,6 @@
 
 from ._base_layer   import BaseLayer, BeamLayer, ProjectionLayer, LayerSettings, ChannelSettings
-from ._utilities    import BlendType, angle_to_strip_position, apply_circular
+from ._utilities    import BlendType, normalize_azimuth, apply_circular
 from .compositor    import Compositor, Mix
 
 from .beam.blue_sound               import BeamBlueSound,       BeamBlueSoundSettings

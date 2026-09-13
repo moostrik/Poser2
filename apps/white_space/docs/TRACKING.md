@@ -10,7 +10,7 @@ The one-per-camera tracker (`modules/tracker/onepercam/`) is not described here.
 
 - Everything here is code-verified unless marked **(site fact)** — told by the operator — or
   **(deduction)** — follows from the facts, not checked on hardware.
-- Numbers assume the studio preset: 4 cameras on a ring of R 0.36 m at 0.50 m, `fov` 127, P720,
+- Numbers assume the studio preset: a rig of 4 cameras at R 0.36 m and 0.50 m high, `fov` 127, P720,
   tilt 15, the derived 960-row frame, the tracked zone R 1.5 – R 3.5. A table on another
   configuration names it.
 - Every length is a radius from the fixture axis, as in `CALIBRATION.md`.
@@ -140,7 +140,7 @@ The tracker itself filters nothing on freshness; how stale is too stale is each 
 
 ### Why the azimuth does not use the measured distance
 
-The cameras sit on a ring, 0.36 m out, aimed radially outward. The same person is seen at different
+The rig's cameras sit 0.36 m out from the centre (`camera_radius`), aimed radially outward. The same person is seen at different
 bearings by two neighbours, and turning a camera bearing into a rig-centre azimuth takes a triangle
 that needs a distance (`camera_local_to_azimuth`, `modules/tracker/panoramic/projection.py`).
 

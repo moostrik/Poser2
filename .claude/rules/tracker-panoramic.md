@@ -1,5 +1,5 @@
 ---
-description: The panoramic tracker — cross-camera identity on a ring of cameras
+description: The panoramic tracker — cross-camera identity on the camera rig
 paths:
   - "modules/tracker/panoramic/**"
 ---

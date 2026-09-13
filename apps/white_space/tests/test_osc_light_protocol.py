@@ -140,7 +140,7 @@ class ConfigMessageTest(unittest.TestCase):
 class FixtureSlotTest(unittest.TestCase):
     """The fixture's readout mode follows the rpm sent with the frame: in beam mode it reads the
     four beam lights from pixel 0 and the middle pixel of each channel and nothing else, in
-    projection mode it steps the whole strip and never reads a slot. The rebuild mirrors that exactly."""
+    projection mode it paints the projection and never reads a slot. The rebuild mirrors that exactly."""
 
     LEVELS = {BeamLightId.FRONT_WHITE: 0.9, BeamLightId.BACK_WHITE: 0.6,
               BeamLightId.LEFT_BLUE: 0.4, BeamLightId.RIGHT_BLUE: 0.2}
@@ -166,11 +166,11 @@ class FixtureSlotTest(unittest.TestCase):
         self.assertAlmostEqual(float(white[self.HALF]), 0.6, places=6)   # back white
         self.assertAlmostEqual(float(blue[0]),          0.4, places=6)   # left blue
         self.assertAlmostEqual(float(blue[self.HALF]),  0.2, places=6)   # right blue
-        np.testing.assert_array_equal(white[1:self.HALF], _frame().white[1:self.HALF])   # the rest is projection content
+        np.testing.assert_array_equal(white[1:self.HALF], _frame().white[1:self.HALF])   # the rest is the projection
 
     def test_beam_mode_replaces_projection_content_at_the_slots(self) -> None:
         frame = self._lit_frame()
-        frame.white[0], frame.blue[self.HALF] = 1.0, 1.0        # projection content the fixture never reads
+        frame.white[0], frame.blue[self.HALF] = 1.0, 1.0        # projection the fixture never reads
         white, blue = OscLightSender._rebuild_fixture_pixels(frame, slow=True, shift=0)
         self.assertAlmostEqual(float(white[0]), 0.9, places=6)
         self.assertAlmostEqual(float(blue[self.HALF]), 0.2, places=6)
@@ -217,12 +217,12 @@ class ProjectionOffsetTest(unittest.TestCase):
 
     @staticmethod
     def _one_lit_pixel() -> Frame:
-        """A dark strip with a single lit pixel at azimuth 0 — the rotation is visible as a move."""
+        """A dark projection with a single lit pixel at azimuth 0 — the rotation is visible as a move."""
         frame = Frame(RESOLUTION, Tick(0.0, 0.0))
         frame.white[0], frame.blue[0] = 1.0, 1.0
         return frame
 
-    def test_degrees_convert_to_whole_strip_pixels(self) -> None:
+    def test_degrees_convert_to_whole_pixels(self) -> None:
         self.assertEqual(OscLightSender._projection_shift(self._settings(0.0)), 0)
         self.assertEqual(OscLightSender._projection_shift(self._settings(90.0)), RESOLUTION // 4)
         self.assertEqual(OscLightSender._projection_shift(self._settings(360.0)), 0)      # a full turn wraps

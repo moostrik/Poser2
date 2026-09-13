@@ -1,7 +1,7 @@
 """Layer base classes and shared settings primitives.
 
 Two modes, two bases, one axis: a ``ProjectionLayer`` draws pixels — the persistence-of-vision
-projection image — and a ``BeamLayer`` writes the four beam lights by name. The split is structural
+projection — and a ``BeamLayer`` writes the four beam lights by name. The split is structural
 because it is the fixture's truth: in beam mode (commanded below ``FIXTURE_PROJECTION_RPM``) the
 firmware drives the lamps from four values and ignores the pixels, in projection mode it steps the
 pixels and ignores the lamps (see ``inout/osc_light_sender.py`` for the wire contract). A beam
@@ -72,7 +72,7 @@ class BaseLayer(ABC):
 
 class BeamLayer(BaseLayer):
     """Beam mode (commanded below ``FIXTURE_PROJECTION_RPM``): the fixture drives the four
-    beam lights directly and reads no projection pixels, so a beam layer writes ``beam_lights`` —
+    beam lights directly and reads no projection, so a beam layer writes ``beam_lights`` —
     a ``(4,)`` array indexed by ``BeamLightId`` — and nothing else."""
 
     MODE = MotorMode.BEAM
@@ -104,7 +104,7 @@ class BeamLayer(BaseLayer):
 
 class ProjectionLayer(BaseLayer):
     """Projection mode (commanded at or above ``FIXTURE_PROJECTION_RPM``): pixels draw the
-    persistence-of-vision projection image, so the content rides the fast spin. A projection layer authors
+    persistence-of-vision projection, so the content rides the fast spin. A projection layer authors
     in azimuth and nothing rotates it here — the light sender applies the projection offset on
     the way out, so the frame on the board stays azimuth-true. Subclasses write additively into
     the ``white`` / ``blue`` scratch arrays (shape ``(resolution,)``, pre-zeroed)."""

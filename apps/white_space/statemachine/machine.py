@@ -63,7 +63,7 @@ class StateContext:
     is_playhead_locked: bool  # playhead lock: the sweep tracks the measured rotation at BEAM
                               # (stale-proof after a spin-down — OFF and S9/S10 exit on it)
     is_projecting: bool     # PROJECTION commanded and the sensor silent: the bar is fast enough
-                            # for the projection image to show (S6's swap to the instrument)
+                            # for the projection to show (S6's swap to the instrument)
 
 
 class StateMachine:

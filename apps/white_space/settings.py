@@ -66,7 +66,7 @@ class Layers(IntEnum):
     poser        = auto()
     # WS visualization
     cam_panorama = auto()   # the 360° calibration strip: the stitch with the tracker data over it
-    ws_light     = auto()   # the projection image (fixture in projection mode)
+    ws_light     = auto()   # the projection (fixture in projection mode)
     ws_beam       = auto()   # the bar's four lights (fixture in beam mode); shares ws_light's row
     ws_azimuth   = auto()   # eye and bbox-centre azimuth lines, over whichever of the two is shown
     # data
@@ -324,7 +324,7 @@ class BeamLightSimSettings(BaseSettings):
 class RenderSettings(BaseSettings):
     camera_view: Field[CameraView] = Field(CameraView.BOTH, widget=Widget.select,
                                            description="Which camera row to show: the delivered frames, the 360° strip, or both")
-    azimuth_overlay: Field[bool] = Field(True, description="Eye (solid) and bbox-centre (faint) azimuth lines over the light strip")
+    azimuth_overlay: Field[bool] = Field(True, description="Eye (solid) and bbox-centre (faint) azimuth lines over the projection row")
     num_cams:    Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of players")
     tilt:        Field[float] = Field(0.0, access=Field.INIT, visible=False, description="Camera up-tilt (°), shared from the root — relayed to the panorama layer")
@@ -352,7 +352,7 @@ class Settings(BaseSettings):
     num_cameras     : Field[int]   = Field(4, access=Field.INIT)
     input_fps       : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     render_fps      : Field[float] = Field(30.0)
-    light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="LED strip resolution (pixels)")
+    light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="Projection resolution (pixels per turn)")
     fov             : Field[float] = Field(127.0, access=Field.INIT, description="Azimuth span (°) of each delivered camera frame — the tracker's contract, baked in at open")
     resolution      : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode for all cameras")
     frame_height    : Field[int]   = Field(0, access=Field.INIT, step=16, description="Delivered frame height (px, multiple of 16); 0 = derived: the sensor's full reach at this tilt")

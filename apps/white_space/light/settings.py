@@ -31,10 +31,10 @@ class LayerId(IntEnum):
     beam_wind_down      = auto()   # beam: flood's ending — the two white lamps fading over the spin-down (the wall while fast)
     beam_haunted        = auto()   # beam: player/ghost flash (debug/experimentation)
     beam_test           = auto()   # beam: direct levels for the four physical lamps (debug)
-    # projection mode — the projection image
+    # projection mode — the projection
     pose_instrument     = auto()   # projection: the pose instrument — people-anchored line patterns (see LAYERS.md)
     projection_playhead = auto()   # projection: bright marker visualising the content playhead
-    flood               = auto()   # projection: constant full-strip white (S8's wall)
+    flood               = auto()   # projection: the whole projection constant white (S8's wall)
     test_player_lines   = auto()
     test_calibration    = auto()
     test_fill           = auto()
@@ -62,7 +62,7 @@ class DebugLayer(IntEnum):
     beam_wind_down      = auto()
     beam_haunted        = auto()
     beam_test           = auto()
-    # projection mode — the projection image
+    # projection mode — the projection
     pose_instrument     = auto()
     projection_playhead = auto()
     flood               = auto()
@@ -115,7 +115,7 @@ class LightSettings(BaseSettings):
     max_poses:        Field[int]   = Field(3,    min=1,   max=16,   access=Field.INIT, description="Max tracked poses")
     num_cameras:      Field[int]   = Field(1,    min=1,   max=16,   access=Field.INIT, description="Number of cameras")
     light_rate:       Field[float] = Field(30.0, min=1,   max=120,  access=Field.INIT, description="Light output frame rate (fps)")
-    light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, description="LED strip resolution (pixels)")
+    light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, description="Projection resolution (pixels per turn)")
     fov: Field[float] = Field(110.0, access=Field.INIT, description="Camera horizontal FOV — relay from root to test_calibration; its visible home is the camera panel")
     spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — hidden relay from states (via the root) into wind_down")
 

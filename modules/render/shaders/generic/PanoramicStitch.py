@@ -1,4 +1,4 @@
-"""Unwrap a ring of camera frames into one 360-degree strip."""
+"""Unwrap the rig's camera frames into one 360-degree strip."""
 
 from OpenGL.GL import *  # type: ignore
 from modules.gl import Shader, draw_quad, Texture
@@ -18,7 +18,7 @@ class PanoramicStitch(Shader):
     """
 
     def use(self, textures: list[Texture], cam_fov: float, row_model: tuple[float, float],
-            target_fov: float, ring_radius: float, focus_radius: float,
+            target_fov: float, camera_radius: float, focus_radius: float,
             elevation_window: tuple[float, float], populated_band: tuple[float, float],
             blend: int) -> None:
         """Args:
@@ -27,7 +27,7 @@ class PanoramicStitch(Shader):
             row_model: (horizon_row, focal_rows) — the frames' rows are tangents of elevation,
                 `row = horizon_row - focal_rows * tan(e)` (`projection.row_from_elevation`)
             target_fov: the sector one camera owns, 360 / num_cameras (degrees)
-            ring_radius: camera distance from the rig centre (m); 0 disables the parallax term
+            camera_radius: camera distance from the rig centre (m); 0 disables the parallax term
             focus_radius: radius of the play-zone cylinder the image is aligned for (m), passed
                 to `focusRadius` unchanged — everything here is a radius from the fixture axis
             elevation_window: (top, bottom) elevation of the strip, measured at the rig centre
@@ -58,7 +58,7 @@ class PanoramicStitch(Shader):
         glUniform1f(self.get_uniform_loc("horizonRow"), row_model[0])
         glUniform1f(self.get_uniform_loc("focalRows"), row_model[1])
         glUniform1f(self.get_uniform_loc("targetFov"), target_fov)
-        glUniform1f(self.get_uniform_loc("ringRadius"), ring_radius)
+        glUniform1f(self.get_uniform_loc("cameraRadius"), camera_radius)
         glUniform1f(self.get_uniform_loc("focusRadius"), focus_radius)
         glUniform1f(self.get_uniform_loc("elevTop"), elevation_window[0])
         glUniform1f(self.get_uniform_loc("elevBottom"), elevation_window[1])

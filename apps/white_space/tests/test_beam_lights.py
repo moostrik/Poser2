@@ -69,7 +69,7 @@ class BeamProfileTest(unittest.TestCase):
     def test_zero_width_is_a_single_pixel(self) -> None:
         np.testing.assert_allclose(beam_profile(0.0, 0.0, R), [1.0])
 
-    def test_profile_never_outgrows_the_strip(self) -> None:
+    def test_profile_never_outgrows_the_full_turn(self) -> None:
         profile = beam_profile(math.tau, math.tau, R)
         self.assertLessEqual(len(profile), R)
 
@@ -116,7 +116,7 @@ class ProjectionTest(unittest.TestCase):
         for d in range(1, 31):
             self.assertAlmostEqual(white[centre - d], white[centre + d], places=6, msg=f"offset {d}")
 
-    def test_line_wraps_across_the_strip_edge(self) -> None:
+    def test_line_wraps_across_the_zero_azimuth_seam(self) -> None:
         self._project(self._one(BeamLightId.FRONT_WHITE), math.radians(-2.0))
         white = self.out[0, :, 0]
         self.assertAlmostEqual(white[R - 2], 1.0, places=5)   # centre, just before the seam

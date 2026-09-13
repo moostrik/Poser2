@@ -1,4 +1,4 @@
-"""TestChase composition — sine wave scrolling around the strip."""
+"""TestChase composition — sine wave scrolling around the projection."""
 
 import math
 
@@ -16,7 +16,7 @@ class TestChaseSettings(LayerSettings):
 
 
 class TestChase(ProjectionLayer):
-    """Sine wave chase pattern scrolling continuously around the strip."""
+    """Sine wave chase pattern scrolling continuously around the projection."""
 
     def __init__(self, resolution: int, config: TestChaseSettings, board) -> None:
         super().__init__(resolution, config, board)

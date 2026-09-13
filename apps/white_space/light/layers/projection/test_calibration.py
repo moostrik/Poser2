@@ -1,4 +1,4 @@
-"""Calibration composition — projects live camera slices onto the LED strip, so a camera's
+"""TestCalibration composition — projects live camera slices into the projection, so a camera's
 columns can be checked on the wall against the azimuths the tracker assigns them.
 
 Each camera contributes a horizontal luminance slice (rows slice_top..slice_bottom).
@@ -50,7 +50,7 @@ class TestCalibrationSettings(LayerSettings):
 
 
 class TestCalibration(ProjectionLayer):
-    """Projects horizontal camera slices onto the LED strip, to check on the wall that a camera's
+    """Projects horizontal camera slices into the projection, to check on the wall that a camera's
     columns land at the azimuths the tracker thinks they do."""
 
     def __init__(
@@ -121,7 +121,7 @@ class TestCalibration(ProjectionLayer):
                 continue
 
             # ----------------------------------------------------------
-            # Project ON columns onto the strip. The camera's warp delivers an
+            # Project ON columns into the projection. The camera's warp delivers an
             # equirectangular frame, so a column IS an azimuth: the mapping is linear and
             # there is nothing to undistort. (It used to carry an inlined copy of the
             # tracker's `undistort_x`, which the projection change made redundant.)
@@ -130,10 +130,10 @@ class TestCalibration(ProjectionLayer):
             on_x  = cam_x[on_mask]
 
             world_angle = (target_fov * cam_id + on_x * fov - fov_overlap) % 360.0
-            strip_pos   = world_angle / 360.0
-            strip_idx   = (strip_pos * res).astype(np.int32) % res
+            position    = world_angle / 360.0                       # normalized azimuth
+            pixel       = (position * res).astype(np.int32) % res
 
-            white[strip_idx] = np.maximum(white[strip_idx], 1.0)
+            white[pixel] = np.maximum(white[pixel], 1.0)
 
         # ----------------------------------------------------------
         # Overlap zone indicator

@@ -16,7 +16,7 @@ class TestLinesSettings(LayerSettings):
 
 
 class TestLines(ProjectionLayer):
-    """Discrete bright lines scrolling around the strip."""
+    """Discrete bright lines scrolling around the projection."""
 
     def __init__(self, resolution: int, config: TestLinesSettings, board) -> None:
         super().__init__(resolution, config, board)

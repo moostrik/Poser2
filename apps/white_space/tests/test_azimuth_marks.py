@@ -1,11 +1,11 @@
-"""Tests for the light strip's azimuth overlay geometry (eye vs bbox-centre strip positions)."""
+"""Tests for the projection row's azimuth overlay geometry (eye vs bbox-centre normalized azimuths)."""
 
 import math
 import unittest
 
 from modules.pose.frame import Frame
 from modules.pose.features import Azimuth
-from apps.white_space.render.layers.azimuth_marks import build_azimuth_marks, signed_strip_gap
+from apps.white_space.render.layers.azimuth_marks import build_azimuth_marks, signed_azimuth_gap
 
 
 def _frame(track_id: int, azimuth: float) -> Frame:
@@ -13,7 +13,7 @@ def _frame(track_id: int, azimuth: float) -> Frame:
 
 
 class BuildAzimuthMarksTest(unittest.TestCase):
-    def test_both_azimuths_map_to_strip_positions(self) -> None:
+    def test_both_azimuths_map_to_normalized_azimuths(self) -> None:
         marks = build_azimuth_marks({0: _frame(0, math.pi / 2)}, {0: _frame(0, -math.pi / 2)})
         self.assertEqual(len(marks), 1)
         self.assertAlmostEqual(marks[0].eye_x, 0.25, places=5)
@@ -36,14 +36,14 @@ class BuildAzimuthMarksTest(unittest.TestCase):
         self.assertEqual([m.track_id for m in build_azimuth_marks(frames, frames)], [0, 1])
 
 
-class SignedStripGapTest(unittest.TestCase):
+class SignedAzimuthGapTest(unittest.TestCase):
     def test_plain_gap(self) -> None:
-        self.assertAlmostEqual(signed_strip_gap(0.2, 0.3), 0.1, places=9)
-        self.assertAlmostEqual(signed_strip_gap(0.3, 0.2), -0.1, places=9)
+        self.assertAlmostEqual(signed_azimuth_gap(0.2, 0.3), 0.1, places=9)
+        self.assertAlmostEqual(signed_azimuth_gap(0.3, 0.2), -0.1, places=9)
 
     def test_across_the_join(self) -> None:
-        self.assertAlmostEqual(signed_strip_gap(0.98, 0.02), 0.04, places=9)
-        self.assertAlmostEqual(signed_strip_gap(0.02, 0.98), -0.04, places=9)
+        self.assertAlmostEqual(signed_azimuth_gap(0.98, 0.02), 0.04, places=9)
+        self.assertAlmostEqual(signed_azimuth_gap(0.02, 0.98), -0.04, places=9)
 
 
 if __name__ == "__main__":

@@ -32,7 +32,7 @@ class RigSettings(BaseSettings):
     taped from — and the same number goes into `Rig`, `projection`, the stitch shader and the
     panorama's ``R`` label, unconverted. (``camera_height`` is a height.)
 
-    What depends on them: the parallax correction (the lenses sit on a ring, not at a shared centre;
+    What depends on them: the parallax correction (the lenses sit ``camera_radius`` out, not at a shared centre;
     ``camera_radius`` 0 disables it), the parallax depth and overlap band derived from the zone
     (`Rig._update_parallax_depth`), and the far edge past which ``zone_filter`` ignores people.
 

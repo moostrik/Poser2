@@ -178,7 +178,7 @@ class Conductor(Thread):
         frame = Frame(self._config.light_resolution, tick, motor, command, playhead=playhead)
         self._compositor.render(frame)
 
-        # Main brightness — the projection pixels and the beam lights alike
+        # Main brightness — the projection and the beam lights alike
         m = self._config.brightness
         if m != 1.0:
             frame.white      *= m

@@ -34,7 +34,7 @@ def _coverage(src: tuple[int, int], rows: int, fov: float, tilt: float, lens_fov
     return coverage
 
 
-def reach_radius(height: float, centre_bearing: float, camera_height: float, ring_radius: float,
+def reach_radius(height: float, centre_bearing: float, camera_height: float, camera_radius: float,
                  limit: Callable[[float], float], far: float = 50.0) -> float:
     """The nearest radius (m) from the fixture, along the line `centre_bearing` off a camera's
     axis, at which a point `height` m above the floor is still inside that camera's picture.
@@ -46,20 +46,20 @@ def reach_radius(height: float, centre_bearing: float, camera_height: float, rin
     frame edges, and a person on the line is seen at the wider `camera_bearing`, not the line's
     own bearing — so the seam reach is searched rather than read off one column.
 
-    Monotonic in the radius, so a bisection over `[ring_radius, far]` finds it; `inf` if not in
-    frame even at `far`. On the axis it is `(height - camera_height) / tan(limit) + ring_radius`.
+    Monotonic in the radius, so a bisection over `[camera_radius, far]` finds it; `inf` if not in
+    frame even at `far`. On the axis it is `(height - camera_height) / tan(limit) + camera_radius`.
     """
     rise: float = height - camera_height
 
     def in_frame(radius: float) -> bool:
-        distance: float = focus_distance(centre_bearing, ring_radius, radius)
+        distance: float = focus_distance(centre_bearing, camera_radius, radius)
         if distance <= 1e-9:
             return False
         angle: float = math.degrees(math.atan(rise / distance))
-        edge: float = limit(camera_bearing(centre_bearing, ring_radius, distance))
+        edge: float = limit(camera_bearing(centre_bearing, camera_radius, distance))
         return angle <= edge if rise >= 0.0 else angle >= edge     # NaN edge: both False
 
-    lo: float = max(0.0, ring_radius)
+    lo: float = max(0.0, camera_radius)
     hi: float = max(lo, far)
     if not in_frame(hi):
         return math.inf
@@ -77,7 +77,7 @@ class RigSync:
     derives, so the panel and the panorama read the numbers the tracker actually tracks with.
 
     The frame is derived once, here in the constructor, because every input to it is an init field.
-    `apply()` covers the live ones — the ring, the lens height, the foot offset and the zone — and
+    `apply()` covers the live ones — the camera radius, the lens height, the foot offset and the zone — and
     always pushes all of them, so no ordering between them can matter. Not thread-safe on its own:
     the tracker calls it on its own thread.
     """
@@ -160,9 +160,9 @@ class RigSync:
         """
         top, bottom = self._picture_edges
         r: RigSettings = self._config.rig
-        ring: float = max(0.0, r.camera_radius)
+        camera_radius: float = max(0.0, r.camera_radius)
         seam: float = self._rig.target_fov / 2.0
-        r.feet_from = reach_radius(0.0, 0.0, r.camera_height, ring, bottom)
-        r.hands_from = reach_radius(HANDS_HEIGHT, 0.0, r.camera_height, ring, top)
-        r.hands_seam = max(reach_radius(HANDS_HEIGHT, side, r.camera_height, ring, top)
+        r.feet_from = reach_radius(0.0, 0.0, r.camera_height, camera_radius, bottom)
+        r.hands_from = reach_radius(HANDS_HEIGHT, 0.0, r.camera_height, camera_radius, top)
+        r.hands_seam = max(reach_radius(HANDS_HEIGHT, side, r.camera_height, camera_radius, top)
                            for side in (-seam, seam))

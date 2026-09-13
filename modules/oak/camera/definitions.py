@@ -711,7 +711,7 @@ def log_connected_sensors(device: Device, device_id: str = '') -> None:
 # ---------------------------------------------------------------------------
 #  Mount readout — what the camera can say about its own orientation
 # ---------------------------------------------------------------------------
-# Every camera constant in this installation is either measured with a tape (the ring radius,
+# Every camera constant in this installation is either measured with a tape (the camera radius,
 # the lens height) or taken from a datasheet (`fov`). Two are neither: `tilt` depends on a hand
 # adjustment on a tripod head, and ROLL is not modelled anywhere at all — `warp_mesh_points`
 # takes a tilt and assumes the camera is level about its optical axis. A rolled camera tilts the

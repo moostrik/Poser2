@@ -52,7 +52,7 @@ class RegimeSwitchTest(unittest.TestCase):
         # here beam mode, with the beam lights lit.
         self.conductor.set_motor_mode(MotorMode.PROJECTION)
         self.conductor.set_mix([(LayerId.flood, 1.0)])
-        self.assertGreater(float(self._tick().white.sum()), 0.0)      # END: a lit projection image
+        self.assertGreater(float(self._tick().white.sum()), 0.0)      # END: a lit projection
 
         self.conductor.add_update_callback(self._enter_wind_down)
         frame = self._tick()

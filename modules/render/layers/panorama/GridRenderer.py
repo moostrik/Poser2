@@ -103,7 +103,7 @@ class GridRenderer(LayerBase):
         self._draw_labels(spacing)
 
     def _reference_verticals(self, px_x: float) -> None:
-        """The ring's own bearings: sector boundaries, camera axes, overlap edges.
+        """The rig's own bearings: sector boundaries, camera axes, overlap edges.
 
         All three are azimuth and nothing else — no camera frame, no depth, no
         `camera_local_to_azimuth` — which is exactly what lets them be read straight off the degree

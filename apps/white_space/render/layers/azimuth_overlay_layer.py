@@ -1,8 +1,8 @@
-"""AzimuthOverlayLayer — each person's eye and bbox-centre azimuth over the light strip.
+"""AzimuthOverlayLayer — each person's eye and bbox-centre azimuth over the projection row.
 
 The light places people at their eyes (``EyeAzimuthExtractor``); this shows that position beside
 the tracker's bbox-centre azimuth it was shifted from, so the correction can be judged live against
-the light it drives. Drawn over both the projection simulation and the beam simulation, which share one 360° x axis.
+the light it drives. Drawn over both the projection and the beam simulation, which share one 360° x axis.
 """
 
 import math
@@ -13,7 +13,7 @@ from modules.render import ColorSettings
 from modules.render.layers import LayerBase, strip_spans
 from modules.render.shaders import DrawColoredRectangle
 
-from .azimuth_marks import AzimuthMark, build_azimuth_marks, signed_strip_gap
+from .azimuth_marks import AzimuthMark, build_azimuth_marks, signed_azimuth_gap
 from ...settings import Stage
 
 _EYE_PX: float = 2.0
@@ -31,7 +31,7 @@ class AzimuthOverlayLayer(LayerBase):
     bbox-centre azimuth, and a bar joining them at mid-height so a small offset still reads.
 
     Owns no FBO: it draws into whatever viewport is current when `draw()` is called, which must be
-    the light strip's, sized by the last `allocate`.
+    the projection row's, sized by the last `allocate`.
     """
 
     def __init__(self, board: AzimuthOverlayBoard, colors: ColorSettings) -> None:
@@ -42,7 +42,7 @@ class AzimuthOverlayLayer(LayerBase):
         self._height: int = 1
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
-        # Reallocated with the strip's size whenever the layout changes; the shader is ref-counted,
+        # Reallocated with the row's size whenever the layout changes; the shader is ref-counted,
         # so allocate it once or a single deallocate would never free it.
         if not self._rect.allocated:
             self._rect.allocate()
@@ -75,7 +75,7 @@ class AzimuthOverlayLayer(LayerBase):
             if not math.isnan(mark.eye_x):
                 self._line(mark.eye_x, _EYE_PX * px_x, (r, g, b, a))
             if not math.isnan(mark.eye_x) and not math.isnan(mark.bbox_x):
-                gap: float = signed_strip_gap(mark.bbox_x, mark.eye_x)
+                gap: float = signed_azimuth_gap(mark.bbox_x, mark.eye_x)
                 height: float = _CONNECTOR_PX * px_y
                 self._spans(min(mark.bbox_x, mark.bbox_x + gap), abs(gap), 0.5 - height / 2.0, height,
                             (r, g, b, a))
@@ -85,6 +85,6 @@ class AzimuthOverlayLayer(LayerBase):
 
     def _spans(self, x: float, width: float, y: float, height: float,
                color: tuple[float, float, float, float]) -> None:
-        """One quad, or two when it runs off the strip's 0/360 join (`strip_spans`)."""
+        """One quad, or two when it runs off the row's 0/360 join (`strip_spans`)."""
         for span_x, span_w in strip_spans(x, width):
             self._rect.use(span_x, y, span_w, height, *color)

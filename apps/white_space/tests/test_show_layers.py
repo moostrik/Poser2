@@ -148,7 +148,7 @@ class FakePose:
 
 def _pose(azimuth_pos: float, sims: dict[int, float] | None = None, shoulders: float = 0.0,
           elbows: float = 0.0, legs: float = 0.0, tilt: float = 0.0) -> FakePose:
-    """A fake pose at strip position ``azimuth_pos`` (0..1) with the given arm angles
+    """A fake pose at normalized azimuth ``azimuth_pos`` (0..1) with the given arm angles
     (radians, applied to both sides), leg deviation, torso tilt and pairwise sims."""
     angles = np.full(len(features.AngleLandmark), np.nan)
     angles[features.AngleLandmark.left_shoulder]  = shoulders

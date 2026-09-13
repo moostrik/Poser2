@@ -2,7 +2,7 @@
 
 Renders the look it was handed this tick: a weighted list of layers. Each entry's layer
 draws itself into a private scratch frame (via its own blend mode) and is added
-``weight ×`` into the output frame — the projection pixels as authored, the beam lights weighted
+``weight ×`` into the output frame — the projection as authored, the beam lights weighted
 per channel (white weight on the whites, blue weight on the blues).
 
 Nothing is rotated here: the frame leaves the Compositor azimuth-true, so the board and the

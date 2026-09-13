@@ -50,7 +50,7 @@ class MarkContext:
     """
     cam_fov: float
     target_fov: float
-    ring_radius: float
+    camera_radius: float
     parallax_radius: float
     camera_height: float
     row_model: tuple[float, float]
@@ -113,14 +113,14 @@ def _mark(tracklet: Tracklet, primaries: set[int],
     if has_foot:
         cam_distance: float = max(1e-6, annotation.distance)
         centre_dist: float = centre_distance(annotation.local_angle - c.cam_fov / 2.0,
-                                             cam_distance, c.ring_radius)
+                                             cam_distance, c.camera_radius)
         top_y: float = _row_y(tracklet.roi.y, c, cam_distance, centre_dist)
         bottom_y: float = _foot_y(c, centre_dist)
     else:
         # Feet at or above the horizon: no floor distance. Rows go through the parallax cylinder,
         # where the x already is, and there is no foot tick.
         phi: float = wrap180(annotation.world_angle - camera_azimuth(tracklet.cam_id, c.target_fov))
-        cylinder: float = focus_distance(phi, c.ring_radius, c.parallax_radius)
+        cylinder: float = focus_distance(phi, c.camera_radius, c.parallax_radius)
         centre_dist = math.inf
         top_y = _row_y(tracklet.roi.y, c, cylinder, c.parallax_radius)
         bottom_y = _row_y(roi_bottom, c, cylinder, c.parallax_radius)
@@ -232,9 +232,9 @@ def _field(annotation: PanoramicAnnotation, cam_id: int, c: MarkContext) -> tupl
     half_local: float = c.reacquire_angle / 2.0
     local: float = annotation.local_angle
     lo: float = camera_local_to_azimuth(max(0.0, local - half_local), cam_id, c.cam_fov,
-                                        c.target_fov, c.ring_radius, c.parallax_radius)
+                                        c.target_fov, c.camera_radius, c.parallax_radius)
     hi: float = camera_local_to_azimuth(min(c.cam_fov, local + half_local), cam_id, c.cam_fov,
-                                        c.target_fov, c.ring_radius, c.parallax_radius)
+                                        c.target_fov, c.camera_radius, c.parallax_radius)
     return (lo, hi)
 
 
