@@ -9,10 +9,10 @@ import math
 import unittest
 
 from modules.oak import frame_window
-from modules.tracker import azimuth_to_camera_x, camera_azimuth, camera_elevation, \
+from modules.tracker import azimuth_to_camera_x, camera_azimuth, camera_bearing, camera_elevation, \
     camera_local_to_azimuth, centre_distance, centre_elevation, elevation_window, \
-    focus_distance, fov_overlap, panorama_coverage, populated_band, row_from_elevation, \
-    elevation_from_row, strip_spans, strip_y, strip_elevation, strip_aspect_ratio, wrap180
+    focus_distance, fov_overlap, panorama_coverage, populated_band, reach_radius, row_from_elevation, \
+    row_model, elevation_from_row, strip_spans, strip_y, strip_elevation, strip_aspect_ratio, wrap180
 from modules.tracker.panoramic.geometry import Geometry
 from modules.utils import Rect
 
@@ -362,6 +362,93 @@ class TestRowModel(unittest.TestCase):
 
     def test_no_focal_is_flat(self) -> None:
         self.assertEqual(elevation_from_row(0.3, 0.5, 0.0), 0.0)
+
+    def test_the_two_angles_carry_the_whole_row_model(self) -> None:
+        """Why the tracker publishes only `angle_bottom`/`angle_top`: `row_model` rebuilds
+        (horizon_row, focal_rows) from them exactly, for any sensor mode, tilt and frame height —
+        horizon inside the frame or below it. If this ever fails, the dropped fields lost something."""
+        for src in ((1280, 720), (1280, 800)):
+            for tilt in (0.0, 12.0, 15.0, 16.0, 30.0):
+                for rows in (src[1], 960, 1152):
+                    with self.subTest(src=src, tilt=tilt, rows=rows):
+                        w = _window(rows, tilt, src)
+                        horizon_row, focal_rows = row_model(w.elevation_bottom, w.elevation_top)
+                        self.assertAlmostEqual(horizon_row, w.horizon_px / (rows - 1), places=12)
+                        self.assertAlmostEqual(focal_rows, w.focal / (rows - 1), places=12)
+                        self.assertAlmostEqual(row_from_elevation(w.elevation_top, horizon_row, focal_rows),
+                                               0.0, places=12)
+                        self.assertAlmostEqual(row_from_elevation(w.elevation_bottom, horizon_row, focal_rows),
+                                               1.0, places=12)
+
+    def test_a_frame_with_no_span_does_not_divide_by_zero(self) -> None:
+        horizon_row, focal_rows = row_model(10.0, 10.0)
+        self.assertGreater(focal_rows, 0.0)
+        self.assertTrue(math.isfinite(horizon_row))
+
+
+class TestReachRadius(unittest.TestCase):
+    """How near the fixture a point at a given height is still in frame, along a line.
+
+    The limits here are hand-made (a constant top, a top that falls off axis) so the search is
+    tested apart from any real sensor; the tracker's published numbers are checked against the real
+    coverage in `test_panoramic_tracker`.
+    """
+
+    CAMERA_HEIGHT: float = 0.5
+    HANDS: float = 2.2
+
+    def test_on_axis_it_is_the_closed_form(self) -> None:
+        # (height - h) / tan(limit) + ring — the doc's own tilt-table arithmetic.
+        for ring in (0.0, 0.36):
+            for top in (30.0, 45.0, 51.23):
+                with self.subTest(ring=ring, top=top):
+                    got: float = reach_radius(self.HANDS, 0.0, self.CAMERA_HEIGHT, ring, lambda _b: top)
+                    want: float = (self.HANDS - self.CAMERA_HEIGHT) / math.tan(math.radians(top)) + ring
+                    self.assertAlmostEqual(got, want, delta=1e-6)
+
+    def test_below_the_lens_it_reads_the_bottom(self) -> None:
+        for ring in (0.0, 0.36):
+            for bottom in (-15.0, -21.2, -30.0):
+                with self.subTest(ring=ring, bottom=bottom):
+                    got: float = reach_radius(0.0, 0.0, self.CAMERA_HEIGHT, ring, lambda _b: bottom)
+                    want: float = self.CAMERA_HEIGHT / math.tan(math.radians(-bottom)) + ring
+                    self.assertAlmostEqual(got, want, delta=1e-6)
+
+    def test_without_a_ring_the_seam_is_the_axis(self) -> None:
+        # No parallax: a line 45 deg off the axis is seen at 45 deg, at the same distance.
+        axis: float = reach_radius(self.HANDS, 0.0, self.CAMERA_HEIGHT, 0.0, lambda _b: 45.0)
+        seam: float = reach_radius(self.HANDS, 45.0, self.CAMERA_HEIGHT, 0.0, lambda _b: 45.0)
+        self.assertAlmostEqual(seam, axis, delta=1e-6)
+
+    def test_a_top_that_falls_off_axis_pushes_the_seam_out(self) -> None:
+        """The four-leaf pattern: the sensor's top edge is lower toward the frame edge, and on a
+        ring the seam line is seen even further out than its own bearing — so the seam is worse."""
+        def falling(bearing: float) -> float:
+            return 51.0 - 0.2 * abs(bearing)
+        axis: float = reach_radius(self.HANDS, 0.0, self.CAMERA_HEIGHT, 0.36, falling)
+        seam: float = reach_radius(self.HANDS, 45.0, self.CAMERA_HEIGHT, 0.36, falling)
+        flat_seam: float = reach_radius(self.HANDS, 45.0, self.CAMERA_HEIGHT, 0.36, lambda _b: 51.0)
+        self.assertGreater(seam, axis)
+        self.assertGreater(seam, flat_seam)
+
+    def test_the_seam_is_judged_at_the_wider_camera_bearing(self) -> None:
+        """A point on the seam line at the found radius is seen by the camera at more than 45 deg,
+        and it is that column's limit the answer sits exactly on."""
+        def falling(bearing: float) -> float:
+            return 51.0 - 0.2 * abs(bearing)
+        radius: float = reach_radius(self.HANDS, 45.0, self.CAMERA_HEIGHT, 0.36, falling)
+        distance: float = focus_distance(45.0, 0.36, radius)
+        seen_at: float = camera_bearing(45.0, 0.36, distance)
+        self.assertGreater(seen_at, 45.0)
+        angle: float = math.degrees(math.atan((self.HANDS - self.CAMERA_HEIGHT) / distance))
+        self.assertAlmostEqual(angle, falling(seen_at), delta=1e-6)
+
+    def test_a_point_never_in_frame_is_unreachable(self) -> None:
+        self.assertEqual(reach_radius(self.HANDS, 0.0, self.CAMERA_HEIGHT, 0.36, lambda _b: math.nan),
+                         math.inf)
+        # A top below eye level: a point above the lens is never inside it.
+        self.assertEqual(reach_radius(self.HANDS, 0.0, self.CAMERA_HEIGHT, 0.36, lambda _b: -5.0),
+                         math.inf)
 
 
 class TestStripRows(unittest.TestCase):

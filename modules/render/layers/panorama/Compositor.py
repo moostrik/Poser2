@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.board import HasObservations, HasTracklets
 from modules.gl import Fbo, Texture, clear_color
-from modules.tracker import PanoramicTrackerSettings, Tracklet, elevation_window, \
+from modules.tracker import PanoramicTrackerSettings, Tracklet, elevation_window, row_model, \
     strip_aspect_ratio
 from modules.utils import HotReloadMethods
 
@@ -122,17 +122,19 @@ class Compositor(LayerBase):
 
     @property
     def row_model(self) -> tuple[float, float]:
-        """(horizon_row, focal_rows): the delivered frame's rows as the tracker published them.
-        Rows are tangents of elevation — see `panorama_map.row_from_elevation`."""
-        p = self._tracker.rig
-        return (p.horizon_row, max(1e-6, p.focal_rows))
+        """(horizon_row, focal_rows): the delivered frame's rows, rebuilt from the two edge angles
+        the tracker publishes. Exact — the angles carry the whole row model — so the stitch and the
+        marks convert rows while the panel only ever shows degrees. Rows are tangents of elevation:
+        see `panorama_map.row_from_elevation`."""
+        horizon_row, focal_rows = row_model(*self.populated_band)
+        return (horizon_row, max(1e-6, focal_rows))
 
     @property
     def populated_band(self) -> tuple[float, float]:
-        """The elevations the delivered frames carry, measured at the camera: the window's
-        bottom and top rows, as the tracker published them."""
+        """The angles the delivered frames carry, measured at the camera: the window's bottom and
+        top rows, as the tracker published them."""
         p = self._tracker.rig
-        return (p.elevation_bottom, p.elevation_top)
+        return (p.angle_bottom, p.angle_top)
 
     @property
     def elevation_window(self) -> tuple[float, float]:

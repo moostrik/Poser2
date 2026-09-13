@@ -76,24 +76,36 @@ class RigSettings(BaseSettings):
     # the two differ). `fov` is the setting above, not republished here.
     overlap: Field[float] = Field(0.0, access=Field.READ,
                                   description="Azimuth (°) two neighbours share, at the zone's far edge")
-    # The delivered frame's shape and row model, published by the tracker for whatever draws with
-    # its numbers (the panorama). Rows are tangents of elevation, NOT linear in it:
-    # row = horizon_row - focal_rows · tan(e). Horizontal first, as a frame is quoted.
+    # The delivered frame's shape, published by the tracker for whatever draws with its numbers (the
+    # panorama). Horizontal first, as a frame is quoted. `hfov` and `tilt` mirror init fields the
+    # panel hides by default, so the frame can be read here in one place.
+    #
+    # The two angles ARE the row model: rows are tangents of elevation, and `panorama_map.row_model`
+    # rebuilds (horizon_row, focal_rows) from them exactly, so nothing in row space is published.
+    # `angle_bottom` follows the tilt 1:1 (the frame is pinned at the sensor's lowest reach);
+    # `angle_top` only partly (+1° to +1.5° per +3°), since a fixed number of tangent rows spend
+    # themselves at the top. It is the frame's top ROW, which may sit above what the sensor fills.
     hfov: Field[float] = Field(127.0, access=Field.READ, newline=True,
                                description="Azimuth span (°) of the delivered frame, left edge to right")
     vfov: Field[float] = Field(79.5, access=Field.READ,
-                              description="Elevation span (°) of the delivered frame, bottom row to top row")
-    elevation_bottom: Field[float] = Field(-39.7, access=Field.READ,
-                                          description="Elevation (°) of the frame's bottom row, at the camera")
-    elevation_top: Field[float] = Field(39.7, access=Field.READ,
-                                       description="Elevation (°) of the frame's top row, at the camera")
-    # These two ARE the row model — two numbers, and the four elevations above are derivable from
-    # them. Both are published because each consumer wants a different form: the stitch and the
-    # marks convert rows, the strip's window converts elevations.
-    horizon_row: Field[float] = Field(0.5, access=Field.READ,
-                                     description="Normalised row (0 = top) of eye level; may fall outside 0..1 on a tilted camera")
-    focal_rows: Field[float] = Field(0.72, access=Field.READ,
-                                    description="Focal length in frame heights — the scale of the tangent rows")
+                              description="Angle span (°) of the delivered frame, bottom row to top row")
+    tilt: Field[float] = Field(0.0, access=Field.READ,
+                               description="Camera up-tilt (°), as the frame was built with")
+    angle_bottom: Field[float] = Field(-39.7, access=Field.READ,
+                                       description="Angle (°) from eye level of the frame's bottom row; negative is below")
+    angle_top: Field[float] = Field(39.7, access=Field.READ,
+                                    description="Angle (°) from eye level of the frame's top row")
+    # What that frame allows, as radii from the fixture — the numbers the tilt is chosen by, live
+    # for the running configuration (CALIBRATION.md, *Tilt — derived from the build*, has them as
+    # design tables). Per column, against what the sensor actually fills rather than the frame's
+    # rows, so the black arch counts. Feet once: the bottom row is covered at every bearing.
+    # Hands twice, because the sensor's top edge falls toward the seams where people cross.
+    feet_from: Field[float] = Field(0.0, access=Field.READ, newline=True,
+                                    description="Nearest radius (m) with the feet in frame")
+    hands_from: Field[float] = Field(0.0, access=Field.READ,
+                                     description="Nearest radius (m) with 2.2 m raised hands in frame, on a camera's axis")
+    hands_seam: Field[float] = Field(0.0, access=Field.READ,
+                                     description="Nearest radius (m) with 2.2 m raised hands in frame, on a seam")
 
 
 class TrackerSettings(BaseSettings):

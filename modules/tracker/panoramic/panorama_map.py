@@ -47,6 +47,7 @@ at the picture's depth, for everything drawn on it.
 """
 
 import math
+from collections.abc import Callable
 
 from modules.oak import FrameWindow
 
@@ -98,6 +99,21 @@ def focus_distance(bearing: float, ring_radius: float, depth_radius: float) -> f
     return math.sqrt(max(0.0, d2))
 
 
+def camera_bearing(centre_bearing: float, ring_radius: float, distance: float) -> float:
+    """The bearing (degrees) off a camera's own axis of a point the centre sees `centre_bearing`
+    off that axis, `distance` m from the camera.
+
+    Wider than the centre's, because the camera sits `ring_radius` out toward the point:
+    `theta = phi + asin(r · sin(phi) / d)`, the law of sines on the centre/camera/point triangle.
+    The step `azimuth_to_camera_x` needs to find a column, and `reach_radius` to find which column
+    a person on a given line is seen in.
+    """
+    if ring_radius <= 0.0 or distance <= 1e-9:
+        return centre_bearing
+    ratio: float = ring_radius * math.sin(math.radians(centre_bearing)) / distance
+    return centre_bearing + math.degrees(math.asin(max(-1.0, min(1.0, ratio))))
+
+
 def azimuth_to_camera_x(azimuth: float, cam_id: int, cam_fov: float, target_fov: float,
                         ring_radius: float, depth_radius: float) -> float | None:
     """The normalized column of camera `cam_id` showing this world azimuth, or None.
@@ -112,11 +128,7 @@ def azimuth_to_camera_x(azimuth: float, cam_id: int, cam_fov: float, target_fov:
     """
     phi: float = wrap180(azimuth - camera_azimuth(cam_id, target_fov))
     distance: float = focus_distance(phi, ring_radius, depth_radius)
-
-    theta: float = phi
-    if ring_radius > 0.0 and distance > 1e-9:
-        ratio: float = ring_radius * math.sin(math.radians(phi)) / distance
-        theta = phi + math.degrees(math.asin(max(-1.0, min(1.0, ratio))))
+    theta: float = camera_bearing(phi, ring_radius, distance)
 
     local: float = theta + cam_fov / 2.0
     if local < -_EDGE_TOLERANCE or local > cam_fov + _EDGE_TOLERANCE:
@@ -272,6 +284,24 @@ def elevation_from_row(row: float, horizon_row: float, focal_rows: float) -> flo
     return math.degrees(math.atan((horizon_row - row) / focal_rows))
 
 
+def row_model(angle_bottom: float, angle_top: float) -> tuple[float, float]:
+    """(horizon_row, focal_rows) of a frame whose bottom row is at `angle_bottom` and top row at
+    `angle_top` (degrees from eye level) — the row model, rebuilt from the frame's two edges.
+
+    Exact, not an approximation: the two numbers carry no information the angles don't. At row 0
+    `tan(top) = horizon_row / focal_rows`, at row 1 `tan(bottom) = (horizon_row - 1) / focal_rows`,
+    so `focal_rows = 1 / (tan(top) - tan(bottom))` and `horizon_row = focal_rows · tan(top)`. That
+    is why the tracker publishes only the angles — readable, and in the panel's own units — and the
+    stitch and the marks derive the row form here where they need it.
+    """
+    tan_top: float = math.tan(math.radians(angle_top))
+    span: float = tan_top - math.tan(math.radians(angle_bottom))
+    if span < 1e-9:
+        return 0.5, 1e-6
+    focal_rows: float = 1.0 / span
+    return focal_rows * tan_top, focal_rows
+
+
 def strip_y(elevation: float, elevation_window: tuple[float, float]) -> float:
     """Normalised, top-down y of a centre elevation (degrees) in the 360-degree STRIP.
 
@@ -342,3 +372,50 @@ def panorama_coverage(azimuth: float, num_cameras: int, cam_fov: float, target_f
         if azimuth_to_camera_x(azimuth, cam_id, cam_fov, target_fov,
                                ring_radius, depth_radius) is not None
     )
+
+
+def reach_radius(height: float, centre_bearing: float, camera_height: float, ring_radius: float,
+                 limit: Callable[[float], float], far: float = 50.0) -> float:
+    """The nearest radius (m) from the fixture, along the line `centre_bearing` off a camera's
+    axis, at which a point `height` m above the floor is still inside that camera's picture.
+
+    What the tilt is chosen by, as a number: `height` 0 gives where the feet enter the frame, the
+    reference 2.2 m where raised hands do. `limit(camera_bearing)` is the picture's edge at that
+    camera column, in degrees from eye level — its **top** for a point above the lens, its
+    **bottom** for one below — and NaN where the column has no picture, which reads as "not in
+    frame". Taking it per column is the whole point: the sensor's top edge falls toward the frame
+    edges (the four-leaf pattern in CALIBRATION.md), so a person on the seam is judged against the
+    column they actually land in.
+
+    **The column is not the line's bearing.** The camera sits `ring_radius` out, so a person on the
+    line at `centre_bearing` is seen at the wider `camera_bearing` — ≈54° for a seam at 45° near the
+    fixture — and nearer the frame edge, where the top is lower. That is why the seam reach is
+    searched rather than read off the 45° column.
+
+    In frame iff the point's angle at the camera, `atan((height - camera_height) / d)`, is inside
+    the limit. Monotonic in the radius — the angle shrinks with distance, and the column moves
+    back toward the line's bearing where the limit is no worse — so a bisection over
+    `[ring_radius, far]` finds it. `inf` if it is not in frame even at `far`. On the axis this is
+    exactly the closed form `(height - camera_height) / tan(limit) + ring_radius`.
+    """
+    rise: float = height - camera_height
+
+    def in_frame(radius: float) -> bool:
+        distance: float = focus_distance(centre_bearing, ring_radius, radius)
+        if distance <= 1e-9:
+            return False
+        angle: float = math.degrees(math.atan(rise / distance))
+        edge: float = limit(camera_bearing(centre_bearing, ring_radius, distance))
+        return angle <= edge if rise >= 0.0 else angle >= edge     # NaN edge: both False
+
+    lo: float = max(0.0, ring_radius)
+    hi: float = max(lo, far)
+    if not in_frame(hi):
+        return math.inf
+    for _ in range(60):
+        mid: float = (lo + hi) / 2.0
+        if in_frame(mid):
+            hi = mid
+        else:
+            lo = mid
+    return hi

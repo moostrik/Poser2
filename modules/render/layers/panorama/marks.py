@@ -62,8 +62,9 @@ class StripGeometry:
     """The strip's geometry, in one value object, so a mark is one argument's worth of context.
 
     Owned by the compositor and rebuilt each tick from the tracker's published numbers; nothing
-    here is a preference. `row_model` is (horizon_row, focal_rows) — the delivered frames' rows as
-    the tracker published them — and `elevation_window` the strip's (top, bottom) at the rig centre.
+    here is a preference. `row_model` is (horizon_row, focal_rows) — the delivered frames' rows,
+    rebuilt from the tracker's published edge angles (`panorama_map.row_model`) — and
+    `elevation_window` the strip's (top, bottom) at the rig centre.
 
     `parallax_radius` is the one depth the tracker corrects the azimuth at, mirrored here so a
     mark's x and its tolerance land on the same cylinder — the tracker's own number, unconverted.

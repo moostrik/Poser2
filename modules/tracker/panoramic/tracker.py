@@ -1,25 +1,52 @@
 # Standard library imports
 import logging
+import math
 import time
 from dataclasses import dataclass, replace
+from functools import lru_cache
 from itertools import combinations
 from queue import Empty, Queue
 from threading import Lock, Thread, Event
 from typing import Callable
 
+# Third-party imports
+import numpy as np
+
 # Local application imports
-from modules.oak import DepthTracklet, mode_size, frame_window, delivered_height
+from modules.oak import DepthTracklet, FrameWindow, degrees_per_pixel, delivered_height, \
+    frame_coverage, frame_window, mode_size
 from .. import (
     BaseTracker, TrackerAnnotation,
     Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback,
 )
 from .store import TrackletStore
 from .geometry import Geometry, height_is_measured
+from .panorama_map import reach_radius
 from .settings import RigSettings, TrackerSettings
 
 TrackletListCallback = Callable[[list[Tracklet]], None]
 
 logger = logging.getLogger(__name__)
+
+# The reference person's overhead reach (m): 1.8 m tall, hands at 2.2 m with the arms up —
+# CALIBRATION.md, *Tilt — derived from the build*. The height the `hands_*` read-outs are
+# quoted at. A constant, not a setting: nothing tunes it, and the fields it feeds are read-only.
+HANDS_HEIGHT: float = 2.2
+
+
+@lru_cache(maxsize=8)
+def _coverage(src: tuple[int, int], rows: int, fov: float, tilt: float, lens_fov: float,
+              lens_centre: tuple[float, float]) -> np.ndarray:
+    """`frame_coverage` for one frame configuration, computed once per process.
+
+    It projects the whole output grid (≈0.1 s) and every input is an init field, so the running app
+    pays for it once — but the tests build trackers by the dozen, mostly on the same few frames.
+    Read-only, since every caller shares the one array.
+    """
+    coverage: np.ndarray = frame_coverage(src, (src[0], rows), src[0], fov, tilt,
+                                          lens_fov=lens_fov, lens_centre=lens_centre)
+    coverage.flags.writeable = False
+    return coverage
 
 
 @dataclass(frozen=True)
@@ -87,13 +114,18 @@ class Tracker(Thread, BaseTracker):
         # Each camera owns 360/num_cameras degrees of the ring; whatever its field has beyond
         # that is the overlap it shares with its neighbours.
         self.geometry: Geometry = Geometry(num_cameras, config.fov, 360.0 / num_cameras)
+        # Where the sensor's picture ends, per camera bearing: (top, bottom) in degrees from eye
+        # level. Set by `_set_frame`; the reach read-outs are measured against it.
+        self._picture_edges: tuple[Callable[[float], float], Callable[[float], float]] | None = None
 
         # Wire fov and rig changes to geometry. The three that move the overlap band must also
-        # republish it, or the readout and the panorama's lines go stale on a live drag.
+        # republish it, or the readout and the panorama's lines go stale on a live drag. The ring
+        # and the lens height also move the reach, which is cheap to redo from the cached edges.
         TrackerSettings.fov.bind(config, lambda v: (self._set_frame(v), self._update_seam_angles()))
         RigSettings.camera_radius.bind(config.rig, lambda v: (self.geometry.set_camera_radius(v),
-                                                              self._set_zone()))
-        RigSettings.camera_height.bind(config.rig, lambda v: self.geometry.set_camera_height(v))
+                                                              self._set_zone(), self._publish_reach()))
+        RigSettings.camera_height.bind(config.rig, lambda v: (self.geometry.set_camera_height(v),
+                                                              self._publish_reach()))
         RigSettings.zone_min_radius.bind(config.rig, lambda _: self._set_zone())
         RigSettings.zone_max_radius.bind(config.rig, lambda _: self._set_zone())
         TrackerSettings.foot_offset.bind(config, lambda v: self.geometry.set_foot_offset(v))
@@ -141,8 +173,9 @@ class Tracker(Thread, BaseTracker):
         Rows are tangents of elevation with the horizon at `horizon_px`, not linear about the
         centre row, so the row model is a window rather than a `vfov`. Derived here, once, from
         the shared camera fields, and published as read-only fields on `rig` so the panorama draws
-        with exactly the numbers the tracker tracks with. Mono and landscape, which is what this
-        tracker has always assumed."""
+        with exactly the numbers the tracker tracks with — as the frame's two edge **angles**, from
+        which `panorama_map.row_model` rebuilds the row form exactly. Mono and landscape, which is
+        what this tracker has always assumed."""
         self.geometry.set_fov(fov)
         c: TrackerSettings = self.config
         lens_centre: tuple[float, float] = (c.lens_centre_x, c.lens_centre_y)
@@ -153,10 +186,55 @@ class Tracker(Thread, BaseTracker):
         p: RigSettings = c.rig
         p.hfov = fov
         p.vfov = window.elevation_top - window.elevation_bottom
-        p.elevation_bottom = window.elevation_bottom
-        p.elevation_top = window.elevation_top
-        p.horizon_row = window.horizon_px / (rows - 1)
-        p.focal_rows = window.focal / (rows - 1)
+        p.tilt = c.tilt
+        p.angle_bottom = window.elevation_bottom
+        p.angle_top = window.elevation_top
+        self._set_picture_edges(_coverage(src, rows, fov, c.tilt, c.lens_fov, lens_centre),
+                                window, src[0], fov)
+        self._publish_reach()
+
+    def _set_picture_edges(self, coverage: np.ndarray, window: FrameWindow, width: int,
+                           fov: float) -> None:
+        """Per camera bearing, the angle where the sensor's picture ends: its top and its bottom.
+
+        Not the frame's top and bottom rows — the sensor fills less than the frame toward the sides
+        (the black arch), and at some presets less than the frame even on axis — so a reach judged
+        against the rows would be too generous exactly where it matters. NaN outside the field or
+        on a column with no picture, which `reach_radius` reads as "not in frame". The column of a
+        bearing is taken the way `coverage_summary` takes it, so the two describe the same pixels.
+        """
+        dpp: float = degrees_per_pixel(fov, width)
+        centre: float = (width - 1) / 2.0
+
+        def edge(bearing: float, which: int) -> float:
+            if dpp <= 0.0:
+                return math.nan
+            x: float = centre + bearing / dpp
+            if x < -0.5 or x > width - 0.5:
+                return math.nan
+            row: int = int(coverage[int(round(min(max(x, 0.0), width - 1.0))), which])
+            return window.elevation(row) if row >= 0 else math.nan
+
+        self._picture_edges = (lambda bearing: edge(bearing, 0), lambda bearing: edge(bearing, 1))
+
+    def _publish_reach(self) -> None:
+        """How near the fixture a person can stand and still be in frame — the tilt's trade, live.
+
+        Feet on the camera axis only: the frame is pinned at the sensor's lowest centre-column
+        reach, so the bottom row is covered at every bearing. Raised hands on the axis and on the
+        seam, the worse of the seam's two sides (a lens-centre offset makes them differ): the
+        sensor's top edge falls toward the frame edges, and a seam is where people cross.
+        """
+        if self._picture_edges is None:
+            return
+        top, bottom = self._picture_edges
+        r: RigSettings = self.config.rig
+        ring: float = max(0.0, r.camera_radius)
+        seam: float = self.geometry.target_fov / 2.0
+        r.feet_from = reach_radius(0.0, 0.0, r.camera_height, ring, bottom)
+        r.hands_from = reach_radius(HANDS_HEIGHT, 0.0, r.camera_height, ring, top)
+        r.hands_seam = max(reach_radius(HANDS_HEIGHT, side, r.camera_height, ring, top)
+                                for side in (-seam, seam))
 
     def _update_seam_angles(self) -> None:
         """The shared overlap, for the panorama. Moved by `fov`, by the ring and by the zone's far

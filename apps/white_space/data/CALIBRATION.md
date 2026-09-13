@@ -373,19 +373,19 @@ projection is fixed in the warp, and distance comes off the floor plane.
 `tilt` is derived, not set by eye, from the lens height, the ring radius and the **R 1.35 m** inner
 circle (site decision).
 
-The reference person is **1.8 m**, with an overhead fingertip reach of **2.2 m** — raised arms are
+The reference person is **1.8 m**, with an overhead hand reach of **2.2 m** — raised arms are
 content the pose reads. On the R 1.35 m circle, on a camera's axis, they stand 0.99 m from the lens,
-which puts their fingertips at +59.8°, head at +52.7° and feet at −26.8°. A camera aimed up by
+which puts their hands at +59.8°, head at +52.7° and feet at −26.8°. A camera aimed up by
 `tilt` sees from `tilt − 39.2°` to `tilt + 41.3°` on its centre column (P800 with the shared lens;
 35.1° and 37.3° at P720 — the sensor's own vertical field, which the frame delivers in full at the
-derived `frame_height`); fitting fingertips *and* feet at R 1.35 would need 120° of it, against
+derived `frame_height`); fitting hands *and* feet at R 1.35 would need 120° of it, against
 80°. So the tilt is a trade, and **it is resolved in favour of the top**: losing the feet degrades
 the distance estimate (it extrapolates the box bottom), losing the arms loses a gesture outright.
 
 **The rule:** the feet are in frame from **R 1.5 m** — the inner edge of the calibrated play zone
 (R 1.5 – R 3.5) — and all remaining room goes to headroom.
 
-| `resolution` | sensor field | tilt | fingertips from | head from | feet from |
+| `resolution` | sensor field | tilt | hands from | head from | feet from |
 |---|---|---|---|---|---|
 | **P800** | 79.4° | 13 | R 1.655 | R 1.35 | R 1.355 |
 | | | **16** ← use | R 1.52 | R 1.245 | **R 1.5** |
@@ -403,7 +403,7 @@ costs more feet than it gains reach.
 **The table is on-axis, and the reach falls toward the seams.** The sensor's top edge lifts by
 less than the tilt off axis, so what a camera sees at tilt 16 (P800, the shared lens) by bearing:
 
-| bearing off the camera axis | top | bottom | fingertips from | head from | feet from |
+| bearing off the camera axis | top | bottom | hands from | head from | feet from |
 |---|---|---|---|---|---|
 | 0° (axis) | 56.3° | −24.3° | R 1.5 | R 1.25 | R 1.45 |
 | 30° | 53.8° | −24.6° | R 1.6 | R 1.3 | R 1.45 |
@@ -414,8 +414,35 @@ The feet rule holds all round; the overhead reach is a four-leaf pattern, R 1.5 
 R 1.75 at the seams. That is the mount, the same in any projection or frame height: a shorter frame
 can only equalise it by cutting the middle. The frame delivers all of it at the full-reach
 `frame_height` (1152 rows at P800 and tilt 16); at the sensor's own 800 rows the tangent rows would
-cap the top at 43.7° everywhere — fingertips from R 2.1, head from R 1.7 — which is why the frame
+cap the top at 43.7° everywhere — hands from R 2.1, head from R 1.7 — which is why the frame
 is taller than the sensor.
+
+**The panel shows this live, for the configuration actually running.** The tables above are the
+design reference; `camera.tracker.rig` is the check. After `hfov`, `vfov`, `tilt` and the frame's
+two edge angles it publishes, as radii from the fixture:
+
+| read-out | what it is |
+|---|---|
+| `feet_from` | nearest radius with the feet in frame — compare with `zone_min_radius` |
+| `hands_from` | nearest radius with 2.2 m raised hands in frame, on a camera's axis |
+| `hands_seam` | the same along a seam line, the worse of its two sides |
+
+All three are measured against what the **sensor** fills per column (`frame_coverage`), not the
+frame's rows, so the black arch counts. The gap between the two hands read-outs says which limit
+the frame is running into. **Wide** — the rows reach past the sensor, so the top is the sensor's
+own edge, falling toward the seams. **Near zero** — the rows run out first and cap the top at one
+angle on every column, leaving only the ring's parallax. On the studio preset (P800, tilt 15, 960
+rows of the 1136 the sensor could fill) it is the second: feet from R 1.47, hands from R 1.76 on
+the axis and R 1.78 on the seam. The seam line is searched, not read off the 45° column: a person
+on it near the fixture is seen by the camera ≈9° wider than the seam's own bearing, because the
+camera sits 0.36 m out.
+
+Three facts about what `tilt` moves, since they are easy to get wrong. **`angle_bottom` follows it
+1:1**: the frame is pinned at the sensor's lowest reach, a lens constant below the tilt. **`angle_top`
+does not** — +1° to +1.5° per +3° of tilt at a fixed `frame_height` (the taller the frame, the less)
+— because a fixed number of tangent rows spend themselves at the top. And **the row scale does not depend on it at all** at a fixed
+`frame_height`: that is `fov` and the frame's shape. Tilt reaches it only when `frame_height` is 0 and
+the height is derived from the tilt.
 
 ### What the horizontal field allows
 
@@ -762,8 +789,9 @@ cancel. The offset corrects the *reading*, not the image.
 Floor plane, on tangent rows: `camera_height · focal / (bottom_px − horizon_px)` — the rows below
 the horizon *are* the tangent of the depression, so nothing is converted. The row model is the
 frame's own (`frame_window`, derived by the tracker from the same camera fields the warp used)
-and published as read-only fields under `camera.tracker.rig` (`horizon_row`, `focal_rows`,
-`elevation_bottom/top`), which the panorama draws with. Two limits:
+and published under `camera.tracker.rig` as the frame's two edge angles, `angle_bottom` and
+`angle_top` — from which `panorama_map.row_model` rebuilds the row form exactly, so the panel shows
+degrees and the panorama still draws with the tracker's own rows. Two limits:
 
 - **It cannot see nearer than the picture reaches.** At the recommended tilt — 16° at P800 or 12° at
   P720 — the lowest row with picture is 23.7° below the horizon: 1.14 m from the lens, which is

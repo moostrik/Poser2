@@ -124,6 +124,18 @@ def _is_field_read_only(settings, name: str, field: Field) -> bool:
     return field.access is Access.READ
 
 
+def _lock_prop(locked: bool, *, readonly: bool = True) -> str:
+    """Return the Quasar prop suffix that locks a read-only control.
+
+    ``readonly`` keeps hover events alive (tooltips) and the value legible;
+    ``disable`` sets ``pointer-events:none`` on q-field controls, so it is used
+    only for components without a ``readonly`` prop (QToggle, QBtn).
+    """
+    if not locked:
+        return ""
+    return " readonly" if readonly else " disable"
+
+
 def _field_needs_poll(settings, name: str, field: Field) -> bool:
     """Return True when UI should poll external updates for this field."""
     if settings.is_shared(name):
@@ -167,10 +179,10 @@ def _build_field_header(
                 actions()
 
 
-def _build_init_field(settings, name: str) -> None:
+def _build_init_field(settings, name: str, field: Field) -> None:
     """Render a single init-only field without forcing it into a separate section."""
     with ui.row().classes("items-center gap-2 poser-init"):
-        ui.label(generate_label(name))
+        _build_field_title(generate_label(name), _wiring_tooltip(settings, name, field.description))
         ui.label(str(getattr(settings, name))).classes("text-secondary italic")
 
 
@@ -194,7 +206,7 @@ def _build_settings_entry(settings, name: str, field: Field, polls) -> None:
             _build_action_button(settings, name, field)
         return
     if field.access is Access.INIT:
-        _build_init_field(settings, name)
+        _build_init_field(settings, name, field)
         return
     with ui.element("div").classes(css):
         _build_field_control(settings, name, field, polls)
@@ -261,7 +273,7 @@ def _build_switch(settings, name, field, polls):
     is_disabled = _is_field_read_only(settings, name, field)
 
     sw = _attach_description_tooltip(ui.switch(label, value=value).props(
-        "dense" + (" disable" if is_disabled else "")
+        "dense" + _lock_prop(is_disabled, readonly=False)
     ), desc)
 
     if not is_disabled:
@@ -290,7 +302,7 @@ def _build_toggle(settings, name, field, polls):
         btn.update()
 
     btn = _attach_description_tooltip(ui.button(label).props(
-        "dense" + (" disable" if is_disabled else "")
+        "dense" + _lock_prop(is_disabled, readonly=False)
     ), desc)
     _apply_style(btn, value)
 
@@ -330,13 +342,13 @@ def _build_slider(settings, name, field, polls):
                 format=fmt,
             ).props(
                 "dense borderless"
-                + (" disable" if is_disabled else "")
+                + _lock_prop(is_disabled)
             ).classes("w-16")
         sl = ui.slider(
             min=field.min, max=field.max, step=step, value=value
         ).props(
             f"dense color={color}"
-            + (" disable" if is_disabled else "")
+            + _lock_prop(is_disabled)
         ).classes("w-full")
 
     _updating = {"lock": False}
@@ -390,7 +402,7 @@ def _build_number(settings, name, field, polls):
         value=value,
         step=field.step if field.step is not None else (1 if field.type_ is int else 0.01),
         format="%.0f" if field.type_ is int else "%.2f",
-    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24"), desc)
+    ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24"), desc)
 
     if not is_disabled:
         def commit_num(val):
@@ -418,7 +430,7 @@ def _build_knob(settings, name, field, polls):
             value=value, min=min_val, max=max_val, step=step,
             show_value=True, size="lg",
         ).props(
-            "thickness=0.2" + (" disable" if is_disabled else "")
+            "thickness=0.2" + _lock_prop(is_disabled)
         )
 
     if not is_disabled:
@@ -445,7 +457,7 @@ def _build_select(settings, name, field, polls):
         options=options,
         value=value,
         label=label,
-    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-48 max-w-full"), desc)
+    ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-48 max-w-full"), desc)
 
     if not is_disabled:
         def on_select_change(e):
@@ -470,7 +482,7 @@ def _build_text_select(settings, name, field, polls):
         options=option_list,
         value=value if value in option_list else None,
         label=label,
-    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-48 max-w-full"), desc)
+    ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-48 max-w-full"), desc)
 
     if not is_disabled:
         def on_select_change(e):
@@ -495,7 +507,7 @@ def _build_radio(settings, name, field, polls):
     with ui.column().classes("gap-1"):
         _build_field_title(label, desc)
         rg = ui.toggle(options=options, value=value).props(
-            "dense" + (" disable" if is_disabled else "")
+            "dense" + _lock_prop(is_disabled)
         )
 
     if not is_disabled:
@@ -517,7 +529,7 @@ def _build_input(settings, name, field, polls):
     is_disabled = _is_field_read_only(settings, name, field)
 
     inp = _attach_description_tooltip(ui.input(label=label, value=value).props(
-        "dense outlined" + (" disable" if is_disabled else "")
+        "dense outlined" + _lock_prop(is_disabled)
     ), desc)
 
     if not is_disabled:
@@ -544,7 +556,7 @@ def _build_ip(settings, name, field, polls):
         label=label, value=value,
         validation={"": is_valid_ip},
     ).props(
-        'dense outlined hide-bottom-space' + (" disable" if is_disabled else "")
+        'dense outlined hide-bottom-space' + _lock_prop(is_disabled)
     ).classes("w-36"), desc)
 
     if not is_disabled:
@@ -582,7 +594,7 @@ def _build_number_input(settings, name, field, polls):
         label=label, value=str(value),
         validation={"": is_valid},
     ).props(
-        'dense outlined hide-bottom-space' + (" disable" if is_disabled else "")
+        'dense outlined hide-bottom-space' + _lock_prop(is_disabled)
     ).classes("w-24"), desc)
 
     if not is_disabled:
@@ -603,7 +615,7 @@ def _build_textarea(settings, name, field, polls):
     is_disabled = _is_field_read_only(settings, name, field)
 
     ta = _attach_description_tooltip(ui.textarea(label=label, value=value).props(
-        "dense outlined" + (" disable" if is_disabled else "")
+        "dense outlined" + _lock_prop(is_disabled)
     ), desc)
 
     if not is_disabled:
@@ -633,11 +645,13 @@ def _build_color(settings, name, field, polls):
 
     ci = _attach_description_tooltip(ui.color_input(
         label=label, value=hex_val
-    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-36").style(
+    ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-36").style(
         _color_style(hex_val)
     ), desc)
 
-    if not is_disabled:
+    if is_disabled:
+        ci.button.disable()  # readonly does not block the picker button
+    else:
         def on_color_change(e):
             if e.value:
                 c = Color.from_hex(e.value)
@@ -667,15 +681,17 @@ def _build_color_alpha(settings, name, field, polls):
         with ui.row().classes("items-end gap-2"):
             ci = ui.color_input(
                 label="Color", value=hex_val
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-36")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-36")
 
             alpha_num = ui.number(
                 label="A", value=alpha,
                 min=0.0, max=1.0, step=0.01,
                 format="%.2f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
 
-    if not is_disabled:
+    if is_disabled:
+        ci.button.disable()  # readonly does not block the picker button
+    else:
         def on_color_change(e):
             if e.value:
                 c = Color.from_hex(e.value)
@@ -910,11 +926,11 @@ def _build_point2f(settings, name, field, polls):
             x_num = ui.number(
                 label="X", value=value.x if isinstance(value, Point2f) else 0.0,
                 step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
             y_num = ui.number(
                 label="Y", value=value.y if isinstance(value, Point2f) else 0.0,
                 step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
 
     if not is_disabled:
         def commit_x(val):
@@ -950,19 +966,19 @@ def _build_rect(settings, name, field, polls):
             rx = ui.number(
                 label="X", value=value.x if isinstance(value, Rect) else 0.0,
                 step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
             ry = ui.number(
                 label="Y", value=value.y if isinstance(value, Rect) else 0.0,
                 step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
             rw = ui.number(
                 label="W", value=value.width if isinstance(value, Rect) else 0.0,
                 step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
             rh = ui.number(
                 label="H", value=value.height if isinstance(value, Rect) else 0.0,
                 step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
 
     if not is_disabled:
         def commit_rx(val):
@@ -1006,11 +1022,10 @@ def _build_fallback(settings, name, field, polls):
     """Build a control for types without a registered Widget builder."""
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = _is_field_read_only(settings, name, field)
 
     # -- Generic fallback: read-only label -----------------------------------
     with ui.row().classes("items-center gap-2"):
-        ui.label(label)
+        _build_field_title(label, _wiring_tooltip(settings, name, field.description))
         lbl = ui.label(str(value)).classes("text-secondary")
 
     if _field_needs_poll(settings, name, field):

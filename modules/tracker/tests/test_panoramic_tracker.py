@@ -7,12 +7,13 @@ import time
 import unittest
 from dataclasses import replace
 
-from modules.oak import frame_window, delivered_height
+from modules.oak import CameraResolution, delivered_height, frame_coverage, frame_window
 from modules.tracker import (
     PanoramicTracker, PanoramicTrackerSettings, PanoramicAnnotation,
-    Tracklet, TrackingStatus, TrackletDict, camera_local_to_azimuth, row_from_elevation,
+    Tracklet, TrackingStatus, TrackletDict, camera_local_to_azimuth, row_from_elevation, row_model,
 )
 from modules.tracker.panoramic.geometry import Geometry, _MAX_HEIGHT, height_is_measured
+from modules.tracker.panoramic.tracker import HANDS_HEIGHT
 from modules.tracker.panoramic.store import TrackletIdPool
 from modules.utils import Rect
 
@@ -57,9 +58,10 @@ class PanoramicTrackerCase(unittest.TestCase):
         represent and so reads as someone smaller and further away.
         """
         p = self.config.rig
-        lift: float = p.focal_rows * feet_off_floor / distance
-        bottom: float = p.horizon_row + p.focal_rows * p.camera_height / distance - lift
-        box_h: float = p.focal_rows * height_m / distance
+        horizon_row, focal_rows = row_model(p.angle_bottom, p.angle_top)
+        lift: float = focal_rows * feet_off_floor / distance
+        bottom: float = horizon_row + focal_rows * p.camera_height / distance - lift
+        box_h: float = focal_rows * height_m / distance
         return make_tracklet(cam_id, ext_id, local_angle, status=status, age=age,
                              height=box_h, top=bottom - box_h)
 
@@ -876,6 +878,109 @@ class TestFootOffset(unittest.TestCase):
         self.assertAlmostEqual(max(angles), min(angles), places=12)
 
 
+class TestReachReadouts(unittest.TestCase):
+    """`feet_from` / `hands_from` / `hands_seam`: how near a person can stand and still be
+    in frame, published live for the running configuration.
+
+    Checked against a brute-force scan that shares nothing with the implementation but the
+    sensor's coverage: the person is placed in plan view and seen from the camera with `atan2`, so a
+    mistake in `camera_bearing`, `focus_distance` or the bisection shows up here.
+    """
+
+    # A frame TALLER than the sensor's reach: P720 at tilt 15 fills 944 rows on the centre column,
+    # so on 960 the sensor, not the rows, is what ends the picture at the top — and the sensor's top
+    # edge falls toward the sides. The configuration where the seam reach differs most from the axis.
+    SRC = (1280, 720)
+    ROWS = 960
+    TILT = 15.0
+    LENS_FOV = 128.9
+
+    def make_config(self, resolution: CameraResolution = CameraResolution.P720,
+                    lens_centre: tuple[float, float] = (0.0, 0.0)) -> PanoramicTrackerSettings:
+        config = PanoramicTrackerSettings(fov=PARALLAX_FOV, resolution=resolution,
+                                          tilt=self.TILT, frame_height=self.ROWS, lens_fov=self.LENS_FOV,
+                                          lens_centre_x=lens_centre[0], lens_centre_y=lens_centre[1])
+        config.rig.camera_radius = RING_RADIUS
+        config.rig.camera_height = CAMERA_HEIGHT
+        return config
+
+    def brute_force(self, height: float, centre_bearing: float, ring: float, lens_height: float,
+                    edge: int) -> float:
+        """The first radius, in 1 mm steps, at which a point on the line is inside the picture."""
+        window = frame_window(self.SRC, (self.SRC[0], self.ROWS), self.SRC[0], PARALLAX_FOV,
+                              self.TILT, self.LENS_FOV)
+        coverage = frame_coverage(self.SRC, (self.SRC[0], self.ROWS), self.SRC[0], PARALLAX_FOV,
+                                  self.TILT, lens_fov=self.LENS_FOV)
+        dpp: float = PARALLAX_FOV / self.SRC[0]
+        centre: float = (self.SRC[0] - 1) / 2.0
+        phi: float = math.radians(centre_bearing)
+        for step in range(int(ring * 1000) + 1, 10000):
+            radius: float = step / 1000.0
+            dx, dy = radius * math.cos(phi) - ring, radius * math.sin(phi)     # camera at (ring, 0)
+            distance: float = math.hypot(dx, dy)
+            x: float = centre + math.degrees(math.atan2(dy, dx)) / dpp
+            if distance <= 0.0 or x < -0.5 or x > self.SRC[0] - 0.5:
+                continue
+            row: int = int(coverage[int(round(min(max(x, 0.0), self.SRC[0] - 1.0))), edge])
+            if row < 0:
+                continue
+            limit: float = window.elevation(row)
+            angle: float = math.degrees(math.atan((height - lens_height) / distance))
+            if (angle <= limit) if height >= lens_height else (angle >= limit):
+                return radius
+        return math.inf
+
+    def test_published_reach_matches_a_brute_force_scan(self) -> None:
+        config = self.make_config()
+        PanoramicTracker(config, num_players=4, num_cameras=4)
+        r = config.rig
+        self.assertAlmostEqual(r.feet_from,
+                               self.brute_force(0.0, 0.0, RING_RADIUS, CAMERA_HEIGHT, 1), delta=0.0015)
+        self.assertAlmostEqual(r.hands_from,
+                               self.brute_force(HANDS_HEIGHT, 0.0, RING_RADIUS, CAMERA_HEIGHT, 0),
+                               delta=0.0015)
+        seam: float = max(self.brute_force(HANDS_HEIGHT, side, RING_RADIUS, CAMERA_HEIGHT, 0)
+                          for side in (-45.0, 45.0))
+        self.assertAlmostEqual(r.hands_seam, seam, delta=0.0015)
+
+    def test_when_the_sensor_ends_the_picture_the_seam_is_worse(self) -> None:
+        """A frame taller than the sensor's reach shows the black arch, so raised hands are judged
+        against a top that falls toward the seam: here R 1.73 on the axis but beyond R 1.9 on the
+        seam. And the lower tilt-for-resolution leaves feet out of frame at R 1.5."""
+        config = self.make_config(CameraResolution.P720)
+        PanoramicTracker(config, num_players=4, num_cameras=4)
+        r = config.rig
+        self.assertAlmostEqual(r.feet_from, 1.65, delta=0.01)
+        self.assertAlmostEqual(r.hands_from, 1.73, delta=0.01)
+        self.assertGreater(r.hands_seam, r.hands_from + 0.2)
+
+    def test_when_the_rows_end_the_picture_the_seam_barely_differs(self) -> None:
+        """The opposite case, and the studio configuration: P800 with the shared lens's centre
+        offset reaches 1136 rows at tilt 15, so 960 rows cap the top at the same angle on every
+        column. The seam is then only worse by the ring's parallax — centimetres — which is why the
+        two hands read-outs are worth having side by side: their gap says which of the two limits
+        the frame is running into. Feet are in frame inside the zone's R 1.5 edge here."""
+        config = self.make_config(CameraResolution.P800, lens_centre=(-10.5, 10.5))
+        PanoramicTracker(config, num_players=4, num_cameras=4)
+        r = config.rig
+        self.assertLess(r.feet_from, 1.5)
+        self.assertGreaterEqual(r.hands_seam, r.hands_from)
+        self.assertLess(r.hands_seam - r.hands_from, 0.05)
+
+    def test_the_ring_and_the_lens_height_update_it_live(self) -> None:
+        # Both are live settings and both move the reach; neither needs the coverage redone.
+        config = self.make_config()
+        PanoramicTracker(config, num_players=4, num_cameras=4)
+        feet, hands = config.rig.feet_from, config.rig.hands_from
+        config.rig.camera_radius = RING_RADIUS + 0.1
+        # On the axis the ring only shifts the answer outward by itself.
+        self.assertAlmostEqual(config.rig.feet_from, feet + 0.1, delta=1e-6)
+        self.assertAlmostEqual(config.rig.hands_from, hands + 0.1, delta=1e-6)
+        config.rig.camera_height = CAMERA_HEIGHT + 0.2
+        self.assertGreater(config.rig.feet_from, feet + 0.1)      # a higher lens sees feet further out
+        self.assertLess(config.rig.hands_from, hands + 0.1)  # ...and raised hands nearer
+
+
 class TestInitialGeometrySync(unittest.TestCase):
 
     def test_the_published_radius_is_the_geometrys_own(self) -> None:
@@ -916,8 +1021,8 @@ class TestInitialGeometrySync(unittest.TestCase):
             PanoramicTracker(config, num_players=4, num_cameras=3).geometry.target_fov,
             120.0, places=9)
         # The row model is derived from the shared camera fields with the warp's own functions —
-        # frame_height 0 resolving to the sensor's full reach at this tilt — and published as
-        # read-only fields for the panorama.
+        # frame_height 0 resolving to the sensor's full reach at this tilt — and published as the
+        # frame's shape and two edge angles, from which the row form is rebuilt exactly.
         rows = delivered_height(False, config.resolution, PARALLAX_FOV, config.tilt,
                                 config.lens_fov, (config.lens_centre_x, config.lens_centre_y),
                                 config.frame_height)
@@ -926,11 +1031,14 @@ class TestInitialGeometrySync(unittest.TestCase):
         self.assertAlmostEqual(tracker.geometry._horizon_px, window.horizon_px, places=9)
         self.assertAlmostEqual(tracker.geometry._focal, window.focal, places=9)
         self.assertEqual(tracker.geometry._rows, rows)
-        self.assertAlmostEqual(config.rig.horizon_row, window.horizon_px / (rows - 1), places=9)
-        self.assertAlmostEqual(config.rig.focal_rows, window.focal / (rows - 1), places=9)
+        self.assertEqual(config.rig.hfov, PARALLAX_FOV)
+        self.assertEqual(config.rig.tilt, config.tilt)
         self.assertAlmostEqual(config.rig.vfov, window.elevation_top - window.elevation_bottom, places=9)
-        self.assertAlmostEqual(config.rig.elevation_bottom, window.elevation_bottom, places=9)
-        self.assertAlmostEqual(config.rig.elevation_top, window.elevation_top, places=9)
+        self.assertAlmostEqual(config.rig.angle_bottom, window.elevation_bottom, places=9)
+        self.assertAlmostEqual(config.rig.angle_top, window.elevation_top, places=9)
+        horizon_row, focal_rows = row_model(config.rig.angle_bottom, config.rig.angle_top)
+        self.assertAlmostEqual(horizon_row, window.horizon_px / (rows - 1), places=9)
+        self.assertAlmostEqual(focal_rows, window.focal / (rows - 1), places=9)
 
 
 if __name__ == "__main__":

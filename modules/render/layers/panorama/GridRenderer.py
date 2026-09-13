@@ -207,7 +207,7 @@ class GridRenderer(LayerBase):
         # the number that produced it.
         #
         # `elev` is the STRIP's window — at the rig centre, at `focus_radius` — not the frame's.
-        # It reads narrower than `rig.elevation_bottom/top` (−17..47 against −20..52 here) because
+        # It reads narrower than `rig.angle_bottom/top` (−17..47 against −21..52 here) because
         # `elevation_window` converts the camera's band to the centre's view and takes the ratio at
         # its tightest bearing, straight ahead, so no column of the strip fades to black. It
         # therefore moves with `focus_radius` while the rig's numbers do not.
