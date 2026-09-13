@@ -51,8 +51,8 @@ only in a settings panel.
 
 **Detections a filter dropped are marks too**, so nobody leaves the strip without a reason. They
 have no world, so they are a grey line with no tolerance field (no rule can join them), labelled
-with the filter's name (`Rejection`: `young`, `small`, `dead zone`, `past R3.5`). A LOST mark — a
-tracked person the far edge stops counting, or one the device missed — keeps its own line, which
+with the filter's name (`Rejection`: `young`, `small`, `dead zone`, `past R3.5`, `no id`). A LOST
+mark — a tracked person a filter stops counting, or one the device missed — keeps its own line, which
 fades to grey over `lost_timeout`, while its field fades out (`_fade`); the moment the line is fully
 grey is the moment a dropped detection's grey line takes over.
 """

@@ -525,8 +525,8 @@ labels never collide and never move as people do, and its x always sits on its o
 **Nobody leaves the strip without a reason.**
 
 - **A line fading to grey, its field fading out, is an identity the tracker holds but no longer
-  counts** — a LOST observation: the device missed them, or they walked past the far edge (the label
-  then ends in `past R3.5`). How far it has faded says how close it is to being forgotten: their
+  counts** — a LOST observation: the device missed them, or a filter stopped counting them (the
+  label then ends in its tag, `past R3.5` or `small`). How far it has faded says how close it is to being forgotten: their
   pose leaves the show after `pose.tracklets.detection_timeout`, the identity at `lost_timeout`, the moment the line is
   fully grey and the field gone.
 - **A grey line with no field is a detection the tracker dropped**, with the filter named at its
@@ -538,6 +538,7 @@ labels never collide and never move as people do, and its x always sits on its o
 | `small` | the box is shorter than the minimum | `track.height_filter` |
 | `dead zone` | a new person arriving right at a camera's field edge | `track.seam.dead_zone` |
 | `past R3.5` | standing past the far edge | `track.zone_filter`, at `track.rig.zone_max_radius` |
+| `no id` | a new person while every world id is in use | `num_players` |
 
 So a person walking out keeps their own mark, fading, and when it has gone grey a grey line tagged
 `past R3.5` takes its place for as long as the camera still sees them.
@@ -657,8 +658,8 @@ drags.
 ### Linking on a seam
 
 A person on a seam is seen twice, and the tracker has to decide that the two sightings are one
-person before anything else in the app sees them. Four settings do it, all in **degrees of world
-azimuth or a fraction of a measured height** — never in metres, and never as a fraction of the overlap:
+person before anything else in the app sees them. These settings do it, in **degrees of world
+azimuth, a fraction of a measured height, or seconds** — never in metres, and never as a fraction of the overlap:
 
 | setting | unit | studio | what it decides |
 |---|---|---|---|
@@ -666,6 +667,7 @@ azimuth or a fraction of a measured height** — never in metres, and never as a
 | `seam.link_angle` | ° of world azimuth | 18 | how far apart two cameras' views may be and still be one person |
 | `seam.link_height` | fraction of the larger `H`, 0–1 | 0.25 | a veto on that link when the two heights disagree |
 | `seam.hysteresis` | ratio | 0.6 | how sticky the chosen primary is at a handover |
+| `seam.hold` | s | 0.5 | a primary that loses the person hands over at once, skipping `hysteresis`; this is how long the better-placed camera must then wait to take the person back |
 | `reacquire_angle` | ° of local angle | 5 | how far a returning person may be from the one just lost — *same camera*, so it sits beside `lost_timeout`, not under `seam` |
 
 **Why azimuth and not distance.** Azimuth is the quantity this whole procedure verifies; the

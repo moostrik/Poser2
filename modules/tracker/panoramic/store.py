@@ -170,9 +170,9 @@ class TrackletStore:
         """The device has no detection this frame but still holds the track: mark LOST and keep
         it live, because the same device id legitimately comes back.
 
-        `latest` is for a person the camera *does* see but the tracker does not count — beyond the
-        zone's far edge. Their newest `roi` and `annotation` are kept, so the observation (and the
-        panorama's mark) follows them walking out, but `last_active` is **not** advanced: that is
+        `latest` is for a person the camera *does* see but the tracker does not count — past the
+        zone's far edge, or a box a filter drops. Their newest `roi` and `annotation` are kept, so the
+        observation (and the panorama's mark) follows them, but `last_active` is **not** advanced: that is
         the clock `lost_timeout` and pose's `detection_timeout` run on, and restarting it would keep them
         forever. (`replace_tracklet` with a LOST copy cannot do this — it takes the newer time.)
         """
@@ -211,7 +211,11 @@ class TrackletStore:
         if tracklet is None:
             logger.warning(f"Attempted to remove non-existent observation {obs_id}.")
             return
-        self._live.pop((tracklet.cam_id, tracklet.external_id), None)
+        # Only if the key is still this observation's: after `end_device_track` the device may have
+        # handed the same id to a newer observation, whose entry this must not take.
+        key: DeviceKey = (tracklet.cam_id, tracklet.external_id)
+        if self._live.get(key) == obs_id:
+            del self._live[key]
         world_id: int | None = self._world_for.pop(obs_id, None)
         if world_id is None:
             return
@@ -237,6 +241,10 @@ class TrackletStore:
         return True
 
     # ── reads ──────────────────────────────────────────────────────────
+
+    def has_free_id(self) -> bool:
+        """Whether a new world can be started."""
+        return self._id_pool.size() > 0
 
     def get_tracklets(self, world_id: int) -> list[Tracklet]:
         obs_ids: set[ObsId] = self._world_members.get(world_id, set())

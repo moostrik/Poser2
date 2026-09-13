@@ -60,13 +60,15 @@ class Rejection(IntEnum):
     SMALL = auto()       # its box is shorter than `height_filter`
     DEAD_ZONE = auto()   # a new arrival inside `seam.dead_zone` of a field edge
     PAST_EDGE = auto()   # past `rig.zone_max_radius`, with `zone_filter` on
+    NO_ID = auto()       # a new person while every world id is in use
 
 
 def rejection_label(reason: Rejection, zone_max_radius: float) -> str:
     """The short name of a filter, as the panorama tags a box with it."""
     if reason == Rejection.PAST_EDGE:
         return f'past R{zone_max_radius:g}'
-    return {Rejection.YOUNG: 'young', Rejection.SMALL: 'small', Rejection.DEAD_ZONE: 'dead zone'}[reason]
+    return {Rejection.YOUNG: 'young', Rejection.SMALL: 'small', Rejection.DEAD_ZONE: 'dead zone',
+            Rejection.NO_ID: 'no id'}[reason]
 
 
 @dataclass(frozen=True)
@@ -108,17 +110,18 @@ class Tracker(Thread, BaseTracker):
       puts that continuity under our control instead of leaving it to the
       device's habit of reusing numbers.
     - **View selection (primary)**: per world, the tracker emits one primary
-      observation each tick. Selection is sticky with hysteresis (governed by
-      ``seam.hysteresis``): the current primary stays primary unless a
-      competitor's distance from the FOV edge exceeds it by the hysteresis
-      ratio. Smooth handoff at seams without flicker.
+      observation each tick. A primary that loses the person hands over at once
+      to an active view, which is then kept for ``seam.hold``; otherwise the
+      primary yields only by the ``seam.hysteresis`` ratio of distance from the
+      FOV edge. Smooth handoff at seams without flicker.
     - **Late safety net**: if two genuine new arrivals at a seam each got their
       own world, a per-tick scan can collapse them into one via ``merge_worlds``.
 
     Processing runs in a background thread. Camera data is submitted via
     ``submit_cam_tracklets``. Two output channels: ``add_tracklet_callback``
-    delivers one primary per world still remembered, LOST ones included — freshness
-    is the consumer's to judge (pose by box age, the show by ``is_active``) — and
+    delivers one primary per world still remembered, LOST only when no camera sees
+    the person — freshness is the consumer's to judge (pose by box age, the show by
+    ``is_active``) — and
     ``add_observation_callback`` delivers every live observation, which is the
     only way to see the two cameras' separate opinions of a person on a seam.
     """
@@ -160,8 +163,9 @@ class Tracker(Thread, BaseTracker):
         self._update_seam_angles()
 
         # Last emitted primary per world id, as an observation id — view-selection state,
-        # used for hysteresis
+        # used for hysteresis — and when a LOST primary was last replaced, for `seam.hold`
         self._primary_for_world: dict[int, int] = {}
+        self._handed_over_at: dict[int, float] = {}
 
         self._callback_lock = Lock()
         self._tracklet_callbacks: set[TrackletDictCallback] = set()
@@ -171,6 +175,8 @@ class Tracker(Thread, BaseTracker):
         # on the observation channel so the panorama can draw them, never on the primary channel.
         # Touched only on the tracker thread (`_add_tracklet` and `_update_and_notify`).
         self._rejected: dict[tuple[int, int], Tracklet] = {}
+        # Set while births are refused for want of a world id, so that is logged once, not per frame.
+        self._pool_full: bool = False
 
     def _sync_geometry_from_config(self) -> None:
         """Apply current config values to geometry. Needed at construction because ``bind`` does
@@ -291,7 +297,8 @@ class Tracker(Thread, BaseTracker):
         with self._callback_lock:
             self._tracklet_callbacks.clear()
 
-        self.join(timeout=1.0)  # Wait for the thread to finish
+        if self.is_alive():
+            self.join(timeout=1.0)  # Wait for the thread to finish
 
     def notify_update(self) -> None:
         if self._running:
@@ -344,29 +351,26 @@ class Tracker(Thread, BaseTracker):
         new_tracklet = replace(new_tracklet, annotation=Annotation(local_angle, world_angle, _overlap, distance, height))
         existing: bool = self.store.get_world_id(cam_id, ext_id) is not None
 
-        # Too young or too small: not counted, and — for a person already tracked — not refreshed,
-        # so their observation goes stale and expires.
-        if new_tracklet.external_age_in_frames <= self.config.age_filter:
-            self._reject(new_tracklet, Rejection.YOUNG)
-            return
-        if new_tracklet.roi.height < self.config.height_filter:
-            self._reject(new_tracklet, Rejection.SMALL)
-            return
-
-        # Past the zone's far edge the tracker does not see this person — handled exactly like a
-        # missed detection, before every branch below, so it cannot be born, re-acquired or linked
-        # there. Someone already tracked goes LOST: their pose carries on from their last box for
+        # Too young, too small, or past the zone's far edge: not counted — handled exactly like a
+        # missed detection, before every branch below, so nobody is born, re-acquired or linked on
+        # it. Someone already tracked goes LOST: their pose carries on from their last box for
         # `pose.tracklets.detection_timeout`, so a jump or a moment of hidden feet changes nothing
-        # visible; forgotten after `lost_timeout`; the same
-        # person again if they step back inside before that. Their latest position is kept, tagged,
-        # so the panorama's mark follows them out and says why it is fading.
-        if self.config.zone_filter and self.geometry.beyond_zone(local_angle, distance):
+        # visible; forgotten after `lost_timeout`; the same person again if they are counted before
+        # that. Their latest box is kept, tagged, so the panorama's mark follows them and says why it
+        # is fading.
+        reason: Rejection | None = None
+        if new_tracklet.external_age_in_frames <= self.config.age_filter:
+            reason = Rejection.YOUNG
+        elif new_tracklet.roi.height < self.config.height_filter:
+            reason = Rejection.SMALL
+        elif self.config.zone_filter and self.geometry.beyond_zone(local_angle, distance):
+            reason = Rejection.PAST_EDGE
+        if reason is not None:
             if existing:
                 self._rejected.pop(key, None)
-                self.store.lose_tracklet(cam_id, ext_id,
-                                         latest=self._tagged(new_tracklet, Rejection.PAST_EDGE))
+                self.store.lose_tracklet(cam_id, ext_id, latest=self._tagged(new_tracklet, reason))
             else:
-                self._reject(new_tracklet, Rejection.PAST_EDGE)
+                self._reject(new_tracklet, reason)
             return
 
         # Existing observation — refresh in place, even inside the edge dead
@@ -393,12 +397,22 @@ class Tracker(Thread, BaseTracker):
         if self.geometry.angle_in_edge(local_angle, self.config.seam.dead_zone):
             self._reject(new_tracklet, Rejection.DEAD_ZONE)
             return
-        self._rejected.pop(key, None)
         if _overlap:
             candidate_world: int | None = self._find_world_candidate(new_tracklet)
             if candidate_world is not None:
+                self._rejected.pop(key, None)
                 self.store.add_tracklet(new_tracklet, world_id=candidate_world)
                 return
+
+        # A new person. Checked here rather than read off `add_tracklet`'s None, which cannot say why.
+        if not self.store.has_free_id():
+            if not self._pool_full:
+                logger.warning("Every world id is in use: new people are not tracked until one frees up")
+                self._pool_full = True
+            self._reject(new_tracklet, Rejection.NO_ID)
+            return
+        self._pool_full = False
+        self._rejected.pop(key, None)
         self.store.add_tracklet(new_tracklet)
 
     @staticmethod
@@ -431,6 +445,8 @@ class Tracker(Thread, BaseTracker):
                 continue
             if not isinstance(t.annotation, Annotation):
                 continue
+            if self._camera_sees_world(new_tracklet.cam_id, t.id):
+                continue                    # already re-found: this is someone else
             diff: float = abs(t.annotation.local_angle - new_angle)
             if diff > self.config.reacquire_angle:
                 continue
@@ -467,6 +483,14 @@ class Tracker(Thread, BaseTracker):
         largest: float = max(height_a, height_b)
         return abs(height_a - height_b) / largest <= self.config.seam.link_height
 
+    def _camera_sees_world(self, cam_id: int, world_id: int) -> bool:
+        """Whether this camera already actively tracks someone in this world.
+
+        One camera never sees one person twice — the device de-duplicates — so a second id from it
+        is a second person, and no rule may join the two. A merge would be sticky: nothing splits a
+        world again."""
+        return any(t.cam_id == cam_id and t.is_active for t in self.store.get_tracklets(world_id))
+
     def _find_world_candidate(self, new_tracklet: Tracklet) -> int | None:
         """Return the world id whose other-camera observation best matches
         ``new_tracklet`` in angle and height; None if none match. LOST
@@ -481,6 +505,8 @@ class Tracker(Thread, BaseTracker):
                 continue
             if not self._observations_match(new_tracklet, t):
                 continue
+            if self._camera_sees_world(new_tracklet.cam_id, t.id):
+                continue
             assert isinstance(t.annotation, Annotation)
             diff: float = self.geometry.angle_diff(new_tracklet.annotation.world_angle, t.annotation.world_angle)
             if diff < best_diff:
@@ -489,6 +515,8 @@ class Tracker(Thread, BaseTracker):
         return best_world
 
     def _update_and_notify(self) -> None:
+        now: float = time.time()
+
         # Expire timed-out observations
         for t in self.store.all_tracklets():
             if t.is_expired(self.config.lost_timeout):
@@ -499,22 +527,23 @@ class Tracker(Thread, BaseTracker):
         for keep_id, drop_id in self._find_world_collapse_pairs():
             if self.store.merge_worlds(keep_id, drop_id):
                 self._primary_for_world.pop(drop_id, None)
+                self._handed_over_at.pop(drop_id, None)
 
-        # Emit one primary per world the tracker still remembers, LOST or not, until `lost_timeout`
-        # retires it. How stale is too stale is each consumer's call, not this one's: pose stops
-        # posing a person after `pose.tracklets.detection_timeout`, and the show counts only active
-        # tracklets. Filtering here instead would decide for all of them with one number. A world
-        # retired just above is still in the store until the end of this tick; it is not emitted.
+        # Emit one primary per world the tracker still remembers until `lost_timeout` retires it —
+        # LOST only when no camera sees the person. How stale is too stale is each consumer's call,
+        # not this one's: pose stops posing a person after `pose.tracklets.detection_timeout`, and
+        # the show counts only active tracklets. Filtering here instead would decide for all of them
+        # with one number. A world retired just above is still in the store until the end of this
+        # tick; it is not emitted.
         emitted: TrackletDict = {}
         for world_id in self.store.all_world_ids():
-            primary: Tracklet | None = self._pick_primary(world_id)
-            if primary is not None and not primary.is_removed:
+            primary: Tracklet | None = self._pick_primary(world_id, now)
+            if primary is not None:
                 emitted[world_id] = primary
         self._notify_callback(emitted)
 
         # Dropped detections a camera has stopped reporting: a device track normally ends with LOST
         # or REMOVED, which clears its entry, but a camera that simply goes quiet does not.
-        now: float = time.time()
         lost_timeout: float = self.config.lost_timeout
         for key in [k for k, t in self._rejected.items() if now - t.last_active > lost_timeout]:
             del self._rejected[key]
@@ -534,46 +563,47 @@ class Tracker(Thread, BaseTracker):
         for world_id in list(self._primary_for_world):
             if world_id not in live_worlds:
                 del self._primary_for_world[world_id]
+                self._handed_over_at.pop(world_id, None)
 
-    def _pick_primary(self, world_id: int) -> Tracklet | None:
-        """Sticky primary selection with hysteresis to avoid per-tick flicker.
+    def _pick_primary(self, world_id: int, now: float) -> Tracklet | None:
+        """The one view a world is emitted as: sticky, but never a LOST view while another is active.
 
-        The incumbent is held through transient LOST states: takeover
-        candidates must be active, but a LOST incumbent only yields once a
-        competitor beats its last-known edge distance by the hysteresis
-        ratio. Truly departed observations are bounded by the ``lost_timeout``
-        retirement in ``_update_and_notify``.
+        - **No member active**: the most recently seen one.
+        - **The primary lost the person**: the best-placed active view takes over at once. The show
+          reads `is_active`, so holding a LOST primary would drop a person a camera still sees.
+        - **Otherwise** the primary yields only to a view whose distance from its field edge beats
+          its own by the ``seam.hysteresis`` ratio.
+
+        The two guards cover different switches. The ratio keeps an active-to-active handover from
+        bouncing, since going back needs the ratio again. A forced handover skipped the ratio, so the
+        new primary is often the worse-placed view and the ratio would hand the person straight back
+        the moment the old camera returns; ``seam.hold`` blocks that for a while after a forced
+        handover, so a one-frame miss costs one camera switch, not two.
         """
-        members: list[Tracklet] = self.store.get_tracklets(world_id)
+        members: list[Tracklet] = [t for t in self.store.get_tracklets(world_id)
+                                   if not t.is_removed and isinstance(t.annotation, Annotation)]
         if not members:
             return None
-        active: list[Tracklet] = [t for t in members if t.is_active and isinstance(t.annotation, Annotation)]
-        if not active:
-            chosen: Tracklet = max(members, key=lambda t: t.last_active)
-            self._primary_for_world[world_id] = chosen.obs_id
-            return chosen
 
         def edge(t: Tracklet) -> float:
             assert isinstance(t.annotation, Annotation)
             return self.geometry.angle_from_edge(t.annotation.local_angle)
 
         current_key: int | None = self._primary_for_world.get(world_id)
-        current: Tracklet | None = next(
-            (t for t in members
-             if t.obs_id == current_key
-             and not t.is_removed
-             and isinstance(t.annotation, Annotation)),
-            None,
-        )
-        if current is None:
+        current: Tracklet | None = next((t for t in members if t.obs_id == current_key), None)
+        active: list[Tracklet] = [t for t in members if t.is_active]
+        chosen: Tracklet
+        if not active:
+            chosen = max(members, key=lambda t: t.last_active)
+        elif current is None or not current.is_active:
             chosen = max(active, key=edge)
+            if current is not None:
+                self._handed_over_at[world_id] = now
         else:
-            best_competitor: Tracklet = max(active, key=edge)
-            if best_competitor is current:
-                chosen = current
-            else:
-                hysteresis: float = self.config.seam.hysteresis
-                chosen = best_competitor if edge(best_competitor) >= edge(current) / hysteresis else current
+            best: Tracklet = max(active, key=edge)
+            held: bool = now - self._handed_over_at.get(world_id, -math.inf) < self.config.seam.hold
+            beaten: bool = edge(best) >= edge(current) / self.config.seam.hysteresis
+            chosen = best if best is not current and beaten and not held else current
 
         self._primary_for_world[world_id] = chosen.obs_id
         return chosen
@@ -623,6 +653,10 @@ class Tracker(Thread, BaseTracker):
                 continue
             if nearest[i] is not b or nearest[j] is not a:
                 continue
+            if any(self._camera_sees_world(t.cam_id, b.id)
+                   for t in self.store.get_tracklets(a.id) if t.is_active):
+                continue
+
             # Older world wins
             members_a: list[Tracklet] = self.store.get_tracklets(a.id)
             members_b: list[Tracklet] = self.store.get_tracklets(b.id)

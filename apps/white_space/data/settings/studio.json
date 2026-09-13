@@ -392,7 +392,8 @@
       "dead_zone": 6.5,
       "link_angle": 15.0,
       "link_height": 0.2,
-      "hysteresis": 0.6
+      "hysteresis": 0.6,
+      "hold": 0.5
     },
     "rig": {
       "camera_radius": 0.36,

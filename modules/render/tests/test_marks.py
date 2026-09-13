@@ -139,7 +139,8 @@ class TestDroppedDetections(unittest.TestCase):
 
     def test_each_filter_names_itself(self) -> None:
         for reason, tag in ((Rejection.YOUNG, 'young'), (Rejection.SMALL, 'small'),
-                            (Rejection.DEAD_ZONE, 'dead zone'), (Rejection.PAST_EDGE, 'past R3.5')):
+                            (Rejection.DEAD_ZONE, 'dead zone'), (Rejection.PAST_EDGE, 'past R3.5'),
+                            (Rejection.NO_ID, 'no id')):
             with self.subTest(reason=reason):
                 self.assertEqual(mark(dropped(reason)).label, tag)
 

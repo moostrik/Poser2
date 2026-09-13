@@ -23,6 +23,10 @@ class SeamSettings(BaseSettings):
                                       description="Maximum fraction the two measured heights may differ when linking")
     hysteresis: Field[float] = Field(0.9, min=0.1, max=1.0, step=0.05,
                                      description="Lower values make active camera stickier.")
+    # The flicker guard: a primary that loses the person hands over at once, skipping `hysteresis`,
+    # so without this a one-frame miss would switch cameras twice. Normal handovers are hysteresis's.
+    hold: Field[float] = Field(0.5, min=0.0, max=2.0, step=0.05,
+                               description="Seconds after a lost primary is replaced before the better-placed camera may take the person back")
 
 
 class RigSettings(BaseSettings):
@@ -124,7 +128,8 @@ class TrackerSettings(BaseSettings):
     lens_centre_x: Field[float] = Field(0.0, access=Field.INIT, description="Optical centre offset (px), shared")
     lens_centre_y: Field[float] = Field(0.0, access=Field.INIT, description="Optical centre offset (px), shared")
     # The intake's filters, together. A detection one of them drops is not counted, and the panorama
-    # draws it as a grey line tagged with the filter (`young`, `small`, `past R…`).
+    # draws it as a grey line tagged with the filter (`young`, `small`, `past R…`); a person already
+    # tracked goes LOST instead, their own mark tagged.
     age_filter: Field[int] = Field(5, min=0, max=9, step=1,
                                    description="Minimum age in frames before a tracklet is considered.")
     height_filter: Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05,
