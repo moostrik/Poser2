@@ -91,11 +91,11 @@ class Tracker(Thread, BaseTracker):
         # Wire fov and rig changes to geometry. The three that move the overlap band must also
         # republish it, or the readout and the panorama's lines go stale on a live drag.
         TrackerSettings.fov.bind(config, lambda v: (self._set_frame(v), self._update_seam_angles()))
-        RigSettings.camera_diameter.bind(config.rig, lambda v: (self.geometry.set_camera_diameter(v),
-                                                                self._set_zone()))
+        RigSettings.camera_radius.bind(config.rig, lambda v: (self.geometry.set_camera_radius(v),
+                                                              self._set_zone()))
         RigSettings.camera_height.bind(config.rig, lambda v: self.geometry.set_camera_height(v))
-        RigSettings.zone_min_diameter.bind(config.rig, lambda _: self._set_zone())
-        RigSettings.zone_max_diameter.bind(config.rig, lambda _: self._set_zone())
+        RigSettings.zone_min_radius.bind(config.rig, lambda _: self._set_zone())
+        RigSettings.zone_max_radius.bind(config.rig, lambda _: self._set_zone())
         TrackerSettings.foot_offset.bind(config, lambda v: self.geometry.set_foot_offset(v))
 
         # bind() does not fire with the current value, and the preset is loaded
@@ -119,7 +119,7 @@ class Tracker(Thread, BaseTracker):
         The rig goes first: the overlap band is derived from the ring and the zone, so pushing
         `fov` before them would derive it once against the defaults."""
         r: RigSettings = self.config.rig
-        self.geometry.set_camera_diameter(r.camera_diameter)
+        self.geometry.set_camera_radius(r.camera_radius)
         self.geometry.set_camera_height(r.camera_height)
         self.geometry.set_foot_offset(self.config.foot_offset)
         self._set_zone()
@@ -127,10 +127,11 @@ class Tracker(Thread, BaseTracker):
 
     def _set_zone(self) -> None:
         r: RigSettings = self.config.rig
-        self.geometry.set_zone(r.zone_min_diameter, r.zone_max_diameter)
+        self.geometry.set_zone(r.zone_min_radius, r.zone_max_radius)
         # Published so the panorama draws its marks on the same cylinder the azimuth is corrected
-        # at; derived from the zone, never set.
-        r.parallax_diameter = self.geometry.parallax_diameter
+        # at; derived from the zone, never set. Straight across, no conversion — the setting, the
+        # geometry and the panorama all speak radii.
+        r.parallax_radius = self.geometry.parallax_radius
         self._update_seam_angles()
 
     def _set_frame(self, fov: float) -> None:
@@ -150,6 +151,7 @@ class Tracker(Thread, BaseTracker):
         window = frame_window(src, (src[0], rows), src[0], fov, c.tilt, c.lens_fov, lens_centre)
         self.geometry.set_window(window, rows)
         p: RigSettings = c.rig
+        p.hfov = fov
         p.vfov = window.elevation_top - window.elevation_bottom
         p.elevation_bottom = window.elevation_bottom
         p.elevation_top = window.elevation_top
@@ -157,16 +159,14 @@ class Tracker(Thread, BaseTracker):
         p.focal_rows = window.focal / (rows - 1)
 
     def _update_seam_angles(self) -> None:
-        """The frame's own spans, for the panorama. Moved by `fov`, by the ring and by the zone's
-        far edge — the three inputs the overlap is derived from — so every one of them rebinds to
-        this. The fusion settings are not here: they are already in the units they are drawn in.
+        """The shared overlap, for the panorama. Moved by `fov`, by the ring and by the zone's far
+        edge — the three inputs it is derived from — so every one of them rebinds to this. The
+        fusion settings are not here: they are already in the units they are drawn in.
 
-        `overlap` is published in **world azimuth**, which is what can be measured against the
-        panorama's degree grid and what the overlap lines are drawn from. The local-angle band
-        `angle_in_overlap` tests stays inside `Geometry`."""
-        a = self.config.seam.angles
-        a.fov = self.geometry.cam_fov
-        a.overlap = self.geometry.overlap_azimuth
+        Published in **world azimuth**, which is what can be measured against the panorama's degree
+        grid and what the overlap lines are drawn from. The local-angle band `angle_in_overlap`
+        tests stays inside `Geometry`."""
+        self.config.rig.overlap = self.geometry.overlap_azimuth
 
     def start(self) -> None:
         if self._running:

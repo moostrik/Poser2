@@ -2,23 +2,6 @@ from modules.oak import CameraResolution
 from modules.settings import BaseSettings, Field, Group
 
 
-class SeamAngles(BaseSettings):
-    """The frame's own azimuth spans, published by the tracker for whatever draws with them.
-
-    Not settings: `fov` is the camera's field and `overlap` the azimuth two neighbours share, both
-    fixed by the lens, the mount and the zone. Everything the fusion rules are tuned with is on
-    `SeamSettings` in degrees or percent, so nothing here is a ratio of anything.
-
-    `overlap` is in **world azimuth**, which is the number measurable against the panorama's degree
-    grid and the one the overlap lines are drawn from. `angle_in_overlap` tests the *local*-angle
-    equivalent, which `Geometry` derives alongside it and keeps to itself — the two differ because
-    the local-to-azimuth map compresses.
-    """
-    fov: Field[float] = Field(0.0, access=Field.READ, description="Camera FOV (°)")
-    overlap: Field[float] = Field(0.0, access=Field.READ,
-                                  description="Azimuth (°) two neighbours share, at the zone's far edge")
-
-
 class SeamSettings(BaseSettings):
     """When two cameras' views of a seam are one person, and where a person may be born.
 
@@ -26,6 +9,10 @@ class SeamSettings(BaseSettings):
     than fractions of the overlap zone, so a number here means the same thing after a change of
     `fov`, mount or lens. Azimuth is the quantity the panorama check verifies; the distance
     estimate is not, so it is deliberately not a gate.
+
+    **Only tunables live here.** The overlap two neighbours share is *derived* from the ring and
+    the zone's far edge, so it is published on `RigSettings` beside the things it comes from,
+    rather than in a sub-group here where it read as though it were one of these four.
     """
     dead_zone: Field[float] = Field(5.0, min=0.0, max=20.0, step=0.5,
                                     description="No new person is born within this many ° of a camera's field edge")
@@ -35,60 +22,78 @@ class SeamSettings(BaseSettings):
                                       description="Maximum % the two measured heights may differ when linking")
     hysteresis: Field[float] = Field(0.9, min=0.1, max=1.0, step=0.05,
                                      description="Lower values make active camera stickier.")
-    angles: Group[SeamAngles] = Group(SeamAngles)
 
 
 class RigSettings(BaseSettings):
     """The installation in metres: where the lenses are, and where people are tracked.
 
     **Two circles, so two prefixes.** ``camera_`` is the ring the lenses sit on; ``zone_`` is the
-    floor people are tracked on. Everything is a **diameter**, as every figure in CALIBRATION.md
-    is, so the group reads in one unit — radii exist only inside `Geometry`, which halves on the
-    way in exactly as the render halves ``focus_diameter``.
+    floor people are tracked on.
 
-    Nothing here is tuned. The camera pair is *measured with a tape*; the zone is *decided* and
-    then taped on the floor. Three things depend on them:
+    **Everything is a RADIUS, measured from the fixture's axis**, because that is where the
+    installation is built and taped from: the light fixture stands at the centre, so the origin is
+    a physical object you can hook a tape to rather than a point to infer. Every triangle in
+    `Geometry`, `panorama_map` and `panoramicstitch.frag` already takes a radius, and so does the
+    panorama's ``R`` label — so a number here, a number in the footer, a number on a person's label
+    and a tape on the floor are now **one number**, with nothing halved anywhere between them.
+    (``camera_height`` is the exception that proves the rule: a height is not a radius.)
+
+    Nothing here is tuned. The camera ring is *measured*; the zone is *decided* and then taped on
+    the floor. Three things depend on them:
 
     - **The parallax correction.** The cameras sit on a ring rather than at a shared optical
       centre, so the same person is seen at different world angles by neighbours — several degrees
       of disagreement at a seam. The distance to the person comes from where their feet meet the
       floor, which needs only the lens height, and that is enough to re-project every observation
-      to the shared centre. At ``camera_diameter = 0`` the correction is disabled (identity).
-    - **The overlap band** (`Geometry.angle_in_overlap`), derived at ``zone_max_diameter``: the
+      to the shared centre. At ``camera_radius = 0`` the correction is disabled (identity).
+    - **The overlap band** (`Geometry.angle_in_overlap`), derived at ``zone_max_radius``: the
       widest band two cameras can share anywhere inside the zone, and so the most generous
       depth-free bound that never under-reports where people actually are.
-    - **The parallax depth** (``parallax_diameter``, published below), derived at the zone's
+    - **The parallax depth** (``parallax_radius``, published below), derived at the zone's
       *harmonic* mean: the one depth every world azimuth is corrected at. Two depths from one zone
       on purpose — a flag must never under-report, so it takes the far edge; a correction wants its
       worst case smallest, so it takes the middle.
-    - **The distance clamp**, from both diameters: a mangled bounding box can then only move the
+    - **The distance clamp**, from both radii: a mangled bounding box can then only move the
       reported metres within the band people are in, never to a nonsensical depth.
     """
-    camera_diameter: Field[float] = Field(0.0, min=0.0, max=2.0, step=0.01,
-                                          description="Ø (m) of the ring the lenses sit on, measured. 0 disables the parallax correction")
-    camera_height: Field[float] = Field(0.5, min=0.1, max=3.0, step=0.01, newline=True,
+    camera_radius: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01,
+                                        description="Distance (m) of each lens from the fixture axis. 0 disables the parallax correction")
+    camera_height: Field[float] = Field(0.5, min=0.1, max=3.0, step=0.01,
                                         description="Lens height above the floor (m), measured")
-    zone_min_diameter: Field[float] = Field(3.0, min=0.5, max=20.0, step=0.1,
-                                            description="Ø (m) of the tracked floor's near edge — the nearest distance claimed")
-    zone_max_diameter: Field[float] = Field(7.0, min=1.0, max=30.0, step=0.1,
-                                            description="Ø (m) of its far edge — sets the overlap band and the distance clamp")
+    zone_min_radius: Field[float] = Field(1.5, min=0.25, max=10.0, step=0.05, newline=True,
+                                          description="Radius (m) of the tracked floor's near edge — the nearest distance claimed")
+    zone_max_radius: Field[float] = Field(3.5, min=0.5, max=15.0, step=0.05,
+                                          description="Radius (m) of its far edge — sets the overlap band and the distance clamp")
     # Derived from the zone and published for the panorama, which places its marks on the same
     # cylinder the tracker corrects the azimuth at. The harmonic mean, because the correction is
     # linear in 1/d — see `Geometry._update_parallax_depth`.
-    parallax_diameter: Field[float] = Field(4.2, access=Field.READ,
-                                            description="Ø (m) the world azimuth is corrected at — derived, the zone's harmonic mean")
-    # The delivered frame's row model, published by the tracker for whatever draws with its
-    # numbers (the panorama). Rows are tangents of elevation: row = horizon_row - focal_rows * tan(e).
-    vfov: Field[float] = Field(79.5, access=Field.READ, newline=True,
+    parallax_radius: Field[float] = Field(2.1, access=Field.READ,
+                                          description="Radius (m) the world azimuth is corrected at — derived, the zone's harmonic mean")
+    # Beside the two it comes from — the ring and `zone_max_radius` — rather than under `seam`,
+    # where it read as a fifth tunable. In WORLD AZIMUTH, which is what the panorama's degree grid
+    # measures and what its overlap lines are drawn from; `angle_in_overlap` tests the *local*
+    # equivalent, which `Geometry` derives alongside and keeps to itself (the map compresses, so
+    # the two differ). `fov` is the setting above, not republished here.
+    overlap: Field[float] = Field(0.0, access=Field.READ,
+                                  description="Azimuth (°) two neighbours share, at the zone's far edge")
+    # The delivered frame's shape and row model, published by the tracker for whatever draws with
+    # its numbers (the panorama). Rows are tangents of elevation, NOT linear in it:
+    # row = horizon_row - focal_rows · tan(e). Horizontal first, as a frame is quoted.
+    hfov: Field[float] = Field(127.0, access=Field.READ, newline=True,
+                               description="Azimuth span (°) of the delivered frame, left edge to right")
+    vfov: Field[float] = Field(79.5, access=Field.READ,
                               description="Elevation span (°) of the delivered frame, bottom row to top row")
     elevation_bottom: Field[float] = Field(-39.7, access=Field.READ,
                                           description="Elevation (°) of the frame's bottom row, at the camera")
     elevation_top: Field[float] = Field(39.7, access=Field.READ,
                                        description="Elevation (°) of the frame's top row, at the camera")
+    # These two ARE the row model — two numbers, and the four elevations above are derivable from
+    # them. Both are published because each consumer wants a different form: the stitch and the
+    # marks convert rows, the strip's window converts elevations.
     horizon_row: Field[float] = Field(0.5, access=Field.READ,
-                                     description="Normalised row (0 = top) of the horizon; may fall outside 0..1")
+                                     description="Normalised row (0 = top) of eye level; may fall outside 0..1 on a tilted camera")
     focal_rows: Field[float] = Field(0.72, access=Field.READ,
-                                    description="Focal length in frame heights: rows below the horizon = focal_rows · tan(depression)")
+                                    description="Focal length in frame heights — the scale of the tangent rows")
 
 
 class TrackerSettings(BaseSettings):

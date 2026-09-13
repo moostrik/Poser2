@@ -29,11 +29,11 @@ class SeamRenderer(LayerBase):
     places the picture through the same map at the same depth. So **band and pixels agree by
     construction at every depth**: a person whose pixels fall inside the red is a person that camera
     will not start, wherever they are standing. That is what makes it checkable against the image
-    anywhere rather than only at the focus diameter.
+    anywhere rather than only at the focus radius.
 
     **Its cost is the region where two bands overlap.** A person is born as long as **one** camera
-    accepts them, so nobody can be born only where both refuse: at Ø 2.7 the two bands do overlap on
-    the seam, and a person arriving exactly there is not picked up until they move. From about Ø 3
+    accepts them, so nobody can be born only where both refuse: at R 1.35 the two bands do overlap on
+    the seam, and a person arriving exactly there is not picked up until they move. From about R 1.5
     they no longer do. Each band's *outer* edge sits exactly on its camera's field edge, so the pair
     also delimits where the two pictures reach — no separate overlap fill is needed to show that.
 
@@ -101,5 +101,5 @@ class SeamRenderer(LayerBase):
         """A camera's own local angle to the strip x its pixels land on, at the focus depth — the
         stitch's own chain, which is what keeps a band on the columns it describes."""
         return camera_local_to_azimuth(local, cam_id, self._tracker.fov, self._target_fov,
-                                       max(0.0, self._tracker.rig.camera_diameter) / 2.0,
-                                       self._settings.focus_diameter)
+                                       max(0.0, self._tracker.rig.camera_radius),
+                                       self._settings.focus_radius)

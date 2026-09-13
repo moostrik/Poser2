@@ -43,7 +43,7 @@ class Compositor(LayerBase):
 
     **This class owns the strip's geometry**, and hands it down: the elevation window is derived
     once here and passed to whichever renderer needs it, so nothing can drift. `aspect_ratio` is
-    read by the render's row layout — change `tilt`, `fov` or `focus_diameter` and the row follows.
+    read by the render's row layout — change `tilt`, `fov` or `focus_radius` and the row follows.
 
     **What actually varies between the renderers is the DEPTH, not the space.** Both axes need an
     assumed distance to turn a camera's view into the centre's, and each renderer names its own for
@@ -52,13 +52,13 @@ class Compositor(LayerBase):
 
     | drawn thing                        | x              | y                  | depth |
     |------------------------------------|----------------|--------------------|-------|
-    | image (`StitchRenderer`)           | centre azimuth | centre elevation   | `focus_diameter` |
-    | dead zone (`SeamRenderer`)         | centre azimuth | — full height      | `focus_diameter` |
+    | image (`StitchRenderer`)           | centre azimuth | centre elevation   | `focus_radius` |
+    | dead zone (`SeamRenderer`)         | centre azimuth | — full height      | `focus_radius` |
     | lattice, seam + axis lines (`Grid`)| centre azimuth | —                  | **exact** |
-    | overlap verticals (`Grid`)         | centre azimuth | —                  | `parallax_diameter` |
+    | overlap verticals (`Grid`)         | centre azimuth | —                  | `parallax_radius` |
     | horizon, zone field (`Grid`)       | —              | centre elevation   | **exact** |
-    | mark + foot tick (`Observations`)  | centre azimuth | centre elevation   | x: `parallax_diameter`, y: **the person's own distance** |
-    | label (`LabelRenderer`)            | centre azimuth | pixel lane by id   | `parallax_diameter` |
+    | mark + foot tick (`Observations`)  | centre azimuth | centre elevation   | x: `parallax_radius`, y: **the person's own distance** |
+    | label (`LabelRenderer`)            | centre azimuth | pixel lane by id   | `parallax_radius` |
 
     The picture's depth so a band lands on the pixels it describes; the fusion depth so the azimuth
     never rides on a measured distance, and so the overlap verticals mark where a mark's field
@@ -116,9 +116,9 @@ class Compositor(LayerBase):
 
     @property
     def ring_radius(self) -> float:
-        """Half of `rig.camera_diameter`. The settings are all diameters, matching the doc's Ø
-        convention; every triangle below takes a radius, so the halving happens once, here."""
-        return max(0.0, self._tracker.rig.camera_diameter) / 2.0
+        """`rig.camera_radius`, clamped. Every setting, every triangle below and the shader's
+        `ringRadius` are all radii from the fixture axis, so nothing is converted here."""
+        return max(0.0, self._tracker.rig.camera_radius)
 
     @property
     def row_model(self) -> tuple[float, float]:
@@ -138,7 +138,7 @@ class Compositor(LayerBase):
     def elevation_window(self) -> tuple[float, float]:
         """(top, bottom) elevation of the strip, measured at the rig centre."""
         return elevation_window(self.populated_band, self.ring_radius,
-                                max(1e-6, self._settings.focus_diameter / 2.0))
+                                max(1e-6, self._settings.focus_radius))
 
     @property
     def aspect_ratio(self) -> float:
@@ -146,7 +146,7 @@ class Compositor(LayerBase):
 
         360 degrees of azimuth at the same focal as the tangent rows: a degree at the horizon is
         the same size either way, and the window's tangent span is the height. Nothing here is a
-        preference — `tilt`, `fov`, `frame_height` and `focus_diameter` all move it.
+        preference — `tilt`, `fov`, `frame_height` and `focus_radius` all move it.
         """
         return strip_aspect_ratio(self.elevation_window)
 
@@ -197,7 +197,7 @@ class Compositor(LayerBase):
             cam_fov=self._tracker.fov,
             target_fov=self.target_fov,
             ring_radius=self.ring_radius,
-            parallax_diameter=self._tracker.rig.parallax_diameter,
+            parallax_radius=self._tracker.rig.parallax_radius,
             camera_height=self._tracker.rig.camera_height,
             row_model=self.row_model,
             elevation_window=window,

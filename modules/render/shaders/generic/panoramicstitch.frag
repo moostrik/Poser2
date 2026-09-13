@@ -11,7 +11,7 @@
 //
 // BOTH AXES ARE RE-PROJECTED, and they have to be. A camera sits `ringRadius` out from the
 // centre, so it sees a point on the focus cylinder at a wider bearing AND a higher elevation
-// than the centre does — by the same factor, R/d, which is 1.19 straight ahead at Ø 4.5 and
+// than the centre does — by the same factor, R/d, which is 1.19 straight ahead at R 2.25 and
 // 1.08 at a seam. Re-projecting only the azimuth (which is all the tracker needs) would leave
 // everything in the strip 19% too tall for its width, and no single row aspect can undo that
 // because the factor varies across the frame.
@@ -40,7 +40,7 @@ uniform float horizonRow;  // the frames' rows are TANGENTS of elevation: row = 
 uniform float focalRows;   //   focalRows * tan(e), normalised, 0 = top (panorama_map.row_from_elevation)
 uniform float targetFov;   // the sector one camera owns, 360 / numCams (degrees)
 uniform float ringRadius;  // camera distance from the rig centre (m)
-uniform float focusRadius; // half the focus diameter: the cylinder the image is aligned for (m)
+uniform float focusRadius; // radius of the cylinder the image is aligned for (m), from the fixture axis
 uniform float elevTop;     // elevation of this strip's top row, at the centre (degrees)
 uniform float elevBottom;  // elevation of its bottom row, at the centre (degrees)
 uniform float camElevLo;   // the frames' window, at the camera (degrees): the bottom row is the

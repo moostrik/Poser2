@@ -185,14 +185,13 @@
         "dead_zone": 6.5,
         "link_angle": 15.0,
         "link_height": 25.0,
-        "hysteresis": 0.6,
-        "angles": {}
+        "hysteresis": 0.6
       },
       "rig": {
-        "camera_diameter": 0.72,
+        "camera_radius": 0.36,
         "camera_height": 0.5,
-        "zone_min_diameter": 3.0,
-        "zone_max_diameter": 7.0
+        "zone_min_radius": 1.5,
+        "zone_max_radius": 3.5
       }
     },
     "frame_sync": {},
@@ -759,7 +758,7 @@
         "labels"
       ],
       "blend": "MAX",
-      "focus_diameter": 4.2,
+      "focus_radius": 2.1,
       "grid_degrees": 10.0,
       "show_all_observations": true
     },

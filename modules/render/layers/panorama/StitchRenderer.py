@@ -20,7 +20,7 @@ class StitchRenderer(LayerBase):
     on top of each other at the azimuth each one claims. Right geometry: content in an overlap
     coincides. Wrong geometry: it ghosts, and *what* ghosts says *which* number is wrong.
 
-    **Depth.** The image is stitched for one assumed depth, `focus_diameter`, because a camera
+    **Depth.** The image is stitched for one assumed depth, `focus_radius`, because a camera
     0.36 m off centre genuinely sees a different bearing than its neighbour and only the distance
     to the subject resolves it. Nothing about a person feeds this — no box, no pose, no estimate —
     so nothing can fool it: the ghost at other depths is a known, bounded residual rather than a
@@ -65,8 +65,8 @@ class StitchRenderer(LayerBase):
             self._tracker.fov,
             self._row_model,
             self._target_fov,
-            max(0.0, self._tracker.rig.camera_diameter) / 2.0,
-            self._settings.focus_diameter,
+            max(0.0, self._tracker.rig.camera_radius),
+            self._settings.focus_radius,
             self._elevation_window,
             self._populated_band,
             int(self._settings.blend),

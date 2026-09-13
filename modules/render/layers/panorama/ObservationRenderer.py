@@ -38,7 +38,7 @@ class ObservationRenderer(LayerBase):
     the opaque one.
 
     A mark is the tracker's belief, not the picture: its x is `world_angle`, at the fixed
-    `parallax_diameter`, while the image under it is stitched for `focus_diameter`. So a line
+    `parallax_radius`, while the image under it is stitched for `focus_radius`. So a line
     generally sits beside its own pixels, by a constant that is the difference between those two
     depths and is not a measurement of anything. Its **rows** are the person's own distance, which
     is what the tick below depends on.
@@ -51,9 +51,9 @@ class ObservationRenderer(LayerBase):
       a decoration**. Because a mark's rows go through the person's own distance, the foot row is
       exactly `atan(camera_height / R)` below the horizon, which is the formula the grid's zone
       field is drawn from. So the tick and the yellow zone edges are directly comparable: **tape
-      Ø 3 and Ø 7 on the floor, stand on one, and the tick must land on that edge.** That is the
+      R 1.5 and R 3.5 on the floor, stand on one, and the tick must land on that edge.** That is the
       strip's one precise distance check, and it is why the rows are not on the parallax cylinder
-      with the x — there the tick would be 20 px out at Ø 3 and check nothing.
+      with the x — there the tick would be 20 px out at R 1.5 and check nothing.
     - **The field** around the line, same height, translucent, as wide as the tolerance that decides
       what this observation may be joined to: `seam.link_angle` where a second camera also sees it,
       `reacquire_angle` where none does (`marks._tolerance`). Read it as a **pair test** — two

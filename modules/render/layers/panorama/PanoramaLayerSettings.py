@@ -49,8 +49,8 @@ class PanoramaLayerSettings(BaseSettings):
                                      description="Which pieces of the display to draw")
     blend: Field[PanoramaBlend] = Field(PanoramaBlend.MAX,
                                         description="How overlapping cameras combine")
-    focus_diameter: Field[float] = Field(4.5, min=1.0, max=12.0, step=0.5,
-                                         description="Play-zone diameter (m) the image is stitched for — exact there, ghosts elsewhere")
+    focus_radius: Field[float] = Field(2.25, min=0.5, max=6.0, step=0.05,
+                                       description="Play-zone radius (m) the image is stitched for — exact there, ghosts elsewhere")
     grid_degrees: Field[float] = Field(10.0, min=1.0, max=90.0, step=1.0,
                                        description="Grid spacing (°), the same on both axes")
     tilt: Field[float] = Field(0.0, access=Field.INIT,
@@ -74,7 +74,7 @@ AXIS_COLOR:    tuple[float, float, float, float] = (0.0, 0.7, 1.0, 0.6)    # cam
 # columns and only the picture can be read against it.
 OVERLAP_COLOR:  tuple[float, float, float, float] = (1.0, 0.85, 0.0, 0.65)  # two cameras see it
 DEAD_ZONE_COLOR: tuple[float, float, float, float] = (1.0, 0.15, 0.1, 0.10)  # no births here
-# The tracked floor, as one band between the two diameters. The overlap's yellow, on purpose:
+# The tracked floor, as one band between the two radii. The overlap's yellow, on purpose:
 # together they say where the tracker works — the overlap bounds it in azimuth, the zone in
 # distance — and shape tells them apart, the overlap a pair of verticals and the zone a horizontal
 # field. Yellow also keeps both clear of the camera axes, which are the blue ones.

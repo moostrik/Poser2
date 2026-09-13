@@ -39,7 +39,7 @@ Calibrate in this order. Cameras first: everything else is tuned against the fra
      *The horizon check*.
    - **The metres**, last of the camera step and the only part needing a person to walk: turn
      `camera.tracker.foot_offset` until the label's `H` stops drifting as they walk out, then read
-     `H`'s value to check `rig.camera_height`. Tape confirms it: standing on Ø 3 or Ø 7, the mark's
+     `H`'s value to check `rig.camera_height`. Tape confirms it: standing on R 1.5 or R 3.5, the mark's
      foot tick must land on that edge of the zone field. See *Calibrating the metres*. Nothing in
      the show depends on this — only the readouts — so it may be deferred.
 2. **Playhead offset** — `light.playhead.pulse_offset`. Beam mode (IDLE is fine), one person stands
@@ -58,7 +58,7 @@ was); the flash on the first person at IDLE → INTRO; the sound on the beam.
 
 | step | settings | readout | passes when |
 |---|---|---|---|
-| 1 cameras | `fov`, `resolution`, `frame_height`, `tilt`, `lens_fov`, `lens_centre_x`, `lens_centre_y`, `camera.cam_N.readings.roll_offset`, `camera.tracker.rig.*`, `camera.tracker.seam.*`, `camera.tracker.reacquire_angle`, `camera.tracker.foot_offset` | the open log's `lens:` and `frame:` lines; `camera.mount.status`; the panorama row | lens errors as tabled; mount OK; overlaps coincide at head and knee height; tape on the horizon line; `H` flat as a person walks out, then their real height; standing on taped Ø 3 and Ø 7 the foot tick lands on that zone edge; one person crossing a seam keeps one id and two overlapping fields |
+| 1 cameras | `fov`, `resolution`, `frame_height`, `tilt`, `lens_fov`, `lens_centre_x`, `lens_centre_y`, `camera.cam_N.readings.roll_offset`, `camera.tracker.rig.*`, `camera.tracker.seam.*`, `camera.tracker.reacquire_angle`, `camera.tracker.foot_offset` | the open log's `lens:` and `frame:` lines; `camera.mount.status`; the panorama row | lens errors as tabled; mount OK; overlaps coincide at head and knee height; tape on the horizon line; `H` flat as a person walks out, then their real height; standing on taped R 1.5 and R 3.5 the foot tick lands on that zone edge; one person crossing a seam keeps one id and two overlapping fields |
 | 2 playhead | `light.playhead.pulse_offset` | beam mode, `beam_flash`; `/pose/N/playhead/offset` | flash on the person; offset reads 0 at the crossing |
 | 3 projection | `inout.osc_light_sender.projection_offset`, `.interlace` | projection mode, `pose_instrument` | static line on the person; single line on the wall |
 | 4 speakers | `inout.osc_sound_sender.speaker_offset` (0) | IDLE, Max voicing `/global/playhead` | sound follows the beam |
@@ -94,7 +94,7 @@ A person's bearing leaves the tracker as `Azimuth`; the playhead is an azimuth; 
 at an azimuth's strip position (`angle_to_strip_position`: azimuth / 360 × 3600 pixels); every
 angle Max receives is an azimuth.
 
-That formula is the whole of it at `camera_diameter = 0`. The cameras are **not** at the centre,
+That formula is the whole of it at `camera_radius = 0`. The cameras are **not** at the centre,
 though, so one term is added on top — and where that term's distance comes from is the next
 section.
 
@@ -109,37 +109,37 @@ it here**. The device tracker's box bottom sits below the feet, so the reading i
 cameras at a seam err in *opposite* directions, each pulling its bearing toward its own axis, so the
 disagreement doubles. Measured, for one person at the cam0/cam1 seam:
 
-| distance the correction uses | Ø 3 | Ø 4.5 | Ø 7 | worst |
+| distance the correction uses | R 1.5 | R 2.25 | R 3.5 | worst |
 |---|---|---|---|---|
 | none — no correction at all | 23.1° | 14.5° | 9.0° | 23.1° |
 | the measured one, reading ~50% short | 16.5° | 11.6° | 7.8° | 16.5° |
-| **a fixed assumed depth, Ø 4.2** | **6.7°** | **~1°** | **6.0°** | **6.7°** |
+| **a fixed assumed depth, R 2.1** | **6.7°** | **~1°** | **6.0°** | **6.7°** |
 | a perfect per-person distance | 0° | 0° | 0° | 0° |
 
 A real body's *own* seam disagreement — one camera on the chest, the other on a shoulder — is
-5.9° / 2.3° / 0.85° at those diameters. So a fixed depth already sits at the irreducible floor,
+5.9° / 2.3° / 0.85° at those radii. So a fixed depth already sits at the irreducible floor,
 while the number we can actually measure costs about 10° more than assuming one. The bias could be
 calibrated away; the per-person **variance** could not, because a detector's box bottom is not a
 physical landmark.
 
-So the tracker assumes one depth, **`camera.tracker.rig.parallax_diameter`** — derived, never set:
-the tracked zone's *harmonic* mean (`2·min·max/(min+max)` = Ø 4.2 for Ø 3 – Ø 7), because the
+So the tracker assumes one depth, **`camera.tracker.rig.parallax_radius`** — derived, never set:
+the tracked zone's *harmonic* mean (`2·min·max/(min+max)` = R 2.1 for R 1.5 – R 3.5), because the
 correction's term is linear in `1/d` and the minimax of that over an interval sits at the midpoint
-of `1/d`. It is exact at Ø 4.2 and bounded by 6.7° everywhere in the zone.
+of `1/d`. It is exact at R 2.1 and bounded by 6.7° everywhere in the zone.
 
 **Consequences worth holding onto:**
 - **Nothing behavioural is in metres.** The chain is `fov`, `tilt`, the lens, the frame → a local
   angle → one assumed depth → an azimuth, and every fusion gate is in degrees or percent. The
-  metres that remain (`camera_diameter`, `camera_height`, the zone) are tape measurements and
+  metres that remain (`camera_radius`, `camera_height`, the zone) are tape measurements and
   declarations, never derived from a detector.
 - **The box bottom cannot move a bearing.** Drag it 30% of the frame height and the azimuth is
   unchanged to nine decimals; only the reported metres move.
-- **The guarantee is the zone's.** Outside Ø 3 – Ø 7 the residual keeps growing (7.1° at Ø 8, 8.5°
-  at Ø 10, 10.1° at Ø 14, 11.7° at Ø 2.5) and nothing filters on distance, so a far person crossing
+- **The guarantee is the zone's.** Outside R 1.5 – R 3.5 the residual keeps growing (7.1° at R 4, 8.5°
+  at R 5, 10.1° at R 7, 11.7° at R 1.25) and nothing filters on distance, so a far person crossing
   a seam can still split. Not a regression — today they are worse everywhere — but the zone is now
   load-bearing and should be taped honestly.
-- **`seam.link_angle` has to cover this plus the body**: 12.6° at Ø 3, ~3° at Ø 4.5, 6.9° at Ø 7.
-  Those are two worst cases summed, and at Ø 3 the overlap is only 9.4° wide, so it bites within
+- **`seam.link_angle` has to cover this plus the body**: 12.6° at R 1.5, ~3° at R 2.25, 6.9° at R 3.5.
+  Those are two worst cases summed, and at R 1.5 the overlap is only 9.4° wide, so it bites within
   about 5° of a seam. See *Linking on a seam*.
 
 ### Direction
@@ -361,43 +361,43 @@ bearing error it has under the shared lens. Unit F124's optical centre sits 24 p
 centre, so it keeps 1.4° at its azimuth zero; the other three are within 0.6°. Re-read the numbers
 only after a lens or a unit is replaced.
 
-The tracker's other constants, under `camera.tracker.rig`: `camera_diameter` (**Ø 0.72 m** — a
-diameter, like every figure here, so twice the 0.36 m each lens sits out), `camera_height`
-(0.50 m), and the tracked zone `zone_min_diameter` / `zone_max_diameter` (Ø 3 – Ø 7). The first two
+The tracker's other constants, under `camera.tracker.rig`: `camera_radius` (**R 0.36 m** — how far
+each lens sits from the fixture axis, like every figure here), `camera_height`
+(0.50 m), and the tracked zone `zone_min_radius` / `zone_max_radius` (R 1.5 – R 3.5). The first two
 are **measured with a tape**, the zone is **decided and then taped**; none is tuned. Plus `seam.*`
 (handover in the overlap). There is no distortion correction and no person-height assumption: the
 projection is fixed in the warp, and distance comes off the floor plane.
 
 ### Tilt — derived from the build
 
-`tilt` is derived, not set by eye, from the lens height, the ring radius and the **Ø 2.7 m** inner
+`tilt` is derived, not set by eye, from the lens height, the ring radius and the **R 1.35 m** inner
 circle (site decision).
 
 The reference person is **1.8 m**, with an overhead fingertip reach of **2.2 m** — raised arms are
-content the pose reads. On the Ø 2.7 m circle, on a camera's axis, they stand 0.99 m from the lens,
+content the pose reads. On the R 1.35 m circle, on a camera's axis, they stand 0.99 m from the lens,
 which puts their fingertips at +59.8°, head at +52.7° and feet at −26.8°. A camera aimed up by
 `tilt` sees from `tilt − 39.2°` to `tilt + 41.3°` on its centre column (P800 with the shared lens;
 35.1° and 37.3° at P720 — the sensor's own vertical field, which the frame delivers in full at the
-derived `frame_height`); fitting fingertips *and* feet at Ø 2.7 would need 120° of it, against
+derived `frame_height`); fitting fingertips *and* feet at R 1.35 would need 120° of it, against
 80°. So the tilt is a trade, and **it is resolved in favour of the top**: losing the feet degrades
 the distance estimate (it extrapolates the box bottom), losing the arms loses a gesture outright.
 
-**The rule:** the feet are in frame from **Ø 3.0 m** — the inner edge of the calibrated play zone
-(Ø 3 – Ø 7) — and all remaining room goes to headroom.
+**The rule:** the feet are in frame from **R 1.5 m** — the inner edge of the calibrated play zone
+(R 1.5 – R 3.5) — and all remaining room goes to headroom.
 
 | `resolution` | sensor field | tilt | fingertips from | head from | feet from |
 |---|---|---|---|---|---|
-| **P800** | 79.4° | 13 | Ø 3.31 | Ø 2.70 | Ø 2.71 |
-| | | **16** ← use | Ø 3.04 | Ø 2.49 | **Ø 3.00** |
-| | | 18 | Ø 2.87 | Ø 2.36 | Ø 3.23 |
-| | | 20 | Ø 2.71 | Ø 2.24 | Ø 3.51 |
-| **P720** | 71.4° | **12** ← use | Ø 3.81 | Ø 3.08 | **Ø 3.00** |
-| | | 14 | Ø 3.60 | Ø 2.92 | Ø 3.23 |
-| | | 16 | Ø 3.40 | Ø 2.77 | Ø 3.51 |
+| **P800** | 79.4° | 13 | R 1.655 | R 1.35 | R 1.355 |
+| | | **16** ← use | R 1.52 | R 1.245 | **R 1.5** |
+| | | 18 | R 1.435 | R 1.18 | R 1.615 |
+| | | 20 | R 1.355 | R 1.12 | R 1.755 |
+| **P720** | 71.4° | **12** ← use | R 1.905 | R 1.54 | **R 1.5** |
+| | | 14 | R 1.8 | R 1.46 | R 1.615 |
+| | | 16 | R 1.7 | R 1.385 | R 1.755 |
 
 P720 needs less tilt because its field is 8° narrower, so the feet run out of frame sooner — and
-the feet are what the rule pins. P720 cannot reach the Ø 2.7 inner circle at any tilt: head
-clipping inside about Ø 3.1 is expected there, not a fault. Beyond 16° at P800 each extra degree
+the feet are what the rule pins. P720 cannot reach the R 1.35 inner circle at any tilt: head
+clipping inside about R 1.55 is expected there, not a fault. Beyond 16° at P800 each extra degree
 costs more feet than it gains reach.
 
 **The table is on-axis, and the reach falls toward the seams.** The sensor's top edge lifts by
@@ -405,16 +405,16 @@ less than the tilt off axis, so what a camera sees at tilt 16 (P800, the shared 
 
 | bearing off the camera axis | top | bottom | fingertips from | head from | feet from |
 |---|---|---|---|---|---|
-| 0° (axis) | 56.3° | −24.3° | Ø 3.0 | Ø 2.5 | Ø 2.9 |
-| 30° | 53.8° | −24.6° | Ø 3.2 | Ø 2.6 | Ø 2.9 |
-| 45° (seam) | 50.5° | −24.9° | Ø 3.5 | Ø 2.9 | Ø 2.9 |
-| 63.5° (frame edge) | 44.1° | −25.3° | Ø 4.2 | Ø 3.4 | Ø 2.8 |
+| 0° (axis) | 56.3° | −24.3° | R 1.5 | R 1.25 | R 1.45 |
+| 30° | 53.8° | −24.6° | R 1.6 | R 1.3 | R 1.45 |
+| 45° (seam) | 50.5° | −24.9° | R 1.75 | R 1.45 | R 1.45 |
+| 63.5° (frame edge) | 44.1° | −25.3° | R 2.1 | R 1.7 | R 1.4 |
 
-The feet rule holds all round; the overhead reach is a four-leaf pattern, Ø 3.0 on the axes and
-Ø 3.5 at the seams. That is the mount, the same in any projection or frame height: a shorter frame
+The feet rule holds all round; the overhead reach is a four-leaf pattern, R 1.5 on the axes and
+R 1.75 at the seams. That is the mount, the same in any projection or frame height: a shorter frame
 can only equalise it by cutting the middle. The frame delivers all of it at the full-reach
 `frame_height` (1152 rows at P800 and tilt 16); at the sensor's own 800 rows the tangent rows would
-cap the top at 43.7° everywhere — fingertips from Ø 4.2, head from Ø 3.4 — which is why the frame
+cap the top at 43.7° everywhere — fingertips from R 2.1, head from R 1.7 — which is why the frame
 is taller than the sensor.
 
 ### What the horizontal field allows
@@ -424,22 +424,22 @@ P720 and P800 — decides whether they are inside any camera's sector at all. It
 **seams**, where a person is 45° off both neighbouring axes. Because each camera sits 0.36 m out
 from the centre, its 127° covers less of the room as measured from the centre, worst up close:
 
-| Ø | one camera's azimuth span | overlap at each seam |
+| R | one camera's azimuth span | overlap at each seam |
 |---|---|---|
-| 2.0 m | 89.4° | **−0.6°** — the sectors do not meet |
-| 2.7 m | 99.4° | +9.4° |
-| 3.0 m | 102.2° | +12.2° |
-| 4.5 m | 110.5° | +20.5° — the panorama's focus depth |
-| 7.0 m | 116.4° | +26.4° |
+| 1.0 m | 89.4° | **−0.6°** — the sectors do not meet |
+| 1.35 m | 99.4° | +9.4° |
+| 1.5 m | 102.2° | +12.2° |
+| 2.25 m | 110.5° | +20.5° — the panorama's focus depth |
+| 3.5 m | 116.4° | +26.4° |
 
-- **Ø 2.03 m** — a seam person's centre enters one camera. Below it they are in the gap and
-  invisible, which is why **Ø 2.0 m is the hard floor**: a consequence of the ring radius, not a
+- **R 1.015 m** — a seam person's centre enters one camera. Below it they are in the gap and
+  invisible, which is why **R 1 m is the hard floor**: a consequence of the ring radius, not a
   choice.
-- **Ø 3.53 m** — a whole body (50 cm shoulders) fits inside one camera. Between the two, a seam
+- **R 1.765 m** — a whole body (50 cm shoulders) fits inside one camera. Between the two, a seam
   person is cut on one side in each camera and the box centre leans toward the visible side, ≈3°
-  at Ø 2.7 m — a wobble at the handover, not a failure.
+  at R 1.35 m — a wobble at the handover, not a failure.
 
-On a camera's own axis the horizontal field never binds (a whole body fits from Ø 0.97 m), so these
+On a camera's own axis the horizontal field never binds (a whole body fits from R 0.485 m), so these
 are purely seam properties.
 
 ### Reading the panorama
@@ -467,10 +467,10 @@ image right and marks wrong means the distance model, not the camera.
 
 **A mark is the tracker's belief, not the picture, and its two axes use two depths on purpose.** Its
 **x** is the fused `world_angle` — the number the light, the sound and the hit detector all receive
-— which the tracker derives at `rig.parallax_diameter` (Ø 4.2), never from a person's measured
+— which the tracker derives at `rig.parallax_radius` (R 2.1), never from a person's measured
 distance; the tolerance field follows x onto that cylinder. Its **rows** go through the person's own
 distance instead, which is what makes the foot tick exact against the zone field (*Two axes, and the
-depth that varies*). The image under it is stitched at `focus_diameter` (Ø 4.5), so a line sits a
+depth that varies*). The image under it is stitched at `focus_radius` (R 2.25), so a line sits a
 small **constant** distance from its own pixels — a chosen consequence of deriving the parallax
 depth from the zone rather than from a render slider, not a fault.
 
@@ -479,8 +479,8 @@ The strip asks four questions, and reading them in order says which number to re
 | what you read | what it tests |
 |---|---|
 | the two pictures coincide in an overlap | the lens and the mount — `lens_fov`, `fov`, `tilt`, roll |
-| standing on taped Ø 3 and Ø 7, a mark's **foot tick** lands on that edge of the yellow field | the distance chain end to end: `rig.camera_height`, the zone's own diameters, and `foot_offset`. The only metres on the strip, and exact — see *Calibrating the metres* |
-| the **gap** between two lines of one colour at a seam | how far that person is from Ø 4.2 — a **depth indicator**, not an error. Zero on the cylinder, up to 6.7° at the zone's edges. A gap *larger* than that is the azimuth chain: `fov`, `tilt`, `camera_diameter` |
+| standing on taped R 1.5 and R 3.5, a mark's **foot tick** lands on that edge of the yellow field | the distance chain end to end: `rig.camera_height`, the zone's own radii, and `foot_offset`. The only metres on the strip, and exact — see *Calibrating the metres* |
+| the **gap** between two lines of one colour at a seam | how far that person is from R 2.1 — a **depth indicator**, not an error. Zero on the cylinder, up to 6.7° at the zone's edges. A gap *larger* than that is the azimuth chain: `fov`, `tilt`, `camera_radius` |
 | whether two fields of one colour overlap | the linking rules — the tracker will join exactly the pairs whose fields touch |
 
 A **line, not a box**: the box's width said nothing its azimuth does not. Its bottom end carries the
@@ -502,17 +502,17 @@ on its own line.
 | a constant sideways offset across the whole overlap | `lens_fov` (the lens, not `fov`, which is the frame's span) |
 | a residual on one camera's seams only | that unit's `lens_error` — the shared lens's residual; F124 is expected to show ≈ 1.4° |
 | a residual growing toward the frame edges on every camera | the lens is not equidistant after all — re-read the calibrations |
-| two lines in one colour, side by side on a seam, opening and closing as they walk | nothing — that is the depth indicator; it closes at Ø 4.2 and opens to 6.7° at the zone's edges |
-| two lines in one colour further apart than 6.7°, anywhere | the azimuth chain — `fov`, `tilt` or `camera_diameter` |
-| every line sits the same small distance beside its own pixels | nothing — the image is stitched at Ø 4.5 and the marks at Ø 4.2 (see above) |
+| two lines in one colour, side by side on a seam, opening and closing as they walk | nothing — that is the depth indicator; it closes at R 2.1 and opens to 6.7° at the zone's edges |
+| two lines in one colour further apart than 6.7°, anywhere | the azimuth chain — `fov`, `tilt` or `camera_radius` |
+| every line sits the same small distance beside its own pixels | nothing — the image is stitched at R 2.25 and the marks at R 2.1 (see above) |
 | the lines coincide but the primary still jumps at the seam | `camera.tracker.seam.hysteresis` |
 
-The image is stitched for one assumed depth, `render.panorama.focus_diameter` — **Ø 4.5 m**, the
-middle of the play zone. It is exact there and ghosts by a bounded amount elsewhere (+3.9° at Ø 3,
-−2.5° at Ø 7), so judge alignment with someone near the middle of the room. Nothing about a person
+The image is stitched for one assumed depth, `render.panorama.focus_radius` — **R 2.25 m**, the
+middle of the play zone. It is exact there and ghosts by a bounded amount elsewhere (+3.9° at R 1.5,
+−2.5° at R 3.5), so judge alignment with someone near the middle of the room. Nothing about a person
 feeds the image, so nothing can fool it — and since the change that took the measured distance
 out of the azimuth, nothing about a person feeds the *marks* either. Both now assume a depth; they
-just assume slightly different ones, Ø 4.5 and Ø 4.2, for reasons each section gives.
+just assume slightly different ones, R 2.25 and R 2.1, for reasons each section gives.
 
 ### Two axes, and the depth that varies
 
@@ -528,19 +528,19 @@ turn a camera's view into the centre's, and each thing drawn names its own, for 
 
 | drawn thing | x | y | depth |
 |---|---|---|---|
-| image (`image`) | centre azimuth | centre elevation | `focus_diameter` |
-| dead zone (`seams`) | centre azimuth | — full height | `focus_diameter` |
+| image (`image`) | centre azimuth | centre elevation | `focus_radius` |
+| dead zone (`seams`) | centre azimuth | — full height | `focus_radius` |
 | lattice, seam + axis lines (`grid`) | centre azimuth | — | **exact** |
-| overlap verticals (`grid`) | centre azimuth | — | `parallax_diameter` |
+| overlap verticals (`grid`) | centre azimuth | — | `parallax_radius` |
 | horizon, zone field (`grid`) | — | centre elevation | **exact** |
-| mark + foot tick (`observations`) | centre azimuth | centre elevation | x: `parallax_diameter` · y: **the person's own distance** |
-| label (`labels`) | centre azimuth | pixel lane by id | `parallax_diameter` |
+| mark + foot tick (`observations`) | centre azimuth | centre elevation | x: `parallax_radius` · y: **the person's own distance** |
+| label (`labels`) | centre azimuth | pixel lane by id | `parallax_radius` |
 
 **The rule: two things on the strip are comparable only if they share an axis *and* a depth.** Every
 misalignment this display has had was a pair that shared the axis and not the depth — the overlap
 line 2.3° from where a mark's field actually switched, the marks beside their own pixels, the foot
 tick 20 px off its own zone line. None was an axis confusion. In the code the depth parameter of
-the shared functions is therefore called `depth_diameter` / `depth_radius`, never after any one
+the shared functions is therefore called `depth_radius`, never after any one
 caller's depth; `elevation_window` is the exception, because it is the strip's *single* y scale and
 moves everything on it together.
 
@@ -552,11 +552,11 @@ picture through the same map, and the **foot tick** is exact against the zone fi
 through the person's own distance makes the lens height cancel algebraically
 (`atan(tan(−atan(h/d))·d/R) = atan(−h/R)`, the zone line's own formula).
 
-- **The overlap**, `seam.angles.overlap` wide (**31.0°** on this rig), symmetric about each seam.
+- **The overlap**, `rig.overlap` wide (**31.0°** on this rig), symmetric about each seam.
   Nothing tunable, and read it as one thing only: **exactly where a mark's tolerance field changes
   width**, from `seam.link_angle` inside to `reacquire_angle` outside. It is `angle_in_overlap`'s
   own threshold — a *local* angle of 28.3°, derived at the zone's far edge so the flag never
-  under-reports — projected at `rig.parallax_diameter`, the depth the marks are drawn at. That
+  under-reports — projected at `rig.parallax_radius`, the depth the marks are drawn at. That
   projection is the whole point: a local angle has no single position on the ring, and the same
   threshold drawn at the far edge instead would land 2.3° away, where nothing happens.
 
@@ -564,19 +564,19 @@ through the person's own distance makes the lens height cancel algebraically
   - *not* the azimuth two cameras geometrically share at that depth — that is 19.4°, and the line
     is wider because the flag is deliberately generous (too wide costs nothing, too narrow splits
     a person);
-  - *not* where the two **pictures** meet, which is 20.5° at Ø 4.5 and which the frames show for
+  - *not* where the two **pictures** meet, which is 20.5° at R 2.25 and which the frames show for
     themselves. So the yellow lines sit outside the visible overlap, on purpose.
 
-  It goes to zero below about Ø 2.0, where the sectors stop meeting at all (the table under *What
+  It goes to zero below about R 1, where the sectors stop meeting at all (the table under *What
   the horizontal field allows*), and the lines then vanish — no threshold, nothing to mark.
-- **The tracked zone**, a translucent field between `rig.zone_min_diameter` and
-  `rig.zone_max_diameter`, at the depressions they subtend at the rig centre,
-  `atan(camera_height / R)` — Ø 3 is −18.4° and Ø 7 is −8.1°. A floor circle of constant radius is
+- **The tracked zone**, a translucent field between `rig.zone_min_radius` and
+  `rig.zone_max_radius`, at the depressions they subtend at the rig centre,
+  `atan(camera_height / R)` — R 1.5 is −18.4° and R 3.5 is −8.1°. A floor circle of constant radius is
   a constant depression, so the zone is a band of rows, the same at every azimuth. **Tape the two
   circles on the floor and they must land on the field's two edges.** It is also what a person's
   mark is read against: a mark's line ends at the foot row, so someone inside the zone has that end
   inside the field. The field is clipped to the strip's window, and the clipping means something —
-  at the studio preset it runs off the bottom, because the window bottom is −17.1° against Ø 3's
+  at the studio preset it runs off the bottom, because the window bottom is −17.1° against R 1.5's
   −18.4° (the strip shows less than the frames do: `elevation_window` takes the band at its
   tightest column so no column fades to black). A fill that runs off the edge says *continues past
   here*, which a line pinned to the boundary row could not.
@@ -584,9 +584,9 @@ through the person's own distance makes the lens height cancel algebraically
   start a new person. It is a band in image space because the rule reads the raw local angle —
   literally the image column — and the stitch places the picture through the same map, so band and
   pixels agree **by construction at every depth**. That is what makes it checkable against the
-  image anywhere rather than only at the focus diameter. A person is born as long as **one** camera
+  image anywhere rather than only at the focus radius. A person is born as long as **one** camera
   accepts them, so the region where nobody can be born is where two red bands **overlap**: at
-  Ø 2.7 they do, on the seam; from about Ø 3 they no longer do.
+  R 1.35 they do, on the seam; from about R 1.5 they no longer do.
 
 The link tolerance is deliberately *not* a zone here — it is a property of a pair of observations,
 not of a place — so it is drawn as a field around each mark instead. See *Linking on a seam*.
@@ -602,8 +602,8 @@ this procedure assumes; the others are second opinions on the same seam:
 | `SPLIT` | **which way** it is wrong — one camera to red, the other to green; the leading fringe is the left camera |
 | `STRIPE` | alternating columns, so a straight edge zigzags. Blind to exposure differences — use it when the two cameras disagree on brightness |
 
-**A free check of the whole azimuth chain:** at Ø 4.5 m each camera should span **110.5°** of the
-strip, not 127°. Set `camera.tracker.rig.camera_diameter` to 0 and every image should snap to
+**A free check of the whole azimuth chain:** at R 2.25 m each camera should span **110.5°** of the
+strip, not 127°. Set `camera.tracker.rig.camera_radius` to 0 and every image should snap to
 exactly 127° with 37° overlaps. It is a live slider, so this exercises the entire geometry in two
 drags.
 
@@ -628,7 +628,7 @@ would inherit both problems. So the link is decided on the one number the panora
 **How far apart two honest sightings can be.** The two cameras see different parts of a body, and
 the disagreement is the body's own width re-projected — it shrinks with distance:
 
-| what the two cameras disagree about | Ø 3 | Ø 4.5 | Ø 7 |
+| what the two cameras disagree about | R 1.5 | R 2.25 | R 3.5 |
 |---|---|---|---|
 | a torso (one camera on the chest, the other on a shoulder) | 5.9° | 2.3° | 0.85° |
 | one arm held out sideways | 15.1° | 6.1° | 2.4° |
@@ -637,13 +637,13 @@ the disagreement is the body's own width re-projected — it shrinks with distan
 price of correcting the azimuth at one assumed depth rather than per person (*Why the azimuth does
 not use the measured distance*). Both are worst cases, so summing them is conservative:
 
-| | Ø 3 | Ø 4.5 | Ø 7 |
+| | R 1.5 | R 2.25 | R 3.5 |
 |---|---|---|---|
 | body, arms down | 5.9° | 2.3° | 0.85° |
-| parallax residual at Ø 4.2 | 6.7° | ~1° | 6.0° |
+| parallax residual at R 2.1 | 6.7° | ~1° | 6.0° |
 | **budget** | **12.6°** | **~3°** | **6.9°** |
 
-At Ø 3 the overlap is only 9.4° wide, so the inner figure bites within about 5° of a seam. **Set it
+At R 1.5 the overlap is only 9.4° wide, so the inner figure bites within about 5° of a seam. **Set it
 from the display**: one person crossing a seam should keep two overlapping fields of one colour with
 their arms down, and two people a metre apart should not overlap at all. A value that once looked
 loose may simply have been paying for the residual honestly.
@@ -660,25 +660,25 @@ mid-air, so the height is never allowed to refuse a link the azimuth supports.
 **Nothing here is distance-based — not the gates, and not the azimuth either.** Every fusion
 decision reads the raw local angle or a world azimuth corrected at one assumed depth; the measured
 distance reaches none of them. The reason is one asymmetry, and it applies twice over. The overlap
-band is derived at the zone's **far** edge rather than per person: someone truly at Ø 7, standing
-27° in from their camera's field edge, is inside the Ø 7 band (28.3° of local angle) and gets a
-cross-camera link attempt, where a band computed from a distance reading Ø 4.5 would be 22.8°, the
+band is derived at the zone's **far** edge rather than per person: someone truly at R 3.5, standing
+27° in from their camera's field edge, is inside the R 3.5 band (28.3° of local angle) and gets a
+cross-camera link attempt, where a band computed from a distance reading R 2.25 would be 22.8°, the
 flag would come out false, and they would become **two people** at the seam. Too wide costs nothing
 — `_find_world_candidate` runs and finds no partner within `link_angle`. Too narrow splits a person.
 The same asymmetry keeps the link in degrees rather than metres, and (see the azimuth section) kept
 the distance out of the parallax correction, where a 50%-short reading was manufacturing 11.6° of
-seam disagreement at Ø 4.5.
+seam disagreement at R 2.25.
 
 One residual is visible and worth knowing: because a threshold on an image column cannot be a fixed
 azimuth at every depth, a mark's field still widens about **4.8° before** the two pictures overlap
-at Ø 4.5 — down from 12.3° when the band was the infinite-distance one, and exactly 0 at Ø 7 where
+at R 2.25 — down from 12.3° when the band was the infinite-distance one, and exactly 0 at R 3.5 where
 it is derived.
 
 **What the dead zone costs, stated rather than fixed.** A person arriving on a seam inside about
-Ø 3 sits within `dead_zone` of *both* field edges and is not picked up until they move (the two red
+R 1.5 sits within `dead_zone` of *both* field edges and is not picked up until they move (the two red
 bands overlap there — see *Three coordinate systems*). That is chosen: half a person tracked from
-one frame edge is worse than no person, and the play zone starts at Ø 2.7 for the separate reason
-that the sectors stop meeting at Ø 2.0.
+one frame edge is worse than no person, and the play zone starts at R 1.35 for the separate reason
+that the sectors stop meeting at R 1.0.
 
 **The rule is drawn around the mark it governs.** Each observation's line sits inside a translucent
 field of its own colour, the same height as the line, as wide as the tolerance that decides what
@@ -712,7 +712,7 @@ can be checked against the number that produced it.
 
 The green line is elevation 0: the level plane at lens height, 0.50 m. Anything at that height
 lands on it at *any* distance — the parallax correction scales elevations, and zero stays zero —
-so it is the one row in the panorama that is exact everywhere, not only at the focus diameter.
+so it is the one row in the panorama that is exact everywhere, not only at the focus radius.
 It is also the zero the tracker measures distance from (see *The tracker's distance*).
 
 **Tape at 50 cm on the wall in front of each camera** and read it against the line:
@@ -767,17 +767,17 @@ and published as read-only fields under `camera.tracker.rig` (`horizon_row`, `fo
 
 - **It cannot see nearer than the picture reaches.** At the recommended tilt — 16° at P800 or 12° at
   P720 — the lowest row with picture is 23.7° below the horizon: 1.14 m from the lens, which is
-  the Ø 3.0 m feet rule by construction. Anyone closer has their feet in the empty band and reads
+  the R 1.5 m feet rule by construction. Anyone closer has their feet in the empty band and reads
   ≈1.14 m however close they stand. A limit, not a fault.
 - **It is weak at range.** Each degree of horizon error moves the reading by ≈0.15 m at 2 m,
   ≈0.9 m at 5 m, ≈1.7 m at 7 m. A tripod within ±1° still leaves roughly ±1 m at the far wall.
 
 **The reading is clamped, and the clamp is derived from the tracked zone** rather than hardcoded:
-`zone_min_diameter/2 − ring` to `zone_max_diameter/2 + ring`, the on-axis extremes, which is
+`zone_min_radius/2 − ring` to `zone_max_radius/2 + ring`, the on-axis extremes, which is
 **1.14 m to 3.86 m** on this rig. A **guard, not a filter** — nothing is rejected for falling
 outside, only the reading is pinned — because the denominator can go to almost nothing (feet a
 pixel below the horizon would read as infinitely far) and the device extrapolates boxes far below
-the frame (reads as zero). Being derived means it follows a change of `camera_diameter` instead of
+the frame (reads as zero). Being derived means it follows a change of `camera_radius` instead of
 silently going wrong, which the two hand-computed constants it replaced would have.
 
 **The box bottom is not the feet, and `camera.tracker.foot_offset` is the correction.** The device
@@ -858,13 +858,13 @@ Don't read the absolute value yet; only the flatness.
 reach in metres and nothing else can be moving it. If a known 1.80 m person reads 1.65, the lens
 height is out by the same factor — remeasure it rather than tuning `H` back.
 
-**Absolute confirmation, with tape.** Tape the Ø 3 and Ø 7 circles and stand on each: the mark's
+**Absolute confirmation, with tape.** Tape the R 1.5 and R 3.5 circles and stand on each: the mark's
 **foot tick** must land on that edge of the yellow zone field. This is exact, not approximate —
 going through the person's own distance makes the lens height cancel
 (`atan(tan(−atan(h/d))·d/R) = atan(−h/R)`), which is literally the formula the zone edge is drawn
 from, so the two are the same kind of number to the pixel. `R` on the label should read the taped
-radius at the same time (it is a **radius** where the zone is a **diameter** — half of Ø 7 is 3.5),
-and the azimuth should not have moved through any of it.
+distance at the same time — **the same number** as `rig.zone_max_radius` and the footer's `zone`,
+with nothing to convert — and the azimuth should not have moved through any of it.
 
 `foot_offset` is a fraction of frame height and a property of the **detector**, so it travels with
 the detector and not the room; it scales with `resolution` like `min_height` does
@@ -1017,14 +1017,14 @@ hit, the sound and both screen views are self-consistent.
   every frame or tilt change, where in metres it would say what it means, "at least a 1 m person".
   Not changed yet, because it is a tuned value and swapping its unit is a rig session.)
 - **`seam.link_angle` is loose at 18°.** It has to be, until the fields have been read on the
-  rig. Shrink it until one person's two fields still overlap with their arms down at Ø 7 — the body
+  rig. Shrink it until one person's two fields still overlap with their arms down at R 3.5 — the body
   table in *Linking on a seam* says 8° should be enough — and two people a metre apart do not
   overlap at all.
-- **The zone's own two diameters are declared, not measured.** `rig.zone_min_diameter` /
-  `zone_max_diameter` (Ø 3 – Ø 7) now decide the overlap band and the distance clamp, so they are
+- **The zone's own two radii are declared, not measured.** `rig.zone_min_radius` /
+  `zone_max_radius` (R 1.5 – R 3.5) now decide the overlap band and the distance clamp, so they are
   load-bearing rather than documentation. Tape both circles on the floor and check them against the
   yellow field's edges; the near one is currently below what the strip can show at P720 / tilt 15,
-  so the field runs off the bottom there and Ø 3 has to be judged in the camera frames instead. If the room's
+  so the field runs off the bottom there and R 1.5 has to be judged in the camera frames instead. If the room's
   usable area turns out different, change these rather than anything derived from them.
 - **The panorama counts the black arch as covered.** The stitch culls by the frame's window (the
   centre column's reach), not per column, so in the top corners of a camera's field the comparing
@@ -1096,31 +1096,37 @@ hit, the sound and both screen views are self-consistent.
 
 ## Site facts
 
+**`R` is a radius from the fixture axis**, because that is where everything here is built and taped
+from, and it is what the settings, the panorama's footer and a mark's `R` all carry — one number, no
+halving. The only `Ø` left in this document is the `fixture:` line's own hardware: a ring or a tube
+is described by its cross-section, as its supplier does, and converting those to radii would make
+the doc harder to check against the parts, not easier. Leave them.
+
     reference:        the connection side of the cube                            (site fact)
     direction:        counter-clockwise seen from above                          (site fact)
     azimuth 0:        the centre of the connection side                          (rule — follows from the cameras)
     cameras:          on the corners, 15 cm beyond the cube, pointing diagonally;
                       camera 0 at the corner counter-clockwise of the connection
-                      side, then counter-clockwise; camera Ø 0.72, height 0.50 m  (rule; taped)
+                      side, then counter-clockwise; camera R 0.36, height 0.50 m  (rule; taped)
     speakers:         parallel to the faces, 10 cm off, pointing out; speaker 0
                       on the connection side, then counter-clockwise             (rule)
-    play zone:        Ø 2.7 m to Ø 7 m; hard floor Ø 2.0 m                        (site decision)
-    tracked zone:     Ø 3 – Ø 7 = rig.zone_*; drives the overlap band and the
+    play zone:        R 1.35 m to R 3.5 m; hard floor R 1 m                        (site decision)
+    tracked zone:     R 1.5 – R 3.5 = rig.zone_*; drives the overlap band and the
                       distance clamp. THREE notions in this doc: the play zone
-                      (Ø 2.7 – Ø 7), the hard floor (Ø 2.0) and this, the
+                      (R 1.35 – R 3.5), the hard floor (R 1) and this, the
                       calibrated span, which is the one the code acts on  (site decision)
-    panorama focus:   Ø 4.5 m
+    panorama focus:   R 2.25 m
     seam overlap:     the FLAG is 28.3° of local angle, taken at the zone's far
                       edge so it never under-reports; drawn as 31.0° of azimuth
                       at the parallax depth, which is where a mark's field
-                      switches. The two cameras' pictures share 20.5° at Ø 4.5,
-                      9.4° at Ø 2.7, none by Ø 2.0 — a different number, and the
+                      switches. The two cameras' pictures share 20.5° at R 2.25,
+                      9.4° at R 1.35, none by R 1 — a different number, and the
                       one the frames show                                       (derived)
-    parallax depth:   Ø 4.20 = the zone's harmonic mean 2·3·7/(3+7). The one depth
+    parallax depth:   R 2.1 = the zone's harmonic mean 2·1.5·3.5/(1.5+3.5). The one depth
                       the world azimuth is corrected at; exact there, 6.7° of seam
-                      disagreement worst-case over Ø 3 – Ø 7                    (derived)
+                      disagreement worst-case over R 1.5 – R 3.5                    (derived)
     distance clamp:   1.14 m to 3.86 m from a lens = the zone +/- the ring       (derived)
-    seam births:      none on a seam inside ≈ Ø 3 at dead_zone 6.5           (chosen consequence)
+    seam births:      none on a seam inside ≈ R 1.5 at dead_zone 6.5           (chosen consequence)
     room:             8 × 8 m, machine in the middle                              (site fact)
     fixture:          cube 25 × 25 × 28 cm; rings Ø 25 / Ø 20 × 3.5 cm; tube Ø 20 × 154 cm;
                       head 9 × 9 cm; light from ≈ 32 cm                          (site fact)

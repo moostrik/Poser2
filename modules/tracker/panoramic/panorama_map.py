@@ -20,22 +20,27 @@ bearing ``phi``, and the law of sines on the centre/camera/point triangle gives
 exact, not a small-angle expansion.
 
 **And `d` is assumed, never measured — by both sides, for the same reason.** A stitch has no person,
-only pixels, so it must assume a depth: a **cylinder** of diameter ``focus_diameter`` around the rig.
+only pixels, so it must assume a depth: a **cylinder** of radius ``focus_radius`` around the rig.
 The tracker *could* measure a person's distance, and deliberately does not: the device's box bottom
 sits below the feet, and the two cameras at a seam err in opposite directions, so feeding that in
 cost about 10° more seam disagreement than assuming a depth (`Geometry._update_parallax_depth` has
-the table). So the tracker assumes one too — its own `parallax_diameter`, the tracked zone's
-harmonic mean. Both are exactly aligned at their assumed diameter and drift by a bounded amount
+the table). So the tracker assumes one too — its own `parallax_radius`, the tracked zone's
+harmonic mean. Both are exactly aligned at their assumed radius and drift by a bounded amount
 nearer and farther. Nothing about a person, a box or a pose feeds either, so nothing can fool them.
 
-**Which is why the depth parameters here are named `depth_diameter` / `depth_radius` and not after
-any one of them.** These functions serve every caller's depth — the stitch's `focus_diameter`, the
-tracker's `parallax_diameter`, the zone's far edge, a person's own measured distance — and naming
-the parameter after one of them is how a call ends up drawn at a depth its author did not mean.
-The rule the whole strip rests on: **two things on the strip are comparable only if they share an
-axis *and* a depth.** Sharing the axis is automatic (x is centre azimuth, y is centre elevation,
-everywhere); sharing the depth is the caller's job. Every one of the panorama's three alignment
-bugs was two things at two depths, never two things on two axes.
+**Everything here is a RADIUS from the fixture axis, and nothing is ever halved.** The installation
+is built and taped from the light fixture at the centre, so that is the origin; the settings, the
+shader's ``focusRadius``/``ringRadius``, the panorama's ``R`` label and a tape on the floor all
+carry the same number into these triangles, with no conversion anywhere to get wrong.
+
+**The depth parameters are named `depth_radius` and not after any one caller.** These functions
+serve every caller's depth — the stitch's `focus_radius`, the tracker's `parallax_radius`, the
+zone's far edge, a person's own measured distance — and naming the parameter after one of them is
+how a call ends up drawn at a depth its author did not mean. The rule the whole strip rests on:
+**two things on the strip are comparable only if they share an axis *and* a depth.** Sharing the
+axis is automatic (x is centre azimuth, y is centre elevation, everywhere); sharing the depth is
+the caller's job. Every one of the panorama's three alignment bugs was two things at two depths,
+never two things on two axes.
 
 `elevation_window` is the exception and keeps `focus_radius`: it sets the strip's *single* y scale,
 at the picture's depth, for everything drawn on it.
@@ -94,7 +99,7 @@ def focus_distance(bearing: float, ring_radius: float, depth_radius: float) -> f
 
 
 def azimuth_to_camera_x(azimuth: float, cam_id: int, cam_fov: float, target_fov: float,
-                        ring_radius: float, depth_diameter: float) -> float | None:
+                        ring_radius: float, depth_radius: float) -> float | None:
     """The normalized column of camera `cam_id` showing this world azimuth, or None.
 
     None means the azimuth falls outside that camera's field — the caller draws nothing for it.
@@ -102,11 +107,11 @@ def azimuth_to_camera_x(azimuth: float, cam_id: int, cam_fov: float, target_fov:
     re-projection moves the accepted band, so at a non-zero `ring_radius` a camera covers less of
     the cylinder than its bare field suggests.
 
-    `depth_diameter` is the caller's assumed depth, and the answer is only comparable with another
+    `depth_radius` is the caller's assumed depth, and the answer is only comparable with another
     call's at the same one.
     """
     phi: float = wrap180(azimuth - camera_azimuth(cam_id, target_fov))
-    distance: float = focus_distance(phi, ring_radius, depth_diameter / 2.0)
+    distance: float = focus_distance(phi, ring_radius, depth_radius)
 
     theta: float = phi
     if ring_radius > 0.0 and distance > 1e-9:
@@ -120,7 +125,7 @@ def azimuth_to_camera_x(azimuth: float, cam_id: int, cam_fov: float, target_fov:
 
 
 def camera_local_to_azimuth(local: float, cam_id: int, cam_fov: float, target_fov: float,
-                            ring_radius: float, depth_diameter: float) -> float:
+                            ring_radius: float, depth_radius: float) -> float:
     """The world azimuth a camera's own column points at, **at the depth the caller names**.
 
     The inverse of `azimuth_to_camera_x` (times `cam_fov`), and the one thing that lets the
@@ -138,15 +143,15 @@ def camera_local_to_azimuth(local: float, cam_id: int, cam_fov: float, target_fo
     At `ring_radius = 0` this collapses to `φ = θ` and the whole thing to the plain offset
     `target_fov * cam_id + local - fov_overlap` that defines the azimuth frame. **This is the
     tracker's forward chain as well as the stitch's**, and the three live callers name three
-    different depths: `Geometry.calc_angle` and the marks' tolerance fields at `parallax_diameter`,
-    `Geometry._update_overlap_band` at the zone's far edge, `SeamRenderer` at `focus_diameter`.
+    different depths: `Geometry.calc_angle` and the marks' tolerance fields at `parallax_radius`,
+    `Geometry._update_overlap_band` at the zone's far edge, `SeamRenderer` at `focus_radius`.
     Two of those answers may not be compared with each other — the same local angle lands 2.3°
-    apart at the studio's two depths — which is why the parameter is `depth_diameter` and not any
+    apart at the studio's two depths — which is why the parameter is `depth_radius` and not any
     one of their names. No caller passes a person's measured distance, deliberately.
     """
     theta: float = math.radians(local - cam_fov / 2.0)
     phi: float = local - cam_fov / 2.0
-    radius: float = max(0.0, depth_diameter / 2.0)
+    radius: float = max(0.0, depth_radius)
     if ring_radius > 0.0 and radius > 0.0:
         sin_t, cos_t = math.sin(theta), math.cos(theta)
         root: float = radius * radius - ring_radius * ring_radius * sin_t * sin_t
@@ -191,7 +196,7 @@ def camera_elevation(elevation: float, bearing: float, ring_radius: float,
         ->  tan(e_camera) = tan(e_centre) * depth_radius / d
 
     and the height cancels: only the ratio of the two horizontal distances survives. The factor
-    is `R / (R - r)` straight ahead — 1.19 at Ø 4.5 — falling toward 1 at the sides, exactly
+    is `R / (R - r)` straight ahead — 1.19 at R 2.25 — falling toward 1 at the sides, exactly
     matching the horizontal compression, which is why re-projecting one axis without the other
     leaves everything in the panorama too tall for its width.
 
@@ -313,7 +318,7 @@ def elevation_window(band: tuple[float, float], ring_radius: float,
     has one caller and one meaning: it fixes the strip's **single, shared** y scale at the
     picture's depth, and everything drawn on the strip is then placed on that same ruler. So it
     moves the whole strip together and can never break a comparison between two things on it: drag
-    `focus_diameter` and the horizon stays at y 0.7791, because the scale and the thing measured
+    `focus_radius` and the horizon stays at y 0.7791, because the scale and the thing measured
     move as one. That is the opposite of the per-call depths above, which do break comparisons.
     """
     radius: float = max(1e-6, focus_radius)
@@ -324,7 +329,7 @@ def elevation_window(band: tuple[float, float], ring_radius: float,
 
 
 def panorama_coverage(azimuth: float, num_cameras: int, cam_fov: float, target_fov: float,
-                      ring_radius: float, depth_diameter: float) -> int:
+                      ring_radius: float, depth_radius: float) -> int:
     """How many cameras see this azimuth — the divisor an averaging blend needs.
 
     At `ring_radius = 0` this is 2 within `fov_overlap` of every seam and 1 elsewhere. With the
@@ -335,5 +340,5 @@ def panorama_coverage(azimuth: float, num_cameras: int, cam_fov: float, target_f
     return sum(
         1 for cam_id in range(num_cameras)
         if azimuth_to_camera_x(azimuth, cam_id, cam_fov, target_fov,
-                               ring_radius, depth_diameter) is not None
+                               ring_radius, depth_radius) is not None
     )

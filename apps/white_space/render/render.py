@@ -106,7 +106,7 @@ class Render(RenderBase):
         # GL reallocation, which only the render thread may do. The callback arrives on whichever
         # thread wrote the setting, so it raises a flag and `update()` acts on it.
         self._layout_dirty: bool = False
-        settings.panorama.bind(PanoramaLayerSettings.focus_diameter, self._on_layout_setting)
+        settings.panorama.bind(PanoramaLayerSettings.focus_radius, self._on_layout_setting)
         RenderSettings.camera_view.bind(settings, self._on_layout_setting)
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
@@ -147,7 +147,7 @@ class Render(RenderBase):
 
         The aspect is the compositor's own — 360 degrees of azimuth over the elevations it can
         actually fill, both measured at the rig centre. It is not a preference: `tilt`, `fov` and
-        `focus_diameter` all move it, and the compositor is the only thing that knows how.
+        `focus_radius` all move it, and the compositor is the only thing that knows how.
         """
         panorama: Compositor = self.L[Layers.cam_panorama][0]  # type: ignore[assignment]
         return SubdivisionRow(name='panoramic', columns=1, rows=1,
@@ -193,7 +193,7 @@ class Render(RenderBase):
             self.L[Layers.poser][i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
-        self.settings.panorama.unbind(PanoramaLayerSettings.focus_diameter, self._on_layout_setting)
+        self.settings.panorama.unbind(PanoramaLayerSettings.focus_radius, self._on_layout_setting)
         RenderSettings.camera_view.unbind(self.settings, self._on_layout_setting)
         for cam_dict in self.L.values():
             for layer in cam_dict.values():

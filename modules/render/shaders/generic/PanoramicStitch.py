@@ -18,7 +18,7 @@ class PanoramicStitch(Shader):
     """
 
     def use(self, textures: list[Texture], cam_fov: float, row_model: tuple[float, float],
-            target_fov: float, ring_radius: float, focus_diameter: float,
+            target_fov: float, ring_radius: float, focus_radius: float,
             elevation_window: tuple[float, float], populated_band: tuple[float, float],
             blend: int) -> None:
         """Args:
@@ -28,7 +28,8 @@ class PanoramicStitch(Shader):
                 `row = horizon_row - focal_rows * tan(e)` (`panorama_map.row_from_elevation`)
             target_fov: the sector one camera owns, 360 / num_cameras (degrees)
             ring_radius: camera distance from the rig centre (m); 0 disables the parallax term
-            focus_diameter: the play-zone cylinder the image is aligned for (m)
+            focus_radius: radius of the play-zone cylinder the image is aligned for (m), passed
+                to `focusRadius` unchanged — everything here is a radius from the fixture axis
             elevation_window: (top, bottom) elevation of the strip, measured at the rig centre
             populated_band: (low, high) elevation the frames carry, at the camera — the window's
                 bottom and top rows; beyond it there is no row to read
@@ -58,7 +59,7 @@ class PanoramicStitch(Shader):
         glUniform1f(self.get_uniform_loc("focalRows"), row_model[1])
         glUniform1f(self.get_uniform_loc("targetFov"), target_fov)
         glUniform1f(self.get_uniform_loc("ringRadius"), ring_radius)
-        glUniform1f(self.get_uniform_loc("focusRadius"), focus_diameter / 2.0)
+        glUniform1f(self.get_uniform_loc("focusRadius"), focus_radius)
         glUniform1f(self.get_uniform_loc("elevTop"), elevation_window[0])
         glUniform1f(self.get_uniform_loc("elevBottom"), elevation_window[1])
         glUniform1f(self.get_uniform_loc("camElevLo"), populated_band[0])

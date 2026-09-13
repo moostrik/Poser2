@@ -20,14 +20,14 @@ from modules.utils import Rect
 CAM_FOV: float = 127.0
 TARGET_FOV: float = 90.0
 RING_RADIUS: float = 0.36
-PARALLAX_DIAMETER: float = 4.2      # the zone's harmonic mean, what the tracker corrects at
+PARALLAX_RADIUS: float = 2.1        # the zone's harmonic mean, what the tracker corrects at
 CAMERA_HEIGHT: float = 0.5
 LINK_ANGLE: float = 18.0
 REACQUIRE_ANGLE: float = 5.0
 
 GEOMETRY: StripGeometry = StripGeometry(
     cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
-    parallax_diameter=PARALLAX_DIAMETER, camera_height=CAMERA_HEIGHT,
+    parallax_radius=PARALLAX_RADIUS, camera_height=CAMERA_HEIGHT,
     row_model=(0.78, 0.58), elevation_window=(40.0, -30.0),
     link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE,
 )
@@ -105,11 +105,11 @@ class TestToleranceField(unittest.TestCase):
     def test_outside_an_overlap_it_is_the_reacquire_angle(self) -> None:
         # A local-angle rule, converted to azimuth through the SAME cylinder the tracker corrects
         # the azimuth at. The centre is further from the cylinder than the camera is, so the field
-        # measures less than the rule: 5 deg of local angle is about 4.1 deg of azimuth at Ø 4.2
+        # measures less than the rule: 5 deg of local angle is about 4.1 deg of azimuth at R 2.1
         # on the camera's own axis.
         m: Mark = mark(observation(0, 63.5, 45.0, overlap=False))
         low, high = span(m)
-        radius: float = PARALLAX_DIAMETER / 2.0
+        radius: float = PARALLAX_RADIUS
         expected: float = REACQUIRE_ANGLE * (radius - RING_RADIUS) / radius
         self.assertAlmostEqual(high - low, expected, delta=0.05)
         self.assertAlmostEqual((low + high) / 2.0, 45.0, delta=0.01)
@@ -136,7 +136,7 @@ class TestToleranceField(unittest.TestCase):
     def test_a_zero_tolerance_draws_nothing(self) -> None:
         blank: StripGeometry = StripGeometry(
             cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
-            parallax_diameter=PARALLAX_DIAMETER, camera_height=CAMERA_HEIGHT,
+            parallax_radius=PARALLAX_RADIUS, camera_height=CAMERA_HEIGHT,
             row_model=(0.78, 0.58), elevation_window=(40.0, -30.0),
             link_angle=0.0, reacquire_angle=0.0)
         for overlap in (True, False):
@@ -158,7 +158,7 @@ class TestFieldsOverlapExactlyWhenTheTrackerLinks(unittest.TestCase):
     def setUp(self) -> None:
         self.config = PanoramicTrackerSettings(fov=CAM_FOV)
         self.config.seam.link_angle = LINK_ANGLE
-        self.config.rig.camera_diameter = RING_RADIUS * 2.0
+        self.config.rig.camera_radius = RING_RADIUS
         self.tracker = PanoramicTracker(self.config, num_players=8, num_cameras=4)
 
     def fields_overlap(self, a: Mark, b: Mark) -> bool:
@@ -180,7 +180,7 @@ class TestFieldsOverlapExactlyWhenTheTrackerLinks(unittest.TestCase):
                 self.assertEqual(links, difference <= LINK_ANGLE)   # and the gate is the gate
 
     def test_two_people_at_a_seam_do_not_overlap(self) -> None:
-        # The rig case: a metre apart at Ø 4.5 is about 25 deg, past the 18 deg gate.
+        # The rig case: a metre apart at R 2.25 is about 25 deg, past the 18 deg gate.
         a, b = observation(0, 120.0, 90.0, overlap=True), observation(1, 8.0, 115.0, overlap=True)
         self.assertFalse(self.tracker._observations_match(a, b))
         self.assertFalse(self.fields_overlap(mark(a), mark(b)))
@@ -212,14 +212,14 @@ class TestZoneLines(unittest.TestCase):
     """
 
     CAMERA_HEIGHT: float = 0.5
-    # The studio strip: P720 up 15 on 960 rows, re-projected to the centre for Ø 4.5.
+    # The studio strip: P720 up 15 on 960 rows, re-projected to the centre for R 2.25.
     WINDOW: tuple[float, float] = (47.38, -17.13)
 
-    def elevation(self, diameter: float) -> float:
-        return -math.degrees(math.atan(self.CAMERA_HEIGHT / (diameter / 2.0)))
+    def elevation(self, radius: float) -> float:
+        return -math.degrees(math.atan(self.CAMERA_HEIGHT / radius))
 
     def test_a_wider_zone_edge_sits_closer_to_the_horizon(self) -> None:
-        near, far = self.elevation(3.0), self.elevation(7.0)
+        near, far = self.elevation(1.5), self.elevation(3.5)
         self.assertAlmostEqual(near, -18.43, delta=0.01)
         self.assertAlmostEqual(far, -8.13, delta=0.01)
         self.assertLess(near, far)                                  # both below the horizon
@@ -232,15 +232,15 @@ class TestZoneLines(unittest.TestCase):
         elevation that is not its own. The strip shows less than the frames do —
         `elevation_window` takes the band at its tightest column so no column fades to black."""
         top, bottom = self.WINDOW
-        self.assertLess(self.elevation(3.0), bottom)                 # Ø 3 is 1.3 deg below
-        self.assertGreater(self.elevation(7.0), bottom)              # Ø 7 is comfortably inside
-        self.assertLess(self.elevation(7.0), top)
+        self.assertLess(self.elevation(1.5), bottom)                 # R 1.5 is 1.3 deg below
+        self.assertGreater(self.elevation(3.5), bottom)              # R 3.5 is comfortably inside
+        self.assertLess(self.elevation(3.5), top)
 
     def test_an_edge_beyond_the_horizon_cannot_happen(self) -> None:
         # The floor is always below the lens, so a zone edge is always a depression. Only the
         # bottom of the window can ever clip one.
-        for diameter in (0.5, 3.0, 50.0):
-            self.assertLess(self.elevation(diameter), 0.0)
+        for radius in (0.25, 1.5, 25.0):
+            self.assertLess(self.elevation(radius), 0.0)
 
     def test_a_mark_inside_the_zone_ends_between_the_two_rows(self) -> None:
         """What the lines are for: a mark's line ends at the foot row, so a person inside the zone
@@ -248,18 +248,17 @@ class TestZoneLines(unittest.TestCase):
         copy of it."""
         geometry = StripGeometry(
             cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=0.0,
-            parallax_diameter=PARALLAX_DIAMETER, camera_height=self.CAMERA_HEIGHT,
+            parallax_radius=PARALLAX_RADIUS, camera_height=self.CAMERA_HEIGHT,
             row_model=GEOMETRY.row_model, elevation_window=self.WINDOW,
             link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE)
-        near_y = strip_y(self.elevation(3.0), self.WINDOW)
-        far_y = strip_y(self.elevation(7.0), self.WINDOW)
+        near_y = strip_y(self.elevation(1.5), self.WINDOW)
+        far_y = strip_y(self.elevation(3.5), self.WINDOW)
         horizon_row, focal_rows = geometry.row_model
-        for diameter in (4.0, 4.5, 6.0):
-            with self.subTest(diameter=diameter):
+        for radius in (2.0, 2.25, 3.0):
+            with self.subTest(radius=radius):
                 # Feet on the floor at this radius, with the camera at the centre (ring 0, so the
                 # camera distance and the centre radius are the same number).
-                radius: float = diameter / 2.0
-                feet: float = row_from_elevation(self.elevation(diameter), horizon_row, focal_rows)
+                feet: float = row_from_elevation(self.elevation(radius), horizon_row, focal_rows)
                 t = observation(0, 63.5, 45.0, overlap=False, distance=radius,
                                 top=feet - 0.2, height=0.2)
                 m: Mark = mark(t, geometry)
@@ -268,7 +267,7 @@ class TestZoneLines(unittest.TestCase):
 
     def test_the_foot_tick_is_exactly_the_zone_lines_own_formula(self) -> None:
         """**The instrument.** Standing on a taped circle, the tick must land on that zone edge —
-        so "the tick is on the Ø 7 line" has to mean "the tracker reports this person at Ø 7", to
+        so "the tick is on the R 3.5 line" has to mean "the tracker reports this person at R 3.5", to
         the pixel, and not approximately.
 
         It does because the rows go through the person's OWN distance, where the lens height
@@ -277,21 +276,20 @@ class TestZoneLines(unittest.TestCase):
             atan(tan(-atan(h/d)) * d / R) = atan(-h/R)
 
         the right-hand side being exactly what `GridRenderer._zone_field` draws. Put the rows on the
-        parallax cylinder instead — tidier, since the x uses it — and this breaks by 20 px at Ø 3.
+        parallax cylinder instead — tidier, since the x uses it — and this breaks by 20 px at R 1.5.
         That is what this test exists to catch.
         """
         geometry = StripGeometry(
             cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
-            parallax_diameter=PARALLAX_DIAMETER, camera_height=self.CAMERA_HEIGHT,
+            parallax_radius=PARALLAX_RADIUS, camera_height=self.CAMERA_HEIGHT,
             row_model=GEOMETRY.row_model, elevation_window=self.WINDOW,
             link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE)
         horizon_row, focal_rows = geometry.row_model
-        for diameter in (3.0, PARALLAX_DIAMETER, 5.0, 7.0):
+        for radius in (1.5, PARALLAX_RADIUS, 2.5, 3.5):
             for local_angle in (63.5, 20.0, 110.0):     # on the axis and well off it
-                with self.subTest(diameter=diameter, local_angle=local_angle):
+                with self.subTest(radius=radius, local_angle=local_angle):
                     # A person on that circle, as the camera sees them: the bearing off its axis
                     # fixes the camera distance, and the feet then fix the row.
-                    radius: float = diameter / 2.0
                     bearing: float = math.radians(local_angle - CAM_FOV / 2.0)
                     # Camera `RING_RADIUS` out, aimed radially: solve for its distance to the circle.
                     cam_distance: float = -RING_RADIUS * math.cos(bearing) + math.sqrt(

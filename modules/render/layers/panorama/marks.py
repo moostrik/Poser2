@@ -9,8 +9,8 @@ Both axes share the strip's space — x is azimuth at the rig centre, y is eleva
 differs is the distance each is converted through, because each answers a different question.
 
 **x: the fixed parallax depth.** The x is the fused `world_angle`, the number the light, the sound
-and the hit detector all act on, and the tracker derives it at `rig.parallax_diameter` (the tracked
-zone's harmonic mean, Ø 4.2 here), never from a person's measured distance —
+and the hit detector all act on, and the tracker derives it at `rig.parallax_radius` (the tracked
+zone's harmonic mean, R 2.1 here), never from a person's measured distance —
 `Geometry._update_parallax_depth` has the measurements: the two cameras at a seam err in opposite
 directions, so feeding a measured distance in cost about 10° more than assuming one. The tolerance
 field follows x onto that same cylinder, because it is a statement about the same azimuth.
@@ -22,10 +22,10 @@ distance the lens height cancels algebraically:
     atan(tan(-atan(h / d)) * d / R) = atan(-h / R)
 
 which is *precisely* the formula the grid's zone field is drawn from. So the foot tick and the zone
-lines are exactly comparable: **the tick sits on the Ø 7 line iff the tracker reports this person at
-Ø 7** — tape the circle, stand on it, read it off. Put the rows on the parallax cylinder for
-uniformity with x and that exactness is gone (20 px of error at Ø 3), and the one calibration the
-strip can do precisely goes with it.
+lines are exactly comparable: **the tick sits on the R 3.5 line iff the tracker reports this person
+at R 3.5** — tape the circle, stand on it, read it off, and the label's `R` prints that same 3.5.
+Put the rows on the parallax cylinder for uniformity with x and that exactness is gone (20 px of
+error at R 1.5), and the one calibration the strip can do precisely goes with it.
 
 Note what this buys besides: the foot correction (`TrackerSettings.foot_offset`) reaches the mark
 through `annotation.distance`, already computed, so **nothing here knows about it** and the
@@ -35,11 +35,11 @@ cannot throw a tick off the strip.
 Two consequences a reader has to know:
 
 - **A mark sits a small constant distance from its own pixels.** The image is stitched at
-  `render.panorama.focus_diameter` (Ø 4.5) and a mark's x at Ø 4.2, so they are drawn on two nearby
+  `render.panorama.focus_radius` (R 2.25) and a mark's x at R 2.1, so they are drawn on two nearby
   cylinders. That offset is a chosen consequence — the parallax depth is derived from the zone so it
   minimises the worst-case *seam* error, not so it matches a render slider — and it is not a fault.
 - **Two marks of one colour at a seam no longer have to coincide exactly.** They disagree by the
-  known geometric residual for that person's depth: zero at Ø 4.2, up to about 6.6° at the zone's
+  known geometric residual for that person's depth: zero at R 2.1, up to about 6.6° at the zone's
   edges. So the gap is a **depth indicator**, not an error signal. It is a weaker diagnostic than
   the old one, and an honest one — the old one was reading the detector's bias.
 
@@ -65,24 +65,21 @@ class StripGeometry:
     here is a preference. `row_model` is (horizon_row, focal_rows) — the delivered frames' rows as
     the tracker published them — and `elevation_window` the strip's (top, bottom) at the rig centre.
 
-    `parallax_diameter` is the one depth the tracker corrects the azimuth at, mirrored here so a
-    mark's x and its tolerance land on the same cylinder. `camera_height` is the rig's measured lens
-    height, and it is here for the *rows*: the foot tick is `atan(camera_height / R)` below the
-    horizon, the grid's zone field's own formula, which is what makes the two comparable.
+    `parallax_radius` is the one depth the tracker corrects the azimuth at, mirrored here so a
+    mark's x and its tolerance land on the same cylinder — the tracker's own number, unconverted.
+    `camera_height` is the rig's measured lens height, and it is here for the *rows*: the foot tick
+    is `atan(camera_height / R)` below the horizon, the grid's zone field's own formula, which is
+    what makes the two comparable.
     """
     cam_fov: float
     target_fov: float
     ring_radius: float
-    parallax_diameter: float
+    parallax_radius: float
     camera_height: float
     row_model: tuple[float, float]
     elevation_window: tuple[float, float]
     link_angle: float
     reacquire_angle: float
-
-    @property
-    def parallax_radius(self) -> float:
-        return max(1e-6, self.parallax_diameter / 2.0)
 
 
 @dataclass(frozen=True)
@@ -157,10 +154,10 @@ def _mark(tracklet: Tracklet, primaries: set[int],
         is_primary=is_primary,
         # Fixed width, so the right-edge flip threshold is the same for everybody and cannot wobble
         # as the digits change. `R` is the same radius the foot tick is drawn at — the tick is the
-        # picture of this number — so a tick on the Ø 7 zone line and an `R` of 3.5 say the same
-        # thing twice. Both `R` and `H` read low until `camera.tracker.foot_offset` is measured;
-        # `H` falling as a person walks away is the signature that it has not been. `R` is a radius
-        # from the rig centre where the footer's Ø is a diameter — a factor of two apart.
+        # picture of this number — so a tick on the R 3.5 zone line and an `R` of 3.5 say the same
+        # thing twice, and `rig.zone_max_radius` says 3.5 as well. Both `R` and `H` read low until
+        # `camera.tracker.foot_offset` is measured; `H` falling as a person walks away is the
+        # signature that it has not been.
         label=f'#{tracklet.id} c{tracklet.cam_id} '
               f'az{annotation.world_angle % 360.0:03.0f} '
               f'R{centre_dist:.1f}m '
@@ -192,7 +189,7 @@ def _tolerance(annotation: PanoramicAnnotation, cam_id: int,
         return (centre - half, centre + half)
 
     # A LOCAL-angle gate, carried into the strip's frame through the same map the tracker's own
-    # azimuth goes through — `camera_local_to_azimuth` at `parallax_diameter`. That is what keeps
+    # azimuth goes through — `camera_local_to_azimuth` at `parallax_radius`. That is what keeps
     # the pair test valid once drawn: the two positions AND the two widths take the same map, so
     # their overlap still answers the gate, exactly rather than approximately (it used to depend on
     # each observation's own estimated distance, so two of them converted by slightly different
@@ -204,9 +201,9 @@ def _tolerance(annotation: PanoramicAnnotation, cam_id: int,
     half_local: float = g.reacquire_angle / 2.0
     local: float = annotation.local_angle
     lo: float = camera_local_to_azimuth(max(0.0, local - half_local), cam_id, g.cam_fov,
-                                        g.target_fov, g.ring_radius, g.parallax_diameter)
+                                        g.target_fov, g.ring_radius, g.parallax_radius)
     hi: float = camera_local_to_azimuth(min(g.cam_fov, local + half_local), cam_id, g.cam_fov,
-                                        g.target_fov, g.ring_radius, g.parallax_diameter)
+                                        g.target_fov, g.ring_radius, g.parallax_radius)
     return (lo, hi)
 
 

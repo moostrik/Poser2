@@ -35,10 +35,10 @@ class GridRenderer(LayerBase):
       responsibility ends and the next begins;
     - the **camera axes** in blue at `camera_azimuth` — each camera's optical centre, and the one
       bearing where the parallax correction is the identity at any depth;
-    - the **overlap** in yellow, two verticals per seam at `± seam.angles.overlap / 2`: **exactly
+    - the **overlap** in yellow, two verticals per seam at `± rig.overlap / 2`: **exactly
       where a mark's tolerance field changes width**. It is `angle_in_overlap`'s own threshold —
       a *local* angle, derived at the zone's far edge so the flag never under-reports — projected
-      at `rig.parallax_diameter`, which is the depth the marks themselves are drawn at. Drawn at
+      at `rig.parallax_radius`, which is the depth the marks themselves are drawn at. Drawn at
       any other depth the line would sit where nothing happens: the same threshold at the far edge
       lands 2.3° away on this rig, because a local angle has no single position on the ring.
       Two things it is therefore **not**: the azimuth two cameras geometrically share at that
@@ -46,14 +46,14 @@ class GridRenderer(LayerBase):
       inherits that), nor where the two *pictures* meet, which the frames show for themselves.
 
     **In elevation**, the horizon and the tracked zone. The zone is a **translucent field** between
-    the two diameters, at the depressions they subtend at the centre, `atan(camera_height / R)` — a
+    the two radii, at the depressions they subtend at the centre, `atan(camera_height / R)` — a
     floor circle of constant radius is a constant depression, so it is a band of rows, the same at
     every azimuth. It is the only thing on the strip measured in **metres**, which makes it the only
     one a tape on the floor can check, and the reference a person's mark is read against: a mark's
     line ends at the foot row, so someone inside the zone has that end inside the field.
 
     A field rather than two lines because of what happens at the edges. The zone reaches below what
-    the strip can show at some presets — at the studio one the window bottom is −17.1° against Ø 3's
+    the strip can show at some presets — at the studio one the window bottom is −17.1° against R 1.5's
     −18.4°, the strip showing less than the frames do (`elevation_window` takes the band at its
     tightest column so no column fades to black) — and a fill that runs off the bottom says
     "continues past here" by itself, where a line pinned to the boundary row would have claimed an
@@ -135,7 +135,7 @@ class GridRenderer(LayerBase):
         `camera_local_to_azimuth` — which is exactly what lets them be read straight off the degree
         labels, and why they sit in the lattice rather than beside the dead zone.
         """
-        half: float = self._tracker.seam.angles.overlap / 2.0
+        half: float = self._tracker.rig.overlap / 2.0
         for cam_id in range(self._num_cams):
             seam: float = self._target_fov * cam_id
             if half > 0.0:                    # 0 once the sectors stop meeting: nothing to mark
@@ -148,7 +148,7 @@ class GridRenderer(LayerBase):
         """The tracked floor, as the band of elevations it subtends at the rig centre.
 
         A floor circle of radius `R` sits `atan(camera_height / R)` below the horizon, so the zone
-        between two diameters is a band of rows — the same at every azimuth, which is what makes it
+        between two radii is a band of rows — the same at every azimuth, which is what makes it
         one straight-sided field rather than a curve. The far edge is the higher row, since a more
         distant floor is nearer the horizon.
 
@@ -160,13 +160,13 @@ class GridRenderer(LayerBase):
         rig = self._tracker.rig
         top, bottom = self._elevation_window
 
-        def row(diameter: float) -> float:
+        def row(radius: float) -> float:
             elevation: float = -math.degrees(
-                math.atan(rig.camera_height / max(1e-6, diameter / 2.0)))
+                math.atan(rig.camera_height / max(1e-6, radius)))
             return strip_y(min(max(elevation, bottom), top), self._elevation_window)
 
-        y_far: float = row(rig.zone_max_diameter)
-        y_near: float = row(rig.zone_min_diameter)
+        y_far: float = row(rig.zone_max_radius)
+        y_near: float = row(rig.zone_min_radius)
         if y_near - y_far <= 0.0:
             return
         self._rect.use(0.0, y_far, 1.0, y_near - y_far, *ZONE_COLOR)
@@ -206,18 +206,20 @@ class GridRenderer(LayerBase):
         # drawn in, so a band's or a field's width can be read off the strip and checked against
         # the number that produced it.
         #
-        # `elev` is the STRIP's window — at the rig centre, at `focus_diameter` — not the frame's.
+        # `elev` is the STRIP's window — at the rig centre, at `focus_radius` — not the frame's.
         # It reads narrower than `rig.elevation_bottom/top` (−17..47 against −20..52 here) because
         # `elevation_window` converts the camera's band to the centre's view and takes the ratio at
         # its tightest bearing, straight ahead, so no column of the strip fades to black. It
-        # therefore moves with `focus_diameter` while the rig's numbers do not.
+        # therefore moves with `focus_radius` while the rig's numbers do not.
         top, bottom = self._elevation_window
         seam = self._tracker.seam
         rig = self._tracker.rig
-        footer: str = (f'Ø{self._settings.focus_diameter:.1f}m  fov {self._tracker.fov:.0f}  '
+        # Radii throughout, so the zone here, a mark's `R` and a tape from the fixture are one
+        # number — `zone 1.5..3.5` and a person labelled `R3.5` are saying the same thing.
+        footer: str = (f'R{self._settings.focus_radius:.2f}m  fov {self._tracker.fov:.0f}  '
                        f'tilt {self._settings.tilt:.0f}  elev {bottom:.0f}..{top:.0f}  '
-                       f'zone Ø{rig.zone_min_diameter:.1f}..{rig.zone_max_diameter:.1f}m  '
-                       f'overlap {seam.angles.overlap:.1f}°  dead {seam.dead_zone:.1f}°  '
+                       f'zone {rig.zone_min_radius:.2f}..{rig.zone_max_radius:.2f}m  '
+                       f'overlap {rig.overlap:.1f}°  dead {seam.dead_zone:.1f}°  '
                        f'link {seam.link_angle:.1f}°/{seam.link_height:.0f}%  '
                        f'reacquire {self._tracker.reacquire_angle:.1f}°')
         self._text.draw_box_text(3, self._height - 22, footer, LABEL_FG, LABEL_BG,
