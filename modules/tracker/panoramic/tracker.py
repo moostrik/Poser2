@@ -164,7 +164,7 @@ class Tracker(Thread, BaseTracker):
         `angle_in_overlap` tests stays inside `Geometry`."""
         a = self.config.seam.angles
         a.fov = self.geometry.cam_fov
-        a.overlap = self.geometry.overlap_world
+        a.overlap = self.geometry.overlap_azimuth
 
     def start(self) -> None:
         if self._running:

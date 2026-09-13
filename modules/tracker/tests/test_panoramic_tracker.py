@@ -10,7 +10,7 @@ from dataclasses import replace
 from modules.oak import frame_window, delivered_height
 from modules.tracker import (
     PanoramicTracker, PanoramicTrackerSettings, PanoramicAnnotation,
-    Tracklet, TrackingStatus, TrackletDict, row_from_elevation,
+    Tracklet, TrackingStatus, TrackletDict, camera_local_to_azimuth, row_from_elevation,
 )
 from modules.tracker.panoramic.geometry import Geometry, _MAX_HEIGHT, height_is_measured
 from modules.tracker.panoramic.store import TrackletIdPool
@@ -452,8 +452,12 @@ class TestOverlapBand(unittest.TestCase):
         # Ø 0.72 ring, Ø 3 – Ø 7 zone, 127 deg fields on 90 deg sectors.
         g = self.make_geometry()
         self.assertAlmostEqual(g.overlap_band, 28.3, delta=0.05)     # local angle: the threshold
-        self.assertAlmostEqual(g.overlap_world, 26.4, delta=0.05)    # azimuth: what gets drawn
-        self.assertLess(g.overlap_world, g.overlap_band)             # the map compresses
+        # The same threshold in azimuth, at the depth the marks are drawn on — which is what the
+        # panorama's overlap lines use, so a mark's tolerance changes width exactly on the line.
+        self.assertAlmostEqual(g.overlap_azimuth, 31.0, delta=0.05)
+        # Wider than the local band, because a nearer depth pulls a bearing toward the camera's
+        # own axis and so away from the seam the band is measured from.
+        self.assertGreater(g.overlap_azimuth, g.overlap_band)
 
     def test_no_ring_is_the_bare_field_at_any_zone(self) -> None:
         # With the cameras at the centre there is no depth question left to ask, so the band is
@@ -463,7 +467,7 @@ class TestOverlapBand(unittest.TestCase):
             with self.subTest(zone=zone):
                 g = self.make_geometry(camera_diameter=0.0, zone=zone)
                 self.assertAlmostEqual(g.overlap_band, PARALLAX_FOV - TARGET_FOV, places=9)
-                self.assertAlmostEqual(g.overlap_world, PARALLAX_FOV - TARGET_FOV, places=9)
+                self.assertAlmostEqual(g.overlap_azimuth, PARALLAX_FOV - TARGET_FOV, places=9)
 
     def test_it_widens_with_the_zone_and_approaches_the_bare_field(self) -> None:
         bands = [self.make_geometry(zone=(1.0, d)).overlap_band for d in (3.0, 4.5, 7.0, 40.0)]
@@ -476,7 +480,7 @@ class TestOverlapBand(unittest.TestCase):
         # sector at all — the reason the zone has a floor.
         g = self.make_geometry(zone=(1.0, 2.0))
         self.assertEqual(g.overlap_band, 0.0)
-        self.assertEqual(g.overlap_world, 0.0)
+        self.assertEqual(g.overlap_azimuth, 0.0)
         self.assertFalse(g.angle_in_overlap(PARALLAX_FOV / 2.0))
 
     def test_an_observation_between_the_two_bands_is_no_longer_flagged(self) -> None:
@@ -489,6 +493,24 @@ class TestOverlapBand(unittest.TestCase):
         self.assertTrue(local > PARALLAX_FOV - (PARALLAX_FOV - TARGET_FOV))   # inside the old band
         self.assertFalse(g.angle_in_overlap(local))                           # outside the new one
         self.assertTrue(g.angle_in_overlap(PARALLAX_FOV - 20.0))              # still flagged nearer
+
+    def test_the_drawn_line_is_exactly_where_the_flag_flips(self) -> None:
+        """What `overlap_azimuth` exists for. The panorama draws two verticals per seam at
+        ±`overlap_azimuth`/2 and switches a mark's tolerance width on `angle_in_overlap`. Those are
+        the same threshold, but one is a local angle and the other a strip position, and a local
+        angle has no single position on the ring — project it at the wrong depth and the line sits
+        where nothing happens. Pinned here because the two live in different files."""
+        g = self.make_geometry()
+        line: float = g.target_fov - g.overlap_azimuth / 2.0
+        # The last local angle still inside the flag, carried to the strip the way a mark is.
+        flips: float = camera_local_to_azimuth(g.cam_fov - g.overlap_band, 0, g.cam_fov,
+                                               g.target_fov, g._ring_radius, g.parallax_diameter)
+        self.assertAlmostEqual(line, flips, places=9)
+        # And it is genuinely a different place from the far-edge projection it used to be.
+        far_edge: float = camera_local_to_azimuth(g.cam_fov - g.overlap_band, 0, g.cam_fov,
+                                                  g.target_fov, g._ring_radius,
+                                                  g._max_radius * 2.0)
+        self.assertGreater(abs(far_edge - flips), 1.0)
 
     def test_the_zone_drives_the_distance_clamp(self) -> None:
         # The on-axis extremes, so the clamp follows the ring instead of being hand-computed for

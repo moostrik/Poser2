@@ -57,11 +57,12 @@ class Geometry:
         self._max_radius: float = 3.5
         self._min_distance: float = 1.5
         self._max_distance: float = 3.5
-        # The part of this camera's field a neighbour also sees, in local angle and in world
-        # azimuth. `_update_overlap_band` is the one place either is derived; it needs the ring,
-        # so it runs after it exists rather than beside `fov_overlap`.
+        # The overlap threshold in the two frames it is needed in: `overlap_band` the local
+        # angle `angle_in_overlap` tests, `overlap_azimuth` the same threshold as the panorama
+        # draws it. `_update_overlap_band` is the one place either is derived; it needs the ring
+        # and the parallax depth, so it runs after both exist rather than beside `fov_overlap`.
         self.overlap_band: float = self.cam_fov - self.target_fov
-        self.overlap_world: float = self.cam_fov - self.target_fov
+        self.overlap_azimuth: float = self.cam_fov - self.target_fov
         # The one depth the azimuth is corrected at. Must exist before `set_zone` runs, which is
         # what derives it — the same ordering trap `overlap_band` fell into above.
         self.parallax_diameter: float = self._min_radius + self._max_radius
@@ -314,19 +315,30 @@ class Geometry:
         diameter: float = self._max_radius * 2.0
         if self._ring_radius <= 0.0 or diameter <= 0.0:
             self.overlap_band = bare
-            self.overlap_world = bare
+            self.overlap_azimuth = bare
             return
 
+        # The local threshold, at the zone's far edge.
         axis: float = camera_azimuth(0, self.target_fov)
         edge: float = camera_local_to_azimuth(self.cam_fov, 0, self.cam_fov, self.target_fov,
                                               self._ring_radius, diameter)
         half_span: float = wrap180(edge - axis)
-        self.overlap_world = max(0.0, 2.0 * half_span - self.target_fov)
-
         x: float | None = azimuth_to_camera_x(axis + self.target_fov - half_span, 0, self.cam_fov,
                                               self.target_fov, self._ring_radius, diameter)
         band: float = self.cam_fov - x * self.cam_fov if x is not None else 0.0
         self.overlap_band = min(max(0.0, band), self.cam_fov / 2.0)
+
+        # The same threshold in azimuth, at the depth the marks are drawn on, measured from the
+        # seam this camera's far edge sits on (`target_fov`, one sector along from its own axis 0).
+        # No threshold, no line: a zero band must stay zero here, not become the distance from the
+        # seam to an unthresholded field edge.
+        if self.overlap_band <= 0.0:
+            self.overlap_azimuth = 0.0
+            return
+        inner: float = camera_local_to_azimuth(self.cam_fov - self.overlap_band, 0, self.cam_fov,
+                                               self.target_fov, self._ring_radius,
+                                               self.parallax_diameter)
+        self.overlap_azimuth = max(0.0, 2.0 * wrap180(self.target_fov - inner))
 
     # SET
     def set_fov(self, cam_fov: float) -> None:

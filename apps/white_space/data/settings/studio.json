@@ -3,7 +3,7 @@
   "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "render_fps": 58.0,
+  "render_fps": 60.0,
   "light_resolution": 3600,
   "fov": 127.0,
   "resolution": "P720",
@@ -171,8 +171,8 @@
       "apply_warp": true,
       "folder": "20260702-161442_flabber",
       "sim_passthrough": false,
-      "start_norm": 0.47,
-      "end_norm": 0.52
+      "start_norm": 0.0,
+      "end_norm": 1.0
     },
     "tracker": {
       "min_age": 5,
@@ -758,7 +758,7 @@
         "labels"
       ],
       "blend": "MAX",
-      "focus_diameter": 4.5,
+      "focus_diameter": 4.2,
       "grid_degrees": 10.0,
       "show_all_observations": true
     },

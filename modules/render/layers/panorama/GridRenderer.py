@@ -10,19 +10,9 @@ from modules.tracker import PanoramicTrackerSettings, camera_azimuth, strip_y
 
 from ...shaders import DrawColoredRectangle
 from ..LayerBase import LayerBase
-from .PanoramaLayerSettings import PanoramaLayerSettings, PanoramaBlend, \
+from .PanoramaLayerSettings import PanoramaLayerSettings, \
     AXIS_COLOR, GRID_COLOR, HORIZON_COLOR, HORIZON_PX, LABEL_BG, LABEL_FG, \
     OVERLAP_COLOR, SEAM_COLOR, ZONE_COLOR
-
-# Short names for the footer, in enum order.
-_BLEND_NAMES: dict[PanoramaBlend, str] = {
-    PanoramaBlend.MAX:        'max',
-    PanoramaBlend.AVERAGE:    'avg',
-    PanoramaBlend.MIN:        'min',
-    PanoramaBlend.DIFFERENCE: 'diff',
-    PanoramaBlend.SPLIT:      'rg',
-    PanoramaBlend.STRIPE:     'stripe',
-}
 
 
 class GridRenderer(LayerBase):
@@ -45,12 +35,15 @@ class GridRenderer(LayerBase):
       responsibility ends and the next begins;
     - the **camera axes** in blue at `camera_azimuth` — each camera's optical centre, and the one
       bearing where the parallax correction is the identity at any depth;
-    - the **overlap** in yellow, two verticals per seam at `± seam.angles.overlap / 2`: the azimuth
-      two neighbours share, derived at the tracked zone's far edge, which is the one depth at which
-      the two cameras' bands coincide and so the only one where the overlap has two sides rather
-      than four. A vertical is therefore exact at that edge and within about 5.5° elsewhere in the
-      zone, because one threshold on a camera's own bearing cannot be a fixed azimuth at every
-      depth.
+    - the **overlap** in yellow, two verticals per seam at `± seam.angles.overlap / 2`: **exactly
+      where a mark's tolerance field changes width**. It is `angle_in_overlap`'s own threshold —
+      a *local* angle, derived at the zone's far edge so the flag never under-reports — projected
+      at `rig.parallax_diameter`, which is the depth the marks themselves are drawn at. Drawn at
+      any other depth the line would sit where nothing happens: the same threshold at the far edge
+      lands 2.3° away on this rig, because a local angle has no single position on the ring.
+      Two things it is therefore **not**: the azimuth two cameras geometrically share at that
+      depth (19.4° against the line's 31.0° — the flag is deliberately generous, and the line
+      inherits that), nor where the two *pictures* meet, which the frames show for themselves.
 
     **In elevation**, the horizon and the tracked zone. The zone is a **translucent field** between
     the two diameters, at the depressions they subtend at the centre, `atan(camera_height / R)` — a
@@ -209,20 +202,23 @@ class GridRenderer(LayerBase):
         self._text.draw_box_text(3, max(3.0, horizon_px - 24), 'horizon', HORIZON_COLOR, LABEL_BG,
                                  self._width, self._height)
 
+        # One line: the strip's own geometry, then the fusion tolerances in the units they are
+        # drawn in, so a band's or a field's width can be read off the strip and checked against
+        # the number that produced it.
+        #
+        # `elev` is the STRIP's window — at the rig centre, at `focus_diameter` — not the frame's.
+        # It reads narrower than `rig.elevation_bottom/top` (−17..47 against −20..52 here) because
+        # `elevation_window` converts the camera's band to the centre's view and takes the ratio at
+        # its tightest bearing, straight ahead, so no column of the strip fades to black. It
+        # therefore moves with `focus_diameter` while the rig's numbers do not.
         top, bottom = self._elevation_window
-        blend: str = _BLEND_NAMES.get(self._settings.blend, 'max')
-        footer: str = (f'Ø{self._settings.focus_diameter:.1f}m  fov {self._tracker.fov:.0f}  '
-                       f'tilt {self._settings.tilt:.0f}  elev {bottom:.0f}..{top:.0f}  {blend}')
-        self._text.draw_box_text(3, self._height - 22, footer, LABEL_FG, LABEL_BG,
-                                 self._width, self._height)
-
-        # The fusion tolerances, in the units they are drawn in, so a band's or a field's width can
-        # be read off the strip and checked against the number that produced it.
         seam = self._tracker.seam
         rig = self._tracker.rig
-        rules: str = (f'zone Ø{rig.zone_min_diameter:.1f}..{rig.zone_max_diameter:.1f}m  '
-                      f'overlap {seam.angles.overlap:.1f}°  dead {seam.dead_zone:.1f}°  '
-                      f'link {seam.link_angle:.1f}°/{seam.link_height:.0f}%  '
-                      f'reacquire {self._tracker.reacquire_angle:.1f}°')
-        self._text.draw_box_text(3, self._height - 40, rules, LABEL_FG, LABEL_BG,
+        footer: str = (f'Ø{self._settings.focus_diameter:.1f}m  fov {self._tracker.fov:.0f}  '
+                       f'tilt {self._settings.tilt:.0f}  elev {bottom:.0f}..{top:.0f}  '
+                       f'zone Ø{rig.zone_min_diameter:.1f}..{rig.zone_max_diameter:.1f}m  '
+                       f'overlap {seam.angles.overlap:.1f}°  dead {seam.dead_zone:.1f}°  '
+                       f'link {seam.link_angle:.1f}°/{seam.link_height:.0f}%  '
+                       f'reacquire {self._tracker.reacquire_angle:.1f}°')
+        self._text.draw_box_text(3, self._height - 22, footer, LABEL_FG, LABEL_BG,
                                  self._width, self._height)

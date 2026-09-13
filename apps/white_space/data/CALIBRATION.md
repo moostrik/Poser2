@@ -520,14 +520,23 @@ thing in image space is the other (`seams`).
 | **centre elevation** — the grid's y | the horizon (green), the **tracked zone** (yellow field) — also `grid` | against a tape on the floor or the wall |
 | **image space** — where a camera's columns land once stitched | the **dead zone** (red, two bands per camera) — the whole of `seams` | against the picture, at any depth |
 
-- **The overlap**, `seam.angles.overlap` wide, symmetric about each seam. Nothing tunable: it is
-  **26.4° at Ø 7** and *nothing* by Ø 2.0, where the sectors stop meeting (the table under *What the
-  horizontal field allows*). It is the precondition for linking, not a rule — two cameras can only
-  be fused about a person they can both see. Drawn from the same number `angle_in_overlap` is
-  derived from, at the tracked zone's **far edge**, which is the one depth where the two cameras'
-  bands coincide; that is why the overlap has two sides here rather than four. A vertical is
-  therefore exact at Ø 7 and within about 5.5° anywhere in the zone, since one threshold on an image
-  column cannot be a fixed azimuth at every depth.
+- **The overlap**, `seam.angles.overlap` wide (**31.0°** on this rig), symmetric about each seam.
+  Nothing tunable, and read it as one thing only: **exactly where a mark's tolerance field changes
+  width**, from `seam.link_angle` inside to `reacquire_angle` outside. It is `angle_in_overlap`'s
+  own threshold — a *local* angle of 28.3°, derived at the zone's far edge so the flag never
+  under-reports — projected at `rig.parallax_diameter`, the depth the marks are drawn at. That
+  projection is the whole point: a local angle has no single position on the ring, and the same
+  threshold drawn at the far edge instead would land 2.3° away, where nothing happens.
+
+  Two things it is **not**, both easy to misread:
+  - *not* the azimuth two cameras geometrically share at that depth — that is 19.4°, and the line
+    is wider because the flag is deliberately generous (too wide costs nothing, too narrow splits
+    a person);
+  - *not* where the two **pictures** meet, which is 20.5° at Ø 4.5 and which the frames show for
+    themselves. So the yellow lines sit outside the visible overlap, on purpose.
+
+  It goes to zero below about Ø 2.0, where the sectors stop meeting at all (the table under *What
+  the horizontal field allows*), and the lines then vanish — no threshold, nothing to mark.
 - **The tracked zone**, a translucent field between `rig.zone_min_diameter` and
   `rig.zone_max_diameter`, at the depressions they subtend at the rig centre,
   `atan(camera_height / R)` — Ø 3 is −18.4° and Ø 7 is −8.1°. A floor circle of constant radius is
@@ -1027,9 +1036,12 @@ hit, the sound and both screen views are self-consistent.
                       (Ø 2.7 – Ø 7), the hard floor (Ø 2.0) and this, the
                       calibrated span, which is the one the code acts on  (site decision)
     panorama focus:   Ø 4.5 m
-    seam overlap:     26.4° of azimuth at Ø 7 (28.3° of local angle) — what the
-                      tracker uses; 20.5° at Ø 4.5, 9.4° at Ø 2.7, none by Ø 2.0;
-                      37° only at infinity                                      (derived)
+    seam overlap:     the FLAG is 28.3° of local angle, taken at the zone's far
+                      edge so it never under-reports; drawn as 31.0° of azimuth
+                      at the parallax depth, which is where a mark's field
+                      switches. The two cameras' pictures share 20.5° at Ø 4.5,
+                      9.4° at Ø 2.7, none by Ø 2.0 — a different number, and the
+                      one the frames show                                       (derived)
     parallax depth:   Ø 4.20 = the zone's harmonic mean 2·3·7/(3+7). The one depth
                       the world azimuth is corrected at; exact there, 6.7° of seam
                       disagreement worst-case over Ø 3 – Ø 7                    (derived)
