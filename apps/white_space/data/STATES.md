@@ -6,7 +6,8 @@ tunables live in the `states` settings group; each state returns its mix from `u
 
 Vocabulary:
 
-- **P** — the live participant count, debounced by `states.count_hold_seconds`
+- **P** — the live participant count: the poses at the machine's stage (`LAYERS.md`, *Inputs*), debounced
+  by `states.count_hold_seconds`
 - **bar** — one full playhead cycle, the content clock
 - **hit** — the playhead sweeps past a participant
 - **readout mode** — the fixture reads beam mode below 200 rpm and projection mode at or above, switching

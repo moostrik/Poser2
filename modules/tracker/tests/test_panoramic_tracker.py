@@ -718,7 +718,7 @@ class TestRigParallax(unittest.TestCase):
         crossing splits. Bounded, and zero on the cylinder.
 
         On the STUDIO zone (R 1.5 – R 3.5), because that is the configuration whose bound is quoted
-        in CALIBRATION.md — the surrounding fixture uses a wider R 1 – R 4, and a wider zone
+        in TRACKING.md — the surrounding fixture uses a wider R 1 – R 4, and a wider zone
         necessarily has a worse worst case (14.4° at R 1 – R 4, which is the honest cost of
         claiming that much floor)."""
         g = self.make_rig(zone=(1.5, 3.5))
@@ -1265,7 +1265,7 @@ class TestFootOffset(unittest.TestCase):
     """The detector's box bottom sits below the feet by a fixed pad in pixels. `foot_offset`
     subtracts it, in one place (`_foot_px`), shared by the distance and the height."""
 
-    PAD: float = 94.0 / (ROWS - 1)          # the measured studio bias, as a frame fraction
+    PAD: float = 94.0 / (ROWS - 1)          # a detector's box-bottom pad, as a frame fraction
 
     def make_rig(self, foot_offset: float = 0.0) -> Rig:
         g = Rig(cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
@@ -1306,7 +1306,7 @@ class TestFootOffset(unittest.TestCase):
                 self.assertAlmostEqual(g.estimate_height(box), 1.8, places=6)
 
     def test_the_uncorrected_signature(self) -> None:
-        """Pins the table in CALIBRATION: with the pad present and the offset at 0, both readouts
+        """Pins the signature in TRACKING.md: with the pad present and the offset at 0, both readouts
         are short AND the height *falls* as the person walks away. That drift is the whole
         calibration signal — a proportional error would leave `H` flat but wrong instead."""
         g = self.make_rig()

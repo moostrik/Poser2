@@ -258,8 +258,8 @@ class TestCameraLocalToAzimuth(unittest.TestCase):
                                        msg=f'cam {cam_id} local {local}')
 
     def test_a_camera_spans_less_than_its_field_at_the_focus_depth(self) -> None:
-        """The free check in CALIBRATION.md, in one call: 127 degrees of lens covers 110.5
-        degrees of the strip at R 2.25, because the camera sits 0.36 m outside the centre."""
+        """The free check in CALIBRATION.md, at this file's focus depth: 127 degrees of lens covers
+        110.5 degrees of the strip at R 2.25, because the camera sits 0.36 m outside the centre."""
         for cam_id in range(NUM_CAMERAS):
             left: float = camera_local_to_azimuth(0.0, cam_id, CAM_FOV, TARGET_FOV,
                                                   RING_RADIUS, FOCUS_RADIUS)

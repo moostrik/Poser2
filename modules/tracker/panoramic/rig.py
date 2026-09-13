@@ -118,7 +118,7 @@ class Rig:
         detector extrapolates a partly visible person — and the formula is continuous across it, but
         it is a guess there.
 
-        Reads short until `foot_offset` is calibrated (CALIBRATION.md, *The tracker's height*).
+        Reads short until `foot_offset` is calibrated (TRACKING.md, *The box bottom is not the feet*).
         Unclamped: the far-edge filter (`beyond_zone`) and the panorama's `R` and foot tick need a
         reading past the zone to be past the zone. Feet at or above the horizon read `inf`.
         """
@@ -154,7 +154,7 @@ class Rig:
 
         It reads **reach, not stature** — raised arms read ~2.2 m where arms down read 1.8 m — and it
         is the signal `foot_offset` is tuned by: with the detector's pad uncorrected it reads low and
-        *falls* with distance; tune until it is flat (CALIBRATION.md, *The tracker's height*). 0.0
+        *falls* with distance; tune until it is flat (CALIBRATION.md, *Calibrating the metres*). 0.0
         when the feet are at or above the horizon; capped at ``_MAX_HEIGHT``.
         """
         rows: int = self._rows - 1
@@ -207,7 +207,7 @@ class Rig:
             distance used           R 1.5   R 2.25   R 3.5   worst
             no correction at all    23.1     14.5     9.0     23.1
             per-person, 50% short   16.5     11.6     7.8     16.5
-            fixed, R 2.1             6.1      1.4     6.3      6.3
+            fixed, R 2.1             6.7      1.0     6.0      6.7
             per-person, exact        0.0      0.0     0.0      0.0
 
         A real body's own seam disagreement is 5.9 / 2.3 / 0.85 at those radii, so the fixed depth

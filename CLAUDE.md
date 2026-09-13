@@ -17,6 +17,12 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - `modules/settings/` is shared infrastructure; any module may depend on it
 - Never change the White Space fixture firmware (`apps/white_space/data/firmware/`); solve everything on the app side of the wire
 
+## Naming
+
+- Name a concept after what it is in the domain, and use that one term everywhere it appears: file, class, method, setting, panel label, document
+- Name a module file after the class or domain noun it holds
+- Use no synonyms for one concept across modules; when a term changes, rename it everywhere in the same change
+
 ## Settings
 
 - `BaseSettings` subclasses are pure data containers with no runtime side effects

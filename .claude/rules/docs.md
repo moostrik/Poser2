@@ -1,5 +1,5 @@
 ---
-description: Writing and updating design documents (CALIBRATION.md, LAYERS.md, STATES.md)
+description: Writing and updating design documents (CALIBRATION.md, TRACKING.md, LAYERS.md, STATES.md)
 paths:
   - "apps/**/*.md"
   - "modules/**/*.md"
@@ -8,6 +8,8 @@ paths:
 
 ## Content
 
+- Give each document one audience and purpose: `CALIBRATION.md` the operator's procedure and what explains a failed step, `TRACKING.md` the tracker's design, `STATES.md` the choreography, `LAYERS.md` the layers
+- State a component's design reasoning in that component's document; other documents link to it
 - State how the system works now, why it works that way, and the data behind it
 - Put measured and derived numbers in tables, and name the configuration they assume (preset, resolution, tilt)
 - Leave out how a conclusion was reached, what the code used to do, and what changed; that belongs in commit messages

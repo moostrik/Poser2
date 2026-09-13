@@ -10,7 +10,7 @@ Modes: **beam** layers write the four beam lights by name (`Frame.beam_lights`, 
 `BeamLightId`: front/back white, left/right blue) and no pixels; **projection** layers draw the
 persistence-of-vision ring. The fixture's readout mode follows the *commanded* rpm — beam
 mode below 200, projection mode at or above, switching on receipt of the rpm regardless of the
-bar's actual speed (`firmware.cpp` line 475). The light sender maps the beam lights to the
+bar's actual speed (`loop` in `firmware.cpp` sets `SLOW` from `RPM`). The light sender maps the beam lights to the
 firmware's pixel slots exactly when the fixture reads them (`inout/osc_light_sender.py`),
 and the render simulates the beams in its own layer (`render/layers/
 beam_light_simulation_layer.py`). Base classes `BeamLayer` / `ProjectionLayer` encode this, and the
@@ -19,17 +19,31 @@ folders and settings groups follow the same single axis (`layers/beam/` ↔ `lig
 that role in their docstrings; the projection block's generic patterns keep a `test_` prefix,
 while the beam tools are named as playhead tools (`beam_haunted`, `beam_test`).
 
+## Inputs
+
+Show layers and the state machine read pose frames from the board, never the tracker's tracklets.
+A person is present while their pose exists: the pose pipeline stops posing a person
+`pose.tracklets.detection_timeout` (1.0 s) after their last detection, and every filter downstream
+resets a track the moment its pose is missing. A layer adds no presence test of its own. A person's
+azimuth is the pose's `Azimuth`, moved to the eyes at LERP; their age is the pose's `Age`. Ghosts are
+published to their own board store (`get_ghosts`), not among the poses. How the tracker produces the
+poses is in `TRACKING.md`, *Downstream*.
+
 ## Index — show layers
 
-| Layer             | Mode       | Reads                                                  | Writes                        | Used by |
-|-------------------|------------|--------------------------------------------------------|-------------------------------|---------|
-| `beam_playhead`     | beam       | — (settings only)                                      | front white lamp              | S1–S6, S9, S10 |
-| `beam_flash`  | beam       | LERP frames (PlayheadOffset), tracklets                 | front white lamp + blue lamps (blue zeroed in presets — S4 runs blue-none by design) | S4 |
-| `projection_playhead` | projection | frame playhead phase                               | white ring marker             | S6 (post-un-lock), S7, S8 |
-| `pose_instrument` | projection | LERP frames (Azimuth, BBox, Angles, LegDeviation, TorsoTilt, Similarity), tracklets, playhead bars (PLAYHEAD motion only) | white lines, blue anchor + between-lines | S6 (post-un-lock), S7, S8 |
-| `flood`           | projection | — (settings only)                                      | full-strip white              | S8 |
-| `beam_wind_down`       | beam       | tick clock                                             | both white lamps, fading (the wall while the bar is still fast) | S9, S10 |
-| `beam_blue_sound`     | beam       | sound levels from Max (board)                          | left/right blue lamps         | S1, S2, S3, S5, S10 |
+| Layer                 | Mode       | Reads                         | Writes                                   | Used by                   |
+|-----------------------|------------|-------------------------------|------------------------------------------|---------------------------|
+| `beam_playhead`       | beam       | — (settings only)             | front white lamp                         | S1–S6, S9, S10            |
+| `beam_flash`          | beam       | LERP frames (PlayheadOffset)  | front white lamp + blue lamps            | S4                        |
+| `projection_playhead` | projection | frame playhead phase          | white ring marker                        | S6 (post-un-lock), S7, S8 |
+| `pose_instrument`     | projection | LERP frames, playhead bars    | white lines, blue anchor + between-lines | S6 (post-un-lock), S7, S8 |
+| `flood`               | projection | — (settings only)             | full-strip white                         | S8                        |
+| `beam_wind_down`      | beam       | tick clock                    | both white lamps, fading                 | S9, S10                   |
+| `beam_blue_sound`     | beam       | sound levels from Max (board) | left/right blue lamps                    | S1, S2, S3, S5, S10       |
+
+`beam_flash`'s blue lamps are zeroed in the presets: S4 runs blue-none by design. `pose_instrument`
+reads `Azimuth`, `BBox`, `Angles`, `LegDeviation`, `TorsoTilt` and `Similarity` from the LERP frames,
+and the playhead bars in PLAYHEAD motion only.
 
 `beam_wind_down` is `flood`'s ending and a plain beam layer: the fixture is in beam mode from
 S9's first packet, so the wall while the bar is still fast *is* the two white lamps
@@ -136,7 +150,7 @@ between people* gives symmetry and the seamless join at once.
   on these): the four arm angles (`Angles`: left/right shoulder, left/right elbow),
   `LegDeviation` (joint-weighted hip/knee deviation, 0..1), `TorsoTilt` (signed sideways
   lean against the image vertical, −1..1 — the one absolute measure; every joint angle is
-  segment-vs-segment); plus pose length (BBox height), presence (tracklets) and the
+  segment-vs-segment); plus pose length (BBox height), presence (the pose itself, *Inputs*) and the
   pairwise `Similarity` row. Both new features are also sent to Max
   (`/pose/{id}/angle/legs`, `/pose/{id}/angle/tilt`) so sound and light read the same values.
 - **Initial mapping** (a starting point to tune and rework — not the design's fixed part):
