@@ -190,14 +190,15 @@ class WindowSimilarity:
         track_ids = list(windows.keys())
         window_length = self._config.window_length
 
-        # Step 1: Stack angle windows (N, T, F)
-        values = np.stack([w.values[-window_length:] for w in windows.values()], axis=0)
+        # Step 1: Stack angle windows (N, T, F); missing joints and unfilled slots are NaN
+        values = np.stack([w.masked_values()[-window_length:] for w in windows.values()], axis=0)
 
         # Configure aggregator with joint count
         _, _, F = values.shape
         _JointAggregator.configure(F)
 
-        # Step 1b: Stack motion windows if enabled (N, T)
+        # Step 1b: Stack motion windows if enabled (N, T); missing motion stays 0 (no motion), as NaN would
+        # blank the whole body at that frame
         motion_values: np.ndarray | None = None
         if self._config.use_motion_weighting and motion_windows:
             motion_values = np.stack([w.values[-window_length:, 0] for w in motion_windows.values()], axis=0)
@@ -205,13 +206,13 @@ class WindowSimilarity:
         # Step 1c: Stack velocity windows if enabled (N, T, F)
         velocity_values: np.ndarray | None = None
         if self._config.use_velocity_similarity and velocity_windows:
-            velocity_values = np.stack([w.values[-window_length:] for w in velocity_windows.values()], axis=0)
+            velocity_values = np.stack([w.masked_values()[-window_length:] for w in velocity_windows.values()], axis=0)
 
         # Step 2: Compute similarity tensor
-        best_sim, confidence_scores, leader_scores = self._compute_similarity_tensor(values, motion_values, velocity_values)
+        best_sim, coverage, leader_scores = self._compute_similarity_tensor(values, motion_values, velocity_values)
         # Step 3: Build per-pose dicts
-        similarity_dict = self._build_similarity_dict(track_ids, best_sim, confidence_scores)
-        leader_dict = self._build_leader_dict(track_ids, leader_scores)
+        similarity_dict = self._build_similarity_dict(track_ids, best_sim, coverage)
+        leader_dict = self._build_leader_dict(track_ids, leader_scores, coverage)
 
         # Debug: Print per-pose similarities and leader scores
         if self._config.verbose:
@@ -243,14 +244,17 @@ class WindowSimilarity:
         Compares each person's current frame against all frames in others' windows.
         Uses Gaussian similarity for both angles and velocities.
 
+        Missing data is NaN. A joint missing in either person's angles drops out of that comparison; missing
+        velocity leaves the angle similarity unscaled, so joint coverage is decided by angles alone.
+
         Args:
-            values: Stacked angle window values (N, T, F)
+            values: Stacked angle window values (N, T, F), NaN where missing
             motion_values: Stacked motion values (N, T) for weighting, or None
-            velocity_values: Stacked velocity values (N, T, F) for similarity, or None
+            velocity_values: Stacked velocity values (N, T, F) for similarity, NaN where missing, or None
 
         Returns:
-            best_sim: Best similarity per joint (N, N, F)
-            confidence_scores: Confidence scores (N, N, F)
+            best_sim: Similarity per joint at the best-matching frame (N, N, F), NaN for joints not compared
+            coverage: Fraction of joints compared at the best-matching frame (N, N), 0 when nothing overlapped
             leader_scores: Leader score [0, 1] (N, N) - 0=sync, 1=j leads by full window
         """
         # print(self._config)
@@ -280,6 +284,7 @@ class WindowSimilarity:
             vel_current = velocity_values[:, -1, :]  # (N, F)
             vel_diff = vel_current[:, None, None, :] - velocity_values[None, :, :, :]  # (N, N, T, F)
             vel_sim = np.exp(-np.square(vel_diff / vel_scale))
+            vel_sim = np.where(np.isnan(vel_sim), 1.0, vel_sim)  # missing velocity is neutral
             similarity = similarity * vel_sim  # element-wise per joint
 
         # Compute whole-body similarity per time step (mean across features)
@@ -315,8 +320,9 @@ class WindowSimilarity:
             # Apply to per-joint similarity tensor too
             similarity = similarity * motion_weight[:, :, :, None]  # (N, N, T, F)
 
-        # Find best match time index for each pair
-        best_t = np.nanargmax(whole_body_sim, axis=2)  # (N, N)
+        # Find best match time index for each pair; a pair with no overlapping data at any t has no best
+        # match (nanargmax would raise), it gets t=0 and zero coverage below
+        best_t = np.argmax(np.where(np.isnan(whole_body_sim), -np.inf, whole_body_sim), axis=2)  # (N, N)
 
         # Leader score: (T-1 - best_t) / (T-1) → 0=sync, 1=j leads by full window
         # When best_t = T-1 (matched current): leader = 0 (synchronized)
@@ -330,26 +336,29 @@ class WindowSimilarity:
         # (N, N, T, F) -> (N, N, F) using advanced indexing
         i_idx = np.arange(N)[:, None]  # (N, 1)
         j_idx = np.arange(N)[None, :]  # (1, N)
-        best_sim = similarity[i_idx, j_idx, best_t, :]  # (N, N, F)
-        best_sim = np.nan_to_num(best_sim, nan=0.0).astype(np.float32)
+        best_sim = similarity[i_idx, j_idx, best_t, :].astype(np.float32)  # (N, N, F)
 
-        # Confidence scores at best_t
-        confidence_scores = 1.0 - np.isnan(similarity[i_idx, j_idx, best_t, :]).astype(np.float32)  # (N, N, F)
+        # Fraction of joints compared at best_t
+        coverage = (np.sum(~np.isnan(best_sim), axis=2) / F).astype(np.float32)  # (N, N)
 
-        return best_sim, confidence_scores, leader_scores
+        return best_sim, coverage, leader_scores
 
     def _build_similarity_dict(
         self,
         track_ids: list[int],
         best_sim: np.ndarray,
-        confidence_scores: np.ndarray
+        coverage: np.ndarray
     ) -> dict[int, 'Similarity']:
         """Build per-pose Similarity dict from similarity tensors.
 
+        Each pair's value aggregates the joints both people have, remapped, then scaled by joint coverage so a
+        mostly-occluded pair can't read as fully in sync. The score is the coverage; a pair with no joint in
+        common is NaN with score 0.
+
         Args:
             track_ids: List of track IDs (N,)
-            best_sim: Best similarity per joint (N, N, F)
-            confidence_scores: Confidence scores (N, N, F)
+            best_sim: Similarity per joint (N, N, F), NaN for joints not compared
+            coverage: Fraction of joints compared per pair (N, N)
 
         Returns:
             Dict mapping track_id -> Similarity object
@@ -369,10 +378,11 @@ class WindowSimilarity:
                 if i == j:
                     continue  # Skip self-comparison
 
-                # Use helper to aggregate per-joint similarities
+                # Use helper to aggregate per-joint similarities; NaN joints are skipped
+                joint_sim = best_sim[i, j].copy()
                 temp_feature = _JointAggregator(
-                    values=best_sim[i, j],
-                    scores=confidence_scores[i, j]
+                    values=joint_sim,
+                    scores=np.where(np.isnan(joint_sim), 0.0, 1.0).astype(np.float32)
                 )
 
                 # Aggregate per-joint similarities into single scalar
@@ -388,15 +398,11 @@ class WindowSimilarity:
                     aggregated_sim = (aggregated_sim - low) / (high - low)
                     aggregated_sim = float(np.clip(aggregated_sim, 0.0, 1.0))
 
-                # Store at absolute pose ID index
+                # Store at absolute pose ID index, penalised by the fraction of joints compared
                 pose_id_j = track_ids[j]
                 if not np.isnan(aggregated_sim):
-                    values[pose_id_j] = aggregated_sim
-
-                    # Compute mean confidence from valid joints
-                    valid_scores = temp_feature.scores[temp_feature.valid_mask]
-                    if len(valid_scores) > 0:
-                        scores[pose_id_j] = np.mean(valid_scores)
+                    values[pose_id_j] = aggregated_sim * coverage[i, j]
+                    scores[pose_id_j] = coverage[i, j]
 
             # Create Similarity object for this pose
             result[track_ids[i]] = Similarity(values, scores)
@@ -406,13 +412,17 @@ class WindowSimilarity:
     def _build_leader_dict(
         self,
         track_ids: list[int],
-        leader_scores: np.ndarray
+        leader_scores: np.ndarray,
+        coverage: np.ndarray
     ) -> dict[int, 'LeaderScore']:
         """Build per-pose LeaderScore dict from leader score tensor.
 
+        A pair with no joint in common has no meaningful best match: value 0 with score 0.
+
         Args:
             track_ids: List of track IDs (N,)
-            leader_scores: Temporal offset scores (N, N) in range [-1, 1]
+            leader_scores: Temporal offset scores (N, N) in range [0, 1]
+            coverage: Fraction of joints compared per pair (N, N)
 
         Returns:
             Dict mapping track_id -> LeaderScore object
@@ -433,8 +443,9 @@ class WindowSimilarity:
                     continue  # Skip self-comparison
 
                 pose_id_j = track_ids[j]
-                values[pose_id_j] = leader_scores[i, j]
-                scores[pose_id_j] = 1.0  # Leader scores always valid when poses are compared
+                if coverage[i, j] > 0.0:
+                    values[pose_id_j] = leader_scores[i, j]
+                    scores[pose_id_j] = 1.0
 
             # Create LeaderScore object for this pose
             result[track_ids[i]] = LeaderScore(values, scores)

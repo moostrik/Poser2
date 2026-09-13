@@ -44,6 +44,10 @@ class FeatureWindow(Generic[TEnum]):
         """
         return self.values[:, landmark]
 
+    def masked_values(self) -> np.ndarray:
+        """Values with NaN wherever the mask marks no data (missing samples and unfilled slots)."""
+        return np.where(self.mask, self.values, np.nan)
+
     @property
     def shape(self) -> tuple[int, ...]:
         """Return (time, feature_len) shape."""

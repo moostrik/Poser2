@@ -149,17 +149,23 @@ class InterpolatorTrackerTest(unittest.TestCase):
         out = tracker.update()
         self.assertIs(received[0], out)
 
-    @unittest.expectedFailure
     def test_failing_set_does_not_skip_later_tracks(self) -> None:
-        # One try wraps the whole per-track loop in set(), so a raise for track 0 skips track 1.
         tracker = InterpolatorTracker({i: InterpolatorPipeline([_RaisingInterpolator(0, 'set')]) for i in range(2)})
         with self.assertLogs('modules.pose.trackers', level='ERROR'):
             tracker.set({0: _angle(0, 0.1), 1: _angle(1, 0.2)})
         self.assertIn(1, tracker.update())
 
-    @unittest.expectedFailure
+    def test_failing_set_does_not_emit_a_half_updated_frame(self) -> None:
+        # The lerp node takes the new target before the second node raises; the failed track is reset so it
+        # doesn't emit a frame built from only part of its pipeline.
+        tracker = InterpolatorTracker({i: InterpolatorPipeline([
+            AngleLerpInterpolator(LerpInterpolatorSettings()), _RaisingInterpolator(0, 'set'),
+        ]) for i in range(2)})
+        with self.assertLogs('modules.pose.trackers', level='ERROR'):
+            tracker.set({0: _angle(0, 0.1), 1: _angle(1, 0.2)})
+        self.assertEqual(set(tracker.update()), {1})
+
     def test_failing_update_does_not_drop_later_tracks(self) -> None:
-        # One try wraps the whole per-track loop in update(), so a raise for track 0 drops track 1.
         tracker = InterpolatorTracker({i: InterpolatorPipeline([_RaisingInterpolator(0, 'update')]) for i in range(2)})
         tracker.set({0: _angle(0, 0.1), 1: _angle(1, 0.2)})
         with self.assertLogs('modules.pose.trackers', level='ERROR'):

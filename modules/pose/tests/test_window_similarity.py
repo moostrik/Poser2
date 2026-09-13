@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 
 from modules.pose.analytics import WindowSimilarity, WindowSimilaritySettings
-from modules.pose.features import AngleLandmark, Angles, LeaderScore, Similarity
+from modules.pose.features import AngleLandmark, Angles, AngleVelocity, LeaderScore, Similarity
 from modules.pose.frame import FeatureWindow
 from modules.pose.window import WindowNode, WindowNodeSettings
 
@@ -14,18 +14,19 @@ from ._builders import NUM_POSES, frame
 
 T = 10
 STEP = 0.05          # rad per frame on every joint
+F = len(AngleLandmark)
 
 
-def _window(angles_per_frame: list[np.ndarray]) -> FeatureWindow:
-    """Feed per-frame angle arrays (NaN = missing joint) through a WindowNode and return its last window."""
+def _window(per_frame: list[np.ndarray], feature: type = Angles, size: int = T) -> FeatureWindow:
+    """Feed per-frame arrays (NaN = missing joint) through a WindowNode and return its last window."""
     settings = WindowNodeSettings()
-    settings.window_size = len(angles_per_frame)
-    node = WindowNode(Angles, settings)
+    settings.window_size = size
+    node = WindowNode(feature, settings)
     window = None
-    for values in angles_per_frame:
+    for values in per_frame:
         v = values.astype(np.float32)
         s = np.where(np.isnan(v), 0.0, 1.0).astype(np.float32)
-        window = node.process(frame(features={Angles: Angles(v, s)}))
+        window = node.process(frame(features={feature: feature(v, s)}))
     return window
 
 
@@ -87,11 +88,9 @@ class WindowSimilarityTest(unittest.TestCase):
         self.assertEqual(lead[1].get_score(3), 1.0)
         self.assertEqual(lead[1].get_score(1), 0.0)
 
-    @unittest.expectedFailure
     def test_missing_joint_is_not_compared_as_zero(self) -> None:
-        # WindowNode stores a missing joint as 0.0 and marks it only in the mask; WindowSimilarity looks for
-        # NaN in the values and never reads the mask, so "joint missing" and "joint measured at 0 rad" give
-        # the same similarity.
+        # WindowNode stores a missing joint as 0.0 and marks it only in the mask; "joint missing" and
+        # "joint measured at 0 rad" must not give the same similarity.
         knee = AngleLandmark.left_knee
         a = _ramp()
         for values in a:
@@ -107,6 +106,57 @@ class WindowSimilarityTest(unittest.TestCase):
         same = (np.allclose(sim_measured[0].values, sim_missing[0].values, equal_nan=True)
                 and np.allclose(sim_measured[0].scores, sim_missing[0].scores))
         self.assertFalse(same)
+
+    def test_missing_joint_is_skipped_and_penalised_by_coverage(self) -> None:
+        missing = _ramp()
+        for values in missing:
+            values[AngleLandmark.left_knee] = np.nan
+        sim, lead = _similarity()._process({0: _window(_ramp()), 1: _window(missing)})
+        for i, j in ((0, 1), (1, 0)):
+            with self.subTest(pair=(i, j)):
+                self.assertAlmostEqual(sim[i][j], (F - 1) / F, places=5)
+                self.assertAlmostEqual(sim[i].get_score(j), (F - 1) / F, places=5)
+                self.assertAlmostEqual(lead[i][j], 0.0, places=5)
+
+    def test_unfilled_window_slots_are_not_frames(self) -> None:
+        # Track 1 has only 3 frames, all far from track 0's pose. Its 7 unfilled slots hold 0.0 in the buffer;
+        # if they counted as frames they would match track 0's 0-rad pose perfectly.
+        still = [np.zeros(F) for _ in range(T)]
+        new_arrival = [np.full(F, 1.5) for _ in range(3)]
+        sim, lead = _similarity(use_time_penalty=False)._process({0: _window(still), 1: _window(new_arrival)})
+        self.assertLess(sim[0][1], 0.1)
+        self.assertLessEqual(lead[0][1], 2 / (T - 1) + 1e-6)
+
+    def test_partial_window_still_matches_an_identical_track(self) -> None:
+        few = _ramp()[:3]
+        sim, lead = _similarity()._process({0: _window(few), 1: _window(few)})
+        self.assertAlmostEqual(sim[0][1], 1.0, places=5)
+        self.assertAlmostEqual(sim[0].get_score(1), 1.0, places=5)
+        self.assertAlmostEqual(lead[0][1], 0.0, places=5)
+
+    def test_track_without_current_angles_has_no_similarity(self) -> None:
+        # Track 0's current frame has no angles at all: nothing to compare from its side. This must not abort
+        # the batch (an all-NaN argmax raises).
+        gone = _ramp()
+        gone[-1] = np.full(F, np.nan)
+        sim, lead = _similarity()._process({0: _window(gone), 1: _window(_ramp())})
+        self.assertTrue(math.isnan(sim[0][1]))
+        self.assertEqual(sim[0].get_score(1), 0.0)
+        self.assertEqual(lead[0].get_score(1), 0.0)
+        self.assertEqual(lead[0][1], 0.0)
+        self.assertFalse(math.isnan(sim[1][0]))        # track 1's current pose still finds track 0's past frames
+
+    def test_missing_velocity_does_not_reduce_coverage(self) -> None:
+        velocity = [np.full(F, STEP * 30.0) for _ in range(T)]
+        gappy = [v.copy() for v in velocity]
+        for values in gappy:
+            values[AngleLandmark.head] = np.nan
+        sim, _ = _similarity(use_velocity_similarity=True)._process(
+            {0: _window(_ramp()), 1: _window(_ramp())},
+            velocity_windows={0: _window(velocity, AngleVelocity), 1: _window(gappy, AngleVelocity)},
+        )
+        self.assertAlmostEqual(sim[0][1], 1.0, places=5)
+        self.assertAlmostEqual(sim[0].get_score(1), 1.0, places=5)
 
 
 if __name__ == "__main__":
