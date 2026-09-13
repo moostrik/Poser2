@@ -8,7 +8,8 @@ import numpy as np
 
 from apps.white_space.light import Frame, Tick, BeamLightId, BEAM_LIGHT_HEADINGS, BUFFER_DTYPE
 from apps.white_space.light.layers import BeamTest, BeamTestSettings
-from apps.white_space.render.layers.beam_light_projection import beam_profile, project_beam_lights
+from modules.board import Flash, FlashStoreMixin
+from apps.white_space.render.layers.beam_light_projection import beam_profile, project_beam_lights, paint_flashes
 
 R = 360   # one pixel per degree keeps the expected indices readable
 
@@ -143,6 +144,62 @@ class ProjectionTest(unittest.TestCase):
         self._project(self._all(1.0))
         self._project(self._all(0.0))
         self.assertTrue(np.all(self.out == 0.0))
+
+
+class FlashPaintTest(unittest.TestCase):
+    """Recent flashes drawn over the beam view at the heading they lit, fading with age."""
+
+    NOW = 100.0
+    SECONDS = 1.0
+
+    def setUp(self) -> None:
+        self.out = np.zeros((1, R, 3), dtype=BUFFER_DTYPE)
+        self.beam = math.radians(4.0)
+        self.blur = 0.0
+
+    def _paint(self, *flashes: Flash, seconds: float = SECONDS) -> None:
+        paint_flashes(list(flashes), self.NOW, seconds, self.beam, self.blur, self.out)
+
+    def test_a_new_flash_lights_its_heading_at_full(self) -> None:
+        self._paint(Flash(math.radians(90.0), 0.8, 0.0, self.NOW))
+        self.assertAlmostEqual(float(self.out[0, 90, 0]), 0.8, places=5)
+        self.assertEqual(float(self.out[0, 0, 0]), 0.0)             # nothing at the current bar
+
+    def test_it_fades_linearly_and_is_gone_after_the_seconds(self) -> None:
+        self._paint(Flash(math.radians(90.0), 1.0, 0.0, self.NOW - 0.25))
+        self.assertAlmostEqual(float(self.out[0, 90, 0]), 0.75, places=5)
+        self.out.fill(0.0)
+        self._paint(Flash(math.radians(90.0), 1.0, 0.0, self.NOW - self.SECONDS))
+        self.assertTrue(np.all(self.out == 0.0))
+
+    def test_blue_lights_both_blue_lamps(self) -> None:
+        self._paint(Flash(0.0, 0.0, 0.5, self.NOW))
+        blue = self.out[0, :, 1]
+        self.assertAlmostEqual(float(blue[R // 4]), 0.5, places=5)       # right, +90°
+        self.assertAlmostEqual(float(blue[3 * R // 4]), 0.5, places=5)   # left, −90°
+        self.assertTrue(np.all(self.out[0, :, 0] == 0.0))
+
+    def test_zero_seconds_draws_nothing(self) -> None:
+        self._paint(Flash(0.0, 1.0, 1.0, self.NOW), seconds=0.0)
+        self.assertTrue(np.all(self.out == 0.0))
+
+    def test_the_steady_image_underneath_is_kept(self) -> None:
+        self.out[0, :, 0] = 0.4                                          # a DIM line everywhere
+        self._paint(Flash(math.radians(90.0), 1.0, 0.0, self.NOW - 0.9))  # a faint old flash
+        self.assertAlmostEqual(float(self.out[0, 90, 0]), 0.4, places=5)  # MAX, never darker
+        self.assertAlmostEqual(float(self.out[0, 200, 0]), 0.4, places=5)
+
+
+class FlashStoreTest(unittest.TestCase):
+
+    def test_flashes_come_back_oldest_first_and_bounded(self) -> None:
+        store = FlashStoreMixin()
+        for i in range(100):
+            store.add_flash(float(i), 1.0, 0.0)
+        flashes = store.get_flashes()
+        self.assertLess(len(flashes), 100)
+        self.assertEqual(flashes[-1].azimuth, 99.0)
+        self.assertEqual([f.azimuth for f in flashes], sorted(f.azimuth for f in flashes))
 
 
 if __name__ == '__main__':

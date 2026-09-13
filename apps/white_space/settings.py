@@ -329,6 +329,7 @@ class BeamLightSimSettings(BaseSettings):
     walls."""
     width: Field[float] = Field(15.0, min=0.0, max=90.0, step=0.5, description="Solid width of a beam light's line on the wall (deg)")
     blur: Field[float] = Field(6.0,  min=0.0, max=45.0, step=0.5, description="Soft falloff on each side of the line (deg); 0 = a hard edge")
+    flash_seconds: Field[float] = Field(1.0, min=0.0, max=5.0, step=0.05, description="Flash marker: seconds a flash stays drawn, fading out; 0 = off")
 
 
 class RenderSettings(BaseSettings):

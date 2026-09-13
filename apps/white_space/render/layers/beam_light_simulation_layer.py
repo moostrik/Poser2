@@ -6,29 +6,38 @@ the board and push a Frame-shaped image through the same shader, so the two mode
 one look. This one builds its image from the frame's explicit ``beam_lights``
 and its playhead heading (``beam_light_projection``). The render draws whichever of the two
 layers matches the fixture's readout mode for the frame.
+
+Recent flashes from the board are drawn over it, fading out over ``flash_seconds``, so a flash that
+lasts a tick or two on the fixture stays readable on screen; the steady lines are drawn as they are.
 """
 
 import math
+from time import monotonic
+from typing import Protocol
 
 import numpy as np
 from OpenGL.GL import * # type: ignore
 
 from modules.gl import Fbo, Texture, Image
-from modules.board import HasCompositionOutput
+from modules.board import HasCompositionOutput, HasFlashes
 from modules.render.layers.LayerBase import LayerBase
 from modules.utils import HotReloadMethods
 
 from apps.white_space.light import BUFFER_DTYPE
 from apps.white_space.render.shaders.light_simulation import LightSimulation
 
-from .beam_light_projection import project_beam_lights
+from .beam_light_projection import project_beam_lights, paint_flashes
 from ...settings import BeamLightSimSettings
+
+
+class BeamLightSimulationBoard(HasCompositionOutput, HasFlashes, Protocol):
+    ...
 
 
 class BeamLightSimulationLayer(LayerBase):
 
-    def __init__(self, board: HasCompositionOutput, config: BeamLightSimSettings) -> None:
-        self.board: HasCompositionOutput = board
+    def __init__(self, board: BeamLightSimulationBoard, config: BeamLightSimSettings) -> None:
+        self.board: BeamLightSimulationBoard = board
         self._config: BeamLightSimSettings = config
         self.fbo_angles: Fbo = Fbo()
         self.image: Image = Image()
@@ -61,8 +70,10 @@ class BeamLightSimulationLayer(LayerBase):
 
         if self._projection is None or self._projection.shape != output.light_img.shape:
             self._projection = np.zeros(output.light_img.shape, dtype=BUFFER_DTYPE)
-        project_beam_lights(output.beam_lights, self._heading, math.radians(self._config.width),
-                            math.radians(self._config.blur), self._projection)
+        width, blur = math.radians(self._config.width), math.radians(self._config.blur)
+        project_beam_lights(output.beam_lights, self._heading, width, blur, self._projection)
+        paint_flashes(self.board.get_flashes(), monotonic(), self._config.flash_seconds, width, blur,
+                      self._projection)
 
         self.image.set_image(self._projection)
         self.image.update()

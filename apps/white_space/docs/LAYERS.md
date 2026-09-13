@@ -38,7 +38,7 @@ poses is in `TRACKING.md`, *Downstream*.
 | Layer                 | Mode       | Reads                         | Writes                                   | Used by                   |
 |-----------------------|------------|-------------------------------|------------------------------------------|---------------------------|
 | `beam_playhead`       | beam       | — (settings only)             | front white lamp                         | S1–S6, S9, S10            |
-| `beam_flash`          | beam       | LERP frames (PlayheadOffset)  | front white lamp + blue lamps            | S4                        |
+| `beam_flash`          | beam       | LERP frames (PlayheadOffset)  | front white + blue lamps; board flashes  | S4                        |
 | `projection_playhead` | projection | frame playhead phase          | white playhead marker                    | S6 (projecting), S7, S8   |
 | `pose_instrument`     | projection | LERP frames, playhead bars    | white lines, blue anchor + between-lines | S6 (projecting), S7, S8   |
 | `flood`               | projection | — (settings only)             | whole projection white                   | S8                        |

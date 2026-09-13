@@ -20,6 +20,7 @@ from .depth_tracklets import        HasDepthTracklets, DepthTrackletStoreMixin
 from .sequence import               HasSequence, SequenceStoreMixin
 from .playhead import               HasPlayhead, PlayheadStoreMixin, PlayheadSignals
 from .sound import                  HasSoundLevels, SoundLevelStoreMixin, SoundLevels
+from .flashes import                HasFlashes, FlashStoreMixin, Flash
 from .tracklets import              HasTracklets, TrackletStoreMixin
 from .observations import           HasObservations, ObservationStoreMixin
 from .video import                  HasVideoImages, VideoImageStoreMixin

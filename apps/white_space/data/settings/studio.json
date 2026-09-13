@@ -3,7 +3,7 @@
   "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "render_fps": 59.0,
+  "render_fps": 60.0,
   "light_resolution": 3600,
   "fov": 127.0,
   "resolution": "P720",
@@ -53,8 +53,9 @@
       "use_history_color": false
     },
     "beam_light_sim": {
-      "width": 2.0,
-      "blur": 4.0
+      "width": 1.0,
+      "blur": 3.0,
+      "flash_seconds": 1.0
     },
     "panorama": {
       "parts": [
@@ -482,7 +483,7 @@
         "d_cutoff": 1.0
       },
       "prediction": {
-        "method": "LINEAR"
+        "method": "QUADRATIC"
       },
       "interpolator": {
         "responsiveness": 0.5,

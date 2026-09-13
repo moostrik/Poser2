@@ -74,17 +74,20 @@ class FlashPose:
 
 
 class FlashBoard(SimpleNamespace):
-    """Poses only: the flash never reads tracklets."""
+    """Poses only: the flash never reads tracklets. Records the flashes it is handed."""
 
     def get_frames(self, stage: int):
         return self.frames
+
+    def add_flash(self, azimuth: float, white: float, blue: float) -> None:
+        self.flashes.append((azimuth, white, blue))
 
 
 class FlashTest(unittest.TestCase):
     def setUp(self) -> None:
         self.cfg = BeamFlashSettings()
         self.cfg.width = 20.0                       # ±10°
-        self.board = FlashBoard(frames={})
+        self.board = FlashBoard(frames={}, flashes=[])
         self.layer = BeamFlash(RES, self.cfg, self.board, pose_stage=4)
 
     def _sweep(self, *offsets_deg: float, id: int = 0) -> list[float]:
@@ -127,6 +130,18 @@ class FlashTest(unittest.TestCase):
         f = Frame(RES, Tick(0.0, 1 / 30))
         self.layer.render(f)
         self.assertEqual(float(f.beam_lights[BeamLightId.FRONT_WHITE]), 0.0)
+
+    def test_each_lit_tick_posts_a_flash_at_the_playhead(self) -> None:
+        self.board.frames = {0: FlashPose(0, 5.0)}
+        f = Frame(RES, Tick(0.0, 1 / 30), playhead=1.25)
+        self.layer.render(f)
+        self.assertEqual(self.board.flashes, [(1.25, 1.0, 0.0)])
+
+    def test_a_dark_tick_or_no_playhead_posts_nothing(self) -> None:
+        self._sweep(90.0)                                            # outside the window
+        self.board.frames = {0: FlashPose(0, 5.0)}
+        self.layer.render(Frame(RES, Tick(0.0, 1 / 30), playhead=float("nan")))
+        self.assertEqual(self.board.flashes, [])
 
     def test_reset_clears_the_pass_history(self) -> None:
         self._sweep(40.0)

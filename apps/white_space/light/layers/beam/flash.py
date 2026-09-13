@@ -13,6 +13,10 @@ repositioned), ``_closest_pass`` still guarantees one flash on the frame nearest
 so a hit is never silently skipped. It is bypassed when a ``gap`` notch is configured, since
 that asks for darkness at exactly the crossing the guarantee would fire on.
 
+Every tick it lights, the flash is also posted to the board (``add_flash``: the playhead heading
+and the white and blue flash levels), so the render can mark it longer than the tick or two it
+lasts on the fixture.
+
 This module owns both flash kernels (``offset_to_level``, ``_closest_pass``);
 ``beam_haunted`` imports them.
 """
@@ -103,6 +107,9 @@ class BeamFlash(BeamLayer):
             flash_white = max(flash_white, level * P.white)
             flash_blue  = max(flash_blue,  level * P.blue)
         self._prev_offsets = prev_offsets
+
+        if (flash_white > 0.0 or flash_blue > 0.0) and not math.isnan(frame.playhead):
+            self._board.add_flash(frame.playhead, flash_white, flash_blue)
 
         # The flash is the front white lamp plus both blue lamps, on a constant base.
         self._add_beam_lights(beam_lights,
