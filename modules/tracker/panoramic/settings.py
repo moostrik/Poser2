@@ -56,7 +56,7 @@ class RigSettings(BaseSettings):
       worst case smallest, so it takes the middle.
     - **The far edge**, ``zone_max_radius``, while the tracker's ``zone_filter`` is on: past it a
       person is not seen — not born, and dropped after the tracker's timeouts if they walk out
-      (`Geometry.beyond_zone`). The panorama draws them as a grey box tagged ``past R…``. The near
+      (`Geometry.beyond_zone`). The panorama draws them as a grey line tagged ``past R…``. The near
       edge filters nothing, because close to the fixture the feet are often below the frame.
     """
     camera_radius: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01,
@@ -124,7 +124,7 @@ class TrackerSettings(BaseSettings):
     lens_centre_x: Field[float] = Field(0.0, access=Field.INIT, description="Optical centre offset (px), shared")
     lens_centre_y: Field[float] = Field(0.0, access=Field.INIT, description="Optical centre offset (px), shared")
     # The intake's filters, together. A detection one of them drops is not counted, and the panorama
-    # draws it as a grey box tagged with the filter (`young`, `small`, `past R…`).
+    # draws it as a grey line tagged with the filter (`young`, `small`, `past R…`).
     age_filter: Field[int] = Field(5, min=0, max=9, step=1,
                                    description="Minimum age in frames before a tracklet is considered.")
     height_filter: Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05,

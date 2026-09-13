@@ -101,20 +101,20 @@ class LabelRenderer(LayerBase):
                                          self._width, self._height)
 
     def _draw_tag(self, mark: Mark) -> None:
-        """A dropped detection's filter name, just above its box.
+        """A dropped detection's filter name, at the top of its line.
 
-        Not in a lane: lanes are world ids, and a dropped detection belongs to nobody. Above the box
-        it names, left-aligned to it; flipped to right-aligned at the strip's right edge, for the same
-        reason the lane labels flip. Two dropped views of one person at a seam can overlap their
-        tags — rare, and left so.
+        Not in a lane: lanes are world ids, and a dropped detection belongs to nobody. Beside the top
+        of the line it names, reading right from it; flipped to the left at the strip's right edge,
+        for the same reason the lane labels flip. Two dropped views of one person at a seam can
+        overlap their tags — rare, and left so.
         """
         width, height = self._text.measure_text(mark.label)
-        left_px: float = mark.box_x * self._width
-        x: float = left_px
+        mark_px: float = mark.x * self._width
+        x: float = mark_px + _MARK_GAP_PX
         if x + width > self._width:
-            x = left_px + mark.box_w * self._width - width
+            x = mark_px - _MARK_GAP_PX - width
         x = min(max(x, 0.0), max(0.0, self._width - width))
-        y: float = max(0.0, mark.box_top_y * self._height - height - _LANE_GAP_PX)
+        y: float = max(0.0, min(mark.top_y * self._height, self._height - height))
         self._text.draw_box_text(x, y, mark.label, mark.color, LABEL_BG, self._width, self._height)
 
     def _by_world(self) -> dict[int, list[Mark]]:

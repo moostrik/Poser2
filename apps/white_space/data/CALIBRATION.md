@@ -489,8 +489,8 @@ image right and marks wrong means the distance model, not the camera.
 | `image` | the four camera frames, stitched |
 | `seams` | the seam rule defined on a camera's own frame: the dead zone (red bands) |
 | `grid` | **every reference mark in the strip's own two axes**: the degree lattice, the sector boundaries (orange), the camera axes (blue), the overlap (yellow verticals), the green horizon, the yellow zone field, the labels, the footer |
-| `observations` | a line per observation with a **foot tick** at the reported distance, inside a field as wide as the rule that governs it — and a **grey box** for every detection a filter dropped |
-| `labels` | `#id cam az R distance H height` per observation; the filter's name above each grey box |
+| `observations` | a line per observation with a **foot tick** at the reported distance, inside a field as wide as the rule that governs it — and a **grey line** for every detection a filter dropped |
+| `labels` | `#id cam az R distance H height` per observation; the filter's name at the top of each grey line |
 
 **A mark is the tracker's belief, not the picture, and its two axes use two depths on purpose.** Its
 **x** is the fused `world_angle` — the number the light, the sound and the hit detector all receive
@@ -523,12 +523,13 @@ labels never collide and never move as people do, and its x always sits on its o
 
 **Nobody leaves the strip without a reason.**
 
-- **A mark fading from its colour to grey is an identity the tracker holds but no longer counts** —
-  a LOST observation: the device missed them, or they walked past the far edge (the label then ends
-  in `past R3.5`). How grey it is says how close it is to being forgotten: their pose leaves the show
-  after `emit_timeout`, the identity at `lost_timeout`, the moment it is fully grey.
-- **A grey box is a detection the tracker dropped**, outlined at the detector's own size, with the
-  filter named above it:
+- **A line fading to grey, its field fading out, is an identity the tracker holds but no longer
+  counts** — a LOST observation: the device missed them, or they walked past the far edge (the label
+  then ends in `past R3.5`). How far it has faded says how close it is to being forgotten: their
+  pose leaves the show after `emit_timeout`, the identity at `lost_timeout`, the moment the line is
+  fully grey and the field gone.
+- **A grey line with no field is a detection the tracker dropped**, with the filter named at its
+  top:
 
 | tag | dropped because | the setting |
 |---|---|---|
@@ -537,7 +538,7 @@ labels never collide and never move as people do, and its x always sits on its o
 | `dead zone` | a new person arriving right at a camera's field edge | `track.seam.dead_zone` |
 | `past R3.5` | standing past the far edge | `track.zone_filter`, at `track.rig.zone_max_radius` |
 
-So a person walking out keeps their own mark, fading, and when it has gone grey a grey box tagged
+So a person walking out keeps their own mark, fading, and when it has gone grey a grey line tagged
 `past R3.5` takes its place for as long as the camera still sees them.
 
 | what you see | what is wrong |
@@ -830,7 +831,7 @@ standing on it. Feet at or above the horizon read as infinitely far: not standin
 **Past `rig.zone_max_radius` the tracker does not see a person** — while `track.zone_filter`
 is on (the switch sits with the tracker's other filters, `age_filter` and `height_filter`; off means
 off: nothing is filtered at the far edge and nothing mentions it). That is the whole rule, and it is
-handled exactly like a missed detection. On the panorama they show as a grey box tagged `past R3.5`:
+handled exactly like a missed detection. On the panorama they show as a grey line tagged `past R3.5`:
 
 | situation | what happens |
 |---|---|

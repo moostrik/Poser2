@@ -14,16 +14,16 @@ from .marks import Mark
 _PRIMARY_PX: float = 2.0
 _CANDIDATE_PX: float = 1.0
 
-# The foot tick: wide enough to read against a zone edge by eye, and 2 px tall so it has a
+# The foot tick: wide enough to read against a zone edge by eye, and 3 px tall so it has a
 # definite row. Deliberately larger than the line — the tick is the measurement, the line is
 # context — and the same size for every observation, since a reading's precision does not
 # depend on whether the tracker picked that camera.
-_TICK_PX: float = 11.0
-_TICK_HEIGHT_PX: float = 2.0
+_TICK_PX: float = 17.0
+_TICK_HEIGHT_PX: float = 3.0
 
-# The tolerance field's opacity, and it is NOT scaled by the mark's own confidence alpha. The line
-# already says LOST / candidate / primary, and the re-acquisition window matters most on a LOST
-# mark — dimming that one to a twentieth would hide the single case it exists for.
+# The tolerance field's opacity, and it is NOT scaled by the line's confidence alpha: the line
+# already says candidate / primary. Only a LOST mark's field dims, by its own `field_color` alpha,
+# fading out as the identity runs toward `lost_timeout`.
 _FIELD_ALPHA: float = 0.2
 
 
@@ -61,9 +61,11 @@ class ObservationRenderer(LayerBase):
       that overlap are two people it might confuse. A field is drawn the tolerance wide rather than
       either side of the line precisely so that overlapping *is* the gate.
 
-    **A detection the tracker dropped** is drawn in grey as its line, its foot tick and an outline of
-    the detector's own box, with no field — no rule can join it to anything. Its tag names the filter
-    (`LabelRenderer`). So a person never leaves the strip without a reason on screen.
+    **A LOST mark** keeps its line and field, and fades: the line to grey, the field out.
+
+    **A detection the tracker dropped** is drawn in grey as its line and its foot tick, with no field
+    — no rule can join it to anything. Its tag names the filter (`LabelRenderer`). So a person never
+    leaves the strip without a reason on screen.
 
     Owns no FBO: the compositor's is bound when `draw()` is called.
     """
@@ -101,32 +103,17 @@ class ObservationRenderer(LayerBase):
             if mark.rejected:
                 continue                                  # no rule can join it: no field
             top, bottom = self._rows(mark, px_y)
-            r, g, b, _a = mark.color
+            r, g, b, visible = mark.field_color
+            if visible <= 0.0:
+                continue
             self._spans(mark.tolerance_x, mark.tolerance_w, top, bottom - top,
-                        (r, g, b, _FIELD_ALPHA))
+                        (r, g, b, _FIELD_ALPHA * visible))
 
         for mark in self._marks:
             top, bottom = self._rows(mark, px_y)
             width: float = (_PRIMARY_PX if mark.is_primary else _CANDIDATE_PX) * px_x
             self._spans(mark.x - width / 2.0, width, top, bottom - top, mark.color)
-            if mark.rejected:
-                self._box(mark, px_x, px_y)
             self._foot_tick(mark, px_x, px_y)
-
-    def _box(self, mark: Mark, px_x: float, px_y: float) -> None:
-        """A dropped detection's own box, outlined: what the detector reported, at its real size.
-
-        An outline rather than a fill, so the picture — and a tracked person standing behind it —
-        stays readable, and so a box too small to count visibly is small. Its sides wrap at the 0/360
-        join like everything else on the strip.
-        """
-        top: float = min(max(mark.box_top_y, 0.0), 1.0)
-        bottom: float = min(max(mark.box_bottom_y, 0.0), 1.0)
-        height: float = max(px_y, bottom - top)
-        self._spans(mark.box_x, mark.box_w, top, px_y, mark.color)                  # top edge
-        self._spans(mark.box_x, mark.box_w, top + height - px_y, px_y, mark.color)  # bottom edge
-        self._spans(mark.box_x, px_x, top, height, mark.color)                      # left side
-        self._spans(mark.box_x + mark.box_w - px_x, px_x, top, height, mark.color)  # right side
 
     def _foot_tick(self, mark: Mark, px_x: float, px_y: float) -> None:
         """The foot row, marked so it can be read against the zone field.

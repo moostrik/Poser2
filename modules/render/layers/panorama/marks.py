@@ -50,11 +50,11 @@ Each mark also carries the **joining tolerance that governs its place on the rin
 only in a settings panel.
 
 **Detections a filter dropped are marks too**, so nobody leaves the strip without a reason. They
-have no world, so they are grey, have no tolerance (no rule can join them), carry the detector's own
-box — a box too small to count *looks* too small — and are labelled with the filter's name
-(`Rejection`: `young`, `small`, `dead zone`, `past R3.5`). A tracked person the far edge stops
-counting keeps their own mark, fading to grey over `lost_timeout` (`_color`); the moment it is fully
-grey is the moment their grey box takes over.
+have no world, so they are a grey line with no tolerance field (no rule can join them), labelled
+with the filter's name (`Rejection`: `young`, `small`, `dead zone`, `past R3.5`). A LOST mark — a
+tracked person the far edge stops counting, or one the device missed — keeps its own line, which
+fades to grey over `lost_timeout`, while its field fades out (`_fade`); the moment the line is fully
+grey is the moment a dropped detection's grey line takes over.
 """
 
 # Standard library imports
@@ -65,6 +65,8 @@ from dataclasses import dataclass
 from modules.tracker import PanoramicAnnotation, Tracklet, TrackingStatus, camera_azimuth, \
     camera_local_to_azimuth, centre_distance, centre_elevation, elevation_from_row, focus_distance, \
     rejection_label, strip_y, wrap180
+
+Color = tuple[float, float, float, float]
 
 
 @dataclass(frozen=True)
@@ -83,7 +85,7 @@ class StripGeometry:
     what makes the two comparable.
 
     `zone_max_radius` names the far edge in a `past R…` tag; `lost_timeout` and `now` are what a
-    LOST mark's fade to grey is timed by — passed in rather than read, so this stays pure.
+    LOST mark's fade is timed by — passed in rather than read, so this stays pure.
     """
     cam_fov: float
     target_fov: float
@@ -110,11 +112,8 @@ class Mark:
     has_foot: bool                                  # whether `bottom_y` is a floor reading at all
     tolerance_x: float                              # left edge of the joining tolerance...
     tolerance_w: float                              # ... and its width; both normalised strip x
-    box_x: float                                    # the detector's own box: left edge...
-    box_w: float                                    # ... and width, normalised strip x...
-    box_top_y: float                                # ... and its top and bottom rows
-    box_bottom_y: float
-    color: tuple[float, float, float, float]        # the world colour, alpha carrying confidence
+    color: tuple[float, float, float, float]        # the line's colour, alpha carrying confidence
+    field_color: tuple[float, float, float, float]  # the field's world colour; alpha = how visible
     is_primary: bool
     rejected: bool                                  # a detection a filter dropped: no world, grey
     label: str
@@ -157,35 +156,27 @@ def _mark(tracklet: Tracklet, primaries: set[int],
         centre_dist: float = centre_distance(annotation.local_angle - g.cam_fov / 2.0,
                                              cam_distance, g.ring_radius)
         top_y: float = _row_y(tracklet.roi.y, g, cam_distance, centre_dist)
-        box_bottom_y: float = _row_y(roi_bottom, g, cam_distance, centre_dist)
         bottom_y: float = _foot_y(g, centre_dist)
     else:
         # Feet at or above the horizon: not standing on this floor, so there is no distance to
-        # convert the rows through. Place the box on the parallax cylinder instead — where its x
+        # convert the rows through. Place the line on the parallax cylinder instead — where its x
         # already is — and draw no foot tick, since there is no floor reading to mark.
         phi: float = wrap180(annotation.world_angle - camera_azimuth(tracklet.cam_id, g.target_fov))
         cylinder: float = focus_distance(phi, g.ring_radius, g.parallax_radius)
         centre_dist = math.inf
         top_y = _row_y(tracklet.roi.y, g, cylinder, g.parallax_radius)
-        box_bottom_y = _row_y(roi_bottom, g, cylinder, g.parallax_radius)
-        bottom_y = box_bottom_y
+        bottom_y = _row_y(roi_bottom, g, cylinder, g.parallax_radius)
 
-    # The detector's own box, across: its two edge columns through the same map the line takes.
-    left: float = camera_local_to_azimuth(tracklet.roi.x * g.cam_fov, tracklet.cam_id, g.cam_fov,
-                                          g.target_fov, g.ring_radius, g.parallax_radius)
-    right: float = camera_local_to_azimuth((tracklet.roi.x + tracklet.roi.width) * g.cam_fov,
-                                           tracklet.cam_id, g.cam_fov, g.target_fov,
-                                           g.ring_radius, g.parallax_radius)
-
-    # Dropped by a filter and never given a world: grey, no rule to join it by, tagged with why.
+    # Dropped by a filter and never given a world: a grey line, no rule to join it by, tagged with why.
     rejected: bool = annotation.rejected is not None and tracklet.id < 0
     is_primary: bool = tracklet.obs_id in primaries
     if rejected:
         tolerance_lo = tolerance_hi = annotation.world_angle
         color: tuple[float, float, float, float] = rejected_color
+        field_color: tuple[float, float, float, float] = (*rejected_color[:3], 0.0)
     else:
         tolerance_lo, tolerance_hi = _tolerance(annotation, tracklet.cam_id, g)
-        color = _color(tracklet, is_primary, colors, rejected_color, g)
+        color, field_color = _colors(tracklet, is_primary, colors, rejected_color, g)
 
     return Mark(
         world_id=tracklet.id,
@@ -196,33 +187,40 @@ def _mark(tracklet: Tracklet, primaries: set[int],
         has_foot=has_foot,
         tolerance_x=(tolerance_lo % 360.0) / 360.0,
         tolerance_w=((tolerance_hi - tolerance_lo) % 360.0) / 360.0,
-        box_x=(left % 360.0) / 360.0,
-        box_w=((right - left) % 360.0) / 360.0,
-        box_top_y=top_y,
-        box_bottom_y=box_bottom_y,
         color=color,
+        field_color=field_color,
         is_primary=is_primary,
         rejected=rejected,
         label=_label(tracklet, annotation, centre_dist, rejected, g),
     )
 
 
-def _color(tracklet: Tracklet, is_primary: bool, colors: list[tuple[float, float, float, float]],
-           grey: tuple[float, float, float, float], g: StripGeometry) -> tuple[float, float, float, float]:
-    """The world colour, its alpha saying how much to trust it.
+def _fade(tracklet: Tracklet, g: StripGeometry) -> float:
+    """How far a LOST observation is toward being forgotten: 0 just lost, 1 at `lost_timeout`.
+    0 for anything the device is still detecting."""
+    if tracklet.status != TrackingStatus.LOST:
+        return 0.0
+    return min(1.0, max(0.0, g.now - tracklet.last_active) / max(1e-6, g.lost_timeout))
 
-    A loser at a seam is dimmed so the primary reads as the one in charge. A **LOST** observation
-    fades from the world colour to grey over `lost_timeout`, at the candidate's alpha: it is still
-    an identity the tracker holds — anchoring a seam crossing, or a person walking past the far
-    edge — and how grey it is says how close it is to being forgotten. Fully grey is exactly the
-    moment a dropped detection's grey box takes over, so a person walking out never vanishes.
+
+def _colors(tracklet: Tracklet, is_primary: bool, colors: list[Color], grey: Color,
+            g: StripGeometry) -> tuple[Color, Color]:
+    """(line, field) colours: the world colour, alpha saying how much to trust it.
+
+    A loser at a seam is dimmed so the primary reads as the one in charge. A **LOST** observation is
+    still an identity the tracker holds — anchoring a seam crossing, or a person walking past the far
+    edge — so it keeps its mark, and the mark says how close it is to being forgotten: over
+    `lost_timeout` its **line fades to grey**, at the candidate's alpha, and its **field fades out**,
+    keeping its colour. Fully grey is exactly the moment a dropped detection's grey line takes over,
+    so a person walking out never vanishes; the field going first says the rule it stood for — who
+    it may be joined to — is running out with it.
     """
     r, gr, b, a = colors[tracklet.id % len(colors)] if colors else (1.0, 1.0, 1.0, 1.0)
     if tracklet.status == TrackingStatus.LOST:
-        age: float = max(0.0, g.now - tracklet.last_active)
-        t: float = min(1.0, age / max(1e-6, g.lost_timeout))
-        return (r + (grey[0] - r) * t, gr + (grey[1] - gr) * t, b + (grey[2] - b) * t, a * 0.5)
-    return (r, gr, b, a if is_primary else a * 0.5)
+        t: float = _fade(tracklet, g)
+        line: Color = (r + (grey[0] - r) * t, gr + (grey[1] - gr) * t, b + (grey[2] - b) * t, a * 0.5)
+        return line, (r, gr, b, 1.0 - t)
+    return (r, gr, b, a if is_primary else a * 0.5), (r, gr, b, 1.0)
 
 
 def _label(tracklet: Tracklet, annotation: PanoramicAnnotation, centre_dist: float,

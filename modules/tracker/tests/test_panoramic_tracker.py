@@ -920,7 +920,7 @@ class TestFilteredDetections(RigTrackerCase):
         observation = self.tracker.store.get_live_observation(0, 1)
         assert observation is not None and isinstance(observation.annotation, PanoramicAnnotation)
         self.assertEqual(observation.annotation.rejected, Rejection.PAST_EDGE)
-        self.assertEqual(self.rejected(), {})                    # one mark, not a second grey box
+        self.assertEqual(self.rejected(), {})                    # one mark, not a second grey line
         self.seen(3.0)
         observation = self.tracker.store.get_live_observation(0, 1)
         assert observation is not None and isinstance(observation.annotation, PanoramicAnnotation)

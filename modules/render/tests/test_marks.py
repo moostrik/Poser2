@@ -13,7 +13,7 @@ from dataclasses import replace
 
 from modules.render.layers.panorama.marks import Mark, StripGeometry, build_marks
 from modules.tracker import PanoramicAnnotation, PanoramicTracker, PanoramicTrackerSettings, Rejection, \
-    Tracklet, TrackingStatus, camera_local_to_azimuth, row_from_elevation, strip_spans, strip_y
+    Tracklet, TrackingStatus, row_from_elevation, strip_spans, strip_y
 from modules.utils import Rect
 
 
@@ -106,12 +106,12 @@ class TestPlacement(unittest.TestCase):
         self.assertLess(m.bottom_y, far_edge_y)                   # higher on the strip = further
 
     def test_feet_not_on_the_floor_still_make_a_mark_but_no_foot_tick(self) -> None:
-        # `inf`: no distance to put the rows through, so the box is placed on the parallax cylinder
+        # `inf`: no distance to put the rows through, so the line is placed on the parallax cylinder
         # instead — it is still drawn, so it cannot vanish — and there is no floor reading to tick.
         m: Mark = mark(observation(0, 63.5, 45.0, overlap=False, distance=math.inf))
         self.assertFalse(m.has_foot)
-        self.assertTrue(math.isfinite(m.top_y) and math.isfinite(m.box_bottom_y))
-        self.assertLess(m.top_y, m.box_bottom_y)
+        self.assertTrue(math.isfinite(m.top_y) and math.isfinite(m.bottom_y))
+        self.assertLess(m.top_y, m.bottom_y)
         self.assertIn('R-', m.label)
 
     def test_a_removed_observation_makes_no_mark(self) -> None:
@@ -127,12 +127,13 @@ def dropped(reason: Rejection, **kwargs) -> Tracklet:
 
 
 class TestDroppedDetections(unittest.TestCase):
-    """A detection the tracker did not count is still a mark: grey, boxed, and named."""
+    """A detection the tracker did not count is still a mark: a grey line, and named."""
 
-    def test_it_is_grey_boxed_and_joins_nothing(self) -> None:
+    def test_it_is_a_grey_line_that_joins_nothing(self) -> None:
         m: Mark = mark(dropped(Rejection.SMALL))
         self.assertTrue(m.rejected)
         self.assertEqual(m.color, GREY)
+        self.assertEqual(m.field_color[3], 0.0)                     # no field
         self.assertAlmostEqual(m.tolerance_w, 0.0, places=12)
         self.assertEqual(strip_spans(m.tolerance_x, m.tolerance_w), [])
 
@@ -142,25 +143,13 @@ class TestDroppedDetections(unittest.TestCase):
             with self.subTest(reason=reason):
                 self.assertEqual(mark(dropped(reason)).label, tag)
 
-    def test_the_box_is_the_detectors_own_through_the_lines_map(self) -> None:
-        t: Tracklet = dropped(Rejection.SMALL)
-        m: Mark = mark(t)
-        left = camera_local_to_azimuth(t.roi.x * CAM_FOV, 0, CAM_FOV, TARGET_FOV, RING_RADIUS, PARALLAX_RADIUS)
-        right = camera_local_to_azimuth((t.roi.x + t.roi.width) * CAM_FOV, 0, CAM_FOV, TARGET_FOV,
-                                        RING_RADIUS, PARALLAX_RADIUS)
-        self.assertAlmostEqual(m.box_x, (left % 360.0) / 360.0, places=9)
-        self.assertAlmostEqual(m.box_w, ((right - left) % 360.0) / 360.0, places=9)
-        self.assertLess(m.box_x, m.x)
-        self.assertGreater(m.box_x + m.box_w, m.x)                 # the line runs through the box
-        self.assertLess(m.box_top_y, m.box_bottom_y)
-
     def test_dropped_marks_are_drawn_first(self) -> None:
         marks = build_marks([observation(0, 63.5, 45.0, overlap=False), dropped(Rejection.YOUNG)],
                             set(), WHITE, GREY, GEOMETRY)
         self.assertEqual([m.rejected for m in marks], [True, False])
 
     def test_a_tracked_person_past_the_edge_keeps_their_own_mark(self) -> None:
-        # Tagged but holding a world: not grey-boxed, and the label says why it is fading.
+        # Tagged but holding a world: its own mark, not a grey line, and the label says why it is fading.
         t: Tracklet = observation(0, 63.5, 45.0, overlap=False, status=TrackingStatus.LOST)
         assert isinstance(t.annotation, PanoramicAnnotation)
         t = replace(t, id=0, last_active=NOW, annotation=replace(t.annotation, rejected=Rejection.PAST_EDGE))
@@ -171,12 +160,22 @@ class TestDroppedDetections(unittest.TestCase):
 
 
 class TestLostFade(unittest.TestCase):
-    """A LOST observation fades from its world colour to grey over `lost_timeout`."""
+    """A LOST observation's line fades from its world colour to grey over `lost_timeout`, and its
+    field fades out, keeping its colour."""
 
-    def colour(self, seconds_lost: float, status: TrackingStatus = TrackingStatus.LOST):
+    def lost(self, seconds_lost: float, status: TrackingStatus = TrackingStatus.LOST) -> Mark:
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, status=status),
                               id=0, last_active=NOW - seconds_lost)
-        return build_marks([t], set(), RED, GREY, GEOMETRY)[0].color
+        return build_marks([t], set(), RED, GREY, GEOMETRY)[0]
+
+    def colour(self, seconds_lost: float, status: TrackingStatus = TrackingStatus.LOST):
+        return self.lost(seconds_lost, status).color
+
+    def test_the_field_keeps_its_colour_and_fades_out(self) -> None:
+        self.assertEqual(self.lost(0.0).field_color, (1.0, 0.0, 0.0, 1.0))
+        self.assertEqual(self.lost(LOST_TIMEOUT / 2.0).field_color, (1.0, 0.0, 0.0, 0.5))
+        self.assertEqual(self.lost(LOST_TIMEOUT).field_color, (1.0, 0.0, 0.0, 0.0))
+        self.assertEqual(self.lost(LOST_TIMEOUT, TrackingStatus.TRACKED).field_color, (1.0, 0.0, 0.0, 1.0))
 
     def test_fresh_is_the_world_colour(self) -> None:
         self.assertEqual(self.colour(0.0), (1.0, 0.0, 0.0, 0.5))
