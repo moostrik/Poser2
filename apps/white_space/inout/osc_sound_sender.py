@@ -21,10 +21,8 @@ class OscSoundSender(BaseOscSound):
     (/global/volume, /global/speaker/offset), and the panoramic-only per-pose azimuth and
     playhead-offset messages.
 
-    ``/global/state`` carries the show state (``ShowState``, 0–8) from the state machine —
-    the address name is kept for backwards compatibility although it now means show state
-    (it used to carry the commanded MotorMode as a workaround). The motor mode still goes
-    out, on ``/global/motor``.
+    ``/global/state`` carries the show state (``StateId``, 0–10) from the state machine, and
+    −1 in the shutdown blackout. The motor mode goes out on ``/global/motor``.
 
     ``/global/speaker/offset`` is the one number Max needs of its own: where speaker 0 stands
     as an azimuth. With the speakers placed by the fixed layout (speaker 0 on the connection

@@ -1,56 +1,58 @@
 # White Space — States
+Eleven states played by the `StateMachine` (`apps/white_space/statemachine/`). This document is the
+source of truth for the installation's dramaturgy; the state classes in `statemachine/states.py` point
+here. Transition lists are in **priority order**, matching each class's `needs_state_change()`. Timing
+tunables live in the `states` settings group; each state returns its mix from `update()`.
 
-Eleven states played by the `StateMachine` (`apps/white_space/statemachine/`).
-This document is the source of truth for the installation's dramaturgy. Each state's description
-is mirrored as the docstring of its class in `statemachine/states.py`; transition lists below
-are in **priority order**, matching each class's `needs_state_change()`. Timing tunables live
-in the `states` settings group; layer choices in each state's `update()`.
+Vocabulary:
 
-Vocabulary: **P** = debounced live participant count · **bar** = one full playhead cycle
-(the content clock) · **hit** = the playhead sweeps past a participant · **beam layers**
-write the four beam lights (front/back white, left/right blue) · **projection layers** draw
-the persistence-of-vision ring · **readout mode** = the fixture's own mode switch, on
-the *commanded* rpm: beam mode (the four lamps driven directly) below 200 rpm, projection mode
-at or above — it flips on receipt of the rpm, not when the bar is actually fast or slow,
-so a wind-down is in beam mode from its first packet and a spin-up in projection mode from its
-first packet · **motor lock** = the playhead has re-synced
-to the measured rotation *at BEAM speed* (its re-lock gate: a fresh measurement settling
-within tolerance of `beam_rpm` — not merely "under the 200 RPM sensor ceiling", and immune
-to stale spin-down readings) · **un-lock** = the raw measured speed passes the ceiling on
-the way up (the lamp bar physically blurring into the ring).
+- **P** — the live participant count, debounced by `states.count_hold_seconds`
+- **bar** — one full playhead cycle, the content clock
+- **hit** — the playhead sweeps past a participant
+- **readout mode** — the fixture reads beam mode below 200 rpm and projection mode at or above, switching
+  on receipt of the *commanded* rpm (see `CALIBRATION.md` *Two modes, two offsets*). A spin-up is in
+  projection mode from its first packet; a wind-down is in beam mode from its first packet.
+- **motor lock** — the playhead has re-synced to the measured rotation *at BEAM speed*: a fresh
+  measurement has settled within tolerance of `beam_rpm`. Being under the 200 rpm sensor ceiling is not
+  enough, and stale spin-down readings do not count.
+- **un-lock** — PROJECTION is commanded and the sensor has been silent for 2.5 ceiling periods: the lamp
+  bar has blurred into the ring.
 
 ## Summary
 
-| #  | State      | P        | Duration      | Motor   | White light                      | Blue light                | Pose sound           | Secondary sound                |
-|----|------------|----------|---------------|---------|----------------------------------|---------------------------|----------------------|--------------------------------|
-| S0 | OFF        | —        | ∞ (blackout) / until lock | BEAM | none                         | none                      | no                   | no                             |
-| S1 | OFF_IDLE   | —        | 1 bar         | BEAM     | fade dark → BRIGHT line          | fade-in sound visuals     | no                   | fade-in soundscape             |
-| S2 | IDLE       | 0        | ∞             | BEAM     | BRIGHT line                      | sound visuals             | no                   | searchlight soundscape         |
-| S3 | IDLE_INTRO | > 0      | until hit     | BEAM     | BRIGHT line                      | sound visuals             | yes (pre-hit)        | searchlight + anticipatory cue |
-| S4 | INTRO      | > 0      | ∞             | BEAM     | DIM line + flash on hit          | none                      | yes (only)           | none                           |
-| S5 | INTRO_IDLE | 0        | 1 bar         | BEAM     | fade DIM → BRIGHT                | fade-in sound visuals     | no                   | fade-in soundscape             |
-| S6 | INTRO_PLAY | ≥ 3      | 14 s spin-up  | PROJECTION    | instrument + playhead at un-lock | pose instrument (ease in) | yes (effect?)        | enhance spin-up chaos          |
-| S7 | PLAY       | ≥ 3      | ∞             | PROJECTION    | pose instrument + playhead       | pose instrument           | yes                  | enhance spin                   |
-| S8 | END        | < 3      | N bars (↔)    | PROJECTION    | instrument + playhead → full     | fade-out instrument       | distortion?          | fade-out spin + distortion?    |
-| S9 | END_INTRO  | < 3, > 0 | spin-down (fade, then lock) | BEAM | wall fades → DIM over the spin-down | none                | fade out distortion? | fade out distortion?           |
-| S10| END_IDLE   | 0        | spin-down (fade, then lock) | BEAM | stays BRIGHT, back lamp fades out | fade-in sound visuals | fade out distortion? | fade out distortion?           |
+| #   | State      | P   | Duration                       | Motor      | White                              | Blue                 | Pose sound | Secondary sound               |
+|-----|------------|-----|--------------------------------|------------|------------------------------------|----------------------|------------|-------------------------------|
+| S0  | OFF        | —   | until unpinned and locked      | BEAM       | none                               | none                 | no         | none                          |
+| S1  | OFF_IDLE   | —   | `off_idle_bars`                | BEAM       | dark → BRIGHT line                 | none → sound visuals | no         | none → soundscape             |
+| S2  | IDLE       | 0   | ∞                              | BEAM       | BRIGHT line                        | sound visuals        | no         | soundscape                    |
+| S3  | IDLE_INTRO | > 0 | until hit                      | BEAM       | BRIGHT line                        | sound visuals        | before hit | soundscape + anticipatory cue |
+| S4  | INTRO      | > 0 | ∞                              | BEAM       | DIM line + flash on hit            | none                 | yes        | none                          |
+| S5  | INTRO_IDLE | 0   | `intro_idle_bars`              | BEAM       | DIM → BRIGHT line                  | none → sound visuals | no         | none → soundscape             |
+| S6  | INTRO_PLAY | ≥ 3 | `spin_up_seconds`              | PROJECTION | dark → instrument + playhead       | none → instrument    | yes        | enhance spin-up chaos         |
+| S7  | PLAY       | ≥ 3 | ∞                              | PROJECTION | instrument + playhead              | instrument           | yes        | enhance spin                  |
+| S8  | END        | < 3 | `end_bars`, both ways          | PROJECTION | instrument + playhead → full white | instrument → none    | open       | enhance spin → none           |
+| S9  | END_INTRO  | 1–2 | `spin_down_seconds`, then lock | BEAM       | wall → DIM line                    | none                 | open       | open                          |
+| S10 | END_IDLE   | 0   | `spin_down_seconds`, then lock | BEAM       | wall → BRIGHT line                 | none → sound visuals | open       | open                          |
+
+Durations name settings in the `states` group; `studio.json` sets `off_idle_bars` 1, `intro_idle_bars` 2,
+`spin_up_seconds` 14, `end_bars` 8 and `spin_down_seconds` 6. `open` cells are listed under *Open*.
 
 ## Transition graph
 
 ```mermaid
 stateDiagram-v2
-    OFF: OFF — dark and silent, still sweeping at BEAM
     [*] --> OFF
+    OFF: OFF — dark and silent, still sweeping at BEAM
     OFF --> OFF_IDLE: blackout released and playhead locked
     OFF_IDLE --> INTRO: hit by light
-    OFF_IDLE --> IDLE: 1 bar
+    OFF_IDLE --> IDLE: off_idle_bars
     IDLE --> IDLE_INTRO: P > 0
     IDLE_INTRO --> INTRO: hit by light
     IDLE_INTRO --> INTRO_IDLE: P == 0
     INTRO --> INTRO_IDLE: P == 0
     INTRO --> INTRO_PLAY: sync ≥ threshold & P ≥ 3\n(session - after fixed time)
-    INTRO_IDLE --> IDLE: 1 bar
-    INTRO_PLAY --> PLAY: spin-up done (14 s)
+    INTRO_IDLE --> IDLE: intro_idle_bars
+    INTRO_PLAY --> PLAY: spin_up_seconds
     PLAY --> END: P < 3\n(session - after fixed time)
     END --> PLAY: P ≥ 3 — winds back first\n(stand-alone only)
     END --> END_INTRO: wound down, P > 0
@@ -59,306 +61,275 @@ stateDiagram-v2
     END_IDLE --> IDLE: fade done and BEAM reacquired
 ```
 
-The machine always **boots into OFF** — dark, motor at BEAM — and wakes through OFF_IDLE
-by itself once the playhead has locked, so power-on is the same wake as a blackout
-release (failsafe — the persisted `manual.select` is only the goto target, and
-`manual.hold` and `blackout` are forced off at construction: a power-cycled installation
-resumes the show unattended, never stays dark). **OFF (S0)** is also entered from any
-state by pinning `blackout` (an operator input, so it is not drawn as an edge above) and
-leaves it by condition like any other state — through its wake transition, OFF_IDLE, once
-neither the pin nor a missing lock holds it. In **session mode** the
-two open-ended states (INTRO, PLAY) gain timed exits, and END only winds down (no return
-to PLAY), so a session always concludes.
+The machine always **boots into OFF** — dark, motor at BEAM — and wakes through OFF_IDLE by itself once
+the playhead has locked, so power-on is the same wake as a blackout release. The persisted
+`manual.select` is only the goto target, and `manual.hold` and `blackout` are forced off at construction:
+a power-cycled installation resumes the show unattended and never stays dark. **OFF (S0)** is also
+entered from any state by pinning `blackout` (an operator input, so it is not drawn as an edge above), and
+leaves by condition like any other state — through OFF_IDLE, once neither the pin nor a missing lock
+holds it. In **session mode** the two open-ended states (INTRO, PLAY) gain timed exits, and END only winds
+down (no return to PLAY), so a session always concludes.
 
-**Boot invariant — the motor NEVER powers on into PROJECTION.** Every path that could command
-PROJECTION at boot is guarded, and each guard has a unit test:
+**Boot invariant — the motor never powers on into PROJECTION.** Every path that could command PROJECTION
+at boot is guarded, and each guard has a unit test:
 
-1. **State machine**: always boots into OFF (dark, motor BEAM) and wakes through OFF_IDLE
-   only once the playhead has locked, ignoring the persisted `select` — a preset saved
-   mid-show can never boot into a PROJECTION state (`statemachine/machine.py`;
-   `test_startup_ignores_persisted_select`, `test_boot_waits_for_the_lock`).
-2. **Motor**: there is no manual mode field — the arbitration is debug > machine command >
-   **STOPPED**, so before the machine's first tick (or with the machine disabled) nothing
-   spins (`light/motor.py` `_target_mode`; `test_boot_without_command_is_stopped`).
-3. **Debug**: the Conductor forces the `light.debug` select back to OFF at construction —
-   a preset saved with a projection layer selected can never auto-follow to PROJECTION at power-on
-   (`light/conductor.py`; `test_boot_failsafe_clears_debug`).
+1. **State machine**: always boots into OFF (dark, motor BEAM) and wakes through OFF_IDLE only once the
+   playhead has locked, ignoring the persisted `select` — a preset saved mid-show can never boot into a
+   PROJECTION state (`statemachine/machine.py`; `test_startup_ignores_persisted_select`,
+   `test_boot_waits_for_the_lock`).
+2. **Motor**: there is no manual mode field — the arbitration is debug > machine command > **STOPPED**, so
+   before the machine's first tick (or with the machine disabled) nothing spins (`light/motor.py`
+   `_target_mode`; `test_boot_without_command_is_stopped`).
+3. **Debug**: the Conductor forces the `light.debug` select back to OFF at construction — a preset saved
+   with a projection layer selected can never auto-follow to PROJECTION at power-on (`light/conductor.py`;
+   `test_boot_failsafe_clears_debug`).
 
-On top of these, `osc_light` holds the commanded rpm at 0 for `startup_delay` seconds
-after connecting, giving the motor controller one clean 0 → target edge. PROJECTION is
-therefore reachable only through an explicit runtime action: the show's own sync into
-INTRO_PLAY, an operator goto to a PROJECTION state, or selecting a projection layer in the debug
-select. **Any future change to boot, arbitration, or the debug select must preserve
-this invariant.**
+On top of these, `osc_light` holds the commanded rpm at 0 for `startup_delay` seconds after connecting,
+giving the motor controller one clean 0 → target edge. PROJECTION is therefore reachable only through an
+explicit runtime action: the show's own sync into INTRO_PLAY, an operator goto to a PROJECTION state, or
+selecting a projection layer in the debug select. **Any change to boot, arbitration or the debug select
+must preserve this invariant.**
 
-**Hardware failsafe**: if the machine does not rotate, it turns the lights off — so a
-stalled spin-down can never strand bright lights on a stationary bar. A sensor failure on
-a machine that *is* still spinning can hold a state (e.g. S8/S9 waiting for lock); that is
-an operator-intervention case (`goto` / the debug select), not a safety one.
+**Hardware failsafe**: if the machine does not rotate, it turns the lights off **(site fact)**, so a
+stalled spin-down cannot strand bright lights on a stationary bar. A sensor failure on a machine that is
+still spinning can hold a state (S9/S10 waiting for the lock); that is an operator-intervention case
+(`goto` or the debug select), not a safety one.
 
-**Shutdown**: a clean quit ends with an explicit **blackout from each sender** — the
-light sender sends rpm 0, an all-zero frame, and rpm 0 again (fixture dark and
-decelerating at once); the sound sender sends its zeroed bundle (`/global/state` −1).
-The firmware's Ethernet watchdog (packet silence → motor stop + blank after several
-revolutions) covers only the crash path, where `stop()` never runs.
+**Shutdown**: a clean quit ends with an explicit **blackout from each sender**. The light sender sends
+rpm 0, an all-zero frame and rpm 0 again, so the fixture goes dark and decelerates at once; the sound
+sender sends its zeroed bundle (`/global/state` −1). The firmware's Ethernet watchdog (packet silence →
+motor stop and blank after several revolutions) covers only the crash path, where `stop()` never runs.
 
 ## Layers
 
-Each state composes its **mix**: a weighted list of layers, returned every tick
-(`p` = the state's progress; weights may differ per channel).
-
-| Layer             | Mode       | Draws |
-|-------------------|------------|-------|
-| `beam_playhead`     | beam       | the searchlight line — front white lamp |
-| `beam_flash`  | beam       | flash as the playhead crosses a participant |
-| `beam_blue_sound`     | beam       | soundscape levels on the left/right blue lamps (`/WS/sound/level` from Max) |
-| `pose_instrument` | projection | the pose instrument — each participant in a blue anchor light with a symmetric pose-derived line pattern; matched participants' patterns grow together across the space between them (see `LAYERS.md`) |
-| `projection_playhead` | projection | the playhead line on the ring — full-white marker |
-| `flood`           | projection | constant full-strip white (S7's wall) |
-| `beam_wind_down`       | beam       | the dying wall — both white lamps fading over the spin-down (S8/S9; the wall while the bar is still fast is the lamps spinning, see `LAYERS.md`) |
-
-Per-layer design, inputs, and settings: see `LAYERS.md`. `beam_playhead` and
-`projection_playhead` are deliberately two layers: the light data protocol differs between
-beam mode and projection mode. Debug layers (see the roster in `LAYERS.md`)
-are never in a state's mix — they are reached via the `light.debug` select: choosing a
-layer IS turning debug on (it shows solo and the motor auto-follows its mode; OFF
-returns the show where it would have been).
+Each state composes its **mix**: a weighted list of layers, returned every tick (`p` = the state's
+progress; weights may differ per channel). The layers' modes, inputs and settings are indexed in
+`LAYERS.md` (*Index — show layers*). `beam_playhead` and `projection_playhead` are two layers because the
+light data protocol differs between beam mode and projection mode. Debug layers are never in a state's
+mix; they are reached through the `light.debug` select, and OFF there returns the show where it would
+have been (see `LAYERS.md`).
 
 ---
 
 ## S0 — OFF
 
-The installation is off: dark and silent. An operational state, not a show beat — end of
-day, before opening, and the state the machine boots into. On the wire, `/global/state`
-0 means off.
+The installation is off: dark and silent. An operational state, not a show beat — end of day, before
+opening, and the state the machine boots into. On the wire, `/global/state` 0 means off.
 
-The rotor keeps sweeping at BEAM: OFF is "dark and silent", not "powered down". Stopping
-would silence the fall sensor and unlock the playhead, so waking would need a full
-re-acquire; sweeping on keeps the content clock locked and the wake instant. Quitting the
-app is the true stop.
+The rotor keeps sweeping at BEAM: OFF is "dark and silent", not "powered down". Stopping would silence the
+fall sensor and unlock the playhead, so waking would need a full re-acquire; sweeping keeps the content
+clock locked and the wake instant. Quitting the app is the true stop.
 
-Two things can hold it, and the exit waits for both to clear: the operator's pin
-(`blackout`) and the physics (the playhead not yet locked at BEAM — at boot the motor
-comes up from a standstill and needs a few revolutions to lock). After a blackout the
-lock is already there, so the wake starts at once.
+Two things can hold it, and the exit waits for both to clear: the operator's pin (`blackout`) and the
+physics (the playhead not yet locked at BEAM — at boot the motor comes up from a standstill and needs a few
+revolutions to lock). After a blackout the lock is already there, so the wake starts at once.
 
-- **Participants**: — (ignored) · **Duration**: as long as `blackout` is pinned or the
-  playhead is unlocked · **Motor**: BEAM
-- **Transitions**: **in** — boot; or pinning `states.blackout`, the machine's
-  highest-priority input: from any state, beating `hold` and `goto`. **out** — a normal
-  condition like any other state's: `blackout` released *and* motor lock → OFF_IDLE (the
-  wake). A silent sensor holds it dark — the operator `goto` case, as for S9/S10.
-- **Mix**: empty (dark strip) — darkness comes from the mix alone, since the bar is
-  turning and the fixture is in beam mode
+- **Participants**: — (ignored) · **Duration**: as long as `blackout` is pinned or the playhead is
+  unlocked · **Motor**: BEAM
+- **Transitions**: **in** — boot; or pinning `states.blackout`, the machine's highest-priority input: from
+  any state, beating `hold` and `goto`. **out** — `blackout` released *and* motor lock → S1 OFF_IDLE. A
+  silent sensor holds it dark — the operator `goto` case, as for S9/S10.
+- **Mix**: empty — the bar is turning and the fixture is in beam mode, so darkness comes from the mix alone
 - **White / Blue**: none
 - **Pose sound / Secondary sound**: no
-- **Open questions**: —
 
 ## S1 — OFF_IDLE
 
-The wake — at boot and after a blackout alike. OFF has let go (blackout released, playhead
-locked), so over one bar the searchlight and the soundscape fade up out of the dark into
-IDLE's look. The sweep is already running and locked underneath — only the light returns.
+The wake, at boot and after a blackout alike. OFF has let go (blackout released, playhead locked), so over
+`off_idle_bars` the searchlight and the soundscape fade up out of the dark into IDLE's look. The sweep is already
+running and locked underneath; only the light returns.
 
-If the sweep crosses a participant mid-fade the intro begins right there (the hit's own
-flash covers the step from the fading level to INTRO's dim line). With people present but
-not yet hit it lands in IDLE and the graph moves straight on to IDLE_INTRO — the identical
-look, so seamless — to wait for the sweep: the room is re-introduced by the light rather
-than dropped into the middle of INTRO.
+If the sweep crosses a participant mid-fade the intro begins right there (the hit's own flash covers the
+step from the fading level to INTRO's dim line). With people present but not yet hit it lands in IDLE and
+moves straight on to IDLE_INTRO — the identical look, so seamless — to wait for the sweep: the room is
+re-introduced by the light rather than dropped into the middle of INTRO.
 
-- **Participants**: — (either way) · **Duration**: `off_idle_bars` (1 bar) ·
-  **Motor**: BEAM
-- **Transitions** (priority order): hit → INTRO · fade complete → IDLE
+- **Participants**: — (either way) · **Duration**: `off_idle_bars` · **Motor**: BEAM
+- **Transitions**
+  1. hit → S4 INTRO
+  2. fade complete → S2 IDLE
 - **Mix**: `beam_playhead` and `beam_blue_sound`, both eased 0 → 1 over the bar
 - **White**: fade dark → BRIGHT line · **Blue**: fade-in sound visuals
 - **Pose sound**: no · **Secondary sound**: fade-in soundscape
-- **Open questions**: —
 
 ## S2 — IDLE
 
-The white searchlight (playhead) spins slowly through the empty space, supported by an
-atmospheric soundscape that evokes curiosity and plays on both blue lamps.
+The white searchlight (playhead) spins slowly through the empty space, supported by an atmospheric
+soundscape that evokes curiosity and plays on both blue lamps.
 
 - **Participants**: 0 · **Duration**: ∞ · **Motor**: BEAM
 - **Transitions**
-  1. P > 0 → S2 IDLE_INTRO
+  1. P > 0 → S3 IDLE_INTRO
 - **Mix**: `beam_playhead` 1.0 · `beam_blue_sound` 1.0
 - **White**: BRIGHT line — `beam_playhead` full
 - **Blue**: sound visuals — `beam_blue_sound`
 - **Pose sound**: no
 - **Secondary sound**: SEARCHLIGHT soundscape
-- **Open questions**: —
 
 ## S3 — IDLE_INTRO
 
-Someone has entered. The searchlight keeps sweeping at full brightness, but the sound is
-already stirring: the pose instrument starts a little *before* the actual hit — this
-anticipation is the reason the state exists. When the bright beam strikes the person the
-intro begins: the line snaps to dim and the soundscape stops.
+Someone has entered. The searchlight keeps sweeping at full brightness, but the sound is already stirring:
+the pose instrument starts a little *before* the actual hit — this anticipation is the reason the state
+exists. When the bright beam strikes the person the intro begins: the line snaps to dim and the soundscape
+stops.
 
 - **Participants**: > 0 · **Duration**: until hit · **Motor**: BEAM
 - **Transitions**
-  1. hit by light → S3 INTRO
-  2. P == 0 → S4 INTRO_IDLE *(if the person leaves before being hit, wind back to idle
-     via the normal transition — INTRO_IDLE ramps from its entry brightness, so this
-     pass-through causes no dip)*
+  1. hit by light → S4 INTRO
+  2. P == 0 → S5 INTRO_IDLE *(the person left before being hit; INTRO_IDLE ramps from its entry
+     brightness, so the pass-through causes no dip)*
 - **Mix**: `beam_playhead` 1.0 · `beam_blue_sound` 1.0
 - **White**: BRIGHT line — `beam_playhead` full
 - **Blue**: sound visuals — `beam_blue_sound`
 - **Pose sound**: yes — deliberately audible before the hit (the anticipation)
 - **Secondary sound**: SEARCHLIGHT + anticipatory cue building toward the hit
-- **Open questions**: the anticipatory cue's design (Max side)
 
 ## S4 — INTRO
 
-The pose instrument is introduced. Neutral poses give a glass ping; arms raised gives a
-heavy bass; all other arm positions give unique sounds. The dim playhead flashes bright
-as it crosses each participant.
+The pose instrument is introduced. Neutral poses give a glass ping; arms raised gives a heavy bass; all
+other arm positions give unique sounds. The dim playhead flashes bright as it crosses each participant.
 
 - **Participants**: > 0 · **Duration**: ∞ · **Motor**: BEAM
 - **Transitions**
-  1. P == 0 → S4 INTRO_IDLE
-  2. at least `sync.mode` participants in sync (3 / all−1 / all, each ≥ `sync.threshold`)
-     and P ≥ 3 → S5 INTRO_PLAY
-  3. session: elapsed ≥ `session.intro_seconds` → S5 INTRO_PLAY *(checked after P == 0,
-     so an empty room never spins up)*
+  1. P == 0 → S5 INTRO_IDLE
+  2. at least `sync.mode` participants in sync (3 / all−1 / all, each ≥ `sync.threshold`) and P ≥ 3 →
+     S6 INTRO_PLAY
+  3. session: elapsed ≥ `session.intro_seconds` → S6 INTRO_PLAY *(checked after P == 0, so an empty room
+     never spins up)*
 - **Mix**: `beam_playhead` DIM · `beam_flash` 1.0 (reset on entry)
 - **White**: DIM line + BRIGHT flash on hit
 - **Blue**: none
 - **Pose sound**: yes (only sound)
-- **Ghosts**: an experimentation mode, used by no state — `pose.ghoster.enabled` off
-  means no ghosts anywhere (no sound slots, nothing to draw); enabling it plus the
-  `beam_haunted` debug layer brings ghost sound and visuals together for solo testing.
 - **Secondary sound**: none
-- **Open questions**: —
 
 ## S5 — INTRO_IDLE
 
-The participants have left mid-intro. Over one bar the dim line fades back to the bright
-searchlight and the soundscape fades back in.
+The participants have left mid-intro. Over `intro_idle_bars` the dim line fades back to the bright searchlight and
+the soundscape fades back in.
 
-- **Participants**: 0 · **Duration**: 1 bar (`intro_idle_bars`) · **Motor**: BEAM
+- **Participants**: 0 · **Duration**: `intro_idle_bars` · **Motor**: BEAM
 - **Transitions**
-  1. bars ≥ `intro_idle_bars` → S1 IDLE
+  1. bars ≥ `intro_idle_bars` → S2 IDLE
 - **Mix**: `beam_playhead` ramp(entry level → 1.0) · `beam_blue_sound` ramp(entry level → 1.0)
-- **White**: fade DIM → BRIGHT (from wherever the lamp actually was on entry — no dip)
-- **Blue**: fade-in sound visuals — also from the entry level (0 arriving from INTRO,
-  already 1.0 on the IDLE_INTRO pass-through — no blink)
+- **White**: fade DIM → BRIGHT, from wherever the lamp was on entry — no dip
+- **Blue**: fade-in sound visuals, also from the entry level (0 arriving from INTRO, already 1.0 on the
+  IDLE_INTRO pass-through — no blink)
 - **Pose sound**: no
 - **Secondary sound**: fade-in SOUNDSCAPE
-- **Open questions**: —
 
 ## S6 — INTRO_PLAY
 
-The participants have synced their poses: the machine spins up. The pose instrument takes
-over from the line during the spin-up, and the sound enhances the accelerating chaos.
+The participants have synced their poses: the machine spins up. The pose instrument takes over from the
+line during the spin-up, and the sound enhances the accelerating chaos.
 
-- **Participants**: ≥ 3 · **Duration**: spin-up (`spin_up_seconds`, 14 s) · **Motor**: PROJECTION
+- **Participants**: ≥ 3 · **Duration**: spin-up (`spin_up_seconds`) · **Motor**: PROJECTION
 - **Transitions**
-  1. elapsed ≥ `spin_up_seconds` → S6 PLAY *(stands in for "at motor top speed" —
-     the sensor is blind above 200 RPM, so time approximates it)*
-- **Mix**: `beam_playhead` DIM until motor **un-lock**, then `pose_instrument` white 1.0
-  (hard) / blue ease-in · `projection_playhead` 1.0 — per-channel weights; pose_instrument
-  reset on entry (fresh instrument per cycle)
-- **White**: **hard mix at un-lock** — the dim line holds unchanged from INTRO while the
-  strip is still physically lamps; the moment the motor passes the ceiling and the ring
-  forms, the instrument and the playhead line snap in (the spin-up through the ceiling is
-  fast, so this is near-entry)
-- **Blue**: pose instrument **eases in** from the un-lock over the remaining spin-up,
-  reaching 1.0 at the PLAY hand-off
+  1. elapsed ≥ `spin_up_seconds` → S7 PLAY *(stands in for "at motor top speed": the sensor is blind above
+     200 rpm, so time approximates it)*
+- **Mix**: `beam_playhead` DIM until **un-lock**, then `pose_instrument` white 1.0 (hard) / blue ease-in ·
+  `projection_playhead` 1.0 — per-channel weights. `pose_instrument` is reset on entry, so each show cycle
+  starts a fresh instrument; PLAY does not reset it, because END's wind-back re-enters PLAY with the
+  running instrument.
+- **White**: dark until un-lock — the fixture is in projection mode from the first packet, so the
+  `beam_playhead` beam light in the mix is not read. At un-lock the instrument and the playhead line snap
+  in (a hard mix); the spin-up through the ceiling is fast, so this is near entry.
+- **Blue**: pose instrument **eases in** from the un-lock over the remaining spin-up, reaching 1.0 at the
+  PLAY hand-off
 - **Pose sound**: yes (effect?)
 - **Secondary sound**: ENHANCE spin-up chaos
-- **Open questions**: the "(effect?)" on pose sound (Max side)
 
 ## S7 — PLAY
 
-The participants play the instrument, creating music and light patterns. The space
-between participants holding the same pose fills with light.
+The participants play the instrument, creating music and light patterns. The space between participants
+holding the same pose fills with light.
 
 - **Participants**: ≥ 3 · **Duration**: ∞ · **Motor**: PROJECTION
 - **Transitions**
-  1. P < 3 (debounced) → S7 END
-  2. session: elapsed ≥ `session.play_seconds` → S7 END
+  1. P < 3 (debounced) → S8 END
+  2. session: elapsed ≥ `session.play_seconds` → S8 END
 - **Mix**: `pose_instrument` 1.0 · `projection_playhead` 1.0
-- **White**: the pose instrument — patterns per pose plus the sync fill between
-  similarly-posed participants — and the playhead line at full white
+- **White**: the pose instrument — patterns per pose plus the sync fill between similarly-posed
+  participants — and the playhead line at full white
 - **Blue**: pose instrument (`pose_instrument`'s blue)
 - **Pose sound**: yes
 - **Secondary sound**: ENHANCE spin
-- **Future option (deferred)**: an inactivity exit — "no action for x bars → END" (with an
-  action-gated wind-back in END to match). Kept out for now to keep the graph simple.
-- **Open questions**: —
 
 ## S8 — END
 
-Fewer than three participants remain: the machine begins its end. Over N bars the light
-crosses to full white and the sound reflects it. If participants return, the white winds
-back and PLAY resumes — the ramp runs both ways, never jumping.
+Fewer than three participants remain: the machine begins its end. Over `end_bars` the light crosses to full
+white and the sound reflects it. If participants return, the white winds back and PLAY resumes — the ramp
+runs both ways, never jumping, and at p = 0 the mix equals PLAY's, so the hand-over back is seamless.
 
 - **Participants**: < 3 · **Duration**: `end_bars` bars, bidirectional · **Motor**: PROJECTION
 - **Transitions**
-  1. wound down (p ≥ 1) and P > 0 → S8 END_INTRO
-  2. wound down (p ≥ 1) and P == 0 → S9 END_IDLE
-  3. wound back (p ≤ 0) and P ≥ 3 → S6 PLAY *(stand-alone only; in session mode the
-     wind-back is disabled so a session always concludes)*
+  1. wound down (p ≥ 1) and P > 0 → S9 END_INTRO
+  2. wound down (p ≥ 1) and P == 0 → S10 END_IDLE
+  3. wound back (p ≤ 0) and P ≥ 3 → S7 PLAY *(stand-alone only; in session mode the wind-back is disabled
+     so a session always concludes)*
 - **Mix**: `pose_instrument` 1−p · `projection_playhead` 1−p · `flood` ease(p)
 - **White**: instrument and playhead line fade as the flood crosses to full white
-- **Blue**: fades out with the instrument (pose_instrument is the only blue source — one ramp
-  crosses the white to full and fades the blue out together)
+- **Blue**: fades out with the instrument — `pose_instrument` is the only blue source, so one ramp crosses
+  the white to full and fades the blue out together
 - **Pose sound**: DISTORTION? (based on progress)
 - **Secondary sound**: fade out enhanced spin + DISTORTION? (based on progress)
-- **Open questions**: the distortion treatment (Max side; `stage_progress` on OSC is the
-  ramp to drive it)
 
 ## S9 — END_INTRO
 
-Participants remain, so the machine returns to the intro: the wall of white **fades
-away during the spin-down**, revealing the dim playhead line underneath. The fade is
-purely timed; the state hands over once it is complete and the motor has found its lock
-at BEAM (the landing state needs a live playhead).
+Participants remain, so the machine returns to the intro: the wall of white **fades away during the
+spin-down**, revealing the dim playhead line underneath. The fade is timed; the state hands over once it
+is complete and the motor has locked at BEAM, because the landing state needs a live playhead.
 
-*(The fade lives in the `beam_wind_down` layer, not in mix weights. The fixture switches to
-beam mode on the first packet commanding BEAM, so from S8's first tick the two white
-lamps are driven directly: while the bar is still fast they spin into a wall, as it
-slows they thin into beams — one mechanism, so the layer needs no knowledge of the
-bar's speed — see `LAYERS.md`. The fade is timed, not driven by the measured
-deceleration: the sensor is silent above 200 rpm. The `states.spin_down_seconds`
-slider — next to `spin_up_seconds`, its mirror; shared into the layer — is tuned by hand
-to the physical spin-down.)*
+The fade lives in the `beam_wind_down` layer, not in the mix weights (see `LAYERS.md` *beam_wind_down*).
+It is timed rather than driven by the measured deceleration because the sensor is silent above 200 rpm;
+`states.spin_down_seconds`, beside `spin_up_seconds`, is tuned by hand to the physical spin-down.
 
 - **Participants**: < 3, > 0 · **Duration**: the spin-down (fade complete, then the lock) · **Motor**: BEAM
 - **Transitions**
-  1. fade complete (`progress` ≥ 1) and motor lock → S3 INTRO
-- **Mix**: `beam_wind_down` 1.0 · `beam_playhead` DIM — **constant weights**; the dynamics
-  live inside `beam_wind_down` (reset on entry). The dim line sits underneath from the
-  start and is *revealed* as the wall dies — no splice, no seam into INTRO (the front
-  sums past full and clips until the wall drops away; monotonic to DIM)
-- **White**: both white lamps fade BRIGHT → gone over `spin_down_seconds`; the front
-  lands on the dim line underneath, the back goes out
+  1. fade complete (`progress` ≥ 1) and motor lock → S4 INTRO
+- **Mix**: `beam_wind_down` 1.0 · `beam_playhead` DIM — **constant weights**; the dynamics live inside
+  `beam_wind_down` (reset on entry). The dim line sits underneath from the start and is *revealed* as the
+  wall dies, so there is no splice and no seam into INTRO (the front sums past full and clips until the
+  wall drops away; monotonic to DIM)
+- **White**: both white lamps fade BRIGHT → gone over `spin_down_seconds`; the front lands on the dim line
+  underneath, the back goes out
 - **Blue**: none
 - **Pose sound**: fade out distortion?
 - **Secondary sound**: fade out distortion?
-- **Progress** (OSC `stage_progress`): the layer's own fade readout (0 = full wall,
-  1 = gone), so the sound-side distortion fade rides the actual fade
-- **Open questions**: distortion fade (Max side)
+- **Progress** (OSC `stage_progress`): the layer's own fade readout (0 = full wall, 1 = gone), so the
+  sound-side distortion fade rides the actual fade
 
 ## S10 — END_IDLE
 
-The space is empty: the wall of white fades away during the spin-down, revealing the
-bright searchlight line; the distortion disappears and the searchlight soundscape
-returns with it. The same engine as S8 — `beam_wind_down` owns the timed fade, the state
-hands over once it is complete and the motor has locked — landing on the BRIGHT line
-instead of the dim one.
+The space is empty: the wall of white fades away during the spin-down, revealing the bright searchlight
+line; the distortion disappears and the searchlight soundscape returns with it. The same engine as S9 —
+`beam_wind_down` owns the timed fade, and the state hands over once it is complete and the motor has
+locked — landing on the BRIGHT line instead of the dim one.
 
 - **Participants**: 0 · **Duration**: the spin-down (fade complete, then the lock) · **Motor**: BEAM
 - **Transitions**
-  1. fade complete (`progress` ≥ 1) and motor lock → S1 IDLE
-- **Mix**: `beam_wind_down` 1.0 · `beam_playhead` 1.0 · `beam_blue_sound` p — the line at
-  constant full underneath the dying wall (the front lamp clips at full throughout:
-  constant BRIGHT, no seam into IDLE); the sound visuals fade in on p = the layer's
-  fade readout
-- **White**: stays BRIGHT — the front is at full the whole way, while the back lamp
-  rides the wall down and goes out over `spin_down_seconds`
+  1. fade complete (`progress` ≥ 1) and motor lock → S2 IDLE
+- **Mix**: `beam_wind_down` 1.0 · `beam_playhead` 1.0 · `beam_blue_sound` p — the line at constant full
+  underneath the dying wall (the front lamp clips at full throughout: constant BRIGHT, no seam into IDLE);
+  the sound visuals fade in on p = the layer's fade readout
+- **White**: stays BRIGHT — the front is at full the whole way, while the back lamp rides the wall down and
+  goes out over `spin_down_seconds`
+- **Blue**: sound visuals fade in with the wall's fade
+- **Pose sound**: fade out distortion?
+- **Secondary sound**: fade out distortion?
+- **Progress** (OSC `stage_progress`): the layer's own fade readout, so the sound-side fades ride the
+  actual fade
+
+---
+
+## Open
+
+- **S3**: the anticipatory cue's design (Max side)
+- **S6**: the "(effect?)" on pose sound (Max side)
+- **S6**: whether to draw a line as ring content while the strip is dark during the spin-up
+- **S7**: an inactivity exit — "no action for x bars → END", with an action-gated wind-back in END to
+  match; left out to keep the graph simple
+- **S8–S10**: the distortion treatment (Max side); `stage_progress` on OSC is the ramp that drives it
+ides the wall down and goes out over `spin_down_seconds`
 - **Blue**: sound visuals fade in with the wall's fade
 - **Pose sound**: fade out distortion?
 - **Secondary sound**: fade out distortion?

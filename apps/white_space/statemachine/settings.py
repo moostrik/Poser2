@@ -71,9 +71,9 @@ class StateMachineSettings(BaseSettings):
     times, unit in the name (seconds = wall clock, bars = playhead bars)."""
 
     # Blackout — the installation's big switch. Pinning it is OFF's entry door (from any
-    # state, beating hold and goto); leaving OFF is a normal condition: once unpinned,
-    # OffState exits to INTRO or IDLE depending on presence.
-    blackout: Field[bool] = Field(False, pinned=True, description="Blackout: pin to switch the installation OFF (spinning low, strip dark, /global/state 0); unpin and OFF exits to INTRO (people present) or IDLE (empty)")
+    # state, beating hold and goto); leaving OFF is a normal condition: once unpinned and
+    # the playhead is locked, OffState wakes through OFF_IDLE.
+    blackout: Field[bool] = Field(False, pinned=True, description="Switch the installation OFF: dark and silent, still sweeping at BEAM")
 
     # Telemetry (read-only) — the show at a glance
     current:      Field[StateId] = Field(StateId.OFF, access=Field.READ, description="Current show state")
@@ -81,10 +81,10 @@ class StateMachineSettings(BaseSettings):
     participants: Field[int]       = Field(0, access=Field.READ, pinned=True, description="Debounced participant count")
 
     # Transition-state durations — one per state. spin_down_seconds is shared (via the
-    # root) into the wind_down layer, which runs the S9/S10 wall fade on it; those states'
-    # exit is one playhead bar after the motor re-locks at BEAM.
+    # root) into the beam_wind_down layer, which runs the S9/S10 wall fade on it; those
+    # states exit once the fade is complete and the motor has re-locked at BEAM.
     spin_up_seconds:       Field[float] = Field(14.0, min=1.0, max=60.0,  step=0.5, description="INTRO_PLAY: spin-up transition (seconds) — hand-tuned to the physical spin-up (spin_down_seconds' mirror)", newline=True)
-    spin_down_seconds:     Field[float] = Field(10.0, min=1.0, max=60.0,  step=0.5, description="END_INTRO/END_IDLE: wall fade towards the line (seconds) — hand-tuned to the physical spin-down (drives the wind_down layer)")
+    spin_down_seconds:     Field[float] = Field(10.0, min=1.0, max=60.0,  step=0.5, description="END_INTRO/END_IDLE: wall fade towards the line (seconds) — hand-tuned to the physical spin-down (drives the beam_wind_down layer)")
     off_idle_bars:         Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="OFF_IDLE: wake fade from dark, in playhead bars", newline=True)
     intro_idle_bars:       Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="INTRO_IDLE: playhead bars back to IDLE")
     end_bars:              Field[float] = Field(3.0,  min=0.5, max=20.0,  step=0.5, description="END: wind-down playhead bars (bidirectional ramp)")

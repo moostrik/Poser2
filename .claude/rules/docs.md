@@ -22,6 +22,11 @@ paths:
 - Put operator procedures before reference material
 - Refer to code by file and symbol, not line number; line numbers go stale
 
+## Tables
+
+- Align the columns in the source so the table reads in a plain-text editor
+- Keep cells short and consistent within a column; detail belongs in the text
+
 ## Updating
 
 - Edit the section that states the fact; never append a paragraph about the change
