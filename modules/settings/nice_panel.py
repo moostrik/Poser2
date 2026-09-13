@@ -285,6 +285,25 @@ def _build_switch(settings, name, field, polls):
         polls.append((settings, name, [value], lambda v, sw=sw: sw.set_value(v)))
 
 
+@widget_builder(Widget.status)
+def _build_status(settings, name, field, polls):
+    """Read-only good/bad indicator: one badge carrying the field's label, green with OK or red
+    with WARNING."""
+    value = getattr(settings, name)
+    label = generate_label(name)
+    desc = _wiring_tooltip(settings, name, field.description)
+
+    def _apply_style(badge, ok: bool):
+        badge.set_text(f"{label} {'OK' if ok else 'WARNING'}")
+        badge._props["color"] = "positive" if ok else "negative"
+        badge.update()
+
+    badge = _attach_description_tooltip(ui.badge().classes("text-sm text-weight-bold px-2 py-1"), desc)
+    _apply_style(badge, value)
+
+    polls.append((settings, name, [value], lambda v, b=badge: _apply_style(b, v)))
+
+
 @widget_builder(Widget.toggle)
 def _build_toggle(settings, name, field, polls):
     value = getattr(settings, name)

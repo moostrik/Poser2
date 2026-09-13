@@ -1,4 +1,4 @@
-"""The mount readout: gravity to angles, and the warning that summarises it.
+"""The mount readout: gravity to angles, and the verdict that summarises it.
 
 Neither needs a device. The gravity conversion is a pure function, and `MountCheck` reads plain
 settings objects, so the interesting cases — a rig with no IMU, one camera out of four off — are
@@ -9,7 +9,7 @@ import math
 import unittest
 
 from modules.oak import MountCheck, MountCheckSettings, imu_to_camera, unroll_imu_frame, \
-    orientation_from_gravity
+    orientation_from_gravity, mount_deviation
 from modules.oak.camera.settings import CameraReadings, CameraSettings
 
 
@@ -137,6 +137,42 @@ def _cameras(readings: list[tuple[float, float]], configured_tilt: float = 12.0)
         camera.readings.roll_measured = roll_measured
         cameras.append(camera)
     return cameras
+
+
+def _mount(readings: list[tuple[float, float]], tolerance: float = 2.0) -> bool:
+    settings = MountCheckSettings()
+    settings.tolerance = tolerance
+    MountCheck(_cameras(readings), settings).update()
+    return settings.mount
+
+
+class TestMountCheck(unittest.TestCase):
+    NAN: float = float('nan')
+
+    def test_deviation_is_signed(self) -> None:
+        tilt, roll = mount_deviation(_cameras([(10.5, -1.5)], configured_tilt=12.0)[0])
+        self.assertAlmostEqual(tilt, -1.5)
+        self.assertAlmostEqual(roll, -1.5)
+
+    def test_deviation_is_nan_without_a_reading(self) -> None:
+        tilt, roll = mount_deviation(_cameras([(self.NAN, self.NAN)])[0])
+        self.assertTrue(math.isnan(tilt))
+        self.assertTrue(math.isnan(roll))
+
+    def test_no_readings_is_a_warning(self) -> None:
+        self.assertFalse(_mount([(self.NAN, self.NAN)] * 4))
+
+    def test_all_within_tolerance_is_ok(self) -> None:
+        self.assertTrue(_mount([(12.5, 0.4), (11.0, -1.9), (12.0, 0.0), (13.9, 1.0)]))
+
+    def test_one_tilt_past_tolerance_is_a_warning(self) -> None:
+        self.assertFalse(_mount([(12.0, 0.0), (15.0, 0.0), (12.0, 0.0), (12.0, 0.0)]))
+
+    def test_one_negative_roll_past_tolerance_is_a_warning(self) -> None:
+        self.assertFalse(_mount([(12.0, 0.0), (12.0, -2.5), (12.0, 0.0), (12.0, 0.0)]))
+
+    def test_a_camera_without_imu_does_not_spoil_ok(self) -> None:
+        self.assertTrue(_mount([(12.0, 0.0), (self.NAN, self.NAN), (12.3, 0.5), (12.0, -0.2)]))
 
 
 class TestRollOffsetIsABox(unittest.TestCase):

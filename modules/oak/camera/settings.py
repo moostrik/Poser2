@@ -11,24 +11,16 @@ from modules.settings import BaseSettings, Field, Group, Widget
 
 
 class MountCheckSettings(BaseSettings):
-    """One pinned line saying whether the cameras are mounted the way the preset assumes.
+    """One pinned verdict saying whether the cameras are mounted the way the preset assumes.
 
     The per-camera readings live on each `CameraSettings`, four groups deep in the panel, which
-    is where a readout goes to be ignored. The point of measuring is to be *told*, so this is the
-    summary: the average deviation always, and a warning when any one camera drifts past
-    `tolerance`.
-
-    Only `tolerance` is a real setting; the rest is read-only output. `Field(color=...)` is a
-    declaration-time hint and cannot change with the value, so the text carries the severity.
+    is where a readout goes to be ignored. The pinned indicator says good or bad; which camera and
+    which axis is drawn on that camera's own view in the renderer.
     """
     tolerance:      Field[float] = Field(2.0, min=0.5, max=10.0, step=0.5,
-                                         description="Deviation (°) a camera may have before the status line warns")
-    status:         Field[str]   = Field('mount not measured', access=Field.READ, pinned=True,
-                                         description="Mount check: average deviation, and a warning naming the worst camera")
-    tilt_deviation: Field[float] = Field(0.0, access=Field.READ,
-                                         description="Mean tilt deviation (°) over the cameras that reported")
-    roll_deviation: Field[float] = Field(0.0, access=Field.READ,
-                                         description="Mean roll (°) over the cameras that reported")
+                                         description="Deviation (°) a camera may have before the mount warns")
+    mount:          Field[bool]  = Field(False, access=Field.READ, pinned=True, widget=Widget.status,
+                                         description="Camera tilt and roll within tolerance; the camera row shows each camera's error")
 
 
 class CameraReadings(BaseSettings):

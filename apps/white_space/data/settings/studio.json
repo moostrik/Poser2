@@ -362,7 +362,7 @@
         "bright_max": 255
       }
     },
-    "mount": {
+    "mount_check": {
       "tolerance": 2.0
     },
     "simulator": {

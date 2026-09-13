@@ -10,7 +10,7 @@ choreography) and `LAYERS.md` (the layers).
 - Operator-facing angles are degrees, 0–360, counter-clockwise seen from above. The code keeps
   radians internally and on the wire.
 - The fixture firmware is never changed. Everything is modelled and corrected app-side.
-- Setting paths are written as they appear in the preset (`camera.mount.status`); `cam_N` means
+- Setting paths are written as they appear in the preset (`camera.mount_check.mount`); `cam_N` means
   each of `cam_0`…`cam_3`.
 
 ---
@@ -30,7 +30,9 @@ Calibrate in this order. Cameras first: everything else is tuned against the fra
    - Read the open log: the `frame_height` line (the derived height), then per camera one `lens:`
      line (its field, centre offset and `lens_error`, which must match the table under *The lens*)
      and one `frame:` line (the elevation window, the horizon row, the rows covered).
-   - Read the pinned `camera.mount.status`. It must say *mount OK*.
+   - Read the pinned indicator (`camera.mount_check.mount`). It must be a green `Mount OK`. On a red
+     `Mount WARNING` the camera row names the camera and the axis: each view shows its tilt and roll
+     error, red past the tolerance.
    - Level each camera against a spirit level, read its roll, type it into
      `camera.cam_N.readings.roll_offset`.
    - Look at the panorama row (always on; `render.panorama.parts` says which pieces draw). With
@@ -61,7 +63,7 @@ the flash on the first person at IDLE → INTRO; the sound on the beam.
 
 | step         | settings                                   | readout                                   | passes when                                   |
 |--------------|--------------------------------------------|-------------------------------------------|-----------------------------------------------|
-| 1 cameras    | frame constants, `track.*`, `focus_radius` | open log, `camera.mount.status`, panorama | every check in step 1                         |
+| 1 cameras    | frame constants, `track.*`, `focus_radius` | open log, *Mount*, camera row, panorama   | every check in step 1                         |
 | 2 playhead   | `light.playhead.pulse_offset`              | `beam_flash`, `/pose/N/playhead/offset`   | flash on the person; offset 0 at the crossing |
 | 3 projection | `projection_offset`, `interlace`           | projection mode, `pose_instrument`        | static line on the person; single line        |
 | 4 speakers   | `speaker_offset` (0)                       | IDLE, Max voicing `/global/playhead`      | sound follows the beam                        |
@@ -506,7 +508,7 @@ So a person walking out keeps their own mark, fading, and when it has gone grey 
 | what you see                                              | what is wrong                                                |
 |-----------------------------------------------------------|--------------------------------------------------------------|
 | the overlap coincides                                     | nothing                                                      |
-| aligns at head height but not at knee height              | the mount — `tilt` or roll; `camera.mount.status` says which |
+| aligns at head height but not at knee height              | the mount — `tilt` or roll; the camera row says which        |
 | a constant sideways offset across the whole overlap       | `lens_fov` (the lens, not `fov`, which is the frame's span)  |
 | a residual on one camera's seams only                     | that unit's `lens_error`; F124 shows ≈ 1.4°                  |
 | a residual growing toward the frame edges on every camera | the lens is not equidistant — re-read the calibrations       |
@@ -670,9 +672,13 @@ camera tilts the horizon, which looks exactly like a wrong `tilt` in the panoram
 tell them apart. The cameras can:
 
 - **`camera.cam_N.readings.tilt_measured` / `roll_measured`** — from each board's IMU.
-- **`camera.mount.status`** — pinned, always on screen: the average deviation from the preset, and a
-  warning naming the worst camera when any exceeds `camera.mount.tolerance` (2°). If a board has no
-  IMU it says *not measured*; then check roll by eye against a vertical edge.
+- **`camera.mount_check.mount`** — pinned, always on screen: a green `Mount OK` when every
+  measured tilt and roll deviation is within `camera.mount_check.tolerance` (2°), a red
+  `Mount WARNING` otherwise. It also warns when no board reports an IMU reading; then check roll by eye against a
+  vertical edge.
+- **The camera row** — each camera's view carries its tilt error (measured − `tilt`, signed) and its
+  roll, each red past the tolerance, or `no IMU` for a board without one. It is what names the camera
+  and the axis on a `WARNING`.
 - **`camera.cam_N.readings.roll_offset`** — what that camera reads when level. Subtracted from the raw
   reading, so the roll shown is how far the camera has moved since it was levelled. Per camera and
   never shared: it absorbs each unit's own sensor error, and those differ (cam_2 reads −2.25° sitting

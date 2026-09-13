@@ -5,16 +5,24 @@ import math
 from .settings import CameraSettings, MountCheckSettings
 
 
-class MountCheck:
-    """Turns the per-camera IMU readings into one line a person will actually read.
+def mount_deviation(camera: CameraSettings) -> tuple[float, float]:
+    """The camera's signed ``(tilt, roll)`` deviation in degrees; NaN where it has no reading.
 
-    Two deviations, both in degrees, both compared against the same `tolerance`:
-
-    - **tilt** — ``|tilt_measured - tilt|``. `tilt` is the value the warp mesh was baked with, so
+    - **tilt** — ``tilt_measured - tilt``. `tilt` is the value the warp mesh was baked with, so
       a camera that does not sit at it is being un-tilted by the wrong amount.
-    - **roll** — ``|roll_measured|``. There is no configured roll: `warp_mesh_points` has no
+    - **roll** — ``roll_measured``. There is no configured roll: `warp_mesh_points` has no
       roll term at all, so the only correct value is zero, and any roll tips the horizon in a way
       the panorama cannot distinguish from a wrong tilt.
+    """
+    return (camera.readings.tilt_measured - camera.tilt, camera.readings.roll_measured)
+
+
+class MountCheck:
+    """Turns the per-camera IMU readings into one verdict a person will actually read.
+
+    Both deviations of every camera (`mount_deviation`) are compared against the same
+    `tolerance`, and `mount` is True only when every reported value is within it. Which camera and
+    axis is off is not repeated here: the renderer draws each camera's numbers on its own view.
 
     `fov_factory` and `lens_error` are deliberately *not* checked. They describe the unit's lens
     against the shared one, which is a property of the build, not of how the tripod was set
@@ -27,58 +35,9 @@ class MountCheck:
         self._settings: MountCheckSettings = settings
 
     def update(self) -> None:
-        """Recompute the status line. Cheap; call it on the render tick."""
-        tilt_deviations: list[tuple[int, float]] = []
-        roll_deviations: list[tuple[int, float]] = []
-
-        for index, camera in enumerate(self._cameras):
-            measured_tilt: float = camera.readings.tilt_measured
-            if not math.isnan(measured_tilt):
-                tilt_deviations.append((index, abs(measured_tilt - camera.tilt)))
-            measured_roll: float = camera.readings.roll_measured
-            if not math.isnan(measured_roll):
-                roll_deviations.append((index, abs(measured_roll)))
-
-        # Cameras that never reported are left out entirely rather than counted as zero: a board
-        # with no IMU must not be able to drag an average down and make a bad rig look fine.
-        if not tilt_deviations and not roll_deviations:
-            self._settings.tilt_deviation = 0.0
-            self._settings.roll_deviation = 0.0
-            self._settings.status = 'mount not measured — no IMU reading from any camera'
-            return
-
-        mean_tilt: float = self._mean(tilt_deviations)
-        mean_roll: float = self._mean(roll_deviations)
-        self._settings.tilt_deviation = mean_tilt
-        self._settings.roll_deviation = mean_roll
-
-        reported: int = len({index for index, _ in tilt_deviations} |
-                            {index for index, _ in roll_deviations})
-        summary: str = f'tilt {mean_tilt:.1f}°, roll {mean_roll:.1f}° ({reported} of {len(self._cameras)})'
-
-        tolerance: float = self._settings.tolerance
-        worst_axis, worst_camera, worst_value = self._worst(tilt_deviations, roll_deviations)
-        if worst_value > tolerance:
-            self._settings.status = (f'!! cam {worst_camera} {worst_axis} {worst_value:.1f}° off '
-                                     f'(limit {tolerance:.1f}°) — avg {summary}')
-        else:
-            self._settings.status = f'mount OK — {summary}'
-
-    @staticmethod
-    def _mean(deviations: list[tuple[int, float]]) -> float:
-        if not deviations:
-            return 0.0
-        return sum(value for _, value in deviations) / len(deviations)
-
-    @staticmethod
-    def _worst(tilt_deviations: list[tuple[int, float]],
-               roll_deviations: list[tuple[int, float]]) -> tuple[str, int, float]:
-        """The single worst offender across both axes, so the warning names one thing."""
-        candidates: list[tuple[float, str, int]] = (
-            [(value, 'tilt', index) for index, value in tilt_deviations] +
-            [(value, 'roll', index) for index, value in roll_deviations]
-        )
-        if not candidates:
-            return ('tilt', 0, 0.0)
-        value, axis, index = max(candidates)
-        return (axis, index, value)
+        """Recompute the verdict. Cheap; call it on the render tick."""
+        # Cameras that never reported are left out rather than counted as zero, and a rig where no
+        # camera reported at all is not OK: an unmeasured mount must not look like a good one.
+        deviations: list[float] = [abs(value) for camera in self._cameras
+                                   for value in mount_deviation(camera) if not math.isnan(value)]
+        self._settings.mount = bool(deviations) and max(deviations) <= self._settings.tolerance

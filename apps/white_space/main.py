@@ -288,10 +288,11 @@ class WhiteSpaceMain:
 
         # MOUNT CHECK — compares each camera's own IMU reading against the preset it was warped
         # for, and summarises it on one pinned line. A setup aid; nothing downstream reads it.
-        self.mount_check = MountCheck(self.settings.camera.cameras, self.settings.camera.mount)
+        self.mount_check = MountCheck(self.settings.camera.cameras, self.settings.camera.mount_check)
 
         # RENDER
-        self.render = WindowRender(self.board, self.settings.render, self.settings.track)
+        self.render = WindowRender(self.board, self.settings.render, self.settings.track,
+                                   self.settings.camera.cameras, self.settings.camera.mount_check)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
         self.render.add_update_callback(self.mount_check.update)
         self.conductor.add_update_callback(self.state_machine.update)

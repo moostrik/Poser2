@@ -1,4 +1,4 @@
-from .camera import             Camera, CameraSettings, MountCheck, MountCheckSettings, \
+from .camera import             Camera, CameraSettings, MountCheck, MountCheckSettings, mount_deviation, \
                                 FrameType, CoderFormat, DepthTracklet, \
                                 CameraResolution, resolve_resolution, mono_mode, color_mode, WARP_ALIGNMENT, \
                                 mono_frame_size, color_frame_size, frame_size, mode_size, full_frame_height, aligned_height, delivered_height, \

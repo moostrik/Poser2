@@ -87,6 +87,7 @@ class Widget(Enum):
     switch      = (bool,)
     toggle      = (bool,)
     button      = (bool,)
+    status      = (bool,)   # read-only badge: "<label> OK" in green when True, "<label> WARNING" in red when False
     # numeric widgets
     slider      = (int, float)
     number      = (int, float)

@@ -8,11 +8,12 @@ from modules.render.layers import ImageSourceLayer, CropSourceLayer
 from modules.render.layers import TrackerCompositor, PoseCompositor
 from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer
 from modules.render.layers import Compositor, PanoramaLayerSettings
-from modules.oak import mono_frame_size
+from modules.oak import CameraSettings, MountCheckSettings, mono_frame_size
 from modules.tracker import PanoramicTrackerSettings
 from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
 from apps.white_space.render.layers.beam_light_simulation_layer import BeamLightSimulationLayer
 from apps.white_space.render.layers.azimuth_overlay_layer import AzimuthOverlayLayer
+from apps.white_space.render.layers.mount_readout_layer import MountReadoutLayer
 from apps.white_space.light import FIXTURE_PROJECTION_RPM
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
@@ -44,7 +45,8 @@ _SWITCHED_ROWS: dict[str, Layers] = {
 
 class Render(RenderBase):
     def __init__(self, board: Board, settings: RenderSettings,
-                 tracker: PanoramicTrackerSettings) -> None:
+                 tracker: PanoramicTrackerSettings,
+                 cameras: list[CameraSettings], mount: MountCheckSettings) -> None:
         super().__init__(settings.window)
         self.num_players: int = settings.num_players
         self.num_cams: int = settings.num_cams
@@ -66,6 +68,7 @@ class Render(RenderBase):
                 settings.preview.tracker,
                 settings.colors,
             )
+            self.L[Layers.cam_mount][i] = MountReadoutLayer(cameras[i], mount)
 
         # Row 5 — per-player: pose compositor + data overlays
         # cam_image[0] texture used as fallback for non-GPU crop path (GPU crop is default)
@@ -184,6 +187,7 @@ class Render(RenderBase):
             for i in range(self.num_cams):
                 w, h = self.subdivision.get_allocation_size('track', i)
                 self.L[Layers.tracker][i].allocate(w, h, GL_RGBA)
+                self.L[Layers.cam_mount][i].allocate(w, h, GL_RGBA)
 
         if self.subdivision.has('panoramic'):
             w, h = self.subdivision.get_allocation_size('panoramic', 0)
@@ -233,11 +237,13 @@ class Render(RenderBase):
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
-        # Row 1 — one tracker compositor per camera: the raw frames. Absent under PANORAMA.
+        # Row 1 — one tracker compositor per camera: the raw frames, with that camera's tilt and
+        # roll error over them. Absent under PANORAMA.
         if self.subdivision.has('track'):
             for i in range(self.num_cams):
                 self._viewport(height, self.subdivision.get_rect('track', i))
                 self.L[Layers.tracker][i].draw()
+                self.L[Layers.cam_mount][i].draw()
 
         # Row 2 — the whole ring as one 360° strip, image and tracker data on one vertical scale.
         # Absent under CAMERAS.

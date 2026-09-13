@@ -62,6 +62,7 @@ class Layers(IntEnum):
     cam_crop     = auto()
     # composite
     tracker      = auto()
+    cam_mount    = auto()   # each camera's tilt and roll error, over its own view
     poser        = auto()
     # WS visualization
     cam_panorama = auto()   # the 360° calibration strip: the stitch with the tracker data over it
@@ -106,7 +107,7 @@ class OakGroup(BaseSettings):
     cam_1     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_2     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_3     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
-    mount     : Group[MountCheckSettings]        = Group(MountCheckSettings)
+    mount_check: Group[MountCheckSettings]       = Group(MountCheckSettings)
     simulator : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cameras, fps])
     frame_sync: Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
     tracklet_sync: Group[SyncSettings]           = Group(SyncSettings, share=[num_cameras, fps])
