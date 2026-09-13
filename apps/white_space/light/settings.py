@@ -92,19 +92,19 @@ class BeamLayersSettings(BaseSettings):
 
 class ProjectionLayersSettings(BaseSettings):
     """Per-layer composition settings — the projection-mode block of the pool.
-    `fov` is a hidden relay (from the root) into the calibration layers."""
-    fov: Field[float] = Field(110.0, access=Field.INIT, description="Camera horizontal FOV — relay to test_player_lines/test_calibration")
+    `fov` is a hidden relay (from the root) into the calibration layer."""
+    fov: Field[float] = Field(110.0, access=Field.INIT, description="Camera horizontal FOV — relay to test_calibration")
     pose_instrument:    Group[PoseInstrumentSettings]        = Group(PoseInstrumentSettings)
     projection_playhead: Group[ProjectionPlayheadSettings]   = Group(ProjectionPlayheadSettings)
     flood:              Group[FloodSettings]           = Group(FloodSettings)
-    test_player_lines:  Group[PlayerLinesSettings]     = Group(PlayerLinesSettings, share=[fov.as_('fov')])
+    test_player_lines:  Group[PlayerLinesSettings]     = Group(PlayerLinesSettings)
     test_calibration:   Group[CameraLightSettings]     = Group(CameraLightSettings, share=[fov.as_('fov')])
     test_fill:          Group[FillSettings]            = Group(FillSettings)
     test_pulse:         Group[PulseSettings]           = Group(PulseSettings)
     test_chase:         Group[ChaseSettings]           = Group(ChaseSettings)
     test_lines:         Group[LinesSettings]           = Group(LinesSettings)
     test_random:        Group[RandomSettings]          = Group(RandomSettings)
-    test_pose_waves:    Group[PoseWavesSettings]       = Group(PoseWavesSettings, share=[fov.as_('fov_degrees')])
+    test_pose_waves:    Group[PoseWavesSettings]       = Group(PoseWavesSettings)
     test_harmonic:      Group[HarmonicSettings]        = Group(HarmonicSettings)
 
 
@@ -116,7 +116,7 @@ class LightSettings(BaseSettings):
     num_cameras:      Field[int]   = Field(1,    min=1,   max=16,   access=Field.INIT, description="Number of cameras")
     light_rate:       Field[float] = Field(30.0, min=1,   max=120,  access=Field.INIT, description="Light output frame rate (fps)")
     light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, description="LED strip resolution (pixels)")
-    fov: Field[float] = Field(110.0, access=Field.INIT, description="Camera horizontal FOV — relay from root to player_lines/calibration; its visible home is the camera panel")
+    fov: Field[float] = Field(110.0, access=Field.INIT, description="Camera horizontal FOV — relay from root to test_calibration; its visible home is the camera panel")
     spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — hidden relay from states (via the root) into wind_down")
 
     brightness:     Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Main brightness — applied to the composite; the lamp gamma and floor live in the light sender", newline=True, pinned=True)

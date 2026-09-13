@@ -101,10 +101,21 @@ class Geometry:
         that is the only quantity two cameras can compare.
         """
         local_angle: float = self._calc_local_angle(roi)
-        world_angle: float = camera_local_to_azimuth(
-            local_angle, cam_id, self.cam_fov, self.target_fov,
-            self._ring_radius, self.parallax_radius)
+        world_angle: float = self._local_to_azimuth(local_angle, cam_id)
         return local_angle, world_angle, self.estimate_distance(roi)
+
+    def column_to_azimuth(self, cam_id: int, x: float) -> float:
+        """World azimuth (degrees, [0, 360)) of a normalised column of camera `cam_id`.
+
+        The same chain `calc_angle` puts a box centre through, at `parallax_radius`, so a keypoint's
+        column and its box centre's land on one comparable scale — their difference is how far the
+        point sits from the centre in world degrees.
+        """
+        return self._local_to_azimuth(x * self.cam_fov, cam_id)
+
+    def _local_to_azimuth(self, local_angle: float, cam_id: int) -> float:
+        return camera_local_to_azimuth(local_angle, cam_id, self.cam_fov, self.target_fov,
+                                       self._ring_radius, self.parallax_radius)
 
     def _foot_px(self, roi: Rect) -> float:
         """The row (px) the feet are on — the box bottom, less `foot_offset`.

@@ -15,6 +15,7 @@
   "spin_down_seconds": 6.0,
   "render": {
     "camera_view": "BOTH",
+    "azimuth_overlay": true,
     "preview": {
       "tracker": {
         "stage": "LERP",
@@ -686,7 +687,6 @@
         "invert": false,
         "level_center": 0.5,
         "level_flank": 1.0,
-        "anchor_nose": true,
         "blend": "ADD"
       },
       "test_calibration": {

@@ -10,6 +10,7 @@ from .extractors.AgeExtractor import            AgeExtractor
 from .extractors.MotionTimeExtractor import     MotionTimeExtractor
 from .extractors.LegDeviationExtractor import   LegDeviationExtractor, LegDeviationExtractorSettings
 from .extractors.TorsoTiltExtractor import      TorsoTiltExtractor, TorsoTiltExtractorSettings
+from .extractors.EyeAzimuthExtractor import     EyeAzimuthExtractor
 
 from .applicators.SimilarityApplicator import   SimilarityApplicator, SimilarityApplicatorSettings
 from .applicators.LeaderScoreApplicator import  LeaderScoreApplicator, LeaderScoreApplicatorSettings

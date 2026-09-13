@@ -12,6 +12,7 @@ from modules.oak import mono_frame_size
 from modules.tracker import PanoramicTrackerSettings
 from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
 from apps.white_space.render.layers.beam_light_simulation_layer import BeamLightSimulationLayer
+from apps.white_space.render.layers.azimuth_overlay_layer import AzimuthOverlayLayer
 from apps.white_space.light import FIXTURE_PROJECTION_RPM
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
@@ -92,6 +93,7 @@ class Render(RenderBase):
         )
         self.L[Layers.ws_light][0]   = LightSimulationLayer(board)
         self.L[Layers.ws_beam][0]     = BeamLightSimulationLayer(board, settings.beam_light_sim)
+        self.L[Layers.ws_azimuth][0]  = AzimuthOverlayLayer(board, settings.colors)
 
         self.subdivision_rows: list[SubdivisionRow] = self._build_rows()
         self._window_size: tuple[int, int] = (settings.window.width, settings.window.height)
@@ -187,6 +189,9 @@ class Render(RenderBase):
             w, h = self.subdivision.get_allocation_size('panoramic', 0)
             self.L[Layers.cam_panorama][0].allocate(w, h, GL_RGBA)
 
+        w, h = self.subdivision.get_allocation_size('ws_light', 0)
+        self.L[Layers.ws_azimuth][0].allocate(w, h, GL_RGBA)
+
         for i in range(self.num_players):
             w, h = self.subdivision.get_allocation_size('pose', i)
             self.L[Layers.poser][i].allocate(w, h, GL_RGBA)
@@ -246,6 +251,8 @@ class Render(RenderBase):
         beam_mode = output is not None and output.motor_command.target_rpm < FIXTURE_PROJECTION_RPM
         self._viewport(height, self.subdivision.get_rect('ws_light', 0))
         self.L[Layers.ws_beam if beam_mode else Layers.ws_light][0].draw()
+        if self.settings.azimuth_overlay:
+            self.L[Layers.ws_azimuth][0].draw()
 
         # Row 4 - pose cutouts with data overlays, one viewport per player
         for i in range(self.num_players):

@@ -274,6 +274,11 @@ class Tracker(Thread, BaseTracker):
         tests stays inside `Geometry`."""
         self.config.rig.overlap = self.geometry.overlap_azimuth
 
+    def column_to_azimuth(self, cam_id: int, x: float) -> float:
+        """World azimuth (degrees, [0, 360)) of a normalised column of camera `cam_id`, through the
+        same geometry the tracker's own azimuths come from (`Geometry.column_to_azimuth`)."""
+        return self.geometry.column_to_azimuth(cam_id, x)
+
     def start(self) -> None:
         if self._running:
             return

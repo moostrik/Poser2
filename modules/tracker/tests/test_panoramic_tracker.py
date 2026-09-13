@@ -640,6 +640,22 @@ class TestGeometryParallax(unittest.TestCase):
         expected = (TARGET_FOV * 2 + local - fov_overlap) % 360.0
         self.assertAlmostEqual(world, expected, places=6)
 
+    def test_column_to_azimuth_is_the_box_centre_chain(self) -> None:
+        # A keypoint's column goes through the same projection as a box centre, so the two are
+        # comparable — the premise of shifting a pose's azimuth by their difference.
+        g = self.make_geometry()
+        for cam_id in range(4):
+            for x in (0.1, 0.5, 0.93):
+                roi = Rect(x=x - 0.02, y=0.1, width=0.04, height=0.5)
+                with self.subTest(cam_id=cam_id, x=x):
+                    self.assertAlmostEqual(g.column_to_azimuth(cam_id, x), g.calc_angle(roi, cam_id)[1],
+                                           places=9)
+
+    def test_column_to_azimuth_centre_is_the_camera_axis(self) -> None:
+        g = self.make_geometry()
+        for cam_id in range(4):
+            self.assertAlmostEqual(g.column_to_azimuth(cam_id, 0.5), TARGET_FOV * (cam_id + 0.5), places=9)
+
     def test_estimate_distance_reads_the_feet_not_the_height(self) -> None:
         # The whole point of the floor-plane model: arms up, legs pulled up and bending over all
         # change a box's height and none of them move the feet, so the estimate must not care.

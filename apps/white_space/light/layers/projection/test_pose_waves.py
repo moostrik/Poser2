@@ -24,8 +24,6 @@ logger = logging.getLogger(__name__)
 
 class PoseWavesSettings(LayerSettings):
     """Settings for the pose-driven void and wave pattern composition."""
-    fov_degrees: Field[float] = Field(110.0, access=Field.INIT,
-                                      description="Camera horizontal FOV — shared from the root, the same value the tracker and the warp use")
 
     # Void zones
     void_width:    Field[float] = Field(0.05,  min=0.0, max=1.0,   step=0.01,  description="Void width (normalised)")
@@ -114,8 +112,7 @@ class PoseWaves(ProjectionLayer):
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         P = self._config
-        fov_degrees: float = P.fov_degrees
-        dt:          float = frame.tick.dt
+        dt: float = frame.tick.dt
 
         frames    = list(self._board.get_frames(self._pose_stage).values())
         tracklets = self._board.get_tracklets()
@@ -134,17 +131,9 @@ class PoseWaves(ProjectionLayer):
                 continue
 
             azimuth: float = angle_to_strip_position(pose[features.Azimuth].value)
-            bbox    = pose[features.BBox]
-            points  = pose[features.Points2D]
-            nose_xy = points[features.PointLandmark.nose]
-            nose_conf: float = points.get_score(features.PointLandmark.nose)
-            bbox_rect = bbox.to_rect()
-            if nose_conf > 0.3 and not np.isnan(nose_xy[0]) and not np.isnan(bbox_rect.width):
-                nose_offset_x: float = float(nose_xy[0]) - 0.5
-                azimuth = (azimuth + nose_offset_x * bbox_rect.width * fov_degrees / 360.0) % 1.0
             state.world_position = float((azimuth - 0.5) * 2 * np.pi)
 
-            bbox_height: float = bbox[features.BBoxElement.height]
+            bbox_height: float = pose[features.BBox][features.BBoxElement.height]
             state.pose_length = (
                 bbox_height if not np.isnan(bbox_height) and bbox_height > 0.0 else 1.0
             )

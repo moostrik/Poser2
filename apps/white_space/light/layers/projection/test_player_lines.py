@@ -21,7 +21,6 @@ from modules.utils import HotReloadMethods
 from modules.tracker import Tracklet
 from modules.pose import frame as pose_frame
 from modules.pose import features
-from modules.pose.features import PointLandmark
 
 from .._base_layer import ProjectionLayer, LayerSettings
 from ...frame import Frame
@@ -38,8 +37,6 @@ class PlayerLinesSettings(LayerSettings):
     invert:        Field[bool]  = Field(False,                                 description="Swap centre/flank colours", newline=True)
     level_center:  Field[float] = Field(1.0,   min=0.0, max=1.0,   step=0.01, description="Centre line level")
     level_flank:   Field[float] = Field(1.0,   min=0.0, max=1.0,   step=0.01, description="Flank line level")
-    anchor_nose:   Field[bool]  = Field(False,                                 description="Anchor centre line to nose instead of bbox centre", newline=True)
-    fov:           Field[float] = Field(110.0, description="Camera horizontal FOV (shared from compositor)", access=Field.INIT)
 
 
 @dataclass
@@ -75,17 +72,6 @@ class PlayerLines(ProjectionLayer):
                 continue
 
             strip_pos: float = angle_to_strip_position(pose[features.Azimuth].value)
-
-            if self._config.anchor_nose:
-                points    = pose[features.Points2D]
-                nose_xy   = points[features.PointLandmark.nose]
-                nose_conf: float = points.get_score(features.PointLandmark.nose)
-                bbox_rect = pose[features.BBox].to_rect()
-                # NOTE: nose_xy comes from the raw 2D pose keypoints and is NOT
-                # The camera's warp delivers an equirectangular frame, so a column is one
-                # azimuth exactly and this offset is linear in the box's width.
-                if nose_conf > 0.3 and not np.isnan(nose_xy[0]) and not np.isnan(bbox_rect.width):
-                    strip_pos = (strip_pos + (float(nose_xy[0]) - 0.5) * bbox_rect.width * self._config.fov / 360.0) % 1.0
 
             bottom_y: float = pose[features.BBox].to_rect().bottom
             if np.isnan(bottom_y):

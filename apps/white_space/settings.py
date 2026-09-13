@@ -67,6 +67,7 @@ class Layers(IntEnum):
     cam_panorama = auto()   # the 360° calibration strip: the stitch with the tracker data over it
     ws_light     = auto()   # the ring (fixture in projection mode)
     ws_beam       = auto()   # the bar's four lights (fixture in beam mode); shares ws_light's row
+    ws_azimuth   = auto()   # eye and bbox-centre azimuth lines, over whichever of the two is shown
     # data
     data_W       = auto()
     data_F       = auto()
@@ -323,6 +324,7 @@ class BeamLightSimSettings(BaseSettings):
 class RenderSettings(BaseSettings):
     camera_view: Field[CameraView] = Field(CameraView.BOTH, widget=Widget.select,
                                            description="Which camera row to show: the delivered frames, the 360° strip, or both")
+    azimuth_overlay: Field[bool] = Field(True, description="Eye (solid) and bbox-centre (faint) azimuth lines over the light strip")
     num_cams:    Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of players")
     tilt:        Field[float] = Field(0.0, access=Field.INIT, visible=False, description="Camera up-tilt (°), shared from the root — relayed to the panorama layer")

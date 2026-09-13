@@ -1,5 +1,6 @@
 """White Space — 3-camera panoramic installation with circular LED light output."""
 
+import math
 from typing import Optional
 from functools import partial
 
@@ -250,8 +251,13 @@ class WhiteSpaceMain:
             ])
             for i in range(num_players)
         })
+        # EyeAzimuthExtractor first, so everything from here on — PlayheadOffset, the ghoster, the
+        # light and the sound — places a person at their eyes. Only here: LERP frames are rebuilt
+        # from PREDICT each tick, so the tracker's bbox-centre azimuth arrives fresh and is shifted
+        # once; stages up to PREDICT keep it, which the render's azimuth overlay relies on.
         self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
+                nodes.EyeAzimuthExtractor(self._column_to_azimuth),
                 nodes.AngleSymExtractor(),
                 nodes.LegDeviationExtractor(ps.leg_deviation_extractor),
                 nodes.TorsoTiltExtractor(ps.torso_tilt_extractor),
@@ -324,6 +330,10 @@ class WhiteSpaceMain:
         """Camera frame callback — store raw VIDEO frames on the board for the light renderer."""
         if frame_type == FrameType.VIDEO:
             self.board.set_video_image(cam_id, frame)
+
+    def _column_to_azimuth(self, cam_id: int, x: float) -> float:
+        """A camera column's world azimuth in radians, through the tracker's own geometry."""
+        return math.radians(self.tracker.column_to_azimuth(cam_id, x))
 
     def _process_poses(self, poses: FrameDict) -> None:
         images, prev_images = self.source_uploader.snapshot()
