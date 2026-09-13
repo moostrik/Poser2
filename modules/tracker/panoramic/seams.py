@@ -19,8 +19,8 @@ class Seams:
     tracker intake's. Owns the handover state, and runs on the tracker thread only.
     """
 
-    def __init__(self, store: ObservationStore, rig: Rig, config: TrackerSettings) -> None:
-        self._store: ObservationStore = store
+    def __init__(self, observations: ObservationStore, rig: Rig, config: TrackerSettings) -> None:
+        self._observations: ObservationStore = observations
         self._rig: Rig = rig
         self._config: TrackerSettings = config
         # Last emitted primary per world id, as an observation id — for hysteresis — and when a
@@ -37,12 +37,12 @@ class Seams:
         assert isinstance(new_tracklet.annotation, Annotation)
         best_world: int | None = None
         best_diff: float = float('inf')
-        for t in self._store.all_tracklets():
+        for t in self._observations.all():
             if t.is_removed:
                 continue
             if not self._observations_match(new_tracklet, t):
                 continue
-            if self._store.camera_sees_world(new_tracklet.cam_id, t.id):
+            if self._observations.camera_sees_world(new_tracklet.cam_id, t.id):
                 continue
             assert isinstance(t.annotation, Annotation)
             diff: float = self._rig.angle_diff(new_tracklet.annotation.world_angle, t.annotation.world_angle)
@@ -55,7 +55,7 @@ class Seams:
         """Late safety net: merge worlds whose observations match each other (ambiguous
         simultaneous arrivals that each got their own world). Older world wins."""
         for keep_id, drop_id in self._collapse_pairs():
-            if self._store.merge_worlds(keep_id, drop_id):
+            if self._observations.merge_worlds(keep_id, drop_id):
                 self._primary_for_world.pop(drop_id, None)
                 self._handed_over_at.pop(drop_id, None)
 
@@ -76,7 +76,7 @@ class Seams:
         the moment the old camera returns; ``seam.hold`` blocks that for a while after a forced
         handover, so a one-frame miss costs one camera switch, not two.
         """
-        members: list[Tracklet] = [t for t in self._store.get_tracklets(world_id)
+        members: list[Tracklet] = [t for t in self._observations.members(world_id)
                                    if not t.is_removed and isinstance(t.annotation, Annotation)]
         if not members:
             return None
@@ -142,7 +142,7 @@ class Seams:
         wins. Only mutual nearest matches, so an observation already explained by a partner in its
         own world cannot drag a neighbour in; each world in at most one pair."""
         observations: list[Tracklet] = [
-            t for t in self._store.all_tracklets()
+            t for t in self._observations.all()
             if not t.is_removed
             and isinstance(t.annotation, Annotation)
             # Eligible where a second opinion exists at all: the picture's overlap, not a tuned
@@ -179,13 +179,13 @@ class Seams:
                 continue
             if nearest[i] is not b or nearest[j] is not a:
                 continue
-            if any(self._store.camera_sees_world(t.cam_id, b.id)
-                   for t in self._store.get_tracklets(a.id) if t.is_active):
+            if any(self._observations.camera_sees_world(t.cam_id, b.id)
+                   for t in self._observations.members(a.id) if t.is_active):
                 continue
 
             # Older world wins
-            members_a: list[Tracklet] = self._store.get_tracklets(a.id)
-            members_b: list[Tracklet] = self._store.get_tracklets(b.id)
+            members_a: list[Tracklet] = self._observations.members(a.id)
+            members_b: list[Tracklet] = self._observations.members(b.id)
             oldest_a: float = min(t.created_at for t in members_a) if members_a else float('inf')
             oldest_b: float = min(t.created_at for t in members_b) if members_b else float('inf')
             keep_id, drop_id = (a.id, b.id) if oldest_a <= oldest_b else (b.id, a.id)

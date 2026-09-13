@@ -79,19 +79,20 @@ class ObservationStore:
 
     # ── live-index lookups ─────────────────────────────────────────────
 
-    def get_world_id(self, cam_id: int, external_id: int) -> int | None:
+    def world_of(self, cam_id: int, external_id: int) -> int | None:
         """The world of the LIVE device track with this id, or None. A device track that has
         ended is deliberately invisible here, even while its observation still anchors."""
         obs_id: ObsId | None = self._live.get((cam_id, external_id))
         return None if obs_id is None else self._world_for.get(obs_id)
 
-    def get_live_observation(self, cam_id: int, external_id: int) -> Tracklet | None:
+    def live(self, cam_id: int, external_id: int) -> Tracklet | None:
+        """The observation of the LIVE device track with this id, or None."""
         obs_id: ObsId | None = self._live.get((cam_id, external_id))
         return None if obs_id is None else self._obs.get(obs_id)
 
     # ── mutation ───────────────────────────────────────────────────────
 
-    def add_tracklet(self, tracklet: Tracklet, world_id: int | None = None) -> int | None:
+    def add(self, tracklet: Tracklet, world_id: int | None = None) -> int | None:
         """
         Store a brand-new observation. If `world_id` is None, a fresh world id
         is acquired from the pool; otherwise the observation is linked into the
@@ -99,7 +100,7 @@ class ObservationStore:
         """
         key: DeviceKey = (tracklet.cam_id, tracklet.external_id)
         if key in self._live:
-            logger.warning(f"add_tracklet on live key {key}; use replace_tracklet.")
+            logger.warning(f"add on live key {key}; use refresh.")
             return self._world_for.get(self._live[key])
 
         if world_id is None:
@@ -109,7 +110,7 @@ class ObservationStore:
                 logger.info(f"No more world IDs available: {e}")
                 return None
         elif world_id not in self._world_members:
-            logger.warning(f"add_tracklet linking to unknown world {world_id}.")
+            logger.warning(f"add linking to unknown world {world_id}.")
             return None
 
         obs_id: ObsId = self._next_obs_id
@@ -121,16 +122,16 @@ class ObservationStore:
         self._world_for[obs_id] = world_id
         return world_id
 
-    def replace_tracklet(self, new_tracklet: Tracklet) -> int:
+    def refresh(self, new_tracklet: Tracklet) -> int:
         """
         Refresh the live observation for this device track with a new detection. Preserves
-        `created_at` and the observation's identity. A missed detection is `lose_tracklet`.
+        `created_at` and the observation's identity. A missed detection is `lose`.
         """
         key: DeviceKey = (new_tracklet.cam_id, new_tracklet.external_id)
         obs_id: ObsId | None = self._live.get(key)
         old_tracklet: Tracklet | None = None if obs_id is None else self._obs.get(obs_id)
         if obs_id is None or old_tracklet is None:
-            logger.warning(f"Attempted to replace non-live tracklet {key}.")
+            logger.warning(f"Attempted to refresh non-live observation {key}.")
             return -1
 
         status: TrackingStatus = new_tracklet.status
@@ -147,7 +148,7 @@ class ObservationStore:
         )
         return world_id
 
-    def lose_tracklet(self, cam_id: int, external_id: int, latest: Tracklet | None = None) -> None:
+    def lose(self, cam_id: int, external_id: int, latest: Tracklet | None = None) -> None:
         """The device has no detection this frame but still holds the track: mark LOST and keep
         it live, because the same device id legitimately comes back.
 
@@ -155,11 +156,11 @@ class ObservationStore:
         zone's far edge, or a box a filter rejects. Their newest `roi` and `annotation` are kept, so
         the observation (and the panorama's mark) follows them, but `last_active` is **not** advanced:
         that is the clock `lost_timeout` and pose's `detection_timeout` run on, and restarting it would
-        keep them forever. (`replace_tracklet` with a LOST copy cannot do this — it takes the newer time.)
+        keep them forever. (`refresh` with a LOST copy cannot do this — it takes the newer time.)
         """
         obs_id: ObsId | None = self._live.get((cam_id, external_id))
         if obs_id is None or obs_id not in self._obs:
-            logger.warning(f"Attempted to lose non-live tracklet {(cam_id, external_id)}.")
+            logger.warning(f"Attempted to lose non-live observation {(cam_id, external_id)}.")
             return
         old: Tracklet = self._obs[obs_id]
         if latest is None:
@@ -175,18 +176,18 @@ class ObservationStore:
         key: DeviceKey = (cam_id, external_id)
         obs_id: ObsId | None = self._live.pop(key, None)
         if obs_id is None or obs_id not in self._obs:
-            logger.warning(f"Attempted to end non-live tracklet {key}.")
+            logger.warning(f"Attempted to end non-live observation {key}.")
             return
         self._obs[obs_id] = replace(self._obs[obs_id], status=TrackingStatus.LOST)
 
-    def retire_tracklet(self, obs_id: ObsId) -> None:
+    def retire(self, obs_id: ObsId) -> None:
         """Timed out: mark REMOVED so the next tick deletes it."""
         if obs_id not in self._obs:
             logger.warning(f"Attempted to retire non-existent observation {obs_id}.")
             return
         self._obs[obs_id] = replace(self._obs[obs_id], status=TrackingStatus.REMOVED)
 
-    def remove_tracklet(self, obs_id: ObsId) -> None:
+    def remove(self, obs_id: ObsId) -> None:
         """Delete an observation. Releases its world id if it was the last member."""
         tracklet: Tracklet | None = self._obs.pop(obs_id, None)
         if tracklet is None:
@@ -233,14 +234,16 @@ class ObservationStore:
         One camera never sees one person twice — the device de-duplicates — so a second id from it
         is a second person, and no rule may join the two. A merge would be sticky: nothing splits a
         world again."""
-        return any(t.cam_id == cam_id and t.is_active for t in self.get_tracklets(world_id))
+        return any(t.cam_id == cam_id and t.is_active for t in self.members(world_id))
 
-    def get_tracklets(self, world_id: int) -> list[Tracklet]:
+    def members(self, world_id: int) -> list[Tracklet]:
+        """Every observation in this world."""
         obs_ids: set[ObsId] = self._world_members.get(world_id, set())
         return [self._obs[o] for o in obs_ids if o in self._obs]
 
-    def all_tracklets(self) -> list[Tracklet]:
+    def all(self) -> list[Tracklet]:
+        """Every observation, in every world."""
         return list(self._obs.values())
 
-    def all_world_ids(self) -> list[int]:
+    def world_ids(self) -> list[int]:
         return list(self._world_members.keys())

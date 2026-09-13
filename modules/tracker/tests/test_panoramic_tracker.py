@@ -87,12 +87,12 @@ class TestDeviceIdReuse(PanoramicTrackerCase):
 
     def test_reused_id_elsewhere_does_not_inherit_the_world(self) -> None:
         self.submit(make_tracklet(0, 1, 50.0))
-        self.assertEqual(self.tracker.store.get_world_id(0, 1), 0)
+        self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
         # The device drops the track: its id 1 is now free.
         self.submit(make_tracklet(0, 1, 50.0, status=TrackingStatus.REMOVED))
         # A different person appears 30 deg away and the device hands them id 1 again.
         out = self.submit(make_tracklet(0, 1, 80.0))
-        self.assertEqual(self.tracker.store.get_world_id(0, 1), 1)   # a NEW world, not 0
+        self.assertEqual(self.tracker.observations.world_of(0, 1), 1)   # a NEW world, not 0
         self.assertEqual(set(out.keys()), {0, 1})                    # the old one still anchors
 
     def test_reacquired_in_place_under_the_same_id_keeps_the_world(self) -> None:
@@ -100,7 +100,7 @@ class TestDeviceIdReuse(PanoramicTrackerCase):
         self.submit(make_tracklet(0, 1, 50.0))
         self.submit(make_tracklet(0, 1, 50.0, status=TrackingStatus.REMOVED))
         out = self.submit(make_tracklet(0, 1, 52.0))
-        self.assertEqual(self.tracker.store.get_world_id(0, 1), 0)
+        self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
         self.assertEqual(set(out.keys()), {0})
 
     def test_reacquired_in_place_under_a_new_id_keeps_the_world(self) -> None:
@@ -108,7 +108,7 @@ class TestDeviceIdReuse(PanoramicTrackerCase):
         self.submit(make_tracklet(0, 1, 50.0))
         self.submit(make_tracklet(0, 1, 50.0, status=TrackingStatus.REMOVED))
         out = self.submit(make_tracklet(0, 7, 51.0))
-        self.assertEqual(self.tracker.store.get_world_id(0, 7), 0)
+        self.assertEqual(self.tracker.observations.world_of(0, 7), 0)
         self.assertEqual(set(out.keys()), {0})
 
     def test_relink_is_bounded_by_angle_alone(self) -> None:
@@ -117,7 +117,7 @@ class TestDeviceIdReuse(PanoramicTrackerCase):
         self.submit(self.person(0, 1, 50.0, height_m=1.8, distance=3.0))
         self.submit(self.person(0, 1, 50.0, status=TrackingStatus.REMOVED))
         out = self.submit(self.person(0, 2, 52.0, height_m=1.2, distance=1.8))
-        self.assertEqual(self.tracker.store.get_world_id(0, 2), 0)   # same world
+        self.assertEqual(self.tracker.observations.world_of(0, 2), 0)   # same world
         self.assertEqual(set(out.keys()), {0})
 
     def test_relink_refused_beyond_the_reacquire_angle(self) -> None:
@@ -125,7 +125,7 @@ class TestDeviceIdReuse(PanoramicTrackerCase):
         self.submit(self.person(0, 1, 50.0))
         self.submit(self.person(0, 1, 50.0, status=TrackingStatus.REMOVED))
         out = self.submit(self.person(0, 2, 60.0))
-        self.assertEqual(self.tracker.store.get_world_id(0, 2), 1)   # too far: a new world
+        self.assertEqual(self.tracker.observations.world_of(0, 2), 1)   # too far: a new world
         self.assertEqual(set(out.keys()), {0, 1})
 
     def test_lost_anchor_still_links_across_a_seam_after_its_id_is_reused(self) -> None:
@@ -135,16 +135,16 @@ class TestDeviceIdReuse(PanoramicTrackerCase):
         self.submit(make_tracklet(0, 1, 98.0, status=TrackingStatus.REMOVED))
         self.submit(make_tracklet(0, 1, 40.0))                       # id 1 reused mid-field
         out = self.submit(make_tracklet(1, 1, 8.0))                  # cam1 sees the seam person
-        self.assertEqual(self.tracker.store.get_world_id(1, 1), 0)   # links to the anchor
+        self.assertEqual(self.tracker.observations.world_of(1, 1), 0)   # links to the anchor
         self.assertIn(0, out)
 
     def test_a_new_observation_is_a_new_observation(self) -> None:
         # Host-owned ids: reusing a device number must not reuse our record of it.
         self.submit(make_tracklet(0, 1, 50.0))
-        first = self.tracker.store.get_live_observation(0, 1)
+        first = self.tracker.observations.live(0, 1)
         self.submit(make_tracklet(0, 1, 50.0, status=TrackingStatus.REMOVED))
         self.submit(make_tracklet(0, 1, 52.0))
-        second = self.tracker.store.get_live_observation(0, 1)
+        second = self.tracker.observations.live(0, 1)
         assert first is not None and second is not None
         self.assertNotEqual(first.obs_id, second.obs_id)
 
@@ -158,7 +158,7 @@ class TestDeviceIdReuse(PanoramicTrackerCase):
         self.config.lost_timeout = 1.0
         self.submit()                                                # the old anchor retires
         out = self.submit(make_tracklet(0, 1, 52.0))
-        self.assertEqual(self.tracker.store.get_world_id(0, 1), 0)
+        self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
         self.assertEqual(set(out.keys()), {0})
 
     def test_someone_else_on_the_id_survives_the_old_anchor_retiring(self) -> None:
@@ -168,7 +168,7 @@ class TestDeviceIdReuse(PanoramicTrackerCase):
         self.config.lost_timeout = 1.0
         self.submit()
         out = self.submit(make_tracklet(0, 1, 80.0))
-        self.assertEqual(self.tracker.store.get_world_id(0, 1), 1)
+        self.assertEqual(self.tracker.observations.world_of(0, 1), 1)
         self.assertEqual(set(out.keys()), {1})
 
 
@@ -180,7 +180,7 @@ class TestEmitsWhatItRemembers(PanoramicTrackerCase):
         stale = replace(make_tracklet(0, 1, 50.0), last_active=time.time() - 1.0)
         out = self.submit(stale)
         self.assertEqual(set(out.keys()), {0})                         # 1.0 s < lost_timeout 2.0
-        self.assertEqual(self.tracker.store.get_world_id(0, 1), 0)
+        self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
 
     def test_a_forgotten_world_is_not_emitted(self) -> None:
         # Last seen 1.5 s ago: remembered at 2.0. Lowering `lost_timeout` below that stands in for
@@ -324,7 +324,7 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         self.submit(make_tracklet(0, 1, 98.0, status=TrackingStatus.LOST))
         out = self.submit(make_tracklet(1, 1, 8.0))
         self.assertEqual(set(out.keys()), {0})
-        self.assertEqual(self.tracker.store.get_world_id(1, 1), 0)
+        self.assertEqual(self.tracker.observations.world_of(1, 1), 0)
 
     def test_one_person_seen_from_two_distances_passes_the_height_gate(self) -> None:
         # The point of gating on metres. Two cameras at a seam are at genuinely different
@@ -336,7 +336,7 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         self.submit(near)
         out = self.submit(far)
         self.assertEqual(set(out.keys()), {0})
-        self.assertEqual(self.tracker.store.get_world_id(1, 1), 0)
+        self.assertEqual(self.tracker.observations.world_of(1, 1), 0)
 
     def test_height_gate_rejects_a_genuinely_different_person(self) -> None:
         # Same azimuth, 1.2 m against 1.8 m: 0.33 apart, past the 0.15 gate.
@@ -360,8 +360,8 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         jumper = self.person(1, 1, 8.0, height_m=1.8, distance=2.5, feet_off_floor=0.3)
         out = self.submit(jumper)
         self.assertEqual(set(out.keys()), {0})
-        self.assertEqual(self.tracker.store.get_world_id(1, 1), 0)
-        annotation = self.tracker.store.get_live_observation(1, 1)
+        self.assertEqual(self.tracker.observations.world_of(1, 1), 0)
+        annotation = self.tracker.observations.live(1, 1)
         assert annotation is not None and isinstance(annotation.annotation, PanoramicAnnotation)
         # It really is a bad reading, not a lucky one that happened to fall inside the gate.
         self.assertFalse(height_is_measured(annotation.annotation.height)
@@ -375,9 +375,9 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         self.submit(self.person(0, 1, 98.0, height_m=1.8, distance=2.5))
         out = self.submit(self.person(1, 1, 8.0, height_m=1.8, distance=2.5, feet_off_floor=0.45))
         self.assertEqual(set(out.keys()), {0})                         # still emitted, from cam 0
-        self.assertIsNone(self.tracker.store.get_world_id(1, 1))       # the view is not seen
+        self.assertIsNone(self.tracker.observations.world_of(1, 1))       # the view is not seen
         self.submit(self.person(1, 1, 8.0, height_m=1.8, distance=2.5))
-        self.assertEqual(self.tracker.store.get_world_id(1, 1), 0)     # landed: linked
+        self.assertEqual(self.tracker.observations.world_of(1, 1), 0)     # landed: linked
 
     def test_two_people_inside_the_overlap_stay_two_worlds(self) -> None:
         # 12 deg of world azimuth apart, both inside the cam0/cam1 overlap band (20 deg in from
@@ -387,7 +387,7 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         self.submit(self.person(0, 1, 96.0))         # world angle 86
         out = self.submit(self.person(1, 2, 18.0))   # world angle 98
         self.assertEqual(set(out.keys()), {0, 1})
-        self.assertEqual(self.tracker.store.get_world_id(1, 2), 1)
+        self.assertEqual(self.tracker.observations.world_of(1, 2), 1)
 
     def test_two_people_fuse_at_a_loose_link_angle(self) -> None:
         # The other half of the same fixture: the gate, not the geometry, is what kept them
@@ -405,7 +405,7 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         # must not merge world 0 into it afterwards (its mutual nearest match
         # is its own-world partner, not world 0's observation).
         out = self.submit(make_tracklet(1, 1, 10.5))
-        self.assertEqual(self.tracker.store.get_world_id(1, 1), 1)
+        self.assertEqual(self.tracker.observations.world_of(1, 1), 1)
         self.assertEqual(set(out.keys()), {0, 1})
 
     def test_collapse_repairs_simultaneous_arrivals(self) -> None:
@@ -420,7 +420,7 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         self.tracker._update_and_notify()
         out = self.emitted[-1]
         self.assertEqual(set(out.keys()), {0})
-        self.assertEqual(self.tracker.store.get_world_id(1, 1), 0)
+        self.assertEqual(self.tracker.observations.world_of(1, 1), 0)
 
 
 class TestOneCameraOnePerson(PanoramicTrackerCase):
@@ -434,7 +434,7 @@ class TestOneCameraOnePerson(PanoramicTrackerCase):
         self.submit(make_tracklet(0, 1, 98.0))                        # azimuth 88: world 0
         self.submit(make_tracklet(1, 1, 8.0))                         # the same person in cam 1
         out = self.submit(make_tracklet(1, 2, 12.0))                  # someone else, 4° along
-        self.assertEqual(self.tracker.store.get_world_id(1, 2), 1)
+        self.assertEqual(self.tracker.observations.world_of(1, 2), 1)
         self.assertEqual(set(out.keys()), {0, 1})
 
     def test_a_re_acquisition_skips_a_world_this_camera_already_sees(self) -> None:
@@ -442,18 +442,18 @@ class TestOneCameraOnePerson(PanoramicTrackerCase):
         self.submit(make_tracklet(0, 1, 50.0, status=TrackingStatus.REMOVED))   # a LOST anchor at 50
         self.submit(make_tracklet(0, 2, 51.0))                        # re-found: world 0
         self.submit(make_tracklet(0, 3, 54.0))                        # someone else near the anchor
-        self.assertEqual(self.tracker.store.get_world_id(0, 2), 0)
-        self.assertEqual(self.tracker.store.get_world_id(0, 3), 1)
+        self.assertEqual(self.tracker.observations.world_of(0, 2), 0)
+        self.assertEqual(self.tracker.observations.world_of(0, 3), 1)
 
     def test_worlds_this_camera_sees_apart_are_never_collapsed(self) -> None:
         # Cam 1's view (azimuth 89) sits in the world of cam 0's person at 84, and is the mutual
         # nearest match of cam 0's person at 88 — a pair the collapse net would merge.
-        store = self.tracker.store
-        store.add_tracklet(self.annotated(make_tracklet(0, 1, 98.0)))
-        world: int | None = store.add_tracklet(self.annotated(make_tracklet(0, 2, 94.0)))
-        store.add_tracklet(self.annotated(make_tracklet(1, 1, 9.0)), world_id=world)
+        observations = self.tracker.observations
+        observations.add(self.annotated(make_tracklet(0, 1, 98.0)))
+        world: int | None = observations.add(self.annotated(make_tracklet(0, 2, 94.0)))
+        observations.add(self.annotated(make_tracklet(1, 1, 9.0)), world_id=world)
         self.submit()
-        self.assertNotEqual(store.get_world_id(0, 1), store.get_world_id(0, 2))
+        self.assertNotEqual(observations.world_of(0, 1), observations.world_of(0, 2))
 
 
 class TestWorldIdPool(unittest.TestCase):
@@ -849,8 +849,8 @@ class TestSeamBirths(unittest.TestCase):
         # links into the same world rather than creating a second one.
         out = self.arrive(1.75)
         self.assertEqual(set(out.keys()), {0})
-        self.assertEqual(self.tracker.store.get_world_id(0, 1), 0)
-        self.assertEqual(self.tracker.store.get_world_id(1, 1), 0)
+        self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
+        self.assertEqual(self.tracker.observations.world_of(1, 1), 0)
 
 
 class RigTrackerCase(unittest.TestCase):
@@ -901,7 +901,7 @@ class TestFarEdge(RigTrackerCase):
 
     def test_a_new_arrival_past_the_edge_is_not_started(self) -> None:
         self.assertEqual(self.seen(4.0), {})
-        self.assertIsNone(self.tracker.store.get_world_id(0, 1))
+        self.assertIsNone(self.tracker.observations.world_of(0, 1))
         self.assertEqual(set(self.seen(3.0).keys()), {0})             # inside: started
 
     def test_a_brief_excursion_changes_nothing_visible(self) -> None:
@@ -910,7 +910,7 @@ class TestFarEdge(RigTrackerCase):
         self.seen(3.0)
         out = self.seen(4.0)
         self.assertEqual(set(out.keys()), {0})
-        observation = self.tracker.store.get_live_observation(0, 1)
+        observation = self.tracker.observations.live(0, 1)
         assert observation is not None
         self.assertEqual(observation.status, TrackingStatus.LOST)
 
@@ -918,10 +918,10 @@ class TestFarEdge(RigTrackerCase):
         """The trap the store's `latest` argument exists for: the observation follows the person
         out (so the panorama does too), but its `last_active` stays where they were last inside."""
         self.seen(3.0, seconds_ago=1.5)
-        before = self.tracker.store.get_live_observation(0, 1)
+        before = self.tracker.observations.live(0, 1)
         assert before is not None
         out = self.seen(4.0)
-        after = self.tracker.store.get_live_observation(0, 1)
+        after = self.tracker.observations.live(0, 1)
         assert after is not None and isinstance(after.annotation, PanoramicAnnotation)
         self.assertEqual(after.last_active, before.last_active)
         self.assertAlmostEqual(after.annotation.distance, 4.0 - RING_RADIUS, delta=0.01)
@@ -932,20 +932,20 @@ class TestFarEdge(RigTrackerCase):
         # below 1.5 before the outside frame stands in for time passing. Without the filter that
         # frame would refresh `last_active` and keep them; with it, the old clock retires them.
         self.seen(3.0, seconds_ago=1.5)
-        self.assertEqual(self.tracker.store.all_world_ids(), [0])
+        self.assertEqual(self.tracker.observations.world_ids(), [0])
         self.config.lost_timeout = 1.2
         self.seen(4.0)
-        self.assertEqual(self.tracker.store.all_world_ids(), [])
+        self.assertEqual(self.tracker.observations.world_ids(), [])
 
     def test_stepping_back_in_keeps_the_same_person(self) -> None:
         self.seen(3.0)
         self.seen(4.0)
         out = self.seen(3.2)
         self.assertEqual(set(out.keys()), {0})
-        observation = self.tracker.store.get_live_observation(0, 1)
+        observation = self.tracker.observations.live(0, 1)
         assert observation is not None
         self.assertEqual(observation.status, TrackingStatus.TRACKED)
-        self.assertEqual(self.tracker.store.get_world_id(0, 1), 0)
+        self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
 
     def test_past_the_edge_blocks_reacquisition(self) -> None:
         # The device drops the person and re-finds them under a new id, but past the edge: not them
@@ -953,9 +953,9 @@ class TestFarEdge(RigTrackerCase):
         self.seen(3.0)
         self.seen(3.0, status=TrackingStatus.REMOVED)
         self.seen(4.0, ext_id=2)
-        self.assertIsNone(self.tracker.store.get_world_id(0, 2))
+        self.assertIsNone(self.tracker.observations.world_of(0, 2))
         self.seen(3.0, ext_id=3)
-        self.assertEqual(self.tracker.store.get_world_id(0, 3), 0)
+        self.assertEqual(self.tracker.observations.world_of(0, 3), 0)
 
 
 class TestRejectedDetections(RigTrackerCase):
@@ -983,7 +983,7 @@ class TestRejectedDetections(RigTrackerCase):
                 out = self.seen(**kwargs)
                 self.assertEqual(out, {})                                  # the show sees nobody
                 self.assertEqual(self.rejected(), {reason: 1})             # the strip sees why
-                self.assertEqual(self.tracker.store.all_world_ids(), [])
+                self.assertEqual(self.tracker.observations.world_ids(), [])
 
     def test_a_new_arrival_in_the_dead_zone_is_rejected(self) -> None:
         # Both cameras' first sight of someone on a seam close in: both inside the dead zone.
@@ -1001,7 +1001,7 @@ class TestRejectedDetections(RigTrackerCase):
         self.assertEqual(self.rejected(), {Rejection.YOUNG: 1})
         self.seen(3.0)                                           # old enough: a person
         self.assertEqual(self.rejected(), {})
-        self.assertEqual(self.tracker.store.all_world_ids(), [0])
+        self.assertEqual(self.tracker.observations.world_ids(), [0])
         self.seen(4.0, ext_id=2)                                 # someone else, past the edge
         self.assertEqual(self.rejected(), {Rejection.PAST_EDGE: 1})
         self.seen(4.0, ext_id=2, status=TrackingStatus.REMOVED)  # the device lets them go
@@ -1028,12 +1028,12 @@ class TestRejectedDetections(RigTrackerCase):
     def test_a_tracked_person_past_the_edge_carries_the_rejection_on_their_own_mark(self) -> None:
         self.seen(3.0)
         self.seen(4.0)
-        observation = self.tracker.store.get_live_observation(0, 1)
+        observation = self.tracker.observations.live(0, 1)
         assert observation is not None and isinstance(observation.annotation, PanoramicAnnotation)
         self.assertEqual(observation.annotation.rejected, Rejection.PAST_EDGE)
         self.assertEqual(self.rejected(), {})                    # one mark, not a second grey line
         self.seen(3.0)
-        observation = self.tracker.store.get_live_observation(0, 1)
+        observation = self.tracker.observations.live(0, 1)
         assert observation is not None and isinstance(observation.annotation, PanoramicAnnotation)
         self.assertIsNone(observation.annotation.rejected)       # back inside: no rejection
 
@@ -1041,9 +1041,9 @@ class TestRejectedDetections(RigTrackerCase):
         # The same as walking out: LOST, the clock not restarted, rejection kept — not frozen as TRACKED
         # beside a grey duplicate.
         self.seen(3.0, seconds_ago=0.5)
-        before = self.tracker.store.get_live_observation(0, 1)
+        before = self.tracker.observations.live(0, 1)
         self.seen(3.0, height=self.config.height_filter / 2.0)
-        after = self.tracker.store.get_live_observation(0, 1)
+        after = self.tracker.observations.live(0, 1)
         assert before is not None and after is not None
         assert isinstance(after.annotation, PanoramicAnnotation)
         self.assertEqual(after.status, TrackingStatus.LOST)
@@ -1062,16 +1062,16 @@ class TestRejectedDetections(RigTrackerCase):
             self.seen(3.0, ext_id=2)
         self.assertEqual(self.rejected(), {Rejection.NO_ID: 1})
         self.assertEqual(len(logs.records), 1)
-        self.assertEqual(self.tracker.store.all_world_ids(), [0])
+        self.assertEqual(self.tracker.observations.world_ids(), [0])
 
 
 class TestUnknownStatus(PanoramicTrackerCase):
 
     def test_an_unmapped_device_status_changes_nothing(self) -> None:
         self.submit(make_tracklet(0, 1, 50.0))
-        before = self.tracker.store.get_live_observation(0, 1)
+        before = self.tracker.observations.live(0, 1)
         self.submit(make_tracklet(0, 1, 60.0, status=TrackingStatus.NONE))
-        self.assertEqual(self.tracker.store.get_live_observation(0, 1), before)
+        self.assertEqual(self.tracker.observations.live(0, 1), before)
 
 
 class TestLifecycle(unittest.TestCase):

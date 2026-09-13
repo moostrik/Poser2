@@ -48,14 +48,14 @@ class Tracker(Thread, BaseTracker):
 
         self._input_queue: Queue[Tracklet] = Queue()
 
-        self.store: ObservationStore = ObservationStore(num_players)
+        self.observations: ObservationStore = ObservationStore(num_players)
 
         self.config: TrackerSettings = config
         # Each camera owns 360/num_cameras degrees of the ring; whatever its field has beyond
         # that is the overlap it shares with its neighbours.
         self.rig: Rig = Rig(config.fov, 360.0 / num_cameras)
         self.rig_sync: RigSync = RigSync(config, self.rig)
-        self.seams: Seams = Seams(self.store, self.rig, config)
+        self.seams: Seams = Seams(self.observations, self.rig, config)
 
         # A live rig change only raises this; the tracker thread applies it before its next tick, so
         # the `Rig` is never written while the intake reads it.
@@ -150,16 +150,16 @@ class Tracker(Thread, BaseTracker):
         # after the near one gave up.
         if new_tracklet.is_removed:
             self._rejected.pop(key, None)
-            if self.store.get_world_id(cam_id, ext_id) is not None:
-                self.store.end_device_track(cam_id, ext_id)
+            if self.observations.world_of(cam_id, ext_id) is not None:
+                self.observations.end_device_track(cam_id, ext_id)
             return
 
         # No detection this frame, but the device still holds the track: the same id will come
         # back, so the observation stays live.
         if new_tracklet.is_lost:
             self._rejected.pop(key, None)
-            if self.store.get_world_id(cam_id, ext_id) is not None:
-                self.store.lose_tracklet(cam_id, ext_id)
+            if self.observations.world_of(cam_id, ext_id) is not None:
+                self.observations.lose(cam_id, ext_id)
             return
 
         # A status the device mapping does not know (`TrackingStatus.NONE`) says nothing usable.
@@ -171,7 +171,7 @@ class Tracker(Thread, BaseTracker):
         # order changes nothing that is decided below.
         annotation: Annotation = self.rig.annotate(new_tracklet.roi, cam_id)
         new_tracklet = replace(new_tracklet, annotation=annotation)
-        existing: bool = self.store.get_world_id(cam_id, ext_id) is not None
+        existing: bool = self.observations.world_of(cam_id, ext_id) is not None
 
         # Too young, too small, or past the zone's far edge: not counted — handled exactly like a
         # missed detection, before every branch below, so nobody is born, re-acquired or linked on
@@ -190,7 +190,7 @@ class Tracker(Thread, BaseTracker):
         if reason is not None:
             if existing:
                 self._rejected.pop(key, None)
-                self.store.lose_tracklet(cam_id, ext_id, latest=self._with_rejection(new_tracklet, reason))
+                self.observations.lose(cam_id, ext_id, latest=self._with_rejection(new_tracklet, reason))
             else:
                 self._reject(new_tracklet, reason)
             return
@@ -200,7 +200,7 @@ class Tracker(Thread, BaseTracker):
         # while the camera still tracks the person.
         if existing:
             self._rejected.pop(key, None)
-            self.store.replace_tracklet(new_tracklet)
+            self.observations.refresh(new_tracklet)
             return
 
         # A re-acquisition in the same camera is a continuation, not an arrival, so it is
@@ -209,7 +209,7 @@ class Tracker(Thread, BaseTracker):
         anchor_world: int | None = self._reacquired_world(new_tracklet)
         if anchor_world is not None:
             self._rejected.pop(key, None)
-            self.store.add_tracklet(new_tracklet, world_id=anchor_world)
+            self.observations.add(new_tracklet, world_id=anchor_world)
             return
 
         # Brand-new observations are ignored too close to the FOV edge
@@ -220,11 +220,11 @@ class Tracker(Thread, BaseTracker):
             linked_world: int | None = self.seams.linked_world(new_tracklet)
             if linked_world is not None:
                 self._rejected.pop(key, None)
-                self.store.add_tracklet(new_tracklet, world_id=linked_world)
+                self.observations.add(new_tracklet, world_id=linked_world)
                 return
 
         # A new person. Checked here rather than read off `add_tracklet`'s None, which cannot say why.
-        if not self.store.has_free_id():
+        if not self.observations.has_free_id():
             if not self._pool_full:
                 logger.warning("Every world id is in use: new people are not tracked until one frees up")
                 self._pool_full = True
@@ -232,7 +232,7 @@ class Tracker(Thread, BaseTracker):
             return
         self._pool_full = False
         self._rejected.pop(key, None)
-        self.store.add_tracklet(new_tracklet)
+        self.observations.add(new_tracklet)
 
     def _reacquired_world(self, new_tracklet: Tracklet) -> int | None:
         """The world of a lost observation in the SAME camera that this new one continues.
@@ -245,12 +245,12 @@ class Tracker(Thread, BaseTracker):
         new_angle: float = new_tracklet.annotation.local_angle
         best_world: int | None = None
         best_diff: float = float('inf')
-        for t in self.store.all_tracklets():
+        for t in self.observations.all():
             if t.cam_id != new_tracklet.cam_id or t.is_active or t.is_removed:
                 continue
             if not isinstance(t.annotation, Annotation):
                 continue
-            if self.store.camera_sees_world(new_tracklet.cam_id, t.id):
+            if self.observations.camera_sees_world(new_tracklet.cam_id, t.id):
                 continue                    # already re-found: this is someone else
             diff: float = abs(t.annotation.local_angle - new_angle)
             if diff > self.config.reacquire_angle:
@@ -274,9 +274,9 @@ class Tracker(Thread, BaseTracker):
         now: float = time.time()
 
         # Expire timed-out observations
-        for t in self.store.all_tracklets():
+        for t in self.observations.all():
             if t.is_expired(self.config.lost_timeout):
-                self.store.retire_tracklet(t.obs_id)
+                self.observations.retire(t.obs_id)
 
         self.seams.collapse_worlds()
 
@@ -287,7 +287,7 @@ class Tracker(Thread, BaseTracker):
         # with one number. A world retired just above is still in the store until the end of this
         # tick; it is not emitted.
         emitted: TrackletDict = {}
-        for world_id in self.store.all_world_ids():
+        for world_id in self.observations.world_ids():
             primary: Tracklet | None = self.seams.pick_primary(world_id, now)
             if primary is not None:
                 emitted[world_id] = primary
@@ -303,14 +303,14 @@ class Tracker(Thread, BaseTracker):
         # of a person on a seam, which the primaries above deliberately reduce to one — and every
         # detection a filter rejected, so nobody vanishes from the strip without a reason.
         self._notify_observation_callback(
-            [t for t in self.store.all_tracklets() if not t.is_removed] + list(self._rejected.values())
+            [t for t in self.observations.all() if not t.is_removed] + list(self._rejected.values())
         )
 
         # Drop REMOVED observations and the handover state of worlds that went with them
-        for t in self.store.all_tracklets():
+        for t in self.observations.all():
             if t.status == TrackingStatus.REMOVED:
-                self.store.remove_tracklet(t.obs_id)
-        self.seams.prune(set(self.store.all_world_ids()))
+                self.observations.remove(t.obs_id)
+        self.seams.prune(set(self.observations.world_ids()))
 
     # CALLBACKS
     def _notify_callback(self, tracklets: TrackletDict) -> None:
