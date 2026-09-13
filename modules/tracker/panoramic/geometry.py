@@ -49,6 +49,9 @@ class Geometry:
         # Parallax: cameras sit on a ring of this radius (m), not at the shared
         # centre the world-angle model assumes. 0 disables the correction.
         self._ring_radius: float = 0.0
+        # How far below the feet the device tracker puts the box bottom, as a fraction of frame
+        # height. 0 is the identity; it is a measurement of the detector, not of the site.
+        self._foot_offset: float = 0.0
         # Lens height above the floor (m) — the one measured constant the distance estimate needs.
         self._camera_height: float = 0.5
         # The tracked floor, as radii from the rig centre, and the camera distances they bound.
@@ -103,6 +106,21 @@ class Geometry:
             self._ring_radius, self.parallax_diameter)
         return local_angle, world_angle, self.estimate_distance(roi)
 
+    def _foot_px(self, roi: Rect) -> float:
+        """The row (px) the feet are on — the box bottom, less `foot_offset`.
+
+        **One derived row, shared by both readouts**, and the only place the correction exists.
+        The device tracker's box bottom sits below the feet by what measures as a fixed pad in
+        pixels, so it is subtracted as a fraction of frame height rather than scaled: a fixed pad
+        is what makes `estimate_height` *fall* with distance (the numerator is the box, the
+        denominator the box's depression, and only the latter shrinks), and that drift is the
+        signature `foot_offset` is tuned against.
+
+        **The ROI itself is never rewritten**, only this row derived from it, so `min_height`, the
+        crop extractor and everything else downstream still see the detector's own box.
+        """
+        return (roi.y + roi.height - self._foot_offset) * (self._rows - 1)
+
     def estimate_distance(self, roi: Rect) -> float:
         """Distance from the camera (m), from where the feet meet the floor.
 
@@ -132,18 +150,17 @@ class Geometry:
         close they are. It is used, not discarded: the formula is continuous across the frame edge
         and the final clamp is what bounds the answer.
 
-        **THIS DOES NOT FEED THE AZIMUTH, AND ITS ABSOLUTE VALUE IS BIASED LOW.** The device
-        tracker's box bottom sits *below* the feet, so `below` is too large and the reading too
-        short — a person at 5 m reads about 1.9 m on this rig, and the same error makes a 1.8 m
-        person's `estimate_height` read 1.1–1.4. The bias is the box's, not the model's: nothing in
-        our code touches the ROI (`Tracklet.from_depthcam` is a field-for-field copy), and the
-        floor-plane model itself is exact. It is left uncorrected because it no longer matters where
-        it used to: `calc_angle` corrects the bearing at a fixed depth instead
-        (`_update_parallax_depth`), so no box bottom can move a person's azimuth. What is left
-        consumes it is the panorama's `R` label, the mark rows, and `seam.link_height` — and that
-        last one compares two readings of the *same* person, which survives a shared bias (1–2%
-        across a seam, measured). See CALIBRATION.md, *Open*, for the optional calibration that
-        would make the metres read true.
+        **THIS DOES NOT FEED THE AZIMUTH, AND IT READS THROUGH `foot_offset`.** The device tracker's
+        box bottom sits *below* the feet, so the raw bottom makes `below` too large and the reading
+        too short — a person at 5 m reads about 1.9 m with the offset at 0. The bias is the box's,
+        not the model's: nothing in our code touches the ROI (`Tracklet.from_depthcam` is a
+        field-for-field copy), and the floor-plane model itself is exact, so it is corrected in one
+        place, `_foot_px`. Until `foot_offset` is measured on the rig it is 0 and the metres read
+        short; the azimuth is unaffected either way, since `calc_angle` corrects the bearing at a
+        fixed depth (`_update_parallax_depth`) and no box bottom can move it. What consumes the
+        metres is the panorama's `R` label, the mark rows and the foot tick, and `seam.link_height`
+        — and that last compares two readings of the *same* person, which survives a shared bias
+        (1–2% across a seam, measured). CALIBRATION.md, *The tracker's height*, has the procedure.
 
         **THE CLAMP IS A GUARD, NOT A FILTER.** Nothing is rejected for falling outside it; only
         the reading is pinned. The denominator can go to almost nothing (feet a pixel below the
@@ -152,8 +169,7 @@ class Geometry:
         They are derived from the tracked zone by `set_zone`, so they follow the ring instead of
         being hand-computed for one.
         """
-        bottom_px: float = (roi.y + roi.height) * (self._rows - 1)
-        below: float = bottom_px - self._horizon_px          # px below the horizon
+        below: float = self._foot_px(roi) - self._horizon_px  # px below the horizon
         if below <= 0.0:
             # Feet at or above the horizon: not standing on this floor.
             return self._max_distance
@@ -166,11 +182,16 @@ class Geometry:
         A PURE PIXEL RATIO, which is the gift of the cylindrical frame: the rows below the
         horizon *are* the tangent of the depression, so
 
-            height = camera_height * (bottom_px - top_px) / (bottom_px - horizon_px)
+            height = camera_height * (foot_px - top_px) / (foot_px - horizon_px)
 
         The focal length, the field of view, the tilt and the distance all cancel, because the
         person and the camera stand on the same floor — the classic single-view horizon ratio.
         On rows linear in elevation it would have taken the distance and two arctangents.
+
+        **Both terms read `_foot_px`**, so the person spans head to *corrected* feet and the ratio
+        stays the true one. That sharing is what makes `H` the calibration signal: get
+        `foot_offset` right and `H` is distance-invariant again, which is a thing one person
+        walking away can show without a tape.
 
         SCALE-FREE AND PARALLAX-FREE. One camera sees both the feet and the head, so unlike the
         azimuth this needs no ring correction, and two cameras at different distances from the
@@ -182,13 +203,14 @@ class Geometry:
         about 2.2 m where the same person reads 1.8 m with their arms down, at any distance.
         Here that is the useful number: overhead reach is what the tilt is chosen around.
 
-        AND ITS ABSOLUTE VALUE IS BIASED LOW, for the same reason `estimate_distance` is: `below`
-        is the shared denominator, so a box bottom placed under the feet shortens both. A 1.8 m
-        person reads 1.1–1.4 on this rig, and — the signature that identifies the cause — the
-        reading *falls* as they walk away, where it should be distance-invariant. What survives the
-        bias is the *comparison* `seam.link_height` makes between two views of one person, which is
-        why that gate is a percentage. Do not read the metres as a person's height until the
-        calibration in CALIBRATION.md, *Open*, has been done.
+        AND IT IS THE SIGNAL `foot_offset` IS TUNED BY. With the offset at 0 and the detector's pad
+        present, a 1.8 m person reads 1.29 / 1.11 / 0.94 at 2 / 3.5 / 6 m — biased low, and *falling*
+        as they walk away where it should be distance-invariant. Raise `foot_offset` until it stops
+        drifting and all three read 1.80. Falling means increase, rising means decrease; `H` already
+        flat but wrong means the bias is proportional rather than a fixed pad, and this setting is
+        then the wrong shape. What survives any residual bias is the *comparison* `seam.link_height`
+        makes between two views of one person, which is why that gate is a percentage. Don't read
+        the metres as a stature before the procedure in CALIBRATION.md, *The tracker's height*.
 
         Accuracy is the distance estimate's in relative terms, since it is the same denominator:
         a pixel of box noise is a centimetre, while a degree of horizon error is 9 cm at 1.5 m
@@ -196,10 +218,12 @@ class Geometry:
         on this floor — and is capped at ``_MAX_HEIGHT``.
         """
         rows: int = self._rows - 1
-        below: float = (roi.y + roi.height) * rows - self._horizon_px
+        foot_px: float = self._foot_px(roi)
+        below: float = foot_px - self._horizon_px
         if below <= 0.0:
             return 0.0
-        return min(_MAX_HEIGHT, self._camera_height * roi.height * rows / below)
+        span: float = foot_px - roi.y * rows                 # head to corrected feet, px
+        return min(_MAX_HEIGHT, max(0.0, self._camera_height * span / below))
 
     def _calc_local_angle(self, roi: Rect) -> float:
         """The bearing of the box centre within this camera's field. Exact, not approximate:
@@ -354,6 +378,10 @@ class Geometry:
 
     def set_camera_height(self, camera_height: float) -> None:
         self._camera_height = camera_height
+
+    def set_foot_offset(self, foot_offset: float) -> None:
+        """How far below the feet the detector's box bottom sits, in frame heights. See `_foot_px`."""
+        self._foot_offset = max(0.0, foot_offset)
 
     def set_zone(self, min_diameter: float, max_diameter: float) -> None:
         """The tracked floor, as the two **diameters** the settings carry.

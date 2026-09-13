@@ -802,6 +802,80 @@ class TestGeometryHeight(unittest.TestCase):
         self.assertGreater(distance, 0.6)
 
 
+class TestFootOffset(unittest.TestCase):
+    """The detector's box bottom sits below the feet by a fixed pad in pixels. `foot_offset`
+    subtracts it, in one place (`_foot_px`), shared by the distance and the height."""
+
+    PAD: float = 94.0 / (ROWS - 1)          # the measured studio bias, as a frame fraction
+
+    def make_geometry(self, foot_offset: float = 0.0) -> Geometry:
+        g = Geometry(num_cameras=4, cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
+        g.set_camera_diameter(RING_RADIUS * 2.0)
+        g.set_camera_height(CAMERA_HEIGHT)
+        g.set_zone(ZONE_MIN_DIAMETER, ZONE_MAX_DIAMETER)
+        g.set_window(WINDOW, ROWS)
+        g.set_foot_offset(foot_offset)
+        return g
+
+    def true_box(self, height_m: float, distance: float) -> Rect:
+        """The box a perfect detector would report: bottom exactly on the feet."""
+        top: float = head_row(height_m, distance)
+        return Rect(x=0.5, y=top, width=0.05, height=feet_row(distance) - top)
+
+    def padded_box(self, height_m: float, distance: float) -> Rect:
+        """...and what this detector actually reports: the same box, bottom dragged down."""
+        box: Rect = self.true_box(height_m, distance)
+        return replace(box, height=box.height + self.PAD)
+
+    def test_zero_offset_is_the_identity(self) -> None:
+        # The default must change nothing, which is what lets every other test in this file stand.
+        plain = self.make_geometry()
+        for distance in (1.5, 2.0, 3.0):
+            box: Rect = self.true_box(1.8, distance)
+            with self.subTest(distance=distance):
+                self.assertAlmostEqual(plain.estimate_distance(box), distance, places=6)
+                self.assertAlmostEqual(plain.estimate_height(box), 1.8, places=6)
+
+    def test_a_matching_offset_recovers_the_distance_and_the_height(self) -> None:
+        # The point of sharing `_foot_px`: one number fixes both readouts at once, at every
+        # distance, because it corrects the thing they have in common.
+        g = self.make_geometry(self.PAD)
+        for distance in (1.5, 2.0, 3.0, 3.8):
+            with self.subTest(distance=distance):
+                box: Rect = self.padded_box(1.8, distance)
+                self.assertAlmostEqual(g.estimate_distance(box), distance, places=6)
+                self.assertAlmostEqual(g.estimate_height(box), 1.8, places=6)
+
+    def test_the_uncorrected_signature(self) -> None:
+        """Pins the table in CALIBRATION: with the pad present and the offset at 0, both readouts
+        are short AND the height *falls* as the person walks away. That drift is the whole
+        calibration signal — a proportional error would leave `H` flat but wrong instead."""
+        g = self.make_geometry()
+        heights: list[float] = []
+        for distance in (1.5, 2.5, 3.8):
+            box: Rect = self.padded_box(1.8, distance)
+            self.assertLess(g.estimate_distance(box), distance)
+            heights.append(g.estimate_height(box))
+        self.assertTrue(all(h < 1.8 for h in heights))
+        self.assertTrue(all(b < a for a, b in zip(heights, heights[1:])),
+                        f'H should fall with distance, got {heights}')
+
+    def test_the_correction_is_applied_before_the_clamp(self) -> None:
+        # An over-corrected foot row walks up toward the horizon and the reading runs away with it,
+        # so the clamp must still be the thing that bounds the answer.
+        g = self.make_geometry(0.2)
+        box: Rect = self.true_box(1.8, 3.0)
+        self.assertLessEqual(g.estimate_distance(box), g._max_distance)
+        self.assertGreaterEqual(g.estimate_distance(box), g._min_distance)
+
+    def test_the_azimuth_ignores_it_entirely(self) -> None:
+        # The bearing no longer rides on any box row, so no value of this setting can move it.
+        roi, _d = synth_observation(0, world_azimuth=90.0, radius=2.0)
+        angles = [self.make_geometry(offset).calc_angle(roi, 0)[1]
+                  for offset in (0.0, 0.02, self.PAD, 0.15)]
+        self.assertAlmostEqual(max(angles), min(angles), places=12)
+
+
 class TestInitialGeometrySync(unittest.TestCase):
 
     def test_config_applied_to_geometry_at_construction(self) -> None:

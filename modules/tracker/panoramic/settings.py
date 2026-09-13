@@ -66,7 +66,7 @@ class RigSettings(BaseSettings):
     """
     camera_diameter: Field[float] = Field(0.0, min=0.0, max=2.0, step=0.01,
                                           description="Ø (m) of the ring the lenses sit on, measured. 0 disables the parallax correction")
-    camera_height: Field[float] = Field(0.5, min=0.1, max=3.0, step=0.01,
+    camera_height: Field[float] = Field(0.5, min=0.1, max=3.0, step=0.01, newline=True,
                                         description="Lens height above the floor (m), measured")
     zone_min_diameter: Field[float] = Field(3.0, min=0.5, max=20.0, step=0.1,
                                             description="Ø (m) of the tracked floor's near edge — the nearest distance claimed")
@@ -79,7 +79,7 @@ class RigSettings(BaseSettings):
                                             description="Ø (m) the world azimuth is corrected at — derived, the zone's harmonic mean")
     # The delivered frame's row model, published by the tracker for whatever draws with its
     # numbers (the panorama). Rows are tangents of elevation: row = horizon_row - focal_rows * tan(e).
-    vfov: Field[float] = Field(79.5, access=Field.READ,
+    vfov: Field[float] = Field(79.5, access=Field.READ, newline=True,
                               description="Elevation span (°) of the delivered frame, bottom row to top row")
     elevation_bottom: Field[float] = Field(-39.7, access=Field.READ,
                                           description="Elevation (°) of the frame's bottom row, at the camera")
@@ -107,6 +107,12 @@ class TrackerSettings(BaseSettings):
                                 description="Minimum age in frames before a tracklet is considered.")
     min_height: Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05,
                                      description="Minimum ROI height to accept a tracklet.")
+    # A property of the DETECTOR, not of the site, which is why it is here and not in `rig`: that
+    # group is metres someone measured on the floor. Tuned by walking one person out until the
+    # panorama's `H` stops drifting — the ROI is never rewritten, only the row derived from it
+    # (`Geometry._foot_px`), so `min_height` and the crop extractor still see the detector's box.
+    foot_offset: Field[float] = Field(0.0, min=0.0, max=0.2, step=0.005,
+                                      description="How far below the feet the detector's box bottom sits (frame heights)")
     # Not under `seam`: this is the same camera re-finding a person it dropped, anywhere in its
     # field, and has nothing to do with two cameras meeting.
     reacquire_angle: Field[float] = Field(5.0, min=0.0, max=20.0, step=0.5,

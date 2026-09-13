@@ -37,6 +37,11 @@ Calibrate in this order. Cameras first: everything else is tuned against the fra
      height. If not, see *Reading the panorama*.
    - Tape at 50 cm on the wall in front of each camera: it must sit on the green horizon line. See
      *The horizon check*.
+   - **The metres**, last of the camera step and the only part needing a person to walk: turn
+     `camera.tracker.foot_offset` until the label's `H` stops drifting as they walk out, then read
+     `H`'s value to check `rig.camera_height`. Tape confirms it: standing on Ø 3 or Ø 7, the mark's
+     foot tick must land on that edge of the zone field. See *Calibrating the metres*. Nothing in
+     the show depends on this — only the readouts — so it may be deferred.
 2. **Playhead offset** — `light.playhead.pulse_offset`. Beam mode (IDLE is fine), one person stands
    still; adjust until the flash fires as the beam crosses them.
 3. **Projection offset, then interlace** — `inout.osc_light_sender.projection_offset`, then
@@ -53,7 +58,7 @@ was); the flash on the first person at IDLE → INTRO; the sound on the beam.
 
 | step | settings | readout | passes when |
 |---|---|---|---|
-| 1 cameras | `fov`, `resolution`, `frame_height`, `tilt`, `lens_fov`, `lens_centre_x`, `lens_centre_y`, `camera.cam_N.readings.roll_offset`, `camera.tracker.rig.*`, `camera.tracker.seam.*`, `camera.tracker.reacquire_angle` | the open log's `lens:` and `frame:` lines; `camera.mount.status`; the panorama row | lens errors as tabled; mount OK; overlaps coincide at head and knee height; tape on the horizon line; tape at Ø 3 and Ø 7 on the zone lines; one person crossing a seam keeps one id and two overlapping fields |
+| 1 cameras | `fov`, `resolution`, `frame_height`, `tilt`, `lens_fov`, `lens_centre_x`, `lens_centre_y`, `camera.cam_N.readings.roll_offset`, `camera.tracker.rig.*`, `camera.tracker.seam.*`, `camera.tracker.reacquire_angle`, `camera.tracker.foot_offset` | the open log's `lens:` and `frame:` lines; `camera.mount.status`; the panorama row | lens errors as tabled; mount OK; overlaps coincide at head and knee height; tape on the horizon line; `H` flat as a person walks out, then their real height; standing on taped Ø 3 and Ø 7 the foot tick lands on that zone edge; one person crossing a seam keeps one id and two overlapping fields |
 | 2 playhead | `light.playhead.pulse_offset` | beam mode, `beam_flash`; `/pose/N/playhead/offset` | flash on the person; offset reads 0 at the crossing |
 | 3 projection | `inout.osc_light_sender.projection_offset`, `.interlace` | projection mode, `pose_instrument` | static line on the person; single line on the wall |
 | 4 speakers | `inout.osc_sound_sender.speaker_offset` (0) | IDLE, Max voicing `/global/playhead` | sound follows the beam |
@@ -455,30 +460,32 @@ image right and marks wrong means the distance model, not the camera.
 | part | what it draws |
 |---|---|
 | `image` | the four camera frames, stitched |
-| `seams` | the seam rules that live in image space: the dead zone (red bands) |
+| `seams` | the seam rule defined on a camera's own frame: the dead zone (red bands) |
 | `grid` | **every reference mark in the strip's own two axes**: the degree lattice, the sector boundaries (orange), the camera axes (blue), the overlap (yellow verticals), the green horizon, the yellow zone field, the labels, the footer |
-| `observations` | a line per observation, inside a field as wide as the rule that governs it |
+| `observations` | a line per observation with a **foot tick** at the reported distance, inside a field as wide as the rule that governs it |
 | `labels` | `#id cam az R distance H height` per observation |
 
-**A mark is the tracker's belief, not the picture — and all of it sits at one depth.** It is drawn
-at the fused `world_angle`, the number the light, the sound and the hit detector all receive, which
-the tracker derives at `rig.parallax_diameter` (Ø 4.2) and never from a person's measured distance.
-Its rows and its tolerance follow onto the same cylinder, so x and y describe a person at one place
-rather than two. The image under it is stitched at `focus_diameter` (Ø 4.5), so a line sits a small
-**constant** distance from its own pixels — a chosen consequence of deriving the parallax depth from
-the zone rather than from a render slider, not a fault.
+**A mark is the tracker's belief, not the picture, and its two axes use two depths on purpose.** Its
+**x** is the fused `world_angle` — the number the light, the sound and the hit detector all receive
+— which the tracker derives at `rig.parallax_diameter` (Ø 4.2), never from a person's measured
+distance; the tolerance field follows x onto that cylinder. Its **rows** go through the person's own
+distance instead, which is what makes the foot tick exact against the zone field (*Two axes, and the
+depth that varies*). The image under it is stitched at `focus_diameter` (Ø 4.5), so a line sits a
+small **constant** distance from its own pixels — a chosen consequence of deriving the parallax
+depth from the zone rather than from a render slider, not a fault.
 
 The strip asks four questions, and reading them in order says which number to reach for:
 
 | what you read | what it tests |
 |---|---|
 | the two pictures coincide in an overlap | the lens and the mount — `lens_fov`, `fov`, `tilt`, roll |
-| tape at Ø 3 and Ø 7 lands on the yellow field's two edges | `rig.camera_height` and the zone's own two diameters — the only metres on the strip |
+| standing on taped Ø 3 and Ø 7, a mark's **foot tick** lands on that edge of the yellow field | the distance chain end to end: `rig.camera_height`, the zone's own diameters, and `foot_offset`. The only metres on the strip, and exact — see *Calibrating the metres* |
 | the **gap** between two lines of one colour at a seam | how far that person is from Ø 4.2 — a **depth indicator**, not an error. Zero on the cylinder, up to 6.7° at the zone's edges. A gap *larger* than that is the azimuth chain: `fov`, `tilt`, `camera_diameter` |
 | whether two fields of one colour overlap | the linking rules — the tracker will join exactly the pairs whose fields touch |
 
-A **line, not a box**: the box's width said nothing its azimuth does not. Its bottom end is the row
-the distance was read from, so what feeds `R` is visible. `H` is that person's height in metres
+A **line, not a box**: the box's width said nothing its azimuth does not. Its bottom end carries the
+**foot tick**, which is the picture of the `R` beside it and the one thing on the strip that can be
+checked against a tape to the pixel. `H` is that person's height in metres
 (see *The tracker's height*), and it is **the one number on the strip that checks itself**: a
 seam's two observations are at different distances and so have different box heights in pixels, but
 their `H` must agree — it is also exactly what `seam.link_height` compares. Two labels of one
@@ -507,18 +514,43 @@ feeds the image, so nothing can fool it — and since the change that took the m
 out of the azimuth, nothing about a person feeds the *marks* either. Both now assume a depth; they
 just assume slightly different ones, Ø 4.5 and Ø 4.2, for reasons each section gives.
 
-### Three coordinate systems, and what is drawn in each
+### Two axes, and the depth that varies
 
-Every line and band on the strip lives in one of three frames, and **which one a thing belongs in
-is the whole design** — drawn in the wrong frame it cannot be read against anything. It is also how
-the renderers are split: everything in the strip's own two axes is one piece (`grid`), and the one
-thing in image space is the other (`seams`).
+**There is one space, with two axes, and everything on the strip uses them**: x is azimuth at the
+rig centre, y is elevation at the rig centre (`strip_y`). There is no "image space" — the stitch
+starts from a strip column, turns it into (azimuth, elevation), and works *backwards* into each
+camera's frame, which is exactly what makes drawing data over pixels meaningful. Two things opt out
+of one axis each and neither is a measurement: the dead zone uses x only and runs the full height,
+and a label's y is a lane picked by `world_id` so labels never collide.
 
-| frame | what is in it | how to read it |
-|---|---|---|
-| **azimuth** — the grid's x, what the degree labels measure | the sector boundaries (orange), the camera axes (blue), the **overlap** (yellow, two verticals per seam) — all in `grid` | against the degree labels, directly |
-| **centre elevation** — the grid's y | the horizon (green), the **tracked zone** (yellow field) — also `grid` | against a tape on the floor or the wall |
-| **image space** — where a camera's columns land once stitched | the **dead zone** (red, two bands per camera) — the whole of `seams` | against the picture, at any depth |
+**What varies is the depth assumed to get into that space.** Both axes need an assumed distance to
+turn a camera's view into the centre's, and each thing drawn names its own, for its own reason:
+
+| drawn thing | x | y | depth |
+|---|---|---|---|
+| image (`image`) | centre azimuth | centre elevation | `focus_diameter` |
+| dead zone (`seams`) | centre azimuth | — full height | `focus_diameter` |
+| lattice, seam + axis lines (`grid`) | centre azimuth | — | **exact** |
+| overlap verticals (`grid`) | centre azimuth | — | `parallax_diameter` |
+| horizon, zone field (`grid`) | — | centre elevation | **exact** |
+| mark + foot tick (`observations`) | centre azimuth | centre elevation | x: `parallax_diameter` · y: **the person's own distance** |
+| label (`labels`) | centre azimuth | pixel lane by id | `parallax_diameter` |
+
+**The rule: two things on the strip are comparable only if they share an axis *and* a depth.** Every
+misalignment this display has had was a pair that shared the axis and not the depth — the overlap
+line 2.3° from where a mark's field actually switched, the marks beside their own pixels, the foot
+tick 20 px off its own zone line. None was an axis confusion. In the code the depth parameter of
+the shared functions is therefore called `depth_diameter` / `depth_radius`, never after any one
+caller's depth; `elevation_window` is the exception, because it is the strip's *single* y scale and
+moves everything on it together.
+
+*Exact* means no depth enters at all — a seam is a bearing, and a floor circle's depression is
+`atan(camera_height / R)` whatever anything assumes — which is why those are the things a tape can
+check. The two lines that cross the boundary are worth naming: the **dead zone** agrees with the
+picture at every depth because the rule reads the raw image column and the stitch places the
+picture through the same map, and the **foot tick** is exact against the zone field because going
+through the person's own distance makes the lens height cancel algebraically
+(`atan(tan(−atan(h/d))·d/R) = atan(−h/R)`, the zone line's own formula).
 
 - **The overlap**, `seam.angles.overlap` wide (**31.0°** on this rig), symmetric about each seam.
   Nothing tunable, and read it as one thing only: **exactly where a mark's tolerance field changes
@@ -748,28 +780,33 @@ pixel below the horizon would read as infinitely far) and the device extrapolate
 the frame (reads as zero). Being derived means it follows a change of `camera_diameter` instead of
 silently going wrong, which the two hand-computed constants it replaced would have.
 
-**It is biased low, and it no longer feeds the azimuth.** The device tracker's box bottom sits
-*below* the feet, so `below` is too large and the reading too short — 5 m reads about 1.9 m, and the
-same denominator makes a 1.8 m person's `H` read 1.1–1.4. The bias is the box's, not the model's:
-nothing in our code touches the ROI (`Tracklet.from_depthcam` is a field-for-field copy) and the
-floor-plane model is exact. It used to matter a great deal, because this distance drove the parallax
-correction; it no longer does — see *Why the azimuth does not use the measured distance*. What still
-consumes it is the panorama's `R` label and `seam.link_height`, and that gate compares two readings
-of the **same** person, which survives a shared bias (1–2% across a seam).
+**The box bottom is not the feet, and `camera.tracker.foot_offset` is the correction.** The device
+tracker puts its box bottom *below* the feet, by what measures as a fixed pad in pixels (≈94 px on
+the studio frame, 0.098 of frame height). Uncorrected, `below` is too large and both readouts read
+short. The bias is the box's, not the model's: nothing in our code touches the ROI
+(`Tracklet.from_depthcam` is a field-for-field copy) and the floor-plane model is exact — so it is
+corrected in exactly one place, `Geometry._foot_px`, which derives one foot row that both
+`estimate_distance` and `estimate_height` read. **The ROI itself is never rewritten**, so
+`min_height` and the crop extractor still see the detector's own box.
+
+It no longer touches the azimuth either way — see *Why the azimuth does not use the measured
+distance* — so this setting is about making the metres readable, not about fusion. What consumes
+the metres is the panorama's `R` label, the **foot tick**, and `seam.link_height`; that last gate
+compares two readings of the **same** person and so survives a shared bias (1–2% across a seam).
 
 **Recognising the cause rather than chasing it.** `R` and `H` share the denominator, so they move
-together in a way that names the culprit:
+together in a way that names the culprit — which is what makes `H` a usable calibration signal:
 
 | cause | `R` | `H` | signature |
 |---|---|---|---|
 | wrong horizon row | short | short **by the same factor** | `H/R` constant |
 | wrong `camera_height` | scales | scales | `H/R` constant |
 | box a fixed **%** too tall | short by a constant % | wrong but **constant** with distance | `H` flat |
-| box a fixed **px** too low | error **grows** with distance | **falls** with distance | `H/R` falls — **what we observe** |
+| box a fixed **px** too low | error **grows** with distance | **falls** with distance | `H/R` falls — **what `foot_offset` corrects** |
 
 (An earlier version of this document said *"a box that misses the feet moves `R` alone"*. That is
 false — `estimate_height` shares the denominator, so it moves both, and the fourth row is the real
-signature.) `Open` has the optional calibration that would make both read true.
+signature.)
 
 ### The tracker's height
 
@@ -797,6 +834,41 @@ which is what keeps a jumper from being refused a link.
 
 It rides on the annotation, prints on the label, and is the one thing `seam.link_height` gates on;
 nothing in the show consumes it yet.
+
+#### Calibrating the metres — two stages, and the first needs no tape
+
+The two stages fix different things and do not interact: stage 1 removes the **drift**, stage 2 the
+**scale**. Do them in order, with `image` + `grid` + `observations` + `labels` on the panorama.
+
+**1. Walk one person out and turn `camera.tracker.foot_offset` until `H` stops drifting.** `H` is
+distance-invariant by construction, so any drift is the detector's pad and nothing else. With the
+offset at 0 a 1.8 m person on the studio rig prints:
+
+| camera distance | 1.5 m | 2.5 m | 3.8 m |
+|---|---|---|---|
+| `H`, offset 0 | 1.37 | 1.22 | 1.08 |
+| `H`, offset 0.098 | **1.80** | **1.80** | **1.80** |
+
+It is **self-signing**: falling as they walk away means *increase*, rising means *decrease*. And
+the model check is built in — if `H` is already flat but simply wrong, the bias is proportional
+rather than a fixed pad, and this setting is the wrong shape for it (row 3 of the table above).
+Don't read the absolute value yet; only the flatness.
+
+**2. Then `H`'s absolute value checks `rig.camera_height`.** Once flat, `H` is the person's real
+reach in metres and nothing else can be moving it. If a known 1.80 m person reads 1.65, the lens
+height is out by the same factor — remeasure it rather than tuning `H` back.
+
+**Absolute confirmation, with tape.** Tape the Ø 3 and Ø 7 circles and stand on each: the mark's
+**foot tick** must land on that edge of the yellow zone field. This is exact, not approximate —
+going through the person's own distance makes the lens height cancel
+(`atan(tan(−atan(h/d))·d/R) = atan(−h/R)`), which is literally the formula the zone edge is drawn
+from, so the two are the same kind of number to the pixel. `R` on the label should read the taped
+radius at the same time (it is a **radius** where the zone is a **diameter** — half of Ø 7 is 3.5),
+and the azimuth should not have moved through any of it.
+
+`foot_offset` is a fraction of frame height and a property of the **detector**, so it travels with
+the detector and not the room; it scales with `resolution` like `min_height` does
+(`CameraResolution` names the list).
 
 ---
 
@@ -966,26 +1038,20 @@ hit, the sound and both screen views are self-consistent.
 - **Roll is not modelled by the warp.** `warp_mesh_points` takes `tilt` only, so a camera that
   is genuinely rolled still ghosts at its seams (≈2.2° vertical per 1.2° of roll). The mount readout
   says whether that is happening; the fix, if it is, is the tripod or a second rotation in the mesh.
-- **The tracker's distance reads short, and the cause is identified.** 5 m reads about 1.9 m: the
-  device tracker's box bottom sits **below the feet**, roughly 94 px on the studio frame, and the
-  floor-plane model faithfully turns that into a closer person. The signature confirms it — `H`
-  *falls* as someone walks away, where it should be distance-invariant (see the table under *The
-  tracker's distance*). Nothing in our code touches the ROI, so this is the detector's box, not our
-  arithmetic.
+- **`camera.tracker.foot_offset` is built but still 0 — it is a measurement, waiting on rig time.**
+  The mechanism is in place (`Geometry._foot_px`, shared by both readouts) and the instrument to
+  tune it is on the panorama; what has not happened is a person walking out on the real rig. Until
+  it does, `R` and `H` read short — the studio table under *The tracker's height* has the numbers.
+  The procedure is there too, and stage 1 needs no tape.
 
-  **It is now display-only.** The change that took the measured distance out of the parallax
-  correction means no bearing, no link and no identity depends on it — only the label's `R`, the
-  mark rows, and `seam.link_height`, which compares two readings of one person and so survives a
-  shared bias. **So this is optional**, and worth rig time rather than urgency.
+  **It is display-only**, which is why it can wait: the change that took the measured distance out
+  of the parallax correction means no bearing, no link and no identity depends on it — only the
+  label's `R`, the mark's foot tick, and `seam.link_height`, which compares two readings of one
+  person and so survives a shared bias.
 
-  The fix, when there is time: a `foot_offset` in frame fractions, subtracted from the box bottom
-  before both `estimate_distance` and `estimate_height` (they share the denominator, so one number
-  corrects both). Calibrate it by standing a person on taped Ø 3 and Ø 7 — the zone field's two
-  edges are already drawn there — and solving
-  `δ_px = camera_height · focal · (1/R_read − 1/d_true)`, then `foot_offset = δ_px / (rows − 1)`.
-  **Two distances give two estimates: if they agree, the fixed-pixel model is right and one offset
-  is enough; if they diverge, the bias is proportional and the setting has to be a fraction of box
-  height instead.** Check afterwards that `H` reads the person's real height at both.
+  The one thing the walk-out can still disprove: if `H` comes out **flat but wrong**, the bias is
+  proportional rather than a fixed pad and `foot_offset` is the wrong shape — it would have to
+  become a fraction of box height instead. The measurements so far (≈94 px, constant) say fixed.
 
   Levelling is a smaller, separate term: tape at lens height on the far wall sits a few degrees off
   the horizon line, and the lens read found the horizon ≈1° high under the old model.
@@ -993,6 +1059,14 @@ hit, the sound and both screen views are self-consistent.
   **Metres and a floor plan still wait on this.** A plan view drawn from `R` and the azimuth would
   be the natural way to read this installation, and it is exactly the view that would be
   confidently wrong while the distance is.
+- **The cam row draws the CROP box, not the tracker's ROI.** `BBoxRenderer` reads *stage* frames,
+  whose `BBox` the crop extractor has already overwritten with the crop ROI — zoomed 1.1× and
+  aspect-filled to 3:4 — so its bottom sits **10–27 px below** the tracker's real ROI bottom, and by
+  a distance-dependent amount. Judging "the box is below the feet" up there therefore partly
+  measures the crop expansion, not the detector. Not touched: it is a render concern, the crop box
+  is the honest thing to draw for a crop, and the pose skeleton already draws the ankles if pixel
+  truth about the feet is wanted. Tune `foot_offset` from `H` on the panorama instead, where the
+  number being corrected is the number being shown.
 - **`flip_v` is not applied to the row model.** The warp mirrors the delivered rows
   (`definitions.py`, `warp_mesh_points`), and `FrameWindow`'s own docstring says a caller must then
   read the horizon at `out_h − 1 − horizon_px`. `Tracker._set_frame` never does, and never even

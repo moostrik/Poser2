@@ -177,6 +177,7 @@
     "tracker": {
       "min_age": 5,
       "min_height": 0.2,
+      "foot_offset": 0.0,
       "reacquire_angle": 5.0,
       "lost_timeout": 2.0,
       "emit_timeout": 1.0,

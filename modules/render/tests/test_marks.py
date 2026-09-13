@@ -21,12 +21,13 @@ CAM_FOV: float = 127.0
 TARGET_FOV: float = 90.0
 RING_RADIUS: float = 0.36
 PARALLAX_DIAMETER: float = 4.2      # the zone's harmonic mean, what the tracker corrects at
+CAMERA_HEIGHT: float = 0.5
 LINK_ANGLE: float = 18.0
 REACQUIRE_ANGLE: float = 5.0
 
 GEOMETRY: StripGeometry = StripGeometry(
     cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
-    parallax_diameter=PARALLAX_DIAMETER,
+    parallax_diameter=PARALLAX_DIAMETER, camera_height=CAMERA_HEIGHT,
     row_model=(0.78, 0.58), elevation_window=(40.0, -30.0),
     link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE,
 )
@@ -69,12 +70,22 @@ class TestPlacement(unittest.TestCase):
         self.assertAlmostEqual(mark(observation(0, 120.0, 96.0, overlap=True)).x,
                                96.0 / 360.0, places=9)
 
-    def test_rows_are_not_clamped_to_the_strip(self) -> None:
+    def test_the_head_row_is_not_clamped_to_the_strip(self) -> None:
         # The device extrapolates a partly visible person, and that is real information about how
         # close they are. The renderer clips when it draws; a mark must not throw it away first.
         m: Mark = mark(observation(0, 63.5, 45.0, overlap=False, top=-0.4, height=1.8))
         self.assertLess(m.top_y, 0.0)
-        self.assertGreater(m.bottom_y, 1.0)
+
+    def test_the_foot_row_follows_the_distance_and_not_the_box(self) -> None:
+        """The foot row is the FLOOR at the reported radius, not the box's bottom pixel — which is
+        what makes it exact against the zone field, and what keeps `foot_offset` out of this file:
+        the correction arrives already applied, inside `distance`."""
+        rows = {mark(observation(0, 63.5, 45.0, overlap=False, distance=3.0,
+                                 top=0.1, height=h)).bottom_y for h in (0.2, 0.5, 1.4)}
+        self.assertEqual(len(rows), 1, f'foot row still moves with the box: {rows}')
+        near: Mark = mark(observation(0, 63.5, 45.0, overlap=False, distance=1.5))
+        far: Mark = mark(observation(0, 63.5, 45.0, overlap=False, distance=6.0))
+        self.assertGreater(near.bottom_y, far.bottom_y)     # nearer feet are lower on the strip
 
     def test_a_removed_observation_makes_no_mark(self) -> None:
         removed = observation(0, 63.5, 45.0, overlap=False, status=TrackingStatus.REMOVED)
@@ -125,7 +136,7 @@ class TestToleranceField(unittest.TestCase):
     def test_a_zero_tolerance_draws_nothing(self) -> None:
         blank: StripGeometry = StripGeometry(
             cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
-            parallax_diameter=PARALLAX_DIAMETER,
+            parallax_diameter=PARALLAX_DIAMETER, camera_height=CAMERA_HEIGHT,
             row_model=(0.78, 0.58), elevation_window=(40.0, -30.0),
             link_angle=0.0, reacquire_angle=0.0)
         for overlap in (True, False):
@@ -237,7 +248,7 @@ class TestZoneLines(unittest.TestCase):
         copy of it."""
         geometry = StripGeometry(
             cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=0.0,
-            parallax_diameter=PARALLAX_DIAMETER,
+            parallax_diameter=PARALLAX_DIAMETER, camera_height=self.CAMERA_HEIGHT,
             row_model=GEOMETRY.row_model, elevation_window=self.WINDOW,
             link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE)
         near_y = strip_y(self.elevation(3.0), self.WINDOW)
@@ -254,6 +265,46 @@ class TestZoneLines(unittest.TestCase):
                 m: Mark = mark(t, geometry)
                 self.assertLess(far_y, m.bottom_y)
                 self.assertLess(m.bottom_y, near_y)
+
+    def test_the_foot_tick_is_exactly_the_zone_lines_own_formula(self) -> None:
+        """**The instrument.** Standing on a taped circle, the tick must land on that zone edge —
+        so "the tick is on the Ø 7 line" has to mean "the tracker reports this person at Ø 7", to
+        the pixel, and not approximately.
+
+        It does because the rows go through the person's OWN distance, where the lens height
+        cancels out of the conversion algebraically:
+
+            atan(tan(-atan(h/d)) * d / R) = atan(-h/R)
+
+        the right-hand side being exactly what `GridRenderer._zone_field` draws. Put the rows on the
+        parallax cylinder instead — tidier, since the x uses it — and this breaks by 20 px at Ø 3.
+        That is what this test exists to catch.
+        """
+        geometry = StripGeometry(
+            cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
+            parallax_diameter=PARALLAX_DIAMETER, camera_height=self.CAMERA_HEIGHT,
+            row_model=GEOMETRY.row_model, elevation_window=self.WINDOW,
+            link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE)
+        horizon_row, focal_rows = geometry.row_model
+        for diameter in (3.0, PARALLAX_DIAMETER, 5.0, 7.0):
+            for local_angle in (63.5, 20.0, 110.0):     # on the axis and well off it
+                with self.subTest(diameter=diameter, local_angle=local_angle):
+                    # A person on that circle, as the camera sees them: the bearing off its axis
+                    # fixes the camera distance, and the feet then fix the row.
+                    radius: float = diameter / 2.0
+                    bearing: float = math.radians(local_angle - CAM_FOV / 2.0)
+                    # Camera `RING_RADIUS` out, aimed radially: solve for its distance to the circle.
+                    cam_distance: float = -RING_RADIUS * math.cos(bearing) + math.sqrt(
+                        radius ** 2 - (RING_RADIUS * math.sin(bearing)) ** 2)
+                    depression: float = math.degrees(math.atan(self.CAMERA_HEIGHT / cam_distance))
+                    feet: float = row_from_elevation(-depression, horizon_row, focal_rows)
+                    m: Mark = mark(observation(0, local_angle, 45.0, overlap=False,
+                                               distance=cam_distance, top=feet - 0.2, height=0.2),
+                                   geometry)
+                    # The zone field's own line, for that radius.
+                    zone_y: float = strip_y(
+                        -math.degrees(math.atan(self.CAMERA_HEIGHT / radius)), self.WINDOW)
+                    self.assertAlmostEqual(m.bottom_y, zone_y, places=9)
 
 
 if __name__ == "__main__":

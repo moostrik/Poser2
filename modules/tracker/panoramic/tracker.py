@@ -96,6 +96,7 @@ class Tracker(Thread, BaseTracker):
         RigSettings.camera_height.bind(config.rig, lambda v: self.geometry.set_camera_height(v))
         RigSettings.zone_min_diameter.bind(config.rig, lambda _: self._set_zone())
         RigSettings.zone_max_diameter.bind(config.rig, lambda _: self._set_zone())
+        TrackerSettings.foot_offset.bind(config, lambda v: self.geometry.set_foot_offset(v))
 
         # bind() does not fire with the current value, and the preset is loaded
         # before this tracker is constructed — push config into geometry once now.
@@ -120,6 +121,7 @@ class Tracker(Thread, BaseTracker):
         r: RigSettings = self.config.rig
         self.geometry.set_camera_diameter(r.camera_diameter)
         self.geometry.set_camera_height(r.camera_height)
+        self.geometry.set_foot_offset(self.config.foot_offset)
         self._set_zone()
         self._set_frame(self.config.fov)
 

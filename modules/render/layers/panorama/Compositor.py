@@ -45,6 +45,29 @@ class Compositor(LayerBase):
     once here and passed to whichever renderer needs it, so nothing can drift. `aspect_ratio` is
     read by the render's row layout — change `tilt`, `fov` or `focus_diameter` and the row follows.
 
+    **What actually varies between the renderers is the DEPTH, not the space.** Both axes need an
+    assumed distance to turn a camera's view into the centre's, and each renderer names its own for
+    its own reason. Everything on the strip shares the two axes; two things are comparable only if
+    they also share a depth, and every misalignment this display has had was a pair that did not:
+
+    | drawn thing                        | x              | y                  | depth |
+    |------------------------------------|----------------|--------------------|-------|
+    | image (`StitchRenderer`)           | centre azimuth | centre elevation   | `focus_diameter` |
+    | dead zone (`SeamRenderer`)         | centre azimuth | — full height      | `focus_diameter` |
+    | lattice, seam + axis lines (`Grid`)| centre azimuth | —                  | **exact** |
+    | overlap verticals (`Grid`)         | centre azimuth | —                  | `parallax_diameter` |
+    | horizon, zone field (`Grid`)       | —              | centre elevation   | **exact** |
+    | mark + foot tick (`Observations`)  | centre azimuth | centre elevation   | x: `parallax_diameter`, y: **the person's own distance** |
+    | label (`LabelRenderer`)            | centre azimuth | pixel lane by id   | `parallax_diameter` |
+
+    The picture's depth so a band lands on the pixels it describes; the fusion depth so the azimuth
+    never rides on a measured distance, and so the overlap verticals mark where a mark's field
+    really switches; the person's own distance for the mark's rows, because only there does the
+    lens height cancel and the foot tick become *exactly* the zone field's own formula — which is
+    what makes the tick an instrument rather than a decoration. Exact means no depth enters at all:
+    a seam is a bearing, and a floor circle's depression is `atan(camera_height / R)` whatever the
+    picture assumes.
+
     Renderers own no FBO of their own (as in `cam/`): each draws into this one between `begin()` and
     `end()`, in the order below, and an unticked `Part` is skipped entirely rather than drawn and
     hidden.
@@ -175,6 +198,7 @@ class Compositor(LayerBase):
             target_fov=self.target_fov,
             ring_radius=self.ring_radius,
             parallax_diameter=self._tracker.rig.parallax_diameter,
+            camera_height=self._tracker.rig.camera_height,
             row_model=self.row_model,
             elevation_window=window,
             link_angle=self._tracker.seam.link_angle,
