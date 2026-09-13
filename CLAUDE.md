@@ -1,100 +1,110 @@
 # Poser2 — Coding Guidelines
 
+Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`, reusable infrastructure in `modules/`.
+
+## Writing rules in this file
+
+- One rule per bullet, phrased as an instruction
+- Add a short reason only when it marks the rule's boundary or the rule isn't obvious
+- No incident history, no examples unless the rule is ambiguous without one
+- Put a rule where it loads when the code it governs is written: here, or a `.claude/rules/` file whose `paths` match that code
+
 ## Project shape
 
-Poser2 is a real-time, low-latency system with app-specific orchestration in `apps/` and reusable infrastructure in `modules/`.
+- Use Python 3.12 and follow PEP 8
+- `apps/` may import `modules/`; `modules/` must never import app code
+- Keep modules independent and cross-module coupling minimal
+- `modules/settings/` is shared infrastructure; any module may depend on it
+- Never change the White Space fixture firmware (`apps/white_space/data/firmware/`); solve everything on the app side of the wire
 
-- Using Python 3.12
-- Follow PEP 8.
-- `apps/` can import `modules/`; `modules/` must not depend on app code
-- Prefer module independence; keep cross-module coupling minimal
-- `modules/settings/` is shared infrastructure by design
+## Settings
 
-## Settings are pure data
-
-- `BaseSettings` subclasses are pure data containers with no runtime side effects.
-- Use `BaseSettings` for reactive configuration, `@dataclass` for plain value objects.
+- `BaseSettings` subclasses are pure data containers with no runtime side effects
+- Use `BaseSettings` for reactive configuration and `@dataclass` for plain value objects
+- Components take their settings object (or a `Group`/`Child` of it) in the constructor, never as a global, and read fields when they use them
+- Never unpack setting values into constructor parameters; a copied value goes stale when the panel changes it
+- Cache only `Field.INIT` values, since they cannot change after `initialize()`
+- Use `bind()` only to react to configuration changes, never to relay runtime data between components
+- Keep bound callbacks thread-safe, and never write the field that triggered the callback
+- Components that `bind()` must `unbind()` the same callbacks on teardown
+- Treat `Field.READ` values as snapshots; copy arrays before handing them to another thread
+- Keep `Field` descriptions to one short line of panel text: what the value is and its unit
 
 ## Pose Frame contract
 
-- `frame[FeatureType]` never raises; missing data is NaN with score `0.0`.
+- `frame[FeatureType]` never raises; missing data is NaN with score `0.0`
 
 ## Composition and wiring
 
-- Prefer composition over inheritance for runtime assembly.
-- Pass dependencies through constructors
-- Use callback pipelines for data flow between components
-- Public data-flow methods signal execution timing: set (store for polling), submit (enqueue for deferred work), process (synchronous transform-and-emit), update (tick-driven advance/pull)
-- Output channels use verb + domain noun (`submit_frames`, `add_similarity_callback`)
-
-## Board
-
-`modules/board/` defines protocol + mixin pairs for shared runtime data. Each app composes its own `RenderBoard` from the mixins it needs.
+- Prefer composition over inheritance for runtime assembly
+- Pass collaborators and fixed structure (counts known at startup) through constructors; tunable values come from settings
+- Move data between components with callback pipelines
+- Name public data-flow methods by execution timing: `set` stores for polling, `submit` enqueues deferred work, `process` transforms and emits synchronously, `update` advances on a tick
+- Name output channels verb + domain noun (`submit_frames`, `add_similarity_callback`)
+- Share runtime data through `modules/board/` protocol + mixin pairs; each app composes its own `RenderBoard` from the mixins it needs
 
 ## Concurrency
 
-- The runtime uses threads and explicit synchronization, not async/await.
+- Use threads with explicit synchronization, not async/await
 - Use `Lock` and `Event` for shared mutable state and lifecycle signals
 - Keep shared critical sections small
 - Treat callback registration and dispatch as thread-sensitive
-- Components that `bind()` to settings fields must `unbind()` the same callbacks on teardown
-- Native extensions (numpy, ONNX Runtime, OpenGL, depthai) release the GIL; pure Python loops do not — avoid heavy Python loops in hot paths
+- Avoid heavy pure-Python loops in hot paths; they hold the GIL, while numpy, ONNX Runtime, OpenGL and depthai release it
 
 ## Performance
 
-Latency is a first-order concern.
-- Prefer vectorized numpy operations; avoid unnecessary copies
+- Treat latency as a first-order concern
+- Prefer vectorized numpy operations and avoid unnecessary copies
 
 ## Types
 
-- Use modern Python typing (`list[T]`, `dict[K, V]`, `X | Y`).
-- Public methods should include return type hints
-- Use `Protocol` or `ABC` as appropriate; be consistent
+- Use modern typing (`list[T]`, `dict[K, V]`, `X | Y`)
+- Give public methods return type hints
+- Use `Protocol` or `ABC` as appropriate, and be consistent
 - Prefer `IntEnum` over string keys for dict lookups and identifiers
 
 ## Imports
 
-`modules/` is the namespace root; each direct subdirectory is an independent package with its own `__init__.py` as its public boundary.
-- Use whichever import style keeps use sites unambiguous: import the package as a namespace (`from modules import X`; use `X.Y`) when the qualifier adds clarity, or import names directly (`from modules.X import A, B`) when they are unambiguous on their own.
-- Consolidate all imports from the same package onto one line; never split a single package across multiple `from x import` statements
-- Import from a package's `__init__.py` boundary, not from internal implementation files inside it.
-- Keep `__init__.py` exports limited to the package's own public symbols
-- Inside a package's own `__init__.py` or sub-modules, always use relative imports (`from .X import`, `from ..X import`). Never use the full `modules.X.Y` path to import from within the same package.
-- Do not define `__all__` in `__init__.py`; explicit named re-exports are sufficient.
+- Treat each direct subdirectory of `modules/` as an independent package whose `__init__.py` is its public boundary
+- Import from a package's `__init__.py`, never from its internal files
+- Import the package as a namespace (`from modules import X`, then `X.Y`) when the qualifier adds clarity; import names directly otherwise
+- Put all imports from one package on a single `from` line
+- Export only the package's own public symbols from `__init__.py`, and don't define `__all__`
+- Inside a package, use relative imports, never the full `modules.X.Y` path
 
 ## Error handling
 
 - Define module loggers as `logger = logging.getLogger(__name__)`
-- Log exceptions with context; avoid silent failures
-- Prefer graceful degradation for non-critical runtime failures
+- Log exceptions with context; never fail silently
+- Degrade gracefully on non-critical runtime failures
 
 ## Testing
 
-Poser2 is tested heavily by running the real-time system.
-- Prioritize unit tests for infrastructure modules (settings, frame/features, serialization, utility primitives)
-- Add tests where they provide long-term leverage, not ceremony
+- Rely on running the real-time system for integration; unit-test infrastructure (settings, frame/features, serialization, utility primitives, geometry)
+- Add tests where they give long-term leverage, not ceremony
+- Keep geometry in plain modules and drawing in renderers, so geometry is testable without a GL context
 
-Run Python and the test suites through the Bash tool, never PowerShell — this
-overrides any environment default naming PowerShell the primary shell. Windows
-PowerShell 5.1 wraps a native command's stderr in `NativeCommandError` and sets
-`$?` to false even on exit code 0; `unittest` writes its results to stderr, so a
-passing run reads as a failure.
+## Running code
 
-    python -m unittest discover -s apps/white_space/tests -t .
-    python -m unittest modules.oak.tests.test_warp_mesh modules.oak.tests.test_lens_image modules.oak.tests.test_keystone_warp modules.pose.tests.test_distance_extractor modules.pose.tests.test_motion_time_extractor modules.render.tests.test_marks modules.settings.tests.test_reactive modules.tracker.tests.test_panoramic_tracker modules.tracker.tests.test_panorama_map
+- Run Python and tests through Bash, never PowerShell; PowerShell 5.1 reports unittest's stderr output as a failure
+- Start each Bash command with the program itself (no `cd`, env-var prefix or heredoc) so it matches the allow-rules in `.claude/settings.json`
+- Change files with Edit/Write, not scripts
 
-`modules/` is a namespace root with no `__init__.py`, so `discover -s modules`
-fails with `ImportError: Start directory is not importable` — name the
-sub-packages explicitly.
-
-GL code cannot be tested without a context, but the arithmetic beside it can:
-`modules/render/layers/panorama/marks.py` holds no GL and imports cleanly, which
-is why `modules.render.tests.test_marks` exists. Keep that split — geometry in a
-plain module, drawing in the renderer — rather than testing renderers.
+```
+python -m unittest discover -s apps/white_space/tests -t .
+python -m unittest discover -s modules/<pkg>/tests -t .    # oak, pose, render, settings, tracker
+```
 
 ## API evolution
 
-- Prefer clean breaks over long deprecation windows.
-- Update all affected call sites in one change
-- Keep presets/settings schemas in sync with code changes
-- Remove obsolete pathways instead of leaving parallel legacy patterns
+- Prefer clean breaks over deprecation windows
+- Update all affected call sites in the same change
+- Keep presets and settings schemas in sync with code changes
+- Remove obsolete pathways instead of leaving parallel legacy ones
+
+## Working style
+
+- Separate what the code or a measurement shows from what is inferred, and say which is which
+- Do the plan step asked for and stop; don't start the next one
+- Don't offer to revert work
+- Never delete or rewrite a plan without confirmation; propose the change first
