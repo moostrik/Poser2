@@ -1,11 +1,11 @@
 from modules.oak import CameraResolution
-from modules.settings import BaseSettings, Field, Group
+from modules.settings import BaseSettings, Field, Group, Widget
 
 
 class SeamSettings(BaseSettings):
     """When two cameras' views of a seam are one person, and where a person may be born.
 
-    All in real units — degrees of world azimuth and a percentage of a measured height — rather
+    All in real units — degrees of world azimuth and a fraction of a measured height — rather
     than fractions of the overlap zone, so a number here means the same thing after a change of
     `fov`, mount or lens. Azimuth is the quantity the panorama check verifies; the distance
     estimate is not, so it is deliberately not a gate.
@@ -18,8 +18,9 @@ class SeamSettings(BaseSettings):
                                     description="No new person is born within this many ° of a camera's field edge")
     link_angle: Field[float] = Field(8.0, min=0.0, max=40.0, step=0.5,
                                      description="Two cameras' observations within this many ° of azimuth are one person")
-    link_height: Field[float] = Field(15.0, min=0.0, max=100.0, step=1.0,
-                                      description="Maximum % the two measured heights may differ when linking")
+    # Normalised 0..1, like `height_filter`: a fraction of the larger of the two measured heights.
+    link_height: Field[float] = Field(0.15, min=0.0, max=1.0, step=0.01,
+                                      description="Maximum fraction the two measured heights may differ when linking")
     hysteresis: Field[float] = Field(0.9, min=0.1, max=1.0, step=0.05,
                                      description="Lower values make active camera stickier.")
 
@@ -53,8 +54,10 @@ class RigSettings(BaseSettings):
       *harmonic* mean: the one depth every world azimuth is corrected at. Two depths from one zone
       on purpose — a flag must never under-report, so it takes the far edge; a correction wants its
       worst case smallest, so it takes the middle.
-    - **The distance clamp**, from both radii: a mangled bounding box can then only move the
-      reported metres within the band people are in, never to a nonsensical depth.
+    - **The far edge**, ``zone_max_radius``, while the tracker's ``zone_filter`` is on: past it a
+      person is not seen — not born, and dropped after the tracker's timeouts if they walk out
+      (`Geometry.beyond_zone`). The panorama draws them as a grey box tagged ``past R…``. The near
+      edge filters nothing, because close to the fixture the feet are often below the frame.
     """
     camera_radius: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01,
                                         description="Distance (m) of each lens from the fixture axis. 0 disables the parallax correction")
@@ -63,7 +66,7 @@ class RigSettings(BaseSettings):
     zone_min_radius: Field[float] = Field(1.5, min=0.25, max=10.0, step=0.05, newline=True,
                                           description="Radius (m) of the tracked floor's near edge — the nearest distance claimed")
     zone_max_radius: Field[float] = Field(3.5, min=0.5, max=15.0, step=0.05,
-                                          description="Radius (m) of its far edge — sets the overlap band and the distance clamp")
+                                          description="Radius (m) of its far edge — sets the overlap band, and where zone_filter ignores people")
     # Derived from the zone and published for the panorama, which places its marks on the same
     # cylinder the tracker corrects the azimuth at. The harmonic mean, because the correction is
     # linear in 1/d — see `Geometry._update_parallax_depth`.
@@ -120,14 +123,21 @@ class TrackerSettings(BaseSettings):
     lens_fov: Field[float] = Field(0.0, access=Field.INIT, description="Lens field (°) across the sensor width, shared; 0 = fov")
     lens_centre_x: Field[float] = Field(0.0, access=Field.INIT, description="Optical centre offset (px), shared")
     lens_centre_y: Field[float] = Field(0.0, access=Field.INIT, description="Optical centre offset (px), shared")
-    min_age: Field[int] = Field(5, min=0, max=9, step=1,
-                                description="Minimum age in frames before a tracklet is considered.")
-    min_height: Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05,
-                                     description="Minimum ROI height to accept a tracklet.")
+    # The intake's filters, together. A detection one of them drops is not counted, and the panorama
+    # draws it as a grey box tagged with the filter (`young`, `small`, `past R…`).
+    age_filter: Field[int] = Field(5, min=0, max=9, step=1,
+                                   description="Minimum age in frames before a tracklet is considered.")
+    height_filter: Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05,
+                                        description="Minimum ROI height to accept a tracklet.")
+    # A switch, not a radius: whether the zone's far edge (`rig.zone_max_radius`) acts at all. Off
+    # means off — nothing is filtered there and nothing on the strip mentions it; the other filters
+    # still run.
+    zone_filter: Field[bool] = Field(True, widget=Widget.switch,
+                                     description="Ignore people past rig.zone_max_radius (dropped after the lost timeouts)")
     # A property of the DETECTOR, not of the site, which is why it is here and not in `rig`: that
     # group is metres someone measured on the floor. Tuned by walking one person out until the
     # panorama's `H` stops drifting — the ROI is never rewritten, only the row derived from it
-    # (`Geometry._foot_px`), so `min_height` and the crop extractor still see the detector's box.
+    # (`Geometry._foot_px`), so `height_filter` and the crop extractor still see the detector's box.
     foot_offset: Field[float] = Field(0.0, min=0.0, max=0.2, step=0.005,
                                       description="How far below the feet the detector's box bottom sits (frame heights)")
     # Not under `seam`: this is the same camera re-finding a person it dropped, anywhere in its

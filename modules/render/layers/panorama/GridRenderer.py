@@ -220,7 +220,7 @@ class GridRenderer(LayerBase):
                        f'tilt {self._settings.tilt:.0f}  elev {bottom:.0f}..{top:.0f}  '
                        f'zone {rig.zone_min_radius:.2f}..{rig.zone_max_radius:.2f}m  '
                        f'overlap {rig.overlap:.1f}°  dead {seam.dead_zone:.1f}°  '
-                       f'link {seam.link_angle:.1f}°/{seam.link_height:.0f}%  '
+                       f'link {seam.link_angle:.1f}°/{seam.link_height:.2f}  '
                        f'reacquire {self._tracker.reacquire_angle:.1f}°')
         self._text.draw_box_text(3, self._height - 22, footer, LABEL_FG, LABEL_BG,
                                  self._width, self._height)

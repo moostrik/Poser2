@@ -9,7 +9,7 @@ from dataclasses import replace
 
 from modules.oak import CameraResolution, delivered_height, frame_coverage, frame_window
 from modules.tracker import (
-    PanoramicTracker, PanoramicTrackerSettings, PanoramicAnnotation,
+    PanoramicTracker, PanoramicTrackerSettings, PanoramicAnnotation, Rejection,
     Tracklet, TrackingStatus, TrackletDict, camera_local_to_azimuth, row_from_elevation, row_model,
 )
 from modules.tracker.panoramic.geometry import Geometry, _MAX_HEIGHT, height_is_measured
@@ -20,9 +20,9 @@ from modules.utils import Rect
 
 # fov 110 / target 90 -> `fov_overlap` 10 deg of offset, and a 20 deg band of each camera's field
 # that its neighbour also sees. With the default seam settings (dead_zone 5, link_angle 8,
-# link_height 15, hysteresis 0.9): no births at local angle <= 5 or >= 105; a second opinion
+# link_height 0.15, hysteresis 0.9): no births at local angle <= 5 or >= 105; a second opinion
 # exists at <= 20 or >= 90; two cameras' observations are one person within 8 deg of world
-# azimuth and 15% of measured height.
+# azimuth and 0.15 of the larger measured height.
 FOV = 110.0
 
 
@@ -42,6 +42,12 @@ class PanoramicTrackerCase(unittest.TestCase):
 
     def setUp(self) -> None:
         self.config = PanoramicTrackerSettings(fov=FOV)
+        # These tests are about identity — hysteresis, linking, id reuse — not about where on the
+        # floor anyone stands, and `make_tracklet`'s boxes put the feet wherever their `top` and
+        # `height` land. Open the far edge as wide as it goes so the floor position never decides
+        # them; the far-edge filter has its own tests (`TestFarEdge`). With no ring, the zone moves
+        # nothing else here: the overlap band is the bare field at any zone.
+        self.config.rig.zone_max_radius = 15.0
         self.tracker = PanoramicTracker(self.config, num_players=8, num_cameras=4)
         self.emitted: list[TrackletDict] = []
         self.tracker.add_tracklet_callback(self.emitted.append)
@@ -271,17 +277,25 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         self.assertEqual(self.tracker.store.get_world_id(1, 1), 0)
 
     def test_height_gate_rejects_a_genuinely_different_person(self) -> None:
-        # Same azimuth, 1.2 m against 1.8 m: 33% apart, past the 15% gate.
+        # Same azimuth, 1.2 m against 1.8 m: 0.33 apart, past the 0.15 gate.
         self.submit(self.person(0, 1, 98.0, height_m=1.8, distance=2.5))
         out = self.submit(self.person(1, 1, 8.0, height_m=1.2, distance=2.5))
         self.assertEqual(set(out.keys()), {0, 1})  # link refused -> new world
 
+    def test_the_height_gate_is_a_fraction_of_the_larger_height(self) -> None:
+        # Normalised like `height_filter`: 0.15 means 15 % of the larger height. Either side of it,
+        # so a gate read as a percentage (0.15 %) or scaled twice would fail one of the two.
+        self.config.seam.link_height = 0.15
+        self.assertTrue(self.tracker._heights_match(1.8, 1.8 * 0.86))     # 0.14 apart: one person
+        self.assertFalse(self.tracker._heights_match(1.8, 1.8 * 0.84))    # 0.16 apart: two
+
     def test_a_jumper_links_on_azimuth_alone(self) -> None:
         # Feet off the floor breaks the one assumption the height measurement rests on, so the
         # reading is not a measurement and must not be allowed to veto a link the azimuth
-        # supports — a person is never harder to re-find than mid-jump.
+        # supports — a person is never harder to re-find than mid-jump. A 0.3 m jump: enough to
+        # wreck the height, while the feet still read inside this fixture's open far edge.
         self.submit(self.person(0, 1, 98.0, height_m=1.8, distance=2.5))
-        jumper = self.person(1, 1, 8.0, height_m=1.8, distance=2.5, feet_off_floor=0.45)
+        jumper = self.person(1, 1, 8.0, height_m=1.8, distance=2.5, feet_off_floor=0.3)
         out = self.submit(jumper)
         self.assertEqual(set(out.keys()), {0})
         self.assertEqual(self.tracker.store.get_world_id(1, 1), 0)
@@ -290,6 +304,18 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         # It really is a bad reading, not a lucky one that happened to fall inside the gate.
         self.assertFalse(height_is_measured(annotation.annotation.height)
                          and abs(annotation.annotation.height - 1.8) < 0.15 * 1.8)
+
+    def test_a_view_whose_feet_read_past_the_far_edge_links_once_they_land(self) -> None:
+        """The far-edge filter's trade at a seam. Feet 0.45 m up, with the lens at 0.5 m, sit just
+        below eye level and read about 21 m out — past even this fixture's open edge — so the second
+        camera's view is not counted mid-jump. Nobody is lost: the first camera still carries the
+        person, and the view links the moment the feet are back on the floor."""
+        self.submit(self.person(0, 1, 98.0, height_m=1.8, distance=2.5))
+        out = self.submit(self.person(1, 1, 8.0, height_m=1.8, distance=2.5, feet_off_floor=0.45))
+        self.assertEqual(set(out.keys()), {0})                         # still emitted, from cam 0
+        self.assertIsNone(self.tracker.store.get_world_id(1, 1))       # the view is not seen
+        self.submit(self.person(1, 1, 8.0, height_m=1.8, distance=2.5))
+        self.assertEqual(self.tracker.store.get_world_id(1, 1), 0)     # landed: linked
 
     def test_two_people_inside_the_overlap_stay_two_worlds(self) -> None:
         # 12 deg of world azimuth apart, both inside the cam0/cam1 overlap band (20 deg in from
@@ -371,11 +397,10 @@ PARALLAX_FOV = 127.0
 TARGET_FOV = 90.0
 RING_RADIUS = 0.36
 CAMERA_HEIGHT = 0.5
-# The tracked zone, deliberately WIDER than the studio preset's R 1.5 – R 3.5. The distance clamp
-# is derived from it (`Geometry.set_zone`), and at R 1.5 the near bound lands on 1.14 m — exactly
-# the frame's own nearest readable row at this tilt, which would make
-# `test_the_bottom_row_is_the_nearest_readable_distance` pass for the wrong reason. R 1.0 keeps the
-# clamp clear of the frame's limit, so each test measures the one thing it names.
+# The tracked zone, deliberately WIDER than the studio preset's R 1.5 – R 3.5. It was chosen when
+# the distance was clamped to the zone, to keep that clamp clear of the frame's own nearest
+# readable row; the clamp is gone, and the geometry tests below only ever read distances, so the
+# zone now matters to them only through the overlap band and the parallax depth.
 ZONE_MIN_RADIUS = 1.0
 ZONE_MAX_RADIUS = 4.0
 # The delivered frame: P800 aimed up 16 on the sensor's full reach (1152 rows), the ideal lens.
@@ -514,18 +539,10 @@ class TestOverlapBand(unittest.TestCase):
                                                   g._max_radius)
         self.assertGreater(abs(far_edge - flips), 1.0)
 
-    def test_the_zone_drives_the_distance_clamp(self) -> None:
-        # The on-axis extremes, so the clamp follows the ring instead of being hand-computed for
-        # one: a camera is pushed toward the circle it faces and away from the one behind it.
-        g = self.make_geometry()
-        self.assertAlmostEqual(g._min_distance, 1.5 - RING_RADIUS, places=9)
-        self.assertAlmostEqual(g._max_distance, 3.5 + RING_RADIUS, places=9)
-
     def test_a_max_below_the_min_collapses_rather_than_inverting(self) -> None:
         g = self.make_geometry(zone=(1.5, 1.0))
         self.assertAlmostEqual(g._min_radius, 1.5, places=9)
         self.assertAlmostEqual(g._max_radius, 1.5, places=9)
-        self.assertGreaterEqual(g._max_distance, g._min_distance)
 
 
 class TestGeometryParallax(unittest.TestCase):
@@ -558,8 +575,7 @@ class TestGeometryParallax(unittest.TestCase):
         crossing splits. Bounded, and zero on the cylinder.
 
         On the STUDIO zone (R 1.5 – R 3.5), because that is the configuration whose bound is quoted
-        in CALIBRATION.md — the surrounding fixture deliberately uses a wider R 1 – R 4 so the
-        distance clamp stays clear of the frame's own nearest readable row, and a wider zone
+        in CALIBRATION.md — the surrounding fixture uses a wider R 1 – R 4, and a wider zone
         necessarily has a worse worst case (14.4° at R 1 – R 4, which is the honest cost of
         claiming that much floor)."""
         g = self.make_geometry(zone=(1.5, 3.5))
@@ -630,7 +646,7 @@ class TestGeometryParallax(unittest.TestCase):
 
     def test_estimate_distance_matches_the_floor_geometry(self) -> None:
         g = self.make_geometry()
-        for want in (1.5, 2.0, 3.0, 3.9):   # all inside the zone's derived clamp
+        for want in (1.5, 2.0, 3.0, 3.9):
             with self.subTest(distance=want):
                 got = g.estimate_distance(Rect(y=feet_row(want) - 0.4, width=0.05, height=0.4))
                 self.assertAlmostEqual(got, want, places=6)
@@ -643,29 +659,34 @@ class TestGeometryParallax(unittest.TestCase):
         self.assertAlmostEqual(g.estimate_distance(Rect(y=0.6, height=0.4)), nearest, places=6)
         self.assertAlmostEqual(nearest, 1.14, delta=0.01)
 
-    def test_estimate_distance_clamps_degenerate_box(self) -> None:
+    def test_feet_not_on_this_floor_read_infinitely_far(self) -> None:
         g = self.make_geometry()
         # Feet at or above the horizon: nobody standing on this floor.
-        far: float = g._max_distance          # derived from the zone, not a literal
-        self.assertEqual(g.estimate_distance(Rect(y=HORIZON_ROW - 0.5, height=0.5)), far)
-        self.assertEqual(g.estimate_distance(Rect(y=0.0, height=0.5)), far)
-        d = g.estimate_distance(Rect(y=0.55, height=0.4))
-        self.assertGreaterEqual(d, g._min_distance)
-        self.assertLessEqual(d, far)
+        self.assertEqual(g.estimate_distance(Rect(y=HORIZON_ROW - 0.5, height=0.5)), math.inf)
+        self.assertEqual(g.estimate_distance(Rect(y=0.0, height=0.5)), math.inf)
+
+    def test_estimate_distance_is_not_clamped_to_the_zone(self) -> None:
+        # The point of removing the clamp: someone well past the far edge reads where they are, so
+        # the far-edge filter can see them and the panorama can show them.
+        g = self.make_geometry()
+        for want in (5.0, 8.0, 12.0):
+            with self.subTest(distance=want):
+                got = g.estimate_distance(Rect(y=feet_row(want) - 0.2, width=0.05, height=0.2))
+                self.assertAlmostEqual(got, want, places=6)
 
     def test_estimate_distance_uses_boxes_that_leave_the_frame(self) -> None:
         # The device extrapolates the extent of a partly-visible person and nothing clamps it on
-        # the way in, so `bottom` past 1.0 is real and must not be thrown away. It is monotonic
-        # across the frame edge — closer feet, closer person — and bounded by the clamp.
+        # the way in, so `bottom` past 1.0 is kept, not thrown away. It is monotonic across the frame
+        # edge — closer feet, closer person — and stays a positive distance however far it runs.
         g = self.make_geometry()
         near_edge = g.estimate_distance(Rect(y=0.55, height=0.44))     # bottom 0.99, in frame
         at_edge = g.estimate_distance(Rect(y=0.6, height=0.4))         # bottom 1.00, at the edge
         past_edge = g.estimate_distance(Rect(y=0.7, height=0.4))       # bottom 1.10, extrapolated
+        absurd = g.estimate_distance(Rect(y=1.5, height=0.5))          # bottom 2.00
         self.assertGreater(near_edge, at_edge)
-        self.assertGreaterEqual(at_edge, past_edge)
-        self.assertGreaterEqual(past_edge, g._min_distance)
-        # Absurd extrapolation (feet "behind" the camera) still lands inside the band.
-        self.assertEqual(g.estimate_distance(Rect(y=1.5, height=0.5)), g._min_distance)
+        self.assertGreater(at_edge, past_edge)
+        self.assertGreater(past_edge, absurd)
+        self.assertGreater(absurd, 0.0)
 
     def test_a_box_may_start_above_the_frame(self) -> None:
         # A tall person close in: head extrapolated above the top. Only the bottom is read, so
@@ -674,7 +695,7 @@ class TestGeometryParallax(unittest.TestCase):
         cut = g.estimate_distance(Rect(y=-0.3, height=1.2))            # bottom 0.9
         whole = g.estimate_distance(Rect(y=0.5, height=0.4))           # bottom 0.9
         self.assertAlmostEqual(cut, whole, places=9)
-        self.assertLess(cut, g._max_distance)                           # a real reading, not the clamp
+        self.assertTrue(math.isfinite(cut))                            # a real reading
 
 
 class TestSeamBirths(unittest.TestCase):
@@ -721,6 +742,191 @@ class TestSeamBirths(unittest.TestCase):
         self.assertEqual(self.tracker.store.get_world_id(1, 1), 0)
 
 
+class RigTrackerCase(unittest.TestCase):
+    """A tracker on the rig's geometry (R 0.36 ring, R 1.5 – R 3.5 zone) with the fixture's own
+    frame, so a synthesised box puts the feet where the person really stands. No tests of its own."""
+
+    AXIS: float = 45.0            # camera 0's optical axis, in world azimuth
+
+    def setUp(self) -> None:
+        self.config = PanoramicTrackerSettings(fov=PARALLAX_FOV)
+        self.config.rig.camera_radius = RING_RADIUS
+        self.config.rig.camera_height = CAMERA_HEIGHT
+        self.config.emit_timeout = 1.0
+        self.config.lost_timeout = 2.0
+        self.tracker = PanoramicTracker(self.config, num_players=8, num_cameras=4)
+        self.tracker.geometry.set_window(WINDOW, ROWS)
+        self.emitted: list[TrackletDict] = []
+        self.observed: list[list[Tracklet]] = []
+        self.tracker.add_tracklet_callback(self.emitted.append)
+        self.tracker.add_observation_callback(self.observed.append)
+
+    def seen(self, radius: float, ext_id: int = 1, seconds_ago: float = 0.0,
+             status: TrackingStatus = TrackingStatus.TRACKED, age: int = 10,
+             height: float | None = None) -> TrackletDict:
+        """Camera 0 sees someone on its own axis at `radius`, last detected `seconds_ago`. `height`
+        overrides the box's height (frame fraction), keeping its bottom on the feet."""
+        roi, _distance = synth_observation(0, world_azimuth=self.AXIS, radius=radius)
+        if height is not None:
+            roi = replace(roi, y=roi.y + roi.height - height, height=height)
+        self.tracker._add_tracklet(Tracklet(cam_id=0, status=status, roi=roi, external_id=ext_id,
+                                            external_age_in_frames=age,
+                                            last_active=time.time() - seconds_ago))
+        self.tracker._update_and_notify()
+        return self.emitted[-1]
+
+
+class TestFarEdge(RigTrackerCase):
+    """Past `zone_max_radius` a person is not seen: handled exactly like a missed detection."""
+
+    def test_the_edge_is_a_radius_not_a_camera_distance(self) -> None:
+        """A camera sits `ring_radius` out toward the person, so it reads them nearer than their
+        radius: on its axis at R 3.6 it reads 3.24 m, which a camera-distance test against 3.5
+        would wrongly accept."""
+        g = self.tracker.geometry
+        on_axis: float = PARALLAX_FOV / 2.0
+        self.assertTrue(g.beyond_zone(on_axis, 3.6 - RING_RADIUS))
+        self.assertFalse(g.beyond_zone(on_axis, 3.4 - RING_RADIUS))
+        self.assertTrue(g.beyond_zone(on_axis, math.inf))            # feet not on this floor
+
+    def test_a_new_arrival_past_the_edge_is_not_started(self) -> None:
+        self.assertEqual(self.seen(4.0), {})
+        self.assertIsNone(self.tracker.store.get_world_id(0, 1))
+        self.assertEqual(set(self.seen(3.0).keys()), {0})             # inside: started
+
+    def test_a_brief_excursion_changes_nothing_visible(self) -> None:
+        # A jump, or feet hidden for a moment: LOST, but still emitted inside `emit_timeout`.
+        self.seen(3.0)
+        out = self.seen(4.0)
+        self.assertEqual(set(out.keys()), {0})
+        observation = self.tracker.store.get_live_observation(0, 1)
+        assert observation is not None
+        self.assertEqual(observation.status, TrackingStatus.LOST)
+
+    def test_walking_out_does_not_restart_the_clock(self) -> None:
+        """The trap the store's `latest` argument exists for: the observation follows the person
+        out (so the panorama does too), but its `last_active` stays where they were last inside."""
+        self.seen(3.0, seconds_ago=1.5)
+        before = self.tracker.store.get_live_observation(0, 1)
+        assert before is not None
+        out = self.seen(4.0)
+        after = self.tracker.store.get_live_observation(0, 1)
+        assert after is not None and isinstance(after.annotation, PanoramicAnnotation)
+        self.assertEqual(after.last_active, before.last_active)
+        self.assertAlmostEqual(after.annotation.distance, 4.0 - RING_RADIUS, delta=0.01)
+        self.assertEqual(out, {})                                      # 1.5 s > emit_timeout
+
+    def test_someone_who_stays_out_is_forgotten(self) -> None:
+        # Last inside 1.5 s ago: alive at that tick (< lost_timeout 2.0). Lowering the timeout
+        # below 1.5 before the outside frame stands in for time passing. Without the filter that
+        # frame would refresh `last_active` and keep them; with it, the old clock retires them.
+        self.seen(3.0, seconds_ago=1.5)
+        self.assertEqual(self.tracker.store.all_world_ids(), [0])
+        self.config.lost_timeout = 1.2
+        self.seen(4.0)
+        self.assertEqual(self.tracker.store.all_world_ids(), [])
+
+    def test_stepping_back_in_keeps_the_same_person(self) -> None:
+        self.seen(3.0)
+        self.seen(4.0)
+        out = self.seen(3.2)
+        self.assertEqual(set(out.keys()), {0})
+        observation = self.tracker.store.get_live_observation(0, 1)
+        assert observation is not None
+        self.assertEqual(observation.status, TrackingStatus.TRACKED)
+        self.assertEqual(self.tracker.store.get_world_id(0, 1), 0)
+
+    def test_past_the_edge_blocks_reacquisition(self) -> None:
+        # The device drops the person and re-finds them under a new id, but past the edge: not them
+        # yet. Back inside, the same world picks them up.
+        self.seen(3.0)
+        self.seen(3.0, status=TrackingStatus.REMOVED)
+        self.seen(4.0, ext_id=2)
+        self.assertIsNone(self.tracker.store.get_world_id(0, 2))
+        self.seen(3.0, ext_id=3)
+        self.assertEqual(self.tracker.store.get_world_id(0, 3), 0)
+
+
+class TestFilteredDetections(RigTrackerCase):
+    """Every detection a filter drops is published on the observation channel, tagged with why —
+    so the panorama can draw it — and never on the primary channel the show reads."""
+
+    def rejected(self) -> dict[Rejection, int]:
+        """The reasons on the latest observation channel, counted."""
+        counts: dict[Rejection, int] = {}
+        for t in self.observed[-1]:
+            assert isinstance(t.annotation, PanoramicAnnotation)
+            if t.annotation.rejected is not None and t.id < 0:
+                counts[t.annotation.rejected] = counts.get(t.annotation.rejected, 0) + 1
+        return counts
+
+    def test_each_filter_is_tagged_and_kept_off_the_primary_channel(self) -> None:
+        cases = {
+            Rejection.YOUNG: dict(radius=3.0, age=self.config.age_filter),
+            Rejection.SMALL: dict(radius=3.0, height=self.config.height_filter / 2.0),
+            Rejection.PAST_EDGE: dict(radius=4.0),
+        }
+        for reason, kwargs in cases.items():
+            with self.subTest(reason=reason):
+                self.setUp()
+                out = self.seen(**kwargs)
+                self.assertEqual(out, {})                                  # the show sees nobody
+                self.assertEqual(self.rejected(), {reason: 1})             # the strip sees why
+                self.assertEqual(self.tracker.store.all_world_ids(), [])
+
+    def test_a_new_arrival_in_the_dead_zone_is_tagged(self) -> None:
+        # Both cameras' first sight of someone on a seam close in: both inside the dead zone.
+        self.config.seam.dead_zone = 6.5
+        for cam_id in (0, 1):
+            roi, _d = synth_observation(cam_id, world_azimuth=90.0, radius=1.35)
+            self.tracker._add_tracklet(Tracklet(cam_id=cam_id, status=TrackingStatus.TRACKED, roi=roi,
+                                                external_id=1, external_age_in_frames=10))
+        self.tracker._update_and_notify()
+        self.assertEqual(self.emitted[-1], {})
+        self.assertEqual(self.rejected(), {Rejection.DEAD_ZONE: 2})
+
+    def test_it_leaves_the_channel_once_accepted_or_ended(self) -> None:
+        self.seen(3.0, age=self.config.age_filter)              # young
+        self.assertEqual(self.rejected(), {Rejection.YOUNG: 1})
+        self.seen(3.0)                                           # old enough: a person
+        self.assertEqual(self.rejected(), {})
+        self.assertEqual(self.tracker.store.all_world_ids(), [0])
+        self.seen(4.0, ext_id=2)                                 # someone else, past the edge
+        self.assertEqual(self.rejected(), {Rejection.PAST_EDGE: 1})
+        self.seen(4.0, ext_id=2, status=TrackingStatus.REMOVED)  # the device lets them go
+        self.assertEqual(self.rejected(), {})
+
+    def test_a_camera_that_stops_reporting_does_not_leave_it_behind(self) -> None:
+        # Last reported 0.9 s ago: still fresh at 1.0 s. Lowering `emit_timeout` below that stands in
+        # for time passing with no further report from the camera — no LOST, no REMOVED.
+        self.seen(4.0, seconds_ago=0.9)
+        self.assertEqual(self.rejected(), {Rejection.PAST_EDGE: 1})
+        self.config.emit_timeout = 0.5
+        self.tracker._update_and_notify()
+        self.assertEqual(self.rejected(), {})
+
+    def test_off_means_off(self) -> None:
+        self.config.zone_filter = False
+        out = self.seen(4.0)
+        self.assertEqual(set(out.keys()), {0})                   # tracked like anyone
+        self.assertEqual(self.rejected(), {})
+        for t in self.observed[-1]:
+            assert isinstance(t.annotation, PanoramicAnnotation)
+            self.assertIsNone(t.annotation.rejected)
+
+    def test_a_tracked_person_past_the_edge_is_tagged_on_their_own_mark(self) -> None:
+        self.seen(3.0)
+        self.seen(4.0)
+        observation = self.tracker.store.get_live_observation(0, 1)
+        assert observation is not None and isinstance(observation.annotation, PanoramicAnnotation)
+        self.assertEqual(observation.annotation.rejected, Rejection.PAST_EDGE)
+        self.assertEqual(self.rejected(), {})                    # one mark, not a second grey box
+        self.seen(3.0)
+        observation = self.tracker.store.get_live_observation(0, 1)
+        assert observation is not None and isinstance(observation.annotation, PanoramicAnnotation)
+        self.assertIsNone(observation.annotation.rejected)       # back inside: no tag
+
+
 class TestGeometryHeight(unittest.TestCase):
     """A person's height is a pure pixel ratio on cylindrical rows: camera_height times the box
     height over the rows from the horizon down to the feet. No focal, no field, no distance."""
@@ -746,7 +952,7 @@ class TestGeometryHeight(unittest.TestCase):
 
     def test_is_independent_of_distance(self) -> None:
         # The pixel box shrinks with distance; the metres must not move. This is what a gate on
-        # pixel box heights could not do, and why `seam.link_height` is a percentage of these.
+        # pixel box heights could not do, and why `seam.link_height` is a fraction of these.
         g = self.make_geometry()
         near: Rect = self.box(1.8, 2.0)
         far: Rect = self.box(1.8, 6.0)
@@ -862,13 +1068,16 @@ class TestFootOffset(unittest.TestCase):
         self.assertTrue(all(b < a for a, b in zip(heights, heights[1:])),
                         f'H should fall with distance, got {heights}')
 
-    def test_the_correction_is_applied_before_the_clamp(self) -> None:
-        # An over-corrected foot row walks up toward the horizon and the reading runs away with it,
-        # so the clamp must still be the thing that bounds the answer.
-        g = self.make_geometry(0.2)
+    def test_over_correcting_reads_further_and_then_infinitely_far(self) -> None:
+        """An over-corrected foot row walks up toward the horizon, so the reading runs away — the
+        failure is loud (a person past the far edge, or `inf`), never a negative distance. It is
+        also why `foot_offset` must be tuned by `H` staying flat, not overshot: too much makes the
+        far-edge filter reject people who are inside."""
         box: Rect = self.true_box(1.8, 3.0)
-        self.assertLessEqual(g.estimate_distance(box), g._max_distance)
-        self.assertGreaterEqual(g.estimate_distance(box), g._min_distance)
+        gap: float = feet_row(3.0) - HORIZON_ROW                  # the feet's rows below the horizon
+        self.assertGreater(self.make_geometry(gap * 0.5).estimate_distance(box), 3.0)
+        self.assertEqual(self.make_geometry(gap).estimate_distance(box), math.inf)
+        self.assertEqual(self.make_geometry(gap * 1.5).estimate_distance(box), math.inf)
 
     def test_the_azimuth_ignores_it_entirely(self) -> None:
         # The bearing no longer rides on any box row, so no value of this setting can move it.

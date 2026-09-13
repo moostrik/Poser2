@@ -1,4 +1,5 @@
 # Standard library imports
+import time
 from typing import Protocol
 
 # Third-party imports
@@ -16,7 +17,7 @@ from ...color_settings import ColorSettings
 from .GridRenderer import GridRenderer
 from .LabelRenderer import LabelRenderer
 from .ObservationRenderer import ObservationRenderer
-from .PanoramaLayerSettings import PanoramaLayerSettings, Part
+from .PanoramaLayerSettings import PanoramaLayerSettings, Part, REJECTED_COLOR
 from .SeamRenderer import SeamRenderer
 from .StitchRenderer import StitchRenderer
 from .marks import Mark, StripGeometry, build_marks
@@ -205,8 +206,11 @@ class Compositor(LayerBase):
             elevation_window=window,
             link_angle=self._tracker.seam.link_angle,
             reacquire_angle=self._tracker.reacquire_angle,
+            zone_max_radius=self._tracker.rig.zone_max_radius,
+            lost_timeout=self._tracker.lost_timeout,
+            now=time.time(),
         )
         marks: list[Mark] = build_marks(
-            observations, primaries, self._color_settings.track_color_tuples, geometry)
+            observations, primaries, self._color_settings.track_color_tuples, REJECTED_COLOR, geometry)
         self._observations.set_marks(marks)
         self._labels.set_marks(marks)

@@ -166,14 +166,26 @@ class TrackletStore:
         )
         return world_id
 
-    def lose_tracklet(self, cam_id: int, external_id: int) -> None:
+    def lose_tracklet(self, cam_id: int, external_id: int, latest: Tracklet | None = None) -> None:
         """The device has no detection this frame but still holds the track: mark LOST and keep
-        it live, because the same device id legitimately comes back."""
+        it live, because the same device id legitimately comes back.
+
+        `latest` is for a person the camera *does* see but the tracker does not count — beyond the
+        zone's far edge. Their newest `roi` and `annotation` are kept, so the observation (and the
+        panorama's mark) follows them walking out, but `last_active` is **not** advanced: that is
+        the clock `emit_timeout` and `lost_timeout` run on, and restarting it would keep them
+        forever. (`replace_tracklet` with a LOST copy cannot do this — it takes the newer time.)
+        """
         obs_id: ObsId | None = self._live.get((cam_id, external_id))
         if obs_id is None or obs_id not in self._obs:
             logger.warning(f"Attempted to lose non-live tracklet {(cam_id, external_id)}.")
             return
-        self._obs[obs_id] = replace(self._obs[obs_id], status=TrackingStatus.LOST)
+        old: Tracklet = self._obs[obs_id]
+        if latest is None:
+            self._obs[obs_id] = replace(old, status=TrackingStatus.LOST)
+        else:
+            self._obs[obs_id] = replace(old, status=TrackingStatus.LOST,
+                                        roi=latest.roi, annotation=latest.annotation)
 
     def end_device_track(self, cam_id: int, external_id: int) -> None:
         """The device has dropped the track for good. The observation stays as a LOST anchor

@@ -3,6 +3,7 @@ import logging
 import math
 import time
 from dataclasses import dataclass, replace
+from enum import IntEnum, auto
 from functools import lru_cache
 from itertools import combinations
 from queue import Empty, Queue
@@ -49,18 +50,39 @@ def _coverage(src: tuple[int, int], rows: int, fov: float, tilt: float, lens_fov
     return coverage
 
 
+class Rejection(IntEnum):
+    """Why the tracker did not count a detection this frame — one member per filter in `_add_tracklet`.
+
+    Carried on the annotation so the panorama can draw the dropped detection and name the filter,
+    rather than it vanishing. `rejection_label` is the one spelling of each.
+    """
+    YOUNG = auto()       # the device has not held it for `age_filter` frames yet
+    SMALL = auto()       # its box is shorter than `height_filter`
+    DEAD_ZONE = auto()   # a new arrival inside `seam.dead_zone` of a field edge
+    PAST_EDGE = auto()   # past `rig.zone_max_radius`, with `zone_filter` on
+
+
+def rejection_label(reason: Rejection, zone_max_radius: float) -> str:
+    """The short name of a filter, as the panorama tags a box with it."""
+    if reason == Rejection.PAST_EDGE:
+        return f'past R{zone_max_radius:g}'
+    return {Rejection.YOUNG: 'young', Rejection.SMALL: 'small', Rejection.DEAD_ZONE: 'dead zone'}[reason]
+
+
 @dataclass(frozen=True)
 class Annotation(TrackerAnnotation):
     """What one camera's box says about one person, all of it derived in `Geometry`.
 
     `distance` is from that camera (m); `height` is absolute (m) and needs no re-projection,
-    since the same camera sees the person's feet and head.
+    since the same camera sees the person's feet and head. `rejected` is set when a filter
+    dropped this detection (or, for a person already tracked, stopped counting it).
     """
     local_angle: float
     world_angle: float
     overlap: bool
     distance: float = 0.0
     height: float = 0.0
+    rejected: Rejection | None = None
 
 
 class Tracker(Thread, BaseTracker):
@@ -143,6 +165,11 @@ class Tracker(Thread, BaseTracker):
         self._callback_lock = Lock()
         self._tracklet_callbacks: set[TrackletDictCallback] = set()
         self._observation_callbacks: set[TrackletListCallback] = set()
+
+        # Detections the intake dropped, latest per device track, tagged with the filter — published
+        # on the observation channel so the panorama can draw them, never on the primary channel.
+        # Touched only on the tracker thread (`_add_tracklet` and `_update_and_notify`).
+        self._rejected: dict[tuple[int, int], Tracklet] = {}
 
     def _sync_geometry_from_config(self) -> None:
         """Apply current config values to geometry. Needed at construction because ``bind`` does
@@ -284,12 +311,14 @@ class Tracker(Thread, BaseTracker):
     def _add_tracklet(self, new_tracklet: Tracklet) -> None:
         cam_id: int = new_tracklet.cam_id
         ext_id: int = new_tracklet.external_id
+        key: tuple[int, int] = (cam_id, ext_id)
 
         # The device has finished with this track: its id is now free to be handed to a
         # different person, so the observation leaves the live index. It stays LOST and keeps
         # anchoring until `lost_timeout`, which is what lets a far camera link across a seam
         # after the near one gave up.
         if new_tracklet.is_removed:
+            self._rejected.pop(key, None)
             if self.store.get_world_id(cam_id, ext_id) is not None:
                 self.store.end_device_track(cam_id, ext_id)
             return
@@ -297,24 +326,47 @@ class Tracker(Thread, BaseTracker):
         # No detection this frame, but the device still holds the track: the same id will come
         # back, so the observation stays live.
         if new_tracklet.is_lost:
+            self._rejected.pop(key, None)
             if self.store.get_world_id(cam_id, ext_id) is not None:
                 self.store.lose_tracklet(cam_id, ext_id)
             return
 
-        # Filter out tracklets that are too young or too small
-        if new_tracklet.external_age_in_frames <= self.config.min_age:
-            return
-        if new_tracklet.roi.height < self.config.min_height:
-            return
-
-        # Annotate with local/world angles, overlap flag, estimated distance and height
+        # Annotate first, before any filter: a detection a filter drops is still drawn on the
+        # panorama, tagged with the reason, and it needs its angles for that. Pure geometry, so the
+        # order changes nothing that is decided below.
         local_angle, world_angle, _overlap, distance, height = self.geometry.get_angles_and_overlap(new_tracklet.roi, cam_id)
         new_tracklet = replace(new_tracklet, annotation=Annotation(local_angle, world_angle, _overlap, distance, height))
+        existing: bool = self.store.get_world_id(cam_id, ext_id) is not None
+
+        # Too young or too small: not counted, and — for a person already tracked — not refreshed,
+        # so their observation goes stale and expires.
+        if new_tracklet.external_age_in_frames <= self.config.age_filter:
+            self._reject(new_tracklet, Rejection.YOUNG)
+            return
+        if new_tracklet.roi.height < self.config.height_filter:
+            self._reject(new_tracklet, Rejection.SMALL)
+            return
+
+        # Past the zone's far edge the tracker does not see this person — handled exactly like a
+        # missed detection, before every branch below, so it cannot be born, re-acquired or linked
+        # there. Someone already tracked goes LOST: still emitted for `emit_timeout`, so a jump or a
+        # moment of hidden feet changes nothing visible; forgotten after `lost_timeout`; the same
+        # person again if they step back inside before that. Their latest position is kept, tagged,
+        # so the panorama's mark follows them out and says why it is fading.
+        if self.config.zone_filter and self.geometry.beyond_zone(local_angle, distance):
+            if existing:
+                self._rejected.pop(key, None)
+                self.store.lose_tracklet(cam_id, ext_id,
+                                         latest=self._tagged(new_tracklet, Rejection.PAST_EDGE))
+            else:
+                self._reject(new_tracklet, Rejection.PAST_EDGE)
+            return
 
         # Existing observation — refresh in place, even inside the edge dead
         # zone: starving it would freeze its angles and expire it via lost_timeout
         # while the camera still tracks the person.
-        if self.store.get_world_id(cam_id, ext_id) is not None:
+        if existing:
+            self._rejected.pop(key, None)
             self.store.replace_tracklet(new_tracklet)
             return
 
@@ -326,18 +378,30 @@ class Tracker(Thread, BaseTracker):
         # *new* people being born on a seam.
         anchor_world: int | None = self._find_same_camera_anchor(new_tracklet)
         if anchor_world is not None:
+            self._rejected.pop(key, None)
             self.store.add_tracklet(new_tracklet, world_id=anchor_world)
             return
 
         # Brand-new observations are ignored too close to the FOV edge
         if self.geometry.angle_in_edge(local_angle, self.config.seam.dead_zone):
+            self._reject(new_tracklet, Rejection.DEAD_ZONE)
             return
+        self._rejected.pop(key, None)
         if _overlap:
             candidate_world: int | None = self._find_world_candidate(new_tracklet)
             if candidate_world is not None:
                 self.store.add_tracklet(new_tracklet, world_id=candidate_world)
                 return
         self.store.add_tracklet(new_tracklet)
+
+    @staticmethod
+    def _tagged(tracklet: Tracklet, reason: Rejection) -> Tracklet:
+        assert isinstance(tracklet.annotation, Annotation)
+        return replace(tracklet, annotation=replace(tracklet.annotation, rejected=reason))
+
+    def _reject(self, tracklet: Tracklet, reason: Rejection) -> None:
+        """Not counted this frame: keep the detection, tagged, for the panorama instead of losing it."""
+        self._rejected[(tracklet.cam_id, tracklet.external_id)] = self._tagged(tracklet, reason)
 
     def _find_same_camera_anchor(self, new_tracklet: Tracklet) -> int | None:
         """The world of a lost observation in the SAME camera that this new one continues.
@@ -389,12 +453,12 @@ class Tracker(Thread, BaseTracker):
         return self._heights_match(a.annotation.height, b.annotation.height)
 
     def _heights_match(self, height_a: float, height_b: float) -> bool:
-        """The scale-free height veto: `|a - b| / max(a, b)` against ``seam.link_height``
-        percent. Passes whenever either side has no usable reading — see `_observations_match`."""
+        """The scale-free height veto: `|a - b| / max(a, b)` against ``seam.link_height``, a
+        fraction. Passes whenever either side has no usable reading — see `_observations_match`."""
         if not (height_is_measured(height_a) and height_is_measured(height_b)):
             return True
         largest: float = max(height_a, height_b)
-        return abs(height_a - height_b) / largest * 100.0 <= self.config.seam.link_height
+        return abs(height_a - height_b) / largest <= self.config.seam.link_height
 
     def _find_world_candidate(self, new_tracklet: Tracklet) -> int | None:
         """Return the world id whose other-camera observation best matches
@@ -449,10 +513,16 @@ class Tracker(Thread, BaseTracker):
             emitted[world_id] = primary
         self._notify_callback(emitted)
 
+        # Dropped detections a camera has stopped reporting: a device track normally ends with LOST
+        # or REMOVED, which clears its entry, but a camera that simply goes quiet does not.
+        for key in [k for k, t in self._rejected.items() if now - t.last_active > emit_timeout]:
+            del self._rejected[key]
+
         # Every live observation, for the calibration view: the two cameras' separate opinions
-        # of a person on a seam, which the primaries above deliberately reduce to one.
+        # of a person on a seam, which the primaries above deliberately reduce to one — and every
+        # detection a filter dropped, tagged, so nobody vanishes from the strip without a reason.
         self._notify_observation_callback(
-            [t for t in self.store.all_tracklets() if not t.is_removed]
+            [t for t in self.store.all_tracklets() if not t.is_removed] + list(self._rejected.values())
         )
 
         # Drop REMOVED observations and prune stale primary entries

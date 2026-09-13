@@ -1,7 +1,10 @@
+import math
+
 from modules.oak import FrameWindow, frame_window
 from modules.utils import Rect
 
-from .panorama_map import azimuth_to_camera_x, camera_azimuth, camera_local_to_azimuth, wrap180
+from .panorama_map import azimuth_to_camera_x, camera_azimuth, camera_local_to_azimuth, \
+    centre_distance, wrap180
 
 
 # Tallest reading `estimate_height` will report (m). A box whose feet land a pixel below the
@@ -54,12 +57,9 @@ class Geometry:
         self._foot_offset: float = 0.0
         # Lens height above the floor (m) — the one measured constant the distance estimate needs.
         self._camera_height: float = 0.5
-        # The tracked floor, as radii from the rig centre, and the camera distances they bound.
-        # `set_zone` derives the second pair from the first; these are its defaults.
+        # The tracked floor, as radii from the rig centre. `set_zone` replaces these defaults.
         self._min_radius: float = 1.5
         self._max_radius: float = 3.5
-        self._min_distance: float = 1.5
-        self._max_distance: float = 3.5
         # The overlap threshold in the two frames it is needed in: `overlap_band` the local
         # angle `angle_in_overlap` tests, `overlap_azimuth` the same threshold as the panorama
         # draws it. `_update_overlap_band` is the one place either is derived; it needs the ring
@@ -116,7 +116,7 @@ class Geometry:
         denominator the box's depression, and only the latter shrinks), and that drift is the
         signature `foot_offset` is tuned against.
 
-        **The ROI itself is never rewritten**, only this row derived from it, so `min_height`, the
+        **The ROI itself is never rewritten**, only this row derived from it, so `height_filter`, the
         crop extractor and everything else downstream still see the detector's own box.
         """
         return (roi.y + roi.height - self._foot_offset) * (self._rows - 1)
@@ -147,8 +147,9 @@ class Geometry:
         **A box may extend outside the frame.** The device tracker extrapolates the extent of a
         partly-visible person, and nothing clamps it on the way in (`Tracklet.from_depthcam`), so
         a close person's `bottom` legitimately exceeds 1.0 and that is real information about how
-        close they are. It is used, not discarded: the formula is continuous across the frame edge
-        and the final clamp is what bounds the answer.
+        close they are. It is used, not discarded: the formula is continuous across the frame edge.
+        It is a guess rather than a measurement there, which is one reason the zone filter acts on
+        the far edge only (`beyond_zone`).
 
         **THIS DOES NOT FEED THE AZIMUTH, AND IT READS THROUGH `foot_offset`.** The device tracker's
         box bottom sits *below* the feet, so the raw bottom makes `below` too large and the reading
@@ -158,23 +159,36 @@ class Geometry:
         place, `_foot_px`. Until `foot_offset` is measured on the rig it is 0 and the metres read
         short; the azimuth is unaffected either way, since `calc_angle` corrects the bearing at a
         fixed depth (`_update_parallax_depth`) and no box bottom can move it. What consumes the
-        metres is the panorama's `R` label, the mark rows and the foot tick, and `seam.link_height`
-        — and that last compares two readings of the *same* person, which survives a shared bias
-        (1–2% across a seam, measured). CALIBRATION.md, *The tracker's height*, has the procedure.
+        metres is the far-edge filter (`beyond_zone`) and the panorama's `R` label and foot tick.
 
-        **THE CLAMP IS A GUARD, NOT A FILTER.** Nothing is rejected for falling outside it; only
-        the reading is pinned. The denominator can go to almost nothing (feet a pixel below the
-        horizon would read as infinitely far) or the box can be extrapolated far below the frame
-        (reads as zero), and the bounds keep the answer inside the band people are actually in.
-        They are derived from the tracked zone by `set_zone`, so they follow the ring instead of
-        being hand-computed for one.
+        **UNCLAMPED, ON PURPOSE.** It used to be pinned to the zone, back when it fed the parallax
+        correction and a mangled box could throw a person's azimuth off. Nothing it feeds now can
+        be thrown off that way, and a pinned reading is never outside the zone — so it could not be
+        filtered on, and the panorama drew everyone past the edge as standing on it. Feet at or
+        above the horizon read `inf`: not standing on this floor, which the filter treats as beyond.
         """
         below: float = self._foot_px(roi) - self._horizon_px  # px below the horizon
         if below <= 0.0:
-            # Feet at or above the horizon: not standing on this floor.
-            return self._max_distance
-        distance: float = self._camera_height * self._focal / below
-        return max(self._min_distance, min(self._max_distance, distance))
+            return math.inf
+        return self._camera_height * self._focal / below
+
+    def beyond_zone(self, local_angle: float, distance: float) -> bool:
+        """Whether a person at this column and camera distance stands past the zone's far edge.
+
+        The test the tracker treats as "not seen". As a **radius from the fixture**, not a camera
+        distance: the zone is a circle about the fixture, and a camera sits `ring_radius` out
+        toward the person, so it always reads them nearer than their radius — on its own axis at
+        R 3.6 it reads 3.24 m, which a camera-distance test against 3.5 would wrongly accept. The
+        radius is also what two cameras at a seam agree on.
+
+        **Far edge only.** Near the fixture the feet are often below the frame and the foot row is
+        the detector's guess, so a near test would judge guesses. No margin: transient errors (a
+        jump, feet hidden for a moment) are absorbed by the tracker's timeouts, and steady ones are
+        calibration — `foot_offset`, the horizon, the roll. An uncalibrated `foot_offset` makes
+        everyone read nearer, so this fails open.
+        """
+        radius: float = centre_distance(local_angle - self.cam_fov / 2.0, distance, self._ring_radius)
+        return radius > self._max_radius
 
     def estimate_height(self, roi: Rect) -> float:
         """How tall the person is (m), from the box's top and bottom rows.
@@ -196,7 +210,7 @@ class Geometry:
         SCALE-FREE AND PARALLAX-FREE. One camera sees both the feet and the head, so unlike the
         azimuth this needs no ring correction, and two cameras at different distances from the
         same person agree in metres while their *pixel* box heights differ by tens of percent.
-        That is what ``seam.link_height`` compares, as a percentage of the larger of the two:
+        That is what ``seam.link_height`` compares, as a fraction of the larger of the two:
         scale-free, so the lens height cancels out of it as well.
 
         IT READS REACH, NOT STATURE. The box top is the highest pixel, so raised arms read
@@ -372,8 +386,8 @@ class Geometry:
     def set_camera_radius(self, camera_radius: float) -> None:
         """How far each lens sits from the fixture axis — the setting's own unit, unconverted.
 
-        Re-derives the zone, because the distance clamp is the zone's radii plus and minus this
-        ring (`set_zone`).
+        Re-derives the zone, because the overlap band and the parallax depth both depend on the
+        ring as well as the zone (`set_zone`).
         """
         self._ring_radius = max(0.0, camera_radius)
         self.set_zone(self._min_radius, self._max_radius)
@@ -390,16 +404,11 @@ class Geometry:
 
         Three things follow. The **overlap band**, at the far edge (`_update_overlap_band`). The
         **parallax depth**, at the harmonic mean (`_update_parallax_depth`) — the one length the
-        world azimuth is corrected with. And the **distance clamp**, as camera distances: the
-        on-axis extremes, since a camera is pushed `ring_radius` toward the circle it faces and away
-        from the one behind it — so the nearest anyone in the zone can be is
-        `min_radius - ring_radius`, and the furthest `max_radius + ring_radius`. R 1.5 to R 3.5 on
-        an R 0.36 ring gives 1.14 m to 3.86 m.
+        world azimuth is corrected with. And the **far edge** itself, past which a person is not
+        seen (`beyond_zone`).
         """
         self._min_radius = max(0.0, min_radius)
         self._max_radius = max(self._min_radius, max_radius)
-        self._min_distance = max(0.01, self._min_radius - self._ring_radius)
-        self._max_distance = max(self._min_distance, self._max_radius + self._ring_radius)
         self._update_parallax_depth()
         self._update_overlap_band()
 

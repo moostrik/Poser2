@@ -49,7 +49,7 @@ class CameraResolution(IntEnum):
 
     NOT derived from it, and to be re-tuned on the rig alongside it, because they are set by eye
     against the frame rather than computed (P800 -> P720 scales them by 800/720 = 1.111):
-      camera.tracker.min_height             a fraction of frame height, so it scales
+      camera.tracker.height_filter          a fraction of frame height, so it scales
       camera.tracker.foot_offset            likewise: the detector's pad measures in pixels
       pose.distance_extractor.near_y/far_y  positions in the frame, so they scale and shift
     (`camera.tracker.seam.*` is NOT in that list either: it is in degrees and percent.)

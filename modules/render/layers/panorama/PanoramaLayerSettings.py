@@ -84,5 +84,10 @@ DEAD_ZONE_COLOR: tuple[float, float, float, float] = (1.0, 0.15, 0.1, 0.10)  # n
 # past here" by itself, where a line pinned to the boundary would have claimed a row that is not
 # its own.
 ZONE_COLOR:     tuple[float, float, float, float] = (1.0, 0.85, 0.0, 0.10)
+# A detection the tracker did not count — too young, too small, a new one in the dead zone, past the
+# far edge. Grey because it belongs to nobody: every track colour means a person, and this is the
+# absence of one. Also the colour a LOST mark fades toward, so a person walking out ends where their
+# grey box begins.
+REJECTED_COLOR: tuple[float, float, float, float] = (0.6, 0.6, 0.6, 0.8)
 LABEL_FG:      tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
 LABEL_BG:      tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.6)

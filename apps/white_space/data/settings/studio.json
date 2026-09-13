@@ -175,16 +175,17 @@
       "end_norm": 1.0
     },
     "tracker": {
-      "min_age": 5,
-      "min_height": 0.2,
-      "foot_offset": 0.0,
+      "age_filter": 5,
+      "height_filter": 0.2,
+      "zone_filter": true,
+      "foot_offset": 0.03,
       "reacquire_angle": 5.0,
       "lost_timeout": 2.0,
       "emit_timeout": 1.0,
       "seam": {
         "dead_zone": 6.5,
         "link_angle": 15.0,
-        "link_height": 25.0,
+        "link_height": 0.25,
         "hysteresis": 0.6
       },
       "rig": {

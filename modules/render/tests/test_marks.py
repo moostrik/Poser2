@@ -9,10 +9,11 @@ against `Tracker`'s own gate rather than against a second copy of the same compa
 
 import math
 import unittest
+from dataclasses import replace
 
 from modules.render.layers.panorama.marks import Mark, StripGeometry, build_marks
-from modules.tracker import PanoramicAnnotation, PanoramicTracker, PanoramicTrackerSettings, \
-    Tracklet, TrackingStatus, row_from_elevation, strip_spans, strip_y
+from modules.tracker import PanoramicAnnotation, PanoramicTracker, PanoramicTrackerSettings, Rejection, \
+    Tracklet, TrackingStatus, camera_local_to_azimuth, row_from_elevation, strip_spans, strip_y
 from modules.utils import Rect
 
 
@@ -24,15 +25,21 @@ PARALLAX_RADIUS: float = 2.1        # the zone's harmonic mean, what the tracker
 CAMERA_HEIGHT: float = 0.5
 LINK_ANGLE: float = 18.0
 REACQUIRE_ANGLE: float = 5.0
+ZONE_MAX_RADIUS: float = 3.5
+LOST_TIMEOUT: float = 2.0
+NOW: float = 1_000_000.0            # a fixed clock, so a LOST mark's fade is deterministic
 
 GEOMETRY: StripGeometry = StripGeometry(
     cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
     parallax_radius=PARALLAX_RADIUS, camera_height=CAMERA_HEIGHT,
     row_model=(0.78, 0.58), elevation_window=(40.0, -30.0),
     link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE,
+    zone_max_radius=ZONE_MAX_RADIUS, lost_timeout=LOST_TIMEOUT, now=NOW,
 )
 
 WHITE: list[tuple[float, float, float, float]] = [(1.0, 1.0, 1.0, 1.0)]
+RED: list[tuple[float, float, float, float]] = [(1.0, 0.0, 0.0, 1.0)]
+GREY: tuple[float, float, float, float] = (0.6, 0.6, 0.6, 0.8)
 
 
 def observation(cam_id: int, local_angle: float, world_angle: float, *, overlap: bool,
@@ -53,7 +60,7 @@ def observation(cam_id: int, local_angle: float, world_angle: float, *, overlap:
 
 
 def mark(tracklet: Tracklet, geometry: StripGeometry = GEOMETRY) -> Mark:
-    marks: list[Mark] = build_marks([tracklet], set(), WHITE, geometry)
+    marks: list[Mark] = build_marks([tracklet], set(), WHITE, GREY, geometry)
     assert len(marks) == 1
     return marks[0]
 
@@ -87,9 +94,107 @@ class TestPlacement(unittest.TestCase):
         far: Mark = mark(observation(0, 63.5, 45.0, overlap=False, distance=6.0))
         self.assertGreater(near.bottom_y, far.bottom_y)     # nearer feet are lower on the strip
 
+    def test_someone_past_the_far_edge_reads_where_they_are(self) -> None:
+        """The distance is unclamped, so a person at R 5 is labelled R5.0 and their foot tick sits
+        above the zone's R 3.5 row — which on the strip is what "no longer seen" looks like —
+        instead of being piled up at the edge with everyone else beyond it."""
+        on_axis: float = CAM_FOV / 2.0
+        m: Mark = mark(observation(0, on_axis, 45.0, overlap=False, distance=5.0 - RING_RADIUS))
+        self.assertIn('R5.0m', m.label)
+        far_edge_y: float = strip_y(-math.degrees(math.atan(CAMERA_HEIGHT / 3.5)),
+                                    GEOMETRY.elevation_window)
+        self.assertLess(m.bottom_y, far_edge_y)                   # higher on the strip = further
+
+    def test_feet_not_on_the_floor_still_make_a_mark_but_no_foot_tick(self) -> None:
+        # `inf`: no distance to put the rows through, so the box is placed on the parallax cylinder
+        # instead — it is still drawn, so it cannot vanish — and there is no floor reading to tick.
+        m: Mark = mark(observation(0, 63.5, 45.0, overlap=False, distance=math.inf))
+        self.assertFalse(m.has_foot)
+        self.assertTrue(math.isfinite(m.top_y) and math.isfinite(m.box_bottom_y))
+        self.assertLess(m.top_y, m.box_bottom_y)
+        self.assertIn('R-', m.label)
+
     def test_a_removed_observation_makes_no_mark(self) -> None:
         removed = observation(0, 63.5, 45.0, overlap=False, status=TrackingStatus.REMOVED)
-        self.assertEqual(build_marks([removed], set(), WHITE, GEOMETRY), [])
+        self.assertEqual(build_marks([removed], set(), WHITE, GREY, GEOMETRY), [])
+
+
+def dropped(reason: Rejection, **kwargs) -> Tracklet:
+    """A detection a filter dropped, as the tracker publishes it: no world, tagged."""
+    t: Tracklet = observation(0, 63.5, 45.0, overlap=False, **kwargs)
+    assert isinstance(t.annotation, PanoramicAnnotation)
+    return replace(t, id=-1, annotation=replace(t.annotation, rejected=reason))
+
+
+class TestDroppedDetections(unittest.TestCase):
+    """A detection the tracker did not count is still a mark: grey, boxed, and named."""
+
+    def test_it_is_grey_boxed_and_joins_nothing(self) -> None:
+        m: Mark = mark(dropped(Rejection.SMALL))
+        self.assertTrue(m.rejected)
+        self.assertEqual(m.color, GREY)
+        self.assertAlmostEqual(m.tolerance_w, 0.0, places=12)
+        self.assertEqual(strip_spans(m.tolerance_x, m.tolerance_w), [])
+
+    def test_each_filter_names_itself(self) -> None:
+        for reason, tag in ((Rejection.YOUNG, 'young'), (Rejection.SMALL, 'small'),
+                            (Rejection.DEAD_ZONE, 'dead zone'), (Rejection.PAST_EDGE, 'past R3.5')):
+            with self.subTest(reason=reason):
+                self.assertEqual(mark(dropped(reason)).label, tag)
+
+    def test_the_box_is_the_detectors_own_through_the_lines_map(self) -> None:
+        t: Tracklet = dropped(Rejection.SMALL)
+        m: Mark = mark(t)
+        left = camera_local_to_azimuth(t.roi.x * CAM_FOV, 0, CAM_FOV, TARGET_FOV, RING_RADIUS, PARALLAX_RADIUS)
+        right = camera_local_to_azimuth((t.roi.x + t.roi.width) * CAM_FOV, 0, CAM_FOV, TARGET_FOV,
+                                        RING_RADIUS, PARALLAX_RADIUS)
+        self.assertAlmostEqual(m.box_x, (left % 360.0) / 360.0, places=9)
+        self.assertAlmostEqual(m.box_w, ((right - left) % 360.0) / 360.0, places=9)
+        self.assertLess(m.box_x, m.x)
+        self.assertGreater(m.box_x + m.box_w, m.x)                 # the line runs through the box
+        self.assertLess(m.box_top_y, m.box_bottom_y)
+
+    def test_dropped_marks_are_drawn_first(self) -> None:
+        marks = build_marks([observation(0, 63.5, 45.0, overlap=False), dropped(Rejection.YOUNG)],
+                            set(), WHITE, GREY, GEOMETRY)
+        self.assertEqual([m.rejected for m in marks], [True, False])
+
+    def test_a_tracked_person_past_the_edge_keeps_their_own_mark(self) -> None:
+        # Tagged but holding a world: not grey-boxed, and the label says why it is fading.
+        t: Tracklet = observation(0, 63.5, 45.0, overlap=False, status=TrackingStatus.LOST)
+        assert isinstance(t.annotation, PanoramicAnnotation)
+        t = replace(t, id=0, last_active=NOW, annotation=replace(t.annotation, rejected=Rejection.PAST_EDGE))
+        m: Mark = build_marks([t], set(), RED, GREY, GEOMETRY)[0]
+        self.assertFalse(m.rejected)
+        self.assertTrue(m.label.endswith(' past R3.5'))
+        self.assertTrue(m.label.startswith('#0 c0'))
+
+
+class TestLostFade(unittest.TestCase):
+    """A LOST observation fades from its world colour to grey over `lost_timeout`."""
+
+    def colour(self, seconds_lost: float, status: TrackingStatus = TrackingStatus.LOST):
+        t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, status=status),
+                              id=0, last_active=NOW - seconds_lost)
+        return build_marks([t], set(), RED, GREY, GEOMETRY)[0].color
+
+    def test_fresh_is_the_world_colour(self) -> None:
+        self.assertEqual(self.colour(0.0), (1.0, 0.0, 0.0, 0.5))
+
+    def test_at_the_timeout_it_is_grey(self) -> None:
+        r, g, b, a = self.colour(LOST_TIMEOUT)
+        self.assertAlmostEqual(r, GREY[0]); self.assertAlmostEqual(g, GREY[1]); self.assertAlmostEqual(b, GREY[2])
+        self.assertEqual(self.colour(LOST_TIMEOUT * 3.0)[:3], self.colour(LOST_TIMEOUT)[:3])   # and stays
+
+    def test_halfway_is_halfway(self) -> None:
+        r, g, b, a = self.colour(LOST_TIMEOUT / 2.0)
+        self.assertAlmostEqual(r, (1.0 + GREY[0]) / 2.0)
+        self.assertAlmostEqual(g, GREY[1] / 2.0)
+        self.assertAlmostEqual(a, 0.5)
+
+    def test_a_tracked_observation_does_not_fade(self) -> None:
+        # Only LOST fades; an active candidate keeps its colour at half alpha however old.
+        self.assertEqual(self.colour(LOST_TIMEOUT, status=TrackingStatus.TRACKED), (1.0, 0.0, 0.0, 0.5))
 
 
 class TestToleranceField(unittest.TestCase):
@@ -138,7 +243,8 @@ class TestToleranceField(unittest.TestCase):
             cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
             parallax_radius=PARALLAX_RADIUS, camera_height=CAMERA_HEIGHT,
             row_model=(0.78, 0.58), elevation_window=(40.0, -30.0),
-            link_angle=0.0, reacquire_angle=0.0)
+            link_angle=0.0, reacquire_angle=0.0,
+            zone_max_radius=ZONE_MAX_RADIUS, lost_timeout=LOST_TIMEOUT, now=NOW)
         for overlap in (True, False):
             with self.subTest(overlap=overlap):
                 m: Mark = mark(observation(0, 63.5, 45.0, overlap=overlap), blank)
@@ -250,7 +356,8 @@ class TestZoneLines(unittest.TestCase):
             cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=0.0,
             parallax_radius=PARALLAX_RADIUS, camera_height=self.CAMERA_HEIGHT,
             row_model=GEOMETRY.row_model, elevation_window=self.WINDOW,
-            link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE)
+            link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE,
+            zone_max_radius=ZONE_MAX_RADIUS, lost_timeout=LOST_TIMEOUT, now=NOW)
         near_y = strip_y(self.elevation(1.5), self.WINDOW)
         far_y = strip_y(self.elevation(3.5), self.WINDOW)
         horizon_row, focal_rows = geometry.row_model
@@ -283,7 +390,8 @@ class TestZoneLines(unittest.TestCase):
             cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
             parallax_radius=PARALLAX_RADIUS, camera_height=self.CAMERA_HEIGHT,
             row_model=GEOMETRY.row_model, elevation_window=self.WINDOW,
-            link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE)
+            link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE,
+            zone_max_radius=ZONE_MAX_RADIUS, lost_timeout=LOST_TIMEOUT, now=NOW)
         horizon_row, focal_rows = geometry.row_model
         for radius in (1.5, PARALLAX_RADIUS, 2.5, 3.5):
             for local_angle in (63.5, 20.0, 110.0):     # on the axis and well off it
