@@ -58,13 +58,13 @@ class LeaderScore(BaseScalarFeature[FeatureEnum]):
 
     @classmethod
     def create_dummy(cls) -> 'LeaderScore':
-        """Create empty LeaderScore with all zero values and zero scores."""
+        """Create empty LeaderScore with all NaN values and zero scores."""
         if cls._empty_instance is None:
             if _PoseEnum is None:
                 raise RuntimeError(
                 "LeaderScore not configured. Call configure_features(max_poses) at app startup."
                 )
-            values = np.zeros(len(_PoseEnum), dtype=np.float32)
+            values = np.full(len(_PoseEnum), np.nan, dtype=np.float32)
             scores = np.zeros(len(_PoseEnum), dtype=np.float32)
             cls._empty_instance = cls(values, scores)
         return cls._empty_instance

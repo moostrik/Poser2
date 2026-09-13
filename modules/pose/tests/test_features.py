@@ -6,15 +6,12 @@ import unittest
 import numpy as np
 
 from modules.pose.features import (
-    FEATURES, AggregationMethod, AngleLandmark, Angles, AngleSymmetry, BBox, BBoxElement, LeaderScore,
-    MotionGate, PointLandmark, Points2D, BaseVectorFeature,
+    FEATURES, AggregationMethod, AngleLandmark, Angles, AngleSymmetry, BBox, BBoxElement, PointLandmark,
+    Points2D, BaseVectorFeature,
 )
 from modules.utils import Rect
 
 from ._builders import points, scalar
-
-# Track-indexed features whose dummy is zeros, not NaN — see test_track_feature_dummies_are_nan.
-_ZERO_DUMMIES = {LeaderScore, MotionGate}
 
 
 def _in_range_value(feature_type: type) -> float:
@@ -46,17 +43,8 @@ class FeatureContractTest(unittest.TestCase):
 
     def test_dummy_values_are_nan(self) -> None:
         for ft in FEATURES:
-            if ft in _ZERO_DUMMIES:
-                continue
             with self.subTest(feature=ft.__name__):
                 self.assertTrue(np.all(np.isnan(ft.create_dummy().values)))
-
-    @unittest.expectedFailure
-    def test_track_feature_dummies_are_nan(self) -> None:
-        # Pose Frame contract: missing data is NaN with score 0. LeaderScore and MotionGate dummies are
-        # zeros, so a reader can't tell "not computed" from "computed as 0" without checking scores.
-        for ft in _ZERO_DUMMIES:
-            self.assertTrue(np.all(np.isnan(ft.create_dummy().values)), ft.__name__)
 
     def test_dummy_arrays_are_read_only(self) -> None:
         for ft in FEATURES:
