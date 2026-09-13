@@ -103,3 +103,4 @@ class Tracklet:
 TrackletCallback: TypeAlias = Callable[[Tracklet], None]
 TrackletDict: TypeAlias = dict[int, Tracklet]
 TrackletDictCallback: TypeAlias = Callable[[TrackletDict], None]
+TrackletListCallback: TypeAlias = Callable[[list[Tracklet]], None]

@@ -1,11 +1,12 @@
 #version 460 core
 
 // The four camera frames unwrapped into one 360-degree strip as the RIG CENTRE would see them:
-// x is azimuth, linear in degrees; y is the TANGENT of elevation (panorama_map.strip_y), so the
+// x is azimuth, linear in degrees; y is the TANGENT of elevation (strip.strip_y), so the
 // strip's vertical is a photograph's, the same shape as the camera frames' rows.
 //
-// A transcription of modules/tracker/panoramic/panorama_map.py, which is round-tripped against
-// the tracker's own Geometry in modules/tracker/tests/test_panorama_map.py. Keep the two in step:
+// A transcription of modules/tracker/panoramic/projection.py — round-tripped against the tracker's
+// own Rig in modules/tracker/tests/test_projection.py — and of the strip's rows, vertical re-projection
+// and coverage in modules/render/layers/panorama/strip.py (tests in test_strip.py). Keep them in step:
 // the whole value of this display is that it draws with the numbers the tracker tracks with, so
 // a wrong camera constant shows up as a ghost instead of being silently absorbed.
 //
@@ -21,7 +22,7 @@
 
 #define MAX_CAMS 8
 
-// Must stay in step with PanoramaBlend in modules/render/layers/panorama/PanoramaLayerSettings.py:
+// Must stay in step with PanoramaBlend in modules/render/layers/panorama/settings.py:
 // the enum's value IS this uniform.
 #define BLEND_MAX        0
 #define BLEND_AVERAGE    1
@@ -37,7 +38,7 @@ uniform sampler2D tex[MAX_CAMS];
 uniform int   numCams;
 uniform float camFov;      // one camera's horizontal field (degrees)
 uniform float horizonRow;  // the frames' rows are TANGENTS of elevation: row = horizonRow -
-uniform float focalRows;   //   focalRows * tan(e), normalised, 0 = top (panorama_map.row_from_elevation)
+uniform float focalRows;   //   focalRows * tan(e), normalised, 0 = top (projection.row_from_elevation)
 uniform float targetFov;   // the sector one camera owns, 360 / numCams (degrees)
 uniform float ringRadius;  // camera distance from the rig centre (m)
 uniform float focusRadius; // radius of the cylinder the image is aligned for (m), from the fixture axis
@@ -53,7 +54,7 @@ out vec4 fragColor;
 // Where camera `cam` shows this azimuth and elevation, in its own normalized frame.
 // Returns x < 0 when this camera does not cover the point.
 vec2 cameraUV(int cam, float azimuth, float elevation) {
-    // --- azimuth: the inverse of Geometry's forward chain -------------------------------
+    // --- azimuth: the inverse of the Rig's forward chain -------------------------------
     // Camera axes sit between the seams: targetFov * (cam + 0.5).
     float phi = azimuth - targetFov * (float(cam) + 0.5);
     phi = mod(phi + 180.0, 360.0) - 180.0;      // fold to [-180, 180)

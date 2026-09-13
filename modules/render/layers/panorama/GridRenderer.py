@@ -6,62 +6,36 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl import Text
-from modules.tracker import PanoramicTrackerSettings, camera_azimuth, strip_y
+from modules.tracker import PanoramicTrackerSettings, camera_azimuth
 
 from ...shaders import DrawColoredRectangle
 from ..LayerBase import LayerBase
-from .PanoramaLayerSettings import PanoramaLayerSettings, \
+from .settings import PanoramaLayerSettings, \
     AXIS_COLOR, GRID_COLOR, HORIZON_COLOR, HORIZON_PX, LABEL_BG, LABEL_FG, \
     OVERLAP_COLOR, SEAM_COLOR, ZONE_COLOR
+from .strip import strip_y
 
 
 class GridRenderer(LayerBase):
-    """Every reference mark measured in the strip's **own two axes**, and nothing else.
+    """Every reference line measured in the strip's own two axes — centre azimuth and centre
+    elevation — against its degree labels. Anything defined on a camera's own frame has no single
+    azimuth and lives in `SeamRenderer`, against the picture.
 
-    That is the rule that decides what lives here. The strip's x is azimuth at the rig centre and
-    its y is elevation at the rig centre; anything expressible in those two numbers belongs in this
-    lattice, because the degree labels down the side and along the top are what a reader measures it
-    against. Anything defined on a camera's **own** frame stays out — an image column has no single
-    azimuth, so there is nothing here to read it against — and lives in `SeamRenderer`, against the
-    picture instead.
-
-    Azimuth is linear, so the verticals are evenly spaced; the rows are tangents of elevation
-    (`strip_y`), so the horizontals spread toward the top exactly as the camera frames' rows do.
-
-    **In azimuth**, four families, each exact and depth-free:
+    **In azimuth**, exact and depth-free:
 
     - the **degree lattice** at `grid_degrees`, faint;
-    - the **sector boundaries** in orange at `target_fov · cam_id` — where one camera's ring
-      responsibility ends and the next begins;
-    - the **camera axes** in blue at `camera_azimuth` — each camera's optical centre, and the one
-      bearing where the parallax correction is the identity at any depth;
-    - the **overlap** in yellow, two verticals per seam at `± rig.overlap / 2`: **exactly
-      where a mark's tolerance field changes width**. It is `angle_in_overlap`'s own threshold —
-      a *local* angle, derived at the zone's far edge so the flag never under-reports — projected
-      at `rig.parallax_radius`, which is the depth the marks themselves are drawn at. Drawn at
-      any other depth the line would sit where nothing happens: the same threshold at the far edge
-      lands 2.3° away on this rig, because a local angle has no single position on the ring.
-      Two things it is therefore **not**: the azimuth two cameras geometrically share at that
-      depth (19.4° against the line's 31.0° — the flag is deliberately generous, and the line
-      inherits that), nor where the two *pictures* meet, which the frames show for themselves.
+    - the **sector boundaries** in orange at `target_fov · cam_id`;
+    - the **camera axes** in blue at `camera_azimuth`, where the parallax correction is the identity;
+    - the **overlap** in yellow, two verticals per seam at `± rig.overlap / 2`: exactly where a
+      mark's field changes width (`Rig._update_overlap_band`). Not where the pictures meet — the
+      flag is deliberately generous.
 
-    **In elevation**, the horizon and the tracked zone. The zone is a **translucent field** between
-    the two radii, at the depressions they subtend at the centre, `atan(camera_height / R)` — a
-    floor circle of constant radius is a constant depression, so it is a band of rows, the same at
-    every azimuth. It is the only thing on the strip measured in **metres**, which makes it the only
-    one a tape on the floor can check, and the reference a person's mark is read against: a mark's
-    line ends at the foot row, so someone inside the zone has that end inside the field.
-
-    A field rather than two lines because of what happens at the edges. The zone reaches below what
-    the strip can show at some presets — at the studio one the window bottom is −17.1° against R 1.5's
-    −18.4°, the strip showing less than the frames do (`elevation_window` takes the band at its
-    tightest column so no column fades to black) — and a fill that runs off the bottom says
-    "continues past here" by itself, where a line pinned to the boundary row would have claimed an
-    elevation that is not its own.
-
-    Drawn from Python, one quad per line, rather than in the stitch shader: a few dozen quads a
-    frame costs nothing, and it keeps the widths in pixels and the labels beside the numbers they
-    label.
+    **In elevation**, the horizon and the **zone band**: the tracked floor, a translucent band between
+    the two radii at `atan(camera_height / R)` below the horizon, the same at every azimuth. The only
+    thing on the strip in metres, so the one a tape on the floor checks, and what a mark's foot tick is
+    read against. A band rather than two lines, because at some presets the zone runs below the
+    strip's bottom and a fill running off the edge says so, where a line pinned there would claim a
+    wrong elevation.
     """
 
     def __init__(self, num_cams: int, tracker: PanoramicTrackerSettings,
@@ -103,7 +77,7 @@ class GridRenderer(LayerBase):
         px_y: float = 1.0 / self._height
 
         # The one fill here, and first, so every line below stays legible over it.
-        self._zone_field()
+        self._zone_band()
 
         azimuth: float = 0.0
         while azimuth < 360.0:
@@ -144,16 +118,16 @@ class GridRenderer(LayerBase):
             self._vertical(camera_azimuth(cam_id, self._target_fov), 2.0 * px_x, AXIS_COLOR)
             self._vertical(seam, 2.0 * px_x, SEAM_COLOR)
 
-    def _zone_field(self) -> None:
+    def _zone_band(self) -> None:
         """The tracked floor, as the band of elevations it subtends at the rig centre.
 
         A floor circle of radius `R` sits `atan(camera_height / R)` below the horizon, so the zone
         between two radii is a band of rows — the same at every azimuth, which is what makes it
-        one straight-sided field rather than a curve. The far edge is the higher row, since a more
-        distant floor is nearer the horizon.
+        straight-sided rather than a curve. The far edge is the higher row, since a more distant
+        floor is nearer the horizon.
 
         Clipped to the strip's window, and the clipping carries meaning: at P720 / tilt 15 the near
-        edge is 1.3° below the window bottom, so the field simply runs off the bottom of the strip
+        edge is 1.3° below the window bottom, so the band simply runs off the bottom of the strip
         and says "the tracked floor continues past here". A whole zone below the window draws
         nothing at all, which is then the honest answer.
         """
@@ -202,8 +176,8 @@ class GridRenderer(LayerBase):
         self._text.draw_box_text(3, max(3.0, horizon_px - 24), 'horizon', HORIZON_COLOR, LABEL_BG,
                                  self._width, self._height)
 
-        # One line: the strip's own geometry, then the fusion tolerances in the units they are
-        # drawn in, so a band's or a field's width can be read off the strip and checked against
+        # One line: the strip's own geometry, then the seam settings in the units they are
+        # drawn in, so a band's or a mark field's width can be read off the strip and checked against
         # the number that produced it.
         #
         # `elev` is the STRIP's window — at the rig centre, at `focus_radius` — not the frame's.

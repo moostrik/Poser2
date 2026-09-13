@@ -2,46 +2,26 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.tracker import PanoramicTrackerSettings, camera_local_to_azimuth, strip_spans, wrap180
+from modules.tracker import PanoramicTrackerSettings, camera_local_to_azimuth, wrap180
 
 from ...shaders import DrawColoredRectangle
 from ..LayerBase import LayerBase
-from .PanoramaLayerSettings import PanoramaLayerSettings, DEAD_ZONE_COLOR
+from .settings import PanoramaLayerSettings, DEAD_ZONE_COLOR
+from .strip import strip_spans
 
 
 class SeamRenderer(LayerBase):
-    """The seam rules that live in **image space** — what has to be read against the picture.
+    """The seam rules defined on a camera's own frame, read against the picture rather than the grid
+    (an image column has no single azimuth; `GridRenderer` holds what does).
 
-    The split from `GridRenderer` is by coordinate system, not by subject. Anything expressible in
-    the strip's own two axes — centre azimuth and centre elevation — is a lattice mark and lives
-    there, where the degree labels can measure it: the sector boundaries, the camera axes, the
-    overlap. What lands here instead is anything defined on a camera's **own** frame, because one
-    image column has no single azimuth — it maps to a different bearing at every depth, so there is
-    nothing on the grid to read it against.
+    Today that is the **dead zone**: `seam.dead_zone` degrees in from each camera's field edges, where
+    that camera refuses to start a new person. The band goes through the same map at the same depth
+    as the stitch, so band and pixels agree at every depth: a person whose pixels fall in the red is
+    one that camera will not start. Where two bands overlap on a seam (close to the fixture) nobody
+    can be born until they move. Each band's outer edge is its camera's field edge, so the pair also
+    shows where the two pictures reach.
 
-    Today that is the **dead zone**: `seam.dead_zone` degrees in from each camera's field edges, two
-    bands per camera, where *that* camera refuses to start a new person. Someone already tracked is
-    still refreshed there and a re-acquisition is still allowed; only *arrivals* are refused, so
-    that nobody is created twice on a seam.
-
-    **Why a band here works where a line on the grid would not.** The rule reads the raw local angle
-    — the bearing within that camera's frame, before the parallax re-projection — and the stitch
-    places the picture through the same map at the same depth. So **band and pixels agree by
-    construction at every depth**: a person whose pixels fall inside the red is a person that camera
-    will not start, wherever they are standing. That is what makes it checkable against the image
-    anywhere rather than only at the focus radius.
-
-    **Its cost is the region where two bands overlap.** A person is born as long as **one** camera
-    accepts them, so nobody can be born only where both refuse: at R 1.35 the two bands do overlap on
-    the seam, and a person arriving exactly there is not picked up until they move. From about R 1.5
-    they no longer do. Each band's *outer* edge sits exactly on its camera's field edge, so the pair
-    also delimits where the two pictures reach — no separate overlap fill is needed to show that.
-
-    How close two views must be to count as one person is `seam.link_angle`, a property of a *pair*
-    rather than of a place, so it is drawn as a field around each observation instead.
-
-    Drawn beneath the grid so the lattice stays legible over a band, and faintly, so the image
-    underneath still reads.
+    Drawn faintly, beneath the grid.
     """
 
     def __init__(self, num_cams: int, tracker: PanoramicTrackerSettings,

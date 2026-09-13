@@ -2,76 +2,43 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.tracker import strip_spans
 from modules.utils import HotReloadMethods
 
 from ...shaders import DrawColoredRectangle
 from ..LayerBase import LayerBase
 from .marks import Mark
+from .strip import strip_spans
 
-# A mark is a line, not a box: the box's width said nothing the azimuth does not, and two boxes at
-# a seam overlapped into a shape neither camera claimed.
 _PRIMARY_PX: float = 2.0
-_CANDIDATE_PX: float = 1.0
+_PASSIVE_PX: float = 1.0
 
-# The foot tick: wide enough to read against a zone edge by eye, and 3 px tall so it has a
-# definite row. Deliberately larger than the line — the tick is the measurement, the line is
-# context — and the same size for every observation, since a reading's precision does not
-# depend on whether the tracker picked that camera.
+# The foot tick: wide enough to read against a zone edge by eye, 3 px so it has a definite row. The
+# same for every view, since a reading's precision does not depend on which camera was picked.
 _TICK_PX: float = 17.0
 _TICK_HEIGHT_PX: float = 3.0
 
-# The tolerance field's opacity: the primary's fill, and the outline of a view the tracker did not
-# pick. Both scaled by `field_color`'s alpha, which fades a LOST identity out toward `lost_timeout`.
-# The outline sits below a candidate's line (`marks._PASSIVE`), so its sides do not read as a
-# second observation beside the line.
+# The field's opacity, filled and outlined, both scaled by `field_color`'s alpha (a LOST fade). The
+# outline stays below a passive line's alpha (`marks._PASSIVE_ALPHA`) so it does not read as a line.
 _FIELD_ALPHA: float = 0.2
 _OUTLINE_ALPHA: float = 0.6
 
 
-class ObservationRenderer(LayerBase):
-    """A line per observation at the azimuth the tracker gives it, inside the rule that governs it.
+class MarkRenderer(LayerBase):
+    """Every observation's mark, not one per person: each camera's own view of a seam person stands
+    beside the other's in the same world colour, which the fused `world_angle` hides everywhere else.
+    What a mark's position means is in `marks`; its label is `LabelRenderer`'s.
 
-    **Every observation, not one per person**, which is the point. A person on a seam is seen by
-    two cameras and each has its own opinion of their azimuth; the tracker fuses those into one
-    `world_angle` before anything else in the app sees it, so a disagreement — the symptom of a
-    wrong `fov`, `tilt` or `ring_radius` — is invisible everywhere else. Here the two lines stand
-    side by side in the same world colour and the gap between them *is* the error. The primary is
-    the opaque one.
+    Per mark:
 
-    A mark is the tracker's belief, not the picture: its x is `world_angle`, at the fixed
-    `parallax_radius`, while the image under it is stitched for `focus_radius`. So a line
-    generally sits beside its own pixels, by a constant that is the difference between those two
-    depths and is not a measurement of anything. Its **rows** are the person's own distance, which
-    is what the tick below depends on.
+    - **The line**, head to foot elevation; 2 px for the primary view, 1 px for the passive views.
+    - **The foot tick** at the foot row: the instrument. Stand on a taped R 1.5 or R 3.5 circle and
+      the tick must land on that edge of the grid's zone band.
+    - **The field**, the join range as a width (`marks._field`): two fields of one colour that
+      overlap will be joined; two colours that overlap are two people it might confuse. Filled for
+      the primary view, outlined for passive views and for LOST marks.
 
-    Three things per observation:
-
-    - **The line**, head elevation to foot elevation, so it says how high in the room they are as
-      well as where.
-    - **The foot tick**, a short horizontal at the foot row — and this one is an **instrument, not
-      a decoration**. Because a mark's rows go through the person's own distance, the foot row is
-      exactly `atan(camera_height / R)` below the horizon, which is the formula the grid's zone
-      field is drawn from. So the tick and the yellow zone edges are directly comparable: **tape
-      R 1.5 and R 3.5 on the floor, stand on one, and the tick must land on that edge.** That is the
-      strip's one precise distance check, and it is why the rows are not on the parallax cylinder
-      with the x — there the tick would be 20 px out at R 1.5 and check nothing.
-    - **The field** around the line, same height, translucent, as wide as the tolerance that decides
-      what this observation may be joined to: `seam.link_angle` where a second camera also sees it,
-      `reacquire_angle` where none does (`marks._tolerance`). Read it as a **pair test** — two
-      fields of one colour that overlap are two observations the tracker will join, and two colours
-      that overlap are two people it might confuse. A field is drawn the tolerance wide rather than
-      either side of the line precisely so that overlapping *is* the gate. The primary's field is
-      filled; another camera's view of the same person gets only its **outline**, so at a seam the
-      passive field's edges stay visible inside or beyond the primary's fill.
-
-    **A LOST mark** keeps its line and its outlined field, and fades: the line to grey, the field out.
-
-    **A detection the tracker dropped** is drawn in grey as its line and its foot tick, with no field
-    — no rule can join it to anything. Its tag names the filter (`LabelRenderer`). So a person never
-    leaves the strip without a reason on screen.
-
-    Owns no FBO: the compositor's is bound when `draw()` is called.
+    A rejected detection is its grey line and tick, no field. Owns no FBO: the compositor's is bound
+    when `draw()` is called.
     """
 
     def __init__(self) -> None:
@@ -101,7 +68,7 @@ class ObservationRenderer(LayerBase):
         px_y: float = 1.0 / self._height
 
         # Two passes, not one per mark: `build_marks` sorts primaries last, so drawing each mark
-        # whole would let a primary's translucent field tint a candidate's line. Every field first
+        # whole would let a primary's translucent field tint a passive line. Every field first
         # means no field ever covers a line.
         for mark in self._marks:
             if mark.rejected:
@@ -111,20 +78,20 @@ class ObservationRenderer(LayerBase):
             if visible <= 0.0:
                 continue
             if mark.field_outline:
-                self._outline(mark.tolerance_x, mark.tolerance_w, top, bottom, px_x, px_y,
+                self._outline(mark.field_x, mark.field_w, top, bottom, px_x, px_y,
                               (r, g, b, _OUTLINE_ALPHA * visible))
             else:
-                self._spans(mark.tolerance_x, mark.tolerance_w, top, bottom - top,
+                self._spans(mark.field_x, mark.field_w, top, bottom - top,
                             (r, g, b, _FIELD_ALPHA * visible))
 
         for mark in self._marks:
             top, bottom = self._rows(mark, px_y)
-            width: float = (_PRIMARY_PX if mark.is_primary else _CANDIDATE_PX) * px_x
+            width: float = (_PRIMARY_PX if mark.is_primary else _PASSIVE_PX) * px_x
             self._spans(mark.x - width / 2.0, width, top, bottom - top, mark.color)
             self._foot_tick(mark, px_x, px_y)
 
     def _foot_tick(self, mark: Mark, px_x: float, px_y: float) -> None:
-        """The foot row, marked so it can be read against the zone field.
+        """The foot row, marked so it can be read against the zone band.
 
         Guarded on the **raw** row rather than the clipped one: a tick pinned to the strip's edge
         would claim a reading that was not made, and a person whose feet fall outside the window is

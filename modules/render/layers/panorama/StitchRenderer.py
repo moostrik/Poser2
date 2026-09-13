@@ -7,7 +7,7 @@ from modules.tracker import PanoramicTrackerSettings
 
 from ...shaders import PanoramicStitch
 from ..LayerBase import LayerBase
-from .PanoramaLayerSettings import PanoramaLayerSettings
+from .settings import PanoramaLayerSettings
 
 
 class StitchRenderer(LayerBase):

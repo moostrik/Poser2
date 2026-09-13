@@ -61,7 +61,7 @@
         "image",
         "seams",
         "grid",
-        "observations",
+        "marks",
         "labels"
       ],
       "blend": "MAX",

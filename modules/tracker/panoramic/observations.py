@@ -5,7 +5,7 @@ from dataclasses import replace
 from threading import Lock
 
 # Local application imports
-from .. import Tracklet, TrackingStatus
+from ..tracklet import Tracklet, TrackingStatus
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +14,8 @@ ObsId = int
 DeviceKey = tuple[int, int]  # (cam_id, external_id) — only meaningful while a device track lives
 
 
-class TrackletIdPool:
-    """FIFO id pool: released ids go to the back of the queue, so a freed id
+class WorldIdPool:
+    """FIFO pool of world ids: released ids go to the back of the queue, so a freed id
     is reused as late as possible instead of being handed to the next arrival."""
 
     def __init__(self, max_size: int) -> None:
@@ -48,16 +48,10 @@ class TrackletIdPool:
         with self._lock:
             return obj in self._available
 
-    @property
-    def available(self) -> list[int]:
-        """Free ids in reuse order (front of the queue first)."""
-        with self._lock:
-            return list(self._queue)
 
-
-class TrackletStore:
+class ObservationStore:
     """
-    Stores per-camera tracklet observations and groups them into world identities.
+    Stores per-camera observations and groups them into world identities.
 
     Observations are **host-owned**, keyed by an ``obs_id`` this store hands out and never
     reuses. A device tracklet id is only a token for the life of one device track: once the
@@ -66,17 +60,13 @@ class TrackletStore:
     moment the device track ends (``end_device_track``). A reused device number then lands on a
     new observation, while the old one lives on as a ``LOST`` anchor until the tracker times it
     out — which is what lets a far camera still link across a seam after the near one gave up.
-    Without that split, a newcomer inheriting a departed person's device id would be refreshed
-    into the departed person's world.
 
-    Observations are immutable and never rewritten by cross-camera fusion: each one's
-    ``cam_id``, ``external_id``, ``roi`` and ``annotation`` always reflect the camera it was
-    actually seen by.
+    Observations are immutable and never rewritten when worlds are joined: each one's ``cam_id``,
+    ``external_id``, ``roi`` and ``annotation`` always reflect the camera it was actually seen by.
 
     World identities (ids drawn from the pool) own one or more observations. A person visible in
     two cameras simultaneously has two observations linked to the same world id; one is selected
-    as "primary" by the tracker's view policy. Crossing a seam is handled by linking the new
-    camera's observation into the existing world id — no merge, no rewrite, no flicker.
+    as primary (`Seams.pick_primary`).
     """
 
     def __init__(self, max_players: int) -> None:
@@ -85,10 +75,7 @@ class TrackletStore:
         self._world_members: dict[int, set[ObsId]] = {}
         self._world_for: dict[ObsId, int] = {}
         self._next_obs_id: ObsId = 0
-        self._id_pool = TrackletIdPool(max_players)
-
-    def __contains__(self, tracklet: Tracklet) -> bool:
-        return self.get_world_id(tracklet.cam_id, tracklet.external_id) is not None
+        self._id_pool = WorldIdPool(max_players)
 
     # ── live-index lookups ─────────────────────────────────────────────
 
@@ -136,9 +123,8 @@ class TrackletStore:
 
     def replace_tracklet(self, new_tracklet: Tracklet) -> int:
         """
-        Refresh the live observation for this device track. Preserves `created_at` and the
-        observation's identity. On LOST, `last_active` keeps the maximum to avoid rolling time
-        backward.
+        Refresh the live observation for this device track with a new detection. Preserves
+        `created_at` and the observation's identity. A missed detection is `lose_tracklet`.
         """
         key: DeviceKey = (new_tracklet.cam_id, new_tracklet.external_id)
         obs_id: ObsId | None = self._live.get(key)
@@ -151,17 +137,12 @@ class TrackletStore:
         if status == TrackingStatus.NEW:
             status = TrackingStatus.TRACKED  # a replaced tracklet can not be NEW
 
-        last_active: float = new_tracklet.last_active
-        if new_tracklet.status == TrackingStatus.LOST:
-            last_active = max(old_tracklet.last_active, new_tracklet.last_active)
-
         world_id: int = self._world_for[obs_id]
         self._obs[obs_id] = replace(
             new_tracklet,
             id=world_id,
             obs_id=obs_id,
             created_at=old_tracklet.created_at,
-            last_active=last_active,
             status=status,
         )
         return world_id
@@ -171,10 +152,10 @@ class TrackletStore:
         it live, because the same device id legitimately comes back.
 
         `latest` is for a person the camera *does* see but the tracker does not count — past the
-        zone's far edge, or a box a filter drops. Their newest `roi` and `annotation` are kept, so the
-        observation (and the panorama's mark) follows them, but `last_active` is **not** advanced: that is
-        the clock `lost_timeout` and pose's `detection_timeout` run on, and restarting it would keep them
-        forever. (`replace_tracklet` with a LOST copy cannot do this — it takes the newer time.)
+        zone's far edge, or a box a filter rejects. Their newest `roi` and `annotation` are kept, so
+        the observation (and the panorama's mark) follows them, but `last_active` is **not** advanced:
+        that is the clock `lost_timeout` and pose's `detection_timeout` run on, and restarting it would
+        keep them forever. (`replace_tracklet` with a LOST copy cannot do this — it takes the newer time.)
         """
         obs_id: ObsId | None = self._live.get((cam_id, external_id))
         if obs_id is None or obs_id not in self._obs:
@@ -245,6 +226,14 @@ class TrackletStore:
     def has_free_id(self) -> bool:
         """Whether a new world can be started."""
         return self._id_pool.size() > 0
+
+    def camera_sees_world(self, cam_id: int, world_id: int) -> bool:
+        """Whether this camera already actively tracks someone in this world.
+
+        One camera never sees one person twice — the device de-duplicates — so a second id from it
+        is a second person, and no rule may join the two. A merge would be sticky: nothing splits a
+        world again."""
+        return any(t.cam_id == cam_id and t.is_active for t in self.get_tracklets(world_id))
 
     def get_tracklets(self, world_id: int) -> list[Tracklet]:
         obs_ids: set[ObsId] = self._world_members.get(world_id, set())

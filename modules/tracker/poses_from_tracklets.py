@@ -6,7 +6,7 @@ from modules.pose.frame import Frame, FrameDict, FrameDictCallbackMixin
 from modules.pose.features import BBox, Azimuth
 from modules.settings import BaseSettings, Field
 from .tracklet import Tracklet
-from . import PanoramicAnnotation
+from .panoramic.annotation import Annotation as PanoramicAnnotation
 
 logger = logging.getLogger(__name__)
 

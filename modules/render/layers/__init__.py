@@ -16,6 +16,6 @@ from .generic import  CompositeLayer, CompositeLayerSettings, LutSettings, \
                       HDTPrepare, HDTBlend, MotionLayer, \
                       MSColorMaskLayer, ColorMaskLayerSettings
 from .panorama import Compositor, PanoramaLayerSettings, PanoramaBlend, Part, \
-                      GridRenderer, LabelRenderer, ObservationRenderer, SeamRenderer, \
-                      StitchRenderer, Mark, StripGeometry, build_marks
+                      GridRenderer, LabelRenderer, MarkRenderer, SeamRenderer, \
+                      StitchRenderer, Mark, MarkContext, build_marks, strip_spans
 from .source import   CropSourceLayer, DFlowSourceLayer, FrgSourceLayer, ImageSourceLayer, MaskSourceLayer

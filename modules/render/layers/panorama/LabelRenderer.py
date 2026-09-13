@@ -6,8 +6,8 @@ from modules.gl import Text
 from modules.utils import HotReloadMethods
 
 from ..LayerBase import LayerBase
-from .PanoramaLayerSettings import LABEL_BG
 from .marks import Mark
+from .settings import LABEL_BG
 
 _LANE_TOP_PX: float = 25.0   # clear of the grid's azimuth labels along the top edge
 _LANE_GAP_PX: float = 2.0
@@ -15,7 +15,7 @@ _MARK_GAP_PX: float = 6.0    # between a label and the line it belongs to
 
 
 class LabelRenderer(LayerBase):
-    """The per-person text, laid out so it never overlaps and never lies about a bearing.
+    """Each mark's label, laid out so labels never overlap and never lie about a bearing.
 
     **Height is the id.** A label's lane is its world id, the same index its colour comes from, so
     two different people can never collide however they move, no label shifts when someone else
@@ -29,11 +29,8 @@ class LabelRenderer(LayerBase):
     past the edge is silently truncated by the FBO.
 
     **The one real collision is a person's own two observations**, which share a world id and so a
-    lane, a few degrees apart at a seam. They are pushed apart, and *which way is decided by where
-    they are, not by which one the tracker picked*: the left mark's text runs left and the right
-    mark's runs right, so the two always diverge. Choosing by role instead — primary keeps its side,
-    candidate takes the other — only works while the candidate happens to sit on the left; when it
-    sits on the right its text runs back across the primary's own line.
+    lane, a few degrees apart at a seam. They diverge by position, not by role: the left mark's text
+    runs left and the right mark's runs right, so neither crosses the other's line.
 
     Drawn last of all, so nothing is ever laid over text.
     """
@@ -63,7 +60,7 @@ class LabelRenderer(LayerBase):
     def draw(self) -> None:
         for mark in self._marks:
             if mark.rejected:
-                self._draw_tag(mark)
+                self._draw_rejected_label(mark)
 
         for group in self._by_world().values():
             count: int = len(group)
@@ -100,13 +97,13 @@ class LabelRenderer(LayerBase):
                 self._text.draw_box_text(x, y, mark.label, mark.color, LABEL_BG,
                                          self._width, self._height)
 
-    def _draw_tag(self, mark: Mark) -> None:
-        """A dropped detection's filter name, at the top of its line.
+    def _draw_rejected_label(self, mark: Mark) -> None:
+        """A rejected detection's label — its rejection — at the top of its line.
 
-        Not in a lane: lanes are world ids, and a dropped detection belongs to nobody. Beside the top
-        of the line it names, reading right from it; flipped to the left at the strip's right edge,
-        for the same reason the lane labels flip. Two dropped views of one person at a seam can
-        overlap their tags — rare, and left so.
+        Not in a lane: lanes are world ids, and a rejected detection belongs to nobody. Beside the top
+        of the line, reading right from it; flipped to the left at the strip's right edge, for the
+        same reason lane labels flip. Two rejected views of one person at a seam can overlap their
+        labels — rare, and left so.
         """
         width, height = self._text.measure_text(mark.label)
         mark_px: float = mark.x * self._width
@@ -119,7 +116,8 @@ class LabelRenderer(LayerBase):
 
     def _by_world(self) -> dict[int, list[Mark]]:
         """One person's marks together, ordered left to right — the order the side rule needs.
-        Dropped detections have no world and are tagged at their box instead (`_draw_tag`)."""
+        Rejected detections have no world and are labelled at their line instead
+        (`_draw_rejected_label`)."""
         grouped: dict[int, list[Mark]] = {}
         for mark in self._marks:
             if mark.rejected:

@@ -31,11 +31,11 @@ class Part(IntEnum):
     `PanoramaLayerSettings.parts` is a checklist over these, so each piece can be taken off the
     strip without disturbing the others.
     """
-    image        = 0      # StitchRenderer — the four camera frames
-    seams        = auto()  # SeamRenderer — the seam rules that live in image space
-    grid         = auto()  # GridRenderer — every reference mark in the strip's own two axes
-    observations = auto()  # ObservationRenderer — a line per observation inside its tolerance
-    labels       = auto()  # LabelRenderer — the per-person text
+    image  = 0       # StitchRenderer — the four camera frames
+    seams  = auto()  # SeamRenderer — the seam rules that live in image space
+    grid   = auto()  # GridRenderer — every reference line in the strip's own two axes
+    marks  = auto()  # MarkRenderer — each observation's line, foot tick and field
+    labels = auto()  # LabelRenderer — each mark's text
 
 
 class PanoramaLayerSettings(BaseSettings):
@@ -45,7 +45,7 @@ class PanoramaLayerSettings(BaseSettings):
     are right, the marks over it say whether the distance model is. They share a vertical scale,
     so a person's pixels and a person's numbers are compared in place.
     """
-    parts: Field[list[Part]] = Field([Part.image, Part.grid, Part.observations, Part.labels],
+    parts: Field[list[Part]] = Field([Part.image, Part.grid, Part.marks, Part.labels],
                                      description="Which pieces of the display to draw")
     blend: Field[PanoramaBlend] = Field(PanoramaBlend.MAX,
                                         description="How overlapping cameras combine")
@@ -56,7 +56,7 @@ class PanoramaLayerSettings(BaseSettings):
     tilt: Field[float] = Field(0.0, access=Field.INIT,
                                description="Camera up-tilt (°), shared — shown in the footer; the rows come from the tracker")
     show_all_observations: Field[bool] = Field(True, widget=Widget.switch,
-                                              description="Draw every camera's own opinion, not just the one the tracker picked")
+                                              description="Draw every camera's own view, not just the primary")
 
 
 # Fixed meanings, so not in ColorSettings: those are per-player track colours a user may tune, and
@@ -66,28 +66,18 @@ HORIZON_COLOR: tuple[float, float, float, float] = (0.3, 1.0, 0.3, 1.0)    # its
 HORIZON_PX:    float = 1.0                        # the colour sets it apart, not the width
 SEAM_COLOR:    tuple[float, float, float, float] = (1.0, 0.35, 0.0, 0.75)  # sector boundary
 AXIS_COLOR:    tuple[float, float, float, float] = (0.0, 0.7, 1.0, 0.6)    # camera optical axis
-# The two seam zones get their own hues, because they say opposite things and used to share one.
 # Yellow is permissive (a second camera sees here), red prohibitive (no new person is born here).
-# Their SHAPES and their HOMES differ too, and that is the point: yellow is a pair of lines in
-# `GridRenderer`, because the overlap is a statement about azimuth and the degree grid measures it;
-# red is a fill in `SeamRenderer`, because the dead zone is a band of one camera's image
-# columns and only the picture can be read against it.
+# Shape and home differ too: yellow is a pair of lines in `GridRenderer`, because the overlap is a
+# statement about azimuth; red is a band in `SeamRenderer`, because the dead zone is a band of one
+# camera's image columns and only the picture can be read against it.
 OVERLAP_COLOR:  tuple[float, float, float, float] = (1.0, 0.85, 0.0, 0.65)  # two cameras see it
 DEAD_ZONE_COLOR: tuple[float, float, float, float] = (1.0, 0.15, 0.1, 0.10)  # no births here
-# The tracked floor, as one band between the two radii. The overlap's yellow, on purpose:
-# together they say where the tracker works — the overlap bounds it in azimuth, the zone in
-# distance — and shape tells them apart, the overlap a pair of verticals and the zone a horizontal
-# field. Yellow also keeps both clear of the camera axes, which are the blue ones.
-#
-# A FIELD RATHER THAN TWO LINES, and the clipping is why it reads better: the zone reaches below
-# what the strip can show at some presets, and a fill running off the bottom edge says "continues
-# past here" by itself, where a line pinned to the boundary would have claimed a row that is not
-# its own.
+# The tracked floor as a band between the two radii, in the overlap's yellow: together they say
+# where the tracker works — the overlap bounds it in azimuth, the zone in distance.
 ZONE_COLOR:     tuple[float, float, float, float] = (1.0, 0.85, 0.0, 0.10)
-# A detection the tracker did not count — too young, too small, a new one in the dead zone, past the
-# far edge. Grey because it belongs to nobody: every track colour means a person, and this is the
-# absence of one. Also the colour a LOST mark's line fades toward, so a person walking out ends where
-# their grey line begins.
+# A rejected detection — too young, too small, a new one in the dead zone, past the far edge, no id.
+# Grey because it belongs to nobody: every track colour means a person. Also the colour a LOST mark's
+# line fades toward, so a person walking out ends where their grey line begins.
 REJECTED_COLOR: tuple[float, float, float, float] = (0.6, 0.6, 0.6, 0.8)
 LABEL_FG:      tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
 LABEL_BG:      tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.6)

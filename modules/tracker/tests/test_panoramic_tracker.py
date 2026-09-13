@@ -12,9 +12,10 @@ from modules.tracker import (
     PanoramicTracker, PanoramicTrackerSettings, PanoramicAnnotation, Rejection,
     Tracklet, TrackingStatus, TrackletDict, camera_local_to_azimuth, row_from_elevation, row_model,
 )
-from modules.tracker.panoramic.geometry import Geometry, _MAX_HEIGHT, height_is_measured
-from modules.tracker.panoramic.tracker import HANDS_HEIGHT
-from modules.tracker.panoramic.store import TrackletIdPool
+from modules.tracker import camera_bearing, focus_distance
+from modules.tracker.panoramic.observations import WorldIdPool
+from modules.tracker.panoramic.rig import Rig, _MAX_HEIGHT, height_is_measured
+from modules.tracker.panoramic.rig_sync import HANDS_HEIGHT, reach_radius
 from modules.utils import Rect
 
 
@@ -347,8 +348,8 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         # Normalised like `height_filter`: 0.15 means 15 % of the larger height. Either side of it,
         # so a gate read as a percentage (0.15 %) or scaled twice would fail one of the two.
         self.config.seam.link_height = 0.15
-        self.assertTrue(self.tracker._heights_match(1.8, 1.8 * 0.86))     # 0.14 apart: one person
-        self.assertFalse(self.tracker._heights_match(1.8, 1.8 * 0.84))    # 0.16 apart: two
+        self.assertTrue(self.tracker.seams._heights_match(1.8, 1.8 * 0.86))     # 0.14 apart: one person
+        self.assertFalse(self.tracker.seams._heights_match(1.8, 1.8 * 0.84))    # 0.16 apart: two
 
     def test_a_jumper_links_on_azimuth_alone(self) -> None:
         # Feet off the floor breaks the one assumption the height measurement rests on, so the
@@ -427,9 +428,7 @@ class TestOneCameraOnePerson(PanoramicTrackerCase):
     both in one world — a merge is sticky, and nothing splits it again."""
 
     def annotated(self, tracklet: Tracklet) -> Tracklet:
-        local, world, overlap, distance, height = self.tracker.geometry.get_angles_and_overlap(
-            tracklet.roi, tracklet.cam_id)
-        return replace(tracklet, annotation=PanoramicAnnotation(local, world, overlap, distance, height))
+        return replace(tracklet, annotation=self.tracker.rig.annotate(tracklet.roi, tracklet.cam_id))
 
     def test_a_seam_link_skips_a_world_this_camera_already_sees(self) -> None:
         self.submit(make_tracklet(0, 1, 98.0))                        # azimuth 88: world 0
@@ -457,10 +456,10 @@ class TestOneCameraOnePerson(PanoramicTrackerCase):
         self.assertNotEqual(store.get_world_id(0, 1), store.get_world_id(0, 2))
 
 
-class TestTrackletIdPool(unittest.TestCase):
+class TestWorldIdPool(unittest.TestCase):
 
     def test_fifo_reuse(self) -> None:
-        pool = TrackletIdPool(4)
+        pool = WorldIdPool(4)
         self.assertEqual([pool.acquire() for _ in range(3)], [0, 1, 2])
         pool.release(0)
         pool.release(1)
@@ -468,18 +467,18 @@ class TestTrackletIdPool(unittest.TestCase):
         self.assertEqual([pool.acquire() for _ in range(3)], [3, 0, 1])
 
     def test_release_of_free_id_raises(self) -> None:
-        pool = TrackletIdPool(2)
+        pool = WorldIdPool(2)
         with self.assertRaises(Exception):
             pool.release(0)
 
     def test_exhaustion_raises(self) -> None:
-        pool = TrackletIdPool(1)
+        pool = WorldIdPool(1)
         pool.acquire()
         with self.assertRaises(Exception):
             pool.acquire()
 
     def test_availability_tracking(self) -> None:
-        pool = TrackletIdPool(2)
+        pool = WorldIdPool(2)
         self.assertTrue(pool.is_available(0))
         acquired = pool.acquire()
         self.assertFalse(pool.is_available(acquired))
@@ -558,25 +557,25 @@ class TestOverlapBand(unittest.TestCase):
     """The band `angle_in_overlap` tests, derived at the tracked zone's far edge.
 
     It used to be `cam_fov - target_fov`, the band two cameras share at *infinite* distance, which
-    flagged 58% of every camera's field and widened an observation's drawn tolerance 12° of azimuth
+    flagged 58% of every camera's field and widened a mark's field 12° of azimuth
     before the person was anywhere near a seam. Deriving it at the zone's outer circle is the
     tightest choice that still never under-reports anywhere people are tracked — and under-reporting
     is the failure that matters, because it splits one person into two worlds at a seam.
     """
 
-    def make_geometry(self, camera_radius: float = RING_RADIUS,
-                      zone: tuple[float, float] = (1.5, 3.5)) -> Geometry:
-        g = Geometry(num_cameras=4, cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
+    def make_rig(self, camera_radius: float = RING_RADIUS,
+                      zone: tuple[float, float] = (1.5, 3.5)) -> Rig:
+        g = Rig(cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
         g.set_camera_radius(camera_radius)
         g.set_zone(*zone)
         return g
 
     def test_the_rig_band(self) -> None:
         # R 0.36 ring, R 1.5 – R 3.5 zone, 127 deg fields on 90 deg sectors.
-        g = self.make_geometry()
+        g = self.make_rig()
         self.assertAlmostEqual(g.overlap_band, 28.3, delta=0.05)     # local angle: the threshold
         # The same threshold in azimuth, at the depth the marks are drawn on — which is what the
-        # panorama's overlap lines use, so a mark's tolerance changes width exactly on the line.
+        # panorama's overlap lines use, so a mark's field changes width exactly on the line.
         self.assertAlmostEqual(g.overlap_azimuth, 31.0, delta=0.05)
         # Wider than the local band, because a nearer depth pulls a bearing toward the camera's
         # own axis and so away from the seam the band is measured from.
@@ -588,12 +587,12 @@ class TestOverlapBand(unittest.TestCase):
         # leave `camera_radius` at 0, are untouched by any of this.
         for zone in ((1.5, 3.5), (1.0, 50.0), (0.5, 0.75)):
             with self.subTest(zone=zone):
-                g = self.make_geometry(camera_radius=0.0, zone=zone)
+                g = self.make_rig(camera_radius=0.0, zone=zone)
                 self.assertAlmostEqual(g.overlap_band, PARALLAX_FOV - TARGET_FOV, places=9)
                 self.assertAlmostEqual(g.overlap_azimuth, PARALLAX_FOV - TARGET_FOV, places=9)
 
     def test_it_widens_with_the_zone_and_approaches_the_bare_field(self) -> None:
-        bands = [self.make_geometry(zone=(0.5, r)).overlap_band for r in (1.5, 2.25, 3.5, 20.0)]
+        bands = [self.make_rig(zone=(0.5, r)).overlap_band for r in (1.5, 2.25, 3.5, 20.0)]
         self.assertEqual(bands, sorted(bands))
         self.assertLess(bands[-1], PARALLAX_FOV - TARGET_FOV)        # never reaches infinity
         self.assertGreater(bands[-1], 33.0)                          # but gets close
@@ -601,7 +600,7 @@ class TestOverlapBand(unittest.TestCase):
     def test_nothing_is_shared_once_the_sectors_stop_meeting(self) -> None:
         # Below about R 1.0 a camera pushed 0.36 m outward no longer reaches its neighbour's
         # sector at all — the reason the zone has a floor.
-        g = self.make_geometry(zone=(0.5, 1.0))
+        g = self.make_rig(zone=(0.5, 1.0))
         self.assertEqual(g.overlap_band, 0.0)
         self.assertEqual(g.overlap_azimuth, 0.0)
         self.assertFalse(g.angle_in_overlap(PARALLAX_FOV / 2.0))
@@ -611,7 +610,7 @@ class TestOverlapBand(unittest.TestCase):
         edge was inside the old infinite-distance band (37) and is outside the R 3.5 one (28.3), so
         the tracker no longer believes a second camera can see it — and it cannot: at R 3.5 the
         shared band really is 26.4 deg of azimuth."""
-        g = self.make_geometry()
+        g = self.make_rig()
         local: float = PARALLAX_FOV - 30.0
         self.assertTrue(local > PARALLAX_FOV - (PARALLAX_FOV - TARGET_FOV))   # inside the old band
         self.assertFalse(g.angle_in_overlap(local))                           # outside the new one
@@ -619,11 +618,11 @@ class TestOverlapBand(unittest.TestCase):
 
     def test_the_drawn_line_is_exactly_where_the_flag_flips(self) -> None:
         """What `overlap_azimuth` exists for. The panorama draws two verticals per seam at
-        ±`overlap_azimuth`/2 and switches a mark's tolerance width on `angle_in_overlap`. Those are
+        ±`overlap_azimuth`/2 and switches a mark's field width on `angle_in_overlap`. Those are
         the same threshold, but one is a local angle and the other a strip position, and a local
         angle has no single position on the ring — project it at the wrong depth and the line sits
         where nothing happens. Pinned here because the two live in different files."""
-        g = self.make_geometry()
+        g = self.make_rig()
         line: float = g.target_fov - g.overlap_azimuth / 2.0
         # The last local angle still inside the flag, carried to the strip the way a mark is.
         flips: float = camera_local_to_azimuth(g.cam_fov - g.overlap_band, 0, g.cam_fov,
@@ -636,16 +635,16 @@ class TestOverlapBand(unittest.TestCase):
         self.assertGreater(abs(far_edge - flips), 1.0)
 
     def test_a_max_below_the_min_collapses_rather_than_inverting(self) -> None:
-        g = self.make_geometry(zone=(1.5, 1.0))
+        g = self.make_rig(zone=(1.5, 1.0))
         self.assertAlmostEqual(g._min_radius, 1.5, places=9)
         self.assertAlmostEqual(g._max_radius, 1.5, places=9)
 
 
-class TestGeometryParallax(unittest.TestCase):
+class TestRigParallax(unittest.TestCase):
 
-    def make_geometry(self, ring_radius: float = RING_RADIUS,
-                      zone: tuple[float, float] = (ZONE_MIN_RADIUS, ZONE_MAX_RADIUS)) -> Geometry:
-        g = Geometry(num_cameras=4, cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
+    def make_rig(self, ring_radius: float = RING_RADIUS,
+                      zone: tuple[float, float] = (ZONE_MIN_RADIUS, ZONE_MAX_RADIUS)) -> Rig:
+        g = Rig(cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
         g.set_camera_radius(ring_radius)
         g.set_camera_height(CAMERA_HEIGHT)
         g.set_zone(*zone)
@@ -656,7 +655,7 @@ class TestGeometryParallax(unittest.TestCase):
         # The correction assumes ONE depth — `parallax_radius`, derived from the zone — so that
         # is where it is exact. A person standing on it is recovered to the degree from either
         # side of the seam, which is the property the whole fusion rests on.
-        g = self.make_geometry()
+        g = self.make_rig()
         radius: float = g.parallax_radius
         for cam_id in (0, 1):
             roi, _distance = synth_observation(cam_id, world_azimuth=90.0, radius=radius)
@@ -674,7 +673,7 @@ class TestGeometryParallax(unittest.TestCase):
         in CALIBRATION.md — the surrounding fixture uses a wider R 1 – R 4, and a wider zone
         necessarily has a worse worst case (14.4° at R 1 – R 4, which is the honest cost of
         claiming that much floor)."""
-        g = self.make_geometry(zone=(1.5, 3.5))
+        g = self.make_rig(zone=(1.5, 3.5))
         self.assertAlmostEqual(g.parallax_radius, 2.1, places=9)
         worst: float = 0.0
         for radius in (1.5, 2.0, g.parallax_radius, 3.0, 3.5):
@@ -696,7 +695,7 @@ class TestGeometryParallax(unittest.TestCase):
         feet, which is why `estimate_distance` reads short — and while that number fed the parallax
         triangle, the bias moved every person's *bearing*, in opposite directions at a seam. Now
         the same person with the box bottom dragged anywhere reports the same azimuth."""
-        g = self.make_geometry()
+        g = self.make_rig()
         for cam_id in (0, 1):
             roi, _d = synth_observation(cam_id, world_azimuth=90.0, radius=2.0)
             angles, distances = [], []
@@ -713,7 +712,7 @@ class TestGeometryParallax(unittest.TestCase):
     def test_uncorrected_model_disagrees_at_seam(self) -> None:
         # Sanity check that the correction is actually doing something: with
         # parallax disabled the two cameras disagree by several degrees.
-        g = self.make_geometry(ring_radius=0.0)
+        g = self.make_rig(ring_radius=0.0)
         roi0, _ = synth_observation(0, world_azimuth=90.0, radius=2.0)
         roi1, _ = synth_observation(1, world_azimuth=90.0, radius=2.0)
         _l0, world0, _d0 = g.calc_angle(roi0, 0)
@@ -721,7 +720,7 @@ class TestGeometryParallax(unittest.TestCase):
         self.assertGreater(abs(world0 - world1), 5.0)
 
     def test_disabled_matches_raw_model(self) -> None:
-        g = self.make_geometry(ring_radius=0.0)
+        g = self.make_rig(ring_radius=0.0)
         roi = Rect(x=0.6, y=0.1, width=0.05, height=0.5)
         local, world, _dist = g.calc_angle(roi, 2)
         fov_overlap = (PARALLAX_FOV - TARGET_FOV) / 2.0
@@ -731,7 +730,7 @@ class TestGeometryParallax(unittest.TestCase):
     def test_column_to_azimuth_is_the_box_centre_chain(self) -> None:
         # A keypoint's column goes through the same projection as a box centre, so the two are
         # comparable — the premise of shifting a pose's azimuth by their difference.
-        g = self.make_geometry()
+        g = self.make_rig()
         for cam_id in range(4):
             for x in (0.1, 0.5, 0.93):
                 roi = Rect(x=x - 0.02, y=0.1, width=0.04, height=0.5)
@@ -740,14 +739,14 @@ class TestGeometryParallax(unittest.TestCase):
                                            places=9)
 
     def test_column_to_azimuth_centre_is_the_camera_axis(self) -> None:
-        g = self.make_geometry()
+        g = self.make_rig()
         for cam_id in range(4):
             self.assertAlmostEqual(g.column_to_azimuth(cam_id, 0.5), TARGET_FOV * (cam_id + 0.5), places=9)
 
     def test_estimate_distance_reads_the_feet_not_the_height(self) -> None:
         # The whole point of the floor-plane model: arms up, legs pulled up and bending over all
         # change a box's height and none of them move the feet, so the estimate must not care.
-        g = self.make_geometry()
+        g = self.make_rig()
         bottom = feet_row(2.0)
         base = g.estimate_distance(Rect(y=bottom - 0.4, height=0.4))
         self.assertAlmostEqual(base, 2.0, places=6)
@@ -757,7 +756,7 @@ class TestGeometryParallax(unittest.TestCase):
                                        base, places=9)
 
     def test_estimate_distance_matches_the_floor_geometry(self) -> None:
-        g = self.make_geometry()
+        g = self.make_rig()
         for want in (1.5, 2.0, 3.0, 3.9):
             with self.subTest(distance=want):
                 got = g.estimate_distance(Rect(y=feet_row(want) - 0.4, width=0.05, height=0.4))
@@ -766,13 +765,13 @@ class TestGeometryParallax(unittest.TestCase):
     def test_the_bottom_row_is_the_nearest_readable_distance(self) -> None:
         # The window is pinned at the sensor's bottom reach, so feet on the last row are as close
         # as the frame can read: camera_height / tan(-elevation_bottom), 1.14 m at P800 and tilt 16.
-        g = self.make_geometry()
+        g = self.make_rig()
         nearest = CAMERA_HEIGHT / math.tan(math.radians(-WINDOW.elevation_bottom))
         self.assertAlmostEqual(g.estimate_distance(Rect(y=0.6, height=0.4)), nearest, places=6)
         self.assertAlmostEqual(nearest, 1.14, delta=0.01)
 
     def test_feet_not_on_this_floor_read_infinitely_far(self) -> None:
-        g = self.make_geometry()
+        g = self.make_rig()
         # Feet at or above the horizon: nobody standing on this floor.
         self.assertEqual(g.estimate_distance(Rect(y=HORIZON_ROW - 0.5, height=0.5)), math.inf)
         self.assertEqual(g.estimate_distance(Rect(y=0.0, height=0.5)), math.inf)
@@ -780,7 +779,7 @@ class TestGeometryParallax(unittest.TestCase):
     def test_estimate_distance_is_not_clamped_to_the_zone(self) -> None:
         # The point of removing the clamp: someone well past the far edge reads where they are, so
         # the far-edge filter can see them and the panorama can show them.
-        g = self.make_geometry()
+        g = self.make_rig()
         for want in (5.0, 8.0, 12.0):
             with self.subTest(distance=want):
                 got = g.estimate_distance(Rect(y=feet_row(want) - 0.2, width=0.05, height=0.2))
@@ -790,7 +789,7 @@ class TestGeometryParallax(unittest.TestCase):
         # The device extrapolates the extent of a partly-visible person and nothing clamps it on
         # the way in, so `bottom` past 1.0 is kept, not thrown away. It is monotonic across the frame
         # edge — closer feet, closer person — and stays a positive distance however far it runs.
-        g = self.make_geometry()
+        g = self.make_rig()
         near_edge = g.estimate_distance(Rect(y=0.55, height=0.44))     # bottom 0.99, in frame
         at_edge = g.estimate_distance(Rect(y=0.6, height=0.4))         # bottom 1.00, at the edge
         past_edge = g.estimate_distance(Rect(y=0.7, height=0.4))       # bottom 1.10, extrapolated
@@ -803,7 +802,7 @@ class TestGeometryParallax(unittest.TestCase):
     def test_a_box_may_start_above_the_frame(self) -> None:
         # A tall person close in: head extrapolated above the top. Only the bottom is read, so
         # the estimate is unaffected by how far above 0 the box starts.
-        g = self.make_geometry()
+        g = self.make_rig()
         cut = g.estimate_distance(Rect(y=-0.3, height=1.2))            # bottom 0.9
         whole = g.estimate_distance(Rect(y=0.5, height=0.4))           # bottom 0.9
         self.assertAlmostEqual(cut, whole, places=9)
@@ -826,8 +825,8 @@ class TestSeamBirths(unittest.TestCase):
         self.config.rig.camera_height = CAMERA_HEIGHT
         self.config.seam.dead_zone = 6.5
         self.tracker = PanoramicTracker(self.config, num_players=8, num_cameras=4)
-        # The fixture's own frame, as in `TestGeometryParallax`: P800 up 16 on the full reach.
-        self.tracker.geometry.set_window(WINDOW, ROWS)
+        # The fixture's own frame, as in `TestRigParallax`: P800 up 16 on the full reach.
+        self.tracker.rig.set_window(WINDOW, ROWS)
         self.emitted: list[TrackletDict] = []
         self.tracker.add_tracklet_callback(self.emitted.append)
 
@@ -866,7 +865,7 @@ class RigTrackerCase(unittest.TestCase):
         self.config.rig.camera_height = CAMERA_HEIGHT
         self.config.lost_timeout = 2.0
         self.tracker = PanoramicTracker(self.config, num_players=8, num_cameras=4)
-        self.tracker.geometry.set_window(WINDOW, ROWS)
+        self.tracker.rig.set_window(WINDOW, ROWS)
         self.emitted: list[TrackletDict] = []
         self.observed: list[list[Tracklet]] = []
         self.tracker.add_tracklet_callback(self.emitted.append)
@@ -894,7 +893,7 @@ class TestFarEdge(RigTrackerCase):
         """A camera sits `ring_radius` out toward the person, so it reads them nearer than their
         radius: on its axis at R 3.6 it reads 3.24 m, which a camera-distance test against 3.5
         would wrongly accept."""
-        g = self.tracker.geometry
+        g = self.tracker.rig
         on_axis: float = PARALLAX_FOV / 2.0
         self.assertTrue(g.beyond_zone(on_axis, 3.6 - RING_RADIUS))
         self.assertFalse(g.beyond_zone(on_axis, 3.4 - RING_RADIUS))
@@ -959,8 +958,8 @@ class TestFarEdge(RigTrackerCase):
         self.assertEqual(self.tracker.store.get_world_id(0, 3), 0)
 
 
-class TestFilteredDetections(RigTrackerCase):
-    """Every detection a filter drops is published on the observation channel, tagged with why —
+class TestRejectedDetections(RigTrackerCase):
+    """Every detection a filter rejects is published on the observation channel with its reason —
     so the panorama can draw it — and never on the primary channel the show reads."""
 
     def rejected(self) -> dict[Rejection, int]:
@@ -972,7 +971,7 @@ class TestFilteredDetections(RigTrackerCase):
                 counts[t.annotation.rejected] = counts.get(t.annotation.rejected, 0) + 1
         return counts
 
-    def test_each_filter_is_tagged_and_kept_off_the_primary_channel(self) -> None:
+    def test_each_filter_rejects_with_its_reason_off_the_primary_channel(self) -> None:
         cases = {
             Rejection.YOUNG: dict(radius=3.0, age=self.config.age_filter),
             Rejection.SMALL: dict(radius=3.0, height=self.config.height_filter / 2.0),
@@ -986,7 +985,7 @@ class TestFilteredDetections(RigTrackerCase):
                 self.assertEqual(self.rejected(), {reason: 1})             # the strip sees why
                 self.assertEqual(self.tracker.store.all_world_ids(), [])
 
-    def test_a_new_arrival_in_the_dead_zone_is_tagged(self) -> None:
+    def test_a_new_arrival_in_the_dead_zone_is_rejected(self) -> None:
         # Both cameras' first sight of someone on a seam close in: both inside the dead zone.
         self.config.seam.dead_zone = 6.5
         for cam_id in (0, 1):
@@ -1026,7 +1025,7 @@ class TestFilteredDetections(RigTrackerCase):
             assert isinstance(t.annotation, PanoramicAnnotation)
             self.assertIsNone(t.annotation.rejected)
 
-    def test_a_tracked_person_past_the_edge_is_tagged_on_their_own_mark(self) -> None:
+    def test_a_tracked_person_past_the_edge_carries_the_rejection_on_their_own_mark(self) -> None:
         self.seen(3.0)
         self.seen(4.0)
         observation = self.tracker.store.get_live_observation(0, 1)
@@ -1036,10 +1035,10 @@ class TestFilteredDetections(RigTrackerCase):
         self.seen(3.0)
         observation = self.tracker.store.get_live_observation(0, 1)
         assert observation is not None and isinstance(observation.annotation, PanoramicAnnotation)
-        self.assertIsNone(observation.annotation.rejected)       # back inside: no tag
+        self.assertIsNone(observation.annotation.rejected)       # back inside: no rejection
 
     def test_a_tracked_person_whose_box_shrinks_goes_lost_on_their_own_mark(self) -> None:
-        # The same as walking out: LOST, the clock not restarted, tagged — not frozen as TRACKED
+        # The same as walking out: LOST, the clock not restarted, rejection kept — not frozen as TRACKED
         # beside a grey duplicate.
         self.seen(3.0, seconds_ago=0.5)
         before = self.tracker.store.get_live_observation(0, 1)
@@ -1052,9 +1051,9 @@ class TestFilteredDetections(RigTrackerCase):
         self.assertEqual(after.annotation.rejected, Rejection.SMALL)
         self.assertEqual(self.rejected(), {})
 
-    def test_a_full_id_pool_is_tagged_and_logged_once(self) -> None:
+    def test_a_full_id_pool_is_rejected_and_logged_once(self) -> None:
         self.tracker = PanoramicTracker(self.config, num_players=1, num_cameras=4)
-        self.tracker.geometry.set_window(WINDOW, ROWS)
+        self.tracker.rig.set_window(WINDOW, ROWS)
         self.tracker.add_tracklet_callback(self.emitted.append)
         self.tracker.add_observation_callback(self.observed.append)
         self.seen(3.0)                                           # takes the only id
@@ -1066,18 +1065,27 @@ class TestFilteredDetections(RigTrackerCase):
         self.assertEqual(self.tracker.store.all_world_ids(), [0])
 
 
+class TestUnknownStatus(PanoramicTrackerCase):
+
+    def test_an_unmapped_device_status_changes_nothing(self) -> None:
+        self.submit(make_tracklet(0, 1, 50.0))
+        before = self.tracker.store.get_live_observation(0, 1)
+        self.submit(make_tracklet(0, 1, 60.0, status=TrackingStatus.NONE))
+        self.assertEqual(self.tracker.store.get_live_observation(0, 1), before)
+
+
 class TestLifecycle(unittest.TestCase):
 
     def test_stop_before_start_does_not_raise(self) -> None:
         PanoramicTracker(PanoramicTrackerSettings(fov=FOV), num_players=1, num_cameras=4).stop()
 
 
-class TestGeometryHeight(unittest.TestCase):
+class TestRigHeight(unittest.TestCase):
     """A person's height is a pure pixel ratio on cylindrical rows: camera_height times the box
     height over the rows from the horizon down to the feet. No focal, no field, no distance."""
 
-    def make_geometry(self) -> Geometry:
-        g = Geometry(num_cameras=4, cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
+    def make_rig(self) -> Rig:
+        g = Rig(cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
         g.set_camera_height(CAMERA_HEIGHT)
         g.set_zone(ZONE_MIN_RADIUS, ZONE_MAX_RADIUS)
         g.set_window(WINDOW, ROWS)
@@ -1089,7 +1097,7 @@ class TestGeometryHeight(unittest.TestCase):
                     height=bottom - head_row(height_m, distance))
 
     def test_recovers_the_height_at_every_distance(self) -> None:
-        g = self.make_geometry()
+        g = self.make_rig()
         for want in (1.5, 1.8, 2.0):
             for distance in (1.5, 2.0, 3.0, 5.0, 7.0):
                 with self.subTest(height=want, distance=distance):
@@ -1098,7 +1106,7 @@ class TestGeometryHeight(unittest.TestCase):
     def test_is_independent_of_distance(self) -> None:
         # The pixel box shrinks with distance; the metres must not move. This is what a gate on
         # pixel box heights could not do, and why `seam.link_height` is a fraction of these.
-        g = self.make_geometry()
+        g = self.make_rig()
         near: Rect = self.box(1.8, 2.0)
         far: Rect = self.box(1.8, 6.0)
         self.assertGreater(near.height, far.height * 2.0)           # the pixels differ a lot
@@ -1107,28 +1115,28 @@ class TestGeometryHeight(unittest.TestCase):
     def test_reads_reach_when_the_arms_go_up(self) -> None:
         # The box top is the highest pixel, so this is overhead reach, not stature — the number
         # the tilt table is chosen around.
-        g = self.make_geometry()
+        g = self.make_rig()
         for distance in (2.0, 4.0):
             with self.subTest(distance=distance):
                 self.assertAlmostEqual(g.estimate_height(self.box(1.8, distance)), 1.8, places=6)
                 self.assertAlmostEqual(g.estimate_height(self.box(2.2, distance)), 2.2, places=6)
 
     def test_zero_when_the_feet_are_not_on_this_floor(self) -> None:
-        g = self.make_geometry()
+        g = self.make_rig()
         self.assertEqual(g.estimate_height(Rect(y=0.0, height=HORIZON_ROW)), 0.0)   # feet on the horizon
         self.assertEqual(g.estimate_height(Rect(y=0.0, height=0.2)), 0.0)           # and above it
 
     def test_capped_for_a_box_that_barely_clears_the_horizon(self) -> None:
         # Feet a pixel below the horizon divide by almost nothing; the cap is what bounds it, and
         # it sits above any height a person can measure so it only ever catches a mangled box.
-        g = self.make_geometry()
+        g = self.make_rig()
         one_px: float = 1.0 / (ROWS - 1)
         self.assertEqual(g.estimate_height(Rect(y=0.1, height=HORIZON_ROW - 0.1 + one_px)), _MAX_HEIGHT)
         self.assertGreater(_MAX_HEIGHT, 2.4)                # a tall person with both arms up
 
     def test_the_feet_on_the_bottom_row_still_measure(self) -> None:
         # The nearest the frame can read, which is where the distance estimate saturates too.
-        g = self.make_geometry()
+        g = self.make_rig()
         nearest: float = CAMERA_HEIGHT / math.tan(math.radians(-WINDOW.elevation_bottom))
         self.assertAlmostEqual(g.estimate_height(self.box(1.8, nearest)), 1.8, places=6)
 
@@ -1137,7 +1145,7 @@ class TestGeometryHeight(unittest.TestCase):
         genuinely different distances from the two cameras, so their pixel box heights differ by
         up to 0.16 of the frame — which a gate on frame fractions could not tell from two
         different people — while the measured heights agree exactly."""
-        g = self.make_geometry()
+        g = self.make_rig()
         for azimuth in (80.0, 75.0, 72.0):
             for radius in (1.35, 2.25, 3.5):
                 with self.subTest(azimuth=azimuth, radius=radius):
@@ -1148,11 +1156,11 @@ class TestGeometryHeight(unittest.TestCase):
                     self.assertAlmostEqual(g.estimate_height(roi1), 1.8, places=6)
 
     def test_the_annotation_carries_it(self) -> None:
-        g = self.make_geometry()
+        g = self.make_rig()
         roi, _distance = synth_observation(0, 45.0, 2.25, person_height=1.8)
-        *_rest, distance, height = g.get_angles_and_overlap(roi, 0)
-        self.assertAlmostEqual(height, 1.8, places=6)
-        self.assertGreater(distance, 0.6)
+        annotation = g.annotate(roi, 0)
+        self.assertAlmostEqual(annotation.height, 1.8, places=6)
+        self.assertGreater(annotation.distance, 0.6)
 
 
 class TestFootOffset(unittest.TestCase):
@@ -1161,8 +1169,8 @@ class TestFootOffset(unittest.TestCase):
 
     PAD: float = 94.0 / (ROWS - 1)          # the measured studio bias, as a frame fraction
 
-    def make_geometry(self, foot_offset: float = 0.0) -> Geometry:
-        g = Geometry(num_cameras=4, cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
+    def make_rig(self, foot_offset: float = 0.0) -> Rig:
+        g = Rig(cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
         g.set_camera_radius(RING_RADIUS)
         g.set_camera_height(CAMERA_HEIGHT)
         g.set_zone(ZONE_MIN_RADIUS, ZONE_MAX_RADIUS)
@@ -1182,7 +1190,7 @@ class TestFootOffset(unittest.TestCase):
 
     def test_zero_offset_is_the_identity(self) -> None:
         # The default must change nothing, which is what lets every other test in this file stand.
-        plain = self.make_geometry()
+        plain = self.make_rig()
         for distance in (1.5, 2.0, 3.0):
             box: Rect = self.true_box(1.8, distance)
             with self.subTest(distance=distance):
@@ -1192,7 +1200,7 @@ class TestFootOffset(unittest.TestCase):
     def test_a_matching_offset_recovers_the_distance_and_the_height(self) -> None:
         # The point of sharing `_foot_px`: one number fixes both readouts at once, at every
         # distance, because it corrects the thing they have in common.
-        g = self.make_geometry(self.PAD)
+        g = self.make_rig(self.PAD)
         for distance in (1.5, 2.0, 3.0, 3.8):
             with self.subTest(distance=distance):
                 box: Rect = self.padded_box(1.8, distance)
@@ -1203,7 +1211,7 @@ class TestFootOffset(unittest.TestCase):
         """Pins the table in CALIBRATION: with the pad present and the offset at 0, both readouts
         are short AND the height *falls* as the person walks away. That drift is the whole
         calibration signal — a proportional error would leave `H` flat but wrong instead."""
-        g = self.make_geometry()
+        g = self.make_rig()
         heights: list[float] = []
         for distance in (1.5, 2.5, 3.8):
             box: Rect = self.padded_box(1.8, distance)
@@ -1220,16 +1228,81 @@ class TestFootOffset(unittest.TestCase):
         far-edge filter reject people who are inside."""
         box: Rect = self.true_box(1.8, 3.0)
         gap: float = feet_row(3.0) - HORIZON_ROW                  # the feet's rows below the horizon
-        self.assertGreater(self.make_geometry(gap * 0.5).estimate_distance(box), 3.0)
-        self.assertEqual(self.make_geometry(gap).estimate_distance(box), math.inf)
-        self.assertEqual(self.make_geometry(gap * 1.5).estimate_distance(box), math.inf)
+        self.assertGreater(self.make_rig(gap * 0.5).estimate_distance(box), 3.0)
+        self.assertEqual(self.make_rig(gap).estimate_distance(box), math.inf)
+        self.assertEqual(self.make_rig(gap * 1.5).estimate_distance(box), math.inf)
 
     def test_the_azimuth_ignores_it_entirely(self) -> None:
         # The bearing no longer rides on any box row, so no value of this setting can move it.
         roi, _d = synth_observation(0, world_azimuth=90.0, radius=2.0)
-        angles = [self.make_geometry(offset).calc_angle(roi, 0)[1]
+        angles = [self.make_rig(offset).calc_angle(roi, 0)[1]
                   for offset in (0.0, 0.02, self.PAD, 0.15)]
         self.assertAlmostEqual(max(angles), min(angles), places=12)
+
+
+class TestReachRadius(unittest.TestCase):
+    """How near the fixture a point at a given height is still in frame, along a line.
+
+    The limits here are hand-made (a constant top, a top that falls off axis) so the search is
+    tested apart from any real sensor; the published numbers are checked against the real coverage
+    in `TestReachReadouts`.
+    """
+
+    CAMERA_HEIGHT: float = 0.5
+    HANDS: float = 2.2
+
+    def test_on_axis_it_is_the_closed_form(self) -> None:
+        # (height - h) / tan(limit) + ring — the doc's own tilt-table arithmetic.
+        for ring in (0.0, 0.36):
+            for top in (30.0, 45.0, 51.23):
+                with self.subTest(ring=ring, top=top):
+                    got: float = reach_radius(self.HANDS, 0.0, self.CAMERA_HEIGHT, ring, lambda _b: top)
+                    want: float = (self.HANDS - self.CAMERA_HEIGHT) / math.tan(math.radians(top)) + ring
+                    self.assertAlmostEqual(got, want, delta=1e-6)
+
+    def test_below_the_lens_it_reads_the_bottom(self) -> None:
+        for ring in (0.0, 0.36):
+            for bottom in (-15.0, -21.2, -30.0):
+                with self.subTest(ring=ring, bottom=bottom):
+                    got: float = reach_radius(0.0, 0.0, self.CAMERA_HEIGHT, ring, lambda _b: bottom)
+                    want: float = self.CAMERA_HEIGHT / math.tan(math.radians(-bottom)) + ring
+                    self.assertAlmostEqual(got, want, delta=1e-6)
+
+    def test_without_a_ring_the_seam_is_the_axis(self) -> None:
+        # No parallax: a line 45 deg off the axis is seen at 45 deg, at the same distance.
+        axis: float = reach_radius(self.HANDS, 0.0, self.CAMERA_HEIGHT, 0.0, lambda _b: 45.0)
+        seam: float = reach_radius(self.HANDS, 45.0, self.CAMERA_HEIGHT, 0.0, lambda _b: 45.0)
+        self.assertAlmostEqual(seam, axis, delta=1e-6)
+
+    def test_a_top_that_falls_off_axis_pushes_the_seam_out(self) -> None:
+        """The four-leaf pattern: the sensor's top edge is lower toward the frame edge, and on a
+        ring the seam line is seen even further out than its own bearing — so the seam is worse."""
+        def falling(bearing: float) -> float:
+            return 51.0 - 0.2 * abs(bearing)
+        axis: float = reach_radius(self.HANDS, 0.0, self.CAMERA_HEIGHT, 0.36, falling)
+        seam: float = reach_radius(self.HANDS, 45.0, self.CAMERA_HEIGHT, 0.36, falling)
+        flat_seam: float = reach_radius(self.HANDS, 45.0, self.CAMERA_HEIGHT, 0.36, lambda _b: 51.0)
+        self.assertGreater(seam, axis)
+        self.assertGreater(seam, flat_seam)
+
+    def test_the_seam_is_judged_at_the_wider_camera_bearing(self) -> None:
+        """A point on the seam line at the found radius is seen by the camera at more than 45 deg,
+        and it is that column's limit the answer sits exactly on."""
+        def falling(bearing: float) -> float:
+            return 51.0 - 0.2 * abs(bearing)
+        radius: float = reach_radius(self.HANDS, 45.0, self.CAMERA_HEIGHT, 0.36, falling)
+        distance: float = focus_distance(45.0, 0.36, radius)
+        seen_at: float = camera_bearing(45.0, 0.36, distance)
+        self.assertGreater(seen_at, 45.0)
+        angle: float = math.degrees(math.atan((self.HANDS - self.CAMERA_HEIGHT) / distance))
+        self.assertAlmostEqual(angle, falling(seen_at), delta=1e-6)
+
+    def test_a_point_never_in_frame_is_unreachable(self) -> None:
+        self.assertEqual(reach_radius(self.HANDS, 0.0, self.CAMERA_HEIGHT, 0.36, lambda _b: math.nan),
+                         math.inf)
+        # A top below eye level: a point above the lens is never inside it.
+        self.assertEqual(reach_radius(self.HANDS, 0.0, self.CAMERA_HEIGHT, 0.36, lambda _b: -5.0),
+                         math.inf)
 
 
 class TestReachReadouts(unittest.TestCase):
@@ -1323,24 +1396,27 @@ class TestReachReadouts(unittest.TestCase):
 
     def test_the_ring_and_the_lens_height_update_it_live(self) -> None:
         # Both are live settings and both move the reach; neither needs the coverage redone.
+        # A live change is applied on the tracker's own thread; `_apply_settings` stands in for its tick.
         config = self.make_config()
-        PanoramicTracker(config, num_players=4, num_cameras=4)
+        tracker = PanoramicTracker(config, num_players=4, num_cameras=4)
         feet, hands = config.rig.feet_from, config.rig.hands_from
         config.rig.camera_radius = RING_RADIUS + 0.1
+        tracker._apply_settings()
         # On the axis the ring only shifts the answer outward by itself.
         self.assertAlmostEqual(config.rig.feet_from, feet + 0.1, delta=1e-6)
         self.assertAlmostEqual(config.rig.hands_from, hands + 0.1, delta=1e-6)
         config.rig.camera_height = CAMERA_HEIGHT + 0.2
+        tracker._apply_settings()
         self.assertGreater(config.rig.feet_from, feet + 0.1)      # a higher lens sees feet further out
         self.assertLess(config.rig.hands_from, hands + 0.1)  # ...and raised hands nearer
 
 
-class TestInitialGeometrySync(unittest.TestCase):
+class TestInitialRigSync(unittest.TestCase):
 
-    def test_the_published_radius_is_the_geometrys_own(self) -> None:
-        """No conversion between what `Geometry` derives and what the panorama draws with.
+    def test_the_published_radius_is_the_rigs_own(self) -> None:
+        """No conversion between what the `Rig` derives and what the panorama draws with.
 
-        The settings, the geometry, the marks, the shader and a tape on the floor all carry radii
+        The settings, the rig, the marks, the shader and a tape on the floor all carry radii
         from the fixture axis, so this is an equality and not an `assertAlmostEqual` with a factor
         in it. That is the whole point of the convention: a halving anywhere in the chain has
         somewhere to show up.
@@ -1351,7 +1427,7 @@ class TestInitialGeometrySync(unittest.TestCase):
             with self.subTest(zone=zone):
                 config.rig.zone_min_radius, config.rig.zone_max_radius = zone
                 tracker = PanoramicTracker(config, num_players=4, num_cameras=4)
-                self.assertEqual(config.rig.parallax_radius, tracker.geometry.parallax_radius)
+                self.assertEqual(config.rig.parallax_radius, tracker.rig.parallax_radius)
                 # ...and it really is the zone's harmonic mean, in the zone's own unit.
                 lo, hi = zone
                 self.assertAlmostEqual(config.rig.parallax_radius,
@@ -1359,20 +1435,20 @@ class TestInitialGeometrySync(unittest.TestCase):
                 self.assertGreaterEqual(config.rig.parallax_radius, lo)
                 self.assertLessEqual(config.rig.parallax_radius, hi)
 
-    def test_config_applied_to_geometry_at_construction(self) -> None:
+    def test_config_applied_to_the_rig_at_construction(self) -> None:
         # bind() does not fire with the initial value and presets load before
-        # the tracker exists, so construction must push config into geometry.
+        # the tracker exists, so construction must push config into the rig.
         config = PanoramicTrackerSettings(fov=PARALLAX_FOV)
         config.rig.camera_radius = RING_RADIUS
         config.rig.camera_height = CAMERA_HEIGHT
         tracker = PanoramicTracker(config, num_players=4, num_cameras=4)
-        self.assertEqual(tracker.geometry.cam_fov, PARALLAX_FOV)
-        self.assertEqual(tracker.geometry._ring_radius, RING_RADIUS)
-        self.assertEqual(tracker.geometry._camera_height, CAMERA_HEIGHT)
+        self.assertEqual(tracker.rig.cam_fov, PARALLAX_FOV)
+        self.assertEqual(tracker.rig._ring_radius, RING_RADIUS)
+        self.assertEqual(tracker.rig._camera_height, CAMERA_HEIGHT)
         # Each camera owns 360/num_cameras of the ring, not a hardcoded 90
-        self.assertAlmostEqual(tracker.geometry.target_fov, 90.0, places=9)
+        self.assertAlmostEqual(tracker.rig.target_fov, 90.0, places=9)
         self.assertAlmostEqual(
-            PanoramicTracker(config, num_players=4, num_cameras=3).geometry.target_fov,
+            PanoramicTracker(config, num_players=4, num_cameras=3).rig.target_fov,
             120.0, places=9)
         # The row model is derived from the shared camera fields with the warp's own functions —
         # frame_height 0 resolving to the sensor's full reach at this tilt — and published as the
@@ -1382,9 +1458,9 @@ class TestInitialGeometrySync(unittest.TestCase):
                                 config.frame_height)
         window = frame_window((1280, 800), (1280, rows), 1280, PARALLAX_FOV, config.tilt,
                               config.lens_fov, (config.lens_centre_x, config.lens_centre_y))
-        self.assertAlmostEqual(tracker.geometry._horizon_px, window.horizon_px, places=9)
-        self.assertAlmostEqual(tracker.geometry._focal, window.focal, places=9)
-        self.assertEqual(tracker.geometry._rows, rows)
+        self.assertAlmostEqual(tracker.rig._horizon_px, window.horizon_px, places=9)
+        self.assertAlmostEqual(tracker.rig._focal, window.focal, places=9)
+        self.assertEqual(tracker.rig._rows, rows)
         self.assertEqual(config.rig.hfov, PARALLAX_FOV)
         self.assertEqual(config.rig.tilt, config.tilt)
         self.assertAlmostEqual(config.rig.vfov, window.elevation_top - window.elevation_bottom, places=9)

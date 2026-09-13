@@ -1,60 +1,26 @@
 """One observation turned into one mark on the strip. No GL, no board, no settings — arithmetic.
 
-Kept out of the renderers because two of them draw the same marks: `ObservationRenderer` draws the
-lines, `LabelRenderer` the text beside them, and if each worked the geometry out for itself the two
-could disagree about where a person is. The compositor builds the list once and hands it to both.
+A mark is everything drawn for one observation: its **line**, its **foot tick**, its **field** and
+its **label**. Built once by the compositor for both `MarkRenderer` (line, tick, field) and
+`LabelRenderer` (label), so the two cannot disagree about where a person is.
 
-**A mark is the tracker's own belief, and its two axes deliberately use two different depths.**
-Both axes share the strip's space — x is azimuth at the rig centre, y is elevation there — and what
-differs is the distance each is converted through, because each answers a different question.
+**A mark is the tracker's belief, and its two axes use two different depths on purpose.**
 
-**x: the fixed parallax depth.** The x is the fused `world_angle`, the number the light, the sound
-and the hit detector all act on, and the tracker derives it at `rig.parallax_radius` (the tracked
-zone's harmonic mean, R 2.1 here), never from a person's measured distance —
-`Geometry._update_parallax_depth` has the measurements: the two cameras at a seam err in opposite
-directions, so feeding a measured distance in cost about 10° more than assuming one. The tolerance
-field follows x onto that same cylinder, because it is a statement about the same azimuth.
+- **x** is the fused `world_angle` — what the light, sound and hit detector act on — which the
+  tracker derives at the fixed `rig.parallax_radius`. The field goes through the same depth, since
+  it is a statement about the same azimuth. So a mark sits a small constant distance from its own
+  pixels (the image is stitched at `focus_radius`), and two views of one person at a seam differ by
+  the residual for their depth: a depth indicator, not an error.
+- **y** goes through the person's own `annotation.distance`. There the lens height cancels,
+  `atan(tan(-atan(h / d)) * d / R) = atan(-h / R)`, which is the grid's zone-band formula: **the
+  foot tick sits on the R 3.5 edge iff the tracker reports this person at R 3.5.** On the parallax
+  cylinder that exactness would be lost. The distance is unclamped, so a person past the far edge
+  shows as a tick above the zone band.
 
-**y: the person's own distance.** The rows go through `annotation.distance` instead, and that is
-what makes the foot row an *instrument* rather than a decoration. Converted through the person's own
-distance the lens height cancels algebraically:
-
-    atan(tan(-atan(h / d)) * d / R) = atan(-h / R)
-
-which is *precisely* the formula the grid's zone field is drawn from. So the foot tick and the zone
-lines are exactly comparable: **the tick sits on the R 3.5 line iff the tracker reports this person
-at R 3.5** — tape the circle, stand on it, read it off, and the label's `R` prints that same 3.5.
-Put the rows on the parallax cylinder for uniformity with x and that exactness is gone (20 px of
-error at R 1.5), and the one calibration the strip can do precisely goes with it.
-
-Note what this buys besides: the foot correction (`TrackerSettings.foot_offset`) reaches the mark
-through `annotation.distance`, already computed, so **nothing here knows about it** and the
-correction stays in one place. The distance is **unclamped**, so someone at R 5 reads `R5.0` with
-the tick well above the zone field rather than piled up at its edge — which is what lets the strip
-show why the tracker stopped counting them. A tick off the strip is not drawn
-(`ObservationRenderer`).
-
-Two consequences a reader has to know:
-
-- **A mark sits a small constant distance from its own pixels.** The image is stitched at
-  `render.panorama.focus_radius` (R 2.25) and a mark's x at R 2.1, so they are drawn on two nearby
-  cylinders. That offset is a chosen consequence — the parallax depth is derived from the zone so it
-  minimises the worst-case *seam* error, not so it matches a render slider — and it is not a fault.
-- **Two marks of one colour at a seam no longer have to coincide exactly.** They disagree by the
-  known geometric residual for that person's depth: zero at R 2.1, up to about 6.6° at the zone's
-  edges. So the gap is a **depth indicator**, not an error signal. It is a weaker diagnostic than
-  the old one, and an honest one — the old one was reading the detector's bias.
-
-Each mark also carries the **joining tolerance that governs its place on the ring** as a width
-(`_tolerance`), so the rule the tracker is about to apply to it is on screen next to it rather than
-only in a settings panel.
-
-**Detections a filter dropped are marks too**, so nobody leaves the strip without a reason. They
-have no world, so they are a grey line with no tolerance field (no rule can join them), labelled
-with the filter's name (`Rejection`: `young`, `small`, `dead zone`, `past R3.5`, `no id`). A LOST
-mark — a tracked person a filter stops counting, or one the device missed — keeps its own line, which
-fades to grey over `lost_timeout`, while its field fades out (`_fade`); the moment the line is fully
-grey is the moment a dropped detection's grey line takes over.
+A mark's **field** is the join range that governs it, as a width (`_field`). A **rejected**
+detection is a grey line with no field, labelled with its rejection (`rejection_label`). A **LOST**
+mark keeps its line, fading to grey over `lost_timeout` while its field fades out (`_colors`).
+The primary view of a person is drawn strong; the other views are **passive**.
 """
 
 # Standard library imports
@@ -62,33 +28,24 @@ import math
 from dataclasses import dataclass
 
 # Local application imports
-from modules.tracker import PanoramicAnnotation, Tracklet, TrackingStatus, camera_azimuth, \
-    camera_local_to_azimuth, centre_distance, centre_elevation, elevation_from_row, focus_distance, \
-    rejection_label, strip_y, wrap180
+from modules.tracker import PanoramicAnnotation, Rejection, Tracklet, TrackingStatus, camera_azimuth, \
+    camera_local_to_azimuth, centre_distance, elevation_from_row, focus_distance, wrap180
+
+from .strip import centre_elevation, strip_y
 
 Color = tuple[float, float, float, float]
 
-# How lit the line of a view the tracker did not pick is, against the primary's 1.
-_PASSIVE: float = 0.8
+# How lit a passive view's line is, against the primary's 1.
+_PASSIVE_ALPHA: float = 0.8
 
 
 @dataclass(frozen=True)
-class StripGeometry:
-    """The strip's geometry, in one value object, so a mark is one argument's worth of context.
+class MarkContext:
+    """Everything a mark needs from the tracker's published numbers, rebuilt by the compositor each
+    tick and passed in so this module stays pure.
 
-    Owned by the compositor and rebuilt each tick from the tracker's published numbers; nothing
-    here is a preference. `row_model` is (horizon_row, focal_rows) — the delivered frames' rows,
-    rebuilt from the tracker's published edge angles (`panorama_map.row_model`) — and
-    `elevation_window` the strip's (top, bottom) at the rig centre.
-
-    `parallax_radius` is the one depth the tracker corrects the azimuth at, mirrored here so a
-    mark's x and its tolerance land on the same cylinder — the tracker's own number, unconverted.
-    `camera_height` is the rig's measured lens height, and it is here for the *rows*: the foot tick
-    is `atan(camera_height / R)` below the horizon, the grid's zone field's own formula, which is
-    what makes the two comparable.
-
-    `zone_max_radius` names the far edge in a `past R…` tag; `lost_timeout` and `now` are what a
-    LOST mark's fade is timed by — passed in rather than read, so this stays pure.
+    `row_model` is the frames' (horizon_row, focal_rows) (`projection.row_model`); `elevation_window` the
+    strip's (top, bottom) at the rig centre; `now` and `lost_timeout` time a LOST mark's fade.
     """
     cam_fov: float
     target_fov: float
@@ -106,32 +63,32 @@ class StripGeometry:
 
 @dataclass(frozen=True)
 class Mark:
-    """Where one observation lands on the strip, and what to say about it."""
+    """Where one observation lands on the strip, and what its label says."""
     world_id: int
     cam_id: int
     x: float                                        # normalised strip x, from the world azimuth
     top_y: float                                    # normalised strip y of the box's top row
     bottom_y: float                                 # ... and of the feet
     has_foot: bool                                  # whether `bottom_y` is a floor reading at all
-    tolerance_x: float                              # left edge of the joining tolerance...
-    tolerance_w: float                              # ... and its width; both normalised strip x
+    field_x: float                                  # left edge of the field...
+    field_w: float                                  # ... and its width; both normalised strip x
     color: tuple[float, float, float, float]        # the line's colour, alpha carrying confidence
     field_color: tuple[float, float, float, float]  # the field's world colour; alpha = how visible
-    field_outline: bool                             # a view the tracker did not pick: outlined, not filled
+    field_outline: bool                             # a passive or LOST view: outlined, not filled
     is_primary: bool
-    rejected: bool                                  # a detection a filter dropped: no world, grey
+    rejected: bool                                  # a detection a filter rejected: no world, grey
     label: str
 
 
 def build_marks(observations: list[Tracklet], primaries: set[int],
                 colors: list[tuple[float, float, float, float]],
                 rejected_color: tuple[float, float, float, float],
-                geometry: StripGeometry) -> list[Mark]:
-    """A mark per usable observation. Dropped detections first, under everyone; primaries last, so
-    they are drawn over their candidates."""
+                context: MarkContext) -> list[Mark]:
+    """A mark per usable observation. Rejected detections first, under everyone; primaries last, so
+    they are drawn over their passive views."""
     marks: list[Mark] = []
     for tracklet in observations:
-        mark: Mark | None = _mark(tracklet, primaries, colors, rejected_color, geometry)
+        mark: Mark | None = _mark(tracklet, primaries, colors, rejected_color, context)
         if mark is not None:
             marks.append(mark)
     marks.sort(key=lambda m: (not m.rejected, m.is_primary))
@@ -141,7 +98,7 @@ def build_marks(observations: list[Tracklet], primaries: set[int],
 def _mark(tracklet: Tracklet, primaries: set[int],
           colors: list[tuple[float, float, float, float]],
           rejected_color: tuple[float, float, float, float],
-          g: StripGeometry) -> Mark | None:
+          c: MarkContext) -> Mark | None:
     if tracklet is None or tracklet.is_removed:
         return None
     if not isinstance(tracklet.annotation, PanoramicAnnotation):
@@ -149,38 +106,34 @@ def _mark(tracklet: Tracklet, primaries: set[int],
 
     annotation: PanoramicAnnotation = tracklet.annotation
     roi_bottom: float = tracklet.roi.y + tracklet.roi.height
-    # The ROWS go through the person's OWN distance, unlike the x above. `cam_distance` is how far
-    # the camera reads them as being (through `foot_offset`, and unclamped); `centre_dist` the
-    # radius from the rig centre the label prints as `R`, and the radius the foot tick is then exact
-    # at against the zone field — so a tick above the field's top edge is a person past the far
-    # edge, whom the tracker no longer sees.
+    # The rows go through the person's own distance (module docstring); `centre_dist` is the radius
+    # the label prints as `R` and the foot tick is drawn at.
     has_foot: bool = math.isfinite(annotation.distance)
     if has_foot:
         cam_distance: float = max(1e-6, annotation.distance)
-        centre_dist: float = centre_distance(annotation.local_angle - g.cam_fov / 2.0,
-                                             cam_distance, g.ring_radius)
-        top_y: float = _row_y(tracklet.roi.y, g, cam_distance, centre_dist)
-        bottom_y: float = _foot_y(g, centre_dist)
+        centre_dist: float = centre_distance(annotation.local_angle - c.cam_fov / 2.0,
+                                             cam_distance, c.ring_radius)
+        top_y: float = _row_y(tracklet.roi.y, c, cam_distance, centre_dist)
+        bottom_y: float = _foot_y(c, centre_dist)
     else:
-        # Feet at or above the horizon: not standing on this floor, so there is no distance to
-        # convert the rows through. Place the line on the parallax cylinder instead — where its x
-        # already is — and draw no foot tick, since there is no floor reading to mark.
-        phi: float = wrap180(annotation.world_angle - camera_azimuth(tracklet.cam_id, g.target_fov))
-        cylinder: float = focus_distance(phi, g.ring_radius, g.parallax_radius)
+        # Feet at or above the horizon: no floor distance. Rows go through the parallax cylinder,
+        # where the x already is, and there is no foot tick.
+        phi: float = wrap180(annotation.world_angle - camera_azimuth(tracklet.cam_id, c.target_fov))
+        cylinder: float = focus_distance(phi, c.ring_radius, c.parallax_radius)
         centre_dist = math.inf
-        top_y = _row_y(tracklet.roi.y, g, cylinder, g.parallax_radius)
-        bottom_y = _row_y(roi_bottom, g, cylinder, g.parallax_radius)
+        top_y = _row_y(tracklet.roi.y, c, cylinder, c.parallax_radius)
+        bottom_y = _row_y(roi_bottom, c, cylinder, c.parallax_radius)
 
-    # Dropped by a filter and never given a world: a grey line, no rule to join it by, tagged with why.
+    # Rejected by a filter and never given a world: a grey line, no field, labelled with why.
     rejected: bool = annotation.rejected is not None and tracklet.id < 0
     is_primary: bool = tracklet.obs_id in primaries
     if rejected:
-        tolerance_lo = tolerance_hi = annotation.world_angle
+        field_lo = field_hi = annotation.world_angle
         color: tuple[float, float, float, float] = rejected_color
         field_color: tuple[float, float, float, float] = (*rejected_color[:3], 0.0)
     else:
-        tolerance_lo, tolerance_hi = _tolerance(annotation, tracklet.cam_id, g)
-        color, field_color = _colors(tracklet, is_primary, colors, rejected_color, g)
+        field_lo, field_hi = _field(annotation, tracklet.cam_id, c)
+        color, field_color = _colors(tracklet, is_primary, colors, rejected_color, c)
 
     return Mark(
         world_id=tracklet.id,
@@ -189,144 +142,114 @@ def _mark(tracklet: Tracklet, primaries: set[int],
         top_y=top_y,
         bottom_y=bottom_y,
         has_foot=has_foot,
-        tolerance_x=(tolerance_lo % 360.0) / 360.0,
-        tolerance_w=((tolerance_hi - tolerance_lo) % 360.0) / 360.0,
+        field_x=(field_lo % 360.0) / 360.0,
+        field_w=((field_hi - field_lo) % 360.0) / 360.0,
         color=color,
         field_color=field_color,
         field_outline=not is_primary or tracklet.status == TrackingStatus.LOST,
         is_primary=is_primary,
         rejected=rejected,
-        label=_label(tracklet, annotation, centre_dist, rejected, g),
+        label=_label(tracklet, annotation, centre_dist, rejected, c),
     )
 
 
-def _fade(tracklet: Tracklet, g: StripGeometry) -> float:
+def _fade(tracklet: Tracklet, c: MarkContext) -> float:
     """How far a LOST observation is toward being forgotten: 0 just lost, 1 at `lost_timeout`.
     0 for anything the device is still detecting."""
     if tracklet.status != TrackingStatus.LOST:
         return 0.0
-    return min(1.0, max(0.0, g.now - tracklet.last_active) / max(1e-6, g.lost_timeout))
+    return min(1.0, max(0.0, c.now - tracklet.last_active) / max(1e-6, c.lost_timeout))
 
 
 def _colors(tracklet: Tracklet, is_primary: bool, colors: list[Color], grey: Color,
-            g: StripGeometry) -> tuple[Color, Color]:
+            c: MarkContext) -> tuple[Color, Color]:
     """(line, field) colours: the world colour, alpha saying how much to trust it.
 
-    A loser at a seam has its line dimmed so the primary reads as the one in charge; its field is
-    told apart by shape instead (`Mark.field_outline`), since a fill too faint to see says nothing. A
-    **LOST** observation is still an identity the tracker holds — anchoring a seam crossing, or a
-    person walking past the far edge — so it keeps its mark, dimmed like a candidate, and the mark
-    says how close it is to being forgotten: over `lost_timeout` its **line fades to grey** and its
-    **field fades out**, keeping its colour. Fully grey is exactly the moment a dropped detection's
-    grey line takes over, so a person walking out never vanishes; the field going first says the rule
-    it stood for — who it may be joined to — is running out with it.
+    A passive view has its line dimmed; its field is told apart by shape (`Mark.field_outline`). A
+    **LOST** observation is still an identity the tracker holds, so it keeps its mark, dimmed, and
+    over `lost_timeout` its line fades to grey and its field fades out — fully grey is when a
+    rejected detection's grey line would take over.
     """
     r, gr, b, a = colors[tracklet.id % len(colors)] if colors else (1.0, 1.0, 1.0, 1.0)
     if tracklet.status == TrackingStatus.LOST:
-        t: float = _fade(tracklet, g)
-        line: Color = (r + (grey[0] - r) * t, gr + (grey[1] - gr) * t, b + (grey[2] - b) * t, a * _PASSIVE)
+        t: float = _fade(tracklet, c)
+        line: Color = (r + (grey[0] - r) * t, gr + (grey[1] - gr) * t, b + (grey[2] - b) * t,
+                       a * _PASSIVE_ALPHA)
         return line, (r, gr, b, 1.0 - t)
-    return (r, gr, b, a if is_primary else a * _PASSIVE), (r, gr, b, 1.0)
+    return (r, gr, b, a if is_primary else a * _PASSIVE_ALPHA), (r, gr, b, 1.0)
+
+
+def rejection_label(reason: Rejection, zone_max_radius: float) -> str:
+    """The label text for a rejection: the whole label of a rejected detection, and the suffix on a
+    tracked person's label when a filter stopped counting them."""
+    if reason == Rejection.PAST_EDGE:
+        return f'past R{zone_max_radius:g}'
+    return {Rejection.YOUNG: 'young', Rejection.SMALL: 'small', Rejection.DEAD_ZONE: 'dead zone',
+            Rejection.NO_ID: 'no id'}[reason]
 
 
 def _label(tracklet: Tracklet, annotation: PanoramicAnnotation, centre_dist: float,
-           rejected: bool, g: StripGeometry) -> str:
-    """What to say beside a mark: the filter's name for a dropped detection, the readout otherwise.
+           rejected: bool, c: MarkContext) -> str:
+    """The label beside a mark: the rejection for a rejected detection, the readout otherwise,
+    followed by the rejection for a tracked person a filter stopped counting.
 
-    Fixed width, so the right-edge flip threshold is the same for everybody and cannot wobble as
-    the digits change. `R` is the same radius the foot tick is drawn at — the tick is the picture of
-    this number — so a tick on the R 3.5 zone line and an `R` of 3.5 say the same thing twice, and
-    `rig.zone_max_radius` says 3.5 as well. Both `R` and `H` read low until
-    `track.foot_offset` is measured; `H` falling as a person walks away is the signature
-    that it has not been. A tracked person the far edge has stopped counting says so after it.
+    Fixed width, so the right-edge flip threshold cannot wobble as the digits change. `R` is the
+    radius the foot tick is drawn at. `R` and `H` read low until `track.foot_offset` is calibrated.
     """
-    tag: str = '' if annotation.rejected is None else rejection_label(annotation.rejected, g.zone_max_radius)
+    reason: str = '' if annotation.rejected is None else rejection_label(annotation.rejected, c.zone_max_radius)
     if rejected:
-        return tag
+        return reason
     distance: str = f'R{centre_dist:.1f}m' if math.isfinite(centre_dist) else 'R-'
-    label: str = (f'#{tracklet.id} c{tracklet.cam_id} '
-                  f'az{annotation.world_angle % 360.0:03.0f} '
-                  f'{distance} '
-                  f'H{annotation.height:.1f}m')
-    return f'{label} {tag}' if tag else label
+    readout: str = (f'#{tracklet.id} c{tracklet.cam_id} '
+                    f'az{annotation.world_angle % 360.0:03.0f} '
+                    f'{distance} '
+                    f'H{annotation.height:.1f}m')
+    return f'{readout} {reason}' if reason else readout
 
 
-def _tolerance(annotation: PanoramicAnnotation, cam_id: int,
-               g: StripGeometry) -> tuple[float, float]:
-    """(low, high) azimuth of the rule that decides what this observation may be joined to.
+def _field(annotation: PanoramicAnnotation, cam_id: int, c: MarkContext) -> tuple[float, float]:
+    """(low, high) azimuth of the field: the rule that decides what this observation may be joined to.
 
-    **A pair test, so the field is the tolerance wide and not twice it.** Both gates have the form
-    `|Δ| ≤ angle`, so two fields of `angle` touch exactly when the difference equals the gate: two
-    fields of one colour that overlap are two observations the tracker will join. Fields of
-    `±angle` would overlap out to twice the gate and claim links that never happen.
+    **A pair test**: both rules are `|Δ| ≤ angle`, so fields `angle` wide touch exactly when the
+    difference equals the angle — two fields of one colour that overlap are two observations the
+    tracker will join.
 
-    **Which rule, and why the switch.** `overlap` means a second camera also sees this bearing, and
-    there the question worth watching is the cross-camera one (`seam.link_angle`, in world azimuth).
-    Outside it there is no second camera, so the only rule that can join anything is the same
-    camera re-finding a person it dropped (`reacquire_angle`, in its own local angle). Both rules
-    do in fact apply inside the overlap — a re-acquisition is tried first, everywhere — but the
-    cross-camera one is the one being tuned, so it is the one drawn.
+    Inside the overlap the seam rule is drawn (`seam.link_angle`, world azimuth); outside it the only
+    rule is the same camera re-finding a person (`reacquire_angle`, local angle). Re-acquisition also
+    applies inside the overlap, but the seam rule is the one being tuned there.
     """
     if annotation.overlap:
-        # A world-azimuth gate: symmetric about the mark, and deliberately unclamped, since the
-        # observation it might be joined to belongs to the camera whose field continues there.
-        half: float = g.link_angle / 2.0
+        # Symmetric about the mark, unclamped: its partner is in the neighbouring camera's field of view.
+        half: float = c.link_angle / 2.0
         centre: float = annotation.world_angle
         return (centre - half, centre + half)
 
-    # A LOCAL-angle gate, carried into the strip's frame through the same map the tracker's own
-    # azimuth goes through — `camera_local_to_azimuth` at `parallax_radius`. That is what keeps
-    # the pair test valid once drawn: the two positions AND the two widths take the same map, so
-    # their overlap still answers the gate, exactly rather than approximately (it used to depend on
-    # each observation's own estimated distance, so two of them converted by slightly different
-    # factors). It is also why the field measures visibly less than `reacquire_angle` against the
-    # degree grid: the centre is further from the person than the camera is, so 5 deg of local angle
-    # is about 4.5 deg of azimuth. Clamped to the camera's own field, because past its edge there
-    # are no pixels for anyone to come back in through; the clamp cannot hide a real pair, since
-    # both observations' centres lie inside the field and so does their overlap.
-    half_local: float = g.reacquire_angle / 2.0
+    # A local-angle rule, carried into azimuth through the tracker's own map (`parallax_radius`), so
+    # positions and widths take the same map and the overlap still answers the rule exactly — and
+    # the field reads narrower than `reacquire_angle` on the degree grid. Clamped to the camera's own
+    # field of view, which cannot hide a real pair: both centres lie inside it.
+    half_local: float = c.reacquire_angle / 2.0
     local: float = annotation.local_angle
-    lo: float = camera_local_to_azimuth(max(0.0, local - half_local), cam_id, g.cam_fov,
-                                        g.target_fov, g.ring_radius, g.parallax_radius)
-    hi: float = camera_local_to_azimuth(min(g.cam_fov, local + half_local), cam_id, g.cam_fov,
-                                        g.target_fov, g.ring_radius, g.parallax_radius)
+    lo: float = camera_local_to_azimuth(max(0.0, local - half_local), cam_id, c.cam_fov,
+                                        c.target_fov, c.ring_radius, c.parallax_radius)
+    hi: float = camera_local_to_azimuth(min(c.cam_fov, local + half_local), cam_id, c.cam_fov,
+                                        c.target_fov, c.ring_radius, c.parallax_radius)
     return (lo, hi)
 
 
-def _row_y(row: float, g: StripGeometry, cam_distance: float, centre_dist: float) -> float:
-    """A normalised frame row to a normalised strip y, through THIS PERSON's own distance.
+def _row_y(row: float, c: MarkContext, cam_distance: float, centre_dist: float) -> float:
+    """A normalised frame row to a normalised strip y, converted to the rig centre through the given
+    distances. Not clamped — an extrapolated box may run past the frame — the renderer clips."""
+    cam_elevation: float = elevation_from_row(row, *c.row_model)
+    return strip_y(centre_elevation(cam_elevation, cam_distance, centre_dist), c.elevation_window)
 
-    The delivered frame is cylindrical and levelled, so a row is the tangent of an elevation
-    measured at the camera, below the horizon row (`elevation_from_row`). Converting that to the rig
-    centre needs a distance, and it is the person's own: only then is the mark's vertical extent
-    their height on the same ruler the zone field is drawn on. Converting through the parallax
-    cylinder instead — tidier, since x uses it — is what cost the foot tick its exactness.
 
-    A row may legitimately fall outside [0, 1] — the device tracker extrapolates a partly visible
-    person, and that is real information about how close they are — so nothing is clamped here; the
-    renderer clips when it draws.
+def _foot_y(c: MarkContext, centre_dist: float) -> float:
+    """The strip y of the floor at radius `centre_dist` — the foot tick.
+
+    The same number as `_row_y` of the foot row through the person's own distance (the lens height
+    cancels), written as `GridRenderer._zone_band`'s own formula so the tick and the zone edges
+    cannot drift apart. Below the strip for a box extrapolated far below the frame; not drawn then.
     """
-    cam_elevation: float = elevation_from_row(row, *g.row_model)
-    return strip_y(centre_elevation(cam_elevation, cam_distance, centre_dist), g.elevation_window)
-
-
-def _foot_y(g: StripGeometry, centre_dist: float) -> float:
-    """The strip y of the floor at radius `centre_dist` — the tick that reads against the zone.
-
-    A closed form rather than `_row_y` of the box bottom, and it is the SAME number: running the
-    foot row through the person's own distance gives
-
-        atan(tan(-atan(h / d)) * d / R) = atan(-h / R)
-
-    with the lens height `h` cancelling out of the conversion entirely. That right-hand side is
-    exactly `GridRenderer._zone_field`'s formula, so the tick and the two zone edges are the same
-    kind of number and may be compared by eye to the pixel. Written out rather than derived through
-    the rows because it says what it means — *the floor, at the radius this person is reported at* —
-    and because it cannot then drift from the zone line if the row model changes.
-
-    The radius comes from the tracker's unclamped `distance`, so the tick keeps climbing toward the
-    horizon as a person walks past the far edge. A box extrapolated far below the frame puts it
-    below the strip, where `ObservationRenderer` does not draw it.
-    """
-    elevation: float = -math.degrees(math.atan(g.camera_height / max(1e-6, centre_dist)))
-    return strip_y(elevation, g.elevation_window)
+    elevation: float = -math.degrees(math.atan(c.camera_height / max(1e-6, centre_dist)))
+    return strip_y(elevation, c.elevation_window)

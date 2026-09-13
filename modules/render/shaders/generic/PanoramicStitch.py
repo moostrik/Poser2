@@ -25,7 +25,7 @@ class PanoramicStitch(Shader):
             textures: one per camera, in camera-id order; camera 0 owns azimuth 0 upward
             cam_fov: one camera's horizontal field (degrees)
             row_model: (horizon_row, focal_rows) — the frames' rows are tangents of elevation,
-                `row = horizon_row - focal_rows * tan(e)` (`panorama_map.row_from_elevation`)
+                `row = horizon_row - focal_rows * tan(e)` (`projection.row_from_elevation`)
             target_fov: the sector one camera owns, 360 / num_cameras (degrees)
             ring_radius: camera distance from the rig centre (m); 0 disables the parallax term
             focus_radius: radius of the play-zone cylinder the image is aligned for (m), passed

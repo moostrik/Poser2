@@ -8,19 +8,19 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.board import HasObservations, HasTracklets
 from modules.gl import Fbo, Texture, clear_color
-from modules.tracker import PanoramicTrackerSettings, Tracklet, elevation_window, row_model, \
-    strip_aspect_ratio
+from modules.tracker import PanoramicTrackerSettings, Tracklet, row_model
 from modules.utils import HotReloadMethods
 
 from ..LayerBase import LayerBase
 from ...color_settings import ColorSettings
 from .GridRenderer import GridRenderer
 from .LabelRenderer import LabelRenderer
-from .ObservationRenderer import ObservationRenderer
-from .PanoramaLayerSettings import PanoramaLayerSettings, Part, REJECTED_COLOR
+from .MarkRenderer import MarkRenderer
 from .SeamRenderer import SeamRenderer
 from .StitchRenderer import StitchRenderer
-from .marks import Mark, StripGeometry, build_marks
+from .marks import Mark, MarkContext, build_marks
+from .settings import PanoramaLayerSettings, Part, REJECTED_COLOR
+from .strip import elevation_window, strip_aspect_ratio
 
 
 class PanoramaBoard(HasTracklets, HasObservations, Protocol):
@@ -30,26 +30,16 @@ class PanoramaBoard(HasTracklets, HasObservations, Protocol):
 class Compositor(LayerBase):
     """The 360-degree calibration display: one strip, one FBO, five renderers in a fixed order.
 
-    x is azimuth, 0 at the left edge, linear in degrees — the ring's own unit. y is the TANGENT of
-    elevation, both measured at the rig centre: the strip's vertical is a photograph's, like the
-    camera frames', so a person has the same shape in both and only the azimuth re-projection
-    to the centre tells them apart. A degree at the horizon is the same size either way; above it
-    the rows spend more (`strip_y`).
+    x is centre azimuth, linear in degrees, 0 at the left edge; y is the tangent of centre elevation
+    (`strip.strip_y`), a photograph's vertical like the frames'. The image and the tracker's data are
+    drawn on the same axes so a person's pixels and numbers are read in the same place — and which
+    is wrong says whether to reach for `fov`/`tilt` or the `rig` metres.
 
-    **Why the image and the data are one display.** The camera constants define the azimuth frame
-    every other number in the installation is expressed in, and the distance model rides on top of
-    them. Drawn apart, on two vertical scales, the two could not be compared; drawn together, a
-    person's pixels and a person's numbers are read in the same place — and which of the two is
-    wrong tells you whether to reach for `fov`/`tilt` or for the `rig` group's metres.
+    **This class owns the strip's geometry** and hands it down, so nothing can drift. `aspect_ratio`
+    is read by the render's row layout.
 
-    **This class owns the strip's geometry**, and hands it down: the elevation window is derived
-    once here and passed to whichever renderer needs it, so nothing can drift. `aspect_ratio` is
-    read by the render's row layout — change `tilt`, `fov` or `focus_radius` and the row follows.
-
-    **What actually varies between the renderers is the DEPTH, not the space.** Both axes need an
-    assumed distance to turn a camera's view into the centre's, and each renderer names its own for
-    its own reason. Everything on the strip shares the two axes; two things are comparable only if
-    they also share a depth, and every misalignment this display has had was a pair that did not:
+    **What varies between the renderers is the depth, not the space.** Two things on the strip are
+    comparable only if they also share a depth:
 
     | drawn thing                        | x              | y                  | depth |
     |------------------------------------|----------------|--------------------|-------|
@@ -57,21 +47,16 @@ class Compositor(LayerBase):
     | dead zone (`SeamRenderer`)         | centre azimuth | — full height      | `focus_radius` |
     | lattice, seam + axis lines (`Grid`)| centre azimuth | —                  | **exact** |
     | overlap verticals (`Grid`)         | centre azimuth | —                  | `parallax_radius` |
-    | horizon, zone field (`Grid`)       | —              | centre elevation   | **exact** |
-    | mark + foot tick (`Observations`)  | centre azimuth | centre elevation   | x: `parallax_radius`, y: **the person's own distance** |
+    | horizon, zone band (`Grid`)        | —              | centre elevation   | **exact** |
+    | mark: line, tick, field (`Mark`)   | centre azimuth | centre elevation   | x: `parallax_radius`, y: **the person's own distance** |
     | label (`LabelRenderer`)            | centre azimuth | pixel lane by id   | `parallax_radius` |
 
-    The picture's depth so a band lands on the pixels it describes; the fusion depth so the azimuth
-    never rides on a measured distance, and so the overlap verticals mark where a mark's field
-    really switches; the person's own distance for the mark's rows, because only there does the
-    lens height cancel and the foot tick become *exactly* the zone field's own formula — which is
-    what makes the tick an instrument rather than a decoration. Exact means no depth enters at all:
-    a seam is a bearing, and a floor circle's depression is `atan(camera_height / R)` whatever the
-    picture assumes.
+    The picture's depth so a band lands on its pixels; the tracker's depth so marks and the overlap
+    verticals agree with the azimuth it emits; the person's own distance for a mark's rows (`marks`).
+    Exact means no depth enters: a seam is a bearing, a floor circle a fixed depression.
 
-    Renderers own no FBO of their own (as in `cam/`): each draws into this one between `begin()` and
-    `end()`, in the order below, and an unticked `Part` is skipped entirely rather than drawn and
-    hidden.
+    Renderers own no FBO: each draws into this one between `begin()` and `end()`, in order, and an
+    unticked `Part` is skipped entirely.
     """
 
     def __init__(self, board: PanoramaBoard, cam_textures: list[Texture], num_cams: int,
@@ -88,18 +73,18 @@ class Compositor(LayerBase):
         self._stitch: StitchRenderer = StitchRenderer(cam_textures, tracker, settings)
         self._seams: SeamRenderer = SeamRenderer(self.num_cams, tracker, settings)
         self._grid: GridRenderer = GridRenderer(self.num_cams, tracker, settings)
-        self._observations: ObservationRenderer = ObservationRenderer()
+        self._marks: MarkRenderer = MarkRenderer()
         self._labels: LabelRenderer = LabelRenderer()
 
         # Bottom to top. The image first because everything else is read against it; the seams
-        # under the grid so the lattice stays legible over a band; the text last so nothing
-        # covers it.
+        # under the grid so the lattice stays legible over a band; the labels last so nothing
+        # covers them.
         self._order: list[tuple[Part, LayerBase]] = [
-            (Part.image,        self._stitch),
-            (Part.seams,        self._seams),
-            (Part.grid,         self._grid),
-            (Part.observations, self._observations),
-            (Part.labels,       self._labels),
+            (Part.image,  self._stitch),
+            (Part.seams,  self._seams),
+            (Part.grid,   self._grid),
+            (Part.marks,  self._marks),
+            (Part.labels, self._labels),
         ]
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
@@ -126,7 +111,7 @@ class Compositor(LayerBase):
         """(horizon_row, focal_rows): the delivered frame's rows, rebuilt from the two edge angles
         the tracker publishes. Exact — the angles carry the whole row model — so the stitch and the
         marks convert rows while the panel only ever shows degrees. Rows are tangents of elevation:
-        see `panorama_map.row_from_elevation`."""
+        see `projection.row_from_elevation`."""
         horizon_row, focal_rows = row_model(*self.populated_band)
         return (horizon_row, max(1e-6, focal_rows))
 
@@ -175,7 +160,7 @@ class Compositor(LayerBase):
         self._stitch.set_geometry(self.target_fov, self.row_model, window, self.populated_band)
         self._grid.set_geometry(window)
 
-        if Part.observations in parts or Part.labels in parts:
+        if Part.marks in parts or Part.labels in parts:
             self._set_marks(window)
 
         self._fbo.begin()
@@ -188,15 +173,15 @@ class Compositor(LayerBase):
         self._fbo.end()
 
     def _set_marks(self, window: tuple[float, float]) -> None:
-        """Build the marks once, for the two renderers that draw the same people."""
+        """Build the marks once, for the mark and label renderers."""
         chosen: list[Tracklet] = [t for t in self._board.get_tracklets().values() if t is not None]
         primaries: set[int] = {t.obs_id for t in chosen}
-        # Every camera's own opinion, or only the fused one. The disagreement is the whole point, so
-        # all of them by default; primaries-only is the fallback for reading a busy room.
+        # Every camera's own view, or only the primary. The disagreement is the whole point, so all
+        # of them by default; primaries-only is the fallback for reading a busy room.
         observations: list[Tracklet] = \
             self._board.get_observations() if self._settings.show_all_observations else chosen
 
-        geometry: StripGeometry = StripGeometry(
+        context: MarkContext = MarkContext(
             cam_fov=self._tracker.fov,
             target_fov=self.target_fov,
             ring_radius=self.ring_radius,
@@ -211,6 +196,6 @@ class Compositor(LayerBase):
             now=time.time(),
         )
         marks: list[Mark] = build_marks(
-            observations, primaries, self._color_settings.track_color_tuples, REJECTED_COLOR, geometry)
-        self._observations.set_marks(marks)
+            observations, primaries, self._color_settings.track_color_tuples, REJECTED_COLOR, context)
+        self._marks.set_marks(marks)
         self._labels.set_marks(marks)

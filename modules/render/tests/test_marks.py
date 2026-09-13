@@ -11,9 +11,10 @@ import math
 import unittest
 from dataclasses import replace
 
-from modules.render.layers.panorama.marks import Mark, StripGeometry, build_marks
+from modules.render.layers.panorama.marks import Mark, MarkContext, build_marks
+from modules.render.layers.panorama.strip import strip_spans, strip_y
 from modules.tracker import PanoramicAnnotation, PanoramicTracker, PanoramicTrackerSettings, Rejection, \
-    Tracklet, TrackingStatus, row_from_elevation, strip_spans, strip_y
+    Tracklet, TrackingStatus, row_from_elevation
 from modules.utils import Rect
 
 
@@ -29,7 +30,7 @@ ZONE_MAX_RADIUS: float = 3.5
 LOST_TIMEOUT: float = 2.0
 NOW: float = 1_000_000.0            # a fixed clock, so a LOST mark's fade is deterministic
 
-GEOMETRY: StripGeometry = StripGeometry(
+CONTEXT: MarkContext = MarkContext(
     cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
     parallax_radius=PARALLAX_RADIUS, camera_height=CAMERA_HEIGHT,
     row_model=(0.78, 0.58), elevation_window=(40.0, -30.0),
@@ -59,15 +60,15 @@ def observation(cam_id: int, local_angle: float, world_angle: float, *, overlap:
     )
 
 
-def mark(tracklet: Tracklet, geometry: StripGeometry = GEOMETRY) -> Mark:
-    marks: list[Mark] = build_marks([tracklet], set(), WHITE, GREY, geometry)
+def mark(tracklet: Tracklet, context: MarkContext = CONTEXT) -> Mark:
+    marks: list[Mark] = build_marks([tracklet], set(), WHITE, GREY, context)
     assert len(marks) == 1
     return marks[0]
 
 
 def span(m: Mark) -> tuple[float, float]:
-    """A mark's tolerance field in degrees, as (low, high) — high may pass 360 when it wraps."""
-    return (m.tolerance_x * 360.0, (m.tolerance_x + m.tolerance_w) * 360.0)
+    """A mark's field in degrees, as (low, high) — high may pass 360 when it wraps."""
+    return (m.field_x * 360.0, (m.field_x + m.field_w) * 360.0)
 
 
 class TestPlacement(unittest.TestCase):
@@ -85,7 +86,7 @@ class TestPlacement(unittest.TestCase):
 
     def test_the_foot_row_follows_the_distance_and_not_the_box(self) -> None:
         """The foot row is the FLOOR at the reported radius, not the box's bottom pixel — which is
-        what makes it exact against the zone field, and what keeps `foot_offset` out of this file:
+        what makes it exact against the zone band, and what keeps `foot_offset` out of this file:
         the correction arrives already applied, inside `distance`."""
         rows = {mark(observation(0, 63.5, 45.0, overlap=False, distance=3.0,
                                  top=0.1, height=h)).bottom_y for h in (0.2, 0.5, 1.4)}
@@ -102,7 +103,7 @@ class TestPlacement(unittest.TestCase):
         m: Mark = mark(observation(0, on_axis, 45.0, overlap=False, distance=5.0 - RING_RADIUS))
         self.assertIn('R5.0m', m.label)
         far_edge_y: float = strip_y(-math.degrees(math.atan(CAMERA_HEIGHT / 3.5)),
-                                    GEOMETRY.elevation_window)
+                                    CONTEXT.elevation_window)
         self.assertLess(m.bottom_y, far_edge_y)                   # higher on the strip = further
 
     def test_feet_not_on_the_floor_still_make_a_mark_but_no_foot_tick(self) -> None:
@@ -116,45 +117,45 @@ class TestPlacement(unittest.TestCase):
 
     def test_a_removed_observation_makes_no_mark(self) -> None:
         removed = observation(0, 63.5, 45.0, overlap=False, status=TrackingStatus.REMOVED)
-        self.assertEqual(build_marks([removed], set(), WHITE, GREY, GEOMETRY), [])
+        self.assertEqual(build_marks([removed], set(), WHITE, GREY, CONTEXT), [])
 
 
-def dropped(reason: Rejection, **kwargs) -> Tracklet:
-    """A detection a filter dropped, as the tracker publishes it: no world, tagged."""
+def rejected(reason: Rejection, **kwargs) -> Tracklet:
+    """A detection a filter rejected, as the tracker publishes it: no world, with its rejection."""
     t: Tracklet = observation(0, 63.5, 45.0, overlap=False, **kwargs)
     assert isinstance(t.annotation, PanoramicAnnotation)
     return replace(t, id=-1, annotation=replace(t.annotation, rejected=reason))
 
 
-class TestDroppedDetections(unittest.TestCase):
-    """A detection the tracker did not count is still a mark: a grey line, and named."""
+class TestRejectedDetections(unittest.TestCase):
+    """A detection the tracker did not count is still a mark: a grey line, labelled with why."""
 
     def test_it_is_a_grey_line_that_joins_nothing(self) -> None:
-        m: Mark = mark(dropped(Rejection.SMALL))
+        m: Mark = mark(rejected(Rejection.SMALL))
         self.assertTrue(m.rejected)
         self.assertEqual(m.color, GREY)
         self.assertEqual(m.field_color[3], 0.0)                     # no field
-        self.assertAlmostEqual(m.tolerance_w, 0.0, places=12)
-        self.assertEqual(strip_spans(m.tolerance_x, m.tolerance_w), [])
+        self.assertAlmostEqual(m.field_w, 0.0, places=12)
+        self.assertEqual(strip_spans(m.field_x, m.field_w), [])
 
-    def test_each_filter_names_itself(self) -> None:
-        for reason, tag in ((Rejection.YOUNG, 'young'), (Rejection.SMALL, 'small'),
-                            (Rejection.DEAD_ZONE, 'dead zone'), (Rejection.PAST_EDGE, 'past R3.5'),
-                            (Rejection.NO_ID, 'no id')):
+    def test_each_rejection_labels_itself(self) -> None:
+        for reason, text in ((Rejection.YOUNG, 'young'), (Rejection.SMALL, 'small'),
+                             (Rejection.DEAD_ZONE, 'dead zone'), (Rejection.PAST_EDGE, 'past R3.5'),
+                             (Rejection.NO_ID, 'no id')):
             with self.subTest(reason=reason):
-                self.assertEqual(mark(dropped(reason)).label, tag)
+                self.assertEqual(mark(rejected(reason)).label, text)
 
-    def test_dropped_marks_are_drawn_first(self) -> None:
-        marks = build_marks([observation(0, 63.5, 45.0, overlap=False), dropped(Rejection.YOUNG)],
-                            set(), WHITE, GREY, GEOMETRY)
+    def test_rejected_marks_are_drawn_first(self) -> None:
+        marks = build_marks([observation(0, 63.5, 45.0, overlap=False), rejected(Rejection.YOUNG)],
+                            set(), WHITE, GREY, CONTEXT)
         self.assertEqual([m.rejected for m in marks], [True, False])
 
     def test_a_tracked_person_past_the_edge_keeps_their_own_mark(self) -> None:
-        # Tagged but holding a world: its own mark, not a grey line, and the label says why it is fading.
+        # Rejected but holding a world: its own mark, not a grey line, and the label says why it is fading.
         t: Tracklet = observation(0, 63.5, 45.0, overlap=False, status=TrackingStatus.LOST)
         assert isinstance(t.annotation, PanoramicAnnotation)
         t = replace(t, id=0, last_active=NOW, annotation=replace(t.annotation, rejected=Rejection.PAST_EDGE))
-        m: Mark = build_marks([t], set(), RED, GREY, GEOMETRY)[0]
+        m: Mark = build_marks([t], set(), RED, GREY, CONTEXT)[0]
         self.assertFalse(m.rejected)
         self.assertTrue(m.label.endswith(' past R3.5'))
         self.assertTrue(m.label.startswith('#0 c0'))
@@ -167,7 +168,7 @@ class TestLostFade(unittest.TestCase):
     def lost(self, seconds_lost: float, status: TrackingStatus = TrackingStatus.LOST) -> Mark:
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, status=status),
                               id=0, last_active=NOW - seconds_lost)
-        return build_marks([t], set(), RED, GREY, GEOMETRY)[0]
+        return build_marks([t], set(), RED, GREY, CONTEXT)[0]
 
     def colour(self, seconds_lost: float, status: TrackingStatus = TrackingStatus.LOST):
         return self.lost(seconds_lost, status).color
@@ -181,7 +182,7 @@ class TestLostFade(unittest.TestCase):
     def test_a_lost_field_is_outlined_even_as_primary(self) -> None:
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, status=TrackingStatus.LOST),
                               id=0, last_active=NOW)
-        self.assertTrue(build_marks([t], {t.obs_id}, RED, GREY, GEOMETRY)[0].field_outline)
+        self.assertTrue(build_marks([t], {t.obs_id}, RED, GREY, CONTEXT)[0].field_outline)
 
     def test_fresh_is_the_world_colour(self) -> None:
         self.assertEqual(self.colour(0.0), (1.0, 0.0, 0.0, 0.8))
@@ -198,26 +199,26 @@ class TestLostFade(unittest.TestCase):
         self.assertAlmostEqual(a, 0.8)
 
     def test_a_tracked_observation_does_not_fade(self) -> None:
-        # Only LOST fades; an active candidate keeps its colour at the passive alpha however old.
+        # Only LOST fades; an active passive view keeps its colour at the passive alpha however old.
         self.assertEqual(self.colour(LOST_TIMEOUT, status=TrackingStatus.TRACKED), (1.0, 0.0, 0.0, 0.8))
 
 
 class TestPassiveField(unittest.TestCase):
-    """The primary's field is filled; a view the tracker did not pick is outlined, at full visibility."""
+    """The primary's field is filled; a passive view's is outlined, at full visibility."""
 
     def test_primary_filled_passive_outlined(self) -> None:
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=True), id=0)
-        primary: Mark = build_marks([t], {t.obs_id}, RED, GREY, GEOMETRY)[0]
-        passive: Mark = build_marks([t], set(), RED, GREY, GEOMETRY)[0]
+        primary: Mark = build_marks([t], {t.obs_id}, RED, GREY, CONTEXT)[0]
+        passive: Mark = build_marks([t], set(), RED, GREY, CONTEXT)[0]
         self.assertFalse(primary.field_outline)
         self.assertTrue(passive.field_outline)
         self.assertEqual(primary.field_color, passive.field_color)
         self.assertEqual((primary.color[3], passive.color[3]), (1.0, 0.8))
 
 
-class TestToleranceField(unittest.TestCase):
-    """The width says which rule owns this part of the ring, and it is the tolerance wide rather
-    than either side of the line, so that two fields overlapping *is* the gate."""
+class TestFieldWidth(unittest.TestCase):
+    """The width says which rule owns this part of the ring, and it is the rule's angle wide rather
+    than either side of the line, so that two fields overlapping *is* the rule."""
 
     def test_in_an_overlap_it_is_the_link_angle_centred_on_the_mark(self) -> None:
         m: Mark = mark(observation(0, 120.0, 96.0, overlap=True))
@@ -244,7 +245,7 @@ class TestToleranceField(unittest.TestCase):
         two observations of one person converted by different factors. Now it is the same width
         whatever the box bottom says, which is what makes the pair test exact rather than
         approximate."""
-        widths = {mark(observation(0, 63.5, 45.0, overlap=False, distance=d)).tolerance_w
+        widths = {mark(observation(0, 63.5, 45.0, overlap=False, distance=d)).field_w
                   for d in (0.6, 2.0, 3.0, 8.0, 40.0)}
         self.assertEqual(len(widths), 1, f'field width still varies with distance: {widths}')
 
@@ -253,11 +254,11 @@ class TestToleranceField(unittest.TestCase):
         # so the window stops there rather than claiming ring the camera cannot see.
         at_edge: Mark = mark(observation(0, CAM_FOV, 100.2, overlap=False))
         inside: Mark = mark(observation(0, CAM_FOV - REACQUIRE_ANGLE, 96.0, overlap=False))
-        self.assertLess(at_edge.tolerance_w, inside.tolerance_w)
-        self.assertAlmostEqual(at_edge.tolerance_w, inside.tolerance_w / 2.0, delta=0.001)
+        self.assertLess(at_edge.field_w, inside.field_w)
+        self.assertAlmostEqual(at_edge.field_w, inside.field_w / 2.0, delta=0.001)
 
-    def test_a_zero_tolerance_draws_nothing(self) -> None:
-        blank: StripGeometry = StripGeometry(
+    def test_a_zero_angle_draws_no_field(self) -> None:
+        blank: MarkContext = MarkContext(
             cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
             parallax_radius=PARALLAX_RADIUS, camera_height=CAMERA_HEIGHT,
             row_model=(0.78, 0.58), elevation_window=(40.0, -30.0),
@@ -266,8 +267,8 @@ class TestToleranceField(unittest.TestCase):
         for overlap in (True, False):
             with self.subTest(overlap=overlap):
                 m: Mark = mark(observation(0, 63.5, 45.0, overlap=overlap), blank)
-                self.assertAlmostEqual(m.tolerance_w, 0.0, places=12)
-                self.assertEqual(strip_spans(m.tolerance_x, m.tolerance_w), [])
+                self.assertAlmostEqual(m.field_w, 0.0, places=12)
+                self.assertEqual(strip_spans(m.field_x, m.field_w), [])
 
 
 class TestFieldsOverlapExactlyWhenTheTrackerLinks(unittest.TestCase):
@@ -276,7 +277,7 @@ class TestFieldsOverlapExactlyWhenTheTrackerLinks(unittest.TestCase):
     Two views of a seam person are joined when their world angles differ by no more than
     `seam.link_angle`. Drawn as two fields each that wide, they touch at exactly that difference —
     so `fields overlap` and `the tracker will link` are the same statement, which is the whole
-    reason the field is the tolerance wide and not either side of the line.
+    reason the field is the rule's angle wide and not either side of the line.
     """
 
     def setUp(self) -> None:
@@ -287,8 +288,8 @@ class TestFieldsOverlapExactlyWhenTheTrackerLinks(unittest.TestCase):
 
     def fields_overlap(self, a: Mark, b: Mark) -> bool:
         """Do the two drawn fields share any strip, wrap included?"""
-        for ax, aw in strip_spans(a.tolerance_x, a.tolerance_w):
-            for bx, bw in strip_spans(b.tolerance_x, b.tolerance_w):
+        for ax, aw in strip_spans(a.field_x, a.field_w):
+            for bx, bw in strip_spans(b.field_x, b.field_w):
                 if ax < bx + bw and bx < ax + aw:
                     return True
         return False
@@ -298,7 +299,7 @@ class TestFieldsOverlapExactlyWhenTheTrackerLinks(unittest.TestCase):
             with self.subTest(difference=difference):
                 a = observation(0, 120.0, 90.0, overlap=True)
                 b = observation(1, 8.0, 90.0 + difference, overlap=True)
-                links: bool = self.tracker._observations_match(a, b)
+                links: bool = self.tracker.seams._observations_match(a, b)
                 self.assertEqual(self.fields_overlap(mark(a), mark(b)), links,
                                  f'{difference} deg apart: drawn and gated disagree')
                 self.assertEqual(links, difference <= LINK_ANGLE)   # and the gate is the gate
@@ -306,7 +307,7 @@ class TestFieldsOverlapExactlyWhenTheTrackerLinks(unittest.TestCase):
     def test_two_people_at_a_seam_do_not_overlap(self) -> None:
         # The rig case: a metre apart at R 2.25 is about 25 deg, past the 18 deg gate.
         a, b = observation(0, 120.0, 90.0, overlap=True), observation(1, 8.0, 115.0, overlap=True)
-        self.assertFalse(self.tracker._observations_match(a, b))
+        self.assertFalse(self.tracker.seams._observations_match(a, b))
         self.assertFalse(self.fields_overlap(mark(a), mark(b)))
 
 
@@ -316,14 +317,14 @@ class TestTheWrap(unittest.TestCase):
 
     def test_a_field_across_zero_splits_into_two_spans_that_sum(self) -> None:
         m: Mark = mark(observation(3, 120.0, 356.0, overlap=True))
-        spans = strip_spans(m.tolerance_x, m.tolerance_w)
+        spans = strip_spans(m.field_x, m.field_w)
         self.assertEqual(len(spans), 2)
         self.assertAlmostEqual(sum(w for _x, w in spans) * 360.0, LINK_ANGLE, places=9)
 
     def test_a_field_just_past_zero_starts_negative_and_wraps_in(self) -> None:
         m: Mark = mark(observation(0, 8.0, 4.0, overlap=True))
-        self.assertGreater(m.tolerance_x, 0.9)                      # left edge came back round
-        spans = strip_spans(m.tolerance_x, m.tolerance_w)
+        self.assertGreater(m.field_x, 0.9)                      # left edge came back round
+        spans = strip_spans(m.field_x, m.field_w)
         self.assertAlmostEqual(sum(w for _x, w in spans) * 360.0, LINK_ANGLE, places=9)
 
 
@@ -370,15 +371,15 @@ class TestZoneLines(unittest.TestCase):
         """What the lines are for: a mark's line ends at the foot row, so a person inside the zone
         has that end between the two. Checked through the marks' own row model rather than a second
         copy of it."""
-        geometry = StripGeometry(
+        context = MarkContext(
             cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=0.0,
             parallax_radius=PARALLAX_RADIUS, camera_height=self.CAMERA_HEIGHT,
-            row_model=GEOMETRY.row_model, elevation_window=self.WINDOW,
+            row_model=CONTEXT.row_model, elevation_window=self.WINDOW,
             link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE,
             zone_max_radius=ZONE_MAX_RADIUS, lost_timeout=LOST_TIMEOUT, now=NOW)
         near_y = strip_y(self.elevation(1.5), self.WINDOW)
         far_y = strip_y(self.elevation(3.5), self.WINDOW)
-        horizon_row, focal_rows = geometry.row_model
+        horizon_row, focal_rows = context.row_model
         for radius in (2.0, 2.25, 3.0):
             with self.subTest(radius=radius):
                 # Feet on the floor at this radius, with the camera at the centre (ring 0, so the
@@ -386,7 +387,7 @@ class TestZoneLines(unittest.TestCase):
                 feet: float = row_from_elevation(self.elevation(radius), horizon_row, focal_rows)
                 t = observation(0, 63.5, 45.0, overlap=False, distance=radius,
                                 top=feet - 0.2, height=0.2)
-                m: Mark = mark(t, geometry)
+                m: Mark = mark(t, context)
                 self.assertLess(far_y, m.bottom_y)
                 self.assertLess(m.bottom_y, near_y)
 
@@ -400,17 +401,17 @@ class TestZoneLines(unittest.TestCase):
 
             atan(tan(-atan(h/d)) * d / R) = atan(-h/R)
 
-        the right-hand side being exactly what `GridRenderer._zone_field` draws. Put the rows on the
+        the right-hand side being exactly what `GridRenderer._zone_band` draws. Put the rows on the
         parallax cylinder instead — tidier, since the x uses it — and this breaks by 20 px at R 1.5.
         That is what this test exists to catch.
         """
-        geometry = StripGeometry(
+        context = MarkContext(
             cam_fov=CAM_FOV, target_fov=TARGET_FOV, ring_radius=RING_RADIUS,
             parallax_radius=PARALLAX_RADIUS, camera_height=self.CAMERA_HEIGHT,
-            row_model=GEOMETRY.row_model, elevation_window=self.WINDOW,
+            row_model=CONTEXT.row_model, elevation_window=self.WINDOW,
             link_angle=LINK_ANGLE, reacquire_angle=REACQUIRE_ANGLE,
             zone_max_radius=ZONE_MAX_RADIUS, lost_timeout=LOST_TIMEOUT, now=NOW)
-        horizon_row, focal_rows = geometry.row_model
+        horizon_row, focal_rows = context.row_model
         for radius in (1.5, PARALLAX_RADIUS, 2.5, 3.5):
             for local_angle in (63.5, 20.0, 110.0):     # on the axis and well off it
                 with self.subTest(radius=radius, local_angle=local_angle):
@@ -424,8 +425,8 @@ class TestZoneLines(unittest.TestCase):
                     feet: float = row_from_elevation(-depression, horizon_row, focal_rows)
                     m: Mark = mark(observation(0, local_angle, 45.0, overlap=False,
                                                distance=cam_distance, top=feet - 0.2, height=0.2),
-                                   geometry)
-                    # The zone field's own line, for that radius.
+                                   context)
+                    # The zone band's own edge, for that radius.
                     zone_y: float = strip_y(
                         -math.degrees(math.atan(self.CAMERA_HEIGHT / radius)), self.WINDOW)
                     self.assertAlmostEqual(m.bottom_y, zone_y, places=9)

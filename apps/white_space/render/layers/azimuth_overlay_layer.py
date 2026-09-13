@@ -10,9 +10,8 @@ from typing import Protocol
 
 from modules.board import HasFrames, HasTracklets
 from modules.render import ColorSettings
-from modules.render.layers import LayerBase
+from modules.render.layers import LayerBase, strip_spans
 from modules.render.shaders import DrawColoredRectangle
-from modules.tracker import strip_spans
 
 from .azimuth_marks import AzimuthMark, build_azimuth_marks, signed_strip_gap
 from ...settings import Stage
