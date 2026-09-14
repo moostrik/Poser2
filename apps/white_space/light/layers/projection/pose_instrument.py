@@ -3,11 +3,13 @@
 
 Each person stands in a dim blue **mask** at their azimuth. Around them, mirrored about their
 centre pixel and cut to the **window** each side, their **pattern**: full white and full blue
-lines, one spatial oscillator per colour thresholded into lines (``LinePattern.lines``). The
-sources are pose features and nothing else; ``connect`` is the connections of the design's Part 3
-written out, turning a person's measures into the pattern's parameters. Every number it uses is
-a setting of the ``PI`` group (``PoseInstrumentSettings``): the panel keeps the values, the code
-keeps the routing. Nothing moves by itself: the lines change only as the pose does.
+lines, one spatial oscillator per colour thresholded into lines (``LinePattern.lines``): two
+drawbars, the fundamental and the harmonic, over one interval shared by the colours, the blue
+detuned and its registration inverted. The sources are pose features and nothing else;
+``connect`` is the connections of the design's Part 3 written out, turning a person's measures
+into the pattern's parameters. Every number it uses is a setting of the ``PI`` group
+(``PoseInstrumentSettings``): the panel keeps the values, the code keeps the routing. Nothing
+moves by itself: the lines change only as the pose does.
 
 Above ``window.sync_threshold`` a pair's window grows toward each other until each pattern
 reaches the partner, and overlapping patterns union. No line or gap is narrower than the visual
@@ -342,16 +344,16 @@ class PoseInstrument(ProjectionLayer):
         if side <= 0:
             return
 
-        interval = max(interval, 2.0 * min_px)
+        interval = max(interval, 2.0 * min_px)                            # never below one period
         # The strip runs a margin past the window, so the circular morphology's wrap at its ends
         # never reaches a pixel that is shown.
         n = min(side + widen + min_px, R)
-        half = LinePattern.lines(self._distance[:n + 1], interval, osc.fundamental, osc.harmonic,
-                                 int(C.cutoff), osc.overtone_phase, -osc.phase)
+        half = LinePattern.lines(self._distance[:n + 1], interval, int(C.waveform), osc.fundamental,
+                                 osc.harmonic, int(C.cutoff), osc.overtone_phase, osc.phase)
         strip = np.concatenate((half[:0:-1], half))                       # offsets −n … n
         if widen > 0:
             strip = LinePattern.dilate(strip, widen, widen)
-        strip = LinePattern.legible(strip, min_px)[n - side:n + side + 1]    # offsets −side … side
+        strip = LinePattern.visible(strip, min_px)[n - side:n + side + 1]    # offsets −side … side
         offsets = np.arange(-left, right + 1)
         idx = (centre + offsets) % R
         lines[idx] |= strip[offsets + side]

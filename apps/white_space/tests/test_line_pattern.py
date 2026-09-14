@@ -1,10 +1,12 @@
-"""Tests for LinePattern: the thresholded LFO lines and the legibility morphology."""
+"""Tests for LinePattern: the two-drawbar oscillator thresholded into lines, and the visibility
+morphology."""
 
+import math
 import unittest
 
 import numpy as np
 
-from apps.white_space.light.layers import LinePattern
+from apps.white_space.light.layers import LinePattern, Waveform
 
 
 def runs(mask: np.ndarray) -> list[tuple[int, int]]:
@@ -22,29 +24,66 @@ def mask(n: int, *spans: tuple[int, int]) -> np.ndarray:
 
 class LinesTest(unittest.TestCase):
     X = np.arange(400, dtype=np.float64)
+    INTERVAL = 40.0
+    PHASE = 0.8875      # line centres at x = 35.5, 75.5, …: every edge falls between two pixels
 
-    def test_duty_zero_is_dark_and_one_is_solid(self) -> None:
-        self.assertFalse(LinePattern.lines(self.X, 40.0, 0.0, 0.0, 2, 0.0, 0.0).any())
-        self.assertTrue(LinePattern.lines(self.X, 40.0, 1.0, 0.7, 2, 0.3, 0.2).all())
+    def _lines(self, fundamental: float, harmonic: float, waveform: int = Waveform.SINE,
+               cutoff: int = 2, overtone_phase: float = 0.0, phase: float | None = None) -> np.ndarray:
+        return LinePattern.lines(self.X, self.INTERVAL, int(waveform), fundamental, harmonic, cutoff,
+                                 overtone_phase, self.PHASE if phase is None else phase)
 
-    PHASE = 0.1125      # line centres at x = 35.5, 75.5, …: every edge falls between two pixels
+    def _inner(self, lit: np.ndarray) -> list[tuple[int, int]]:
+        return [r for r in runs(lit) if r[0] > 0 and r[0] + r[1] < lit.size]
 
-    def test_half_duty_is_equal_lines_and_gaps(self) -> None:
-        lit = LinePattern.lines(self.X, 40.0, 0.5, 0.0, 2, 0.0, self.PHASE)
-        inner = [r for r in runs(lit) if r[0] > 0 and r[0] + r[1] < len(lit)]
+    def test_both_drawbars_in_is_dark_and_both_out_is_solid(self) -> None:
+        for waveform in Waveform:
+            with self.subTest(waveform=waveform.name):
+                self.assertFalse(self._lines(0.0, 0.0, waveform).any())
+                self.assertTrue(self._lines(1.0, 1.0, waveform, overtone_phase=0.3).all())
+
+    def test_the_fundamental_alone_out_lights_half_the_interval(self) -> None:
+        for waveform in Waveform:
+            with self.subTest(waveform=waveform.name):
+                inner = self._inner(self._lines(1.0, 0.0, waveform))
+                self.assertGreater(len(inner), 5)
+                self.assertEqual({length for _, length in inner}, {20})
+
+    def test_the_fundamental_grows_a_line_at_every_whole_u(self) -> None:
+        inner = self._inner(self._lines(0.5, 0.0))
         self.assertGreater(len(inner), 5)
         for start, length in inner:
-            self.assertEqual(length, 20)
-            self.assertEqual((start + (length - 1) / 2 - 35.5) % 40.0, 0.0)
+            self.assertAlmostEqual(length, math.acos(0.5) / math.pi * self.INTERVAL, delta=1.0)   # a third
+            self.assertEqual((start + (length - 1) / 2 - 35.5) % self.INTERVAL, 0.0)
+        self.assertLess(self._lines(0.25, 0.0).sum(), self._lines(0.5, 0.0).sum())
 
-    def test_duty_sets_the_line_thickness(self) -> None:
-        lit = LinePattern.lines(self.X, 40.0, 0.25, 0.0, 2, 0.0, self.PHASE)
-        self.assertEqual({length for start, length in runs(lit) if start > 0 and start + length < 400}, {10})
+    def test_the_sine_and_the_triangle_grow_from_the_centre_and_the_saw_from_the_edge(self) -> None:
+        crest = 35.5 + self.INTERVAL                                    # the crest at x = 75.5
+        for waveform in (Waveform.SINE, Waveform.TRIANGLE):
+            start, length = [r for r in self._inner(self._lines(0.5, 0.0, waveform)) if r[0] > 60][0]
+            self.assertAlmostEqual(start + (length - 1) / 2, crest)
+        start, length = [r for r in self._inner(self._lines(0.5, 0.0, Waveform.SAW)) if r[0] > 60][0]
+        self.assertEqual(start, 76)                                     # from the crest outward
+        self.assertEqual(length, 10)                                    # a quarter, linear
 
-    def test_full_harmonic_multiplies_the_lines(self) -> None:
-        base = runs(LinePattern.lines(self.X, 40.0, 0.5, 0.0, 2, 0.0, self.PHASE))
-        doubled = runs(LinePattern.lines(self.X, 40.0, 0.5, 1.0, 2, 0.0, self.PHASE))
-        self.assertAlmostEqual(len(doubled), 2 * len(base), delta=1)
+    def test_the_harmonic_alone_out_is_cutoff_sub_lines_per_interval(self) -> None:
+        for cutoff in (2, 3, 4):
+            with self.subTest(cutoff=cutoff):
+                inner = self._inner(self._lines(0.0, 1.0, cutoff=cutoff))
+                base = self._inner(self._lines(1.0, 0.0))
+                self.assertAlmostEqual(len(inner), cutoff * len(base), delta=cutoff)
+                for _, length in inner:                                 # half the sub-interval, ±1 px of sampling
+                    self.assertAlmostEqual(length, 20 / cutoff, delta=1.0)
+
+    def test_a_positive_phase_moves_the_lines_outward(self) -> None:
+        base = self._inner(self._lines(1.0, 0.0))
+        moved = self._inner(self._lines(1.0, 0.0, phase=self.PHASE + 0.25))
+        self.assertEqual(moved[0][0], base[0][0] + 10)
+
+    def test_the_overtone_phase_reshapes_the_wave(self) -> None:
+        stacked = self._lines(0.5, 0.5)                                 # overtone in phase: a third
+        offset = self._lines(0.5, 0.5, overtone_phase=0.5)              # against: two thirds
+        self.assertEqual({length for _, length in self._inner(stacked)}, {14})
+        self.assertEqual({length for _, length in self._inner(offset)}, {26})
 
 
 class MorphologyTest(unittest.TestCase):
@@ -66,15 +105,15 @@ class MorphologyTest(unittest.TestCase):
         gap = mask(self.N, (5, 195))                         # a 10 px gap through index 0
         self.assertTrue(LinePattern.fill_gaps(gap, 20).all())
 
-    def test_legible_leaves_a_legal_pattern_unchanged(self) -> None:
+    def test_visible_leaves_a_legal_pattern_unchanged(self) -> None:
         legal = mask(self.N, (0, 20), (40, 70), (90, 110), (150, 175))
-        np.testing.assert_array_equal(LinePattern.legible(legal, 20), legal)
+        np.testing.assert_array_equal(LinePattern.visible(legal, 20), legal)
 
-    def test_legible_output_has_no_narrow_feature(self) -> None:
+    def test_visible_output_has_no_narrow_feature(self) -> None:
         rng = np.random.default_rng(3)
         lengths = rng.integers(1, 60, size=200)                 # alternating lines and gaps of 1–59 px
         m = np.repeat(np.arange(lengths.size) % 2 == 0, lengths)[:3600]
-        out = LinePattern.legible(m, 20)
+        out = LinePattern.visible(m, 20)
         self.assertTrue(out.any() and not out.all())
         lit = runs(np.roll(out, -int(out.argmin())))        # starts in a gap: no run wraps
         dark = runs(np.roll(~out, -int(out.argmax())))      # starts on a line: no gap wraps

@@ -429,17 +429,14 @@ the masks, sync growth, the hit, presence) is in `LAYERS.md`, *pose_instrument*.
 connections (`connect`) and the `PI` settings group are as *Design* has them; the sources are the
 features of *The body*, and the symmetries are read and connected to nothing.
 
-The line math is `LinePattern` (`line_pattern.py`); its docstring holds the waveform. The waveform
-is a cosine; the filter is additive: one overtone at the cutoff, mixed in by the harmonic drawbar,
-placed by the overtone phase. The two drawbars are not yet the mix and the level of *The pattern*:
-the fundamental is the line thickness as a fraction of the interval (0 off, 1 solid) and the
-harmonic the overtone's weight in the mix (0 the fundamental alone, 1 the overtone alone). The
-interval is one per person, shared by both colours, bent by the body bend and detuned for the
-blue as designed; the waveform setting is not yet read.
+The line math is `LinePattern` (`line_pattern.py`), *The pattern* as written: the wave is the mix
+of the fundamental and its overtone at the cutoff, weighted by the two drawbars, thresholded at
+the level; the waveform is the colour's setting (sine, triangle, saw). The interval is one per
+person, shared by both colours, bent by the body bend and detuned for the blue.
 
 The visual limit is `max_lines` (90): no line and no gap narrower than half its period. The
 interval never goes below one period; a line or a gap narrower than the limit is filled or dropped
-(`LinePattern.legible`). A mask or the window's edge cuts a line as it is, so lines slide out from
+(`LinePattern.visible`). A mask or the window's edge cuts a line as it is, so lines slide out from
 behind the mask and into view at the window. The hit today widens every line of the person by
 `events.hit_widen` each side for `events.hit_frames` frames, the mark that does not read. Drift,
 the push, the tint, the mask flash, and the playhead dimming itself in the mask are not
@@ -447,17 +444,27 @@ implemented; their settings are declared and unread.
 
 ### The pose results now
 
-What the rows of Part 3 draw under the current line math (`tests/test_show_layers.py`):
+What the rows of Part 3 draw under the line math, one test per row (`tests/test_show_layers.py`,
+at the 14° interval). Where a row draws other than Part 3 says, the difference is a consequence of
+the additive filter: the overtone's phase against the fundamental changes the wave's shape, and
+under the level a shape is a thickness.
 
-| Pose                                        | Draws now                                                   |
-|---------------------------------------------|-------------------------------------------------------------|
-| arms hanging, standing straight             | full blue over the window                                   |
-| both arms straight up                       | full white over the window, no blue                         |
-| left arm up, right hanging                  | solid white: the fundamental at 1 is solid, not half        |
-| left arm half up, right hanging             | white lines half the interval, blue's overtone between      |
-| a T                                         | white and blue lines with overtones, mirrored               |
-| a T, leaning                                | the interval doubled or halved at full lean, back upright   |
-| a T, in a crouch                            | blue's interval past white's by the detune: beating         |
+| Pose                                        | Draws now                                                                   |
+|---------------------------------------------|-----------------------------------------------------------------------------|
+| arms hanging, standing straight             | full blue over the window: the blue ping                                    |
+| both arms straight up                       | full white over the window, no blue: the bass                               |
+| arms out level, a T                         | white lines a third of the interval, blue lines between; no sub-line yet    |
+| left arm up, right hanging                  | white lines half the interval, one per interval; blue sub-lines             |
+| right arm up, left hanging                  | white sub-lines a quarter of the interval, two per interval; blue lines     |
+| a T, both elbows folded                     | the lines moved out half an interval, and two thirds wide                   |
+| a T, left elbow folded                      | the lines moved out half an interval, a third wide                          |
+| a T, right elbow folded                     | the lines in place, two thirds wide                                         |
+| a T, leaning                                | the interval doubled or halved at full lean, back when upright              |
+| a T, in a crouch                            | the blue's interval past the white's by the detune: beating                 |
+
+At half registration the sub-line is a point: the overtone's crest between the lines reaches the
+level exactly and lights nothing. It appears as the arms rise above level, and grows with the
+harmonic's drawbar past the fundamental's.
 
 ---
 

@@ -209,8 +209,11 @@ class PoseInstrumentTest(unittest.TestCase):
     # blue's rest phase carries it, the white's comes from a barely folded left elbow.
     QUARTER = 0.25 / INTERVAL
     ELBOW_QUARTER = elbow(2.0 * QUARTER)      # phase = measure × phase_range (½) → QUARTER intervals
-    # The fundamental alone, half out: plain white lines half the interval wide.
-    HALF_OUT = dict(left_shoulder=shoulder(0.5), right_shoulder=shoulder(0.0), elbows=ELBOW_QUARTER)
+    # The fundamental alone, fully out: plain white lines half the interval wide.
+    FUNDAMENTAL_OUT = dict(left_shoulder=shoulder(1.0), right_shoulder=shoulder(0.0),
+                           left_elbow=ELBOW_QUARTER, right_elbow=elbow(0.0))
+    # A T: both drawbars half out, the elbows straight.
+    T = dict(shoulders=shoulder(0.5), left_elbow=ELBOW_QUARTER, right_elbow=elbow(0.0))
 
     def setUp(self) -> None:
         self.cfg = PoseInstrumentSettings()
@@ -301,20 +304,117 @@ class PoseInstrumentTest(unittest.TestCase):
         for channel in (f.white, f.blue):
             np.testing.assert_array_equal(channel[C + 1:C + span], channel[C - 1:C - span:-1])
 
-    def _inner_white_runs(self, f: Frame) -> list[int]:
-        return [length for start, length in _runs(f.white) if C + 50 < start and start + length < C + WINDOW - 50]
+    @staticmethod
+    def _inner(channel: np.ndarray) -> list[tuple[int, int]]:
+        """(start, length) of the right side's runs clear of the mask and the window edge, which cut lines."""
+        return [(s, l) for s, l in _runs(channel) if C + MASK + 1 < s and s + l < C + WINDOW]
 
-    def test_the_fundamental_half_out_lines_half_the_interval(self) -> None:
-        self._people({0: _pose(0.5, **self.HALF_OUT)})
+    def _inner_white_runs(self, f: Frame) -> list[int]:
+        return [length for _, length in self._inner(f.white)]
+
+    @staticmethod
+    def _centres(inner: list[tuple[int, int]]) -> list[float]:
+        return [s + (l - 1) / 2 - C for s, l in inner]
+
+    def _on_grid(self, inner: list[tuple[int, int]], spacing: float, offset: float = 0.0) -> None:
+        """Every run's centre sits at ``offset`` modulo ``spacing`` from the person, to a pixel."""
+        for c in self._centres(inner):
+            d = (c - offset) % spacing
+            self.assertLessEqual(min(d, spacing - d), 1.0, f"centre {c} off the grid of {spacing} at {offset}")
+
+    def _rows(self, pose: FakePose) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+        """The inner white and blue runs of one person at the centre."""
+        self._people({0: pose})
+        f = self._render()
+        return self._inner(f.white), self._inner(f.blue)
+
+    def test_the_fundamental_half_out_lights_a_third_of_the_interval(self) -> None:
+        self._people({0: _pose(0.5, **dict(self.FUNDAMENTAL_OUT, left_shoulder=shoulder(0.5)))})
         inner = self._inner_white_runs(self._render())
         self.assertTrue(inner)
-        self.assertEqual(set(inner), {INTERVAL // 2})
+        self.assertEqual(set(inner), {round(INTERVAL / 3)})
+
+    # -- the pose results (POSE_INSTRUMENT.md, Part 3): one test per row --
+
+    def test_row_arms_hanging_is_the_blue_ping(self) -> None:
+        self._people({0: _pose(0.5)})
+        f = self._render()
+        self.assertEqual(float(f.white.sum()), 0.0)
+        np.testing.assert_array_equal(f.blue[C + MASK + 1:C + WINDOW + 1], 1.0)
+
+    def test_row_both_arms_up_is_the_bass(self) -> None:
+        self._people({0: _pose(0.5, shoulders=shoulder(1.0))})
+        f = self._render()
+        np.testing.assert_array_equal(f.white[C + MASK + 1:C + WINDOW + 1], 1.0)
+        self.assertEqual(float(f.blue[self._outside_mask()].sum()), 0.0)
+
+    def test_row_a_t_is_half_registration(self) -> None:
+        # Both drawbars half out: white lines a third of the interval wide, the blue's between them
+        # at the blue's rest phase; the sub-line at half registration is a point that shows nothing.
+        white, blue = self._rows(_pose(0.5, **self.T))
+        self.assertGreater(len(white), 2)
+        self.assertEqual({l for _, l in white}, {47})
+        self.assertEqual({l for _, l in blue}, {47})
+        self._on_grid(white, INTERVAL)
+        self._on_grid(blue, INTERVAL, INTERVAL / 2)
+
+    def test_row_left_arm_up_is_the_fundamental_alone(self) -> None:
+        white, blue = self._rows(_pose(0.5, **self.FUNDAMENTAL_OUT))
+        self.assertGreaterEqual(len(white), 2)
+        self.assertEqual({l for _, l in white}, {INTERVAL // 2})                     # thick lines
+        self._on_grid(white, INTERVAL)                                               # one per interval
+        self.assertEqual({l for _, l in blue}, {INTERVAL // 4})                      # the blue's harmonic alone
+
+    def test_row_right_arm_up_is_the_harmonic_alone(self) -> None:
+        pose = _pose(0.5, left_shoulder=shoulder(0.0), right_shoulder=shoulder(1.0),
+                     left_elbow=self.ELBOW_QUARTER, right_elbow=self.ELBOW_QUARTER)
+        white, blue = self._rows(pose)
+        self.assertGreater(len(white), 4)
+        self.assertEqual({l for _, l in white}, {INTERVAL // 4})                      # thin sub-lines
+        self._on_grid(white, INTERVAL / 2)                                            # two per interval
+        self.assertEqual({l for _, l in blue}, {INTERVAL // 2})                       # the blue's fundamental alone
+
+    def test_row_a_t_with_both_elbows_folded(self) -> None:
+        # The lines move out half an interval; the overtone against the fundamental thickens them.
+        white, _ = self._rows(_pose(0.5, shoulders=shoulder(0.5), elbows=elbow(1.0)))
+        self.assertGreater(len(white), 1)
+        self.assertEqual({l for _, l in white}, {93})
+        self._on_grid(white, INTERVAL, INTERVAL / 2)
+
+    def test_row_a_t_with_the_left_elbow_folded(self) -> None:
+        # The lines move out half an interval, the shape unchanged.
+        white, _ = self._rows(_pose(0.5, shoulders=shoulder(0.5), left_elbow=elbow(1.0), right_elbow=elbow(0.0)))
+        self.assertGreater(len(white), 1)
+        self.assertEqual({l for _, l in white}, {47})
+        self._on_grid(white, INTERVAL, INTERVAL / 2)
+
+    def test_row_a_t_with_the_right_elbow_folded(self) -> None:
+        # The overtone moves against the fundamental: the lines stay in place and thicken.
+        white, _ = self._rows(_pose(0.5, shoulders=shoulder(0.5), left_elbow=self.ELBOW_QUARTER, right_elbow=elbow(1.0)))
+        self.assertGreater(len(white), 1)
+        self.assertEqual({l for _, l in white}, {93})
+        self._on_grid(white, INTERVAL)
+
+    def test_row_a_t_leaning_bends_the_interval_and_back(self) -> None:
+        white, _ = self._rows(_pose(0.5, tilt=1.0, **self.T))
+        self.assertGreater(len(white), 0)
+        self.assertLessEqual({l for _, l in white}, {93, 94})                          # a third of a doubled interval
+        self._on_grid(white, 2 * INTERVAL)
+        white, _ = self._rows(_pose(0.5, tilt=0.0, **self.T))
+        self.assertEqual({l for _, l in white}, {47})
+
+    def test_row_a_t_in_a_crouch_detunes_the_blue(self) -> None:
+        white, blue = self._rows(_pose(0.5, legs=1.0, **self.T))
+        detuned = round(INTERVAL * (1.0 + self.cfg.pattern.detune))
+        self.assertGreater(len(blue), 1)
+        self.assertEqual({round(b - a) for a, b in zip(self._centres(white), self._centres(white)[1:])}, {INTERVAL})
+        self.assertEqual({round(b - a) for a, b in zip(self._centres(blue), self._centres(blue)[1:])}, {detuned})
 
     def test_no_line_or_gap_is_narrower_than_the_visual_limit(self) -> None:
         # Two overlapping synced patterns of different intervals (one leans): the union is a moiré.
         b = round(0.537 * IRES)
-        self.cfg.window.width = 90.0                            # a long overlap: plenty of interior
-        window = 900
+        self.cfg.window.width = 150.0                           # a long overlap: plenty of interior
+        window = 1500
         arms = dict(left_shoulder=shoulder(0.4), right_shoulder=shoulder(0.3), right_elbow=elbow(0.4))
         self._people({0: _pose(0.5, sims={1: 1.0}, **arms), 1: _pose(0.537, sims={0: 1.0}, tilt=0.4, **arms)})
         f = self._render()
@@ -335,17 +435,17 @@ class PoseInstrumentTest(unittest.TestCase):
             self.assertTrue(all(gap >= min_px for gap in gaps), gaps)
 
     def test_a_still_pose_is_a_still_frame_and_a_small_move_a_small_change(self) -> None:
-        self._people({0: _pose(0.5, **self.HALF_OUT)})
+        nearly_out = dict(self.FUNDAMENTAL_OUT, left_shoulder=shoulder(0.9))
+        self._people({0: _pose(0.5, **nearly_out)})
         f = self._render()
         first = f.light_img.copy()
         edges = 2 * (len(_runs(f.white)) + len(_runs(f.blue)))
         np.testing.assert_array_equal(self._render().light_img, first)
-        moved_arm = dict(self.HALF_OUT, left_shoulder=shoulder(0.5) + 0.03)                    # lines ~1.3 px wider
-        self._people({0: _pose(0.5, **moved_arm)})
+        self._people({0: _pose(0.5, **dict(nearly_out, left_shoulder=shoulder(0.9) + 0.1))})   # lines ~1 px wider
         moved = self._render().light_img
         changed = int(np.count_nonzero(moved != first))
         self.assertGreater(changed, 0)
-        self.assertLessEqual(changed, edges)                    # each line edge shifts a pixel at most: nothing pops
+        self.assertLessEqual(changed, 2 * edges)                # each line edge shifts a pixel or two: nothing pops
 
     def test_every_mask_goes_over_every_pattern(self) -> None:
         b = round(0.52 * IRES)
@@ -361,12 +461,12 @@ class PoseInstrumentTest(unittest.TestCase):
         widen = int(self.cfg.events.hit_widen * DEG)
         lengths = []
         for offset in (23.4, 1.8, -2.0, -9.2):                 # 36 rpm at 30 Hz: 7.2° a tick, closest at +1.8°
-            self._people({0: _pose(0.5, offset_deg=offset, **self.HALF_OUT)})
+            self._people({0: _pose(0.5, offset_deg=offset, **self.FUNDAMENTAL_OUT)})
             lengths.append(set(self._inner_white_runs(self._render())))
         self.assertEqual(lengths, [{70}, {70 + 2 * widen}, {70}, {70}])
 
     def test_reset_starts_a_new_pass(self) -> None:
-        self._people({0: _pose(0.5, offset_deg=1.8, **self.HALF_OUT)})
+        self._people({0: _pose(0.5, offset_deg=1.8, **self.FUNDAMENTAL_OUT)})
         self._render()
         self.layer.reset()
         self.assertEqual(set(self._inner_white_runs(self._render())), {70 + 2 * int(self.cfg.events.hit_widen * DEG)})

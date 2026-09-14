@@ -151,8 +151,8 @@ this section is the layer: what it reads, how it composes people, and what it ex
 - **Union**: overlapping patterns combine per channel (a pixel is lit when any pattern lights it).
   Two patterns of different intervals or centres make a moiré.
 - **The visual limit**: `max_lines` per revolution, line and gap equal, so no line and no gap is
-  narrower than half its period. Each person's pattern is made legible on its own
-  (`LinePattern.legible`: gaps under the limit fill, then lines under it drop). A union of legal
+  narrower than half its period. Each person's pattern is made visible on its own
+  (`LinePattern.visible`: gaps under the limit fill, then lines under it drop). A union of legal
   patterns can only add narrow gaps, so the union fills gaps under the limit. A line or gap appears
   and disappears at the limit's width, never thinner.
 - **Masks**: every mask goes over every pattern, in both channels, and lights dim blue
