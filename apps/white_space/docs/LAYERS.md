@@ -41,14 +41,14 @@ poses is in `TRACKING.md`, *Downstream*.
 | `beam_playhead`       | beam       | — (settings only)             | front white lamp                         | S1–S6, S9, S10            |
 | `beam_flash`          | beam       | LERP frames (PlayheadOffset)  | front white + blue lamps; board flashes  | S4                        |
 | `projection_playhead` | projection | frame playhead phase          | white playhead marker                    | S6 (projecting), S7, S8   |
-| `pose_instrument`     | projection | LERP frames (PlayheadOffset)  | white and blue lines, dim blue bands     | S6 (projecting), S7, S8   |
+| `pose_instrument`     | projection | LERP frames (PlayheadOffset)  | white and blue lines, dim blue masks     | S6 (projecting), S7, S8   |
 | `flood`               | projection | — (settings only)             | whole projection white                   | S8                        |
 | `beam_wind_down`      | beam       | tick clock                    | both white lamps, fading                 | S9, S10                   |
 | `beam_blue_sound`     | beam       | sound levels from Max (board) | left/right blue lamps                    | S1, S2, S3, S5, S10       |
 
 `beam_flash`'s blue lamps are zeroed in the presets: S4 runs blue-none by design. `pose_instrument`
-reads `Azimuth`, `BBox`, `Angles`, `LegDeviation`, `TorsoTilt`, `Similarity` and `PlayheadOffset` from
-the LERP frames.
+reads `Azimuth`, `BBox`, `Angles`, `LegDeviation`, `TorsoTilt`, `AngleSymmetry`, `Similarity` and
+`PlayheadOffset` from the LERP frames.
 
 `beam_wind_down` is `flood`'s ending and a plain beam layer: the fixture is in beam mode from
 S9's first packet, so the wall while the bar is still fast *is* the two white lamps
@@ -127,59 +127,59 @@ mode drives the same two white outputs as this layer at 1.0 in beam mode.
 
 ## pose_instrument (ProjectionLayer)
 
-The heart of the piece: each person stands in a dim blue **band** at their azimuth, and around
+The heart of the piece: each person stands in a dim blue **mask** at their azimuth, and around
 them lies a mirror-symmetric pattern of full white and full blue **lines** drawn from their pose.
-The design, the pattern's LFO, the pose controls, the patch and the poses, is `POSE_INSTRUMENT.md`;
+The design, the vocabulary, the meanings, the connections and the pattern, is `POSE_INSTRUMENT.md`;
 this section is the layer: what it reads, how it composes people, and what it exposes.
 
 - **Used by**: S6 (once projecting), S7, S8
-- **Input**: per person from the LERP frames, the six pose values: the four arm angles (`Angles`:
-  left/right shoulder, left/right elbow), `LegDeviation` (joint-weighted hip/knee deviation, 0..1)
-  and `TorsoTilt` (signed sideways lean against the image vertical, −1..1); plus pose length (BBox
-  height), presence (the pose itself, *Inputs*), the pairwise `Similarity` row and `PlayheadOffset`.
-  `LegDeviation` and `TorsoTilt` are also sent to Max (`/pose/{id}/angle/legs`,
+- **Input**: per person from the LERP frames, the measures: the four arm angles (`Angles`:
+  left/right shoulder, left/right elbow), `LegDeviation` (joint-weighted hip/knee deviation, 0..1),
+  `TorsoTilt` (signed sideways lean against the image vertical, −1..1) and `AngleSymmetry` (signed
+  left minus right per pair, −1..1); plus pose length (BBox height), presence (the pose itself,
+  *Inputs*), the pairwise `Similarity` row and `PlayheadOffset`. `AngleSymmetry`, `LegDeviation` and
+  `TorsoTilt` are also sent to Max (`/pose/{id}/angle/sym`, `/pose/{id}/angle/legs`,
   `/pose/{id}/angle/tilt`) so sound and light read the same values. The layer adds no smoothing: the
   LERP poses are the pipeline's smoothed output.
-- **Per person**: the pattern is mirrored about the person's centre pixel, so it is symmetric exactly
-  and moves with them as one piece; a neighbour walking never re-spaces it. Every pixel is 0 or 1
-  per channel; only the band is dim.
+- **Per person**: `PoseInstrument.connect` turns the measures into the pattern's parameters
+  (`POSE_INSTRUMENT.md`, *Sources and connections*). The pattern is mirrored about the person's
+  centre pixel, so it is symmetric exactly and moves with them as one piece; a neighbour walking
+  never re-spaces it. Every pixel is 0 or 1 per channel; only the mask is dim.
 
 ### Between people
 
 - **Union**: overlapping patterns combine per channel (a pixel is lit when any pattern lights it).
   Two patterns of different intervals or centres make a moiré.
-- **Legibility**: each person's pattern is made legible on its own (`LinePattern.legible`: gaps
-  under `min_feature` fill, then lines under it drop). A union of legal patterns can only add narrow
-  gaps, so the union fills gaps under `min_feature`. A line or gap appears and disappears at
-  `min_feature` wide, never thinner.
-- **Bands**: every band masks every pattern, in both channels, and lights dim blue
-  (`band_level`, width `band_width` × (0.5 + 0.5 × pose length)). A band or a reach edge cuts a line
-  where it falls, so lines slide out from behind the band and into view at the reach edge.
-- **Sync**: above `sync_threshold` (mean of both directions' similarity) a pair's reach grows toward
-  each other along the shorter arc, eased, until each pattern reaches the partner: full sync is full
-  overlap, one pattern. It grows over any intermediate person, whose own pattern is unchanged. Sync
-  shows more of the pattern; it never changes the lines.
+- **The visual limit**: `max_lines` per revolution, line and gap equal, so no line and no gap is
+  narrower than half its period. Each person's pattern is made legible on its own
+  (`LinePattern.legible`: gaps under the limit fill, then lines under it drop). A union of legal
+  patterns can only add narrow gaps, so the union fills gaps under the limit. A line or gap appears
+  and disappears at the limit's width, never thinner.
+- **Masks**: every mask goes over every pattern, in both channels, and lights dim blue
+  (`mask.brightness`, width `mask.width` × (0.5 + 0.5 × pose length)). A mask or a window edge cuts
+  a line where it falls, so lines slide out from behind the mask and into view at the window edge.
+- **Sync**: above `window.sync_threshold` (mean of both directions' similarity) a pair's window opens
+  toward each other along the shorter arc, eased, until each pattern reaches the partner: full sync
+  is full overlap, one pattern. It opens over any intermediate person, whose own pattern is
+  unchanged. Sync shows more of the pattern; it never changes the lines.
 
 ### Hit
 
-On the tick the playhead crosses a person (`PlayheadCrossing` in `pose/playhead_offset.py`, the same
-closest-tick rule as `beam_flash` with one frame), every line of that person, in both channels,
-widens by `hit_widen` each side. The crossing is measured in playhead steps at `beam_rpm`, the rate
-the content playhead free-runs at in PROJECTION.
+On the ticks the playhead is closest to a person (`PlayheadCrossing` in `pose/playhead_offset.py`,
+the same closest-tick rule as `beam_flash`, `events.hit_frames` of them), every line of that person,
+in both channels, widens by `events.hit_widen` each side. The crossing is measured in playhead steps
+at `beam_rpm`, the rate the content playhead free-runs at in PROJECTION.
 
 ### Presence, tuning, reset
 
-- **Presence**: per participant attack (`attack_seconds`: the reach grows from the band) and release
-  (`release_seconds`: the last pose is held while the reach shrinks and the band dims). A pose with a
-  NaN azimuth has no place in the projection and counts as absent (it releases), the one exception to
-  *Inputs*' no-presence-test rule.
-- **Tuning**: the patch, ranges and levels are settings, live from the panel and saved in presets.
-  The drawing math (`PoseInstrument`, `LinePattern`) hot-reloads on save; adding a setting needs a
-  restart.
-- **Settings**: `min_feature`; `band_width`, `band_level`; `reach`, `sync_threshold`, `hit_widen`;
-  `attack_seconds`, `release_seconds`; per channel (`white`, `blue`): `interval_min`, `interval_max`,
-  `harmonic_order` and the patches `duty`, `interval`, `harmonic`, `harmonic_phase`, `phase`, each
-  `source`, `low`, `high`, `curve`
+- **Presence**: per participant attack (`presence.attack_seconds`: the window opens from the mask)
+  and release (`presence.release_seconds`: the last pose is held while the window closes and the mask
+  dims). A pose with a NaN azimuth has no place in the projection and counts as absent (it releases),
+  the one exception to *Inputs*' no-presence-test rule.
+- **Tuning**: the values are the root `PI` settings group (`POSE_INSTRUMENT.md`, *Settings*), live
+  from the panel and saved in the preset; the connections are code. `connect`, the drawing math
+  (`PoseInstrument`, `LinePattern`) hot-reload on save; adding a setting needs a restart.
+- **Settings**: the layer's own group holds only `blend`; everything else is `PI`
 - **Reset**: forgets every participant and pass (S6's entry, a fresh instrument per cycle)
 - **Relation to `pose_waves`**: the old wave/void instrument lives on as `test_pose_waves` (debug
   override), a reference/montage visual.
@@ -192,5 +192,5 @@ the content playhead free-runs at in PROJECTION.
   with Max (linear 0..1 vs dB)
 - **pose_instrument**: see `POSE_INSTRUMENT.md`, *Open*
 - **Sync thresholds**: `states.sync.threshold` (per participant, INTRO → INTRO_PLAY) and
-  `pose_instrument.sync_threshold` (pairwise, pattern growth) measure different quantities and are
+  `PI.window.sync_threshold` (pairwise, the window opening) measure different quantities and are
   tuned separately; whether they should share one value

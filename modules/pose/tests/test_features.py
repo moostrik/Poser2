@@ -6,8 +6,8 @@ import unittest
 import numpy as np
 
 from modules.pose.features import (
-    FEATURES, AggregationMethod, AngleLandmark, Angles, AngleSymmetry, BBox, BBoxElement, PointLandmark,
-    Points2D, BaseVectorFeature,
+    FEATURES, AggregationMethod, AngleLandmark, Angles, BBox, BBoxElement, PointLandmark,
+    Points2D, Similarity, BaseVectorFeature,
 )
 from modules.utils import Rect
 
@@ -123,15 +123,15 @@ class AnglesTest(unittest.TestCase):
 
 
 class AggregateTest(unittest.TestCase):
-    """NormalizedScalarFeature statistics, on AngleSymmetry (a fixed-length normalised feature)."""
+    """NormalizedScalarFeature statistics, on Similarity (four poses configured by the builders)."""
 
-    def _sym(self, values: list[float], scores: list[float] | None = None) -> AngleSymmetry:
+    def _sym(self, values: list[float], scores: list[float] | None = None) -> Similarity:
         v = np.array(values, dtype=np.float32)
         s = np.array(scores if scores is not None else [0.0 if math.isnan(x) else 1.0 for x in values], dtype=np.float32)
-        return AngleSymmetry(v, s)
+        return Similarity(v, s)
 
     def test_mean_and_harmonic_mean(self) -> None:
-        self.assertEqual(AngleSymmetry.length(), 4)
+        self.assertEqual(Similarity.length(), 4)
         sym = self._sym([0.9, 0.9, 0.9, 0.3])
         self.assertAlmostEqual(sym.aggregate(AggregationMethod.MEAN), 0.75, places=5)
         self.assertAlmostEqual(sym.aggregate(AggregationMethod.HARMONIC_MEAN), 4.0 / (3 / 0.9 + 1 / 0.3), places=5)

@@ -6,9 +6,10 @@ from .clock import ClockSettings
 from .motor import MotorSettings
 from .playhead import PlayheadSettings
 from .layers import (
+    LayerSettings,
     BeamBlueSoundSettings, BeamPlayheadSettings, BeamFlashSettings, BeamWindDownSettings,
     BeamHauntedSettings, BeamTestSettings,
-    PoseInstrumentSettings, ProjectionPlayheadSettings, FloodSettings,
+    ProjectionPlayheadSettings, FloodSettings,
     TestPlayerLinesSettings, TestCalibrationSettings, TestFillSettings, TestPulseSettings,
     TestChaseSettings, TestLinesSettings, TestRandomSettings, TestPoseWavesSettings,
     TestHarmonicSettings,
@@ -92,9 +93,10 @@ class BeamLayersSettings(BaseSettings):
 
 class ProjectionLayersSettings(BaseSettings):
     """Per-layer composition settings — the projection-mode block of the pool.
-    `fov` is a hidden relay (from the root) into the calibration layer."""
+    `fov` is a hidden relay (from the root) into the calibration layer. The pose instrument's
+    values are the root ``PI`` group; here it keeps only its blend."""
     fov: Field[float] = Field(110.0, access=Field.INIT, description="Camera horizontal FOV — relay to test_calibration")
-    pose_instrument:    Group[PoseInstrumentSettings]        = Group(PoseInstrumentSettings)
+    pose_instrument:    Group[LayerSettings]               = Group(LayerSettings)
     projection_playhead: Group[ProjectionPlayheadSettings]   = Group(ProjectionPlayheadSettings)
     flood:              Group[FloodSettings]           = Group(FloodSettings)
     test_player_lines:  Group[TestPlayerLinesSettings] = Group(TestPlayerLinesSettings)
@@ -127,9 +129,11 @@ class LightSettings(BaseSettings):
     # show where it would have been. Forced OFF at startup (boot failsafe: a preset saved
     # mid-debug must never spin at power-on).
     debug: Field[DebugLayer] = Field(DebugLayer.OFF, description="Debug override: select a layer to show it solo and auto-follow the motor to its mode (OFF = show runs)")
+    # Forced off at startup when the fixture answers a ping (main.py): real hardware drives the falls.
+    motor_simulate: Field[bool] = Field(False, description="Simulate the motor + fall sensor (no hardware)")
 
     clock:        Group[ClockSettings]        = Group(ClockSettings)
-    motor:        Group[MotorSettings]        = Group(MotorSettings)
+    motor:        Group[MotorSettings]        = Group(MotorSettings, share=[motor_simulate.as_('simulate')])
     playhead:     Group[PlayheadSettings]     = Group(PlayheadSettings)
 
     # The per-layer composition settings pool, grouped by mode (mirrors layers/beam|projection/).

@@ -9,8 +9,8 @@ from .beam.flash                    import BeamFlash,           BeamFlashSetting
 from .beam.wind_down                import BeamWindDown,        BeamWindDownSettings
 from .beam.haunted                  import BeamHaunted,         BeamHauntedSettings
 from .beam.test                     import BeamTest,            BeamTestSettings
-from .projection.pose_instrument    import PoseInstrument,      PoseInstrumentSettings, ChannelPatternSettings, PatchSettings, PoseControl
-from .projection.line_pattern       import LinePattern
+from .projection.pose_instrument    import PoseInstrument,      PoseInstrumentSettings, Pattern, Oscillator
+from .projection.line_pattern       import LinePattern,         Waveform
 from .projection.projection_playhead import ProjectionPlayhead, ProjectionPlayheadSettings
 from .projection.flood              import Flood,               FloodSettings
 from .projection.test_player_lines  import TestPlayerLines,     TestPlayerLinesSettings

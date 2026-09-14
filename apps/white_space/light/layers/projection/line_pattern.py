@@ -7,8 +7,16 @@ app runs (it re-executes class bodies, not module-level functions).
 """
 
 import math
+from enum import IntEnum, auto
 
 import numpy as np
+
+
+class Waveform(IntEnum):
+    """The wave thresholded into lines; compared through ``int``, since a reload redefines the class."""
+    SINE     = 0
+    TRIANGLE = auto()
+    SAW      = auto()
 
 
 class LinePattern:

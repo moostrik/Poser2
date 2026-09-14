@@ -2,14 +2,16 @@
 
 The instrument the participants play with their bodies: the light half of pose → sound. Four
 parts. **Vocabulary** is the language of the instrument, borrowed from the synthesizer. **Meaning**
-is what each measure of the body, alone and with the others, should say in it. **Connections** is
-how the measures are wired to the pattern so that the meaning comes out. **Implementation** is how the layer draws it
-today. Meaning and connections are one loop: meaning sets the targets, the targets pick the
-connections, the connections have consequences, and the consequences are new meaning to judge.
-While one is held still the other is worked on.
+is what each measure of the body should say in it. **Connections** is how the measures are wired
+to the pattern so that the meaning comes out. **Implementation** is the layer's design and its
+state today.
+Meaning and connections are one loop: meaning sets the targets, the targets pick the connections,
+the connections have consequences, and the consequences are new meaning to judge. While one is
+held still the other is worked on.
 
 The layer's place among the other layers is in `LAYERS.md`; the states that run it are in
-`STATES.md`.
+`STATES.md`. The order the design is built in, each step visible on the machine: the sources and
+the connections; the pattern; motion and marks; the playhead at the masks and the render.
 
 ## The instrument
 
@@ -23,15 +25,16 @@ window wider.
 The ground rules, as set:
 
 - About 90 lines per revolution, line and gap equal, is the visual maximum **(site fact)**. It is a
-  guide, not a wall: a good reason may go past it.
+  guide: a good reason may go past it.
 - No brightness: every pixel of white and of blue is off or full. The mask is the one dim
   thing.
 - No blinding: the instrument never blinds a person with white; people must be able to see each
-  other. The mask is how: it goes over everything at the person, so full white can fill a window
-  and never fall on a face. This rule is the instrument's alone, not the other layers'.
+  other. The mask is how, so full white can fill a window and never fall on a face. This rule is
+  the instrument's alone, not the other layers'.
 - White and blue are projected separately by the fixture **(site fact)**, so where both are on the
   overlap reads as a subtly different tone. The palette is four tones: dark, blue, white, both.
-- No jitter: the layer adds no flicker of its own.
+- No jitter: the pose pipeline's smoothing is the only smoothing. The layer adds no smoothing and
+  no steps, since steps are jitter of another kind, and no flicker of its own.
 - Lines follow the pose. On top of that they drift by themselves, slowly and peacefully, blue
   inward and white outward: a low setting that may be 0 (see *Drift*).
 - The output each side of a person is symmetric.
@@ -40,7 +43,7 @@ The ground rules, as set:
 - Arms down is neutral: full blue over the window. Arms up: full white. In between, the pattern.
 - Blue and white can behave differently; line thickness and interval can change.
 - A hit (the playhead crossing the person) marks that person for one frame. Wider lines do not
-  read **(site fact)**; the mark is open, see *The hit*.
+  read **(site fact)**; the mark is *The hit*.
 - Sync makes more of the pattern visible: the window opens, the lines stay what they are.
 
 ---
@@ -52,10 +55,9 @@ The ground rules, as set:
 The pattern is two low-frequency oscillators, one for white and one for blue. They are spatial:
 they oscillate over the distance from the person, not over time. The vocabulary is the LFO's.
 
-The projection is an oscilloscope of one dimension. It draws sine waves as the old green screens
-did, but it has no height to draw them with, so it draws where the wave rises above a level: a bar
-for every crest. The thickness of a bar is how long the wave stays above the level; the interval is
-the wavelength.
+The projection is an oscilloscope of one dimension. It draws sine waves, but it has no height to
+draw them with, so it draws where the wave rises above a level: a bar for every crest. The
+thickness of a bar is how long the wave stays above the level; the interval is the wavelength.
 
 | Synth term     | In the instrument                                                         |
 |----------------|---------------------------------------------------------------------------|
@@ -71,24 +73,23 @@ the wavelength.
 
 A **filter** shapes the wave before the level: the cutoff says which overtones pass, the resonance
 how strongly the passing overtone speaks. Open, the bars split into sub-lines or grow uneven;
-closed, there is a plain bar per crest. In code the filter is additive, one overtone at the cutoff
-mixed in by the resonance; to the eye it is the same. An overtone is not a second oscillator: it
-sits at a whole number of cycles per interval and can never leave its fundamental, so the pattern
-still repeats every interval. Only detune lets one wave leave another. The **waveform** decides how thickness
-answers the level: a sine or a triangle grows a bar from its centre both ways, the triangle
-linearly; a saw grows it from one edge only, toward the person or away from them.
+closed, there is a plain bar per crest. The filter is additive: the overtone is a second wave at
+the cutoff, mixed in before the level. An overtone is not a second oscillator: it sits at a whole
+number of cycles per interval and can never leave its fundamental, so the pattern still repeats
+every interval. Only detune lets one wave leave another. The **waveform** decides
+how thickness answers the level: a sine or a triangle grows a bar from its centre both ways, the
+triangle linearly; a saw grows it from one edge only, toward the person or away from them.
 
 **Registration** is the organ's word for which drawbars are out. The fundamental's drawbar is the
 pulse width, the harmonic's drawbar is the resonance: one thickens the lines, the other the
-sub-lines. Full organ, every drawbar out, fills the window; all drawbars in is silence in that
-colour.
+sub-lines. Both drawbars out fills the window with that colour; both in is silence in it.
 
 Each colour has its own oscillator: its thickness, phase, filter and drift are its own. The
 interval is one, shared, and **detune** lets blue's interval leave white's; at 0 the two are locked
 to one grid. Locked, with phases half an interval apart, they alternate white and blue. With equal
 phases they stack into the overlap tone with dark between. Detuned, the two beat: a moiré within
 one person's pattern. The colours meet as AND, the overlap tone where both are lit; they could also
-meet as XOR, dark where they coincide, lines that cancel: the ring modulation of the palette.
+meet as XOR, dark where they coincide, lines that cancel: ring modulation.
 
 ## Drift
 
@@ -109,8 +110,8 @@ The push is an attack-release envelope on the drift, and the accent may be a tri
 decay if one frame proves too short to see.
 
 **Expression** is how fast and how hard a key is played: velocity and aftertouch. The pose pipeline
-measures motion (angle motion, motion time), and under the principle of *The body* those are
-sources like any feature: a fast arm can give a stronger push or a wider tint.
+measures motion (angle motion, motion time), and those are sources like any feature: a fast arm
+can give a stronger push or a wider tint.
 
 **Unison** is sync: two voices stacked. Two nearly equal intervals in unison beat, which is the
 chorus of unison detune: the moiré, and the reason it must stay small.
@@ -118,8 +119,8 @@ chorus of unison detune: the moiré, and the reason it must stay small.
 ## The hit
 
 The playhead crosses a person once per revolution of the content sweep. On that frame the person is
-marked: the accent. The mark lasts one frame (or the few closest frames, as the beam flash), and
-has to read within the palette of four tones. Candidates, each per colour where it applies:
+marked: the accent. The mark lasts the closest frame, or up to the three closest, a setting as the
+beam flash has, and has to read within the palette of four tones. Candidates, each per colour where it applies:
 
 | Mark         | For the frame                                                        | Settings                          |
 |--------------|----------------------------------------------------------------------|-----------------------------------|
@@ -130,8 +131,7 @@ has to read within the palette of four tones. Candidates, each per colour where 
 
 Tint keeps the pattern and changes its colour, and at blend 1 it is the swap; the mask flash is
 the person's own light; push and window pulse speak the drift and sync vocabulary. Chosen to try:
-tint, push and the mask flash.
-The layer's mark today is in Part 4.
+tint, push and the mask flash. The layer's mark today is in Part 4.
 
 ---
 
@@ -139,13 +139,11 @@ The layer's mark today is in Part 4.
 
 ## What we hold on to
 
-Two meanings are fixed. Neutral, arms hanging and standing straight, is full blue over the window:
-the blue ping. Raised arms is full white over the window: the bass. Both follow the sound
-(`STATES.md`, S6: a glass ping for neutral, a heavy bass for arms raised). Between the two the
-magic happens,
-and this part describes the magic: an instrument that draws a beautiful pattern for every
-combination of its parameters. So each measure of the body, alone and with the others, has to mean
-something, and nothing but the two fixed points is tied to a pose.
+Two meanings are fixed, the ground rules' neutral and raised arms: the blue ping and the bass, as
+the sound has them (`STATES.md`, S4: a glass ping for neutral, a heavy bass for arms raised).
+Between the two the magic happens, and this part describes it: a pattern for every combination of
+the measures, so each measure of the body has to mean something, and nothing but the two fixed
+points is tied to a pose.
 
 ## The rules of meaning
 
@@ -171,9 +169,10 @@ something, and nothing but the two fixed points is tied to a pose.
 
 Each measure is a musical term. The first best guess, with the alternatives beside it.
 
-**Primary** measures make the note: the arms are the organist's hands on the white registration,
-the left the fundamental's drawbar and the right the harmonic's, the relation between them the
-harmonic series, a note and its overtone; each elbow places what its shoulder pulls. **Secondary**
+**Primary** measures make the note: the arms are the organist's hands on the registration, the
+left the fundamental's drawbar and the right the harmonic's, pulling the white out and the blue in;
+the relation between them is the harmonic series, a note and its overtone; each elbow places what
+its shoulder pulls. **Secondary**
 measures modulate the note: detune, pitch bend and drift are what a player does to a note that is
 already sounding, and with the arms hanging there is no note to modulate. The drift is a setting
 until a secondary measure takes it.
@@ -234,190 +233,249 @@ and publishes with every frame, smoothed. The instrument never derives a value o
 derivation the pipeline adds is the symmetry of a pair, as it derives the leg deviation from the
 hip and knee angles.
 
-| Feature           | Measure                                | In the pipeline |
-|-------------------|----------------------------------------|-----------------|
-| left shoulder     | 0 hanging → π straight up              | `Angles`        |
-| right shoulder    | 0 hanging → π straight up              | `Angles`        |
-| left elbow        | 0 straight → π folded                  | `Angles`        |
-| right elbow       | 0 straight → π folded                  | `Angles`        |
-| leg deviation     | 0 standing → 1 bent, stretched         | `LegDeviation`  |
-| body bend         | −1 left → 0 upright → 1 right          | `TorsoTilt`     |
-| symmetry, a pair  | signed: how unequal the two sides are  | to come         |
+| Feature           | Measure                                                  | In the pipeline |
+|-------------------|----------------------------------------------------------|-----------------|
+| left shoulder     | 0.18π hanging → 1.18π straight up, wrapped past π        | `Angles`        |
+| right shoulder    | 0.18π hanging → 1.18π straight up, wrapped past π        | `Angles`        |
+| left elbow        | −0.10π straight → 0.90π folded                           | `Angles`        |
+| right elbow       | −0.10π straight → 0.90π folded                           | `Angles`        |
+| leg deviation     | 0 standing → 1 bent, stretched                           | `LegDeviation`  |
+| body bend         | −1 left → 0 upright → 1 right                            | `TorsoTilt`     |
+| symmetry, a pair  | signed, left minus right: how unequal the two sides are  | `AngleSymmetry` |
+
+The angles are the extractor's geometry (`modules/pose/nodes/_utils/AngleUtils.py`): each joint
+travels a range of π from its **rest**, the hanging shoulder at 0.18π and the straight elbow at
+−0.10π, and the shoulder's travel crosses π, where the angle wraps to −0.82π. The rests and the
+reaches are settings the connections read, so a measure is 0 at rest and 1 at full travel whatever
+the geometry.
 
 A **connection** is one feature into one pattern parameter. A feature may feed several parameters;
-a parameter has one source; two features never sum into one parameter. The patch is a
+a parameter has one source; two features never sum into one parameter. The connections are a
 **modulation matrix**: features down one side, parameters along the other, a depth and a polarity
-in each cell; a feature feeding several parameters is a macro. The connections stay few, and each
-carries a meaning a person can find with their body.
-
-Everything else said about the body is description, of two kinds. A **target** is a meaning of
-Part 2: what a measure should say, and the two fixed points. The connections are chosen so that
-the targets come out. A **consequence** is what the chosen connections then draw for any shape.
-"Both arms", "one arm higher", "the elbows together" are neither parameters nor connections; they
-are consequences.
+in each cell; a feature feeding several parameters is a macro. The matrix is code (Part 4,
+*Sources and connections*); the panel holds the values it uses.
 
 ## Symmetry
 
-The light is mirrored, so left and right in the body never show as left and right in the light. A
-joint on its own can only show as a different sound, so the two joints of a pair are given two
-sounds that belong together (rule 4). How unequal a pair is carries meaning of its own, as the leg
-deviation and the body bend do. The **symmetry** feature holds the meaningful pairs (the shoulders,
-the elbows, the arms as a whole, the two halves of the body), each signed, so that downstream the
-signed value or its absolute can be used. Which arm is which matters: a person and their mirror
-image draw differently.
+The light is mirrored, so left and right in the body never show as left and right in the light;
+which arm is which shows only as a different sound. The **symmetry** feature (`AngleSymmetry`)
+holds the meaningful pairs, the four joints (shoulder, elbow, hip, knee) and the arm and the leg as
+a whole per side (`arms`, `legs`), each signed, left minus right, so that downstream the signed
+value or its absolute can be used. A person and their mirror image draw differently.
 
 ## The first connections
 
 The connections that make the meanings of Part 2 come out: feature into pattern parameter. The
-white registration is the two shoulders. The bass is a consequence: full organ has to fill the
-window, so the fundamental's drawbar alone reaches at most half a window of white and the harmonic's
-drawbar fills the rest (how the two drawbars sum into a solid is Part 4's). The blue ping and the
-blue's fading as the arms rise is open: blue pulse width has one source, so either one shoulder also
-fades the blue, or the blue recedes by construction, drawn where the white registration leaves room.
+two drawbars are the same for both colours, inverted: what pulls the white out pushes the blue in.
+The bass is a consequence: one drawbar lights at most half of each interval, both at full light it
+all (the registration, Part 4 *Design*).
 
 | Feature           | Connection                                               | Alternatives                                                   |
 |-------------------|----------------------------------------------------------|----------------------------------------------------------------|
-| left shoulder     | white pulse width 0 → ½ (the fundamental's drawbar)      |                                                                |
-| right shoulder    | white resonance 0 → 1 (the harmonic's drawbar)           |                                                                |
-| left elbow        | white phase 0 → ½                                        | the interval                                                   |
+| left shoulder     | white fundamental 0 → 1, blue fundamental 1 → 0          |                                                                |
+| right shoulder    | white harmonic 0 → 1, blue harmonic 1 → 0                |                                                                |
+| left elbow        | white phase 0 → ½, outward                               | the interval                                                   |
 | right elbow       | white overtone phase 0 → ½                               | white cutoff 2 → 4                                             |
 | leg deviation     | the detune 0 → its maximum                               | the interval; the drift                                        |
-| body bend         | the interval, signed about its rest                      | the two phases in opposite directions; the drift               |
+| body bend         | the interval, scaled by ± its octave range               | the two phases in opposite directions; the drift               |
 | shoulder symmetry | unconnected                                              | one colour's interval or phase                                 |
 | elbow symmetry    | unconnected                                              | the two phases against each other                              |
-| the blue          | open: one shoulder, or by construction                   |                                                                |
-
-Deviation is the legs' word: the rest interval is the standing pose, and the further the legs
-deviate from standing, the further the interval is pushed. Pitch bend is the body's: signed, and
-back to centre when the person stands straight.
 
 ## Consequences
 
 Once the first connections run on the machine, the *Pose results* are read back here: what each
-row draws, against what it should. Empty until then; what the deprecated patch draws is in Part 4.
+row draws, against what it should. Empty until then; what the current build draws is in Part 4,
+*The pose results now*.
 
 ---
 
 # Part 4 — Implementation
 
-## The layer
+## Design
+
+The layer built to Parts 1 to 3. Where a choice is still open it is marked **(open)**.
+
+### Sources and connections
+
+The instrument reads pose features from the LERP frames and derives nothing. The sources are the
+elements of `Angles` (the four arm joints), `LegDeviation`, `TorsoTilt`, and `AngleSymmetry`
+(`modules/pose`): one signed scalar per pair, left minus right, normalised to −1..1, made by its
+own extractor (`AngleSymExtractor`) and windowed, graphed and sent to Max like the leg deviation.
+The pairs: the shoulder, the elbow, the hip and the knee (the joint angles), the arms (shoulder and
+elbow together per side), the legs (hip and knee together per side, weighted as the leg deviation
+is, by its settings).
+
+The connections are code, not settings: one method, `PoseInstrument.connect`, takes a person's
+measures and returns the pattern parameters of both colours (`Pattern`: the interval and the
+detune, and an `Oscillator` per colour: the two drawbars and the two phases). It is the first
+connections table of Part 3 written out, with the ranges, the curves and the absolutes of signed
+values that a panel cannot express, and it hot-reloads on save. Every number it uses is a setting
+it reads (the rest interval, the detune's maximum, a joint's rest and reach, a phase's range),
+never a literal, so the panel keeps the values and the code keeps the routing. The preset carries
+values only. An angle becomes a measure through its joint's rest and reach: the difference from the
+rest is wrapped about the middle of the reach, so the shoulder's crossing of π never flips a raised
+arm back to 0.
+
+### The pattern
+
+Per person, one **interval** in degrees, shared by both colours: a rest value from settings, bent
+by its source (the body bend, see the pitch bend below). **Detune** makes blue's interval
+`white × (1 + detune)`; at 0 the colours share one grid.
+
+Per colour: `waveform` (sine, triangle, saw), the two drawbars `fundamental` and `harmonic` (each
+0..1), `phase`, `cutoff` (2, 3 or 4), `overtone_phase`, `drift`. The colour's wave is the filter
+of Part 1, the two drawbars as its weights, thresholded at one level:
+
+```
+u    = x / interval − phase                          phase positive moves the lines outward
+wave = (fundamental · w(u) + harmonic · w(cutoff · u + overtone_phase)) / (fundamental + harmonic)
+lit  = wave ≥ 1 − (fundamental + harmonic)
+```
+
+`w` is the waveform, a cosine for the sine. The wave is the mix of the two, so it stays within
+−1..1 whatever the drawbars; the level falls from 1 with both drawbars in to −1 with both out. One
+drawbar alone lights at most half the interval (the fundamental thick lines, the harmonic thin
+sub-lines); both out light everything. The bass is solid; one drawbar is not.
+
+The blue is the same instrument with the registration inverted: the drawbar that pulls the white
+out pushes the blue in, so at rest the blue is full and at the bass it is silent. The blue's rest
+phase is half an interval from the white's, so the colours interleave when locked.
+
+The **pitch bend** scales the interval: `rest × 2^(bend × octaves)`, with `octaves` the range each
+way, so a lean to one side halves the interval at most and to the other doubles it.
+
+**Drift** advances each colour's phase by `drift` intervals per second, blue negative (inward),
+white positive (outward); the phase's source adds to it. A **push** raises each colour's drift by
+`push_strength` in that colour's direction on the hit and lets it settle back over
+`push_seconds`; the phase keeps what it gained.
+
+The visual limit is `max_lines` (90): no line and no gap narrower than half a period of it, 2° at
+90. The interval never goes below one period; a line or a gap narrower than the limit is filled or
+dropped as the current layer does. A low pitch thins the harmonic first: below `cutoff` periods
+its sub-lines fall under the limit and drop, as a low note loses its overtones. A mask or the
+window's edge cuts a line as it is, so lines slide out from behind the mask and into view at the
+window.
+
+### People
+
+Each person's pattern is mirrored about their centre pixel and cut to the **window** each side:
+`window` degrees × the presence envelope (attack from 0, release to 0), grown by sync toward every
+similarity-matched partner along the shorter arc, up to the partner. Patterns union per colour and a
+gap narrower than the limit fills. On arrival the mask is there at once and the window opens; on
+release the window closes first and then the mask fades: the pattern goes first, the person's own
+light last.
+
+The **mask** is a dim blue band, `mask_width` × (½ + ½ × pose length) wide at `mask_brightness`, and
+goes over everything at the person: the instrument's own patterns, and the playhead. The projection
+playhead dims itself to `playhead_at_mask` inside a mask: it reads the poses and the mask width as
+the instrument does, so there is no store and no compositor change. No other layer shares a mix
+with the instrument at a person.
+
+### Events
+
+On the frames the playhead is closest to a person (`PlayheadCrossing`, `hit_frames` 1 to 3, as the
+beam flash), the person's mark: a
+`tint` blend per colour, 0 none, 1 the swap; **(open)** between 0 and 1 the central fraction of
+each line takes the other colour, never narrower than the limit. The `mask_flash` raises the mask's
+blue to `mask_flash_brightness` for the frame. The push is above.
+
+### Settings
+
+`PI` is a root settings group of the app (`apps/white_space/settings.py`), not a layer group, and
+holds tweakable values only, each concern a `Group` (`PoseInstrumentSettings`,
+`light/layers/projection/pose_instrument.py`): `max_lines`; `pattern`, the rests and ranges (the
+interval at rest and its octaves of bend, the detune's maximum, the blue's rest phase, the phases'
+ranges, the joints' rests and reaches, and per colour `white` / `blue` the waveform, the cutoff and
+the drift); `mask` (width, brightness, the playhead's level in it, the flash brightness); `window`
+(width, the sync threshold); `events` (the hit's frames, the tint per colour, the push); `presence`
+(attack, release). The layer keeps its `blend`. No setting routes anything.
+
+### Hot reload
+
+The composition is worked on the machine in two ways. Values are tweaked in the panel and saved in
+the preset. Connections are edited in code and seen at once: `HotReloadMethods` (`modules/utils`)
+watches `pose_instrument.py` and `line_pattern.py` and, on save, re-executes their class bodies and
+module constants into the running app, so `connect`, the drawing methods and `LinePattern` change
+under the layer without a restart. The panel is for tweaking; making connections needs ranges,
+curves and the absolutes of signed values, which a panel of fields cannot express and a node
+editor could, and that is out of scope.
+
+What the reloader patches: methods of a class (instance, static, class), class constants, module
+constants. What it does not: module-level functions, imports, settings fields, and the objects
+already built (a settings instance keeps its fields). Hence the rules:
+
+- Everything that may change lives in a class method or a module constant, never in a module-level
+  function.
+- A reload redefines the enum classes, so enum values are compared through `int`, never `==`.
+- Every number `connect` uses is a setting it reads, never a literal, so the preset keeps
+  describing the show.
+- A new setting, feature or parameter needs a restart; a new connection does not.
+- The first connections table of Part 3 is `connect` in words; when one changes, the other follows
+  in the same change.
+
+### Tests
+
+The pose results of Part 3 are unit tests in `apps/white_space/tests`: a pose's features into
+`connect`, the parameters into the pattern, one test per row.
+
+## State
+
+### The layer
 
 `pose_instrument` (`light/layers/projection/pose_instrument.py`) draws one boolean mask per colour,
 mirrored about each person's centre pixel, cut to the window each side, unioned over people, masked
 by every mask, and written as 0 or 1 into the frame. How people compose (union, visibility,
-the masks, sync growth, the hit, presence) is in `LAYERS.md`, *pose_instrument*. The line
-math is `LinePattern` (`line_pattern.py`). The waveform is a cosine; the filter is additive: one
-overtone at `harmonic_order` (the cutoff), mixed in by `harmonic` (the resonance), placed by
-`harmonic_phase`.
+the masks, sync growth, the hit, presence) is in `LAYERS.md`, *pose_instrument*. The sources, the
+connections (`connect`) and the `PI` settings group are as *Design* has them; the sources are the
+features of *The body*, and the symmetries are read and connected to nothing.
 
-The waveform per colour, `x` the distance from the person in pixels:
+The line math is `LinePattern` (`line_pattern.py`); its docstring holds the waveform. The waveform
+is a cosine; the filter is additive: one overtone at the cutoff, mixed in by the harmonic drawbar,
+placed by the overtone phase. The two drawbars are not yet the mix and the level of *The pattern*:
+the fundamental is the line thickness as a fraction of the interval (0 off, 1 solid) and the
+harmonic the overtone's weight in the mix (0 the fundamental alone, 1 the overtone alone). The
+interval is one per person, shared by both colours, bent by the body bend and detuned for the
+blue as designed; the waveform setting is not yet read.
 
-```
-u   = x / interval + phase
-lfo = (1 − harmonic) · cos 2πu + harmonic · cos 2π(order · u + harmonic_phase)
-lit = lfo ≥ cos(π · thickness)
-```
+The visual limit is `max_lines` (90): no line and no gap narrower than half its period. The
+interval never goes below one period; a line or a gap narrower than the limit is filled or dropped
+(`LinePattern.legible`). A mask or the window's edge cuts a line as it is, so lines slide out from
+behind the mask and into view at the window. The hit today widens every line of the person by
+`events.hit_widen` each side for `events.hit_frames` frames, the mark that does not read. Drift,
+the push, the tint, the mask flash, and the playhead dimming itself in the mask are not
+implemented; their settings are declared and unread.
 
-The visual limit is a minimum width: no line and no gap narrower than `min_feature` (2°, the 90
-lines per revolution). The interval never goes below twice it; a thickness that would make a line
-or gap narrower is clamped, below that the colour is off, above it solid. A mask or the
-window's edge cuts a line as it is, so lines slide out from behind the mask and into view at the
-window. The hit today widens every line of the person by `hit_widen` each side for one frame, the
-mark that does not read. Each colour has its own interval range: the shared interval with detune,
-drift, the push, and the mask over the other layers' light are not implemented.
+### The pose results now
 
-## Names
+What the rows of Part 3 draw under the current line math (`tests/test_show_layers.py`):
 
-The settings today, the concept each carries, and the name that would carry it. The renames are
-open (see *Open*); the code uses the current names.
-
-| Concept                                | Current name     | Carries the concept        |
-|----------------------------------------|------------------|----------------------------|
-| the dim blue mask at the person        | `band_width`     | `mask_width`               |
-| its brightness                         | `band_level`     | `mask_brightness`          |
-| the visible part of the pattern        | `reach`          | `window`                   |
-| the visual limit                       | `min_feature`    | `max_lines` (90)           |
-| line thickness, fraction of interval   | `duty`           | `thickness`                |
-| the hit's mark                         | `hit_widen`      | after the mark chosen      |
-| lines and gaps at least the limit wide | legible          | visible                    |
-| no pose control on a parameter         | `CONSTANT`       | `NONE`                     |
-| the sources                            | derived controls | the features               |
-| the filter's cutoff                    | `harmonic_order` | `cutoff`                   |
-| the filter's resonance                 | `harmonic`       | `resonance`                |
-| the overtone's place                   | `harmonic_phase` | `overtone_phase`           |
-| the interval and the phase             | as named         | as named                   |
-
-## The controls (deprecated)
-
-The code today derives controls inside the instrument (`PoseControl`), against the principle of
-*The body*; they go when the features take their place (*Open*):
-
-| Control      | Value                                  |
-|--------------|----------------------------------------|
-| `CONSTANT`   | 1: the parameter holds its `high`      |
-| `LIFT`       | mean \|shoulder\| / π                  |
-| `ARM_SPLIT`  | \|\|left\| − \|right\|\| shoulder / π  |
-| `BEND`       | mean \|elbow\| / π                     |
-| `BEND_SPLIT` | \|\|left\| − \|right\|\| elbow / π     |
-| `LEGS`       | `LegDeviation`                         |
-| `TILT`       | (`TorsoTilt` + 1) / 2, upright 0.5     |
-
-`LIFT`, `ARM_SPLIT`, `BEND` and `BEND_SPLIT` are derived: the sum and the difference of a pair.
-
-## The patch (deprecated)
-
-A patch (`PatchSettings`) routes one control into one parameter:
-`parameter = low + (high − low) × control^curve`. Each colour has five patches (`duty`,
-`interval`, `harmonic`, `harmonic_phase`, `phase`) and its interval range (`interval_min`,
-`interval_max`) and cutoff (`harmonic_order`). The panel re-routes live; the preset
-stores the routing. A parameter takes one source.
-
-The patch in `studio.json` is a first routing and is deprecated: only its two targets, arms down
-full blue and arms up full white, carry over. The rest is an example of what a routing looks like
-until Part 3's connections are chosen.
-
-| Colour | `duty`     | `interval`           | `harmonic`   | `harmonic_phase`   | `phase`         |
-|--------|------------|----------------------|--------------|--------------------|-----------------|
-| white  | LIFT 0 → 1 | LEGS 0.5 → 0         | BEND 0 → 1   | BEND_SPLIT 0 → 0.5 | TILT 0 → 1      |
-| blue   | LIFT 1 → 0 | ARM_SPLIT 0.5 → 0.15 | BEND 0 → 0.6 | CONSTANT 0.5       | TILT 0.5 → −0.5 |
-
-Intervals span 4° to 24° (patch value 0 → 1), cutoff 2. Lift is the fader, legs push
-the white interval, an arm split tightens the blue lines, folded elbows add overtones, the body bend
-shifts the two colours' phases in opposite directions.
-
-## Shapes and what they draw now
-
-A few shapes under the deprecated patch:
-
-| Shape                                       | Draws now                                                  |
-|---------------------------------------------|------------------------------------------------------------|
-| arms hanging, standing straight             | solid blue over the window                                 |
-| arms out level (a T)                        | white and blue lines alternating, equal, 14° interval      |
-| both arms straight up (a V)                 | solid white over the window                                |
-| one arm up, the other hanging               | white lines at half thickness over tight blue lines        |
-| hands on hips, elbows folded, shoulders low | the blue splits into sub-lines                             |
-| hands on the head, arms up and folded       | sub-lines in both colours, white thicker                   |
-| one arm folded, one straight, both level    | the white sub-lines sit off the blue's                     |
-| any of the above, leaning                   | white and blue slide across each other: overlap and dark   |
-| any of the above, in a lunge or a crouch    | the white interval tightens toward 4°: the colours beat    |
-
-## Tuning
-
-The patch, the ranges and the levels are settings: live from the panel, saved in the preset. The
-drawing (`PoseInstrument`, `LinePattern`) hot-reloads on save. Adding a control, a parameter or a
-setting needs a restart.
+| Pose                                        | Draws now                                                   |
+|---------------------------------------------|-------------------------------------------------------------|
+| arms hanging, standing straight             | full blue over the window                                   |
+| both arms straight up                       | full white over the window, no blue                         |
+| left arm up, right hanging                  | solid white: the fundamental at 1 is solid, not half        |
+| left arm half up, right hanging             | white lines half the interval, blue's overtone between      |
+| a T                                         | white and blue lines with overtones, mirrored               |
+| a T, leaning                                | the interval doubled or halved at full lean, back upright   |
+| a T, in a crouch                            | blue's interval past white's by the detune: beating         |
 
 ---
 
 ## Open
 
-- Parts 1 to 3 are revisited after the first build runs on the machine; until then the theory
-  stands as written and the pose results are what the build is measured against
-- The elbows at the fixed points: hands on the hips draw the blue ping and hands on the head the
-  bass, because the elbows place white lines; whether the elbows should also touch the blue is a
-  meaning question for that revisit
-- The composition: which connections people find with their bodies (the work on the machine)
-- The waveform as a parameter: sine, triangle or saw
+Parts 1 to 3 are revisited after the first build runs on the machine; until then the theory stands
+as written and the pose results are what the build is measured against.
+
+Meaning:
+
+- The elbows at the fixed points (*Pose results*): with the arms hanging the white is silent, so a
+  folded elbow shows nothing; whether that is right
+- The symmetries: which of the four pairs earns a connection, and what it means
+- Drift's source: a setting for now; whether a secondary measure should take it
+- The composition itself: which connections people find with their bodies
+
+Vocabulary not yet in the design:
+
 - Tuning: intervals from a scale (4°, 6°, 8°, 12°, 24°, the series of the 90-line limit), so that
   synced people sit in simple ratios and their union reads as a chord; a scale means steps, and
   portamento between them is motion of its own
@@ -426,28 +484,17 @@ setting needs a restart.
 - Expression: the motion features as sources for the push and the tint
 - XOR as a second way for the colours to meet
 - Decay and sustain on the window: the arrival flourish
-- The hit's mark: how tint's blend is realised in the binary palette (which pixels of a line
-  take the other colour between 0 and 1), the push's strength and settle time, the mask flash's
-  blue level
-- The playhead's dimming at the mask: a setting; and how the mask reaches the other layers' light
-  (the compositor, or the board)
-- The renames in *Names*, in code and preset, once the concepts settle
-- From the machine **(site facts)**: the mask is too narrow and the window too wide at the preset's
-  values; the render hides blue under full white, so the two colours need their own visualisation;
-  the settings panel should warn when one control is linked twice; the instrument's settings should
-  become their own root group, `PI`
-- Drift: its low default per colour (0 = none), and whether its speed is patched from the body
-  bend or another control
-- The symmetry feature in the pose pipeline: its pairs (shoulders, elbows, arms, the body's
-  halves), signed
-- How the blue fades as the arms rise: one shoulder as its source, or by construction
-- The instrument's derived controls replaced by the features as sources
-- Whether the body bend should bend the pitch (interval) or shift the phase as now
-- Whether the legs should detune blue from white or push both intervals
-- Pitch bend and deviation both want the interval; a parameter has one source, so one of them goes
-  to the detune or the drift
+
+Design:
+
+- The tint between 0 and 1: which pixels of a line take the other colour
+
+From the machine **(site facts)**:
+
+- The mask is too narrow and the window too wide at the preset's values
+- The render hides blue under full white; the two colours need their own visualisation
 - Whether a line appearing at the limit width flickers when a pose hovers at its threshold
   **(deduction: the pipeline's smoothing should hold it)**
-- Whether the 90-line limit holds with the moiré of two synced patterns on the machine
-- Camera level: a pitched wide-FOV camera reads a small spurious body bend near the frame edges, a
-  pitch bend nobody played; check a straight person at the edge
+- Whether the 90-line limit holds with the moiré of two synced patterns
+- A pitched wide-FOV camera reads a small spurious body bend near the frame edges, a pitch bend
+  nobody played; check a straight person at the edge

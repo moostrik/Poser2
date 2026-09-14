@@ -97,7 +97,7 @@ class _Stages:
             AzimuthEuroSmoother(ps.azimuth_smoother),
             AngleMotionExtractor(ps.motion_extractor),
             AngleMotionMovingAverageSmoother(ps.motion_average),
-            AngleSymExtractor(),
+            AngleSymExtractor(ps.leg_deviation),
             LegDeviationExtractor(ps.leg_deviation),
             TorsoTiltExtractor(ps.torso_tilt),
             MotionTimeExtractor(),
@@ -125,7 +125,7 @@ class _Stages:
         ]) for i in tracks})
 
         self.lerp = FilterTracker({i: FilterPipeline([
-            AngleSymExtractor(),
+            AngleSymExtractor(ps.leg_deviation),
             LegDeviationExtractor(ps.leg_deviation),
             TorsoTiltExtractor(ps.torso_tilt),
             MotionTimeExtractor(),

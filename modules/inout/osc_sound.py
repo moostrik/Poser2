@@ -230,9 +230,10 @@ class OscSound:
             vel_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(vel_reset_msg.build()) # type: ignore
 
-        # Reset angle/sym to 0
+        # Reset angle/sym values to 0
         sym_msg = OscMessageBuilder(address=f"/pose/{id}/angle/sym")
-        sym_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        for _ in range(AngleSymmetry.length()):
+            sym_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(sym_msg.build()) # type: ignore
 
         # Reset angle/legs and angle/tilt to 0
@@ -310,11 +311,12 @@ class OscSound:
             angle_vel_msg.add_arg(angle_vel, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(angle_vel_msg.build()) # type: ignore
 
-        # range [0, 1]
-        mean_sym: float = frame[AngleSymmetry].overall_symmetry() if AngleSymmetry in frame else 0.0
-        mean_sym_msg = OscMessageBuilder(address=f"/pose/{id}/angle/sym")
-        mean_sym_msg.add_arg(float(mean_sym), OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(mean_sym_msg.build()) # type: ignore
+        # range [-1, 1] - signed left-minus-right per pair: shoulder, elbow, hip, knee, arms, legs
+        sym_values: list[float] = frame[AngleSymmetry].values.tolist() if AngleSymmetry in frame else [0.0] * AngleSymmetry.length()
+        sym_msg = OscMessageBuilder(address=f"/pose/{id}/angle/sym")
+        for val in sym_values:
+            sym_msg.add_arg(float(val), OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(sym_msg.build()) # type: ignore
 
         # range [0, 1] - joint-weighted leg deviation from standing straight
         legs: float = frame[LegDeviation].value if LegDeviation in frame else 0.0

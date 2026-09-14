@@ -606,9 +606,9 @@
     "light_rate": 30.0,
     "brightness": 1.0,
     "debug": "OFF",
+    "motor_simulate": true,
     "clock": {},
     "motor": {
-      "simulate": true,
       "beam_rpm": 36.0,
       "projection_rpm": 2000.0
     },
@@ -660,85 +660,7 @@
     },
     "projection_layers": {
       "pose_instrument": {
-        "min_feature": 2.0,
-        "band_width": 3.0,
-        "band_level": 0.3,
-        "reach": 45.0,
-        "sync_threshold": 0.75,
-        "hit_widen": 1.0,
-        "attack_seconds": 1.0,
-        "release_seconds": 1.5,
-        "blend": "ADD",
-        "white": {
-          "interval_min": 4.0,
-          "interval_max": 24.0,
-          "harmonic_order": 2,
-          "duty": {
-            "source": "LIFT",
-            "low": 0.0,
-            "high": 1.0,
-            "curve": 1.0
-          },
-          "interval": {
-            "source": "LEGS",
-            "low": 0.5,
-            "high": 0.0,
-            "curve": 1.0
-          },
-          "harmonic": {
-            "source": "BEND",
-            "low": 0.0,
-            "high": 1.0,
-            "curve": 1.0
-          },
-          "harmonic_phase": {
-            "source": "BEND_SPLIT",
-            "low": 0.0,
-            "high": 0.5,
-            "curve": 1.0
-          },
-          "phase": {
-            "source": "TILT",
-            "low": 0.0,
-            "high": 1.0,
-            "curve": 1.0
-          }
-        },
-        "blue": {
-          "interval_min": 4.0,
-          "interval_max": 24.0,
-          "harmonic_order": 2,
-          "duty": {
-            "source": "LIFT",
-            "low": 1.0,
-            "high": 0.0,
-            "curve": 1.0
-          },
-          "interval": {
-            "source": "ARM_SPLIT",
-            "low": 0.5,
-            "high": 0.15,
-            "curve": 1.0
-          },
-          "harmonic": {
-            "source": "BEND",
-            "low": 0.0,
-            "high": 0.6,
-            "curve": 1.0
-          },
-          "harmonic_phase": {
-            "source": "CONSTANT",
-            "low": 0.0,
-            "high": 0.5,
-            "curve": 1.0
-          },
-          "phase": {
-            "source": "TILT",
-            "low": 0.5,
-            "high": -0.5,
-            "curve": 1.0
-          }
-        }
+        "blend": "ADD"
       },
       "projection_playhead": {
         "level": 1.0,
@@ -911,6 +833,53 @@
           "amplitude_blue": 0.3
         }
       }
+    }
+  },
+  "PI": {
+    "max_lines": 90,
+    "pattern": {
+      "interval": 14.0,
+      "octaves": 1.0,
+      "detune": 0.1,
+      "blue_phase": 0.5,
+      "phase_range": 0.5,
+      "overtone_phase_range": 0.5,
+      "shoulder_rest": 0.5654866776461628,
+      "shoulder_reach": 3.141592653589793,
+      "elbow_rest": -0.3141592653589793,
+      "elbow_reach": 3.141592653589793,
+      "white": {
+        "waveform": "SINE",
+        "cutoff": 2,
+        "drift": 0.0
+      },
+      "blue": {
+        "waveform": "SINE",
+        "cutoff": 2,
+        "drift": 0.0
+      }
+    },
+    "mask": {
+      "width": 3.0,
+      "brightness": 0.3,
+      "playhead_at_mask": 0.3,
+      "flash_brightness": 1.0
+    },
+    "window": {
+      "width": 45.0,
+      "sync_threshold": 0.75
+    },
+    "events": {
+      "hit_frames": 1,
+      "hit_widen": 1.0,
+      "tint_white": 0.0,
+      "tint_blue": 0.0,
+      "push_strength": 0.0,
+      "push_seconds": 1.0
+    },
+    "presence": {
+      "attack_seconds": 1.0,
+      "release_seconds": 1.5
     }
   },
   "states": {

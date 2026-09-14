@@ -21,7 +21,7 @@ from modules.pose import nodes, trackers, window, analytics
 from modules import inference
 from modules.session import SessionSettings
 from modules.gl import WindowSettings
-from .light import LightSettings
+from .light import LightSettings, PoseInstrumentSettings
 from .inout import OscLightSenderSettings, UdpLightReceiverSettings
 from .pose import GhosterSettings
 from .statemachine import StateMachineSettings
@@ -387,5 +387,7 @@ class Settings(BaseSettings):
                                                                                       lens_fov, lens_centre_x, lens_centre_y])
     pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), num_virtual.as_('ghost_slots'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     light  : Group[LightSettings]   = Group(LightSettings, share=[num_players.as_('max_poses'), num_cameras.as_('num_cameras'), light_resolution.as_('light_resolution'), fov, spin_down_seconds])
+    # The pose instrument's values: its own root group, not a layer group (POSE_INSTRUMENT.md, Settings).
+    PI     : Group[PoseInstrumentSettings] = Group(PoseInstrumentSettings)
     states : Group[StateMachineSettings] = Group(StateMachineSettings, share=[spin_down_seconds])
     server : Group[NiceSettings]    = Group(NiceSettings)

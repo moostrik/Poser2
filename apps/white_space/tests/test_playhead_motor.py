@@ -458,11 +458,11 @@ class DebugOverrideTest(unittest.TestCase):
     def test_boot_failsafe_clears_debug(self) -> None:
         # A preset saved mid-debug (a projection layer selected) must never auto-derive PROJECTION at
         # power-on: the Conductor forces the select back to OFF at construction.
-        from apps.white_space.light import Conductor, DebugLayer, LightSettings
+        from apps.white_space.light import Conductor, DebugLayer, LightSettings, PoseInstrumentSettings
         from apps.white_space.board import Board
         cfg = LightSettings()
         cfg.debug = DebugLayer.test_pose_waves
-        Conductor(cfg, Board(), pose_stage=4)
+        Conductor(cfg, PoseInstrumentSettings(), Board(), pose_stage=4)
         self.assertEqual(DebugLayer(int(cfg.debug)), DebugLayer.OFF)
 
 

@@ -20,7 +20,7 @@ from .playhead import Playhead
 from .settings import LightSettings, LayerId, DebugLayer
 from .layers import (BaseLayer, Compositor, Mix,
                      BeamBlueSound, BeamPlayhead, BeamFlash, BeamWindDown, BeamHaunted, BeamTest,
-                     PoseInstrument, ProjectionPlayhead, Flood,
+                     PoseInstrument, PoseInstrumentSettings, ProjectionPlayhead, Flood,
                      TestPlayerLines, TestCalibration, TestFill, TestPulse, TestChase, TestLines,
                      TestRandom, TestPoseWaves, TestHarmonic)
 from modules.board import PlayheadSignals
@@ -47,7 +47,7 @@ def _debug_motor_mode(selection: DebugLayer, layers: dict[LayerId, BaseLayer]) -
 class Conductor(Thread):
     """Runs the light loop at a fixed rate (light_rate Hz); see the module docstring."""
 
-    def __init__(self, config: LightSettings, board: Board, pose_stage: int) -> None:
+    def __init__(self, config: LightSettings, instrument: PoseInstrumentSettings, board: Board, pose_stage: int) -> None:
         super().__init__(daemon=True, name="LightConductor")
 
         self._stop_event = Event()
@@ -75,7 +75,7 @@ class Conductor(Thread):
             LayerId.beam_wind_down:      BeamWindDown       (resolution, LO.beam_wind_down,      board),
             LayerId.beam_haunted:        BeamHaunted        (resolution, LO.beam_haunted,        board, pose_stage),
             LayerId.beam_test:           BeamTest           (resolution, LO.beam_test,           board),
-            LayerId.pose_instrument:     PoseInstrument     (resolution, HI.pose_instrument,     board, pose_stage, self._clock.interval),
+            LayerId.pose_instrument:     PoseInstrument     (resolution, HI.pose_instrument,     instrument, board, pose_stage, self._clock.interval),
             LayerId.projection_playhead: ProjectionPlayhead (resolution, HI.projection_playhead, board),
             LayerId.flood:               Flood              (resolution, HI.flood,               board),
             LayerId.test_player_lines:   TestPlayerLines    (resolution, HI.test_player_lines,   board, pose_stage),
