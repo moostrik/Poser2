@@ -120,7 +120,8 @@ class Ghoster:
         self._settings = settings
         self._playhead = playhead   # live playhead (radians) — refreshes each ghost's PlayheadOffset
         live = settings.live_players
-        self._ghost_ids: list[int] = list(range(live, live + settings.ghost_slots))
+        # The id above the live players is the dummy's (`dummy.py`); the ghosts start above it.
+        self._ghost_ids: list[int] = list(range(live + 1, live + 1 + settings.ghost_slots))
 
         self._lock = Lock()
         self._prev_offset: dict[int, float] = {}   # live id -> last PlayheadOffset (beat-crossing detection)

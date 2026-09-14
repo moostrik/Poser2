@@ -135,21 +135,22 @@ IRES = 3600                 # one pixel per 0.1°
 DEG = IRES // 360           # pixels per degree
 C = IRES // 2               # the pixel of a person at normalized azimuth 0.5
 TICK = 1 / 30
-MASK = 15                   # mask half width (px) at the default 3° and pose length 1
+MASK = 15                   # mask half width (px) at the default 3°
 WINDOW = 450                # default 45° window (px)
 INTERVAL = 140              # the default 14° interval (px)
 
-# The joints' rests and reaches as the settings default them; a measure is a fraction of the reach.
-SHOULDER_REST, SHOULDER_REACH = 0.18 * math.pi, math.pi
-ELBOW_REST, ELBOW_REACH = -0.10 * math.pi, math.pi
+# The joints' reaches as the settings default them; a measure is a fraction of the reach from
+# neutral, the pipeline's 0.
+SHOULDER_REACH = math.pi
+ELBOW_REACH = math.pi
 
 
 def shoulder(fraction: float) -> float:
-    return SHOULDER_REST + fraction * SHOULDER_REACH
+    return fraction * SHOULDER_REACH
 
 
 def elbow(fraction: float) -> float:
-    return ELBOW_REST + fraction * ELBOW_REACH
+    return fraction * ELBOW_REACH
 
 
 class FakePose:
@@ -180,7 +181,6 @@ def _pose(azimuth_pos: float, sims: dict[int, float] | None = None, shoulders: f
         sim_values[j] = v
     return FakePose({
         features.Azimuth: SimpleNamespace(value=azimuth_pos * math.tau),
-        features.BBox: {features.BBoxElement.height: 1.0},
         features.Angles: SimpleNamespace(values=angles),
         features.AngleSymmetry: SimpleNamespace(values=np.full(len(features.SymmetryElement), np.nan)),
         features.Similarity: SimpleNamespace(values=sim_values),
@@ -252,11 +252,12 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertAlmostEqual(p.white.fundamental, 0.0, places=5)
         self.assertAlmostEqual(p.white.harmonic, 0.5, places=5)
 
-    def test_an_arm_past_the_vertical_stays_fully_out(self) -> None:
-        # The shoulder wraps at π: straight up reads as −0.82π, not +1.18π; a little further is still out.
-        for angle in (shoulder(1.0), shoulder(1.0) - math.tau, shoulder(1.1) - math.tau):
+    def test_the_sign_of_an_angle_is_not_a_measure(self) -> None:
+        # The sign is the side of the body the arm passes; straight up is π from either side.
+        for angle in (shoulder(1.0), -shoulder(1.0)):
             self.assertAlmostEqual(self._connect(_pose(0.5, left_shoulder=angle)).white.fundamental, 1.0, places=5)
-        self.assertEqual(self._connect(_pose(0.5, left_shoulder=shoulder(-0.05))).white.fundamental, 0.0)   # a little behind
+        for angle in (shoulder(0.5), -shoulder(0.5)):
+            self.assertAlmostEqual(self._connect(_pose(0.5, left_shoulder=angle)).white.fundamental, 0.5, places=5)
 
     def test_the_elbows_place_the_lines_and_the_overtone(self) -> None:
         p = self._connect(_pose(0.5, shoulders=shoulder(0.5), left_elbow=elbow(1.0), right_elbow=elbow(0.5)))

@@ -42,9 +42,9 @@ class OscSoundSender(BaseOscSound):
 
     @property
     def _slot_count(self) -> int:
-        """Live players (``max_players``) + the virtual (ghost) id slots Ghoster injects.
-        The per-track array width stays ``max_players``; only the slot count grows."""
-        return self._config.max_players + self._config.virtual_players  # type: ignore[attr-defined]
+        """Live players (``max_players``) + the dummy's slot + the virtual (ghost) id slots
+        Ghoster injects. The per-track array width stays ``max_players``; only the slot count grows."""
+        return self._config.max_players + 1 + self._config.virtual_players  # type: ignore[attr-defined]
 
     def set_composition(self, output: Frame) -> None:
         """Store the latest Frame; thread-safe."""

@@ -17,11 +17,8 @@ DEG = RES // 360
 
 
 class FakePose:
-    def __init__(self, azimuth_pos: float, length: float = 1.0) -> None:
-        self._by_type = {
-            features.Azimuth: SimpleNamespace(value=azimuth_pos * math.tau),
-            features.BBox: {features.BBoxElement.height: length},
-        }
+    def __init__(self, azimuth_pos: float) -> None:
+        self._by_type = {features.Azimuth: SimpleNamespace(value=azimuth_pos * math.tau)}
 
     def __getitem__(self, feature_type):
         return self._by_type[feature_type]
@@ -60,7 +57,7 @@ class ProjectionPlayheadTest(unittest.TestCase):
         np.testing.assert_allclose(f.white[centre - 5:centre + 5], self.cfg.level * self.instrument.mask.playhead_at_mask)
 
     def test_the_marker_dims_pixel_by_pixel_at_the_mask_edge(self) -> None:
-        # The default mask is 3° × 1 at length 1: 15 px each side of the person.
+        # The default mask is 3°: 15 px each side of the person.
         self.board.frames = {0: FakePose(0.5)}
         f = self._render(0.5 + 15 / RES)                       # the marker straddles the mask's edge
         centre = RES // 2 + 15
@@ -68,8 +65,9 @@ class ProjectionPlayheadTest(unittest.TestCase):
         np.testing.assert_allclose(f.white[centre - 5:centre + 1], dim)
         np.testing.assert_allclose(f.white[centre + 1:centre + 5], self.cfg.level)
 
-    def test_the_mask_scales_with_pose_length(self) -> None:
-        self.board.frames = {0: FakePose(0.5, length=3.0)}     # 3° × 2: 30 px each side
+    def test_the_mask_follows_its_width(self) -> None:
+        self.instrument.mask.width = 6.0                       # 30 px each side
+        self.board.frames = {0: FakePose(0.5)}
         f = self._render(0.5 + 25 / RES)
         np.testing.assert_allclose(f.white[RES // 2 + 20:RES // 2 + 30], self.cfg.level * self.instrument.mask.playhead_at_mask)
 

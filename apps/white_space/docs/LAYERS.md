@@ -31,8 +31,11 @@ resets a track the moment its pose is missing. A layer adds no presence test of 
 azimuth is the pose's `Azimuth`, at their eyes: raw from CLEAN, smoothed at SMOOTH, predicted at
 PREDICT and interpolated at LERP. Show layers and the state machine read LERP poses, the stable eye
 azimuth and its `PlayheadOffset`. Their age is the pose's `Age`. Ghosts are published to their own
-board store (`get_ghosts`), not among the poses. How the tracker produces the
-poses is in `TRACKING.md`, *Downstream*.
+board store (`get_ghosts`), not among the poses. The dummy (`POSE_INSTRUMENT.md`, *The dummy*)
+joins the poses before the LERP filters at its own id, `num_players`, so to every layer it is a
+person; the ghosts' ids start above it. The render draws every LERP pose as a figure over the
+projection row at its azimuth (`render.pose_figures`). How the tracker produces the poses is in
+`TRACKING.md`, *Downstream*.
 
 ## Index — show layers
 
@@ -40,14 +43,14 @@ poses is in `TRACKING.md`, *Downstream*.
 |-----------------------|------------|-------------------------------|------------------------------------------|---------------------------|
 | `beam_playhead`       | beam       | — (settings only)             | front white lamp                         | S1–S6, S9, S10            |
 | `beam_flash`          | beam       | LERP frames (PlayheadOffset)  | front white + blue lamps; board flashes  | S4                        |
-| `projection_playhead` | projection | frame playhead phase; LERP frames (Azimuth, BBox) | white playhead marker, dim in a mask | S6 (projecting), S7, S8 |
+| `projection_playhead` | projection | frame playhead phase; LERP frames (Azimuth) | white playhead marker, dim in a mask | S6 (projecting), S7, S8 |
 | `pose_instrument`     | projection | LERP frames (PlayheadOffset)  | white and blue lines, dim blue masks     | S6 (projecting), S7, S8   |
 | `flood`               | projection | — (settings only)             | whole projection white                   | S8                        |
 | `beam_wind_down`      | beam       | tick clock                    | both white lamps, fading                 | S9, S10                   |
 | `beam_blue_sound`     | beam       | sound levels from Max (board) | left/right blue lamps                    | S1, S2, S3, S5, S10       |
 
 `beam_flash`'s blue lamps are zeroed in the presets: S4 runs blue-none by design. `pose_instrument`
-reads `Azimuth`, `BBox`, `Angles`, `LegDeviation`, `TorsoTilt`, `AngleSymmetry`, `Similarity` and
+reads `Azimuth`, `Angles`, `LegDeviation`, `TorsoTilt`, `AngleSymmetry`, `Similarity` and
 `PlayheadOffset` from the LERP frames.
 
 `beam_wind_down` is `flood`'s ending and a plain beam layer: the fixture is in beam mode from
@@ -136,7 +139,7 @@ this section is the layer: what it reads, how it composes people, and what it ex
 - **Input**: per person from the LERP frames, the measures: the four arm angles (`Angles`:
   left/right shoulder, left/right elbow), `LegDeviation` (joint-weighted hip/knee deviation, 0..1),
   `TorsoTilt` (signed sideways lean against the image vertical, −1..1) and `AngleSymmetry` (signed
-  left minus right per pair, −1..1); plus pose length (BBox height), presence (the pose itself,
+  left minus right per pair, −1..1); plus presence (the pose itself,
   *Inputs*), the pairwise `Similarity` row and `PlayheadOffset`. `AngleSymmetry`, `LegDeviation` and
   `TorsoTilt` are also sent to Max (`/pose/{id}/angle/sym`, `/pose/{id}/angle/legs`,
   `/pose/{id}/angle/tilt`) so sound and light read the same values. The layer adds no smoothing: the
@@ -157,7 +160,7 @@ this section is the layer: what it reads, how it composes people, and what it ex
   patterns can only add narrow gaps, so the union fills gaps under the limit. A line or gap appears
   and disappears at the limit's width, never thinner.
 - **Masks**: every mask goes over every pattern, in both channels, and lights dim blue
-  (`mask.brightness`, width `mask.width` × (0.5 + 0.5 × pose length)). A mask or a window edge cuts
+  (`mask.brightness`, `mask.width` wide). A mask or a window edge cuts
   a line where it falls, so lines slide out from behind the mask and into view at the window edge.
 - **Sync**: above `window.sync_threshold` (mean of both directions' similarity) a pair's window opens
   toward each other along the shorter arc, eased, until each pattern reaches the partner: full sync

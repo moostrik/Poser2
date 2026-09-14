@@ -16,6 +16,7 @@
   "render": {
     "camera_view": "BOTH",
     "azimuth_overlay": true,
+    "pose_figures": true,
     "preview": {
       "tracker": {
         "stage": "LERP",
@@ -605,7 +606,7 @@
   "light": {
     "light_rate": 30.0,
     "brightness": 1.0,
-    "debug": "OFF",
+    "debug": "pose_instrument",
     "motor_simulate": true,
     "clock": {},
     "motor": {
@@ -844,9 +845,7 @@
       "blue_phase": 0.5,
       "phase_range": 0.5,
       "overtone_phase_range": 0.5,
-      "shoulder_rest": 0.5654866776461628,
       "shoulder_reach": 3.141592653589793,
-      "elbow_rest": -0.3141592653589793,
       "elbow_reach": 3.141592653589793,
       "white": {
         "waveform": "SINE",
@@ -860,25 +859,41 @@
       }
     },
     "mask": {
-      "width": 3.0,
-      "brightness": 0.3,
+      "width": 4.0,
+      "brightness": 0.5,
       "playhead_at_mask": 0.3,
       "flash_brightness": 1.0
     },
     "window": {
-      "width": 45.0,
+      "width": 20.0,
       "sync_threshold": 0.75
     },
     "events": {
-      "hit_frames": 1,
-      "tint_white": 0.0,
-      "tint_blue": 0.0,
+      "hit_frames": 3,
+      "tint_white": 0.3,
+      "tint_blue": 0.3,
       "push_strength": 0.0,
       "push_seconds": 1.0
     },
     "presence": {
       "attack_seconds": 1.0,
       "release_seconds": 1.5
+    },
+    "dummy": {
+      "enabled": false,
+      "azimuth": 180.0,
+      "torso": 0.0,
+      "left_shoulder": 0.0,
+      "right_shoulder": 0.0,
+      "left_elbow": 0.0,
+      "right_elbow": 0.0,
+      "left_hip": 0.0,
+      "right_hip": 0.0,
+      "left_knee": 0.0,
+      "right_knee": 0.0,
+      "morph": 0.5,
+      "pose": "",
+      "name": ""
     }
   },
   "states": {

@@ -40,7 +40,7 @@ from .._base_layer import ProjectionLayer, LayerSettings
 from .._utilities import normalize_azimuth, mask_half_width
 from .line_pattern import LinePattern, Waveform
 from ...frame import Frame
-from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step
+from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step, DummySettings
 
 
 # -- Settings: the PI root group ---------------------------------------------------------------
@@ -60,10 +60,8 @@ class PatternSettings(BaseSettings):
     blue_phase:           Field[float] = Field(0.5,             min=-1.0, max=1.0,  step=0.01, description="Blue's rest phase from white's (intervals)")
     phase_range:          Field[float] = Field(0.5,             min=-1.0, max=1.0,  step=0.01, description="How far a measure moves the lines (intervals)")
     overtone_phase_range: Field[float] = Field(0.5,             min=-1.0, max=1.0,  step=0.01, description="How far a measure moves the overtone (intervals)")
-    shoulder_rest:        Field[float] = Field(0.18 * math.pi,  min=-math.pi, max=math.pi, step=0.01, description="Shoulder angle with the arm hanging (rad)", newline=True)
-    shoulder_reach:       Field[float] = Field(math.pi,         min=0.1,  max=math.tau, step=0.01, description="Shoulder travel to the drawbar fully out (rad)")
-    elbow_rest:           Field[float] = Field(-0.10 * math.pi, min=-math.pi, max=math.pi, step=0.01, description="Elbow angle with the arm straight (rad)")
-    elbow_reach:          Field[float] = Field(math.pi,         min=0.1,  max=math.tau, step=0.01, description="Elbow travel to fully folded (rad)")
+    shoulder_reach:       Field[float] = Field(math.pi,         min=0.1,  max=math.tau, step=0.01, description="Shoulder travel from hanging to the drawbar fully out (rad)", newline=True)
+    elbow_reach:          Field[float] = Field(math.pi,         min=0.1,  max=math.tau, step=0.01, description="Elbow travel from straight to fully folded (rad)")
     white:                Group[OscillatorSettings] = Group(OscillatorSettings)
     blue:                 Group[OscillatorSettings] = Group(OscillatorSettings)
 
@@ -105,6 +103,7 @@ class PoseInstrumentSettings(BaseSettings):
     window:    Group[WindowSettings]   = Group(WindowSettings)
     events:    Group[EventSettings]    = Group(EventSettings)
     presence:  Group[PresenceSettings] = Group(PresenceSettings)
+    dummy:     Group[DummySettings]    = Group(DummySettings)
 
 
 # -- The pattern's parameters -------------------------------------------------------------------
@@ -131,7 +130,6 @@ class Pattern:
 class _Participant:
     """One person's measures, presence, window and hit."""
     position:       float = 0.0     # normalized azimuth
-    length:         float = 1.0     # BBox height (pose length)
     left_shoulder:  float = 0.0     # the four arm angles (rad)
     right_shoulder: float = 0.0
     left_elbow:     float = 0.0
@@ -234,8 +232,6 @@ class PoseInstrument(ProjectionLayer):
             p = self._participants.setdefault(id, _Participant())
             p.present = True
             p.position = normalize_azimuth(azimuth)
-            height = pose[features.BBox][features.BBoxElement.height]
-            p.length = height if not math.isnan(height) and height > 0.0 else p.length
             angles = pose[features.Angles].values
             p.left_shoulder  = self._value(angles[features.AngleLandmark.left_shoulder],  p.left_shoulder)
             p.right_shoulder = self._value(angles[features.AngleLandmark.right_shoulder], p.right_shoulder)
@@ -297,22 +293,22 @@ class PoseInstrument(ProjectionLayer):
         - the symmetries: unconnected
         """
         S = self._instrument.pattern
-        fundamental = self._measure(p.left_shoulder, S.shoulder_rest, S.shoulder_reach)
-        harmonic = self._measure(p.right_shoulder, S.shoulder_rest, S.shoulder_reach)
+        fundamental = self._measure(p.left_shoulder, S.shoulder_reach)
+        harmonic = self._measure(p.right_shoulder, S.shoulder_reach)
         white = Oscillator(fundamental, harmonic,
-                           phase=self._measure(p.left_elbow, S.elbow_rest, S.elbow_reach) * S.phase_range,
-                           overtone_phase=self._measure(p.right_elbow, S.elbow_rest, S.elbow_reach) * S.overtone_phase_range)
+                           phase=self._measure(p.left_elbow, S.elbow_reach) * S.phase_range,
+                           overtone_phase=self._measure(p.right_elbow, S.elbow_reach) * S.overtone_phase_range)
         blue = Oscillator(1.0 - fundamental, 1.0 - harmonic, phase=S.blue_phase, overtone_phase=0.0)
         interval = S.interval * 2.0 ** (min(max(p.tilt, -1.0), 1.0) * S.octaves)
         detune = S.detune * min(max(p.legs, 0.0), 1.0)
         return Pattern(interval, detune, white, blue)
 
     @staticmethod
-    def _measure(angle: float, rest: float, reach: float) -> float:
-        """An angle as a measure 0..1 over its travel from ``rest``: the difference is wrapped
-        about the middle of the travel, so an arm past the vertical never flips back to 0."""
-        d = (angle - rest - reach / 2.0 + math.pi) % math.tau - math.pi + reach / 2.0
-        return min(max(d / reach, 0.0), 1.0)
+    def _measure(angle: float, reach: float) -> float:
+        """An angle as a measure 0..1 over its travel from neutral (the pipeline's 0). The sign
+        is the side of the body the limb passes, which the design gives no meaning, so the
+        absolute is taken: straight up is π from either side."""
+        return min(max(abs(angle) / reach, 0.0), 1.0)
 
     # -- Window and sync ------------------------------------------------------------
 
@@ -402,7 +398,7 @@ class PoseInstrument(ProjectionLayer):
         flashes on the hit."""
         P = self._instrument.mask
         R = self.resolution
-        half = mask_half_width(P.width, p.length, R)
+        half = mask_half_width(P.width, R)
         idx = (centre + np.arange(-half, half + 1)) % R
         mask[idx] = True
         brightness = P.flash_brightness if p.hit else P.brightness

@@ -17,7 +17,7 @@ from modules.session import Session
 from modules.gl import WindowSettings
 
 from .board import Board
-from .pose import GhostFeature, PlayheadOffset, PlayheadOffsetExtractor, Ghoster
+from .pose import GhostFeature, PlayheadOffset, PlayheadOffsetExtractor, Ghoster, Dummy, dummy_id
 from .light import Conductor
 from .inout import OscLightSender, OscSoundSender, UdpLightReceiver
 from .render import Render as WindowRender
@@ -44,6 +44,9 @@ class WhiteSpaceMain:
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
         self.settings.camera.sim_enabled = simulation
+        # Boot failsafe: a preset saved with the dummy in the pipeline must never wake the show with
+        # a figure standing in the room.
+        self.settings.PI.dummy.enabled = False
         # The delivered frame's height follows the tilt unless the preset pins it. The warp's
         # rows are tangents of elevation, so the sensor's full reach needs more rows the further
         # the camera is aimed up (848 at P720 and tilt 0, 960 at tilt 15, 1152 at P800 and tilt
@@ -76,6 +79,9 @@ class WhiteSpaceMain:
         self.session = Session(self.settings.record.core)
         self.osc_sound_sender = OscSoundSender(self.settings.inout.osc_sound_sender)
         self.ghoster = Ghoster(self.settings.pose.ghoster, playhead=self.board.get_playhead)   # live/pool counts shared from root
+        # The dummy has its own id between the live players and the ghosts; the LERP stage is
+        # built one id wider for it, so it is a pose like any other from there.
+        self.dummy = Dummy(self.settings.PI.dummy, ps.angle_extractor, dummy_id(num_players), f"{DATA_PATH}/poses.json")
         self.video_recorder = VideoRecorder(self.settings.record.video, data_path=DATA_PATH)
 
         # CAMERA
@@ -130,7 +136,8 @@ class WhiteSpaceMain:
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
             wt_features = lerp_features if stage == Stage.LERP else None
-            wt = window.WindowTracker(num_players, getattr(ps, f'window_{stage.name.lower()}'), features=wt_features)
+            tracks = num_players + 1 if stage == Stage.LERP else num_players      # LERP also holds the dummy's id
+            wt = window.WindowTracker(tracks, getattr(ps, f'window_{stage.name.lower()}'), features=wt_features)
             wt.add_windows_callback(partial(self.board.set_windows, stage))
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
@@ -270,14 +277,17 @@ class WhiteSpaceMain:
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
                 PlayheadOffsetExtractor(self.board.get_playhead),
             ])
-            for i in range(num_players)
+            for i in range(num_players + 1)                                       # the players and the dummy
         })
         self.gate_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([self.motion_gate_applicator])
-            for i in range(num_players)
+            for i in range(num_players + 1)
         })
         self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.set)
-        self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
+        # The dummy joins the interpolated poses before the LERP filters, which stamp on it
+        # everything a person has (the playhead offset, the symmetries, the leg deviation, the bend).
+        self.interpolators_lerp.add_frames_callback(self.dummy.process)
+        self.dummy.add_frames_callback(self.filters_lerp.process)
         self.filters_lerp.add_frames_callback(self.motion_gate_applicator.set)
         self.filters_lerp.add_frames_callback(self.gate_lerp.process)
         # Ghoster sits between LERP and the fan-out: records held poses, commits/refreshes ghosts,
@@ -293,7 +303,7 @@ class WhiteSpaceMain:
 
         # RENDER
         self.render = WindowRender(self.board, self.settings.render, self.settings.track,
-                                   self.settings.camera.cameras, self.settings.camera.camera_check)
+                                   self.settings.camera.cameras, self.settings.camera.camera_check, ps.angle_extractor)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
         self.render.add_update_callback(self.camera_check.update)
         # LERP first: the state machine's hit reads this tick's PlayheadOffset, the same the flash draws on.

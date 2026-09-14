@@ -3,8 +3,8 @@
 Draws a marker at the normalized azimuth of ``frame.playhead`` (the continuous content playhead,
 radians [-π, π); NaN → nothing drawn). Inside a person's **mask** (the pose instrument's dim blue
 band at their azimuth, ``PI.mask``) the marker dims itself to ``playhead_at_mask`` of its level: it
-reads the poses' azimuth and length from the LERP frames and the mask width from the same settings
-the instrument draws with, so the instrument never blinds and no layer shares a mix at a person.
+reads the poses' azimuth from the LERP frames and the mask width from the same settings the
+instrument draws with, so the instrument never blinds and no layer shares a mix at a person.
 Distinct from the beam-mode ``BeamPlayhead`` and the motor/content ``Playhead`` (the NCO in
 ``light/playhead.py``).
 """
@@ -56,13 +56,11 @@ class ProjectionPlayhead(ProjectionLayer):
         R = self.resolution
         masked = self._masked
         masked.fill(False)
+        half = mask_half_width(self._mask.width, R)
         for pose in self._board.get_frames(self._pose_stage).values():
             azimuth = pose[features.Azimuth].value
             if math.isnan(azimuth):
                 continue
             centre = int(round(normalize_azimuth(azimuth) * R)) % R
-            height = pose[features.BBox][features.BBoxElement.height]
-            length = height if not math.isnan(height) and height > 0.0 else 1.0
-            half = mask_half_width(self._mask.width, length, R)
             masked[(centre + np.arange(-half, half + 1)) % R] = True
         return masked

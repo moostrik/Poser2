@@ -207,7 +207,8 @@ may drive more than one parameter, and a parameter may stay fixed.
 
 The poses we check against: each with the light it should produce under the meanings of Part 2.
 The list is the acceptance set, small on purpose; on the machine each row is a thing to stand in
-and look at, and later a test. Every pose between the rows is unique and is not described.
+and look at, and a test. The rows are the dummy's saved poses (`data/poses.json`, *The dummy*),
+so each is one pick in the panel. Every pose between the rows is unique and is not described.
 
 | Pose                                        | Result                                                         |
 |---------------------------------------------|----------------------------------------------------------------|
@@ -235,19 +236,20 @@ hip and knee angles.
 
 | Feature           | Measure                                                  | In the pipeline |
 |-------------------|----------------------------------------------------------|-----------------|
-| left shoulder     | 0.18π hanging → 1.18π straight up, wrapped past π        | `Angles`        |
-| right shoulder    | 0.18π hanging → 1.18π straight up, wrapped past π        | `Angles`        |
-| left elbow        | −0.10π straight → 0.90π folded                           | `Angles`        |
-| right elbow       | −0.10π straight → 0.90π folded                           | `Angles`        |
+| left shoulder     | 0 hanging → ±π straight up, the sign the side it passes  | `Angles`        |
+| right shoulder    | 0 hanging → ±π straight up, the sign the side it passes  | `Angles`        |
+| left elbow        | 0 straight → ±π folded                                   | `Angles`        |
+| right elbow       | 0 straight → ±π folded                                   | `Angles`        |
 | leg deviation     | 0 standing → 1 bent, stretched                           | `LegDeviation`  |
 | body bend         | −1 left → 0 upright → 1 right                            | `TorsoTilt`     |
 | symmetry, a pair  | signed, left minus right: how unequal the two sides are  | `AngleSymmetry` |
 
-The angles are the extractor's geometry (`modules/pose/nodes/_utils/AngleUtils.py`): each joint
-travels a range of π from its **rest**, the hanging shoulder at 0.18π and the straight elbow at
-−0.10π, and the shoulder's travel crosses π, where the angle wraps to −0.82π. The rests and the
-reaches are settings the connections read, so a measure is 0 at rest and 1 at full travel whatever
-the geometry.
+The angle extractor's offsets (`modules/pose/nodes/_utils/AngleUtils.py`) define the neutral
+pose: every joint reads 0 standing with the arms hanging, and the right side is mirrored so a
+symmetric pose reads equal on both sides. The sign of an angle is the side of the body the limb
+passes, outward or across, and means nothing to the instrument: the connections take the
+absolute, so an arm raised outward and one raised across the body read alike, and straight up is
+π from either side.
 
 A **connection** is one feature into one pattern parameter. A feature may feed several parameters;
 a parameter has one source; two features never sum into one parameter. The connections are a
@@ -310,11 +312,10 @@ measures and returns the pattern parameters of both colours (`Pattern`: the inte
 detune, and an `Oscillator` per colour: the two drawbars and the two phases). It is the first
 connections table of Part 3 written out, with the ranges, the curves and the absolutes of signed
 values that a panel cannot express, and it hot-reloads on save. Every number it uses is a setting
-it reads (the rest interval, the detune's maximum, a joint's rest and reach, a phase's range),
-never a literal, so the panel keeps the values and the code keeps the routing. The preset carries
-values only. An angle becomes a measure through its joint's rest and reach: the difference from the
-rest is wrapped about the middle of the reach, so the shoulder's crossing of π never flips a raised
-arm back to 0.
+it reads (the rest interval, the detune's maximum, a joint's reach, a phase's range), never a
+literal, so the panel keeps the values and the code keeps the routing. The preset carries values
+only. An angle becomes a measure through its joint's reach: its absolute over the reach, since
+the sign is the side the limb passes and not a measure.
 
 ### The pattern
 
@@ -365,7 +366,7 @@ gap narrower than the limit fills. On arrival the mask is there at once and the 
 release the window closes first and then the mask fades: the pattern goes first, the person's own
 light last.
 
-The **mask** is a dim blue band, `mask_width` × (½ + ½ × pose length) wide at `mask_brightness`, and
+The **mask** is a dim blue band, `mask_width` wide at `mask_brightness`, and
 goes over everything at the person: the instrument's own patterns, and the playhead. The projection
 playhead dims itself to `playhead_at_mask` inside a mask: it reads the poses and the mask width as
 the instrument does, so there is no store and no compositor change. No other layer shares a mix
@@ -386,10 +387,10 @@ for the frame. The push is above.
 holds tweakable values only, each concern a `Group` (`PoseInstrumentSettings`,
 `light/layers/projection/pose_instrument.py`): `max_lines`; `pattern`, the rests and ranges (the
 interval at rest and its octaves of bend, the detune's maximum, the blue's rest phase, the phases'
-ranges, the joints' rests and reaches, and per colour `white` / `blue` the waveform, the cutoff and
+ranges, the joints' reaches, and per colour `white` / `blue` the waveform, the cutoff and
 the drift); `mask` (width, brightness, the playhead's level in it, the flash brightness); `window`
 (width, the sync threshold); `events` (the hit's frames, the tint per colour, the push); `presence`
-(attack, release). The layer keeps its `blend`. No setting routes anything.
+(attack, release); `dummy` (*The dummy*). The layer keeps its `blend`. No setting routes anything.
 
 ### Hot reload
 
@@ -470,6 +471,30 @@ under the level a shape is a thickness.
 At half registration the sub-line is a point: the overtone's crest between the lines reaches the
 level exactly and lights nothing. It appears as the arms rise above level, and grows with the
 harmonic's drawbar past the fundamental's.
+
+### The dummy
+
+The dummy (`pose/dummy.py`, settings `PI.dummy`) stands in for a person while the instrument is
+judged: a figure of the pipeline's 17 landmarks whose joints are turned by the panel, in degrees
+from neutral (the shoulder 0 hanging, 90 level, 180 straight up; the elbow 0 straight, 180
+folded; the hip 0 to 120, the knee 0 to 150; the torso from upright), standing at `azimuth`.
+Its sides are named as the pipeline names people's, the left on image-right, and its degrees turn
+a joint outward, which the pipeline reads as the negative angle. Its frame joins the interpolated
+poses before the LERP filters at its own id, `num_players`, between the live players and the
+ghosts (which start one above it), so it is a pose like any other from there: the filters stamp
+the playhead offset, the symmetries, the leg deviation and the bend on it, the render draws its
+figure over the projection row where it stands (as it does every pose, `render.pose_figures`),
+the azimuth overlay marks it, Max plays it at its slot and the instrument lights it. Only the
+joints are set; the leg deviation and the bend are the pipeline's, derived from the figure as for
+a person. Each joint is turned by the difference between the wanted angle and what the angle
+extractor reads, so the pipeline reads back exactly the set degrees, and the extractor's offsets
+stay the one definition of neutral.
+
+Its poses are named in `data/poses.json`, seeded with the rows of Part 3, picked in the `pose`
+select and saved under `name` with `save`. A change of any measure morphs over `morph` seconds
+(`easeInOutSine`), the azimuth and the arms the shortest way round, an exact opposite going up
+through the front on both sides. `enabled` is forced off at startup; in the show the dummy is
+never in the room.
 
 ---
 

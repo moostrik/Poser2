@@ -13,7 +13,9 @@ from modules.tracker import PanoramicTrackerSettings
 from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
 from apps.white_space.render.layers.beam_light_simulation_layer import BeamLightSimulationLayer
 from apps.white_space.render.layers.azimuth_overlay_layer import AzimuthOverlayLayer
+from apps.white_space.render.layers.pose_figure_layer import PoseFigureLayer
 from apps.white_space.light import FIXTURE_PROJECTION_RPM
+from modules.pose.nodes import AngleExtractorSettings
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -45,7 +47,8 @@ _SWITCHED_ROWS: dict[str, Layers] = {
 class Render(RenderBase):
     def __init__(self, board: Board, settings: RenderSettings,
                  tracker: PanoramicTrackerSettings,
-                 cameras: list[CameraSettings], camera_check: CameraCheckSettings) -> None:
+                 cameras: list[CameraSettings], camera_check: CameraCheckSettings,
+                 angle_extractor: AngleExtractorSettings) -> None:
         super().__init__(settings.window)
         self.num_players: int = settings.num_players
         self.num_cams: int = settings.num_cams
@@ -96,6 +99,7 @@ class Render(RenderBase):
         self.L[Layers.ws_light][0]   = LightSimulationLayer(board)
         self.L[Layers.ws_beam][0]     = BeamLightSimulationLayer(board, settings.beam_light_sim)
         self.L[Layers.ws_azimuth][0]  = AzimuthOverlayLayer(board, settings.colors)
+        self.L[Layers.ws_figures][0]  = PoseFigureLayer(board, settings.colors, angle_extractor)
 
         self.subdivision_rows: list[SubdivisionRow] = self._build_rows()
         self._window_size: tuple[int, int] = (settings.window.width, settings.window.height)
@@ -194,6 +198,7 @@ class Render(RenderBase):
 
         w, h = self.subdivision.get_allocation_size('ws_light', 0)
         self.L[Layers.ws_azimuth][0].allocate(w, h, GL_RGBA)
+        self.L[Layers.ws_figures][0].allocate(w, h, GL_RGBA)
 
         for i in range(self.num_players):
             w, h = self.subdivision.get_allocation_size('pose', i)
@@ -258,6 +263,8 @@ class Render(RenderBase):
         self.L[Layers.ws_beam if beam_mode else Layers.ws_light][0].draw()
         if self.settings.azimuth_overlay:
             self.L[Layers.ws_azimuth][0].draw()
+        if self.settings.pose_figures:
+            self.L[Layers.ws_figures][0].draw()
 
         # Row 4 - pose cutouts with data overlays, one viewport per player
         for i in range(self.num_players):
