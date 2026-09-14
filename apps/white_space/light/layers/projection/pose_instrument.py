@@ -8,15 +8,18 @@ drawbars, the fundamental and the harmonic, over one interval shared by the colo
 detuned and its registration inverted. The sources are pose features and nothing else;
 ``connect`` is the connections of the design's Part 3 written out, turning a person's measures
 into the pattern's parameters. Every number it uses is a setting of the ``PI`` group
-(``PoseInstrumentSettings``): the panel keeps the values, the code keeps the routing. Nothing
-moves by itself: the lines change only as the pose does.
+(``PoseInstrumentSettings``): the panel keeps the values, the code keeps the routing. The lines
+follow the pose; on top of that they **drift** by themselves, each colour's phase advancing by
+its ``drift`` per second, blue inward and white outward.
 
 Above ``window.sync_threshold`` a pair's window grows toward each other until each pattern
 reaches the partner, and overlapping patterns union. No line or gap is narrower than the visual
 limit (``max_lines`` per revolution), except where a mask or a window edge cuts a line: lines slide
 out from behind the mask and into view. On the ticks the playhead crosses a person
-(``PlayheadCrossing``, ``events.hit_frames``), all of that person's lines widen by
-``events.hit_widen``.
+(``PlayheadCrossing``, ``events.hit_frames``) the person is marked: the mask flashes to
+``mask.flash_brightness``, each colour's lines take the other colour by its ``tint`` (the central
+fraction of every line; 1 is the swap), and a **push** raises the drift by ``push_strength`` and
+lets it settle back over ``push_seconds``; the phase keeps what it gained.
 
 ``connect``, the drawing methods and ``LinePattern`` are hot-reloaded while the app runs; enum
 values are compared through ``int`` because a reload redefines the enum classes.
@@ -34,7 +37,7 @@ from modules.settings import BaseSettings, Field, Group
 from modules.utils import HotReloadMethods
 
 from .._base_layer import ProjectionLayer, LayerSettings
-from .._utilities import normalize_azimuth
+from .._utilities import normalize_azimuth, mask_half_width
 from .line_pattern import LinePattern, Waveform
 from ...frame import Frame
 from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step
@@ -82,7 +85,6 @@ class WindowSettings(BaseSettings):
 class EventSettings(BaseSettings):
     """The hit's mark and the push."""
     hit_frames:    Field[int]   = Field(1,   min=1,   max=3,    step=1,    description="Hit length: the ticks closest to the crossing, 1-3")
-    hit_widen:     Field[float] = Field(1.0, min=0.0, max=10.0, step=0.1,  description="Line widening each side on a hit (deg)")
     tint_white:    Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.01, description="White lines take blue on a hit: 0 none, 1 swap")
     tint_blue:     Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.01, description="Blue lines take white on a hit: 0 none, 1 swap")
     push_strength: Field[float] = Field(0.0, min=0.0, max=5.0,  step=0.05, description="Drift added on a hit (intervals per second)")
@@ -143,6 +145,10 @@ class _Participant:
     envelope:       float = 0.0     # presence 0..1 (attack / release)
     window_left:    float = 0.0     # this tick's window each side (normalized azimuth)
     window_right:   float = 0.0
+    phase_white:    float = 0.0     # the drift's gain per colour (intervals, signed: white out, blue in)
+    phase_blue:     float = 0.0
+    push_white:     float = 0.0     # the push per colour: extra drift settling back (intervals per second)
+    push_blue:      float = 0.0
 
 
 class PoseInstrument(ProjectionLayer):
@@ -179,7 +185,6 @@ class PoseInstrument(ProjectionLayer):
         self._set_windows()
 
         min_px = self._min_px()
-        widen_px = max(0, int(round(P.events.hit_widen / 360.0 * R)))
         white_lines, blue_lines = self._white_lines, self._blue_lines
         mask, mask_level = self._mask, self._mask_level
         white_lines.fill(False)
@@ -190,10 +195,17 @@ class PoseInstrument(ProjectionLayer):
         for p in self._participants.values():
             centre = int(round(p.position * R)) % R
             pattern = self.connect(p)
-            widen = widen_px if p.hit else 0
-            interval = pattern.interval / 360.0 * R
-            self._draw_lines(white_lines, p, centre, pattern.white, interval, P.pattern.white, min_px, widen)
-            self._draw_lines(blue_lines, p, centre, pattern.blue, interval * (1.0 + pattern.detune), P.pattern.blue, min_px, widen)
+            pattern.white.phase += p.phase_white
+            pattern.blue.phase += p.phase_blue
+            left, right, side = self._window_px(p)
+            if side > 0:
+                interval = pattern.interval / 360.0 * R
+                white_strip = self._strip(pattern.white, interval, P.pattern.white, min_px, side)
+                blue_strip = self._strip(pattern.blue, interval * (1.0 + pattern.detune), P.pattern.blue, min_px, side)
+                if p.hit:
+                    white_strip, blue_strip = self._tint(white_strip, blue_strip, min_px)
+                self._paint(white_lines, white_strip, centre, left, right, side)
+                self._paint(blue_lines, blue_strip, centre, left, right, side)
             self._draw_mask(mask, mask_level, p, centre)
 
         # Each pattern is visible on its own; overlaps can only leave narrow gaps, so the union
@@ -241,6 +253,7 @@ class PoseInstrument(ProjectionLayer):
         gone: list[int] = []
         for id, p in self._participants.items():
             p.hit = id in hits
+            self._advance_drift(p, dt)
             if p.present:
                 p.envelope = 1.0 if P.presence.attack_seconds <= 0.0 else min(1.0, p.envelope + dt / P.presence.attack_seconds)
             else:
@@ -253,6 +266,21 @@ class PoseInstrument(ProjectionLayer):
     @staticmethod
     def _value(x: float, fallback: float) -> float:
         return fallback if math.isnan(x) else float(x)
+
+    def _advance_drift(self, p: _Participant, dt: float) -> None:
+        """The lines' own motion this tick: each colour's phase gains its drift and its push,
+        white outward and blue inward. A hit raises the push by ``push_strength``; it settles
+        back exponentially over ``push_seconds`` and the phase keeps what it gained."""
+        P = self._instrument
+        E = P.events
+        if p.hit:
+            p.push_white += E.push_strength
+            p.push_blue += E.push_strength
+        p.phase_white += (P.pattern.white.drift + p.push_white) * dt
+        p.phase_blue -= (P.pattern.blue.drift + p.push_blue) * dt
+        settle = math.exp(-dt / E.push_seconds) if E.push_seconds > 0.0 else 0.0
+        p.push_white *= settle
+        p.push_blue *= settle
 
     # -- Connections -----------------------------------------------------------------
 
@@ -333,36 +361,49 @@ class PoseInstrument(ProjectionLayer):
 
     # -- Drawing ---------------------------------------------------------------------
 
-    def _draw_lines(self, lines: np.ndarray, p: _Participant, centre: int, osc: Oscillator, interval: float,
-                    C: OscillatorSettings, min_px: int, widen: int) -> None:
-        """OR one colour of one person's pattern into ``lines``: the half pattern mirrored about
-        the centre pixel, widened on a hit, made visible, cut to each side's window."""
+    def _window_px(self, p: _Participant) -> tuple[int, int, int]:
+        """This tick's window each side in pixels, and the larger of the two."""
         R = self.resolution
         left = min(int(round(p.window_left * R)), R // 2)
         right = min(int(round(p.window_right * R)), R - 1 - left)
-        side = max(left, right)
-        if side <= 0:
-            return
+        return left, right, max(left, right)
 
+    def _strip(self, osc: Oscillator, interval: float, C: OscillatorSettings, min_px: int, side: int) -> np.ndarray:
+        """One colour of one person's pattern over offsets −side … side: the half pattern
+        mirrored about the centre pixel and made visible."""
+        R = self.resolution
         interval = max(interval, 2.0 * min_px)                            # never below one period
         # The strip runs a margin past the window, so the circular morphology's wrap at its ends
         # never reaches a pixel that is shown.
-        n = min(side + widen + min_px, R)
+        n = min(side + min_px, R)
         half = LinePattern.lines(self._distance[:n + 1], interval, int(C.waveform), osc.fundamental,
                                  osc.harmonic, int(C.cutoff), osc.overtone_phase, osc.phase)
         strip = np.concatenate((half[:0:-1], half))                       # offsets −n … n
-        if widen > 0:
-            strip = LinePattern.dilate(strip, widen, widen)
-        strip = LinePattern.visible(strip, min_px)[n - side:n + side + 1]    # offsets −side … side
+        return LinePattern.visible(strip, min_px)[n - side:n + side + 1]  # offsets −side … side
+
+    def _tint(self, white: np.ndarray, blue: np.ndarray, min_px: int) -> tuple[np.ndarray, np.ndarray]:
+        """The hit's tint: the central ``tint`` fraction of each colour's lines takes the other
+        colour; at 1 the colours swap."""
+        E = self._instrument.events
+        white_core = LinePattern.core(white, E.tint_white, min_px)
+        blue_core = LinePattern.core(blue, E.tint_blue, min_px)
+        return (white & ~white_core) | blue_core, (blue & ~blue_core) | white_core
+
+    @staticmethod
+    def _paint(lines: np.ndarray, strip: np.ndarray, centre: int, left: int, right: int, side: int) -> None:
+        """OR a strip over offsets −side … side into ``lines`` at ``centre``, cut to each side's window."""
+        R = lines.size
         offsets = np.arange(-left, right + 1)
         idx = (centre + offsets) % R
         lines[idx] |= strip[offsets + side]
 
     def _draw_mask(self, mask: np.ndarray, mask_level: np.ndarray, p: _Participant, centre: int) -> None:
-        """Mark the person's mask: it goes over every pattern, lit dim blue by presence."""
+        """Mark the person's mask: it goes over every pattern, lit dim blue by presence, and
+        flashes on the hit."""
         P = self._instrument.mask
         R = self.resolution
-        half = int(round(P.width / 360.0 * R * (0.5 + 0.5 * p.length) / 2.0))
+        half = mask_half_width(P.width, p.length, R)
         idx = (centre + np.arange(-half, half + 1)) % R
         mask[idx] = True
-        mask_level[idx] = np.maximum(mask_level[idx], P.brightness * p.envelope)
+        brightness = P.flash_brightness if p.hit else P.brightness
+        mask_level[idx] = np.maximum(mask_level[idx], brightness * p.envelope)

@@ -375,9 +375,10 @@ with the instrument at a person.
 
 On the frames the playhead is closest to a person (`PlayheadCrossing`, `hit_frames` 1 to 3, as the
 beam flash), the person's mark: a
-`tint` blend per colour, 0 none, 1 the swap; **(open)** between 0 and 1 the central fraction of
-each line takes the other colour, never narrower than the limit. The `mask_flash` raises the mask's
-blue to `mask_flash_brightness` for the frame. The push is above.
+`tint` blend per colour, 0 none, 1 the swap; between 0 and 1 the central fraction of each line
+takes the other colour, never narrower than the limit, and a line whose rims would be narrower
+than the limit is taken whole. The `mask_flash` raises the mask's blue to `mask_flash_brightness`
+for the frame. The push is above.
 
 ### Settings
 
@@ -437,10 +438,14 @@ person, shared by both colours, bent by the body bend and detuned for the blue.
 The visual limit is `max_lines` (90): no line and no gap narrower than half its period. The
 interval never goes below one period; a line or a gap narrower than the limit is filled or dropped
 (`LinePattern.visible`). A mask or the window's edge cuts a line as it is, so lines slide out from
-behind the mask and into view at the window. The hit today widens every line of the person by
-`events.hit_widen` each side for `events.hit_frames` frames, the mark that does not read. Drift,
-the push, the tint, the mask flash, and the playhead dimming itself in the mask are not
-implemented; their settings are declared and unread.
+behind the mask and into view at the window.
+
+Drift and the push are as *The pattern* has them, the push settling exponentially over
+`push_seconds`; the phase keeps what it gained. The hit (`events.hit_frames` frames) marks the
+person as *Events* has it: the tint per colour (`LinePattern.core`), the mask flash, the push. The
+projection playhead dims itself at the masks as *People* has it (`projection_playhead.py`), and the
+render shows the overlap of the two colours as a tone of its own
+(`render/shaders/lightsimulation.frag`).
 
 ### The pose results now
 
@@ -494,12 +499,12 @@ Vocabulary not yet in the design:
 
 Design:
 
-- The tint between 0 and 1: which pixels of a line take the other colour
+- The tint between 0 and 1 is the central fraction of each line; whether that reads, or the
+  line should take the other colour whole past some blend
 
 From the machine **(site facts)**:
 
 - The mask is too narrow and the window too wide at the preset's values
-- The render hides blue under full white; the two colours need their own visualisation
 - Whether a line appearing at the limit width flickers when a pose hovers at its threshold
   **(deduction: the pipeline's smoothing should hold it)**
 - Whether the 90-line limit holds with the moiré of two synced patterns

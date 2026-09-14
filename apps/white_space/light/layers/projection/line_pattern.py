@@ -101,6 +101,26 @@ class LinePattern:
         return LinePattern.dilate(LinePattern.erode(mask, before, after), after, before)
 
     @staticmethod
+    def core(mask: np.ndarray, fraction: float, min_px: int) -> np.ndarray:
+        """The central ``fraction`` of every run of ``mask`` (linear, no wrap), for the tint. A
+        core is never narrower than ``min_px``, and a run whose rims would be narrower than
+        ``min_px`` is taken whole, so nothing under the limit is left either side."""
+        if fraction <= 0.0 or not mask.any():
+            return np.zeros(mask.shape, dtype=bool)
+        if fraction >= 1.0:
+            return mask.copy()
+        edges = np.flatnonzero(np.diff(np.concatenate(([False], mask, [False])).astype(np.int8)))
+        starts, ends = edges[::2], edges[1::2]
+        lengths = ends - starts
+        cores = np.minimum(lengths, np.maximum(np.rint(lengths * fraction).astype(np.int64), min_px))
+        cores = np.where((lengths - cores) // 2 < min_px, lengths, cores)
+        core_starts = starts + (lengths - cores) // 2
+        marks = np.zeros(mask.size + 1, dtype=np.int32)
+        np.add.at(marks, core_starts, 1)
+        np.add.at(marks, core_starts + cores, -1)
+        return np.cumsum(marks[:-1]) > 0
+
+    @staticmethod
     def visible(mask: np.ndarray, min_px: int) -> np.ndarray:
         """No line and no gap narrower than ``min_px``, the visual limit: gaps are filled first,
         then slivers dropped (dropping a line only merges gaps, so no narrow gap reappears). A

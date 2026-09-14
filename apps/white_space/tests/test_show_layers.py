@@ -15,7 +15,7 @@ from modules.pose import features
 from apps.white_space.light import Tick, BeamLightId, MotorCommand, MotorMode, LayerSettings
 from apps.white_space.light.frame import Frame
 from apps.white_space.light.layers.beam.blue_sound import BeamBlueSound, BeamBlueSoundSettings, SoundFallback
-from apps.white_space.light.layers import PoseInstrument, PoseInstrumentSettings
+from apps.white_space.light.layers import PoseInstrument, PoseInstrumentSettings, LinePattern
 from apps.white_space.pose import PlayheadOffset
 
 RES = 200
@@ -457,19 +457,88 @@ class PoseInstrumentTest(unittest.TestCase):
 
     # -- the hit --
 
-    def test_the_crossing_tick_widens_every_line_once(self) -> None:
-        widen = int(self.cfg.events.hit_widen * DEG)
-        lengths = []
-        for offset in (23.4, 1.8, -2.0, -9.2):                 # 36 rpm at 30 Hz: 7.2° a tick, closest at +1.8°
-            self._people({0: _pose(0.5, offset_deg=offset, **self.FUNDAMENTAL_OUT)})
-            lengths.append(set(self._inner_white_runs(self._render())))
-        self.assertEqual(lengths, [{70}, {70 + 2 * widen}, {70}, {70}])
+    STEADY = (23.4, 16.2, 9.0, 1.8, -5.4, -12.6)     # 36 rpm at 30 Hz: 7.2° a tick, closest at +1.8°
+
+    def _sweep(self, **pose) -> list[Frame]:
+        frames = []
+        for offset in self.STEADY:
+            self._people({0: _pose(0.5, offset_deg=offset, **pose)})
+            frames.append(self._render())
+        return frames
+
+    def test_the_mask_flashes_on_the_hit_frames(self) -> None:
+        M = self.cfg.mask
+        for frames, expected in ((1, [0, 0, 0, 1, 0, 0]), (3, [0, 0, 1, 1, 1, 0])):
+            self.cfg.events.hit_frames = frames
+            self.layer.reset()
+            levels = [float(f.blue[C]) for f in self._sweep()]
+            np.testing.assert_allclose(levels, [M.flash_brightness if e else M.brightness for e in expected], atol=1e-6)
+
+    def test_tint_one_swaps_the_colours_for_the_hit_frame(self) -> None:
+        self.cfg.events.tint_white = self.cfg.events.tint_blue = 1.0
+        outside = self._outside_mask()
+        frames = self._sweep(**self.FUNDAMENTAL_OUT)
+        before, hit, after = frames[2], frames[3], frames[4]
+        np.testing.assert_array_equal(hit.white[outside], before.blue[outside])
+        np.testing.assert_array_equal(hit.blue[outside], before.white[outside])
+        np.testing.assert_array_equal(after.light_img, before.light_img)
+
+    def test_tint_half_gives_the_centre_of_each_line_to_the_other_colour(self) -> None:
+        self.cfg.events.tint_white = 0.6
+        self.cfg.pattern.interval = 28.0                        # 140 px lines: cores of 84, rims of 28 above the limit
+        frames = self._sweep(**self.FUNDAMENTAL_OUT)
+        before, hit = frames[2], frames[3]
+        self.assertEqual(set(self._inner_white_runs(before)), {140})
+        self.assertLessEqual(set(self._inner_white_runs(hit)), {28, 29})    # the rims stay white (the centre line is 141 px)
+        self.assertGreater(len(self._inner_white_runs(hit)), 2)
+        edge = C + 280 - 40                                                 # in a white line's core, past the blue's own sub-line
+        self.assertEqual(float(before.blue[edge]), 0.0)
+        self.assertEqual(float(hit.blue[edge]), 1.0)                        # the core is blue for the frame
+        self.assertEqual(float(hit.white[edge]), 0.0)
+
+    def test_a_narrow_rim_takes_the_tint_whole(self) -> None:
+        self.cfg.events.tint_white = 0.5                        # 70 px lines: rims of 17 would be under the limit
+        frames = self._sweep(**self.FUNDAMENTAL_OUT)
+        outside = self._outside_mask()
+        self.assertEqual(self._inner_white_runs(frames[3]), [])
+        union = LinePattern.fill_gaps((frames[2].white > 0.5) | (frames[2].blue > 0.5), round(IRES / (2 * self.cfg.max_lines)))
+        np.testing.assert_array_equal(frames[3].blue[outside], union[outside].astype(np.float32))
+
+    def test_the_push_moves_the_lines_out_and_they_keep_the_gain(self) -> None:
+        E = self.cfg.events
+        E.push_strength = 1.0                                   # an interval per second
+        E.push_seconds = 0.1
+        frames = self._sweep(**self.FUNDAMENTAL_OUT)
+        before = self._centres(self._inner(frames[2].white))
+        on_hit = self._centres(self._inner(frames[3].white))                # the hit tick moves by strength × dt
+        self.assertAlmostEqual(on_hit[0] - before[0], INTERVAL * TICK, delta=1.0)
+        for _ in range(30):
+            settled = self._render()
+        gained = self._centres(self._inner(settled.white))[0] - before[0]
+        expected = INTERVAL * E.push_strength * TICK / (1.0 - math.exp(-TICK / E.push_seconds))   # the settle's sum
+        self.assertAlmostEqual(gained, expected, delta=1.0)                 # kept, nothing comes back
+        np.testing.assert_array_equal(self._render().light_img, settled.light_img)
+
+    def test_drift_moves_white_out_and_blue_in(self) -> None:
+        self.cfg.pattern.white.drift = 0.5                      # half an interval per second
+        self.cfg.pattern.blue.drift = 0.25
+        self._people({0: _pose(0.5, **self.FUNDAMENTAL_OUT)})
+        for _ in range(30):                                     # a second
+            f = self._render()
+        self._on_grid(self._inner(f.white), INTERVAL, INTERVAL / 2)       # out by half an interval
+        self._on_grid(self._inner(f.blue), INTERVAL / 2, INTERVAL / 4)    # the blue's sub-lines in by a quarter
+        for _ in range(30):
+            f = self._render()
+        self._on_grid(self._inner(f.white), INTERVAL)                     # a full interval on: the grid again
+        self._on_grid(self._inner(f.blue), INTERVAL / 2)
 
     def test_reset_starts_a_new_pass(self) -> None:
+        M = self.cfg.mask
         self._people({0: _pose(0.5, offset_deg=1.8, **self.FUNDAMENTAL_OUT)})
-        self._render()
+        self.assertAlmostEqual(float(self._render().blue[C]), M.flash_brightness, places=6)
+        self.assertAlmostEqual(float(self._render().blue[C]), M.brightness, places=6)   # one hit per pass
         self.layer.reset()
-        self.assertEqual(set(self._inner_white_runs(self._render())), {70 + 2 * int(self.cfg.events.hit_widen * DEG)})
+        self.assertAlmostEqual(float(self._render().blue[C]), M.flash_brightness, places=6)
 
     # -- sync --
 

@@ -47,8 +47,12 @@ void main() {
     white = white / overlap;
     blue = blue / overlap;
 
+    // Four tones: dark, blue, white, and both. The fixture projects the two colours from separate
+    // lamps, so where both are on the overlap reads as a tone of its own; here a pale violet, so
+    // blue never disappears under white.
     vec3 color = vec3(white, white, white);
     color += vec3(blue * 0.05,  0.0, blue);
+    color = mix(color, vec3(0.75, 0.55, 1.0), clamp(white * blue, 0.0, 1.0));
 
     fragColor = vec4(vec3(clamp(color, 0.0, 1.0)), 1.0);
 }

@@ -29,6 +29,12 @@ def normalize_azimuth(rad: float) -> float:
     """
     return (rad / TWOPI) % 1.0
 
+
+def mask_half_width(width_deg: float, length: float, resolution: int) -> int:
+    """Half the pose instrument's mask in pixels: ``width_deg`` scaled by (½ + ½ × pose length).
+    The instrument draws the mask with it and the projection playhead dims itself inside it."""
+    return int(round(width_deg / 360.0 * resolution * (0.5 + 0.5 * length) / 2.0))
+
 class EdgeSide(Enum):
     NONE  = 0
     LEFT  = 1

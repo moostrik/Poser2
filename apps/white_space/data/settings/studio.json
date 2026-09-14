@@ -871,7 +871,6 @@
     },
     "events": {
       "hit_frames": 1,
-      "hit_widen": 1.0,
       "tint_white": 0.0,
       "tint_blue": 0.0,
       "push_strength": 0.0,

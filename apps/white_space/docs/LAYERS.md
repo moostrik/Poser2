@@ -40,7 +40,7 @@ poses is in `TRACKING.md`, *Downstream*.
 |-----------------------|------------|-------------------------------|------------------------------------------|---------------------------|
 | `beam_playhead`       | beam       | — (settings only)             | front white lamp                         | S1–S6, S9, S10            |
 | `beam_flash`          | beam       | LERP frames (PlayheadOffset)  | front white + blue lamps; board flashes  | S4                        |
-| `projection_playhead` | projection | frame playhead phase          | white playhead marker                    | S6 (projecting), S7, S8   |
+| `projection_playhead` | projection | frame playhead phase; LERP frames (Azimuth, BBox) | white playhead marker, dim in a mask | S6 (projecting), S7, S8 |
 | `pose_instrument`     | projection | LERP frames (PlayheadOffset)  | white and blue lines, dim blue masks     | S6 (projecting), S7, S8   |
 | `flood`               | projection | — (settings only)             | whole projection white                   | S8                        |
 | `beam_wind_down`      | beam       | tick clock                    | both white lamps, fading                 | S9, S10                   |
@@ -144,7 +144,8 @@ this section is the layer: what it reads, how it composes people, and what it ex
 - **Per person**: `PoseInstrument.connect` turns the measures into the pattern's parameters
   (`POSE_INSTRUMENT.md`, *Sources and connections*). The pattern is mirrored about the person's
   centre pixel, so it is symmetric exactly and moves with them as one piece; a neighbour walking
-  never re-spaces it. Every pixel is 0 or 1 per channel; only the mask is dim.
+  never re-spaces it. On top of the pose each colour drifts by its own `drift`, white outward and
+  blue inward. Every pixel is 0 or 1 per channel; only the mask is dim.
 
 ### Between people
 
@@ -166,9 +167,12 @@ this section is the layer: what it reads, how it composes people, and what it ex
 ### Hit
 
 On the ticks the playhead is closest to a person (`PlayheadCrossing` in `pose/playhead_offset.py`,
-the same closest-tick rule as `beam_flash`, `events.hit_frames` of them), every line of that person,
-in both channels, widens by `events.hit_widen` each side. The crossing is measured in playhead steps
-at `beam_rpm`, the rate the content playhead free-runs at in PROJECTION.
+the same closest-tick rule as `beam_flash`, `events.hit_frames` of them), the person is marked: the
+mask flashes to `mask.flash_brightness`; each colour's lines take the other colour by its tint
+(`events.tint_white`, `events.tint_blue`: the central fraction of every line, 1 the swap); and the
+push raises the drift by `events.push_strength`, settling back over `events.push_seconds` while
+the lines keep what they gained (`POSE_INSTRUMENT.md`, *Events*). The crossing is measured in
+playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJECTION.
 
 ### Presence, tuning, reset
 

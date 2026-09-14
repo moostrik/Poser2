@@ -76,7 +76,7 @@ class Conductor(Thread):
             LayerId.beam_haunted:        BeamHaunted        (resolution, LO.beam_haunted,        board, pose_stage),
             LayerId.beam_test:           BeamTest           (resolution, LO.beam_test,           board),
             LayerId.pose_instrument:     PoseInstrument     (resolution, HI.pose_instrument,     instrument, board, pose_stage, self._clock.interval),
-            LayerId.projection_playhead: ProjectionPlayhead (resolution, HI.projection_playhead, board),
+            LayerId.projection_playhead: ProjectionPlayhead (resolution, HI.projection_playhead, instrument.mask, board, pose_stage),
             LayerId.flood:               Flood              (resolution, HI.flood,               board),
             LayerId.test_player_lines:   TestPlayerLines    (resolution, HI.test_player_lines,   board, pose_stage),
             LayerId.test_calibration:    TestCalibration    (resolution, HI.test_calibration,    config.num_cameras, board),
