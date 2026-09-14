@@ -71,11 +71,11 @@ class Conductor(Thread):
         self.layers: dict[LayerId, BaseLayer] = {
             LayerId.beam_blue_sound:     BeamBlueSound      (resolution, LO.beam_blue_sound,     board),
             LayerId.beam_playhead:       BeamPlayhead       (resolution, LO.beam_playhead,       board),
-            LayerId.beam_flash:          BeamFlash          (resolution, LO.beam_flash,          board, pose_stage),
+            LayerId.beam_flash:          BeamFlash          (resolution, LO.beam_flash,          board, pose_stage, self._clock.interval),
             LayerId.beam_wind_down:      BeamWindDown       (resolution, LO.beam_wind_down,      board),
             LayerId.beam_haunted:        BeamHaunted        (resolution, LO.beam_haunted,        board, pose_stage),
             LayerId.beam_test:           BeamTest           (resolution, LO.beam_test,           board),
-            LayerId.pose_instrument:     PoseInstrument     (resolution, HI.pose_instrument,     board, pose_stage),
+            LayerId.pose_instrument:     PoseInstrument     (resolution, HI.pose_instrument,     board, pose_stage, self._clock.interval),
             LayerId.projection_playhead: ProjectionPlayhead (resolution, HI.projection_playhead, board),
             LayerId.flood:               Flood              (resolution, HI.flood,               board),
             LayerId.test_player_lines:   TestPlayerLines    (resolution, HI.test_player_lines,   board, pose_stage),

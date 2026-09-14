@@ -18,7 +18,7 @@ also its ``LayerId``.
 
 from .blue_sound    import BeamBlueSound, BeamBlueSoundSettings
 from .playhead      import BeamPlayhead,  BeamPlayheadSettings
-from .flash         import BeamFlash,     BeamFlashSettings, offset_to_level
+from .flash         import BeamFlash,     BeamFlashSettings
 from .wind_down     import BeamWindDown,  BeamWindDownSettings
 from .haunted       import BeamHaunted,   BeamHauntedSettings
 from .test          import BeamTest,      BeamTestSettings

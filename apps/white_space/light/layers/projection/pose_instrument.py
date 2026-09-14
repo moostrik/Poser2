@@ -1,31 +1,20 @@
-"""PoseInstrument — the heart of the piece (see ``docs/LAYERS.md``).
+"""PoseInstrument — the heart of the piece (design: ``docs/POSE_INSTRUMENT.md``; the layer:
+``docs/LAYERS.md``, pose_instrument).
 
-Each person stands in a blue **anchor** line at their azimuth, and around them a
-mirror-symmetric pattern of white and blue **lines** derived from their pose — the visual
-analogue of how the sound works: pose → pattern as pose → sound. A neutral pose is
-"boring": one white line each side. Arms up is the bass: many thick lines.
+Each person stands in a dim blue **band** at their azimuth. Around them, mirror-symmetric and
+masked by every band, lie full white and full blue **lines** drawn from their pose: per channel a
+spatial LFO thresholded into lines (``LinePattern.lines``), whose five parameters (duty, interval,
+harmonic, harmonic phase, phase) are each patched from one of six pose controls in the settings.
+Nothing moves by itself: the lines change only as the pose does.
 
-**The line world is anchored to the people, not to the projection.** The projection is divided into
-segments between neighbouring participants; each segment fits a whole number of lines
-(``n = round(gap / line_spacing)``), so its actual spacing is ``gap / n``. Every person is a
-mirror point of their own pattern, and the run of lines between two people is *the same
-lines* counted from either side — matched patterns join seamlessly by construction, with no
-global grid to disagree with the symmetry. Line parameters (thickness, density, levels) are
-blended by position along a segment, so a thick pattern thins toward a neutral neighbour.
+A person's pattern shows over ``reach`` each side; above ``sync_threshold`` a pair's reach grows
+toward each other until each pattern reaches the partner, and overlapping patterns union. No line
+or gap is narrower than ``min_feature``, except where a band or a reach edge cuts a line: lines
+slide out from behind the band and into view. On the tick the playhead crosses a person
+(``PlayheadCrossing``), all of that person's lines widen by ``hit_widen``.
 
-**Sync**: above ``sync_threshold`` the patterns of a similarity-matched pair grow toward each
-other along the shortest arc — through intermediate people too — until they meet.
-
-**Motion** (``line_motion`` / ``line_flow``) is a shared phase φ, the same for everyone. Any
-motion breaks instantaneous symmetry (it holds exactly at φ ∈ {0, ½}) — a symmetric flow
-collides at segment midpoints, a global flow approaches on one side and departs on the other —
-so ``STATIC`` is the default and the moving modes are for evaluation on the machine.
-
-**Input contract** (all six pose parameters are read into ``_Participant`` every tick,
-whether or not the current mapping draws with them): the four arm angles, ``LegDeviation``,
-``TorsoTilt``; plus BBox length, presence (the pose frame itself) and pairwise ``Similarity``. The
-mapping in ``_Participant.lift`` / ``.bend`` and the colour balance is an initial proposal —
-the composition work happens here, on settings.
+The drawing math lives in class methods here and in ``LinePattern``, both hot-reloaded while the
+app runs; enum values are compared through ``int`` because a reload redefines the enum classes.
 """
 
 from __future__ import annotations
@@ -33,134 +22,67 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
-from typing import TYPE_CHECKING
 
 import numpy as np
-import pytweening
 
 from modules.pose import features
-from modules.settings import Field
+from modules.settings import BaseSettings, Field, Group
+from modules.utils import HotReloadMethods
 
 from .._base_layer import ProjectionLayer, LayerSettings
-from .._utilities import BlendType, normalize_azimuth, draw_field
+from .._utilities import normalize_azimuth
+from .line_pattern import LinePattern
 from ...frame import Frame
-
-if TYPE_CHECKING:
-    from ....board import Board
+from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step
 
 
-class LineMotion(IntEnum):
-    """What drives the shared line phase φ."""
-    STATIC   = 0
-    CONSTANT = auto()    # φ accumulates line_speed (spacings / s)
-    PLAYHEAD = auto()    # φ follows the playhead bars × lines_per_bar
+class PoseControl(IntEnum):
+    """A pose value as a control in 0..1; a mirrored pose gives the same arm and bend controls."""
+    CONSTANT   = 0        # always 1: the patch holds its high value
+    LIFT       = auto()   # both arms raised: 0 hanging, 1 straight up
+    ARM_SPLIT  = auto()   # one arm higher than the other
+    BEND       = auto()   # both elbows bent
+    BEND_SPLIT = auto()   # one elbow more bent than the other
+    LEGS       = auto()   # LegDeviation
+    TILT       = auto()   # torso lean: 0 one way, 0.5 upright, 1 the other
 
 
-class LineFlow(IntEnum):
-    """Which way a moving φ carries the lines."""
-    SYMMETRIC = 0        # outward from (or inward to) every person; flows meet at midpoints
-    GLOBAL    = auto()   # all lines move one way round the projection
+class PatchSettings(BaseSettings):
+    """One pattern parameter: a pose control mapped linearly (after the curve) from low to high."""
+    source: Field[PoseControl] = Field(PoseControl.CONSTANT,                     description="Pose control driving this parameter")
+    low:    Field[float]       = Field(0.0, min=-1.0, max=1.0, step=0.01, description="Parameter at control 0")
+    high:   Field[float]       = Field(0.0, min=-1.0, max=1.0, step=0.01, description="Parameter at control 1; CONSTANT holds this")
+    curve:  Field[float]       = Field(1.0, min=0.25, max=4.0, step=0.05, description="Response exponent on the control")
+
+
+class ChannelPatternSettings(BaseSettings):
+    """One channel's line pattern: the interval range and five patched parameters (each 0..1)."""
+    interval_min:   Field[float] = Field(4.0,  min=0.5, max=90.0, step=0.5, description="Line interval at patch value 0 (deg)")
+    interval_max:   Field[float] = Field(24.0, min=0.5, max=90.0, step=0.5, description="Line interval at patch value 1 (deg)")
+    harmonic_order: Field[int]   = Field(2,    min=2,   max=4,    step=1,   description="Sub-line LFO multiple of the interval")
+    duty:           Group[PatchSettings] = Group(PatchSettings)
+    interval:       Group[PatchSettings] = Group(PatchSettings)
+    harmonic:       Group[PatchSettings] = Group(PatchSettings)
+    harmonic_phase: Group[PatchSettings] = Group(PatchSettings)
+    phase:          Group[PatchSettings] = Group(PatchSettings)
 
 
 class PoseInstrumentSettings(LayerSettings):
-    line_spacing:   Field[float]      = Field(10.0, min=1.0,  max=90.0,  step=0.5,  description="Nominal line spacing (deg); each segment between neighbours fits a whole number of lines")
-    line_motion:    Field[LineMotion] = Field(LineMotion.STATIC,                    description="Line phase drive: static, constant rate, or the playhead bars")
-    line_flow:      Field[LineFlow]   = Field(LineFlow.SYMMETRIC,                   description="Moving lines flow outward from every person (symmetric) or one way round the projection (global)")
-    line_speed:     Field[float]      = Field(0.0,  min=-2.0, max=2.0,   step=0.01, description="CONSTANT: spacings per second (negative = inward / the other way)")
-    lines_per_bar:  Field[float]      = Field(1.0,  min=0.0,  max=36.0,  step=0.5,  description="PLAYHEAD: spacings travelled per playhead bar")
-    line_phase:     Field[float]      = Field(0.0,  min=0.0,  max=1.0,   step=0.01, description="Phase offset (spacings) added to the motion; the first line sits (1 + phase) spacings out")
-    n_blend:        Field[float]      = Field(0.1,  min=0.0,  max=0.5,   step=0.01, description="Crossfade band around the half-spacing where a segment's line count steps (0 = hard)")
-    extent_min:     Field[float]      = Field(10.0, min=0.0,  max=180.0, step=0.5,  description="Pattern reach each side (deg) at neutral — one spacing shows the first line left and right", newline=True)
-    extent_max:     Field[float]      = Field(60.0, min=0.0,  max=180.0, step=0.5,  description="Pattern reach each side (deg) with the arms up")
-    line_edge:      Field[float]      = Field(3.0,  min=0.1,  max=36.0,  step=0.1,  description="Softness of the reach's outer end (deg)")
-    line_min:       Field[float]      = Field(0.1,  min=0.01, max=1.0,   step=0.01, description="Line thickness (fraction of spacing) at neutral", newline=True)
-    line_max:       Field[float]      = Field(0.6,  min=0.01, max=1.0,   step=0.01, description="Line thickness (fraction of spacing) with the arms up")
-    line_soft:      Field[float]      = Field(0.3,  min=0.0,  max=1.0,   step=0.01, description="Line edge softness (fraction of the thickness)")
-    harmonics:      Field[int]        = Field(2,    min=1,    max=4,     step=1,    description="Bent elbows subdivide the spacing up to this harmonic (1 = never)")
-    level:          Field[float]      = Field(0.8,  min=0.0,  max=1.0,   step=0.01, description="White line level", newline=True)
-    legs_dim:       Field[float]      = Field(0.3,  min=0.0,  max=1.0,   step=0.01, description="How much bent legs dim the white lines")
-    blue_min:       Field[float]      = Field(0.0,  min=0.0,  max=1.0,   step=0.01, description="Blue between-line level with the legs straight")
-    blue_max:       Field[float]      = Field(0.6,  min=0.0,  max=1.0,   step=0.01, description="Blue between-line level with the legs bent")
-    anchor_width:   Field[float]      = Field(3.0,  min=0.1,  max=36.0,  step=0.1,  description="Blue anchor width (deg; scaled by pose length) — the person's own light", newline=True)
-    anchor_level:   Field[float]      = Field(0.8,  min=0.0,  max=1.0,   step=0.01, description="Blue anchor level")
-    sync_threshold: Field[float]      = Field(0.75, min=0.0,  max=0.99,  step=0.01, description="Pairwise similarity above which two patterns grow toward each other", newline=True)
-    attack_seconds: Field[float]      = Field(1.0,  min=0.0,  max=10.0,  step=0.1,  description="Fade-in of a newly present person (s)")
-    release_seconds:Field[float]      = Field(1.5,  min=0.0,  max=10.0,  step=0.1,  description="Fade-out after a person is gone (s; the last pose is held)")
+    min_feature:     Field[float] = Field(2.0,  min=0.1, max=10.0,  step=0.1,  description="Narrowest line or gap the projection resolves (deg)")
+    band_width:      Field[float] = Field(3.0,  min=0.1, max=36.0,  step=0.1,  description="Blue band width (deg, scaled by pose length)", newline=True)
+    band_level:      Field[float] = Field(0.3,  min=0.0, max=1.0,   step=0.01, description="Blue band level")
+    reach:           Field[float] = Field(45.0, min=0.0, max=180.0, step=0.5,  description="Pattern shown each side of a person (deg)", newline=True)
+    sync_threshold:  Field[float] = Field(0.75, min=0.0, max=0.99,  step=0.01, description="Pair similarity above which patterns grow toward each other")
+    hit_widen:       Field[float] = Field(1.0,  min=0.0, max=10.0,  step=0.1,  description="Line widening each side on a playhead crossing (deg)")
+    attack_seconds:  Field[float] = Field(1.0,  min=0.0, max=10.0,  step=0.1,  description="Reach grows in after arrival (s)", newline=True)
+    release_seconds: Field[float] = Field(1.5,  min=0.0, max=10.0,  step=0.1,  description="Reach and band fade after leaving (s)")
+    white:           Group[ChannelPatternSettings] = Group(ChannelPatternSettings)
+    blue:            Group[ChannelPatternSettings] = Group(ChannelPatternSettings)
 
-
-# -- Geometry helpers (positions and offsets are normalized azimuth) ------------------
-
-def _signed_offset(a: float, b: float) -> float:
-    """Signed shortest offset a → b around the projection (normalized azimuth, in [-0.5, 0.5))."""
-    return ((b - a + 0.5) % 1.0) - 0.5
-
-
-def _segment_counts(gap: float, spacing: float, n_blend: float) -> tuple[int, int, float]:
-    """How many lines a segment of ``gap`` (normalized azimuth) fits at the nominal ``spacing``: the two
-    candidate counts and the crossfade weight toward the higher one. Away from the
-    half-spacing boundary the count is simply the rounded ratio (weight 0); within
-    ±``n_blend`` of the boundary the two counts crossfade so lines slide instead of jump."""
-    ratio = gap / spacing
-    low = max(1, int(math.floor(ratio)))
-    frac = ratio - math.floor(ratio)
-    if n_blend > 0.0 and abs(frac - 0.5) < n_blend:
-        return low, low + 1, (frac - (0.5 - n_blend)) / (2.0 * n_blend)
-    n = max(1, int(round(ratio)))
-    return n, n, 0.0
-
-
-def _line_centres(u: np.ndarray, harmonic: int, between: bool = False) -> np.ndarray:
-    """The nearest line centre, in units of the harmonic's own spacing, for positions
-    ``u`` measured in base spacings from the origin: white lines sit at the integers,
-    blue between-lines half-way between them."""
-    v = u * harmonic
-    return np.floor(v) + 0.5 if between else np.round(v)
-
-
-def _line_distance(u: np.ndarray, harmonic: int) -> np.ndarray:
-    """Distance to the nearest white line (units of the harmonic's spacing)."""
-    return np.abs(u * harmonic - _line_centres(u, harmonic))
-
-
-def _between_distance(u: np.ndarray, harmonic: int) -> np.ndarray:
-    """Distance to the nearest blue between-line (units of the harmonic's spacing)."""
-    return np.abs(u * harmonic - _line_centres(u, harmonic, between=True))
-
-
-def _line_profile(distance: np.ndarray, thickness: np.ndarray | float, soft: float) -> np.ndarray:
-    """A line of ``thickness`` (fraction of spacing) around distance 0: full inside
-    ``thickness/2 × (1 − soft)``, fading to 0 at ``thickness/2``."""
-    half = np.asarray(thickness, dtype=np.float32) * 0.5
-    ramp = np.maximum(half * soft, 1e-6)
-    return np.clip((half - distance) / ramp, 0.0, 1.0)
-
-
-def _anchor_gate(centre_offset: np.ndarray) -> np.ndarray:
-    """Whole-line gate by the line centre's distance from the anchor (base spacings): the
-    anchor's own quarter spacing holds no line, a line is fully born by half a spacing —
-    so the "line zero" at the person never shows, and a moving φ births lines smoothly."""
-    return np.clip((centre_offset - 0.25) / 0.25, 0.0, 1.0)
-
-
-def _lines(u: np.ndarray, harmonic: int, thickness: np.ndarray | float, soft: float,
-           flow_phase: float, between: bool) -> np.ndarray:
-    """The gated line profile for one harmonic: ``u`` in base spacings from the person
-    (``u = offset / spacing + flow_phase``, so a centre ``c`` sits ``c/harmonic − flow_phase``
-    spacings from the anchor)."""
-    centres = _line_centres(u, harmonic, between)
-    profile = _line_profile(np.abs(u * harmonic - centres), thickness, soft)
-    return profile * _anchor_gate(centres / harmonic - flow_phase)
-
-
-def _ease(t: float) -> float:
-    return pytweening.easeInOutSine(min(max(t, 0.0), 1.0))
-
-
-# -- Participants and segments ------------------------------------------------------
 
 @dataclass
 class _Participant:
-    """One person's input state (the six-parameter contract) plus presence and reach."""
+    """One person's input state (the six pose values), presence, reach and hit."""
     position:       float = 0.0     # normalized azimuth
     length:         float = 1.0     # BBox height (pose length)
     left_shoulder:  float = 0.0     # the four arm angles (rad, 0 = neutral)
@@ -171,87 +93,78 @@ class _Participant:
     tilt:           float = 0.0     # TorsoTilt [-1, 1]
     similarity:     np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float32))
     present:        bool  = False   # seen this tick
+    hit:            bool  = False   # the playhead crosses this person this tick
     envelope:       float = 0.0     # presence 0..1 (attack / release)
-    extent_left:    float = 0.0     # this tick's reach each side (normalized azimuth)
-    extent_right:   float = 0.0
-
-    # -- The initial mapping (a proposal; the composition work lives here) --
-    @property
-    def lift(self) -> float:
-        """Arms raised: 0 hanging → 1 straight up (mean over both shoulders)."""
-        return min(1.0, (abs(self.left_shoulder) + abs(self.right_shoulder)) / (2.0 * math.pi))
-
-    @property
-    def bend(self) -> float:
-        """Elbows bent: 0 straight → 1 fully bent (mean over both elbows)."""
-        return min(1.0, (abs(self.left_elbow) + abs(self.right_elbow)) / (2.0 * math.pi))
-
-
-@dataclass
-class _Segment:
-    """The stretch of projection between two neighbouring participants, walking in increasing position."""
-    start: int          # participant id at the low-position end
-    end:   int          # participant id at the high-position end (== start when alone)
-    gap:   float        # normalized azimuth
-    n_low: int          # candidate line counts (crossfaded by ``blend``)
-    n_high: int
-    blend: float
-
-
-def _value(x: float, fallback: float) -> float:
-    return fallback if math.isnan(x) else float(x)
+    reach_left:     float = 0.0     # this tick's reach each side (normalized azimuth)
+    reach_right:    float = 0.0
 
 
 class PoseInstrument(ProjectionLayer):
     """The pose instrument; see the module docstring."""
 
-    def __init__(self, resolution: int, config: PoseInstrumentSettings,
-                 board: Board, pose_stage: int) -> None:
+    def __init__(self, resolution: int, config: PoseInstrumentSettings, board,
+                 pose_stage: int, tick_interval: float) -> None:
         super().__init__(resolution, config, board)
         self._config = config
         self._pose_stage = pose_stage
+        self._tick_interval = tick_interval
         self._participants: dict[int, _Participant] = {}
-        self._phase: float = 0.0            # CONSTANT motion's accumulated phase (spacings)
-        self._pixel = np.arange(1, resolution + 1, dtype=np.float32) / resolution   # offsets 1..R px
+        self._crossing = PlayheadCrossing()
+        self._distance = np.arange(resolution + 1, dtype=np.float64)     # px from a person
+        self._white_lines = np.zeros(resolution, dtype=bool)
+        self._blue_lines = np.zeros(resolution, dtype=bool)
+        self._band = np.zeros(resolution, dtype=bool)
+        self._band_level = np.zeros(resolution, dtype=np.float32)
+        self._hot_reloaders = (HotReloadMethods(self.__class__, True), HotReloadMethods(LinePattern, True))
 
     def reset(self) -> None:
-        """A fresh instrument (S6 entry): forget every participant. The line phase is a
-        world property and keeps running."""
+        """A fresh instrument (S6 entry): forget every participant and pass."""
         self._participants.clear()
+        self._crossing.reset()
 
     # -- Per tick --------------------------------------------------------------
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         P = self._config
-        dt = frame.tick.dt
-        self._update_participants(dt)
-        order = sorted((p.position, id) for id, p in self._participants.items())
-        if not order:
+        R = self.resolution
+        self._update_participants(frame)
+        if not self._participants:
             return
-        ids = [id for _, id in order]
-        phi = self._advance_phase(dt)
-        segments = self._build_segments(ids)
-        self._set_extents(ids, segments)
+        self._set_reaches()
 
-        spacing = P.line_spacing / 360.0
-        edge = P.line_edge / 360.0
-        for i, id in enumerate(ids):
-            p = self._participants[id]
-            # Right side: the segment starting here; left side: the segment ending here.
-            self._draw_side(white, blue, p, +1, segments[i], self._participants[segments[i].end], p.extent_right, phi, edge, spacing)
-            self._draw_side(white, blue, p, -1, segments[i - 1], self._participants[segments[i - 1].start], p.extent_left, phi, edge, spacing)
-            anchor_w = P.anchor_width / 360.0 * (0.5 + 0.5 * p.length)
-            draw_field(blue, p.position, anchor_w, P.anchor_level * p.envelope,
-                       int(anchor_w * 0.3 * self.resolution), BlendType.MAX)
+        min_px = max(1, int(round(P.min_feature / 360.0 * R)))
+        widen_px = max(0, int(round(P.hit_widen / 360.0 * R)))
+        white_lines, blue_lines = self._white_lines, self._blue_lines
+        band, band_level = self._band, self._band_level
+        white_lines.fill(False)
+        blue_lines.fill(False)
+        band.fill(False)
+        band_level.fill(0.0)
+
+        for p in self._participants.values():
+            centre = int(round(p.position * R)) % R
+            controls = self._controls(p)
+            widen = widen_px if p.hit else 0
+            self._draw_lines(white_lines, p, centre, controls, P.white, min_px, widen)
+            self._draw_lines(blue_lines, p, centre, controls, P.blue, min_px, widen)
+            self._draw_band(band, band_level, p, centre)
+
+        # Each pattern is legible on its own; overlaps can only leave narrow gaps, so the union
+        # fills those. The reach edges and the bands cut lines as they are: a line slides out.
+        white_mask = LinePattern.fill_gaps(white_lines, min_px) & ~band
+        blue_mask = LinePattern.fill_gaps(blue_lines, min_px) & ~band
+        white += white_mask
+        blue += np.where(band, band_level, blue_mask)
 
     # -- Participants ------------------------------------------------------------
 
-    def _update_participants(self, dt: float) -> None:
+    def _update_participants(self, frame: Frame) -> None:
         P = self._config
-        frames = self._board.get_frames(self._pose_stage)
+        dt = frame.tick.dt
         for p in self._participants.values():
             p.present = False
-        for id, pose in frames.items():
+        offsets: dict[int, float] = {}
+        for id, pose in self._board.get_frames(self._pose_stage).items():
             azimuth = pose[features.Azimuth].value
             if math.isnan(azimuth):
                 continue
@@ -261,15 +174,21 @@ class PoseInstrument(ProjectionLayer):
             height = pose[features.BBox][features.BBoxElement.height]
             p.length = height if not math.isnan(height) and height > 0.0 else p.length
             angles = pose[features.Angles].values
-            p.left_shoulder  = _value(angles[features.AngleLandmark.left_shoulder],  p.left_shoulder)
-            p.right_shoulder = _value(angles[features.AngleLandmark.right_shoulder], p.right_shoulder)
-            p.left_elbow     = _value(angles[features.AngleLandmark.left_elbow],     p.left_elbow)
-            p.right_elbow    = _value(angles[features.AngleLandmark.right_elbow],    p.right_elbow)
-            p.legs = _value(pose[features.LegDeviation].value, p.legs)
-            p.tilt = _value(pose[features.TorsoTilt].value, p.tilt)
+            p.left_shoulder  = self._value(angles[features.AngleLandmark.left_shoulder],  p.left_shoulder)
+            p.right_shoulder = self._value(angles[features.AngleLandmark.right_shoulder], p.right_shoulder)
+            p.left_elbow     = self._value(angles[features.AngleLandmark.left_elbow],     p.left_elbow)
+            p.right_elbow    = self._value(angles[features.AngleLandmark.right_elbow],    p.right_elbow)
+            p.legs = self._value(pose[features.LegDeviation].value, p.legs)
+            p.tilt = self._value(pose[features.TorsoTilt].value, p.tilt)
             p.similarity = pose[features.Similarity].values
+            offsets[id] = pose[PlayheadOffset].value
+
+        step = playhead_step(frame.motor_command.beam_rpm, self._tick_interval)
+        hits = self._crossing.update(offsets, step, 1)
+
         gone: list[int] = []
         for id, p in self._participants.items():
+            p.hit = id in hits
             if p.present:
                 p.envelope = 1.0 if P.attack_seconds <= 0.0 else min(1.0, p.envelope + dt / P.attack_seconds)
             else:
@@ -279,72 +198,57 @@ class PoseInstrument(ProjectionLayer):
         for id in gone:
             del self._participants[id]
 
-    # -- The line world ------------------------------------------------------------
+    @staticmethod
+    def _value(x: float, fallback: float) -> float:
+        return fallback if math.isnan(x) else float(x)
 
-    def _advance_phase(self, dt: float) -> float:
-        P = self._config
-        motion = LineMotion(int(P.line_motion))
-        if motion == LineMotion.CONSTANT:
-            self._phase += P.line_speed * dt
-            return P.line_phase + self._phase
-        if motion == LineMotion.PLAYHEAD:
-            return P.line_phase + self._board.get_playhead_signals().bars * P.lines_per_bar
-        return P.line_phase
+    @staticmethod
+    def _controls(p: _Participant) -> list[float]:
+        """The six pose controls in 0..1, indexed by ``PoseControl``."""
+        controls = [0.0] * len(PoseControl)
+        left_shoulder, right_shoulder = abs(p.left_shoulder), abs(p.right_shoulder)
+        left_elbow, right_elbow = abs(p.left_elbow), abs(p.right_elbow)
+        controls[int(PoseControl.CONSTANT)]   = 1.0
+        controls[int(PoseControl.LIFT)]       = min(1.0, (left_shoulder + right_shoulder) / math.tau)
+        controls[int(PoseControl.ARM_SPLIT)]  = min(1.0, abs(left_shoulder - right_shoulder) / math.pi)
+        controls[int(PoseControl.BEND)]       = min(1.0, (left_elbow + right_elbow) / math.tau)
+        controls[int(PoseControl.BEND_SPLIT)] = min(1.0, abs(left_elbow - right_elbow) / math.pi)
+        controls[int(PoseControl.LEGS)]       = min(1.0, max(0.0, p.legs))
+        controls[int(PoseControl.TILT)]       = min(1.0, max(0.0, (p.tilt + 1.0) / 2.0))
+        return controls
 
-    def _build_segments(self, ids: list[int]) -> list[_Segment]:
-        """Segment i runs from ids[i] to ids[i + 1] (the last wraps to the first; one
-        participant alone bounds the full turn with themself)."""
-        P = self._config
-        spacing = P.line_spacing / 360.0
-        segments: list[_Segment] = []
-        for i, id in enumerate(ids):
-            next_id = ids[(i + 1) % len(ids)]
-            gap = 1.0 if next_id == id else (self._participants[next_id].position - self._participants[id].position) % 1.0
-            n_low, n_high, blend = _segment_counts(gap, spacing, P.n_blend)
-            segments.append(_Segment(id, next_id, gap, n_low, n_high, blend))
-        return segments
+    @staticmethod
+    def _patch(patch: PatchSettings, controls: list[float]) -> float:
+        """The patched parameter: low → high over the control raised to the curve."""
+        control = controls[int(patch.source)]
+        return patch.low + (patch.high - patch.low) * control ** max(patch.curve, 0.01)
 
-    def _set_extents(self, ids: list[int], segments: list[_Segment]) -> None:
-        """Each person's reach per side: the pose-driven extent, then the sync growth
-        toward every similarity-matched partner along the shortest arc (carried across
-        intermediate people segment by segment)."""
+    # -- Reach and sync ------------------------------------------------------------
+
+    def _set_reaches(self) -> None:
+        """Each side's reach: ``reach`` scaled by presence, then grown toward every
+        similarity-matched partner along the shorter arc, up to the partner's position."""
         P = self._config
-        edge = P.line_edge / 360.0
-        for i, id in enumerate(ids):
-            p = self._participants[id]
-            reach = (P.extent_min + (P.extent_max - P.extent_min) * p.lift) / 360.0
-            p.extent_right = min(reach, segments[i].gap)
-            p.extent_left  = min(reach, segments[i - 1].gap)
+        base = min(P.reach / 360.0, 0.5)
+        for p in self._participants.values():
+            p.reach_left = p.reach_right = base * p.envelope
         threshold = P.sync_threshold
+        ids = list(self._participants)
         for i, id_a in enumerate(ids):
-            for j in range(i + 1, len(ids)):
-                id_b = ids[j]
+            for id_b in ids[i + 1:]:
                 sim = self._pair_similarity(id_a, id_b)
                 if math.isnan(sim) or sim < threshold:
                     continue
-                t = _ease((sim - threshold) / max(1.0 - threshold, 1e-6))
-                delta = _signed_offset(self._participants[id_a].position, self._participants[id_b].position)
-                direction = 1 if delta >= 0.0 else -1
-                amount = t * (abs(delta) / 2.0 + edge)
-                self._grow(ids, segments, i, direction, amount)
-                self._grow(ids, segments, j, -direction, amount)
-
-    def _grow(self, ids: list[int], segments: list[_Segment], index: int, direction: int, amount: float) -> None:
-        """Extend the reach from ``ids[index]`` by ``amount`` (normalized azimuth) in ``direction`` (+1 =
-        increasing position), handing the remainder to each intermediate person."""
-        remaining = amount
-        for _ in range(len(ids)):
-            if remaining <= 0.0:
-                return
-            p = self._participants[ids[index]]
-            seg = segments[index] if direction > 0 else segments[index - 1]
-            reach = min(remaining, seg.gap)
-            if direction > 0:
-                p.extent_right = max(p.extent_right, reach)
-            else:
-                p.extent_left = max(p.extent_left, reach)
-            remaining -= seg.gap
-            index = (index + direction) % len(ids)
+                a, b = self._participants[id_a], self._participants[id_b]
+                t = self._ease((sim - threshold) / max(1.0 - threshold, 1e-6)) * min(a.envelope, b.envelope)
+                delta = self._signed_offset(a.position, b.position)
+                amount = t * abs(delta)
+                if delta >= 0.0:
+                    a.reach_right = max(a.reach_right, amount)
+                    b.reach_left = max(b.reach_left, amount)
+                else:
+                    a.reach_left = max(a.reach_left, amount)
+                    b.reach_right = max(b.reach_right, amount)
 
     def _pair_similarity(self, id_a: int, id_b: int) -> float:
         """Mean of both directions' pairwise similarity (one side may be NaN)."""
@@ -355,55 +259,53 @@ class PoseInstrument(ProjectionLayer):
                 sims.append(float(row[other]))
         return float(np.mean(sims)) if sims else float('nan')
 
+    @staticmethod
+    def _signed_offset(a: float, b: float) -> float:
+        """Signed shortest offset a → b around the projection (normalized azimuth, in [-0.5, 0.5))."""
+        return ((b - a + 0.5) % 1.0) - 0.5
+
+    @staticmethod
+    def _ease(t: float) -> float:
+        return 0.5 - 0.5 * math.cos(math.pi * min(max(t, 0.0), 1.0))
+
     # -- Drawing ---------------------------------------------------------------------
 
-    def _draw_side(self, white: np.ndarray, blue: np.ndarray, p: _Participant, sign: int,
-                   seg: _Segment, neighbour: _Participant, extent: float, phi: float,
-                   edge: float, spacing: float) -> None:
-        """Draw one side of a person's pattern: the segment's lines, generated outward
-        from the person, inside a soft-ended reach window, with the line parameters
-        blended toward the neighbour's along the segment."""
+    def _draw_lines(self, lines: np.ndarray, p: _Participant, centre: int, controls: list[float],
+                    C: ChannelPatternSettings, min_px: int, widen: int) -> None:
+        """OR one channel of one person's pattern into ``lines``: the half pattern mirrored about
+        the centre pixel, widened on a hit, made legible, cut to each side's reach."""
+        R = self.resolution
+        left = min(int(round(p.reach_left * R)), R // 2)
+        right = min(int(round(p.reach_right * R)), R - 1 - left)
+        side = max(left, right)
+        if side <= 0:
+            return
+
+        span = C.interval_min + (C.interval_max - C.interval_min) * min(max(self._patch(C.interval, controls), 0.0), 1.0)
+        interval = max(span / 360.0 * R, 2.0 * min_px)
+        duty = min(max(self._patch(C.duty, controls), 0.0), 1.0)
+        harmonic = min(max(self._patch(C.harmonic, controls), 0.0), 1.0)
+        harmonic_phase = self._patch(C.harmonic_phase, controls) % 1.0
+        phase = self._patch(C.phase, controls) % 1.0
+
+        # The strip runs a margin past the reach, so the circular morphology's wrap at its ends
+        # never reaches a pixel that is shown.
+        n = min(side + widen + min_px, R)
+        half = LinePattern.lines(self._distance[:n + 1], interval, duty, harmonic,
+                                 max(1, int(C.harmonic_order)), harmonic_phase, phase)
+        strip = np.concatenate((half[:0:-1], half))                       # offsets −n … n
+        if widen > 0:
+            strip = LinePattern.dilate(strip, widen, widen)
+        strip = LinePattern.legible(strip, min_px)[n - side:n + side + 1]    # offsets −side … side
+        offsets = np.arange(-left, right + 1)
+        idx = (centre + offsets) % R
+        lines[idx] |= strip[offsets + side]
+
+    def _draw_band(self, band: np.ndarray, band_level: np.ndarray, p: _Participant, centre: int) -> None:
+        """Mark the person's band: masks every pattern, lit dim blue by presence."""
         P = self._config
         R = self.resolution
-        count = min(R, int(round((extent + edge) * R)))
-        if count <= 0 or p.envelope <= 0.0:
-            return
-        base = int(round(p.position * R))
-        idx = (base + sign * np.arange(1, count + 1)) % R
-        offset = self._pixel[:count] + sign * (base / R - p.position)     # normalized azimuth from the person, ≥ 0
-
-        # Parameters blended along the segment toward the neighbour (f = 0 at the person).
-        f = np.clip(offset / max(seg.gap, 1e-6), 0.0, 1.0).astype(np.float32)
-        lift  = p.lift + (neighbour.lift - p.lift) * f
-        bend  = p.bend + (neighbour.bend - p.bend) * f
-        legs  = p.legs + (neighbour.legs - p.legs) * f
-        thickness = P.line_min + (P.line_max - P.line_min) * lift
-        white_level = P.level * (1.0 - legs * P.legs_dim)
-        blue_level  = P.blue_min + (P.blue_max - P.blue_min) * legs
-
-        # The reach window: full to the extent, fading over the edge.
-        window = np.clip((extent + edge - offset) / edge, 0.0, 1.0)
-
-        # Positions in base spacings from the person, for each candidate line count; the
-        # line at the anchor itself is gated away (see _anchor_gate).
-        flow_phase = -phi if (sign > 0 or LineFlow(int(P.line_flow)) == LineFlow.SYMMETRIC) else phi
-        harmonic = max(1, int(P.harmonics))
-        white_profile = np.zeros(count, dtype=np.float32)
-        blue_profile  = np.zeros(count, dtype=np.float32)
-        for n, weight in ((seg.n_low, 1.0 - seg.blend), (seg.n_high, seg.blend)):
-            if weight <= 0.0:
-                continue
-            u = offset * n / seg.gap + flow_phase
-            w1 = _lines(u, 1, thickness, P.line_soft, flow_phase, between=False)
-            b1 = _lines(u, 1, thickness, P.line_soft, flow_phase, between=True)
-            if harmonic > 1:
-                wh = _lines(u, harmonic, thickness, P.line_soft, flow_phase, between=False)
-                bh = _lines(u, harmonic, thickness, P.line_soft, flow_phase, between=True)
-                w1 = w1 + (wh - w1) * bend
-                b1 = b1 + (bh - b1) * bend
-            white_profile += weight * w1
-            blue_profile  += weight * b1
-
-        env = p.envelope
-        white[idx] = np.maximum(white[idx], window * white_profile * white_level * env)
-        blue[idx]  = np.maximum(blue[idx],  window * blue_profile  * blue_level  * env)
+        half = int(round(P.band_width / 360.0 * R * (0.5 + 0.5 * p.length) / 2.0))
+        idx = (centre + np.arange(-half, half + 1)) % R
+        band[idx] = True
+        band_level[idx] = np.maximum(band_level[idx], P.band_level * p.envelope)

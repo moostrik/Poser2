@@ -13,8 +13,8 @@ so it trails the white. A still-building passive ghost gets no blue. Fade is irr
 A single ``width`` sizes every window; ``white`` / ``blue`` set the two flash brightnesses and
 ``base_white`` a constant front-lamp floor the white flash rides on. Dwell/Motion no longer shape
 the flash. When the sweep steps clean over a narrow window (fast crossings — e.g. a person just
-repositioned), ``_closest_pass`` still guarantees one flash on the frame nearest the pose. Reuses
-``BeamFlash``'s ``offset_to_level`` and ``_closest_pass`` kernels. No gap.
+repositioned), ``_closest_pass`` still guarantees one flash on the frame nearest the pose. This
+module owns both window kernels (``offset_to_level``, ``_closest_pass``). No gap.
 """
 
 import math
@@ -24,13 +24,44 @@ import numpy as np
 from modules.settings import Field
 
 from .._base_layer import BeamLayer, LayerSettings
-from .flash import offset_to_level, _closest_pass
 from ...frame import Frame
 from ....pose import GhostElement, GhostFeature, GhostStateValue, PlayheadOffset, ghost_state
 
 # The blue lamp trails the white by a quarter-turn, so the blue flash fires when the playhead is 0.25 of
 # a turn *past* the passive ghost (PlayheadOffset ≈ −0.25·2π, i.e. departing).
 _PHASE_OFFSET: float = 0.25
+
+# Only guarantee a flash on the near half of the sweep; the far side (|offset| → π) never triggers.
+_HALF_PI: float = math.pi / 2.0
+
+
+def offset_to_level(phi: float, width: float, gap: float = 0.0) -> float:
+    """On/off window around the crossing: ``1`` while the playhead is within ``width`` radians
+    of the pose, except the central ``gap`` fraction of that width — a dark notch straddling
+    the crossing. ``0`` outside the window, inside the notch, and for NaN offsets.
+
+    ``phi`` is the pose's signed playhead offset: positive approaching, negative departing.
+    """
+    if math.isnan(phi):
+        return 0.0
+    distance = abs(phi)
+    return 1.0 if gap * width <= distance <= width else 0.0
+
+
+def _closest_pass(prev: float, cur: float) -> bool:
+    """True on the sample where the playhead is nearest the pose — the local minimum of ``|offset|``
+    as the sweep passes it. A constant-velocity one-step prediction lets it fire in real time on the
+    closest frame (which may sit just *before* or just *after* zero), not a frame late. Guarantees at
+    least one flash per pass even when the ``width`` window is too narrow for any sample to land in it.
+
+    Gated to the near half so the far side never fires; NaN (no prev yet / motor stopped) never fires.
+    Steps are small (~7°) and the gate keeps ``cur`` off the ±π wrap, so a plain difference is a safe
+    velocity estimate here.
+    """
+    if math.isnan(prev) or math.isnan(cur) or abs(cur) >= _HALF_PI:
+        return False
+    nxt = cur + (cur - prev)                 # predicted next offset (constant velocity)
+    return abs(cur) <= abs(prev) and abs(cur) <= abs(nxt)
 
 
 class BeamHauntedSettings(LayerSettings):

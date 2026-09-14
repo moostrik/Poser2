@@ -166,6 +166,18 @@ class StateMachineTest(unittest.TestCase):
         self.tick(dbar=self.config.intro_idle_bars + 0.1)
         self.assertEqual(self.current, StateId.IDLE)
 
+    def test_the_closest_tick_before_the_crossing_is_the_hit(self) -> None:
+        # The hit is the tick a one-frame flash lights: within half a playhead step (72 rpm, 30 Hz:
+        # 0.25 rad), here still approaching — not the sign flip one tick later.
+        self.boot()
+        self.set_participants(1)
+        self.board.frames[0] = FakeFrame(0.5)      # two steps out
+        self.tick()
+        self.assertEqual(self.current, StateId.IDLE_INTRO)
+        self.board.frames[0] = FakeFrame(0.1)      # the closest tick, before zero
+        self.tick()
+        self.assertEqual(self.current, StateId.INTRO)
+
     def test_wrap_flip_is_not_a_hit(self) -> None:
         self.boot()
         self.set_participants(1)

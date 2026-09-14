@@ -296,8 +296,9 @@ class WhiteSpaceMain:
                                    self.settings.camera.cameras, self.settings.camera.camera_check)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
         self.render.add_update_callback(self.camera_check.update)
-        self.conductor.add_update_callback(self.state_machine.update)
+        # LERP first: the state machine's hit reads this tick's PlayheadOffset, the same the flash draws on.
         self.conductor.add_update_callback(self.interpolators_lerp.update)
+        self.conductor.add_update_callback(self.state_machine.update)
         self.render.add_exit_callback(self.stop)
 
     def start(self) -> None:

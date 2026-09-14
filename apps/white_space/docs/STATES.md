@@ -9,7 +9,8 @@ Vocabulary:
 - **P** — the live participant count: the LERP poses (`LAYERS.md`, *Inputs*), debounced
   by `states.count_hold_seconds`
 - **bar** — one full playhead cycle, the content clock
-- **hit** — the playhead sweeps past a participant
+- **hit** — the tick the playhead is closest to a participant: the tick a one-frame `beam_flash` lights
+  (`statemachine/machine.py` `_detect_hit`)
 - **readout mode** — the fixture reads beam mode below 200 rpm and projection mode at or above, switching
   on receipt of the *commanded* rpm (see `CALIBRATION.md` *Two modes, two offsets*). A spin-up is in
   projection mode from its first packet; a wind-down is in beam mode from its first packet.

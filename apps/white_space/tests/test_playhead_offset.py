@@ -5,9 +5,9 @@ import unittest
 
 from modules.pose.frame import Frame
 from modules.pose.features import Azimuth
-from apps.white_space.pose import PlayheadOffset, PlayheadOffsetExtractor
+from apps.white_space.pose import PlayheadOffset, PlayheadOffsetExtractor, playhead_step, ticks_to_crossing
 from apps.white_space.light.layers._utilities import normalize_azimuth
-from apps.white_space.light.layers.beam.flash import offset_to_level
+from apps.white_space.light.layers.beam.haunted import offset_to_level
 
 PI = math.pi
 TAU = math.tau
@@ -66,6 +66,24 @@ class PlayheadOffsetExtractorTest(unittest.TestCase):
     def test_missing_inputs_absent(self) -> None:
         self.assertNotIn(PlayheadOffset, PlayheadOffsetExtractor(lambda: 0.5).process(_frame(float("nan"))))
         self.assertNotIn(PlayheadOffset, PlayheadOffsetExtractor(lambda: float("nan")).process(_frame(0.5)))
+
+
+class TicksToCrossingTest(unittest.TestCase):
+    STEP = math.radians(7.2)     # 36 rpm at 30 Hz
+
+    def test_step_is_the_sweep_per_tick(self) -> None:
+        self.assertAlmostEqual(playhead_step(36.0, 1.0 / 30.0), self.STEP, places=9)
+
+    def test_signed_ticks_to_the_crossing(self) -> None:
+        self.assertAlmostEqual(ticks_to_crossing(math.radians(3.6), self.STEP), 0.5, places=9)    # approaching
+        self.assertAlmostEqual(ticks_to_crossing(math.radians(-7.2), self.STEP), -1.0, places=9)  # just past
+        self.assertEqual(ticks_to_crossing(0.0, self.STEP), 0.0)
+
+    def test_nan_far_half_and_no_motion_have_no_crossing(self) -> None:
+        self.assertTrue(math.isnan(ticks_to_crossing(float("nan"), self.STEP)))
+        self.assertTrue(math.isnan(ticks_to_crossing(PI / 2, self.STEP)))       # far half
+        self.assertTrue(math.isnan(ticks_to_crossing(-3.0, self.STEP)))         # far half, past the wrap
+        self.assertTrue(math.isnan(ticks_to_crossing(0.1, 0.0)))                # playhead not moving
 
 
 class FlashWindowTest(unittest.TestCase):

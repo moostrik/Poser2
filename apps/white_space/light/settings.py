@@ -32,7 +32,7 @@ class LayerId(IntEnum):
     beam_haunted        = auto()   # beam: player/ghost flash (debug/experimentation)
     beam_test           = auto()   # beam: direct levels for the four physical lamps (debug)
     # projection mode — the projection
-    pose_instrument     = auto()   # projection: the pose instrument — people-anchored line patterns (see LAYERS.md)
+    pose_instrument     = auto()   # projection: the pose instrument — each person's pose-patched line pattern (see LAYERS.md)
     projection_playhead = auto()   # projection: bright marker visualising the content playhead
     flood               = auto()   # projection: the whole projection constant white (S8's wall)
     test_player_lines   = auto()

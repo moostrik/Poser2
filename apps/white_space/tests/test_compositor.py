@@ -98,6 +98,22 @@ class CompositorTest(unittest.TestCase):
         self.assertEqual(f.white[0], 1.0)
         self.assertEqual(float(f.white.sum()), 1.0)
 
+    def test_layers_read_the_frame_context(self) -> None:
+        """A layer draws into the private scratch but reads this tick's context: the motor
+        command's beam rpm drives the crossing tick of the flash and the instrument."""
+        from apps.white_space.light import MotorCommand, MotorMode
+        seen: list[tuple[float, float]] = []
+
+        class Reader(FakeLayer):
+            def render(self, frame: Frame) -> None:
+                seen.append((frame.motor_command.beam_rpm, frame.playhead))
+
+        comp = Compositor(config(), {LayerId.test_pose_waves: Reader(0.0)})
+        comp.set_mix([(LayerId.test_pose_waves, 1.0)])
+        f = Frame(RES, Tick(0.0, 0.0), motor_command=MotorCommand(mode=MotorMode.PROJECTION, beam_rpm=36.0), playhead=1.5)
+        comp.render(f)
+        self.assertEqual(seen, [(36.0, 1.5)])
+
     def test_debug_override_replaces_state_mix(self) -> None:
         # Selecting a layer IS turning debug on: the select replaces the state's mix solo.
         self.cfg.debug = DebugLayer.test_pose_waves

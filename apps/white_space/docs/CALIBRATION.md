@@ -141,8 +141,8 @@ loop's output delay. The playhead is never reset at spin-up, so it keeps that le
 playhead line reaches the wall one output delay later — exactly where the beam would have been. So
 the playhead needs no offset of its own in projection mode, and tuning the projection offset onto the
 moving line would rotate the whole projection by that delay. (The firmware applies a frame on the next fast
-revolution, so the line may lag up to 30 ms more — a degree or two, inside the flash window;
-deduction.) The hit and the sound fire on the internal playhead in both modes, so their timing
+revolution, so the line may lag up to 30 ms more — a degree or two, within the half playhead step
+(3.6° at 36 rpm) the flash tick can sit from the person; deduction.) The hit and the sound fire on the internal playhead in both modes, so their timing
 against the light matches too.
 
 **Why they sit at opposite ends of the pipeline.** The playhead offset corrects a measurement coming
@@ -759,12 +759,14 @@ the measured motor phase while locked and adds it (`light/playhead.py`). (The pe
 **What depends on it:**
 - `PlayheadOffset = azimuth − playhead` per pose (`pose/playhead_offset.py`): the flash layers fire on
   it, and the sound receives it (`/pose/N/playhead/offset`).
-- The hit that starts INTRO is `PlayheadOffset` changing sign (`statemachine/machine.py`,
-  `_detect_hit`). A wrong offset fires the intro early or late.
+- The hit that starts INTRO is the tick the playhead is closest to the person, the same tick the flash
+  lights (`statemachine/machine.py`, `_detect_hit`). A wrong offset fires the intro early or late.
 - The bar simulation on screen draws the four lamps at this heading.
 - Max receives it as `/global/playhead`.
 
-Calibrating it aligns all three consumers at once. The flash window is 11.5° wide in the preset.
+Calibrating it aligns all three consumers at once. The flash lights the `frames` ticks closest to the
+person (1 in the preset), so on a correct offset the single flash sits within half a playhead step
+(3.6° at 36 rpm) of them.
 Re-tune after changing `light.motor.beam_rpm`: the loop delay inside the offset scales with speed.
 
 Across a spin-up and a spin-down the playhead is never reset; only its rate source changes

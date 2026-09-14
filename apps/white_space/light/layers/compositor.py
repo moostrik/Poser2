@@ -90,7 +90,7 @@ class Compositor:
             entries = [(LayerId(int(cfg.debug)), 1.0)]
 
         s = self._scratch
-        s.tick, s.motor, s.playhead = frame.tick, frame.motor, frame.playhead
+        s.tick, s.motor, s.motor_command, s.playhead = frame.tick, frame.motor, frame.motor_command, frame.playhead
         for id, weight in entries:
             w_white, w_blue = _channel_weights(weight)
             if w_white <= 0.0 and w_blue <= 0.0:

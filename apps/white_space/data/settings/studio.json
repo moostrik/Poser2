@@ -635,8 +635,7 @@
         "base_blue": 0.0,
         "white": 1.0,
         "blue": 0.0,
-        "width": 11.5,
-        "gap": 0.0,
+        "frames": 1,
         "blend": "ADD"
       },
       "beam_wind_down": {
@@ -661,30 +660,85 @@
     },
     "projection_layers": {
       "pose_instrument": {
-        "line_spacing": 10.0,
-        "line_motion": "STATIC",
-        "line_flow": "SYMMETRIC",
-        "line_speed": 0.0,
-        "lines_per_bar": 1.0,
-        "line_phase": 0.0,
-        "n_blend": 0.1,
-        "extent_min": 10.0,
-        "extent_max": 60.0,
-        "line_edge": 3.0,
-        "line_min": 0.1,
-        "line_max": 0.6,
-        "line_soft": 0.3,
-        "harmonics": 2,
-        "level": 0.8,
-        "legs_dim": 0.3,
-        "blue_min": 0.0,
-        "blue_max": 0.6,
-        "anchor_width": 3.0,
-        "anchor_level": 0.8,
+        "min_feature": 2.0,
+        "band_width": 3.0,
+        "band_level": 0.3,
+        "reach": 45.0,
         "sync_threshold": 0.75,
+        "hit_widen": 1.0,
         "attack_seconds": 1.0,
         "release_seconds": 1.5,
-        "blend": "ADD"
+        "blend": "ADD",
+        "white": {
+          "interval_min": 4.0,
+          "interval_max": 24.0,
+          "harmonic_order": 2,
+          "duty": {
+            "source": "LIFT",
+            "low": 0.0,
+            "high": 1.0,
+            "curve": 1.0
+          },
+          "interval": {
+            "source": "LEGS",
+            "low": 0.5,
+            "high": 0.0,
+            "curve": 1.0
+          },
+          "harmonic": {
+            "source": "BEND",
+            "low": 0.0,
+            "high": 1.0,
+            "curve": 1.0
+          },
+          "harmonic_phase": {
+            "source": "BEND_SPLIT",
+            "low": 0.0,
+            "high": 0.5,
+            "curve": 1.0
+          },
+          "phase": {
+            "source": "TILT",
+            "low": 0.0,
+            "high": 1.0,
+            "curve": 1.0
+          }
+        },
+        "blue": {
+          "interval_min": 4.0,
+          "interval_max": 24.0,
+          "harmonic_order": 2,
+          "duty": {
+            "source": "LIFT",
+            "low": 1.0,
+            "high": 0.0,
+            "curve": 1.0
+          },
+          "interval": {
+            "source": "ARM_SPLIT",
+            "low": 0.5,
+            "high": 0.15,
+            "curve": 1.0
+          },
+          "harmonic": {
+            "source": "BEND",
+            "low": 0.0,
+            "high": 0.6,
+            "curve": 1.0
+          },
+          "harmonic_phase": {
+            "source": "CONSTANT",
+            "low": 0.0,
+            "high": 0.5,
+            "curve": 1.0
+          },
+          "phase": {
+            "source": "TILT",
+            "low": 0.5,
+            "high": -0.5,
+            "curve": 1.0
+          }
+        }
       },
       "projection_playhead": {
         "level": 1.0,

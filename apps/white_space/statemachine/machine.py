@@ -31,7 +31,7 @@ from modules.utils import HotReloadMethods
 
 from ..board import Board
 from ..light import LightSettings, LayerId, Mix, MotorMode
-from ..pose import PlayheadOffset
+from ..pose import PlayheadOffset, playhead_step, ticks_to_crossing
 from .settings import StateId, StateMachineSettings, ManualSettings, SyncSource
 
 import logging
@@ -54,7 +54,7 @@ class StateContext:
     participants: int       # debounced live participant count (ghosts excluded)
     sync:    float          # mean pose similarity (0..1)
     sync_count: int         # participants whose similarity is ≥ sync.threshold
-    hit:     bool           # a live participant was passed by the playhead this tick
+    hit:     bool           # this tick the playhead is closest to a live participant (the flash tick)
     session: bool           # session mode active — states consult it in needs_state_change()
     blackout: bool          # the pinned blackout toggle — OFF stays put while pinned and
                             # wakes through OFF_IDLE once released and the playhead lock holds
@@ -177,16 +177,22 @@ class StateMachine:
         return self._eff_participants
 
     def _detect_hit(self, frames: FrameDict) -> bool:
-        """True when a live participant's PlayheadOffset sign-flipped + → − this tick
-        (the playhead swept past them). The ±π wrap flips − → +, so it never false-fires."""
+        """True when this tick is the one the playhead is closest to a live participant — the tick a
+        one-frame ``beam_flash`` lights (``ticks_to_crossing`` < ½ step at ``beam_rpm``). A
+        PlayheadOffset sign flip + → − also counts, so a pass a jittered step skipped is still a hit;
+        the ±π wrap flips − → +, so it never false-fires."""
+        step = playhead_step(self._light.motor.beam_rpm, 1.0 / self._light.light_rate)
         hit = False
         offsets: dict[int, float] = {}
         for id, frame in frames.items():
             off = frame[PlayheadOffset].value
             if math.isnan(off):
                 continue
+            tau = ticks_to_crossing(off, step)
             prev = self._prev_offsets.get(id)
-            if prev is not None and prev > 0.0 and off < 0.0 and (prev - off) < math.pi:
+            if not math.isnan(tau) and abs(tau) < 0.5:
+                hit = True
+            elif prev is not None and prev > 0.0 and off < 0.0 and (prev - off) < math.pi:
                 hit = True
             offsets[id] = off
         self._prev_offsets = offsets
