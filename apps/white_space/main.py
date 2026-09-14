@@ -9,7 +9,7 @@ import numpy as np
 from modules.utils import Broadcast
 from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType, CameraCheck, delivered_height
 from modules.settings import presets, NiceServer
-from modules.inout import OscReceiver, ping_ip
+from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
 from modules.inference import source, crop, pose
@@ -44,11 +44,6 @@ class WhiteSpaceMain:
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
         self.settings.camera.sim_enabled = simulation
-        # A reachable fixture means real falls: a preset saved while simulating must not mask them.
-        fixture_ip = self.settings.inout.osc_light_sender.ip_addresses
-        if self.settings.light.motor_simulate and ping_ip(fixture_ip):
-            self.settings.light.motor_simulate = False
-            logger.info("Fixture at %s is reachable: motor simulation off", fixture_ip)
         # The delivered frame's height follows the tilt unless the preset pins it. The warp's
         # rows are tangents of elevation, so the sensor's full reach needs more rows the further
         # the camera is aimed up (848 at P720 and tilt 0, 960 at tilt 15, 1152 at P800 and tilt

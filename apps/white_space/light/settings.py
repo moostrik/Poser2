@@ -129,8 +129,7 @@ class LightSettings(BaseSettings):
     # show where it would have been. Forced OFF at startup (boot failsafe: a preset saved
     # mid-debug must never spin at power-on).
     debug: Field[DebugLayer] = Field(DebugLayer.OFF, description="Debug override: select a layer to show it solo and auto-follow the motor to its mode (OFF = show runs)")
-    # Forced off at startup when the fixture answers a ping (main.py): real hardware drives the falls.
-    motor_simulate: Field[bool] = Field(False, description="Simulate the motor + fall sensor (no hardware)")
+    motor_simulate: Field[bool] = Field(False, description="Simulate the motor + fall sensor (no hardware)", pinned=True)
 
     clock:        Group[ClockSettings]        = Group(ClockSettings)
     motor:        Group[MotorSettings]        = Group(MotorSettings, share=[motor_simulate.as_('simulate')])
