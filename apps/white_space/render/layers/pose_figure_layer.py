@@ -1,16 +1,19 @@
 """PoseFigureLayer — each pose as a small figure over the projection row, where it stands.
 
-Every LERP pose with an azimuth and keypoints is drawn as its skeleton in its track colour,
-centred at its azimuth on the row's 360° x axis, so a person, a ghost's origin or the dummy can
-be seen where the light places them. The figure keeps the crop's aspect: its height is a fraction
-of the row, its width follows from the row's pixel aspect and the crop's.
+Every LERP pose with an azimuth and keypoints is drawn as its skeleton in its track colour, its
+eyes at its azimuth on the row's 360° x axis (the azimuth is the eyes', `LAYERS.md` *Inputs*), so
+a person, a ghost's origin or the dummy can be seen where the light places them. The figure keeps
+the crop's aspect: its height is a fraction of the row, its width follows from the row's pixel
+aspect and the crop's.
 """
 
 import math
 from typing import Protocol
 
+import numpy as np
+
 from modules.board import HasFrames
-from modules.pose.features import Azimuth, Points2D
+from modules.pose.features import Azimuth, Points2D, PointLandmark
 from modules.pose.nodes import AngleExtractorSettings
 from modules.render import ColorSettings
 from modules.render.layers import LayerBase
@@ -33,6 +36,16 @@ def figure_spans(x: float, width: float) -> list[float]:
     elif x + width > 1.0:
         spans.append(x - 1.0)
     return spans
+
+
+def eye_column(points: Points2D) -> float:
+    """Where the eyes are across the crop (0..1): the eyes' mean, the nose when they are missing,
+    the centre when both are. The azimuth is the eyes', so this column is placed at it."""
+    eyes = points.values[[PointLandmark.left_eye, PointLandmark.right_eye], 0]
+    if not np.isnan(eyes).any():
+        return float(eyes.mean())
+    nose = float(points.values[PointLandmark.nose, 0])
+    return 0.5 if math.isnan(nose) else nose
 
 
 class PoseFigureBoard(HasFrames, Protocol):
@@ -86,6 +99,6 @@ class PoseFigureLayer(LayerBase):
             if math.isnan(azimuth) or points.valid_count == 0:
                 continue
             color = colors[track_id % len(colors)]
-            for x in figure_spans(normalize_azimuth(azimuth) - width / 2.0, width):
+            for x in figure_spans(normalize_azimuth(azimuth) - eye_column(points) * width, width):
                 self._shader.use(points, line_width=line_width, line_smooth=line_smooth, color=color,
                                  use_scores=False, rect=(x, y, width, height), aspect_ratio=aspect)

@@ -1,8 +1,31 @@
 """Tests for the pose figure overlay's geometry: where a figure is drawn on the row's circle."""
 
+import math
 import unittest
 
-from apps.white_space.render.layers.pose_figure_layer import figure_spans
+import numpy as np
+
+from modules.pose.features import Points2D, PointLandmark as P
+
+from apps.white_space.render.layers.pose_figure_layer import eye_column, figure_spans
+
+
+def _points(**xy: tuple[float, float]) -> Points2D:
+    values = np.full((len(P), 2), np.nan, dtype=np.float32)
+    for name, (x, y) in xy.items():
+        values[P[name]] = (x, y)
+    return Points2D(values, (~np.isnan(values[:, 0])).astype(np.float32))
+
+
+class EyeColumnTest(unittest.TestCase):
+    def test_the_eyes_mean_when_both_are_there(self) -> None:
+        self.assertAlmostEqual(eye_column(_points(left_eye=(0.7, 0.1), right_eye=(0.6, 0.1), nose=(0.2, 0.2))), 0.65, places=6)
+
+    def test_the_nose_when_an_eye_is_missing(self) -> None:
+        self.assertAlmostEqual(eye_column(_points(left_eye=(0.7, 0.1), nose=(0.62, 0.2))), 0.62, places=6)
+
+    def test_the_centre_when_the_face_is_missing(self) -> None:
+        self.assertEqual(eye_column(_points(left_shoulder=(0.3, 0.3))), 0.5)
 
 
 class FigureSpansTest(unittest.TestCase):
