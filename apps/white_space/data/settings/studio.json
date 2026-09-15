@@ -3,7 +3,7 @@
   "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "render_fps": 44.0,
+  "render_fps": 60.0,
   "light_resolution": 3600,
   "fov": 127.0,
   "resolution": "P720",
@@ -379,8 +379,8 @@
       "apply_warp": true,
       "folder": "20260702-161442_flabber",
       "sim_passthrough": false,
-      "start_norm": 0.33,
-      "end_norm": 0.38
+      "start_norm": 0.0,
+      "end_norm": 1.0
     },
     "frame_sync": {},
     "tracklet_sync": {}
@@ -548,17 +548,6 @@
         "remap_low": 0.2,
         "remap_high": 0.9,
         "enabled": true,
-        "verbose": false
-      },
-      "window_correlation": {
-        "window_length": 7,
-        "method": "HARMONIC_MEAN",
-        "max_lag": 7,
-        "min_variance": 0.01,
-        "use_motion_weighting": true,
-        "remap_low": 0.0,
-        "remap_high": 0.75,
-        "enabled": false,
         "verbose": false
       },
       "similarity_applicator": {},
@@ -913,11 +902,11 @@
     "intro_idle_bars": 2.0,
     "end_bars": 8.0,
     "dim_level": 0.4,
+    "crowd": 2,
     "count_hold_seconds": 1.0,
     "sync": {
-      "threshold": 0.75,
-      "mode": "THREE",
-      "source": "POSE_FRAMES"
+      "threshold": 0.5,
+      "mode": "CROWD"
     },
     "manual": {
       "select": "PLAY",

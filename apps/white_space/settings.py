@@ -205,9 +205,8 @@ class SimilarityFeature(BaseSettings):
     output_frequency: Field[float] = Field(30.0)
     max_poses       : Field[int]   = Field(3, min=1, max=16, access=Field.INIT)
 
-    # posture similarity (WindowSimilarity at window_length 1) enabled; movement correlation disabled by default
+    # posture similarity (WindowSimilarity at window_length 1)
     window_similarity    : Group[analytics.WindowSimilaritySettings]      = Group(analytics.WindowSimilaritySettings, share=[max_poses])
-    window_correlation   : Group[analytics.WindowCorrelationSettings]     = Group(analytics.WindowCorrelationSettings, share=[max_poses])
     similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_poses])
     leader_applicator    : Group[nodes.LeaderScoreApplicatorSettings] = Group(nodes.LeaderScoreApplicatorSettings, share=[max_poses])
     smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])

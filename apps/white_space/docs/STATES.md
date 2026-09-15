@@ -205,9 +205,8 @@ other arm positions give unique sounds. The dim playhead flashes bright as it cr
   1. P == 0 → S5 INTRO_IDLE
   2. at least `sync.mode` participants in sync (the crowd / all−1 / all, each ≥ `sync.threshold`) and P ≥ crowd →
      S6 INTRO_PLAY. Each participant's similarity is the posture similarity, current pose against current
-     pose (`WindowSimilarity` at `window_length` 1). `sync.source` picks where it is read: the `Similarity`
-     feature of the pose frames (default; smoothed by the Euro smoother and the chase interpolator), the raw
-     window similarity result, or the window correlation
+     pose (`WindowSimilarity` at `window_length` 1), read from the `Similarity` feature of the LERP pose
+     frames, smoothed by the Euro smoother and the chase interpolator
   3. session: elapsed ≥ `session.intro_seconds` → S6 INTRO_PLAY *(checked after P == 0, so an empty room
      never spins up)*
 - **Mix**: `beam_playhead` DIM · `beam_flash` 1.0 (reset on entry)

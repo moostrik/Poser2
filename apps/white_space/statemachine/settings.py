@@ -1,8 +1,8 @@
 """StateMachine settings — the show's identity enums and configuration tree.
 
 Pure data (fields, groups, enums), mirroring ``light/settings.py``'s role for its
-package: ``StateId`` is the state vocabulary of ``docs/STATES.md``, ``SyncMode`` and ``SyncSource``
-the INTRO → INTRO_PLAY sync condition, and ``StateMachineSettings`` the panel — telemetry
+package: ``StateId`` is the state vocabulary of ``docs/STATES.md``, ``SyncMode`` the INTRO →
+INTRO_PLAY sync condition, and ``StateMachineSettings`` the panel — telemetry
 first, then the show timings, with the sync / manual / session corners as nested groups.
 """
 
@@ -22,13 +22,6 @@ class SyncMode(IntEnum):
             case SyncMode.CROWD:         return crowd
             case SyncMode.ALL_MINUS_ONE: return max(participants - 1, crowd - 1)
             case _:                      return participants
-
-
-class SyncSource(IntEnum):
-    """Where the per-participant pose similarity behind the sync count comes from."""
-    SIMILARITY  = 0        # WindowSimilarity over the SMOOTH windows (set_similarity)
-    CORRELATION = auto()   # WindowCorrelation over the SMOOTH windows (set_correlation)
-    POSE_FRAMES = auto()   # the Similarity feature of the pose frames the machine reads
 
 
 class StateId(IntEnum):
@@ -63,7 +56,6 @@ class SyncSettings(BaseSettings):
     in_sync:    Field[int]      = Field(0, access=Field.READ, pinned=True, description="Participants currently at or above threshold")
     threshold:  Field[float]    = Field(0.75, min=0.0, max=1.0, step=0.01, widget=Widget.slider, description="A participant counts as in sync at this pose similarity")
     mode:       Field[SyncMode] = Field(SyncMode.CROWD, description="INTRO → INTRO_PLAY: how many participants must be in sync (the crowd / all−1 / all)")
-    source:     Field[SyncSource] = Field(SyncSource.SIMILARITY, description="Pose similarity source: window similarity, window correlation, or the pose frames")
 
 
 class SessionModeSettings(BaseSettings):

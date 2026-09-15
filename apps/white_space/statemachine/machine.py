@@ -3,8 +3,8 @@
 A condition-driven state machine that plays the states designed in ``docs/STATES.md``
 (the source of truth): a sequencer hybrid, progress-driven *within* a state and
 condition-driven *between* states. Each tick (on the Conductor's light thread) it builds a
-``StateContext`` from the board (participants, hit-by-light, the playhead's content clock and
-lock signals) and the selected pose-similarity source (sync), lets the active state return its
+``StateContext`` from the board (participants, hit-by-light, the pose frames' ``Similarity`` for the
+sync condition, the playhead's content clock and lock signals), lets the active state return its
 mix, evaluates that state's transition conditions, and emits a ``SequencerState`` snapshot for
 the board and OSC sound.
 
@@ -22,17 +22,16 @@ from __future__ import annotations
 import math
 import time
 from dataclasses import dataclass
-from threading import Lock
 from typing import Callable, Iterable
 
 from modules.session import SequencerState
-from modules.pose import analytics, features, FrameDict
+from modules.pose import features, FrameDict
 from modules.utils import HotReloadMethods
 
 from ..board import Board
 from ..light import LightSettings, LayerId, Mix, MotorMode
 from ..pose import PlayheadOffset, playhead_step, ticks_to_crossing
-from .settings import StateId, StateMachineSettings, ManualSettings, SyncSource
+from .settings import StateId, StateMachineSettings, ManualSettings
 
 import logging
 logger = logging.getLogger(__name__)
@@ -68,9 +67,8 @@ class StateContext:
 
 class StateMachine:
     """Plays the show; see the module docstring. ``update()`` is ticked from
-    ``conductor.add_update_callback`` — everything runs on the light thread, so composing
-    needs no locking (``set_similarity`` / ``set_correlation`` are the cross-thread inputs
-    and are locked)."""
+    ``conductor.add_update_callback`` — everything runs on the light thread and every input is
+    read from the board there, so composing needs no locking."""
 
     def __init__(self, config: StateMachineSettings, light: LightSettings, board: Board,
                  set_mix: Callable[[Mix], None],
@@ -114,10 +112,7 @@ class StateMachine:
         self._pending_count: int = 0
         self._pending_since: float = 0.0
         self._prev_offsets: dict[int, float] = {}   # per-id PlayheadOffset for hit detection
-        self._sync_lock = Lock()
-        self._similarity_values: list[float] = []
-        self._correlation_values: list[float] = []
-        self._tick_sync_values: list[float] = []    # this tick's values from the selected source
+        self._tick_sync_values: list[float] = []    # this tick's per-participant similarities
 
         self._goto_requested: bool = False
         config.manual.bind(ManualSettings.goto, self._on_goto)
@@ -140,25 +135,9 @@ class StateMachine:
 
     # -- Inputs --------------------------------------------------------------
 
-    def set_similarity(self, result: analytics.SimilarityResult) -> None:
-        """Store WindowSimilarity's per-participant similarities; thread-safe (analytics thread)."""
-        values = _overall_similarities(result.similarity.values())
-        with self._sync_lock:
-            self._similarity_values = values
-
-    def set_correlation(self, result: analytics.SimilarityResult) -> None:
-        """Store WindowCorrelation's per-participant similarities; thread-safe (analytics thread)."""
-        values = _overall_similarities(result.similarity.values())
-        with self._sync_lock:
-            self._correlation_values = values
-
     def _sync_values(self, frames: FrameDict) -> list[float]:
-        """The per-participant similarities from the selected ``sync.source``."""
-        source = SyncSource(int(self._config.sync.source))
-        if source == SyncSource.POSE_FRAMES:
-            return _overall_similarities(frame[features.Similarity] for frame in frames.values())
-        with self._sync_lock:
-            return self._correlation_values if source == SyncSource.CORRELATION else self._similarity_values
+        """Each participant's overall similarity, from the ``Similarity`` feature of the pose frames."""
+        return _overall_similarities(frame[features.Similarity] for frame in frames.values())
 
     def _debounced_participants(self, now: float, live_ids: set[int]) -> int:
         """Live participant count — the people with a pose — debounced by count_hold_seconds so

@@ -39,14 +39,6 @@ class FakeBoard:
         return self.frames
 
 
-class FakeSimilarity:
-    def __init__(self, value: float) -> None:
-        self._value = value
-
-    def overall_similarity(self) -> float:
-        return self._value
-
-
 class StateMachineTest(unittest.TestCase):
     def setUp(self) -> None:
         self.t = 1000.0
@@ -87,6 +79,10 @@ class StateMachineTest(unittest.TestCase):
         if settle:
             self.tick()   # register the pending count
             self.tick(dt=self.config.count_hold_seconds + 0.01)
+
+    def set_similarities(self, values: dict[int, float]) -> None:
+        """Give the present participants' frames these overall similarities (same ids: the count holds)."""
+        self.board.frames = {i: FakeFrame(similarity=v) for i, v in values.items()}
 
     @property
     def current(self) -> StateId:
@@ -202,8 +198,7 @@ class StateMachineTest(unittest.TestCase):
         # fill per cycle); PLAY inherits the running instrument — no reset on END → PLAY.
         self._to_intro(participants=3)
         self.assertIn([LayerId.beam_flash], self.resets)
-        self.machine.set_similarity(SimpleNamespace(similarity={
-            0: FakeSimilarity(0.9), 1: FakeSimilarity(0.9), 2: FakeSimilarity(0.9)}))
+        self.set_similarities({0: 0.9, 1: 0.9, 2: 0.9})
         self.tick()
         self.assertIn([LayerId.pose_instrument], self.resets)
         self.resets.clear()
@@ -213,8 +208,7 @@ class StateMachineTest(unittest.TestCase):
 
     def test_intro_to_intro_play_on_sync_and_through_to_play(self) -> None:
         self._to_intro(participants=3)
-        self.machine.set_similarity(SimpleNamespace(similarity={
-            0: FakeSimilarity(0.9), 1: FakeSimilarity(0.8), 2: FakeSimilarity(0.9)}))
+        self.set_similarities({0: 0.9, 1: 0.8, 2: 0.9})
         self.tick()
         self.assertEqual(self.current, StateId.INTRO_PLAY)
         self.assertEqual(self.motors[-1], MotorMode.PROJECTION)
@@ -515,9 +509,7 @@ class StateMachineTest(unittest.TestCase):
         self.config.sync.mode = SyncMode.ALL
         self._to_intro(participants=4)
         # 3 of 4 in sync: enough for CROWD (3), not for ALL
-        self.machine.set_similarity(SimpleNamespace(similarity={
-            0: FakeSimilarity(0.9), 1: FakeSimilarity(0.9),
-            2: FakeSimilarity(0.9), 3: FakeSimilarity(0.1)}))
+        self.set_similarities({0: 0.9, 1: 0.9, 2: 0.9, 3: 0.1})
         self.tick()
         self.assertEqual(self.current, StateId.INTRO)
         self.config.sync.mode = SyncMode.CROWD
@@ -529,7 +521,7 @@ class StateMachineTest(unittest.TestCase):
         # winds back to PLAY once two are back.
         self.config.crowd = 2
         self._to_intro(participants=2)
-        self.machine.set_similarity(SimpleNamespace(similarity={0: FakeSimilarity(0.9), 1: FakeSimilarity(0.9)}))
+        self.set_similarities({0: 0.9, 1: 0.9})
         self.tick()
         self.assertEqual(self.current, StateId.INTRO_PLAY)
         self.tick(dt=self.config.spin_up_seconds + 0.1)
@@ -545,32 +537,21 @@ class StateMachineTest(unittest.TestCase):
     def test_default_crowd_needs_three_people(self) -> None:
         # The default crowd of 3 keeps the three-person show: two in sync with two present never spin up.
         self._to_intro(participants=2)
-        self.machine.set_similarity(SimpleNamespace(similarity={0: FakeSimilarity(0.9), 1: FakeSimilarity(0.9)}))
+        self.set_similarities({0: 0.9, 1: 0.9})
         self.tick()
         self.assertEqual(self.current, StateId.INTRO)
 
-    def test_sync_source_selects_one_writer(self) -> None:
-        from apps.white_space.statemachine import SyncSource
-        in_sync = SimpleNamespace(similarity={i: FakeSimilarity(0.9) for i in range(3)})
-        apart = SimpleNamespace(similarity={i: FakeSimilarity(0.1) for i in range(3)})
+    def test_sync_reads_the_frames_similarity(self) -> None:
+        # The sync count is the Similarity feature of the pose frames the machine reads, nothing else.
         self._to_intro(participants=3)
-        # Default SIMILARITY: the correlation writer has no effect.
-        self.machine.set_similarity(apart)
-        self.machine.set_correlation(in_sync)
-        self.tick()
-        self.assertEqual(self.current, StateId.INTRO)
-        self.assertEqual(self.config.sync.in_sync, 0)
-        # CORRELATION: now the similarity writer is ignored.
-        self.config.sync.source = SyncSource.CORRELATION
-        self.config.manual.hold = True
-        self.tick()
-        self.assertEqual(self.config.sync.in_sync, 3)
-        # POSE_FRAMES: the Similarity feature of the pose frames.
-        self.config.sync.source = SyncSource.POSE_FRAMES
-        self.board.frames = {0: FakeFrame(similarity=0.9), 1: FakeFrame(similarity=0.9),
-                             2: FakeFrame(similarity=0.2)}
+        self.set_similarities({0: 0.9, 1: 0.9, 2: 0.2})
         self.tick()
         self.assertEqual(self.config.sync.in_sync, 2)
+        self.assertEqual(self.current, StateId.INTRO)
+        self.set_similarities({0: 0.9, 1: 0.9, 2: 0.9})
+        self.tick()
+        self.assertEqual(self.config.sync.in_sync, 3)
+        self.assertEqual(self.current, StateId.INTRO_PLAY)
 
     def test_dim_level_is_the_intro_line(self) -> None:
         self.config.dim_level = 0.25

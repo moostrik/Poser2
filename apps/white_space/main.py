@@ -225,20 +225,13 @@ class WhiteSpaceMain:
         self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
         self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
 
-        # Posture similarity: WindowSimilarity at window_length 1, current pose vs current pose (enabled by
-        # default); movement correlation (disabled by default)
-        self.window_similator  = analytics.WindowSimilarity(ps.similarity.window_similarity)
-        self.window_correlator = analytics.WindowCorrelation(ps.similarity.window_correlation)
+        # Posture similarity: WindowSimilarity at window_length 1, current pose vs current pose. It is
+        # stamped on the frames; the state machine and the light show read it from the LERP frames.
+        self.window_similator = analytics.WindowSimilarity(ps.similarity.window_similarity)
 
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similator.submit)
         self.window_similator.add_similarity_callback(self.similarity_applicator.set)
         self.window_similator.add_similarity_callback(self.leader_applicator.set)
-        self.window_similator.add_similarity_callback(self.state_machine.set_similarity)
-
-        self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_correlator.submit)
-        self.window_correlator.add_similarity_callback(self.similarity_applicator.set)
-        self.window_correlator.add_similarity_callback(self.leader_applicator.set)
-        self.window_correlator.add_similarity_callback(self.state_machine.set_correlation)
 
         # POSE STAGE PREDICT
         self.filters_predict = trackers.FilterTracker({
@@ -324,7 +317,6 @@ class WhiteSpaceMain:
         self.tracker.start()
         self.pose_predictor.start()
         self.window_similator.start()
-        self.window_correlator.start()
         self.conductor.start()
         self.osc_light_sender.start()
         self.osc_sound_receiver.start()
@@ -383,7 +375,6 @@ class WhiteSpaceMain:
 
         self.pose_predictor.stop()
         self.window_similator.stop()
-        self.window_correlator.stop()
 
         for camera in self.cameras:
             camera.join(timeout=10)
