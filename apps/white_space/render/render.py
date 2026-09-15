@@ -23,7 +23,8 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 from ..board import Board
 from ..pose import PlayheadOffset, GhostFeature, dummy_id
-from ..settings import Layers, RenderSettings, PlayheadFeatureSelect, CameraView, Stage
+from ..settings import Layers, RenderSettings, PlayheadFeatureSelect, CameraView, Layout, Stage
+from .focus import FOCUS_COLUMNS, focus_ids
 
 # Maps the app-local feature dropdown to the concrete app features. Kept here (not in
 # settings, which stays data-only) and handed to the generic data layers via feature_map.
@@ -37,11 +38,13 @@ PLAYHEAD_FEATURE_MAP = {
 # as a hole in the window, and the gaps between rows show where one ends.
 _BACKGROUND: tuple[float, float, float, float] = (0.15, 0.15, 0.15, 1.0)
 
-# The two rows `camera_view` switches between, and the layer whose compositing each one needs.
-# A hidden row's layers are not updated at all — hiding the strip skips a whole stitch per frame.
-_SWITCHED_ROWS: dict[str, Layers] = {
-    'track':     Layers.tracker,
-    'panoramic': Layers.cam_panorama,
+# The rows a layout may leave out (`camera_view` the two camera rows, FOCUS all three), and the
+# layers whose compositing each one needs. A hidden row's layers are not updated at all — hiding
+# the strip skips a whole stitch per frame.
+_SWITCHED_ROWS: dict[str, tuple[Layers, ...]] = {
+    'track':     (Layers.tracker,),
+    'panoramic': (Layers.cam_panorama,),
+    'ws_light':  (Layers.ws_light, Layers.ws_beam, Layers.ws_azimuth, Layers.ws_figures),
 }
 
 
@@ -133,16 +136,20 @@ class Render(RenderBase):
         self._layout_dirty: bool = False
         settings.panorama.bind(PanoramaLayerSettings.focus_radius, self._on_layout_setting)
         RenderSettings.camera_view.bind(settings, self._on_layout_setting)
+        RenderSettings.layout.bind(settings, self._on_layout_setting)
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def _build_rows(self) -> list[SubdivisionRow]:
         """The rows the window shows, top to bottom.
 
-        `camera_view` decides which of the two camera rows are among them. Every row's height is
-        its content's aspect over the shared width, so leaving one out hands its height to the
-        others rather than leaving a gap — which is the point of the switch.
+        FOCUS is one row: the three longest-present poses, large. Otherwise `camera_view` decides
+        which of the two camera rows are among them. Every row's height is its content's aspect
+        over the shared width, so leaving one out hands its height to the others rather than
+        leaving a gap — which is the point of the switch.
         """
+        if self.settings.layout == Layout.FOCUS:
+            return [SubdivisionRow(name='focus', columns=FOCUS_COLUMNS, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0))]
         view: CameraView = self.settings.camera_view
         rows: list[SubdivisionRow] = []
         if view in (CameraView.CAMERAS, CameraView.BOTH):
@@ -156,7 +163,11 @@ class Render(RenderBase):
 
     def _hidden_layers(self) -> set[Layers]:
         """The layers belonging to rows this layout leaves out — neither composited nor drawn."""
-        return {layer for name, layer in _SWITCHED_ROWS.items() if not self.subdivision.has(name)}
+        return {layer for name, layers in _SWITCHED_ROWS.items() if not self.subdivision.has(name) for layer in layers}
+
+    def _skeleton(self, track_id: int) -> LayerBase:
+        """A pose's crop-and-skeleton layer: a player's compositor, or the dummy's lines."""
+        return self.L[Layers.dummy_pose if track_id == self.dummy_id else Layers.poser][track_id]
 
     def _track_row(self) -> SubdivisionRow:
         """Row 1: one view per camera, always — the raw frames the strip below is derived from.
@@ -215,19 +226,28 @@ class Render(RenderBase):
             w, h = self.subdivision.get_allocation_size('panoramic', 0)
             self.L[Layers.cam_panorama][0].allocate(w, h, GL_RGBA)
 
-        w, h = self.subdivision.get_allocation_size('ws_light', 0)
-        self.L[Layers.ws_azimuth][0].allocate(w, h, GL_RGBA)
-        self.L[Layers.ws_figures][0].allocate(w, h, GL_RGBA)
+        if self.subdivision.has('ws_light'):
+            w, h = self.subdivision.get_allocation_size('ws_light', 0)
+            self.L[Layers.ws_azimuth][0].allocate(w, h, GL_RGBA)
+            self.L[Layers.ws_figures][0].allocate(w, h, GL_RGBA)
 
-        for i in range(self.num_players):
-            w, h = self.subdivision.get_allocation_size('pose', i)
-            self.L[Layers.poser][i].allocate(w, h, GL_RGBA)
-        w, h = self.subdivision.get_allocation_size('pose', self.num_players)
-        self.L[Layers.dummy_pose][self.dummy_id].allocate(w, h, GL_RGBA)
+        if self.subdivision.has('pose'):
+            for i in range(self.num_players):
+                w, h = self.subdivision.get_allocation_size('pose', i)
+                self.L[Layers.poser][i].allocate(w, h, GL_RGBA)
+            w, h = self.subdivision.get_allocation_size('pose', self.num_players)
+            self.L[Layers.dummy_pose][self.dummy_id].allocate(w, h, GL_RGBA)
+
+        # FOCUS: any pose may land in a slot, so every skeleton layer takes the slot's size.
+        if self.subdivision.has('focus'):
+            w, h = self.subdivision.get_allocation_size('focus', 0)
+            for track_id in range(self.num_players + 1):
+                self._skeleton(track_id).allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
         self.settings.panorama.unbind(PanoramaLayerSettings.focus_radius, self._on_layout_setting)
         RenderSettings.camera_view.unbind(self.settings, self._on_layout_setting)
+        RenderSettings.layout.unbind(self.settings, self._on_layout_setting)
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()
@@ -262,6 +282,14 @@ class Render(RenderBase):
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
+        # FOCUS — the three longest-present poses, large, each as its pose-row cell would show it.
+        if self.subdivision.has('focus'):
+            for slot, track_id in enumerate(focus_ids(self.board.get_frames(int(Stage.LERP)))):
+                self._viewport(height, self.subdivision.get_rect('focus', slot))
+                self._skeleton(track_id).draw()
+                self._draw_data_overlays(track_id)
+            return
+
         # Row 1 — one tracker compositor per camera: the raw frames, with that camera's frame rate,
         # tilt and roll error over them. Absent under PANORAMA.
         if self.subdivision.has('track'):
@@ -278,23 +306,22 @@ class Render(RenderBase):
 
         # Row 3 - WS light: the projection, or the bar's lights while the fixture is in beam mode —
         # the same rule the fixture applies to the same command (the frame's target rpm).
-        output = self.board.get_composition_output()
-        beam_mode = output is not None and output.motor_command.target_rpm < FIXTURE_PROJECTION_RPM
-        self._viewport(height, self.subdivision.get_rect('ws_light', 0))
-        self.L[Layers.ws_beam if beam_mode else Layers.ws_light][0].draw()
-        if self.settings.azimuth_overlay:
-            self.L[Layers.ws_azimuth][0].draw()
-        if self.settings.pose_figures:
-            self.L[Layers.ws_figures][0].draw()
+        if self.subdivision.has('ws_light'):
+            output = self.board.get_composition_output()
+            beam_mode = output is not None and output.motor_command.target_rpm < FIXTURE_PROJECTION_RPM
+            self._viewport(height, self.subdivision.get_rect('ws_light', 0))
+            self.L[Layers.ws_beam if beam_mode else Layers.ws_light][0].draw()
+            if self.settings.azimuth_overlay:
+                self.L[Layers.ws_azimuth][0].draw()
+            if self.settings.pose_figures:
+                self.L[Layers.ws_figures][0].draw()
 
         # Row 4 - pose cutouts with data overlays, one viewport per player, the dummy's last
-        for i in range(self.num_players):
-            self._viewport(height, self.subdivision.get_rect('pose', i))
-            self.L[Layers.poser][i].draw()
-            self._draw_data_overlays(i)
-        self._viewport(height, self.subdivision.get_rect('pose', self.num_players))
-        self.L[Layers.dummy_pose][self.dummy_id].draw()
-        self._draw_data_overlays(self.dummy_id)
+        if self.subdivision.has('pose'):
+            for track_id in range(self.num_players + 1):
+                self._viewport(height, self.subdivision.get_rect('pose', track_id))
+                self._skeleton(track_id).draw()
+                self._draw_data_overlays(track_id)
 
     def _draw_data_overlays(self, track_id: int) -> None:
         self.L[Layers.data_W][track_id].draw()

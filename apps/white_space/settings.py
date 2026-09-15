@@ -52,6 +52,12 @@ class CameraView(IntEnum):
     PANORAMA = auto()   # the 360° strip only
 
 
+class Layout(IntEnum):
+    """What the window shows: its rows, or three poses large."""
+    ROWS  = 0           # the camera rows (per camera_view), the projection and the pose row
+    FOCUS = auto()      # the three longest-present poses side by side over the whole window
+
+
 # ---------------------------------------------------------------------------
 #  Layers enum
 # ---------------------------------------------------------------------------
@@ -336,6 +342,8 @@ class BeamLightSimSettings(BaseSettings):
 
 
 class RenderSettings(BaseSettings):
+    layout:      Field[Layout]     = Field(Layout.ROWS, widget=Widget.select,
+                                           description="ROWS: the window's rows; FOCUS: the three longest-present poses, large")
     camera_view: Field[CameraView] = Field(CameraView.BOTH, widget=Widget.select,
                                            description="Which camera row to show: the delivered frames, the 360° strip, or both")
     azimuth_overlay: Field[bool] = Field(True, description="Eye (solid) and bbox (faint) azimuth lines over the projection row")
