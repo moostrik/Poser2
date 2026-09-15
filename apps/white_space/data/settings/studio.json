@@ -380,8 +380,8 @@
       "apply_warp": true,
       "folder": "20260702-161442_flabber",
       "sim_passthrough": false,
-      "start_norm": 0.3,
-      "end_norm": 0.41
+      "start_norm": 0.0,
+      "end_norm": 1.0
     },
     "frame_sync": {},
     "tracklet_sync": {}
@@ -438,13 +438,14 @@
       "elbow_raised": 166.0
     },
     "leg_deviation_extractor": {
-      "hip_degrees": 60.0,
-      "knee_degrees": 90.0,
+      "min_degrees": 20.0,
+      "hip_max_degrees": 60.0,
+      "knee_max_degrees": 90.0,
       "n_top": 2
     },
     "arm_deviation_extractor": {
-      "shoulder_degrees": 90.0,
-      "elbow_degrees": 90.0,
+      "min_degrees": 20.0,
+      "max_degrees": 45.0,
       "n_top": 1
     },
     "torso_tilt_extractor": {
@@ -556,6 +557,9 @@
         "enabled": true,
         "verbose": false
       },
+      "neutral_weight": {
+        "enabled": true
+      },
       "similarity_applicator": {},
       "leader_applicator": {},
       "smoother": {
@@ -572,16 +576,7 @@
         "responsiveness": 0.33,
         "friction": 0.05
       },
-      "sticky": {
-        "enabled": true,
-        "init_to_zero": true,
-        "hold_scores": false
-      },
-      "motion_gate": {},
-      "neutral_gate": {
-        "enabled": true,
-        "neutral": 0.1
-      }
+      "motion_gate": {}
     },
     "window_raw": {
       "window_size": 180,

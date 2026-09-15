@@ -10,9 +10,10 @@ Vocabulary:
   by `states.count_hold_seconds`
 - **crowd** — `states.crowd`, the participants the show needs (`studio.json`: 3): that many in sync
   spin it up, fewer present end it, and END winds back to PLAY once they are back
-- **neutral** — arms hanging: `ArmDeviation` at or below `pose.similarity.neutral_gate.neutral`. A pair
-  with a person at neutral has similarity 0 (`pose/neutral_gate.py`, before the frames are stamped and
-  smoothed, so a pose crossing neutral never jumps the sync)
+- **neutral** — arms hanging: the most-moved arm joint within `pose.arm_deviation_extractor.min_degrees` of
+  it (`ArmDeviation` 0; 1 from `max_degrees`, linear between). A pair's similarity is weighted by its
+  less-moved member's deviation (`pose/neutral_weight.py`, before the frames are stamped and smoothed), so a
+  pair with a person at neutral reads 0 and a pose leaving neutral never jumps the sync
 - **bar** — one full playhead cycle, the content clock
 - **hit** — the tick the playhead is closest to a participant: the tick a one-frame `beam_flash` lights
   (`statemachine/machine.py` `_detect_hit`)

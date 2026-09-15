@@ -22,7 +22,7 @@ class AngleSymExtractor(FilterNode):
 
     The four joints: the difference wrapped to [-π, π), over π. ``arms``: the mean of the
     shoulder and elbow elements. ``legs``: the mean of the hip and knee differences, each over its
-    full-deviation angle from the leg deviation's settings (``hip_degrees``, ``knee_degrees``), clipped to
+    top from the leg deviation's settings (``hip_max_degrees``, ``knee_max_degrees``), clipped to
     [-1, 1]. A pair's score is the lower of its two joints'; a whole-limb score the lower of its
     pairs'. Leaves the frame unchanged when no pair is valid.
     """
@@ -45,8 +45,8 @@ class AngleSymExtractor(FilterNode):
         scores[:4] = pair_scores
         values[SymmetryElement.arms] = (values[SymmetryElement.shoulder] + values[SymmetryElement.elbow]) / 2.0
         scores[SymmetryElement.arms] = min(pair_scores[SymmetryElement.shoulder], pair_scores[SymmetryElement.elbow])
-        legs = (diff[SymmetryElement.hip] / math.radians(self._config.hip_degrees)
-                + diff[SymmetryElement.knee] / math.radians(self._config.knee_degrees)) / 2.0
+        legs = (diff[SymmetryElement.hip] / math.radians(self._config.hip_max_degrees)
+                + diff[SymmetryElement.knee] / math.radians(self._config.knee_max_degrees)) / 2.0
         values[SymmetryElement.legs] = min(max(legs, -1.0), 1.0) if not math.isnan(legs) else math.nan
         scores[SymmetryElement.legs] = min(pair_scores[SymmetryElement.hip], pair_scores[SymmetryElement.knee])
         scores[np.isnan(values)] = 0.0

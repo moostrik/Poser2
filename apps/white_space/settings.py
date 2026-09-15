@@ -23,7 +23,7 @@ from modules.session import SessionSettings
 from modules.gl import WindowSettings
 from .light import LightSettings, PoseInstrumentSettings
 from .inout import OscLightSenderSettings, UdpLightReceiverSettings
-from .pose import GhosterSettings, NeutralGateSettings
+from .pose import GhosterSettings, NeutralWeightSettings
 from .statemachine import StateMachineSettings
 
 
@@ -213,9 +213,9 @@ class SimilarityFeature(BaseSettings):
     max_poses       : Field[int]   = Field(3, min=1, max=16, access=Field.INIT)
 
     # In pipeline order. SMOOTH: the posture similarity (WindowSimilarity at window_length 1) on the analytics
-    # thread, gated at neutral, stamped on the frames, smoothed.
+    # thread, weighted by the arm deviation out of neutral, stamped on the frames, smoothed.
     window_similarity    : Group[analytics.WindowSimilaritySettings]      = Group(analytics.WindowSimilaritySettings, share=[max_poses])
-    neutral_gate         : Group[NeutralGateSettings]                 = Group(NeutralGateSettings)
+    neutral_weight       : Group[NeutralWeightSettings]               = Group(NeutralWeightSettings)
     similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_poses])
     leader_applicator    : Group[nodes.LeaderScoreApplicatorSettings] = Group(nodes.LeaderScoreApplicatorSettings, share=[max_poses])
     smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])

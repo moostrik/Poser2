@@ -21,17 +21,24 @@ def _frame(**legs: float) -> Frame:
     return Frame(track_id=0, cam_id=0, features={Angles: Angles(values, scores)})
 
 
-def _settings(n_top: int = 2) -> LegDeviationExtractorSettings:
+def _settings(n_top: int = 2, min_degrees: float = 0.0) -> LegDeviationExtractorSettings:
     cfg = LegDeviationExtractorSettings()
-    cfg.hip_degrees = 60.0
-    cfg.knee_degrees = 90.0
+    cfg.min_degrees = min_degrees
+    cfg.hip_max_degrees = 60.0
+    cfg.knee_max_degrees = 90.0
     cfg.n_top = n_top
     return cfg
 
 
 class LegDeviationExtractorTest(unittest.TestCase):
-    def _legs(self, frame: Frame, n_top: int = 2) -> float:
-        return LegDeviationExtractor(_settings(n_top)).process(frame)[LegDeviation].value
+    def _legs(self, frame: Frame, n_top: int = 2, min_degrees: float = 0.0) -> float:
+        return LegDeviationExtractor(_settings(n_top, min_degrees)).process(frame)[LegDeviation].value
+
+    def test_the_range_starts_at_min_degrees(self) -> None:
+        # From 30° to the knee's 90° top: a 60° bend sits half way.
+        f = _frame(left_knee=math.radians(60.0))
+        self.assertAlmostEqual(self._legs(f, n_top=1, min_degrees=30.0), 0.5, places=5)
+        self.assertAlmostEqual(self._legs(_frame(left_knee=math.radians(30.0)), n_top=1, min_degrees=30.0), 0.0, places=5)
 
     def test_standing_straight_is_zero(self) -> None:
         f = _frame(left_hip=0.0, right_hip=0.0, left_knee=0.0, right_knee=0.0)
