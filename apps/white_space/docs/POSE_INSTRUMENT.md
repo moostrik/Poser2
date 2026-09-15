@@ -497,7 +497,8 @@ Its frame joins the interpolated
 poses before the LERP filters at its own id, `num_players`, between the live players and the
 ghosts (which start one above it), so it is a pose like any other from there: the filters stamp
 the playhead offset, the symmetries, the leg deviation and the bend on it, the render draws its
-figure over the projection row where it stands (as it does every pose, `render.pose_figures`),
+figure over the projection row where it stands (as it does every pose, `render.pose_figures`)
+and its skeleton with the same data graphs as a player's in the pose row's last column,
 the azimuth overlay marks it, Max plays it at its slot and the instrument lights it. Only the
 joints are set; the leg deviation and the bend are the pipeline's, derived from the figure as for
 a person, and its angles pass through the angle extractor and the calibrator as a person's do.

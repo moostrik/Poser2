@@ -6,7 +6,7 @@ from modules.gl import RenderBase, clear_color, Style
 from modules.render.layers import LayerBase
 from modules.render.layers import ImageSourceLayer, CropSourceLayer
 from modules.render.layers import TrackerCompositor, PoseCompositor
-from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer
+from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer, PoseLineLayer, PoseLineSettings
 from modules.render.layers import Compositor, PanoramaLayerSettings, CameraReadingsLayer
 from modules.oak import CameraSettings, CameraCheckSettings, mono_frame_size
 from modules.tracker import PanoramicTrackerSettings
@@ -16,13 +16,14 @@ from apps.white_space.render.layers.azimuth_overlay_layer import AzimuthOverlayL
 from apps.white_space.render.layers.pose_figure_layer import PoseFigureLayer
 from apps.white_space.light import FIXTURE_PROJECTION_RPM
 from modules.pose.nodes import AngleExtractorSettings
+from modules.utils import Color
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from ..board import Board
-from ..pose import PlayheadOffset, GhostFeature
-from ..settings import Layers, RenderSettings, PlayheadFeatureSelect, CameraView
+from ..pose import PlayheadOffset, GhostFeature, dummy_id
+from ..settings import Layers, RenderSettings, PlayheadFeatureSelect, CameraView, Stage
 
 # Maps the app-local feature dropdown to the concrete app features. Kept here (not in
 # settings, which stays data-only) and handed to the generic data layers via feature_map.
@@ -52,6 +53,7 @@ class Render(RenderBase):
         super().__init__(settings.window)
         self.num_players: int = settings.num_players
         self.num_cams: int = settings.num_cams
+        self.dummy_id: int = dummy_id(self.num_players)
         self.settings: RenderSettings = settings
         # The tracker's own geometry, live. Anything drawing the tracker's world has to use the
         # numbers the tracker used, or the display invents an error of its own.
@@ -87,6 +89,22 @@ class Render(RenderBase):
             self.L[Layers.data_time][i] = MTimeRenderer(     i, board, settings.data_time)
             self.L[Layers.data_playhead_W][i] = FeatureWindowLayer(i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
             self.L[Layers.data_playhead_F][i] = FeatureFrameLayer( i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
+
+        # The dummy's column, last in the same row: its skeleton at LERP, the only stage it is in
+        # (the pose compositor overlays CLEAN, SMOOTH and PREDICT over a crop it has neither of),
+        # under the same data overlays as a player's. White: it is not a player.
+        d = self.dummy_id
+        self.L[Layers.dummy_pose][d] = PoseLineLayer(d, board, PoseLineSettings(
+            stage=int(Stage.LERP),
+            line_width=settings.preview.poser.line_width,
+            line_smooth=settings.preview.poser.line_smooth,
+            use_scores=True, use_bbox=False, color=Color(1.0, 1.0, 1.0),
+        ))
+        self.L[Layers.data_W][d]    = FeatureWindowLayer(d, board, settings.data, settings.colors) # type: ignore
+        self.L[Layers.data_F][d]    = FeatureFrameLayer( d, board, settings.data, settings.colors)   # type: ignore
+        self.L[Layers.data_time][d] = MTimeRenderer(     d, board, settings.data_time)
+        self.L[Layers.data_playhead_W][d] = FeatureWindowLayer(d, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
+        self.L[Layers.data_playhead_F][d] = FeatureFrameLayer( d, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
 
         # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready.
         # The calibration strip owns row 2 by itself: it consumes all four camera images at once and
@@ -132,7 +150,8 @@ class Render(RenderBase):
         if view in (CameraView.PANORAMA, CameraView.BOTH):
             rows.append(self._panorama_row())
         rows.append(SubdivisionRow(name='ws_light', columns=1,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(0.0, 1.0)))
-        rows.append(SubdivisionRow(name='pose',     columns=self.num_players, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0)))
+        # The pose row: one column per player, and the dummy's last (index num_players, its id).
+        rows.append(SubdivisionRow(name='pose',     columns=self.num_players + 1, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0)))
         return rows
 
     def _hidden_layers(self) -> set[Layers]:
@@ -203,6 +222,8 @@ class Render(RenderBase):
         for i in range(self.num_players):
             w, h = self.subdivision.get_allocation_size('pose', i)
             self.L[Layers.poser][i].allocate(w, h, GL_RGBA)
+        w, h = self.subdivision.get_allocation_size('pose', self.num_players)
+        self.L[Layers.dummy_pose][self.dummy_id].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
         self.settings.panorama.unbind(PanoramaLayerSettings.focus_radius, self._on_layout_setting)
@@ -266,15 +287,21 @@ class Render(RenderBase):
         if self.settings.pose_figures:
             self.L[Layers.ws_figures][0].draw()
 
-        # Row 4 - pose cutouts with data overlays, one viewport per player
+        # Row 4 - pose cutouts with data overlays, one viewport per player, the dummy's last
         for i in range(self.num_players):
             self._viewport(height, self.subdivision.get_rect('pose', i))
             self.L[Layers.poser][i].draw()
-            self.L[Layers.data_W][i].draw()
-            self.L[Layers.data_F][i].draw()
-            self.L[Layers.data_time][i].draw()
-            self.L[Layers.data_playhead_W][i].draw()
-            self.L[Layers.data_playhead_F][i].draw()
+            self._draw_data_overlays(i)
+        self._viewport(height, self.subdivision.get_rect('pose', self.num_players))
+        self.L[Layers.dummy_pose][self.dummy_id].draw()
+        self._draw_data_overlays(self.dummy_id)
+
+    def _draw_data_overlays(self, track_id: int) -> None:
+        self.L[Layers.data_W][track_id].draw()
+        self.L[Layers.data_F][track_id].draw()
+        self.L[Layers.data_time][track_id].draw()
+        self.L[Layers.data_playhead_W][track_id].draw()
+        self.L[Layers.data_playhead_F][track_id].draw()
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         pass

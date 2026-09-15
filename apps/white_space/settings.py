@@ -64,6 +64,7 @@ class Layers(IntEnum):
     tracker      = auto()
     cam_readings = auto()   # each camera's frame rate, tilt and roll error, over its own view
     poser        = auto()
+    dummy_pose   = auto()   # the dummy's skeleton at LERP, no crop; the pose row's last column
     # WS visualization
     cam_panorama = auto()   # the 360° calibration strip: the stitch with the tracker data over it
     ws_light     = auto()   # the projection (fixture in projection mode)
