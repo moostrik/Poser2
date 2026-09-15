@@ -184,13 +184,16 @@ class HDTrioMain:
 
         self.window_similator  = analytics.WindowSimilarity(ps.similarity.window_similarity)
         self.window_correlator = analytics.WindowCorrelation(ps.similarity.window_correlation)
+        # On the result, where presence is known: a present pair's gap is held, a departed player's slot stays NaN.
+        self.similarity_sticky = analytics.SimilarityStickyFiller(ps.similarity.sticky)
+        self.similarity_sticky.add_similarity_callback(self.similarity_applicator.set)
 
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similator.submit)
-        self.window_similator.add_similarity_callback(self.similarity_applicator.set)
+        self.window_similator.add_similarity_callback(self.similarity_sticky.process)
         self.window_similator.add_similarity_callback(self.leader_applicator.set)
 
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_correlator.submit)
-        self.window_correlator.add_similarity_callback(self.similarity_applicator.set)
+        self.window_correlator.add_similarity_callback(self.similarity_sticky.process)
         self.window_correlator.add_similarity_callback(self.leader_applicator.set)
 
         # POSE STAGE PREDICT
@@ -200,7 +203,6 @@ class HDTrioMain:
                 nodes.AnglePredictor(ps.angle.prediction),
                 nodes.AngleVelPredictor(ps.velocity.prediction),
                 nodes.AngleStickyFiller(ps.angle.sticky),
-                nodes.SimilarityStickyFiller(ps.similarity.sticky),
             ])
             for i in range(num_players)
         })

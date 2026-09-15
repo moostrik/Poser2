@@ -226,15 +226,19 @@ class WhiteSpaceMain:
         self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
         self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
 
-        # Posture similarity: WindowSimilarity at window_length 1, current pose vs current pose. The neutral
-        # weight scales a pair by how far both are out of neutral (their arm deviation), before the rows are
-        # stamped on the frames and smoothed; the state machine and the light show read the LERP frames.
+        # Posture similarity: WindowSimilarity at window_length 1, current pose vs current pose. On the result,
+        # where presence is known: the sticky filler bridges a present pair's gap (a departed player's slot
+        # stays NaN), then the neutral weight scales a pair by how far both are out of neutral (their arm
+        # deviation). Then the rows are stamped on the frames and smoothed; the state machine and the light
+        # show read the LERP frames.
         self.window_similator = analytics.WindowSimilarity(ps.similarity.window_similarity)
+        self.similarity_sticky = analytics.SimilarityStickyFiller(ps.similarity.sticky)
         self.neutral_weight = NeutralWeight(ps.similarity.neutral_weight)
 
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similator.submit)
         self.stages[Stage.SMOOTH].add_callback(self.neutral_weight.set_frames)
-        self.window_similator.add_similarity_callback(self.neutral_weight.process)
+        self.window_similator.add_similarity_callback(self.similarity_sticky.process)
+        self.similarity_sticky.add_similarity_callback(self.neutral_weight.process)
         self.neutral_weight.add_similarity_callback(self.similarity_applicator.set)
         self.window_similator.add_similarity_callback(self.leader_applicator.set)
 
@@ -246,7 +250,6 @@ class WhiteSpaceMain:
                 nodes.AngleVelPredictor(ps.velocity.prediction),
                 nodes.AzimuthPredictor(ps.azimuth.prediction),
                 nodes.AngleStickyFiller(ps.angle.sticky),
-                nodes.SimilarityStickyFiller(ps.similarity.sticky),
             ])
             for i in range(num_players)
         })

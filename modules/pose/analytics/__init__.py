@@ -1,2 +1,3 @@
 from .window_similarity import WindowSimilarity, WindowSimilaritySettings, SimilarityResult
 from .window_correlation import WindowCorrelation, WindowCorrelationSettings
+from .similarity_sticky_filler import SimilarityStickyFiller, SimilarityStickyFillerSettings

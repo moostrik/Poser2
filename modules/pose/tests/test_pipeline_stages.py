@@ -12,7 +12,7 @@ import unittest
 
 import numpy as np
 
-from modules.pose.analytics import SimilarityResult
+from modules.pose.analytics import SimilarityResult, SimilarityStickyFiller, SimilarityStickyFillerSettings
 from modules.pose.features import (
     FEATURES, Age, AngleLandmark, AngleMotion, Angles, AngleSymmetry, AngleVelocity, ArmDeviation, Azimuth, BBox,
     BBoxAzimuth, LeaderScore, LegDeviation, MotionGate, MotionTime, PointLandmark, Points2D, Similarity, TorsoTilt,
@@ -29,7 +29,7 @@ from modules.pose.nodes import (
     LegDeviationExtractor, LegDeviationExtractorSettings, MotionGateApplicator, MotionTimeExtractor,
     MovingAverageSettings, PointChaseInterpolator, PointDualConfFilter, PointEuroSmoother, PointPredictor,
     PointStickyFiller, PredictorSettings, SimilarityApplicator, SimilarityChaseInterpolator,
-    SimilarityEuroSmoother, SimilarityStickyFiller, StickyFillerSettings, TorsoTiltExtractor,
+    SimilarityEuroSmoother, StickyFillerSettings, TorsoTiltExtractor,
     TorsoTiltExtractorSettings,
 )
 from modules.pose.trackers import FilterPipeline, FilterTracker, InterpolatorPipeline, InterpolatorTracker
@@ -67,7 +67,7 @@ class _Settings:
         self.velocity_prediction = PredictorSettings()
         self.azimuth_prediction = PredictorSettings()
         self.angle_sticky = StickyFillerSettings()
-        self.similarity_sticky = StickyFillerSettings()
+        self.similarity_sticky = SimilarityStickyFillerSettings()
         self.velocity_sticky = StickyFillerSettings()
         self.point_interpolator = ChaseInterpolatorSettings()
         self.angle_interpolator = ChaseInterpolatorSettings()
@@ -92,6 +92,9 @@ class _Stages:
 
         self.similarity_applicator = SimilarityApplicator()
         self.leader_applicator = LeaderScoreApplicator()
+        self.similarity_sticky = SimilarityStickyFiller(ps.similarity_sticky)     # on the result, before the stamping
+        self.similarity_sticky.add_similarity_callback(self.similarity_applicator.set)
+        self.similarity_sticky.add_similarity_callback(self.leader_applicator.set)
         self.smooth = FilterTracker({i: FilterPipeline([
             PointEuroSmoother(ps.point_smoother),
             AngleExtractor(ps.angle_extractor),
@@ -119,7 +122,6 @@ class _Stages:
             AngleVelPredictor(ps.velocity_prediction),
             AzimuthPredictor(ps.azimuth_prediction),
             AngleStickyFiller(ps.angle_sticky),
-            SimilarityStickyFiller(ps.similarity_sticky),
         ]) for i in tracks})
 
         self.interpolate = InterpolatorTracker({i: InterpolatorPipeline([
@@ -174,9 +176,7 @@ class _Stages:
                     values[other], scores[other] = 0.6, 1.0
             similarity[tid] = Similarity(values, scores)
             leader[tid] = LeaderScore(lead, scores.copy())
-        result = SimilarityResult(similarity, leader)
-        self.similarity_applicator.set(result)
-        self.leader_applicator.set(result)
+        self.similarity_sticky.process(SimilarityResult(similarity, leader))
 
 
 def _raw(tick: int) -> FrameDict:
@@ -290,13 +290,15 @@ class PipelineStagesTest(unittest.TestCase):
         self.assertGreater(before, 1.0)
         self.assertLess(after, 0.2)
 
-    def test_similarity_to_a_departed_track_decays_instead_of_holding(self) -> None:
-        # With one track left, no similarity is published; the applicator falls back to zeros so the smoothed
-        # and sticky-filled similarity decays toward 0 rather than holding the last 0.6.
+    def test_similarity_to_a_departed_track_is_no_data(self) -> None:
+        # With one track left, no similarity is published and nothing holds the last 0.6: the slot of the
+        # departed track is NaN through PREDICT and LERP, not a value toward someone who is gone.
         before = self.history[ABSENT.start - 1]['predict'][0][0][Similarity][1]
         during = self.history[ABSENT.stop - 1]['predict'][0][0][Similarity][1]
+        at_lerp = self.history[ABSENT.stop - 1]['lerp'][-1][0][Similarity][1]
         self.assertAlmostEqual(before, 0.6, places=2)
-        self.assertLess(during, 0.3)
+        self.assertTrue(math.isnan(during))
+        self.assertTrue(math.isnan(at_lerp))
 
 
 if __name__ == "__main__":

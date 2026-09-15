@@ -1,8 +1,6 @@
 # Standard library imports
 from threading import Lock
 
-import numpy as np
-
 from ...features import Similarity
 from ...analytics import SimilarityResult
 from ..Nodes import FilterNode
@@ -16,26 +14,19 @@ class SimilarityApplicatorSettings(BaseSettings):
 
 
 class SimilarityApplicator(FilterNode):
-    """Filter that applies pre-computed similarity data to poses.
+    """Filter that stamps the analytics' per-pose Similarity rows onto the poses.
 
-    Unlike SimilarityExtractor, this does not aggregate from pairwise batch.
-    It simply applies dict[int, Similarity] where the Similarity objects
-    are already computed per-pose by WindowSimilarity.
+    It applies dict[int, Similarity] as computed per pose by WindowSimilarity (and held across gaps by
+    SimilarityStickyFiller on the result, where presence is known). A pose without a row — no result yet, or
+    the analytics saw fewer than two poses — gets the NaN dummy: no data. This node only stamps.
 
     Thread-safe: Uses lock to protect stored similarity dict.
     """
 
     def __init__(self, settings: SimilarityApplicatorSettings | None = None) -> None:
         self._settings = settings if settings is not None else SimilarityApplicatorSettings()
-        max_poses = self._settings.max_poses
         self._similarity_dict: dict[int, Similarity] = {}
         self._lock: Lock = Lock()
-        # Zero similarity with valid scores - used when a track is absent so that
-        # downstream SimilarityStickyFiller receives real (zero) data instead of NaN,
-        # which would cause it to hold the last stale value indefinitely.
-        values = np.zeros(max_poses, dtype=np.float32)
-        scores = np.ones(max_poses, dtype=np.float32)
-        self._zero_similarity: Similarity = Similarity(values, scores)
 
     def set(self, result: SimilarityResult) -> None:
         """Store the per-pose similarity from a SimilarityResult."""
@@ -54,8 +45,6 @@ class SimilarityApplicator(FilterNode):
         with self._lock:
             similarity: Similarity | None = self._similarity_dict.get(pose.track_id)
 
-        # Always update - use zero Similarity if not found (resets stale data and
-        # signals the downstream SimilarityStickyFiller with valid zeros instead of NaN)
         if similarity is None:
-            similarity = self._zero_similarity
+            similarity = Similarity.create_dummy()
         return replace(pose, {Similarity: similarity})

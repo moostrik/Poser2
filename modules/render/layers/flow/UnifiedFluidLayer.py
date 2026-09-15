@@ -223,7 +223,7 @@ class UnifiedFluidLayer(LayerBase):
         for cam_id in self._flow_layers.keys():
             pose: Frame | None = self._board.get_frame(self.config.stage, cam_id)
             motions[cam_id] = pose[AngleMotion].value if pose and AngleMotion in pose else 0.0
-            similarities[cam_id] = pose[Similarity].values if pose and Similarity in pose else np.full((self._num_slots,), 0.0)
+            similarities[cam_id] = np.nan_to_num(pose[Similarity].values) if pose and Similarity in pose else np.full((self._num_slots,), 0.0)
             motion_gates[cam_id] = pose[MotionGate].values if pose and MotionGate in pose else np.full((self._num_slots,), 0.0)
 
         Style.push_style()

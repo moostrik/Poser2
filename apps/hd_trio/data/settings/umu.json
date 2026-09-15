@@ -375,7 +375,6 @@
       },
       "sticky": {
         "enabled": true,
-        "init_to_zero": true,
         "hold_scores": false
       },
       "motion_gate": {}

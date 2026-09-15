@@ -199,7 +199,7 @@ class Fluid3DLayer(LayerBase):
         # Get motion data from pose
         pose: Frame | None = self._board.get_frame(self.config.stage, self._cam_id)
         similarities: np.ndarray = (
-            pose[Similarity].values if pose is not None and Similarity in pose
+            np.nan_to_num(pose[Similarity].values) if pose is not None and Similarity in pose
             else np.full((self.config.num_players,), 0.0)
         )
         motion_gates: np.ndarray = (

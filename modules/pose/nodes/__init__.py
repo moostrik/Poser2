@@ -24,7 +24,7 @@ from .filters.Predictors import                 PredictorSettings,    Prediction
 from .filters.EmaSmoothers import               EmaSmootherSettings,  BBoxEmaSmoother,    PointEmaSmoother,   AngleEmaSmoother,   AngleVelEmaSmoother,    AngleSymEmaSmoother,    SimilarityEmaSmoother,  AngleMotionEmaSmoother
 from .filters.EuroSmoothers import              EuroSmootherSettings, BBoxEuroSmoother,   PointEuroSmoother,  AngleEuroSmoother,  AngleVelEuroSmoother,   AngleSymEuroSmoother,   SimilarityEuroSmoother, AzimuthEuroSmoother
 from .filters.MovingAverageSmoothers import     MovingAverageSettings, WindowType, AngleMotionMovingAverageSmoother, SimilarityMovingAverageSmoother
-from .filters.StickyFillers import              StickyFillerSettings, BBoxStickyFiller,   PointStickyFiller,  AngleStickyFiller,  AngleVelStickyFiller,   AngleSymStickyFiller,   SimilarityStickyFiller
+from .filters.StickyFillers import              StickyFillerSettings, BBoxStickyFiller,   PointStickyFiller,  AngleStickyFiller,  AngleVelStickyFiller,   AngleSymStickyFiller
 from .filters.RateLimiters import               RateLimiterSettings,  BBoxRateLimiter,    PointRateLimiter,   AngleRateLimiter,   AngleVelRateLimiter,    AngleSymRateLimiter,    SimilarityRateLimiter,  AngleMotionRateLimiter
 from .filters.EasingNode import                 EasingSettings,       EasingNode,         AngleMotionEasingNode
 from .filters.TemporalFilters import            TemporalStabilizerSettings,   BBoxTemporalStabilizer, PointTemporalStabilizer,    AngleTemporalStabilizer,    AngleVelTemporalStabilizer, AngleSymTemporalStabilizer

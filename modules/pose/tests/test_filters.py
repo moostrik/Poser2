@@ -17,7 +17,7 @@ from modules.pose.nodes import (
     AngleVelPredictor, AngleVelStickyFiller, AzimuthEuroSmoother, AzimuthExtractor, AzimuthPredictor,
     DualConfFilterSettings, EuroSmootherSettings, FilterNode, LeaderScoreApplicator, LegDeviationExtractor, MotionGateApplicator, MotionTimeExtractor,
     MovingAverageSettings, PointDualConfFilter, PointEuroSmoother, PointPredictor, PointStickyFiller,
-    PredictionMethod, PredictorSettings, SimilarityApplicator, SimilarityEuroSmoother, SimilarityStickyFiller,
+    PredictionMethod, PredictorSettings, SimilarityApplicator, SimilarityEuroSmoother,
     StickyFillerSettings, TorsoTiltExtractor, WindowType,
 )
 from modules.utils import Rect
@@ -56,7 +56,6 @@ def _stage_nodes() -> list[FilterNode]:
         AngleVelPredictor(PredictorSettings()),
         AzimuthPredictor(PredictorSettings()),
         AngleStickyFiller(StickyFillerSettings()),
-        SimilarityStickyFiller(StickyFillerSettings()),
         AngleVelStickyFiller(StickyFillerSettings()),
         MotionGateApplicator(),
     ]
@@ -359,18 +358,18 @@ class ApplicatorTest(unittest.TestCase):
         self.assertIs(app.process(frame(track_id=0))[Similarity], mine)
         self.assertIs(app.process(frame(track_id=1))[Similarity], theirs)
 
-    def test_similarity_applicator_unknown_track_gets_valid_zeros(self) -> None:
+    def test_similarity_applicator_unknown_track_gets_no_data(self) -> None:
         app = SimilarityApplicator()
         app.set(SimilarityResult(similarity={0: _similarity({1: 0.7})}, leader_score={}))
         out = app.process(frame(track_id=3))[Similarity]
-        self.assertTrue(np.all(out.values == 0.0))
-        self.assertTrue(np.all(out.scores == 1.0))
+        self.assertTrue(np.all(np.isnan(out.values)))
+        self.assertTrue(np.all(out.scores == 0.0))
 
     def test_similarity_applicator_replaces_stale_result(self) -> None:
         app = SimilarityApplicator()
         app.set(SimilarityResult(similarity={0: _similarity({1: 0.7})}, leader_score={}))
         app.set(SimilarityResult(similarity={}, leader_score={}))
-        self.assertTrue(np.all(app.process(frame(track_id=0))[Similarity].values == 0.0))
+        self.assertTrue(np.all(np.isnan(app.process(frame(track_id=0))[Similarity].values)))
 
     def test_leader_applicator_stamps_own_row_or_leaves_frame(self) -> None:
         app = LeaderScoreApplicator()

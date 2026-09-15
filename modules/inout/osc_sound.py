@@ -330,8 +330,8 @@ class OscSound:
         tilt_msg.add_arg(float(tilt), OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(tilt_msg.build()) # type: ignore
 
-        # range [0, 1] - raw angle similarity
-        pose_sim_values: list[float] = frame[Similarity].values.tolist() if Similarity in frame else [0.0] * num_players
+        # range [0, 1] - pose similarity per player; NaN (no pair, or no such player) is sent as 0
+        pose_sim_values: list[float] = np.nan_to_num(frame[Similarity].values, nan=0.0).tolist() if Similarity in frame else [0.0] * num_players
         pose_sim_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/pose")
         for val in pose_sim_values:
             pose_sim_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
@@ -345,8 +345,7 @@ class OscSound:
         bundle_builder.add_content(gate_msg.build()) # type: ignore
 
         # range [0, 1] - motion-gated similarity (similarity * motion_gate)
-        motion_sim_values: list[float] = frame[Similarity].values.tolist() if Similarity in frame else [0.0] * num_players
-        motion_sim_values = [0.0 if np.isnan(v) else v for v in motion_sim_values]
+        motion_sim_values: list[float] = np.nan_to_num(frame[Similarity].values, nan=0.0).tolist() if Similarity in frame else [0.0] * num_players
         motion_sim_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/motion")
         for val in motion_sim_values:
             motion_sim_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)

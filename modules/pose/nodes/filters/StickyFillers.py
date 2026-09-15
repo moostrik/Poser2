@@ -9,7 +9,7 @@ when pose detection temporarily fails.
 import numpy as np
 
 # Pose imports
-from ...features import Angles, AngleVelocity, AngleSymmetry, BBox, Points2D, Similarity, BaseFeature
+from ...features import Angles, AngleVelocity, AngleSymmetry, BBox, Points2D, BaseFeature
 from ..Nodes import FilterNode
 from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
@@ -105,7 +105,3 @@ class AngleVelStickyFiller(FeatureStickyFiller):
 class AngleSymStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerSettings) -> None:
         super().__init__(config, AngleSymmetry)
-
-class SimilarityStickyFiller(FeatureStickyFiller):
-    def __init__(self, config: StickyFillerSettings) -> None:
-        super().__init__(config, Similarity)

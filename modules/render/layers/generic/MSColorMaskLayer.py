@@ -111,7 +111,7 @@ class MSColorMaskLayer(LayerBase):
 
         # Extract similarity and motion data
         num_players = self.config.num_players
-        similarities: np.ndarray = pose[Similarity].values if pose is not None else np.zeros(num_players, dtype=np.float32)
+        similarities: np.ndarray = np.nan_to_num(pose[Similarity].values) if pose is not None else np.zeros(num_players, dtype=np.float32)
         motion_gates: np.ndarray = pose[MotionGate].values if pose is not None else np.zeros(num_players, dtype=np.float32)
         motion: float = pose[AngleMotion].value if pose is not None else 0.0
         motion = easeInOutSine(motion)

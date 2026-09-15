@@ -234,7 +234,7 @@ class SimilarityFeature(BaseSettings):
     leader_applicator    : Group[nodes.LeaderScoreApplicatorSettings] = Group(nodes.LeaderScoreApplicatorSettings, share=[max_poses])
     smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])
     interpolator         : Group[nodes.ChaseInterpolatorSettings]     = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
-    sticky               : Group[nodes.StickyFillerSettings]          = Group(nodes.StickyFillerSettings)
+    sticky               : Group[analytics.SimilarityStickyFillerSettings] = Group(analytics.SimilarityStickyFillerSettings)
     motion_gate          : Group[nodes.MotionGateApplicatorSettings]  = Group(nodes.MotionGateApplicatorSettings, share=[max_poses])
 
 

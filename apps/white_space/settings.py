@@ -212,15 +212,16 @@ class SimilarityFeature(BaseSettings):
     output_frequency: Field[float] = Field(30.0)
     max_poses       : Field[int]   = Field(3, min=1, max=16, access=Field.INIT)
 
-    # In pipeline order. SMOOTH: the posture similarity (WindowSimilarity at window_length 1) on the analytics
-    # thread, weighted by the arm deviation out of neutral, stamped on the frames, smoothed.
+    # In pipeline order. SMOOTH, on the analytics thread: the posture similarity (WindowSimilarity at
+    # window_length 1), a present pair's gap held, the pair weighted by the arm deviation out of neutral;
+    # then, per frame: stamped on the poses and smoothed.
     window_similarity    : Group[analytics.WindowSimilaritySettings]      = Group(analytics.WindowSimilaritySettings, share=[max_poses])
+    sticky               : Group[analytics.SimilarityStickyFillerSettings] = Group(analytics.SimilarityStickyFillerSettings)
     neutral_weight       : Group[NeutralWeightSettings]               = Group(NeutralWeightSettings)
     similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_poses])
     leader_applicator    : Group[nodes.LeaderScoreApplicatorSettings] = Group(nodes.LeaderScoreApplicatorSettings, share=[max_poses])
     smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])
-    # PREDICT: held over detection gaps. LERP: interpolated to the output rate, then the motion gate.
-    sticky               : Group[nodes.StickyFillerSettings]          = Group(nodes.StickyFillerSettings)
+    # LERP: interpolated to the output rate, then the motion gate.
     interpolator         : Group[nodes.ChaseInterpolatorSettings]     = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     motion_gate          : Group[nodes.MotionGateApplicatorSettings]  = Group(nodes.MotionGateApplicatorSettings, share=[max_poses])
 

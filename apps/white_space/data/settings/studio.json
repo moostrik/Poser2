@@ -557,6 +557,10 @@
         "enabled": true,
         "verbose": false
       },
+      "sticky": {
+        "enabled": true,
+        "hold_scores": false
+      },
       "neutral_weight": {
         "enabled": true
       },
@@ -566,11 +570,6 @@
         "min_cutoff": 0.01,
         "beta": 0.4,
         "d_cutoff": 1.0
-      },
-      "sticky": {
-        "enabled": true,
-        "init_to_zero": true,
-        "hold_scores": false
       },
       "interpolator": {
         "responsiveness": 0.33,
