@@ -24,7 +24,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 from ..board import Board
 from ..pose import PlayheadOffset, GhostFeature, dummy_id
 from ..settings import Layers, RenderSettings, PlayheadFeatureSelect, CameraView, Layout, Stage
-from .focus import FOCUS_COLUMNS, focus_ids
+from .pose_slots import POSE_SLOTS, pose_slots
 
 # Maps the app-local feature dropdown to the concrete app features. Kept here (not in
 # settings, which stays data-only) and handed to the generic data layers via feature_map.
@@ -38,7 +38,7 @@ PLAYHEAD_FEATURE_MAP = {
 # as a hole in the window, and the gaps between rows show where one ends.
 _BACKGROUND: tuple[float, float, float, float] = (0.15, 0.15, 0.15, 1.0)
 
-# The rows a layout may leave out (`camera_view` the two camera rows, FOCUS all three), and the
+# The rows a layout may leave out (`camera_view` one of the two camera rows, POSE both), and the
 # layers whose compositing each one needs. A hidden row's layers are not updated at all — hiding
 # the strip skips a whole stitch per frame.
 _SWITCHED_ROWS: dict[str, tuple[Layers, ...]] = {
@@ -57,6 +57,7 @@ class Render(RenderBase):
         self.num_players: int = settings.num_players
         self.num_cams: int = settings.num_cams
         self.dummy_id: int = dummy_id(self.num_players)
+        self._pose_slots: list[int | None] = [None] * POSE_SLOTS     # POSE layout: which pose is in which slot
         self.settings: RenderSettings = settings
         # The tracker's own geometry, live. Anything drawing the tracker's world has to use the
         # numbers the tracker used, or the display invents an error of its own.
@@ -143,22 +144,24 @@ class Render(RenderBase):
     def _build_rows(self) -> list[SubdivisionRow]:
         """The rows the window shows, top to bottom.
 
-        FOCUS is one row: the three longest-present poses, large. Otherwise `camera_view` decides
-        which of the two camera rows are among them. Every row's height is its content's aspect
-        over the shared width, so leaving one out hands its height to the others rather than
-        leaving a gap — which is the point of the switch.
+        POSE: the three longest-present poses, large, over the projection. CAMERA: the camera
+        rows `camera_view` picks, the projection and the pose row. Every row's height is its
+        content's aspect over the shared width, so leaving one out hands its height to the others
+        rather than leaving a gap — which is the point of the switches.
         """
-        if self.settings.layout == Layout.FOCUS:
-            return [SubdivisionRow(name='focus', columns=FOCUS_COLUMNS, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0))]
+        projection = SubdivisionRow(name='ws_light', columns=1, rows=1, src_aspect_ratio=6.0, padding=Point2f(0.0, 1.0))
+        if self.settings.layout == Layout.POSE:
+            slots = SubdivisionRow(name='slots', columns=POSE_SLOTS, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0))
+            return [slots, projection]
         view: CameraView = self.settings.camera_view
         rows: list[SubdivisionRow] = []
         if view in (CameraView.CAMERAS, CameraView.BOTH):
             rows.append(self._track_row())
         if view in (CameraView.PANORAMA, CameraView.BOTH):
             rows.append(self._panorama_row())
-        rows.append(SubdivisionRow(name='ws_light', columns=1,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(0.0, 1.0)))
+        rows.append(projection)
         # The pose row: one column per player, and the dummy's last (index num_players, its id).
-        rows.append(SubdivisionRow(name='pose',     columns=self.num_players + 1, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0)))
+        rows.append(SubdivisionRow(name='pose', columns=self.num_players + 1, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0)))
         return rows
 
     def _hidden_layers(self) -> set[Layers]:
@@ -238,9 +241,9 @@ class Render(RenderBase):
             w, h = self.subdivision.get_allocation_size('pose', self.num_players)
             self.L[Layers.dummy_pose][self.dummy_id].allocate(w, h, GL_RGBA)
 
-        # FOCUS: any pose may land in a slot, so every skeleton layer takes the slot's size.
-        if self.subdivision.has('focus'):
-            w, h = self.subdivision.get_allocation_size('focus', 0)
+        # POSE layout: any pose may land in a slot, so every skeleton layer takes the slot's size.
+        if self.subdivision.has('slots'):
+            w, h = self.subdivision.get_allocation_size('slots', 0)
             for track_id in range(self.num_players + 1):
                 self._skeleton(track_id).allocate(w, h, GL_RGBA)
 
@@ -282,13 +285,18 @@ class Render(RenderBase):
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
-        # FOCUS — the three longest-present poses, large, each as its pose-row cell would show it.
-        if self.subdivision.has('focus'):
-            for slot, track_id in enumerate(focus_ids(self.board.get_frames(int(Stage.LERP)))):
-                self._viewport(height, self.subdivision.get_rect('focus', slot))
+        # Every row is drawn if the layout holds it, so one pass serves both layouts.
+
+        # POSE layout, top — the three longest-present poses, large, each as its pose-row cell
+        # would show it; a pose keeps its slot while it is among them.
+        if self.subdivision.has('slots'):
+            self._pose_slots = pose_slots(self._pose_slots, self.board.get_frames(int(Stage.LERP)))
+            for slot, track_id in enumerate(self._pose_slots):
+                if track_id is None:
+                    continue
+                self._viewport(height, self.subdivision.get_rect('slots', slot))
                 self._skeleton(track_id).draw()
                 self._draw_data_overlays(track_id)
-            return
 
         # Row 1 — one tracker compositor per camera: the raw frames, with that camera's frame rate,
         # tilt and roll error over them. Absent under PANORAMA.
@@ -304,8 +312,9 @@ class Render(RenderBase):
             self._viewport(height, self.subdivision.get_rect('panoramic', 0))
             self.L[Layers.cam_panorama][0].draw()
 
-        # Row 3 - WS light: the projection, or the bar's lights while the fixture is in beam mode —
-        # the same rule the fixture applies to the same command (the frame's target rpm).
+        # Row 3 (POSE layout: the bottom) - WS light: the projection, or the bar's lights while the
+        # fixture is in beam mode — the same rule the fixture applies to the same command (the
+        # frame's target rpm).
         if self.subdivision.has('ws_light'):
             output = self.board.get_composition_output()
             beam_mode = output is not None and output.motor_command.target_rpm < FIXTURE_PROJECTION_RPM
