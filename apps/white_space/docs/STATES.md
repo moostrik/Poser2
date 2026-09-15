@@ -10,6 +10,9 @@ Vocabulary:
   by `states.count_hold_seconds`
 - **crowd** — `states.crowd`, the participants the show needs (`studio.json`: 3): that many in sync
   spin it up, fewer present end it, and END winds back to PLAY once they are back
+- **neutral** — arms hanging: `ArmDeviation` at or below `pose.similarity.neutral_gate.neutral`. A pair
+  with a person at neutral has similarity 0 (`pose/neutral_gate.py`, before the frames are stamped and
+  smoothed, so a pose crossing neutral never jumps the sync)
 - **bar** — one full playhead cycle, the content clock
 - **hit** — the tick the playhead is closest to a participant: the tick a one-frame `beam_flash` lights
   (`statemachine/machine.py` `_detect_hit`)
@@ -207,7 +210,7 @@ other arm positions give unique sounds. The dim playhead flashes bright as it cr
      S6 INTRO_PLAY. Each participant's similarity is the harmonic mean of their posture similarity (current
      pose against current pose, `WindowSimilarity` at `window_length` 1) to every other participant present,
      read from the `Similarity` feature of the LERP pose frames, smoothed by the Euro smoother and the chase
-     interpolator
+     interpolator, and 0 toward anyone at neutral (*Vocabulary*)
   3. session: elapsed ≥ `session.intro_seconds` → S6 INTRO_PLAY *(checked after P == 0, so an empty room
      never spins up)*
 - **Mix**: `beam_playhead` DIM · `beam_flash` 1.0 (reset on entry)

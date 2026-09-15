@@ -14,15 +14,16 @@ import numpy as np
 
 from modules.pose.analytics import SimilarityResult
 from modules.pose.features import (
-    FEATURES, Age, AngleLandmark, AngleMotion, Angles, AngleSymmetry, AngleVelocity, Azimuth, BBox, BBoxAzimuth,
-    LeaderScore, LegDeviation, MotionGate, MotionTime, PointLandmark, Points2D, Similarity, TorsoTilt,
+    FEATURES, Age, AngleLandmark, AngleMotion, Angles, AngleSymmetry, AngleVelocity, ArmDeviation, Azimuth, BBox,
+    BBoxAzimuth, LeaderScore, LegDeviation, MotionGate, MotionTime, PointLandmark, Points2D, Similarity, TorsoTilt,
 )
 from modules.pose.frame import FrameDict
 from modules.pose.nodes import (
     AgeExtractor, AngleCalibrator, AngleCalibratorSettings, AngleChaseInterpolator, AngleEuroSmoother, AngleExtractor, AngleExtractorSettings,
     AngleMotionExtractor, AngleMotionExtractorSettings, AngleMotionMovingAverageSmoother, AnglePredictor,
     AngleStickyFiller, AngleSymExtractor, AngleVelChaseInterpolator, AngleVelEuroSmoother, AngleVelExtractor,
-    AngleVelExtractorSettings, AngleVelPredictor, AngleVelStickyFiller, AzimuthChaseInterpolator,
+    AngleVelExtractorSettings, AngleVelPredictor, AngleVelStickyFiller, ArmDeviationExtractor,
+    ArmDeviationExtractorSettings, AzimuthChaseInterpolator,
     AzimuthEuroSmoother, AzimuthExtractor, AzimuthPredictor, ChaseInterpolatorSettings,
     DualConfFilterSettings, EuroSmootherSettings, LeaderScoreApplicator,
     LegDeviationExtractor, LegDeviationExtractorSettings, MotionGateApplicator, MotionTimeExtractor,
@@ -58,6 +59,7 @@ class _Settings:
         self.motion_extractor = AngleMotionExtractorSettings()
         self.motion_average = MovingAverageSettings()
         self.leg_deviation = LegDeviationExtractorSettings()
+        self.arm_deviation = ArmDeviationExtractorSettings()
         self.torso_tilt = TorsoTiltExtractorSettings()
         self.similarity_smoother = EuroSmootherSettings()
         self.point_prediction = PredictorSettings()
@@ -102,6 +104,7 @@ class _Stages:
             AngleMotionMovingAverageSmoother(ps.motion_average),
             AngleSymExtractor(ps.leg_deviation),
             LegDeviationExtractor(ps.leg_deviation),
+            ArmDeviationExtractor(ps.arm_deviation),
             TorsoTiltExtractor(ps.torso_tilt),
             MotionTimeExtractor(),
             AgeExtractor(),
@@ -130,6 +133,7 @@ class _Stages:
         self.lerp = FilterTracker({i: FilterPipeline([
             AngleSymExtractor(ps.leg_deviation),
             LegDeviationExtractor(ps.leg_deviation),
+            ArmDeviationExtractor(ps.arm_deviation),
             TorsoTiltExtractor(ps.torso_tilt),
             MotionTimeExtractor(),
             AgeExtractor(),
@@ -249,7 +253,7 @@ class PipelineStagesTest(unittest.TestCase):
 
     def test_smooth_stage_has_every_feature(self) -> None:
         expected = {Points2D, BBox, BBoxAzimuth, Azimuth, Angles, AngleVelocity, AngleMotion, AngleSymmetry, LegDeviation,
-                    TorsoTilt, MotionTime, Age, Similarity, LeaderScore}
+                    ArmDeviation, TorsoTilt, MotionTime, Age, Similarity, LeaderScore}
         _, _, f = list(self._frames('smooth'))[-1]
         self.assertEqual({ft for ft in FEATURES if ft in f}, expected)
 

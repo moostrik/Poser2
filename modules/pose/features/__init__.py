@@ -7,6 +7,7 @@ from .Angles import         Angles, AngleLandmark
 from .AngleVelocity import  AngleVelocity
 from .AngleMotion import    AngleMotion
 from .AngleSymmetry import  AngleSymmetry, SymmetryElement
+from .ArmDeviation import   ArmDeviation
 from .Similarity import     Similarity
 from .LeaderScore import    LeaderScore
 from .MotionGate import     MotionGate
@@ -19,7 +20,7 @@ from .TorsoTilt import      TorsoTilt
 
 
 FEATURES: list[type[BaseFeature]] = [
-    Age, AngleMotion, Angles, AngleSymmetry, AngleVelocity,
+    Age, AngleMotion, Angles, AngleSymmetry, AngleVelocity, ArmDeviation,
     Azimuth, BBox, BBoxAzimuth, LeaderScore, LegDeviation, MotionGate, MotionTime, Points2D,
     Similarity, TorsoTilt,
 ]

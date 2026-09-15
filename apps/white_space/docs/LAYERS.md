@@ -166,7 +166,8 @@ this section is the layer: what it reads, how it composes people, and what it ex
 - **Sync**: above `window.sync_threshold` (mean of both directions' similarity) a pair's window opens
   toward each other along the shorter arc, eased, until each pattern reaches the partner: full sync
   is full overlap, one pattern. It opens over any intermediate person, whose own pattern is
-  unchanged. Sync shows more of the pattern; it never changes the lines.
+  unchanged. Sync shows more of the pattern; it never changes the lines. A pair with a person at neutral
+  reads 0 and does not open (`STATES.md`, *Vocabulary*).
 
 ### Hit
 

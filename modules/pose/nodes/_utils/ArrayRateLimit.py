@@ -9,8 +9,8 @@ import numpy as np
 class RateLimit:
     """Asymmetric rate limiter for vector data.
 
-    Limits the maximum allowed acceleration and deceleration of each vector component.
-    Useful for post-processing velocities or other signals to prevent sudden jumps.
+    Limits how fast each vector component may rise and fall, in units per second (the step is scaled by
+    the time since the previous update). Useful for post-processing signals to prevent sudden jumps.
     """
 
     def __init__(self, vector_size: int, max_increase: float , max_decrease: float,
@@ -18,8 +18,8 @@ class RateLimit:
         """
         Args:
             vector_size: Number of vector components.
-            max_increase: Maximum allowed acceleration (units/s²).
-            max_decrease: Maximum allowed deceleration (units/s²).
+            max_increase: Fastest allowed rise (units/s).
+            max_decrease: Fastest allowed fall (units/s).
         """
         if vector_size <= 0:
             raise ValueError("vector_size must be positive")

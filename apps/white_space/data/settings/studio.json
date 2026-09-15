@@ -14,6 +14,7 @@
   "lens_centre_y": 10.5,
   "spin_down_seconds": 6.0,
   "render": {
+    "layout": "POSE",
     "camera_view": "BOTH",
     "azimuth_overlay": true,
     "pose_figures": true,
@@ -36,7 +37,7 @@
     "data": {
       "stage": "LERP",
       "mode": "WINDOW",
-      "feature_field": "TorsoTilt",
+      "feature_field": "Similarity",
       "line_width": 3.0,
       "line_smooth": 10.0,
       "use_scores": false,
@@ -379,8 +380,8 @@
       "apply_warp": true,
       "folder": "20260702-161442_flabber",
       "sim_passthrough": false,
-      "start_norm": 0.37,
-      "end_norm": 0.53
+      "start_norm": 0.3,
+      "end_norm": 0.41
     },
     "frame_sync": {},
     "tracklet_sync": {}
@@ -440,6 +441,11 @@
       "hip_rad": 1.0471975511965976,
       "knee_rad": 1.5707963267948966,
       "n_top": 2
+    },
+    "arm_deviation_extractor": {
+      "shoulder_rad": 1.5707963267948966,
+      "elbow_rad": 1.5707963267948966,
+      "n_top": 1
     },
     "torso_tilt_extractor": {
       "tilt_rad": 0.4,
@@ -550,6 +556,10 @@
         "enabled": true,
         "verbose": false
       },
+      "neutral_gate": {
+        "enabled": true,
+        "neutral": 0.1
+      },
       "similarity_applicator": {},
       "leader_applicator": {},
       "smoother": {
@@ -557,14 +567,14 @@
         "beta": 0.4,
         "d_cutoff": 1.0
       },
-      "interpolator": {
-        "responsiveness": 0.33,
-        "friction": 0.05
-      },
       "sticky": {
         "enabled": true,
         "init_to_zero": true,
         "hold_scores": false
+      },
+      "interpolator": {
+        "responsiveness": 0.33,
+        "friction": 0.05
       },
       "motion_gate": {}
     },

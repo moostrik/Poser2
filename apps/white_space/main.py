@@ -17,7 +17,7 @@ from modules.session import Session
 from modules.gl import WindowSettings
 
 from .board import Board
-from .pose import GhostFeature, PlayheadOffset, PlayheadOffsetExtractor, Ghoster, Dummy, dummy_id
+from .pose import GhostFeature, PlayheadOffset, PlayheadOffsetExtractor, Ghoster, Dummy, dummy_id, NeutralGate
 from .light import Conductor
 from .inout import OscLightSender, OscSoundSender, UdpLightReceiver
 from .render import Render as WindowRender
@@ -213,6 +213,7 @@ class WhiteSpaceMain:
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
                 nodes.AngleSymExtractor(ps.leg_deviation_extractor),
                 nodes.LegDeviationExtractor(ps.leg_deviation_extractor),
+                nodes.ArmDeviationExtractor(ps.arm_deviation_extractor),
                 nodes.TorsoTiltExtractor(ps.torso_tilt_extractor),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
@@ -225,12 +226,16 @@ class WhiteSpaceMain:
         self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
         self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
 
-        # Posture similarity: WindowSimilarity at window_length 1, current pose vs current pose. It is
-        # stamped on the frames; the state machine and the light show read it from the LERP frames.
+        # Posture similarity: WindowSimilarity at window_length 1, current pose vs current pose. The neutral
+        # gate zeroes a pair while either person stands neutral, before the rows are stamped on the frames
+        # and smoothed; the state machine and the light show read the result from the LERP frames.
         self.window_similator = analytics.WindowSimilarity(ps.similarity.window_similarity)
+        self.neutral_gate = NeutralGate(ps.similarity.neutral_gate)
 
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similator.submit)
-        self.window_similator.add_similarity_callback(self.similarity_applicator.set)
+        self.stages[Stage.SMOOTH].add_callback(self.neutral_gate.set_frames)
+        self.window_similator.add_similarity_callback(self.neutral_gate.process)
+        self.neutral_gate.add_similarity_callback(self.similarity_applicator.set)
         self.window_similator.add_similarity_callback(self.leader_applicator.set)
 
         # POSE STAGE PREDICT
@@ -265,6 +270,7 @@ class WhiteSpaceMain:
             i: trackers.FilterPipeline([
                 nodes.AngleSymExtractor(ps.leg_deviation_extractor),
                 nodes.LegDeviationExtractor(ps.leg_deviation_extractor),
+                nodes.ArmDeviationExtractor(ps.arm_deviation_extractor),
                 nodes.TorsoTiltExtractor(ps.torso_tilt_extractor),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),

@@ -23,7 +23,7 @@ from modules.session import SessionSettings
 from modules.gl import WindowSettings
 from .light import LightSettings, PoseInstrumentSettings
 from .inout import OscLightSenderSettings, UdpLightReceiverSettings
-from .pose import GhosterSettings
+from .pose import GhosterSettings, NeutralGateSettings
 from .statemachine import StateMachineSettings
 
 
@@ -212,13 +212,16 @@ class SimilarityFeature(BaseSettings):
     output_frequency: Field[float] = Field(30.0)
     max_poses       : Field[int]   = Field(3, min=1, max=16, access=Field.INIT)
 
-    # posture similarity (WindowSimilarity at window_length 1)
+    # In pipeline order. SMOOTH: the posture similarity (WindowSimilarity at window_length 1) on the analytics
+    # thread, gated at neutral, stamped on the frames, smoothed.
     window_similarity    : Group[analytics.WindowSimilaritySettings]      = Group(analytics.WindowSimilaritySettings, share=[max_poses])
+    neutral_gate         : Group[NeutralGateSettings]                 = Group(NeutralGateSettings)
     similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_poses])
     leader_applicator    : Group[nodes.LeaderScoreApplicatorSettings] = Group(nodes.LeaderScoreApplicatorSettings, share=[max_poses])
     smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])
-    interpolator         : Group[nodes.ChaseInterpolatorSettings]     = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+    # PREDICT: held over detection gaps. LERP: interpolated to the output rate, then the motion gate.
     sticky               : Group[nodes.StickyFillerSettings]          = Group(nodes.StickyFillerSettings)
+    interpolator         : Group[nodes.ChaseInterpolatorSettings]     = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     motion_gate          : Group[nodes.MotionGateApplicatorSettings]  = Group(nodes.MotionGateApplicatorSettings, share=[max_poses])
 
 
@@ -243,6 +246,7 @@ class PoseGroup(BaseSettings):
     angle_extractor : Group[nodes.AngleExtractorSettings]    = Group(nodes.AngleExtractorSettings)
     angle_calibrator: Group[nodes.AngleCalibratorSettings]   = Group(nodes.AngleCalibratorSettings)
     leg_deviation_extractor: Group[nodes.LegDeviationExtractorSettings] = Group(nodes.LegDeviationExtractorSettings)
+    arm_deviation_extractor: Group[nodes.ArmDeviationExtractorSettings] = Group(nodes.ArmDeviationExtractorSettings)
     torso_tilt_extractor: Group[nodes.TorsoTiltExtractorSettings] = Group(nodes.TorsoTiltExtractorSettings)
     bbox            : Group[BboxFeature]                     = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                    = Group(PointFeature, share=_feature_share)
