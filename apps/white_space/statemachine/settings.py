@@ -52,7 +52,7 @@ class ManualSettings(BaseSettings):
 
 class SyncSettings(BaseSettings):
     """The pose-sync condition (INTRO → INTRO_PLAY): its live telemetry and tunables."""
-    similarity: Field[float]    = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Mean pose similarity")
+    similarity: Field[float]    = Field(0.0, min=0.0, max=1.0, widget=Widget.number, access=Field.READ, description="Mean of each participant's similarity to the others present")
     in_sync:    Field[int]      = Field(0, access=Field.READ, pinned=True, description="Participants currently at or above threshold")
     threshold:  Field[float]    = Field(0.75, min=0.0, max=1.0, step=0.01, widget=Widget.slider, description="A participant counts as in sync at this pose similarity")
     mode:       Field[SyncMode] = Field(SyncMode.CROWD, description="INTRO → INTRO_PLAY: how many participants must be in sync (the crowd / all−1 / all)")

@@ -56,9 +56,9 @@ class WindowSimilaritySettings(BaseSettings):
     window_length:          Field[int]                = Field(30, min=1, max=300, description="Number of frames to compare")
     method:                 Field[AggregationMethod]  = Field(AggregationMethod.HARMONIC_MEAN, description="Aggregation method")
     use_angle_similarity:   Field[bool]               = Field(True, description="Use angle similarity")
-    angle_scale:            Field[float]              = Field(0.8, min=0.1, max=2.0, description="Angle similarity scale (rad)")
+    angle_tolerance:        Field[float]              = Field(0.8, min=0.1, max=2.0, description="Joint angles this far apart still count as similar (rad); smaller is stricter")
     use_velocity_similarity: Field[bool]              = Field(True, description="Multiply by velocity similarity")
-    vel_scale:              Field[float]              = Field(0.5, min=0.1, max=2.0, description="Velocity similarity scale (rad/frame)")
+    velocity_tolerance:     Field[float]              = Field(0.5, min=0.1, max=2.0, description="Joint velocities this far apart still count as similar (rad/s); smaller is stricter")
     use_motion_weighting:   Field[bool]               = Field(True, description="Weight similarity by motion")
     use_time_penalty:       Field[bool]               = Field(True, description="Penalize older frames in window")
     time_decay_exp:         Field[float]              = Field(1.0, min=0.1, max=4.0, description="Time decay exponent")
@@ -259,8 +259,8 @@ class WindowSimilarity:
         """
         # print(self._config)
 
-        angle_scale = self._config.angle_scale
-        vel_scale = self._config.vel_scale
+        angle_tolerance = self._config.angle_tolerance
+        velocity_tolerance = self._config.velocity_tolerance
         N, T, F = values.shape
 
         # Current frame of each person: (N, F)
@@ -274,7 +274,7 @@ class WindowSimilarity:
         # Compute angle similarity if enabled
         if self._config.use_angle_similarity:
             angular_diff = np.mod(raw_diff + np.pi, 2 * np.pi) - np.pi
-            similarity = np.exp(-np.square(angular_diff / angle_scale))
+            similarity = np.exp(-np.square(angular_diff / angle_tolerance))   # 1/e at one tolerance
         else:
             # Start with ones (neutral), NaN where input is NaN
             similarity = np.where(np.isnan(raw_diff), np.nan, 1.0)
@@ -283,7 +283,7 @@ class WindowSimilarity:
         if velocity_values is not None:
             vel_current = velocity_values[:, -1, :]  # (N, F)
             vel_diff = vel_current[:, None, None, :] - velocity_values[None, :, :, :]  # (N, N, T, F)
-            vel_sim = np.exp(-np.square(vel_diff / vel_scale))
+            vel_sim = np.exp(-np.square(vel_diff / velocity_tolerance))
             vel_sim = np.where(np.isnan(vel_sim), 1.0, vel_sim)  # missing velocity is neutral
             similarity = similarity * vel_sim  # element-wise per joint
 

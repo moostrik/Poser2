@@ -5,22 +5,32 @@ import math
 import unittest
 from types import SimpleNamespace
 
+import numpy as np
+
 from apps.white_space.light import LayerId, LightSettings, MotorMode
 from apps.white_space.statemachine import StateId, StateMachine, StateMachineSettings
 from apps.white_space.statemachine import machine as machine_module
 
 POSE_STAGE = 4
+ROW = 6            # Similarity row length: one slot per player id
 
 
 class FakeFrame:
-    """frame[PlayheadOffset].value → the stored offset; frame[Similarity].overall_similarity()
-    → the stored similarity. A pose frame is a present participant."""
-    def __init__(self, offset: float = math.nan, similarity: float = math.nan) -> None:
+    """frame[PlayheadOffset].value → the stored offset; frame[Similarity].values → a Similarity row: a
+    float fills every slot, a dict fills the given slots (NaN elsewhere). A pose frame is a present
+    participant."""
+    def __init__(self, offset: float = math.nan, similarity: float | dict[int, float] = math.nan) -> None:
         self._offset = offset
-        self._similarity = similarity
+        row = np.full(ROW, math.nan, dtype=np.float32)
+        if isinstance(similarity, dict):
+            for slot, value in similarity.items():
+                row[slot] = value
+        else:
+            row[:] = similarity
+        self._row = row
 
     def __getitem__(self, _key) -> SimpleNamespace:
-        return SimpleNamespace(value=self._offset, overall_similarity=lambda: self._similarity)
+        return SimpleNamespace(value=self._offset, values=self._row)
 
 
 class FakeBoard:
@@ -81,7 +91,8 @@ class StateMachineTest(unittest.TestCase):
             self.tick(dt=self.config.count_hold_seconds + 0.01)
 
     def set_similarities(self, values: dict[int, float]) -> None:
-        """Give the present participants' frames these overall similarities (same ids: the count holds)."""
+        """Give the present participants' frames a Similarity row reading that value to everyone (same
+        ids: the count holds)."""
         self.board.frames = {i: FakeFrame(similarity=v) for i, v in values.items()}
 
     @property
@@ -539,6 +550,19 @@ class StateMachineTest(unittest.TestCase):
         self._to_intro(participants=2)
         self.set_similarities({0: 0.9, 1: 0.9})
         self.tick()
+        self.assertEqual(self.current, StateId.INTRO)
+
+    def test_sync_ignores_absent_players_and_self(self) -> None:
+        # The row is indexed by player id and only the ids with a pose are partners: a held zero in an
+        # absent player's slot (5) and the NaN self slot do not count. A present partner at zero does, and
+        # collapses that participant's harmonic mean.
+        self._to_intro(participants=3)
+        self.board.frames = {0: FakeFrame(similarity={1: 0.9, 2: 0.9, 5: 0.0}),
+                             1: FakeFrame(similarity={0: 0.9, 2: 0.0}),
+                             2: FakeFrame(similarity=0.9)}
+        self.tick()
+        self.assertEqual(self.config.sync.in_sync, 2)
+        self.assertAlmostEqual(self.config.sync.similarity, 0.6, places=3)   # (0.9 + ~0 + 0.9) / 3
         self.assertEqual(self.current, StateId.INTRO)
 
     def test_sync_reads_the_frames_similarity(self) -> None:

@@ -22,7 +22,9 @@ from __future__ import annotations
 import math
 import time
 from dataclasses import dataclass
-from typing import Callable, Iterable
+from typing import Callable
+
+import numpy as np
 
 from modules.session import SequencerState
 from modules.pose import features, FrameDict
@@ -37,10 +39,24 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _overall_similarities(similarities: Iterable[features.Similarity]) -> list[float]:
-    """Each participant's overall similarity to the others, NaN (no data) dropped."""
-    values = (s.overall_similarity() for s in similarities)
-    return [v for v in values if not math.isnan(v)]
+_TINY = 1e-5   # the zero guard NormalizedScalarFeature uses for its harmonic mean
+
+
+def _present_similarities(frames: FrameDict) -> list[float]:
+    """Each participant's similarity to the other participants present: the harmonic mean of their
+    ``Similarity`` row at the other ids in ``frames`` (strict: one poor match pulls it down). The row is
+    indexed by player id, so the self slot and the slots of players without a pose are never read. A
+    participant with no partner, or only NaN there, is left out."""
+    ids = np.fromiter(frames.keys(), dtype=int)
+    result: list[float] = []
+    for i, frame in frames.items():
+        row = frame[features.Similarity].values
+        values = row[ids[(ids != i) & (ids < len(row))]]
+        values = values[~np.isnan(values)]
+        if values.size == 0:
+            continue
+        result.append(float(values.size / np.sum(1.0 / np.maximum(values, _TINY))))
+    return result
 
 
 @dataclass
@@ -51,8 +67,8 @@ class StateContext:
     dt:      float          # this tick's wall-clock delta (bidirectional ramps integrate these)
     dbar:    float          # this tick's bar delta
     participants: int       # debounced live participant count (ghosts excluded)
-    sync:    float          # mean pose similarity (0..1)
-    sync_count: int         # participants whose similarity is ≥ sync.threshold
+    sync:    float          # mean of the participants' similarity to the others present (0..1)
+    sync_count: int         # participants whose similarity to the others present is ≥ sync.threshold
     hit:     bool           # this tick the playhead is closest to a live participant (the flash tick)
     session: bool           # session mode active — states consult it in needs_state_change()
     blackout: bool          # the pinned blackout toggle — OFF stays put while pinned and
@@ -136,8 +152,8 @@ class StateMachine:
     # -- Inputs --------------------------------------------------------------
 
     def _sync_values(self, frames: FrameDict) -> list[float]:
-        """Each participant's overall similarity, from the ``Similarity`` feature of the pose frames."""
-        return _overall_similarities(frame[features.Similarity] for frame in frames.values())
+        """Each participant's similarity to the others present, from the pose frames' ``Similarity``."""
+        return _present_similarities(frames)
 
     def _debounced_participants(self, now: float, live_ids: set[int]) -> int:
         """Live participant count — the people with a pose — debounced by count_hold_seconds so

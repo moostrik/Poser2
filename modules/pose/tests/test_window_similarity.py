@@ -152,7 +152,7 @@ class WindowSimilarityTest(unittest.TestCase):
         ws = _similarity(window_length=1, use_motion_weighting=False, use_velocity_similarity=False,
                          remap_low=0.0, remap_high=1.0)
         sim, lead = ws._process({0: _window(_ramp()), 1: _window(_ramp(lag=T - 1))})
-        expected = math.exp(-((STEP * (T - 1)) / ws._config.angle_scale) ** 2)
+        expected = math.exp(-((STEP * (T - 1)) / ws._config.angle_tolerance) ** 2)
         self.assertAlmostEqual(sim[1][0], expected, places=5)
         self.assertAlmostEqual(sim[0][1], expected, places=5)
         self.assertEqual(lead[1][0], 0.0)
