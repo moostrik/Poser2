@@ -13,14 +13,14 @@ from modules.settings import BaseSettings, Field, Group, Widget
 
 class SyncMode(IntEnum):
     """How many participants must be in sync for INTRO → INTRO_PLAY."""
-    THREE         = 0   # at least 3 participants ≥ sync.threshold
+    CROWD         = 0        # the crowd (``states.crowd``) ≥ sync.threshold
     ALL_MINUS_ONE = auto()   # all but one
     ALL           = auto()   # everyone
 
-    def required(self, participants: int) -> int:
+    def required(self, participants: int, crowd: int) -> int:
         match self:
-            case SyncMode.THREE:         return 3
-            case SyncMode.ALL_MINUS_ONE: return max(participants - 1, 2)
+            case SyncMode.CROWD:         return crowd
+            case SyncMode.ALL_MINUS_ONE: return max(participants - 1, crowd - 1)
             case _:                      return participants
 
 
@@ -62,7 +62,7 @@ class SyncSettings(BaseSettings):
     similarity: Field[float]    = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Mean pose similarity")
     in_sync:    Field[int]      = Field(0, access=Field.READ, pinned=True, description="Participants currently at or above threshold")
     threshold:  Field[float]    = Field(0.75, min=0.0, max=1.0, step=0.01, widget=Widget.slider, description="A participant counts as in sync at this pose similarity")
-    mode:       Field[SyncMode] = Field(SyncMode.THREE, description="INTRO → INTRO_PLAY: how many participants must be in sync (3 / all−1 / all)")
+    mode:       Field[SyncMode] = Field(SyncMode.CROWD, description="INTRO → INTRO_PLAY: how many participants must be in sync (the crowd / all−1 / all)")
     source:     Field[SyncSource] = Field(SyncSource.SIMILARITY, description="Pose similarity source: window similarity, window correlation, or the pose frames")
 
 
@@ -101,7 +101,8 @@ class StateMachineSettings(BaseSettings):
     dim_level: Field[float] = Field(0.4, min=0.0, max=1.0, step=0.01, description="DIM line level: the front white lamp in INTRO, and where INTRO_PLAY and END_INTRO hold it", newline=True)
 
     # Condition tunables
-    count_hold_seconds: Field[float] = Field(1.0,  min=0.0, max=10.0, step=0.1, description="Participant-count debounce: a new count must persist this long before conditions see it", newline=True)
+    crowd:              Field[int]   = Field(3, min=2, max=16, description="Participants the show needs: this many in sync spin it up, fewer present end it", newline=True)
+    count_hold_seconds: Field[float] = Field(1.0,  min=0.0, max=10.0, step=0.1, description="Participant-count debounce: a new count must persist this long before conditions see it")
 
     sync:    Group[SyncSettings]        = Group(SyncSettings)
     manual:  Group[ManualSettings]      = Group(ManualSettings)

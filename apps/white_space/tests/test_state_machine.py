@@ -514,15 +514,40 @@ class StateMachineTest(unittest.TestCase):
         from apps.white_space.statemachine import SyncMode
         self.config.sync.mode = SyncMode.ALL
         self._to_intro(participants=4)
-        # 3 of 4 in sync: enough for THREE, not for ALL
+        # 3 of 4 in sync: enough for CROWD (3), not for ALL
         self.machine.set_similarity(SimpleNamespace(similarity={
             0: FakeSimilarity(0.9), 1: FakeSimilarity(0.9),
             2: FakeSimilarity(0.9), 3: FakeSimilarity(0.1)}))
         self.tick()
         self.assertEqual(self.current, StateId.INTRO)
-        self.config.sync.mode = SyncMode.THREE
+        self.config.sync.mode = SyncMode.CROWD
         self.tick()
         self.assertEqual(self.current, StateId.INTRO_PLAY)
+
+    def test_crowd_of_two_runs_a_two_person_show(self) -> None:
+        # The crowd is the show's size: two people in sync spin up, PLAY holds with two, and END
+        # winds back to PLAY once two are back.
+        self.config.crowd = 2
+        self._to_intro(participants=2)
+        self.machine.set_similarity(SimpleNamespace(similarity={0: FakeSimilarity(0.9), 1: FakeSimilarity(0.9)}))
+        self.tick()
+        self.assertEqual(self.current, StateId.INTRO_PLAY)
+        self.tick(dt=self.config.spin_up_seconds + 0.1)
+        self.assertEqual(self.current, StateId.PLAY)
+        self.board.is_locked = False
+        self.set_participants(1)
+        self.assertEqual(self.current, StateId.END)
+        self.tick(dbar=self.config.end_bars / 2)
+        self.set_participants(2)
+        self.tick(dbar=self.config.end_bars)
+        self.assertEqual(self.current, StateId.PLAY)
+
+    def test_default_crowd_needs_three_people(self) -> None:
+        # The default crowd of 3 keeps the three-person show: two in sync with two present never spin up.
+        self._to_intro(participants=2)
+        self.machine.set_similarity(SimpleNamespace(similarity={0: FakeSimilarity(0.9), 1: FakeSimilarity(0.9)}))
+        self.tick()
+        self.assertEqual(self.current, StateId.INTRO)
 
     def test_sync_source_selects_one_writer(self) -> None:
         from apps.white_space.statemachine import SyncSource
