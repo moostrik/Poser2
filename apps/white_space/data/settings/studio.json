@@ -226,7 +226,7 @@
     "color": false,
     "square": false,
     "stereo": false,
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "ir_flood_light": 0.75,
     "mono_auto_exposure": true,
@@ -251,8 +251,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 29992,
-        "iso": 217,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -285,8 +285,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 29992,
-        "iso": 186,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -319,8 +319,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 29992,
-        "iso": 246,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -353,8 +353,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 29992,
-        "iso": 184,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -618,7 +618,7 @@
   "light": {
     "light_rate": 30.0,
     "brightness": 1.0,
-    "debug": "OFF",
+    "debug": "pose_instrument",
     "motor_simulate": true,
     "clock": {},
     "motor": {
@@ -853,19 +853,19 @@
     "pattern": {
       "interval": 14.0,
       "octaves": 1.0,
-      "detune": 0.1,
-      "blue_phase": 0.5,
-      "phase_range": 0.5,
+      "detune": 0.22,
+      "blue_phase": -1.0,
+      "phase_range": 0.63,
       "overtone_phase_range": 0.5,
       "white": {
         "waveform": "SINE",
         "cutoff": 2,
-        "drift": 0.0
+        "drift": 0.28
       },
       "blue": {
         "waveform": "SINE",
         "cutoff": 2,
-        "drift": 0.0
+        "drift": 0.32
       }
     },
     "mask": {
@@ -875,15 +875,15 @@
       "flash_brightness": 1.0
     },
     "window": {
-      "width": 20.0,
+      "width": 33.0,
       "sync_threshold": 0.75
     },
     "events": {
-      "hit_frames": 3,
-      "tint_white": 0.3,
-      "tint_blue": 0.3,
-      "push_strength": 0.0,
-      "push_seconds": 1.0
+      "hit_frames": 1,
+      "tint_white": 0.0,
+      "tint_blue": 0.0,
+      "push_strength": 1.0,
+      "push_seconds": 0.15
     },
     "presence": {
       "attack_seconds": 1.0,
@@ -893,16 +893,16 @@
       "enabled": true,
       "azimuth": 180.0,
       "torso": 0.0,
-      "left_shoulder": 190.0,
-      "right_shoulder": 190.0,
-      "left_elbow": 166.0,
-      "right_elbow": 166.0,
+      "left_shoulder": 265.0,
+      "right_shoulder": 265.0,
+      "left_elbow": 179.0,
+      "right_elbow": 179.0,
       "left_hip": 170.0,
       "right_hip": 171.0,
       "left_knee": 188.0,
       "right_knee": 188.0,
       "morph": 0.5,
-      "pose": "raised",
+      "pose": "arms out level, a T",
       "name": ""
     }
   },
