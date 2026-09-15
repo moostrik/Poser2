@@ -244,12 +244,18 @@ hip and knee angles.
 | body bend         | −1 left → 0 upright → 1 right                            | `TorsoTilt`     |
 | symmetry, a pair  | signed, left minus right: how unequal the two sides are  | `AngleSymmetry` |
 
-The angle extractor's offsets (`modules/pose/nodes/_utils/AngleUtils.py`) define the neutral
-pose: every joint reads 0 standing with the arms hanging, and the right side is mirrored so a
-symmetric pose reads equal on both sides. The sign of an angle is the side of the body the limb
+The angle extractor measures the geometric angle between body segments, the arm against the
+torso line, mirrored on the right so a symmetric pose reads equal on both sides; what a body
+reads at neutral is its geometry, and a vertical arm is not π from it. The angle calibrator
+(`modules/pose/nodes/filters/AngleCalibrator.py`, settings `pose.angle_calibrator`) then maps
+each joint from two reference poses, the body with the arms hanging and with the arms raised,
+each held as the raw readings: every reading at neutral becomes 0; the shoulder's raised reading
+becomes π, so the fixed points are the feature's 0 and π for sound and light alike; the elbow's
+raised reading is where its straight is with the arm up, so a relaxed straight elbow reads 0 in
+both poses and π is the fold from there. The readings are tuned in the panel, against a person or
+the dummy. The sign of an angle is the side of the body the limb
 passes, outward or across, and means nothing to the instrument: the connections take the
-absolute, so an arm raised outward and one raised across the body read alike, and straight up is
-π from either side.
+absolute, so an arm raised outward and one raised across the body read alike.
 
 A **connection** is one feature into one pattern parameter. A feature may feed several parameters;
 a parameter has one source; two features never sum into one parameter. The connections are a
@@ -312,10 +318,10 @@ measures and returns the pattern parameters of both colours (`Pattern`: the inte
 detune, and an `Oscillator` per colour: the two drawbars and the two phases). It is the first
 connections table of Part 3 written out, with the ranges, the curves and the absolutes of signed
 values that a panel cannot express, and it hot-reloads on save. Every number it uses is a setting
-it reads (the rest interval, the detune's maximum, a joint's reach, a phase's range), never a
-literal, so the panel keeps the values and the code keeps the routing. The preset carries values
-only. An angle becomes a measure through its joint's reach: its absolute over the reach, since
-the sign is the side the limb passes and not a measure.
+it reads (the rest interval, the detune's maximum, a phase's range), never a literal, so the
+panel keeps the values and the code keeps the routing. The preset carries values only. An angle
+becomes a measure as its absolute over π, the feature's range, since the calibrated angle is 0 at
+neutral and π at raised, and the sign is the side the limb passes and not a measure.
 
 ### The pattern
 
@@ -387,7 +393,7 @@ for the frame. The push is above.
 holds tweakable values only, each concern a `Group` (`PoseInstrumentSettings`,
 `light/layers/projection/pose_instrument.py`): `max_lines`; `pattern`, the rests and ranges (the
 interval at rest and its octaves of bend, the detune's maximum, the blue's rest phase, the phases'
-ranges, the joints' reaches, and per colour `white` / `blue` the waveform, the cutoff and
+ranges, and per colour `white` / `blue` the waveform, the cutoff and
 the drift); `mask` (width, brightness, the playhead's level in it, the flash brightness); `window`
 (width, the sync threshold); `events` (the hit's frames, the tint per colour, the push); `presence`
 (attack, release); `dummy` (*The dummy*). The layer keeps its `blend`. No setting routes anything.
@@ -475,22 +481,24 @@ harmonic's drawbar past the fundamental's.
 ### The dummy
 
 The dummy (`pose/dummy.py`, settings `PI.dummy`) stands in for a person while the instrument is
-judged: a figure of the pipeline's 17 landmarks whose joints are turned by the panel, in degrees
-from neutral (the shoulder 0 hanging, 90 level, 180 straight up; the elbow 0 straight, 180
-folded; the hip 0 to 120, the knee 0 to 150; the torso from upright), standing at `azimuth`.
-Its sides are named as the pipeline names people's, the left on image-right, and its degrees turn
-a joint outward, which the pipeline reads as the negative angle. Its frame joins the interpolated
+judged: a figure of the pipeline's 17 landmarks whose joints are set by the panel, each joint's
+degrees the angle the angle extractor reads at it, the signed angle from the segment above to
+the limb below, the right side mirrored as the extractor mirrors it (the shoulder 0 hanging, 90
+out, 180 up; the elbow 180 straight, 0 folded; the hip 180 standing, 90 leg out level; the knee
+180 straight, 90 bent; the torso from upright), standing at `azimuth`. What is set is what the
+extractor reads. Its sides are named as the pipeline names people's, the left on image-right.
+Its frame joins the interpolated
 poses before the LERP filters at its own id, `num_players`, between the live players and the
 ghosts (which start one above it), so it is a pose like any other from there: the filters stamp
 the playhead offset, the symmetries, the leg deviation and the bend on it, the render draws its
 figure over the projection row where it stands (as it does every pose, `render.pose_figures`),
 the azimuth overlay marks it, Max plays it at its slot and the instrument lights it. Only the
 joints are set; the leg deviation and the bend are the pipeline's, derived from the figure as for
-a person. Each joint is turned by the difference between the wanted angle and what the angle
-extractor reads, so the pipeline reads back exactly the set degrees, and the extractor's offsets
-stay the one definition of neutral.
+a person, and its angles pass through the angle extractor and the calibrator as a person's do.
+What the pipeline reads of its poses is what the calibrator is read against: the preset's
+calibration is the dummy's raw readings, so its hanging arm reads 0 and its vertical arm π.
 
-Its poses are named in `data/poses.json`, seeded with the rows of Part 3, picked in the `pose`
+Its poses are named in `data/poses.json`, built up from `neutral`, picked in the `pose`
 select and saved under `name` with `save`. A change of any measure morphs over `morph` seconds
 (`easeInOutSine`), the azimuth and the arms the shortest way round, an exact opposite going up
 through the front on both sides. `enabled` is forced off at startup; in the show the dummy is

@@ -81,7 +81,8 @@ class WhiteSpaceMain:
         self.ghoster = Ghoster(self.settings.pose.ghoster, playhead=self.board.get_playhead)   # live/pool counts shared from root
         # The dummy has its own id between the live players and the ghosts; the LERP stage is
         # built one id wider for it, so it is a pose like any other from there.
-        self.dummy = Dummy(self.settings.PI.dummy, ps.angle_extractor, dummy_id(num_players), f"{DATA_PATH}/poses.json")
+        self.dummy = Dummy(self.settings.PI.dummy, ps.angle_extractor, ps.angle_calibrator, dummy_id(num_players),
+                           f"{DATA_PATH}/poses.json")
         self.video_recorder = VideoRecorder(self.settings.record.video, data_path=DATA_PATH)
 
         # CAMERA
@@ -187,6 +188,7 @@ class WhiteSpaceMain:
                 # the box's jitter cancels out of the eye azimuth. A held eye moves with the box.
                 nodes.AzimuthExtractor(self._column_to_azimuth),
                 nodes.AngleExtractor(ps.angle_extractor),
+                nodes.AngleCalibrator(ps.angle_calibrator),
                 nodes.AngleVelExtractor(ps.velocity.extractor),
             ])
             for i in range(num_players)
@@ -202,6 +204,7 @@ class WhiteSpaceMain:
             i: trackers.FilterPipeline([
                 nodes.PointEuroSmoother(ps.point.smoother),
                 nodes.AngleExtractor(ps.angle_extractor),
+                nodes.AngleCalibrator(ps.angle_calibrator),
                 nodes.AngleVelExtractor(ps.velocity.extractor),
                 nodes.AngleVelEuroSmoother(ps.velocity.smoother),
                 nodes.AngleEuroSmoother(ps.angle.smoother),

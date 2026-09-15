@@ -119,6 +119,7 @@ class DeepFlowMain:
             i: trackers.FilterPipeline([
                 nodes.PointDualConfFilter(p.point.confidence_filter),
                 nodes.AngleExtractor(p.angle_extractor),
+                nodes.AngleCalibrator(),
                 nodes.AngleVelExtractor(p.velocity.extractor),
             ])
             for i in range(num_players)
@@ -131,6 +132,7 @@ class DeepFlowMain:
             i: trackers.FilterPipeline([
                 nodes.PointEuroSmoother(p.point.smoother),
                 nodes.AngleExtractor(p.angle_extractor),
+                nodes.AngleCalibrator(),
                 nodes.AngleVelExtractor(p.velocity.extractor),
                 nodes.AngleVelEuroSmoother(p.velocity.smoother),
                 nodes.AngleEuroSmoother(p.angle.smoother),

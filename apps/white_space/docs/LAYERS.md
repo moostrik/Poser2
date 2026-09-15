@@ -30,7 +30,8 @@ A person is present while their pose exists: the pose pipeline stops posing a pe
 resets a track the moment its pose is missing. A layer adds no presence test of its own. A person's
 azimuth is the pose's `Azimuth`, at their eyes: raw from CLEAN, smoothed at SMOOTH, predicted at
 PREDICT and interpolated at LERP. Show layers and the state machine read LERP poses, the stable eye
-azimuth and its `PlayheadOffset`. Their age is the pose's `Age`. Ghosts are published to their own
+azimuth and its `PlayheadOffset`. Their angles are the calibrator's (`POSE_INSTRUMENT.md`, *The
+body*): 0 at neutral, π at raised. Their age is the pose's `Age`. Ghosts are published to their own
 board store (`get_ghosts`), not among the poses. The dummy (`POSE_INSTRUMENT.md`, *The dummy*)
 joins the poses before the LERP filters at its own id, `num_players`, so to every layer it is a
 person; the ghosts' ids start above it. The render draws every LERP pose as a figure over the

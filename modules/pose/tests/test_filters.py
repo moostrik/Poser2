@@ -12,7 +12,7 @@ from modules.pose.features import (
 )
 from modules.pose.frame import Frame
 from modules.pose.nodes import (
-    AgeExtractor, AngleEuroSmoother, AngleExtractor, AngleMotionExtractor, AngleMotionMovingAverageSmoother,
+    AgeExtractor, AngleCalibrator, AngleEuroSmoother, AngleExtractor, AngleMotionExtractor, AngleMotionMovingAverageSmoother,
     AnglePredictor, AngleStickyFiller, AngleSymExtractor, AngleVelEuroSmoother, AngleVelExtractor,
     AngleVelPredictor, AngleVelStickyFiller, AzimuthEuroSmoother, AzimuthExtractor, AzimuthPredictor,
     DualConfFilterSettings, EuroSmootherSettings, FilterNode, LeaderScoreApplicator, LegDeviationExtractor, MotionGateApplicator, MotionTimeExtractor,
@@ -35,6 +35,7 @@ def _stage_nodes() -> list[FilterNode]:
         PointStickyFiller(StickyFillerSettings()),
         AzimuthExtractor(lambda _cam, x: x),
         AngleExtractor(),
+        AngleCalibrator(),
         AngleVelExtractor(),
         PointEuroSmoother(EuroSmootherSettings()),
         AngleVelEuroSmoother(EuroSmootherSettings()),

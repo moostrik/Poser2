@@ -1,52 +1,38 @@
 {
-  "arms hanging": {
-    "azimuth": 180.0, "torso": 0.0,
-    "left_shoulder": 0.0, "right_shoulder": 0.0, "left_elbow": 0.0, "right_elbow": 0.0,
-    "left_hip": 0.0, "right_hip": 0.0, "left_knee": 0.0, "right_knee": 0.0
+  "neutral": {
+    "azimuth": 180.0,
+    "torso": 0.0,
+    "left_shoulder": 340.0,
+    "right_shoulder": 340.0,
+    "left_elbow": 192.0,
+    "right_elbow": 192.0,
+    "left_hip": 170.0,
+    "right_hip": 171.0,
+    "left_knee": 188.0,
+    "right_knee": 188.0
   },
-  "both arms up": {
-    "azimuth": 180.0, "torso": 0.0,
-    "left_shoulder": 180.0, "right_shoulder": 180.0, "left_elbow": 0.0, "right_elbow": 0.0,
-    "left_hip": 0.0, "right_hip": 0.0, "left_knee": 0.0, "right_knee": 0.0
+  "raised": {
+    "azimuth": 180.0,
+    "torso": 0.0,
+    "left_shoulder": 190.0,
+    "right_shoulder": 190.0,
+    "left_elbow": 166.0,
+    "right_elbow": 166.0,
+    "left_hip": 170.0,
+    "right_hip": 171.0,
+    "left_knee": 188.0,
+    "right_knee": 188.0
   },
-  "a T": {
-    "azimuth": 180.0, "torso": 0.0,
-    "left_shoulder": 90.0, "right_shoulder": 90.0, "left_elbow": 0.0, "right_elbow": 0.0,
-    "left_hip": 0.0, "right_hip": 0.0, "left_knee": 0.0, "right_knee": 0.0
-  },
-  "left arm up": {
-    "azimuth": 180.0, "torso": 0.0,
-    "left_shoulder": 180.0, "right_shoulder": 0.0, "left_elbow": 0.0, "right_elbow": 0.0,
-    "left_hip": 0.0, "right_hip": 0.0, "left_knee": 0.0, "right_knee": 0.0
-  },
-  "right arm up": {
-    "azimuth": 180.0, "torso": 0.0,
-    "left_shoulder": 0.0, "right_shoulder": 180.0, "left_elbow": 0.0, "right_elbow": 0.0,
-    "left_hip": 0.0, "right_hip": 0.0, "left_knee": 0.0, "right_knee": 0.0
-  },
-  "a T, both elbows folded": {
-    "azimuth": 180.0, "torso": 0.0,
-    "left_shoulder": 90.0, "right_shoulder": 90.0, "left_elbow": 180.0, "right_elbow": 180.0,
-    "left_hip": 0.0, "right_hip": 0.0, "left_knee": 0.0, "right_knee": 0.0
-  },
-  "a T, left elbow folded": {
-    "azimuth": 180.0, "torso": 0.0,
-    "left_shoulder": 90.0, "right_shoulder": 90.0, "left_elbow": 180.0, "right_elbow": 0.0,
-    "left_hip": 0.0, "right_hip": 0.0, "left_knee": 0.0, "right_knee": 0.0
-  },
-  "a T, right elbow folded": {
-    "azimuth": 180.0, "torso": 0.0,
-    "left_shoulder": 90.0, "right_shoulder": 90.0, "left_elbow": 0.0, "right_elbow": 180.0,
-    "left_hip": 0.0, "right_hip": 0.0, "left_knee": 0.0, "right_knee": 0.0
-  },
-  "a T, leaning": {
-    "azimuth": 180.0, "torso": 45.0,
-    "left_shoulder": 90.0, "right_shoulder": 90.0, "left_elbow": 0.0, "right_elbow": 0.0,
-    "left_hip": 0.0, "right_hip": 0.0, "left_knee": 0.0, "right_knee": 0.0
-  },
-  "a T, in a crouch": {
-    "azimuth": 180.0, "torso": 0.0,
-    "left_shoulder": 90.0, "right_shoulder": 90.0, "left_elbow": 0.0, "right_elbow": 0.0,
-    "left_hip": 60.0, "right_hip": 60.0, "left_knee": 90.0, "right_knee": 90.0
+  "T": {
+    "azimuth": 180.0,
+    "torso": 0.0,
+    "left_shoulder": 260.0,
+    "right_shoulder": 260.0,
+    "left_elbow": 166.0,
+    "right_elbow": 166.0,
+    "left_hip": 170.0,
+    "right_hip": 171.0,
+    "left_knee": 188.0,
+    "right_knee": 188.0
   }
 }

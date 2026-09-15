@@ -17,19 +17,6 @@ ANGLE_KEYPOINTS: dict[AngleLandmark, tuple[PointLandmark, ...]] = {
     AngleLandmark.head:           (PointLandmark.left_eye,       PointLandmark.right_eye,      PointLandmark.nose),
 }
 
-"""Rotation offsets to normalize angles to neutral body position"""
-_ANGLE_OFFSET: dict[AngleLandmark, float] = {
-    AngleLandmark.left_shoulder:   0.15 * np.pi,
-    AngleLandmark.right_shoulder: -0.15 * np.pi,
-    AngleLandmark.left_elbow:      0.9 * np.pi,
-    AngleLandmark.right_elbow:    -0.9 * np.pi,
-    AngleLandmark.left_hip:       -0.95 * np.pi,
-    AngleLandmark.right_hip:       0.95 * np.pi,
-    AngleLandmark.left_knee:       np.pi,
-    AngleLandmark.right_knee:      np.pi,
-    AngleLandmark.head:            0.0,
-}
-
 """Right-side angles that get negated for left-right symmetry"""
 _ANGLE_MIRRORED: set[AngleLandmark] = {
     AngleLandmark.right_shoulder,
@@ -44,8 +31,9 @@ class AngleUtils:
     def from_points(points: Points2D, aspect_ratio: float = 0.75, min_dist: float = 0.02) -> Angles:
         """Create angle measurements from keypoint data.
 
-        Computes joint angles from 2D keypoint positions, applies rotation offsets,
-        and mirrors right-side angles for symmetric representation.
+        Computes the geometric joint angles from 2D keypoint positions and mirrors right-side
+        angles for symmetric representation. Nothing is corrected here: the neutral pose reads
+        as the body's geometry has it, and ``AngleCalibrator`` maps it to 0.
 
         Points are scaled to isotropic space before angle computation to correct
         for non-square crop aspect ratios (e.g. 192x256 → 3:4).
@@ -81,13 +69,11 @@ class AngleUtils:
             if AngleUtils._points_too_close(P, min_dist):
                 continue  # Skip if any points are too close
 
-            rotate_by = _ANGLE_OFFSET[landmark]
-
             # Compute angle based on number of keypoints (no NaN checks needed)
             if landmark == AngleLandmark.head:
-                angle = AngleUtils._calculate_head_yaw(P[0], P[1], P[2], rotate_by)
+                angle = AngleUtils._calculate_head_yaw(P[0], P[1], P[2])
             else:
-                angle = AngleUtils._calculate_angle(P[0], P[1], P[2], rotate_by)
+                angle = AngleUtils._calculate_angle(P[0], P[1], P[2])
 
             # Mirror right-side angles for symmetric representation
             if landmark in _ANGLE_MIRRORED:
@@ -110,14 +96,13 @@ class AngleUtils:
         return False
 
     @staticmethod
-    def _calculate_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, rotate_by: float = 0) -> float:
+    def _calculate_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray) -> float:
         """Calculate signed angle between three points (assumes valid input).
 
         Args:
             p1: First point coordinates [x, y] (must be valid)
             p2: Second point (vertex) coordinates [x, y] (must be valid)
             p3: Third point coordinates [x, y] (must be valid)
-            rotate_by: Rotation offset in radians
 
         Returns:
             Angle in radians in range [-π, π)
@@ -128,23 +113,18 @@ class AngleUtils:
         dot: float = np.dot(v1, v2)
         det: float = v1[0] * v2[1] - v1[1] * v2[0]
         angle: float = np.arctan2(det, dot)
-
-        angle += rotate_by
         angle = ((angle + np.pi) % (2 * np.pi)) - np.pi
 
         return float(angle)
 
     @staticmethod
-    def _calculate_head_yaw(left_eye: np.ndarray, right_eye: np.ndarray,
-                            nose: np.ndarray,
-                            rotate_by: float = 0) -> float:
+    def _calculate_head_yaw(left_eye: np.ndarray, right_eye: np.ndarray, nose: np.ndarray) -> float:
         """Calculate head yaw using eyes and nose (assumes valid input).
 
         Args:
             left_eye: Left eye coordinates [x, y] (must be valid)
             right_eye: Right eye coordinates [x, y] (must be valid)
             nose: Nose coordinates [x, y] (must be valid)
-            rotate_by: Rotation offset in radians
 
         Returns:
             Yaw angle in radians [-π, π), or NaN if eye_width is 0
@@ -155,8 +135,6 @@ class AngleUtils:
         if eye_width > 0:
             offset_x = (nose[0] - eye_midpoint[0]) / eye_width
             yaw = np.arctan(offset_x)
-
-            yaw += rotate_by
             yaw = ((yaw + np.pi) % (2 * np.pi)) - np.pi
 
             return float(yaw)

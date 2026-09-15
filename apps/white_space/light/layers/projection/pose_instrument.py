@@ -60,15 +60,13 @@ class PatternSettings(BaseSettings):
     blue_phase:           Field[float] = Field(0.5,             min=-1.0, max=1.0,  step=0.01, description="Blue's rest phase from white's (intervals)")
     phase_range:          Field[float] = Field(0.5,             min=-1.0, max=1.0,  step=0.01, description="How far a measure moves the lines (intervals)")
     overtone_phase_range: Field[float] = Field(0.5,             min=-1.0, max=1.0,  step=0.01, description="How far a measure moves the overtone (intervals)")
-    shoulder_reach:       Field[float] = Field(math.pi,         min=0.1,  max=math.tau, step=0.01, description="Shoulder travel from hanging to the drawbar fully out (rad)", newline=True)
-    elbow_reach:          Field[float] = Field(math.pi,         min=0.1,  max=math.tau, step=0.01, description="Elbow travel from straight to fully folded (rad)")
     white:                Group[OscillatorSettings] = Group(OscillatorSettings)
     blue:                 Group[OscillatorSettings] = Group(OscillatorSettings)
 
 
 class MaskSettings(BaseSettings):
     """The dim blue mask at the person."""
-    width:            Field[float] = Field(3.0, min=0.1, max=36.0, step=0.1,  description="Mask width (deg, scaled by pose length)")
+    width:            Field[float] = Field(3.0, min=0.1, max=36.0, step=0.1,  description="Mask width (deg)")
     brightness:       Field[float] = Field(0.3, min=0.0, max=1.0,  step=0.01, description="Mask blue level")
     playhead_at_mask: Field[float] = Field(0.3, min=0.0, max=1.0,  step=0.01, description="Playhead level inside a mask (fraction)")
     flash_brightness: Field[float] = Field(1.0, min=0.0, max=1.0,  step=0.01, description="Mask blue level on a hit")
@@ -293,22 +291,23 @@ class PoseInstrument(ProjectionLayer):
         - the symmetries: unconnected
         """
         S = self._instrument.pattern
-        fundamental = self._measure(p.left_shoulder, S.shoulder_reach)
-        harmonic = self._measure(p.right_shoulder, S.shoulder_reach)
+        fundamental = self._measure(p.left_shoulder)
+        harmonic = self._measure(p.right_shoulder)
         white = Oscillator(fundamental, harmonic,
-                           phase=self._measure(p.left_elbow, S.elbow_reach) * S.phase_range,
-                           overtone_phase=self._measure(p.right_elbow, S.elbow_reach) * S.overtone_phase_range)
+                           phase=self._measure(p.left_elbow) * S.phase_range,
+                           overtone_phase=self._measure(p.right_elbow) * S.overtone_phase_range)
         blue = Oscillator(1.0 - fundamental, 1.0 - harmonic, phase=S.blue_phase, overtone_phase=0.0)
         interval = S.interval * 2.0 ** (min(max(p.tilt, -1.0), 1.0) * S.octaves)
         detune = S.detune * min(max(p.legs, 0.0), 1.0)
         return Pattern(interval, detune, white, blue)
 
     @staticmethod
-    def _measure(angle: float, reach: float) -> float:
-        """An angle as a measure 0..1 over its travel from neutral (the pipeline's 0). The sign
-        is the side of the body the limb passes, which the design gives no meaning, so the
-        absolute is taken: straight up is π from either side."""
-        return min(max(abs(angle) / reach, 0.0), 1.0)
+    def _measure(angle: float) -> float:
+        """An angle as a measure 0..1: the pipeline's angles are calibrated so neutral is 0 and
+        the raised pose π (``AngleCalibrator``), and π is the feature's range, not a tunable. The
+        sign is the side of the body the limb passes, which the design gives no meaning, so the
+        absolute is taken."""
+        return min(max(abs(angle) / math.pi, 0.0), 1.0)
 
     # -- Window and sync ------------------------------------------------------------
 

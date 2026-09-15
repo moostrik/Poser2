@@ -19,7 +19,7 @@ from modules.pose.features import (
 )
 from modules.pose.frame import FrameDict
 from modules.pose.nodes import (
-    AgeExtractor, AngleChaseInterpolator, AngleEuroSmoother, AngleExtractor, AngleExtractorSettings,
+    AgeExtractor, AngleCalibrator, AngleCalibratorSettings, AngleChaseInterpolator, AngleEuroSmoother, AngleExtractor, AngleExtractorSettings,
     AngleMotionExtractor, AngleMotionExtractorSettings, AngleMotionMovingAverageSmoother, AnglePredictor,
     AngleStickyFiller, AngleSymExtractor, AngleVelChaseInterpolator, AngleVelEuroSmoother, AngleVelExtractor,
     AngleVelExtractorSettings, AngleVelPredictor, AngleVelStickyFiller, AzimuthChaseInterpolator,
@@ -49,6 +49,7 @@ class _Settings:
         self.confidence = DualConfFilterSettings()
         self.point_sticky = StickyFillerSettings()
         self.angle_extractor = AngleExtractorSettings()
+        self.angle_calibrator = AngleCalibratorSettings()
         self.velocity_extractor = AngleVelExtractorSettings()
         self.point_smoother = EuroSmootherSettings()
         self.velocity_smoother = EuroSmootherSettings()
@@ -83,6 +84,7 @@ class _Stages:
             PointStickyFiller(ps.point_sticky),
             AzimuthExtractor(lambda _cam, x: x),
             AngleExtractor(ps.angle_extractor),
+            AngleCalibrator(ps.angle_calibrator),
             AngleVelExtractor(ps.velocity_extractor),
         ]) for i in tracks})
 
@@ -91,6 +93,7 @@ class _Stages:
         self.smooth = FilterTracker({i: FilterPipeline([
             PointEuroSmoother(ps.point_smoother),
             AngleExtractor(ps.angle_extractor),
+            AngleCalibrator(ps.angle_calibrator),
             AngleVelExtractor(ps.velocity_extractor),
             AngleVelEuroSmoother(ps.velocity_smoother),
             AngleEuroSmoother(ps.angle_smoother),

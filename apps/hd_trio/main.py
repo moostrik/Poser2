@@ -148,6 +148,7 @@ class HDTrioMain:
             i: trackers.FilterPipeline([
                 nodes.PointDualConfFilter(ps.point.confidence_filter),
                 nodes.AngleExtractor(ps.angle_extractor),
+                nodes.AngleCalibrator(),
                 nodes.AngleVelExtractor(ps.velocity.extractor),
             ])
             for i in range(num_players)
@@ -163,6 +164,7 @@ class HDTrioMain:
             i: trackers.FilterPipeline([
                 nodes.PointEuroSmoother(ps.point.smoother),
                 nodes.AngleExtractor(ps.angle_extractor),
+                nodes.AngleCalibrator(),
                 nodes.AngleVelExtractor(ps.velocity.extractor),
                 nodes.AngleVelEuroSmoother(ps.velocity.smoother),
                 nodes.AngleEuroSmoother(ps.angle.smoother),

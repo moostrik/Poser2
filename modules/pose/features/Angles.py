@@ -11,11 +11,14 @@ Coordinate System Design:
 -------------------------
 AngleFeature uses a normalized coordinate system where:
 
-1. **Normalization (Rotation Offsets)**:
-   - All angles are rotated relative to a neutral standing position
-   - Example: Elbow at 0° = neutral position (slightly bent), not raw geometric angle
-   - Applied via rotation offsets per landmark (see AngleFactory._ANGLE_OFFSET)
-   - Each landmark has a specific offset to define its "neutral" state
+1. **Calibration (AngleCalibrator)**:
+   - The extractor measures the geometric angle between body segments (the arm against the
+     torso line); the calibrator then maps each joint from two reference poses in its settings,
+     the body with the arms hanging and with the arms raised: every reading at neutral becomes 0;
+     the shoulder's raised reading becomes π in magnitude, so 0 = hanging and π = straight up
+     hold by calibration; the elbow's raised reading is where its straight is with the arm up,
+     so a relaxed straight elbow reads 0 in both poses and π is the geometric fold from there
+   - The legs are neutralised only; their full poses are the leg deviation's
 
 2. **Mirroring (Right-Side Negation)**:
    - Right-side angles are negated for symmetric representation

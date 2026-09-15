@@ -16,6 +16,7 @@ from .applicators.SimilarityApplicator import   SimilarityApplicator, Similarity
 from .applicators.LeaderScoreApplicator import  LeaderScoreApplicator, LeaderScoreApplicatorSettings
 from .applicators.MotionGateApplicator import   MotionGateApplicator, MotionGateApplicatorSettings
 
+from .filters.AngleCalibrator import            AngleCalibrator, AngleCalibratorSettings
 from .filters.ConfidenceFilters import          ConfidenceFilterSettings,     BBoxConfidenceFilter,   PointConfidenceFilter,  AngleConfidenceFilter,  AngleVelConfidenceFilter,   AngleSymConfFilter
 from .filters.DualConfidenceFilters import      DualConfFilterSettings,       BBoxDualConfFilter,     PointDualConfFilter,    AngleDualConfFilter,    AngleVelDualConfFilter,     AngleSymDualConfidenceFilter
 from .filters.Predictors import                 PredictorSettings,    PredictionMethod,   BBoxPredictor,     PointPredictor,     AnglePredictor,     AngleVelPredictor,      AngleSymPredictor,      AzimuthPredictor

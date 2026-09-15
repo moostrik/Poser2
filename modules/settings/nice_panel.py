@@ -515,14 +515,20 @@ def _build_text_select(settings, name, field, polls):
 
     if not is_disabled:
         def on_select_change(e):
+            if e.value is None:         # the select clears itself when its options change; not a choice
+                return
             setattr(settings, name, e.value)
         sel.on_value_change(on_select_change)
 
     polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v)))
-    # Add a custom poll for the options field too
+    # Add a custom poll for the options field too; re-apply the value the new options may have cleared
     if options_field:
-        polls.append((settings, options_field.name, [list(option_list)],
-                       lambda v, s=sel: (setattr(s, 'options', v), s.update())))
+        def on_options_change(v, s=sel):
+            s.options = v
+            s.update()
+            current = getattr(settings, name)
+            s.set_value(current if current in v else None)
+        polls.append((settings, options_field.name, [list(option_list)], on_options_change))
 
 
 @widget_builder(Widget.radio)

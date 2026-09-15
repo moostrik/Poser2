@@ -3,7 +3,7 @@
   "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "render_fps": 60.0,
+  "render_fps": 47.0,
   "light_resolution": 3600,
   "fov": 127.0,
   "resolution": "P720",
@@ -35,8 +35,8 @@
     },
     "data": {
       "stage": "LERP",
-      "mode": "NONE",
-      "feature_field": "MotionGate",
+      "mode": "WINDOW",
+      "feature_field": "Angles",
       "line_width": 3.0,
       "line_smooth": 10.0,
       "use_scores": false,
@@ -45,7 +45,7 @@
     },
     "playhead_data": {
       "stage": "LERP",
-      "mode": "WINDOW",
+      "mode": "NONE",
       "feature_field": "PlayheadOffset",
       "line_width": 10.0,
       "line_smooth": 0.0,
@@ -424,6 +424,16 @@
     "angle_extractor": {
       "aspect_ratio": 0.75
     },
+    "angle_calibrator": {
+      "neutral": false,
+      "shoulder_neutral": -0.3491,
+      "elbow_neutral": -2.9322,
+      "hip_neutral": 2.9671,
+      "knee_neutral": -3.002,
+      "raised": false,
+      "shoulder_raised": -2.9671,
+      "elbow_raised": 2.8972
+    },
     "leg_deviation_extractor": {
       "hip_rad": 1.0471975511965976,
       "knee_rad": 1.5707963267948966,
@@ -606,7 +616,7 @@
   "light": {
     "light_rate": 30.0,
     "brightness": 1.0,
-    "debug": "pose_instrument",
+    "debug": "OFF",
     "motor_simulate": true,
     "clock": {},
     "motor": {
@@ -845,8 +855,6 @@
       "blue_phase": 0.5,
       "phase_range": 0.5,
       "overtone_phase_range": 0.5,
-      "shoulder_reach": 3.141592653589793,
-      "elbow_reach": 3.141592653589793,
       "white": {
         "waveform": "SINE",
         "cutoff": 2,
@@ -880,17 +888,17 @@
       "release_seconds": 1.5
     },
     "dummy": {
-      "enabled": false,
+      "enabled": true,
       "azimuth": 180.0,
       "torso": 0.0,
       "left_shoulder": 0.0,
       "right_shoulder": 0.0,
-      "left_elbow": 0.0,
-      "right_elbow": 0.0,
-      "left_hip": 0.0,
-      "right_hip": 0.0,
-      "left_knee": 0.0,
-      "right_knee": 0.0,
+      "left_elbow": 180.0,
+      "right_elbow": 180.0,
+      "left_hip": 180.0,
+      "right_hip": 180.0,
+      "left_knee": 180.0,
+      "right_knee": 180.0,
       "morph": 0.5,
       "pose": "",
       "name": ""
