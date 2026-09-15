@@ -252,7 +252,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 375,
+        "iso": 217,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -286,7 +286,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 208,
+        "iso": 186,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -320,7 +320,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 328,
+        "iso": 246,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -354,7 +354,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 347,
+        "iso": 184,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -890,19 +890,19 @@
       "release_seconds": 1.5
     },
     "dummy": {
-      "enabled": false,
+      "enabled": true,
       "azimuth": 180.0,
       "torso": 0.0,
-      "left_shoulder": 340.0,
-      "right_shoulder": 340.0,
-      "left_elbow": 192.0,
-      "right_elbow": 192.0,
+      "left_shoulder": 190.0,
+      "right_shoulder": 190.0,
+      "left_elbow": 166.0,
+      "right_elbow": 166.0,
       "left_hip": 170.0,
       "right_hip": 171.0,
       "left_knee": 188.0,
       "right_knee": 188.0,
       "morph": 0.5,
-      "pose": "neutral",
+      "pose": "raised",
       "name": ""
     }
   },

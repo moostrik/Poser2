@@ -2,15 +2,16 @@
 
 The dummy stands in for a person while the pose instrument is judged (``docs/POSE_INSTRUMENT.md``,
 *The dummy*): a standing figure of the pipeline's 17 landmarks whose joints are set by the
-``PI.dummy`` settings, each joint's degrees the angle the angle extractor reads at it (the shoulder
-0 hanging, 90 out, 180 up; the elbow 180 straight, 0 folded; the hip 180 standing; the knee 180
-straight), and whose frame enters the LERP stage before the filters, so it is extracted, drawn,
-heard in Max and lit exactly as a person is.
-Only the joints and the torso are set: the leg deviation and the body bend are the pipeline's,
-derived from the figure as for a person, and the pipeline's readings of its poses are what the
-angle calibrator is read against. Its poses are named in ``data/poses.json``, seeded with the design's pose
-results; a change of any measure morphs over ``morph`` seconds, the shortest way round for the
-azimuth and the arms.
+``PI.dummy`` settings, each joint's degrees the angle the angle extractor reads at it when the
+figure is upright (the shoulder 0 hanging, 90 across, 180 up, 270 out; the elbow 180 straight,
+0 folded; the hip 180 standing; the knee 180 straight), and whose frame enters the LERP stage
+before the filters, so it is extracted, drawn, heard in Max and lit exactly as a person is.
+The torso leans the upper body over standing legs, as a person leans: the arms still read as set,
+the hips read off by the lean. Only the joints and the torso are set: the leg deviation and the
+body bend are the pipeline's, derived from the figure as for a person, and the pipeline's readings
+of its poses are what the angle calibrator is read against. Its poses are named in
+``data/poses.json``, seeded with the rows of the design's pose results; a change of any measure
+morphs over ``morph`` seconds, the shortest way round for the azimuth and the joints.
 """
 
 from __future__ import annotations
@@ -39,9 +40,9 @@ class DummySettings(BaseSettings):
     """The dummy: where it stands and how its joints are turned, in degrees from neutral."""
     enabled:        Field[bool]      = Field(False, description="Put the dummy in the pose pipeline")
     azimuth:        Field[float]     = Field(180.0, min=0.0,   max=360.0, step=1.0, description="Where the dummy stands (deg)")
-    torso:          Field[float]     = Field(0.0,   min=-90.0, max=90.0,  step=1.0, description="Upper body from upright, positive to image right (deg)")
-    left_shoulder:  Field[float]     = Field(0.0,   min=0.0,   max=360.0, step=1.0, description="Shoulder angle as the extractor reads it: 0 hanging, 90 out, 180 up (deg)", newline=True)
-    right_shoulder: Field[float]     = Field(0.0,   min=0.0,   max=360.0, step=1.0, description="Shoulder angle as the extractor reads it: 0 hanging, 90 out, 180 up (deg)")
+    torso:          Field[float]     = Field(0.0,   min=-90.0, max=90.0,  step=1.0, description="Upper body leaned over standing legs, positive to image right (deg)")
+    left_shoulder:  Field[float]     = Field(0.0,   min=0.0,   max=360.0, step=1.0, description="Shoulder angle as the extractor reads it: 0 hanging, 90 across, 180 up, 270 out (deg)", newline=True)
+    right_shoulder: Field[float]     = Field(0.0,   min=0.0,   max=360.0, step=1.0, description="Shoulder angle as the extractor reads it: 0 hanging, 90 across, 180 up, 270 out (deg)")
     left_elbow:     Field[float]     = Field(180.0, min=0.0,   max=360.0, step=1.0, description="Elbow angle as the extractor reads it: 180 straight, 0 folded (deg)")
     right_elbow:    Field[float]     = Field(180.0, min=0.0,   max=360.0, step=1.0, description="Elbow angle as the extractor reads it: 180 straight, 0 folded (deg)")
     left_hip:       Field[float]     = Field(180.0, min=0.0,   max=360.0, step=1.0, description="Hip angle as the extractor reads it: 180 standing, 90 leg out level (deg)", newline=True)
@@ -122,12 +123,15 @@ _JOINTS: dict[str, tuple[PointLandmark, list[PointLandmark], bool]] = {
     'right_knee':     (_P.right_knee,     [_P.right_ankle],                 False),
 }
 # The point the extractor measures each joint's angle from (its first keypoint), joints nearer the
-# torso first, so a joint's chain carries the joints after it.
-_PROXIMAL: tuple[tuple[str, PointLandmark], ...] = (
-    ('left_shoulder',  _P.left_hip),      ('right_shoulder', _P.right_hip),
+# torso first, so a joint's chain carries the joints after it. The legs are aimed against the
+# upright torso line, before the torso leans; the arms against the leaning one.
+_LEGS: tuple[tuple[str, PointLandmark], ...] = (
     ('left_hip',       _P.left_shoulder), ('right_hip',      _P.right_shoulder),
-    ('left_elbow',     _P.left_shoulder), ('right_elbow',    _P.right_shoulder),
     ('left_knee',      _P.left_hip),      ('right_knee',     _P.right_hip),
+)
+_ARMS: tuple[tuple[str, PointLandmark], ...] = (
+    ('left_shoulder',  _P.left_hip),      ('right_shoulder', _P.right_hip),
+    ('left_elbow',     _P.left_shoulder), ('right_elbow',    _P.right_shoulder),
 )
 
 
@@ -213,22 +217,30 @@ class Dummy(FrameDictCallbackMixin):
     @staticmethod
     def points(m: Measures, aspect_ratio: float) -> Points2D:
         """The figure with its joints at the angles of ``m``, as the angle extractor measures
-        them: each joint's degrees are the signed angle from the segment above it (the torso line
-        for the shoulder and the hip, the upper arm for the elbow, the thigh for the knee) to the
-        limb below, the right side mirrored as the extractor mirrors it, so what is set is what
-        the extractor reads. The upper body is first turned about the hip midpoint by the torso;
-        then each limb's chain is turned about its joint from where it points to where it should,
-        the joints nearer the torso first."""
+        them when the figure is upright: each joint's degrees are the signed angle from the
+        segment above it (the torso line for the shoulder and the hip, the upper arm for the
+        elbow, the thigh for the knee) to the limb below, the right side mirrored as the extractor
+        mirrors it, so what is set is what the extractor reads. Each limb's chain is turned about
+        its joint from where it points to where it should, the joints nearer the torso first: the
+        legs against the upright torso line, then the upper body is leaned about the hip midpoint
+        by the torso over the standing legs, then the arms against the leaning torso line. So a
+        lean leaves the arms reading as set and moves the hips' reading by the lean, as a
+        person's."""
         xy = np.array([_FIGURE[lm] for lm in PointLandmark], dtype=np.float64)
+        Dummy._aim_joints(xy, m, _LEGS)
         pivot = (xy[_P.left_hip] + xy[_P.right_hip]) / 2.0
         Dummy._turn(xy, pivot, _UPPER, math.radians(m.torso))
-        for name, proximal in _PROXIMAL:
+        Dummy._aim_joints(xy, m, _ARMS)
+        return Dummy._points2d(xy, aspect_ratio)
+
+    @staticmethod
+    def _aim_joints(xy: np.ndarray, m: Measures, joints: tuple[tuple[str, PointLandmark], ...]) -> None:
+        for name, proximal in joints:
             joint, chain, left = _JOINTS[name]
             angle = math.radians(getattr(m, name)) * (1.0 if left else -1.0)
             above = Dummy._unit(xy[proximal] - xy[joint])              # the extractor's first vector
             c, s = math.cos(angle), math.sin(angle)
             Dummy._aim(xy, joint, chain, np.array([c * above[0] - s * above[1], s * above[0] + c * above[1]]))
-        return Dummy._points2d(xy, aspect_ratio)
 
     @staticmethod
     def _aim(xy: np.ndarray, joint: PointLandmark, chain: list[PointLandmark], direction: np.ndarray) -> None:

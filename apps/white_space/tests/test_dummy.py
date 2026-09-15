@@ -30,7 +30,9 @@ def wrap(angle: float) -> float:
 
 POSES_FILE = json.loads(POSES.read_text(encoding='utf-8'))
 NEUTRAL = Measures(**POSES_FILE['neutral'])                     # the saved neutral: a body's, not the extractor's zero
-UP = replace(NEUTRAL, left_shoulder=180.0, right_shoulder=180.0, left_elbow=180.0, right_elbow=180.0)
+UP = Measures(**POSES_FILE['raised'])                           # the calibrator's two reference poses
+ROWS = ('neutral', 'raised', 'arms out level, a T', 'left arm up, right hanging', 'right arm up, left hanging',
+        'a T, both elbows folded', 'a T, left elbow folded', 'a T, right elbow folded', 'a T, leaning', 'a T, in a crouch')
 
 
 def from_neutral(**deltas: float) -> Measures:
@@ -58,10 +60,10 @@ class FigureTest(unittest.TestCase):
     def test_the_default_reads_as_set(self) -> None:
         self._assert_reads_as_set(Measures())
 
-    def test_every_saved_pose_reads_as_set(self) -> None:
+    def test_every_saved_pose_reads_as_set_when_upright(self) -> None:
         for name, values in POSES_FILE.items():
             with self.subTest(pose=name):
-                self._assert_reads_as_set(Measures(**values))
+                self._assert_reads_as_set(replace(Measures(**values), torso=0.0))   # a lean moves the hips' reading
 
     def test_the_arms_read_as_set_round_the_circle(self) -> None:
         for degrees in range(0, 360, 30):
@@ -69,9 +71,22 @@ class FigureTest(unittest.TestCase):
                 self._assert_reads_as_set(Measures(left_shoulder=degrees, right_shoulder=(degrees + 90) % 360,
                                                    left_elbow=(degrees + 180) % 360, right_elbow=(degrees + 45) % 360))
 
-    def test_a_mixed_pose_reads_as_set_with_the_torso_leaning(self) -> None:
-        self._assert_reads_as_set(Measures(torso=30.0, left_shoulder=45.0, right_shoulder=135.0, left_elbow=60.0,
-                                           right_elbow=250.0, left_hip=150.0, right_hip=100.0, left_knee=120.0, right_knee=45.0))
+    def test_a_mixed_pose_reads_as_set(self) -> None:
+        self._assert_reads_as_set(Measures(left_shoulder=45.0, right_shoulder=135.0, left_elbow=60.0, right_elbow=250.0,
+                                           left_hip=150.0, right_hip=100.0, left_knee=120.0, right_knee=45.0))
+
+    def test_the_arms_read_as_set_under_a_lean(self) -> None:
+        read = self._read(Measures(torso=30.0, left_shoulder=45.0, right_shoulder=135.0, left_elbow=60.0, right_elbow=250.0))
+        for name, degrees in (('left_shoulder', 45.0), ('right_shoulder', 135.0), ('left_elbow', 60.0), ('right_elbow', 250.0)):
+            with self.subTest(joint=name):
+                self.assertAlmostEqual(wrap(float(read[AngleLandmark[name]]) - math.radians(degrees)), 0.0, delta=1e-3)
+
+    def test_the_legs_stand_still_under_a_lean(self) -> None:
+        legs = dict(left_hip=150.0, right_hip=100.0, left_knee=120.0, right_knee=45.0)
+        upright, leaning = Dummy.points(Measures(**legs), 1.0).values, Dummy.points(Measures(torso=30.0, **legs), 1.0).values
+        for lm in (P.left_hip, P.right_hip, P.left_knee, P.right_knee, P.left_ankle, P.right_ankle):
+            with self.subTest(landmark=lm.name):
+                np.testing.assert_allclose(leaning[lm], upright[lm], atol=1e-6)
 
     def test_the_sides_are_named_as_the_pipeline_names_people(self) -> None:
         points = Dummy.points(Measures(), 1.0).values
@@ -156,6 +171,33 @@ class ReadingsTest(unittest.TestCase):
             with self.subTest(torso=torso):
                 self.assertAlmostEqual(self._read(Measures(torso=torso))[TorsoTilt].value, bend, delta=1e-3)
 
+    def test_the_rows_read_as_the_results_table(self) -> None:
+        def row(name: str) -> Frame:
+            return self._read(Measures(**POSES_FILE[name]))
+
+        def shoulders(f: Frame) -> tuple[float, float]:
+            a = f[Angles]
+            return abs(a[AngleLandmark.left_shoulder]) / math.pi, abs(a[AngleLandmark.right_shoulder]) / math.pi
+
+        def elbows(f: Frame) -> tuple[float, float]:
+            a = f[Angles]
+            return abs(a[AngleLandmark.left_elbow]) / math.pi, abs(a[AngleLandmark.right_elbow]) / math.pi
+
+        t = row('arms out level, a T')
+        np.testing.assert_allclose(shoulders(t), (0.5, 0.5), atol=0.02)          # half registration by construction
+        np.testing.assert_allclose(elbows(t), (0.0, 0.0), atol=0.02)
+        np.testing.assert_allclose(shoulders(row('left arm up, right hanging')), (1.0, 0.0), atol=0.02)
+        np.testing.assert_allclose(shoulders(row('right arm up, left hanging')), (0.0, 1.0), atol=0.02)
+        np.testing.assert_allclose(elbows(row('a T, both elbows folded')), (1.0, 1.0), atol=0.02)
+        np.testing.assert_allclose(elbows(row('a T, left elbow folded')), (1.0, 0.0), atol=0.02)
+        np.testing.assert_allclose(elbows(row('a T, right elbow folded')), (0.0, 1.0), atol=0.02)
+        leaning = row('a T, leaning')
+        self.assertAlmostEqual(leaning[TorsoTilt].value, 1.0, delta=0.02)
+        self.assertAlmostEqual(leaning[LegDeviation].value, 0.75, delta=0.05)     # the lean moves the hips' reading
+        crouch = row('a T, in a crouch')
+        self.assertAlmostEqual(crouch[LegDeviation].value, 1.0, delta=0.02)
+        self.assertAlmostEqual(crouch[TorsoTilt].value, 0.0, delta=0.02)
+
     def test_the_legs_read_as_the_leg_deviation(self) -> None:
         for hips, knees, deviation in ((0.0, 0.0, 0.0), (-30.0, -45.0, 0.5), (-60.0, -90.0, 1.0)):   # from neutral
             with self.subTest(hips=hips, knees=knees):
@@ -182,8 +224,8 @@ class DummyTest(unittest.TestCase):
     def test_the_poses_file_fills_the_select(self) -> None:
         self.assertEqual(self.cfg.poses, ['up'])
 
-    def test_the_shipped_poses_hold_a_neutral(self) -> None:
-        self.assertIn('neutral', POSES_FILE)
+    def test_the_shipped_poses_are_the_rows_of_the_results_table(self) -> None:
+        self.assertEqual(tuple(POSES_FILE), ROWS)
 
     def test_the_dummy_starts_in_the_saved_neutral(self) -> None:
         self.path.write_text(json.dumps({'up': {'left_shoulder': 180.0}, 'neutral': {'left_shoulder': 340.0, 'left_hip': 170.0}}), encoding='utf-8')

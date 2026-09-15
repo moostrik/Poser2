@@ -208,12 +208,15 @@ may drive more than one parameter, and a parameter may stay fixed.
 The poses we check against: each with the light it should produce under the meanings of Part 2.
 The list is the acceptance set, small on purpose; on the machine each row is a thing to stand in
 and look at, and a test. The rows are the dummy's saved poses (`data/poses.json`, *The dummy*),
-so each is one pick in the panel. Every pose between the rows is unique and is not described.
+so each is one pick in the panel. The first two are the calibrator's reference poses, `neutral`
+(arms hanging, standing) and `raised` (arms up); the others are built on them, the T halfway along
+the calibrator's shoulder arc from neutral to raised, so it reads half registration by
+construction. Every pose between the rows is unique and is not described.
 
 | Pose                                        | Result                                                         |
 |---------------------------------------------|----------------------------------------------------------------|
-| arms hanging, standing straight             | full blue over the window: the blue ping                       |
-| both arms straight up                       | full white over the window, no blue: the bass                  |
+| neutral                                     | full blue over the window: the blue ping                       |
+| raised                                      | full white over the window, no blue: the bass                  |
 | arms out level, a T                         | white lines with sub-lines, blue between: half registration    |
 | left arm up, right hanging                  | thick white lines, no sub-lines: the fundamental alone         |
 | right arm up, left hanging                  | thin white sub-lines only: the harmonic alone                  |
@@ -463,8 +466,8 @@ under the level a shape is a thickness.
 
 | Pose                                        | Draws now                                                                   |
 |---------------------------------------------|-----------------------------------------------------------------------------|
-| arms hanging, standing straight             | full blue over the window: the blue ping                                    |
-| both arms straight up                       | full white over the window, no blue: the bass                               |
+| neutral                                     | full blue over the window: the blue ping                                    |
+| raised                                      | full white over the window, no blue: the bass                               |
 | arms out level, a T                         | white lines a third of the interval, blue lines between; no sub-line yet    |
 | left arm up, right hanging                  | white lines half the interval, one per interval; blue sub-lines             |
 | right arm up, left hanging                  | white sub-lines a quarter of the interval, two per interval; blue lines     |
@@ -482,11 +485,14 @@ harmonic's drawbar past the fundamental's.
 
 The dummy (`pose/dummy.py`, settings `PI.dummy`) stands in for a person while the instrument is
 judged: a figure of the pipeline's 17 landmarks whose joints are set by the panel, each joint's
-degrees the angle the angle extractor reads at it, the signed angle from the segment above to
-the limb below, the right side mirrored as the extractor mirrors it (the shoulder 0 hanging, 90
-out, 180 up; the elbow 180 straight, 0 folded; the hip 180 standing, 90 leg out level; the knee
-180 straight, 90 bent; the torso from upright), standing at `azimuth`. What is set is what the
-extractor reads. Its sides are named as the pipeline names people's, the left on image-right.
+degrees the angle the angle extractor reads at it when the figure is upright, the signed angle
+from the segment above to the limb below, the right side mirrored as the extractor mirrors it
+(the shoulder 0 hanging, 90 across the body, 180 up, 270 out; the elbow 180 straight, 0 folded;
+the hip 180 standing, 90 leg out level; the knee 180 straight, 90 bent), standing at `azimuth`.
+What is set is what the extractor reads. The `torso` leans the upper body over standing legs, as
+a person leans: the arms, measured against the leaning torso line, still read as set; the hips
+read off neutral by the lean, as a person's do. Its sides are named as the pipeline names
+people's, the left on image-right.
 Its frame joins the interpolated
 poses before the LERP filters at its own id, `num_players`, between the live players and the
 ghosts (which start one above it), so it is a pose like any other from there: the filters stamp
@@ -498,7 +504,7 @@ a person, and its angles pass through the angle extractor and the calibrator as 
 What the pipeline reads of its poses is what the calibrator is read against: the preset's
 calibration is the dummy's raw readings, so its hanging arm reads 0 and its vertical arm π.
 
-Its poses are named in `data/poses.json`, built up from `neutral`, picked in the `pose`
+Its poses are named in `data/poses.json`, the rows of *Pose results*, picked in the `pose`
 select and saved under `name` with `save`. A change of any measure morphs over `morph` seconds
 (`easeInOutSine`), the azimuth and the arms the shortest way round, an exact opposite going up
 through the front on both sides. `enabled` is forced off at startup; in the show the dummy is
@@ -515,6 +521,9 @@ Meaning:
 
 - The elbows at the fixed points (*Pose results*): with the arms hanging the white is silent, so a
   folded elbow shows nothing; whether that is right
+- The lean moves the hips' reading by the lean, on the dummy as on a person, so at full lean the
+  leg deviation reads about 0.75 and the detune sounds with the bend; whether the leg deviation
+  should be taken against the vertical instead of the torso line
 - The symmetries: which of the four pairs earns a connection, and what it means
 - Drift's source: a setting for now; whether a secondary measure should take it
 - The composition itself: which connections people find with their bodies
