@@ -536,17 +536,17 @@
     },
     "similarity": {
       "window_similarity": {
-        "window_length": 11,
+        "window_length": 1,
         "method": "HARMONIC_MEAN",
         "use_angle_similarity": true,
-        "angle_scale": 0.8,
-        "use_velocity_similarity": true,
+        "angle_scale": 0.6,
+        "use_velocity_similarity": false,
         "vel_scale": 1.0,
-        "use_motion_weighting": true,
+        "use_motion_weighting": false,
         "use_time_penalty": false,
         "time_decay_exp": 2.5,
-        "remap_low": 0.0,
-        "remap_high": 0.75,
+        "remap_low": 0.2,
+        "remap_high": 0.9,
         "enabled": true,
         "verbose": false
       },
@@ -917,7 +917,7 @@
     "sync": {
       "threshold": 0.75,
       "mode": "THREE",
-      "source": "SIMILARITY"
+      "source": "POSE_FRAMES"
     },
     "manual": {
       "select": "PLAY",

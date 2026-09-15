@@ -146,6 +146,24 @@ class WindowSimilarityTest(unittest.TestCase):
         self.assertEqual(lead[0][1], 0.0)
         self.assertFalse(math.isnan(sim[1][0]))        # track 1's current pose still finds track 0's past frames
 
+    def test_single_frame_window_compares_current_postures_only(self) -> None:
+        # window_length 1 is posture similarity: only the current frames meet. Track 1's current pose equals
+        # track 0's oldest, so a full window would score 1.0; here only the current poses, STEP*(T-1) apart, count.
+        ws = _similarity(window_length=1, use_motion_weighting=False, use_velocity_similarity=False,
+                         remap_low=0.0, remap_high=1.0)
+        sim, lead = ws._process({0: _window(_ramp()), 1: _window(_ramp(lag=T - 1))})
+        expected = math.exp(-((STEP * (T - 1)) / ws._config.angle_scale) ** 2)
+        self.assertAlmostEqual(sim[1][0], expected, places=5)
+        self.assertAlmostEqual(sim[0][1], expected, places=5)
+        self.assertEqual(lead[1][0], 0.0)
+
+        # Different histories, same current posture: full similarity.
+        still = [np.full(F, STEP * (T - 1)) for _ in range(T)]
+        sim, lead = ws._process({0: _window(_ramp()), 1: _window(still)})
+        self.assertAlmostEqual(sim[0][1], 1.0, places=5)
+        self.assertAlmostEqual(sim[1][0], 1.0, places=5)
+        self.assertEqual(lead[0][1], 0.0)
+
     def test_missing_velocity_does_not_reduce_coverage(self) -> None:
         velocity = [np.full(F, STEP * 30.0) for _ in range(T)]
         gappy = [v.copy() for v in velocity]

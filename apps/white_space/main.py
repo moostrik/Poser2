@@ -225,7 +225,8 @@ class WhiteSpaceMain:
         self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
         self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
 
-        # Pose similarity (enabled by default); movement correlation (disabled by default)
+        # Posture similarity: WindowSimilarity at window_length 1, current pose vs current pose (enabled by
+        # default); movement correlation (disabled by default)
         self.window_similator  = analytics.WindowSimilarity(ps.similarity.window_similarity)
         self.window_correlator = analytics.WindowCorrelation(ps.similarity.window_correlation)
 
