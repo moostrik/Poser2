@@ -9,10 +9,10 @@ from modules.settings import BaseSettings, Field
 
 
 class AngleMotionExtractorSettings(BaseSettings):
-    """Configuration for motion extraction with tunable thresholds."""
-    noise_threshold: Field[float] = Field(0.1)
-    max_threshold:   Field[float] = Field(1.0)
-    n_top_motions:   Field[int]   = Field(3)
+    """Configuration for motion extraction with tunable thresholds, in degrees per second."""
+    noise_threshold: Field[float] = Field(5.7,  min=0.0, max=180.0, step=0.5, description="Joint speed up to which is stillness (°/s)")
+    max_threshold:   Field[float] = Field(57.3, min=1.0, max=360.0, step=0.5, description="Weighted joint speed that counts as full motion (°/s)")
+    n_top_motions:   Field[int]   = Field(3, min=1, max=9, step=1, description="Average the N fastest joints")
 
 
 class AngleMotionExtractor(FilterNode):
@@ -35,14 +35,14 @@ class AngleMotionExtractor(FilterNode):
         angle_vel = pose[AngleVelocity]
         motions: np.ndarray = np.abs(angle_vel.values)
 
-        # Remove noise: subtract threshold and clip negative values to 0
-        motions = np.maximum(motions - self._config.noise_threshold, 0.0)
+        # Remove noise: subtract threshold and clip negative values to 0 (the settings are °/s, the velocities rad/s)
+        motions = np.maximum(motions - np.radians(self._config.noise_threshold), 0.0)
 
         # Normalize by joint-specific factors (gives motion semantic meaning)
         motions *= self._normalisation_factors
 
         # Scale to [0, 1] range based on max_threshold
-        motions /= self._config.max_threshold
+        motions /= np.radians(self._config.max_threshold)
 
         # Get top N motions and average them
         valid_motions = motions[~np.isnan(motions)]

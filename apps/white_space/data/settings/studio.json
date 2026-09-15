@@ -37,7 +37,7 @@
     "data": {
       "stage": "LERP",
       "mode": "WINDOW",
-      "feature_field": "Similarity",
+      "feature_field": "ArmDeviation",
       "line_width": 3.0,
       "line_smooth": 10.0,
       "use_scores": false,
@@ -429,26 +429,26 @@
     },
     "angle_calibrator": {
       "neutral": true,
-      "shoulder_neutral": -0.3491,
-      "elbow_neutral": -2.9322,
-      "hip_neutral": 2.9671,
-      "knee_neutral": -3.002,
+      "shoulder_neutral": -20.0,
+      "elbow_neutral": -168.0,
+      "hip_neutral": 170.0,
+      "knee_neutral": -172.0,
       "raised": true,
-      "shoulder_raised": -2.9671,
-      "elbow_raised": 2.8972
+      "shoulder_raised": -170.0,
+      "elbow_raised": 166.0
     },
     "leg_deviation_extractor": {
-      "hip_rad": 1.0471975511965976,
-      "knee_rad": 1.5707963267948966,
+      "hip_degrees": 60.0,
+      "knee_degrees": 90.0,
       "n_top": 2
     },
     "arm_deviation_extractor": {
-      "shoulder_rad": 1.5707963267948966,
-      "elbow_rad": 1.5707963267948966,
+      "shoulder_degrees": 90.0,
+      "elbow_degrees": 90.0,
       "n_top": 1
     },
     "torso_tilt_extractor": {
-      "tilt_rad": 0.4,
+      "tilt_degrees": 22.9,
       "aspect_ratio": 0.75
     },
     "bbox": {},
@@ -531,8 +531,8 @@
     },
     "motion": {
       "extractor": {
-        "noise_threshold": 0.1,
-        "max_threshold": 0.5,
+        "noise_threshold": 5.7,
+        "max_threshold": 28.6,
         "n_top_motions": 1
       },
       "moving_average": {
@@ -545,9 +545,9 @@
         "window_length": 1,
         "method": "HARMONIC_MEAN",
         "use_angle_similarity": true,
-        "angle_tolerance": 0.6,
+        "angle_tolerance": 34.4,
         "use_velocity_similarity": false,
-        "velocity_tolerance": 1.0,
+        "velocity_tolerance": 57.3,
         "use_motion_weighting": false,
         "use_time_penalty": false,
         "time_decay_exp": 2.5,
@@ -555,10 +555,6 @@
         "remap_high": 0.9,
         "enabled": true,
         "verbose": false
-      },
-      "neutral_gate": {
-        "enabled": true,
-        "neutral": 0.1
       },
       "similarity_applicator": {},
       "leader_applicator": {},
@@ -576,7 +572,16 @@
         "responsiveness": 0.33,
         "friction": 0.05
       },
-      "motion_gate": {}
+      "sticky": {
+        "enabled": true,
+        "init_to_zero": true,
+        "hold_scores": false
+      },
+      "motion_gate": {},
+      "neutral_gate": {
+        "enabled": true,
+        "neutral": 0.1
+      }
     },
     "window_raw": {
       "window_size": 180,
@@ -610,7 +615,7 @@
       "motion_scale": 0.1,
       "stability_hold_beats": 2,
       "stability_expiry_beats": 3,
-      "stability_scale": 0.8,
+      "stability_tolerance": 45.8,
       "stability_threshold": 0.9
     }
   },

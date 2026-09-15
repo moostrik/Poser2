@@ -10,7 +10,7 @@ class TorsoTilt(SingleValue):
 
     The one pose measure taken against an absolute axis (every joint angle is measured
     between body segments): the angle of the spine — hip midpoint to shoulder midpoint —
-    from the image's vertical, normalised by the extractor's ``tilt_rad``. 0 = upright;
+    from the image's vertical, normalised by the extractor's ``tilt_degrees``. 0 = upright;
     positive = shoulders displaced toward image right of the hips. Populated by
     TorsoTiltExtractor. Absent (NaN, score 0.0) when the spine keypoints are missing.
     """

@@ -23,8 +23,8 @@ def _frame(**joints: float) -> Frame:
 
 def _settings() -> LegDeviationExtractorSettings:
     cfg = LegDeviationExtractorSettings()
-    cfg.hip_rad = math.pi / 3.0
-    cfg.knee_rad = math.pi / 2.0
+    cfg.hip_degrees = 60.0
+    cfg.knee_degrees = 90.0
     return cfg
 
 

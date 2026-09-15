@@ -56,9 +56,9 @@ class WindowSimilaritySettings(BaseSettings):
     window_length:          Field[int]                = Field(30, min=1, max=300, description="Number of frames to compare")
     method:                 Field[AggregationMethod]  = Field(AggregationMethod.HARMONIC_MEAN, description="Aggregation method")
     use_angle_similarity:   Field[bool]               = Field(True, description="Use angle similarity")
-    angle_tolerance:        Field[float]              = Field(0.8, min=0.1, max=2.0, description="Joint angles this far apart still count as similar (rad); smaller is stricter")
+    angle_tolerance:        Field[float]              = Field(45.0, min=1.0, max=120.0, step=1.0, description="Joint angles this far apart still count as similar (°); smaller is stricter")
     use_velocity_similarity: Field[bool]              = Field(True, description="Multiply by velocity similarity")
-    velocity_tolerance:     Field[float]              = Field(0.5, min=0.1, max=2.0, description="Joint velocities this far apart still count as similar (rad/s); smaller is stricter")
+    velocity_tolerance:     Field[float]              = Field(30.0, min=1.0, max=120.0, step=1.0, description="Joint velocities this far apart still count as similar (°/s); smaller is stricter")
     use_motion_weighting:   Field[bool]               = Field(True, description="Weight similarity by motion")
     use_time_penalty:       Field[bool]               = Field(True, description="Penalize older frames in window")
     time_decay_exp:         Field[float]              = Field(1.0, min=0.1, max=4.0, description="Time decay exponent")
@@ -259,8 +259,8 @@ class WindowSimilarity:
         """
         # print(self._config)
 
-        angle_tolerance = self._config.angle_tolerance
-        velocity_tolerance = self._config.velocity_tolerance
+        angle_tolerance = np.radians(self._config.angle_tolerance)          # the settings are degrees, the angles radians
+        velocity_tolerance = np.radians(self._config.velocity_tolerance)
         N, T, F = values.shape
 
         # Current frame of each person: (N, F)

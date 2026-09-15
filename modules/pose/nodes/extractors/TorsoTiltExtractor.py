@@ -19,8 +19,8 @@ _MIN_SPINE: float = 0.02
 
 class TorsoTiltExtractorSettings(BaseSettings):
     """Configuration for TorsoTiltExtractor."""
-    tilt_rad:     Field[float] = Field(math.pi / 4.0, min=0.05, max=math.pi / 2.0, step=0.01,
-                                       description="Spine angle from vertical (rad) that counts as full lean (±1.0)")
+    tilt_degrees: Field[float] = Field(45.0, min=1.0, max=90.0, step=0.5,
+                                       description="Spine angle from vertical (°) that counts as full lean (±1.0)")
     aspect_ratio: Field[float] = Field(0.75, access=Field.INIT,
                                        description="Crop width/height — corrects the y axis to isotropic space (as the angle extractor)")
 
@@ -30,7 +30,7 @@ class TorsoTiltExtractor(FilterNode):
 
     Spine = hip midpoint → shoulder midpoint, with y scaled by 1/aspect_ratio exactly as
     ``AngleUtils.from_points`` does, so the angle is geometrically true. The signed angle from
-    vertical (arctan2) is normalised by ``tilt_rad`` and clipped to [-1, 1]: 0 = upright,
+    vertical (arctan2) is normalised by ``tilt_degrees`` and clipped to [-1, 1]: 0 = upright,
     positive = shoulders toward image right of the hips. Forward/backward lean is not
     measured — in 2D it is only foreshortening. Leaves the frame unchanged when any spine
     keypoint is missing or the spine is degenerate.
@@ -54,6 +54,6 @@ class TorsoTiltExtractor(FilterNode):
             return pose
 
         angle = math.atan2(float(spine[0]), float(-spine[1]))   # 0 upright, +x = image right
-        tilt = max(-1.0, min(1.0, angle / self._config.tilt_rad))
+        tilt = max(-1.0, min(1.0, angle / math.radians(self._config.tilt_degrees)))
         score = float(min(points.get_scores(_SPINE)))
         return replace(pose, {TorsoTilt: TorsoTilt.from_value(tilt, score)})

@@ -194,8 +194,8 @@
     },
     "motion": {
       "extractor": {
-        "noise_threshold": 0.1,
-        "max_threshold": 0.5,
+        "noise_threshold": 5.7,
+        "max_threshold": 28.6,
         "n_top_motions": 1
       },
       "moving_average": {

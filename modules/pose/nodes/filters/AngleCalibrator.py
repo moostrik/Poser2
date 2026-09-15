@@ -24,15 +24,16 @@ from modules.settings import BaseSettings, Field, Widget
 
 
 class AngleCalibratorSettings(BaseSettings):
-    """The raw readings at the reference poses, in radians: the neutral row, then the raised row."""
+    """The raw readings at the reference poses, in degrees: the neutral row, then the raised row. The
+    calibrator converts them to radians where it reads them; the angles themselves stay radians."""
     neutral:          Field[bool]  = Field(True, description="Map each joint's neutral reading to 0")
-    shoulder_neutral: Field[float] = Field(-0.15 * math.pi, min=-math.pi, max=math.pi, step=0.01, widget=Widget.number, description="Shoulder angle read with the arm hanging (rad)")
-    elbow_neutral:    Field[float] = Field(-0.9 * math.pi,  min=-math.pi, max=math.pi, step=0.01, widget=Widget.number, description="Elbow angle read with the arm straight (rad)")
-    hip_neutral:      Field[float] = Field(0.95 * math.pi,  min=-math.pi, max=math.pi, step=0.01, widget=Widget.number, description="Hip angle read standing (rad)")
-    knee_neutral:     Field[float] = Field(-math.pi,        min=-math.pi, max=math.pi, step=0.01, widget=Widget.number, description="Knee angle read standing (rad)")
-    raised:           Field[bool]  = Field(True, description="Use the arms-raised readings: the shoulder's is π, the elbow's is straight with the arm up", newline=True)
-    shoulder_raised:  Field[float] = Field(0.85 * math.pi,  min=-math.pi, max=math.pi, step=0.01, widget=Widget.number, description="Shoulder angle read with the arm raised (rad)")
-    elbow_raised:     Field[float] = Field(-0.9 * math.pi,  min=-math.pi, max=math.pi, step=0.01, widget=Widget.number, description="Elbow angle read with the arm raised (rad)")
+    shoulder_neutral: Field[float] = Field(-27.0,  min=-180.0, max=180.0, step=0.5, widget=Widget.number, description="Shoulder angle read with the arm hanging (°)")
+    elbow_neutral:    Field[float] = Field(-162.0, min=-180.0, max=180.0, step=0.5, widget=Widget.number, description="Elbow angle read with the arm straight (°)")
+    hip_neutral:      Field[float] = Field(171.0,  min=-180.0, max=180.0, step=0.5, widget=Widget.number, description="Hip angle read standing (°)")
+    knee_neutral:     Field[float] = Field(-180.0, min=-180.0, max=180.0, step=0.5, widget=Widget.number, description="Knee angle read standing (°)")
+    raised:           Field[bool]  = Field(True, description="Use the arms-raised readings: the shoulder's is 180°, the elbow's is straight with the arm up", newline=True)
+    shoulder_raised:  Field[float] = Field(153.0,  min=-180.0, max=180.0, step=0.5, widget=Widget.number, description="Shoulder angle read with the arm raised (°)")
+    elbow_raised:     Field[float] = Field(-162.0, min=-180.0, max=180.0, step=0.5, widget=Widget.number, description="Elbow angle read with the arm raised (°)")
 
 
 # The joint kinds a setting covers; the right side is mirrored by the extractor, so one value serves both.
@@ -75,22 +76,23 @@ class AngleCalibrator(FilterNode):
             # The elbow's zero slides from its neutral reading to its raised reading with the arm's
             # lift (the calibrated shoulder, 0 hanging to π raised), so a straight elbow reads 0 in
             # both poses; its π is the geometric fold from there.
-            slide = _wrap1(C.elbow_raised - C.elbow_neutral)
+            elbow_neutral = math.radians(C.elbow_neutral)
+            slide = _wrap1(math.radians(C.elbow_raised) - elbow_neutral)
             for shoulder, elbow in _ARMS:
                 lift = 0.0 if np.isnan(values[shoulder]) else min(abs(float(values[shoulder])) / math.pi, 1.0)
-                values[elbow] = _wrap1(raw[elbow] - (C.elbow_neutral + lift * slide))
+                values[elbow] = _wrap1(raw[elbow] - (elbow_neutral + lift * slide))
         return replace(pose, {Angles: Angles(values.astype(np.float32), angles.scores)})
 
     def _tables(self) -> tuple[np.ndarray, np.ndarray]:
-        """Per landmark: the neutral to subtract and the scale to apply, from the live settings."""
+        """Per landmark: the neutral to subtract and the scale to apply (radians), from the live settings."""
         C = self._config
         neutral = np.zeros(len(AngleLandmark), dtype=np.float64)
         scale = np.ones(len(AngleLandmark), dtype=np.float64)
         if C.neutral:
             for name, landmarks in _NEUTRAL.items():
-                neutral[list(landmarks)] = getattr(C, name)
+                neutral[list(landmarks)] = math.radians(getattr(C, name))
         if C.raised:
-            travel = abs(_wrap1(C.shoulder_raised - C.shoulder_neutral))
+            travel = abs(_wrap1(math.radians(C.shoulder_raised - C.shoulder_neutral)))
             if travel > 1e-6:
                 scale[list(_SHOULDERS)] = math.pi / travel
         return neutral, scale

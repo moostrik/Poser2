@@ -11,7 +11,8 @@ from modules.pose.features import Points2D, PointLandmark, TorsoTilt
 from modules.pose.nodes import TorsoTiltExtractor, TorsoTiltExtractorSettings
 
 ASPECT = 0.75
-TILT_RAD = math.pi / 4.0
+TILT_DEGREES = 45.0                       # the setting
+TILT_RAD = math.radians(TILT_DEGREES)     # the same lean as frame geometry
 
 
 def _frame(hip_mid: tuple[float, float], shoulder_mid: tuple[float, float],
@@ -45,7 +46,7 @@ def _lean(angle: float, spine: float = 0.4) -> Frame:
 class TorsoTiltExtractorTest(unittest.TestCase):
     def setUp(self) -> None:
         cfg = TorsoTiltExtractorSettings()
-        cfg.tilt_rad = TILT_RAD
+        cfg.tilt_degrees = TILT_DEGREES
         cfg.aspect_ratio = ASPECT
         self.extractor = TorsoTiltExtractor(cfg)
 
@@ -55,19 +56,19 @@ class TorsoTiltExtractorTest(unittest.TestCase):
     def test_upright_is_zero(self) -> None:
         self.assertAlmostEqual(self._tilt(_lean(0.0)), 0.0, places=5)
 
-    def test_lean_right_is_positive_one_at_tilt_rad(self) -> None:
+    def test_lean_right_is_positive_one_at_full_lean(self) -> None:
         self.assertAlmostEqual(self._tilt(_lean(TILT_RAD)), 1.0, places=4)
 
     def test_lean_left_is_negative(self) -> None:
         self.assertAlmostEqual(self._tilt(_lean(-TILT_RAD / 2.0)), -0.5, places=4)
 
-    def test_beyond_tilt_rad_clamps(self) -> None:
+    def test_beyond_full_lean_clamps(self) -> None:
         self.assertAlmostEqual(self._tilt(_lean(math.pi / 2.0 - 0.1)), 1.0, places=5)
 
     def test_aspect_correction_matters(self) -> None:
         # Without the y correction the same crop-space geometry reads as a bigger lean.
         cfg = TorsoTiltExtractorSettings()
-        cfg.tilt_rad = TILT_RAD
+        cfg.tilt_degrees = TILT_DEGREES
         cfg.aspect_ratio = 1.0
         uncorrected = TorsoTiltExtractor(cfg).process(_lean(TILT_RAD / 2.0))[TorsoTilt].value
         self.assertGreater(uncorrected, self._tilt(_lean(TILT_RAD / 2.0)))

@@ -23,8 +23,8 @@ def _frame(**arms: float) -> Frame:
 
 def _settings(n_top: int = 1) -> ArmDeviationExtractorSettings:
     cfg = ArmDeviationExtractorSettings()
-    cfg.shoulder_rad = math.pi / 2.0
-    cfg.elbow_rad = math.pi / 2.0
+    cfg.shoulder_degrees = 90.0
+    cfg.elbow_degrees = 90.0
     cfg.n_top = n_top
     return cfg
 

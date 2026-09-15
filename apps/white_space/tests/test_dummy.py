@@ -126,12 +126,12 @@ class ReadingsTest(unittest.TestCase):
         raw = self._raw(NEUTRAL)
         up = self._raw(UP)
         self.calibration = AngleCalibratorSettings()
-        self.calibration.shoulder_neutral = float(raw[AngleLandmark.left_shoulder])
-        self.calibration.shoulder_raised = float(up[AngleLandmark.left_shoulder])
-        self.calibration.elbow_neutral = float(raw[AngleLandmark.left_elbow])
-        self.calibration.elbow_raised = float(up[AngleLandmark.left_elbow])
-        self.calibration.hip_neutral = float(raw[AngleLandmark.left_hip])
-        self.calibration.knee_neutral = float(raw[AngleLandmark.left_knee])
+        self.calibration.shoulder_neutral = math.degrees(float(raw[AngleLandmark.left_shoulder]))   # the settings are degrees
+        self.calibration.shoulder_raised = math.degrees(float(up[AngleLandmark.left_shoulder]))
+        self.calibration.elbow_neutral = math.degrees(float(raw[AngleLandmark.left_elbow]))
+        self.calibration.elbow_raised = math.degrees(float(up[AngleLandmark.left_elbow]))
+        self.calibration.hip_neutral = math.degrees(float(raw[AngleLandmark.left_hip]))
+        self.calibration.knee_neutral = math.degrees(float(raw[AngleLandmark.left_knee]))
         self.pipeline = FilterPipeline([self.extractor, AngleCalibrator(self.calibration),
                                         LegDeviationExtractor(LegDeviationExtractorSettings()),
                                         TorsoTiltExtractor(TorsoTiltExtractorSettings())])

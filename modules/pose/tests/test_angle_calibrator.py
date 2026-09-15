@@ -23,12 +23,13 @@ def _frame(**joints: float) -> Frame:
 
 
 def _settings(**values: float) -> AngleCalibratorSettings:
+    """The readings are given in radians here (the frames' unit) and stored in degrees, as the panel does."""
     cfg = AngleCalibratorSettings()
-    cfg.shoulder_neutral, cfg.shoulder_raised = -0.2, 2.5      # a travel of 2.7 to straight up
-    cfg.elbow_neutral, cfg.elbow_raised = -2.8, 2.9            # relaxed straight: bent one way hanging, the other raised
-    cfg.hip_neutral, cfg.knee_neutral = 3.0, -3.1
+    cfg.shoulder_neutral, cfg.shoulder_raised = math.degrees(-0.2), math.degrees(2.5)   # a travel of 2.7 to straight up
+    cfg.elbow_neutral, cfg.elbow_raised = math.degrees(-2.8), math.degrees(2.9)         # relaxed straight: bent one way hanging, the other raised
+    cfg.hip_neutral, cfg.knee_neutral = math.degrees(3.0), math.degrees(-3.1)
     for name, value in values.items():
-        setattr(cfg, name, value)
+        setattr(cfg, name, math.degrees(value) if isinstance(value, float) else value)   # the switches stay bools
     return cfg
 
 
@@ -116,7 +117,7 @@ class AngleCalibratorTest(unittest.TestCase):
     def test_the_defaults_change_nothing_but_the_neutral(self) -> None:
         # The default raised readings sit π from the shoulder's neutral (scale 1) and equal the elbow's
         # neutral (no slide): the old offsets, as settings.
-        out = AngleCalibrator().process(_frame(left_shoulder=-0.15 * math.pi + 1.0, left_elbow=-0.9 * math.pi + 0.5))[Angles]
+        out = AngleCalibrator().process(_frame(left_shoulder=math.radians(-27.0) + 1.0, left_elbow=math.radians(-162.0) + 0.5))[Angles]
         self.assertAlmostEqual(out[A.left_shoulder], 1.0, places=5)
         self.assertAlmostEqual(out[A.left_elbow], 0.5, places=5)
 

@@ -109,7 +109,7 @@ class GhosterSettings(BaseSettings):
     motion_scale:           Field[float] = Field(5.0, min=0.1, max=4.0, step=0.1, description="On-spot MotionTime that maps motion to 1.0")
     stability_hold_beats:   Field[int]   = Field(2, min=1, max=8, step=1, description="Beats a pose must be held to become a valid ghost pose (1 = off)", newline=True)
     stability_expiry_beats: Field[int]   = Field(3, min=0, max=8, step=1, description="A valid pose expires this many beats after it was last held")
-    stability_scale:        Field[float] = Field(0.8, min=0.1, max=2.0, step=0.05, description="Pose-similarity scale (rad) — larger = more forgiving")
+    stability_tolerance:    Field[float] = Field(45.0, min=5.0, max=120.0, step=1.0, description="Joint angles this far apart still count as the same pose (°); smaller is stricter")
     stability_threshold:    Field[float] = Field(0.9, min=0.0, max=1.0, step=0.01, description="Min pose similarity between beats to count as 'held'")
 
 
@@ -250,7 +250,7 @@ class Ghoster:
                              stable_beats=1, stable_frame=None, stable_spot=float("nan"), stable_age=0)
                 self._passive[tid] = p
             else:
-                sim = _pose_similarity(frame[Angles], p.frame[Angles], self._settings.stability_scale)
+                sim = _pose_similarity(frame[Angles], p.frame[Angles], math.radians(self._settings.stability_tolerance))
                 p.stable_beats = p.stable_beats + 1 if sim >= self._settings.stability_threshold else 1
                 p.beats += 1           # still on the spot → follow him, build dwell
                 p.spot = az
