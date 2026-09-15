@@ -19,7 +19,7 @@ After renaming, adding, or removing a `Field`, `Group`, or `Child`:
 
 1. Find all `.json` files in `apps/<app>/data/settings/`
 2. For **renamed** fields: find the old key in each JSON and rename it to the new key, preserving the value
-3. For **added** fields: add the key with the Python `Field` default value
+3. For **added** fields: add the key only to presets that need a value other than the Python default
 4. For **removed** fields: delete the key from each JSON
 5. For **restructured** groups (moved/renamed): restructure the corresponding JSON object
 

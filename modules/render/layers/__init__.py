@@ -6,7 +6,7 @@ from .cam import      BBoxRenderer, BBoxRendererSettings, CameraReadingsLayer, C
 from .centre import   CentreGeometry, CentreGeomSettings, SnapPoint, CentreCamLayer, CentreCamSettings, \
                       CentreMaskLayer, CentreMaskSettings, CentreFrgLayer, CentreFrgSettings, \
                       CentrePoseLayer, CentrePoseSettings, CentreDenseFlowLayer, CentreDlowSettings
-from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES, \
+from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOffset, FEATURE_MAP, TRACK_COLOR_FEATURES, \
                       FeatureFrameLayer, FeatureWindowLayer, MTimeRenderer, MTimeRendererSettings, \
                       PoseDotLayer, PoseDotSettings, PoseLineLayer, PoseLineSettings
 from .flow import     FlowLayer, FlowLayerSettings, FlowSettings, FlowDrawMode, \

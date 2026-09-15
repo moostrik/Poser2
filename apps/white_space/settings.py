@@ -14,7 +14,7 @@ from enum import IntEnum, auto
 from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
 from modules.oak import CameraSettings, CameraResolution, CameraCheckSettings, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
-from modules.render.layers import LayerMode
+from modules.render.layers import LayerMode, AngleOffset
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import PanoramicTrackerSettings, PosesFromTrackletsSettings
 from modules.pose import nodes, trackers, window, analytics
@@ -324,6 +324,7 @@ class PlayheadDataLayerSettings(BaseSettings):
     use_scores:        Field[bool]                = Field(False)
     render_labels:     Field[bool]                = Field(True)
     use_history_color: Field[bool]                = Field(False)
+    angle_offset:      Field[AngleOffset]         = Field(AngleOffset.NONE, description="Shift ±π angles before drawing: HALF_PI puts the seam at -π/2, PI at 0")
 
 
 class BeamLightSimSettings(BaseSettings):

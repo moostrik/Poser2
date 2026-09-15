@@ -3,7 +3,7 @@
   "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "render_fps": 47.0,
+  "render_fps": 60.0,
   "light_resolution": 3600,
   "fov": 127.0,
   "resolution": "P720",
@@ -41,7 +41,8 @@
       "line_smooth": 10.0,
       "use_scores": false,
       "render_labels": true,
-      "use_history_color": false
+      "use_history_color": false,
+      "angle_offset": "PI"
     },
     "playhead_data": {
       "stage": "LERP",
@@ -51,7 +52,8 @@
       "line_smooth": 0.0,
       "use_scores": false,
       "render_labels": true,
-      "use_history_color": false
+      "use_history_color": false,
+      "angle_offset": "NONE"
     },
     "beam_light_sim": {
       "width": 1.0,
@@ -224,7 +226,7 @@
     "color": false,
     "square": false,
     "stereo": false,
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "ir_flood_light": 0.75,
     "mono_auto_exposure": true,
@@ -249,8 +251,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 29992,
+        "iso": 375,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -283,8 +285,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 29992,
+        "iso": 208,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -317,8 +319,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 29992,
+        "iso": 328,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -351,8 +353,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 29992,
+        "iso": 347,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -425,12 +427,12 @@
       "aspect_ratio": 0.75
     },
     "angle_calibrator": {
-      "neutral": false,
+      "neutral": true,
       "shoulder_neutral": -0.3491,
       "elbow_neutral": -2.9322,
       "hip_neutral": 2.9671,
       "knee_neutral": -3.002,
-      "raised": false,
+      "raised": true,
       "shoulder_raised": -2.9671,
       "elbow_raised": 2.8972
     },
@@ -888,19 +890,19 @@
       "release_seconds": 1.5
     },
     "dummy": {
-      "enabled": true,
+      "enabled": false,
       "azimuth": 180.0,
       "torso": 0.0,
-      "left_shoulder": 0.0,
-      "right_shoulder": 0.0,
-      "left_elbow": 180.0,
-      "right_elbow": 180.0,
-      "left_hip": 180.0,
-      "right_hip": 180.0,
-      "left_knee": 180.0,
-      "right_knee": 180.0,
+      "left_shoulder": 340.0,
+      "right_shoulder": 340.0,
+      "left_elbow": 192.0,
+      "right_elbow": 192.0,
+      "left_hip": 170.0,
+      "right_hip": 171.0,
+      "left_knee": 188.0,
+      "right_knee": 188.0,
       "morph": 0.5,
-      "pose": "",
+      "pose": "neutral",
       "name": ""
     }
   },

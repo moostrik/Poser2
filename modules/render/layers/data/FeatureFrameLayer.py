@@ -13,7 +13,7 @@ from modules.pose.features import AngleVelocity, Angles, BaseScalarFeature
 from modules.pose.frame import Frame
 from ..LayerBase import LayerBase, DataCache, Rect
 from ...shaders import FeatureShader
-from .DataLayerSettings import DataLayerConfig, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES
+from .DataLayerSettings import DataLayerConfig, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES, AngleOffset, has_pi_range, offset_angles
 from ...color_settings import ColorSettings
 
 
@@ -97,6 +97,9 @@ class FeatureFrameLayer(LayerBase):
         # Extract feature from frame
         feature_type = self._feature_map[self._config.feature_field]
         feature = pose[feature_type]
+        offset = self._config.angle_offset
+        if offset != AngleOffset.NONE and has_pi_range(feature_type):
+            feature = feature_type(offset_angles(feature.values, offset), feature.scores)
 
         # If showing angles, also fetch velocity for thickness modulation. Compare the
         # resolved feature type (not the enum member) so any feature_map/enum works.
