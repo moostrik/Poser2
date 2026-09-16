@@ -91,7 +91,7 @@ class FlashTest(unittest.TestCase):
     def setUp(self) -> None:
         self.cfg = BeamFlashSettings()
         self.board = FlashBoard(frames={}, flashes=[])
-        self.layer = BeamFlash(RES, self.cfg, self.board, pose_stage=4, tick_interval=self.INTERVAL)
+        self.layer = BeamFlash(RES, self.cfg, self.board, pose_stage=4)
 
     def _render(self, pose, playhead: float = 1.0) -> Frame:
         self.board.frames = {} if pose is None else {pose.track_id: pose}

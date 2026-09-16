@@ -32,6 +32,7 @@ _STATS_INTERVAL: float = 1.0
 
 
 class ClockSettings(BaseSettings):
+    light_rate:  Field[float] = Field(30.0, min=1.0, max=120.0, description="Light tick rate (fps, shared from the light settings)")
     time:        Field[float] = Field(0.0, access=Field.READ, description="Elapsed wall-clock time (s)")
     late_max_ms: Field[float] = Field(0.0, access=Field.READ, description="Worst tick lateness vs. its deadline over the last second (ms)")
     dt_max_ms:   Field[float] = Field(0.0, access=Field.READ, description="Longest tick interval over the last second (ms)")
@@ -41,20 +42,27 @@ class ClockSettings(BaseSettings):
 
 @dataclass
 class Tick:
-    """Immutable clock snapshot produced once per render tick."""
-    time: float   # monotonic elapsed seconds since the first tick
-    dt:   float   # seconds elapsed since the previous tick
+    """Clock snapshot produced once per render tick. ``dt`` is measured and jitters; ``interval`` is the
+    target the tick was paced at (``1 / light_rate``), the step anything advancing per tick uses — the
+    layers' playhead step, never ``dt``. Left 0 it takes ``dt``."""
+    time:     float         # monotonic elapsed seconds since the first tick
+    dt:       float         # seconds elapsed since the previous tick
+    interval: float = 0.0   # the tick's target interval (s)
+
+    def __post_init__(self) -> None:
+        if self.interval <= 0.0:
+            self.interval = self.dt
 
 
 class Clock:
-    """Paces the render loop at light_rate Hz and measures each tick.
+    """Paces the render loop at ``light_rate`` Hz and measures each tick.
 
-    Owns the per-frame cadence: callers loop on the blocking ``next_tick()``.
+    Owns the per-frame cadence: callers loop on the blocking ``next_tick()``. The rate is read from the
+    settings on every tick, so a change takes effect on the next deadline; the grid keeps its phase.
     """
 
-    def __init__(self, settings: ClockSettings, rate: float) -> None:
+    def __init__(self, settings: ClockSettings) -> None:
         self._settings  = settings
-        self._interval: float = 1.0 / rate
         self._start: float | None = None   # baselines set lazily on the first tick
         self._last:  float = 0.0
         self._next:  float = 0.0
@@ -67,7 +75,8 @@ class Clock:
 
     @property
     def interval(self) -> float:
-        return self._interval
+        """The target interval (s): ``1 / light_rate``, read live."""
+        return 1.0 / max(1e-3, float(self._settings.light_rate))
 
     def next_tick(self) -> Tick:
         """Block until the next frame deadline, then measure and return the Tick.
@@ -75,6 +84,7 @@ class Clock:
         The first call establishes the timing baselines and returns immediately
         (dt = 0), so the construction→start gap produces no startup dt spike.
         """
+        interval = self.interval
         if self._start is None:
             now = perf_counter()
             self._start    = now
@@ -85,13 +95,13 @@ class Clock:
             busy = perf_counter() - self._last      # the caller's work since the previous tick
             if busy > self._busy_max:
                 self._busy_max = busy
-            self._next += self._interval
+            self._next += interval
             self._wait_until(self._next)
             now  = perf_counter()
             late = now - self._next
             if late > self._late_max:
                 self._late_max = late
-            if late > self._interval:
+            if late > interval:
                 # Severe overrun — resync rather than burst a run of catch-up frames.
                 self._next = now
                 self._overruns += 1
@@ -101,7 +111,7 @@ class Clock:
         if dt > self._dt_max:
             self._dt_max = dt
 
-        t = Tick(time=now - self._start, dt=dt)
+        t = Tick(time=now - self._start, dt=dt, interval=interval)
         self._settings.time = t.time
         if now - self._stats_at >= _STATS_INTERVAL:
             self._publish_stats(now)

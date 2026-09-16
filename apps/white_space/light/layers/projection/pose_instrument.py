@@ -188,11 +188,10 @@ class PoseInstrument(ProjectionLayer):
     """The pose instrument; see the module docstring."""
 
     def __init__(self, resolution: int, config: LayerSettings, instrument: PoseInstrumentSettings, board,
-                 pose_stage: int, tick_interval: float) -> None:
+                 pose_stage: int) -> None:
         super().__init__(resolution, config, board)
         self._instrument = instrument
         self._pose_stage = pose_stage
-        self._tick_interval = tick_interval
         self._players: dict[int, _Player] = {}
         self._crossing = PlayheadCrossing()
         self._distance = np.arange(resolution + 1, dtype=np.float64)     # px from a person
@@ -285,7 +284,7 @@ class PoseInstrument(ProjectionLayer):
             p.similarity = pose[features.Similarity].values
             offsets[id] = pose[PlayheadOffset].value
 
-        step = playhead_step(frame.motor_command.beam_rpm, self._tick_interval)
+        step = playhead_step(frame.motor_command.beam_rpm, frame.tick.interval)
         hits = self._crossing.update(offsets, step, int(P.events.hit_frames))
         manual = self._manual_hits > 0
         if manual:

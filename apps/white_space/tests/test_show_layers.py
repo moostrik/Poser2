@@ -220,7 +220,7 @@ class PoseInstrumentTest(unittest.TestCase):
         self.cfg.presence.attack_seconds = 0.0            # present at once — geometry tests read one frame
         self.cfg.pattern.blue_phase = 0.5 + self.QUARTER
         self.board = InstrumentBoard(frames={})
-        self.layer = PoseInstrument(IRES, LayerSettings(), self.cfg, self.board, pose_stage=4, tick_interval=TICK)
+        self.layer = PoseInstrument(IRES, LayerSettings(), self.cfg, self.board, pose_stage=4)
 
     def _people(self, poses: dict[int, FakePose]) -> None:
         self.board.frames = poses

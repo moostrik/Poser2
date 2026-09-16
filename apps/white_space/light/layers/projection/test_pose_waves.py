@@ -80,7 +80,6 @@ class TestPoseWaves(ProjectionLayer):
         resolution: int,
         max_players: int,
         config: TestPoseWavesSettings,
-        tick_interval: float,
         board: Board,
         pose_stage: int,
     ) -> None:
@@ -91,9 +90,9 @@ class TestPoseWaves(ProjectionLayer):
         self._player_states: dict[int, PlayerState] = {
             i: PlayerState() for i in range(max_players)
         }
-        self._num_active_smoother: OneEuroFilter = OneEuroFilter(
-            freq=1.0 / tick_interval, mincutoff=1.0, beta=0.0
-        )
+        # Stepped with the tick's time, so the filter derives its rate from the timestamps; the constructed
+        # frequency is only the first step's guess.
+        self._num_active_smoother: OneEuroFilter = OneEuroFilter(freq=1.0, mincutoff=1.0, beta=0.0)
 
         self._Wh_L: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
         self._Wh_R: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
@@ -145,7 +144,7 @@ class TestPoseWaves(ProjectionLayer):
             state.right_elbow    = angles.values[features.AngleLandmark.right_elbow]
 
         num_active: int = sum(1 for s in self._player_states.values() if s.present)
-        smooth_active: float = self._num_active_smoother(float(num_active)) or 1.0
+        smooth_active: float = self._num_active_smoother(float(num_active), frame.tick.time) or 1.0
 
         self._Wh_L.fill(0.0)
         self._Wh_R.fill(0.0)

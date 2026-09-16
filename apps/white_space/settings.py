@@ -237,7 +237,7 @@ class PoseGroup(BaseSettings):
     model_path       : Field[str]       = Field("", access=Field.INIT, visible=False)
     verbose          : Field[bool]      = Field(False, access=Field.INIT)
     frequency        : Field[float]     = Field(30.0, access=Field.INIT)
-    output_frequency : Field[float]     = Field(30.0, min=1.0, max=120.0, description="LERP tick rate (fps): the light conductor's rate, equal to the root light_rate")
+    output_frequency : Field[float]     = Field(30.0, min=1.0, max=120.0, description="LERP tick rate (fps, shared from the root light_rate)")
 
     _feature_share: list = [frequency, output_frequency]
 
@@ -379,7 +379,7 @@ class Settings(BaseSettings):
     num_virtual     : Field[int]   = Field(8, access=Field.INIT)
     num_cameras     : Field[int]   = Field(4, access=Field.INIT)
     input_fps       : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
-    light_rate      : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Light tick rate (fps): the fixture's frame rate and the LERP stage's clock")
+    light_rate      : Field[float] = Field(30.0, min=1.0, max=120.0, description="Light tick rate (fps): the fixture's frame rate, the conductor's clock and the LERP stage's step")
     light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="Projection resolution (pixels per turn)")
     fov             : Field[float] = Field(127.0, access=Field.INIT, description="Azimuth span (°) of each delivered camera frame — the tracker's contract, baked in at open")
     resolution      : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode for all cameras")
@@ -402,9 +402,8 @@ class Settings(BaseSettings):
     # nothing in it is a camera setting. The frame's shape is shared in straight from the root.
     track  : Group[PanoramicTrackerSettings] = Group(PanoramicTrackerSettings, share=[fov, resolution, frame_height, tilt,
                                                                                       lens_fov, lens_centre_x, lens_centre_y])
-    # The LERP stage is ticked by the light conductor, so `pose.output_frequency` is the light rate; it
-    # cannot be wired to `light_rate` (INIT) because the interpolators' field is live, so it stands on its own.
-    pose   : Group[PoseGroup]       = Group(PoseGroup, share=[max_players, num_virtual.as_('ghost_slots'), input_fps.as_('frequency')])
+    # The LERP stage is ticked by the light conductor, so its interpolators step at the light rate.
+    pose   : Group[PoseGroup]       = Group(PoseGroup, share=[max_players, num_virtual.as_('ghost_slots'), input_fps.as_('frequency'), light_rate.as_('output_frequency')])
     light  : Group[LightSettings]   = Group(LightSettings, share=[max_players, num_cameras.as_('num_cameras'), light_rate, light_resolution.as_('light_resolution'), fov, spin_down_seconds])
     # The pose instrument's values: its own root group, not a layer group (POSE_INSTRUMENT.md, Settings).
     PI     : Group[PoseInstrumentSettings] = Group(PoseInstrumentSettings)

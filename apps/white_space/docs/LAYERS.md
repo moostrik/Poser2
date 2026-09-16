@@ -31,8 +31,9 @@ A person is present while their pose exists: the pose pipeline stops posing a pe
 `pose.tracklets.detection_timeout` (1.0 s) after their last detection, and every filter downstream
 resets a track the moment its pose is missing. A layer adds no presence test of its own. A person's
 azimuth is the pose's `Azimuth`, at their eyes: raw from CLEAN, smoothed at SMOOTH, predicted at
-PREDICT and interpolated at LERP. Show layers and the state machine read LERP poses, the stable eye
-azimuth and its `PlayheadOffset`. Their angles are the calibrator's (`POSE_INSTRUMENT.md`, *The
+PREDICT and interpolated at LERP. The LERP stage runs inside the light tick at `light_rate`, one live root
+field that the conductor's clock, the layers' playhead step (`Tick.interval`) and the LERP interpolators all
+read. Show layers and the state machine read LERP poses, the stable eye azimuth and its `PlayheadOffset`. Their angles are the calibrator's (`POSE_INSTRUMENT.md`, *The
 body*): 0 at neutral, π at raised. Their age is the pose's `Age`. Ghosts are published to their own
 board store (`get_ghosts`), not among the poses. The dummy (`POSE_INSTRUMENT.md`, *The dummy*)
 joins the poses before the LERP filters at its own id, `max_players`, so to every layer it is a
