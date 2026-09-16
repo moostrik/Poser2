@@ -11,8 +11,9 @@ Vocabulary:
 - **min_players** — `states.min_players`, the players the show needs (`studio.json`: 2): that many alike hits
   in a row spin it up, fewer present end it, and END winds back to PLAY once they are back
 - **in sync** — the most recent hits, within one round, whose poses are alike: each hit's posture similarity
-  to the others (the pipeline's kernel and settings, `pose.similarity.window_similarity`, weighted at neutral
-  by the less-moved of the two) at least `sync.threshold`. `sync.hits` is how many in a row, `sync.similarity`
+  to the others (the pipeline's kernel and settings, `pose.similarity.window_similarity`, over the joints its
+  `joints` group selects — `studio.json`: the arms — weighted at neutral by the less-moved of the two) at
+  least `sync.threshold`. `sync.hits` is how many in a row, `sync.similarity`
   their mean; a hit that does not match restarts the count from itself at once. `HitSync`
   (`pose/hit_sync.py`) records each hit's pose off the LERP frame and publishes the streak on the board
 - **neutral** — arms hanging: the most-moved arm joint within `pose.arm_deviation_extractor.min_degrees` of

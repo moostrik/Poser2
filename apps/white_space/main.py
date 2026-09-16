@@ -14,7 +14,6 @@ from modules.tracker import PanoramicTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
 from modules.inference import source, crop, pose
 from modules.session import Session
-from modules.gl import WindowSettings
 
 from .board import Board
 from .pose import GhostFeature, PlayheadOffset, PlayheadOffsetExtractor, Ghoster, Dummy, dummy_id, NeutralWeight, HitSync
@@ -313,7 +312,6 @@ class WhiteSpaceMain:
         # RENDER
         self.render = WindowRender(self.board, self.settings.render, self.settings.track,
                                    self.settings.camera.cameras, self.settings.camera.camera_check, ps.angle_extractor)
-        self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
         self.render.add_update_callback(self.camera_check.update)
         # In order: LERP first, so the hit reads this tick's PlayheadOffset (the same the flash draws on);
         # then HitSync publishes the hit and the streak; then the state machine reads them.
@@ -394,7 +392,3 @@ class WhiteSpaceMain:
             camera.join(timeout=10)
 
         self.is_finished = True
-
-    def _on_render_fps(self, fps: int) -> None:
-        if fps > 0:
-            self.settings.render_fps = float(fps)

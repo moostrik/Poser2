@@ -3,7 +3,7 @@
   "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "render_fps": 60.0,
+  "light_rate": 30.0,
   "light_resolution": 3600,
   "fov": 127.0,
   "resolution": "P720",
@@ -547,6 +547,13 @@
         "method": "HARMONIC_MEAN",
         "use_angle_similarity": true,
         "angle_tolerance": 34.4,
+        "joints": {
+          "left_hip": false,
+          "right_hip": false,
+          "left_knee": false,
+          "right_knee": false,
+          "head": false
+        },
         "use_velocity_similarity": false,
         "velocity_tolerance": 57.3,
         "use_motion_weighting": false,
@@ -614,7 +621,6 @@
     }
   },
   "light": {
-    "light_rate": 30.0,
     "brightness": 1.0,
     "debug": "OFF",
     "motor_simulate": true,

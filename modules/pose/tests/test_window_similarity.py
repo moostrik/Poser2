@@ -68,6 +68,17 @@ class WindowSimilarityTest(unittest.TestCase):
         sim, _ = _similarity()._process({0: _window(_ramp()), 1: _window(_ramp(offset=1.0))})
         self.assertLess(sim[0][1], 0.5)
 
+    def test_unselected_joints_are_neither_compared_nor_counted(self) -> None:
+        # Alike in the arms, opposite in the legs and head: with only the arms selected the pair is fully
+        # similar, and the coverage (the score) is over the four arm joints.
+        similarity = _similarity()
+        for landmark in AngleLandmark:
+            setattr(similarity._config.joints, landmark.name, landmark.value < 4)
+        legs_apart = [np.concatenate([v[:4], v[4:] + 3.0]) for v in _ramp()]
+        sim, _ = similarity._process({0: _window(_ramp()), 1: _window(legs_apart)})
+        self.assertAlmostEqual(sim[0][1], 1.0, places=5)
+        self.assertAlmostEqual(sim[0].scores[1], 1.0, places=5)
+
     def test_leader_score_measures_the_lag(self) -> None:
         # Track 1 repeats track 0's movement k frames later: track 1's current pose is where track 0 was
         # k frames ago, so from track 1's view track 0 leads by k / (T - 1); from track 0's view nobody leads.

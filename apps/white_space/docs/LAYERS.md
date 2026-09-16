@@ -143,7 +143,9 @@ this section is the layer: what it reads, how it composes people, and what it ex
   left/right shoulder, left/right elbow), `LegDeviation` (joint-weighted hip/knee deviation, 0..1),
   `TorsoTilt` (signed sideways lean against the image vertical, −1..1) and `AngleSymmetry` (signed
   left minus right per pair, −1..1); plus presence (the pose itself,
-  *Inputs*), the pairwise `Similarity` row and `PlayheadOffset`. `AngleSymmetry`, `LegDeviation` and
+  *Inputs*), the pairwise `Similarity` row (over the joints `pose.similarity.window_similarity.joints`
+  selects; `studio.json`: the arms — the same row `states.sync.threshold` and `window.sync_threshold`
+  both read) and `PlayheadOffset`. `AngleSymmetry`, `LegDeviation` and
   `TorsoTilt` are also sent to Max (`/pose/{id}/angle/sym`, `/pose/{id}/angle/legs`,
   `/pose/{id}/angle/tilt`) so sound and light read the same values. The layer adds no smoothing: the
   LERP poses are the pipeline's smoothed output.

@@ -9,12 +9,12 @@ from dataclasses import dataclass
 import numpy as np
 
 # Pose imports
-from modules.settings import BaseSettings, Field
+from modules.settings import BaseSettings, Field, Group
 from ..frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
 from ..features import Angles, AngleMotion, AngleVelocity
 from ..features import AggregationMethod
 from ..features import Similarity, LeaderScore
-from .posture_similarity import _JointAggregator, joint_similarity, aggregate_joints
+from .posture_similarity import _JointAggregator, JointSelectSettings, joint_mask, joint_similarity, aggregate_joints
 from modules.utils import PerformanceTimer, HotReloadMethods
 
 import logging
@@ -35,6 +35,7 @@ class WindowSimilaritySettings(BaseSettings):
     method:                 Field[AggregationMethod]  = Field(AggregationMethod.HARMONIC_MEAN, description="Aggregation method")
     use_angle_similarity:   Field[bool]               = Field(True, description="Use angle similarity")
     angle_tolerance:        Field[float]              = Field(45.0, min=1.0, max=120.0, step=1.0, description="Joint angles this far apart still count as similar (°); smaller is stricter")
+    joints:                 Group[JointSelectSettings] = Group(JointSelectSettings)
     use_velocity_similarity: Field[bool]              = Field(True, description="Multiply by velocity similarity")
     velocity_tolerance:     Field[float]              = Field(30.0, min=1.0, max=120.0, step=1.0, description="Joint velocities this far apart still count as similar (°/s); smaller is stricter")
     use_motion_weighting:   Field[bool]               = Field(True, description="Weight similarity by motion")
@@ -55,6 +56,9 @@ class WindowSimilarity:
     Unlike FrameSimilarity which compares single frames, WindowSimilarity compares
     temporal sequences (windows) using time-series similarity algorithms like DTW,
     cross-correlation, or other sequence matching methods.
+
+    ``joints`` selects the joints compared and counted: an unchecked joint is dropped before the per-joint
+    similarities are aggregated, and the coverage is the fraction of the selected joints both people have.
     """
 
     def __init__(self, config: WindowSimilaritySettings | None = None) -> None:
@@ -186,10 +190,11 @@ class WindowSimilarity:
         if self._config.use_velocity_similarity and velocity_windows:
             velocity_values = np.stack([w.masked_values()[-window_length:] for w in velocity_windows.values()], axis=0)
 
-        # Step 2: Compute similarity tensor
-        best_sim, coverage, leader_scores = self._compute_similarity_tensor(values, motion_values, velocity_values)
+        # Step 2: Compute similarity tensor over the selected joints
+        mask = joint_mask(self._config.joints)
+        best_sim, coverage, leader_scores = self._compute_similarity_tensor(values, motion_values, velocity_values, mask)
         # Step 3: Build per-pose dicts
-        similarity_dict = self._build_similarity_dict(track_ids, best_sim, coverage)
+        similarity_dict = self._build_similarity_dict(track_ids, best_sim, coverage, mask)
         leader_dict = self._build_leader_dict(track_ids, leader_scores, coverage)
 
         # Debug: Print per-pose similarities and leader scores
@@ -215,7 +220,8 @@ class WindowSimilarity:
         self,
         values: np.ndarray,
         motion_values: np.ndarray | None = None,
-        velocity_values: np.ndarray | None = None
+        velocity_values: np.ndarray | None = None,
+        mask: np.ndarray | None = None
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute pairwise similarity tensor using current×all comparison.
 
@@ -223,23 +229,24 @@ class WindowSimilarity:
         Uses Gaussian similarity for both angles and velocities.
 
         Missing data is NaN. A joint missing in either person's angles drops out of that comparison; missing
-        velocity leaves the angle similarity unscaled, so joint coverage is decided by angles alone.
+        velocity leaves the angle similarity unscaled, so joint coverage is decided by angles alone. A joint
+        ``mask`` leaves out is neither compared nor counted: coverage is over the selected joints.
 
         Args:
             values: Stacked angle window values (N, T, F), NaN where missing
             motion_values: Stacked motion values (N, T) for weighting, or None
             velocity_values: Stacked velocity values (N, T, F) for similarity, NaN where missing, or None
+            mask: The joints selected, bool (F,); None selects all
 
         Returns:
             best_sim: Similarity per joint at the best-matching frame (N, N, F), NaN for joints not compared
-            coverage: Fraction of joints compared at the best-matching frame (N, N), 0 when nothing overlapped
+            coverage: Fraction of selected joints compared at the best-matching frame (N, N), 0 when nothing overlapped
             leader_scores: Leader score [0, 1] (N, N) - 0=sync, 1=j leads by full window
         """
-        # print(self._config)
-
         angle_tolerance = np.radians(self._config.angle_tolerance)          # the settings are degrees, the angles radians
         velocity_tolerance = np.radians(self._config.velocity_tolerance)
         N, T, F = values.shape
+        included = F if mask is None else int(np.sum(mask))
 
         # Current frame of each person: (N, F)
         current = values[:, -1, :]
@@ -264,6 +271,10 @@ class WindowSimilarity:
             vel_sim = np.where(np.isnan(vel_sim), 1.0, vel_sim)  # missing velocity is neutral
             similarity = similarity * vel_sim  # element-wise per joint
 
+        # Drop the joints not selected: they are neither compared nor counted
+        if mask is not None:
+            similarity = np.where(mask[None, None, None, :], similarity, np.nan)
+
         # Compute whole-body similarity per time step (mean across features)
         # (N, N, T, F) -> (N, N, T)
 
@@ -271,8 +282,8 @@ class WindowSimilarity:
         valid_mask = ~np.isnan(similarity)  # (N, N, T, F)
         joint_count = np.sum(valid_mask, axis=3)  # (N, N, T)
 
-        # Penalize by proportion of missing joints
-        confidence_penalty = joint_count / F  # [0, 1]
+        # Penalize by proportion of the selected joints missing
+        confidence_penalty = joint_count / included if included > 0 else np.zeros_like(joint_count, dtype=np.float32)  # [0, 1]
 
         # Suppress warning for all-NaN slices (handled by nanmean returning NaN)
         with warnings.catch_warnings():
@@ -315,8 +326,9 @@ class WindowSimilarity:
         j_idx = np.arange(N)[None, :]  # (1, N)
         best_sim = similarity[i_idx, j_idx, best_t, :].astype(np.float32)  # (N, N, F)
 
-        # Fraction of joints compared at best_t
-        coverage = (np.sum(~np.isnan(best_sim), axis=2) / F).astype(np.float32)  # (N, N)
+        # Fraction of the selected joints compared at best_t
+        compared = np.sum(~np.isnan(best_sim), axis=2)
+        coverage = (compared / included if included > 0 else np.zeros_like(compared)).astype(np.float32)  # (N, N)
 
         return best_sim, coverage, leader_scores
 
@@ -324,18 +336,20 @@ class WindowSimilarity:
         self,
         track_ids: list[int],
         best_sim: np.ndarray,
-        coverage: np.ndarray
+        coverage: np.ndarray,
+        mask: np.ndarray | None = None
     ) -> dict[int, 'Similarity']:
         """Build per-pose Similarity dict from similarity tensors.
 
-        Each pair's value aggregates the joints both people have, remapped, then scaled by joint coverage so a
-        mostly-occluded pair can't read as fully in sync. The score is the coverage; a pair with no joint in
-        common is NaN with score 0.
+        Each pair's value aggregates the selected joints both people have, remapped, then scaled by joint
+        coverage so a mostly-occluded pair can't read as fully in sync. The score is the coverage; a pair with
+        no joint in common is NaN with score 0.
 
         Args:
             track_ids: List of track IDs (N,)
             best_sim: Similarity per joint (N, N, F), NaN for joints not compared
-            coverage: Fraction of joints compared per pair (N, N)
+            coverage: Fraction of the selected joints compared per pair (N, N)
+            mask: The joints selected, bool (F,); None selects all
 
         Returns:
             Dict mapping track_id -> Similarity object
@@ -358,7 +372,7 @@ class WindowSimilarity:
                 # The shared posture kernel's aggregation (posture_similarity.py): the joints both have,
                 # remapped, times the coverage; NaN joints are skipped
                 value, _ = aggregate_joints(best_sim[i, j], self._config.method,
-                                            self._config.remap_low, self._config.remap_high)
+                                            self._config.remap_low, self._config.remap_high, mask)
 
                 # Store at absolute pose ID index; the score is the fraction of joints compared
                 pose_id_j = track_ids[j]
