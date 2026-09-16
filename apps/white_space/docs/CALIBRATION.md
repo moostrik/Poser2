@@ -501,7 +501,7 @@ own line.
 | `small`     | the box is shorter than the minimum            | `track.height_filter`                               |
 | `dead zone` | a new person arriving at a camera's field edge | `track.seam.dead_zone`                              |
 | `past R3.5` | standing past the far edge                     | `track.zone_filter`, at `track.rig.zone_max_radius` |
-| `no id`     | a new person while every world id is in use    | `num_players`                                       |
+| `no id`     | a new person while every world id is in use    | `max_players`                                       |
 
 So a person walking out keeps their own mark, fading, and when it has gone grey a grey line labelled
 `past R3.5` takes its place for as long as the camera still sees them.

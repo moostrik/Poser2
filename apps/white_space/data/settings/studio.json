@@ -1,5 +1,5 @@
 {
-  "num_players": 6,
+  "max_players": 6,
   "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
@@ -911,11 +911,11 @@
     "intro_idle_bars": 2.0,
     "end_bars": 8.0,
     "dim_level": 0.4,
-    "quorum": 2,
+    "min_players": 2,
     "count_hold_seconds": 1.0,
     "sync": {
       "threshold": 0.5,
-      "mode": "QUORUM"
+      "mode": "MIN_PLAYERS"
     },
     "manual": {
       "select": "PLAY",

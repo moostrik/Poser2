@@ -28,7 +28,7 @@ class LayerId(IntEnum):
     # beam mode — the lamps
     beam_blue_sound     = auto()   # beam: soundscape levels on the left/right blue lamps
     beam_playhead       = auto()   # beam: front white lamp (the searchlight line)
-    beam_flash          = auto()   # beam: flash as the playhead crosses a participant
+    beam_flash          = auto()   # beam: flash as the playhead crosses a player
     beam_wind_down      = auto()   # beam: flood's ending — the two white lamps fading over the spin-down (the wall while fast)
     beam_haunted        = auto()   # beam: player/ghost flash (debug/experimentation)
     beam_test           = auto()   # beam: direct levels for the four physical lamps (debug)
@@ -114,7 +114,7 @@ class LightSettings(BaseSettings):
     """Settings for the LED light system (conductor thread + layers + compositor)."""
 
     # Construction / wiring (INIT — requires restart to take effect)
-    max_poses:        Field[int]   = Field(3,    min=1,   max=16,   access=Field.INIT, description="Max tracked poses")
+    max_players:      Field[int]   = Field(3,    min=1,   max=16,   access=Field.INIT, description="Players tracked at most (shared from the root)")
     num_cameras:      Field[int]   = Field(1,    min=1,   max=16,   access=Field.INIT, description="Number of cameras")
     light_rate:       Field[float] = Field(30.0, min=1,   max=120,  access=Field.INIT, description="Light output frame rate (fps)")
     light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, description="Projection resolution (pixels per turn)")

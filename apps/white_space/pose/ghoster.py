@@ -94,7 +94,7 @@ class _Passive:
 
 class GhosterSettings(BaseSettings):
     """Configuration for ``Ghoster``."""
-    live_players:           Field[int]   = Field(4, access=Field.INIT, description="Live player count (shared from root num_players)")
+    max_players:            Field[int]   = Field(4, access=Field.INIT, description="Players tracked at most (shared from root max_players); the ghost ids start above the dummy's")
     ghost_slots:            Field[int]   = Field(8, access=Field.INIT, description="Ghost id pool size (shared from root num_virtual)")
     enabled:                Field[bool]  = Field(True, description="Record and commit ghosts", newline=True)
     reset:                  Field[bool]  = Field(False, widget=Widget.button, description="Clear all ghosts")
@@ -119,7 +119,7 @@ class Ghoster:
     def __init__(self, settings: GhosterSettings, playhead: Callable[[], float]) -> None:
         self._settings = settings
         self._playhead = playhead   # live playhead (radians) — refreshes each ghost's PlayheadOffset
-        live = settings.live_players
+        live = settings.max_players
         # The id above the live players is the dummy's (`dummy.py`); the ghosts start above it.
         self._ghost_ids: list[int] = list(range(live + 1, live + 1 + settings.ghost_slots))
 

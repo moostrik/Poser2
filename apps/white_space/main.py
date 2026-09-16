@@ -67,9 +67,9 @@ class WhiteSpaceMain:
         self.settings.initialize()
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
-        num_players: int = self.settings.num_players
+        max_players: int = self.settings.max_players
         num_cameras: int = self.settings.camera.num_cameras
-        logging.info("Settings loaded: %s players, %s cameras, simulation=%s", num_players, num_cameras, simulation)
+        logging.info("Settings loaded: %s players, %s cameras, simulation=%s", max_players, num_cameras, simulation)
         ps = self.settings.pose
 
         # BLACKBOARD
@@ -81,7 +81,7 @@ class WhiteSpaceMain:
         self.ghoster = Ghoster(self.settings.pose.ghoster, playhead=self.board.get_playhead)   # live/pool counts shared from root
         # The dummy has its own id between the live players and the ghosts; the LERP stage is
         # built one id wider for it, so it is a pose like any other from there.
-        self.dummy = Dummy(self.settings.PI.dummy, ps.angle_extractor, ps.angle_calibrator, dummy_id(num_players),
+        self.dummy = Dummy(self.settings.PI.dummy, ps.angle_extractor, ps.angle_calibrator, dummy_id(max_players),
                            f"{DATA_PATH}/poses.json")
         self.video_recorder = VideoRecorder(self.settings.record.video, data_path=DATA_PATH)
 
@@ -96,7 +96,7 @@ class WhiteSpaceMain:
             for i in range(num_cameras):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
-        self.tracker = PanoramicTracker(self.settings.track, num_players, num_cameras)
+        self.tracker = PanoramicTracker(self.settings.track, max_players, num_cameras)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.source_uploader = source.Uploader()
         self.crop_extractor = crop.Extractor(ps.image_crop)
@@ -110,9 +110,9 @@ class WhiteSpaceMain:
             camera.add_tracker_callback(self.tracklet_sync_bang.submit_frame)
 
         # DETECTION
-        features.configure_features(num_players)
+        features.configure_features(max_players)
 
-        self.poses_from_tracklets = PosesFromTracklets(ps.tracklets, num_players)
+        self.poses_from_tracklets = PosesFromTracklets(ps.tracklets, max_players)
 
         self.pose_predictor = pose.Predictor(ps.pose)
 
@@ -137,7 +137,7 @@ class WhiteSpaceMain:
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
             wt_features = lerp_features if stage == Stage.LERP else None
-            tracks = num_players + 1 if stage == Stage.LERP else num_players      # LERP also holds the dummy's id
+            tracks = max_players + 1 if stage == Stage.LERP else max_players      # LERP also holds the dummy's id
             wt = window.WindowTracker(tracks, getattr(ps, f'window_{stage.name.lower()}'), features=wt_features)
             wt.add_windows_callback(partial(self.board.set_windows, stage))
             self.window_trackers[stage] = wt
@@ -191,7 +191,7 @@ class WhiteSpaceMain:
                 nodes.AngleCalibrator(ps.angle_calibrator),
                 nodes.AngleVelExtractor(ps.velocity.extractor),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         })
         self.stages[Stage.RAW].add_callback(self.filters_clean.process)
         self.filters_clean.add_frames_callback(self.stages[Stage.CLEAN])
@@ -221,7 +221,7 @@ class WhiteSpaceMain:
                 self.leader_applicator,
                 nodes.SimilarityEuroSmoother(ps.similarity.smoother),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         })
         self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
         self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
@@ -251,7 +251,7 @@ class WhiteSpaceMain:
                 nodes.AzimuthPredictor(ps.azimuth.prediction),
                 nodes.AngleStickyFiller(ps.angle.sticky),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         })
         self.stages[Stage.SMOOTH].add_callback(self.filters_predict.process)
         self.filters_predict.add_frames_callback(self.stages[Stage.PREDICT])
@@ -267,7 +267,7 @@ class WhiteSpaceMain:
                 nodes.SimilarityChaseInterpolator(ps.similarity.interpolator),
                 nodes.AzimuthChaseInterpolator(ps.azimuth.interpolator),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         })
         self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
@@ -283,11 +283,11 @@ class WhiteSpaceMain:
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
                 PlayheadOffsetExtractor(self.board.get_playhead),
             ])
-            for i in range(num_players + 1)                                       # the players and the dummy
+            for i in range(max_players + 1)                                       # the players and the dummy
         })
         self.gate_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([self.motion_gate_applicator])
-            for i in range(num_players + 1)
+            for i in range(max_players + 1)
         })
         self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.set)
         # The dummy joins the interpolated poses before the LERP filters, which stamp on it

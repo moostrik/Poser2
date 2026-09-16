@@ -31,7 +31,7 @@ class NeutralWeightSettings(BaseSettings):
 
 
 class NeutralWeight:
-    """Weights the pairwise similarity rows by the participants' arm deviation; see the module docstring."""
+    """Weights the pairwise similarity rows by the players' arm deviation; see the module docstring."""
 
     def __init__(self, config: NeutralWeightSettings) -> None:
         self._config = config

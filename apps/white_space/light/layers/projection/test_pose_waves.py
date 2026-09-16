@@ -78,7 +78,7 @@ class TestPoseWaves(ProjectionLayer):
     def __init__(
         self,
         resolution: int,
-        num_players: int,
+        max_players: int,
         config: TestPoseWavesSettings,
         tick_interval: float,
         board: Board,
@@ -89,7 +89,7 @@ class TestPoseWaves(ProjectionLayer):
         self._pose_stage = pose_stage
 
         self._player_states: dict[int, PlayerState] = {
-            i: PlayerState() for i in range(num_players)
+            i: PlayerState() for i in range(max_players)
         }
         self._num_active_smoother: OneEuroFilter = OneEuroFilter(
             freq=1.0 / tick_interval, mincutoff=1.0, beta=0.0

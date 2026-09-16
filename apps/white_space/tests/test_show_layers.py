@@ -238,7 +238,7 @@ class PoseInstrumentTest(unittest.TestCase):
     def _connect(self, pose: FakePose):
         self._people({0: pose})
         self._render()
-        return self.layer.connect(self.layer._participants[0])
+        return self.layer.connect(self.layer._players[0])
 
     # -- the connections --
 

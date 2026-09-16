@@ -494,7 +494,7 @@ a person leans: the arms, measured against the leaning torso line, still read as
 read off neutral by the lean, as a person's do. Its sides are named as the pipeline names
 people's, the left on image-right.
 Its frame joins the interpolated
-poses before the LERP filters at its own id, `num_players`, between the live players and the
+poses before the LERP filters at its own id, `max_players`, between the live players and the
 ghosts (which start one above it), so it is a pose like any other from there: the filters stamp
 the playhead offset, the symmetries, the leg deviation and the bend on it, the render draws its
 figure over the projection row where it stands (as it does every pose, `render.pose_figures`)

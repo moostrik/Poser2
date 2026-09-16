@@ -6,19 +6,19 @@ tunables live in the `states` settings group; each state returns its mix from `u
 
 Vocabulary:
 
-- **P** — the live participant count: the LERP poses (`LAYERS.md`, *Inputs*), debounced
+- **P** — the live player count: the LERP poses (`LAYERS.md`, *Inputs*), debounced
   by `states.count_hold_seconds`
-- **quorum** — `states.quorum`, the participants the show needs (`studio.json`: 2): a group that large in
+- **min_players** — `states.min_players`, the players the show needs (`studio.json`: 2): a group that large in
   sync spins it up, fewer present end it, and END winds back to PLAY once they are back
-- **in sync** — a group of participants each of whose posture similarity to the other members (the
+- **in sync** — a group of players each of whose posture similarity to the other members (the
   harmonic mean of their `Similarity` row at the members' ids, LERP frames) is at least `sync.threshold`;
-  `sync.in_sync` is the size of the largest such group, `sync.similarity` its mean similarity
+  `sync.players` is the size of the largest such group, `sync.similarity` its mean similarity
 - **neutral** — arms hanging: the most-moved arm joint within `pose.arm_deviation_extractor.min_degrees` of
   it (`ArmDeviation` 0; 1 from `max_degrees`, linear between). A pair's similarity is weighted by its
   less-moved member's deviation (`pose/neutral_weight.py`, before the frames are stamped and smoothed), so a
   pair with a person at neutral reads 0 and a pose leaving neutral never jumps the sync
 - **bar** — one full playhead cycle, the content clock
-- **hit** — the tick the playhead is closest to a participant: the tick a one-frame `beam_flash` lights
+- **hit** — the tick the playhead is closest to a player: the tick a one-frame `beam_flash` lights
   (`statemachine/machine.py` `_detect_hit`)
 - **readout mode** — the fixture reads beam mode below 200 rpm and projection mode at or above, switching
   on receipt of the *commanded* rpm (see `CALIBRATION.md` *Two modes, two offsets*). A spin-up is in
@@ -34,19 +34,19 @@ Vocabulary:
 
 ## Summary
 
-| #   | State      | P            | Duration                       | Motor      | White                              | Blue                 | Pose sound | Secondary sound               |
-|-----|------------|--------------|--------------------------------|------------|------------------------------------|----------------------|------------|-------------------------------|
-| S0  | OFF        | —            | until unpinned and locked      | BEAM       | none                               | none                 | no         | none                          |
-| S1  | OFF_IDLE   | —            | `off_idle_bars`                | BEAM       | dark → BRIGHT line                 | none → sound visuals | no         | none → soundscape             |
-| S2  | IDLE       | 0            | ∞                              | BEAM       | BRIGHT line                        | sound visuals        | no         | soundscape                    |
-| S3  | IDLE_INTRO | > 0          | until hit                      | BEAM       | BRIGHT line                        | sound visuals        | before hit | soundscape + anticipatory cue |
-| S4  | INTRO      | > 0          | ∞                              | BEAM       | DIM line + flash on hit            | none                 | yes        | none                          |
-| S5  | INTRO_IDLE | 0            | `intro_idle_bars`              | BEAM       | DIM → BRIGHT line                  | none → sound visuals | no         | none → soundscape             |
-| S6  | INTRO_PLAY | ≥ quorum     | `spin_up_seconds`              | PROJECTION | dark → instrument + playhead       | none → instrument    | yes        | enhance spin-up chaos         |
-| S7  | PLAY       | ≥ quorum     | ∞                              | PROJECTION | instrument + playhead              | instrument           | yes        | enhance spin                  |
-| S8  | END        | < quorum     | `end_bars`, both ways          | PROJECTION | instrument + playhead → full white | instrument → none    | open       | enhance spin → none           |
-| S9  | END_INTRO  | < quorum, >0 | `spin_down_seconds`, then lock | BEAM       | wall → DIM line                    | none                 | open       | open                          |
-| S10 | END_IDLE   | 0            | `spin_down_seconds`, then lock | BEAM       | wall → BRIGHT line                 | none → sound visuals | open       | open                          |
+| #   | State      | P                 | Duration                       | Motor      | White                              | Blue                 | Pose sound | Secondary sound               |
+|-----|------------|-------------------|--------------------------------|------------|------------------------------------|----------------------|------------|-------------------------------|
+| S0  | OFF        | —                 | until unpinned and locked      | BEAM       | none                               | none                 | no         | none                          |
+| S1  | OFF_IDLE   | —                 | `off_idle_bars`                | BEAM       | dark → BRIGHT line                 | none → sound visuals | no         | none → soundscape             |
+| S2  | IDLE       | 0                 | ∞                              | BEAM       | BRIGHT line                        | sound visuals        | no         | soundscape                    |
+| S3  | IDLE_INTRO | > 0               | until hit                      | BEAM       | BRIGHT line                        | sound visuals        | before hit | soundscape + anticipatory cue |
+| S4  | INTRO      | > 0               | ∞                              | BEAM       | DIM line + flash on hit            | none                 | yes        | none                          |
+| S5  | INTRO_IDLE | 0                 | `intro_idle_bars`              | BEAM       | DIM → BRIGHT line                  | none → sound visuals | no         | none → soundscape             |
+| S6  | INTRO_PLAY | ≥ min_players     | `spin_up_seconds`              | PROJECTION | dark → instrument + playhead       | none → instrument    | yes        | enhance spin-up chaos         |
+| S7  | PLAY       | ≥ min_players     | ∞                              | PROJECTION | instrument + playhead              | instrument           | yes        | enhance spin                  |
+| S8  | END        | < min_players     | `end_bars`, both ways          | PROJECTION | instrument + playhead → full white | instrument → none    | open       | enhance spin → none           |
+| S9  | END_INTRO  | < min_players, >0 | `spin_down_seconds`, then lock | BEAM       | wall → DIM line                    | none                 | open       | open                          |
+| S10 | END_IDLE   | 0                 | `spin_down_seconds`, then lock | BEAM       | wall → BRIGHT line                 | none → sound visuals | open       | open                          |
 
 Durations name settings in the `states` group; `studio.json` sets `off_idle_bars` 1, `intro_idle_bars` 2,
 `spin_up_seconds` 14, `end_bars` 8 and `spin_down_seconds` 6. `open` cells are listed under *Open*. The
@@ -66,11 +66,11 @@ stateDiagram-v2
     IDLE_INTRO --> INTRO: hit by light
     IDLE_INTRO --> INTRO_IDLE: P == 0
     INTRO --> INTRO_IDLE: P == 0
-    INTRO --> INTRO_PLAY: a group in sync (sync.mode) & P ≥ quorum\n(session - after fixed time)
+    INTRO --> INTRO_PLAY: a group in sync (sync.mode) & P ≥ min_players\n(session - after fixed time)
     INTRO_IDLE --> IDLE: intro_idle_bars
     INTRO_PLAY --> PLAY: spin_up_seconds
-    PLAY --> END: P < quorum (stand-alone)\n(session - after fixed time)
-    END --> PLAY: P ≥ quorum — winds back first\n(stand-alone only)
+    PLAY --> END: P < min_players (stand-alone)\n(session - after fixed time)
+    END --> PLAY: P ≥ min_players — winds back first\n(stand-alone only)
     END --> END_INTRO: wound down, P > 0
     END --> END_IDLE: wound down, P == 0
     END_INTRO --> INTRO: fade done and BEAM reacquired
@@ -142,7 +142,7 @@ Two things can hold it, and the exit waits for both to clear: the operator's pin
 physics (the playhead not yet locked at BEAM — at boot the motor comes up from a standstill and needs a few
 revolutions to lock). After a blackout the lock is already there, so the wake starts at once.
 
-- **Participants**: — (ignored) · **Duration**: as long as `blackout` is pinned or the playhead is
+- **Players**: — (ignored) · **Duration**: as long as `blackout` is pinned or the playhead is
   unlocked · **Motor**: BEAM
 - **Transitions**: **in** — boot; or pinning `states.blackout`, the machine's highest-priority input: from
   any state, beating `hold` and `goto`. **out** — `blackout` released *and* playhead lock → S1 OFF_IDLE. A
@@ -157,12 +157,12 @@ The wake, at boot and after a blackout alike. OFF has let go (blackout released,
 `off_idle_bars` the searchlight and the soundscape fade up out of the dark into IDLE's look. The sweep is already
 running and locked underneath; only the light returns.
 
-If the sweep crosses a participant mid-fade the intro begins right there (the hit's own flash covers the
+If the sweep crosses a player mid-fade the intro begins right there (the hit's own flash covers the
 step from the fading level to INTRO's dim line). With people present but not yet hit it lands in IDLE and
 moves straight on to IDLE_INTRO — the identical look, so seamless — to wait for the sweep: the room is
 re-introduced by the light rather than dropped into the middle of INTRO.
 
-- **Participants**: — (either way) · **Duration**: `off_idle_bars` · **Motor**: BEAM
+- **Players**: — (either way) · **Duration**: `off_idle_bars` · **Motor**: BEAM
 - **Transitions**
   1. hit → S4 INTRO
   2. fade complete → S2 IDLE
@@ -175,7 +175,7 @@ re-introduced by the light rather than dropped into the middle of INTRO.
 The white searchlight (playhead) spins slowly through the empty space, supported by an atmospheric
 soundscape that evokes curiosity and plays on both blue lamps.
 
-- **Participants**: 0 · **Duration**: ∞ · **Motor**: BEAM
+- **Players**: 0 · **Duration**: ∞ · **Motor**: BEAM
 - **Transitions**
   1. P > 0 → S3 IDLE_INTRO
 - **Mix**: `beam_playhead` 1.0 · `beam_blue_sound` 1.0
@@ -191,7 +191,7 @@ the pose instrument starts a little *before* the actual hit — this anticipatio
 exists. When the bright beam strikes the person the intro begins: the line snaps to dim and the soundscape
 stops.
 
-- **Participants**: > 0 · **Duration**: until hit · **Motor**: BEAM
+- **Players**: > 0 · **Duration**: until hit · **Motor**: BEAM
 - **Transitions**
   1. hit by light → S4 INTRO
   2. P == 0 → S5 INTRO_IDLE *(the person left before being hit; INTRO_IDLE ramps from its entry
@@ -205,16 +205,16 @@ stops.
 ## S4 — INTRO
 
 The pose instrument is introduced. Neutral poses give a glass ping; arms raised gives a heavy bass; all
-other arm positions give unique sounds. The dim playhead flashes bright as it crosses each participant.
+other arm positions give unique sounds. The dim playhead flashes bright as it crosses each player.
 
-- **Participants**: > 0 · **Duration**: ∞ · **Motor**: BEAM
+- **Players**: > 0 · **Duration**: ∞ · **Motor**: BEAM
 - **Transitions**
   1. P == 0 → S5 INTRO_IDLE
-  2. a group **in sync** (*Vocabulary*) at least `sync.mode` large (the quorum / all−1 / all) and P ≥ quorum →
+  2. a group **in sync** (*Vocabulary*) at least `sync.mode` large (the min_players / all−1 / all) and P ≥ min_players →
      S6 INTRO_PLAY. The similarity is the posture similarity (current pose against current pose,
      `WindowSimilarity` at `window_length` 1), weighted at neutral, read from the `Similarity` feature of the
      LERP pose frames, smoothed by the Euro smoother and the chase interpolator. A person at neutral matches
-     nobody and joins no group, so a bystander never blocks the quorum; in ALL everybody must be in the group
+     nobody and joins no group, so a bystander never blocks the min_players; in ALL everybody must be in the group
   3. session: elapsed ≥ `session.intro_seconds` → S6 INTRO_PLAY *(checked after P == 0, so an empty room
      never spins up)*
 - **Mix**: `beam_playhead` DIM · `beam_flash` 1.0 (reset on entry)
@@ -225,10 +225,10 @@ other arm positions give unique sounds. The dim playhead flashes bright as it cr
 
 ## S5 — INTRO_IDLE
 
-The participants have left mid-intro. Over `intro_idle_bars` the dim line fades back to the bright searchlight and
+The players have left mid-intro. Over `intro_idle_bars` the dim line fades back to the bright searchlight and
 the soundscape fades back in.
 
-- **Participants**: 0 · **Duration**: `intro_idle_bars` · **Motor**: BEAM
+- **Players**: 0 · **Duration**: `intro_idle_bars` · **Motor**: BEAM
 - **Transitions**
   1. bars ≥ `intro_idle_bars` → S2 IDLE
 - **Mix**: `beam_playhead` ramp(entry level → 1.0) · `beam_blue_sound` ramp(entry level → 1.0)
@@ -240,10 +240,10 @@ the soundscape fades back in.
 
 ## S6 — INTRO_PLAY
 
-The participants have synced their poses: the machine spins up. The pose instrument takes over from the
+The players have synced their poses: the machine spins up. The pose instrument takes over from the
 line during the spin-up, and the sound enhances the accelerating chaos.
 
-- **Participants**: ≥ quorum (session: > 0) · **Duration**: spin-up (`spin_up_seconds`) · **Motor**: PROJECTION
+- **Players**: ≥ min_players (session: > 0) · **Duration**: spin-up (`spin_up_seconds`) · **Motor**: PROJECTION
 - **Transitions**
   1. elapsed ≥ `spin_up_seconds` → S7 PLAY *(stands in for "at motor top speed": the sensor is blind above
      200 rpm, so time approximates it)*
@@ -261,32 +261,32 @@ line during the spin-up, and the sound enhances the accelerating chaos.
 
 ## S7 — PLAY
 
-The participants play the instrument, creating music and light patterns. The space between participants
+The players play the instrument, creating music and light patterns. The space between players
 holding the same pose fills with light.
 
-- **Participants**: ≥ quorum (session: any) · **Duration**: ∞ (session: `session.play_seconds`) · **Motor**: PROJECTION
+- **Players**: ≥ min_players (session: any) · **Duration**: ∞ (session: `session.play_seconds`) · **Motor**: PROJECTION
 - **Transitions**
-  1. stand-alone: P < quorum (debounced) → S8 END
+  1. stand-alone: P < min_players (debounced) → S8 END
   2. session: elapsed ≥ `session.play_seconds` → S8 END *(the count is not checked: a session plays out
      its time)*
 - **Mix**: `pose_instrument` 1.0 · `projection_playhead` 1.0
 - **White**: the pose instrument — patterns per pose plus the sync fill between similarly-posed
-  participants — and the playhead line at full white
+  players — and the playhead line at full white
 - **Blue**: pose instrument (`pose_instrument`'s blue)
 - **Pose sound**: yes
 - **Secondary sound**: ENHANCE spin
 
 ## S8 — END
 
-Fewer than the quorum remain: the machine begins its end. Over `end_bars` the light crosses to full
-white and the sound reflects it. If participants return, the white winds back and PLAY resumes — the ramp
+Fewer than the min_players remain: the machine begins its end. Over `end_bars` the light crosses to full
+white and the sound reflects it. If players return, the white winds back and PLAY resumes — the ramp
 runs both ways, never jumping, and at p = 0 the mix equals PLAY's, so the hand-over back is seamless.
 
-- **Participants**: < quorum · **Duration**: `end_bars` bars, bidirectional · **Motor**: PROJECTION
+- **Players**: < min_players · **Duration**: `end_bars` bars, bidirectional · **Motor**: PROJECTION
 - **Transitions**
   1. wound down (p ≥ 1) and P > 0 → S9 END_INTRO
   2. wound down (p ≥ 1) and P == 0 → S10 END_IDLE
-  3. wound back (p ≤ 0) and P ≥ quorum → S7 PLAY *(stand-alone only; in session mode the wind-back is disabled
+  3. wound back (p ≤ 0) and P ≥ min_players → S7 PLAY *(stand-alone only; in session mode the wind-back is disabled
      so a session always concludes)*
 - **Mix**: `pose_instrument` 1−p · `projection_playhead` 1−p · `flood` ease-out(p)
 - **White**: instrument and playhead line fade as the flood crosses to full white
@@ -297,7 +297,7 @@ runs both ways, never jumping, and at p = 0 the mix equals PLAY's, so the hand-o
 
 ## S9 — END_INTRO
 
-Participants remain, so the machine returns to the intro: the wall of white **fades away during the
+Players remain, so the machine returns to the intro: the wall of white **fades away during the
 spin-down**, revealing the dim playhead line underneath. The fade is timed; the state hands over once it
 is complete and the playhead lock holds, because the landing state needs a live playhead.
 
@@ -305,7 +305,7 @@ The fade lives in the `beam_wind_down` layer, not in the mix weights (see `LAYER
 It is timed rather than driven by the measured deceleration because the sensor is silent above 200 rpm;
 `states.spin_down_seconds`, beside `spin_up_seconds`, is tuned by hand to the physical spin-down.
 
-- **Participants**: < quorum, > 0 · **Duration**: the spin-down (fade complete, then the lock) · **Motor**: BEAM
+- **Players**: < min_players, > 0 · **Duration**: the spin-down (fade complete, then the lock) · **Motor**: BEAM
 - **Transitions**
   1. fade complete (`progress` ≥ 1) and playhead lock → S4 INTRO
 - **Mix**: `beam_wind_down` 1.0 · `beam_playhead` DIM — **constant weights**; the dynamics live inside
@@ -327,7 +327,7 @@ line; the distortion disappears and the searchlight soundscape returns with it. 
 `beam_wind_down` owns the timed fade, and the state hands over once it is complete and the playhead lock
 holds — landing on the BRIGHT line instead of the dim one.
 
-- **Participants**: 0 · **Duration**: the spin-down (fade complete, then the lock) · **Motor**: BEAM
+- **Players**: 0 · **Duration**: the spin-down (fade complete, then the lock) · **Motor**: BEAM
 - **Transitions**
   1. fade complete (`progress` ≥ 1) and playhead lock → S2 IDLE
 - **Mix**: `beam_wind_down` 1.0 · `beam_playhead` 1.0 · `beam_blue_sound` p — the line at constant full

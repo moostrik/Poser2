@@ -54,9 +54,9 @@ class Render(RenderBase):
                  cameras: list[CameraSettings], camera_check: CameraCheckSettings,
                  angle_extractor: AngleExtractorSettings) -> None:
         super().__init__(settings.window)
-        self.num_players: int = settings.num_players
+        self.max_players: int = settings.max_players
         self.num_cams: int = settings.num_cams
-        self.dummy_id: int = dummy_id(self.num_players)
+        self.dummy_id: int = dummy_id(self.max_players)
         self._pose_slots: list[int | None] = [None] * POSE_SLOTS     # POSE layout: which pose is in which slot
         self.settings: RenderSettings = settings
         # The tracker's own geometry, live. Anything drawing the tracker's world has to use the
@@ -81,7 +81,7 @@ class Render(RenderBase):
         # Row 5 — per-player: pose compositor + data overlays
         # cam_image[0] texture used as fallback for non-GPU crop path (GPU crop is default)
         fallback_cam_texture = self.L[Layers.cam_image][0].texture
-        for i in range(self.num_players):
+        for i in range(self.max_players):
             self.L[Layers.poser][i]     = PoseCompositor(
                 i, board,
                 fallback_cam_texture,
@@ -160,8 +160,8 @@ class Render(RenderBase):
         if view in (CameraView.PANORAMA, CameraView.BOTH):
             rows.append(self._panorama_row())
         rows.append(projection)
-        # The pose row: one column per player, and the dummy's last (index num_players, its id).
-        rows.append(SubdivisionRow(name='pose', columns=self.num_players + 1, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0)))
+        # The pose row: one column per player, and the dummy's last (index max_players, its id).
+        rows.append(SubdivisionRow(name='pose', columns=self.max_players + 1, rows=1, src_aspect_ratio=0.75, padding=Point2f(1.0, 1.0)))
         return rows
 
     def _hidden_layers(self) -> set[Layers]:
@@ -235,16 +235,16 @@ class Render(RenderBase):
             self.L[Layers.ws_figures][0].allocate(w, h, GL_RGBA)
 
         if self.subdivision.has('pose'):
-            for i in range(self.num_players):
+            for i in range(self.max_players):
                 w, h = self.subdivision.get_allocation_size('pose', i)
                 self.L[Layers.poser][i].allocate(w, h, GL_RGBA)
-            w, h = self.subdivision.get_allocation_size('pose', self.num_players)
+            w, h = self.subdivision.get_allocation_size('pose', self.max_players)
             self.L[Layers.dummy_pose][self.dummy_id].allocate(w, h, GL_RGBA)
 
         # POSE layout: any pose may land in a slot, so every skeleton layer takes the slot's size.
         if self.subdivision.has('slots'):
             w, h = self.subdivision.get_allocation_size('slots', 0)
-            for track_id in range(self.num_players + 1):
+            for track_id in range(self.max_players + 1):
                 self._skeleton(track_id).allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
@@ -327,7 +327,7 @@ class Render(RenderBase):
 
         # Row 4 - pose cutouts with data overlays, one viewport per player, the dummy's last
         if self.subdivision.has('pose'):
-            for track_id in range(self.num_players + 1):
+            for track_id in range(self.max_players + 1):
                 self._viewport(height, self.subdivision.get_rect('pose', track_id))
                 self._skeleton(track_id).draw()
                 self._draw_data_overlays(track_id)

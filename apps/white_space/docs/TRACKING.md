@@ -35,7 +35,7 @@ switch, a duplicate box — is a device-tracker setting first.
 
 Each device track becomes an **observation** with a host-owned `obs_id` that is never reused. An
 observation is immutable and always carries its own camera's box and angles. Observations are
-grouped into **worlds**, one per person. A world id comes from a pool of `num_players` ids (6) and
+grouped into **worlds**, one per person. A world id comes from a pool of `max_players` ids (6) and
 is the id everything downstream uses (`/pose/N`); a freed id goes to the back of the queue, so it
 is reused as late as possible.
 

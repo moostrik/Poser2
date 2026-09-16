@@ -84,9 +84,9 @@ class StateBase:
         """Advance or wind back a bidirectional ramp by ``delta``, clamped to [0, 1]."""
         return _clamp(p + delta if forward else p - delta)
 
-    def _sync_required(self, participants: int) -> int:
-        """How many participants ``sync.mode`` wants in sync for the spin-up."""
-        return SyncMode(int(self._config.sync.mode)).required(participants, self._config.quorum)
+    def _sync_required(self, players: int) -> int:
+        """How many players ``sync.mode`` wants in sync for the spin-up."""
+        return SyncMode(int(self._config.sync.mode)).required(players, self._config.min_players)
 
 
 # -- Steady states ---------------------------------------------------------------
@@ -112,7 +112,7 @@ class IdleState(StateBase):
         return [(LayerId.beam_playhead, 1.0), (LayerId.beam_blue_sound, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
-        if ctx.participants > 0:
+        if ctx.players > 0:
             return StateId.IDLE_INTRO
         return None
 
@@ -127,7 +127,7 @@ class IdleIntroState(StateBase):
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.hit:
             return StateId.INTRO
-        if ctx.participants == 0:       # left before being hit → wind back via INTRO_IDLE
+        if ctx.players == 0:       # left before being hit → wind back via INTRO_IDLE
             return StateId.INTRO_IDLE
         return None
 
@@ -143,10 +143,10 @@ class IntroState(StateBase):
         return [(LayerId.beam_playhead, self._config.dim_level), (LayerId.beam_flash, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
-        if ctx.participants == 0:       # before the session timeout: an empty room never spins up
+        if ctx.players == 0:       # before the session timeout: an empty room never spins up
             return StateId.INTRO_IDLE
-        # A large enough group in sync (sync.mode: the quorum / all−1 / all) launches the spin-up.
-        if ctx.sync_count >= self._sync_required(ctx.participants) and ctx.participants >= self._config.quorum:
+        # A large enough group in sync (sync.mode: the min_players / all−1 / all) launches the spin-up.
+        if ctx.sync_players >= self._sync_required(ctx.players) and ctx.players >= self._config.min_players:
             return StateId.INTRO_PLAY
         if ctx.session and ctx.elapsed >= self._config.session.intro_seconds:
             return StateId.INTRO_PLAY
@@ -165,7 +165,7 @@ class PlayState(StateBase):
             if ctx.elapsed >= self._config.session.play_seconds:
                 return StateId.END
             return None
-        if ctx.participants < self._config.quorum:
+        if ctx.players < self._config.min_players:
             return StateId.END
         return None
 
@@ -267,7 +267,7 @@ class EndState(StateBase):
         self._p = 0.0
 
     def update(self, ctx: StateContext) -> Mix:
-        forward = ctx.participants < self._config.quorum or ctx.session
+        forward = ctx.players < self._config.min_players or ctx.session
         self._p = self._ramp(self._p, ctx.dbar / self._config.end_bars, forward)
         # One ramp gives both CSV behaviors: the flood crosses the white to full while the
         # blue fades out with the instrument (the instrument is the only blue source).
@@ -277,8 +277,8 @@ class EndState(StateBase):
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if self._p >= 1.0:
-            return StateId.END_INTRO if ctx.participants > 0 else StateId.END_IDLE
-        if self._p <= 0.0 and not ctx.session and ctx.participants >= self._config.quorum:
+            return StateId.END_INTRO if ctx.players > 0 else StateId.END_IDLE
+        if self._p <= 0.0 and not ctx.session and ctx.players >= self._config.min_players:
             return StateId.PLAY
         return None
 

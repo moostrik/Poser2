@@ -62,7 +62,7 @@ class Conductor(Thread):
         self._clock                 = Clock(config.clock, config.light_rate)
 
         resolution: int             = config.light_resolution
-        num_players: int            = config.max_poses
+        max_players: int            = config.max_players
 
         # The unified layer pool — one instance per LayerId, each reading its own settings
         # group (beam_layers / projection_layers, mirroring the folder taxonomy); each layer's
@@ -85,7 +85,7 @@ class Conductor(Thread):
             LayerId.test_chase:          TestChase          (resolution, HI.test_chase,          board),
             LayerId.test_lines:          TestLines          (resolution, HI.test_lines,          board),
             LayerId.test_random:         TestRandom         (resolution, HI.test_random,         board),
-            LayerId.test_pose_waves:     TestPoseWaves      (resolution, num_players, HI.test_pose_waves, self._clock.interval, board, pose_stage),
+            LayerId.test_pose_waves:     TestPoseWaves      (resolution, max_players, HI.test_pose_waves, self._clock.interval, board, pose_stage),
             LayerId.test_harmonic:       TestHarmonic       (resolution, HI.test_harmonic,       board),
         }
 

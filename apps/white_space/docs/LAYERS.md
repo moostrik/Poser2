@@ -33,7 +33,7 @@ PREDICT and interpolated at LERP. Show layers and the state machine read LERP po
 azimuth and its `PlayheadOffset`. Their angles are the calibrator's (`POSE_INSTRUMENT.md`, *The
 body*): 0 at neutral, π at raised. Their age is the pose's `Age`. Ghosts are published to their own
 board store (`get_ghosts`), not among the poses. The dummy (`POSE_INSTRUMENT.md`, *The dummy*)
-joins the poses before the LERP filters at its own id, `num_players`, so to every layer it is a
+joins the poses before the LERP filters at its own id, `max_players`, so to every layer it is a
 person; the ghosts' ids start above it. The render draws every LERP pose as a figure over the
 projection row at its azimuth (`render.pose_figures`). How the tracker produces the poses is in
 `TRACKING.md`, *Downstream*.
@@ -181,7 +181,7 @@ playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJ
 
 ### Presence, tuning, reset
 
-- **Presence**: per participant attack (`presence.attack_seconds`: the window opens from the mask)
+- **Presence**: per player attack (`presence.attack_seconds`: the window opens from the mask)
   and release (`presence.release_seconds`: the last pose is held while the window closes and the mask
   dims). A pose with a NaN azimuth has no place in the projection and counts as absent (it releases),
   the one exception to *Inputs*' no-presence-test rule.
@@ -189,7 +189,7 @@ playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJ
   from the panel and saved in the preset; the connections are code. `connect`, the drawing math
   (`PoseInstrument`, `LinePattern`) hot-reload on save; adding a setting needs a restart.
 - **Settings**: the layer's own group holds only `blend`; everything else is `PI`
-- **Reset**: forgets every participant and pass (S6's entry, a fresh instrument per cycle)
+- **Reset**: forgets every player and pass (S6's entry, a fresh instrument per cycle)
 - **Relation to `pose_waves`**: the old wave/void instrument lives on as `test_pose_waves` (debug
   override), a reference/montage visual.
 
@@ -200,6 +200,6 @@ playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJ
 - **beam_blue_sound**: fallback choice (off vs idle pulse); exact `/WS/sound/level` scaling agreed
   with Max (linear 0..1 vs dB)
 - **pose_instrument**: see `POSE_INSTRUMENT.md`, *Open*
-- **Sync thresholds**: `states.sync.threshold` (per participant, INTRO → INTRO_PLAY) and
+- **Sync thresholds**: `states.sync.threshold` (per player, INTRO → INTRO_PLAY) and
   `PI.window.sync_threshold` (pairwise, the window opening) measure different quantities and are
   tuned separately; whether they should share one value

@@ -78,10 +78,10 @@ NEUTRAL = 'neutral'                                               # the saved po
 CIRCULAR: frozenset[str] = frozenset(MEASURES) - {'torso'}
 
 
-def dummy_id(num_players: int) -> int:
-    """The dummy's track id: its own, between the live players (0 … num_players − 1) and the
+def dummy_id(max_players: int) -> int:
+    """The dummy's track id: its own, between the live players (0 … max_players − 1) and the
     ghosts, which start one above it."""
-    return num_players
+    return max_players
 
 _P = PointLandmark
 # A standing figure in square-pixel units, centred on x = 0.5, its sides named as the pipeline

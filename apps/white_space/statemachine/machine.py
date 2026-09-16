@@ -3,7 +3,7 @@
 A condition-driven state machine that plays the states designed in ``docs/STATES.md``
 (the source of truth): a sequencer hybrid, progress-driven *within* a state and
 condition-driven *between* states. Each tick (on the Conductor's light thread) it builds a
-``StateContext`` from the board (participants, hit-by-light, the pose frames' ``Similarity`` for the
+``StateContext`` from the board (players, hit-by-light, the pose frames' ``Similarity`` for the
 sync condition, the playhead's content clock and lock signals), lets the active state return its
 mix, evaluates that state's transition conditions, and emits a ``SequencerState`` snapshot for
 the board and OSC sound.
@@ -44,7 +44,7 @@ _TINY = 1e-5   # the zero guard NormalizedScalarFeature uses for its harmonic me
 
 
 def _largest_sync_group(frames: FrameDict, threshold: float) -> tuple[int, float]:
-    """The largest group of present participants in sync with each other — every member's harmonic mean of
+    """The largest group of present players in sync with each other — every member's harmonic mean of
     their ``Similarity`` toward the other members (strict: one poor match pulls it down) at or above
     ``threshold`` — as ``(size, the group's mean value)``; the best group of that size when several qualify,
     ``(0, 0.0)`` when no two are in sync. The rows already carry the neutral weight, so a person at neutral
@@ -81,10 +81,10 @@ class StateContext:
     bars:    float          # playhead bars since state entry (one-way bar ramps)
     dt:      float          # this tick's wall-clock delta (bidirectional ramps integrate these)
     dbar:    float          # this tick's bar delta
-    participants: int       # debounced live participant count (ghosts excluded)
+    players: int       # debounced live player count (ghosts excluded)
     sync:    float          # mean similarity within the largest group in sync (0..1; 0 when no two are)
-    sync_count: int         # size of the largest group in sync with each other (each member ≥ sync.threshold toward the others)
-    hit:     bool           # this tick the playhead is closest to a live participant (the flash tick)
+    sync_players: int         # size of the largest group in sync with each other (each member ≥ sync.threshold toward the others)
+    hit:     bool           # this tick the playhead is closest to a live player (the flash tick)
     session: bool           # session mode active — states consult it in needs_state_change()
     blackout: bool          # the pinned blackout toggle — OFF stays put while pinned and
                             # wakes through OFF_IDLE once released and the playhead lock holds
@@ -139,7 +139,7 @@ class StateMachine:
         self._prev_state: StateId | None = None   # where the current state was entered from
 
         # Condition inputs
-        self._eff_participants: int | None = None   # debounced count (None until first tick)
+        self._eff_players: int | None = None   # debounced count (None until first tick)
         self._pending_count: int = 0
         self._pending_since: float = 0.0
         self._prev_offsets: dict[int, float] = {}   # per-id PlayheadOffset for hit detection
@@ -170,24 +170,24 @@ class StateMachine:
         """The largest group in sync with each other, from the pose frames' ``Similarity``: (size, mean)."""
         return _largest_sync_group(frames, self._config.sync.threshold)
 
-    def _debounced_participants(self, now: float, live_ids: set[int]) -> int:
-        """Live participant count — the people with a pose — debounced by count_hold_seconds so
+    def _debounced_players(self, now: float, live_ids: set[int]) -> int:
+        """Live player count — the people with a pose — debounced by count_hold_seconds so
         occlusion/re-acquisition flicker can't fire transitions."""
         raw = len(live_ids)
-        if self._eff_participants is None:
-            self._eff_participants = raw            # first tick: no startup delay
+        if self._eff_players is None:
+            self._eff_players = raw            # first tick: no startup delay
             self._pending_count = raw
-        elif raw == self._eff_participants:
+        elif raw == self._eff_players:
             self._pending_count = raw               # settled — disarm any pending change
         elif raw != self._pending_count:
             self._pending_count = raw               # new candidate — start the hold window
             self._pending_since = now
         elif now - self._pending_since >= self._config.count_hold_seconds:
-            self._eff_participants = raw            # candidate held long enough
-        return self._eff_participants
+            self._eff_players = raw            # candidate held long enough
+        return self._eff_players
 
     def _detect_hit(self, frames: FrameDict) -> bool:
-        """True when this tick is the one the playhead is closest to a live participant — the tick a
+        """True when this tick is the one the playhead is closest to a live player — the tick a
         one-frame ``beam_flash`` lights (``ticks_to_crossing`` < ½ step at ``beam_rpm``). A
         PlayheadOffset sign flip + → − also counts, so a pass a jittered step skipped is still a hit;
         the ±π wrap flips − → +, so it never false-fires."""
@@ -209,16 +209,16 @@ class StateMachine:
         return hit
 
     def _build_context(self, now: float, dt: float, signals,
-                       participants: int, hit: bool) -> StateContext:
-        sync_count, sync = self._tick_sync
+                       players: int, hit: bool) -> StateContext:
+        sync_players, sync = self._tick_sync
         return StateContext(
             elapsed=now - self._entered_time,
             bars=signals.bars - self._entered_bars,
             dt=dt,
             dbar=signals.bars - self._prev_bars,
-            participants=participants,
+            players=players,
             sync=sync,
-            sync_count=sync_count,
+            sync_players=sync_players,
             hit=hit,
             session=self._config.session.enabled,
             blackout=self._config.blackout,
@@ -237,7 +237,7 @@ class StateMachine:
 
         # The people present are the people with a pose: `pose.tracklets.detection_timeout` decides.
         frames = self._board.get_frames(self._pose_stage)
-        participants = self._debounced_participants(now, set(frames.keys()))
+        players = self._debounced_players(now, set(frames.keys()))
         hit = self._detect_hit(frames)
         self._tick_sync = self._sync_group(frames)
 
@@ -245,26 +245,26 @@ class StateMachine:
             # Startup failsafe: always enter OFF (see __init__) — `manual.select` is not
             # consulted; OFF wakes through OFF_IDLE by itself once the playhead locks.
             self._goto_requested = False
-            self._switch(StateId.OFF, now, dt, signals.bars, participants, hit, signals)
+            self._switch(StateId.OFF, now, dt, signals.bars, players, hit, signals)
         elif self._config.blackout and self._current != StateId.OFF:
             # Pinning blackout is OFF's entry door: highest-priority input, from anywhere,
             # beating hold and goto. Leaving OFF is a normal condition — OffState wakes
             # through OFF_IDLE once the toggle is released and the playhead lock holds.
             self._goto_requested = False
-            self._switch(StateId.OFF, now, dt, signals.bars, participants, hit, signals)
+            self._switch(StateId.OFF, now, dt, signals.bars, players, hit, signals)
         elif self._goto_requested:
             self._goto_requested = False
-            self._switch(StateId(int(self._config.manual.select)), now, dt, signals.bars, participants, hit, signals)
+            self._switch(StateId(int(self._config.manual.select)), now, dt, signals.bars, players, hit, signals)
 
-        ctx = self._build_context(now, dt, signals, participants, hit)
+        ctx = self._build_context(now, dt, signals, players, hit)
         entries = self._active.update(ctx)
         self._set_mix(entries)
 
         if not self._config.manual.hold:
             nxt = self._active.needs_state_change(ctx)
             if nxt is not None:
-                self._switch(nxt, now, dt, signals.bars, participants, hit, signals)
-                ctx = self._build_context(now, dt, signals, participants, hit)
+                self._switch(nxt, now, dt, signals.bars, players, hit, signals)
+                ctx = self._build_context(now, dt, signals, players, hit)
                 entries = self._active.update(ctx)
                 self._set_mix(entries)
 
@@ -272,9 +272,9 @@ class StateMachine:
 
         p = self._active.progress(ctx)
         self._config.progress = p
-        self._config.participants = participants
+        self._config.players = players
         self._config.sync.similarity = ctx.sync
-        self._config.sync.in_sync = ctx.sync_count
+        self._config.sync.players = ctx.sync_players
         self._notify_state(SequencerState(
             stage=int(self._current),                       # wire-format naming (see module doc)
             stage_progress=p,
@@ -284,7 +284,7 @@ class StateMachine:
         ))
 
     def _switch(self, target: StateId, now: float, dt: float, bars_now: float,
-                participants: int, hit: bool, signals) -> None:
+                players: int, hit: bool, signals) -> None:
         """exit() old → reset timers → command motor → enter() new (its mix composes in the
         same tick's update() that follows, before the frame renders). The boot entry skips
         the exit half: nothing has been entered yet, and ``prev`` stays None."""
@@ -300,7 +300,7 @@ class StateMachine:
         self._active = self._states[target]
         self._set_motor(self._active.MOTOR)
         self._config.current = target
-        self._active.enter(self._build_context(now, dt, signals, participants, hit))
+        self._active.enter(self._build_context(now, dt, signals, players, hit))
 
     # -- State callbacks (Sequencer-compatible) --------------------------------
 

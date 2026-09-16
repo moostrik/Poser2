@@ -1,5 +1,5 @@
 """Tests for the show StateMachine — the CSV transition graph in both modes,
-participant debounce, bar-denominated durations, goto/hold, motor commands, and looks."""
+player debounce, bar-denominated durations, goto/hold, motor commands, and looks."""
 
 import math
 import unittest
@@ -18,7 +18,7 @@ ROW = 6            # Similarity row length: one slot per player id
 class FakeFrame:
     """frame[PlayheadOffset].value → the stored offset; frame[Similarity].values → a Similarity row: a
     float fills every slot, a dict fills the given slots (NaN elsewhere). A pose frame is a present
-    participant."""
+    player."""
     def __init__(self, offset: float = math.nan, similarity: float | dict[int, float] = math.nan) -> None:
         self._offset = offset
         row = np.full(ROW, math.nan, dtype=np.float32)
@@ -83,7 +83,7 @@ class StateMachineTest(unittest.TestCase):
         self.board.bars += dbar
         self.machine.update()
 
-    def set_participants(self, n: int, settle: bool = True) -> None:
+    def set_players(self, n: int, settle: bool = True) -> None:
         """Set the raw pose count (no playhead offset yet); when settle, tick past the debounce hold."""
         self.board.frames = {i: FakeFrame() for i in range(n)}
         if settle:
@@ -91,7 +91,7 @@ class StateMachineTest(unittest.TestCase):
             self.tick(dt=self.config.count_hold_seconds + 0.01)
 
     def set_similarities(self, values: dict[int, float]) -> None:
-        """Give the present participants' frames a Similarity row reading that value to everyone (same
+        """Give the present players' frames a Similarity row reading that value to everyone (same
         ids: the count holds)."""
         self.board.frames = {i: FakeFrame(similarity=v) for i, v in values.items()}
 
@@ -148,14 +148,14 @@ class StateMachineTest(unittest.TestCase):
 
     # -- the stand-alone CSV graph -------------------------------------------
 
-    def test_idle_to_idle_intro_on_participant(self) -> None:
+    def test_idle_to_idle_intro_on_player(self) -> None:
         self.boot()
-        self.set_participants(1)
+        self.set_players(1)
         self.assertEqual(self.current, StateId.IDLE_INTRO)
 
     def test_idle_intro_to_intro_on_hit(self) -> None:
         self.boot()
-        self.set_participants(1)
+        self.set_players(1)
         self.board.frames[0] = FakeFrame(0.3)     # playhead approaching
         self.tick()
         self.board.frames[0] = FakeFrame(-0.1)    # just passed → hit
@@ -164,9 +164,9 @@ class StateMachineTest(unittest.TestCase):
 
     def test_idle_intro_winds_back_when_left_before_hit(self) -> None:
         self.boot()
-        self.set_participants(1)
+        self.set_players(1)
         self.assertEqual(self.current, StateId.IDLE_INTRO)
-        self.set_participants(0)
+        self.set_players(0)
         self.assertEqual(self.current, StateId.INTRO_IDLE)
         # Arrived from IDLE_INTRO (already bright): both channels ramp from 1.0 — no dip/blink
         self.assertEqual(self.mixes[-1], [(LayerId.beam_playhead, 1.0), (LayerId.beam_blue_sound, 1.0)])
@@ -177,7 +177,7 @@ class StateMachineTest(unittest.TestCase):
         # The hit is the tick a one-frame flash lights: within half a playhead step (72 rpm, 30 Hz:
         # 0.25 rad), here still approaching — not the sign flip one tick later.
         self.boot()
-        self.set_participants(1)
+        self.set_players(1)
         self.board.frames[0] = FakeFrame(0.5)      # two steps out
         self.tick()
         self.assertEqual(self.current, StateId.IDLE_INTRO)
@@ -187,16 +187,16 @@ class StateMachineTest(unittest.TestCase):
 
     def test_wrap_flip_is_not_a_hit(self) -> None:
         self.boot()
-        self.set_participants(1)
+        self.set_players(1)
         self.board.frames[0] = FakeFrame(3.0)      # far side, positive
         self.tick()
         self.board.frames[0] = FakeFrame(-3.0)     # wrapped past ±π, not a pass
         self.tick()
         self.assertEqual(self.current, StateId.IDLE_INTRO)
 
-    def _to_intro(self, participants: int = 3) -> None:
+    def _to_intro(self, players: int = 3) -> None:
         self.boot()
-        self.set_participants(participants)
+        self.set_players(players)
         self.board.frames[0] = FakeFrame(0.3)
         self.tick()
         self.board.frames[0] = FakeFrame(-0.1)
@@ -207,7 +207,7 @@ class StateMachineTest(unittest.TestCase):
     def test_enter_resets_are_explicit_and_targeted(self) -> None:
         # INTRO resets the flash layer; INTRO_PLAY resets the instrument (fresh patterns +
         # fill per cycle); PLAY inherits the running instrument — no reset on END → PLAY.
-        self._to_intro(participants=3)
+        self._to_intro(players=3)
         self.assertIn([LayerId.beam_flash], self.resets)
         self.set_similarities({0: 0.9, 1: 0.9, 2: 0.9})
         self.tick()
@@ -218,7 +218,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.resets, [])                    # PLAY inherits, never resets
 
     def test_intro_to_intro_play_on_sync_and_through_to_play(self) -> None:
-        self._to_intro(participants=3)
+        self._to_intro(players=3)
         self.set_similarities({0: 0.9, 1: 0.8, 2: 0.9})
         self.tick()
         self.assertEqual(self.current, StateId.INTRO_PLAY)
@@ -245,7 +245,7 @@ class StateMachineTest(unittest.TestCase):
 
     def test_play_to_end_and_end_idle(self) -> None:
         self._to_play()
-        self.set_participants(0)
+        self.set_players(0)
         self.assertEqual(self.current, StateId.END)
         # END advances on bars; with P == 0 it lands in END_IDLE
         for _ in range(4):
@@ -263,7 +263,7 @@ class StateMachineTest(unittest.TestCase):
 
     def test_end_lands_in_end_intro_with_people_then_intro(self) -> None:
         self._to_play()
-        self.set_participants(2)
+        self.set_players(2)
         self.assertEqual(self.current, StateId.END)
         for _ in range(4):
             self.tick(dbar=self.config.end_bars / 3)
@@ -278,7 +278,7 @@ class StateMachineTest(unittest.TestCase):
         # underneath the dying wall), the layer is reset on entry, stage_progress is the
         # layer's own readout, and the exit is the fade complete plus the playhead lock.
         self._to_play()
-        self.set_participants(2)
+        self.set_players(2)
         for _ in range(4):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_INTRO)
@@ -298,7 +298,7 @@ class StateMachineTest(unittest.TestCase):
 
     def test_end_idle_reveals_the_sound_visuals_on_the_fade(self) -> None:
         self._to_play()
-        self.set_participants(0)
+        self.set_players(0)
         self.assertEqual(self.current, StateId.END)
         for _ in range(4):
             self.tick(dbar=self.config.end_bars / 3)
@@ -310,10 +310,10 @@ class StateMachineTest(unittest.TestCase):
 
     def test_end_winds_back_to_play_never_jumps(self) -> None:
         self._to_play()
-        self.set_participants(2)
+        self.set_players(2)
         self.assertEqual(self.current, StateId.END)
         self.tick(dbar=self.config.end_bars / 2)   # half-way down
-        self.set_participants(3)                    # people return
+        self.set_players(3)                    # people return
         self.assertEqual(self.current, StateId.END)   # no jump: winds back first
         self.tick(dbar=self.config.end_bars / 4)
         self.assertEqual(self.current, StateId.END)
@@ -324,14 +324,14 @@ class StateMachineTest(unittest.TestCase):
 
     def test_session_intro_timeout(self) -> None:
         self.config.session.enabled = True
-        self._to_intro(participants=1)
+        self._to_intro(players=1)
         self.tick(dt=self.config.session.intro_seconds + 1.0)
         self.assertEqual(self.current, StateId.INTRO_PLAY)
 
     def test_session_empty_room_never_spins_up(self) -> None:
         self.config.session.enabled = True
-        self._to_intro(participants=1)
-        self.set_participants(0)
+        self._to_intro(players=1)
+        self.set_players(0)
         self.tick(dt=self.config.session.intro_seconds + 1.0)
         self.assertNotEqual(self.current, StateId.INTRO_PLAY)
 
@@ -348,7 +348,7 @@ class StateMachineTest(unittest.TestCase):
     def test_session_play_ignores_the_count(self) -> None:
         # A small session that timed out into the spin-up gets its full PLAY: only play_seconds ends it.
         self.config.session.enabled = True
-        self._to_intro(participants=1)
+        self._to_intro(players=1)
         self.tick(dt=self.config.session.intro_seconds + 1.0)
         self.assertEqual(self.current, StateId.INTRO_PLAY)
         self.tick(dt=self.config.spin_up_seconds + 0.1)
@@ -371,7 +371,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.motors[-1], MotorMode.BEAM)      # still sweeping — no re-acquire
         self.assertEqual(self.mixes[-1], [])                  # empty mix: dark
         self.assertEqual(self.emitted[-1].stage, 0)           # /global/state 0 = off
-        self.set_participants(3)                              # presence alone never leaves OFF
+        self.set_players(3)                              # presence alone never leaves OFF
         self.tick(dt=999.0)
         self.assertEqual(self.current, StateId.OFF)
 
@@ -383,7 +383,7 @@ class StateMachineTest(unittest.TestCase):
     def test_unpin_wakes_through_the_wake_transition(self) -> None:
         # Leaving OFF is a transition, not a jump: the wake fades up over its bar and
         # lands in IDLE — even with people present (the graph re-introduces them).
-        self._to_play()                                       # 3 participants present
+        self._to_play()                                       # 3 players present
         self._to_off()
         self.board.is_locked = True                              # spun down to BEAM and re-locked
         self.config.blackout = False
@@ -421,7 +421,7 @@ class StateMachineTest(unittest.TestCase):
 
     def test_hit_mid_wake_goes_straight_to_intro(self) -> None:
         self.boot()
-        self.set_participants(1)
+        self.set_players(1)
         self._to_off()
         self.config.blackout = False
         self.tick()
@@ -496,7 +496,7 @@ class StateMachineTest(unittest.TestCase):
     def test_hold_freezes_transitions(self) -> None:
         self.boot()
         self.config.manual.hold = True
-        self.set_participants(2)
+        self.set_players(2)
         self.assertEqual(self.current, StateId.IDLE)
         self.config.manual.hold = False
         self.tick()
@@ -515,39 +515,39 @@ class StateMachineTest(unittest.TestCase):
         finally:
             machine.stop()
 
-    def test_sync_mode_counts_participants_in_sync(self) -> None:
+    def test_sync_mode_counts_players_in_sync(self) -> None:
         from apps.white_space.statemachine import SyncMode
         self.config.sync.mode = SyncMode.ALL
-        self._to_intro(participants=4)
-        # 3 of 4 in sync with each other: enough for QUORUM (3), not for ALL
+        self._to_intro(players=4)
+        # 3 of 4 in sync with each other: enough for MIN_PLAYERS (3), not for ALL
         self.set_similarities({0: 0.9, 1: 0.9, 2: 0.9, 3: 0.1})
         self.tick()
         self.assertEqual(self.current, StateId.INTRO)
-        self.config.sync.mode = SyncMode.QUORUM
+        self.config.sync.mode = SyncMode.MIN_PLAYERS
         self.tick()
         self.assertEqual(self.current, StateId.INTRO_PLAY)
 
-    def test_quorum_of_two_runs_a_two_person_show(self) -> None:
-        # The quorum is the show's size: two people in sync spin up, PLAY holds with two, and END
+    def test_min_players_of_two_runs_a_two_person_show(self) -> None:
+        # The min_players is the show's size: two people in sync spin up, PLAY holds with two, and END
         # winds back to PLAY once two are back.
-        self.config.quorum = 2
-        self._to_intro(participants=2)
+        self.config.min_players = 2
+        self._to_intro(players=2)
         self.set_similarities({0: 0.9, 1: 0.9})
         self.tick()
         self.assertEqual(self.current, StateId.INTRO_PLAY)
         self.tick(dt=self.config.spin_up_seconds + 0.1)
         self.assertEqual(self.current, StateId.PLAY)
         self.board.is_locked = False
-        self.set_participants(1)
+        self.set_players(1)
         self.assertEqual(self.current, StateId.END)
         self.tick(dbar=self.config.end_bars / 2)
-        self.set_participants(2)
+        self.set_players(2)
         self.tick(dbar=self.config.end_bars)
         self.assertEqual(self.current, StateId.PLAY)
 
-    def test_default_quorum_needs_three_people(self) -> None:
-        # The default quorum of 3 keeps the three-person show: two in sync with two present never spin up.
-        self._to_intro(participants=2)
+    def test_default_min_players_needs_three_people(self) -> None:
+        # The default min_players of 3 keeps the three-person show: two in sync with two present never spin up.
+        self._to_intro(players=2)
         self.set_similarities({0: 0.9, 1: 0.9})
         self.tick()
         self.assertEqual(self.current, StateId.INTRO)
@@ -555,13 +555,13 @@ class StateMachineTest(unittest.TestCase):
     def test_sync_ignores_absent_players_and_self(self) -> None:
         # The row is indexed by player id and only the ids with a pose are partners: a held zero in an
         # absent player's slot (5) and the NaN self slot do not count. A present partner at zero does, and
-        # collapses that participant's harmonic mean.
-        self._to_intro(participants=3)
+        # collapses that player's harmonic mean.
+        self._to_intro(players=3)
         self.board.frames = {0: FakeFrame(similarity={1: 0.9, 2: 0.9, 5: 0.0}),
                              1: FakeFrame(similarity={0: 0.9, 2: 0.0}),
                              2: FakeFrame(similarity=0.9)}
         self.tick()
-        self.assertEqual(self.config.sync.in_sync, 2)                          # {0, 2}; 1 reads 0 toward 2
+        self.assertEqual(self.config.sync.players, 2)                          # {0, 2}; 1 reads 0 toward 2
         self.assertAlmostEqual(self.config.sync.similarity, 0.9, places=5)
         self.assertEqual(self.current, StateId.INTRO)
 
@@ -570,65 +570,65 @@ class StateMachineTest(unittest.TestCase):
         # group in sync with each other is {0, 1, 3}: 2 joins no group and drags nobody down.
         from apps.white_space.statemachine import SyncMode
         self.config.sync.mode = SyncMode.ALL
-        self._to_intro(participants=4)
+        self._to_intro(players=4)
         self.board.frames = {0: FakeFrame(similarity={1: 0.9, 3: 0.9, 2: 0.0}),
                              1: FakeFrame(similarity={0: 0.9, 3: 0.9, 2: 0.0}),
                              3: FakeFrame(similarity={0: 0.9, 1: 0.9, 2: 0.0}),
                              2: FakeFrame(similarity=0.0)}
         self.tick()
-        self.assertEqual(self.config.sync.in_sync, 3)
+        self.assertEqual(self.config.sync.players, 3)
         self.assertAlmostEqual(self.config.sync.similarity, 0.9, places=5)
         self.assertEqual(self.current, StateId.INTRO)            # ALL: everybody counts, 2 is not in sync
-        self.config.sync.mode = SyncMode.QUORUM
+        self.config.sync.mode = SyncMode.MIN_PLAYERS
         self.tick()
-        self.assertEqual(self.current, StateId.INTRO_PLAY)      # QUORUM (3): the bystander does not block
+        self.assertEqual(self.current, StateId.INTRO_PLAY)      # MIN_PLAYERS (3): the bystander does not block
 
     def test_two_pairs_are_a_group_of_two_not_four(self) -> None:
         # {0, 1} and {2, 3} each pose alike but not like the other pair: the largest group in sync is a pair.
-        self._to_intro(participants=4)
+        self._to_intro(players=4)
         self.board.frames = {0: FakeFrame(similarity={1: 0.9, 2: 0.1, 3: 0.1}),
                              1: FakeFrame(similarity={0: 0.9, 2: 0.1, 3: 0.1}),
                              2: FakeFrame(similarity={3: 0.9, 0: 0.1, 1: 0.1}),
                              3: FakeFrame(similarity={2: 0.9, 0: 0.1, 1: 0.1})}
         self.tick()
-        self.assertEqual(self.config.sync.in_sync, 2)
+        self.assertEqual(self.config.sync.players, 2)
         self.assertAlmostEqual(self.config.sync.similarity, 0.9, places=5)
         self.assertEqual(self.current, StateId.INTRO)
 
     def test_a_half_posing_partner_is_left_out_of_the_group(self) -> None:
         # 2 is half out of neutral: their pairs read half. {0, 1} is in sync at 0.9; a group with 2 is not,
-        # since 2 reads 0.45 toward the others. With the quorum at 3 nothing spins up until 2 poses fully.
-        self._to_intro(participants=3)
+        # since 2 reads 0.45 toward the others. With the min_players at 3 nothing spins up until 2 poses fully.
+        self._to_intro(players=3)
         self.board.frames = {0: FakeFrame(similarity={1: 0.9, 2: 0.45}),
                              1: FakeFrame(similarity={0: 0.9, 2: 0.45}),
                              2: FakeFrame(similarity=0.45)}
         self.tick()
-        self.assertEqual(self.config.sync.in_sync, 2)
+        self.assertEqual(self.config.sync.players, 2)
         self.assertAlmostEqual(self.config.sync.similarity, 0.9, places=5)
         self.assertEqual(self.current, StateId.INTRO)
         self.set_similarities({0: 0.9, 1: 0.9, 2: 0.9})       # 2 fully out of neutral, posing alike
         self.tick()
-        self.assertEqual(self.config.sync.in_sync, 3)
+        self.assertEqual(self.config.sync.players, 3)
         self.assertEqual(self.current, StateId.INTRO_PLAY)
 
     def test_sync_reads_the_frames_similarity(self) -> None:
         # The sync count is the Similarity feature of the pose frames the machine reads, nothing else.
-        self._to_intro(participants=3)
+        self._to_intro(players=3)
         self.set_similarities({0: 0.9, 1: 0.9, 2: 0.2})
         self.tick()
-        self.assertEqual(self.config.sync.in_sync, 2)
+        self.assertEqual(self.config.sync.players, 2)
         self.assertEqual(self.current, StateId.INTRO)
         self.set_similarities({0: 0.9, 1: 0.9, 2: 0.9})
         self.tick()
-        self.assertEqual(self.config.sync.in_sync, 3)
+        self.assertEqual(self.config.sync.players, 3)
         self.assertEqual(self.current, StateId.INTRO_PLAY)
 
     def test_dim_level_is_the_intro_line(self) -> None:
         self.config.dim_level = 0.25
-        self._to_intro(participants=1)
+        self._to_intro(players=1)
         self.assertEqual(dict(self.mixes[-1])[LayerId.beam_playhead], 0.25)
 
-    def test_participant_flicker_is_debounced(self) -> None:
+    def test_player_flicker_is_debounced(self) -> None:
         self.boot()
         self.board.frames = {0: FakeFrame()}
         self.tick()                                   # pending, not yet effective

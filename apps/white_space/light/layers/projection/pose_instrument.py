@@ -125,7 +125,7 @@ class Pattern:
 
 
 @dataclass
-class _Participant:
+class _Player:
     """One person's measures, presence, window and hit."""
     position:       float = 0.0     # normalized azimuth
     left_shoulder:  float = 0.0     # the four arm angles (rad)
@@ -156,7 +156,7 @@ class PoseInstrument(ProjectionLayer):
         self._instrument = instrument
         self._pose_stage = pose_stage
         self._tick_interval = tick_interval
-        self._participants: dict[int, _Participant] = {}
+        self._players: dict[int, _Player] = {}
         self._crossing = PlayheadCrossing()
         self._distance = np.arange(resolution + 1, dtype=np.float64)     # px from a person
         self._white_lines = np.zeros(resolution, dtype=bool)
@@ -166,8 +166,8 @@ class PoseInstrument(ProjectionLayer):
         self._hot_reloaders = (HotReloadMethods(self.__class__, True), HotReloadMethods(LinePattern, True))
 
     def reset(self) -> None:
-        """A fresh instrument (S6 entry): forget every participant and pass."""
-        self._participants.clear()
+        """A fresh instrument (S6 entry): forget every player and pass."""
+        self._players.clear()
         self._crossing.reset()
 
     # -- Per tick --------------------------------------------------------------
@@ -175,8 +175,8 @@ class PoseInstrument(ProjectionLayer):
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         P = self._instrument
         R = self.resolution
-        self._update_participants(frame)
-        if not self._participants:
+        self._update_players(frame)
+        if not self._players:
             return
         self._set_windows()
 
@@ -188,7 +188,7 @@ class PoseInstrument(ProjectionLayer):
         mask.fill(False)
         mask_level.fill(0.0)
 
-        for p in self._participants.values():
+        for p in self._players.values():
             centre = int(round(p.position * R)) % R
             pattern = self.connect(p)
             pattern.white.phase += p.phase_white
@@ -215,19 +215,19 @@ class PoseInstrument(ProjectionLayer):
         """The visual limit in pixels: half a period of ``max_lines`` per revolution."""
         return max(1, int(round(self.resolution / (2.0 * self._instrument.max_lines))))
 
-    # -- Participants ------------------------------------------------------------
+    # -- Players ------------------------------------------------------------
 
-    def _update_participants(self, frame: Frame) -> None:
+    def _update_players(self, frame: Frame) -> None:
         P = self._instrument
         dt = frame.tick.dt
-        for p in self._participants.values():
+        for p in self._players.values():
             p.present = False
         offsets: dict[int, float] = {}
         for id, pose in self._board.get_frames(self._pose_stage).items():
             azimuth = pose[features.Azimuth].value
             if math.isnan(azimuth):
                 continue
-            p = self._participants.setdefault(id, _Participant())
+            p = self._players.setdefault(id, _Player())
             p.present = True
             p.position = normalize_azimuth(azimuth)
             angles = pose[features.Angles].values
@@ -245,7 +245,7 @@ class PoseInstrument(ProjectionLayer):
         hits = self._crossing.update(offsets, step, int(P.events.hit_frames))
 
         gone: list[int] = []
-        for id, p in self._participants.items():
+        for id, p in self._players.items():
             p.hit = id in hits
             self._advance_drift(p, dt)
             if p.present:
@@ -255,13 +255,13 @@ class PoseInstrument(ProjectionLayer):
                 if p.envelope <= 0.0:
                     gone.append(id)
         for id in gone:
-            del self._participants[id]
+            del self._players[id]
 
     @staticmethod
     def _value(x: float, fallback: float) -> float:
         return fallback if math.isnan(x) else float(x)
 
-    def _advance_drift(self, p: _Participant, dt: float) -> None:
+    def _advance_drift(self, p: _Player, dt: float) -> None:
         """The lines' own motion this tick: each colour's phase gains its drift and its push,
         white outward and blue inward. A hit raises the push by ``push_strength``; it settles
         back exponentially over ``push_seconds`` and the phase keeps what it gained."""
@@ -278,7 +278,7 @@ class PoseInstrument(ProjectionLayer):
 
     # -- Connections -----------------------------------------------------------------
 
-    def connect(self, p: _Participant) -> Pattern:
+    def connect(self, p: _Player) -> Pattern:
         """The first connections (``docs/POSE_INSTRUMENT.md``, Part 3) written out: a person's
         measures into the pattern's parameters, every number a setting of ``PI.pattern``.
 
@@ -316,16 +316,16 @@ class PoseInstrument(ProjectionLayer):
         similarity-matched partner along the shorter arc, up to the partner's position."""
         P = self._instrument.window
         base = min(P.width / 360.0, 0.5)
-        for p in self._participants.values():
+        for p in self._players.values():
             p.window_left = p.window_right = base * p.envelope
         threshold = P.sync_threshold
-        ids = list(self._participants)
+        ids = list(self._players)
         for i, id_a in enumerate(ids):
             for id_b in ids[i + 1:]:
                 sim = self._pair_similarity(id_a, id_b)
                 if math.isnan(sim) or sim < threshold:
                     continue
-                a, b = self._participants[id_a], self._participants[id_b]
+                a, b = self._players[id_a], self._players[id_b]
                 t = self._ease((sim - threshold) / max(1.0 - threshold, 1e-6)) * min(a.envelope, b.envelope)
                 delta = self._signed_offset(a.position, b.position)
                 amount = t * abs(delta)
@@ -340,7 +340,7 @@ class PoseInstrument(ProjectionLayer):
         """Mean of both directions' pairwise similarity (one side may be NaN)."""
         sims = []
         for me, other in ((id_a, id_b), (id_b, id_a)):
-            row = self._participants[me].similarity
+            row = self._players[me].similarity
             if other < len(row) and not math.isnan(float(row[other])):
                 sims.append(float(row[other]))
         return float(np.mean(sims)) if sims else float('nan')
@@ -356,7 +356,7 @@ class PoseInstrument(ProjectionLayer):
 
     # -- Drawing ---------------------------------------------------------------------
 
-    def _window_px(self, p: _Participant) -> tuple[int, int, int]:
+    def _window_px(self, p: _Player) -> tuple[int, int, int]:
         """This tick's window each side in pixels, and the larger of the two."""
         R = self.resolution
         left = min(int(round(p.window_left * R)), R // 2)
@@ -392,7 +392,7 @@ class PoseInstrument(ProjectionLayer):
         idx = (centre + offsets) % R
         lines[idx] |= strip[offsets + side]
 
-    def _draw_mask(self, mask: np.ndarray, mask_level: np.ndarray, p: _Participant, centre: int) -> None:
+    def _draw_mask(self, mask: np.ndarray, mask_level: np.ndarray, p: _Player, centre: int) -> None:
         """Mark the person's mask: it goes over every pattern, lit dim blue by presence, and
         flashes on the hit."""
         P = self._instrument.mask
