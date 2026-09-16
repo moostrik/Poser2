@@ -911,11 +911,11 @@
     "intro_idle_bars": 2.0,
     "end_bars": 8.0,
     "dim_level": 0.4,
-    "crowd": 2,
+    "quorum": 2,
     "count_hold_seconds": 1.0,
     "sync": {
       "threshold": 0.5,
-      "mode": "CROWD"
+      "mode": "QUORUM"
     },
     "manual": {
       "select": "PLAY",

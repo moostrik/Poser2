@@ -86,7 +86,7 @@ class StateBase:
 
     def _sync_required(self, participants: int) -> int:
         """How many participants ``sync.mode`` wants in sync for the spin-up."""
-        return SyncMode(int(self._config.sync.mode)).required(participants, self._config.crowd)
+        return SyncMode(int(self._config.sync.mode)).required(participants, self._config.quorum)
 
 
 # -- Steady states ---------------------------------------------------------------
@@ -145,8 +145,8 @@ class IntroState(StateBase):
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.participants == 0:       # before the session timeout: an empty room never spins up
             return StateId.INTRO_IDLE
-        # Enough participants in sync (sync.mode: the crowd / all−1 / all) launches the spin-up.
-        if ctx.sync_count >= self._sync_required(ctx.participants) and ctx.participants >= self._config.crowd:
+        # A large enough group in sync (sync.mode: the quorum / all−1 / all) launches the spin-up.
+        if ctx.sync_count >= self._sync_required(ctx.participants) and ctx.participants >= self._config.quorum:
             return StateId.INTRO_PLAY
         if ctx.session and ctx.elapsed >= self._config.session.intro_seconds:
             return StateId.INTRO_PLAY
@@ -165,7 +165,7 @@ class PlayState(StateBase):
             if ctx.elapsed >= self._config.session.play_seconds:
                 return StateId.END
             return None
-        if ctx.participants < self._config.crowd:
+        if ctx.participants < self._config.quorum:
             return StateId.END
         return None
 
@@ -267,7 +267,7 @@ class EndState(StateBase):
         self._p = 0.0
 
     def update(self, ctx: StateContext) -> Mix:
-        forward = ctx.participants < self._config.crowd or ctx.session
+        forward = ctx.participants < self._config.quorum or ctx.session
         self._p = self._ramp(self._p, ctx.dbar / self._config.end_bars, forward)
         # One ramp gives both CSV behaviors: the flood crosses the white to full while the
         # blue fades out with the instrument (the instrument is the only blue source).
@@ -278,7 +278,7 @@ class EndState(StateBase):
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if self._p >= 1.0:
             return StateId.END_INTRO if ctx.participants > 0 else StateId.END_IDLE
-        if self._p <= 0.0 and not ctx.session and ctx.participants >= self._config.crowd:
+        if self._p <= 0.0 and not ctx.session and ctx.participants >= self._config.quorum:
             return StateId.PLAY
         return None
 

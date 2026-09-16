@@ -12,15 +12,15 @@ from modules.settings import BaseSettings, Field, Group, Widget
 
 
 class SyncMode(IntEnum):
-    """How many participants must be in sync for INTRO → INTRO_PLAY."""
-    CROWD         = 0        # the crowd (``states.crowd``) ≥ sync.threshold
+    """How large the group in sync with each other must be for INTRO → INTRO_PLAY."""
+    QUORUM        = 0        # the quorum (``states.quorum``)
     ALL_MINUS_ONE = auto()   # all but one
     ALL           = auto()   # everyone
 
-    def required(self, participants: int, crowd: int) -> int:
+    def required(self, participants: int, quorum: int) -> int:
         match self:
-            case SyncMode.CROWD:         return crowd
-            case SyncMode.ALL_MINUS_ONE: return max(participants - 1, crowd - 1)
+            case SyncMode.QUORUM:        return quorum
+            case SyncMode.ALL_MINUS_ONE: return max(participants - 1, quorum - 1)
             case _:                      return participants
 
 
@@ -52,10 +52,10 @@ class ManualSettings(BaseSettings):
 
 class SyncSettings(BaseSettings):
     """The pose-sync condition (INTRO → INTRO_PLAY): its live telemetry and tunables."""
-    similarity: Field[float]    = Field(0.0, min=0.0, max=1.0, widget=Widget.number, access=Field.READ, description="Mean of each participant's similarity to the others present")
-    in_sync:    Field[int]      = Field(0, access=Field.READ, pinned=True, description="Participants currently at or above threshold")
-    threshold:  Field[float]    = Field(0.75, min=0.0, max=1.0, step=0.01, widget=Widget.slider, description="A participant counts as in sync at this pose similarity")
-    mode:       Field[SyncMode] = Field(SyncMode.CROWD, description="INTRO → INTRO_PLAY: how many participants must be in sync (the crowd / all−1 / all)")
+    similarity: Field[float]    = Field(0.0, min=0.0, max=1.0, widget=Widget.number, access=Field.READ, description="Mean similarity within the largest group in sync")
+    in_sync:    Field[int]      = Field(0, access=Field.READ, pinned=True, description="Size of the largest group in sync with each other")
+    threshold:  Field[float]    = Field(0.75, min=0.0, max=1.0, step=0.01, widget=Widget.slider, description="A group is in sync when each member's similarity to the others is at least this")
+    mode:       Field[SyncMode] = Field(SyncMode.QUORUM, description="INTRO → INTRO_PLAY: how large the group in sync must be (the quorum / all−1 / all)")
 
 
 class SessionModeSettings(BaseSettings):
@@ -93,7 +93,7 @@ class StateMachineSettings(BaseSettings):
     dim_level: Field[float] = Field(0.4, min=0.0, max=1.0, step=0.01, description="DIM line level: the front white lamp in INTRO, and where INTRO_PLAY and END_INTRO hold it", newline=True)
 
     # Condition tunables
-    crowd:              Field[int]   = Field(3, min=2, max=16, description="Participants the show needs: this many in sync spin it up, fewer present end it", newline=True)
+    quorum:             Field[int]   = Field(3, min=2, max=16, description="Participants the show needs: a group this large in sync spins it up, fewer present end it", newline=True)
     count_hold_seconds: Field[float] = Field(1.0,  min=0.0, max=10.0, step=0.1, description="Participant-count debounce: a new count must persist this long before conditions see it")
 
     sync:    Group[SyncSettings]        = Group(SyncSettings)

@@ -519,18 +519,18 @@ class StateMachineTest(unittest.TestCase):
         from apps.white_space.statemachine import SyncMode
         self.config.sync.mode = SyncMode.ALL
         self._to_intro(participants=4)
-        # 3 of 4 in sync: enough for CROWD (3), not for ALL
+        # 3 of 4 in sync with each other: enough for QUORUM (3), not for ALL
         self.set_similarities({0: 0.9, 1: 0.9, 2: 0.9, 3: 0.1})
         self.tick()
         self.assertEqual(self.current, StateId.INTRO)
-        self.config.sync.mode = SyncMode.CROWD
+        self.config.sync.mode = SyncMode.QUORUM
         self.tick()
         self.assertEqual(self.current, StateId.INTRO_PLAY)
 
-    def test_crowd_of_two_runs_a_two_person_show(self) -> None:
-        # The crowd is the show's size: two people in sync spin up, PLAY holds with two, and END
+    def test_quorum_of_two_runs_a_two_person_show(self) -> None:
+        # The quorum is the show's size: two people in sync spin up, PLAY holds with two, and END
         # winds back to PLAY once two are back.
-        self.config.crowd = 2
+        self.config.quorum = 2
         self._to_intro(participants=2)
         self.set_similarities({0: 0.9, 1: 0.9})
         self.tick()
@@ -545,8 +545,8 @@ class StateMachineTest(unittest.TestCase):
         self.tick(dbar=self.config.end_bars)
         self.assertEqual(self.current, StateId.PLAY)
 
-    def test_default_crowd_needs_three_people(self) -> None:
-        # The default crowd of 3 keeps the three-person show: two in sync with two present never spin up.
+    def test_default_quorum_needs_three_people(self) -> None:
+        # The default quorum of 3 keeps the three-person show: two in sync with two present never spin up.
         self._to_intro(participants=2)
         self.set_similarities({0: 0.9, 1: 0.9})
         self.tick()
@@ -561,9 +561,55 @@ class StateMachineTest(unittest.TestCase):
                              1: FakeFrame(similarity={0: 0.9, 2: 0.0}),
                              2: FakeFrame(similarity=0.9)}
         self.tick()
-        self.assertEqual(self.config.sync.in_sync, 2)
-        self.assertAlmostEqual(self.config.sync.similarity, 0.6, places=3)   # (0.9 + ~0 + 0.9) / 3
+        self.assertEqual(self.config.sync.in_sync, 2)                          # {0, 2}; 1 reads 0 toward 2
+        self.assertAlmostEqual(self.config.sync.similarity, 0.9, places=5)
         self.assertEqual(self.current, StateId.INTRO)
+
+    def test_a_neutral_bystander_does_not_drag_the_others_down(self) -> None:
+        # 0, 1 and 3 pose alike; 2 stands neutral, so the neutral weight zeroed every pair with 2. The largest
+        # group in sync with each other is {0, 1, 3}: 2 joins no group and drags nobody down.
+        from apps.white_space.statemachine import SyncMode
+        self.config.sync.mode = SyncMode.ALL
+        self._to_intro(participants=4)
+        self.board.frames = {0: FakeFrame(similarity={1: 0.9, 3: 0.9, 2: 0.0}),
+                             1: FakeFrame(similarity={0: 0.9, 3: 0.9, 2: 0.0}),
+                             3: FakeFrame(similarity={0: 0.9, 1: 0.9, 2: 0.0}),
+                             2: FakeFrame(similarity=0.0)}
+        self.tick()
+        self.assertEqual(self.config.sync.in_sync, 3)
+        self.assertAlmostEqual(self.config.sync.similarity, 0.9, places=5)
+        self.assertEqual(self.current, StateId.INTRO)            # ALL: everybody counts, 2 is not in sync
+        self.config.sync.mode = SyncMode.QUORUM
+        self.tick()
+        self.assertEqual(self.current, StateId.INTRO_PLAY)      # QUORUM (3): the bystander does not block
+
+    def test_two_pairs_are_a_group_of_two_not_four(self) -> None:
+        # {0, 1} and {2, 3} each pose alike but not like the other pair: the largest group in sync is a pair.
+        self._to_intro(participants=4)
+        self.board.frames = {0: FakeFrame(similarity={1: 0.9, 2: 0.1, 3: 0.1}),
+                             1: FakeFrame(similarity={0: 0.9, 2: 0.1, 3: 0.1}),
+                             2: FakeFrame(similarity={3: 0.9, 0: 0.1, 1: 0.1}),
+                             3: FakeFrame(similarity={2: 0.9, 0: 0.1, 1: 0.1})}
+        self.tick()
+        self.assertEqual(self.config.sync.in_sync, 2)
+        self.assertAlmostEqual(self.config.sync.similarity, 0.9, places=5)
+        self.assertEqual(self.current, StateId.INTRO)
+
+    def test_a_half_posing_partner_is_left_out_of_the_group(self) -> None:
+        # 2 is half out of neutral: their pairs read half. {0, 1} is in sync at 0.9; a group with 2 is not,
+        # since 2 reads 0.45 toward the others. With the quorum at 3 nothing spins up until 2 poses fully.
+        self._to_intro(participants=3)
+        self.board.frames = {0: FakeFrame(similarity={1: 0.9, 2: 0.45}),
+                             1: FakeFrame(similarity={0: 0.9, 2: 0.45}),
+                             2: FakeFrame(similarity=0.45)}
+        self.tick()
+        self.assertEqual(self.config.sync.in_sync, 2)
+        self.assertAlmostEqual(self.config.sync.similarity, 0.9, places=5)
+        self.assertEqual(self.current, StateId.INTRO)
+        self.set_similarities({0: 0.9, 1: 0.9, 2: 0.9})       # 2 fully out of neutral, posing alike
+        self.tick()
+        self.assertEqual(self.config.sync.in_sync, 3)
+        self.assertEqual(self.current, StateId.INTRO_PLAY)
 
     def test_sync_reads_the_frames_similarity(self) -> None:
         # The sync count is the Similarity feature of the pose frames the machine reads, nothing else.

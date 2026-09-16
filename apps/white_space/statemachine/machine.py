@@ -19,6 +19,7 @@ at the wire, the internals speak ``state`` throughout.
 
 from __future__ import annotations
 
+import itertools
 import math
 import time
 from dataclasses import dataclass
@@ -42,21 +43,35 @@ logger = logging.getLogger(__name__)
 _TINY = 1e-5   # the zero guard NormalizedScalarFeature uses for its harmonic mean
 
 
-def _present_similarities(frames: FrameDict) -> list[float]:
-    """Each participant's similarity to the other participants present: the harmonic mean of their
-    ``Similarity`` row at the other ids in ``frames`` (strict: one poor match pulls it down). The row is
-    indexed by player id, so the self slot and the slots of players without a pose are never read. A
-    participant with no partner, or only NaN there, is left out."""
-    ids = np.fromiter(frames.keys(), dtype=int)
-    result: list[float] = []
-    for i, frame in frames.items():
-        row = frame[features.Similarity].values
-        values = row[ids[(ids != i) & (ids < len(row))]]
-        values = values[~np.isnan(values)]
-        if values.size == 0:
-            continue
-        result.append(float(values.size / np.sum(1.0 / np.maximum(values, _TINY))))
-    return result
+def _largest_sync_group(frames: FrameDict, threshold: float) -> tuple[int, float]:
+    """The largest group of present participants in sync with each other — every member's harmonic mean of
+    their ``Similarity`` toward the other members (strict: one poor match pulls it down) at or above
+    ``threshold`` — as ``(size, the group's mean value)``; the best group of that size when several qualify,
+    ``(0, 0.0)`` when no two are in sync. The rows already carry the neutral weight, so a person at neutral
+    matches nobody and joins no group. Rows are indexed by player id; only the ids in ``frames`` are read, a
+    member without data toward another member disqualifies the group."""
+    ids = sorted(frames)
+    rows = {i: frames[i][features.Similarity].values for i in ids}
+    for size in range(len(ids), 1, -1):
+        best: float | None = None
+        for group in itertools.combinations(ids, size):
+            values: list[float] = []
+            for i in group:
+                row = rows[i]
+                others = [j for j in group if j != i]
+                if any(j >= len(row) for j in others):
+                    break
+                s = row[others]
+                if np.isnan(s).any():
+                    break
+                values.append(float(len(others) / np.sum(1.0 / np.maximum(s, _TINY))))
+            if len(values) < size or min(values) < threshold:
+                continue
+            mean = float(np.mean(values))
+            best = mean if best is None else max(best, mean)
+        if best is not None:
+            return size, best
+    return 0, 0.0
 
 
 @dataclass
@@ -67,8 +82,8 @@ class StateContext:
     dt:      float          # this tick's wall-clock delta (bidirectional ramps integrate these)
     dbar:    float          # this tick's bar delta
     participants: int       # debounced live participant count (ghosts excluded)
-    sync:    float          # mean of the participants' similarity to the others present (0..1)
-    sync_count: int         # participants whose similarity to the others present is ≥ sync.threshold
+    sync:    float          # mean similarity within the largest group in sync (0..1; 0 when no two are)
+    sync_count: int         # size of the largest group in sync with each other (each member ≥ sync.threshold toward the others)
     hit:     bool           # this tick the playhead is closest to a live participant (the flash tick)
     session: bool           # session mode active — states consult it in needs_state_change()
     blackout: bool          # the pinned blackout toggle — OFF stays put while pinned and
@@ -128,7 +143,7 @@ class StateMachine:
         self._pending_count: int = 0
         self._pending_since: float = 0.0
         self._prev_offsets: dict[int, float] = {}   # per-id PlayheadOffset for hit detection
-        self._tick_sync_values: list[float] = []    # this tick's per-participant similarities
+        self._tick_sync: tuple[int, float] = (0, 0.0)   # this tick's largest group in sync: (size, mean similarity)
 
         self._goto_requested: bool = False
         config.manual.bind(ManualSettings.goto, self._on_goto)
@@ -151,9 +166,9 @@ class StateMachine:
 
     # -- Inputs --------------------------------------------------------------
 
-    def _sync_values(self, frames: FrameDict) -> list[float]:
-        """Each participant's similarity to the others present, from the pose frames' ``Similarity``."""
-        return _present_similarities(frames)
+    def _sync_group(self, frames: FrameDict) -> tuple[int, float]:
+        """The largest group in sync with each other, from the pose frames' ``Similarity``: (size, mean)."""
+        return _largest_sync_group(frames, self._config.sync.threshold)
 
     def _debounced_participants(self, now: float, live_ids: set[int]) -> int:
         """Live participant count — the people with a pose — debounced by count_hold_seconds so
@@ -195,9 +210,7 @@ class StateMachine:
 
     def _build_context(self, now: float, dt: float, signals,
                        participants: int, hit: bool) -> StateContext:
-        values = self._tick_sync_values
-        sync = sum(values) / len(values) if values else 0.0
-        sync_count = sum(1 for v in values if v >= self._config.sync.threshold)
+        sync_count, sync = self._tick_sync
         return StateContext(
             elapsed=now - self._entered_time,
             bars=signals.bars - self._entered_bars,
@@ -226,7 +239,7 @@ class StateMachine:
         frames = self._board.get_frames(self._pose_stage)
         participants = self._debounced_participants(now, set(frames.keys()))
         hit = self._detect_hit(frames)
-        self._tick_sync_values = self._sync_values(frames)
+        self._tick_sync = self._sync_group(frames)
 
         if not self._entered:
             # Startup failsafe: always enter OFF (see __init__) — `manual.select` is not
