@@ -541,6 +541,66 @@ class PoseInstrumentTest(unittest.TestCase):
         self.layer.reset()
         self.assertAlmostEqual(float(self._render().blue[C]), M.flash_brightness, places=6)
 
+    # -- the override --
+
+    def _hold(self, **values: float) -> None:
+        """The override on, all toggles ticked, with these panel values."""
+        O = self.cfg.override
+        O.on = True
+        O.white_phase = self.QUARTER                             # lines a quarter pixel off the grid
+        for name, value in values.items():
+            setattr(O, name, value)
+
+    def test_the_override_draws_the_panel_not_the_pose(self) -> None:
+        self._hold(white_fundamental=1.0, white_harmonic=0.0)
+        white, _ = self._rows(_pose(0.5))                        # arms hanging: the pose says no white
+        self.assertGreaterEqual(len(white), 2)
+        self.assertEqual({l for _, l in white}, {INTERVAL // 2})   # the fundamental alone, from the panel
+        self._on_grid(white, INTERVAL)
+
+    def test_an_unticked_parameter_follows_its_connection(self) -> None:
+        self._hold(white_fundamental=1.0, white_harmonic=0.0)
+        self.cfg.override.white_fundamental_on = False
+        self._people({0: _pose(0.5)})
+        f = self._render()
+        self.assertEqual(float(f.white.sum()), 0.0)              # the hanging arms' 0 again
+        self.cfg.override.white_fundamental_on = True
+        self.cfg.override.on = False                             # off: nothing is overridden
+        f = self._render()
+        self.assertEqual(float(f.white.sum()), 0.0)
+        np.testing.assert_array_equal(f.blue[C + MASK + 1:C + WINDOW + 1], 1.0)
+
+    def test_the_override_holds_the_interval(self) -> None:
+        self._hold(white_fundamental=1.0, white_harmonic=0.0, interval=28.0)
+        white, _ = self._rows(_pose(0.5, tilt=1.0))              # the bend would double it; the panel says 28
+        self.assertGreaterEqual(len(white), 1)
+        self.assertEqual({l for _, l in white}, {INTERVAL})
+        self._on_grid(white, 2 * INTERVAL)
+
+    def test_the_override_holds_the_window_without_a_partner(self) -> None:
+        self._hold(white_fundamental=1.0, white_harmonic=1.0, window=90.0)
+        self._people({0: _pose(0.5)})
+        f = self._render()
+        np.testing.assert_array_equal(f.white[C + MASK + 1:C + 2 * WINDOW + 1], 1.0)
+        np.testing.assert_array_equal(f.white[C - 2 * WINDOW:C - MASK], 1.0)
+        self.assertEqual(float(f.white[C + 2 * WINDOW + 1:].sum() + f.white[:C - 2 * WINDOW].sum()), 0.0)
+
+    def test_the_hit_button_marks_everyone_for_the_hit_frames(self) -> None:
+        M = self.cfg.mask
+        self._people({0: _pose(0.5), 1: _pose(0.25)})            # the playhead is nowhere near
+        for frames, expected in ((1, [0, 1, 0, 0]), (3, [0, 1, 1, 1, 0])):
+            self.cfg.events.hit_frames = frames
+            levels = []
+            for i in range(len(expected)):
+                if i == 1:
+                    type(self.cfg.override).hit.fire(self.cfg.override)
+                f = self._render()
+                levels.append((float(f.blue[C]), float(f.blue[IRES // 4])))
+            for tick, (a, b) in enumerate(levels):
+                want = M.flash_brightness if expected[tick] else M.brightness
+                self.assertAlmostEqual(a, want, places=6, msg=f"tick {tick} of {frames}")
+                self.assertAlmostEqual(b, want, places=6, msg=f"tick {tick} of {frames}")
+
     # -- sync --
 
     def test_sync_fills_the_arc_between_the_pair_above_threshold_only(self) -> None:

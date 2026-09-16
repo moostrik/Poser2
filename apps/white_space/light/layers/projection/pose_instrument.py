@@ -21,6 +21,13 @@ out from behind the mask and into view. On the ticks the playhead crosses a pers
 fraction of every line; 1 is the swap), and a **push** raises the drift by ``push_strength`` and
 lets it settle back over ``push_seconds``; the phase keeps what it gained.
 
+The instrument has two kinds of numbers. Its **inputs** are what the pipeline delivers per person
+(the arm angles, the leg deviation, the bend, the similarity, the playhead crossing), which the
+dummy can fake. Its **parameters** are what the pattern is drawn from, the ``Pattern`` that
+``connect`` returns. ``PI.override`` sets the parameters by hand: with ``on``, every ticked
+parameter comes from the panel for everyone and its connection is skipped, the window can be held
+open without a partner, and ``hit`` marks everyone as the playhead would.
+
 ``connect``, the drawing methods and ``LinePattern`` are hot-reloaded while the app runs; enum
 values are compared through ``int`` because a reload redefines the enum classes.
 """
@@ -33,7 +40,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from modules.pose import features
-from modules.settings import BaseSettings, Field, Group
+from modules.settings import BaseSettings, Field, Group, Widget
 from modules.utils import HotReloadMethods
 
 from .._base_layer import ProjectionLayer, LayerSettings
@@ -93,6 +100,35 @@ class PresenceSettings(BaseSettings):
     release_seconds: Field[float] = Field(1.5, min=0.0, max=10.0, step=0.1, description="Window closes and mask fades after leaving (s)")
 
 
+class OverrideSettings(BaseSettings):
+    """The pattern's parameters by hand: with ``on``, every ticked parameter comes from here for
+    everyone and its connection is skipped; ``on`` never sets the other toggles."""
+    on:                      Field[bool]  = Field(False,                                     description="Override the ticked parameters for everyone")
+    hit:                     Field[bool]  = Field(False, widget=Widget.button,               description="Hit everyone on the next ticks")
+    interval_on:             Field[bool]  = Field(True,                                      description="Interval from here", newline=True)
+    interval:                Field[float] = Field(14.0, min=1.0,  max=90.0,  step=0.5,       description="Interval (deg)")
+    detune_on:               Field[bool]  = Field(True,                                      description="Detune from here")
+    detune:                  Field[float] = Field(0.0,  min=0.0,  max=1.0,   step=0.01,      description="Blue's interval past white's (fraction)")
+    window_on:               Field[bool]  = Field(True,                                      description="Window from here, no sync growth")
+    window:                  Field[float] = Field(45.0, min=0.0,  max=180.0, step=0.5,       description="Window each side of a person (deg)")
+    white_fundamental_on:    Field[bool]  = Field(True,                                      description="White's fundamental from here", newline=True)
+    white_fundamental:       Field[float] = Field(0.5,  min=0.0,  max=1.0,   step=0.01,      description="White's fundamental drawbar")
+    white_harmonic_on:       Field[bool]  = Field(True,                                      description="White's harmonic from here")
+    white_harmonic:          Field[float] = Field(0.0,  min=0.0,  max=1.0,   step=0.01,      description="White's harmonic drawbar")
+    white_phase_on:          Field[bool]  = Field(True,                                      description="White's phase from here")
+    white_phase:             Field[float] = Field(0.0,  min=-1.0, max=1.0,   step=0.01,      description="White's phase (intervals, positive outward)")
+    white_overtone_phase_on: Field[bool]  = Field(True,                                      description="White's overtone phase from here")
+    white_overtone_phase:    Field[float] = Field(0.0,  min=-1.0, max=1.0,   step=0.01,      description="White's overtone phase (intervals)")
+    blue_fundamental_on:     Field[bool]  = Field(True,                                      description="Blue's fundamental from here", newline=True)
+    blue_fundamental:        Field[float] = Field(0.5,  min=0.0,  max=1.0,   step=0.01,      description="Blue's fundamental drawbar")
+    blue_harmonic_on:        Field[bool]  = Field(True,                                      description="Blue's harmonic from here")
+    blue_harmonic:           Field[float] = Field(0.0,  min=0.0,  max=1.0,   step=0.01,      description="Blue's harmonic drawbar")
+    blue_phase_on:           Field[bool]  = Field(True,                                      description="Blue's phase from here")
+    blue_phase:              Field[float] = Field(0.5,  min=-1.0, max=1.0,   step=0.01,      description="Blue's phase (intervals, positive outward)")
+    blue_overtone_phase_on:  Field[bool]  = Field(True,                                      description="Blue's overtone phase from here")
+    blue_overtone_phase:     Field[float] = Field(0.0,  min=-1.0, max=1.0,   step=0.01,      description="Blue's overtone phase (intervals)")
+
+
 class PoseInstrumentSettings(BaseSettings):
     """The ``PI`` root group: tweakable values only, no routing (``docs/POSE_INSTRUMENT.md``, Settings)."""
     max_lines: Field[int] = Field(90, min=10, max=360, step=1, description="Visual limit: lines per revolution, line and gap equal")
@@ -101,6 +137,7 @@ class PoseInstrumentSettings(BaseSettings):
     window:    Group[WindowSettings]   = Group(WindowSettings)
     events:    Group[EventSettings]    = Group(EventSettings)
     presence:  Group[PresenceSettings] = Group(PresenceSettings)
+    override:  Group[OverrideSettings] = Group(OverrideSettings)
     dummy:     Group[DummySettings]    = Group(DummySettings)
 
 
@@ -163,12 +200,19 @@ class PoseInstrument(ProjectionLayer):
         self._blue_lines = np.zeros(resolution, dtype=bool)
         self._mask = np.zeros(resolution, dtype=bool)
         self._mask_level = np.zeros(resolution, dtype=np.float32)
+        self._manual_hits = 0                                             # ticks left of a hit from the panel
+        instrument.override.bind(OverrideSettings.hit, self._on_hit)
         self._hot_reloaders = (HotReloadMethods(self.__class__, True), HotReloadMethods(LinePattern, True))
 
     def reset(self) -> None:
         """A fresh instrument (S6 entry): forget every player and pass."""
         self._players.clear()
         self._crossing.reset()
+        self._manual_hits = 0
+
+    def _on_hit(self, _: bool) -> None:
+        """The panel's hit button: everyone is hit for ``hit_frames`` ticks, from the next one."""
+        self._manual_hits = int(self._instrument.events.hit_frames)
 
     # -- Per tick --------------------------------------------------------------
 
@@ -190,7 +234,7 @@ class PoseInstrument(ProjectionLayer):
 
         for p in self._players.values():
             centre = int(round(p.position * R)) % R
-            pattern = self.connect(p)
+            pattern = self._override(self.connect(p))
             pattern.white.phase += p.phase_white
             pattern.blue.phase += p.phase_blue
             left, right, side = self._window_px(p)
@@ -243,10 +287,13 @@ class PoseInstrument(ProjectionLayer):
 
         step = playhead_step(frame.motor_command.beam_rpm, self._tick_interval)
         hits = self._crossing.update(offsets, step, int(P.events.hit_frames))
+        manual = self._manual_hits > 0
+        if manual:
+            self._manual_hits -= 1
 
         gone: list[int] = []
         for id, p in self._players.items():
-            p.hit = id in hits
+            p.hit = manual or id in hits
             self._advance_drift(p, dt)
             if p.present:
                 p.envelope = 1.0 if P.presence.attack_seconds <= 0.0 else min(1.0, p.envelope + dt / P.presence.attack_seconds)
@@ -301,6 +348,22 @@ class PoseInstrument(ProjectionLayer):
         detune = S.detune * min(max(p.legs, 0.0), 1.0)
         return Pattern(interval, detune, white, blue)
 
+    def _override(self, pattern: Pattern) -> Pattern:
+        """The panel's parameters in place of the connected ones: with ``override.on``, each
+        ticked parameter is replaced; otherwise the pattern is returned as connected."""
+        O = self._instrument.override
+        if not O.on:
+            return pattern
+        if O.interval_on:
+            pattern.interval = O.interval
+        if O.detune_on:
+            pattern.detune = O.detune
+        for osc, colour in ((pattern.white, 'white'), (pattern.blue, 'blue')):
+            for name in ('fundamental', 'harmonic', 'phase', 'overtone_phase'):
+                if getattr(O, f'{colour}_{name}_on'):
+                    setattr(osc, name, getattr(O, f'{colour}_{name}'))
+        return pattern
+
     @staticmethod
     def _measure(angle: float) -> float:
         """An angle as a measure 0..1: the pipeline's angles are calibrated so neutral is 0 and
@@ -313,11 +376,16 @@ class PoseInstrument(ProjectionLayer):
 
     def _set_windows(self) -> None:
         """Each side's window: ``window.width`` scaled by presence, then grown toward every
-        similarity-matched partner along the shorter arc, up to the partner's position."""
+        similarity-matched partner along the shorter arc, up to the partner's position. Held from
+        the panel (``override.window``), it is that width by presence and does not grow."""
         P = self._instrument.window
-        base = min(P.width / 360.0, 0.5)
+        O = self._instrument.override
+        held = O.on and O.window_on
+        base = min((O.window if held else P.width) / 360.0, 0.5)
         for p in self._players.values():
             p.window_left = p.window_right = base * p.envelope
+        if held:
+            return
         threshold = P.sync_threshold
         ids = list(self._players)
         for i, id_a in enumerate(ids):

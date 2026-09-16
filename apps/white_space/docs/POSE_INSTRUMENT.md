@@ -399,7 +399,9 @@ interval at rest and its octaves of bend, the detune's maximum, the blue's rest 
 ranges, and per colour `white` / `blue` the waveform, the cutoff and
 the drift); `mask` (width, brightness, the playhead's level in it, the flash brightness); `window`
 (width, the sync threshold); `events` (the hit's frames, the tint per colour, the push); `presence`
-(attack, release); `dummy` (*The dummy*). The layer keeps its `blend`. No setting routes anything.
+(attack, release); `override` (*Playing by hand*: the pattern's parameters set directly, a toggle
+each and one `on`, the window held, a hit button); `dummy` (*The dummy*). The layer keeps its
+`blend`. No setting routes anything.
 
 ### Hot reload
 
@@ -423,6 +425,20 @@ already built (a settings instance keeps its fields). Hence the rules:
 - A new setting, feature or parameter needs a restart; a new connection does not.
 - The first connections table of Part 3 is `connect` in words; when one changes, the other follows
   in the same change.
+
+### Playing by hand
+
+The instrument has two kinds of numbers. Its **inputs** are what the pipeline delivers per person:
+the arm angles, the leg deviation, the bend, the similarity, the playhead crossing; the dummy fakes
+them. Its **parameters** are what the pattern is drawn from: the interval and the detune, and per
+colour the two drawbars, the phase and the overtone phase, the `Pattern` that `connect` returns
+for a person each tick. `PI.override` sets the parameters directly: with `on`, every ticked
+parameter comes from the panel for everyone, live people and the dummy alike, and its connection
+is skipped; an unticked one keeps following its measure, so a pose result can be taken apart
+parameter by parameter. `on` sets nothing else; the toggles are independent. `window` holds the
+window each side without a partner, presence still opening and closing it; `hit` marks everyone
+for `hit_frames` ticks as the playhead would. Waveform, cutoff, drift, the mask and the hit's
+values are settings already.
 
 ### Tests
 
