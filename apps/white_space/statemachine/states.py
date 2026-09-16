@@ -25,7 +25,7 @@ from typing import Callable
 import pytweening
 
 from ..light import LightSettings, LayerId, Mix, MotorMode
-from .settings import StateId, SyncMode, StateMachineSettings
+from .settings import StateId, StateMachineSettings
 from .machine import StateContext
 
 
@@ -84,10 +84,6 @@ class StateBase:
         """Advance or wind back a bidirectional ramp by ``delta``, clamped to [0, 1]."""
         return _clamp(p + delta if forward else p - delta)
 
-    def _sync_required(self, players: int) -> int:
-        """How many players ``sync.mode`` wants in sync for the spin-up."""
-        return SyncMode(int(self._config.sync.mode)).required(players, self._config.min_players)
-
 
 # -- Steady states ---------------------------------------------------------------
 
@@ -145,8 +141,8 @@ class IntroState(StateBase):
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.players == 0:       # before the session timeout: an empty room never spins up
             return StateId.INTRO_IDLE
-        # A large enough group in sync (sync.mode: the min_players / all−1 / all) launches the spin-up.
-        if ctx.sync_players >= self._sync_required(ctx.players) and ctx.players >= self._config.min_players:
+        # The players heard the same sound min_players times in a row: that many alike hits launch the spin-up.
+        if ctx.sync_hits >= self._config.min_players and ctx.players >= self._config.min_players:
             return StateId.INTRO_PLAY
         if ctx.session and ctx.elapsed >= self._config.session.intro_seconds:
             return StateId.INTRO_PLAY

@@ -914,8 +914,7 @@
     "min_players": 2,
     "count_hold_seconds": 1.0,
     "sync": {
-      "threshold": 0.5,
-      "mode": "MIN_PLAYERS"
+      "threshold": 0.5
     },
     "manual": {
       "select": "PLAY",

@@ -3,10 +3,11 @@
 A condition-driven state machine that plays the states designed in ``docs/STATES.md``
 (the source of truth): a sequencer hybrid, progress-driven *within* a state and
 condition-driven *between* states. Each tick (on the Conductor's light thread) it builds a
-``StateContext`` from the board (players, hit-by-light, the pose frames' ``Similarity`` for the
-sync condition, the playhead's content clock and lock signals), lets the active state return its
-mix, evaluates that state's transition conditions, and emits a ``SequencerState`` snapshot for
-the board and OSC sound.
+``StateContext`` from the board (the players present, the hit streak ``HitSync`` publishes — this
+tick's hit and how many hits in a row struck alike poses — and the playhead's content clock and
+lock signals), lets the active state return its mix, evaluates that state's transition conditions,
+and emits a ``SequencerState`` snapshot for the board and OSC sound. It reads the board only; the
+hits and their poses are ``pose/hit_sync.py``'s.
 
 The machine is the only component that talks to the Conductor, through three explicit
 command callables: ``set_mix`` (the mix), ``reset_layers`` (explicit layer resets), and
@@ -19,59 +20,20 @@ at the wire, the internals speak ``state`` throughout.
 
 from __future__ import annotations
 
-import itertools
-import math
 import time
 from dataclasses import dataclass
 from typing import Callable
 
-import numpy as np
-
+from modules.board import HitStreak
 from modules.session import SequencerState
-from modules.pose import features, FrameDict
 from modules.utils import HotReloadMethods
 
 from ..board import Board
 from ..light import LightSettings, LayerId, Mix, MotorMode
-from ..pose import PlayheadOffset, playhead_step, ticks_to_crossing
 from .settings import StateId, StateMachineSettings, ManualSettings
 
 import logging
 logger = logging.getLogger(__name__)
-
-
-_TINY = 1e-5   # the zero guard NormalizedScalarFeature uses for its harmonic mean
-
-
-def _largest_sync_group(frames: FrameDict, threshold: float) -> tuple[int, float]:
-    """The largest group of present players in sync with each other — every member's harmonic mean of
-    their ``Similarity`` toward the other members (strict: one poor match pulls it down) at or above
-    ``threshold`` — as ``(size, the group's mean value)``; the best group of that size when several qualify,
-    ``(0, 0.0)`` when no two are in sync. The rows already carry the neutral weight, so a person at neutral
-    matches nobody and joins no group. Rows are indexed by player id; only the ids in ``frames`` are read, a
-    member without data toward another member disqualifies the group."""
-    ids = sorted(frames)
-    rows = {i: frames[i][features.Similarity].values for i in ids}
-    for size in range(len(ids), 1, -1):
-        best: float | None = None
-        for group in itertools.combinations(ids, size):
-            values: list[float] = []
-            for i in group:
-                row = rows[i]
-                others = [j for j in group if j != i]
-                if any(j >= len(row) for j in others):
-                    break
-                s = row[others]
-                if np.isnan(s).any():
-                    break
-                values.append(float(len(others) / np.sum(1.0 / np.maximum(s, _TINY))))
-            if len(values) < size or min(values) < threshold:
-                continue
-            mean = float(np.mean(values))
-            best = mean if best is None else max(best, mean)
-        if best is not None:
-            return size, best
-    return 0, 0.0
 
 
 @dataclass
@@ -81,9 +43,9 @@ class StateContext:
     bars:    float          # playhead bars since state entry (one-way bar ramps)
     dt:      float          # this tick's wall-clock delta (bidirectional ramps integrate these)
     dbar:    float          # this tick's bar delta
-    players: int       # debounced live player count (ghosts excluded)
-    sync:    float          # mean similarity within the largest group in sync (0..1; 0 when no two are)
-    sync_players: int         # size of the largest group in sync with each other (each member ≥ sync.threshold toward the others)
+    players: int            # debounced live player count (ghosts excluded)
+    sync:    float          # mean similarity of the last hits in sync (0..1; 0 below two)
+    sync_hits: int          # hits in a row, within one round, that struck alike poses (HitSync's streak)
     hit:     bool           # this tick the playhead is closest to a live player (the flash tick)
     session: bool           # session mode active — states consult it in needs_state_change()
     blackout: bool          # the pinned blackout toggle — OFF stays put while pinned and
@@ -142,8 +104,7 @@ class StateMachine:
         self._eff_players: int | None = None   # debounced count (None until first tick)
         self._pending_count: int = 0
         self._pending_since: float = 0.0
-        self._prev_offsets: dict[int, float] = {}   # per-id PlayheadOffset for hit detection
-        self._tick_sync: tuple[int, float] = (0, 0.0)   # this tick's largest group in sync: (size, mean similarity)
+        self._streak: HitStreak = HitStreak()       # this tick's hit and hit streak, from the board
 
         self._goto_requested: bool = False
         config.manual.bind(ManualSettings.goto, self._on_goto)
@@ -166,10 +127,6 @@ class StateMachine:
 
     # -- Inputs --------------------------------------------------------------
 
-    def _sync_group(self, frames: FrameDict) -> tuple[int, float]:
-        """The largest group in sync with each other, from the pose frames' ``Similarity``: (size, mean)."""
-        return _largest_sync_group(frames, self._config.sync.threshold)
-
     def _debounced_players(self, now: float, live_ids: set[int]) -> int:
         """Live player count — the people with a pose — debounced by count_hold_seconds so
         occlusion/re-acquisition flicker can't fire transitions."""
@@ -186,39 +143,16 @@ class StateMachine:
             self._eff_players = raw            # candidate held long enough
         return self._eff_players
 
-    def _detect_hit(self, frames: FrameDict) -> bool:
-        """True when this tick is the one the playhead is closest to a live player — the tick a
-        one-frame ``beam_flash`` lights (``ticks_to_crossing`` < ½ step at ``beam_rpm``). A
-        PlayheadOffset sign flip + → − also counts, so a pass a jittered step skipped is still a hit;
-        the ±π wrap flips − → +, so it never false-fires."""
-        step = playhead_step(self._light.motor.beam_rpm, 1.0 / self._light.light_rate)
-        hit = False
-        offsets: dict[int, float] = {}
-        for id, frame in frames.items():
-            off = frame[PlayheadOffset].value
-            if math.isnan(off):
-                continue
-            tau = ticks_to_crossing(off, step)
-            prev = self._prev_offsets.get(id)
-            if not math.isnan(tau) and abs(tau) < 0.5:
-                hit = True
-            elif prev is not None and prev > 0.0 and off < 0.0 and (prev - off) < math.pi:
-                hit = True
-            offsets[id] = off
-        self._prev_offsets = offsets
-        return hit
-
     def _build_context(self, now: float, dt: float, signals,
                        players: int, hit: bool) -> StateContext:
-        sync_players, sync = self._tick_sync
         return StateContext(
             elapsed=now - self._entered_time,
             bars=signals.bars - self._entered_bars,
             dt=dt,
             dbar=signals.bars - self._prev_bars,
             players=players,
-            sync=sync,
-            sync_players=sync_players,
+            sync=self._streak.similarity,
+            sync_hits=self._streak.hits,
             hit=hit,
             session=self._config.session.enabled,
             blackout=self._config.blackout,
@@ -238,8 +172,9 @@ class StateMachine:
         # The people present are the people with a pose: `pose.tracklets.detection_timeout` decides.
         frames = self._board.get_frames(self._pose_stage)
         players = self._debounced_players(now, set(frames.keys()))
-        hit = self._detect_hit(frames)
-        self._tick_sync = self._sync_group(frames)
+        # This tick's hit and the hit streak: HitSync's, published on the board just before this tick.
+        self._streak = self._board.get_hit_streak()
+        hit = self._streak.hit
 
         if not self._entered:
             # Startup failsafe: always enter OFF (see __init__) — `manual.select` is not
@@ -273,8 +208,6 @@ class StateMachine:
         p = self._active.progress(ctx)
         self._config.progress = p
         self._config.players = players
-        self._config.sync.similarity = ctx.sync
-        self._config.sync.players = ctx.sync_players
         self._notify_state(SequencerState(
             stage=int(self._current),                       # wire-format naming (see module doc)
             stage_progress=p,

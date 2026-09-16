@@ -8,18 +8,22 @@ Vocabulary:
 
 - **P** — the live player count: the LERP poses (`LAYERS.md`, *Inputs*), debounced
   by `states.count_hold_seconds`
-- **min_players** — `states.min_players`, the players the show needs (`studio.json`: 2): a group that large in
-  sync spins it up, fewer present end it, and END winds back to PLAY once they are back
-- **in sync** — a group of players each of whose posture similarity to the other members (the
-  harmonic mean of their `Similarity` row at the members' ids, LERP frames) is at least `sync.threshold`;
-  `sync.players` is the size of the largest such group, `sync.similarity` its mean similarity
+- **min_players** — `states.min_players`, the players the show needs (`studio.json`: 2): that many alike hits
+  in a row spin it up, fewer present end it, and END winds back to PLAY once they are back
+- **in sync** — the most recent hits, within one round, whose poses are alike: each hit's posture similarity
+  to the others (the pipeline's kernel and settings, `pose.similarity.window_similarity`, weighted at neutral
+  by the less-moved of the two) at least `sync.threshold`. `sync.hits` is how many in a row, `sync.similarity`
+  their mean; a hit that does not match restarts the count from itself at once. `HitSync`
+  (`pose/hit_sync.py`) records each hit's pose off the LERP frame and publishes the streak on the board
 - **neutral** — arms hanging: the most-moved arm joint within `pose.arm_deviation_extractor.min_degrees` of
   it (`ArmDeviation` 0; 1 from `max_degrees`, linear between). A pair's similarity is weighted by its
   less-moved member's deviation (`pose/neutral_weight.py`, before the frames are stamped and smoothed), so a
   pair with a person at neutral reads 0 and a pose leaving neutral never jumps the sync
 - **bar** — one full playhead cycle, the content clock
-- **hit** — the tick the playhead is closest to a player: the tick a one-frame `beam_flash` lights
-  (`statemachine/machine.py` `_detect_hit`)
+- **hit** — the tick the playhead is closest to a player, once per pass (`PlayheadCrossing` in
+  `pose/playhead_offset.py`): the tick a one-frame `beam_flash` lights, the instrument marks the player, and
+  `HitSync` reads their pose. The playhead crosses each player once per round, so a round has one hit per
+  player and the players hear each hit as that pose's sound
 - **readout mode** — the fixture reads beam mode below 200 rpm and projection mode at or above, switching
   on receipt of the *commanded* rpm (see `CALIBRATION.md` *Two modes, two offsets*). A spin-up is in
   projection mode from its first packet; a wind-down is in beam mode from its first packet.
@@ -66,7 +70,7 @@ stateDiagram-v2
     IDLE_INTRO --> INTRO: hit by light
     IDLE_INTRO --> INTRO_IDLE: P == 0
     INTRO --> INTRO_IDLE: P == 0
-    INTRO --> INTRO_PLAY: a group in sync (sync.mode) & P ≥ min_players\n(session - after fixed time)
+    INTRO --> INTRO_PLAY: min_players alike hits in a row & P ≥ min_players\n(session - after fixed time)
     INTRO_IDLE --> IDLE: intro_idle_bars
     INTRO_PLAY --> PLAY: spin_up_seconds
     PLAY --> END: P < min_players (stand-alone)\n(session - after fixed time)
@@ -205,16 +209,16 @@ stops.
 ## S4 — INTRO
 
 The pose instrument is introduced. Neutral poses give a glass ping; arms raised gives a heavy bass; all
-other arm positions give unique sounds. The dim playhead flashes bright as it crosses each player.
+other arm positions give unique sounds. The dim playhead flashes bright as it crosses each player, and each
+crossing is a hit the players hear as that pose's sound: the show advances when they have heard the same
+sound `min_players` times in a row.
 
 - **Players**: > 0 · **Duration**: ∞ · **Motor**: BEAM
 - **Transitions**
   1. P == 0 → S5 INTRO_IDLE
-  2. a group **in sync** (*Vocabulary*) at least `sync.mode` large (the min_players / all−1 / all) and P ≥ min_players →
-     S6 INTRO_PLAY. The similarity is the posture similarity (current pose against current pose,
-     `WindowSimilarity` at `window_length` 1), weighted at neutral, read from the `Similarity` feature of the
-     LERP pose frames, smoothed by the Euro smoother and the chase interpolator. A person at neutral matches
-     nobody and joins no group, so a bystander never blocks the min_players; in ALL everybody must be in the group
+  2. `sync.hits` ≥ min_players (the last min_players hits **in sync**, *Vocabulary*) and P ≥ min_players →
+     S6 INTRO_PLAY. A neutral hit is alike to nothing, so pings never spin the show up; a hit that does not
+     match restarts the count at once, and the count is visible on the panel as it builds
   3. session: elapsed ≥ `session.intro_seconds` → S6 INTRO_PLAY *(checked after P == 0, so an empty room
      never spins up)*
 - **Mix**: `beam_playhead` DIM · `beam_flash` 1.0 (reset on entry)

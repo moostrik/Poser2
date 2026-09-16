@@ -17,7 +17,7 @@ from modules.session import Session
 from modules.gl import WindowSettings
 
 from .board import Board
-from .pose import GhostFeature, PlayheadOffset, PlayheadOffsetExtractor, Ghoster, Dummy, dummy_id, NeutralWeight
+from .pose import GhostFeature, PlayheadOffset, PlayheadOffsetExtractor, Ghoster, Dummy, dummy_id, NeutralWeight, HitSync
 from .light import Conductor
 from .inout import OscLightSender, OscSoundSender, UdpLightReceiver
 from .render import Render as WindowRender
@@ -175,6 +175,9 @@ class WhiteSpaceMain:
         )
         self.state_machine.add_state_callback(self.board.set_sequence)
         self.state_machine.add_state_callback(self.osc_sound_sender.set_sequencer_state)
+        # HIT SYNC — the hits' poses and the streak of alike ones, published on the board for the machine.
+        self.hit_sync = HitSync(self.settings.states.sync, ps.similarity.window_similarity, self.settings.light,
+                                board=self.board, pose_stage=int(Stage.LERP))
 
         # POSE STAGE RAW
         self.pose_predictor.add_frames_callback(self.stages[Stage.RAW])
@@ -312,8 +315,10 @@ class WhiteSpaceMain:
                                    self.settings.camera.cameras, self.settings.camera.camera_check, ps.angle_extractor)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
         self.render.add_update_callback(self.camera_check.update)
-        # LERP first: the state machine's hit reads this tick's PlayheadOffset, the same the flash draws on.
+        # In order: LERP first, so the hit reads this tick's PlayheadOffset (the same the flash draws on);
+        # then HitSync publishes the hit and the streak; then the state machine reads them.
         self.conductor.add_update_callback(self.interpolators_lerp.update)
+        self.conductor.add_update_callback(self.hit_sync.update)
         self.conductor.add_update_callback(self.state_machine.update)
         self.render.add_exit_callback(self.stop)
 

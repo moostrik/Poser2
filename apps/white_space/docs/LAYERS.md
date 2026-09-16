@@ -24,7 +24,9 @@ projection block's generic patterns keep a `test_` prefix.
 
 ## Inputs
 
-Show layers and the state machine read pose frames from the board, never the tracker's tracklets.
+Show layers and the state machine read pose frames from the board, never the tracker's tracklets. The
+state machine also reads the board's hit streak (`HitSync`, `STATES.md` *Vocabulary*: in sync); the live
+`Similarity` feature stays the instrument's (the window opening) and the sound's.
 A person is present while their pose exists: the pose pipeline stops posing a person
 `pose.tracklets.detection_timeout` (1.0 s) after their last detection, and every filter downstream
 resets a track the moment its pose is missing. A layer adds no presence test of its own. A person's
@@ -203,3 +205,14 @@ playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJ
 - **Sync thresholds**: `states.sync.threshold` (per player, INTRO → INTRO_PLAY) and
   `PI.window.sync_threshold` (pairwise, the window opening) measure different quantities and are
   tuned separately; whether they should share one value
+- **Hit ownership**: `PlayheadCrossing` (`pose/playhead_offset.py`) runs in three instances (`beam_flash`,
+  `pose_instrument`, `HitSync`) on the same LERP `PlayheadOffset` and the same step (`beam_rpm` at the
+  tick rate), so they agree by construction. One light-side detector publishing per-width hit sets on the
+  board would give the hit one owner; left as is because the layers gain nothing by it
+- **Ghosts and the playhead boundary**: the Ghoster is deprecated (off in `studio.json`; a nice-to-have).
+  It is what keeps `PlayheadOffset` a pose feature (its beat reads it, it stamps it on ghosts) and is the
+  pose package's one playhead dependency. Removing the Ghoster removes `beam_haunted`, `GhostFeature`,
+  `GhostState`, the ghost store, the sound's ghost slots and the `playhead_data` dropdown with it; the
+  playhead offset (azimuth − playhead, stateless) can then be computed by its consumers — the flash, the
+  instrument, `HitSync`, the sound sender when its frames arrive — and leave the frame, and the pose
+  pipeline takes the light's clock (the LERP stage runs inside the light tick) and none of its data

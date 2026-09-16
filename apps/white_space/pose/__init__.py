@@ -4,3 +4,4 @@ from .playhead_offset import PlayheadOffset, PlayheadOffsetExtractor, PlayheadCr
 from .ghoster import Ghoster, GhosterSettings
 from .dummy import Dummy, DummySettings, Measures, dummy_id
 from .neutral_weight import NeutralWeight, NeutralWeightSettings
+from .hit_sync import HitSync, HitSyncSettings

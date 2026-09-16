@@ -1,27 +1,17 @@
 """StateMachine settings — the show's identity enums and configuration tree.
 
 Pure data (fields, groups, enums), mirroring ``light/settings.py``'s role for its
-package: ``StateId`` is the state vocabulary of ``docs/STATES.md``, ``SyncMode`` the INTRO →
-INTRO_PLAY sync condition, and ``StateMachineSettings`` the panel — telemetry
-first, then the show timings, with the sync / manual / session corners as nested groups.
+package: ``StateId`` is the state vocabulary of ``docs/STATES.md`` and ``StateMachineSettings`` the
+panel — telemetry first, then the show timings, with the sync (``HitSyncSettings``, the INTRO →
+INTRO_PLAY condition on the hits, owned by ``pose/hit_sync.py``) / manual / session corners as
+nested groups.
 """
 
 from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, Field, Group, Widget
 
-
-class SyncMode(IntEnum):
-    """How large the group in sync with each other must be for INTRO → INTRO_PLAY."""
-    MIN_PLAYERS        = 0        # the min_players (``states.min_players``)
-    ALL_MINUS_ONE = auto()   # all but one
-    ALL           = auto()   # everyone
-
-    def required(self, players: int, min_players: int) -> int:
-        match self:
-            case SyncMode.MIN_PLAYERS:        return min_players
-            case SyncMode.ALL_MINUS_ONE: return max(players - 1, min_players - 1)
-            case _:                      return players
+from ..pose import HitSyncSettings
 
 
 class StateId(IntEnum):
@@ -48,14 +38,6 @@ class ManualSettings(BaseSettings):
     select: Field[StateId] = Field(StateId.IDLE, description="State to jump to with the goto button")
     goto:   Field[bool]    = Field(False, widget=Widget.button, description="Jump to the selected state now")
     hold:   Field[bool]    = Field(False, description="Freeze transitions; the active state keeps updating")
-
-
-class SyncSettings(BaseSettings):
-    """The pose-sync condition (INTRO → INTRO_PLAY): its live telemetry and tunables."""
-    similarity: Field[float]    = Field(0.0, min=0.0, max=1.0, widget=Widget.number, access=Field.READ, description="Mean similarity within the largest group in sync")
-    players:    Field[int]      = Field(0, access=Field.READ, pinned=True, description="Players in the largest group in sync with each other")
-    threshold:  Field[float]    = Field(0.75, min=0.0, max=1.0, step=0.01, widget=Widget.slider, description="A group is in sync when each member's similarity to the others is at least this")
-    mode:       Field[SyncMode] = Field(SyncMode.MIN_PLAYERS, description="INTRO → INTRO_PLAY: how large the group in sync must be (min_players / all−1 / all)")
 
 
 class SessionModeSettings(BaseSettings):
@@ -93,9 +75,10 @@ class StateMachineSettings(BaseSettings):
     dim_level: Field[float] = Field(0.4, min=0.0, max=1.0, step=0.01, description="DIM line level: the front white lamp in INTRO, and where INTRO_PLAY and END_INTRO hold it", newline=True)
 
     # Condition tunables
-    min_players:             Field[int]   = Field(3, min=2, max=16, description="Players the show needs at least: present to play, in sync to start", newline=True)
+    min_players:        Field[int]   = Field(3, min=2, max=16, description="Players the show needs at least: present to play, alike hits in a row to start", newline=True)
     count_hold_seconds: Field[float] = Field(1.0,  min=0.0, max=10.0, step=0.1, description="Player-count debounce: a new count must persist this long before conditions see it")
 
-    sync:    Group[SyncSettings]        = Group(SyncSettings)
+    # The sync condition's group is HitSync's settings (pose/hit_sync.py): it fills the telemetry.
+    sync:    Group[HitSyncSettings]     = Group(HitSyncSettings)
     manual:  Group[ManualSettings]      = Group(ManualSettings)
     session: Group[SessionModeSettings] = Group(SessionModeSettings)

@@ -1,8 +1,7 @@
 # Standard library imports
-from enum import IntEnum
 import threading
 import time
-from typing import Callable, Optional, TYPE_CHECKING, cast
+from typing import Callable, Optional, TYPE_CHECKING
 import warnings
 from dataclasses import dataclass
 
@@ -13,8 +12,9 @@ import numpy as np
 from modules.settings import BaseSettings, Field
 from ..frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
 from ..features import Angles, AngleMotion, AngleVelocity
-from ..features import AggregationMethod, NormalizedScalarFeature
+from ..features import AggregationMethod
 from ..features import Similarity, LeaderScore
+from .posture_similarity import _JointAggregator, joint_similarity, aggregate_joints
 from modules.utils import PerformanceTimer, HotReloadMethods
 
 import logging
@@ -26,28 +26,6 @@ class SimilarityResult:
     """Output of WindowSimilarity / WindowCorrelation."""
     similarity: dict[int, Similarity]
     leader_score: dict[int, LeaderScore]
-
-
-class _JointAggregator(NormalizedScalarFeature):
-    """Helper class for aggregating per-joint similarities into scalars.
-
-    This is a minimal wrapper around NormalizedScalarFeature that allows us
-    to reuse all aggregation methods (mean, harmonic mean, etc.) on arbitrary
-    length arrays without needing a specific feature class.
-    """
-    _joint_enum: type[IntEnum] | None = None
-
-    @classmethod
-    def enum(cls) -> type[IntEnum]:
-        if cls._joint_enum is None:
-            raise RuntimeError("_JointAggregator not configured")
-        return cls._joint_enum
-
-    @classmethod
-    def configure(cls, num_joints: int) -> None:
-        """Configure the aggregator with the number of joints."""
-        if cls._joint_enum is None:
-            cls._joint_enum = cast(type[IntEnum], IntEnum("JointIndex", {f"J{i}": i for i in range(num_joints)}))
 
 
 class WindowSimilaritySettings(BaseSettings):
@@ -271,10 +249,9 @@ class WindowSimilarity:
         # Result: (N, N, T, F) - i's current vs j's full window
         raw_diff = current[:, None, None, :] - values[None, :, :, :]
 
-        # Compute angle similarity if enabled
+        # Compute angle similarity if enabled: the shared posture kernel (posture_similarity.py)
         if self._config.use_angle_similarity:
-            angular_diff = np.mod(raw_diff + np.pi, 2 * np.pi) - np.pi
-            similarity = np.exp(-np.square(angular_diff / angle_tolerance))   # 1/e at one tolerance
+            similarity = joint_similarity(raw_diff, angle_tolerance)
         else:
             # Start with ones (neutral), NaN where input is NaN
             similarity = np.where(np.isnan(raw_diff), np.nan, 1.0)
@@ -378,30 +355,15 @@ class WindowSimilarity:
                 if i == j:
                     continue  # Skip self-comparison
 
-                # Use helper to aggregate per-joint similarities; NaN joints are skipped
-                joint_sim = best_sim[i, j].copy()
-                temp_feature = _JointAggregator(
-                    values=joint_sim,
-                    scores=np.where(np.isnan(joint_sim), 0.0, 1.0).astype(np.float32)
-                )
+                # The shared posture kernel's aggregation (posture_similarity.py): the joints both have,
+                # remapped, times the coverage; NaN joints are skipped
+                value, _ = aggregate_joints(best_sim[i, j], self._config.method,
+                                            self._config.remap_low, self._config.remap_high)
 
-                # Aggregate per-joint similarities into single scalar
-                aggregated_sim = temp_feature.aggregate(
-                    method=self._config.method,
-                    min_confidence=0.0
-                )
-
-                # Remap [remap_low, remap_high] → [0, 1]
-                low, high = self._config.remap_low, self._config.remap_high
-                # print(low, high)
-                if high > low and not np.isnan(aggregated_sim):
-                    aggregated_sim = (aggregated_sim - low) / (high - low)
-                    aggregated_sim = float(np.clip(aggregated_sim, 0.0, 1.0))
-
-                # Store at absolute pose ID index, penalised by the fraction of joints compared
+                # Store at absolute pose ID index; the score is the fraction of joints compared
                 pose_id_j = track_ids[j]
-                if not np.isnan(aggregated_sim):
-                    values[pose_id_j] = aggregated_sim * coverage[i, j]
+                if not np.isnan(value):
+                    values[pose_id_j] = value
                     scores[pose_id_j] = coverage[i, j]
 
             # Create Similarity object for this pose
