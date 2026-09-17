@@ -5,7 +5,8 @@ import unittest
 
 import numpy as np
 
-from apps.white_space.light.synth import Voice, Input, OscillatorSettings, WindowSettings, PresenceSettings, PushSettings
+from apps.white_space.light.synth import (Voice, Input, OscillatorSettings, WindowSettings, PresenceSettings,
+                                          PushSettings, LfoSettings)
 
 STEP = 0.1                                              # degrees per pixel
 OFFSETS = np.arange(-600, 601) * STEP                   # a strip 60° each side of the person
@@ -36,13 +37,13 @@ def has_line_at(output: np.ndarray, position: float) -> bool:
 class VoiceTest(unittest.TestCase):
     def setUp(self) -> None:
         self.one, self.two = OscillatorSettings(), OscillatorSettings()
-        self.window, self.presence, self.push = WindowSettings(), PresenceSettings(), PushSettings()
+        self.window, self.presence, self.push, self.lfo = WindowSettings(), PresenceSettings(), PushSettings(), LfoSettings()
         self.presence.attack_seconds = 0.0              # present at once, unless a test says otherwise
         self.one.interval = self.two.interval = 10.0
         self.one.pulse_width = self.two.pulse_width = 0.3
 
     def _voice(self) -> Voice:
-        return Voice(self.one, self.two, self.window, self.presence, self.push)
+        return Voice(self.one, self.two, self.window, self.presence, self.push, self.lfo)
 
     def _arrived(self) -> Voice:
         voice = self._voice()
@@ -161,6 +162,47 @@ class VoiceTest(unittest.TestCase):
         voice.update(0.01, True, False, ({Input.INTERVAL: 1.0}, {}), MIN_INTERVAL)
         found = centres(self._render(voice, 60.0, 60.0)[0])
         self.assertAlmostEqual(found[1] - found[0], 20.0, delta=2 * STEP)
+
+    # -- the LFO --
+
+    def test_the_lfo_is_silent_at_level_zero(self) -> None:
+        voice = self._arrived()
+        for _ in range(50):
+            self.assertEqual(voice.update_lfo(0.01, 0.0), 0.0)
+        self.assertEqual(voice.lfo, 0.0)
+
+    def test_the_lfo_swings_both_ways_by_its_level_at_its_rate(self) -> None:
+        self.lfo.rate, self.lfo.level = 0.5, 0.6                           # a cycle every two seconds
+        voice = self._arrived()
+        outputs = [voice.update_lfo(0.01, 0.0) for _ in range(200)]        # one cycle
+        self.assertAlmostEqual(max(outputs), 0.6, places=3)
+        self.assertAlmostEqual(min(outputs), -0.6, places=3)
+        self.assertAlmostEqual(outputs[-1], 0.6, places=3)                 # back where it started
+        self.assertLess(max(abs(b - a) for a, b in zip(outputs, outputs[1:])), 0.02)   # smooth
+
+    def test_a_source_brings_the_lfo_in_smoothly(self) -> None:
+        self.lfo.rate, self.lfo.level_amount = 0.5, 1.0                    # the level is played, from 0
+        voice = self._arrived()
+        outputs = [voice.update_lfo(0.01, i / 300.0) for i in range(300)]
+        self.assertEqual(outputs[0], 0.0)
+        self.assertGreater(max(abs(o) for o in outputs[200:]), 0.5)
+        self.assertLess(max(abs(b - a) for a, b in zip(outputs, outputs[1:])), 0.03)   # no step as it comes in
+
+    def test_the_lfo_into_a_phase_rocks_the_lines_about_their_place(self) -> None:
+        self.lfo.rate, self.lfo.level = 0.5, 1.0
+        self.one.phase_amount = 0.25                                       # a quarter interval each way
+        voice = self._arrived()
+        seen = []
+        for _ in range(200):                                               # one cycle
+            voice.update_lfo(0.01, 0.0)
+            found = centres(self._render(voice, sources=({Input.PHASE: voice.lfo}, {}))[0])
+            seen.append(min(found, key=lambda centre: abs(centre - 10.0)))   # the line that rests at 10°
+        self.assertAlmostEqual(max(seen), 12.5, delta=0.2)                 # a quarter of 10° out,
+        self.assertAlmostEqual(min(seen), 7.5, delta=0.2)                  # a quarter in,
+        self.assertAlmostEqual(seen[-1], seen[0], delta=0.3)               # and back where it began
+        self.assertLess(max(abs(b - a) for a, b in zip(seen, seen[1:])), 0.2)   # rocking, never stepping
+        still = centres(self._render(voice, sources=({Input.PHASE: voice.lfo}, {}))[1])
+        self.assertAlmostEqual(still[0], 10.0, delta=0.2)                  # the other output does not move
 
     def test_the_settings_are_read_live(self) -> None:
         voice = self._arrived()

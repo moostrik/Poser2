@@ -37,7 +37,7 @@ from .._base_layer import ProjectionLayer, LayerSettings
 from .._utilities import normalize_azimuth, mask_half_width
 from ...frame import Frame
 from ...synth import (Voice, Input, Sources, Oscillator, Envelope, Slot,
-                      OscillatorSettings, WindowSettings, PresenceSettings, PushSettings)
+                      OscillatorSettings, WindowSettings, PresenceSettings, PushSettings, LfoSettings)
 from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step, DummySettings
 
 
@@ -79,7 +79,8 @@ class PoseInstrumentSettings(BaseSettings):
     reach:     Group[ReachSettings]      = Group(ReachSettings)
     presence:  Group[PresenceSettings]   = Group(PresenceSettings)
     push:      Group[PushSettings]       = Group(PushSettings)
-    events:    Group[EventSettings]      = Group(EventSettings)
+    lfo:       Group[LfoSettings]        = Group(LfoSettings)
+    events:   Group[EventSettings]      = Group(EventSettings)
     mask:      Group[MaskSettings]       = Group(MaskSettings)
     override:  Group[OverrideSettings]   = Group(OverrideSettings)
     dummy:     Group[DummySettings]      = Group(DummySettings)
@@ -170,7 +171,7 @@ class PoseInstrument(ProjectionLayer):
                 continue
             p = self._players.get(id)
             if p is None:
-                p = self._players[id] = _Player(Voice(P.white, P.blue, P.window, P.presence, P.push))
+                p = self._players[id] = _Player(Voice(P.white, P.blue, P.window, P.presence, P.push, P.lfo))
             p.present = True
             p.position = normalize_azimuth(azimuth)
             angles = pose[features.Angles].values
@@ -192,8 +193,10 @@ class PoseInstrument(ProjectionLayer):
 
         min_interval = self._min_interval()
         gone: list[int] = []
+        muted = P.override.on
         for id, p in self._players.items():
             p.hit = manual or id in hits
+            p.voice.update_lfo(frame.tick.dt, 0.0 if muted else self.connect_lfo(p))    # first: connect reads its output
             p.voice.update(frame.tick.dt, p.present, p.hit, self._sources(p), min_interval)
             if not p.present and not p.voice.alive:
                 gone.append(id)
@@ -215,12 +218,32 @@ class PoseInstrument(ProjectionLayer):
         measures into the sources of the white and the blue oscillator's slots. The bases and the
         amounts, the range and the direction, are the ``PI.white`` / ``PI.blue`` settings.
 
-        - left shoulder: both pulse widths (placeholder: with white's base 0 and amount 1 and
-          blue's base 1 and amount −1, arms hanging is full blue and arms raised full white)
-        - every other measure: unconnected
+        Each arm plays one oscillator, the left the white and the right the blue:
+
+        - the shoulder: its pulse width (white's base 0 and amount 1, blue's base 1 and amount −1:
+          arms hanging is full blue, arms raised full white)
+        - the elbow: its interval, finer as the arm folds
+        - the body bend, signed: both speeds, so a lean makes the lines flow one way or the other
+        - the LFO (its level played by the legs, ``connect_lfo``): white's phase, a sway
+        - the symmetries, blue's phase, the hardness: unconnected
         """
-        width = self._measure(p.left_shoulder)
-        return {Input.PULSE_WIDTH: width}, {Input.PULSE_WIDTH: width}
+        flow = min(max(p.tilt, -1.0), 1.0)
+        white = {
+            Input.PULSE_WIDTH: self._measure(p.left_shoulder),
+            Input.INTERVAL:    self._measure(p.left_elbow),
+            Input.SPEED:       flow,
+            Input.PHASE:       p.voice.lfo,
+        }
+        blue = {
+            Input.PULSE_WIDTH: self._measure(p.right_shoulder),
+            Input.INTERVAL:    self._measure(p.right_elbow),
+            Input.SPEED:       flow,
+        }
+        return white, blue
+
+    def connect_lfo(self, p: _Player) -> float:
+        """The source of the LFO's level: the leg deviation, so bent knees bring the sway in."""
+        return min(max(p.legs, 0.0), 1.0)
 
     @staticmethod
     def _measure(angle: float) -> float:

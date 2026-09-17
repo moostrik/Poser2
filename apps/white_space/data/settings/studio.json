@@ -848,26 +848,26 @@
     "max_lines": 90,
     "white": {
       "interval": 14.0,
-      "interval_amount": 0.0,
+      "interval_amount": -1.5,
       "pulse_width": 0.0,
       "pulse_width_amount": 1.0,
       "phase": 0.0,
-      "phase_amount": 0.0,
+      "phase_amount": 0.25,
       "speed": 3.9,
-      "speed_amount": 0.0,
+      "speed_amount": 15.0,
       "hardness": 1.0,
       "hardness_amount": 0.0,
       "push": 14.0
     },
     "blue": {
       "interval": 14.0,
-      "interval_amount": 0.0,
+      "interval_amount": -1.5,
       "pulse_width": 1.0,
       "pulse_width_amount": -1.0,
       "phase": 0.5,
       "phase_amount": 0.0,
       "speed": -4.5,
-      "speed_amount": 0.0,
+      "speed_amount": 15.0,
       "hardness": 1.0,
       "hardness_amount": 0.0,
       "push": -14.0
@@ -885,6 +885,12 @@
     },
     "push": {
       "settle_seconds": 0.15
+    },
+    "lfo": {
+      "rate": 0.5,
+      "phase": 0.0,
+      "level": 0.0,
+      "level_amount": 1.0
     },
     "events": {
       "hit_frames": 1

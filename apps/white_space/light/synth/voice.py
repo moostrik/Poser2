@@ -1,7 +1,8 @@
 """Voice — one person's instance of the light synth (``docs/LIGHT_SYNTH.md``, *The voice*).
 
 Two oscillators, one per output, on one time; the amp stage (each side's window, and presence)
-after the slots; the push on the speed. The patch, the settings objects given to the constructor,
+after the slots; the push on the speed; one LFO in time, whose output is a source for the caller
+to wire. The patch, the settings objects given to the constructor,
 is shared by every voice; what flows through it, the sources, is each voice's own. A voice knows
 nothing of colour or pose: what its outputs are projected in, what feeds its sources, what its
 reaches are and when it is hit are the caller's.
@@ -12,8 +13,10 @@ from enum import IntEnum, auto
 import numpy as np
 
 from .envelope import Envelope, WindowSettings, PresenceSettings, PushSettings
-from .oscillator import Oscillator, OscillatorSettings, Value
+from .oscillator import Oscillator, OscillatorSettings, LfoSettings, Value
 from .slot import Slot
+
+_LFO_POSITION = np.zeros(1)              # an LFO in time has one position
 
 
 class Input(IntEnum):
@@ -32,21 +35,39 @@ class Voice:
     """One person's pattern; see the module docstring."""
 
     def __init__(self, oscillator_1: OscillatorSettings, oscillator_2: OscillatorSettings,
-                 window: WindowSettings, presence: PresenceSettings, push: PushSettings) -> None:
+                 window: WindowSettings, presence: PresenceSettings, push: PushSettings, lfo: LfoSettings) -> None:
         self._patches = (oscillator_1, oscillator_2)
         self._window = window
         self._presence_settings = presence
         self._push_settings = push
+        self._lfo_settings = lfo
         self._oscillators = (Oscillator(), Oscillator())
+        self._lfo_oscillator = Oscillator()
+        self._lfo = 0.0                                                     # this tick's LFO output, −1..1
         self._presence = Envelope()
         self._push = Envelope()
         self._intervals = [float(oscillator_1.interval), float(oscillator_2.interval)]     # this tick's, after the slot
 
     def reset(self) -> None:
-        for oscillator in self._oscillators:
+        for oscillator in (*self._oscillators, self._lfo_oscillator):
             oscillator.reset()
+        self._lfo = 0.0
         self._presence.reset()
         self._push.reset()
+
+    @property
+    def lfo(self) -> float:
+        """This tick's LFO output, −level..level: a source like any other, wired by the caller."""
+        return self._lfo
+
+    def update_lfo(self, dt: float, level_source: float) -> float:
+        """Advance the LFO one tick and set its output. Its level comes from its slot, so at level
+        0 it is silent and whatever it feeds is at its base."""
+        L = self._lfo_settings
+        self._lfo_oscillator.update(dt, 1.0, L.rate)                        # one position: the speed is the rate
+        level = Slot.unit(Slot.modulate(L.level, L.level_amount, level_source))
+        self._lfo = float(Oscillator.sine(self._lfo_oscillator.cycle(_LFO_POSITION, 1.0, L.phase), level)[0])
+        return self._lfo
 
     @property
     def alive(self) -> bool:

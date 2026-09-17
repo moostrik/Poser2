@@ -71,7 +71,7 @@ every instance is given the same settings.
 | oscillator | 2        | one per output, the same inputs, each its own values (*Inputs*)     |
 | time       | 1        | shared by the oscillators and the LFOs (*Distance and time*)        |
 | amp stage  | 1        | each side's window, and presence; for both outputs (*The window*)   |
-| LFO        | open     | sources for the inputs (*Modulation*)                               |
+| LFO        | 1        | in time; its output a source for the caller to wire (*Modulation*)  |
 
 An oscillator draws a line, a gap, a line, a gap, outward from the person, the same on both
 sides. A line is full and a gap is off. The two sides are not voices or oscillators: an oscillator
@@ -244,15 +244,19 @@ anywhere. At base 10° and amount 1 octave the interval goes from 10° to 20°; 
 An **LFO** is an oscillator used as a source: its output feeds an input of another oscillator. An
 LFO is not drawn: its output is a sine, −1..1, so what it feeds moves around its base without a
 step. It has one input more, its **level**, 0..1, which scales its output and has a slot of its
-own. At level 0 the LFO
-is silent and the input it feeds is at its base: the level is what is played, as a synth's mod
-wheel brings in the vibrato, and an envelope into it is a fade-in.
+own. At level 0 the LFO is silent and the input it feeds is at its base: the level is what is
+played, as a synth's mod wheel brings in the vibrato, and an envelope into it is a fade-in.
 
-| An LFO         | Into an oscillator's pulse width                                       |
-|----------------|------------------------------------------------------------------------|
-| along the wall | the lines' thickness varies smoothly from line to line                 |
-| in time        | all the lines breathe together                                         |
-| both           | a swell of thickness travels through the lines, which stay in place    |
+A voice has one LFO, **in time**: it has one position, so no interval and no speed, and what it
+has is a **rate**, in cycles per second, and a phase. Its output is one value per tick, and where
+it goes is the wiring's choice (`POSE_INSTRUMENT.md`, *The connections*: into a phase, a sway).
+An LFO along the wall, with an interval and a speed and one value per pixel, is not built.
+
+| An LFO         | Into a pulse width                                  | Into a phase                              |
+|----------------|-----------------------------------------------------|-------------------------------------------|
+| in time        | all the lines breathe together                      | the lines sway about their place          |
+| along the wall | the thickness varies smoothly from line to line     | the lines bunch and spread (a synth's FM) |
+| both           | a swell of thickness travels through standing lines | a ripple travels through the lines        |
 
 ### An envelope as a source
 
@@ -361,9 +365,8 @@ meet.
 
 ## Open
 
-- Which LFOs a voice has, and what each feeds
-- Whether an LFO is per voice, each pattern with a life of its own, or shared by all voices, all
-  patterns breathing in step
+- More LFOs than the one in time per voice: one along the wall; one shared by all voices, all
+  patterns moving in step
 - Whether blue half an interval from white is the instrument's rest, or a preset value
 - Both solid (the overlap tone everywhere) and both dark: whether each is a sound of the
   instrument or a silence to avoid

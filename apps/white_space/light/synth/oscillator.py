@@ -33,6 +33,15 @@ class OscillatorSettings(BaseSettings):
     push:               Field[float] = Field(0.0,  min=-180.0, max=180.0, step=0.5,  description="Speed a hit adds for a moment: positive outward (deg/s)", newline=True)
 
 
+class LfoSettings(BaseSettings):
+    """An LFO in time: an oscillator with one position, used as a source. It has no interval and
+    no speed, only how fast it cycles, and its level is what is played."""
+    rate:         Field[float] = Field(0.5, min=0.0,  max=10.0, step=0.05, description="Cycles per second (Hz)")
+    phase:        Field[float] = Field(0.0, min=-0.5, max=0.5,  step=0.01, description="Where in its cycle it starts (cycles)")
+    level:        Field[float] = Field(0.0, min=0.0,  max=1.0,  step=0.01, description="How far it swings: 0 silent, 1 full", newline=True)
+    level_amount: Field[float] = Field(0.0, min=-1.0, max=1.0,  step=0.01, description="Its source moves the level by this")
+
+
 class Oscillator:
     """The core and the waveforms; see the module docstring."""
 
