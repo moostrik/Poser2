@@ -7,11 +7,11 @@ from types import SimpleNamespace
 import numpy as np
 
 from modules.board import HitStreak
-from modules.pose.analytics import WindowSimilaritySettings
+from modules.pose.analytics import PostureSimilaritySettings
 from modules.pose.features import Angles, AngleLandmark, ArmDeviation
 
 from apps.white_space.light import LightSettings
-from apps.white_space.pose import HitSync, HitSyncSettings, NeutralWeight, NeutralWeightSettings, PlayheadOffset
+from apps.white_space.pose import HitSync, HitSyncSettings, NeutralWeightSettings, PlayheadOffset
 
 POSE_STAGE = 4
 F = len(AngleLandmark)
@@ -60,14 +60,11 @@ class FakeBoard:
 class HitSyncTest(unittest.TestCase):
     def setUp(self) -> None:
         self.config = HitSyncSettings()
-        similarity = WindowSimilaritySettings()
-        similarity.window_length = 1
-        similarity.angle_tolerance = 45.0
-        similarity.remap_low = 0.0
-        similarity.remap_high = 1.0
+        posture = PostureSimilaritySettings()
+        posture.angle_tolerance = 45.0
         self.neutral = NeutralWeightSettings()
         self.board = FakeBoard()
-        self.sync = HitSync(self.config, similarity, NeutralWeight(self.neutral), LightSettings(),
+        self.sync = HitSync(self.config, posture, self.neutral, LightSettings(),
                             board=self.board, pose_stage=POSE_STAGE)
         self.players = 3
         self.board.frames = {i: FakeFrame() for i in range(self.players)}
@@ -86,27 +83,33 @@ class HitSyncTest(unittest.TestCase):
         return streak
 
     def test_alike_hits_in_a_row_build_the_streak(self) -> None:
-        self.assertEqual(self.hit(0), HitStreak(hit=True, hits=1, similarity=0.0))
-        self.assertEqual(self.hit(1).hits, 2)
-        streak = self.hit(2)
+        self.assertEqual(self.hit(0), HitStreak(hit=True, hits=1, distance=0.0))
+        self.assertEqual(self.hit(1, 70.0).hits, 2)
+        streak = self.hit(2, 80.0)
         self.assertEqual(streak.hits, 3)
-        self.assertAlmostEqual(streak.similarity, 1.0, places=5)
+        self.assertAlmostEqual(streak.distance, 20.0, places=3)       # the largest pair: 60° against 80°
         self.assertEqual(self.config.hits, 3)
-        self.assertAlmostEqual(self.config.similarity, 1.0, places=5)
+        self.assertAlmostEqual(self.config.distance, 20.0, places=3)
 
     def test_a_tick_without_a_crossing_keeps_the_streak_and_clears_the_hit_flag(self) -> None:
         self.hit(0)
         self.hit(1)
         streak = self._tick()
-        self.assertEqual(streak, HitStreak(hit=False, hits=2, similarity=1.0))
+        self.assertEqual(streak, HitStreak(hit=False, hits=2, distance=0.0))
 
-    def test_in_sync_is_the_arms_within_the_tolerance(self) -> None:
-        # The cut is the kernel's value at one angle_tolerance (45° here): every joint just inside it passes,
-        # just outside does not. No setting decides this; the tolerance is the knob.
+    def test_in_sync_is_the_postures_within_the_tolerance(self) -> None:
+        # Fully alike is the similarity reading 1: the distance within angle_tolerance (45° here). Just inside
+        # passes, just outside does not. No setting decides this but the tolerance.
         self.hit(0, 0.0)
         self.assertEqual(self.hit(1, 44.0).hits, 2)
         self.hit(2, 0.0)
         self.assertEqual(self.hit(0, 46.0).hits, 1)
+
+    def test_every_pair_in_the_run_must_be_alike(self) -> None:
+        # 0° and 40° are alike, 40° and 80° are alike, 0° and 80° are not: the run is the last two.
+        self.hit(0, 0.0)
+        self.hit(1, 40.0)
+        self.assertEqual(self.hit(2, 80.0).hits, 2)
 
     def test_a_different_pose_restarts_the_count_at_once(self) -> None:
         self.hit(0, 60.0)
@@ -123,6 +126,13 @@ class HitSyncTest(unittest.TestCase):
     def test_unseen_arms_count_as_neutral(self) -> None:
         self.hit(0)
         self.assertEqual(self.hit(1, arms=math.nan).hits, 1)
+
+    def test_the_neutral_gate_is_fully_out_of_neutral(self) -> None:
+        # A gate, not a ramp: arms nine tenths out do not count, fully out do.
+        self.hit(0)
+        self.assertEqual(self.hit(1, arms=0.9).hits, 1)
+        self.assertEqual(self.hit(2, arms=1.0).hits, 1)      # the 0.9 hit before it is still in the way
+        self.assertEqual(self.hit(0, arms=1.0).hits, 2)
 
     def test_with_the_neutral_weight_off_a_neutral_hit_counts_as_alike(self) -> None:
         # The same switch as the live Similarity's weight: off, the posture alone decides.

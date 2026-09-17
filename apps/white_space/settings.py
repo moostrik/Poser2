@@ -212,14 +212,13 @@ class SimilarityFeature(BaseSettings):
     output_frequency: Field[float] = Field(30.0)
     max_players     : Field[int]   = Field(3, min=1, max=16, access=Field.INIT, description="Players tracked at most (shared from root max_players): the similarity row's width")
 
-    # In pipeline order. SMOOTH, on the analytics thread: the posture similarity (WindowSimilarity at
-    # window_length 1), a present pair's gap held, the pair weighted by the arm deviation out of neutral;
-    # then, per frame: stamped on the poses and smoothed.
-    window_similarity    : Group[analytics.WindowSimilaritySettings]      = Group(analytics.WindowSimilaritySettings, share=[max_players.as_('max_poses')])
+    # In pipeline order. On the SMOOTH poses, synchronously: the posture similarity (distance in degrees →
+    # 0..1), a present pair's gap held, the pair weighted by the arm deviation out of neutral; then, per
+    # frame: stamped on the poses and smoothed.
+    posture              : Group[analytics.PostureSimilaritySettings] = Group(analytics.PostureSimilaritySettings, share=[max_players.as_('max_poses')])
     sticky               : Group[analytics.SimilarityStickyFillerSettings] = Group(analytics.SimilarityStickyFillerSettings)
     neutral_weight       : Group[NeutralWeightSettings]               = Group(NeutralWeightSettings)
     similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_players.as_('max_poses')])
-    leader_applicator    : Group[nodes.LeaderScoreApplicatorSettings] = Group(nodes.LeaderScoreApplicatorSettings, share=[max_players.as_('max_poses')])
     smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])
     # LERP: interpolated to the output rate, then the motion gate.
     interpolator         : Group[nodes.ChaseInterpolatorSettings]     = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])

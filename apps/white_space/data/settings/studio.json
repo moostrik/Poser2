@@ -37,7 +37,7 @@
     "data": {
       "stage": "LERP",
       "mode": "WINDOW",
-      "feature_field": "ArmDeviation",
+      "feature_field": "Similarity",
       "line_width": 3.0,
       "line_smooth": 10.0,
       "use_scores": false,
@@ -542,27 +542,20 @@
       }
     },
     "similarity": {
-      "window_similarity": {
-        "window_length": 1,
-        "method": "HARMONIC_MEAN",
-        "use_angle_similarity": true,
-        "angle_tolerance": 20.0,
+      "posture": {
+        "angle_tolerance": 30.0,
+        "forgiveness": 1.4,
         "joints": {
+          "left_shoulder": true,
+          "right_shoulder": true,
+          "left_elbow": true,
+          "right_elbow": true,
           "left_hip": false,
           "right_hip": false,
           "left_knee": false,
           "right_knee": false,
           "head": false
-        },
-        "use_velocity_similarity": false,
-        "velocity_tolerance": 57.3,
-        "use_motion_weighting": false,
-        "use_time_penalty": false,
-        "time_decay_exp": 2.5,
-        "remap_low": 0.0,
-        "remap_high": 1.0,
-        "enabled": true,
-        "verbose": false
+        }
       },
       "sticky": {
         "enabled": true,
@@ -572,10 +565,9 @@
         "enabled": true
       },
       "similarity_applicator": {},
-      "leader_applicator": {},
       "smoother": {
-        "min_cutoff": 0.01,
-        "beta": 0.4,
+        "min_cutoff": 0.3,
+        "beta": 1.0,
         "d_cutoff": 1.0
       },
       "interpolator": {
@@ -880,7 +872,7 @@
     },
     "window": {
       "width": 33.0,
-      "sync_threshold": 0.6
+      "sync_threshold": 0.9
     },
     "events": {
       "hit_frames": 1,
@@ -892,6 +884,31 @@
     "presence": {
       "attack_seconds": 1.0,
       "release_seconds": 1.5
+    },
+    "override": {
+      "on": false,
+      "interval_on": true,
+      "interval": 14.0,
+      "detune_on": true,
+      "detune": 0.0,
+      "window_on": true,
+      "window": 45.0,
+      "white_fundamental_on": true,
+      "white_fundamental": 0.5,
+      "white_harmonic_on": true,
+      "white_harmonic": 0.0,
+      "white_phase_on": true,
+      "white_phase": 0.0,
+      "white_overtone_phase_on": true,
+      "white_overtone_phase": 0.0,
+      "blue_fundamental_on": true,
+      "blue_fundamental": 0.5,
+      "blue_harmonic_on": true,
+      "blue_harmonic": 0.0,
+      "blue_phase_on": true,
+      "blue_phase": 0.5,
+      "blue_overtone_phase_on": true,
+      "blue_overtone_phase": 0.0
     },
     "dummy": {
       "enabled": false,
@@ -921,7 +938,7 @@
     "count_hold_seconds": 1.0,
     "sync": {},
     "manual": {
-      "select": "PLAY",
+      "select": "INTRO",
       "hold": false
     },
     "session": {

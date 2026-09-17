@@ -10,17 +10,16 @@ Vocabulary:
   by `states.count_hold_seconds`
 - **min_players** — `states.min_players`, the players the show needs (`studio.json`: 2): that many alike hits
   in a row spin it up, fewer present end it, and END winds back to PLAY once they are back
-- **in sync** — the most recent hits, within one round, whose poses are alike: each hit's posture similarity
-  to the others (`SIMILARITY.md`: the arms, raw, weighted at neutral) at least e⁻¹, the kernel's value at one
-  `angle_tolerance` — the arms within the tolerance. `sync.hits` is how many in a row, `sync.similarity`
-  their mean; a hit
-  that does not match restarts the count from itself at once. `HitSync` (`pose/hit_sync.py`) records each
-  hit's pose off the LERP frame and publishes the streak on the board
+- **in sync** — the most recent hits, within one round, whose poses are alike: every pair of them fully
+  alike (`SIMILARITY.md`: the arm postures within `angle_tolerance` of each other) and every one fully out of
+  neutral. `sync.hits` is how many in a row, `sync.distance` the largest distance between them in degrees; a
+  hit that does not match restarts the count from itself at once. `HitSync` (`pose/hit_sync.py`) records
+  each hit's pose off the LERP frame and publishes the streak on the board
 - **neutral** — arms hanging: the arm joint furthest from neutral within
   `pose.arm_deviation_extractor.min_degrees` of it (`ArmDeviation` 0; 1 from `max_degrees`, linear between).
-  A pair's similarity is weighted by the deviation of its member closer to neutral
-  (`pose/neutral_weight.py`, before the frames are stamped and smoothed), so a pair with a person at neutral
-  reads 0 and a pose leaving neutral never jumps the sync
+  For the hit sync it is a gate: a hit counts only fully out of neutral (`ArmDeviation` 1), so pings never
+  spin the show up. On the `Similarity` feature it is a ramp: a pair is weighted by the deviation of its
+  member closer to neutral (`pose/neutral_weight.py`), so a pose leaving neutral never jumps a level
 - **bar** — one full playhead cycle, the content clock
 - **hit** — the tick the playhead is closest to a player, once per pass (`PlayheadCrossing` in
   `pose/playhead_offset.py`): the tick a one-frame `beam_flash` lights, the instrument marks the player, and

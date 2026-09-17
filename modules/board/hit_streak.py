@@ -9,10 +9,11 @@ from typing import Protocol
 class HitStreak:
     """The hits' sync, published per light tick (pure data; the producer defines the semantics — for
     white_space: hit = a player was crossed by the playhead this tick; hits = how many of the most recent
-    hits, within one round, struck alike poses; similarity = their mean similarity, 0 below two)."""
-    hit:        bool  = False
-    hits:       int   = 0
-    similarity: float = 0.0
+    hits, within one round, struck alike poses; distance = the largest posture distance, in degrees, between
+    those hits, 0 with fewer than two)."""
+    hit:      bool  = False
+    hits:     int   = 0
+    distance: float = 0.0
 
 
 class HasHitStreak(Protocol):

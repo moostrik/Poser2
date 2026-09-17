@@ -1,7 +1,9 @@
 # Standard library imports
+from enum import IntEnum
+import math
 import threading
 import time
-from typing import Callable, Optional, TYPE_CHECKING
+from typing import Callable, Optional, TYPE_CHECKING, cast
 import warnings
 from dataclasses import dataclass
 
@@ -12,9 +14,9 @@ import numpy as np
 from modules.settings import BaseSettings, Field, Group
 from ..frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
 from ..features import Angles, AngleMotion, AngleVelocity
-from ..features import AggregationMethod
+from ..features import AggregationMethod, NormalizedScalarFeature
 from ..features import Similarity, LeaderScore
-from .posture_similarity import _JointAggregator, JointSelectSettings, joint_mask, joint_similarity, aggregate_joints
+from .joint_select import JointSelectSettings, joint_mask
 from modules.utils import PerformanceTimer, HotReloadMethods
 
 import logging
@@ -23,9 +25,59 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class SimilarityResult:
-    """Output of WindowSimilarity / WindowCorrelation."""
+    """Output of WindowSimilarity / WindowCorrelation / PostureSimilarity."""
     similarity: dict[int, Similarity]
     leader_score: dict[int, LeaderScore]
+
+
+class _JointAggregator(NormalizedScalarFeature):
+    """Per-joint similarities as a feature, so NormalizedScalarFeature's aggregation methods (mean, harmonic
+    mean, …) apply to them. Configured once with the joint count (class-level, idempotent)."""
+    _joint_enum: type[IntEnum] | None = None
+
+    @classmethod
+    def enum(cls) -> type[IntEnum]:
+        if cls._joint_enum is None:
+            raise RuntimeError("_JointAggregator not configured")
+        return cls._joint_enum
+
+    @classmethod
+    def configure(cls, num_joints: int) -> None:
+        """Configure the aggregator with the number of joints."""
+        if cls._joint_enum is None:
+            cls._joint_enum = cast(type[IntEnum], IntEnum("JointIndex", {f"J{i}": i for i in range(num_joints)}))
+
+
+def joint_similarity(diff: np.ndarray, tolerance: float) -> np.ndarray:
+    """Per joint ``exp(-(Δ / tolerance)²)`` on the angle differences ``diff`` (radians, any shape), wrapped to
+    the shortest way round; NaN where a joint is missing stays NaN. ``tolerance`` in radians: 1/e at one."""
+    wrapped = np.mod(diff + np.pi, 2 * np.pi) - np.pi
+    return np.exp(-np.square(wrapped / tolerance))
+
+
+def aggregate_joints(joint_sims: np.ndarray, method: AggregationMethod,
+                     remap_low: float, remap_high: float, mask: np.ndarray | None = None) -> tuple[float, float]:
+    """One pair's ``(value, coverage)`` from its per-joint similarities (F,), NaN for joints not compared: the
+    aggregate over the joints present (``method``), remapped ``[remap_low, remap_high] → [0, 1]`` when the
+    range is positive, times the fraction of joints compared. A joint ``mask`` (bool (F,)) leaves out is
+    neither compared nor counted, so the coverage is over the selected joints. ``(NaN, 0.0)`` when no joint
+    was compared."""
+    joint_sims = np.asarray(joint_sims, dtype=np.float32)
+    if mask is not None:
+        joint_sims = np.where(mask, joint_sims, np.nan)
+    valid = ~np.isnan(joint_sims)
+    included = joint_sims.size if mask is None else int(np.sum(mask))
+    if included == 0 or not valid.any():
+        return math.nan, 0.0
+    coverage = float(valid.sum() / included)
+    _JointAggregator.configure(int(joint_sims.size))
+    feature = _JointAggregator(values=joint_sims.copy(), scores=valid.astype(np.float32))
+    value = feature.aggregate(method=method, min_confidence=0.0)
+    if math.isnan(value):
+        return math.nan, 0.0
+    if remap_high > remap_low:
+        value = float(np.clip((value - remap_low) / (remap_high - remap_low), 0.0, 1.0))
+    return value * coverage, coverage
 
 
 class WindowSimilaritySettings(BaseSettings):

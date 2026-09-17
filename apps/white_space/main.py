@@ -175,9 +175,8 @@ class WhiteSpaceMain:
         self.state_machine.add_state_callback(self.board.set_sequence)
         self.state_machine.add_state_callback(self.osc_sound_sender.set_sequencer_state)
         # HIT SYNC — the hits' poses and the streak of alike ones, published on the board for the machine. It
-        # scores the hit poses as the live rows are scored: the same kernel settings and the same neutral rule.
-        self.neutral_weight = NeutralWeight(ps.similarity.neutral_weight)
-        self.hit_sync = HitSync(self.settings.states.sync, ps.similarity.window_similarity, self.neutral_weight,
+        # compares the hit poses with the posture module's own distance, on the posture settings.
+        self.hit_sync = HitSync(self.settings.states.sync, ps.similarity.posture, ps.similarity.neutral_weight,
                                 self.settings.light, board=self.board, pose_stage=int(Stage.LERP))
 
         # POSE STAGE RAW
@@ -202,7 +201,6 @@ class WhiteSpaceMain:
 
         # POSE STAGE SMOOTH
         self.similarity_applicator = nodes.SimilarityApplicator(ps.similarity.similarity_applicator)
-        self.leader_applicator     = nodes.LeaderScoreApplicator(ps.similarity.leader_applicator)
 
         self.filters_smooth = trackers.FilterTracker({
             i: trackers.FilterPipeline([
@@ -222,7 +220,6 @@ class WhiteSpaceMain:
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
                 self.similarity_applicator,
-                self.leader_applicator,
                 nodes.SimilarityEuroSmoother(ps.similarity.smoother),
             ])
             for i in range(max_players)
@@ -230,20 +227,21 @@ class WhiteSpaceMain:
         self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
         self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
 
-        # Posture similarity: WindowSimilarity at window_length 1, current pose vs current pose. On the result,
-        # where presence is known: the sticky filler bridges a present pair's gap (a departed player's slot
-        # stays NaN), then the neutral weight scales a pair by how far both are out of neutral (their arm
-        # deviation). Then the rows are stamped on the frames and smoothed; the state machine and the light
-        # show read the LERP frames.
-        self.window_similator = analytics.WindowSimilarity(ps.similarity.window_similarity)
+        # Posture similarity: the pairwise distance of the current SMOOTH poses, as a 0..1 similarity, computed
+        # synchronously on this broadcast. On the result, where presence is known: the sticky filler bridges a
+        # present pair's gap (a departed player's slot stays NaN), then the neutral weight scales a pair by
+        # how far both are out of neutral (their arm deviation). Then the rows are stamped on the next SMOOTH
+        # frames and smoothed; the light show reads the LERP frames. The neutral weight's frames come off the
+        # same broadcast, registered first so its deviations are this frame's.
+        self.posture_similarity = analytics.PostureSimilarity(ps.similarity.posture)
         self.similarity_sticky = analytics.SimilarityStickyFiller(ps.similarity.sticky)
+        self.neutral_weight = NeutralWeight(ps.similarity.neutral_weight)
 
-        self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similator.submit)
         self.stages[Stage.SMOOTH].add_callback(self.neutral_weight.set_frames)
-        self.window_similator.add_similarity_callback(self.similarity_sticky.process)
+        self.stages[Stage.SMOOTH].add_callback(self.posture_similarity.process)
+        self.posture_similarity.add_similarity_callback(self.similarity_sticky.process)
         self.similarity_sticky.add_similarity_callback(self.neutral_weight.process)
         self.neutral_weight.add_similarity_callback(self.similarity_applicator.set)
-        self.window_similator.add_similarity_callback(self.leader_applicator.set)
 
         # POSE STAGE PREDICT
         self.filters_predict = trackers.FilterTracker({
@@ -329,7 +327,6 @@ class WhiteSpaceMain:
 
         self.tracker.start()
         self.pose_predictor.start()
-        self.window_similator.start()
         self.conductor.start()
         self.osc_light_sender.start()
         self.osc_sound_receiver.start()
@@ -387,7 +384,6 @@ class WhiteSpaceMain:
         self.conductor.stop()
 
         self.pose_predictor.stop()
-        self.window_similator.stop()
 
         for camera in self.cameras:
             camera.join(timeout=10)

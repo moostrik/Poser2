@@ -44,7 +44,6 @@ class StateContext:
     dt:      float          # this tick's wall-clock delta (bidirectional ramps integrate these)
     dbar:    float          # this tick's bar delta
     players: int            # debounced live player count (ghosts excluded)
-    sync:    float          # mean similarity of the last hits in sync (0..1; 0 below two)
     sync_hits: int          # hits in a row, within one round, that struck alike poses (HitSync's streak)
     hit:     bool           # this tick the playhead is closest to a live player (the flash tick)
     session: bool           # session mode active — states consult it in needs_state_change()
@@ -151,7 +150,6 @@ class StateMachine:
             dt=dt,
             dbar=signals.bars - self._prev_bars,
             players=players,
-            sync=self._streak.similarity,
             sync_hits=self._streak.hits,
             hit=hit,
             session=self._config.session.enabled,

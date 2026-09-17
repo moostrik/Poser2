@@ -81,15 +81,13 @@ class StateMachineTest(unittest.TestCase):
 
     def hit(self, dbar: float = 0.0) -> None:
         """This tick the playhead crosses a player (HitSync's hit flag on the board), then the pass is over."""
-        self.board.hit_streak = HitStreak(hit=True, hits=self.board.hit_streak.hits,
-                                          similarity=self.board.hit_streak.similarity)
+        self.board.hit_streak = HitStreak(hit=True, hits=self.board.hit_streak.hits)
         self.tick(dbar=dbar)
-        self.board.hit_streak = HitStreak(hit=False, hits=self.board.hit_streak.hits,
-                                          similarity=self.board.hit_streak.similarity)
+        self.board.hit_streak = HitStreak(hit=False, hits=self.board.hit_streak.hits)
 
-    def set_streak(self, hits: int, similarity: float = 0.9) -> None:
+    def set_streak(self, hits: int) -> None:
         """HitSync's streak on the board: this many hits in a row struck alike poses."""
-        self.board.hit_streak = HitStreak(hit=False, hits=hits, similarity=similarity if hits > 1 else 0.0)
+        self.board.hit_streak = HitStreak(hit=False, hits=hits)
 
     @property
     def current(self) -> StateId:

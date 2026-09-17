@@ -144,8 +144,8 @@ this section is the layer: what it reads, how it composes people, and what it ex
   left/right shoulder, left/right elbow), `LegDeviation` (joint-weighted hip/knee deviation, 0..1),
   `TorsoTilt` (signed sideways lean against the image vertical, −1..1) and `AngleSymmetry` (signed
   left minus right per pair, −1..1); plus presence (the pose itself,
-  *Inputs*), the pairwise `Similarity` row (`SIMILARITY.md`: the arms, raw, weighted at neutral; the window
-  opens from `window.sync_threshold` up to 1 = identical arms) and `PlayheadOffset`. `AngleSymmetry`, `LegDeviation` and
+  *Inputs*), the pairwise `Similarity` row (`SIMILARITY.md`: how alike the arm postures are, 0 to 1, 1 within
+  the tolerance, weighted at neutral) and `PlayheadOffset`. `AngleSymmetry`, `LegDeviation` and
   `TorsoTilt` are also sent to Max (`/pose/{id}/angle/sym`, `/pose/{id}/angle/legs`,
   `/pose/{id}/angle/tilt`) so sound and light read the same values. The layer adds no smoothing: the
   LERP poses are the pipeline's smoothed output.
@@ -168,8 +168,9 @@ this section is the layer: what it reads, how it composes people, and what it ex
   (`mask.brightness`, `mask.width` wide). A mask or a window edge cuts
   a line where it falls, so lines slide out from behind the mask and into view at the window edge.
 - **Sync**: above `window.sync_threshold` (mean of both directions' similarity) a pair's window opens
-  toward each other along the shorter arc, eased, until each pattern reaches the partner: full sync
-  is full overlap, one pattern. It opens over any intermediate person, whose own pattern is
+  toward each other along the shorter arc, eased, until each pattern reaches the partner at similarity 1:
+  full sync is full overlap, one pattern. The threshold is the layer's own remap of the similarity, which is
+  well above 0 for most pairs out of neutral (`SIMILARITY.md`, *Interdependence*). It opens over any intermediate person, whose own pattern is
   unchanged. Sync shows more of the pattern; it never changes the lines. A pair with a person at neutral
   reads 0 and does not open (`STATES.md`, *Vocabulary*).
 

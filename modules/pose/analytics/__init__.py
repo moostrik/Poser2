@@ -1,4 +1,5 @@
+from .joint_select import JointSelectSettings, joint_mask
 from .window_similarity import WindowSimilarity, WindowSimilaritySettings, SimilarityResult
 from .window_correlation import WindowCorrelation, WindowCorrelationSettings
 from .similarity_sticky_filler import SimilarityStickyFiller, SimilarityStickyFillerSettings
-from .posture_similarity import JointSelectSettings, joint_mask, joint_similarity, aggregate_joints, posture_similarity
+from .posture_similarity import PostureSimilarity, PostureSimilaritySettings, joint_distances, posture_distance, posture_similarity
