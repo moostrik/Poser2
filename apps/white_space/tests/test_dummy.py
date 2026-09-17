@@ -320,6 +320,18 @@ class DummyTest(unittest.TestCase):
         self.assertAlmostEqual(f[Azimuth].value, math.pi / 2, places=5)
         self.assertGreater(abs(float(f[Angles].values[AngleLandmark.left_shoulder])), 0.8 * math.pi)   # raised, at the default calibration
 
+    def test_solo_leaves_the_live_players_out(self) -> None:
+        self.cfg.enabled = True
+        self.cfg.solo = True
+        self.dummy.process({0: Frame(0, 0)})
+        self.assertEqual(set(self.out[-1]), {ID})
+
+    def test_solo_without_enabled_passes_the_frames_through(self) -> None:
+        self.cfg.solo = True
+        frames = {0: Frame(0, 0)}
+        self.dummy.process(frames)
+        self.assertIs(self.out[-1], frames)
+
     def test_the_lerp_filters_derive_the_rest(self) -> None:
         self.cfg.enabled = True
         self.cfg.morph = 0.0

@@ -518,6 +518,8 @@ and its skeleton with the same data graphs as a player's in the pose row's last 
 the azimuth overlay marks it, Max plays it at its slot and the instrument lights it. Only the
 joints are set; the leg deviation and the bend are the pipeline's, derived from the figure as for
 a person, and its angles pass through the angle extractor and the calibrator as a person's do.
+With `solo` the live players' frames are left out at the merge, so from the LERP filters on the
+dummy is the only pose; the tracker and the earlier stages still see them.
 What the pipeline reads of its poses is what the calibrator is read against: the preset's
 calibration is the dummy's raw readings, so its hanging arm reads 0 and its vertical arm π.
 

@@ -5,7 +5,9 @@ The dummy stands in for a person while the pose instrument is judged (``docs/POS
 ``PI.dummy`` settings, each joint's degrees the angle the angle extractor reads at it when the
 figure is upright (the shoulder 0 hanging, 90 across, 180 up, 270 out; the elbow 180 straight,
 0 folded; the hip 180 standing; the knee 180 straight), and whose frame enters the LERP stage
-before the filters, so it is extracted, drawn, heard in Max and lit exactly as a person is.
+before the filters, so it is extracted, drawn, heard in Max and lit exactly as a person is. With ``solo`` the live
+players' frames are left out at that merge, so from the LERP filters on the dummy is the only pose;
+the tracker and the earlier stages still see them.
 The torso leans the upper body over standing legs, as a person leans: the arms still read as set,
 the hips read off by the lean. Only the joints and the torso are set: the leg deviation and the
 body bend are the pipeline's, derived from the figure as for a person, and the pipeline's readings
@@ -39,6 +41,7 @@ logger = logging.getLogger(__name__)
 class DummySettings(BaseSettings):
     """The dummy: where it stands and how its joints are turned, in degrees from neutral."""
     enabled:        Field[bool]      = Field(False, description="Put the dummy in the pose pipeline")
+    solo:           Field[bool]      = Field(False, description="Dummy only: keep the live players out of the pipeline")
     azimuth:        Field[float]     = Field(180.0, min=0.0,   max=360.0, step=1.0, description="Where the dummy stands (deg)")
     torso:          Field[float]     = Field(0.0,   min=-90.0, max=90.0,  step=1.0, description="Upper body leaned over standing legs, positive to image right (deg)")
     left_shoulder:  Field[float]     = Field(0.0,   min=0.0,   max=360.0, step=1.0, description="Shoulder angle as the extractor reads it: 0 hanging, 90 across, 180 up, 270 out (deg)", newline=True)
@@ -162,7 +165,8 @@ class Dummy(FrameDictCallbackMixin):
     # -- The pipeline step ----------------------------------------------------------
 
     def process(self, frames: FrameDict) -> None:
-        """The merge step before the LERP filters: the frames as they are, plus the dummy's."""
+        """The merge step before the LERP filters: the frames as they are, plus the dummy's; with
+        ``solo``, the dummy's alone."""
         now = time.monotonic()
         dt = 0.0 if self._last is None else now - self._last
         self._last = now
@@ -180,7 +184,8 @@ class Dummy(FrameDictCallbackMixin):
             BBox: BBox.from_rect(box),
         })
         frame = self._calibrator.process(self._extractor.process(frame))
-        self._notify_frames_callbacks({**frames, self._track_id: frame})
+        live = {} if self._settings.solo else frames
+        self._notify_frames_callbacks({**live, self._track_id: frame})
 
     # -- The morph --------------------------------------------------------------------
 
