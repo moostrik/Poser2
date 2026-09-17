@@ -82,7 +82,7 @@ class MaskSettings(BaseSettings):
 class WindowSettings(BaseSettings):
     """The visible part of the pattern each side of the person."""
     width:          Field[float] = Field(45.0, min=0.0, max=180.0, step=0.5,  description="Window each side of a person (deg)")
-    sync_threshold: Field[float] = Field(0.75, min=0.0, max=0.99,  step=0.01, description="Pair similarity above which windows open toward each other")
+    sync_threshold: Field[float] = Field(0.75, min=0.0, max=0.99,  step=0.01, description="Raw pair similarity above which windows open toward each other (1 = identical arms)")
 
 
 class EventSettings(BaseSettings):

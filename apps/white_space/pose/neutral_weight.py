@@ -4,7 +4,8 @@ Sits between ``WindowSimilarity`` and the ``SimilarityApplicator``, so the weigh
 stamped and before the ``Similarity`` smoothers (Euro at SMOOTH, sticky at PREDICT, chase at LERP). The
 weight is the ``ArmDeviation`` the arm extractor measures — 0 with the arms within its ``min_degrees`` of
 hanging (neutral, ``docs/STATES.md`` *Vocabulary*), 1 from its ``max_degrees`` — and a pair reads as its
-less-moved member: the minimum of the two. This node has no thresholds of its own; it only multiplies.
+member closer to neutral: the minimum of the two. This node has no thresholds of its own; it only multiplies.
+``weigh`` is that rule for one pair of poses, so ``HitSync`` weighs the hit poses the way the live rows are.
 The deviation's range handles a pose hovering near neutral, the smoothers handle speed, so a pose leaving
 neutral never jumps the sync. Every consumer of ``Similarity`` — the state machine's sync, the pose
 instrument's window opening, the sound — sees the weighted value.
@@ -21,6 +22,7 @@ from typing import Callable
 import numpy as np
 
 from modules.pose import FrameDict, features
+from modules.pose.frame import Frame
 from modules.pose.analytics import SimilarityResult
 from modules.settings import BaseSettings, Field
 
@@ -54,6 +56,15 @@ class NeutralWeight:
             result = self._weight(result)
         for callback in self._callbacks:
             callback(result)
+
+    def weigh(self, value: float, a: Frame, b: Frame) -> float:
+        """The same rule for one pair of poses: ``value`` times the smaller of the two ``ArmDeviation``s (arms
+        not seen count as neutral, 0) while enabled, else ``value`` unchanged. Pure; ``HitSync`` weighs the
+        hit poses with it, so the hits and the live rows read one rule."""
+        if not self._config.enabled:
+            return value
+        deviations = (a[features.ArmDeviation].value, b[features.ArmDeviation].value)
+        return value * min(0.0 if np.isnan(d) else float(d) for d in deviations)
 
     def _weight(self, result: SimilarityResult) -> SimilarityResult:
         with self._lock:

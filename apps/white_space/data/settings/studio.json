@@ -546,7 +546,7 @@
         "window_length": 1,
         "method": "HARMONIC_MEAN",
         "use_angle_similarity": true,
-        "angle_tolerance": 34.4,
+        "angle_tolerance": 20.0,
         "joints": {
           "left_hip": false,
           "right_hip": false,
@@ -559,8 +559,8 @@
         "use_motion_weighting": false,
         "use_time_penalty": false,
         "time_decay_exp": 2.5,
-        "remap_low": 0.2,
-        "remap_high": 0.9,
+        "remap_low": 0.0,
+        "remap_high": 1.0,
         "enabled": true,
         "verbose": false
       },
@@ -880,7 +880,7 @@
     },
     "window": {
       "width": 33.0,
-      "sync_threshold": 0.75
+      "sync_threshold": 0.6
     },
     "events": {
       "hit_frames": 1,
@@ -919,9 +919,7 @@
     "dim_level": 0.4,
     "min_players": 2,
     "count_hold_seconds": 1.0,
-    "sync": {
-      "threshold": 0.5
-    },
+    "sync": {},
     "manual": {
       "select": "PLAY",
       "hold": false

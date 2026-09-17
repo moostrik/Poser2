@@ -144,9 +144,8 @@ this section is the layer: what it reads, how it composes people, and what it ex
   left/right shoulder, left/right elbow), `LegDeviation` (joint-weighted hip/knee deviation, 0..1),
   `TorsoTilt` (signed sideways lean against the image vertical, −1..1) and `AngleSymmetry` (signed
   left minus right per pair, −1..1); plus presence (the pose itself,
-  *Inputs*), the pairwise `Similarity` row (over the joints `pose.similarity.window_similarity.joints`
-  selects; `studio.json`: the arms — the same row `states.sync.threshold` and `window.sync_threshold`
-  both read) and `PlayheadOffset`. `AngleSymmetry`, `LegDeviation` and
+  *Inputs*), the pairwise `Similarity` row (`SIMILARITY.md`: the arms, raw, weighted at neutral; the window
+  opens from `window.sync_threshold` up to 1 = identical arms) and `PlayheadOffset`. `AngleSymmetry`, `LegDeviation` and
   `TorsoTilt` are also sent to Max (`/pose/{id}/angle/sym`, `/pose/{id}/angle/legs`,
   `/pose/{id}/angle/tilt`) so sound and light read the same values. The layer adds no smoothing: the
   LERP poses are the pipeline's smoothed output.
@@ -205,9 +204,6 @@ playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJ
 - **beam_blue_sound**: fallback choice (off vs idle pulse); exact `/WS/sound/level` scaling agreed
   with Max (linear 0..1 vs dB)
 - **pose_instrument**: see `POSE_INSTRUMENT.md`, *Open*
-- **Sync thresholds**: `states.sync.threshold` (per player, INTRO → INTRO_PLAY) and
-  `PI.window.sync_threshold` (pairwise, the window opening) measure different quantities and are
-  tuned separately; whether they should share one value
 - **Hit ownership**: `PlayheadCrossing` (`pose/playhead_offset.py`) runs in three instances (`beam_flash`,
   `pose_instrument`, `HitSync`) on the same LERP `PlayheadOffset` and the same step (`beam_rpm` at the
   tick rate), so they agree by construction. One light-side detector publishing per-width hit sets on the

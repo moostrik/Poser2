@@ -174,9 +174,11 @@ class WhiteSpaceMain:
         )
         self.state_machine.add_state_callback(self.board.set_sequence)
         self.state_machine.add_state_callback(self.osc_sound_sender.set_sequencer_state)
-        # HIT SYNC — the hits' poses and the streak of alike ones, published on the board for the machine.
-        self.hit_sync = HitSync(self.settings.states.sync, ps.similarity.window_similarity, self.settings.light,
-                                board=self.board, pose_stage=int(Stage.LERP))
+        # HIT SYNC — the hits' poses and the streak of alike ones, published on the board for the machine. It
+        # scores the hit poses as the live rows are scored: the same kernel settings and the same neutral rule.
+        self.neutral_weight = NeutralWeight(ps.similarity.neutral_weight)
+        self.hit_sync = HitSync(self.settings.states.sync, ps.similarity.window_similarity, self.neutral_weight,
+                                self.settings.light, board=self.board, pose_stage=int(Stage.LERP))
 
         # POSE STAGE RAW
         self.pose_predictor.add_frames_callback(self.stages[Stage.RAW])
@@ -235,7 +237,6 @@ class WhiteSpaceMain:
         # show read the LERP frames.
         self.window_similator = analytics.WindowSimilarity(ps.similarity.window_similarity)
         self.similarity_sticky = analytics.SimilarityStickyFiller(ps.similarity.sticky)
-        self.neutral_weight = NeutralWeight(ps.similarity.neutral_weight)
 
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similator.submit)
         self.stages[Stage.SMOOTH].add_callback(self.neutral_weight.set_frames)

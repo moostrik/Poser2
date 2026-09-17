@@ -53,6 +53,14 @@ class NeutralWeightTest(unittest.TestCase):
             np.testing.assert_allclose(rows[id].values, row.values, equal_nan=True)
             np.testing.assert_array_equal(rows[id].scores, row.scores)
 
+    def test_weigh_is_the_same_rule_for_one_pair(self) -> None:
+        # The pair reads as its member closer to neutral; arms not seen are neutral; off, the value stands.
+        self.assertAlmostEqual(self.weight.weigh(0.8, _frame(0, 1.0), _frame(1, 0.5)), 0.4, places=6)
+        self.assertAlmostEqual(self.weight.weigh(0.8, _frame(0, 0.25), _frame(1, 1.0)), 0.2, places=6)
+        self.assertEqual(self.weight.weigh(0.8, _frame(0, 1.0), _frame(1, None)), 0.0)
+        self.config.enabled = False
+        self.assertEqual(self.weight.weigh(0.8, _frame(0, 1.0), _frame(1, 0.0)), 0.8)
+
     def test_a_neutral_person_zeroes_their_pairs_both_ways_and_keeps_the_rest(self) -> None:
         rows = self._run({0: _frame(0, 1.0), 1: _frame(1, 0.0), 2: _frame(2, 1.0)})
         self.assertEqual(rows[0][1], 0.0)

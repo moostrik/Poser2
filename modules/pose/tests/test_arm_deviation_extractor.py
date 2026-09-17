@@ -1,4 +1,4 @@
-"""Tests for ArmDeviationExtractor — the most-moved arm joint's position in a degree range, top-N aggregated."""
+"""Tests for ArmDeviationExtractor — the position of the arm joint furthest from neutral in a degree range, top-N aggregated."""
 
 import math
 import unittest

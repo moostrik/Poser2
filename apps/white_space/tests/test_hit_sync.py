@@ -11,7 +11,7 @@ from modules.pose.analytics import WindowSimilaritySettings
 from modules.pose.features import Angles, AngleLandmark, ArmDeviation
 
 from apps.white_space.light import LightSettings
-from apps.white_space.pose import HitSync, HitSyncSettings, PlayheadOffset
+from apps.white_space.pose import HitSync, HitSyncSettings, NeutralWeight, NeutralWeightSettings, PlayheadOffset
 
 POSE_STAGE = 4
 F = len(AngleLandmark)
@@ -65,8 +65,10 @@ class HitSyncTest(unittest.TestCase):
         similarity.angle_tolerance = 45.0
         similarity.remap_low = 0.0
         similarity.remap_high = 1.0
+        self.neutral = NeutralWeightSettings()
         self.board = FakeBoard()
-        self.sync = HitSync(self.config, similarity, LightSettings(), board=self.board, pose_stage=POSE_STAGE)
+        self.sync = HitSync(self.config, similarity, NeutralWeight(self.neutral), LightSettings(),
+                            board=self.board, pose_stage=POSE_STAGE)
         self.players = 3
         self.board.frames = {i: FakeFrame() for i in range(self.players)}
 
@@ -98,6 +100,14 @@ class HitSyncTest(unittest.TestCase):
         streak = self._tick()
         self.assertEqual(streak, HitStreak(hit=False, hits=2, similarity=1.0))
 
+    def test_in_sync_is_the_arms_within_the_tolerance(self) -> None:
+        # The cut is the kernel's value at one angle_tolerance (45° here): every joint just inside it passes,
+        # just outside does not. No setting decides this; the tolerance is the knob.
+        self.hit(0, 0.0)
+        self.assertEqual(self.hit(1, 44.0).hits, 2)
+        self.hit(2, 0.0)
+        self.assertEqual(self.hit(0, 46.0).hits, 1)
+
     def test_a_different_pose_restarts_the_count_at_once(self) -> None:
         self.hit(0, 60.0)
         self.hit(1, 60.0)
@@ -113,6 +123,12 @@ class HitSyncTest(unittest.TestCase):
     def test_unseen_arms_count_as_neutral(self) -> None:
         self.hit(0)
         self.assertEqual(self.hit(1, arms=math.nan).hits, 1)
+
+    def test_with_the_neutral_weight_off_a_neutral_hit_counts_as_alike(self) -> None:
+        # The same switch as the live Similarity's weight: off, the posture alone decides.
+        self.neutral.enabled = False
+        self.hit(0)
+        self.assertEqual(self.hit(1, arms=0.0).hits, 2)
 
     def test_hits_older_than_a_round_do_not_count(self) -> None:
         self.players = 2
