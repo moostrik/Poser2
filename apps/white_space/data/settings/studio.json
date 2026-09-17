@@ -506,7 +506,7 @@
         "method": "QUADRATIC"
       },
       "interpolator": {
-        "responsiveness": 0.5,
+        "responsiveness": 0.25,
         "friction": 0.05
       }
     },
