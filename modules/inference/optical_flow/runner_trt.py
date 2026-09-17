@@ -58,7 +58,7 @@ class RunnerTRT(Thread):
 
         # Callbacks
         self._callback_lock: Lock = Lock()
-        self._callbacks: set[OpticalFlowOutputCallback] = set()
+        self._callbacks: list[OpticalFlowOutputCallback] = []       # run in registration order
         self._callback_queue: Queue[OpticalFlowOutput | None] = Queue(maxsize=2)
         self._callback_thread: Thread = Thread(target=self._dispatch_callbacks, daemon=True)
 
@@ -369,12 +369,14 @@ class RunnerTRT(Thread):
     def register_callback(self, callback: OpticalFlowOutputCallback) -> None:
         """Register callback to receive optical flow results."""
         with self._callback_lock:
-            self._callbacks.add(callback)
+            if callback not in self._callbacks:
+                self._callbacks.append(callback)
 
     def unregister_callback(self, callback: OpticalFlowOutputCallback) -> None:
         """Unregister previously registered callback."""
         with self._callback_lock:
-            self._callbacks.discard(callback)
+            if callback in self._callbacks:
+                self._callbacks.remove(callback)
 
     def _dispatch_callbacks(self) -> None:
         """Dispatch queued results to registered callbacks."""

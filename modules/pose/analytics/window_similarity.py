@@ -78,7 +78,7 @@ class WindowSimilarity:
         # OUTPUT
         self._output_lock = threading.Lock()
         self._output_data: SimilarityResult | None = None
-        self._callbacks: set[Callable[[SimilarityResult], None]] = set()
+        self._callbacks: list[Callable[[SimilarityResult], None]] = []      # run in registration order
 
         self.Timer: PerformanceTimer = PerformanceTimer(name="similarity  ", sample_count=200, report_interval=100, color="red", omit_init=0)
 
@@ -95,7 +95,8 @@ class WindowSimilarity:
         self._update_event.set()  # Wake the thread so it can see stop_event
 
     def add_similarity_callback(self, callback: Callable[[SimilarityResult], None]) -> None:
-        self._callbacks.add(callback)
+        if callback not in self._callbacks:
+            self._callbacks.append(callback)
 
     def submit(self, all_windows: FrameWindowDict) -> None:
         """Submit all window types for similarity processing.

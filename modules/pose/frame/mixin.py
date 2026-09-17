@@ -1,18 +1,16 @@
 """Callback mixins for frame-related broadcasting."""
 
-from threading import Lock
+from modules.utils import Broadcast
 
 from .frame import Frame, FrameCallback, FrameDict, FrameDictCallback
 from .window import FrameWindowDict, FrameWindowDictCallback
 
-import logging
-logger = logging.getLogger(__name__)
 
 class FrameCallbackMixin:
     """Mixin providing callback management for single frame broadcasting.
 
     Provides thread-safe callback registration and emission for components
-    that broadcast individual Frame updates.
+    that broadcast individual Frame updates. Callbacks run in registration order.
 
     Usage:
         class MyFilter(FrameCallbackMixin):
@@ -21,13 +19,12 @@ class FrameCallbackMixin:
 
             def process(self, frame: Frame):
                 # Do processing...
-                self._emit_callbacks(frame)
+                self._notify_frame_callbacks(frame)
     """
 
     def __init__(self) -> None:
         """Initialize callback system."""
-        self._frame_callbacks: set[FrameCallback] = set()
-        self._frame_callback_lock: Lock = Lock()
+        self._frame_callbacks: Broadcast[Frame] = Broadcast()
 
     def _notify_frame_callbacks(self, frame: Frame) -> None:
         """Emit callbacks with pose.
@@ -39,20 +36,15 @@ class FrameCallbackMixin:
         Args:
             frame: Frame to broadcast to callbacks.
         """
-        with self._frame_callback_lock:
-            for callback in self._frame_callbacks:
-                try:
-                    callback(frame)
-                except Exception:
-                    logger.exception("Error in callback")
+        self._frame_callbacks(frame)
+
     def add_frame_callback(self, callback: FrameCallback) -> None:
         """Register output callback.
 
         Args:
             callback: Function to call with frames.
         """
-        with self._frame_callback_lock:
-            self._frame_callbacks.add(callback)
+        self._frame_callbacks.add_callback(callback)
 
     def remove_frame_callback(self, callback: FrameCallback) -> None:
         """Unregister output callback.
@@ -60,8 +52,8 @@ class FrameCallbackMixin:
         Args:
             callback: Function to remove. Safe to call even if not registered.
         """
-        with self._frame_callback_lock:
-            self._frame_callbacks.discard(callback)
+        self._frame_callbacks.remove_callback(callback)
+
 
 class FrameDictCallbackMixin:
     """Mixin providing callback management for frame dict broadcasting.
@@ -69,6 +61,7 @@ class FrameDictCallbackMixin:
     Provides thread-safe callback registration and emission for components
     that broadcast FrameDict updates. Can be used by trackers, monitors,
     recorders, visualizers, or any component that emits frame dictionaries.
+    Callbacks run in registration order.
 
     Usage:
         class MyTracker(FrameDictCallbackMixin):
@@ -77,13 +70,12 @@ class FrameDictCallbackMixin:
 
             def process(self, frames: FrameDict):
                 # Do processing...
-                self._emit_callbacks(frames)
+                self._notify_frames_callbacks(frames)
     """
 
     def __init__(self) -> None:
         """Initialize callback system."""
-        self._frames_callbacks: set[FrameDictCallback] = set()
-        self._frames_callback_lock: Lock = Lock()
+        self._frames_callbacks: Broadcast[FrameDict] = Broadcast()
 
     def _notify_frames_callbacks(self, frames: FrameDict) -> None:
         """Emit callbacks with frames.
@@ -95,20 +87,15 @@ class FrameDictCallbackMixin:
         Args:
             frames: Dictionary of frames to broadcast to callbacks.
         """
-        with self._frames_callback_lock:
-            for callback in self._frames_callbacks:
-                try:
-                    callback(frames)
-                except Exception:
-                    logger.exception("Error in callback")
+        self._frames_callbacks(frames)
+
     def add_frames_callback(self, callback: FrameDictCallback) -> None:
         """Register output callback.
 
         Args:
             callback: Function to call with frame dictionaries.
         """
-        with self._frames_callback_lock:
-            self._frames_callbacks.add(callback)
+        self._frames_callbacks.add_callback(callback)
 
     def remove_frames_callback(self, callback: FrameDictCallback) -> None:
         """Unregister output callback.
@@ -116,8 +103,7 @@ class FrameDictCallbackMixin:
         Args:
             callback: Function to remove. Safe to call even if not registered.
         """
-        with self._frames_callback_lock:
-            self._frames_callbacks.discard(callback)
+        self._frames_callbacks.remove_callback(callback)
 
 
 class FrameWindowDictCallbackMixin:
@@ -125,23 +111,17 @@ class FrameWindowDictCallbackMixin:
 
     Provides thread-safe callback registration and emission for components
     that broadcast FrameWindowDict updates (all fields' windows per track).
+    Callbacks run in registration order.
     """
 
     def __init__(self) -> None:
-        self._frame_window_callbacks: set[FrameWindowDictCallback] = set()
-        self._frame_window_callback_lock: Lock = Lock()
+        self._frame_window_callbacks: Broadcast[FrameWindowDict] = Broadcast()
 
     def _notify_windows_callbacks(self, windows: FrameWindowDict) -> None:
-        with self._frame_window_callback_lock:
-            for callback in self._frame_window_callbacks:
-                try:
-                    callback(windows)
-                except Exception:
-                    logger.exception("Error in callback")
+        self._frame_window_callbacks(windows)
+
     def add_windows_callback(self, callback: FrameWindowDictCallback) -> None:
-        with self._frame_window_callback_lock:
-            self._frame_window_callbacks.add(callback)
+        self._frame_window_callbacks.add_callback(callback)
 
     def remove_windows_callback(self, callback: FrameWindowDictCallback) -> None:
-        with self._frame_window_callback_lock:
-            self._frame_window_callbacks.discard(callback)
+        self._frame_window_callbacks.remove_callback(callback)

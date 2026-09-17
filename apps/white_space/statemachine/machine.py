@@ -91,7 +91,7 @@ class StateMachine:
         self._entered: bool = False             # the boot entry into OFF happens on the first
                                                 # update() tick, with real clock/bars timestamps
 
-        self._state_callbacks: set[Callable[[SequencerState], None]] = set()
+        self._state_callbacks: list[Callable[[SequencerState], None]] = []      # run in registration order
 
         # Tick timing
         self._prev_time: float | None = None
@@ -238,7 +238,8 @@ class StateMachine:
     # -- State callbacks (Sequencer-compatible) --------------------------------
 
     def add_state_callback(self, callback: Callable[[SequencerState], None]) -> None:
-        self._state_callbacks.add(callback)
+        if callback not in self._state_callbacks:
+            self._state_callbacks.append(callback)
         callback(SequencerState(
             stage=int(self._current),
             stage_progress=self._config.progress,
@@ -248,7 +249,8 @@ class StateMachine:
         ))
 
     def remove_state_callback(self, callback: Callable[[SequencerState], None]) -> None:
-        self._state_callbacks.discard(callback)
+        if callback in self._state_callbacks:
+            self._state_callbacks.remove(callback)
 
     def _notify_state(self, state: SequencerState) -> None:
         for cb in self._state_callbacks:

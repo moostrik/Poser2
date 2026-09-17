@@ -4,7 +4,6 @@
 
 import logging
 from threading import Thread, Event
-from typing import Set
 
 import depthai as dai
 from cv2 import applyColorMap, COLORMAP_JET
@@ -72,11 +71,11 @@ class Camera(Thread):
         self.frame_types: list[FrameType] = get_frame_types(self.do_color, self.do_stereo, self.show_stereo, False)
         self.frame_types.sort(key=lambda x: x.value)
 
-        # CALLBACKS
-        self.preview_callbacks: Set[FrameCallback] = set()
-        self.frame_callbacks: Set[FrameCallback] = set()
-        self.sync_callbacks: Set[SyncCallback] = set()
-        self.tracker_callbacks: Set[TrackerCallback] = set()
+        # CALLBACKS (run in registration order)
+        self.preview_callbacks: list[FrameCallback] = []
+        self.frame_callbacks: list[FrameCallback] = []
+        self.sync_callbacks: list[SyncCallback] = []
+        self.tracker_callbacks: list[TrackerCallback] = []
 
         # MOUNT READOUT — the gravity vector, smoothed, and how to get it into the camera's frame.
         # A tripod does not move, so a single sample is almost all noise; the average is the
@@ -355,25 +354,29 @@ class Camera(Thread):
         if self.running:
             logger.warning('cannot add callback while camera is running')
             return
-        self.frame_callbacks.add(callback)
+        if callback not in self.frame_callbacks:
+            self.frame_callbacks.append(callback)
 
     def add_sync_callback(self, callback: SyncCallback) -> None:
         if self.running:
             logger.warning('cannot add callback while camera is running')
             return
-        self.sync_callbacks.add(callback)
+        if callback not in self.sync_callbacks:
+            self.sync_callbacks.append(callback)
 
     def add_preview_callback(self, callback: FrameCallback) -> None:
         if self.running:
             logger.warning('cannot add callback while camera is running')
             return
-        self.preview_callbacks.add(callback)
+        if callback not in self.preview_callbacks:
+            self.preview_callbacks.append(callback)
 
     def add_tracker_callback(self, callback: TrackerCallback) -> None:
         if self.running:
             logger.warning('cannot add callback while camera is running')
             return
-        self.tracker_callbacks.add(callback)
+        if callback not in self.tracker_callbacks:
+            self.tracker_callbacks.append(callback)
 
     @staticmethod
     def _try_device(device_id: str, pipeline: dai.Pipeline, num_tries: int) -> dai.Device:

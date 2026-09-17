@@ -50,7 +50,7 @@ class Predictor:
         self._process_timer =   PerformanceTimer(name="RAFT Optical Flow", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
         self._wait_timer =      PerformanceTimer(name="RAFT Wait        ", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
 
-        self._callbacks: set[FlowCallback] = set()
+        self._callbacks: list[FlowCallback] = []        # run in registration order
         self._callback_lock = Lock()
         self._settings: Settings = settings
 
@@ -58,11 +58,13 @@ class Predictor:
 
     def add_flow_callback(self, callback: FlowCallback) -> None:
         with self._callback_lock:
-            self._callbacks.add(callback)
+            if callback not in self._callbacks:
+                self._callbacks.append(callback)
 
     def remove_flow_callback(self, callback: FlowCallback) -> None:
         with self._callback_lock:
-            self._callbacks.discard(callback)
+            if callback in self._callbacks:
+                self._callbacks.remove(callback)
 
     def _notify_callbacks(self, flow_dict: FlowDict) -> None:
         with self._callback_lock:

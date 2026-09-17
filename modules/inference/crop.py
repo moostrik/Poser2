@@ -60,7 +60,7 @@ class Extractor:
 
     def __init__(self, config: Settings) -> None:
         self._config = config
-        self._callbacks: set[ImageCallback] = set()
+        self._callbacks: list[ImageCallback] = []       # run in registration order
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
 
     def process(
@@ -169,4 +169,5 @@ class Extractor:
         return crop_chw
 
     def add_image_callback(self, callback: ImageCallback) -> None:
-        self._callbacks.add(callback)
+        if callback not in self._callbacks:
+            self._callbacks.append(callback)

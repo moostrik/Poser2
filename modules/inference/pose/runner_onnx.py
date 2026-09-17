@@ -53,7 +53,7 @@ class RunnerONNX(Thread):
 
         # Callbacks
         self._callback_lock: Lock = Lock()
-        self._callbacks: set[PoseDetectionOutputCallback] = set()
+        self._callbacks: list[PoseDetectionOutputCallback] = []     # run in registration order
         self._callback_queue: Queue[DetectionOutput | None] = Queue(maxsize=2)
         self._callback_thread: Thread = Thread(target=self._dispatch_callbacks, daemon=True)
 
@@ -381,12 +381,14 @@ class RunnerONNX(Thread):
     def register_callback(self, callback: PoseDetectionOutputCallback) -> None:
         """Register callback to receive results."""
         with self._callback_lock:
-            self._callbacks.add(callback)
+            if callback not in self._callbacks:
+                self._callbacks.append(callback)
 
     def unregister_callback(self, callback: PoseDetectionOutputCallback) -> None:
         """Unregister previously registered callback."""
         with self._callback_lock:
-            self._callbacks.discard(callback)
+            if callback in self._callbacks:
+                self._callbacks.remove(callback)
 
     def _dispatch_callbacks(self) -> None:
         """Dispatch results to callbacks. Identical to MMDetection."""

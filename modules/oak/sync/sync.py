@@ -21,7 +21,7 @@ class Sync:
         self.last_bang_time_s: float = 0.0
 
         self._timestamp_history: deque[tuple[int, float]] = deque(maxlen=10 * num_cams)
-        self._callbacks: set[Callable[[], None]] = set()
+        self._callbacks: list[Callable[[], None]] = []      # run in registration order
         self._lock = Lock()
 
     def submit_frame(self, *args) -> None:
@@ -140,7 +140,8 @@ class Sync:
 
     def add_sync_callback(self, callback: Callable[[], Any]) -> None:
         with self._lock:
-            self._callbacks.add(callback)
+            if callback not in self._callbacks:
+                self._callbacks.append(callback)
 
     def _notify_callbacks(self) -> None:
         for callback in self._callbacks:

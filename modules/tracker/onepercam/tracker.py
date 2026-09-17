@@ -33,7 +33,7 @@ class Tracker(Thread, BaseTracker):
         self._update_event: Event = Event()
         self._input_queue: Queue[list[Tracklet]] = Queue()
         self._callback_lock = Lock()
-        self._tracklet_callbacks: set[TrackletDictCallback] = set()
+        self._tracklet_callbacks: list[TrackletDictCallback] = []       # run in registration order
 
         self._num_cams: int = num_trackers
         self.config: TrackerSettings = config
@@ -151,7 +151,8 @@ class Tracker(Thread, BaseTracker):
 
     def add_tracklet_callback(self, callback: TrackletDictCallback) -> None:
         with self._callback_lock:
-            self._tracklet_callbacks.add(callback)
+            if callback not in self._tracklet_callbacks:
+                self._tracklet_callbacks.append(callback)
 
     def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[DepthTracklet]) -> None:
         tracklet_list: list[Tracklet] = []

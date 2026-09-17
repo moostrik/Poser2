@@ -74,8 +74,8 @@ class Tracker(Thread, BaseTracker):
             settings.bind(field, self._on_rig_changed)
 
         self._callback_lock = Lock()
-        self._tracklet_callbacks: set[TrackletDictCallback] = set()
-        self._observation_callbacks: set[TrackletListCallback] = set()
+        self._tracklet_callbacks: list[TrackletDictCallback] = []       # run in registration order
+        self._observation_callbacks: list[TrackletListCallback] = []
 
         # Detections the intake rejected, latest per device track, with their `Rejection` — published
         # on the observation channel so the panorama can draw them, never on the primary channel.
@@ -332,13 +332,15 @@ class Tracker(Thread, BaseTracker):
 
     def add_tracklet_callback(self, callback: TrackletDictCallback) -> None:
         with self._callback_lock:
-            self._tracklet_callbacks.add(callback)
+            if callback not in self._tracklet_callbacks:
+                self._tracklet_callbacks.append(callback)
 
     def add_observation_callback(self, callback: TrackletListCallback) -> None:
         """Every live observation each tick, one per camera that can see a person — not one per
         person. For the calibration view; poses come from ``add_tracklet_callback``."""
         with self._callback_lock:
-            self._observation_callbacks.add(callback)
+            if callback not in self._observation_callbacks:
+                self._observation_callbacks.append(callback)
 
     def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[DepthTracklet]) -> None:
         for t in cam_tracklets:

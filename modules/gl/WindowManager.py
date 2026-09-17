@@ -99,10 +99,11 @@ class WindowManager():
 
         self._render_thread: Thread | None = None
         self._callback_lock = Lock()
-        self._exit_callbacks: set[Callable[[], None]] = set()
-        self._mouse_move_callbacks: set[Callable[[float, float], None]] = set()
-        self._mouse_button_callbacks: set[Callable[[float, float, MouseButton, bool], None]] = set()
-        self._key_callbacks: set[Callable] = set()
+        # Callbacks run in registration order
+        self._exit_callbacks: list[Callable[[], None]] = []
+        self._mouse_move_callbacks: list[Callable[[float, float], None]] = []
+        self._mouse_button_callbacks: list[Callable[[float, float, MouseButton, bool], None]] = []
+        self._key_callbacks: list[Callable] = []
 
         # Secondary windows sharing the main context: logical_id → window
 
@@ -590,19 +591,23 @@ class WindowManager():
 
     def add_mouse_move_callback(self, callback: Callable[[float, float], None]) -> None:
         with self._callback_lock:
-            self._mouse_move_callbacks.add(callback)
+            if callback not in self._mouse_move_callbacks:
+                self._mouse_move_callbacks.append(callback)
 
     def add_mouse_button_callback(self, callback: Callable[[float, float, MouseButton, bool], None]) -> None:
         with self._callback_lock:
-            self._mouse_button_callbacks.add(callback)
+            if callback not in self._mouse_button_callbacks:
+                self._mouse_button_callbacks.append(callback)
 
     def add_keyboard_callback(self, callback: Callable[[int, int, int], None]) -> None:
         with self._callback_lock:
-            self._key_callbacks.add(callback)
+            if callback not in self._key_callbacks:
+                self._key_callbacks.append(callback)
 
     def add_exit_callback(self, callback) -> None:
         with self._callback_lock:
-            self._exit_callbacks.add(callback)
+            if callback not in self._exit_callbacks:
+                self._exit_callbacks.append(callback)
 
     def clear_callbacks(self) -> None:
         with self._callback_lock:

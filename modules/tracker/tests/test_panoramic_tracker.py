@@ -79,6 +79,17 @@ class PanoramicTrackerCase(unittest.TestCase):
         return self.emitted[-1]
 
 
+class TestCallbackOrder(PanoramicTrackerCase):
+    def test_tracklet_callbacks_run_in_registration_order(self) -> None:
+        calls: list[int] = []
+        recorders = [(lambda _tracklets, i=i: calls.append(i)) for i in range(16)]
+        for recorder in recorders:
+            self.tracker.add_tracklet_callback(recorder)
+        self.tracker.add_tracklet_callback(recorders[1])          # registered twice: called once, first position
+        self.submit(make_tracklet(0, 1, 50.0))
+        self.assertEqual(calls, list(range(16)))
+
+
 class TestDeviceIdReuse(PanoramicTrackerCase):
     """The device tracker hands out the smallest free id, so a departed person's number goes
     straight to the next arrival — while our observation of the departed person is still LOST

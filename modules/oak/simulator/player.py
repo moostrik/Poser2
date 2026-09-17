@@ -1,7 +1,7 @@
 from threading import Thread, Event, Lock
 from pathlib import Path
 from numpy import ndarray
-from typing import Set, Dict
+from typing import Dict
 from enum import Enum, auto
 from queue import Queue
 from time import sleep
@@ -100,7 +100,7 @@ class Player(Thread):
         self.drift:int = 0
 
         self.playback_lock: Lock = Lock()
-        self.frameCallbacks: Set[FrameCallback] = set()
+        self.frameCallbacks: list[FrameCallback] = []
 
         # Bind player settings callbacks
         self.settings.bind(SimulatorSettings.start, self._on_start)
@@ -391,7 +391,8 @@ class Player(Thread):
         if self.running:
             logger.warning('Camera: cannot add callback while player is running')
             return
-        self.frameCallbacks.add(callback)
+        if callback not in self.frameCallbacks:
+            self.frameCallbacks.append(callback)
 
     # STATIC METHODS
     @staticmethod

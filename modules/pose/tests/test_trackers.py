@@ -2,6 +2,7 @@
 
 import math
 import unittest
+from functools import partial
 
 import numpy as np
 
@@ -63,7 +64,30 @@ def _ages(out: FrameDict) -> dict[int, float]:
     return {tid: f[Age].value for tid, f in out.items()}
 
 
+class _Recorder:
+    """Appends its name to a shared list each time a frame dict arrives."""
+
+    def __init__(self, name: int, calls: list[int]) -> None:
+        self._name = name
+        self._calls = calls
+
+    def set(self, frames: FrameDict) -> None:
+        self._calls.append(self._name)
+
+
 class FilterTrackerTest(unittest.TestCase):
+    def test_callbacks_run_in_registration_order(self) -> None:
+        tracker = _age_tracker()
+        calls: list[int] = []
+        recorders = [_Recorder(i, calls) for i in range(16)]
+        for i, recorder in enumerate(recorders):
+            # Alternate bound methods and partials, as the app wiring does.
+            tracker.add_frames_callback(recorder.set if i % 2 else partial(_Recorder.set, recorder))
+        tracker.add_frames_callback(recorders[1].set)             # registered twice: called once, first position
+        tracker.remove_frames_callback(_Recorder(99, calls).set)  # never registered: no error
+        tracker.process({0: frame(0, 0.0)})
+        self.assertEqual(calls, list(range(16)))
+
     def test_tracks_keep_independent_state(self) -> None:
         tracker = _age_tracker()
         tracker.process({0: frame(0, 0.0), 1: frame(1, 5.0)})
@@ -108,7 +132,7 @@ class FilterTrackerTest(unittest.TestCase):
 
         tracker.add_frames_callback(bad)
         tracker.add_frames_callback(lambda frames: received.append(frames))
-        with self.assertLogs('modules.pose.frame', level='ERROR'):
+        with self.assertLogs('modules.utils', level='ERROR'):
             tracker.process({0: frame(0, 0.0)})
         self.assertEqual(len(received), 1)
 
