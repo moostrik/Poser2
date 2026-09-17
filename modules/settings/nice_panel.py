@@ -419,6 +419,94 @@ def _build_slider(settings, name, field, polls):
         polls.append((settings, name, [value], _poll_slider))
 
 
+@widget_builder(Widget.log_slider)
+def _build_log_slider(settings, name, field, polls):
+    """Slider over log10(min)..log10(max); the number input holds the real value."""
+    value = getattr(settings, name)
+    label = generate_label(name)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+    color = getattr(field, "color", "primary")
+
+    def clamp(v: float) -> float:
+        return max(field.min, min(field.max, v))
+
+    with ui.column().classes("w-48 max-w-full gap-1"):
+        with ui.row().classes("w-full items-center justify-between flex-nowrap"):
+            _build_field_title(label, desc, classes="flex-1 truncate")
+            # HTML min is 0, not field.min: the browser steps in multiples of step counted
+            # from min, so 0 keeps the values round. field.min is enforced on commit.
+            val_input = ui.number(
+                value=value,
+                min=0,
+                max=field.max,
+                step=Widget.log_step(clamp(value)),
+                format="%.3g",
+            ).props(
+                "dense borderless"
+                + _lock_prop(is_disabled)
+            ).classes("w-16")
+        sl = ui.slider(
+            min=Widget.log_position(field.min),
+            max=Widget.log_position(field.max),
+            step=0.01,
+            value=Widget.log_position(clamp(value)),
+        ).props(
+            f"dense color={color}"
+            + _lock_prop(is_disabled)
+        ).classes("w-full")
+
+    _updating = {"lock": False}
+
+    def set_input(v: float) -> None:
+        val_input.set_value(v)
+
+    def on_input_change(e):
+        # The arrow step follows the value (a tenth of its decade) on every change, not
+        # only on commit: a held arrow keeps stepping in the browser without committing.
+        if e.value is not None and e.value > 0:
+            val_input.props(f"step={Widget.log_step(clamp(e.value))}")
+    val_input.on_value_change(on_input_change)
+
+    if not is_disabled:
+        # Live readout only while dragging — do NOT commit until release.
+        def on_slider_change(e):
+            if not _updating["lock"]:
+                _updating["lock"] = True
+                set_input(Widget.log_value(e.value))
+                _updating["lock"] = False
+        sl.on_value_change(on_slider_change)
+
+        def commit_slider(pos):
+            if pos is None:
+                return
+            _updating["lock"] = True
+            v = field.type_(clamp(Widget.log_value(pos)))
+            setattr(settings, name, v)
+            set_input(v)
+            _updating["lock"] = False
+        _commit_on_release(sl, commit_slider)
+
+        def commit_input(val):
+            if _updating["lock"] or val is None:
+                return
+            _updating["lock"] = True
+            clamped = field.type_(clamp(float(f"{val:.3g}")))
+            setattr(settings, name, clamped)
+            sl.set_value(Widget.log_position(clamped))
+            set_input(clamped)
+            _updating["lock"] = False
+        _commit_typed(val_input, commit_input)
+
+    if _field_needs_poll(settings, name, field):
+        def _poll_log_slider(v, _sl=sl):
+            _updating["lock"] = True
+            _sl.set_value(Widget.log_position(clamp(v)))
+            set_input(v)
+            _updating["lock"] = False
+        polls.append((settings, name, [value], _poll_log_slider))
+
+
 @widget_builder(Widget.number)
 def _build_number(settings, name, field, polls):
     value = getattr(settings, name)

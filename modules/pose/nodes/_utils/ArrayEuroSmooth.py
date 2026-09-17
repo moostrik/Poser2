@@ -9,7 +9,7 @@ from OneEuroFilter import OneEuroFilter
 class EuroSmooth:
     """Smoother for arbitrary vector data (positions, coordinates, etc.)."""
 
-    def __init__(self, vector_size: int, frequency: float, min_cutoff: float, beta: float,
+    def __init__(self, vector_size: int, frequency: float, min_cutoff: float, cutoff_rise: float,
                  d_cutoff: float, clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the vectorized smoother."""
         if vector_size <= 0:
@@ -18,8 +18,8 @@ class EuroSmooth:
             raise ValueError("Frequency must be positive.")
         if min_cutoff < 0.0:
             raise ValueError("min_cutoff must be non-negative.")
-        if beta < 0.0:
-            raise ValueError("beta must be non-negative.")
+        if cutoff_rise < 0.0:
+            raise ValueError("cutoff_rise must be non-negative.")
         if d_cutoff < 0.0:
             raise ValueError("d_cutoff must be non-negative.")
         if clamp_range is not None:
@@ -29,7 +29,7 @@ class EuroSmooth:
         self._vector_size: int = vector_size
         self._frequency: float = frequency
         self._min_cutoff: float = min_cutoff
-        self._beta: float = beta
+        self._cutoff_rise: float = cutoff_rise
         self._d_cutoff: float = d_cutoff
         self._clamp_range: tuple[float, float] | None = clamp_range
 
@@ -81,7 +81,7 @@ class EuroSmooth:
     def _create_filters(self) -> None:
         """Create the OneEuroFilters for each vector component."""
         self._filters = [
-            OneEuroFilter(self._frequency, self._min_cutoff, self._beta, self._d_cutoff)
+            OneEuroFilter(self._frequency, self._min_cutoff, self._cutoff_rise, self._d_cutoff)
             for _ in range(self._vector_size)
         ]
 
@@ -124,16 +124,16 @@ class EuroSmooth:
             filter.setMinCutoff(value)
 
     @property
-    def beta(self) -> float:
-        """Get the beta parameter."""
-        return self._beta
+    def cutoff_rise(self) -> float:
+        """Get the cutoff rise (the One Euro beta)."""
+        return self._cutoff_rise
 
-    @beta.setter
-    def beta(self, value: float) -> None:
-        """Set the beta parameter."""
+    @cutoff_rise.setter
+    def cutoff_rise(self, value: float) -> None:
+        """Set the cutoff rise (the One Euro beta)."""
         if value < 0.0:
-            raise ValueError("beta must be non-negative.")
-        self._beta = value
+            raise ValueError("cutoff_rise must be non-negative.")
+        self._cutoff_rise = value
         for filter in self._filters:
             filter.setBeta(value)
 
@@ -173,14 +173,14 @@ class AngleEuroSmooth(EuroSmooth):
     at the ±π boundary without requiring custom angular filters.
     """
 
-    def __init__(self, vector_size: int, frequency: float, min_cutoff: float, beta: float,
+    def __init__(self, vector_size: int, frequency: float, min_cutoff: float, cutoff_rise: float,
                  d_cutoff: float, clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the angle smoother.
 
         Note: clamp_range is not supported for angles (automatic wrapping to [-π, π]).
         """
         # Create 2x filters (one for sin, one for cos per angle)
-        super().__init__(vector_size * 2, frequency, min_cutoff, beta, d_cutoff, clamp_range=None)
+        super().__init__(vector_size * 2, frequency, min_cutoff, cutoff_rise, d_cutoff, clamp_range=None)
         self._num_angles: int = vector_size
 
     def add_sample(self, angles: np.ndarray) -> None:
@@ -220,10 +220,10 @@ class AngleEuroSmooth(EuroSmooth):
 class PointEuroSmooth(EuroSmooth):
     """Smoother for 2D points with (x, y) coordinates."""
 
-    def __init__(self, vector_size: int, frequency: float, min_cutoff: float, beta: float,
+    def __init__(self, vector_size: int, frequency: float, min_cutoff: float, cutoff_rise: float,
                  d_cutoff: float, clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the point smoother."""
-        super().__init__(vector_size * 2, frequency, min_cutoff, beta, d_cutoff, clamp_range)
+        super().__init__(vector_size * 2, frequency, min_cutoff, cutoff_rise, d_cutoff, clamp_range)
         self._num_points: int = vector_size
 
     def add_sample(self, points: np.ndarray) -> None:

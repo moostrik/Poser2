@@ -83,7 +83,7 @@ zeros.
 | Setting                                              | Reads it            | `studio.json` | Meaning |
 |------------------------------------------------------|---------------------|---------------|---------|
 | `pose.angle_calibrator.*`                            | both                | see `CALIBRATION.md` | 0 and π of every joint |
-| `pose.angle.smoother` (`min_cutoff`, `beta`)         | both                | 0.1, 0.7      | the angles both compare are these smoothed ones |
+| `pose.angle.smoother` (`min_cutoff`, `cutoff_rise`)  | both                | 0.1, 0.7      | the angles both compare are these smoothed ones |
 | `pose.similarity.posture.angle_tolerance`            | both                | 30°           | the slack at both ends; **the knob for how alike** |
 | `pose.similarity.posture.forgiveness`                | both                | 1.4           | how far one joint may exceed the tolerance when the rest match |
 | `pose.similarity.posture.joints`                     | both                | the arms      | which joints are compared and covered |
@@ -92,7 +92,7 @@ zeros.
 | `pose.arm_deviation_extractor.n_top`                 | both                | 1             | the N joints furthest from neutral, averaged |
 | `pose.similarity.neutral_weight.enabled`             | both                | on            | the ramp on the feature and the gate on the sync |
 | `pose.similarity.sticky.enabled`, `hold_scores`      | feature             | on, off       | a present pair's gap held |
-| `pose.similarity.smoother` (`min_cutoff`, `beta`)    | feature             | 0.3, 1.0      | the Euro smoother on the stamped rows |
+| `pose.similarity.smoother` (`min_cutoff`, `cutoff_rise`) | feature          | 0.3, 1.0      | the Euro smoother on the stamped rows |
 | `pose.similarity.interpolator` (`responsiveness`, `friction`) | feature    | 0.33, 0.05    | the chase at LERP |
 | `states.min_players`                                 | hit sync            | 2             | alike hits in a row to spin up |
 | `PI.window.sync_threshold`                           | window              | 0.9           | the feature value from which windows open, fully at 1 |
@@ -132,7 +132,7 @@ poses that sound different stay unlike at this tolerance.
 
 The window reads the smoothed feature, so these are where it settles, not when. The similarity moves gently,
 under a hundredth per degree, so its speed rarely lifts the Euro smoother off its floor: `min_cutoff` 0.3 Hz
-is a time constant of about half a second at rest, and with `beta` 1.0 about a fifth of a second while two
+is a time constant of about half a second at rest, and with `cutoff_rise` 1.0 about a fifth of a second while two
 players' arms converge at 60°/s **(deduction from the 1€ filter's formula)**. The inputs are already
 smoothed angles; this stage only takes the edge off.
 

@@ -122,7 +122,7 @@
     "bbox": {
       "smoother": {
         "min_cutoff": 0.01,
-        "beta": 0.2,
+        "cutoff_rise": 0.2,
         "d_cutoff": 1.0
       },
       "prediction": {
@@ -141,7 +141,7 @@
       },
       "smoother": {
         "min_cutoff": 1.5,
-        "beta": 5.0,
+        "cutoff_rise": 5.0,
         "d_cutoff": 1.0
       },
       "prediction": {
@@ -155,7 +155,7 @@
     "angle": {
       "smoother": {
         "min_cutoff": 0.1,
-        "beta": 0.7,
+        "cutoff_rise": 0.7,
         "d_cutoff": 1.0
       },
       "prediction": {
@@ -175,7 +175,7 @@
       "extractor": {},
       "smoother": {
         "min_cutoff": 0.5,
-        "beta": 2.5,
+        "cutoff_rise": 2.5,
         "d_cutoff": 1.0
       },
       "prediction": {

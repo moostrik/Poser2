@@ -466,7 +466,7 @@
       },
       "smoother": {
         "min_cutoff": 1.5,
-        "beta": 5.0,
+        "cutoff_rise": 5.0,
         "d_cutoff": 1.0
       },
       "prediction": {
@@ -480,7 +480,7 @@
     "angle": {
       "smoother": {
         "min_cutoff": 0.1,
-        "beta": 0.7,
+        "cutoff_rise": 0.7,
         "d_cutoff": 1.0
       },
       "prediction": {
@@ -499,7 +499,7 @@
     "azimuth": {
       "smoother": {
         "min_cutoff": 1.0,
-        "beta": 10.0,
+        "cutoff_rise": 10.0,
         "d_cutoff": 1.0
       },
       "prediction": {
@@ -514,7 +514,7 @@
       "extractor": {},
       "smoother": {
         "min_cutoff": 0.5,
-        "beta": 2.5,
+        "cutoff_rise": 2.5,
         "d_cutoff": 1.0
       },
       "prediction": {
@@ -567,7 +567,7 @@
       "similarity_applicator": {},
       "smoother": {
         "min_cutoff": 0.3,
-        "beta": 1.0,
+        "cutoff_rise": 1.0,
         "d_cutoff": 1.0
       },
       "interpolator": {

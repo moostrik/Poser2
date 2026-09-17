@@ -12,6 +12,7 @@ Adding a new widget:
 
 from __future__ import annotations
 
+import math
 from enum import Enum
 from typing import TYPE_CHECKING, get_origin, get_args
 
@@ -90,6 +91,7 @@ class Widget(Enum):
     status      = (bool,)   # read-only badge: "<label> OK" in green when True, "<label> WARNING" in red when False
     # numeric widgets
     slider      = (int, float)
+    log_slider  = (int, float)   # logarithmic slider for values spanning decades; needs min > 0
     number      = (int, float)
     knob        = (int, float)
     number_field = (int, float)
@@ -199,6 +201,23 @@ class Widget(Enum):
 
         # Fallback — return default (panel renders a read-only label)
         return cls.default
+
+    # -- Log slider mapping --------------------------------------------------
+
+    @staticmethod
+    def log_position(value: float) -> float:
+        """Log slider position of a value: its base-10 logarithm."""
+        return math.log10(value)
+
+    @staticmethod
+    def log_value(position: float) -> float:
+        """Value at a log slider position, rounded to 3 significant digits."""
+        return float(f"{10.0 ** position:.3g}")
+
+    @staticmethod
+    def log_step(value: float) -> float:
+        """Arrow step of a log slider's number input: a tenth of the value's decade."""
+        return float(f"{10.0 ** (math.floor(math.log10(value)) - 1):.1g}")
 
     # -- Dunder --------------------------------------------------------------
 
