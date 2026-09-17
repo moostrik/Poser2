@@ -6,7 +6,7 @@ centre pixel and cut to the **window** each side, their **pattern**: full white 
 lines, one spatial oscillator per colour thresholded into lines (``LinePattern.lines``): two
 drawbars, the fundamental and the harmonic, over one interval shared by the colours, the blue
 detuned and its registration inverted. The sources are pose features and nothing else;
-``connect`` is the connections of the design's Part 3 written out, turning a person's measures
+``connect`` is the connections of the document's *Sources and connections* written out, turning a person's measures
 into the pattern's parameters. Every number it uses is a setting of the ``PI`` group
 (``PoseInstrumentSettings``): the panel keeps the values, the code keeps the routing. The lines
 follow the pose; on top of that they **drift** by themselves, each colour's phase advancing by
@@ -325,7 +325,7 @@ class PoseInstrument(ProjectionLayer):
     # -- Connections -----------------------------------------------------------------
 
     def connect(self, p: _Player) -> Pattern:
-        """The first connections (``docs/POSE_INSTRUMENT.md``, Part 3) written out: a person's
+        """The connections (``docs/POSE_INSTRUMENT.md``, *Sources and connections*) written out: a person's
         measures into the pattern's parameters, every number a setting of ``PI.pattern``.
 
         - left shoulder: the fundamental's drawbar, white 0 → 1 and blue 1 → 0

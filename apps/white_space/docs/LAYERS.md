@@ -136,8 +136,8 @@ mode drives the same two white outputs as this layer at 1.0 in beam mode.
 
 The heart of the piece: each person stands in a dim blue **mask** at their azimuth, and around
 them lies a mirror-symmetric pattern of full white and full blue **lines** drawn from their pose.
-The design, the vocabulary, the meanings, the connections and the pattern, is `POSE_INSTRUMENT.md`;
-this section is the layer: what it reads, how it composes people, and what it exposes.
+The instrument, its meanings, connections and events, is `POSE_INSTRUMENT.md`, and the light synth
+the layer is rebuilt from is `LIGHT_SYNTH.md`; this section is the layer as built: what it reads, how it composes people, and what it exposes.
 
 - **Used by**: S6 (once projecting), S7, S8
 - **Input**: per person from the LERP frames, the measures: the four arm angles (`Angles`:
@@ -181,7 +181,7 @@ the same closest-tick rule as `beam_flash`, `events.hit_frames` of them), the pe
 mask flashes to `mask.flash_brightness`; each colour's lines take the other colour by its tint
 (`events.tint_white`, `events.tint_blue`: the central fraction of every line, 1 the swap); and the
 push raises the drift by `events.push_strength`, settling back over `events.push_seconds` while
-the lines keep what they gained (`POSE_INSTRUMENT.md`, *Events*). The crossing is measured in
+the lines keep what they gained (`POSE_INSTRUMENT.md`, *The hit*). The crossing is measured in
 playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJECTION.
 
 ### Presence, tuning, reset

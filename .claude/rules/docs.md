@@ -8,7 +8,7 @@ paths:
 
 ## Content
 
-- Give each document one audience and purpose: `CALIBRATION.md` the operator's procedure and what explains a failed step, `TRACKING.md` the tracker's design, `STATES.md` the choreography, `LAYERS.md` the layers
+- Give each document one audience and purpose: `CALIBRATION.md` the operator's procedure and what explains a failed step, `TRACKING.md` the tracker's design, `STATES.md` the choreography, `LAYERS.md` the layers, `POSE_INSTRUMENT.md` the instrument a participant plays (the body, the meanings, the connections), `LIGHT_SYNTH.md` the light synth it plays
 - State a component's design reasoning in that component's document; other documents link to it
 - State how the system works now, why it works that way, and the data behind it
 - Put measured and derived numbers in tables, and name the configuration they assume (preset, resolution, tilt)

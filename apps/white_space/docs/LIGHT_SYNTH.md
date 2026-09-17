@@ -3,8 +3,8 @@
 The light of the pose instrument is made by a light synth. This document describes that part and
 nothing else: the lines the oscillators draw, their inputs and what each looks like on the
 projection, how an input is connected, and the building blocks. What plays the inputs is not part
-of it. The instrument as built today, its meanings and its connections are in
-`POSE_INSTRUMENT.md`; this document is the design the instrument is rebuilt from.
+of it: the instrument, its measures, meanings, connections and events, and the layer as built
+today, are in `POSE_INSTRUMENT.md`. This document is the design the layer is rebuilt from.
 
 The synth has three levels, and only the last knows of colour or of pose data:
 
@@ -59,7 +59,7 @@ Where it is not a synth:
 A **voice** is one person's pattern, for as long as they are present. It knows nothing of colour:
 it has two outputs, and what each is projected in is the instrument's choice. There is one synth
 and it is polyphonic. The patch is shared: what is connected to which input, with what base and
-amount, is set once in the panel and holds for every voice. The values are each voice's own: what
+amount, is set once and holds for every voice. The values are each voice's own: what
 flows through a connection comes from that person, so each person's body drives their own
 pattern, and the same patch draws differently for every person. A voice also has its own time and
 its own presence. Put another way, each person gets their own instance of the light synth, and
@@ -323,13 +323,13 @@ without a step. What opens a gate is not part of this document.
 
 ## In the pose instrument
 
-The pose instrument is the bridge between the pose data and the synth. It gives every person a
-voice, sends the voice's two outputs to white and to blue, and decides what is connected to which
-input; that last part is `POSE_INSTRUMENT.md`'s and not this document's.
+The pose instrument is the bridge between the pose data and the synth (`POSE_INSTRUMENT.md`). It
+gives every person a voice, sends the voice's two outputs to white and to blue, connects the
+body's measures to the inputs, triggers the events (presence, the hit, sync) and draws the mask.
 
-White and blue are projected separately by the fixture **(site fact)**, so where both are lit the
-overlap is a tone of its own: the palette is dark, blue, white, both. How the two meet is a
-consequence of their oscillators' inputs, not an input of its own:
+Where white and blue are both lit the overlap is a tone of its own: the palette is dark, blue,
+white, both (`POSE_INSTRUMENT.md`, *The instrument*). How the two meet is a consequence of their
+oscillators' inputs, not an input of its own:
 
 | The two oscillators                            | On the projection                                   |
 |------------------------------------------------|-----------------------------------------------------|
@@ -338,9 +338,9 @@ consequence of their oscillators' inputs, not an input of its own:
 | unequal intervals                              | they slide past each other with distance            |
 | unequal speeds                                 | they slide past each other over time                |
 
-At the person sits the **mask** (`POSE_INSTRUMENT.md`, *The instrument*): a dim blue band over
-everything there, not part of the synth. The lines are generated behind it and come out from
-under it, and it covers the place where the two mirrored sides meet.
+At the person sits the instrument's **mask** (`POSE_INSTRUMENT.md`, *The instrument*), not part of
+the synth. The lines come out from under it, and it covers the place where the two mirrored sides
+meet.
 
 ## Open
 
