@@ -100,6 +100,9 @@ never be connected to anything.
 | speed       | degrees per second   | how fast the lines travel: positive outward, 0 still    |
 | hardness    | 0..1                 | the flanks of a line: 1 hard (default), 0 softest       |
 
+An oscillator also has its `push`, the speed a push adds to it (*Distance and time*): the amount
+of that one envelope, not an input, so it has no slot.
+
 **Interval** spaces the lines. A change of interval moves a far line more than a near one, as an
 accordion opens from the person.
 
@@ -137,10 +140,13 @@ time becomes lines along the wall.
 
 **Time** enters only through the speed: with the speed at 0 it has no effect and the lines stand
 as a row. A voice has one time. Only its steps are used, so the time can run faster or slower,
-stand still or run backward, all smoothly. A **push** is the time running faster for a moment and settling back, an
-envelope over time on the time's rate (*The envelope*): the lines keep the distance they gained.
-The push changes how fast the lines travel at once, which is not a step on the projection: where
-the lines are stays continuous.
+stand still or run backward, all smoothly.
+
+A **push** is a moment of added speed: an envelope over time (*The envelope*) that adds each
+oscillator's `push`, in degrees per second and signed, to its speed, and settles back. The lines
+keep the distance they gained and never move back, and standing lines are moved too, since the
+push is added to the speed and not multiplied into it. The push changes how fast the lines travel
+at once, which is not a step on the projection: where the lines are stays continuous.
 
 The two combine as a difference, the distance less what the lines have travelled, because the
 lines move outward: a pixel further out shows what a nearer pixel showed a moment before.
@@ -161,15 +167,18 @@ line is cut: a cut would leave a last line of a width no input asked for. A thin
 | taper       | 0..1    | the last part of a reach over which the lines thin out: 0.2 by default   |
 
 ```
-reach at a side        = reach × presence                    presence after the reach's slot
+reach at a side        = reach × presence
 pulse width at a pixel = pulse width × window(distance)      the window after the pulse width's slot
 ```
 
 The reach is the one thing that may differ between the two sides of a person: the lines are the
-same on both, the window need not be. With both reaches equal the picture is symmetric.
+same on both, the window need not be. With both reaches equal the picture is symmetric. The
+reaches have no slot: they are given to the voice as values, each tick, by whoever uses it. A
+reach that has to land on something, as sync's on a partner, cannot be reached through a base and
+an amount without reading the patch back, so it is set whole.
 
 The window and **presence** are the amp stage, a synth's amp envelope, and sit after the slots
-and not in them, so the pulse width and the reaches stay free to be connected. Presence is an
+and not in them, so the pulse width stays free to be connected. Presence is an
 envelope over time (*The envelope*) that multiplies both reaches: the window opens from the person
 when they arrive and closes to the person when they leave. The pulse width is the most a line can
 be; the window only thins it, so a dark output stays dark. A solid output is solid over most of
@@ -242,7 +251,8 @@ wheel brings in the vibrato, and an envelope into it is a fade-in.
 
 An envelope's output is a value 0..1, so it is a source like any other: over time one value per
 tick, over distance one per pixel. Three envelopes act outside a slot: the window and presence
-are the amp stage (*The window*), and the push acts on the time (*Distance and time*).
+are the amp stage (*The window*), and the push adds to the speed after its slot (*Distance and
+time*).
 
 ## The oscillator
 
@@ -318,8 +328,8 @@ without a step. What opens a gate is not part of this document.
 | Envelope | Over     | Rise, hold, fall                                       | Acts on                         |
 |----------|----------|--------------------------------------------------------|---------------------------------|
 | window   | distance | 0; to the reach less the taper; the taper              | the pulse width, after its slot |
-| push     | time     | 0; a gate open for a moment; the settle time           | the time's rate                 |
-| presence | time     | the attack; a gate open while present; the release     | both reaches, after their slots |
+| push     | time     | 0; a gate open for a moment; the settle time           | the speeds, after their slots   |
+| presence | time     | the attack; a gate open while present; the release     | both reaches                    |
 
 ## In the pose instrument
 

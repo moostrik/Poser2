@@ -226,11 +226,12 @@ What the instrument triggers in a person's voice, beside the measures:
 | Event    | When                                                        | Acts on                                                     |
 |----------|-------------------------------------------------------------|-------------------------------------------------------------|
 | presence | the person is seen: a gate open while they are there        | the presence envelope, on both reaches                      |
-| hit      | the playhead crosses the person: the ticks closest to it    | a push on the voice's time, and the mask's flash            |
+| hit      | the playhead crosses the person: the ticks closest to it    | a push on both oscillators' speed, and the mask's flash     |
 | sync     | the similarity of a pair is over its threshold              | the reach on the partner's side: full reaches the partner   |
 
-Presence and the push are envelopes of the synth (`LIGHT_SYNTH.md`, *The envelope*). Sync is the
-source of a reach, shaped by the bridge, since only the bridge knows where the partner stands. The
+Presence and the push are envelopes of the synth (`LIGHT_SYNTH.md`, *The envelope*). The reaches
+are the bridge's: it gives each side's reach to the voice as a value, the rest width grown toward
+the partner by sync, since only the bridge knows where the partner stands. The
 mask's flash is the mask going to its flash level for the hit's ticks; the mask is the bridge's
 and not the synth's.
 
