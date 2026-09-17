@@ -479,7 +479,7 @@
     },
     "angle": {
       "smoother": {
-        "min_cutoff": 0.1,
+        "min_cutoff": 0.3,
         "cutoff_rise": 0.7,
         "d_cutoff": 1.0
       },
@@ -498,12 +498,12 @@
     },
     "azimuth": {
       "smoother": {
-        "min_cutoff": 1.0,
+        "min_cutoff": 0.4,
         "cutoff_rise": 10.0,
         "d_cutoff": 1.0
       },
       "prediction": {
-        "method": "QUADRATIC"
+        "method": "LINEAR"
       },
       "interpolator": {
         "responsiveness": 0.25,
@@ -614,7 +614,7 @@
   },
   "light": {
     "brightness": 1.0,
-    "debug": "OFF",
+    "debug": "pose_instrument",
     "motor_simulate": true,
     "clock": {},
     "motor": {
@@ -886,13 +886,13 @@
       "release_seconds": 1.5
     },
     "override": {
-      "on": false,
+      "on": true,
       "interval_on": true,
       "interval": 14.0,
       "detune_on": true,
       "detune": 0.0,
       "window_on": true,
-      "window": 45.0,
+      "window": 35.0,
       "white_fundamental_on": true,
       "white_fundamental": 0.5,
       "white_harmonic_on": true,
