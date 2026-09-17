@@ -5,8 +5,7 @@ layers live side by side — the name carries the role, the folder carries the m
 named after its file (``test_fill.py`` → ``TestFill``), which is also its ``LayerId``.
 """
 
-from .pose_instrument     import PoseInstrument,     PoseInstrumentSettings, Pattern, Oscillator
-from .line_pattern        import LinePattern,        Waveform
+from .pose_instrument     import PoseInstrument,     PoseInstrumentSettings
 from .projection_playhead import ProjectionPlayhead, ProjectionPlayheadSettings
 from .flood               import Flood,              FloodSettings
 from .test_pose_waves     import TestPoseWaves,      TestPoseWavesSettings

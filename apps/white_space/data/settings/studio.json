@@ -846,23 +846,48 @@
   },
   "PI": {
     "max_lines": 90,
-    "pattern": {
+    "white": {
       "interval": 14.0,
-      "octaves": 1.0,
-      "detune": 0.22,
-      "blue_phase": -1.0,
-      "phase_range": 0.63,
-      "overtone_phase_range": 0.5,
-      "white": {
-        "waveform": "SINE",
-        "cutoff": 2,
-        "drift": 0.28
-      },
-      "blue": {
-        "waveform": "SINE",
-        "cutoff": 2,
-        "drift": 0.32
-      }
+      "interval_amount": 0.0,
+      "pulse_width": 0.0,
+      "pulse_width_amount": 1.0,
+      "phase": 0.0,
+      "phase_amount": 0.0,
+      "speed": 3.9,
+      "speed_amount": 0.0,
+      "hardness": 1.0,
+      "hardness_amount": 0.0,
+      "push": 14.0
+    },
+    "blue": {
+      "interval": 14.0,
+      "interval_amount": 0.0,
+      "pulse_width": 1.0,
+      "pulse_width_amount": -1.0,
+      "phase": 0.5,
+      "phase_amount": 0.0,
+      "speed": -4.5,
+      "speed_amount": 0.0,
+      "hardness": 1.0,
+      "hardness_amount": 0.0,
+      "push": -14.0
+    },
+    "window": {
+      "taper": 0.2
+    },
+    "reach": {
+      "width": 33.0,
+      "sync_threshold": 0.9
+    },
+    "presence": {
+      "attack_seconds": 1.0,
+      "release_seconds": 1.5
+    },
+    "push": {
+      "settle_seconds": 0.15
+    },
+    "events": {
+      "hit_frames": 1
     },
     "mask": {
       "width": 4.0,
@@ -870,45 +895,10 @@
       "playhead_at_mask": 0.3,
       "flash_brightness": 1.0
     },
-    "window": {
-      "width": 33.0,
-      "sync_threshold": 0.9
-    },
-    "events": {
-      "hit_frames": 1,
-      "tint_white": 0.0,
-      "tint_blue": 0.0,
-      "push_strength": 1.0,
-      "push_seconds": 0.15
-    },
-    "presence": {
-      "attack_seconds": 1.0,
-      "release_seconds": 1.5
-    },
     "override": {
-      "on": true,
-      "interval_on": true,
-      "interval": 14.0,
-      "detune_on": true,
-      "detune": 0.0,
-      "window_on": true,
-      "window": 35.0,
-      "white_fundamental_on": true,
-      "white_fundamental": 0.5,
-      "white_harmonic_on": true,
-      "white_harmonic": 0.0,
-      "white_phase_on": true,
-      "white_phase": 0.0,
-      "white_overtone_phase_on": true,
-      "white_overtone_phase": 0.0,
-      "blue_fundamental_on": true,
-      "blue_fundamental": 0.5,
-      "blue_harmonic_on": true,
-      "blue_harmonic": 0.0,
-      "blue_phase_on": true,
-      "blue_phase": 0.5,
-      "blue_overtone_phase_on": true,
-      "blue_overtone_phase": 0.0
+      "on": false,
+      "reach_on": true,
+      "reach": 35.0
     },
     "dummy": {
       "enabled": false,

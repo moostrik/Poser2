@@ -77,12 +77,16 @@ class Voice:
         caller's, in the same units, and presence multiplies them. The window thins the pulse
         width after its slot, so a dark output stays dark."""
         reach = np.where(left, reach_left, reach_right) * self._presence.value
-        window = Envelope.over_positions(distance, 0.0, reach * self._window.taper, reach)
+        taper = reach * self._window.taper
         outputs = []
         for oscillator, patch, source, interval in zip(self._oscillators, self._patches, sources, self._intervals):
             pulse_width = Slot.unit(Slot.modulate(patch.pulse_width, patch.pulse_width_amount, source.get(Input.PULSE_WIDTH, 0.0)))
             phase = Slot.modulate(patch.phase, patch.phase_amount, source.get(Input.PHASE, 0.0))
             hardness = Slot.unit(Slot.modulate(patch.hardness, patch.hardness_amount, source.get(Input.HARDNESS, 0.0)))
             cycle = oscillator.cycle(distance, interval, phase)
+            # The window is read at the centre of the line a pixel belongs to, not at the pixel, so
+            # a line in the taper has one width: thinned, whole and still centred where it belongs.
+            line_centre = np.abs(distance - ((cycle + 0.5) % 1.0 - 0.5) * interval)
+            window = Envelope.over_positions(line_centre, 0.0, taper, reach)
             outputs.append(Oscillator.pulse(cycle, pulse_width * window, hardness))
         return outputs[0], outputs[1]

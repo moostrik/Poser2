@@ -3,8 +3,9 @@
 The light of the pose instrument is made by a light synth. This document describes that part and
 nothing else: the lines the oscillators draw, their inputs and what each looks like on the
 projection, how an input is connected, and the building blocks. What plays the inputs is not part
-of it: the instrument, its measures, meanings, connections and events, and the layer as built
-today, are in `POSE_INSTRUMENT.md`. This document is the design the layer is rebuilt from.
+of it: the instrument, its measures, meanings, connections and events, are in
+`POSE_INSTRUMENT.md`. The code is the package `light/synth`: `Oscillator`, `Envelope`, `Slot` and
+`Voice`.
 
 The synth has three levels, and only the last knows of colour or of pose data:
 
@@ -167,9 +168,15 @@ line is cut: a cut would leave a last line of a width no input asked for. A thin
 | taper       | 0..1    | the last part of a reach over which the lines thin out: 0.2 by default   |
 
 ```
-reach at a side        = reach × presence
-pulse width at a pixel = pulse width × window(distance)      the window after the pulse width's slot
+reach at a side       = reach × presence
+pulse width of a line = pulse width × window(the line's centre)    the window after the pulse width's slot
 ```
+
+The window is read once per line, at the line's centre, and not per pixel: read per pixel it
+would thin the outer half of a line more than the inner, and a line in the taper would be lopsided
+and sit off its place. Read per line, a line in the taper is thinner, whole and still centred. A
+solid output is lines that touch, so its solid part ends at a line's boundary within half an
+interval of the taper and not exactly at it.
 
 The reach is the one thing that may differ between the two sides of a person: the lines are the
 same on both, the window need not be. With both reaches equal the picture is symmetric. The

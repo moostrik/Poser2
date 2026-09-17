@@ -137,7 +137,8 @@ mode drives the same two white outputs as this layer at 1.0 in beam mode.
 The heart of the piece: each person stands in a dim blue **mask** at their azimuth, and around
 them lies a mirror-symmetric pattern of full white and full blue **lines** drawn from their pose.
 The instrument, its meanings, connections and events, is `POSE_INSTRUMENT.md`, and the light synth
-the layer is rebuilt from is `LIGHT_SYNTH.md`; this section is the layer as built: what it reads, how it composes people, and what it exposes.
+that draws the lines is `LIGHT_SYNTH.md`; this section is the layer: what it reads, how it
+composes people, and what it exposes.
 
 - **Used by**: S6 (once projecting), S7, S8
 - **Input**: per person from the LERP frames, the measures: the four arm angles (`Angles`:
@@ -149,39 +150,38 @@ the layer is rebuilt from is `LIGHT_SYNTH.md`; this section is the layer as buil
   `TorsoTilt` are also sent to Max (`/pose/{id}/angle/sym`, `/pose/{id}/angle/legs`,
   `/pose/{id}/angle/tilt`) so sound and light read the same values. The layer adds no smoothing: the
   LERP poses are the pipeline's smoothed output.
-- **Per person**: `PoseInstrument.connect` turns the measures into the pattern's parameters
-  (`POSE_INSTRUMENT.md`, *Sources and connections*). The pattern is mirrored about the person's
-  centre pixel, so it is symmetric exactly and moves with them as one piece; a neighbour walking
-  never re-spaces it. On top of the pose each colour drifts by its own `drift`, white outward and
-  blue inward. Every pixel is 0 or 1 per channel; only the mask is dim.
+- **Per person**: a voice of the light synth (`light/synth`, `LIGHT_SYNTH.md`), its output 1
+  drawn in white and its output 2 in blue. `PoseInstrument.connect` turns the measures into the
+  sources of the voice's slots (`POSE_INSTRUMENT.md`, *The connections*). The pattern is mirrored
+  about the person's own azimuth, not their centre pixel, so it is symmetric, moves with them as
+  one piece and smoothly; a neighbour walking never re-spaces it. On top of the pose each colour
+  travels at its own `speed`, white outward and blue inward. At the default hardness every pixel
+  is 0 or 1 per channel; only the mask is dim.
 
 ### Between people
 
-- **Union**: overlapping patterns combine per channel (a pixel is lit when any pattern lights it).
-  Two patterns of different intervals or centres make a moiré.
-- **The visual limit**: `max_lines` per revolution, line and gap equal, so no line and no gap is
-  narrower than half its period. Each person's pattern is made visible on its own
-  (`LinePattern.visible`: gaps under the limit fill, then lines under it drop). A union of legal
-  patterns can only add narrow gaps, so the union fills gaps under the limit. A line or gap appears
-  and disappears at the limit's width, never thinner.
+- **Union**: overlapping voices combine per channel, the fuller level showing. Two patterns of
+  different intervals or centres make a moiré.
+- **The visual limit**: `max_lines` per revolution floors every interval at one period of it
+  (4° at 90). It does not bound a line's or a gap's width: a thin line is drawn as it is.
 - **Masks**: every mask goes over every pattern, in both channels, and lights dim blue
-  (`mask.brightness`, `mask.width` wide). A mask or a window edge cuts
-  a line where it falls, so lines slide out from behind the mask and into view at the window edge.
-- **Sync**: above `window.sync_threshold` (mean of both directions' similarity) a pair's window opens
+  (`mask.brightness`, `mask.width` wide). A mask cuts a line where it falls, so lines slide out
+  from behind it; the window cuts nothing, its lines thin to nothing over the taper.
+- **Sync**: above `reach.sync_threshold` (mean of both directions' similarity) a pair's reach grows
   toward each other along the shorter arc, eased, until each pattern reaches the partner at similarity 1:
   full sync is full overlap, one pattern. The threshold is the layer's own remap of the similarity, which is
   well above 0 for most pairs out of neutral (`SIMILARITY.md`, *Interdependence*). It opens over any intermediate person, whose own pattern is
-  unchanged. Sync shows more of the pattern; it never changes the lines. A pair with a person at neutral
-  reads 0 and does not open (`STATES.md`, *Vocabulary*).
+  unchanged. Sync shows more of the pattern; it never changes the lines. Only the partner's side
+  opens, and the partner's presence scales the growth, so a partner leaving lets go smoothly. A pair
+  with a person at neutral reads 0 and does not open (`STATES.md`, *Vocabulary*).
 
 ### Hit
 
 On the ticks the playhead is closest to a person (`PlayheadCrossing` in `pose/playhead_offset.py`,
 the same closest-tick rule as `beam_flash`, `events.hit_frames` of them), the person is marked: the
-mask flashes to `mask.flash_brightness`; each colour's lines take the other colour by its tint
-(`events.tint_white`, `events.tint_blue`: the central fraction of every line, 1 the swap); and the
-push raises the drift by `events.push_strength`, settling back over `events.push_seconds` while
-the lines keep what they gained (`POSE_INSTRUMENT.md`, *The hit*). The crossing is measured in
+mask flashes to `mask.flash_brightness`, and the push adds each colour's `push` to its speed,
+settling back over `push.settle_seconds` while the lines keep what they gained
+(`POSE_INSTRUMENT.md`, *Events*). The crossing is measured in
 playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJECTION.
 
 ### Presence, tuning, reset
@@ -191,8 +191,9 @@ playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJ
   dims). A pose with a NaN azimuth has no place in the projection and counts as absent (it releases),
   the one exception to *Inputs*' no-presence-test rule.
 - **Tuning**: the values are the root `PI` settings group (`POSE_INSTRUMENT.md`, *Settings*), live
-  from the panel and saved in the preset; the connections are code. `connect`, the drawing math
-  (`PoseInstrument`, `LinePattern`) hot-reload on save; adding a setting needs a restart.
+  from the panel and saved in the preset; the connections are code. `connect`, the drawing and
+  the synth's classes (`Voice`, `Oscillator`, `Envelope`, `Slot`) hot-reload on save; adding a
+  setting needs a restart.
 - **Settings**: the layer's own group holds only `blend`; everything else is `PI`
 - **Reset**: forgets every player and pass (S6's entry, a fresh instrument per cycle)
 - **Relation to `pose_waves`**: the old wave/void instrument lives on as `test_pose_waves` (debug
