@@ -1578,7 +1578,15 @@ def create_settings_panel(
     .poser-source { border-left: 2px solid #26a69a; padding-left: 6px; }
     .poser-synced { border-left: 2px solid #ffa726; padding-left: 6px; }
 
-    .poser-pinned { zoom: 0.8; }
+    /* Scaled with transform, not zoom: zoom puts getBoundingClientRect and pointer clientX in
+       different spaces in some browsers, and Quasar sliders compare the two. A transform keeps
+       its layout size, so the bar is laid out wider and the frame is sized by script. */
+    .poser-pinned-frame { --scale: 0.8; overflow: hidden; }
+    .poser-pinned {
+        width: calc(100% / var(--scale));
+        transform: scale(var(--scale));
+        transform-origin: top left;
+    }
     ''')
 
     # -- Shutdown overlay (client-side JS) ---------------------------------
@@ -1698,7 +1706,21 @@ def create_settings_panel(
             controls = [p for p in pinned_fields if p[2].access in (Access.WRITE, Access.READWRITE)]
             readouts = [p for p in pinned_fields if p[2].access in (Access.READ, Access.INIT)]
             readouts.sort(key=lambda p: p[2].widget is not Widget.status)   # stable: tree order otherwise
-            with ui.column().classes("poser-pinned w-full gap-2 bg-grey-9 rounded px-3 py-2 mt-2"):
+            # The frame follows the bar's scaled height (see .poser-pinned in the CSS above).
+            ui.add_head_html('''<script>(function() {
+              var _i = setInterval(function() {
+                var frame = document.querySelector(".poser-pinned-frame");
+                var bar = frame && frame.querySelector(".poser-pinned");
+                if (!bar) return;
+                clearInterval(_i);
+                var scale = parseFloat(getComputedStyle(frame).getPropertyValue("--scale"));
+                new ResizeObserver(function() {
+                  frame.style.height = bar.offsetHeight * scale + "px";
+                }).observe(bar);
+              }, 100);
+            })();</script>''')
+            with ui.element("div").classes("poser-pinned-frame w-full mt-2"), \
+                    ui.column().classes("poser-pinned gap-2 bg-grey-9 rounded px-3 py-2"):
                 if controls or pinned_actions:
                     with ui.row().classes("w-full gap-4 flex-wrap items-end"):
                         for settings, field_name, field in controls:

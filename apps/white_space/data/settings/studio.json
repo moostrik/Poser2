@@ -152,9 +152,9 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 2561,
+      "x": 2750,
       "y": 31,
-      "width": 1278,
+      "width": 1089,
       "height": 2080,
       "secondary_list": [],
       "secondary_fullscreen": true,
@@ -948,8 +948,8 @@
     "count_hold_seconds": 1.0,
     "sync": {},
     "manual": {
-      "select": "INTRO_PLAY",
-      "hold": false
+      "select": "IDLE",
+      "hold": true
     },
     "session": {
       "enabled": false,

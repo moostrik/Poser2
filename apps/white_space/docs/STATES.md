@@ -65,24 +65,47 @@ whatever the count (see below).
 
 ```mermaid
 stateDiagram-v2
-    [*] --> OFF
-    OFF: OFF — dark and silent, still sweeping at BEAM
-    OFF --> OFF_IDLE: blackout released, playhead locked
-    OFF_IDLE --> INTRO: light hits a player
-    OFF_IDLE --> IDLE: fade-in done
-    IDLE --> IDLE_INTRO: someone enters (P > 0)
-    IDLE_INTRO --> INTRO: light hits a player
-    IDLE_INTRO --> INTRO_IDLE: everyone left (P == 0)
-    INTRO --> INTRO_IDLE: everyone left (P == 0)
-    INTRO --> INTRO_PLAY: hits in sync (P ≥ min_players)
-    INTRO_IDLE --> IDLE: fade-back done
-    INTRO_PLAY --> PLAY: spin-up done
-    PLAY --> END: too few players (P < min_players)
-    END --> PLAY: players back (P ≥ min_players), wound back
-    END --> END_INTRO: wound down, players remain (P > 0)
-    END --> END_IDLE: wound down, room empty (P == 0)
-    END_INTRO --> INTRO: fade done, playhead locked
-    END_IDLE --> IDLE: fade done, playhead locked
+    %% box labels
+    OFF        : S0 OFF
+    OFF_IDLE   : S1 OFF_IDLE
+    IDLE       : S2 IDLE
+    IDLE_INTRO : S3 IDLE_INTRO
+    INTRO      : S4 INTRO
+    INTRO_IDLE : S5 INTRO_IDLE
+    INTRO_PLAY : S6 INTRO_PLAY
+    PLAY       : S7 PLAY
+    END        : S8 END
+    END_INTRO  : S9 END_INTRO
+    END_IDLE   : S10 END_IDLE
+
+    %% transitions, grouped by source state
+    [*]        --> OFF
+
+    OFF        --> OFF_IDLE   : blackout released, playhead locked
+
+    OFF_IDLE   --> INTRO      : light hits a player
+    OFF_IDLE   --> IDLE       : fade-in done
+
+    IDLE       --> IDLE_INTRO : someone enters (P > 0)
+
+    IDLE_INTRO --> INTRO      : light hits a player
+    IDLE_INTRO --> INTRO_IDLE : everyone left (P == 0)
+
+    INTRO      --> INTRO_IDLE : everyone left (P == 0)
+    INTRO      --> INTRO_PLAY : hits in sync (P ≥ min_players)
+
+    INTRO_IDLE --> IDLE       : fade-back done
+
+    INTRO_PLAY --> PLAY       : spin-up done
+
+    PLAY       --> END        : too few players (P < min_players)
+
+    END        --> PLAY       : players back (P ≥ min_players), wound back
+    END        --> END_INTRO  : wound down, players remain (P > 0)
+    END        --> END_IDLE   : wound down, room empty (P == 0)
+
+    END_INTRO  --> INTRO      : fade done, playhead locked
+    END_IDLE   --> IDLE       : fade done, playhead locked
 ```
 
 The graph is the stand-alone show; the exact conditions and their settings are in each state's
