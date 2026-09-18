@@ -12,7 +12,7 @@ from enum import IntEnum, auto
 
 import numpy as np
 
-from .envelope import Envelope, WindowSettings, PresenceSettings, PushSettings
+from .envelope import Envelope, WindowSettings, PushSettings
 from .oscillator import Oscillator, OscillatorSettings, LfoSettings, Value
 from .slot import Slot
 
@@ -35,10 +35,9 @@ class Voice:
     """One person's pattern; see the module docstring."""
 
     def __init__(self, oscillator_1: OscillatorSettings, oscillator_2: OscillatorSettings,
-                 window: WindowSettings, presence: PresenceSettings, push: PushSettings, lfo: LfoSettings) -> None:
+                 window: WindowSettings, push: PushSettings, lfo: LfoSettings) -> None:
         self._patches = (oscillator_1, oscillator_2)
         self._window = window
-        self._presence_settings = presence
         self._push_settings = push
         self._lfo_settings = lfo
         self._oscillators = (Oscillator(), Oscillator())
@@ -65,7 +64,7 @@ class Voice:
         0 it is silent and whatever it feeds is at its base."""
         L = self._lfo_settings
         self._lfo_oscillator.update(dt, 1.0, L.rate)                        # one position: the speed is the rate
-        level = Slot.unit(Slot.modulate(L.level, L.level_amount, Slot.held(L.level_hold, level_source)))
+        level = Slot.unit(Slot.modulate(L.level, L.level_amount, self._played(L.level_bypass, L.level_curve, level_source)))
         self._lfo = float(Oscillator.sine(self._lfo_oscillator.cycle(_LFO_POSITION, 1.0, L.phase), level)[0])
         return self._lfo
 
@@ -82,16 +81,21 @@ class Voice:
         """Advance the voice one tick: presence follows its gate, a hit opens the push, and both
         oscillators travel at their speed plus what the push adds. ``min_interval`` is the visual
         limit's floor on the interval, in the positions' units."""
-        P = self._presence_settings
-        self._presence.update(present, dt, P.attack_seconds, P.release_seconds)
+        W = self._window
+        self._presence.update(present, dt, W.attack_seconds, W.release_seconds)
         push = self._push.update(hit, dt, 0.0, self._push_settings.settle_seconds)
         for i, (oscillator, patch, source) in enumerate(zip(self._oscillators, self._patches, sources)):
-            interval_source = Slot.held(patch.interval_hold, float(source.get(Input.INTERVAL, 0.0)))
+            interval_source = self._played(patch.interval_bypass, patch.interval_curve, float(source.get(Input.INTERVAL, 0.0)))
             interval = Slot.modulate_octaves(patch.interval, patch.interval_amount, interval_source)
             self._intervals[i] = max(float(interval), min_interval)
-            speed_source = Slot.held(patch.speed_hold, float(source.get(Input.SPEED, 0.0)))
+            speed_source = self._played(patch.speed_bypass, patch.speed_curve, float(source.get(Input.SPEED, 0.0)))
             speed = Slot.modulate(patch.speed, patch.speed_amount, speed_source)
             oscillator.update(dt, self._intervals[i], float(speed) + patch.push * push)
+
+    @staticmethod
+    def _played(bypass: bool, curve: int, source: Value) -> Value:
+        """A source as its slot sees it: nothing while bypassed, else eased by its curve."""
+        return Slot.curve(Slot.bypassed(bypass, source), int(curve))
 
     def render(self, distance: np.ndarray, left: np.ndarray, reach_left: float, reach_right: float,
                sources: tuple[Sources, Sources]) -> tuple[np.ndarray, np.ndarray]:
@@ -103,9 +107,9 @@ class Voice:
         taper = reach * self._window.taper
         outputs = []
         for oscillator, patch, source, interval in zip(self._oscillators, self._patches, sources, self._intervals):
-            pulse_width_source = Slot.held(patch.pulse_width_hold, source.get(Input.PULSE_WIDTH, 0.0))
-            phase_source = Slot.held(patch.phase_hold, source.get(Input.PHASE, 0.0))
-            hardness_source = Slot.held(patch.hardness_hold, source.get(Input.HARDNESS, 0.0))
+            pulse_width_source = self._played(patch.pulse_width_bypass, patch.pulse_width_curve, source.get(Input.PULSE_WIDTH, 0.0))
+            phase_source = self._played(patch.phase_bypass, patch.phase_curve, source.get(Input.PHASE, 0.0))
+            hardness_source = self._played(patch.hardness_bypass, patch.hardness_curve, source.get(Input.HARDNESS, 0.0))
             pulse_width = Slot.unit(Slot.modulate(patch.pulse_width, patch.pulse_width_amount, pulse_width_source))
             phase = Slot.modulate(patch.phase, patch.phase_amount, phase_source)
             hardness = Slot.unit(Slot.modulate(patch.hardness, patch.hardness_amount, hardness_source))

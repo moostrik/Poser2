@@ -13,40 +13,57 @@ import math
 
 import numpy as np
 
-from modules.settings import BaseSettings, Field
+from modules.settings import BaseSettings, Field, Widget
+
+from .slot import Curve
 
 Value = float | np.ndarray      # an input's value: one per tick, or one per position
 
+KNOB = Widget.knob
+
 
 class OscillatorSettings(BaseSettings):
-    """One drawn oscillator's patch, a row per input: its base, the amount its source moves it
-    by, and its hold, which keeps it at its base whatever its source says."""
-    interval:           Field[float] = Field(14.0, min=1.0,    max=180.0, step=0.5,  description="Distance from one line to the next (deg)")
-    interval_amount:    Field[float] = Field(0.0,  min=-3.0,   max=3.0,   step=0.05, description="Its source moves the interval by this (octaves)")
-    interval_hold:      Field[bool]  = Field(False,                                  description="Hold the interval at its base: ignore its source")
-    pulse_width:        Field[float] = Field(0.5,  min=0.0,    max=1.0,   step=0.01, description="Line thickness: 0 none, 1 solid (fraction of interval)", newline=True)
-    pulse_width_amount: Field[float] = Field(0.0,  min=-1.0,   max=1.0,   step=0.01, description="Its source moves the pulse width by this")
-    pulse_width_hold:   Field[bool]  = Field(False,                                  description="Hold the pulse width at its base: ignore its source")
-    phase:              Field[float] = Field(0.0,  min=-0.5,   max=0.5,   step=0.01, description="Where the lines sit: 0 a line at the person, 0.5 a gap (intervals)", newline=True)
-    phase_amount:       Field[float] = Field(0.0,  min=-2.0,   max=2.0,   step=0.01, description="Its source moves the phase by this (intervals)")
-    phase_hold:         Field[bool]  = Field(False,                                  description="Hold the phase at its base: ignore its source")
-    speed:              Field[float] = Field(0.0,  min=-90.0,  max=90.0,  step=0.1,  description="Lines travelling: positive outward, 0 still (deg/s)", newline=True)
-    speed_amount:       Field[float] = Field(0.0,  min=-90.0,  max=90.0,  step=0.1,  description="Its source moves the speed by this (deg/s)")
-    speed_hold:         Field[bool]  = Field(False,                                  description="Hold the speed at its base: ignore its source")
-    hardness:           Field[float] = Field(1.0,  min=0.0,    max=1.0,   step=0.01, description="Line flanks: 1 hard, 0 softest", newline=True)
-    hardness_amount:    Field[float] = Field(0.0,  min=-1.0,   max=1.0,   step=0.01, description="Its source moves the hardness by this")
-    hardness_hold:      Field[bool]  = Field(False,                                  description="Hold the hardness at its base: ignore its source")
-    push:               Field[float] = Field(0.0,  min=-180.0, max=180.0, step=0.5,  description="Speed a hit adds for a moment: positive outward (deg/s)", newline=True)
+    """One drawn oscillator's patch, a modulation matrix row per input: the input's own knob (its
+    base), the **Amount** its source moves it by, the **Source** knob reading the live source, its
+    **Curve**, and **Bypass**, which switches the modulation off and leaves the knob's value."""
+    interval:           Field[float] = Field(14.0, min=1.0,    max=180.0, step=0.5,  widget=KNOB, label="Interval",    description="Distance from one line to the next (deg)")
+    interval_amount:    Field[float] = Field(0.0,  min=-3.0,   max=3.0,   step=0.05, widget=KNOB, label="Amount",      description="How far the source moves the interval (octaves)")
+    interval_source:    Field[float] = Field(0.0,  min=-1.0,   max=1.0,   step=0.01, widget=KNOB, label="Source",      description="What plays the interval, live", access=Field.READ)
+    interval_curve:     Field[Curve] = Field(Curve.LINEAR,                                        label="Curve",       description="How the source's magnitude is eased")
+    interval_bypass:    Field[bool]  = Field(False,                                               label="Bypass",      description="Switch the modulation off: the interval is its knob")
+    pulse_width:        Field[float] = Field(0.5,  min=0.0,    max=1.0,   step=0.01, widget=KNOB, label="Pulse Width", description="Line thickness: 0 none, 1 solid (fraction of interval)", newline=True)
+    pulse_width_amount: Field[float] = Field(0.0,  min=-1.0,   max=1.0,   step=0.01, widget=KNOB, label="Amount",      description="How far the source moves the pulse width")
+    pulse_width_source: Field[float] = Field(0.0,  min=-1.0,   max=1.0,   step=0.01, widget=KNOB, label="Source",      description="What plays the pulse width, live", access=Field.READ)
+    pulse_width_curve:  Field[Curve] = Field(Curve.LINEAR,                                        label="Curve",       description="How the source's magnitude is eased")
+    pulse_width_bypass: Field[bool]  = Field(False,                                               label="Bypass",      description="Switch the modulation off: the pulse width is its knob")
+    phase:              Field[float] = Field(0.0,  min=-0.5,   max=0.5,   step=0.01, widget=KNOB, label="Phase",       description="Where the lines sit: 0 a line at the person, 0.5 a gap (intervals)", newline=True)
+    phase_amount:       Field[float] = Field(0.0,  min=-2.0,   max=2.0,   step=0.01, widget=KNOB, label="Amount",      description="How far the source moves the phase (intervals)")
+    phase_source:       Field[float] = Field(0.0,  min=-1.0,   max=1.0,   step=0.01, widget=KNOB, label="Source",      description="What plays the phase, live", access=Field.READ)
+    phase_curve:        Field[Curve] = Field(Curve.LINEAR,                                        label="Curve",       description="How the source's magnitude is eased")
+    phase_bypass:       Field[bool]  = Field(False,                                               label="Bypass",      description="Switch the modulation off: the phase is its knob")
+    speed:              Field[float] = Field(0.0,  min=-90.0,  max=90.0,  step=0.1,  widget=KNOB, label="Speed",       description="Lines travelling: positive outward, 0 still (deg/s)", newline=True)
+    speed_amount:       Field[float] = Field(0.0,  min=-90.0,  max=90.0,  step=0.1,  widget=KNOB, label="Amount",      description="How far the source moves the speed (deg/s)")
+    speed_source:       Field[float] = Field(0.0,  min=-1.0,   max=1.0,   step=0.01, widget=KNOB, label="Source",      description="What plays the speed, live", access=Field.READ)
+    speed_curve:        Field[Curve] = Field(Curve.LINEAR,                                        label="Curve",       description="How the source's magnitude is eased")
+    speed_bypass:       Field[bool]  = Field(False,                                               label="Bypass",      description="Switch the modulation off: the speed is its knob")
+    hardness:           Field[float] = Field(1.0,  min=0.0,    max=1.0,   step=0.01, widget=KNOB, label="Hardness",    description="Line flanks: 1 hard, 0 softest", newline=True)
+    hardness_amount:    Field[float] = Field(0.0,  min=-1.0,   max=1.0,   step=0.01, widget=KNOB, label="Amount",      description="How far the source moves the hardness")
+    hardness_source:    Field[float] = Field(0.0,  min=-1.0,   max=1.0,   step=0.01, widget=KNOB, label="Source",      description="What plays the hardness, live", access=Field.READ)
+    hardness_curve:     Field[Curve] = Field(Curve.LINEAR,                                        label="Curve",       description="How the source's magnitude is eased")
+    hardness_bypass:    Field[bool]  = Field(False,                                               label="Bypass",      description="Switch the modulation off: the hardness is its knob")
+    push:               Field[float] = Field(0.0,  min=-180.0, max=180.0, step=0.5,  widget=KNOB, label="Push",        description="Speed a hit adds for a moment: positive outward (deg/s)", newline=True)
 
 
 class LfoSettings(BaseSettings):
     """An LFO in time: an oscillator with one position, used as a source. It has no interval and
-    no speed, only how fast it cycles, and its level is what is played."""
-    rate:         Field[float] = Field(0.5, min=0.0,  max=10.0, step=0.05, description="Cycles per second (Hz)")
-    phase:        Field[float] = Field(0.0, min=-0.5, max=0.5,  step=0.01, description="Where in its cycle it starts (cycles)")
-    level:        Field[float] = Field(0.0, min=0.0,  max=1.0,  step=0.01, description="How far it swings: 0 silent, 1 full", newline=True)
-    level_amount: Field[float] = Field(0.0, min=-1.0, max=1.0,  step=0.01, description="Its source moves the level by this")
-    level_hold:   Field[bool]  = Field(False,                              description="Hold the level at its base: ignore its source")
+    no speed, only how fast it cycles; its level is what is played, a matrix row like an input's."""
+    rate:         Field[float] = Field(0.5, min=0.0,  max=10.0, step=0.05, widget=KNOB, label="Rate",   description="Cycles per second (Hz)")
+    phase:        Field[float] = Field(0.0, min=-0.5, max=0.5,  step=0.01, widget=KNOB, label="Phase",  description="Where in its cycle it starts (cycles)")
+    level:        Field[float] = Field(0.0, min=0.0,  max=1.0,  step=0.01, widget=KNOB, label="Level",  description="How far it swings: 0 silent, 1 full", newline=True)
+    level_amount: Field[float] = Field(0.0, min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Amount", description="How far the source moves the level")
+    level_source: Field[float] = Field(0.0, min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Source", description="What plays the level, live", access=Field.READ)
+    level_curve:  Field[Curve] = Field(Curve.LINEAR,                                    label="Curve",  description="How the source's magnitude is eased")
+    level_bypass: Field[bool]  = Field(False,                                           label="Bypass", description="Switch the modulation off: the level is its knob")
 
 
 class Oscillator:

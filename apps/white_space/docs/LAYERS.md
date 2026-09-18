@@ -167,7 +167,7 @@ composes people, and what it exposes.
 - **Masks**: every mask goes over every pattern, in both channels, and lights dim blue
   (`mask.brightness`, `mask.width` wide). A mask cuts a line where it falls, so lines slide out
   from behind it; the window cuts nothing, its lines thin to nothing over the taper.
-- **Sync**: above `reach.sync_threshold` (mean of both directions' similarity) a pair's reach grows
+- **Sync**: above `window.sync_threshold` (mean of both directions' similarity) a pair's reach grows
   toward each other along the shorter arc, eased, until each pattern reaches the partner at similarity 1:
   full sync is full overlap, one pattern. The threshold is the layer's own remap of the similarity, which is
   well above 0 for most pairs out of neutral (`SIMILARITY.md`, *Interdependence*). It opens over any intermediate person, whose own pattern is
@@ -178,16 +178,16 @@ composes people, and what it exposes.
 ### Hit
 
 On the ticks the playhead is closest to a person (`PlayheadCrossing` in `pose/playhead_offset.py`,
-the same closest-tick rule as `beam_flash`, `events.hit_frames` of them), the person is marked: the
-mask flashes to `mask.flash_brightness`, and the push adds each colour's `push` to its speed,
-settling back over `push.settle_seconds` while the lines keep what they gained
+the same closest-tick rule as `beam_flash`, `hit.frames` of them), the person is marked: the
+mask flashes to `hit.flash_brightness`, and the push adds each colour's `push` to its speed,
+settling back over `hit.settle_seconds` while the lines keep what they gained
 (`POSE_INSTRUMENT.md`, *Events*). The crossing is measured in
 playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJECTION.
 
 ### Presence, tuning, reset
 
-- **Presence**: per player attack (`presence.attack_seconds`: the window opens from the mask)
-  and release (`presence.release_seconds`: the last pose is held while the window closes and the mask
+- **Presence**: per player attack (`window.attack_seconds`: the window opens from the mask)
+  and release (`window.release_seconds`: the last pose is held while the window closes and the mask
   dims). A pose with a NaN azimuth has no place in the projection and counts as absent (it releases),
   the one exception to *Inputs*' no-presence-test rule.
 - **Tuning**: the values are the root `PI` settings group (`POSE_INSTRUMENT.md`, *Settings*), live

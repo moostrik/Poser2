@@ -326,22 +326,32 @@ with the instrument at a person.
 
 ### The hit
 
-On the ticks the playhead is closest to a person (`PlayheadCrossing`, `events.hit_frames` 1 to 3,
-as the beam flash), the person's voice is pushed (each oscillator's `push`, settling over
-`push.settle_seconds`) and the mask's blue goes to `mask.flash_brightness` for those ticks.
+On the ticks the playhead is closest to a person (`PlayheadCrossing`, `hit.frames` 1 to 3, as the
+beam flash), the person's voice is pushed (each oscillator's `push`, settling over
+`hit.settle_seconds`) and the mask's blue goes to `hit.flash_brightness` for those ticks.
 
 ### Settings
 
 `PI` is a root settings group of the app (`apps/white_space/settings.py`), not a layer group
-(`PoseInstrumentSettings`, `light/layers/projection/pose_instrument.py`). The synth's patch:
-`white` and `blue` (per oscillator a row per input, its base, its amount and its hold, and the
-`push`), `window`
-(the taper), `presence` (attack, release), `push` (the settle time), `lfo` (the rate, the phase,
-the level with its amount and its hold). The bridge's values:
-`max_lines`, `reach` (the width at rest, the sync threshold), `events` (the hit's ticks), `mask`
-(width, brightness, the playhead's level in it, the flash brightness), `override` (*Playing by
-hand*), `dummy` (*The dummy*). The layer keeps its `blend`. No setting routes anything: an amount
-does nothing until `connect` gives its input a source.
+(`PoseInstrumentSettings`, `light/layers/projection/pose_instrument.py`), grouped by what is
+tuned together, knobs throughout:
+
+| Group           | What it holds                                                                     |
+|-----------------|-----------------------------------------------------------------------------------|
+| `max_lines`     | the visual limit                                                                  |
+| `bypass_all`    | the master bypass: every source muted, every input its knob (*Playing by hand*)   |
+| `white`, `blue` | an oscillator's patch: a matrix row per input (Interval · Amount · Source · Curve · Bypass) and its `push` |
+| `lfo`           | the LFO: rate, phase, and the level's row                                         |
+| `window`        | how far the pattern shows and when: width and its bypass, taper, attack, release, sync threshold |
+| `hit`           | the hit: frames, the push's settle time, the mask's flash, the hit button         |
+| `mask`          | width, brightness, the playhead's level in it                                     |
+| `dummy`         | *The dummy*                                                                       |
+
+The synth's settings classes (`OscillatorSettings`, `LfoSettings`, `WindowSettings`,
+`PushSettings`) are extended by the bridge's where a concept spans both (`window`, `hit`); the
+voice reads only its own fields. The layer keeps its `blend`. No setting routes anything: an
+amount does nothing until `connect` gives its input a source, and the row's read-only Source knob
+shows what it gets.
 
 ### Hot reload
 
@@ -367,14 +377,18 @@ already built (a settings instance keeps its fields). Hence the rules:
 
 ### Playing by hand
 
-A base is already the hand's value, so playing by hand is muting sources. Every input has a
-**hold** beside its base and amount (`PI.white`, `PI.blue`, and the level of `PI.lfo`): held, the
-input is its base while every other input keeps following the body, so a pose can be taken apart
-input by input; let go, it follows again with its amount as it was. `PI.override` is the master:
-with `on`, `connect` is skipped and every input is its base, for everyone, live people and the
-dummy alike: the panel draws. `reach_on` with `on` holds both reaches at `reach` without a partner,
-presence still opening and closing them. `hit` marks everyone for `hit_frames` ticks as the
-playhead would.
+An input's knob is already the hand's value, so playing by hand is bypassing modulation. Every
+row has a **Bypass** (`PI.white`, `PI.blue`, and the level of `PI.lfo`): bypassed, the input is
+its knob while every other input keeps following the body, so a pose can be taken apart input by
+input; lifted, it follows again with its amount as it was. `PI.bypass_all` is the master: `connect`
+is skipped and every input is its knob, for everyone, live people and the dummy alike: the panel
+draws. `window.width_bypass` holds both reaches at the width without a partner, presence still
+opening and closing them. `hit.hit` marks everyone for `hit.frames` ticks as the playhead would.
+
+The row's **Source** knob is read-only and shows the live source of the shown person: the dummy's
+while the dummy is enabled (its id is above every live player's), else the first person present's;
+0 for an input nobody plays, and 0 while the master bypass is on. It is the one setting the bridge
+writes, so what the body gives can be read off the panel next to what it does.
 
 ### Tests
 

@@ -10,25 +10,22 @@ import math
 
 import numpy as np
 
-from modules.settings import BaseSettings, Field
+from modules.settings import BaseSettings, Field, Widget
 
 Value = float | np.ndarray
 
 
 class WindowSettings(BaseSettings):
-    """The window: the envelope over distance on the pulse width. Its reaches are the caller's."""
-    taper: Field[float] = Field(0.2, min=0.0, max=1.0, step=0.01, description="Last part of a reach over which the lines thin out")
-
-
-class PresenceSettings(BaseSettings):
-    """Presence: the envelope over time on the reaches."""
-    attack_seconds:  Field[float] = Field(1.0, min=0.0, max=10.0, step=0.1, description="Window opens after arrival (s)")
-    release_seconds: Field[float] = Field(1.5, min=0.0, max=10.0, step=0.1, description="Window closes after leaving (s)")
+    """What the voice reads of the window: the taper of the envelope over distance on the pulse
+    width, and presence, the envelope over time on the reaches. The reaches are the caller's."""
+    taper:           Field[float] = Field(0.2, min=0.0, max=1.0,  step=0.01, widget=Widget.knob, label="Taper",   description="Last part of a reach over which the lines thin out")
+    attack_seconds:  Field[float] = Field(1.0, min=0.0, max=10.0, step=0.1,  widget=Widget.knob, label="Attack",  description="Window opens after arrival (s)")
+    release_seconds: Field[float] = Field(1.5, min=0.0, max=10.0, step=0.1,  widget=Widget.knob, label="Release", description="Window closes after leaving (s)")
 
 
 class PushSettings(BaseSettings):
     """The push: the envelope over time on the speed a hit adds."""
-    settle_seconds: Field[float] = Field(1.0, min=0.05, max=10.0, step=0.05, description="Push settle time (s)")
+    settle_seconds: Field[float] = Field(1.0, min=0.05, max=10.0, step=0.05, widget=Widget.knob, label="Settle", description="Push settle time (s)")
 
 
 class Envelope:

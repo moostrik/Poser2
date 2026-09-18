@@ -206,19 +206,21 @@ the taper grow or thin a little, and nothing appears or disappears.
 
 ## Modulation
 
-Every input has a modulation slot, as a synth's inputs have. What the source is does not matter
-to the slot.
+Every input has a modulation slot, a modulation matrix row, as a synth's inputs have. What the
+source is does not matter to the slot. In the panel a row reads Interval · Amount · Source ·
+Curve · Bypass, the matrix's own words.
 
 | Part   | What it is                                                                          |
 |--------|-------------------------------------------------------------------------------------|
-| base   | the input's value with nothing connected                                            |
+| base   | the input's own knob: its value with nothing connected, and the hand's value        |
 | source | what is connected: a value 0..1, or −1..1 for an LFO; one per tick or one per pixel |
 | amount | how far the source moves the input from its base, in the input's unit, signed       |
-| hold   | held, the input is its base whatever its source says; the amount is kept            |
+| curve  | how the source's magnitude is eased, its sign kept: linear, ease in, out, in-out    |
+| bypass | bypassed, the modulation is off: the input is its knob, and the amount is kept      |
 
 ```
-input    = base + amount × source            amount in the input's unit
-interval = base × 2 ^ (amount × source)      amount in octaves
+input    = base + amount × curve(source)     amount in the input's unit
+interval = base × 2 ^ (amount × curve(source))   amount in octaves
 ```
 
 At pulse width base 0.2 and amount 0.6 the lines are 0.2 wide with the source at 0 and 0.8 wide
@@ -227,9 +229,11 @@ is a large change at a 5° interval and a small one at 40°, and a doubling look
 anywhere. At base 10° and amount 1 octave the interval goes from 10° to 20°; at −1 to 5°.
 
 - An input has one source. A source may feed several inputs, each with its own amount.
-- The hold is how one input is played by hand while the others follow their sources: a base is
-  already the hand's value, so holding an input is all that is needed, and letting go brings its
-  source back with the amount as it was.
+- The bypass is how one input is played by hand while the others follow their sources: a base is
+  already the hand's value, so bypassing the modulation is all that is needed, and lifting it
+  brings the source back with the amount as it was.
+- The panel's Source knob is read-only and shows the live source, the synth's modulation ring: so
+  a row shows what the body gives, and an LFO's ± swing, where the wiring itself is code.
 - A source has a synth's ranges: an LFO swings both ways, −1..1, so the input moves around its
   base; an envelope and everything else is 0..1 and moves the input one way from its base. Any
   source fits any input, and the amount alone carries the unit and the direction.
@@ -240,8 +244,9 @@ anywhere. At base 10° and amount 1 octave the interval goes from 10° to 20°; 
   per tick, since the travelled (*The oscillator*) is one count.
 - Where an input ends: pulse width and hardness stop at 0 and 1, the interval stops at the visual
   limit, phase wraps, speed has no ends. A stop is a standstill, not a step.
-- The slot adds no smoothing, no curve and no steps. A source that needs shaping is shaped in the
-  source.
+- The slot adds no smoothing and no steps. Its curve is the one shaping it does: smooth, odd (0
+  and ±1 stay, the sign is kept), so a connection's feel is tuned in its row and a bipolar source
+  stays symmetric.
 
 ### An LFO as a source
 

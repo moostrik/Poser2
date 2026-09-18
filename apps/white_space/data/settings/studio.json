@@ -14,7 +14,7 @@
   "lens_centre_y": 10.5,
   "spin_down_seconds": 6.0,
   "render": {
-    "layout": "POSE",
+    "layout": "CAMERA",
     "camera_view": "BOTH",
     "azimuth_overlay": true,
     "pose_figures": true,
@@ -151,11 +151,11 @@
     "window": {
       "title": "Poser",
       "v_sync": true,
-      "monitor": "M1",
-      "x": 45,
-      "y": 2162,
-      "width": 2073,
-      "height": 1611,
+      "monitor": "M0",
+      "x": 2561,
+      "y": 31,
+      "width": 1278,
+      "height": 2080,
       "secondary_list": [],
       "secondary_fullscreen": true,
       "fullscreen_mode": "WINDOWED"
@@ -211,13 +211,13 @@
       "stage": "LERP",
       "volume": 1.0,
       "speaker_offset": 0.0,
-      "ip_addresses": "192.168.1.39",
+      "ip_addresses": "192.168.1.40",
       "port": 8000
     },
     "osc_sound_receiver": {
-      "port_in": 6455,
+      "port_in": 8001,
       "return_messages": false,
-      "port_out": 9001,
+      "port_out": 8002,
       "ip_address_out": "192.168.0.0",
       "verbose": true
     }
@@ -614,8 +614,8 @@
   },
   "light": {
     "brightness": 1.0,
-    "debug": "pose_instrument",
-    "motor_simulate": true,
+    "debug": "OFF",
+    "motor_simulate": false,
     "clock": {},
     "motor": {
       "beam_rpm": 36.0,
@@ -846,68 +846,82 @@
   },
   "PI": {
     "max_lines": 90,
+    "bypass_all": false,
     "white": {
       "interval": 14.0,
       "interval_amount": -1.5,
+      "interval_curve": "LINEAR",
+      "interval_bypass": false,
       "pulse_width": 0.0,
       "pulse_width_amount": 1.0,
+      "pulse_width_curve": "LINEAR",
+      "pulse_width_bypass": false,
       "phase": 0.0,
       "phase_amount": 0.25,
+      "phase_curve": "LINEAR",
+      "phase_bypass": false,
       "speed": 3.9,
       "speed_amount": 15.0,
+      "speed_curve": "LINEAR",
+      "speed_bypass": false,
       "hardness": 1.0,
       "hardness_amount": 0.0,
+      "hardness_curve": "LINEAR",
+      "hardness_bypass": false,
       "push": 14.0
     },
     "blue": {
       "interval": 14.0,
       "interval_amount": -1.5,
+      "interval_curve": "LINEAR",
+      "interval_bypass": false,
       "pulse_width": 1.0,
       "pulse_width_amount": -1.0,
+      "pulse_width_curve": "LINEAR",
+      "pulse_width_bypass": false,
       "phase": 0.5,
       "phase_amount": 0.0,
+      "phase_curve": "LINEAR",
+      "phase_bypass": false,
       "speed": -4.5,
       "speed_amount": 15.0,
+      "speed_curve": "LINEAR",
+      "speed_bypass": false,
       "hardness": 1.0,
       "hardness_amount": 0.0,
+      "hardness_curve": "LINEAR",
+      "hardness_bypass": false,
       "push": -14.0
-    },
-    "window": {
-      "taper": 0.2
-    },
-    "reach": {
-      "width": 33.0,
-      "sync_threshold": 0.9
-    },
-    "presence": {
-      "attack_seconds": 1.0,
-      "release_seconds": 1.5
-    },
-    "push": {
-      "settle_seconds": 0.15
     },
     "lfo": {
       "rate": 0.5,
       "phase": 0.0,
       "level": 0.0,
-      "level_amount": 1.0
+      "level_amount": 1.0,
+      "level_curve": "LINEAR",
+      "level_bypass": false
     },
-    "events": {
-      "hit_frames": 1
+    "window": {
+      "width": 33.0,
+      "width_bypass": false,
+      "sync_threshold": 0.9,
+      "taper": 0.2,
+      "attack_seconds": 1.0,
+      "release_seconds": 1.5
+    },
+    "hit": {
+      "frames": 1,
+      "flash_brightness": 1.0,
+      "settle_seconds": 0.15
     },
     "mask": {
       "width": 4.0,
       "brightness": 0.5,
-      "playhead_at_mask": 0.3,
-      "flash_brightness": 1.0
-    },
-    "override": {
-      "on": false,
-      "reach_on": true,
-      "reach": 35.0
+      "playhead_at_mask": 0.3
     },
     "dummy": {
       "enabled": false,
+      "solo": false,
       "azimuth": 180.0,
       "torso": 0.0,
       "left_shoulder": 340.0,
@@ -924,7 +938,7 @@
     }
   },
   "states": {
-    "blackout": false,
+    "blackout": true,
     "spin_up_seconds": 14.0,
     "off_idle_bars": 1.0,
     "intro_idle_bars": 2.0,
@@ -934,7 +948,7 @@
     "count_hold_seconds": 1.0,
     "sync": {},
     "manual": {
-      "select": "INTRO",
+      "select": "INTRO_PLAY",
       "hold": false
     },
     "session": {

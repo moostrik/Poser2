@@ -102,6 +102,11 @@ def generate_label(name):
     return " ".join(result)
 
 
+def _field_label(name: str, field: Field) -> str:
+    """The control's title: the field's own ``label`` when it has one, else its name made readable."""
+    return field.label if field.label is not None else generate_label(name)
+
+
 def _build_field_title(label: str, description: str | None, *, classes: str = ""):
     """Create a shared field title area with an optional hover description."""
     title = ui.label(label).classes(classes)
@@ -182,7 +187,7 @@ def _build_field_header(
 def _build_init_field(settings, name: str, field: Field) -> None:
     """Render a single init-only field without forcing it into a separate section."""
     with ui.row().classes("items-center gap-2 poser-init"):
-        _build_field_title(generate_label(name), _wiring_tooltip(settings, name, field.description))
+        _build_field_title(_field_label(name, field), _wiring_tooltip(settings, name, field.description))
         ui.label(str(getattr(settings, name))).classes("text-secondary italic")
 
 
@@ -268,7 +273,7 @@ def _commit_on_release(element, commit):
 @widget_builder(Widget.switch)
 def _build_switch(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -294,7 +299,7 @@ def _build_status(settings, name, field, polls):
     the longer one and does not jump in size when the value flips.
     """
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
 
     with ui.badge().classes("text-weight-bold px-2 py-1").style("display: inline-grid") as badge:
@@ -317,7 +322,7 @@ def _build_status(settings, name, field, polls):
 @widget_builder(Widget.toggle)
 def _build_toggle(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -355,7 +360,7 @@ def _build_toggle(settings, name, field, polls):
 @widget_builder(Widget.slider)
 def _build_slider(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
@@ -423,7 +428,7 @@ def _build_slider(settings, name, field, polls):
 def _build_log_slider(settings, name, field, polls):
     """Slider over log10(min)..log10(max); the number input holds the real value."""
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     color = getattr(field, "color", "primary")
@@ -510,7 +515,7 @@ def _build_log_slider(settings, name, field, polls):
 @widget_builder(Widget.number)
 def _build_number(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -534,7 +539,7 @@ def _build_number(settings, name, field, polls):
 @widget_builder(Widget.knob)
 def _build_knob(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
@@ -565,7 +570,7 @@ def _build_knob(settings, name, field, polls):
 @widget_builder(Widget.select)
 def _build_select(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -588,7 +593,7 @@ def _build_select(settings, name, field, polls):
 @widget_builder(Widget.text_select)
 def _build_text_select(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -622,7 +627,7 @@ def _build_text_select(settings, name, field, polls):
 @widget_builder(Widget.radio)
 def _build_radio(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -647,7 +652,7 @@ def _build_radio(settings, name, field, polls):
 @widget_builder(Widget.input)
 def _build_input(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -667,7 +672,7 @@ def _build_input(settings, name, field, polls):
 @widget_builder(Widget.ip_field)
 def _build_ip(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -695,7 +700,7 @@ def _build_ip(settings, name, field, polls):
 @widget_builder(Widget.number_field)
 def _build_number_input(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     lo = field.min
@@ -733,7 +738,7 @@ def _build_number_input(settings, name, field, polls):
 @widget_builder(Widget.textarea)
 def _build_textarea(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -754,7 +759,7 @@ def _build_textarea(settings, name, field, polls):
 @widget_builder(Widget.color)
 def _build_color(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -793,7 +798,7 @@ def _build_color(settings, name, field, polls):
 @widget_builder(Widget.color_alpha)
 def _build_color_alpha(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     is_disabled = _is_field_read_only(settings, name, field)
 
     hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
@@ -842,7 +847,7 @@ def _build_color_alpha(settings, name, field, polls):
 def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool, with_order: bool = True):
     """Shared implementation for checklist, playlist, and order widgets."""
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -980,7 +985,7 @@ def _build_order(settings, name, field, polls):
 def _build_number_list(settings, name, field, polls):
     """Render a fixed-length list of numbers as styled rows (matches sortable list look)."""
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     elem_type = get_args(field.type_)[0] if get_args(field.type_) else float
@@ -1040,7 +1045,7 @@ def _build_number_list(settings, name, field, polls):
 @widget_builder(Widget.point2f)
 def _build_point2f(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     is_disabled = _is_field_read_only(settings, name, field)
 
     with ui.column().classes("w-full gap-1"):
@@ -1080,7 +1085,7 @@ def _build_point2f(settings, name, field, polls):
 @widget_builder(Widget.rect)
 def _build_rect(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     is_disabled = _is_field_read_only(settings, name, field)
 
     with ui.column().classes("w-full gap-1"):
@@ -1155,7 +1160,7 @@ def _format_readout(value) -> str:
 def _build_pinned_readout(settings, name, field, polls):
     """A read-only pinned field as one compact chip, "<Label> <value>", instead of a locked input."""
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
 
     chip = _attach_description_tooltip(
@@ -1171,7 +1176,7 @@ def _build_pinned_readout(settings, name, field, polls):
 def _build_fallback(settings, name, field, polls):
     """Build a control for types without a registered Widget builder."""
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
 
     # -- Generic fallback: read-only label -----------------------------------
     with ui.row().classes("items-center gap-2"):
@@ -1184,7 +1189,7 @@ def _build_fallback(settings, name, field, polls):
 
 def _build_action_button(settings, name, field):
     """Create a NiceGUI button for a Widget.button Setting."""
-    label = generate_label(name)
+    label = _field_label(name, field)
     description = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     props = "dense disable" if is_disabled else "dense"

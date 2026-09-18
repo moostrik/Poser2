@@ -13,7 +13,7 @@ from modules.pose import features
 from apps.white_space.light import Tick, MotorCommand, MotorMode, LayerSettings
 from apps.white_space.light.frame import Frame
 from apps.white_space.light.layers import PoseInstrument, PoseInstrumentSettings
-from apps.white_space.light.synth import Input
+from apps.white_space.light.synth import Input, Curve
 from apps.white_space.pose import PlayheadOffset
 
 IRES = 3600                 # one pixel per 0.1°
@@ -87,7 +87,7 @@ class PoseInstrumentTest(unittest.TestCase):
 
     def setUp(self) -> None:
         self.cfg = PoseInstrumentSettings()
-        self.cfg.presence.attack_seconds = 0.0            # present at once — geometry tests read one frame
+        self.cfg.window.attack_seconds = 0.0              # present at once — geometry tests read one frame
         W, B = self.cfg.white, self.cfg.blue              # the placeholder's patch: white out, blue in
         W.pulse_width, W.pulse_width_amount, W.phase = 0.0, 1.0, self.QUARTER
         B.pulse_width, B.pulse_width_amount, B.phase = 1.0, -1.0, -0.5 + self.QUARTER
@@ -242,10 +242,10 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertLess(max(abs(b - a) for a, b in zip(white, white[1:])), 6.0)          # rocking, never stepping
         self.assertLess(max(blue) - min(blue), 1.0)                                      # blue stands still
 
-    def test_the_override_mutes_the_sway_too(self) -> None:
+    def test_the_master_bypass_mutes_the_sway_too(self) -> None:
         self.cfg.lfo.rate, self.cfg.lfo.level_amount = 0.5, 1.0
         self.cfg.white.phase_amount = 0.25
-        self.cfg.override.on = True
+        self.cfg.bypass_all = True
         self.cfg.white.pulse_width = 0.5
         self._people({0: _pose(0.5, legs=1.0)})
         seen = [self._white_line(self._render()) for _ in range(60)]
@@ -367,10 +367,10 @@ class PoseInstrumentTest(unittest.TestCase):
     def test_the_mask_flashes_on_the_hit_frames(self) -> None:
         M = self.cfg.mask
         for frames, expected in ((1, [0, 0, 0, 1, 0, 0]), (3, [0, 0, 1, 1, 1, 0])):
-            self.cfg.events.hit_frames = frames
+            self.cfg.hit.frames = frames
             self.layer.reset()
             levels = [float(f.blue[C]) for f in self._sweep()]
-            np.testing.assert_allclose(levels, [M.flash_brightness if e else M.brightness for e in expected], atol=1e-6)
+            np.testing.assert_allclose(levels, [self.cfg.hit.flash_brightness if e else M.brightness for e in expected], atol=1e-6)
 
     def test_the_hit_leaves_the_lines_colours_alone(self) -> None:
         outside = self._outside_mask()
@@ -381,7 +381,7 @@ class PoseInstrumentTest(unittest.TestCase):
     def test_the_push_moves_standing_lines_and_they_keep_the_gain(self) -> None:
         self.cfg.white.push = 14.0                              # an interval per second, outward
         self.cfg.blue.push = -14.0
-        self.cfg.push.settle_seconds = 0.1
+        self.cfg.hit.settle_seconds = 0.1
         frames = self._sweep(left_shoulder=self.HALFWAY)
         before_white = self._centres(self._inner(frames[2].white))
         before_blue = self._centres(self._inner(frames[2].blue))
@@ -408,28 +408,28 @@ class PoseInstrumentTest(unittest.TestCase):
         self._on_grid(self._inner(f.blue), INTERVAL)
 
     def test_reset_starts_a_new_pass(self) -> None:
-        M = self.cfg.mask
+        M, H = self.cfg.mask, self.cfg.hit
         self._people({0: _pose(0.5, offset_deg=1.8)})
-        self.assertAlmostEqual(float(self._render().blue[C]), M.flash_brightness, places=6)
+        self.assertAlmostEqual(float(self._render().blue[C]), H.flash_brightness, places=6)
         self.assertAlmostEqual(float(self._render().blue[C]), M.brightness, places=6)   # one hit per pass
         self.layer.reset()
-        self.assertAlmostEqual(float(self._render().blue[C]), M.flash_brightness, places=6)
+        self.assertAlmostEqual(float(self._render().blue[C]), H.flash_brightness, places=6)
 
     # -- playing by hand --
 
-    def test_the_override_draws_the_panel_not_the_pose(self) -> None:
-        self.cfg.override.on = True
+    def test_the_master_bypass_draws_the_panel_not_the_pose(self) -> None:
+        self.cfg.bypass_all = True
         self.cfg.white.pulse_width = 0.25
         self._people({0: _pose(0.5, left_shoulder=shoulder(1.0))})          # the pose says full white
         white = self._inner(self._render().white)
         self.assertGreaterEqual(len(white), 2)
-        self.assertEqual({l for _, l in white}, {INTERVAL // 4})            # the base, from the panel
-        self.cfg.override.on = False
+        self.assertEqual({l for _, l in white}, {INTERVAL // 4})            # the knob, from the panel
+        self.cfg.bypass_all = False
         self.assertEqual(self._inner(self._render().white), [])             # the pose again: solid, no lines
         self.assertEqual(float(self._render().white[C + 100]), 1.0)
 
-    def test_a_hold_takes_one_input_from_the_panel_and_leaves_the_rest_to_the_body(self) -> None:
-        self.cfg.white.pulse_width_hold = True
+    def test_a_bypass_takes_one_input_from_the_panel_and_leaves_the_rest_to_the_body(self) -> None:
+        self.cfg.white.pulse_width_bypass = True
         self.cfg.white.pulse_width = 0.25
         self._people({0: _pose(0.5, left_shoulder=shoulder(1.0))})          # the body says full white, no blue
         f = self._render()
@@ -437,11 +437,42 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertGreaterEqual(len(white), 2)
         self.assertEqual({l for _, l in white}, {INTERVAL // 4})            # white from the panel,
         self.assertEqual(float(f.blue[self._outside_mask()].sum()), 0.0)    # blue still following the body
-        self.assertFalse(self.cfg.override.on)                              # without the master
+        self.assertFalse(self.cfg.bypass_all)                               # without the master
 
-    def test_the_override_holds_the_reach_without_a_partner(self) -> None:
-        self.cfg.override.on = True
-        self.cfg.override.reach = 90.0
+    def test_the_source_knobs_show_the_shown_persons_sources(self) -> None:
+        W, B = self.cfg.white, self.cfg.blue
+        self._people({1: _pose(0.3, left_shoulder=shoulder(0.25), right_shoulder=shoulder(0.75), tilt=0.4, legs=0.6),
+                      2: _pose(0.7, left_shoulder=shoulder(1.0), legs=1.0)})
+        self._render()
+        self.assertAlmostEqual(W.pulse_width_source, 0.25, places=5)        # the first person present
+        self.assertAlmostEqual(B.pulse_width_source, 0.75, places=5)
+        self.assertAlmostEqual(W.speed_source, 0.4, places=5)
+        self.assertAlmostEqual(self.cfg.lfo.level_source, 0.6, places=5)
+        self.assertEqual(W.hardness_source, 0.0)                            # nobody plays the hardness
+        self.cfg.dummy.enabled = True                                       # the dummy: the highest id
+        self._render()
+        self.assertAlmostEqual(W.pulse_width_source, 1.0, places=5)
+        self.assertAlmostEqual(self.cfg.lfo.level_source, 1.0, places=5)
+        self.cfg.bypass_all = True                                          # muted: the knobs rest
+        self._render()
+        self.assertEqual(W.pulse_width_source, 0.0)
+        self.cfg.bypass_all = False
+        self._people({})
+        for _ in range(60):
+            self._render()
+        self.assertEqual(W.pulse_width_source, 0.0)                         # nobody there
+
+    def test_a_curve_eases_a_source_and_keeps_its_ends(self) -> None:
+        self.cfg.white.pulse_width_curve = Curve.EASE_IN                    # little at first
+        self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, right_shoulder=0.0)})
+        eased = {l for _, l in self._inner(self._render().white)}
+        self.assertEqual(eased, {INTERVAL // 4})                            # 0.5² of the interval
+        self._people({0: _pose(0.5, left_shoulder=shoulder(1.0), right_shoulder=0.0)})
+        self.assertEqual(float(self._render().white[C + 100]), 1.0)         # the end unchanged: solid
+
+    def test_the_window_bypass_holds_the_reach_without_a_partner(self) -> None:
+        self.cfg.window.width_bypass = True
+        self.cfg.window.width = 90.0
         self._people({0: _pose(0.5)})
         f = self._render()
         np.testing.assert_array_equal(f.blue[C + MASK + 1:C + 2 * FULL - INTERVAL // 2 + 1], 1.0)
@@ -449,18 +480,18 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertEqual(float(f.blue[C + 2 * REACH + 1:].sum() + f.blue[:C - 2 * REACH].sum()), 0.0)
 
     def test_the_hit_button_marks_everyone_for_the_hit_frames(self) -> None:
-        M = self.cfg.mask
+        M, H = self.cfg.mask, self.cfg.hit
         self._people({0: _pose(0.5), 1: _pose(0.25)})            # the playhead is nowhere near
         for frames, expected in ((1, [0, 1, 0, 0]), (3, [0, 1, 1, 1, 0])):
-            self.cfg.events.hit_frames = frames
+            H.frames = frames
             levels = []
             for i in range(len(expected)):
                 if i == 1:
-                    type(self.cfg.override).hit.fire(self.cfg.override)
+                    type(H).hit.fire(H)
                 f = self._render()
                 levels.append((float(f.blue[C]), float(f.blue[IRES // 4])))
             for tick, (a, b) in enumerate(levels):
-                want = M.flash_brightness if expected[tick] else M.brightness
+                want = H.flash_brightness if expected[tick] else M.brightness
                 self.assertAlmostEqual(a, want, places=6, msg=f"tick {tick} of {frames}")
                 self.assertAlmostEqual(b, want, places=6, msg=f"tick {tick} of {frames}")
 
@@ -501,7 +532,7 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertEqual(float(f.blue[round(0.2 * IRES):round(0.8 * IRES)].sum()), 0.0)
 
     def test_a_leaving_partner_lets_the_reach_go_smoothly(self) -> None:
-        self.cfg.presence.release_seconds = 1.0
+        self.cfg.window.release_seconds = 1.0
         self._people({0: _pose(0.3, sims={1: 1.0}), 1: _pose(0.7, sims={0: 1.0})})
         self._render()
         self._people({0: _pose(0.3, sims={1: 1.0})})             # the partner is gone
@@ -512,7 +543,7 @@ class PoseInstrumentTest(unittest.TestCase):
     # -- presence --
 
     def test_attack_opens_the_window_from_the_mask(self) -> None:
-        self.cfg.presence.attack_seconds = 1.0
+        self.cfg.window.attack_seconds = 1.0
         self._people({0: _pose(0.5)})
         first = self._render()
         self.assertEqual(float(first.blue[C + MASK + 1:].sum()), 0.0)     # the window is still inside the mask
@@ -521,7 +552,7 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertEqual(float(last.blue[C + 300]), 1.0)
 
     def test_release_closes_the_window_then_everything_goes_and_reset_clears(self) -> None:
-        self.cfg.presence.release_seconds = 1.0
+        self.cfg.window.release_seconds = 1.0
         self._people({0: _pose(0.5)})
         self._render()
         self._people({})                                        # gone

@@ -9,17 +9,19 @@ the window's **reach** each side. The bridge is everything the synth does not kn
 - the **measures**: pose features and nothing else, read from the LERP frames; ``connect`` is the
   wiring of the document's *The connections* written out, a person's measures into the sources of
   the synth's slots. The bases and amounts are settings of the ``PI`` group; the wiring is code.
-- the **events**: presence (a pose is seen), the hit (``PlayheadCrossing``, ``events.hit_frames``:
-  a push on both oscillators and the mask's flash), and sync, which grows the reach on a partner's
-  side until it reaches them, from ``reach.sync_threshold`` on.
+- the **events**: presence (a pose is seen), the hit (``PlayheadCrossing``, ``hit.frames``: a
+  push on both oscillators and the mask's flash), and sync, which grows the reach on a partner's
+  side until it reaches them, from ``window.sync_threshold`` on.
 - the **mask**: a dim blue band at the person, over every pattern and lit by presence.
 - the colours: output 1 is white, output 2 is blue; where voices overlap the fuller one shows.
 
-Playing by hand: every input has a **hold** beside its base and amount (``PI.white``, ``PI.blue``,
-``PI.lfo``), which keeps that input at its base while the others follow the body, so a pose can be
-taken apart input by input. ``PI.override.on`` is the master: every source is muted, so every input
-is its base and the panel draws for everyone; ``reach_on`` holds both reaches without a partner;
-``hit`` marks everyone as the playhead would.
+Playing by hand: every input is a modulation matrix row in the panel (``PI.white``, ``PI.blue``,
+``PI.lfo``): its knob, the Amount, a read-only Source knob showing the live source (the shown
+person's: the dummy while it is enabled, else the first person present), a Curve and a Bypass. A
+bypassed input is its knob while the others follow the body, so a pose can be taken apart input
+by input. ``PI.bypass_all`` is the master: every source is muted and the panel draws for everyone;
+``window.width_bypass`` holds both reaches without a partner; ``hit.hit`` marks everyone as the
+playhead would.
 
 ``connect``, the drawing methods and the synth's classes are hot-reloaded while the app runs.
 """
@@ -39,54 +41,50 @@ from .._base_layer import ProjectionLayer, LayerSettings
 from .._utilities import normalize_azimuth, mask_half_width
 from ...frame import Frame
 from ...synth import (Voice, Input, Sources, Oscillator, Envelope, Slot,
-                      OscillatorSettings, WindowSettings, PresenceSettings, PushSettings, LfoSettings)
+                      OscillatorSettings, WindowSettings as SynthWindowSettings, PushSettings, LfoSettings)
 from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step, DummySettings
 
+KNOB = Widget.knob
 
-# -- Settings: the PI root group ---------------------------------------------------------------
+
+# -- Settings: the PI root group, grouped by what is tuned together ------------------------------
+
+class WindowSettings(SynthWindowSettings):
+    """The window: how far the pattern shows each side of a person, and when. The synth's part
+    (taper, attack, release) with the bridge's: the reach at rest, its bypass, and sync."""
+    width:          Field[float] = Field(45.0, min=0.0, max=180.0, step=0.5,  widget=KNOB, label="Width",          description="Reach each side of a person at rest (deg)", newline=True)
+    width_bypass:   Field[bool]  = Field(False,                                            label="Bypass",         description="Both reaches at the width: no sync growth")
+    sync_threshold: Field[float] = Field(0.75, min=0.0, max=0.99,  step=0.01, widget=KNOB, label="Sync Threshold", description="Pair similarity from which the reach grows toward the partner, fully at 1 (alike)")
+
+
+class HitSettings(PushSettings):
+    """The hit: the playhead crossing a person. The synth's push (its settle time) with the
+    bridge's: how many ticks, the mask's flash, and the button that hits everyone."""
+    frames:           Field[int]   = Field(1,   min=1,   max=3,   step=1,    widget=KNOB, label="Frames", description="Hit length: the ticks closest to the crossing, 1-3")
+    flash_brightness: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Flash",  description="Mask blue level on a hit")
+    hit:              Field[bool]  = Field(False, widget=Widget.button,                     label="Hit",    description="Hit everyone on the next ticks")
+
 
 class MaskSettings(BaseSettings):
     """The dim blue mask at the person."""
-    width:            Field[float] = Field(3.0, min=0.1, max=36.0, step=0.1,  description="Mask width (deg)")
-    brightness:       Field[float] = Field(0.3, min=0.0, max=1.0,  step=0.01, description="Mask blue level")
-    playhead_at_mask: Field[float] = Field(0.3, min=0.0, max=1.0,  step=0.01, description="Playhead level inside a mask (fraction)")
-    flash_brightness: Field[float] = Field(1.0, min=0.0, max=1.0,  step=0.01, description="Mask blue level on a hit")
-
-
-class ReachSettings(BaseSettings):
-    """How far the window reaches each side of a person, and when sync grows it."""
-    width:          Field[float] = Field(45.0, min=0.0, max=180.0, step=0.5,  description="Reach each side of a person at rest (deg)")
-    sync_threshold: Field[float] = Field(0.75, min=0.0, max=0.99,  step=0.01, description="Pair similarity from which the reach grows toward the partner, fully at 1 (alike)")
-
-
-class EventSettings(BaseSettings):
-    """The hit."""
-    hit_frames: Field[int] = Field(1, min=1, max=3, step=1, description="Hit length: the ticks closest to the crossing, 1-3")
-
-
-class OverrideSettings(BaseSettings):
-    """Playing by hand, the master: with ``on`` every source is muted, so the panel's bases draw
-    for everyone. A single input is held by its own hold, beside its base."""
-    on:       Field[bool]  = Field(False,                                description="Master hold: mute every source, every input is its base")
-    hit:      Field[bool]  = Field(False, widget=Widget.button,          description="Hit everyone on the next ticks")
-    reach_on: Field[bool]  = Field(True,                                 description="Hold both reaches from here, no sync growth", newline=True)
-    reach:    Field[float] = Field(45.0, min=0.0, max=180.0, step=0.5,   description="Reach each side of a person (deg)")
+    width:            Field[float] = Field(3.0, min=0.1, max=36.0, step=0.1,  widget=KNOB, label="Width",      description="Mask width (deg)")
+    brightness:       Field[float] = Field(0.3, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Brightness", description="Mask blue level")
+    playhead_at_mask: Field[float] = Field(0.3, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Playhead",   description="Playhead level inside a mask (fraction)")
 
 
 class PoseInstrumentSettings(BaseSettings):
-    """The ``PI`` root group: the synth's patch and the bridge's values; the wiring is ``connect``."""
-    max_lines: Field[int] = Field(90, min=10, max=360, step=1, description="Visual limit: lines per revolution; no interval goes below one period")
-    white:     Group[OscillatorSettings] = Group(OscillatorSettings)
-    blue:      Group[OscillatorSettings] = Group(OscillatorSettings)
-    window:    Group[WindowSettings]     = Group(WindowSettings)
-    reach:     Group[ReachSettings]      = Group(ReachSettings)
-    presence:  Group[PresenceSettings]   = Group(PresenceSettings)
-    push:      Group[PushSettings]       = Group(PushSettings)
-    lfo:       Group[LfoSettings]        = Group(LfoSettings)
-    events:   Group[EventSettings]      = Group(EventSettings)
-    mask:      Group[MaskSettings]       = Group(MaskSettings)
-    override:  Group[OverrideSettings]   = Group(OverrideSettings)
-    dummy:     Group[DummySettings]      = Group(DummySettings)
+    """The ``PI`` root group, a group per concept: the two oscillators and the LFO (the synth's
+    patch, a matrix row per input), the window, the hit, the mask, the dummy. The wiring is
+    ``connect``; ``bypass_all`` is the master bypass: every source muted, every input its knob."""
+    max_lines:  Field[int]  = Field(90, min=10, max=360, step=1, description="Visual limit: lines per revolution; no interval goes below one period")
+    bypass_all: Field[bool] = Field(False,                       description="Master bypass: mute every source, every input is its knob; the panel draws")
+    white:      Group[OscillatorSettings] = Group(OscillatorSettings)
+    blue:       Group[OscillatorSettings] = Group(OscillatorSettings)
+    lfo:        Group[LfoSettings]        = Group(LfoSettings)
+    window:     Group[WindowSettings]     = Group(WindowSettings)
+    hit:        Group[HitSettings]        = Group(HitSettings)
+    mask:       Group[MaskSettings]       = Group(MaskSettings)
+    dummy:      Group[DummySettings]      = Group(DummySettings)
 
 
 # -- A person ------------------------------------------------------------------------------------
@@ -124,7 +122,7 @@ class PoseInstrument(ProjectionLayer):
         self._mask = np.zeros(resolution, dtype=bool)
         self._mask_level = np.zeros(resolution, dtype=np.float32)
         self._manual_hits = 0                                             # ticks left of a hit from the panel
-        instrument.override.bind(OverrideSettings.hit, self._on_hit)
+        instrument.hit.bind(HitSettings.hit, self._on_hit)
         self._hot_reloaders = tuple(HotReloadMethods(cls, True) for cls in (self.__class__, Voice, Oscillator, Envelope, Slot))
 
     def reset(self) -> None:
@@ -134,8 +132,8 @@ class PoseInstrument(ProjectionLayer):
         self._manual_hits = 0
 
     def _on_hit(self, _: bool) -> None:
-        """The panel's hit button: everyone is hit for ``hit_frames`` ticks, from the next one."""
-        self._manual_hits = int(self._instrument.events.hit_frames)
+        """The panel's hit button: everyone is hit for ``hit.frames`` ticks, from the next one."""
+        self._manual_hits = int(self._instrument.hit.frames)
 
     # -- Per tick --------------------------------------------------------------
 
@@ -174,7 +172,7 @@ class PoseInstrument(ProjectionLayer):
                 continue
             p = self._players.get(id)
             if p is None:
-                p = self._players[id] = _Player(Voice(P.white, P.blue, P.window, P.presence, P.push, P.lfo))
+                p = self._players[id] = _Player(Voice(P.white, P.blue, P.window, P.hit, P.lfo))
             p.present = True
             p.position = normalize_azimuth(azimuth)
             angles = pose[features.Angles].values
@@ -189,14 +187,14 @@ class PoseInstrument(ProjectionLayer):
             offsets[id] = pose[PlayheadOffset].value
 
         step = playhead_step(frame.motor_command.beam_rpm, frame.tick.interval)
-        hits = self._crossing.update(offsets, step, int(P.events.hit_frames))
+        hits = self._crossing.update(offsets, step, int(P.hit.frames))
         manual = self._manual_hits > 0
         if manual:
             self._manual_hits -= 1
 
         min_interval = self._min_interval()
         gone: list[int] = []
-        muted = P.override.on
+        muted = P.bypass_all
         for id, p in self._players.items():
             p.hit = manual or id in hits
             p.voice.update_lfo(frame.tick.dt, 0.0 if muted else self.connect_lfo(p))    # first: connect reads its output
@@ -205,6 +203,25 @@ class PoseInstrument(ProjectionLayer):
                 gone.append(id)
         for id in gone:
             del self._players[id]
+        self._show_sources()
+
+    def _show_sources(self) -> None:
+        """The panel's Source knobs: the live sources of the shown person, the dummy while it is
+        enabled (its id is above every live player's, and the ghosts are not among the poses), else
+        the first person present; 0 for an input nobody plays. The one place the bridge writes
+        settings, and the fields are read-only to the panel."""
+        P = self._instrument
+        present = sorted(id for id, p in self._players.items() if p.present)
+        shown = self._players[present[-1] if P.dummy.enabled else present[0]] if present else None
+        white, blue = self._sources(shown) if shown is not None else ({}, {})
+        lfo_level = self.connect_lfo(shown) if shown is not None and not P.bypass_all else 0.0
+        for patch, sources in ((P.white, white), (P.blue, blue)):
+            patch.interval_source = float(sources.get(Input.INTERVAL, 0.0))
+            patch.pulse_width_source = float(sources.get(Input.PULSE_WIDTH, 0.0))
+            patch.phase_source = float(sources.get(Input.PHASE, 0.0))
+            patch.speed_source = float(sources.get(Input.SPEED, 0.0))
+            patch.hardness_source = float(sources.get(Input.HARDNESS, 0.0))
+        P.lfo.level_source = float(lfo_level)
 
     @staticmethod
     def _value(x: float, fallback: float) -> float:
@@ -214,7 +231,7 @@ class PoseInstrument(ProjectionLayer):
 
     def _sources(self, p: _Player) -> tuple[Sources, Sources]:
         """The voice's sources this tick: the connections, or nothing while the panel plays."""
-        return ({}, {}) if self._instrument.override.on else self.connect(p)
+        return ({}, {}) if self._instrument.bypass_all else self.connect(p)
 
     def connect(self, p: _Player) -> tuple[Sources, Sources]:
         """The connections (``docs/POSE_INSTRUMENT.md``, *The connections*) written out: a person's
@@ -259,19 +276,17 @@ class PoseInstrument(ProjectionLayer):
     # -- Reach and sync ---------------------------------------------------------------
 
     def _set_reaches(self) -> None:
-        """Each side's reach in degrees, before presence: ``reach.width``, grown toward every
+        """Each side's reach in degrees, before presence: ``window.width``, grown toward every
         similarity-matched partner along the shorter arc, full reaching them; the partner's
-        presence scales the growth, so a partner leaving lets go smoothly. Held from the panel
-        (``override.reach``), it is that width and does not grow."""
-        S = self._instrument.reach
-        O = self._instrument.override
-        held = O.on and O.reach_on
-        base = min(O.reach if held else S.width, 180.0)
+        presence scales the growth, so a partner leaving lets go smoothly. Bypassed
+        (``window.width_bypass``, or the master), it is the width and does not grow."""
+        W = self._instrument.window
+        base = min(W.width, 180.0)
         for p in self._players.values():
             p.reach_left = p.reach_right = base
-        if held:
+        if W.width_bypass or self._instrument.bypass_all:
             return
-        threshold = S.sync_threshold
+        threshold = W.sync_threshold
         ids = list(self._players)
         for i, id_a in enumerate(ids):
             for id_b in ids[i + 1:]:
@@ -338,5 +353,5 @@ class PoseInstrument(ProjectionLayer):
         half = mask_half_width(P.width, R)
         idx = (centre + np.arange(-half, half + 1)) % R
         mask[idx] = True
-        brightness = P.flash_brightness if p.hit else P.brightness
+        brightness = self._instrument.hit.flash_brightness if p.hit else P.brightness
         mask_level[idx] = np.maximum(mask_level[idx], brightness * p.voice.presence)

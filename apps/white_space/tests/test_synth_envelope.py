@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from apps.white_space.light.synth import Envelope, Slot
+from apps.white_space.light.synth import Envelope, Slot, Curve
 
 P = np.arange(0.0, 50.0, 0.1)
 
@@ -95,6 +95,30 @@ class SlotTest(unittest.TestCase):
 
     def test_a_unit_input_stops_at_its_ends(self) -> None:
         np.testing.assert_allclose(Slot.unit(np.array([-0.2, 0.4, 1.3])), [0.0, 0.4, 1.0])
+
+    def test_bypassed_the_source_is_nothing_and_the_input_its_base(self) -> None:
+        self.assertEqual(Slot.bypassed(True, 0.7), 0.0)
+        self.assertEqual(Slot.bypassed(False, 0.7), 0.7)
+        self.assertAlmostEqual(Slot.modulate(0.2, 0.6, Slot.bypassed(True, 1.0)), 0.2)
+
+    def test_every_curve_is_smooth_keeps_the_sign_and_leaves_the_ends(self) -> None:
+        source = np.linspace(-1.0, 1.0, 2001)
+        for curve in Curve:
+            eased = Slot.curve(source, curve)
+            self.assertEqual(float(eased[0]), -1.0)
+            self.assertEqual(float(eased[1000]), 0.0)
+            self.assertEqual(float(eased[-1]), 1.0)
+            np.testing.assert_allclose(eased, -eased[::-1], atol=1e-12)       # odd: the sign kept, symmetric
+            self.assertTrue((np.diff(eased) >= -1e-12).all())                 # never turning back
+            self.assertLess(float(np.abs(np.diff(eased)).max()), 0.005)       # no step
+
+    def test_the_curves_ease_the_way_they_say(self) -> None:
+        self.assertAlmostEqual(Slot.curve(0.5, Curve.LINEAR), 0.5)
+        self.assertAlmostEqual(Slot.curve(0.5, Curve.EASE_IN), 0.25)           # little at first
+        self.assertAlmostEqual(Slot.curve(0.5, Curve.EASE_OUT), 0.75)          # much at first
+        self.assertAlmostEqual(Slot.curve(0.5, Curve.EASE_IN_OUT), 0.5)
+        self.assertLess(Slot.curve(0.25, Curve.EASE_IN_OUT), 0.25)
+        self.assertGreater(Slot.curve(0.75, Curve.EASE_IN_OUT), 0.75)
 
 
 if __name__ == "__main__":

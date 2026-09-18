@@ -491,6 +491,10 @@ class TestSettingMetadata(unittest.TestCase):
         field = Field(0, newline=True)
         self.assertTrue(field.newline)
 
+    def test_label_metadata(self):
+        self.assertIsNone(Field(0).label)                       # the panel derives it from the name
+        self.assertEqual(Field(0, label="Amount").label, "Amount")
+
 
 class TestMinMaxMetadata(unittest.TestCase):
     """Tests that min/max/step are stored as GUI metadata, not enforced."""
