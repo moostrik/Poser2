@@ -3,7 +3,7 @@ import math
 from threading import Lock
 
 from modules.pose.frame import Frame, FrameDict, FrameDictCallbackMixin
-from modules.pose.features import BBox, BBoxAzimuth
+from modules.pose.features import BBox, BBoxAzimuth, Distance
 from modules.settings import BaseSettings, Field
 from .tracklet import Tracklet
 from .panoramic.annotation import Annotation as PanoramicAnnotation
@@ -83,11 +83,14 @@ class PosesFromTracklets(FrameDictCallbackMixin):
 
             try:
                 bounding_box = BBox.from_rect(tracklet.roi)
-                world_angle = tracklet.annotation.world_angle if isinstance(tracklet.annotation, PanoramicAnnotation) else None
+                annotation = tracklet.annotation if isinstance(tracklet.annotation, PanoramicAnnotation) else None
                 features: dict = {BBox: bounding_box}
-                if world_angle is not None:
+                if annotation is not None:
                     # SingleAngle.from_value wraps degrees-as-radians to [-π, π).
-                    features[BBoxAzimuth] = BBoxAzimuth.from_value(math.radians(float(world_angle)))
+                    features[BBoxAzimuth] = BBoxAzimuth.from_value(math.radians(float(annotation.world_angle)))
+                    # Without a reading the feature stays absent (NaN, score 0.0).
+                    if not math.isnan(annotation.zone_distance):
+                        features[Distance] = Distance.from_value(annotation.zone_distance)
 
                 generated_poses[track_id] = Frame(
                     track_id=tracklet.id,

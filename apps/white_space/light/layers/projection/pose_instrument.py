@@ -100,7 +100,8 @@ class _Player:
     right_elbow:    float = 0.0
     legs:           float = 0.0     # LegDeviation [0, 1]
     tilt:           float = 0.0     # TorsoTilt [-1, 1]
-    symmetry:       np.ndarray = field(default_factory=lambda: np.zeros(len(features.SymmetryElement), dtype=np.float32))
+    distance:       float = 0.0     # Distance [0, 1]
+    symmetry:      np.ndarray = field(default_factory=lambda: np.zeros(len(features.SymmetryElement), dtype=np.float32))
     similarity:     np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float32))
     present:        bool  = False   # seen this tick
     hit:            bool  = False   # the playhead crosses this person this tick
@@ -182,6 +183,7 @@ class PoseInstrument(ProjectionLayer):
             p.right_elbow    = self._value(angles[features.AngleLandmark.right_elbow],    p.right_elbow)
             p.legs = self._value(pose[features.LegDeviation].value, p.legs)
             p.tilt = self._value(pose[features.TorsoTilt].value, p.tilt)
+            p.distance = self._value(pose[features.Distance].value, p.distance)
             p.symmetry = np.where(np.isnan(pose[features.AngleSymmetry].values), p.symmetry, pose[features.AngleSymmetry].values)
             p.similarity = pose[features.Similarity].values
             offsets[id] = pose[PlayheadOffset].value
@@ -245,7 +247,7 @@ class PoseInstrument(ProjectionLayer):
         - the elbow: its interval, finer as the arm folds
         - the body bend, signed: both speeds, so a lean makes the lines flow one way or the other
         - the LFO (its level played by the legs, ``connect_lfo``): white's phase, a sway
-        - the symmetries, blue's phase, the hardness: unconnected
+        - the symmetries, the distance, blue's phase, the hardness: unconnected
         """
         flow = min(max(p.tilt, -1.0), 1.0)
         white = {

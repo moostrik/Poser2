@@ -43,10 +43,11 @@ class FakePose:
 
 def _pose(azimuth_pos: float, sims: dict[int, float] | None = None, left_shoulder: float = 0.0,
           right_shoulder: float | None = None, left_elbow: float = 0.0, right_elbow: float = 0.0,
-          legs: float = 0.0, tilt: float = 0.0, offset_deg: float = float("nan")) -> FakePose:
+          legs: float = 0.0, tilt: float = 0.0, distance: float = 0.0,
+          offset_deg: float = float("nan")) -> FakePose:
     """A fake pose at normalized azimuth ``azimuth_pos`` (0..1) with the arm angles (radians; the
-    right shoulder follows the left unless given), leg deviation, body bend, pairwise sims and
-    playhead offset."""
+    right shoulder follows the left unless given), leg deviation, body bend, distance, pairwise
+    sims and playhead offset."""
     angles = np.full(len(features.AngleLandmark), np.nan)
     angles[features.AngleLandmark.left_shoulder] = left_shoulder
     angles[features.AngleLandmark.right_shoulder] = left_shoulder if right_shoulder is None else right_shoulder
@@ -62,6 +63,7 @@ def _pose(azimuth_pos: float, sims: dict[int, float] | None = None, left_shoulde
         features.Similarity: SimpleNamespace(values=sim_values),
         features.LegDeviation: SimpleNamespace(value=legs),
         features.TorsoTilt: SimpleNamespace(value=tilt),
+        features.Distance: SimpleNamespace(value=distance),
         PlayheadOffset: SimpleNamespace(value=math.radians(offset_deg)),
     })
 
@@ -152,6 +154,17 @@ class PoseInstrumentTest(unittest.TestCase):
         # The sign is the side of the body the arm passes; straight up is π from either side.
         for angle in (shoulder(0.5), -shoulder(0.5)):
             self.assertAlmostEqual(self._connect(_pose(0.5, left_shoulder=angle))[0][Input.PULSE_WIDTH], 0.5, places=5)
+
+    def test_the_distance_is_a_source_that_plays_nothing_yet(self) -> None:
+        self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, distance=0.0)})
+        near = self._render().light_img.copy()
+        self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, distance=1.0)})
+        far = self._render().light_img
+        self.assertEqual(self.layer._players[0].distance, 1.0)              # there for `connect` to use
+        np.testing.assert_array_equal(far, near)                            # unconnected: the picture is the same
+        self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, distance=float("nan"))})
+        self._render()
+        self.assertEqual(self.layer._players[0].distance, 1.0)              # no reading: the last one holds
 
     # -- the two fixed points --
 

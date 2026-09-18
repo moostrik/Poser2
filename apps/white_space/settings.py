@@ -191,6 +191,14 @@ class AzimuthFeature(BaseSettings):
     interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 
+class DistanceFeature(BaseSettings):
+    frequency       : Field[float] = Field(30.0, access=Field.INIT)
+    output_frequency: Field[float] = Field(30.0)
+
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
+    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+
+
 class VelocityFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(30.0)
@@ -252,7 +260,8 @@ class PoseGroup(BaseSettings):
     point           : Group[PointFeature]                    = Group(PointFeature, share=_feature_share)
     angle           : Group[AngleFeature]                    = Group(AngleFeature, share=_feature_share)
     azimuth         : Group[AzimuthFeature]                  = Group(AzimuthFeature, share=_feature_share)
-    velocity        : Group[VelocityFeature]                 = Group(VelocityFeature, share=_feature_share)
+    distance        : Group[DistanceFeature]                 = Group(DistanceFeature, share=_feature_share)
+    velocity       : Group[VelocityFeature]                 = Group(VelocityFeature, share=_feature_share)
     motion          : Group[MotionFeature]                   = Group(MotionFeature)
     similarity      : Group[SimilarityFeature]               = Group(SimilarityFeature, share=[frequency, output_frequency, max_players])
     window_raw      : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)

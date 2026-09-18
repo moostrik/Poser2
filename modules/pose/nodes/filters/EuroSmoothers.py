@@ -12,7 +12,7 @@ import numpy as np
 
 # Pose imports
 from .._utils.ArrayEuroSmooth import EuroSmooth, AngleEuroSmooth, PointEuroSmooth
-from ...features import Angles, Points2D, AngleVelocity, AngleSymmetry, Azimuth, BBox, Similarity, BaseFeature
+from ...features import Angles, Points2D, AngleVelocity, AngleSymmetry, Azimuth, BBox, Distance, Similarity, BaseFeature
 from ..Nodes import FilterNode
 from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field, Widget
@@ -133,3 +133,8 @@ class SimilarityEuroSmoother(FeatureEuroSmoother):
 class AzimuthEuroSmoother(FeatureEuroSmoother):
     def __init__(self, config: EuroSmootherSettings) -> None:
         super().__init__(config, Azimuth)
+
+
+class DistanceEuroSmoother(FeatureEuroSmoother):
+    def __init__(self, config: EuroSmootherSettings) -> None:
+        super().__init__(config, Distance)

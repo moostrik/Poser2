@@ -1,4 +1,5 @@
 # Standard library imports
+import math
 from dataclasses import dataclass
 from enum import IntEnum, auto
 
@@ -23,9 +24,11 @@ class Rejection(IntEnum):
 class Annotation(TrackerAnnotation):
     """What one camera's box says about one person, all of it derived in `Rig`.
 
-    `distance` is from that camera (m); `height` is absolute (m) and needs no re-projection,
-    since the same camera sees the person's feet and head. `rejected` is set when a filter
-    rejected this detection (or, for a person already tracked, stopped counting it).
+    `distance` is from that camera (m); `radius` is the same reading from the fixture axis (m), and
+    `zone_distance` that radius within the tracked zone: 0 at `rig.zone_min_radius`, 1 at
+    `rig.zone_max_radius`, NaN without a reading. `height` is absolute (m) and needs no
+    re-projection, since the same camera sees the person's feet and head. `rejected` is set when a
+    filter rejected this detection (or, for a person already tracked, stopped counting it).
     """
     local_angle: float
     world_angle: float
@@ -33,3 +36,5 @@ class Annotation(TrackerAnnotation):
     distance: float = 0.0
     height: float = 0.0
     rejected: Rejection | None = None
+    radius: float = 0.0
+    zone_distance: float = math.nan

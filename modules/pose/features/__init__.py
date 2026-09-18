@@ -15,13 +15,14 @@ from .MotionTime import     MotionTime
 from .Age import            Age
 from .Azimuth import        Azimuth
 from .BBoxAzimuth import    BBoxAzimuth
+from .Distance import       Distance
 from .LegDeviation import   LegDeviation
 from .TorsoTilt import      TorsoTilt
 
 
 FEATURES: list[type[BaseFeature]] = [
     Age, AngleMotion, Angles, AngleSymmetry, AngleVelocity, ArmDeviation,
-    Azimuth, BBox, BBoxAzimuth, LeaderScore, LegDeviation, MotionGate, MotionTime, Points2D,
+    Azimuth, BBox, BBoxAzimuth, Distance, LeaderScore, LegDeviation, MotionGate, MotionTime, Points2D,
     Similarity, TorsoTilt,
 ]
 

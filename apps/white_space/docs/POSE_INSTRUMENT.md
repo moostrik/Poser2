@@ -93,8 +93,8 @@ points is tied to a pose.
 
 ## The rules of meaning
 
-1. Only measures mean something: the six measured values, and what the pose pipeline derives from
-   them (the symmetry of a pair). The instrument derives nothing.
+1. Only measures mean something: the six measured values of the body, the distance, and what the
+   pose pipeline derives from them (the symmetry of a pair). The instrument derives nothing.
 2. A meaning belongs to a measure, never to a pose. The table says what happens when a measure
    changes. No pose owns a meaning; the two fixed points are the only exceptions.
 3. Groups of measures (both arms, both elbows) and poses are consequences of the measures'
@@ -123,7 +123,8 @@ told apart by a colour, each arm playing one oscillator.
 Each measure is a musical term of the light synth: an input of an oscillator (interval, pulse
 width, phase, speed), the level of an LFO, a reach. **Primary** measures make the note: the arms,
 each arm one oscillator, the left the white and the right the blue. **Secondary** measures
-modulate a note that is already sounding: the legs and the body bend.
+modulate a note that is already sounding: the legs and the body bend. The distance, how far the
+person stands from the fixture, is the one measure that is not of the body's pose.
 
 | Measure           | Role      | Term                                                        |
 |-------------------|-----------|-------------------------------------------------------------|
@@ -133,6 +134,7 @@ modulate a note that is already sounding: the legs and the body bend.
 | right elbow       | primary   | the pitch of the blue: its interval                         |
 | leg deviation     | secondary | the sway: the level of an LFO, a vibrato in space           |
 | body bend         | secondary | the flow: the speed of both, outward or inward by the lean  |
+| distance          | secondary | open                                                        |
 | shoulder symmetry | secondary | open                                                        |
 | elbow symmetry    | secondary | open: it shows unconnected, as the colours in or out of tune |
 
@@ -179,7 +181,8 @@ not described.
 The instrument's measures are pose features and nothing else: values the pose pipeline measures
 and publishes with every frame, smoothed. The instrument never derives a value of its own. The one
 derivation the pipeline adds is the symmetry of a pair, as it derives the leg deviation from the
-hip and knee angles.
+hip and knee angles. The distance is the tracker's, read from where the feet meet the floor
+(`TRACKING.md`, *The pose's distance*).
 
 | Feature           | Measure                                                  | In the pipeline |
 |-------------------|----------------------------------------------------------|-----------------|
@@ -189,6 +192,7 @@ hip and knee angles.
 | right elbow       | 0 straight → ±π folded                                   | `Angles`        |
 | leg deviation     | 0 standing → 1 bent, stretched                           | `LegDeviation`  |
 | body bend         | −1 left → 0 upright → 1 right                            | `TorsoTilt`     |
+| distance          | 0 the zone's near edge → 1 its far edge                  | `Distance`      |
 | symmetry, a pair  | signed, left minus right: how unequal the two sides are  | `AngleSymmetry` |
 
 The angle extractor measures the geometric angle between body segments, the arm against the
@@ -233,7 +237,7 @@ are the preset's starting values, tuned on the machine:
 | leg deviation  | 0..1  | the LFO's level   | 0        | 1            | the LFO at full swing                         |
 | the LFO        | −1..1 | white phase       | 0        | ¼ interval   | white swaying ¼ interval each way, at 0.5 Hz  |
 
-Unconnected: the symmetries, blue's phase, the hardness.
+Unconnected: the symmetries, the distance, blue's phase, the hardness.
 
 ## Events
 
@@ -296,8 +300,8 @@ and the render shows the overlap of the two colours as a tone of its own
 ### Sources and connections
 
 The layer reads pose features from the LERP frames and derives nothing. The sources are the
-elements of `Angles` (the four arm joints), `LegDeviation`, `TorsoTilt`, and `AngleSymmetry`
-(`modules/pose`): one signed scalar per pair, left minus right, normalised to −1..1, made by its
+elements of `Angles` (the four arm joints), `LegDeviation`, `TorsoTilt`, `Distance`, and
+`AngleSymmetry` (`modules/pose`): one signed scalar per pair, left minus right, normalised to −1..1, made by its
 own extractor (`AngleSymExtractor`) and windowed, graphed and sent to Max like the leg deviation.
 The pairs: the shoulder, the elbow, the hip and the knee (the joint angles), the arms (shoulder and
 elbow together per side), the legs (hip and knee together per side, weighted as the leg deviation
@@ -425,6 +429,8 @@ and its skeleton with the same data graphs as a player's in the pose row's last 
 the azimuth overlay marks it, Max plays it at its slot and the instrument lights it. Only the
 joints are set; the leg deviation and the bend are the pipeline's, derived from the figure as for
 a person, and its angles pass through the angle extractor and the calibrator as a person's do.
+Where it stands is set, as no tracker sees it: the `azimuth`, and the `distance`, 0..1 as the
+`Distance` feature is.
 With `solo` the live players' frames are left out at the merge, so from the LERP filters on the
 dummy is the only pose; the tracker and the earlier stages still see them.
 What the pipeline reads of its poses is what the calibrator is read against: the preset's
@@ -454,6 +460,9 @@ Meaning and connections:
   leg deviation reads about 0.75 and whatever it plays sounds with the bend; whether the leg
   deviation should be taken against the vertical instead of the torso line
 - The symmetries: which of the four pairs earns a connection, and what it means
+- The distance: what it plays, and whether the reading is steady enough to play it; it comes off
+  the detection box's bottom row and is weakest at the zone's far edge (`TRACKING.md`, *The pose's
+  distance*)
 - The composition itself: which connections people find with their bodies
 - Whether the wiring of a connection is chosen in the panel or stays code, as `connect` is
 

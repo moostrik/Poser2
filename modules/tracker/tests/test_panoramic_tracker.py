@@ -1349,6 +1349,56 @@ class TestFootOffset(unittest.TestCase):
         self.assertAlmostEqual(max(angles), min(angles), places=12)
 
 
+class TestZoneDistance(unittest.TestCase):
+    """The annotation's `radius` is from the fixture axis, and `zone_distance` that radius within
+    the zone: 0 at its near edge, 1 at its far edge. A read-out for the pose's `Distance`."""
+
+    def make_rig(self) -> Rig:
+        g = Rig(cam_fov=PARALLAX_FOV, target_fov=TARGET_FOV)
+        g.set_camera_radius(CAMERA_RADIUS)
+        g.set_camera_height(CAMERA_HEIGHT)
+        g.set_zone(ZONE_MIN_RADIUS, ZONE_MAX_RADIUS)
+        g.set_window(WINDOW, ROWS)
+        return g
+
+    def test_the_radius_is_from_the_fixture_axis_at_any_bearing(self) -> None:
+        g = self.make_rig()
+        for world_azimuth in (45.0, 70.0, 100.0):                     # on camera 0's axis and off it
+            for radius in (1.5, 2.5, 3.5):
+                with self.subTest(world_azimuth=world_azimuth, radius=radius):
+                    roi, distance = synth_observation(0, world_azimuth, radius)
+                    annotation = g.annotate(roi, 0)
+                    self.assertAlmostEqual(annotation.distance, distance, places=6)
+                    self.assertAlmostEqual(annotation.radius, radius, places=6)
+
+    def test_the_zone_maps_to_zero_and_one(self) -> None:
+        g = self.make_rig()
+        middle: float = (ZONE_MIN_RADIUS + ZONE_MAX_RADIUS) / 2.0
+        for radius, expected in ((ZONE_MIN_RADIUS, 0.0), (middle, 0.5), (ZONE_MAX_RADIUS, 1.0)):
+            with self.subTest(radius=radius):
+                roi, _d = synth_observation(0, 45.0, radius)
+                self.assertAlmostEqual(g.annotate(roi, 0).zone_distance, expected, places=6)
+
+    def test_outside_the_zone_it_is_clamped(self) -> None:
+        g = self.make_rig()
+        self.assertEqual(g.zone_distance(ZONE_MIN_RADIUS - 0.5), 0.0)
+        self.assertEqual(g.zone_distance(ZONE_MAX_RADIUS + 0.5), 1.0)
+
+    def test_without_a_reading_or_a_zone_it_is_nan(self) -> None:
+        g = self.make_rig()
+        self.assertTrue(math.isnan(g.zone_distance(math.inf)))        # feet at or above the horizon
+        g.set_zone(2.0, 2.0)
+        self.assertTrue(math.isnan(g.zone_distance(2.0)))             # both edges at one radius
+
+    def test_a_change_of_the_zone_changes_the_reading(self) -> None:
+        g = self.make_rig()
+        roi, _d = synth_observation(0, 45.0, 2.5)
+        g.set_zone(1.5, 3.5)
+        self.assertAlmostEqual(g.annotate(roi, 0).zone_distance, 0.5, places=6)
+        g.set_zone(2.5, 3.5)
+        self.assertAlmostEqual(g.annotate(roi, 0).zone_distance, 0.0, places=6)
+
+
 class TestReachRadius(unittest.TestCase):
     """How near the fixture a point at a given height is still in frame, along a line.
 

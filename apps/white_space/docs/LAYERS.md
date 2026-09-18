@@ -143,12 +143,11 @@ composes people, and what it exposes.
 - **Used by**: S6 (once projecting), S7, S8
 - **Input**: per person from the LERP frames, the measures: the four arm angles (`Angles`:
   left/right shoulder, left/right elbow), `LegDeviation` (joint-weighted hip/knee deviation, 0..1),
-  `TorsoTilt` (signed sideways lean against the image vertical, −1..1) and `AngleSymmetry` (signed
-  left minus right per pair, −1..1); plus presence (the pose itself,
+  `TorsoTilt` (signed sideways lean against the image vertical, −1..1), `Distance` (how far out in
+  the tracked zone, 0..1) and `AngleSymmetry` (signed left minus right per pair, −1..1); plus presence (the pose itself,
   *Inputs*), the pairwise `Similarity` row (`SIMILARITY.md`: how alike the arm postures are, 0 to 1, 1 within
-  the tolerance, weighted at neutral) and `PlayheadOffset`. `AngleSymmetry`, `LegDeviation` and
-  `TorsoTilt` are also sent to Max (`/pose/{id}/angle/sym`, `/pose/{id}/angle/legs`,
-  `/pose/{id}/angle/tilt`) so sound and light read the same values. The layer adds no smoothing: the
+  the tolerance, weighted at neutral) and `PlayheadOffset`. The measures are also sent to Max, so
+  sound and light read the same values (`SOUND.md`, *Conversion table*). The layer adds no smoothing: the
   LERP poses are the pipeline's smoothed output.
 - **Per person**: a voice of the light synth (`light/synth`, `LIGHT_SYNTH.md`), its output 1
   drawn in white and its output 2 in blue. `PoseInstrument.connect` turns the measures into the

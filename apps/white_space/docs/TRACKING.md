@@ -314,6 +314,22 @@ is not linked until they land; the first camera still carries them.
 **`foot_offset` sets which way it fails.** Too little makes everyone read nearer, so the filter
 barely acts and nobody is wrongly dropped. Too much makes people inside the zone read past the edge.
 
+### The pose's distance
+
+The same radius reaches the pose as the `Distance` feature: the radius within the zone, 0 at
+`rig.zone_min_radius` and 1 at `rig.zone_max_radius`, clamped (`Rig.zone_distance`, carried on the
+annotation as `zone_distance` and stamped by `PosesFromTracklets`). It is a read-out for the light
+and the sound (`SOUND.md`, *Conversion table*), never a gate: the tracker decides nothing on it.
+Without a reading (feet at or above the horizon) or without a zone (both edges at one radius) it is
+absent. Changing the zone in the panel changes the reading at once.
+
+It inherits the reading's limits. With the studio zone, R 1.5 to R 3.5, a pixel of foot row is
+0.0025 of the range at the near edge and 0.017 at the far edge (*How precise it is*) **(deduction)**;
+near the fixture the feet are below the frame and the reading is the detector's guess; hidden feet
+read further; and at a seam it is the primary view's, so it can step when the primary changes camera.
+The pose pipeline smooths it (`pose.distance.smoother`) and interpolates it to the light's rate
+(`pose.distance.interpolator`), as it does the azimuth.
+
 ### The box bottom is not the feet
 
 The detector puts its box bottom below the feet by a fixed pad in pixels. `track.foot_offset` is the
@@ -325,9 +341,9 @@ model is exact. It is corrected in one place, `Rig._foot_px`, which derives the 
 `height_filter` and the crop extractor still see the detector's box.
 
 The azimuth does not use it (*Why the azimuth does not use the measured distance*). What consumes the
-metres is the panorama's `R` label, the foot tick, the far-edge filter and `seam.link_height`; that
-last gate compares two readings of the same person and so survives a shared bias (1–2% across a
-seam).
+metres is the panorama's `R` label, the foot tick, the far-edge filter, the pose's `Distance` and
+`seam.link_height`; that last gate compares two readings of the same person and so survives a
+shared bias (1–2% across a seam).
 
 `R` and `H` share the denominator, so they move together in a way that names the cause:
 

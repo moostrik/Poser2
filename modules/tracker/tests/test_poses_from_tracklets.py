@@ -4,13 +4,15 @@ import math
 import time
 import unittest
 
-from modules.pose.features import Azimuth, BBox, BBoxAzimuth
+from modules.pose.features import Azimuth, BBox, BBoxAzimuth, Distance
 from modules.tracker import PanoramicAnnotation, PosesFromTracklets, PosesFromTrackletsSettings, Tracklet
 from modules.utils import Rect
 
 
-def tracklet(world_id: int, seconds_ago: float = 0.0, world_angle: float | None = None) -> Tracklet:
-    annotation = None if world_angle is None else PanoramicAnnotation(10.0, world_angle, False)
+def tracklet(world_id: int, seconds_ago: float = 0.0, world_angle: float | None = None,
+             zone_distance: float = math.nan) -> Tracklet:
+    annotation = None if world_angle is None else PanoramicAnnotation(10.0, world_angle, False,
+                                                                      zone_distance=zone_distance)
     return Tracklet(cam_id=0, id=world_id, roi=Rect(x=0.4, y=0.2, width=0.1, height=0.6),
                     last_active=time.time() - seconds_ago, annotation=annotation)
 
@@ -55,6 +57,21 @@ class TestFrameContents(PosesFromTrackletsCase):
         self.assertAlmostEqual(rect.bottom, 0.8, places=5)
         self.assertAlmostEqual(frame[BBoxAzimuth].value, math.pi / 2.0, places=5)
         self.assertNotIn(Azimuth, frame)          # the eye azimuth is derived downstream
+
+    def test_the_distance_in_the_zone_is_carried(self) -> None:
+        self.poses.set_tracklets({2: tracklet(2, world_angle=90.0, zone_distance=0.25)})
+        distance = self.poses.process()[2][Distance]
+        self.assertAlmostEqual(distance.value, 0.25, places=6)
+        self.assertEqual(distance.score, 1.0)
+
+    def test_without_a_reading_the_distance_is_absent(self) -> None:
+        self.poses.set_tracklets({1: tracklet(1, world_angle=90.0), 2: tracklet(2)})
+        frames = self.poses.process()
+        for id in (1, 2):                         # no reading; no panoramic annotation
+            with self.subTest(id=id):
+                self.assertNotIn(Distance, frames[id])
+                self.assertTrue(math.isnan(frames[id][Distance].value))
+                self.assertEqual(frames[id][Distance].score, 0.0)
 
     def test_an_id_beyond_the_slots_warns_and_is_not_posed(self) -> None:
         with self.assertLogs('modules.tracker.poses_from_tracklets', level='WARNING'):

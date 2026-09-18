@@ -66,8 +66,10 @@ class Rig:
         not a tunable; whether two observations are one person is `seam.link_angle`.
         """
         local_angle, world_angle, distance = self.calc_angle(roi, cam_id)
+        radius: float = self._radius(local_angle, distance)
         return Annotation(local_angle, world_angle, self.angle_in_overlap(local_angle), distance,
-                          self.estimate_height(roi))
+                          self.estimate_height(roi), radius=radius,
+                          zone_distance=self.zone_distance(radius))
 
     def calc_angle(self, roi: Rect, cam_id: int) -> tuple[float, float, float]:
         """Local angle, world azimuth and distance (m) for one box.
@@ -138,8 +140,23 @@ class Rig:
         the detector's guess. No margin: brief errors are absorbed by the tracker's timeouts, steady
         ones are calibration. An uncalibrated `foot_offset` reads everyone nearer, so this fails open.
         """
-        radius: float = centre_distance(local_angle - self.cam_fov / 2.0, distance, self._camera_radius)
-        return radius > self._max_radius
+        return self._radius(local_angle, distance) > self._max_radius
+
+    def _radius(self, local_angle: float, distance: float) -> float:
+        """The radius from the fixture axis (m) of a person at this column and camera distance."""
+        return centre_distance(local_angle - self.cam_fov / 2.0, distance, self._camera_radius)
+
+    def zone_distance(self, radius: float) -> float:
+        """Where a radius from the fixture axis (m) falls in the zone: 0 at its near edge, 1 at its
+        far edge, clamped. A read-out for the pose, never a gate.
+
+        NaN without a reading (feet at or above the horizon read `inf`) or without a zone to
+        measure in (both edges at one radius).
+        """
+        width: float = self._max_radius - self._min_radius
+        if not math.isfinite(radius) or width <= 0.0:
+            return math.nan
+        return min(max((radius - self._min_radius) / width, 0.0), 1.0)
 
     def estimate_height(self, roi: Rect) -> float:
         """How tall the person is (m), from the box's top and bottom rows.

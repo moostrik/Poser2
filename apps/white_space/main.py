@@ -213,6 +213,7 @@ class WhiteSpaceMain:
                 nodes.AngleVelEuroSmoother(ps.velocity.smoother),
                 nodes.AngleEuroSmoother(ps.angle.smoother),
                 nodes.AzimuthEuroSmoother(ps.azimuth.smoother),
+                nodes.DistanceEuroSmoother(ps.distance.smoother),
                 nodes.AngleMotionExtractor(ps.motion.extractor),
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
                 nodes.AngleSymExtractor(ps.leg_deviation_extractor),
@@ -269,6 +270,7 @@ class WhiteSpaceMain:
                 nodes.AngleVelChaseInterpolator(ps.velocity.interpolator),
                 nodes.SimilarityChaseInterpolator(ps.similarity.interpolator),
                 nodes.AzimuthChaseInterpolator(ps.azimuth.interpolator),
+                nodes.DistanceChaseInterpolator(ps.distance.interpolator),
             ])
             for i in range(max_players)
         })

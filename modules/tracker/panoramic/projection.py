@@ -136,7 +136,8 @@ def centre_distance(bearing: float, cam_distance: float, camera_radius: float) -
     `local_angle - cam_fov / 2` gives. The camera faces radially outward with the centre
     `camera_radius` behind it, so the person sits at `(d*cos(b) + r, d*sin(b))` from the centre. The
     same triangle `camera_local_to_azimuth` solves for the bearing, solved here for the length
-    instead. Used for the far-edge test and the panorama label's `R` — never a placement.
+    instead. Used for the far-edge test, the panorama label's `R` and the pose's `Distance` —
+    never a placement.
     """
     theta: float = math.radians(bearing)
     x: float = cam_distance * math.cos(theta) + camera_radius

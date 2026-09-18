@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from modules.pose.features import Angles, AngleLandmark, Azimuth, BBox, LegDeviation, Points2D, PointLandmark as P, TorsoTilt
+from modules.pose.features import Angles, AngleLandmark, Azimuth, BBox, Distance, LegDeviation, Points2D, PointLandmark as P, TorsoTilt
 from modules.pose.frame import Frame
 from modules.pose.nodes import (AngleCalibrator, AngleCalibratorSettings, AngleExtractor, AngleExtractorSettings,
                                 LegDeviationExtractor, LegDeviationExtractorSettings, TorsoTiltExtractor,
@@ -281,6 +281,15 @@ class DummyTest(unittest.TestCase):
         self.assertAlmostEqual(m.azimuth % 360.0, 0.0, places=6)          # through 0, not 180
         self.assertAlmostEqual(m.left_shoulder % 360.0, 0.0, places=6)    # through 0
 
+    def test_the_distance_morphs_in_a_straight_line(self) -> None:
+        self.cfg.morph = 0.0
+        self.cfg.distance = 0.0
+        self.dummy.update(0.0)                                           # settled at the start
+        self.cfg.morph = 1.0
+        self.cfg.distance = 1.0
+        self.dummy.update(0.0)
+        self.assertAlmostEqual(self.dummy.update(0.5).distance, 0.5, places=6)   # not a way round a circle
+
     def test_a_tie_goes_up_through_the_front_on_both_sides(self) -> None:
         self.dummy.update(0.0)
         self.cfg.left_shoulder = self.cfg.right_shoulder = 180.0
@@ -309,15 +318,17 @@ class DummyTest(unittest.TestCase):
         self.cfg.enabled = True
         self.cfg.morph = 0.0
         self.cfg.azimuth = 90.0
+        self.cfg.distance = 0.8
         self.cfg.left_shoulder = 180.0
         self.dummy.process({0: Frame(0, 0)})
         frames = self.out[-1]
         self.assertEqual(set(frames), {0, ID})
         f = frames[ID]
         self.assertEqual(f.track_id, ID)
-        for ft in (Points2D, Azimuth, BBox, Angles):
+        for ft in (Points2D, Azimuth, Distance, BBox, Angles):
             self.assertIn(ft, f)
         self.assertAlmostEqual(f[Azimuth].value, math.pi / 2, places=5)
+        self.assertAlmostEqual(f[Distance].value, 0.8, places=5)
         self.assertGreater(abs(float(f[Angles].values[AngleLandmark.left_shoulder])), 0.8 * math.pi)   # raised, at the default calibration
 
     def test_solo_leaves_the_live_players_out(self) -> None:

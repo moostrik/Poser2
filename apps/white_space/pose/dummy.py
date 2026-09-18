@@ -29,7 +29,7 @@ from pathlib import Path
 import numpy as np
 import pytweening
 
-from modules.pose.features import Azimuth, BBox, Points2D, PointLandmark
+from modules.pose.features import Azimuth, BBox, Distance, Points2D, PointLandmark
 from modules.pose.frame import Frame, FrameDict, FrameDictCallbackMixin
 from modules.pose.nodes import AngleCalibrator, AngleCalibratorSettings, AngleExtractor, AngleExtractorSettings
 from modules.settings import BaseSettings, Field, Widget
@@ -43,7 +43,8 @@ class DummySettings(BaseSettings):
     enabled:        Field[bool]      = Field(False, description="Put the dummy in the pose pipeline")
     solo:           Field[bool]      = Field(False, description="Dummy only: keep the live players out of the pipeline")
     azimuth:        Field[float]     = Field(180.0, min=0.0,   max=360.0, step=1.0, description="Where the dummy stands (deg)")
-    torso:          Field[float]     = Field(0.0,   min=-90.0, max=90.0,  step=1.0, description="Upper body leaned over standing legs, positive to image right (deg)")
+    distance:       Field[float]     = Field(0.5,   min=0.0,   max=1.0,   step=0.01, description="How far out the dummy stands: 0 the zone's near edge, 1 its far edge")
+    torso:         Field[float]     = Field(0.0,   min=-90.0, max=90.0,  step=1.0, description="Upper body leaned over standing legs, positive to image right (deg)")
     left_shoulder:  Field[float]     = Field(0.0,   min=0.0,   max=360.0, step=1.0, description="Shoulder angle as the extractor reads it: 0 hanging, 90 across, 180 up, 270 out (deg)", newline=True)
     right_shoulder: Field[float]     = Field(0.0,   min=0.0,   max=360.0, step=1.0, description="Shoulder angle as the extractor reads it: 0 hanging, 90 across, 180 up, 270 out (deg)")
     left_elbow:     Field[float]     = Field(180.0, min=0.0,   max=360.0, step=1.0, description="Elbow angle as the extractor reads it: 180 straight, 0 folded (deg)")
@@ -62,9 +63,10 @@ class DummySettings(BaseSettings):
 @dataclass(frozen=True)
 class Measures:
     """The dummy's measures, in the settings' units: degrees, each joint's the angle the extractor
-    reads at it. The defaults are standing with the arms hanging: 0 at the shoulders, 180 (straight)
-    at the elbows, hips and knees."""
+    reads at it; the distance 0..1. The defaults are standing with the arms hanging: 0 at the
+    shoulders, 180 (straight) at the elbows, hips and knees."""
     azimuth:        float = 180.0
+    distance:       float = 0.5
     torso:          float = 0.0
     left_shoulder:  float = 0.0
     right_shoulder: float = 0.0
@@ -78,7 +80,7 @@ class Measures:
 
 MEASURES: tuple[str, ...] = tuple(f.name for f in fields(Measures))
 NEUTRAL = 'neutral'                                               # the saved pose the dummy starts in
-CIRCULAR: frozenset[str] = frozenset(MEASURES) - {'torso'}
+CIRCULAR: frozenset[str] = frozenset(MEASURES) - {'torso', 'distance'}
 
 
 def dummy_id(max_players: int) -> int:
@@ -181,6 +183,7 @@ class Dummy(FrameDictCallbackMixin):
         frame = Frame(self._track_id, 0, time_stamp=time.time(), features={
             Points2D: points,
             Azimuth: Azimuth.from_value(math.radians(m.azimuth)),
+            Distance: Distance.from_value(m.distance),
             BBox: BBox.from_rect(box),
         })
         frame = self._calibrator.process(self._extractor.process(frame))
