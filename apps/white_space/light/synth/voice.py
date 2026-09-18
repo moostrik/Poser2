@@ -65,7 +65,7 @@ class Voice:
         0 it is silent and whatever it feeds is at its base."""
         L = self._lfo_settings
         self._lfo_oscillator.update(dt, 1.0, L.rate)                        # one position: the speed is the rate
-        level = Slot.unit(Slot.modulate(L.level, L.level_amount, level_source))
+        level = Slot.unit(Slot.modulate(L.level, L.level_amount, Slot.held(L.level_hold, level_source)))
         self._lfo = float(Oscillator.sine(self._lfo_oscillator.cycle(_LFO_POSITION, 1.0, L.phase), level)[0])
         return self._lfo
 
@@ -86,9 +86,11 @@ class Voice:
         self._presence.update(present, dt, P.attack_seconds, P.release_seconds)
         push = self._push.update(hit, dt, 0.0, self._push_settings.settle_seconds)
         for i, (oscillator, patch, source) in enumerate(zip(self._oscillators, self._patches, sources)):
-            interval = Slot.modulate_octaves(patch.interval, patch.interval_amount, float(source.get(Input.INTERVAL, 0.0)))
+            interval_source = Slot.held(patch.interval_hold, float(source.get(Input.INTERVAL, 0.0)))
+            interval = Slot.modulate_octaves(patch.interval, patch.interval_amount, interval_source)
             self._intervals[i] = max(float(interval), min_interval)
-            speed = Slot.modulate(patch.speed, patch.speed_amount, float(source.get(Input.SPEED, 0.0)))
+            speed_source = Slot.held(patch.speed_hold, float(source.get(Input.SPEED, 0.0)))
+            speed = Slot.modulate(patch.speed, patch.speed_amount, speed_source)
             oscillator.update(dt, self._intervals[i], float(speed) + patch.push * push)
 
     def render(self, distance: np.ndarray, left: np.ndarray, reach_left: float, reach_right: float,
@@ -101,9 +103,12 @@ class Voice:
         taper = reach * self._window.taper
         outputs = []
         for oscillator, patch, source, interval in zip(self._oscillators, self._patches, sources, self._intervals):
-            pulse_width = Slot.unit(Slot.modulate(patch.pulse_width, patch.pulse_width_amount, source.get(Input.PULSE_WIDTH, 0.0)))
-            phase = Slot.modulate(patch.phase, patch.phase_amount, source.get(Input.PHASE, 0.0))
-            hardness = Slot.unit(Slot.modulate(patch.hardness, patch.hardness_amount, source.get(Input.HARDNESS, 0.0)))
+            pulse_width_source = Slot.held(patch.pulse_width_hold, source.get(Input.PULSE_WIDTH, 0.0))
+            phase_source = Slot.held(patch.phase_hold, source.get(Input.PHASE, 0.0))
+            hardness_source = Slot.held(patch.hardness_hold, source.get(Input.HARDNESS, 0.0))
+            pulse_width = Slot.unit(Slot.modulate(patch.pulse_width, patch.pulse_width_amount, pulse_width_source))
+            phase = Slot.modulate(patch.phase, patch.phase_amount, phase_source)
+            hardness = Slot.unit(Slot.modulate(patch.hardness, patch.hardness_amount, hardness_source))
             cycle = oscillator.cycle(distance, interval, phase)
             # The window is read at the centre of the line a pixel belongs to, not at the pixel, so
             # a line in the taper has one width: thinned, whole and still centred where it belongs.

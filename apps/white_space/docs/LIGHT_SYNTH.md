@@ -214,6 +214,7 @@ to the slot.
 | base   | the input's value with nothing connected                                            |
 | source | what is connected: a value 0..1, or −1..1 for an LFO; one per tick or one per pixel |
 | amount | how far the source moves the input from its base, in the input's unit, signed       |
+| hold   | held, the input is its base whatever its source says; the amount is kept            |
 
 ```
 input    = base + amount × source            amount in the input's unit
@@ -226,6 +227,9 @@ is a large change at a 5° interval and a small one at 40°, and a doubling look
 anywhere. At base 10° and amount 1 octave the interval goes from 10° to 20°; at −1 to 5°.
 
 - An input has one source. A source may feed several inputs, each with its own amount.
+- The hold is how one input is played by hand while the others follow their sources: a base is
+  already the hand's value, so holding an input is all that is needed, and letting go brings its
+  source back with the amount as it was.
 - A source has a synth's ranges: an LFO swings both ways, −1..1, so the input moves around its
   base; an envelope and everything else is 0..1 and moves the input one way from its base. Any
   source fits any input, and the amount alone carries the unit and the direction.

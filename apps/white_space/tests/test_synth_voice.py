@@ -204,6 +204,40 @@ class VoiceTest(unittest.TestCase):
         still = centres(self._render(voice, sources=({Input.PHASE: voice.lfo}, {}))[1])
         self.assertAlmostEqual(still[0], 10.0, delta=0.2)                  # the other output does not move
 
+    # -- the holds --
+
+    def test_a_held_input_is_its_base_while_the_others_follow(self) -> None:
+        self.one.pulse_width, self.one.pulse_width_amount = 0.2, 0.6
+        self.one.interval_amount = 1.0
+        sources = ({Input.PULSE_WIDTH: 1.0, Input.INTERVAL: 1.0}, {})
+        voice = self._voice()
+        voice.update(0.01, True, False, sources, MIN_INTERVAL)
+        followed = lines(self._render(voice, 60.0, 60.0, sources)[0])
+        self.assertAlmostEqual(followed[0][1], 0.8 * 20.0, delta=2 * STEP)      # width and pitch both from the source
+        self.one.pulse_width_hold = True
+        held = lines(self._render(voice, 60.0, 60.0, sources)[0])
+        self.assertAlmostEqual(held[0][1], 0.2 * 20.0, delta=2 * STEP)          # the width at its base,
+        self.assertAlmostEqual(held[1][0] - held[0][0], 20.0, delta=2 * STEP)   # the pitch still following
+        self.assertEqual(self.one.pulse_width_amount, 0.6)                      # and the amount left as it was
+        self.one.pulse_width_hold = False
+        again = lines(self._render(voice, 60.0, 60.0, sources)[0])
+        self.assertAlmostEqual(again[0][1], 0.8 * 20.0, delta=2 * STEP)         # let go: it follows at once
+
+    def test_a_held_interval_and_speed_ignore_their_sources(self) -> None:
+        self.one.interval_amount, self.one.speed_amount = 1.0, 10.0
+        self.one.interval_hold = self.one.speed_hold = True
+        self.one.pulse_width = 0.2
+        voice = self._voice()
+        for _ in range(100):
+            voice.update(0.01, True, False, ({Input.INTERVAL: 1.0, Input.SPEED: 1.0}, {}), MIN_INTERVAL)
+        found = centres(self._render(voice)[0])
+        self.assertAlmostEqual(found[0], 10.0, delta=0.2)                       # not doubled, not travelled
+
+    def test_a_held_lfo_level_is_silent_whatever_its_source_says(self) -> None:
+        self.lfo.rate, self.lfo.level_amount, self.lfo.level_hold = 0.5, 1.0, True
+        voice = self._arrived()
+        self.assertEqual({voice.update_lfo(0.01, 1.0) for _ in range(50)}, {0.0})
+
     def test_the_settings_are_read_live(self) -> None:
         voice = self._arrived()
         narrow = np.count_nonzero(self._render(voice)[0])

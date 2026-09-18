@@ -15,9 +15,11 @@ the window's **reach** each side. The bridge is everything the synth does not kn
 - the **mask**: a dim blue band at the person, over every pattern and lit by presence.
 - the colours: output 1 is white, output 2 is blue; where voices overlap the fuller one shows.
 
-``PI.override`` plays by hand: with ``on`` every source is muted, so every input is its base and
-the panel draws for everyone; ``reach_on`` holds both reaches without a partner; ``hit`` marks
-everyone as the playhead would.
+Playing by hand: every input has a **hold** beside its base and amount (``PI.white``, ``PI.blue``,
+``PI.lfo``), which keeps that input at its base while the others follow the body, so a pose can be
+taken apart input by input. ``PI.override.on`` is the master: every source is muted, so every input
+is its base and the panel draws for everyone; ``reach_on`` holds both reaches without a partner;
+``hit`` marks everyone as the playhead would.
 
 ``connect``, the drawing methods and the synth's classes are hot-reloaded while the app runs.
 """
@@ -63,8 +65,9 @@ class EventSettings(BaseSettings):
 
 
 class OverrideSettings(BaseSettings):
-    """Playing by hand: with ``on`` every source is muted, so the panel's bases draw for everyone."""
-    on:       Field[bool]  = Field(False,                                description="Mute every source: every input is its base")
+    """Playing by hand, the master: with ``on`` every source is muted, so the panel's bases draw
+    for everyone. A single input is held by its own hold, beside its base."""
+    on:       Field[bool]  = Field(False,                                description="Master hold: mute every source, every input is its base")
     hit:      Field[bool]  = Field(False, widget=Widget.button,          description="Hit everyone on the next ticks")
     reach_on: Field[bool]  = Field(True,                                 description="Hold both reaches from here, no sync growth", newline=True)
     reach:    Field[float] = Field(45.0, min=0.0, max=180.0, step=0.5,   description="Reach each side of a person (deg)")

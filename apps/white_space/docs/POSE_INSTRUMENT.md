@@ -334,9 +334,10 @@ as the beam flash), the person's voice is pushed (each oscillator's `push`, sett
 
 `PI` is a root settings group of the app (`apps/white_space/settings.py`), not a layer group
 (`PoseInstrumentSettings`, `light/layers/projection/pose_instrument.py`). The synth's patch:
-`white` and `blue` (per oscillator each input's base beside its amount, and the `push`), `window`
+`white` and `blue` (per oscillator a row per input, its base, its amount and its hold, and the
+`push`), `window`
 (the taper), `presence` (attack, release), `push` (the settle time), `lfo` (the rate, the phase,
-the level and its amount). The bridge's values:
+the level with its amount and its hold). The bridge's values:
 `max_lines`, `reach` (the width at rest, the sync threshold), `events` (the hit's ticks), `mask`
 (width, brightness, the playhead's level in it, the flash brightness), `override` (*Playing by
 hand*), `dummy` (*The dummy*). The layer keeps its `blend`. No setting routes anything: an amount
@@ -366,9 +367,12 @@ already built (a settings instance keeps its fields). Hence the rules:
 
 ### Playing by hand
 
-A base is already the hand's value, so playing by hand is muting the sources. `PI.override`: with
-`on`, `connect` is skipped and every input is its base, for everyone, live people and the dummy
-alike: the panel draws. `reach_on` with `on` holds both reaches at `reach` without a partner,
+A base is already the hand's value, so playing by hand is muting sources. Every input has a
+**hold** beside its base and amount (`PI.white`, `PI.blue`, and the level of `PI.lfo`): held, the
+input is its base while every other input keeps following the body, so a pose can be taken apart
+input by input; let go, it follows again with its amount as it was. `PI.override` is the master:
+with `on`, `connect` is skipped and every input is its base, for everyone, live people and the
+dummy alike: the panel draws. `reach_on` with `on` holds both reaches at `reach` without a partner,
 presence still opening and closing them. `hit` marks everyone for `hit_frames` ticks as the
 playhead would.
 

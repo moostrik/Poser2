@@ -428,6 +428,17 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertEqual(self._inner(self._render().white), [])             # the pose again: solid, no lines
         self.assertEqual(float(self._render().white[C + 100]), 1.0)
 
+    def test_a_hold_takes_one_input_from_the_panel_and_leaves_the_rest_to_the_body(self) -> None:
+        self.cfg.white.pulse_width_hold = True
+        self.cfg.white.pulse_width = 0.25
+        self._people({0: _pose(0.5, left_shoulder=shoulder(1.0))})          # the body says full white, no blue
+        f = self._render()
+        white = self._inner(f.white)
+        self.assertGreaterEqual(len(white), 2)
+        self.assertEqual({l for _, l in white}, {INTERVAL // 4})            # white from the panel,
+        self.assertEqual(float(f.blue[self._outside_mask()].sum()), 0.0)    # blue still following the body
+        self.assertFalse(self.cfg.override.on)                              # without the master
+
     def test_the_override_holds_the_reach_without_a_partner(self) -> None:
         self.cfg.override.on = True
         self.cfg.override.reach = 90.0

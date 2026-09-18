@@ -19,17 +19,23 @@ Value = float | np.ndarray      # an input's value: one per tick, or one per pos
 
 
 class OscillatorSettings(BaseSettings):
-    """One drawn oscillator's patch: each input's base and the amount its source moves it by."""
+    """One drawn oscillator's patch, a row per input: its base, the amount its source moves it
+    by, and its hold, which keeps it at its base whatever its source says."""
     interval:           Field[float] = Field(14.0, min=1.0,    max=180.0, step=0.5,  description="Distance from one line to the next (deg)")
     interval_amount:    Field[float] = Field(0.0,  min=-3.0,   max=3.0,   step=0.05, description="Its source moves the interval by this (octaves)")
+    interval_hold:      Field[bool]  = Field(False,                                  description="Hold the interval at its base: ignore its source")
     pulse_width:        Field[float] = Field(0.5,  min=0.0,    max=1.0,   step=0.01, description="Line thickness: 0 none, 1 solid (fraction of interval)", newline=True)
     pulse_width_amount: Field[float] = Field(0.0,  min=-1.0,   max=1.0,   step=0.01, description="Its source moves the pulse width by this")
+    pulse_width_hold:   Field[bool]  = Field(False,                                  description="Hold the pulse width at its base: ignore its source")
     phase:              Field[float] = Field(0.0,  min=-0.5,   max=0.5,   step=0.01, description="Where the lines sit: 0 a line at the person, 0.5 a gap (intervals)", newline=True)
     phase_amount:       Field[float] = Field(0.0,  min=-2.0,   max=2.0,   step=0.01, description="Its source moves the phase by this (intervals)")
+    phase_hold:         Field[bool]  = Field(False,                                  description="Hold the phase at its base: ignore its source")
     speed:              Field[float] = Field(0.0,  min=-90.0,  max=90.0,  step=0.1,  description="Lines travelling: positive outward, 0 still (deg/s)", newline=True)
     speed_amount:       Field[float] = Field(0.0,  min=-90.0,  max=90.0,  step=0.1,  description="Its source moves the speed by this (deg/s)")
+    speed_hold:         Field[bool]  = Field(False,                                  description="Hold the speed at its base: ignore its source")
     hardness:           Field[float] = Field(1.0,  min=0.0,    max=1.0,   step=0.01, description="Line flanks: 1 hard, 0 softest", newline=True)
     hardness_amount:    Field[float] = Field(0.0,  min=-1.0,   max=1.0,   step=0.01, description="Its source moves the hardness by this")
+    hardness_hold:      Field[bool]  = Field(False,                                  description="Hold the hardness at its base: ignore its source")
     push:               Field[float] = Field(0.0,  min=-180.0, max=180.0, step=0.5,  description="Speed a hit adds for a moment: positive outward (deg/s)", newline=True)
 
 
@@ -40,6 +46,7 @@ class LfoSettings(BaseSettings):
     phase:        Field[float] = Field(0.0, min=-0.5, max=0.5,  step=0.01, description="Where in its cycle it starts (cycles)")
     level:        Field[float] = Field(0.0, min=0.0,  max=1.0,  step=0.01, description="How far it swings: 0 silent, 1 full", newline=True)
     level_amount: Field[float] = Field(0.0, min=-1.0, max=1.0,  step=0.01, description="Its source moves the level by this")
+    level_hold:   Field[bool]  = Field(False,                              description="Hold the level at its base: ignore its source")
 
 
 class Oscillator:

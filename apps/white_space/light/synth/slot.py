@@ -14,6 +14,12 @@ class Slot:
     """``input = base + amount × source``; static methods so ``HotReloadMethods`` can patch them."""
 
     @staticmethod
+    def held(hold: bool, source: Value) -> Value:
+        """The source, or nothing while the input is held: held, an input is exactly its base,
+        and its amount is left as it is for when the hold is let go."""
+        return 0.0 if hold else source
+
+    @staticmethod
     def modulate(base: float, amount: float, source: Value) -> Value:
         """The amount in the input's own unit."""
         return base + amount * source
