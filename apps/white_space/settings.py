@@ -139,7 +139,7 @@ class _OscSoundSettings(OscSoundSettings):
 class InOutGroup(BaseSettings):
     """Sender/receiver per domain: the light sender feeds the fixture and its receiver
     hears the fall sensor (plain UDP); the sound sender feeds Max and its receiver hears
-    /WS/sound/level (real OSC)."""
+    /WS/idle/blue/left and /right (real OSC)."""
     max_players:     Field[int] = Field(8,   access=Field.INIT, visible=False)
     num_virtual:     Field[int] = Field(8,   access=Field.INIT, visible=False)
     resolution:      Field[int] = Field(3600, access=Field.INIT, visible=False)

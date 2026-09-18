@@ -219,7 +219,7 @@
       "return_messages": false,
       "port_out": 8002,
       "ip_address_out": "192.168.0.0",
-      "verbose": true
+      "verbose": false
     }
   },
   "camera": {
@@ -938,7 +938,7 @@
     }
   },
   "states": {
-    "blackout": true,
+    "blackout": false,
     "spin_up_seconds": 14.0,
     "off_idle_bars": 1.0,
     "intro_idle_bars": 2.0,

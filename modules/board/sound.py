@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from threading import Lock
 from time import monotonic
 from typing import Protocol
@@ -9,7 +9,8 @@ from typing import Protocol
 @dataclass(frozen=True, slots=True)
 class SoundLevels:
     """Sound levels received from the audio side (pure data; producers define the scale —
-    for white_space: two 0..1 channel levels from Max via ``/WS/sound/level``).
+    for white_space: two 0..1 channel levels from Max via ``/WS/idle/blue/left`` and
+    ``/WS/idle/blue/right``).
     ``timestamp`` is the monotonic receive time (0.0 = never received) so consumers can
     detect stale input."""
     left:      float = 0.0
@@ -20,7 +21,8 @@ class SoundLevels:
 class HasSoundLevels(Protocol):
     """Audio-level access."""
     def get_sound_levels(self) -> SoundLevels: ...
-    def set_sound_levels(self, left: float, right: float) -> None: ...
+    def set_sound_level_left(self, level: float) -> None: ...
+    def set_sound_level_right(self, level: float) -> None: ...
 
 
 class SoundLevelStoreMixin:
@@ -34,6 +36,10 @@ class SoundLevelStoreMixin:
         with self._sound_lock:
             return self._sound_levels
 
-    def set_sound_levels(self, left: float, right: float) -> None:
+    def set_sound_level_left(self, level: float) -> None:
         with self._sound_lock:
-            self._sound_levels = SoundLevels(left=left, right=right, timestamp=monotonic())
+            self._sound_levels = replace(self._sound_levels, left=level, timestamp=monotonic())
+
+    def set_sound_level_right(self, level: float) -> None:
+        with self._sound_lock:
+            self._sound_levels = replace(self._sound_levels, right=level, timestamp=monotonic())

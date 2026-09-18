@@ -837,7 +837,7 @@ Two settings of our own, in `inout.osc_sound_sender`, sent in every bundle:
 Neither is show state, so neither is zeroed on a blackout: a fader must read true whenever it is turned,
 and a calibration must not snap to 0 between shows.
 
-**The return path:** `/WS/sound/level` (left, right) → `beam_blue_sound` → the left and right blue
+**The return path:** `/WS/idle/blue/left` and `/WS/idle/blue/right` → `beam_blue_sound` → the left and right blue
 lamps (named after the fixture's blue-left / blue-right; nothing to do with stereo). No alignment; the
 lamps turn with the bar.
 

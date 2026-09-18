@@ -79,10 +79,10 @@ The soundscape made visible: the left and right blue lamps breathe with the actu
 sound Max is playing.
 
 - **Used by**: S2 IDLE and S3 IDLE_INTRO at full; S1 OFF_IDLE, S5 INTRO_IDLE and S10 END_IDLE fading in
-- **Input**: `/WS/sound/level` from Max — two floats (left, right), 0..1, real OSC —
-  received on the **OSC sound receiver** (`inout.osc_sound_receiver`) and stored on the
-  board (sound-level store: levels + received-timestamp). **Max must send this message**
-  (coordination item).
+- **Input**: `/WS/idle/blue/left` and `/WS/idle/blue/right` from Max — one float each,
+  0..1, real OSC — received on the **OSC sound receiver** (`inout.osc_sound_receiver`) and
+  stored on the board (sound-level store: levels + received-timestamp). **Max must send
+  these messages** (coordination item).
 - **Behavior**: left level → left blue lamp, right level → right blue lamp; a gain scales
   the mapping. **Latency first**: no softening — only a minimal smoothing window of at
   most 2–3 light frames (~66–100 ms), there purely to bridge OSC-arrival vs 30 Hz tick
@@ -203,7 +203,7 @@ playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJ
 
 ## Open
 
-- **beam_blue_sound**: fallback choice (off vs idle pulse); exact `/WS/sound/level` scaling agreed
+- **beam_blue_sound**: fallback choice (off vs idle pulse); exact `/WS/idle/blue/left` and `/right` scaling agreed
   with Max (linear 0..1 vs dB)
 - **pose_instrument**: see `POSE_INSTRUMENT.md`, *Open*
 - **Hit ownership**: `PlayheadCrossing` (`pose/playhead_offset.py`) runs in three instances (`beam_flash`,

@@ -1,6 +1,7 @@
 """White Space — 3-camera panoramic installation with circular LED light output."""
 
 import math
+from pathlib import Path
 from typing import Optional
 from functools import partial
 
@@ -81,7 +82,7 @@ class WhiteSpaceMain:
         # The dummy has its own id between the live players and the ghosts; the LERP stage is
         # built one id wider for it, so it is a pose like any other from there.
         self.dummy = Dummy(self.settings.PI.dummy, ps.angle_extractor, ps.angle_calibrator, dummy_id(max_players),
-                           f"{DATA_PATH}/poses.json")
+                           Path(DATA_PATH) / "poses.json")
         self.video_recorder = VideoRecorder(self.settings.record.video, data_path=DATA_PATH)
 
         # CAMERA
@@ -150,14 +151,15 @@ class WhiteSpaceMain:
         self.conductor = Conductor(self.settings.light, self.settings.PI, board=self.board, pose_stage=int(Stage.LERP))
         # One receiver per domain, matching each source's actual transport: the fixture
         # firmware sends the fall as a plain UDP text packet (not OSC) to the light
-        # receiver's port; Max sends /WS/sound/level as real OSC (the UDP receiver could
-        # never decode its float args). Don't cross-bind them.
+        # receiver's port; Max sends /WS/idle/blue/left and /right as real OSC (the UDP
+        # receiver could never decode their float args). Don't cross-bind them.
         self.osc_light_sender   = OscLightSender(self.settings.inout.osc_light_sender)
         self.udp_light_receiver = UdpLightReceiver(self.settings.inout.udp_light_receiver)
         self.osc_sound_receiver = OscReceiver(self.settings.inout.osc_sound_receiver)
         self.udp_light_receiver.bind("/WS/sensor/fall", self.conductor.notify_fall)
-        # Sound levels from Max (left, right 0..1) → board → the beam_blue_sound layer.
-        self.osc_sound_receiver.bind("/WS/sound/level", self._on_sound_level)
+        # Sound levels from Max (one 0..1 float each) → board → the beam_blue_sound layer.
+        self.osc_sound_receiver.bind("/WS/idle/blue/left",  self._on_sound_level_left)
+        self.osc_sound_receiver.bind("/WS/idle/blue/right", self._on_sound_level_right)
         for camera in self.cameras:
             camera.add_frame_callback(self._store_video_frame)
         self.conductor.add_render_callback(self.osc_light_sender.send_message)
@@ -341,9 +343,13 @@ class WhiteSpaceMain:
         self.is_running = True
         self.render.start()
 
-    def _on_sound_level(self, left: float = 0.0, right: float = 0.0, *_rest: object) -> None:
-        """OSC/UDP callback for /WS/sound/level — store the Max soundscape levels."""
-        self.board.set_sound_levels(float(left), float(right))
+    def _on_sound_level_left(self, level: float = 0.0, *_rest: object) -> None:
+        """OSC callback for /WS/idle/blue/left — store the Max soundscape's left level."""
+        self.board.set_sound_level_left(float(level))
+
+    def _on_sound_level_right(self, level: float = 0.0, *_rest: object) -> None:
+        """OSC callback for /WS/idle/blue/right — store the Max soundscape's right level."""
+        self.board.set_sound_level_right(float(level))
 
     def _store_video_frame(self, cam_id: int, frame_type: FrameType, frame: np.ndarray) -> None:
         """Camera frame callback — store raw VIDEO frames on the board for the light renderer."""

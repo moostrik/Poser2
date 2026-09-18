@@ -22,6 +22,8 @@ class OscReceiverSettings(BaseSettings):
     counter         = Field(0,           min=0,    max=99999, widget=Widget.number,   access=Field.READ, description="Message activity")
     last_address    = Field("",                                                       access=Field.READ, description="Last received OSC address")
     last_time       = Field(0.0,                                                      access=Field.READ, description="Wall-clock time of last received message")
+    unbound_counter = Field(0,           min=0,    max=99999, widget=Widget.number,   access=Field.READ, description="Messages received on an address nothing is bound to")
+    last_unbound    = Field("",                                                       access=Field.READ, description="Last received OSC address nothing is bound to")
 
 
 class OscReceiver:
@@ -29,6 +31,7 @@ class OscReceiver:
     def __init__(self, settings: OscReceiverSettings) -> None:
         self.settings: OscReceiverSettings = settings
         self._bindings: dict[str, list[Callable]] = {}
+        self._warned_unbound: set[str] = set()
         self.client_lock = Lock()
         self.osc_return_client = SimpleUDPClient(settings.ip_address_out, settings.port_out)
         self.server: BlockingOSCUDPServer | None = None
@@ -67,10 +70,20 @@ class OscReceiver:
             except TypeError as e:
                 logger.warning(f"Argument mismatch for '{address}': {e}")
 
+    def _handle_unbound(self, address: str, *args) -> None:
+        if self.settings.verbose:
+            logger.info(f"unbound {address} {args}")
+        if address not in self._warned_unbound:
+            self._warned_unbound.add(address)
+            logger.warning(f"Received '{address}' but nothing is bound to it; bound: {sorted(self._bindings)}")
+        self.settings.unbound_counter = (self.settings.unbound_counter + 1) % 100000
+        self.settings.last_unbound    = address
+
     def _start_server(self, port: int) -> BlockingOSCUDPServer:
         dispatcher = Dispatcher()
         for address in self._bindings:
             dispatcher.map(address, self._handle)
+        dispatcher.set_default_handler(self._handle_unbound)
         server = BlockingOSCUDPServer(('0.0.0.0', port), dispatcher)
         Thread(target=server.serve_forever, daemon=True).start()
         logger.info(f"listening on port {port}")

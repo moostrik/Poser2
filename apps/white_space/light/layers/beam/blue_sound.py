@@ -1,5 +1,6 @@
 """BeamBlueSound — the soundscape made visible: the left and right blue lamps follow the
-actual levels Max is playing (``/WS/sound/level`` → the board's sound-level store).
+actual levels Max is playing (``/WS/idle/blue/left`` and ``/WS/idle/blue/right`` → the
+board's sound-level store).
 
 Latency first: no envelope shaping — Max owns the envelope, the lamps follow. The only
 smoothing is a window of at most a few light frames (``smoothing_frames``), there purely
