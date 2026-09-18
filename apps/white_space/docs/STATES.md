@@ -67,23 +67,26 @@ whatever the count (see below).
 stateDiagram-v2
     [*] --> OFF
     OFF: OFF — dark and silent, still sweeping at BEAM
-    OFF --> OFF_IDLE: blackout released and playhead locked
-    OFF_IDLE --> INTRO: hit by light
-    OFF_IDLE --> IDLE: off_idle_bars
-    IDLE --> IDLE_INTRO: P > 0
-    IDLE_INTRO --> INTRO: hit by light
-    IDLE_INTRO --> INTRO_IDLE: P == 0
-    INTRO --> INTRO_IDLE: P == 0
-    INTRO --> INTRO_PLAY: min_players alike hits in a row & P ≥ min_players\n(session - after fixed time)
-    INTRO_IDLE --> IDLE: intro_idle_bars
-    INTRO_PLAY --> PLAY: spin_up_seconds
-    PLAY --> END: P < min_players (stand-alone)\n(session - after fixed time)
-    END --> PLAY: P ≥ min_players — winds back first\n(stand-alone only)
-    END --> END_INTRO: wound down, P > 0
-    END --> END_IDLE: wound down, P == 0
-    END_INTRO --> INTRO: fade done and BEAM reacquired
-    END_IDLE --> IDLE: fade done and BEAM reacquired
+    OFF --> OFF_IDLE: blackout released, playhead locked
+    OFF_IDLE --> INTRO: light hits a player
+    OFF_IDLE --> IDLE: fade-in done
+    IDLE --> IDLE_INTRO: someone enters (P > 0)
+    IDLE_INTRO --> INTRO: light hits a player
+    IDLE_INTRO --> INTRO_IDLE: everyone left (P == 0)
+    INTRO --> INTRO_IDLE: everyone left (P == 0)
+    INTRO --> INTRO_PLAY: hits in sync (P ≥ min_players)
+    INTRO_IDLE --> IDLE: fade-back done
+    INTRO_PLAY --> PLAY: spin-up done
+    PLAY --> END: too few players (P < min_players)
+    END --> PLAY: players back (P ≥ min_players), wound back
+    END --> END_INTRO: wound down, players remain (P > 0)
+    END --> END_IDLE: wound down, room empty (P == 0)
+    END_INTRO --> INTRO: fade done, playhead locked
+    END_IDLE --> IDLE: fade done, playhead locked
 ```
+
+The graph is the stand-alone show; the exact conditions and their settings are in each state's
+*Transitions* list.
 
 The machine always **boots into OFF** — dark, motor at BEAM — and wakes through OFF_IDLE by itself once
 the playhead has locked, so power-on is the same wake as a blackout release. The persisted
