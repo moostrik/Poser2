@@ -52,7 +52,7 @@ KNOB = Widget.knob
 class WindowSettings(SynthWindowSettings):
     """The window: how far the pattern shows each side of a person, and when. The synth's part
     (taper, attack, release) with the bridge's: the reach at rest, its bypass, and sync."""
-    width:          Field[float] = Field(45.0, min=0.0, max=180.0, step=0.5,  widget=KNOB, label="Width",          description="Reach each side of a person at rest (deg)", newline=True)
+    width:          Field[float] = Field(45.0, min=0.0, max=180.0, step=0.5,  widget=KNOB, label="Width",          description="Reach each side of a person at rest (deg)", row_label="Reach", newline=True)
     width_bypass:   Field[bool]  = Field(False,                                            label="Bypass",         description="Both reaches at the width: no sync growth")
     sync_threshold: Field[float] = Field(0.75, min=0.0, max=0.99,  step=0.01, widget=KNOB, label="Sync Threshold", description="Pair similarity from which the reach grows toward the partner, fully at 1 (alike)")
 
@@ -60,7 +60,7 @@ class WindowSettings(SynthWindowSettings):
 class HitSettings(PushSettings):
     """The hit: the playhead crossing a person. The synth's push (its settle time) with the
     bridge's: how many ticks, the mask's flash, and the button that hits everyone."""
-    frames:           Field[int]   = Field(1,   min=1,   max=3,   step=1,    widget=KNOB, label="Frames", description="Hit length: the ticks closest to the crossing, 1-3")
+    frames:           Field[int]   = Field(1,   min=1,   max=3,   step=1,    widget=KNOB, label="Frames", description="Hit length: the ticks closest to the crossing, 1-3", row_label="Hit", newline=True)
     flash_brightness: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Flash",  description="Mask blue level on a hit")
     hit:              Field[bool]  = Field(False, widget=Widget.button,                     label="Hit",    description="Hit everyone on the next ticks")
 

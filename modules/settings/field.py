@@ -75,6 +75,10 @@ class Field(Generic[T]):
       does **not** clamp or validate values against them.
     - ``description`` — tooltip / label text.
     - ``label`` — the panel's title for the control; ``None`` derives it from the name.
+    - ``row_label`` — a text title the panel renders before this field: the name of the row it
+      starts.
+    - ``width`` — a Tailwind width step for a control with a fixed width (a select); ``None``
+      keeps the control's own.
     - ``visible`` — whether the field appears in the panel.
     - ``pinned`` — whether the field is shown in a pinned summary section.
         - ``newline`` — start this field on a new compact UI row.
@@ -132,6 +136,8 @@ class Field(Generic[T]):
         step: float | int | None = None,  # UI hint only — not enforced by the descriptor
         description: str = "",
         label: str | None = None,        # UI hint only — the control's title in the panel
+        row_label: str | None = None,    # UI hint only — a text title rendered before this field
+        width: int | None = None,        # UI hint only — Tailwind width step for a fixed-width control
         access: Access = Access.READWRITE,
         visible: bool = True,
         pinned: bool = False,
@@ -163,6 +169,8 @@ class Field(Generic[T]):
         self.step = step
         self.description = description
         self.label = label
+        self.row_label = row_label
+        self.width = width
         self.access = access
         self.visible = visible
         self.pinned = pinned

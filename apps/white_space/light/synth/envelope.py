@@ -18,14 +18,14 @@ Value = float | np.ndarray
 class WindowSettings(BaseSettings):
     """What the voice reads of the window: the taper of the envelope over distance on the pulse
     width, and presence, the envelope over time on the reaches. The reaches are the caller's."""
-    taper:           Field[float] = Field(0.2, min=0.0, max=1.0,  step=0.01, widget=Widget.knob, label="Taper",   description="Last part of a reach over which the lines thin out")
+    taper:           Field[float] = Field(0.2, min=0.0, max=1.0,  step=0.01, widget=Widget.knob, label="Taper",   description="Last part of a reach over which the lines thin out", row_label="Shape", newline=True)
     attack_seconds:  Field[float] = Field(1.0, min=0.0, max=10.0, step=0.1,  widget=Widget.knob, label="Attack",  description="Window opens after arrival (s)")
     release_seconds: Field[float] = Field(1.5, min=0.0, max=10.0, step=0.1,  widget=Widget.knob, label="Release", description="Window closes after leaving (s)")
 
 
 class PushSettings(BaseSettings):
     """The push: the envelope over time on the speed a hit adds."""
-    settle_seconds: Field[float] = Field(1.0, min=0.05, max=10.0, step=0.05, widget=Widget.knob, label="Settle", description="Push settle time (s)")
+    settle_seconds: Field[float] = Field(1.0, min=0.05, max=10.0, step=0.05, widget=Widget.knob, label="Settle", description="Push settle time (s)", row_label="Push", newline=True)
 
 
 class Envelope:

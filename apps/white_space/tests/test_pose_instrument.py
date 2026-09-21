@@ -476,7 +476,7 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertEqual(W.pulse_width_source, 0.0)                         # nobody there
 
     def test_a_curve_eases_a_source_and_keeps_its_ends(self) -> None:
-        self.cfg.white.pulse_width_curve = Curve.EASE_IN                    # little at first
+        self.cfg.white.pulse_width_curve = Curve.EASE_IN_QUAD               # little at first
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, right_shoulder=0.0)})
         eased = {l for _, l in self._inner(self._render().white)}
         self.assertEqual(eased, {INTERVAL // 4})                            # 0.5² of the interval

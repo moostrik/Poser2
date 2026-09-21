@@ -152,9 +152,9 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 2750,
+      "x": 275,
       "y": 31,
-      "width": 1089,
+      "width": 1874,
       "height": 2080,
       "secondary_list": [],
       "secondary_fullscreen": true,
@@ -508,6 +508,17 @@
       "interpolator": {
         "responsiveness": 0.25,
         "friction": 0.05
+      }
+    },
+    "distance": {
+      "smoother": {
+        "min_cutoff": 1.0,
+        "cutoff_rise": 0.025,
+        "d_cutoff": 1.0
+      },
+      "interpolator": {
+        "responsiveness": 0.2,
+        "friction": 0.03
       }
     },
     "velocity": {
@@ -923,6 +934,7 @@
       "enabled": false,
       "solo": false,
       "azimuth": 180.0,
+      "distance": 0.5,
       "torso": 0.0,
       "left_shoulder": 340.0,
       "right_shoulder": 340.0,
@@ -949,7 +961,7 @@
     "sync": {},
     "manual": {
       "select": "IDLE",
-      "hold": true
+      "hold": false
     },
     "session": {
       "enabled": false,

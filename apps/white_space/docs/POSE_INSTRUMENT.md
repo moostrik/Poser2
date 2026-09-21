@@ -343,13 +343,17 @@ tuned together, knobs throughout:
 | Group           | What it holds                                                                     |
 |-----------------|-----------------------------------------------------------------------------------|
 | `max_lines`     | the visual limit                                                                  |
-| `bypass_all`    | the master bypass: every source muted, every input its knob (*Playing by hand*)   |
-| `white`, `blue` | an oscillator's patch: a matrix row per input (Interval · Amount · Source · Curve · Bypass) and its `push` |
+| `bypass_all`    | the master bypass: every source muted, every input its base (*Playing by hand*)   |
+| `white`, `blue` | an oscillator's patch: a matrix row per input, and its push                       |
 | `lfo`           | the LFO: rate, phase, and the level's row                                         |
-| `window`        | how far the pattern shows and when: width and its bypass, taper, attack, release, sync threshold |
-| `hit`           | the hit: frames, the push's settle time, the mask's flash, the hit button         |
+| `window`        | how far the pattern shows and when: the shape (taper, attack, release) and the reach (width, its bypass, the sync threshold) |
+| `hit`           | the hit: the push's settle time, frames, the mask's flash, the hit button         |
 | `mask`          | width, brightness, the playhead's level in it                                     |
 | `dummy`         | *The dummy*                                                                       |
+
+A matrix row is titled with its input's name and reads Base · Amount · Curve · Source · Bypass
+(`LIGHT_SYNTH.md`, *Modulation*); every other row has its title too (Push, LFO, Shape, Reach,
+Hit), so the panel reads the same way throughout.
 
 The synth's settings classes (`OscillatorSettings`, `LfoSettings`, `WindowSettings`,
 `PushSettings`) are extended by the bridge's where a concept spans both (`window`, `hit`); the

@@ -34,6 +34,7 @@ Design principles for settings widgets and layout:
 from __future__ import annotations
 
 import json
+import math
 import socket
 from enum import Enum
 from pathlib import Path
@@ -545,11 +546,17 @@ def _build_knob(settings, name, field, polls):
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
     min_val = field.min if field.min is not None else 0
     max_val = field.max if field.max is not None else 100
+    # The knob shows its value as it is, so a value that is not on the step's grid (a read-only
+    # knob fed by the app) is shown to the step's decimals and not with a float's tail.
+    decimals = 0 if field.type_ is int else max(0, -math.floor(math.log10(step))) if step > 0 else 2
+
+    def shown(v):
+        return field.type_(round(v, decimals)) if v is not None else v
 
     with ui.column().classes("gap-1"):
         _build_field_title(label, desc)
         kn = ui.knob(
-            value=value, min=min_val, max=max_val, step=step,
+            value=shown(value), min=min_val, max=max_val, step=step,
             show_value=True, size="lg",
         ).props(
             "thickness=0.2" + _lock_prop(is_disabled)
@@ -562,7 +569,7 @@ def _build_knob(settings, name, field, polls):
         _commit_on_release(kn, commit_knob)
 
     if _field_needs_poll(settings, name, field):
-        polls.append((settings, name, [value], lambda v, kn=kn: kn.set_value(v)))
+        polls.append((settings, name, [value], lambda v, kn=kn: kn.set_value(shown(v))))
 
 
 # -- enum builders -----------------------------------------------------------
@@ -575,11 +582,12 @@ def _build_select(settings, name, field, polls):
     is_disabled = _is_field_read_only(settings, name, field)
 
     options = {m: generate_label(m.name) for m in field.type_}
+    width = f"w-{field.width}" if field.width is not None else "w-48"
     sel = _attach_description_tooltip(ui.select(
         options=options,
         value=value,
         label=label,
-    ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-48 max-w-full"), desc)
+    ).props("dense outlined" + _lock_prop(is_disabled)).classes(f"{width} max-w-full"), desc)
 
     if not is_disabled:
         def on_select_change(e):
@@ -1302,6 +1310,9 @@ def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=
                 ui.element("div").classes(
                     f"{_access_css_class(field)} pt-2"
                 ).style("flex-basis: 100%; height: 0")
+            if field.row_label is not None:
+                # The row's title: a fixed width, so the controls of successive rows line up.
+                ui.label(field.row_label).classes(f"{_access_css_class(field)} w-24 font-bold")
             _build_settings_entry(settings, field_name, field, polls)
 
     # Register this card's polls with the page-level timer.

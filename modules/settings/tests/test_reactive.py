@@ -495,6 +495,14 @@ class TestSettingMetadata(unittest.TestCase):
         self.assertIsNone(Field(0).label)                       # the panel derives it from the name
         self.assertEqual(Field(0, label="Amount").label, "Amount")
 
+    def test_row_label_and_width_metadata(self):
+        plain = Field(0)
+        self.assertIsNone(plain.row_label)
+        self.assertIsNone(plain.width)
+        hinted = Field(0, row_label="Interval", width=32)
+        self.assertEqual(hinted.row_label, "Interval")
+        self.assertEqual(hinted.width, 32)
+
 
 class TestMinMaxMetadata(unittest.TestCase):
     """Tests that min/max/step are stored as GUI metadata, not enforced."""

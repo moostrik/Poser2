@@ -101,24 +101,41 @@ class SlotTest(unittest.TestCase):
         self.assertEqual(Slot.bypassed(False, 0.7), 0.7)
         self.assertAlmostEqual(Slot.modulate(0.2, 0.6, Slot.bypassed(True, 1.0)), 0.2)
 
-    def test_every_curve_is_smooth_keeps_the_sign_and_leaves_the_ends(self) -> None:
-        source = np.linspace(-1.0, 1.0, 2001)
+    # Back and Elastic overshoot on the way and Bounce turns back on itself: continuous, not monotonic.
+    WANDERING = ("BACK", "ELASTIC", "BOUNCE")
+
+    def test_every_curve_is_continuous_keeps_the_sign_and_leaves_the_ends(self) -> None:
+        source = np.linspace(-1.0, 1.0, 2049)                     # the curves' own sampling, both ways
+        # The steepest a continuous curve gets here is the circle's vertical end: √(2/1024) ≈ 0.044
+        # between neighbours. A step, a value appearing from nowhere, would be far more.
+        steepest = 0.06
         for curve in Curve:
             eased = Slot.curve(source, curve)
-            self.assertEqual(float(eased[0]), -1.0)
-            self.assertEqual(float(eased[1000]), 0.0)
-            self.assertEqual(float(eased[-1]), 1.0)
-            np.testing.assert_allclose(eased, -eased[::-1], atol=1e-12)       # odd: the sign kept, symmetric
-            self.assertTrue((np.diff(eased) >= -1e-12).all())                 # never turning back
-            self.assertLess(float(np.abs(np.diff(eased)).max()), 0.005)       # no step
+            self.assertAlmostEqual(float(eased[0]), -1.0, places=9, msg=curve.name)
+            self.assertAlmostEqual(float(eased[1024]), 0.0, places=9, msg=curve.name)
+            self.assertAlmostEqual(float(eased[-1]), 1.0, places=9, msg=curve.name)
+            np.testing.assert_allclose(eased, -eased[::-1], atol=1e-12, err_msg=curve.name)   # odd: the sign kept
+            self.assertLess(float(np.abs(np.diff(eased)).max()), steepest, curve.name)        # no step
+            if not any(family in curve.name for family in self.WANDERING):
+                self.assertTrue((np.diff(eased) >= -1e-12).all(), curve.name)                 # never turning back
 
-    def test_the_curves_ease_the_way_they_say(self) -> None:
+    def test_the_curves_are_pytweenings(self) -> None:
+        import pytweening
+        self.assertEqual(len(Curve), 31)                                       # linear and ten families of three
         self.assertAlmostEqual(Slot.curve(0.5, Curve.LINEAR), 0.5)
-        self.assertAlmostEqual(Slot.curve(0.5, Curve.EASE_IN), 0.25)           # little at first
-        self.assertAlmostEqual(Slot.curve(0.5, Curve.EASE_OUT), 0.75)          # much at first
-        self.assertAlmostEqual(Slot.curve(0.5, Curve.EASE_IN_OUT), 0.5)
-        self.assertLess(Slot.curve(0.25, Curve.EASE_IN_OUT), 0.25)
-        self.assertGreater(Slot.curve(0.75, Curve.EASE_IN_OUT), 0.75)
+        self.assertAlmostEqual(Slot.curve(0.5, Curve.EASE_IN_QUAD), 0.25)      # little at first
+        self.assertAlmostEqual(Slot.curve(0.5, Curve.EASE_OUT_QUAD), 0.75)     # much at first
+        for curve, function in ((Curve.EASE_IN_OUT_SINE, pytweening.easeInOutSine),
+                                (Curve.EASE_OUT_EXPO, pytweening.easeOutExpo),
+                                (Curve.EASE_IN_BACK, pytweening.easeInBack),
+                                (Curve.EASE_OUT_BOUNCE, pytweening.easeOutBounce)):
+            for t in (0.1, 0.37, 0.8):
+                self.assertAlmostEqual(float(Slot.curve(t, curve)), function(t), places=3, msg=curve.name)
+                self.assertAlmostEqual(float(Slot.curve(-t, curve)), -function(t), places=3, msg=curve.name)
+
+    def test_a_curve_takes_a_source_per_position(self) -> None:
+        eased = Slot.curve(np.array([-1.0, -0.5, 0.0, 0.5, 1.0]), Curve.EASE_IN_QUAD)
+        np.testing.assert_allclose(eased, [-1.0, -0.25, 0.0, 0.25, 1.0], atol=1e-6)
 
 
 if __name__ == "__main__":

@@ -207,16 +207,16 @@ the taper grow or thin a little, and nothing appears or disappears.
 ## Modulation
 
 Every input has a modulation slot, a modulation matrix row, as a synth's inputs have. What the
-source is does not matter to the slot. In the panel a row reads Interval · Amount · Source ·
-Curve · Bypass, the matrix's own words.
+source is does not matter to the slot. In the panel a row is titled with the input's name and
+reads Base · Amount · Curve · Source · Bypass, the matrix's own words.
 
 | Part   | What it is                                                                          |
 |--------|-------------------------------------------------------------------------------------|
 | base   | the input's own knob: its value with nothing connected, and the hand's value        |
-| source | what is connected: a value 0..1, or −1..1 for an LFO; one per tick or one per pixel |
 | amount | how far the source moves the input from its base, in the input's unit, signed       |
-| curve  | how the source's magnitude is eased, its sign kept: linear, ease in, out, in-out    |
-| bypass | bypassed, the modulation is off: the input is its knob, and the amount is kept      |
+| curve  | how the source's magnitude is eased, its sign kept: one of pytweening's easings     |
+| source | what is connected: a value 0..1, or −1..1 for an LFO; one per tick or one per pixel |
+| bypass | bypassed, the modulation is off: the input is its base, and the amount is kept      |
 
 ```
 input    = base + amount × curve(source)     amount in the input's unit
@@ -244,9 +244,15 @@ anywhere. At base 10° and amount 1 octave the interval goes from 10° to 20°; 
   per tick, since the travelled (*The oscillator*) is one count.
 - Where an input ends: pulse width and hardness stop at 0 and 1, the interval stops at the visual
   limit, phase wraps, speed has no ends. A stop is a standstill, not a step.
-- The slot adds no smoothing and no steps. Its curve is the one shaping it does: smooth, odd (0
-  and ±1 stay, the sign is kept), so a connection's feel is tuned in its row and a bipolar source
-  stays symmetric.
+- The slot adds no smoothing and no steps. Its curve is the one shaping it does, so a
+  connection's feel is tuned in its row. The curves are `pytweening`'s: linear, and ten families
+  (quad, cubic, quart, quint, sine, expo, circ, back, elastic, bounce) each as ease in (little at
+  first), ease out (much at first) and ease in-out. A curve is continuous and odd: 0 and ±1 stay
+  where they are and the sign is kept, so a bipolar source stays symmetric. Back and elastic
+  overshoot on the way, so an input may pass its base or its end for a moment, and bounce turns
+  back on itself; pulse width and hardness still stop at 0 and 1. `pytweening`'s functions take
+  one number, so a curve is sampled once into a table and read between, which also serves a
+  source per pixel; the table's ends are pinned, since `pytweening`'s elastic ends a hair past 1.
 
 ### An LFO as a source
 
