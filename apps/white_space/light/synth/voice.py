@@ -21,7 +21,7 @@ _LFO_POSITION = np.zeros(1)              # an LFO in time has one position
 
 class Parameter(IntEnum):
     """An oscillator's parameters: the keys of its sources."""
-    INTERVAL    = 0
+    PITCH       = 0
     PULSE_WIDTH = auto()
     PHASE       = auto()
     SPEED       = auto()
@@ -35,17 +35,25 @@ class Voice:
     """One person's pattern; see the module docstring."""
 
     def __init__(self, oscillator_1: OscillatorSettings, oscillator_2: OscillatorSettings,
-                 window: WindowSettings, push: PushSettings, lfo: LfoSettings) -> None:
+                 window: WindowSettings, push: PushSettings, lfo: LfoSettings, turn: float = 360.0) -> None:
+        """``turn`` is one revolution in the positions' units: a pitch of *n* lines per revolution
+        is an interval of ``turn / n``."""
         self._patches = (oscillator_1, oscillator_2)
         self._window = window
         self._push_settings = push
         self._lfo_settings = lfo
+        self._turn = turn
         self._oscillators = (Oscillator(), Oscillator())
         self._lfo_oscillator = Oscillator()
         self._lfo = 0.0                                                     # this tick's LFO output, −1..1
         self._presence = Envelope()
         self._push = Envelope()
-        self._intervals = [float(oscillator_1.interval), float(oscillator_2.interval)]     # this tick's, after the slot
+        self._intervals = [self._interval(oscillator_1.pitch, 0.0), self._interval(oscillator_2.pitch, 0.0)]   # this tick's, after the slot
+
+    def _interval(self, pitch: float, min_interval: float) -> float:
+        """The interval a pitch gives, in the positions' units: floored by the visual limit, and
+        never coarser than one line per half turn."""
+        return max(self._turn / max(float(pitch), 2.0), min_interval)
 
     def reset(self) -> None:
         for oscillator in (*self._oscillators, self._lfo_oscillator):
@@ -85,9 +93,9 @@ class Voice:
         self._presence.update(present, dt, W.attack_seconds, W.release_seconds)
         push = self._push.update(hit, dt, 0.0, self._push_settings.settle_seconds)
         for i, (oscillator, patch, source) in enumerate(zip(self._oscillators, self._patches, sources)):
-            interval_source = self._played(patch.interval_bypass, patch.interval_curve, float(source.get(Parameter.INTERVAL, 0.0)))
-            interval = Slot.modulate_octaves(patch.interval, patch.interval_amount, interval_source)
-            self._intervals[i] = max(float(interval), min_interval)
+            pitch_source = self._played(patch.pitch_bypass, patch.pitch_curve, float(source.get(Parameter.PITCH, 0.0)))
+            pitch = Slot.modulate(patch.pitch, patch.pitch_amount, pitch_source)
+            self._intervals[i] = self._interval(pitch, min_interval)
             speed_source = self._played(patch.speed_bypass, patch.speed_curve, float(source.get(Parameter.SPEED, 0.0)))
             speed = Slot.modulate(patch.speed, patch.speed_amount, speed_source)
             oscillator.update(dt, self._intervals[i], float(speed) + patch.push * push)
@@ -107,6 +115,9 @@ class Voice:
         taper = reach * self._window.taper
         outputs = []
         for oscillator, patch, source, interval in zip(self._oscillators, self._patches, sources, self._intervals):
+            if not patch.enabled:                                           # switched off: dark, whatever its slots say
+                outputs.append(np.zeros(distance.shape, dtype=np.float32))
+                continue
             pulse_width_source = self._played(patch.pulse_width_bypass, patch.pulse_width_curve, source.get(Parameter.PULSE_WIDTH, 0.0))
             phase_source = self._played(patch.phase_bypass, patch.phase_curve, source.get(Parameter.PHASE, 0.0))
             hardness_source = self._played(patch.hardness_bypass, patch.hardness_curve, source.get(Parameter.HARDNESS, 0.0))

@@ -82,17 +82,6 @@ class SlotTest(unittest.TestCase):
         swing = Slot.modulate(0.5, 0.2, np.array([-1.0, 0.0, 1.0]))
         np.testing.assert_allclose(swing, [0.3, 0.5, 0.7])
 
-    def test_the_interval_moves_in_octaves(self) -> None:
-        self.assertAlmostEqual(Slot.modulate_octaves(10.0, 1.0, 1.0), 20.0)
-        self.assertAlmostEqual(Slot.modulate_octaves(10.0, -1.0, 1.0), 5.0)
-        self.assertAlmostEqual(Slot.modulate_octaves(10.0, 1.0, 0.0), 10.0)
-        up, down = Slot.modulate_octaves(10.0, 1.0, 0.5), Slot.modulate_octaves(10.0, 1.0, -0.5)
-        self.assertAlmostEqual(up / 10.0, 10.0 / down)                     # an LFO's swing is symmetric in pitch
-
-    def test_one_source_into_two_intervals_keeps_their_ratio(self) -> None:
-        for source in (0.0, 0.3, 1.0):
-            self.assertAlmostEqual(Slot.modulate_octaves(20.0, 0.7, source) / Slot.modulate_octaves(10.0, 0.7, source), 2.0)
-
     def test_a_unit_input_stops_at_its_ends(self) -> None:
         np.testing.assert_allclose(Slot.unit(np.array([-0.2, 0.4, 1.3])), [0.0, 0.4, 1.0])
 

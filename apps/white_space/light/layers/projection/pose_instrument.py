@@ -17,10 +17,9 @@ the window's **reach** each side. The bridge is everything the synth does not kn
 
 Playing by hand: every parameter has its slot as a row in the panel (``PI.white``, ``PI.blue``,
 ``PI.lfo``): Base, Amount, Curve and Bypass. A bypassed parameter is its base while the others
-follow the body, so a pose can be taken apart parameter by parameter. ``PI.bypass_all`` is the
-master: every source is muted and the panel draws for everyone;
-``window.width_bypass`` holds both reaches without a partner; ``hit.hit`` marks everyone as the
-playhead would.
+follow the body, so a pose can be taken apart parameter by parameter; an oscillator's Bypass All
+button sets its five at once, and clears them when all are set. ``window.width_bypass`` holds both reaches
+without a partner; ``hit.hit`` marks everyone as the playhead would.
 
 ``connect``, the drawing methods and the synth's classes are hot-reloaded while the app runs.
 """
@@ -29,6 +28,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from functools import partial
 
 import numpy as np
 
@@ -66,7 +66,7 @@ class HitSettings(PushSettings):
 
 class MaskSettings(BaseSettings):
     """The dim blue mask at the person."""
-    width:            Field[float] = Field(3.0, min=0.1, max=36.0, step=0.1,  widget=KNOB, label="Width",      description="Mask width (deg)")
+    width:            Field[float] = Field(3.0, min=0.5, max=20.0, step=0.1,  widget=KNOB, label="Width",      description="Mask width (deg)")
     brightness:       Field[float] = Field(0.3, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Brightness", description="Mask blue level")
     playhead_at_mask: Field[float] = Field(0.3, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Playhead",   description="Playhead level inside a mask (fraction)")
 
@@ -74,15 +74,14 @@ class MaskSettings(BaseSettings):
 class PoseInstrumentSettings(BaseSettings):
     """The ``PI`` root group, a group per concept: the two oscillators and the LFO (the synth's
     patch, a slot per parameter), the window, the hit, the mask, the dummy. The wiring is
-    ``connect``; ``bypass_all`` is the master bypass: every source muted, every parameter its base."""
-    max_lines:  Field[int]  = Field(90, min=10, max=360, step=1, description="Visual limit: lines per revolution; no interval goes below one period")
-    bypass_all: Field[bool] = Field(False,                       description="Master bypass: mute every source, every parameter is its base; the panel draws")
+    ``connect``."""
+    max_lines:  Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
+    mask:      Group[MaskSettings]       = Group(MaskSettings)
+    window:     Group[WindowSettings]     = Group(WindowSettings)
+    hit:        Group[HitSettings]        = Group(HitSettings)
     white:      Group[OscillatorSettings] = Group(OscillatorSettings)
     blue:       Group[OscillatorSettings] = Group(OscillatorSettings)
     lfo:        Group[LfoSettings]        = Group(LfoSettings)
-    window:     Group[WindowSettings]     = Group(WindowSettings)
-    hit:        Group[HitSettings]        = Group(HitSettings)
-    mask:       Group[MaskSettings]       = Group(MaskSettings)
     dummy:      Group[DummySettings]      = Group(DummySettings)
 
 
@@ -123,6 +122,8 @@ class PoseInstrument(ProjectionLayer):
         self._mask_level = np.zeros(resolution, dtype=np.float32)
         self._manual_hits = 0                                             # ticks left of a hit from the panel
         instrument.hit.bind(HitSettings.hit, self._on_hit)
+        for patch in (instrument.white, instrument.blue):
+            patch.bind(OscillatorSettings.bypass_all, partial(self._bypass_all, patch))
         self._hot_reloaders = tuple(HotReloadMethods(cls, True) for cls in (self.__class__, Voice, Oscillator, Envelope, Slot))
 
     def reset(self) -> None:
@@ -130,6 +131,15 @@ class PoseInstrument(ProjectionLayer):
         self._players.clear()
         self._crossing.reset()
         self._manual_hits = 0
+
+    @staticmethod
+    def _bypass_all(patch: OscillatorSettings, _: bool) -> None:
+        """The panel's Bypass All button: every slot of the oscillator set, or cleared when all
+        are already set."""
+        bypass = not (patch.pitch_bypass and patch.pulse_width_bypass and patch.phase_bypass
+                      and patch.speed_bypass and patch.hardness_bypass)
+        patch.pitch_bypass = patch.pulse_width_bypass = patch.phase_bypass = bypass
+        patch.speed_bypass = patch.hardness_bypass = bypass
 
     def _on_hit(self, _: bool) -> None:
         """The panel's hit button: everyone is hit for ``hit.frames`` ticks, from the next one."""
@@ -172,7 +182,7 @@ class PoseInstrument(ProjectionLayer):
                 continue
             p = self._players.get(id)
             if p is None:
-                p = self._players[id] = _Player(Voice(P.white, P.blue, P.window, P.hit, P.lfo))
+                p = self._players[id] = _Player(Voice(P.white, P.blue, P.window, P.hit, P.lfo, turn=360.0))
             p.present = True
             p.position = normalize_azimuth(azimuth)
             angles = pose[features.Angles].values
@@ -195,10 +205,9 @@ class PoseInstrument(ProjectionLayer):
 
         min_interval = self._min_interval()
         gone: list[int] = []
-        muted = P.bypass_all
         for id, p in self._players.items():
             p.hit = manual or id in hits
-            p.voice.update_lfo(frame.tick.dt, 0.0 if muted else self.connect_lfo(p))    # first: connect reads its output
+            p.voice.update_lfo(frame.tick.dt, self.connect_lfo(p))              # first: connect reads its output
             p.voice.update(frame.tick.dt, p.present, p.hit, self._sources(p), min_interval)
             if not p.present and not p.voice.alive:
                 gone.append(id)
@@ -212,8 +221,8 @@ class PoseInstrument(ProjectionLayer):
     # -- Connections -----------------------------------------------------------------
 
     def _sources(self, p: _Player) -> tuple[Sources, Sources]:
-        """The voice's sources this tick: the connections, or nothing while the panel plays."""
-        return ({}, {}) if self._instrument.bypass_all else self.connect(p)
+        """The voice's sources this tick: the connections."""
+        return self.connect(p)
 
     def connect(self, p: _Player) -> tuple[Sources, Sources]:
         """The connections (``docs/POSE_INSTRUMENT.md``, *The connections*) written out: a person's
@@ -224,7 +233,7 @@ class PoseInstrument(ProjectionLayer):
 
         - the shoulder: its pulse width (white's base 0 and amount 1, blue's base 1 and amount −1:
           arms hanging is full blue, arms raised full white)
-        - the elbow: its interval, finer as the arm folds
+        - the elbow: its pitch, more lines as the arm folds
         - the body bend, signed: both speeds, so a lean makes the lines flow one way or the other
         - the LFO (its level played by the legs, ``connect_lfo``): white's phase, a sway
         - the symmetries, the distance, blue's phase, the hardness: unconnected
@@ -232,13 +241,13 @@ class PoseInstrument(ProjectionLayer):
         flow = min(max(p.tilt, -1.0), 1.0)
         white = {
             Parameter.PULSE_WIDTH: self._measure(p.left_shoulder),
-            Parameter.INTERVAL:    self._measure(p.left_elbow),
+            Parameter.PITCH:       self._measure(p.left_elbow),
             Parameter.SPEED:       flow,
             Parameter.PHASE:       p.voice.lfo,
         }
         blue = {
             Parameter.PULSE_WIDTH: self._measure(p.right_shoulder),
-            Parameter.INTERVAL:    self._measure(p.right_elbow),
+            Parameter.PITCH:       self._measure(p.right_elbow),
             Parameter.SPEED:       flow,
         }
         return white, blue
@@ -261,12 +270,12 @@ class PoseInstrument(ProjectionLayer):
         """Each side's reach in degrees, before presence: ``window.width``, grown toward every
         similarity-matched partner along the shorter arc, full reaching them; the partner's
         presence scales the growth, so a partner leaving lets go smoothly. Bypassed
-        (``window.width_bypass``, or the master), it is the width and does not grow."""
+        (``window.width_bypass``), it is the width and does not grow."""
         W = self._instrument.window
         base = min(W.width, 180.0)
         for p in self._players.values():
             p.reach_left = p.reach_right = base
-        if W.width_bypass or self._instrument.bypass_all:
+        if W.width_bypass:
             return
         threshold = W.sync_threshold
         ids = list(self._players)

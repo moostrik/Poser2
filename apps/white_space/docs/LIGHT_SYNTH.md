@@ -52,7 +52,7 @@ The design is a synthesizer's, part for part, so it can be reasoned about as one
 
 | Synth                          | Here                                                          |
 |--------------------------------|---------------------------------------------------------------|
-| oscillator, a pulse wave       | an oscillator (*Parameters*); its pitch is the interval       |
+| oscillator, a pulse wave       | an oscillator (*Parameters*); its pitch in lines per revolution |
 | pulse width                    | pulse width                                                   |
 | LFO                            | an LFO: an oscillator used as a source (*Modulation*)         |
 | envelope with a gate           | the envelope: push, presence (*The envelope*)                 |
@@ -112,11 +112,11 @@ window knows the side.
 Where the windows of two voices overlap their lines join per output: a pixel of an output is lit
 where either voice's oscillator lights it.
 
-Two intervals in a simple ratio (1:1, 1:2, 2:3) are tuned: with equal phases and equal speeds
-the two outputs' lines coincide at regular places, every 1, 2 or 3 of the shorter interval; with
-unequal speeds the places travel. One source into both intervals with the same amount keeps the
-ratio, since the amount is in octaves (*Modulation*): the two outputs change pitch together and
-stay tuned.
+Two pitches in a simple ratio (1:1, 1:2, 2:3) are tuned: with equal phases and equal speeds the
+two outputs' lines coincide at regular places, every 1, 2 or 3 of the shorter interval; with
+unequal speeds the places travel. They stay tuned only while their sources move them alike: a
+pitch's amount is in lines, so one source into both pitches keeps their difference and not their
+ratio (*Open*).
 
 ## Parameters
 
@@ -126,17 +126,21 @@ probably never be connected to anything.
 
 | Parameter   | Unit                 | What it is                                              |
 |-------------|----------------------|---------------------------------------------------------|
-| interval    | degrees              | the distance from one line to the next                  |
+| pitch       | lines per revolution | how fine the lines are: 25.7 is a line every 14°        |
 | pulse width | fraction of interval | the thickness of a line: 0 none, 1 solid                |
 | phase       | intervals            | where the lines sit relative to the person              |
 | speed       | degrees per second   | how fast the lines travel: positive outward, 0 still    |
 | hardness    | 0..1                 | the flanks of a line: 1 hard (default), 0 softest       |
 
 An oscillator also has its `push`, the speed a push adds to it (*Distance and time*): the amount
-of that one envelope, not a parameter, so it has no slot.
+of that one envelope, not a parameter, so it has no slot. And it has a switch, `enabled`: off,
+its output is dark whatever its slots say. The switch and the bypasses are the panel's, not the
+body's, so flipping them is the one allowed step.
 
-**Interval** spaces the lines. A change of interval moves a far line more than a near one, as an
-accordion opens from the person.
+**Pitch** is how many lines fit in a revolution, the site fact's own unit; the **interval** is the
+spacing it gives, `360° / pitch`, in which phase and pulse width are measured. The pitch never
+goes above the visual limit (`max_lines`) and never below 2, one line per half turn. A change of
+pitch moves a far line more than a near one, as an accordion opens from the person.
 
 **Pulse width** is the thickness of every line, `pulse width × interval` wide. At 0 the output is
 dark, at 1 it is solid, and halfway line and gap are equal.
@@ -251,13 +255,11 @@ parameter's name and reads Base · Amount · Curve · Bypass, the matrix's own w
 
 ```
 parameter = base + amount × curve(source)         amount in the parameter's unit
-interval  = base × 2 ^ (amount × curve(source))   amount in octaves
 ```
 
 At pulse width base 0.2 and amount 0.6 the lines are 0.2 wide with the source at 0 and 0.8 wide
-with the source at 1. The interval is a pitch and is moved in octaves, as a synth's is: a degree
-is a large change at a 5° interval and a small one at 40°, and a doubling looks the same size
-anywhere. At base 10° and amount 1 octave the interval goes from 10° to 20°; at −1 to 5°.
+with the source at 1. At pitch base 25.7 and amount 46.3 the lines go from one every 14° to one
+every 5°: a row reads in one unit, and the 90-line limit is the knob's own scale.
 
 - A slot has one source. A source may feed several parameters, each with its own amount.
 - The bypass is how one parameter is played by hand while the others follow their sources: a base
@@ -271,7 +273,7 @@ anywhere. At base 10° and amount 1 octave the interval goes from 10° to 20°; 
   instrument's choice.
 - Pulse width, phase and hardness take a source per tick or per pixel; interval and speed take one
   per tick, since the travelled (*The oscillator*) is one count.
-- Where a parameter ends: pulse width and hardness stop at 0 and 1, the interval stops at the
+- Where a parameter ends: pulse width and hardness stop at 0 and 1, the pitch stops at the
   visual limit, phase wraps, speed has no ends. A stop is a standstill, not a step.
 - The slot adds no smoothing and no steps. Its curve is the one shaping it does, so a
   connection's feel is tuned in its row. A curve shapes a value, what a source is worth at each of
@@ -426,3 +428,7 @@ meet.
 - Whether blue half an interval from white is the instrument's rest, or a preset value
 - Both solid (the overlap tone everywhere) and both dark: whether each is a sound of the
   instrument or a silence to avoid
+- A pitch's amount in lines is linear in pitch: an LFO on a pitch would swing it further up than
+  down to the eye, and one source into two pitches keeps their difference, not their ratio. If a
+  pitch is ever given a symmetric or a shared source, the synth's answers are an amount in
+  octaves, or detune: blue's pitch set relative to white's, as a ratio, so the two stay tuned

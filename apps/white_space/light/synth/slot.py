@@ -94,11 +94,6 @@ class Slot:
         return base + amount * source
 
     @staticmethod
-    def modulate_octaves(base: float, amount: float, source: Value) -> Value:
-        """The amount in octaves, for the interval: a doubling looks the same size anywhere."""
-        return base * 2.0 ** (amount * source)
-
-    @staticmethod
     def unit(value: Value) -> Value:
         """The end of a parameter that lives in 0..1 (pulse width, hardness): a stop, not a step."""
         return np.clip(value, 0.0, 1.0)

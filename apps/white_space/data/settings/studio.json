@@ -152,10 +152,10 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M1",
-      "x": 300,
-      "y": 41,
-      "width": 3000,
-      "height": 2000,
+      "x": 1,
+      "y": 31,
+      "width": 1918,
+      "height": 2080,
       "secondary_list": [],
       "secondary_fullscreen": true,
       "fullscreen_mode": "WINDOWED"
@@ -857,12 +857,29 @@
   },
   "PI": {
     "max_lines": 90,
-    "bypass_all": false,
+    "mask": {
+      "width": 4.0,
+      "brightness": 0.5,
+      "playhead_at_mask": 0.3
+    },
+    "window": {
+      "taper": 0.2,
+      "attack_seconds": 1.0,
+      "release_seconds": 1.5,
+      "width": 33.0,
+      "width_bypass": false,
+      "sync_threshold": 0.9
+    },
+    "hit": {
+      "settle_seconds": 0.15,
+      "frames": 1,
+      "flash_brightness": 1.0
+    },
     "white": {
-      "interval": 14.0,
-      "interval_amount": -1.5,
-      "interval_curve": "LINEAR",
-      "interval_bypass": false,
+      "pitch": 25.7,
+      "pitch_amount": 46.3,
+      "pitch_curve": "LINEAR",
+      "pitch_bypass": false,
       "pulse_width": 0.0,
       "pulse_width_amount": 1.0,
       "pulse_width_curve": "LINEAR",
@@ -882,10 +899,10 @@
       "push": 14.0
     },
     "blue": {
-      "interval": 14.0,
-      "interval_amount": -1.5,
-      "interval_curve": "LINEAR",
-      "interval_bypass": false,
+      "pitch": 25.7,
+      "pitch_amount": 46.3,
+      "pitch_curve": "LINEAR",
+      "pitch_bypass": false,
       "pulse_width": 1.0,
       "pulse_width_amount": -1.0,
       "pulse_width_curve": "LINEAR",
@@ -911,24 +928,6 @@
       "level_amount": 1.0,
       "level_curve": "LINEAR",
       "level_bypass": false
-    },
-    "window": {
-      "width": 33.0,
-      "width_bypass": false,
-      "sync_threshold": 0.9,
-      "taper": 0.2,
-      "attack_seconds": 1.0,
-      "release_seconds": 1.5
-    },
-    "hit": {
-      "frames": 1,
-      "flash_brightness": 1.0,
-      "settle_seconds": 0.15
-    },
-    "mask": {
-      "width": 4.0,
-      "brightness": 0.5,
-      "playhead_at_mask": 0.3
     },
     "dummy": {
       "enabled": false,

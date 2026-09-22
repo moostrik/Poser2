@@ -140,9 +140,9 @@ class PoseInstrumentTest(unittest.TestCase):
         white, blue = self._connect(_pose(0.5, left_shoulder=shoulder(0.25), right_shoulder=shoulder(0.75),
                                           left_elbow=shoulder(0.5), right_elbow=shoulder(1.0)))
         self.assertAlmostEqual(white[Parameter.PULSE_WIDTH], 0.25, places=5)    # the left arm: the white
-        self.assertAlmostEqual(white[Parameter.INTERVAL], 0.5, places=5)
+        self.assertAlmostEqual(white[Parameter.PITCH], 0.5, places=5)
         self.assertAlmostEqual(blue[Parameter.PULSE_WIDTH], 0.75, places=5)     # the right arm: the blue
-        self.assertAlmostEqual(blue[Parameter.INTERVAL], 1.0, places=5)
+        self.assertAlmostEqual(blue[Parameter.PITCH], 1.0, places=5)
 
     def test_the_body_bend_is_a_signed_source_for_both_speeds(self) -> None:
         for tilt in (-1.0, 0.0, 0.4):
@@ -208,14 +208,14 @@ class PoseInstrumentTest(unittest.TestCase):
         return {round(b - a) for a, b in zip(centres, centres[1:])}
 
     def test_an_elbow_makes_its_own_colour_finer_and_leaves_the_other(self) -> None:
-        self.cfg.white.interval_amount = self.cfg.blue.interval_amount = -1.0            # folded: an octave finer
+        self.cfg.white.pitch_amount = self.cfg.blue.pitch_amount = 25.7                  # folded: twice the lines
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, left_elbow=shoulder(1.0))})
         f = self._render()
         self.assertEqual(self._spacings(f.white), {INTERVAL // 2})
         self.assertEqual(self._spacings(f.blue), {INTERVAL})
 
     def test_equal_elbows_keep_the_colours_tuned(self) -> None:
-        self.cfg.white.interval_amount = self.cfg.blue.interval_amount = -1.0
+        self.cfg.white.pitch_amount = self.cfg.blue.pitch_amount = 25.7
         for fold in (0.0, 0.5, 1.0):
             self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, left_elbow=shoulder(fold), right_elbow=shoulder(fold))})
             f = self._render()
@@ -255,10 +255,11 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertLess(max(abs(b - a) for a, b in zip(white, white[1:])), 6.0)          # rocking, never stepping
         self.assertLess(max(blue) - min(blue), 1.0)                                      # blue stands still
 
-    def test_the_master_bypass_mutes_the_sway_too(self) -> None:
+    def test_the_lfos_own_bypass_mutes_the_sway(self) -> None:
         self.cfg.lfo.rate, self.cfg.lfo.level_amount = 0.5, 1.0
         self.cfg.white.phase_amount = 0.25
-        self.cfg.bypass_all = True
+        self.cfg.lfo.level_bypass = True
+        self.cfg.white.pulse_width_bypass = True
         self.cfg.white.pulse_width = 0.5
         self._people({0: _pose(0.5, legs=1.0)})
         seen = [self._white_line(self._render()) for _ in range(60)]
@@ -268,7 +269,7 @@ class PoseInstrumentTest(unittest.TestCase):
 
     def test_a_small_move_of_any_measure_is_a_small_change(self) -> None:
         W, B = self.cfg.white, self.cfg.blue
-        W.interval_amount = B.interval_amount = -1.5
+        W.pitch_amount = B.pitch_amount = 46.3
         W.speed_amount = B.speed_amount = 15.0
         base = dict(left_shoulder=shoulder(0.4), right_shoulder=shoulder(0.6), left_elbow=shoulder(0.3),
                     right_elbow=shoulder(0.5), tilt=0.0)
@@ -323,8 +324,8 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertLess(last_width, INTERVAL // 4)                        # thinned, not cut
         self.assertLessEqual(last_start + last_width, C + REACH)
 
-    def test_the_interval_never_goes_below_the_visual_limit(self) -> None:
-        self.cfg.white.interval = 1.0                                     # the limit is 4° at 90 lines
+    def test_the_pitch_never_goes_above_the_visual_limit(self) -> None:
+        self.cfg.white.pitch = 180.0                                      # the limit is 90 lines: 4°
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY)})
         white = self._inner(self._render().white)
         self.assertEqual({round(b - a) for a, b in zip(self._centres(white), self._centres(white)[1:])}, {40})
@@ -430,14 +431,26 @@ class PoseInstrumentTest(unittest.TestCase):
 
     # -- playing by hand --
 
-    def test_the_master_bypass_draws_the_panel_not_the_pose(self) -> None:
-        self.cfg.bypass_all = True
-        self.cfg.white.pulse_width = 0.25
-        self._people({0: _pose(0.5, left_shoulder=shoulder(1.0))})          # the pose says full white
-        white = self._inner(self._render().white)
+    BYPASSES = ("pitch_bypass", "pulse_width_bypass", "phase_bypass", "speed_bypass", "hardness_bypass")
+
+    def test_bypass_all_sets_every_tick_of_the_oscillator_and_again_clears_them(self) -> None:
+        W, B = self.cfg.white, self.cfg.blue
+        W.pulse_width = 0.25
+        type(W).bypass_all.fire(W)
+        self.assertTrue(all(getattr(W, name) for name in self.BYPASSES))
+        self.assertFalse(any(getattr(B, name) for name in self.BYPASSES))     # the other oscillator untouched
+        self._people({0: _pose(0.5, left_shoulder=shoulder(1.0), right_shoulder=shoulder(1.0))})   # the pose: full white, no blue
+        f = self._render()
+        white = self._inner(f.white)
         self.assertGreaterEqual(len(white), 2)
-        self.assertEqual({l for _, l in white}, {INTERVAL // 4})            # the knob, from the panel
-        self.cfg.bypass_all = False
+        self.assertEqual({l for _, l in white}, {INTERVAL // 4})            # white from the panel,
+        self.assertEqual(float(f.blue[self._outside_mask()].sum()), 0.0)    # blue still following the body
+        type(W).bypass_all.fire(W)                                          # all set: pressed again, cleared
+        self.assertFalse(any(getattr(W, name) for name in self.BYPASSES))
+        W.phase_bypass = True                                               # one set: pressed, all set
+        type(W).bypass_all.fire(W)
+        self.assertTrue(all(getattr(W, name) for name in self.BYPASSES))
+        type(W).bypass_all.fire(W)
         self.assertEqual(self._inner(self._render().white), [])             # the pose again: solid, no lines
         self.assertEqual(float(self._render().white[C + 100]), 1.0)
 
@@ -450,7 +463,6 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertGreaterEqual(len(white), 2)
         self.assertEqual({l for _, l in white}, {INTERVAL // 4})            # white from the panel,
         self.assertEqual(float(f.blue[self._outside_mask()].sum()), 0.0)    # blue still following the body
-        self.assertFalse(self.cfg.bypass_all)                               # without the master
 
     def test_a_curve_eases_a_source_and_keeps_its_ends(self) -> None:
         self.cfg.white.pulse_width_curve = Curve.EASE_IN_QUAD               # little at first

@@ -11,11 +11,14 @@ from typing import Callable
 from nicegui.element import Element
 
 
-class Knob(Element, component="nice_knob.js"):
-    """SVG knob that reports a finished change through ``on_commit``.
+CHANGE_THROTTLE = 0.05  # seconds between changes sent while turning; the last one always arrives
 
-    The client shows its own value only while the user changes it; ``set_value`` both updates the
-    shown value and tells the client to drop its own, so answer every commit with ``set_value``.
+
+class Knob(Element, component="nice_knob.js"):
+    """SVG knob that reports its value through ``on_change`` while the user turns it.
+
+    The client shows its own value while the user changes it; ``set_value`` both updates the
+    shown value and tells the client to drop its own, so answer every change with ``set_value``.
     """
 
     def __init__(self, value: float, *, min: float, max: float, step: float,
@@ -36,7 +39,7 @@ class Knob(Element, component="nice_knob.js"):
         self._props["revision"] += 1
         self.update()
 
-    def on_commit(self, callback: Callable[[float], None]) -> Knob:
-        """Call *callback* with the value when the user finishes a change."""
-        self.on("commit", lambda e: callback(e.args), [None])
+    def on_change(self, callback: Callable[[float], None]) -> Knob:
+        """Call *callback* with the value as the user changes it, throttled."""
+        self.on("change", lambda e: callback(e.args), [None], throttle=CHANGE_THROTTLE)
         return self

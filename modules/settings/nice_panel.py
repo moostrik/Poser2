@@ -48,7 +48,7 @@ from .nice_util import SafeTimer
 from . import presets
 from .field import Field, Access
 from .widget import Widget
-from .nice_knob import Knob
+from .nice_knob import Knob, CHANGE_THROTTLE
 from modules.utils import Color, Point2f, Rect
 
 # ---------------------------------------------------------------------------
@@ -265,9 +265,9 @@ def _commit_typed(element, commit, *, on_enter=True):
     element.on("blur", lambda _e: commit(element.value), [])
 
 
-def _commit_on_release(element, commit):
-    """Commit a slider value when the drag ends (Quasar lazy 'change')."""
-    element.on("change", lambda _e: commit(element.value))
+def _commit_while_dragging(element, commit):
+    """Commit a slider's value as it is dragged, throttled; the last value always arrives."""
+    element.on("update:model-value", lambda e: commit(e.args), [None], throttle=CHANGE_THROTTLE)
 
 
 # -- bool builders -----------------------------------------------------------
@@ -388,9 +388,11 @@ def _build_slider(settings, name, field, polls):
         ).classes("w-full")
 
     _updating = {"lock": False}
+    # The poll's last-seen value: a commit records what it wrote, so the poll does not push it
+    # back into the slider while the user is still dragging.
+    last = [value]
 
     if not is_disabled:
-        # Live readout only while dragging — do NOT commit until release.
         def on_slider_change(e):
             if not _updating["lock"]:
                 _updating["lock"] = True
@@ -401,12 +403,9 @@ def _build_slider(settings, name, field, polls):
         def commit_slider(val):
             if val is None:
                 return
-            _updating["lock"] = True
-            v = field.type_(val)
-            setattr(settings, name, v)
-            val_input.set_value(v)
-            _updating["lock"] = False
-        _commit_on_release(sl, commit_slider)
+            setattr(settings, name, field.type_(val))
+            last[0] = getattr(settings, name)
+        _commit_while_dragging(sl, commit_slider)
 
         def commit_input(val):
             if _updating["lock"] or val is None:
@@ -414,6 +413,7 @@ def _build_slider(settings, name, field, polls):
             _updating["lock"] = True
             clamped = max(field.min, min(field.max, field.type_(val)))
             setattr(settings, name, clamped)
+            last[0] = getattr(settings, name)
             sl.set_value(clamped)
             val_input.set_value(clamped)
             _updating["lock"] = False
@@ -423,7 +423,7 @@ def _build_slider(settings, name, field, polls):
         def _poll_slider(v, _sl=sl, _vi=val_input):
             _sl.set_value(v)
             _vi.set_value(v)
-        polls.append((settings, name, [value], _poll_slider))
+        polls.append((settings, name, last, _poll_slider))
 
 
 @widget_builder(Widget.log_slider)
@@ -475,8 +475,11 @@ def _build_log_slider(settings, name, field, polls):
             val_input.props(f"step={Widget.log_step(clamp(e.value))}")
     val_input.on_value_change(on_input_change)
 
+    # The poll's last-seen value: a commit records what it wrote, so the poll does not push it
+    # back into the slider while the user is still dragging.
+    last = [value]
+
     if not is_disabled:
-        # Live readout only while dragging — do NOT commit until release.
         def on_slider_change(e):
             if not _updating["lock"]:
                 _updating["lock"] = True
@@ -487,12 +490,9 @@ def _build_log_slider(settings, name, field, polls):
         def commit_slider(pos):
             if pos is None:
                 return
-            _updating["lock"] = True
-            v = field.type_(clamp(Widget.log_value(pos)))
-            setattr(settings, name, v)
-            set_input(v)
-            _updating["lock"] = False
-        _commit_on_release(sl, commit_slider)
+            setattr(settings, name, field.type_(clamp(Widget.log_value(pos))))
+            last[0] = getattr(settings, name)
+        _commit_while_dragging(sl, commit_slider)
 
         def commit_input(val):
             if _updating["lock"] or val is None:
@@ -500,6 +500,7 @@ def _build_log_slider(settings, name, field, polls):
             _updating["lock"] = True
             clamped = field.type_(clamp(float(f"{val:.3g}")))
             setattr(settings, name, clamped)
+            last[0] = getattr(settings, name)
             sl.set_value(Widget.log_position(clamped))
             set_input(clamped)
             _updating["lock"] = False
@@ -511,7 +512,7 @@ def _build_log_slider(settings, name, field, polls):
             _sl.set_value(Widget.log_position(clamp(v)))
             set_input(v)
             _updating["lock"] = False
-        polls.append((settings, name, [value], _poll_log_slider))
+        polls.append((settings, name, last, _poll_log_slider))
 
 
 @widget_builder(Widget.number)
@@ -554,23 +555,27 @@ def _build_knob(settings, name, field, polls):
     def shown(v):
         return field.type_(round(v, decimals)) if v is not None else v
 
-    with ui.column().classes("gap-1 items-center"):
-        _build_field_title(label, desc)
-        kn = Knob(
-            shown(value), min=min_val, max=max_val, step=step,
-            default=field.default, decimals=decimals, readonly=is_disabled,
-        )
+    # The title goes into the knob's caption, above the value and beside the dial.
+    with Knob(
+        shown(value), min=min_val, max=max_val, step=step,
+        default=field.default, decimals=decimals, readonly=is_disabled,
+    ) as kn:
+        _build_field_title(label, desc, classes="truncate max-w-full")
+
+    # The poll's last-seen value: a change records what it wrote, so the poll does not echo it.
+    last = [value]
 
     if not is_disabled:
-        # Answer every commit with the setting's value: the knob shows its own value until then.
+        # Answer every change with the setting's value: the knob shows its own value until then.
         def commit_knob(val):
             if val is not None:
                 setattr(settings, name, field.type_(val))
-            kn.set_value(shown(getattr(settings, name)))
-        kn.on_commit(commit_knob)
+            last[0] = getattr(settings, name)
+            kn.set_value(shown(last[0]))
+        kn.on_change(commit_knob)
 
     if _field_needs_poll(settings, name, field):
-        polls.append((settings, name, [value], lambda v, kn=kn: kn.set_value(shown(v))))
+        polls.append((settings, name, last, lambda v, kn=kn: kn.set_value(shown(v))))
 
 
 # -- enum builders -----------------------------------------------------------
@@ -1590,19 +1595,25 @@ def create_settings_panel(
     .poser-source { border-left: 2px solid #26a69a; padding-left: 6px; }
     .poser-synced { border-left: 2px solid #ffa726; padding-left: 6px; }
 
-    .poser-knob { display: flex; flex-direction: column; align-items: center; width: 56px; }
-    .poser-knob-dial { width: 48px; height: 48px; cursor: grab; touch-action: none; user-select: none; }
+    .poser-knob { display: flex; align-items: center; gap: 6px; }
+    .poser-knob-caption { display: flex; flex-direction: column; align-items: flex-end; min-width: 56px; max-width: 110px; }
+    .poser-knob-dial { width: 40px; height: 40px; flex: none; cursor: grab; touch-action: none; user-select: none; }
     .poser-knob-dragging .poser-knob-dial { cursor: grabbing; }
     .poser-knob-readonly .poser-knob-dial { cursor: default; }
     .poser-knob-track { fill: none; stroke: #424242; stroke-width: 8; stroke-linecap: round; }
     .poser-knob-value { fill: none; stroke: var(--q-primary); stroke-width: 8; stroke-linecap: round; }
     .poser-knob-body { stroke: #0e0e0e; stroke-width: 2; }
     .poser-knob-pointer { stroke: #e0e0e0; stroke-width: 5; stroke-linecap: round; }
-    .poser-knob-text { width: 100%; font-size: 12px; line-height: 18px; text-align: center;
+    /* The value and its editor share one box (border, padding, font), so the digits do not move
+       when editing starts; the editor only lights the border. */
+    .poser-knob-text { width: 100%; box-sizing: border-box; margin: 0; padding: 0 3px;
+                       border: 1px solid #424242; border-radius: 3px;
+                       font-family: inherit; font-size: 12px; line-height: 18px; text-align: right;
                        font-variant-numeric: tabular-nums; cursor: text; }
-    .poser-knob-readonly .poser-knob-text { cursor: default; }
-    .poser-knob-editor { background: #2a2a2a; color: inherit; border: 1px solid var(--q-primary);
-                         border-radius: 3px; outline: none; padding: 0; }
+    .poser-knob-readonly .poser-knob-text { cursor: default; border-color: transparent; }
+    .poser-knob-value-box { position: relative; width: 100%; }
+    .poser-knob-editor { position: absolute; inset: 0; min-width: 0; height: 100%;
+                         background: #2a2a2a; color: inherit; border-color: var(--q-primary); outline: none; }
 
     /* Scaled with transform, not zoom: zoom puts getBoundingClientRect and pointer clientX in
        different spaces in some browsers, and Quasar sliders compare the two. A transform keeps

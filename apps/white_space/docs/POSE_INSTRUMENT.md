@@ -35,7 +35,7 @@ window wider.
 The ground rules, as set:
 
 - About 90 lines per revolution, line and gap equal, is the visual maximum **(site fact)**. It is a
-  guide: a good reason may go past it. It bounds the interval and not the width of a line or a gap
+  guide: a good reason may go past it. It bounds the pitch and not the width of a line or a gap
   (`LIGHT_SYNTH.md`, *The rules*).
 - Full on: every pixel of white and of blue is off or full, since the fixture projects on whatever
   is around it and subtle brightness is lost (`LIGHT_SYNTH.md`, *A light synth*). The mask is the
@@ -66,7 +66,7 @@ The ground rules, as set:
 # Part 1 — Vocabulary
 
 The language of the pattern is the light synth's and is in `LIGHT_SYNTH.md` (*Terms and what
-belongs where*): oscillator, parameter, slot, source, output, interval, pulse width, phase,
+belongs where*): oscillator, parameter, slot, source, output, pitch, interval, pulse width, phase,
 speed, hardness, LFO, envelope, window, reach, taper, push, voice. Standard synth terminology
 where the synth is a synth; our own word where the wall differs. The words of the bridge:
 
@@ -127,7 +127,7 @@ told apart by a colour, each arm playing one oscillator.
 
 ## What each measure means
 
-Each measure is a musical term of the light synth: a parameter of an oscillator (interval, pulse
+Each measure is a musical term of the light synth: a parameter of an oscillator (pitch, pulse
 width, phase, speed), the level of an LFO, a reach. **Primary** measures make the note: the arms,
 each arm one oscillator, the left the white and the right the blue. **Secondary** measures
 modulate a note that is already sounding: the legs and the body bend. The distance, how far the
@@ -137,8 +137,8 @@ person stands from the fixture, is the one measure that is not of the body's pos
 |-------------------|-----------|-------------------------------------------------------------|
 | left shoulder     | primary   | the weight of the white: its pulse width                    |
 | right shoulder    | primary   | the weight of the blue: its pulse width                     |
-| left elbow        | primary   | the pitch of the white: its interval                        |
-| right elbow       | primary   | the pitch of the blue: its interval                         |
+| left elbow        | primary   | the pitch of the white: how fine its lines are              |
+| right elbow       | primary   | the pitch of the blue: how fine its lines are               |
 | leg deviation     | secondary | the sway: the level of an LFO, a vibrato in space           |
 | body bend         | secondary | the flow: the speed of both, outward or inward by the lean  |
 | distance          | secondary | open                                                        |
@@ -237,8 +237,8 @@ are the preset's starting values, tuned on the machine:
 |----------------|-------|-------------------|----------|--------------|-----------------------------------------------|
 | left shoulder  | 0..1  | white pulse width | 0        | 1            | solid white                                   |
 | right shoulder | 0..1  | blue pulse width  | 1        | −1           | no blue                                       |
-| left elbow     | 0..1  | white interval    | 14°      | −1.5 octaves | 5°: finer as the arm folds                    |
-| right elbow    | 0..1  | blue interval     | 14°      | −1.5 octaves | 5°                                            |
+| left elbow     | 0..1  | white pitch       | 25.7     | 46.3 lines   | 72 lines, one every 5°: finer as the arm folds |
+| right elbow    | 0..1  | blue pitch        | 25.7     | 46.3 lines   | 72 lines                                      |
 | body bend      | −1..1 | white speed       | 3.9°/s   | 15°/s        | both colours flowing the way of the lean      |
 | body bend      | −1..1 | blue speed        | −4.5°/s  | 15°/s        | as white's                                    |
 | leg deviation  | 0..1  | the LFO's level   | 0        | 1            | the LFO at full swing                         |
@@ -349,14 +349,16 @@ tuned together, knobs throughout:
 
 | Group           | What it holds                                                                     |
 |-----------------|-----------------------------------------------------------------------------------|
-| `max_lines`     | the visual limit                                                                  |
-| `bypass_all`    | the master bypass: every source muted, every parameter its base (*Playing by hand*) |
-| `white`, `blue` | an oscillator's patch: a slot per parameter, and its push                         |
-| `lfo`           | the LFO: rate, phase, and the level's row                                         |
+| `max_lines`     | the visual limit: the pitch ceiling                                               |
+| `mask`          | width, brightness, the playhead's level in it                                     |
 | `window`        | how far the pattern shows and when: the shape (taper, attack, release) and the reach (width, its bypass, the sync threshold) |
 | `hit`           | the hit: the push's settle time, frames, the mask's flash, the hit button         |
-| `mask`          | width, brightness, the playhead's level in it                                     |
+| `white`, `blue` | an oscillator: its On switch and Bypass All button, a slot per parameter, its push |
+| `lfo`           | the LFO: rate, phase, and the level's row                                         |
 | `dummy`         | *The dummy*                                                                       |
+
+The groups run from the person outward: the mask at the person, the window around them, the hit
+that marks them, then what fills the window, then the tool.
 
 A slot is a row titled with its parameter's name and reads Base · Amount · Curve · Bypass
 (`LIGHT_SYNTH.md`, *Modulation*); every other row has its title too (Push, LFO, Shape, Reach,
@@ -394,11 +396,14 @@ already built (a settings instance keeps its fields). Hence the rules:
 A parameter's base is already the hand's value, so playing by hand is bypassing modulation. Every
 slot has a **Bypass** (`PI.white`, `PI.blue`, and the level of `PI.lfo`): bypassed, the parameter
 is its base while every other parameter keeps following the body, so a pose can be taken apart
-parameter by parameter; lifted, it follows again with its amount as it was. `PI.bypass_all` is
-the master: `connect` is skipped and every parameter is its base, for everyone, live people and
-the dummy alike: the panel draws. `window.width_bypass` holds both reaches at the width without a
-partner, presence still opening and closing them. `hit.hit` marks everyone for `hit.frames` ticks
-as the playhead would. What the body gives is read in the render's data graphs, per person.
+parameter by parameter; lifted, it follows again with its amount as it was. An oscillator's
+**Bypass All** button sets its five ticks at once, and pressed again with all set clears them, so
+the panel draws that colour for everyone, live people and the dummy alike, while the other colour
+and the LFO keep following the body; the ticks are the one state, and can be changed one by one
+after. An oscillator's **On** switch, off, draws nothing for that colour.
+`window.width_bypass` holds both reaches at the width without a partner, presence still opening
+and closing them. `hit.hit` marks everyone for `hit.frames` ticks as the playhead would. What the
+body gives is read in the render's data graphs, per person.
 
 ### Tests
 
