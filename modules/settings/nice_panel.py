@@ -48,6 +48,7 @@ from .nice_util import SafeTimer
 from . import presets
 from .field import Field, Access
 from .widget import Widget
+from .nice_knob import Knob
 from modules.utils import Color, Point2f, Rect
 
 # ---------------------------------------------------------------------------
@@ -265,7 +266,7 @@ def _commit_typed(element, commit, *, on_enter=True):
 
 
 def _commit_on_release(element, commit):
-    """Commit a slider/knob value when the drag ends (Quasar lazy 'change')."""
+    """Commit a slider value when the drag ends (Quasar lazy 'change')."""
     element.on("change", lambda _e: commit(element.value))
 
 
@@ -553,20 +554,20 @@ def _build_knob(settings, name, field, polls):
     def shown(v):
         return field.type_(round(v, decimals)) if v is not None else v
 
-    with ui.column().classes("gap-1"):
+    with ui.column().classes("gap-1 items-center"):
         _build_field_title(label, desc)
-        kn = ui.knob(
-            value=shown(value), min=min_val, max=max_val, step=step,
-            show_value=True, size="lg",
-        ).props(
-            "thickness=0.2" + _lock_prop(is_disabled)
+        kn = Knob(
+            shown(value), min=min_val, max=max_val, step=step,
+            default=field.default, decimals=decimals, readonly=is_disabled,
         )
 
     if not is_disabled:
+        # Answer every commit with the setting's value: the knob shows its own value until then.
         def commit_knob(val):
             if val is not None:
                 setattr(settings, name, field.type_(val))
-        _commit_on_release(kn, commit_knob)
+            kn.set_value(shown(getattr(settings, name)))
+        kn.on_commit(commit_knob)
 
     if _field_needs_poll(settings, name, field):
         polls.append((settings, name, [value], lambda v, kn=kn: kn.set_value(shown(v))))
@@ -1588,6 +1589,20 @@ def create_settings_panel(
 
     .poser-source { border-left: 2px solid #26a69a; padding-left: 6px; }
     .poser-synced { border-left: 2px solid #ffa726; padding-left: 6px; }
+
+    .poser-knob { display: flex; flex-direction: column; align-items: center; width: 56px; }
+    .poser-knob-dial { width: 48px; height: 48px; cursor: grab; touch-action: none; user-select: none; }
+    .poser-knob-dragging .poser-knob-dial { cursor: grabbing; }
+    .poser-knob-readonly .poser-knob-dial { cursor: default; }
+    .poser-knob-track { fill: none; stroke: #424242; stroke-width: 8; stroke-linecap: round; }
+    .poser-knob-value { fill: none; stroke: var(--q-primary); stroke-width: 8; stroke-linecap: round; }
+    .poser-knob-body { stroke: #0e0e0e; stroke-width: 2; }
+    .poser-knob-pointer { stroke: #e0e0e0; stroke-width: 5; stroke-linecap: round; }
+    .poser-knob-text { width: 100%; font-size: 12px; line-height: 18px; text-align: center;
+                       font-variant-numeric: tabular-nums; cursor: text; }
+    .poser-knob-readonly .poser-knob-text { cursor: default; }
+    .poser-knob-editor { background: #2a2a2a; color: inherit; border: 1px solid var(--q-primary);
+                         border-radius: 3px; outline: none; padding: 0; }
 
     /* Scaled with transform, not zoom: zoom puts getBoundingClientRect and pointer clientX in
        different spaces in some browsers, and Quasar sliders compare the two. A transform keeps
