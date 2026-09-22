@@ -34,7 +34,7 @@ export default {
         <div class="poser-knob-value-box">
           <div class="poser-knob-text" :style="{ visibility: editing ? 'hidden' : 'visible' }"
                @click="startEdit">{{ text }}</div>
-          <input v-if="editing" ref="editor" class="poser-knob-text poser-knob-editor" :value="text"
+          <input v-if="editing" ref="editor" class="poser-knob-text poser-knob-editor"
                  @keydown.enter.prevent="finishEdit(true)" @keydown.esc.prevent="finishEdit(false)"
                  @blur="finishEdit(true)" />
         </div>
@@ -56,6 +56,9 @@ export default {
               class="poser-knob-pointer" />
       </svg>
     </div>`,
+  // Declared, so the "change" listener is not also bound to the root as a native DOM listener,
+  // where the editor's own change event would bubble into it.
+  emits: ["change"],
   props: {
     value: Number,
     min: Number,
@@ -182,7 +185,10 @@ export default {
     startEdit() {
       if (this.readonly) return;
       this.editing = true;
+      // The editor's text is set once here, not bound: a bound value is written back into the
+      // input on every re-render (a server update of this knob), wiping what is being typed.
       this.$nextTick(() => {
+        this.$refs.editor.value = this.text;
         this.$refs.editor.focus();
         this.$refs.editor.select();
       });

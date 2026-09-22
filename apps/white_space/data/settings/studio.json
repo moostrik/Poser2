@@ -876,6 +876,13 @@
       "attack_seconds": 1.0,
       "release_seconds": 1.5
     },
+    "measures": {
+      "arm_neutral": 10.0,
+      "arm_raised": 10.0,
+      "bend_neutral": 0.1,
+      "legs_neutral": 0.1,
+      "legs_full": 0.0
+    },
     "white_lines": {
       "enabled": true,
       "mirror": true,
@@ -888,7 +895,7 @@
       "pulse_width_curve": "LINEAR",
       "pulse_width_bypass": false,
       "phase": 0.0,
-      "phase_amount": 0.25,
+      "phase_amount": 0.125,
       "phase_curve": "LINEAR",
       "phase_bypass": false,
       "speed": 3.9,
@@ -903,7 +910,7 @@
       "push_release_seconds": 0.15
     },
     "blue_lines": {
-      "enabled": false,
+      "enabled": true,
       "mirror": true,
       "pitch": 25.7,
       "pitch_amount": 46.3,
@@ -914,7 +921,7 @@
       "pulse_width_curve": "LINEAR",
       "pulse_width_bypass": false,
       "phase": 0.5,
-      "phase_amount": 0.0,
+      "phase_amount": -0.125,
       "phase_curve": "LINEAR",
       "phase_bypass": false,
       "speed": -4.5,
@@ -942,16 +949,16 @@
       "azimuth": 180.0,
       "distance": 0.5,
       "torso": 0.0,
-      "left_shoulder": 340.0,
-      "right_shoulder": 340.0,
-      "left_elbow": 192.0,
-      "right_elbow": 192.0,
+      "left_shoulder": 265.0,
+      "right_shoulder": 265.0,
+      "left_elbow": 179.0,
+      "right_elbow": 90.0,
       "left_hip": 170.0,
       "right_hip": 171.0,
       "left_knee": 188.0,
       "right_knee": 188.0,
       "morph": 0.5,
-      "pose": "neutral",
+      "pose": "arms out level, a T",
       "name": ""
     }
   },

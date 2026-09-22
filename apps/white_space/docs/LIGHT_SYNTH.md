@@ -303,7 +303,7 @@ is played, as a synth's mod wheel brings in the vibrato, and an envelope into it
 
 A voice has one LFO, **in time**: it has one position, so no interval and no speed, and what it
 has is a **rate**, in cycles per second, and a phase. Its output is one value per tick, and where
-it goes is the wiring's choice (`POSE_INSTRUMENT.md`, *The connections*: into a phase, a sway).
+it goes is the wiring's choice (`POSE_INSTRUMENT.md`, *The connections*).
 An LFO along the wall, with an interval and a speed and one value per pixel, is not built.
 
 | An LFO         | Into a pulse width                                  | Into a phase                              |

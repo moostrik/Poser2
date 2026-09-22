@@ -124,28 +124,28 @@ points is tied to a pose.
 The rules are aims, not gates. Two things are fixed: arms hanging is full blue and arms raised is
 full white. Every combination drawing differently (rule 7) is the aim in the end, not a test of
 each step. A calculation on several measures may live in the instrument while it is tried; once
-the result is liked it moves into the pose pipeline (rule 1). The connections depart from rule 4
-as such an experiment: the two arms are told apart by a colour, each arm playing one oscillator.
+the result is liked it moves into the pose pipeline (rule 1): the shoulders' mean and difference
+are such calculations. The elbows depart from rule 4 as an experiment: each elbow plays its own
+colour's pitch.
 
 ## What each measure means
 
 Each measure is a musical term of the light synth: a parameter of an oscillator (pitch, pulse
 width, phase, speed), the level of an LFO, a reach. **Primary** measures make the note: the arms,
-each arm one oscillator, the left the white and the right the blue. **Secondary** measures
-modulate a note that is already sounding: the legs and the body bend. The distance, how far the
-person stands from the fixture, is the one measure that is not of the body's pose.
+worked out in `MATRIX.md`. **Secondary** measures modulate a note that is already sounding: the
+legs and the body bend. The distance, how far the person stands from the fixture, is the one
+measure that is not of the body's pose.
 
-| Measure           | Role      | Term                                                        |
-|-------------------|-----------|-------------------------------------------------------------|
-| left shoulder     | primary   | the weight of the white: its pulse width                    |
-| right shoulder    | primary   | the weight of the blue: its pulse width                     |
-| left elbow        | primary   | the pitch of the white: how fine its lines are              |
-| right elbow       | primary   | the pitch of the blue: how fine its lines are               |
-| leg deviation     | secondary | the sway: the level of an LFO, a vibrato in space           |
-| body bend         | secondary | the flow: the speed of both, outward or inward by the lean  |
-| distance          | secondary | open                                                        |
-| shoulder symmetry | secondary | open                                                        |
-| elbow symmetry    | secondary | open: it shows unconnected, as the colours in or out of tune |
+| Measure             | Role      | Term                                                            |
+|---------------------|-----------|-----------------------------------------------------------------|
+| shoulders (mean)    | primary   | the balance of white and blue: both pulse widths                |
+| shoulder difference | primary   | where the colours sit against each other: both phases           |
+| left elbow          | primary   | the white: its fold the pitch, its turn the flow                |
+| right elbow         | primary   | the blue: its fold the pitch, its turn the flow                 |
+| leg deviation       | secondary | open                                                            |
+| body bend           | secondary | open: parked as the voice's time rate (`MATRIX.md`)             |
+| distance            | secondary | open                                                            |
+| elbow symmetry      | secondary | open: it shows unconnected, as the colours in or out of tune    |
 
 Two events sit over every measure: the **accent** of a hit and the **unison** of sync, the windows
 of two people opening toward each other until the two patterns overlap and become one (*Events*).
@@ -176,15 +176,15 @@ not described.
 |---------------------------------------------|------------------------------------------------------------------|
 | neutral                                     | full blue over the window: the blue ping                         |
 | raised                                      | full white over the window, no blue: the bass                    |
-| arms out level, a T                         | white and blue lines, each half the interval wide, alternating   |
-| left arm up, right hanging                  | white and blue both solid: the overlap tone over the window      |
-| right arm up, left hanging                  | dark but for the mask                                            |
+| arms out level, a T                         | white and blue lines, each half the interval, touching           |
+| left arm up, right hanging                  | the T's widths, a quarter interval overlapping and dark          |
+| right arm up, left hanging                  | the same, the overlap and the dark on the other edges            |
 | a T, both elbows folded                     | the T's lines, finer, white and blue still in tune               |
 | a T, left elbow folded                      | the white lines finer than the blue: the colours slide apart     |
 | a T, right elbow folded                     | the blue lines finer than the white: the colours slide apart     |
-| a T, leaning left                           | the T's lines flowing inward                                     |
-| a T, leaning right                          | the T's lines flowing outward                                    |
-| a T, in a crouch                            | the white lines swaying against a still blue                     |
+| a T, leaning left                           | the T: the bend plays nothing                                    |
+| a T, leaning right                          | the T: the bend plays nothing                                    |
+| a T, in a crouch                            | the T: the legs play nothing                                     |
 
 ## The body
 
@@ -241,21 +241,24 @@ A **connection** is one measure as the source in one parameter's slot (`LIGHT_SY
 the range and the direction. A measure may feed several parameters; a slot has one source; two
 measures never sum into one parameter.
 
-Each arm plays one oscillator, the left the white and the right the blue. The bases and amounts
-are the preset's starting values, tuned on the machine:
+The arms are `MATRIX.md`'s Option 2. The bases and amounts are the preset's starting values,
+tuned on the machine:
 
-| Source         | Range | Parameter         | Base     | Amount       | At full                                       |
-|----------------|-------|-------------------|----------|--------------|-----------------------------------------------|
-| left shoulder  | 0..1  | white pulse width | 0        | 1            | solid white                                   |
-| right shoulder | 0..1  | blue pulse width  | 1        | −1           | no blue                                       |
-| left elbow     | 0..1  | white pitch       | 25.7     | 46.3 lines   | 72 lines, one every 5°: finer as the arm folds |
-| right elbow    | 0..1  | blue pitch        | 25.7     | 46.3 lines   | 72 lines                                      |
-| body bend      | −1..1 | white speed       | 3.9°/s   | 15°/s        | both colours flowing the way of the lean      |
-| body bend      | −1..1 | blue speed        | −4.5°/s  | 15°/s        | as white's                                    |
-| leg deviation  | 0..1  | the LFO's level   | 0        | 1            | the LFO at full swing                         |
-| the LFO        | −1..1 | white phase       | 0        | ¼ interval   | white swaying ¼ interval each way, at 0.5 Hz  |
+| Source              | Range | Parameter         | Base    | Amount     | At full                                        |
+|---------------------|-------|-------------------|---------|------------|------------------------------------------------|
+| shoulders (mean)    | 0..1  | white pulse width | 0       | 1          | solid white                                    |
+| shoulders (mean)    | 0..1  | blue pulse width  | 1       | −1         | no blue                                        |
+| shoulder difference | −1..1 | white phase       | 0       | ⅛ interval | the colours a quarter interval closer          |
+| shoulder difference | −1..1 | blue phase        | ½       | −⅛ interval | as white's, the other way                     |
+| left elbow          | 0..1  | white pitch       | 25.7    | 46.3 lines | 72 lines, one every 5°: finer as the arm folds |
+| right elbow         | 0..1  | blue pitch        | 25.7    | 46.3 lines | 72 lines                                       |
+| left elbow turn     | −1..1 | white speed       | 3.9°/s  | 15°/s      | white flowing one way at +90°, back at −90°    |
+| right elbow turn    | −1..1 | blue speed        | −4.5°/s | 15°/s      | as white's                                     |
+| leg deviation       | 0..1  | the LFO's level   | 0       | 1          | the LFO at full swing; the LFO feeds nothing   |
 
-Unconnected: the symmetries, the distance, blue's phase, the hardness.
+An elbow's turn is the sine of its signed angle: still when straight and when fully folded, where
++180° and −180° are one pose (`MATRIX.md`, Option 2). Unconnected: the body bend, the LFO, the
+symmetries, the distance, the hardness.
 
 ## Events
 
@@ -278,15 +281,17 @@ bridge's and not the synth's.
 
 What follows from the connections, before the machine has been judged **(deductions)**:
 
-- The four corners of the two shoulders are the four tones of the palette: both hanging blue, both
-  raised white, the left up alone the overlap tone, the right up alone dark. Every combination of
-  the two arms draws differently.
+- Level shoulders tile the wall: white's width and blue's add up to the interval and blue sits half
+  an interval from white, so every pixel is one colour, from full blue through the T to full white.
+  A shoulder difference opens the tiling: on one edge of each line the overlap tone, on the other
+  dark, a quarter interval each with one arm up alone; which edge says which arm.
 - The elbows' symmetry shows by itself, unconnected: equally folded, white and blue share one
   interval and stay in tune; unequally, the colours slide past each other with distance
   (`LIGHT_SYNTH.md`, *In the pose instrument*).
 - An elbow shows nothing while its own colour is solid or dark: the pitch needs a note.
-- The legs and the bend show nothing where both colours are solid or dark, as rule 9 expects.
-- A lean also moves the leg deviation (*Open*), so leaning brings some sway with the flow.
+- An elbow's turn, like its fold, shows nothing while its colour is solid or dark.
+- Unequal elbows also open the tiling, as a moiré that changes along the wall; whether it reads
+  apart from the shoulder difference's even gaps is to be seen.
 
 Once the connections have been played on the machine, the *Pose results* are read back here: what
 each row draws, against what it should.
@@ -435,10 +440,11 @@ bridge in `test_pose_instrument.py`; the dummy in `test_dummy.py`.
 ### The pose results now
 
 The rows of *Pose results* draw what that table says, in the unit tests
-(`tests/test_pose_instrument.py`: the four corners of the shoulders, one shoulder moving its own
-colour only, an elbow making its own colour finer, equal elbows in tune, the lean's flow both
-ways, the legs' sway against a still blue, and a small move of any arm measure a small change of
-the picture). What they draw on the machine has not been judged yet.
+(`tests/test_pose_instrument.py`: the two fixed points, one shoulder moving both colours, one arm
+up alone half of each with left and right drawn differently, level shoulders tiling and a
+difference opening a quarter of overlap and of dark, an elbow making its own colour finer, equal
+elbows in tune, an elbow's turn flowing its own colour either way, and a small move of any arm
+measure a small change of the picture). What they draw on the machine has not been judged yet.
 
 ### The dummy
 
@@ -461,10 +467,10 @@ The open questions of the synth itself are in `LIGHT_SYNTH.md`, *Open*.
 
 Meaning and connections:
 
-- Whether the connections of Part 3 can be found with the body: each arm an oscillator, the flow,
-  the sway; and what the symmetries should play
-- Whether the two extreme corners of the shoulders, the overlap tone everywhere and dark, read as
-  striking or as broken on the projection
+- Whether the connections of Part 3 can be found with the body: the shoulders' balance and
+  difference, the elbows' pitch and flow; what the legs, the bend and the symmetries should play
+- Whether left up alone and right up alone read apart on the wall: they differ only in which edge
+  of each line has the overlap and which the dark, a quarter interval (3.5° at 14°)
 - Which of the instrument's departures from the rules of meaning stay, and which calculations move
   into the pose pipeline, once the result is liked
 - The lean moves the hips' reading by the lean, on the dummy as on a person, so at full lean the

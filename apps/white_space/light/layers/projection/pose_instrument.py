@@ -236,35 +236,41 @@ class PoseInstrument(ProjectionLayer):
         amounts, the range and the direction, are the ``PI.white_lines`` / ``PI.blue_lines``
         settings.
 
-        Each arm plays one oscillator, the left the white and the right the blue:
+        The arms are ``docs/MATRIX.md``'s Option 2:
 
-        - the shoulder: its pulse width (white's base 0 and amount 1, blue's base 1 and amount −1:
-          arms hanging is full blue, arms raised full white)
-        - the elbow: its pitch, more lines as the arm folds
-        - the body bend, signed: both speeds, so a lean makes the lines flow one way or the other
-        - the LFO (its level played by the legs, ``connect_lfo``): white's phase, a sway
-        - the symmetries, the distance, blue's phase, the hardness: unconnected
+        - the shoulders, the mean of the two: both pulse widths (white's base 0 and amount 1,
+          blue's base 1 and amount −1: arms hanging is full blue, arms raised full white)
+        - the shoulder difference, left minus right: both phases, opposite ways (white's amount
+          ⅛, blue's −⅛), so which arm is higher shows as where the colours sit against each other
+        - each elbow plays its own colour, the left the white and the right the blue: its fold is
+          the pitch, its turn (the sine of its signed angle) the speed, one way at +90° and the
+          other at −90°, still when straight and when fully folded
+        - the body bend, the LFO, the symmetries, the distance, the hardness: unconnected
 
-        Every measure passes its dead zones first (``PI.measures``).
+        Every arm measure but the turn passes its dead zones first (``PI.measures``). The mean,
+        the difference and the turn are computed here while the matrix is tried; once liked they
+        move into the pipeline.
         """
-        M = self._instrument.measures
-        flow = math.copysign(self._remap(abs(p.tilt), M.bend_neutral, 1.0), p.tilt)
+        left, right = self._measure(p.left_shoulder), self._measure(p.right_shoulder)
+        shoulders = (left + right) / 2.0
+        difference = left - right
         white = {
-            Parameter.PULSE_WIDTH: self._measure(p.left_shoulder),
+            Parameter.PULSE_WIDTH: shoulders,
             Parameter.PITCH:       self._measure(p.left_elbow),
-            Parameter.SPEED:       flow,
-            Parameter.PHASE:       p.voice.lfo,
+            Parameter.PHASE:       difference,
+            Parameter.SPEED:       math.sin(p.left_elbow),
         }
         blue = {
-            Parameter.PULSE_WIDTH: self._measure(p.right_shoulder),
+            Parameter.PULSE_WIDTH: shoulders,
             Parameter.PITCH:       self._measure(p.right_elbow),
-            Parameter.SPEED:       flow,
+            Parameter.PHASE:       difference,
+            Parameter.SPEED:       math.sin(p.right_elbow),
         }
         return white, blue
 
     def connect_lfo(self, p: _Player) -> float:
-        """The source of the LFO's level: the leg deviation, so bent knees bring the sway in;
-        through its dead zones (``PI.measures``)."""
+        """The source of the LFO's level: the leg deviation, through its dead zones
+        (``PI.measures``). The LFO feeds no parameter in Option 1; it is there when one needs it."""
         M = self._instrument.measures
         return self._remap(p.legs, M.legs_neutral, 1.0 - M.legs_full)
 
