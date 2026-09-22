@@ -39,7 +39,12 @@
     "left_shoulder": 265.0, "right_shoulder": 265.0, "left_elbow": 179.0, "right_elbow": 359.0,
     "left_hip": 170.0, "right_hip": 171.0, "left_knee": 188.0, "right_knee": 188.0
   },
-  "a T, leaning": {
+  "a T, leaning left": {
+    "azimuth": 180.0, "torso": -45.0,
+    "left_shoulder": 265.0, "right_shoulder": 265.0, "left_elbow": 179.0, "right_elbow": 179.0,
+    "left_hip": 170.0, "right_hip": 171.0, "left_knee": 188.0, "right_knee": 188.0
+  },
+  "a T, leaning right": {
     "azimuth": 180.0, "torso": 45.0,
     "left_shoulder": 265.0, "right_shoulder": 265.0, "left_elbow": 179.0, "right_elbow": 179.0,
     "left_hip": 170.0, "right_hip": 171.0, "left_knee": 188.0, "right_knee": 188.0

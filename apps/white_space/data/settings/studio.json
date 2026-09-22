@@ -879,6 +879,7 @@
     },
     "white_lines": {
       "enabled": true,
+      "mirror": true,
       "pitch": 25.7,
       "pitch_amount": 46.3,
       "pitch_curve": "LINEAR",
@@ -903,7 +904,8 @@
       "push_release_seconds": 0.15
     },
     "blue_lines": {
-      "enabled": true,
+      "enabled": false,
+      "mirror": true,
       "pitch": 25.7,
       "pitch_amount": 46.3,
       "pitch_curve": "LINEAR",

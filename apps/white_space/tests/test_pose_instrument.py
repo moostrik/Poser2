@@ -90,6 +90,8 @@ class PoseInstrumentTest(unittest.TestCase):
     def setUp(self) -> None:
         self.cfg = PoseInstrumentSettings()
         self.cfg.window.attack_seconds = 0.0              # present at once — geometry tests read one frame
+        M = self.cfg.measures                             # no dead zones: the tests read the raw measures
+        M.arm_neutral = M.arm_raised = M.bend_neutral = M.legs_neutral = M.legs_full = 0.0
         W, B = self.cfg.white_lines, self.cfg.blue_lines              # the placeholder's patch: white out, blue in
         W.pulse_width, W.pulse_width_amount, W.phase = 0.0, 1.0, self.QUARTER
         B.pulse_width, B.pulse_width_amount, B.phase = 1.0, -1.0, -0.5 + self.QUARTER
@@ -162,6 +164,23 @@ class PoseInstrumentTest(unittest.TestCase):
         # The sign is the side of the body the arm passes; straight up is π from either side.
         for angle in (shoulder(0.5), -shoulder(0.5)):
             self.assertAlmostEqual(self._connect(_pose(0.5, left_shoulder=angle))[0][Parameter.PULSE_WIDTH], 0.5, places=5)
+
+    def test_the_dead_zones_come_off_either_end_of_an_arm_angle(self) -> None:
+        M = self.cfg.measures
+        M.arm_neutral = M.arm_raised = 10.0
+        for degrees, expected in ((5.0, 0.0), (10.0, 0.0), (20.0, 10 / 160), (90.0, 0.5), (170.0, 1.0), (175.0, 1.0)):
+            white, _ = self._connect(_pose(0.5, left_shoulder=math.radians(degrees)))
+            self.assertAlmostEqual(white[Parameter.PULSE_WIDTH], expected, places=5, msg=f"{degrees}°")
+
+    def test_the_bend_and_the_legs_have_dead_zones_too(self) -> None:
+        M = self.cfg.measures
+        M.bend_neutral, M.legs_neutral, M.legs_full = 0.1, 0.1, 0.05
+        for tilt, expected in ((0.05, 0.0), (-0.05, 0.0), (-0.55, -0.5), (1.0, 1.0)):
+            white, _ = self._connect(_pose(0.5, tilt=tilt))
+            self.assertAlmostEqual(white[Parameter.SPEED], expected, places=5, msg=f"tilt {tilt}")
+        for legs, expected in ((0.05, 0.0), (0.1, 0.0), (0.525, 0.5), (0.95, 1.0)):
+            self._connect(_pose(0.5, legs=legs))
+            self.assertAlmostEqual(self.layer.connect_lfo(self.layer._players[0]), expected, places=5, msg=f"legs {legs}")
 
     def test_the_distance_is_a_source_that_plays_nothing_yet(self) -> None:
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, distance=0.0)})

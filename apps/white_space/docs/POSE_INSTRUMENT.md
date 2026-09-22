@@ -182,7 +182,8 @@ not described.
 | a T, both elbows folded                     | the T's lines, finer, white and blue still in tune               |
 | a T, left elbow folded                      | the white lines finer than the blue: the colours slide apart     |
 | a T, right elbow folded                     | the blue lines finer than the white: the colours slide apart     |
-| a T, leaning                                | the T's lines flowing, outward one way and inward the other      |
+| a T, leaning left                           | the T's lines flowing inward                                     |
+| a T, leaning right                          | the T's lines flowing outward                                    |
 | a T, in a crouch                            | the white lines swaying against a still blue                     |
 
 ## The body
@@ -216,6 +217,20 @@ both poses and π is the fold from there. The readings are tuned in the panel, a
 the dummy. The sign of an angle is the side of the body the limb passes, outward or across, and
 means nothing to the instrument: a measure is the absolute over π, 0..1, so an arm raised outward
 and one raised across the body read alike.
+
+The bridge puts a **dead zone** on each measure before it becomes a source (`PI.measures`): the
+measure reads 0 up to its neutral zone, 1 from its far zone on, and linear between; continuous,
+so never a jump. A hanging arm reads a few degrees and a raised one stops short of π, so without
+the zones the two fixed points are never quite reached and the pattern never quite rests.
+
+| Measure       | Dead zone                                 | Setting                                  |
+|---------------|-------------------------------------------|------------------------------------------|
+| arm angles    | around neutral and around raised, degrees | `measures.arm_neutral`, `arm_raised`     |
+| body bend     | around upright, a fraction                | `measures.bend_neutral`                  |
+| leg deviation | at standing and at full, fractions        | `measures.legs_neutral`, `legs_full`     |
+
+The distance and the symmetries get theirs with their connection; the similarity has its own
+remap, `window.sync_threshold`.
 
 ## Symmetry
 
@@ -319,8 +334,8 @@ elbow together per side), the legs (hip and knee together per side, weighted as 
 is, by its settings).
 
 The connections are code, not settings: one method, `PoseInstrument.connect`, takes a person's
-measures and returns the sources of the white and the blue oscillator's slots, and it hot-reloads
-on save. It is *The connections* written out; `connect_lfo` beside it gives the LFO's level its
+measures, through their dead zones (*The body*), and returns the sources of the white and the
+blue oscillator's slots, and it hot-reloads on save. It is *The connections* written out; `connect_lfo` beside it gives the LFO's level its
 source, and runs first each tick so `connect` can read the LFO's output. The bases and the amounts,
 the range and the direction of every connection, are settings, so the panel keeps the values and
 the code keeps the routing. The preset carries values only.
@@ -360,17 +375,19 @@ tuned together, knobs throughout:
 | `mask`          | the mask: width, its white and blue; the flash: its white and blue, its release  |
 | `playhead`      | the playhead's marker: width, its white and blue, its level inside a mask         |
 | `window`        | how far the pattern shows and when: the shape (taper, attack, release) and the reach (width, its bypass, the sync threshold) |
+| `measures`      | the dead zones on the measures: the arms in degrees, the bend and the legs as fractions (*The body*) |
 | `white_lines`, `blue_lines` | an oscillator: its On and Mirror switches and Bypass All button, a slot per parameter, its push (amount, release) |
 | `lfo`           | the LFO: rate, phase, and the level's row                                         |
 | `dummy`         | *The dummy*                                                                       |
 
 The groups run from the person outward: the mask at the person, the marker that passes them, the
-window around them, then what fills the window, then the tool. Wherever a mark has a level per
-channel the two settings are `white` and `blue`; the oscillators are the lines.
+window around them, what the body gives, then what fills the window, then the tool. Wherever a
+mark has a level per channel the two settings are `white` and `blue`; the oscillators are the
+lines.
 
 A slot is a row titled with its parameter's name and reads Base · Amount · Curve · Bypass
 (`LIGHT_SYNTH.md`, *Modulation*); every other row has its title too (Push, LFO, Shape, Reach,
-Mask, Flash, Playhead), so the panel reads the same way throughout.
+Mask, Flash, Playhead, Arms, Bend, Legs), so the panel reads the same way throughout.
 
 The synth's settings classes (`OscillatorSettings`, `LfoSettings`, `WindowSettings`) are extended
 by the bridge's where a concept spans both (`window`); the voice reads only its own fields. The

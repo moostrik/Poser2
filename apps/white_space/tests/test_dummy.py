@@ -32,7 +32,8 @@ POSES_FILE = json.loads(POSES.read_text(encoding='utf-8'))
 NEUTRAL = Measures(**POSES_FILE['neutral'])                     # the saved neutral: a body's, not the extractor's zero
 UP = Measures(**POSES_FILE['raised'])                           # the calibrator's two reference poses
 ROWS = ('neutral', 'raised', 'arms out level, a T', 'left arm up, right hanging', 'right arm up, left hanging',
-        'a T, both elbows folded', 'a T, left elbow folded', 'a T, right elbow folded', 'a T, leaning', 'a T, in a crouch')
+        'a T, both elbows folded', 'a T, left elbow folded', 'a T, right elbow folded', 'a T, leaning left', 'a T, leaning right',
+        'a T, in a crouch')
 
 
 def from_neutral(**deltas: float) -> Measures:
@@ -191,9 +192,11 @@ class ReadingsTest(unittest.TestCase):
         np.testing.assert_allclose(elbows(row('a T, both elbows folded')), (1.0, 1.0), atol=0.02)
         np.testing.assert_allclose(elbows(row('a T, left elbow folded')), (1.0, 0.0), atol=0.02)
         np.testing.assert_allclose(elbows(row('a T, right elbow folded')), (0.0, 1.0), atol=0.02)
-        leaning = row('a T, leaning')
-        self.assertAlmostEqual(leaning[TorsoTilt].value, 1.0, delta=0.02)
-        self.assertAlmostEqual(leaning[LegDeviation].value, 0.75, delta=0.05)     # the lean moves the hips' reading
+        for name, bend in (('a T, leaning left', -1.0), ('a T, leaning right', 1.0)):
+            with self.subTest(pose=name):
+                leaning = row(name)
+                self.assertAlmostEqual(leaning[TorsoTilt].value, bend, delta=0.02)
+                self.assertAlmostEqual(leaning[LegDeviation].value, 0.75, delta=0.05)     # the lean moves the hips' reading
         crouch = row('a T, in a crouch')
         self.assertAlmostEqual(crouch[LegDeviation].value, 1.0, delta=0.02)
         self.assertAlmostEqual(crouch[TorsoTilt].value, 0.0, delta=0.02)

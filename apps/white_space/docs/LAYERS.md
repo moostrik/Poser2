@@ -149,7 +149,8 @@ composes people, and what it exposes.
   *Inputs*), the pairwise `Similarity` row (`SIMILARITY.md`: how alike the arm postures are, 0 to 1, 1 within
   the tolerance, weighted at neutral) and `PlayheadOffset`. The measures are also sent to Max, so
   sound and light read the same values (`SOUND.md`, *Conversion table*). The layer adds no smoothing: the
-  LERP poses are the pipeline's smoothed output.
+  LERP poses are the pipeline's smoothed output. Each measure passes the dead zones of
+  `PI.measures` before it becomes a source (`POSE_INSTRUMENT.md`, *The body*).
 - **Per person**: a voice of the light synth (`light/synth`, `LIGHT_SYNTH.md`), its output 1
   drawn in white and its output 2 in blue. `PoseInstrument.connect` turns the measures into the
   sources of the voice's slots (`POSE_INSTRUMENT.md`, *The connections*). The pattern is drawn

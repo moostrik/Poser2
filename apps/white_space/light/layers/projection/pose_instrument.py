@@ -71,14 +71,25 @@ class MaskSettings(BaseSettings):
     flash_release_seconds: Field[float] = Field(0.3, min=0.0, max=2.0,  step=0.05, widget=KNOB, label="Release", description="Flash falls back to the mask's levels over (s)")
 
 
+class MeasureSettings(BaseSettings):
+    """The measures: the dead zones the bridge puts on what the body gives before it becomes a
+    source. A measure reads 0 up to its neutral zone, 1 from its far zone on, linear between."""
+    arm_neutral:  Field[float] = Field(10.0, min=0.0, max=45.0, step=0.5,  widget=KNOB, label="Neutral", description="Arm angles within this of neutral read 0 (deg)", row_label="Arms", newline=True)
+    arm_raised:   Field[float] = Field(10.0, min=0.0, max=45.0, step=0.5,  widget=KNOB, label="Raised",  description="Arm angles within this of raised read 1 (deg)")
+    bend_neutral: Field[float] = Field(0.1,  min=0.0, max=0.5,  step=0.01, widget=KNOB, label="Neutral", description="Body bend within this of straight reads 0 (fraction)", row_label="Bend", newline=True)
+    legs_neutral: Field[float] = Field(0.1,  min=0.0, max=0.5,  step=0.01, widget=KNOB, label="Neutral", description="Leg deviation within this of standing reads 0 (fraction)", row_label="Legs", newline=True)
+    legs_full:    Field[float] = Field(0.0,  min=0.0, max=0.5,  step=0.01, widget=KNOB, label="Full",    description="Leg deviation within this of full reads 1 (fraction)")
+
+
 class PoseInstrumentSettings(BaseSettings):
     """The ``PI`` root group, a group per concept: the mask, the playhead's marker, the window,
-    the two oscillators and the LFO (the synth's patch, a slot per parameter), the dummy. The
-    wiring is ``connect``."""
+    the measures' dead zones, the two oscillators and the LFO (the synth's patch, a slot per
+    parameter), the dummy. The wiring is ``connect``."""
     max_lines:   Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
     mask:        Group[MaskSettings]           = Group(MaskSettings)
     playhead:    Group[PlayheadMarkerSettings] = Group(PlayheadMarkerSettings)
     window:      Group[WindowSettings]         = Group(WindowSettings)
+    measures:    Group[MeasureSettings]        = Group(MeasureSettings)
     white_lines: Group[OscillatorSettings]     = Group(OscillatorSettings)
     blue_lines:  Group[OscillatorSettings]     = Group(OscillatorSettings)
     lfo:         Group[LfoSettings]            = Group(LfoSettings)
@@ -233,8 +244,11 @@ class PoseInstrument(ProjectionLayer):
         - the body bend, signed: both speeds, so a lean makes the lines flow one way or the other
         - the LFO (its level played by the legs, ``connect_lfo``): white's phase, a sway
         - the symmetries, the distance, blue's phase, the hardness: unconnected
+
+        Every measure passes its dead zones first (``PI.measures``).
         """
-        flow = min(max(p.tilt, -1.0), 1.0)
+        M = self._instrument.measures
+        flow = math.copysign(self._remap(abs(p.tilt), M.bend_neutral, 1.0), p.tilt)
         white = {
             Parameter.PULSE_WIDTH: self._measure(p.left_shoulder),
             Parameter.PITCH:       self._measure(p.left_elbow),
@@ -249,16 +263,25 @@ class PoseInstrument(ProjectionLayer):
         return white, blue
 
     def connect_lfo(self, p: _Player) -> float:
-        """The source of the LFO's level: the leg deviation, so bent knees bring the sway in."""
-        return min(max(p.legs, 0.0), 1.0)
+        """The source of the LFO's level: the leg deviation, so bent knees bring the sway in;
+        through its dead zones (``PI.measures``)."""
+        M = self._instrument.measures
+        return self._remap(p.legs, M.legs_neutral, 1.0 - M.legs_full)
 
-    @staticmethod
-    def _measure(angle: float) -> float:
+    def _measure(self, angle: float) -> float:
         """An angle as a measure 0..1: the pipeline's angles are calibrated so neutral is 0 and
         the raised pose π (``AngleCalibrator``), and π is the feature's range, not a tunable. The
         sign is the side of the body the limb passes, which the design gives no meaning, so the
-        absolute is taken."""
-        return min(max(abs(angle) / math.pi, 0.0), 1.0)
+        absolute is taken. The dead zones of ``PI.measures`` around neutral and raised come off
+        either end, so both fixed points are reached."""
+        M = self._instrument.measures
+        return self._remap(abs(angle), math.radians(M.arm_neutral), math.pi - math.radians(M.arm_raised))
+
+    @staticmethod
+    def _remap(x: float, lo: float, hi: float) -> float:
+        """``x`` as 0..1 between ``lo`` and ``hi``, clamped: a dead zone below ``lo`` and above
+        ``hi``, linear between; continuous, so never a jump."""
+        return min(max((x - lo) / max(hi - lo, 1e-6), 0.0), 1.0)
 
     # -- Reach and sync ---------------------------------------------------------------
 
