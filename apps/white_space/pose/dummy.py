@@ -2,9 +2,10 @@
 
 The dummy stands in for a person while the pose instrument is judged (``docs/POSE_INSTRUMENT.md``,
 *The dummy*): a standing figure of the pipeline's 17 landmarks whose joints are set by the
-``PI.dummy`` settings, each joint's degrees the angle the angle extractor reads at it when the
-figure is upright (the shoulder 0 hanging, 90 across, 180 up, 270 out; the elbow 180 straight,
-0 folded; the hip 180 standing; the knee 180 straight), and whose frame enters the LERP stage
+``PI.dummy`` settings, each joint's degrees −180..180 from its rest (the shoulder 0 hanging, 90
+across, ±180 up, −90 out; the elbow 0 straight, ±180 folded; the hip 0 standing, 90 leg out level;
+the knee 0 straight, 90 bent): the angle the angle extractor reads at it when the figure is
+upright, less the rest's reading (``REST``), and whose frame enters the LERP stage
 before the filters, so it is extracted, drawn, heard in Max and lit exactly as a person is. With ``solo`` the live
 players' frames are left out at that merge, so from the LERP filters on the dummy is the only pose;
 the tracker and the earlier stages still see them.
@@ -45,14 +46,14 @@ class DummySettings(BaseSettings):
     azimuth:        Field[float]     = Field(180.0, min=0.0,   max=360.0, step=1.0, description="Where the dummy stands (deg)")
     distance:       Field[float]     = Field(0.5,   min=0.0,   max=1.0,   step=0.01, description="How far out the dummy stands: 0 the zone's near edge, 1 its far edge")
     torso:         Field[float]     = Field(0.0,   min=-90.0, max=90.0,  step=1.0, description="Upper body leaned over standing legs, positive to image right (deg)")
-    left_shoulder:  Field[float]     = Field(0.0,   min=0.0,   max=360.0, step=1.0, description="Shoulder angle as the extractor reads it: 0 hanging, 90 across, 180 up, 270 out (deg)", newline=True)
-    right_shoulder: Field[float]     = Field(0.0,   min=0.0,   max=360.0, step=1.0, description="Shoulder angle as the extractor reads it: 0 hanging, 90 across, 180 up, 270 out (deg)")
-    left_elbow:     Field[float]     = Field(180.0, min=0.0,   max=360.0, step=1.0, description="Elbow angle as the extractor reads it: 180 straight, 0 folded (deg)")
-    right_elbow:    Field[float]     = Field(180.0, min=0.0,   max=360.0, step=1.0, description="Elbow angle as the extractor reads it: 180 straight, 0 folded (deg)")
-    left_hip:       Field[float]     = Field(180.0, min=0.0,   max=360.0, step=1.0, description="Hip angle as the extractor reads it: 180 standing, 90 leg out level (deg)", newline=True)
-    right_hip:      Field[float]     = Field(180.0, min=0.0,   max=360.0, step=1.0, description="Hip angle as the extractor reads it: 180 standing, 90 leg out level (deg)")
-    left_knee:      Field[float]     = Field(180.0, min=0.0,   max=360.0, step=1.0, description="Knee angle as the extractor reads it: 180 straight, 90 bent (deg)")
-    right_knee:     Field[float]     = Field(180.0, min=0.0,   max=360.0, step=1.0, description="Knee angle as the extractor reads it: 180 straight, 90 bent (deg)")
+    left_shoulder:  Field[float]     = Field(0.0,   min=-180.0, max=180.0, step=1.0, description="Shoulder from hanging: 90 across, ±180 up, −90 out (deg)", newline=True)
+    right_shoulder: Field[float]     = Field(0.0,   min=-180.0, max=180.0, step=1.0, description="Shoulder from hanging: 90 across, ±180 up, −90 out (deg)")
+    left_elbow:     Field[float]     = Field(0.0,   min=-180.0, max=180.0, step=1.0, description="Elbow from straight: ±90 half, ±180 folded (deg)")
+    right_elbow:    Field[float]     = Field(0.0,   min=-180.0, max=180.0, step=1.0, description="Elbow from straight: ±90 half, ±180 folded (deg)")
+    left_hip:       Field[float]     = Field(0.0,   min=-180.0, max=180.0, step=1.0, description="Hip from standing: ±90 leg out level (deg)", newline=True)
+    right_hip:      Field[float]     = Field(0.0,   min=-180.0, max=180.0, step=1.0, description="Hip from standing: ±90 leg out level (deg)")
+    left_knee:      Field[float]     = Field(0.0,   min=-180.0, max=180.0, step=1.0, description="Knee from straight: ±90 bent (deg)")
+    right_knee:     Field[float]     = Field(0.0,   min=-180.0, max=180.0, step=1.0, description="Knee from straight: ±90 bent (deg)")
     morph:          Field[float]     = Field(0.5,   min=0.0,   max=10.0,  step=0.05, description="A change morphs over this time (s); 0 at once", newline=True)
     poses:          Field[list[str]] = Field([""], access=Field.READ, visible=False, description="Saved pose names")
     pose:           Field[str]       = Field("", widget=Widget.text_select, options=poses, description="Load a saved pose")
@@ -62,25 +63,31 @@ class DummySettings(BaseSettings):
 
 @dataclass(frozen=True)
 class Measures:
-    """The dummy's measures, in the settings' units: degrees, each joint's the angle the extractor
-    reads at it; the distance 0..1. The defaults are standing with the arms hanging: 0 at the
-    shoulders, 180 (straight) at the elbows, hips and knees."""
+    """The dummy's measures, in the settings' units: degrees, each joint's from its rest; the
+    distance 0..1. The defaults are the rest: standing with the arms hanging, every joint 0."""
     azimuth:        float = 180.0
     distance:       float = 0.5
     torso:          float = 0.0
     left_shoulder:  float = 0.0
     right_shoulder: float = 0.0
-    left_elbow:     float = 180.0
-    right_elbow:    float = 180.0
-    left_hip:       float = 180.0
-    right_hip:      float = 180.0
-    left_knee:      float = 180.0
-    right_knee:     float = 180.0
+    left_elbow:     float = 0.0
+    right_elbow:    float = 0.0
+    left_hip:       float = 0.0
+    right_hip:      float = 0.0
+    left_knee:      float = 0.0
+    right_knee:     float = 0.0
 
 
 MEASURES: tuple[str, ...] = tuple(f.name for f in fields(Measures))
 NEUTRAL = 'neutral'                                               # the saved pose the dummy starts in
 CIRCULAR: frozenset[str] = frozenset(MEASURES) - {'torso', 'distance'}
+# What the angle extractor reads at each joint at rest (deg): a joint's setting is measured from it.
+REST: dict[str, float] = {
+    'left_shoulder': 0.0,   'right_shoulder': 0.0,
+    'left_elbow':    180.0, 'right_elbow':    180.0,
+    'left_hip':      180.0, 'right_hip':      180.0,
+    'left_knee':     180.0, 'right_knee':     180.0,
+}
 
 
 def dummy_id(max_players: int) -> int:
@@ -225,11 +232,12 @@ class Dummy(FrameDictCallbackMixin):
     @staticmethod
     def points(m: Measures, aspect_ratio: float) -> Points2D:
         """The figure with its joints at the angles of ``m``, as the angle extractor measures
-        them when the figure is upright: each joint's degrees are the signed angle from the
-        segment above it (the torso line for the shoulder and the hip, the upper arm for the
-        elbow, the thigh for the knee) to the limb below, the right side mirrored as the extractor
-        mirrors it, so what is set is what the extractor reads. Each limb's chain is turned about
-        its joint from where it points to where it should, the joints nearer the torso first: the
+        them when the figure is upright: each joint's degrees plus its ``REST`` are the signed
+        angle from the segment above it (the torso line for the shoulder and the hip, the upper
+        arm for the elbow, the thigh for the knee) to the limb below, the right side mirrored as
+        the extractor mirrors it, so what is set, from rest, is what the extractor reads. Each
+        limb's chain is turned about its joint from where it points to where it should, the joints
+        nearer the torso first: the
         legs against the upright torso line, then the upper body is leaned about the hip midpoint
         by the torso over the standing legs, then the arms against the leaning torso line. So a
         lean leaves the arms reading as set and moves the hips' reading by the lean, as a
@@ -245,7 +253,7 @@ class Dummy(FrameDictCallbackMixin):
     def _aim_joints(xy: np.ndarray, m: Measures, joints: tuple[tuple[str, PointLandmark], ...]) -> None:
         for name, proximal in joints:
             joint, chain, left = _JOINTS[name]
-            angle = math.radians(getattr(m, name)) * (1.0 if left else -1.0)
+            angle = math.radians(getattr(m, name) + REST[name]) * (1.0 if left else -1.0)
             above = Dummy._unit(xy[proximal] - xy[joint])              # the extractor's first vector
             c, s = math.cos(angle), math.sin(angle)
             Dummy._aim(xy, joint, chain, np.array([c * above[0] - s * above[1], s * above[0] + c * above[1]]))

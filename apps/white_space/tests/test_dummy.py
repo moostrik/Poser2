@@ -17,7 +17,7 @@ from modules.pose.nodes import (AngleCalibrator, AngleCalibratorSettings, AngleE
                                 TorsoTiltExtractorSettings)
 from modules.pose.trackers import FilterPipeline
 
-from apps.white_space.pose import Dummy, DummySettings, Measures, dummy_id
+from apps.white_space.pose import Dummy, DummySettings, Measures, REST, dummy_id
 
 POSES = Path('apps/white_space/data/poses.json')
 JOINTS = ('left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow', 'left_hip', 'right_hip', 'left_knee', 'right_knee')
@@ -33,12 +33,17 @@ NEUTRAL = Measures(**POSES_FILE['neutral'])                     # the saved neut
 UP = Measures(**POSES_FILE['raised'])                           # the calibrator's two reference poses
 ROWS = ('neutral', 'raised', 'arms out level, a T', 'left arm up, right hanging', 'right arm up, left hanging',
         'a T, both elbows folded', 'a T, left elbow folded', 'a T, right elbow folded', 'a T, leaning left', 'a T, leaning right',
-        'a T, in a crouch')
+        'a T, in a crouch', '|__', '__|')
 
 
 def from_neutral(**deltas: float) -> Measures:
-    """NEUTRAL with joints moved by the given degrees."""
-    return replace(NEUTRAL, **{name: (getattr(NEUTRAL, name) + delta) % 360.0 for name, delta in deltas.items()})
+    """NEUTRAL with joints moved by the given degrees, kept in −180..180."""
+    return replace(NEUTRAL, **{name: (getattr(NEUTRAL, name) + delta + 180.0) % 360.0 - 180.0 for name, delta in deltas.items()})
+
+
+def extractor_degrees(m: Measures, name: str) -> float:
+    """What the angle extractor reads at a joint set to ``m``: its setting plus its rest."""
+    return getattr(m, name) + REST[name]
 
 
 class FigureTest(unittest.TestCase):
@@ -56,7 +61,7 @@ class FigureTest(unittest.TestCase):
         read = self._read(m)
         for name in JOINTS:
             with self.subTest(joint=name):
-                self.assertAlmostEqual(wrap(float(read[AngleLandmark[name]]) - math.radians(getattr(m, name))), 0.0, delta=1e-3)
+                self.assertAlmostEqual(wrap(float(read[AngleLandmark[name]]) - math.radians(extractor_degrees(m, name))), 0.0, delta=1e-3)
 
     def test_the_default_reads_as_set(self) -> None:
         self._assert_reads_as_set(Measures())
@@ -73,17 +78,25 @@ class FigureTest(unittest.TestCase):
                                                    left_elbow=(degrees + 180) % 360, right_elbow=(degrees + 45) % 360))
 
     def test_a_mixed_pose_reads_as_set(self) -> None:
-        self._assert_reads_as_set(Measures(left_shoulder=45.0, right_shoulder=135.0, left_elbow=60.0, right_elbow=250.0,
-                                           left_hip=150.0, right_hip=100.0, left_knee=120.0, right_knee=45.0))
+        self._assert_reads_as_set(Measures(left_shoulder=45.0, right_shoulder=135.0, left_elbow=-120.0, right_elbow=70.0,
+                                           left_hip=-30.0, right_hip=-80.0, left_knee=-60.0, right_knee=-135.0))
 
     def test_the_arms_read_as_set_under_a_lean(self) -> None:
-        read = self._read(Measures(torso=30.0, left_shoulder=45.0, right_shoulder=135.0, left_elbow=60.0, right_elbow=250.0))
-        for name, degrees in (('left_shoulder', 45.0), ('right_shoulder', 135.0), ('left_elbow', 60.0), ('right_elbow', 250.0)):
+        m = Measures(torso=30.0, left_shoulder=45.0, right_shoulder=135.0, left_elbow=-120.0, right_elbow=70.0)
+        read = self._read(m)
+        for name in ('left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow'):
             with self.subTest(joint=name):
-                self.assertAlmostEqual(wrap(float(read[AngleLandmark[name]]) - math.radians(degrees)), 0.0, delta=1e-3)
+                self.assertAlmostEqual(wrap(float(read[AngleLandmark[name]]) - math.radians(extractor_degrees(m, name))), 0.0, delta=1e-3)
+
+    def test_the_rest_is_every_joint_at_zero(self) -> None:
+        points = Dummy.points(Measures(), 1.0).values
+        self.assertGreater(points[P.left_wrist][1], points[P.left_elbow][1])       # the arms hang
+        self.assertGreater(points[P.left_ankle][1], points[P.left_knee][1])        # the legs stand,
+        thigh, shin = points[P.left_knee] - points[P.left_hip], points[P.left_ankle] - points[P.left_knee]
+        self.assertAlmostEqual(float(thigh[0] * shin[1] - thigh[1] * shin[0]), 0.0, places=5)   # the knee straight
 
     def test_the_legs_stand_still_under_a_lean(self) -> None:
-        legs = dict(left_hip=150.0, right_hip=100.0, left_knee=120.0, right_knee=45.0)
+        legs = dict(left_hip=-30.0, right_hip=-80.0, left_knee=-60.0, right_knee=-135.0)
         upright, leaning = Dummy.points(Measures(**legs), 1.0).values, Dummy.points(Measures(torso=30.0, **legs), 1.0).values
         for lm in (P.left_hip, P.right_hip, P.left_knee, P.right_knee, P.left_ankle, P.right_ankle):
             with self.subTest(landmark=lm.name):
@@ -95,8 +108,8 @@ class FigureTest(unittest.TestCase):
         self.assertGreater(points[P.left_hip][0], points[P.right_hip][0])
 
     def test_equal_degrees_are_a_mirror_symmetric_figure(self) -> None:
-        points = Dummy.points(Measures(left_shoulder=70.0, right_shoulder=70.0, left_elbow=45.0, right_elbow=45.0,
-                                       left_hip=150.0, right_hip=150.0, left_knee=120.0, right_knee=120.0), 1.0).values
+        points = Dummy.points(Measures(left_shoulder=70.0, right_shoulder=70.0, left_elbow=-135.0, right_elbow=-135.0,
+                                       left_hip=-30.0, right_hip=-30.0, left_knee=-60.0, right_knee=-60.0), 1.0).values
         for left, right in ((P.left_elbow, P.right_elbow), (P.left_wrist, P.right_wrist),
                             (P.left_knee, P.right_knee), (P.left_ankle, P.right_ankle)):
             self.assertAlmostEqual(float(points[left][0] + points[right][0]), 1.0, places=5)     # mirrored about x = 0.5
@@ -231,18 +244,18 @@ class DummyTest(unittest.TestCase):
         self.assertEqual(tuple(POSES_FILE), ROWS)
 
     def test_the_dummy_starts_in_the_saved_neutral(self) -> None:
-        self.path.write_text(json.dumps({'up': {'left_shoulder': 180.0}, 'neutral': {'left_shoulder': 340.0, 'left_hip': 170.0}}), encoding='utf-8')
+        self.path.write_text(json.dumps({'up': {'left_shoulder': 180.0}, 'neutral': {'left_shoulder': -20.0, 'left_hip': -10.0}}), encoding='utf-8')
         cfg = DummySettings()
         cfg.left_shoulder = 90.0                                  # where a preset left it
         dummy = Dummy(cfg, AngleExtractorSettings(), AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
         out: list[dict] = []
         dummy.add_frames_callback(out.append)
         self.assertEqual(cfg.pose, 'neutral')
-        self.assertEqual(cfg.left_shoulder, 340.0)
-        self.assertEqual(cfg.left_hip, 170.0)
+        self.assertEqual(cfg.left_shoulder, -20.0)
+        self.assertEqual(cfg.left_hip, -10.0)
         cfg.enabled = True
         dummy.process({})
-        points = Dummy.points(Measures(left_shoulder=340.0, left_hip=170.0), AngleExtractorSettings().aspect_ratio)
+        points = Dummy.points(Measures(left_shoulder=-20.0, left_hip=-10.0), AngleExtractorSettings().aspect_ratio)
         np.testing.assert_allclose(out[0][ID][Points2D].values, points.values, atol=1e-6)     # in neutral at once, no morph
 
     def test_picking_a_pose_sets_the_measures(self) -> None:
@@ -278,7 +291,7 @@ class DummyTest(unittest.TestCase):
         self.cfg.azimuth, self.cfg.left_shoulder = 350.0, 30.0
         self.dummy.update(0.0)                                           # settled at the start
         self.cfg.morph = 1.0
-        self.cfg.azimuth, self.cfg.left_shoulder = 10.0, 330.0
+        self.cfg.azimuth, self.cfg.left_shoulder = 10.0, -30.0
         self.dummy.update(0.0)
         m = self.dummy.update(0.5)
         self.assertAlmostEqual(m.azimuth % 360.0, 0.0, places=6)          # through 0, not 180
@@ -350,8 +363,8 @@ class DummyTest(unittest.TestCase):
         self.cfg.enabled = True
         self.cfg.morph = 0.0
         self.cfg.torso = 45.0
-        self.cfg.left_hip = self.cfg.right_hip = 120.0
-        self.cfg.left_knee = self.cfg.right_knee = 90.0
+        self.cfg.left_hip = self.cfg.right_hip = -60.0
+        self.cfg.left_knee = self.cfg.right_knee = -90.0
         self.dummy.process({})
         filters = FilterPipeline([LegDeviationExtractor(LegDeviationExtractorSettings()),
                                   TorsoTiltExtractor(TorsoTiltExtractorSettings())])

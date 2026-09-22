@@ -185,6 +185,8 @@ not described.
 | a T, leaning left                           | the T: the bend plays nothing                                    |
 | a T, leaning right                          | the T: the bend plays nothing                                    |
 | a T, in a crouch                            | the T: the legs play nothing                                     |
+| \|__ (a T, the right forearm turned 90°)    | the blue finer and flowing against the white: a moving moiré     |
+| \_\_\| (a T, the left forearm turned 90°)   | the white finer and flowing against the blue: a moving moiré     |
 
 ## The body
 
@@ -449,8 +451,8 @@ measure a small change of the picture). What they draw on the machine has not be
 ### The dummy
 
 The dummy (`pose/dummy.py`, settings `PI.dummy`) stands in for a person while the instrument is
-judged: a figure whose joints and torso lean are set in the panel, in the degrees the angle
-extractor reads. Its frame joins the poses before the LERP filters at its own id, `max_players`,
+judged: a figure whose joints and torso lean are set in the panel, each joint in degrees
+−180..180 from its rest (arms hanging, elbows and knees straight, standing). Its frame joins the poses before the LERP filters at its own id, `max_players`,
 so from there it is a pose like any other: extracted, drawn, heard in Max and lit. With `solo` it
 is the only pose from the LERP filters on. The preset's calibration is the dummy's raw readings,
 so its hanging arm reads 0 and its vertical arm π. How the figure is built is the module's
