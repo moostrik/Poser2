@@ -257,25 +257,28 @@ class PoseInstrument(ProjectionLayer):
         - each elbow plays its own colour, the left the white and the right the blue: its fold is
           the pitch, its turn (the sine of its signed angle) the speed, one way at +90° and the
           other at −90°, still when straight and when fully folded
-        - the body bend, the LFO, the symmetries, the distance, the phases, the hardness:
-          unconnected
+        - the body bend, signed, added to both elbow turns: white drifts outward and blue inward,
+          so a lean one way makes the white faster and the blue slower, the other way the reverse
+        - the LFO, the symmetries, the distance, the phases, the hardness: unconnected
 
-        Every arm measure but the turn passes its dead zones first (``PI.measures``). The mean,
-        the excess and the turn are computed here while the matrix is tried; once liked they
-        move into the pipeline. The breath is the bridge's own, as the mask's flash is.
+        Every measure but the turn passes its dead zones first (``PI.measures``). The mean, the
+        excess, the turn and the sums are computed here while the matrix is tried; once liked
+        they move into the pipeline. The breath is the bridge's own, as the mask's flash is.
         """
+        M = self._instrument.measures
+        bend = math.copysign(self._remap(abs(p.tilt), M.bend_neutral, 1.0), p.tilt)
         left, right = self._measure(p.left_shoulder), self._measure(p.right_shoulder)
         shoulders = (left + right) / 2.0
         swing = self._instrument.breath.depth * self._breath(p)
         white = {
             Parameter.PULSE_WIDTH: shoulders + swing * max(0.0, left - right),
             Parameter.PITCH:       self._measure(p.left_elbow),
-            Parameter.SPEED:       math.sin(p.left_elbow),
+            Parameter.SPEED:       math.sin(p.left_elbow) + bend,
         }
         blue = {
             Parameter.PULSE_WIDTH: shoulders + swing * max(0.0, right - left),
             Parameter.PITCH:       self._measure(p.right_elbow),
-            Parameter.SPEED:       math.sin(p.right_elbow),
+            Parameter.SPEED:       math.sin(p.right_elbow) + bend,
         }
         return white, blue
 

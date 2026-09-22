@@ -115,6 +115,8 @@ difference only while moving.
 | breath      | a sine in time, −1..1, at the breath's rate (0.5 Hz), one per person     |
 | white width | shoulders + depth × left excess × breath                                 |
 | blue width  | shoulders + depth × right excess × breath                                |
+| white flow  | left elbow turn + body bend                                              |
+| blue flow   | right elbow turn + body bend                                             |
 
 The depth is a setting, 0.4; at most ½ (below).
 
@@ -123,16 +125,19 @@ The depth is a setting, 0.4; at most ½ (below).
 | white      | pitch       | left elbow       | 25.7    | 46.3   |
 | white      | pulse width | white width      | 0       | 1      |
 | white      | phase       |                  | 0       |        |
-| white      | speed       | left elbow turn  | 3.9°/s  | 15°/s  |
+| white      | speed       | white flow       | 3.9°/s  | 15°/s  |
 | white      | hardness    |                  | 1       |        |
 | blue       | pitch       | right elbow      | 25.7    | 46.3   |
 | blue       | pulse width | blue width       | 1       | −1     |
 | blue       | phase       |                  | ½       |        |
-| blue       | speed       | right elbow turn | −4.5°/s | 15°/s  |
+| blue       | speed       | blue flow        | −4.5°/s | 15°/s  |
 | blue       | hardness    |                  | 1       |        |
 
 One breath serves both colours: only one shoulder can be the higher, so only one colour breathes
-at a time.
+at a time. The body bend is not the arms', but shares the speed slots with the elbow turns: white
+drifts outward and blue inward, so a bend added to both with one sign makes the white faster and
+the blue slower one way, the reverse the other. A turn and a lean share the amount, so they add
+or cancel.
 
 | Pose                   | White            | Blue             |
 |------------------------|------------------|------------------|
@@ -151,6 +156,9 @@ it thins, dark.
 
 ## Parked
 
+- The body bend as a drift on the wall: both sides of the pattern flowing one way, outward on the
+  side leaned to and inward on the other. Each mirrored oscillator then needs a travel per side,
+  and a choice: after the lean the sides keep the offset they gained, or ease back into mirror.
 - The body bend as the voice's time rate, a multiplier on every tick's time step: both speeds,
   their bases and the push scaled at once, the elbows still choosing each colour's direction.
   Signed, base 1 and amount 1: a lean one way slows the lines to a standstill, the other way

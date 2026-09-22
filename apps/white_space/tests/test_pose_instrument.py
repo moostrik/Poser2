@@ -168,11 +168,29 @@ class PoseInstrumentTest(unittest.TestCase):
         b = self._connect(_pose(0.5, left_elbow=math.radians(-179.0)))[0][Parameter.SPEED]
         self.assertLess(abs(a - b), 0.04)
 
-    def test_the_body_bend_plays_nothing(self) -> None:
-        for tilt in (-1.0, 0.4):
-            white, blue = self._connect(_pose(0.5, tilt=tilt))
-            self.assertEqual(white[Parameter.SPEED], 0.0)
-            self.assertEqual(blue[Parameter.SPEED], 0.0)
+    def test_the_body_bend_is_added_to_both_elbow_turns(self) -> None:
+        for tilt in (-1.0, 0.0, 0.4):
+            white, blue = self._connect(_pose(0.5, tilt=tilt, left_elbow=math.radians(30.0)))
+            self.assertAlmostEqual(white[Parameter.SPEED], 0.5 + tilt, places=5, msg=f"tilt {tilt}")   # the turn plus the bend
+            self.assertAlmostEqual(blue[Parameter.SPEED], tilt, places=5, msg=f"tilt {tilt}")         # the same bend, one sign
+
+    def test_the_bend_has_a_dead_zone(self) -> None:
+        self.cfg.measures.bend_neutral = 0.1
+        for tilt, expected in ((0.05, 0.0), (-0.05, 0.0), (-0.55, -0.5), (1.0, 1.0)):
+            white, _ = self._connect(_pose(0.5, tilt=tilt))
+            self.assertAlmostEqual(white[Parameter.SPEED], expected, places=5, msg=f"tilt {tilt}")
+
+    def test_a_lean_makes_the_white_faster_and_the_blue_slower_and_back(self) -> None:
+        W, B = self.cfg.white_lines, self.cfg.blue_lines
+        W.speed, B.speed = 3.5, -3.5                                   # white out, blue in: a quarter interval a second
+        W.speed_amount = B.speed_amount = 3.5                          # a full lean: plus a quarter interval a second
+        for tilt, white_moved, blue_moved in ((1.0, 70, 0), (-1.0, 0, -70), (0.0, 35, -35)):   # px after a second
+            self.layer.reset()
+            self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, tilt=tilt)})
+            for _ in range(30):
+                f = self._render()
+            self._on_grid(self._inner(f.white), INTERVAL, white_moved % INTERVAL)
+            self._on_grid(self._inner(f.blue), INTERVAL, (INTERVAL / 2 + blue_moved) % INTERVAL)
 
     def test_the_sign_of_an_angle_is_not_a_measure(self) -> None:
         # The sign is the side of the body the arm passes; straight up is π from either side.

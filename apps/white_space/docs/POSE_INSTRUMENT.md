@@ -145,7 +145,7 @@ measure that is not of the body's pose.
 | left elbow          | primary   | the white: its fold the pitch, its turn the flow                |
 | right elbow         | primary   | the blue: its fold the pitch, its turn the flow                 |
 | leg deviation       | secondary | open                                                            |
-| body bend           | secondary | open: parked as the voice's time rate (`MATRIX.md`)             |
+| body bend           | secondary | the flow: one way the white faster and the blue slower          |
 | distance            | secondary | open                                                            |
 | elbow symmetry      | secondary | open: it shows unconnected, as the colours in or out of tune    |
 
@@ -184,8 +184,8 @@ not described.
 | a T, both elbows folded                     | the T's lines, finer, white and blue still in tune               |
 | a T, left elbow folded                      | the white lines finer than the blue: the colours slide apart     |
 | a T, right elbow folded                     | the blue lines finer than the white: the colours slide apart     |
-| a T, leaning left                           | the T: the bend plays nothing                                    |
-| a T, leaning right                          | the T: the bend plays nothing                                    |
+| a T, leaning left                           | the T, the white slower and the blue faster                      |
+| a T, leaning right                          | the T, the white faster and the blue slower                      |
 | a T, in a crouch                            | the T: the legs play nothing                                     |
 | \|__ (a T, the right forearm turned 90°)    | the blue finer and flowing against the white: a moving moiré     |
 | \_\_\| (a T, the left forearm turned 90°)   | the white finer and flowing against the blue: a moving moiré     |
@@ -254,8 +254,8 @@ tuned on the machine:
 | blue width          | 0..1  | blue pulse width  | 1       | −1         | no blue                                        |
 | left elbow          | 0..1  | white pitch       | 25.7    | 46.3 lines | 72 lines, one every 5°: finer as the arm folds |
 | right elbow         | 0..1  | blue pitch        | 25.7    | 46.3 lines | 72 lines                                       |
-| left elbow turn     | −1..1 | white speed       | 3.9°/s  | 15°/s      | white flowing one way at +90°, back at −90°    |
-| right elbow turn    | −1..1 | blue speed        | −4.5°/s | 15°/s      | as white's                                     |
+| left turn + bend    | −2..2 | white speed       | 3.9°/s  | 15°/s      | white flowing one way at +90°, back at −90°    |
+| right turn + bend   | −2..2 | blue speed        | −4.5°/s | 15°/s      | as white's                                     |
 | leg deviation       | 0..1  | the LFO's level   | 0       | 1          | the LFO at full swing; the LFO feeds nothing   |
 
 The widths are the shoulders' mean with the breath on the higher shoulder's colour:
@@ -269,8 +269,11 @@ The breath is a sine in time, −1..1, one per person, at `PI.breath.rate`; the 
 `PI.breath.depth`. Level shoulders have no excess, so the fixed points and a T are still; a depth
 of ½ or less keeps every breath inside none and full, so both fixed points stay exact
 (`MATRIX.md`, Option 3). An elbow's turn is the sine of its signed angle: still when straight and
-when fully folded, where +180° and −180° are one pose. Unconnected: the body bend, the LFO, the
-symmetries, the distance, the phases, the hardness.
+when fully folded, where +180° and −180° are one pose. The body bend, through its dead zone, is
+added to both turns with one sign: white drifts outward and blue inward, so a lean one way makes
+the white faster and the blue slower, the other way the reverse. A turn and a lean share the
+amount, so a forearm and a lean can add or cancel. Unconnected: the LFO, the symmetries, the
+distance, the phases, the hardness.
 
 ## Events
 
@@ -456,8 +459,8 @@ The rows of *Pose results* draw what that table says, in the unit tests
 (`tests/test_pose_instrument.py`: the two fixed points, exact at any breath, one shoulder moving
 both colours, a T still over a breath, the higher shoulder breathing its own colour, left and
 right up drawn differently, level shoulders tiling, an elbow making its own colour finer, equal
-elbows in tune, an elbow's turn flowing its own colour either way, and a small move of any arm
-measure a small change of the picture). What they draw on the machine has not been judged yet.
+elbows in tune, an elbow's turn flowing its own colour either way, a lean making the white faster
+and the blue slower and back, and a small move of any arm measure a small change of the picture). What they draw on the machine has not been judged yet.
 
 ### The dummy
 
@@ -482,7 +485,9 @@ The open questions of the synth itself are in `LIGHT_SYNTH.md`, *Open*.
 Meaning and connections:
 
 - Whether the connections of Part 3 can be found with the body: the shoulders' balance and
-  breath, the elbows' pitch and flow; what the legs, the bend and the symmetries should play
+  breath, the elbows' pitch and flow, the lean; what the legs and the symmetries should play
+- Which way is "right": a positive `TorsoTilt` is shoulders toward image right; whether that
+  lean makes the white faster on the wall as meant is to be checked on the dummy
 - The breath's rate and depth, and whether a breath reads as the higher arm's
 - Which of the instrument's departures from the rules of meaning stay, and which calculations move
   into the pose pipeline, once the result is liked
