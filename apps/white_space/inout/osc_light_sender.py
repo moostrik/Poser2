@@ -7,7 +7,7 @@ from pythonosc.udp_client import UDPClient
 from pythonosc.osc_message import OscMessage
 from pythonosc.osc_message_builder import OscMessageBuilder
 
-from ..light import Frame, Tick, BeamLightId, BEAM_LIGHT_CHANNEL, FIXTURE_PROJECTION_RPM
+from ..light import Frame, Tick, BeamLightId, BEAM_LIGHT_CHANNEL, FIXTURE_PROJECTION_RPM, MotorSettings
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.inout.net_probe import validate_connection
 from modules.utils import ThreadPriority, set_current_thread_priority
@@ -100,10 +100,14 @@ class OscLightSender:
     * On a clean quit, ``stop()`` ends with a **blackout** — rpm 0, an all-zero frame, rpm 0
       again — so the fixture goes dark and the motor decelerates immediately. The firmware's
       Ethernet watchdog (packet silence → motor stop + blank) covers the crash path only.
+    * While the motor is simulated (``motor.simulate``) nothing is sent at all — no rpm, no
+      pixels — so a simulated motor never reaches the fixture; the flag is read live, so
+      switching it off sends from the next frame.
     """
 
-    def __init__(self, settings: OscLightSenderSettings) -> None:
+    def __init__(self, settings: OscLightSenderSettings, motor: MotorSettings) -> None:
         self._config = settings
+        self._motor = motor             # while the motor is simulated, nothing is sent
         self._chunk_size, self._num_chunks = self._calculate_optimal_chunks(settings.resolution, settings.mtu)
         self._config.chunk_size = self._chunk_size
         self._config.num_chunks = self._num_chunks
@@ -201,6 +205,8 @@ class OscLightSender:
                 output, self._latest_output = self._latest_output, None
             if output is None:
                 continue
+            if self._motor.simulate:
+                continue            # a simulated motor never reaches the fixture: no rpm, no pixels
 
             # Hold rpm at 0 for `startup_delay` after connect, then release to the commanded speed:
             # the 0→target edge is what the motor controller acts on. Sending it on change gives

@@ -54,9 +54,6 @@ class Conductor(Thread):
 
         self._config: LightSettings = config
         self._board: Board          = board
-        # Boot failsafe #3: a preset saved mid-debug (a projection layer selected) must never
-        # auto-derive PROJECTION at power-on — the installation always wakes in the show.
-        config.debug = DebugLayer.OFF
         self._motor_controller      = MotorController(config.motor)
         self._playhead              = Playhead(config.playhead)
         self._clock                 = Clock(config.clock)
@@ -90,6 +87,11 @@ class Conductor(Thread):
         }
 
         self._compositor = Compositor(config, self.layers)
+        # Nothing in the preset is forced at start; the one saved state that spins the fixture up
+        # at power-on is worth a line in the log.
+        if not config.motor.simulate and _debug_motor_mode(config.debug, self.layers) is MotorMode.PROJECTION:
+            logger.warning("Starting with debug layer %s selected: the fixture spins up to PROJECTION at once",
+                           DebugLayer(int(config.debug)).name)
 
         self.fps_counter = FpsCounter()
         self._update_callbacks: list[Callable[[], Any]] = []

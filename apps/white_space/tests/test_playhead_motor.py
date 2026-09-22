@@ -455,15 +455,16 @@ class DebugOverrideTest(unittest.TestCase):
         self.assertEqual(_debug_motor_mode(DebugLayer.beam_playhead, layers), MotorMode.BEAM)
         self.assertIsNone(_debug_motor_mode(DebugLayer.OFF, layers))         # debug disarmed
 
-    def test_boot_failsafe_clears_debug(self) -> None:
-        # A preset saved mid-debug (a projection layer selected) must never auto-derive PROJECTION at
-        # power-on: the Conductor forces the select back to OFF at construction.
+    def test_a_saved_debug_selection_comes_back_as_saved(self) -> None:
+        # Nothing in the preset is forced at start: a debug layer saved as selected is selected
+        # after construction (a projection layer with a real motor is warned about in the log).
         from apps.white_space.light import Conductor, DebugLayer, LightSettings, PoseInstrumentSettings
         from apps.white_space.board import Board
         cfg = LightSettings()
         cfg.debug = DebugLayer.test_pose_waves
-        Conductor(cfg, PoseInstrumentSettings(), Board(), pose_stage=4)
-        self.assertEqual(DebugLayer(int(cfg.debug)), DebugLayer.OFF)
+        with self.assertLogs("apps.white_space.light.conductor", level="WARNING"):
+            Conductor(cfg, PoseInstrumentSettings(), Board(), pose_stage=4)
+        self.assertEqual(DebugLayer(int(cfg.debug)), DebugLayer.test_pose_waves)
 
 
 class BarsTest(unittest.TestCase):

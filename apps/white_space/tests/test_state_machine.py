@@ -110,7 +110,7 @@ class StateMachineTest(unittest.TestCase):
     # -- startup ------------------------------------------------------------
 
     def test_first_tick_boots_into_off_and_commands_low(self) -> None:
-        # Boot failsafe #1: the show starts dark at BEAM, never in a lit or PROJECTION state.
+        # The show starts dark at BEAM, never in a lit or PROJECTION state.
         self.tick()
         self.assertEqual(self.current, StateId.OFF)
         self.assertEqual(self.motors, [MotorMode.BEAM])
@@ -435,17 +435,18 @@ class StateMachineTest(unittest.TestCase):
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)      # unpinned → wakes right out
 
-    def test_boot_failsafe_clears_blackout(self) -> None:
-        # A preset saved with blackout pinned must never wake the installation dark.
-        config = StateMachineSettings()
-        config.blackout = True
-        machine = StateMachine(config, LightSettings(), board=FakeBoard(),
-                               set_mix=lambda _: None, reset_layers=lambda _: None,
-                               set_motor=lambda _: None, pose_stage=POSE_STAGE)
-        try:
-            self.assertFalse(config.blackout)
-        finally:
-            machine.stop()
+    def test_a_saved_blackout_comes_back_pinned(self) -> None:
+        # Nothing in the preset is forced at start: saved with blackout pinned, the machine boots
+        # into OFF and stays there past the lock, dark at BEAM, until the pin is released.
+        self.config.blackout = True
+        self.board.is_locked = True
+        self.tick()
+        self.tick(dt=999.0, dbar=50.0)
+        self.assertEqual(self.current, StateId.OFF)
+        self.assertEqual(self.motors, [MotorMode.BEAM])
+        self.config.blackout = False
+        self.tick()
+        self.assertEqual(self.current, StateId.OFF_IDLE)
 
     def test_goto_jumps_and_commands_motor(self) -> None:
         self.boot()
@@ -468,18 +469,17 @@ class StateMachineTest(unittest.TestCase):
         self.tick()
         self.assertEqual(self.current, StateId.IDLE_INTRO)
 
-    def test_boot_failsafe_clears_hold(self) -> None:
-        # A preset saved mid-hold must never freeze the power-on show: the machine forces
-        # manual.hold off at construction.
-        config = StateMachineSettings()
-        config.manual.hold = True
-        machine = StateMachine(config, LightSettings(), board=FakeBoard(),
-                               set_mix=lambda _: None, reset_layers=lambda _: None,
-                               set_motor=lambda _: None, pose_stage=POSE_STAGE)
-        try:
-            self.assertFalse(config.manual.hold)
-        finally:
-            machine.stop()
+    def test_a_saved_hold_comes_back_held(self) -> None:
+        # Nothing in the preset is forced at start: saved mid-hold, the machine boots into OFF and
+        # the hold keeps it there past the lock, until it is released.
+        self.config.manual.hold = True
+        self.board.is_locked = True
+        self.tick()
+        self.tick(dt=999.0, dbar=50.0)
+        self.assertEqual(self.current, StateId.OFF)
+        self.config.manual.hold = False
+        self.tick()
+        self.assertEqual(self.current, StateId.OFF_IDLE)
 
     def test_the_streak_builds_toward_min_players(self) -> None:
         # The players heard the same sound min_players times in a row: two alike hits hold INTRO, the third

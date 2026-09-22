@@ -625,8 +625,8 @@
   },
   "light": {
     "brightness": 1.0,
-    "debug": "OFF",
-    "motor_simulate": false,
+    "debug": "pose_instrument",
+    "motor_simulate": true,
     "clock": {},
     "motor": {
       "beam_rpm": 36.0,
@@ -863,19 +863,20 @@
       "playhead_at_mask": 0.3
     },
     "window": {
-      "taper": 0.2,
-      "attack_seconds": 1.0,
-      "release_seconds": 1.5,
       "width": 33.0,
       "width_bypass": false,
-      "sync_threshold": 0.9
+      "sync_threshold": 0.9,
+      "taper": 0.2,
+      "attack_seconds": 1.0,
+      "release_seconds": 1.5
     },
     "hit": {
-      "settle_seconds": 0.15,
       "frames": 1,
-      "flash_brightness": 1.0
+      "flash_brightness": 1.0,
+      "settle_seconds": 0.15
     },
     "white": {
+      "enabled": true,
       "pitch": 25.7,
       "pitch_amount": 46.3,
       "pitch_curve": "LINEAR",
@@ -899,6 +900,7 @@
       "push": 14.0
     },
     "blue": {
+      "enabled": true,
       "pitch": 25.7,
       "pitch_amount": 46.3,
       "pitch_curve": "LINEAR",
@@ -930,8 +932,8 @@
       "level_bypass": false
     },
     "dummy": {
-      "enabled": false,
-      "solo": false,
+      "enabled": true,
+      "solo": true,
       "azimuth": 180.0,
       "distance": 0.5,
       "torso": 0.0,

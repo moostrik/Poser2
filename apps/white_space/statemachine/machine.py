@@ -77,14 +77,9 @@ class StateMachine:
 
         from .states import StateBase, STATES   # local import: states.py imports from this module
         self._states = {s: cls(config, light, reset_layers) for s, cls in STATES.items()}
-        # Failsafe: the show ALWAYS starts in OFF (dark, motor BEAM) and wakes through OFF_IDLE
-        # once the playhead has locked, regardless of the persisted `manual.select` value —
-        # that field is only the goto target. A preset saved mid-show must never boot the
-        # machine into a PROJECTION-motor state. `manual.hold` and `blackout` are forced off: a
-        # preset saved mid-hold or mid-blackout must never freeze or strand the power-on
-        # show — the installation always wakes into the show, never stays dark.
-        config.manual.hold = False
-        config.blackout = False
+        # The show always starts in OFF (dark, motor BEAM) and wakes through OFF_IDLE once the
+        # playhead has locked. `manual.select` is only the goto target, entered on `goto`, never
+        # at start. Nothing in the preset is forced: a saved hold or blackout comes back as saved.
         self._current: StateId = StateId.OFF
         self._active: StateBase = self._states[self._current]
         self._entered: bool = False             # the boot entry into OFF happens on the first
@@ -175,8 +170,8 @@ class StateMachine:
         hit = self._streak.hit
 
         if not self._entered:
-            # Startup failsafe: always enter OFF (see __init__) — `manual.select` is not
-            # consulted; OFF wakes through OFF_IDLE by itself once the playhead locks.
+            # Start: always enter OFF (see __init__) — `manual.select` is not consulted; OFF
+            # wakes through OFF_IDLE by itself once the playhead locks.
             self._goto_requested = False
             self._switch(StateId.OFF, now, dt, signals.bars, players, hit, signals)
         elif self._config.blackout and self._current != StateId.OFF:

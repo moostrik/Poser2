@@ -126,10 +126,10 @@ class LightSettings(BaseSettings):
     # Debug override — a first-class select ABOVE the state machine: choosing a layer IS
     # turning debug on. The Compositor draws that one layer solo (full weight) and the
     # motor auto-follows its mode (ProjectionLayer → PROJECTION, BeamLayer → BEAM); OFF returns the
-    # show where it would have been. Forced OFF at startup (boot failsafe: a preset saved
-    # mid-debug must never spin at power-on).
+    # show where it would have been. Comes back as saved: a projection layer saved with a real
+    # motor spins the fixture up at power-on, and the Conductor warns about it in the log.
     debug: Field[DebugLayer] = Field(DebugLayer.OFF, description="Debug override: select a layer to show it solo and auto-follow the motor to its mode (OFF = show runs)", pinned=True)
-    motor_simulate: Field[bool] = Field(False, description="Simulate the motor + fall sensor (no hardware)", pinned=True)
+    motor_simulate: Field[bool] = Field(False, description="Simulate the motor + fall sensor; while on, nothing is sent to the fixture", pinned=True)
 
     clock:        Group[ClockSettings]        = Group(ClockSettings, share=[light_rate])
     motor:        Group[MotorSettings]        = Group(MotorSettings, share=[motor_simulate.as_('simulate')])

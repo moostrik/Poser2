@@ -15,6 +15,8 @@ Simulate mode (simulate=True):
     the real motor) with modeled spin-up/down inertia, and fires synthetic falls — going
     silent above the sensor ceiling exactly like the real sensor, so measurement-driven
     behavior (measurement lock and its loss, deceleration) is identical in sim and reality.
+    While simulating, the light sender sends nothing to the fixture, so a simulated motor
+    never reaches the real one.
 """
 
 import math

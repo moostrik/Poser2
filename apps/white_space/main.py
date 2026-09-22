@@ -44,9 +44,6 @@ class WhiteSpaceMain:
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
         self.settings.camera.sim_enabled = simulation
-        # Boot failsafe: a preset saved with the dummy in the pipeline must never wake the show with
-        # a figure standing in the room.
-        self.settings.PI.dummy.enabled = False
         # The delivered frame's height follows the tilt unless the preset pins it. The warp's
         # rows are tangents of elevation, so the sensor's full reach needs more rows the further
         # the camera is aimed up (848 at P720 and tilt 0, 960 at tilt 15, 1152 at P800 and tilt
@@ -153,7 +150,7 @@ class WhiteSpaceMain:
         # firmware sends the fall as a plain UDP text packet (not OSC) to the light
         # receiver's port; Max sends /WS/idle/blue/left and /right as real OSC (the UDP
         # receiver could never decode their float args). Don't cross-bind them.
-        self.osc_light_sender   = OscLightSender(self.settings.inout.osc_light_sender)
+        self.osc_light_sender   = OscLightSender(self.settings.inout.osc_light_sender, self.settings.light.motor)
         self.udp_light_receiver = UdpLightReceiver(self.settings.inout.udp_light_receiver)
         self.osc_sound_receiver = OscReceiver(self.settings.inout.osc_sound_receiver)
         self.udp_light_receiver.bind("/WS/sensor/fall", self.conductor.notify_fall)

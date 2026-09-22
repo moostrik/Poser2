@@ -450,8 +450,8 @@ calibration is the dummy's raw readings, so its hanging arm reads 0 and its vert
 Its poses are named in `data/poses.json`, the rows of *Pose results*, picked in the `pose`
 select and saved under `name` with `save`. A change of any measure morphs over `morph` seconds
 (`easeInOutSine`), the azimuth and the arms the shortest way round, an exact opposite going up
-through the front on both sides. `enabled` is forced off at startup; in the show the dummy is
-never in the room.
+through the front on both sides. `enabled` comes back as the preset saved it; in the show the
+dummy is never in the room, so the site's preset is saved with it off.
 
 ---
 

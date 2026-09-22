@@ -113,33 +113,35 @@ The graph is the stand-alone show; the exact conditions and their settings are i
 
 The machine always **boots into OFF** — dark, motor at BEAM — and wakes through OFF_IDLE by itself once
 the playhead has locked, so power-on is the same wake as a blackout release. The persisted
-`manual.select` is only the goto target, and `manual.hold` and `blackout` are forced off at construction:
-a power-cycled installation resumes the show unattended and never stays dark. **OFF (S0)** is also
+`manual.select` is only the goto target, entered on `goto`, never at start. Nothing else in the preset
+is forced: a saved `manual.hold` or `blackout` comes back as saved, and holds OFF until released. **OFF (S0)** is also
 entered from any state by pinning `blackout` (an operator input, so it is not drawn as an edge above), and
 leaves by condition like any other state — through OFF_IDLE, once neither the pin nor a missing lock
 holds it. In **session mode** the two open-ended states run on time: INTRO spins up after `session.intro_seconds`
 with anyone present, PLAY runs `session.play_seconds` whatever the count, and END only winds down (no
 return to PLAY), so a session always concludes.
 
-**Boot invariant — the motor never powers on into PROJECTION.** Every path that could command PROJECTION
-at boot is guarded, and each guard has a unit test:
+**Boot — the app starts as the startup preset says, and forces nothing.** A preset is written only by
+Save or Save As in the panel, so a saved state is one an operator chose; the app cannot tell a power cycle
+from a launch, so every start is the same start. What keeps the motor from powering on into PROJECTION:
 
 1. **State machine**: always boots into OFF (dark, motor BEAM) and wakes through OFF_IDLE only once the
-   playhead has locked, ignoring the persisted `select` — a preset saved mid-show can never boot into a
-   PROJECTION state (`statemachine/machine.py`; `test_startup_ignores_persisted_select`,
-   `test_boot_waits_for_the_lock`).
+   playhead has locked; the persisted `select` is the goto target and is not entered at start
+   (`statemachine/machine.py`; `test_startup_ignores_persisted_select`, `test_boot_waits_for_the_lock`).
 2. **Motor**: there is no manual mode field — the arbitration is debug > machine command > **STOPPED**, so
    before the machine's first tick (or with the machine disabled) nothing spins (`light/motor.py`
    `_target_mode`; `test_boot_without_command_is_stopped`).
-3. **Debug**: the Conductor forces the `light.debug` select back to OFF at construction — a preset saved
-   with a projection layer selected can never auto-follow to PROJECTION at power-on (`light/conductor.py`;
-   `test_boot_failsafe_clears_debug`).
+3. **The site preset**: saved with the debug select OFF and the dummy off. A projection layer saved as
+   selected comes back selected and spins the fixture up at power-on; the Conductor warns about it in the log
+   (`light/conductor.py`; `test_a_saved_debug_selection_comes_back_as_saved`), it does not reset it.
+4. **A simulated motor never reaches the fixture**: while `light.motor_simulate` is on the light sender sends
+   nothing, no rpm and no pixels, read live (`inout/osc_light_sender.py`). The desk preset is saved with it
+   on, with the debug layer, the dummy and any hold as wanted, and set as the startup preset.
 
 On top of these, `osc_light` holds the commanded rpm at 0 for `startup_delay` seconds after connecting,
-giving the motor controller one clean 0 → target edge. PROJECTION is therefore reachable only through an
-explicit runtime action: the show's own sync into INTRO_PLAY, an operator goto to a PROJECTION state, or
-selecting a projection layer in the debug select. **Any change to boot, arbitration or the debug select
-must preserve this invariant.**
+giving the motor controller one clean 0 → target edge. With the site preset, PROJECTION is reachable only
+through an explicit runtime action: the show's own sync into INTRO_PLAY, an operator goto to a PROJECTION
+state, or selecting a projection layer in the debug select.
 
 **Hardware failsafe**: if the machine does not rotate, it turns the lights off **(site fact)**, so a
 stalled spin-down cannot strand bright lights on a stationary bar. A sensor failure on a machine that is
