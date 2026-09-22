@@ -84,8 +84,10 @@ where the synth is a synth; our own word where the wall differs. The words of th
 What is the instrument's and what is the synth's (`LIGHT_SYNTH.md` states the same split from the
 synth's side): the instrument decides what each source is, which measure, and the shaping of that
 measure before it is handed over (a dead zone, a remap); when the gates open (presence, the hit);
-the reaches; which output is white and which blue; and the mask. Everything from the slot on is
-the synth's, and the synth never changes a source before the slot and never adds two.
+the reaches; which output is white and which blue; and the mask. A source may also move in time
+by the bridge's own hand, as the mask's flash does: the breath, a sine per person that swings a
+width (*The connections*). Everything from the slot on is the synth's, and the synth never
+changes a source before the slot and never adds two.
 
 ---
 
@@ -139,7 +141,7 @@ measure that is not of the body's pose.
 | Measure             | Role      | Term                                                            |
 |---------------------|-----------|-----------------------------------------------------------------|
 | shoulders (mean)    | primary   | the balance of white and blue: both pulse widths                |
-| shoulder difference | primary   | where the colours sit against each other: both phases           |
+| shoulder excess     | primary   | which arm is higher: its own colour's width breathes            |
 | left elbow          | primary   | the white: its fold the pitch, its turn the flow                |
 | right elbow         | primary   | the blue: its fold the pitch, its turn the flow                 |
 | leg deviation       | secondary | open                                                            |
@@ -177,8 +179,8 @@ not described.
 | neutral                                     | full blue over the window: the blue ping                         |
 | raised                                      | full white over the window, no blue: the bass                    |
 | arms out level, a T                         | white and blue lines, each half the interval, touching           |
-| left arm up, right hanging                  | the T's widths, a quarter interval overlapping and dark          |
-| right arm up, left hanging                  | the same, the overlap and the dark on the other edges            |
+| left arm up, right hanging                  | the T's widths, the white breathing, the blue still              |
+| right arm up, left hanging                  | the T's widths, the blue breathing, the white still              |
 | a T, both elbows folded                     | the T's lines, finer, white and blue still in tune               |
 | a T, left elbow folded                      | the white lines finer than the blue: the colours slide apart     |
 | a T, right elbow folded                     | the blue lines finer than the white: the colours slide apart     |
@@ -243,24 +245,32 @@ A **connection** is one measure as the source in one parameter's slot (`LIGHT_SY
 the range and the direction. A measure may feed several parameters; a slot has one source; two
 measures never sum into one parameter.
 
-The arms are `MATRIX.md`'s Option 2. The bases and amounts are the preset's starting values,
+The arms are `MATRIX.md`'s Option 3. The bases and amounts are the preset's starting values,
 tuned on the machine:
 
 | Source              | Range | Parameter         | Base    | Amount     | At full                                        |
 |---------------------|-------|-------------------|---------|------------|------------------------------------------------|
-| shoulders (mean)    | 0..1  | white pulse width | 0       | 1          | solid white                                    |
-| shoulders (mean)    | 0..1  | blue pulse width  | 1       | −1         | no blue                                        |
-| shoulder difference | −1..1 | white phase       | 0       | ⅛ interval | the colours a quarter interval closer          |
-| shoulder difference | −1..1 | blue phase        | ½       | −⅛ interval | as white's, the other way                     |
+| white width         | 0..1  | white pulse width | 0       | 1          | solid white                                    |
+| blue width          | 0..1  | blue pulse width  | 1       | −1         | no blue                                        |
 | left elbow          | 0..1  | white pitch       | 25.7    | 46.3 lines | 72 lines, one every 5°: finer as the arm folds |
 | right elbow         | 0..1  | blue pitch        | 25.7    | 46.3 lines | 72 lines                                       |
 | left elbow turn     | −1..1 | white speed       | 3.9°/s  | 15°/s      | white flowing one way at +90°, back at −90°    |
 | right elbow turn    | −1..1 | blue speed        | −4.5°/s | 15°/s      | as white's                                     |
 | leg deviation       | 0..1  | the LFO's level   | 0       | 1          | the LFO at full swing; the LFO feeds nothing   |
 
-An elbow's turn is the sine of its signed angle: still when straight and when fully folded, where
-+180° and −180° are one pose (`MATRIX.md`, Option 2). Unconnected: the body bend, the LFO, the
-symmetries, the distance, the hardness.
+The widths are the shoulders' mean with the breath on the higher shoulder's colour:
+
+```
+white width = shoulders + depth × left excess  × breath       left excess  = max(0, left − right)
+blue width  = shoulders + depth × right excess × breath       right excess = max(0, right − left)
+```
+
+The breath is a sine in time, −1..1, one per person, at `PI.breath.rate`; the depth is
+`PI.breath.depth`. Level shoulders have no excess, so the fixed points and a T are still; a depth
+of ½ or less keeps every breath inside none and full, so both fixed points stay exact
+(`MATRIX.md`, Option 3). An elbow's turn is the sine of its signed angle: still when straight and
+when fully folded, where +180° and −180° are one pose. Unconnected: the body bend, the LFO, the
+symmetries, the distance, the phases, the hardness.
 
 ## Events
 
@@ -285,15 +295,15 @@ What follows from the connections, before the machine has been judged **(deducti
 
 - Level shoulders tile the wall: white's width and blue's add up to the interval and blue sits half
   an interval from white, so every pixel is one colour, from full blue through the T to full white.
-  A shoulder difference opens the tiling: on one edge of each line the overlap tone, on the other
-  dark, a quarter interval each with one arm up alone; which edge says which arm.
+  With one shoulder higher its colour breathes against the still other, so the tiling opens and
+  closes: the overlap tone as it swells, dark as it thins; which colour breathes says which arm.
 - The elbows' symmetry shows by itself, unconnected: equally folded, white and blue share one
   interval and stay in tune; unequally, the colours slide past each other with distance
   (`LIGHT_SYNTH.md`, *In the pose instrument*).
 - An elbow shows nothing while its own colour is solid or dark: the pitch needs a note.
 - An elbow's turn, like its fold, shows nothing while its colour is solid or dark.
-- Unequal elbows also open the tiling, as a moiré that changes along the wall; whether it reads
-  apart from the shoulder difference's even gaps is to be seen.
+- Unequal elbows also open the tiling, as a moiré that changes along the wall and travels; the
+  breath opens it in time, evenly along the wall.
 
 Once the connections have been played on the machine, the *Pose results* are read back here: what
 each row draws, against what it should.
@@ -382,6 +392,7 @@ tuned together, knobs throughout:
 | `playhead`                  | the marker's width, white and blue; its level inside a mask     |
 | `window`                    | shape: taper, attack, release; reach: width, bypass, sync       |
 | `measures`                  | the dead zones (*The body*)                                     |
+| `breath`                    | the breath's rate and depth (*The connections*)                 |
 | `white_lines`, `blue_lines` | On, Mirror, Bypass All; a slot per parameter; the push          |
 | `lfo`                       | the LFO: rate, phase, the level's slot                          |
 | `dummy`                     | *The dummy*                                                     |
@@ -442,9 +453,9 @@ bridge in `test_pose_instrument.py`; the dummy in `test_dummy.py`.
 ### The pose results now
 
 The rows of *Pose results* draw what that table says, in the unit tests
-(`tests/test_pose_instrument.py`: the two fixed points, one shoulder moving both colours, one arm
-up alone half of each with left and right drawn differently, level shoulders tiling and a
-difference opening a quarter of overlap and of dark, an elbow making its own colour finer, equal
+(`tests/test_pose_instrument.py`: the two fixed points, exact at any breath, one shoulder moving
+both colours, a T still over a breath, the higher shoulder breathing its own colour, left and
+right up drawn differently, level shoulders tiling, an elbow making its own colour finer, equal
 elbows in tune, an elbow's turn flowing its own colour either way, and a small move of any arm
 measure a small change of the picture). What they draw on the machine has not been judged yet.
 
@@ -452,9 +463,10 @@ measure a small change of the picture). What they draw on the machine has not be
 
 The dummy (`pose/dummy.py`, settings `PI.dummy`) stands in for a person while the instrument is
 judged: a figure whose joints and torso lean are set in the panel, each joint in degrees
-−180..180 from its rest (arms hanging, elbows and knees straight, standing). Its frame joins the poses before the LERP filters at its own id, `max_players`,
-so from there it is a pose like any other: extracted, drawn, heard in Max and lit. With `solo` it
-is the only pose from the LERP filters on. The preset's calibration is the dummy's raw readings,
+−180..180 from its rest (arms hanging, elbows and knees straight, standing). Its frame joins
+the poses before the LERP filters at its own id, `max_players`, so from there it is a pose like
+any other: extracted, drawn, heard in Max and lit. With `solo` it is the only pose from the LERP
+filters on. The preset's calibration is the dummy's raw readings,
 so its hanging arm reads 0 and its vertical arm π. How the figure is built is the module's
 docstring.
 
@@ -470,9 +482,8 @@ The open questions of the synth itself are in `LIGHT_SYNTH.md`, *Open*.
 Meaning and connections:
 
 - Whether the connections of Part 3 can be found with the body: the shoulders' balance and
-  difference, the elbows' pitch and flow; what the legs, the bend and the symmetries should play
-- Whether left up alone and right up alone read apart on the wall: they differ only in which edge
-  of each line has the overlap and which the dark, a quarter interval (3.5° at 14°)
+  breath, the elbows' pitch and flow; what the legs, the bend and the symmetries should play
+- The breath's rate and depth, and whether a breath reads as the higher arm's
 - Which of the instrument's departures from the rules of meaning stay, and which calculations move
   into the pose pipeline, once the result is liked
 - The lean moves the hips' reading by the lean, on the dummy as on a person, so at full lean the

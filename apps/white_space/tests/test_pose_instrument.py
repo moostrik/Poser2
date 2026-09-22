@@ -147,11 +147,13 @@ class PoseInstrumentTest(unittest.TestCase):
         return self.layer.connect(self.layer._players[0])
 
     def test_the_shoulders_play_both_colours_and_each_elbow_its_own(self) -> None:
+        self.cfg.breath.rate, self.cfg.breath.depth = 0.0, 0.4                          # the breath held at its crest, 1
         white, blue = self._connect(_pose(0.5, left_shoulder=shoulder(0.25), right_shoulder=shoulder(0.75),
                                           left_elbow=shoulder(0.5), right_elbow=shoulder(1.0)))
-        for source in (white, blue):
-            self.assertAlmostEqual(source[Parameter.PULSE_WIDTH], 0.5, places=5)     # the mean of the shoulders
-            self.assertAlmostEqual(source[Parameter.PHASE], -0.5, places=5)          # left minus right
+        self.assertAlmostEqual(white[Parameter.PULSE_WIDTH], 0.5, places=5)          # the mean; the left is lower: still
+        self.assertAlmostEqual(blue[Parameter.PULSE_WIDTH], 0.5 + 0.4 * 0.5, places=5)   # the right higher: its excess swings
+        self.assertNotIn(Parameter.PHASE, white)
+        self.assertNotIn(Parameter.PHASE, blue)
         self.assertAlmostEqual(white[Parameter.PITCH], 0.5, places=5)                # the left elbow: the white
         self.assertAlmostEqual(blue[Parameter.PITCH], 1.0, places=5)                 # the right elbow: the blue
 
@@ -221,33 +223,67 @@ class PoseInstrumentTest(unittest.TestCase):
         np.testing.assert_array_equal(f.white[C - MASK:C + MASK + 1], 0.0)    # the mask goes over white
         self.assertEqual(float(f.blue[self._outside_mask()].sum()), 0.0)
 
-    def test_one_arm_up_alone_is_half_of_each_and_left_and_right_draw_differently(self) -> None:
-        self.cfg.white_lines.phase_amount, self.cfg.blue_lines.phase_amount = 0.125, -0.125
+    # -- the breath: the higher shoulder's colour --
+
+    BREATH = 60                                          # ticks in one breath at 0.5 Hz
+
+    def _widths(self, left: float, right: float) -> tuple[list[float], list[float]]:
+        """Both colours' width sources over one breath, for the shoulders at ``left`` and ``right``."""
+        self.layer.reset()
+        white, blue = [], []
+        for _ in range(self.BREATH):
+            w, b = self._connect(_pose(0.5, left_shoulder=shoulder(left), right_shoulder=shoulder(right)))
+            white.append(w[Parameter.PULSE_WIDTH])
+            blue.append(b[Parameter.PULSE_WIDTH])
+        return white, blue
+
+    def test_a_t_is_still_over_a_whole_breath(self) -> None:
+        self._people({0: _pose(0.5, left_shoulder=self.HALFWAY)})
+        first = self._render().light_img.copy()
+        for _ in range(self.BREATH):
+            np.testing.assert_array_equal(self._render().light_img, first)
+
+    def test_the_higher_shoulder_breathes_its_own_colour(self) -> None:
+        depth = self.cfg.breath.depth
+        white, blue = self._widths(1.0, 0.0)                                     # the left up alone
+        self.assertAlmostEqual(max(white) - min(white), 2 * depth, delta=0.02)   # white swings around the mean,
+        self.assertAlmostEqual(sum(white) / len(white), 0.5, delta=0.02)
+        self.assertEqual(set(blue), {0.5})                                       # blue still
+        white, blue = self._widths(0.0, 1.0)                                     # the right up alone
+        self.assertEqual(set(white), {0.5})
+        self.assertAlmostEqual(max(blue) - min(blue), 2 * depth, delta=0.02)
+
+    def test_left_up_and_right_up_draw_differently(self) -> None:
         drawn = []
         for left, right in ((1.0, 0.0), (0.0, 1.0)):
+            self.layer.reset()
             self._people({0: _pose(0.5, left_shoulder=shoulder(left), right_shoulder=shoulder(right))})
-            f = self._render()
-            self.assertEqual({l for _, l in self._inner(f.white)}, {INTERVAL // 2})     # the T's widths
-            self.assertEqual({l for _, l in self._inner(f.blue)}, {INTERVAL // 2})
-            drawn.append(f.light_img.copy())
+            drawn.append(self._render().light_img.copy())                        # the breath starts at its crest
+
         self.assertFalse(np.array_equal(drawn[0], drawn[1]))
 
-    def test_level_shoulders_tile_the_colours_and_a_difference_opens_gaps_and_overlaps(self) -> None:
-        self.cfg.white_lines.phase_amount, self.cfg.blue_lines.phase_amount = 0.125, -0.125
+    def test_at_full_depth_a_breath_never_passes_full_or_none_and_the_fixed_points_are_exact(self) -> None:
+        self.cfg.breath.depth = 0.5
+        for left in np.linspace(0.0, 1.0, 6):
+            for right in np.linspace(0.0, 1.0, 6):
+                white, blue = self._widths(left, right)
+                with self.subTest(left=left, right=right):
+                    self.assertGreaterEqual(min(white + blue), -1e-9)
+                    self.assertLessEqual(max(white + blue), 1.0 + 1e-9)
+        white, blue = self._widths(0.0, 0.0)
+        self.assertEqual(set(white) | set(blue), {0.0})                          # neutral: no white, full blue
+        white, blue = self._widths(1.0, 1.0)
+        self.assertEqual(set(white) | set(blue), {1.0})                          # raised: full white, no blue
+
+    def test_level_shoulders_tile_the_colours(self) -> None:
         inner = slice(C + MASK + 1, C + FULL)
         self._people({0: _pose(0.5, left_shoulder=shoulder(0.3))})                   # level: complementary widths
         f = self._render()
         white, blue = f.white[inner] > 0.5, f.blue[inner] > 0.5
         self.assertLessEqual(int(np.count_nonzero(white == blue)), 4 * len(_runs(f.white[inner])))   # every pixel one colour
-        self._people({0: _pose(0.5, left_shoulder=shoulder(1.0), right_shoulder=0.0)})  # the left up alone
-        f = self._render()
-        periods = slice(C + MASK + 1, C + MASK + 1 + 2 * INTERVAL)                      # two whole intervals
-        white, blue = f.white[periods] > 0.5, f.blue[periods] > 0.5
-        span = 2 * INTERVAL
-        self.assertAlmostEqual(np.count_nonzero(white & blue) / span, 0.25, delta=0.03)   # a quarter overlaps,
-        self.assertAlmostEqual(np.count_nonzero(~white & ~blue) / span, 0.25, delta=0.03) # a quarter is dark
 
     def test_one_shoulder_moves_both_colours(self) -> None:
+        self.cfg.breath.depth = 0.0                                                     # the rest alone
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, right_shoulder=0.0)})   # the mean: a quarter
         f = self._render()
         self.assertEqual({l for _, l in self._inner(f.white)}, {INTERVAL // 4})
@@ -291,7 +327,7 @@ class PoseInstrumentTest(unittest.TestCase):
     def test_a_small_move_of_any_measure_is_a_small_change(self) -> None:
         W, B = self.cfg.white_lines, self.cfg.blue_lines
         W.pitch_amount = B.pitch_amount = 46.3
-        W.phase_amount, B.phase_amount = 0.125, -0.125      # the speed moves the lines in time, not a pose's picture
+        self.cfg.breath.rate = 0.0                           # the speed and the breath move the lines in time, not a pose's picture
         base = dict(left_shoulder=shoulder(0.4), right_shoulder=shoulder(0.6), left_elbow=shoulder(0.3),
                     right_elbow=shoulder(0.5), tilt=0.0)
         # A step that moves an edge by about a pixel: a shoulder's moves a width, an elbow's the

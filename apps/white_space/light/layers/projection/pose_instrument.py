@@ -48,6 +48,7 @@ from ...synth import (Voice, Parameter, Sources, Oscillator, Envelope, Slot,
 from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step, DummySettings
 
 KNOB = Widget.knob
+_BREATH_POSITION = np.zeros(1)          # the breath is in time: one position
 
 
 # -- Settings: the PI root group, grouped by what is tuned together ------------------------------
@@ -81,15 +82,23 @@ class MeasureSettings(BaseSettings):
     legs_full:    Field[float] = Field(0.0,  min=0.0, max=0.5,  step=0.01, widget=KNOB, label="Full",    description="Leg deviation within this of full reads 1 (fraction)")
 
 
+class BreathSettings(BaseSettings):
+    """The breath: a sine in time the bridge makes per person, swinging the width of the colour
+    whose shoulder is the higher. A depth of ½ or less keeps both fixed points exact."""
+    rate:  Field[float] = Field(0.5, min=0.0, max=4.0, step=0.05, widget=KNOB, label="Rate",  description="Breaths per second (Hz)", row_label="Breath", newline=True)
+    depth: Field[float] = Field(0.4, min=0.0, max=0.5, step=0.01, widget=KNOB, label="Depth", description="Width swing per unit of the higher shoulder's excess (fraction)")
+
+
 class PoseInstrumentSettings(BaseSettings):
     """The ``PI`` root group, a group per concept: the mask, the playhead's marker, the window,
-    the measures' dead zones, the two oscillators and the LFO (the synth's patch, a slot per
+    the measures' dead zones, the breath, the two oscillators and the LFO (the synth's patch, a slot per
     parameter), the dummy. The wiring is ``connect``."""
     max_lines:   Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
     mask:        Group[MaskSettings]           = Group(MaskSettings)
     playhead:    Group[PlayheadMarkerSettings] = Group(PlayheadMarkerSettings)
     window:      Group[WindowSettings]         = Group(WindowSettings)
     measures:    Group[MeasureSettings]        = Group(MeasureSettings)
+    breath:      Group[BreathSettings]         = Group(BreathSettings)
     white_lines: Group[OscillatorSettings]     = Group(OscillatorSettings)
     blue_lines:  Group[OscillatorSettings]     = Group(OscillatorSettings)
     lfo:         Group[LfoSettings]            = Group(LfoSettings)
@@ -115,6 +124,7 @@ class _Player:
     present:        bool  = False   # seen this tick
     hit:            bool  = False   # the playhead crosses this person this tick
     flash:          Envelope = field(default_factory=Envelope)   # the mask's flash: up on the hit, then its release
+    breath:         Oscillator = field(default_factory=Oscillator)   # the breath: a sine in time on the widths
     reach_left:     float = 0.0     # this tick's reach each side (deg), before presence
     reach_right:    float = 0.0
 
@@ -212,6 +222,7 @@ class PoseInstrument(ProjectionLayer):
         gone: list[int] = []
         for id, p in self._players.items():
             p.hit = id in hits
+            p.breath.update(frame.tick.dt, 1.0, P.breath.rate)                  # before connect reads it
             p.voice.update_lfo(frame.tick.dt, self.connect_lfo(p))              # first: connect reads its output
             p.voice.update(frame.tick.dt, p.present, p.hit, self._sources(p), min_interval)
             p.flash.update(p.hit, frame.tick.dt, 0.0, P.mask.flash_release_seconds)
@@ -236,37 +247,42 @@ class PoseInstrument(ProjectionLayer):
         amounts, the range and the direction, are the ``PI.white_lines`` / ``PI.blue_lines``
         settings.
 
-        The arms are ``docs/MATRIX.md``'s Option 2:
+        The arms are ``docs/MATRIX.md``'s Option 3:
 
-        - the shoulders, the mean of the two: both pulse widths (white's base 0 and amount 1,
-          blue's base 1 and amount −1: arms hanging is full blue, arms raised full white)
-        - the shoulder difference, left minus right: both phases, opposite ways (white's amount
-          ⅛, blue's −⅛), so which arm is higher shows as where the colours sit against each other
+        - the shoulders, the mean of the two: where both pulse widths rest (white's base 0 and
+          amount 1, blue's base 1 and amount −1: arms hanging is full blue, arms raised full white)
+        - the higher shoulder's excess over the other: its own colour's width breathes around
+          that rest, ``PI.breath.depth`` × excess × the breath, the left the white and the right
+          the blue; level shoulders have no excess, so the fixed points and a T are still
         - each elbow plays its own colour, the left the white and the right the blue: its fold is
           the pitch, its turn (the sine of its signed angle) the speed, one way at +90° and the
           other at −90°, still when straight and when fully folded
-        - the body bend, the LFO, the symmetries, the distance, the hardness: unconnected
+        - the body bend, the LFO, the symmetries, the distance, the phases, the hardness:
+          unconnected
 
         Every arm measure but the turn passes its dead zones first (``PI.measures``). The mean,
-        the difference and the turn are computed here while the matrix is tried; once liked they
-        move into the pipeline.
+        the excess and the turn are computed here while the matrix is tried; once liked they
+        move into the pipeline. The breath is the bridge's own, as the mask's flash is.
         """
         left, right = self._measure(p.left_shoulder), self._measure(p.right_shoulder)
         shoulders = (left + right) / 2.0
-        difference = left - right
+        swing = self._instrument.breath.depth * self._breath(p)
         white = {
-            Parameter.PULSE_WIDTH: shoulders,
+            Parameter.PULSE_WIDTH: shoulders + swing * max(0.0, left - right),
             Parameter.PITCH:       self._measure(p.left_elbow),
-            Parameter.PHASE:       difference,
             Parameter.SPEED:       math.sin(p.left_elbow),
         }
         blue = {
-            Parameter.PULSE_WIDTH: shoulders,
+            Parameter.PULSE_WIDTH: shoulders + swing * max(0.0, right - left),
             Parameter.PITCH:       self._measure(p.right_elbow),
-            Parameter.PHASE:       difference,
             Parameter.SPEED:       math.sin(p.right_elbow),
         }
         return white, blue
+
+    @staticmethod
+    def _breath(p: _Player) -> float:
+        """The person's breath this tick, −1..1."""
+        return float(Oscillator.sine(p.breath.cycle(_BREATH_POSITION, 1.0, 0.0), 1.0)[0])
 
     def connect_lfo(self, p: _Player) -> float:
         """The source of the LFO's level: the leg deviation, through its dead zones

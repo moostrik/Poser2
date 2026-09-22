@@ -42,9 +42,9 @@ What belongs where:
   the parameters become an output (the waveform). A slot has one source, so the synth never adds
   two sources; and it never changes a source before the slot: what arrives is what it uses.
 - **The instrument owns** what each source is: which measure, and the shaping of that measure
-  before it is handed over (a dead zone as `PI.measures`, a remap); when the gates open (presence,
-  the hit); the reaches; which output is white and which blue; the mask (`POSE_INSTRUMENT.md`,
-  Part 1).
+  before it is handed over (a dead zone as `PI.measures`, a remap, a movement in time of its own
+  as the breath); when the gates open (presence, the hit); the reaches; which output is white and
+  which blue; the mask (`POSE_INSTRUMENT.md`, Part 1).
 
 ## A light synth
 

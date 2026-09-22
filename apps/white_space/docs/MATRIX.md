@@ -30,6 +30,8 @@ Each 0..1 after the dead zones: 0 at neutral; the shoulders 1 at raised, the elb
 | left excess         | how much higher the left shoulder is: the difference, 0 below 0         |
 | right excess        | how much higher the right shoulder is: minus the difference, 0 below 0  |
 
+Option 3 adds the breath, a source the instrument makes in time (*Option 3 Matrix*).
+
 ## Base matrix
 
 | Oscillator | Parameter   | Source    | Base | Amount |
@@ -102,32 +104,35 @@ outward is the sign of the amount.
 
 ## Option 3 Matrix
 
-Option 2 with a breathing width: each colour gets its own LFO, whose output,
-`centre + level × sine`, is its colour's pulse width. The shoulders play the LFOs: their mean
-sets where the width rests, and the higher shoulder makes its own colour breathe. The phases go:
-they showed the shoulder difference only while moving.
+The wired option (`PoseInstrument.connect`): Option 2 with a breathing width. The instrument
+makes the breath as part of the source it hands to each pulse width slot, as it makes the mask's
+flash: the shoulders' mean sets where the width rests, and the higher shoulder makes its own
+colour's width swing around it. The synth is unchanged. The phases go: they showed the shoulder
+difference only while moving.
+
+| Source      | What it is                                                               |
+|-------------|--------------------------------------------------------------------------|
+| breath      | a sine in time, −1..1, at the breath's rate (0.5 Hz), one per person     |
+| white width | shoulders + depth × left excess × breath                                 |
+| blue width  | shoulders + depth × right excess × breath                                |
+
+The depth is a setting, 0.4; at most ½ (below).
 
 | Oscillator | Parameter   | Source           | Base    | Amount |
 |------------|-------------|------------------|---------|--------|
 | white      | pitch       | left elbow       | 25.7    | 46.3   |
-| white      | pulse width | white LFO        | 0       | 1      |
+| white      | pulse width | white width      | 0       | 1      |
 | white      | phase       |                  | 0       |        |
 | white      | speed       | left elbow turn  | 3.9°/s  | 15°/s  |
 | white      | hardness    |                  | 1       |        |
 | blue       | pitch       | right elbow      | 25.7    | 46.3   |
-| blue       | pulse width | blue LFO         | 1       | −1     |
+| blue       | pulse width | blue width       | 1       | −1     |
 | blue       | phase       |                  | ½       |        |
 | blue       | speed       | right elbow turn | −4.5°/s | 15°/s  |
 | blue       | hardness    |                  | 1       |        |
 
-| LFO   | Parameter | Source       | Base   | Amount |
-|-------|-----------|--------------|--------|--------|
-| white | centre    | shoulders    | 0      | 1      |
-| white | level     | left excess  | 0      | 0.4    |
-| white | rate      |              | 0.5 Hz |        |
-| blue  | centre    | shoulders    | 0      | 1      |
-| blue  | level     | right excess | 0      | 0.4    |
-| blue  | rate      |              | 0.5 Hz |        |
+One breath serves both colours: only one shoulder can be the higher, so only one colour breathes
+at a time.
 
 | Pose                   | White            | Blue             |
 |------------------------|------------------|------------------|
@@ -137,15 +142,12 @@ they showed the shoulder difference only while moving.
 | left up, right hanging | ½, breathing     | ½, still         |
 | right up, left hanging | ½, still         | ½, breathing     |
 
-Level shoulders have no excess, so both LFOs are still at neutral, at raised and in a T. One
+Level shoulders have no excess, so both widths are still at neutral, at raised and in a T. One
 shoulder can only be much higher than the other where the mean is well inside 0..1: the excess is
-at most twice the smaller of the mean and one less the mean, so with a level amount of ½ or less a
-breath never passes full or none, and the width reaches both fixed points exactly. The breathing
-colour no longer tiles with the still one: as it swells past the other's gap the overlap tone
-shows, as it thins, dark.
-
-The synth needs two things it does not have: an LFO per oscillator instead of one per voice, and
-a centre slot on the LFO. The legs' hold on the one LFO's level goes with it.
+at most twice the smaller of the mean and one less the mean, so with a depth of ½ or less a breath
+never passes full or none, and the width reaches both fixed points exactly. The breathing colour
+no longer tiles with the still one: as it swells past the other's gap the overlap tone shows, as
+it thins, dark.
 
 ## Parked
 
