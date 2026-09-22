@@ -854,7 +854,7 @@ def clip_warp_mesh(
 
     - the flips come off, because they are already in the pixels;
     - the clip is the source at its own (sensor) size, because the crop is already in the
-      pixels; the output is the delivered size, taller when `frame_height` says so;
+      pixels; the output is the delivered size, as tall as `delivered_height` makes it;
     - the tilt's sign flips under `flip_v`, because a vertical mirror reverses a rotation about
       the horizontal axis, while a horizontal mirror commutes with it and needs no correction;
     - the lens centre offset mirrors with the pixels: `x` under `flip_h`, `y` under `flip_v`.

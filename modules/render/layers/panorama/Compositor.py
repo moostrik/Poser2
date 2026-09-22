@@ -134,7 +134,7 @@ class Compositor(LayerBase):
 
         360 degrees of azimuth at the same focal as the tangent rows: a degree at the horizon is
         the same size either way, and the window's tangent span is the height. Nothing here is a
-        preference — `tilt`, `fov`, `frame_height` and `focus_radius` all move it.
+        preference — `tilt`, `fov` and `focus_radius` all move it.
         """
         return strip_aspect_ratio(self.elevation_window)
 

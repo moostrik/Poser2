@@ -11,7 +11,7 @@ from numpy import ndarray
 
 from modules.utils import FPS
 
-from .definitions import CameraResolution, FrameType, Input, Output, Tracklet, FrameCallback, SyncCallback, TrackerCallback, get_device_list, log_connected_sensors, read_lens_calibration, imu_rotation_to_camera, imu_to_camera, unroll_imu_frame, orientation_from_gravity, IMU_SMOOTHING, mode_size, frame_size, frame_window, frame_coverage, coverage_summary, full_frame_height, lens_field, lens_deviation
+from .definitions import CameraResolution, FrameType, Input, Output, Tracklet, FrameCallback, SyncCallback, TrackerCallback, get_device_list, log_connected_sensors, read_lens_calibration, imu_rotation_to_camera, imu_to_camera, unroll_imu_frame, orientation_from_gravity, IMU_SMOOTHING, mode_size, frame_size, frame_window, frame_coverage, coverage_summary, delivered_height, lens_field, lens_deviation
 from .pipeline import setup_pipeline, get_frame_types, WarpConfig
 from .settings import CameraSettings
 
@@ -43,7 +43,6 @@ class Camera(Thread):
         self.do_stereo: bool =          core_settings.stereo
         self.do_yolo: bool =            core_settings.yolo
         self.resolution: CameraResolution = core_settings.resolution
-        self.frame_height: int =        core_settings.frame_height
         self.show_stereo: bool =        core_settings.depth.show
 
         self.mount: WarpConfig = WarpConfig(
@@ -56,6 +55,8 @@ class Camera(Thread):
             lens_centre_x=core_settings.lens_centre_x,
             lens_centre_y=core_settings.lens_centre_y,
         )
+        self.frame_height: int = delivered_height(self.do_color, self.resolution, self.mount.fov_h, self.mount.tilt,
+                                                  self.mount.lens_fov, self.mount.lens_centre)
 
         # DAI
         self.device:                    dai.Device
@@ -147,13 +148,10 @@ class Camera(Thread):
         coverage = frame_coverage(src, out, src[0], self.mount.fov_h, self.mount.tilt,
                                   self.mount.flip_h, self.mount.flip_v,
                                   self.mount.lens_fov, self.mount.lens_centre)
-        full: int = full_frame_height(src, src[0], self.mount.fov_h, self.mount.tilt,
-                                      self.mount.lens_fov, self.mount.lens_centre)
         logger.info(f'frame {out[0]}x{out[1]}: elevation {window.elevation_bottom:+.1f} to '
                     f'{window.elevation_top:+.1f} deg, horizon at row {window.horizon_px:.1f}, '
                     f'{window.focal:.1f} px/rad; '
-                    f'{coverage_summary(coverage, out, src[0], self.mount.fov_h, self.mount.flip_h)}; '
-                    f'the sensor\'s full reach needs frame_height {full}')
+                    f'{coverage_summary(coverage, out, src[0], self.mount.fov_h, self.mount.flip_h)}')
 
     def _read_mount_calibration(self) -> None:
         """One-shot at open: what this unit says about its own lens and its IMU's orientation."""

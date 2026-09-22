@@ -15,9 +15,7 @@
       "device_id": "19443010D153874800",
       "flip_h": false,
       "flip_v": true,
-      "keystone": -0.22,
-      "frame_height": 0,
-      "lens_fov": 0.0,
+      "keystone": -0.22,      "lens_fov": 0.0,
       "lens_centre_x": 0.0,
       "lens_centre_y": 0.0,
       "readings": {
@@ -56,9 +54,7 @@
       "device_id": "19443010D1E4974800",
       "flip_h": false,
       "flip_v": true,
-      "keystone": -0.22,
-      "frame_height": 0,
-      "lens_fov": 0.0,
+      "keystone": -0.22,      "lens_fov": 0.0,
       "lens_centre_x": 0.0,
       "lens_centre_y": 0.0,
       "readings": {
@@ -97,9 +93,7 @@
       "device_id": "19443010D14C874800",
       "flip_h": false,
       "flip_v": true,
-      "keystone": -0.22,
-      "frame_height": 0,
-      "lens_fov": 0.0,
+      "keystone": -0.22,      "lens_fov": 0.0,
       "lens_centre_x": 0.0,
       "lens_centre_y": 0.0,
       "readings": {

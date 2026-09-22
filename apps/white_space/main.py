@@ -8,7 +8,7 @@ from functools import partial
 import numpy as np
 
 from modules.utils import Broadcast
-from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType, CameraCheck, delivered_height
+from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType, CameraCheck
 from modules.settings import presets, NiceServer
 from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, PosesFromTracklets
@@ -44,17 +44,6 @@ class WhiteSpaceMain:
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
         self.settings.camera.sim_enabled = simulation
-        # The delivered frame's height follows the tilt unless the preset pins it. The warp's
-        # rows are tangents of elevation, so the sensor's full reach needs more rows the further
-        # the camera is aimed up (848 at P720 and tilt 0, 960 at tilt 15, 1152 at P800 and tilt
-        # 16). Derived once, here, before anything sizes itself by it; a non-zero preset value
-        # is an explicit override. See CALIBRATION.md, "The camera frame".
-        if self.settings.frame_height == 0:
-            self.settings.frame_height = delivered_height(
-                self.settings.camera.color, self.settings.resolution, self.settings.fov, self.settings.tilt,
-                self.settings.lens_fov, (self.settings.lens_centre_x, self.settings.lens_centre_y))
-            logging.info("frame_height derived: %d rows for %s at tilt %.1f", self.settings.frame_height,
-                         self.settings.resolution.name, self.settings.tilt)
         # The crop is the pose model's input, so it is cut at that size: one antialiased resample
         # from the camera frame, rather than a larger crop the runner scales down again. Derived
         # from the model so a change of pose resolution cannot silently reintroduce the second one.

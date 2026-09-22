@@ -11,10 +11,10 @@ Modes: **beam** layers write the four beam lights by name (`Frame.beam_lights`, 
 `BeamLightId`: front/back white, left/right blue) and no pixels; **projection** layers draw the
 persistence-of-vision projection. The fixture's readout mode follows the *commanded* rpm — beam
 mode below 200, projection mode at or above, switching on receipt of the rpm regardless of the
-bar's actual speed (`loop` in `firmware.cpp` sets `SLOW` from `RPM`). The light sender maps the beam lights to the
-firmware's pixel slots exactly when the fixture reads them (`inout/osc_light_sender.py`),
-and the render simulates the beams in its own layer (`render/layers/
-beam_light_simulation_layer.py`). Base classes `BeamLayer` / `ProjectionLayer` encode this, and the
+bar's actual speed (`loop` in `firmware.cpp` sets `SLOW` from `RPM`). The light sender maps the
+beam lights to the firmware's pixel slots exactly when the fixture reads them
+(`inout/osc_light_sender.py`), and the render simulates the beams in its own layer
+(`render/layers/beam_light_simulation_layer.py`). Base classes `BeamLayer` / `ProjectionLayer` encode this, and the
 folders and settings groups follow the same single axis (`layers/beam/` ↔ `light.beam_layers`,
 `layers/projection/` ↔ `light.projection_layers` — no separate test folder). The file path names
 the layer: the class is the folder and file in CamelCase and equals the `LayerId`
@@ -41,34 +41,37 @@ person; the ghosts' ids start above it. The render draws every LERP pose as a fi
 projection row at its azimuth (`render.pose_figures`). How the tracker produces the poses is in
 `TRACKING.md`, *Downstream*.
 
+The hit is detected by `PlayheadCrossing` (`pose/playhead_offset.py`) in three instances
+(`beam_flash`, `pose_instrument`, `HitSync`) on the same LERP `PlayheadOffset` and the same step
+(`beam_rpm` at the tick rate), so they agree by construction; one shared detector would gain the
+layers nothing.
+
 ## Index — show layers
 
 | Layer                 | Mode       | Reads                         | Writes                                   | Used by                   |
 |-----------------------|------------|-------------------------------|------------------------------------------|---------------------------|
 | `beam_playhead`       | beam       | — (settings only)             | front white lamp                         | S1–S6, S9, S10            |
 | `beam_flash`          | beam       | LERP frames (PlayheadOffset)  | front white + blue lamps; board flashes  | S4                        |
-| `pose_instrument`     | projection | LERP frames; frame playhead phase | white and blue lines, the masks, the playhead marker | S6 (projecting), S7, S8 |
+| `pose_instrument`     | projection | LERP frames                   | white and blue lines, masks, marker      | S6 (projecting), S7, S8   |
 | `flood`               | projection | — (settings only)             | whole projection white                   | S8                        |
 | `beam_wind_down`      | beam       | tick clock                    | both white lamps, fading                 | S9, S10                   |
 | `beam_blue_sound`     | beam       | sound levels from Max (board) | left/right blue lamps                    | S1, S2, S3, S5, S10       |
 
-`beam_flash`'s blue lamps are zeroed in the presets: S4 runs blue-none by design. `pose_instrument`
-reads `Azimuth`, `Angles`, `LegDeviation`, `TorsoTilt`, `AngleSymmetry`, `Similarity` and
-`PlayheadOffset` from the LERP frames.
+`beam_flash`'s blue lamps are zeroed in the presets: S4 runs blue-none by design.
 
 `beam_wind_down` is `flood`'s ending and a plain beam layer: the fixture is in beam mode from
-S9's first packet, so the wall while the bar is still fast *is* the two white lamps
+S9's first packet, so the wall while the bar is still fast is the two white lamps
 spinning. See its section below.
 
-Debug layers (never in a state's mix; reached via the `light.debug` select — **choosing a
-layer IS turning debug on**: it shows solo at full weight and the motor auto-follows its
+Debug layers (never in a state's mix; reached via the `light.debug` select — choosing a
+layer turns debug on: it shows solo at full weight and the motor follows its
 mode, OFF returns the show): the two beam tools `beam_haunted` (the ghost flash;
 pairs with `pose.ghoster.enabled` for solo experimentation) and `beam_test` (direct
 levels for the four physical lamps: front/back white, left/right blue — beam mode's
 hardware check), the projection `projection_playhead` (the playhead's marker alone, with the
 instrument's `PI.playhead` settings, for looking at the playhead by itself: `CALIBRATION.md`),
-plus the projection `test_`-prefixed patterns: `test_pose_waves` (the old
-wave/void instrument, kept as a reference/montage visual), `test_harmonic`,
+plus the projection `test_`-prefixed patterns: `test_pose_waves` (a wave/void
+instrument, a reference/montage visual), `test_harmonic`,
 `test_player_lines`, `test_calibration`, `test_fill`, `test_pulse`, `test_chase`,
 `test_lines`, `test_random`.
 
@@ -81,11 +84,11 @@ sound Max is playing.
 
 - **Used by**: S2 IDLE and S3 IDLE_INTRO at full; S1 OFF_IDLE, S5 INTRO_IDLE and S10 END_IDLE fading in
 - **Input**: `/WS/idle/blue/left` and `/WS/idle/blue/right` from Max — one float each,
-  0..1, real OSC — received on the **OSC sound receiver** (`inout.osc_sound_receiver`) and
-  stored on the board (sound-level store: levels + received-timestamp). **Max must send
-  these messages** (coordination item).
+  0..1, real OSC — received on the OSC sound receiver (`inout.osc_sound_receiver`) and
+  stored on the board (sound-level store: levels + received-timestamp). Max sends these
+  messages (`SOUND.md`).
 - **Behavior**: left level → left blue lamp, right level → right blue lamp; a gain scales
-  the mapping. **Latency first**: no softening — only a minimal smoothing window of at
+  the mapping. Latency first: no softening — only a minimal smoothing window of at
   most 2–3 light frames (~66–100 ms), there purely to bridge OSC-arrival vs 30 Hz tick
   timing jitter, never to shape the response (Max shapes the envelope; the lamps follow).
 - **Stale input**: when no message has arrived for `stale_seconds`, the layer falls back —
@@ -97,9 +100,8 @@ sound Max is playing.
 
 ## flood (ProjectionLayer)
 
-The whole projection constant white — the END's wall of light. Deliberately the dumbest layer in
-the pool: all dynamics (the cross-to-full) are mix weights set by the states, never
-behavior inside the layer. The *ending* of the wall belongs to `beam_wind_down` — S8's flood
+The whole projection constant white — the END's wall of light. The layer has no dynamics: the
+cross-to-full is mix weights set by the states. The *ending* of the wall belongs to `beam_wind_down` — S8's flood
 at 1.0 hands over to S9/S10's wind_down starting at the full wall, seamlessly.
 
 - **Used by**: S8 END (easing in as the instrument fades)
@@ -120,7 +122,7 @@ mode drives the same two white outputs as this layer at 1.0 in beam mode.
 
 - **Used by**: S9/S10 at constant weight 1.0 (reset on state entry). The states put the
   landing look underneath (`beam_playhead` at DIM/BRIGHT, `beam_blue_sound`) — it is
-  *revealed* as the wall dies, so nothing has to splice or match at the hand-off.
+  revealed as the wall dies, so nothing has to splice or match at the hand-off.
 - **Input**: the tick clock; no pose data, no playhead signals.
 - **Behavior**: both white lamps at `f × level`, `f = 1 − ease(elapsed / spin_down_seconds)`,
   hand-tuned to ride the physical spin-down (the sensor is silent above 200 rpm, so the
@@ -135,75 +137,18 @@ mode drives the same two white outputs as this layer at 1.0 in beam mode.
 
 ## pose_instrument (ProjectionLayer)
 
-The heart of the piece: each person stands in a dim blue **mask** at their azimuth, and around
-them lies a mirror-symmetric pattern of full white and full blue **lines** drawn from their pose.
-The instrument, its meanings, connections and events, is `POSE_INSTRUMENT.md`, and the light synth
-that draws the lines is `LIGHT_SYNTH.md`; this section is the layer: what it reads, how it
-composes people, and what it exposes.
+The heart of the piece: each person stands in a dim blue mask at their azimuth, and around them
+lies a pattern of full white and full blue lines drawn from their pose. The bridge (its
+measures, connections, events, how people combine, the mask and the hit) is `POSE_INSTRUMENT.md`,
+and the light synth that draws the lines is `LIGHT_SYNTH.md`.
 
 - **Used by**: S6 (once projecting), S7, S8
-- **Input**: per person from the LERP frames, the measures: the four arm angles (`Angles`:
-  left/right shoulder, left/right elbow), `LegDeviation` (joint-weighted hip/knee deviation, 0..1),
-  `TorsoTilt` (signed sideways lean against the image vertical, −1..1), `Distance` (how far out in
-  the tracked zone, 0..1) and `AngleSymmetry` (signed left minus right per pair, −1..1); plus presence (the pose itself,
-  *Inputs*), the pairwise `Similarity` row (`SIMILARITY.md`: how alike the arm postures are, 0 to 1, 1 within
-  the tolerance, weighted at neutral) and `PlayheadOffset`. The measures are also sent to Max, so
-  sound and light read the same values (`SOUND.md`, *Conversion table*). The layer adds no smoothing: the
-  LERP poses are the pipeline's smoothed output. Each measure passes the dead zones of
-  `PI.measures` before it becomes a source (`POSE_INSTRUMENT.md`, *The body*).
-- **Per person**: a voice of the light synth (`light/synth`, `LIGHT_SYNTH.md`), its output 1
-  drawn in white and its output 2 in blue. `PoseInstrument.connect` turns the measures into the
-  sources of the voice's slots (`POSE_INSTRUMENT.md`, *The connections*). The pattern is drawn
-  from the person's own azimuth, not their centre pixel, so it moves with them as one piece and
-  smoothly; a neighbour walking never re-spaces it. An oscillator with Mirror on (the default)
-  draws the same both sides, symmetric; with Mirror off its lines pass behind the person as one
-  grid. On top of the pose each colour
-  travels at its own `speed`, white outward and blue inward. At the default hardness every pixel
-  is 0 or 1 per channel; only the mask is dim.
-
-### Between people
-
-- **Union**: overlapping voices combine per channel, the fuller level showing. Two patterns of
-  different intervals or centres make a moiré.
-- **The visual limit**: `max_lines` per revolution floors every interval at one period of it
-  (4° at 90). It does not bound a line's or a gap's width: a thin line is drawn as it is.
-- **Masks**: every mask goes over every pattern, each channel set to the mask's level
-  (`mask.white`, `mask.blue`; white 0 in the preset, so a dim blue band `mask.width` wide). A
-  mask cuts a line where it falls, so lines slide out from behind it; the window cuts nothing,
-  its lines thin to nothing over the taper. The playhead's marker (`PI.playhead`: width, white,
-  blue) is drawn over the masks, dimmed to `playhead.at_mask` inside one.
-- **Sync**: above `window.sync_threshold` (mean of both directions' similarity) a pair's reach grows
-  toward each other along the shorter arc, eased, until each pattern reaches the partner at similarity 1:
-  full sync is full overlap, one pattern. The threshold is the layer's own remap of the similarity, which is
-  well above 0 for most pairs out of neutral (`SIMILARITY.md`, *Interdependence*). It opens over any intermediate person, whose own pattern is
-  unchanged. Sync shows more of the pattern; it never changes the lines. Only the partner's side
-  opens, and the partner's presence scales the growth, so a partner leaving lets go smoothly. A pair
-  with a person at neutral reads 0 and does not open (`STATES.md`, *Vocabulary*).
-
-### Hit
-
-On the tick the playhead is closest to a person (`PlayheadCrossing` in `pose/playhead_offset.py`,
-the same closest-tick rule as `beam_flash`), the person is marked: the mask goes to its flash
-levels (`mask.flash_white`, `mask.flash_blue`) and falls back over `mask.flash_release_seconds`,
-and each colour's push adds its `push` to its speed, falling back over its own
-`push_release_seconds` while the lines keep what they gained
-(`POSE_INSTRUMENT.md`, *Events*). The crossing is measured in
-playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJECTION.
-
-### Presence, tuning, reset
-
-- **Presence**: per player attack (`window.attack_seconds`: the window opens from the mask)
-  and release (`window.release_seconds`: the last pose is held while the window closes and the mask
-  dims). A pose with a NaN azimuth has no place in the projection and counts as absent (it releases),
-  the one exception to *Inputs*' no-presence-test rule.
-- **Tuning**: the values are the root `PI` settings group (`POSE_INSTRUMENT.md`, *Settings*), live
-  from the panel and saved in the preset; the connections are code. `connect`, the drawing and
-  the synth's classes (`Voice`, `Oscillator`, `Envelope`, `Slot`) and `PlayheadMarker` hot-reload
-  on save; adding a setting needs a restart.
-- **Settings**: the layer's own group holds only `blend`; everything else is `PI`
+- **Input**: from the LERP frames, `Azimuth`, `Angles`, `LegDeviation`, `TorsoTilt`, `Distance`,
+  `AngleSymmetry`, `Similarity` and `PlayheadOffset` (`POSE_INSTRUMENT.md`, *The body*). The
+  layer adds no smoothing.
+- **Settings**: the layer's own group holds only `blend`; everything else is the root `PI` group
+  (`POSE_INSTRUMENT.md`, *Settings*)
 - **Reset**: forgets every player and pass (S6's entry, a fresh instrument per cycle)
-- **Relation to `pose_waves`**: the old wave/void instrument lives on as `test_pose_waves` (debug
-  override), a reference/montage visual.
 
 ---
 
@@ -212,10 +157,6 @@ playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJ
 - **beam_blue_sound**: fallback choice (off vs idle pulse); exact `/WS/idle/blue/left` and `/right` scaling agreed
   with Max (linear 0..1 vs dB)
 - **pose_instrument**: see `POSE_INSTRUMENT.md`, *Open*
-- **Hit ownership**: `PlayheadCrossing` (`pose/playhead_offset.py`) runs in three instances (`beam_flash`,
-  `pose_instrument`, `HitSync`) on the same LERP `PlayheadOffset` and the same step (`beam_rpm` at the
-  tick rate), so they agree by construction. One light-side detector publishing per-width hit sets on the
-  board would give the hit one owner; left as is because the layers gain nothing by it
 - **Ghosts and the playhead boundary**: the Ghoster is deprecated (off in `studio.json`; a nice-to-have).
   It is what keeps `PlayheadOffset` a pose feature (its beat reads it, it stamps it on ghosts) and is the
   pose package's one playhead dependency. Removing the Ghoster removes `beam_haunted`, `GhostFeature`,

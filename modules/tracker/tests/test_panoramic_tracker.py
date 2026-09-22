@@ -1474,7 +1474,7 @@ class TestReachReadouts(unittest.TestCase):
     """
 
     # A frame TALLER than the sensor's reach: P720 at tilt 15 fills 944 rows on the centre column,
-    # so on 960 the sensor, not the rows, is what ends the picture at the top — and the sensor's top
+    # so on the 960 it delivers (aligned to 16) the sensor ends the picture at the top — and its top
     # edge falls toward the sides. The configuration where the seam reach differs most from the axis.
     SRC = (1280, 720)
     ROWS = 960
@@ -1484,7 +1484,7 @@ class TestReachReadouts(unittest.TestCase):
     def make_config(self, resolution: CameraResolution = CameraResolution.P720,
                     lens_centre: tuple[float, float] = (0.0, 0.0)) -> PanoramicTrackerSettings:
         config = PanoramicTrackerSettings(fov=PARALLAX_FOV, resolution=resolution,
-                                          tilt=self.TILT, frame_height=self.ROWS, lens_fov=self.LENS_FOV,
+                                          tilt=self.TILT, lens_fov=self.LENS_FOV,
                                           lens_centre_x=lens_centre[0], lens_centre_y=lens_centre[1])
         config.rig.camera_radius = CAMERA_RADIUS
         config.rig.camera_height = CAMERA_HEIGHT
@@ -1539,19 +1539,6 @@ class TestReachReadouts(unittest.TestCase):
         self.assertAlmostEqual(r.feet_from, 1.65, delta=0.01)
         self.assertAlmostEqual(r.hands_from, 1.73, delta=0.01)
         self.assertGreater(r.hands_seam, r.hands_from + 0.2)
-
-    def test_when_the_rows_end_the_picture_the_seam_barely_differs(self) -> None:
-        """The opposite case, and the studio configuration: P800 with the shared lens's centre
-        offset reaches 1136 rows at tilt 15, so 960 rows cap the top at the same angle on every
-        column. The seam is then only worse by the rig's parallax — centimetres — which is why the
-        two hands read-outs are worth having side by side: their gap says which of the two limits
-        the frame is running into. Feet are in frame inside the zone's R 1.5 edge here."""
-        config = self.make_config(CameraResolution.P800, lens_centre=(-10.5, 10.5))
-        PanoramicTracker(config, num_players=4, num_cameras=4)
-        r = config.rig
-        self.assertLess(r.feet_from, 1.5)
-        self.assertGreaterEqual(r.hands_seam, r.hands_from)
-        self.assertLess(r.hands_seam - r.hands_from, 0.05)
 
     def test_the_camera_radius_and_the_lens_height_update_it_live(self) -> None:
         # Both are live settings and both move the reach; neither needs the coverage redone.
@@ -1610,11 +1597,10 @@ class TestInitialRigSync(unittest.TestCase):
             PanoramicTracker(config, num_players=4, num_cameras=3).rig.target_fov,
             120.0, places=9)
         # The row model is derived from the shared camera fields with the warp's own functions —
-        # frame_height 0 resolving to the sensor's full reach at this tilt — and published as the
-        # frame's shape and two edge angles, from which the row form is rebuilt exactly.
+        # the sensor's full reach at this tilt — and published as the frame's shape and two edge
+        # angles, from which the row form is rebuilt exactly.
         rows = delivered_height(False, config.resolution, PARALLAX_FOV, config.tilt,
-                                config.lens_fov, (config.lens_centre_x, config.lens_centre_y),
-                                config.frame_height)
+                                config.lens_fov, (config.lens_centre_x, config.lens_centre_y))
         window = frame_window((1280, 800), (1280, rows), 1280, PARALLAX_FOV, config.tilt,
                               config.lens_fov, (config.lens_centre_x, config.lens_centre_y))
         self.assertAlmostEqual(tracker.rig._horizon_px, window.horizon_px, places=9)

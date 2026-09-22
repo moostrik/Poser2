@@ -99,8 +99,6 @@ class CameraSettings(BaseSettings):
     stereo:         Field[bool]  = Field(False, access=Field.INIT)
     yolo:           Field[bool]  = Field(True, access=Field.INIT)
     resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode. P1080 is colour only; mono falls back to P800")
-    frame_height:   Field[int]   = Field(0, access=Field.INIT, step=16,
-                                         description="Delivered frame height (px, multiple of 16); 0 = the sensor mode's rows")
     model_path:     Field[str]   = Field("data/models", access=Field.INIT)
     flip_h:         Field[bool]  = Field(False, access=Field.INIT, description="Flip horizontal")
     flip_v:         Field[bool]  = Field(False, access=Field.INIT, description="Flip vertical")

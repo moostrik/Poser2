@@ -24,7 +24,7 @@ value walked through, the left shoulder:
 |---------------|-------------------------------------------------------------------------------------|
 | **measure**   | what the pose pipeline says about the body: the left shoulder's angle, 0 hanging, π raised. The body's, whether or not the light uses it; the sound reads the same one. Ours: the body is our controller |
 | **source**    | that measure once the bridge hands it to the synth to move something: 0..1, plugged into a slot. Also an LFO's or an envelope's output. The word is a role: whatever is in a slot's socket, one per slot |
-| **parameter** | a knob of the oscillator, the thing being moved: interval, pulse width, phase, speed, hardness; the LFO's level. Its value each tick is its base plus what its source adds |
+| **parameter** | a knob of the oscillator, the thing being moved: pitch, pulse width, phase, speed, hardness; the LFO's level. Its value each tick is its base plus what its source adds |
 | **slot**      | the parameter's modulation row, its mechanism: base, amount, curve, bypass, and the one socket the source goes into |
 | **output**    | what the oscillator makes of its parameters: on or off per pixel along the wall; two per voice, sent to white and to blue |
 
@@ -41,10 +41,10 @@ What belongs where:
   on the parameters (the window, presence), how an LFO or an envelope makes its output, and how
   the parameters become an output (the waveform). A slot has one source, so the synth never adds
   two sources; and it never changes a source before the slot: what arrives is what it uses.
-- **The instrument owns** what each source is: which measure, and any shaping of the measure
-  before it is handed over (a dead zone as `PI.measures`, a remap, a mean of two joints: each
-  makes one source out of measures); when the gates open (presence, the hit); the reaches; which
-  output is white and which blue; the mask (`POSE_INSTRUMENT.md`, Part 1).
+- **The instrument owns** what each source is: which measure, and the shaping of that measure
+  before it is handed over (a dead zone as `PI.measures`, a remap); when the gates open (presence,
+  the hit); the reaches; which output is white and which blue; the mask (`POSE_INSTRUMENT.md`,
+  Part 1).
 
 ## A light synth
 
@@ -122,8 +122,7 @@ ratio (*Open*).
 ## Parameters
 
 Per oscillator, five parameters and nothing else. Each has a base value and can be connected to a
-source (*Modulation*). The hardness is a parameter like the others, its base 1, hard; it will
-probably never be connected to anything.
+source (*Modulation*). The hardness is a parameter like the others, its base 1, hard.
 
 | Parameter   | Unit                 | What it is                                              |
 |-------------|----------------------|---------------------------------------------------------|
@@ -278,7 +277,7 @@ every 5°: a row reads in one unit, and the 90-line limit is the knob's own scal
 - A per-pixel source on the phase bunches and spreads the lines along the wall, a synth's FM, and
   can take them past the visual limit locally. The synth allows it; whether it is used is the
   instrument's choice.
-- Pulse width, phase and hardness take a source per tick or per pixel; interval and speed take one
+- Pulse width, phase and hardness take a source per tick or per pixel; pitch and speed take one
   per tick, since the travelled (*The oscillator*) is one count.
 - Where a parameter ends: pulse width and hardness stop at 0 and 1, the pitch stops at the
   visual limit, phase wraps, speed has no ends. A stop is a standstill, not a step.
@@ -357,8 +356,8 @@ pulse  on where |frac(cycle + ½) − ½| ≤ pulse width / 2   centred on every
 | an LFO in time            | one position                | sine     | one value per tick, into any parameter             |
 | elsewhere                 | whatever the user's axis is | either   | a value per position                               |
 
-The hardness is not part of the oscillator: it is a slew on the pulse's output, as a lag after an
-LFO softens a square.
+The hardness is not part of the core: the pulse waveform applies it as a slew on its output, as a
+lag after an LFO softens a square.
 
 ```
 d     = |frac(cycle + ½) − ½|              the distance from the nearest line's centre, in intervals

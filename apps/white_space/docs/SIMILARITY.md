@@ -5,7 +5,7 @@ How alike two players' arm postures are, and what the show does with it. The pos
 degrees, and how alike that makes them, 0 to 1. Two consumers use the answers in two ways: the **hit sync**
 (`STATES.md` *Vocabulary*: in sync) compares the poses at the moments the playhead hits them and decides
 INTRO → INTRO_PLAY; the **`Similarity` feature** on the pose frames carries the live 0-to-1 value to the
-projection window (`LAYERS.md` *pose_instrument*), the sound and the data view. This document owns the
+projection window (`POSE_INSTRUMENT.md` *People*), the sound and the data view. This document owns the
 definition, its settings, their meaning in degrees and how they depend on each other. All numbers assume
 `studio.json`.
 

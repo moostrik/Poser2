@@ -116,7 +116,7 @@ class RigSync:
         self._rig.set_fov(fov)
         lens_centre: tuple[float, float] = (c.lens_centre_x, c.lens_centre_y)
         src: tuple[int, int] = mode_size(False, c.resolution)
-        rows: int = delivered_height(False, c.resolution, fov, c.tilt, c.lens_fov, lens_centre, c.frame_height)
+        rows: int = delivered_height(False, c.resolution, fov, c.tilt, c.lens_fov, lens_centre)
         window = frame_window(src, (src[0], rows), src[0], fov, c.tilt, c.lens_fov, lens_centre)
         self._rig.set_window(window, rows)
         p: RigSettings = c.rig

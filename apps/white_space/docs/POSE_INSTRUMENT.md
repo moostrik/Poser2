@@ -15,7 +15,7 @@ One body plays two engines: the same measures drive the sound synth in Max and t
 This document is the light's. It is the bridge between the pose data and the light synth, in four
 parts. **Vocabulary** fixes the words. **Meaning** is what each measure of the body should say.
 **Connections** is how the measures and the events are wired to the synth so that the meaning
-comes out. **Implementation** is the bridge's design and the layer's state today.
+comes out. **Implementation** is the bridge's design and the layer.
 Meaning and connections are one loop: meaning sets the targets, the targets pick the connections,
 the connections have consequences, and the consequences are new meaning to judge. While one is
 held still the other is worked on.
@@ -29,8 +29,8 @@ Each person makes light in the projection. At their azimuth sits a dim blue **ma
 goes over everything at the person, the patterns of everyone and the light of the other layers;
 the playhead passes through it dimmed by a setting. Around the mask, mirrored about the person
 (or, per oscillator, passing behind them), their **pattern**: lines of full white and full blue,
-generated behind the mask and coming out from under it. Only a **window** of the pattern is visible each side of the person; sync opens the
-window wider.
+generated behind the mask and coming out from under it. Only a **window** of the pattern is
+visible each side of the person; sync opens the window wider.
 
 The ground rules, as set:
 
@@ -57,8 +57,8 @@ The ground rules, as set:
 - Arms down is neutral: full blue over the window. Arms up: full white. In between, the pattern.
   Full is solid over the window, thinning at its ends (`LIGHT_SYNTH.md`, *The window*).
 - Blue and white can behave differently; line thickness and interval can change.
-- A hit (the playhead crossing the person) marks that person. Wider lines do not read, and a tint
-  of the lines did not read **(site facts)**; the mark is the push and the mask's flash
+- A hit (the playhead crossing the person) marks that person. Neither wider lines nor a tint of
+  the lines reads as a mark **(site facts)**; the mark is the push and the mask's flash
   (*Events*), with the playhead's marker passing the person; each mark is optional through its
   levels.
 - Sync makes more of the pattern visible: the window opens, the lines stay what they are.
@@ -82,11 +82,10 @@ where the synth is a synth; our own word where the wall differs. The words of th
 | event      | what the instrument triggers in a voice: presence, the hit, sync (*Events*)           |
 
 What is the instrument's and what is the synth's (`LIGHT_SYNTH.md` states the same split from the
-synth's side): the instrument decides what each source is, which measure, and any shaping of a
-measure before it is handed over (a dead zone, a remap, a mean of two joints, each of which makes
-one source out of measures); when the gates open (presence, the hit); the reaches; which output
-is white and which blue; and the mask. Everything from the slot on is the synth's, and the synth
-never changes a source before the slot and never adds two.
+synth's side): the instrument decides what each source is, which measure, and the shaping of that
+measure before it is handed over (a dead zone, a remap); when the gates open (presence, the hit);
+the reaches; which output is white and which blue; and the mask. Everything from the slot on is
+the synth's, and the synth never changes a source before the slot and never adds two.
 
 ---
 
@@ -103,7 +102,9 @@ points is tied to a pose.
 ## The rules of meaning
 
 1. Only measures mean something: the six measured values of the body, the distance, and what the
-   pose pipeline derives from them (the symmetry of a pair). The instrument derives nothing.
+   pose pipeline derives from them (the symmetry of a pair). The instrument shapes one measure
+   into one source (a dead zone, a remap); a value computed from several measures belongs in the
+   pipeline.
 2. A meaning belongs to a measure, never to a pose. The table says what happens when a measure
    changes. No pose owns a meaning; the two fixed points are the only exceptions.
 3. Groups of measures (both arms, both elbows) and poses are consequences of the measures'
@@ -120,12 +121,11 @@ points is tied to a pose.
 9. Primary measures make the note, secondary measures modulate it. A secondary meaning needs a
    note to act on, so it is judged on a pattern, never on the fixed points.
 
-While the instrument is being built the rules are aims and not gates. Two things are fixed: arms
-hanging is full blue and arms raised is full white. Every combination drawing differently (rule 7)
-is the aim in the end, not a test of each step. A calculation on the measures may live in the
-instrument while it is tried; once the result is liked, what belongs in the pose pipeline moves
-there (rule 1). The connections of today depart from rule 4 as such an experiment: the two arms are
-told apart by a colour, each arm playing one oscillator.
+The rules are aims, not gates. Two things are fixed: arms hanging is full blue and arms raised is
+full white. Every combination drawing differently (rule 7) is the aim in the end, not a test of
+each step. A calculation on several measures may live in the instrument while it is tried; once
+the result is liked it moves into the pose pipeline (rule 1). The connections depart from rule 4
+as such an experiment: the two arms are told apart by a colour, each arm playing one oscillator.
 
 ## What each measure means
 
@@ -189,10 +189,9 @@ not described.
 ## The body
 
 The instrument's measures are pose features and nothing else: values the pose pipeline measures
-and publishes with every frame, smoothed. The instrument never derives a value of its own. The one
-derivation the pipeline adds is the symmetry of a pair, as it derives the leg deviation from the
-hip and knee angles. The distance is the tracker's, read from where the feet meet the floor
-(`TRACKING.md`, *The pose's distance*).
+and publishes with every frame, smoothed. The pipeline derives the leg deviation and the symmetry
+of a pair from the joint angles. The distance is the tracker's, read from where the feet meet the
+floor (`TRACKING.md`, *The pose's distance*).
 
 | Feature           | Measure                                                  | In the pipeline |
 |-------------------|----------------------------------------------------------|-----------------|
@@ -200,23 +199,16 @@ hip and knee angles. The distance is the tracker's, read from where the feet mee
 | right shoulder    | 0 hanging → ±π straight up, the sign the side it passes  | `Angles`        |
 | left elbow        | 0 straight → ±π folded                                   | `Angles`        |
 | right elbow       | 0 straight → ±π folded                                   | `Angles`        |
-| leg deviation     | 0 standing → 1 bent, stretched                           | `LegDeviation`  |
+| leg deviation     | 0 standing straight → 1 a leg fully bent                 | `LegDeviation`  |
 | body bend         | −1 left → 0 upright → 1 right                            | `TorsoTilt`     |
 | distance          | 0 the zone's near edge → 1 its far edge                  | `Distance`      |
 | symmetry, a pair  | signed, left minus right: how unequal the two sides are  | `AngleSymmetry` |
 
-The angle extractor measures the geometric angle between body segments, the arm against the
-torso line, mirrored on the right so a symmetric pose reads equal on both sides; what a body
-reads at neutral is its geometry, and a vertical arm is not π from it. The angle calibrator
-(`modules/pose/nodes/filters/AngleCalibrator.py`, settings `pose.angle_calibrator`) then maps
-each joint from two reference poses, the body with the arms hanging and with the arms raised,
-each held as the raw readings: every reading at neutral becomes 0; the shoulder's raised reading
-becomes π, so the fixed points are the feature's 0 and π for sound and light alike; the elbow's
-raised reading is where its straight is with the arm up, so a relaxed straight elbow reads 0 in
-both poses and π is the fold from there. The readings are tuned in the panel, against a person or
-the dummy. The sign of an angle is the side of the body the limb passes, outward or across, and
-means nothing to the instrument: a measure is the absolute over π, 0..1, so an arm raised outward
-and one raised across the body read alike.
+The angles are calibrated from two reference poses, arms hanging and arms raised
+(`AngleCalibrator` in `modules/pose/nodes/filters`, settings `pose.angle_calibrator`), so the
+fixed points are the feature's 0 and π for sound and light alike. The sign of an angle is the side
+of the body the limb passes and means nothing to the instrument: a measure is the absolute over π,
+0..1, so an arm raised outward and one raised across the body read alike.
 
 The bridge puts a **dead zone** on each measure before it becomes a source (`PI.measures`): the
 measure reads 0 up to its neutral zone, 1 from its far zone on, and linear between; continuous,
@@ -237,8 +229,10 @@ remap, `window.sync_threshold`.
 The light is mirrored, so left and right in the body never show as left and right in the light;
 which arm is which shows only as a different sound. The **symmetry** feature (`AngleSymmetry`)
 holds the meaningful pairs, the four joints (shoulder, elbow, hip, knee) and the arm and the leg as
-a whole per side (`arms`, `legs`), each signed, left minus right, so that downstream the signed
-value or its absolute can be used. A person and their mirror image draw differently.
+a whole per side (`arms`: shoulder and elbow; `legs`: hip and knee, weighted as the leg deviation
+is), each signed, left minus right, −1..1, so that downstream the signed value or its absolute can
+be used. A person and their mirror image draw differently. `AngleSymExtractor` makes it; it is
+windowed, graphed and sent to Max like the leg deviation.
 
 ## The connections
 
@@ -308,60 +302,65 @@ blue, feeds the measures of *The body* into the slots of *The connections*, trig
 and draws the mask over the result. The synth, its building blocks and its rules are
 `LIGHT_SYNTH.md`'s.
 
-## State
+## The code
 
 ### The layer
 
 `pose_instrument` (`light/layers/projection/pose_instrument.py`) is the bridge. It gives each
-person a `Voice` of the light synth (`light/synth`: `Oscillator`, `Envelope`, `Slot`, `Voice`),
-paints the voice's output 1 into white and its output 2 into blue over the person's window, the
-fuller of overlapping voices showing, and draws every mask over the result. Distances are taken
-from the person's own azimuth and not from their centre pixel, so a walking person's lines move
-smoothly. How people compose (union, the masks, sync, the hit, presence) is in `LAYERS.md`,
-*pose_instrument*. The instrument draws the playhead's marker over the masks, dimmed inside them
-(`PlayheadMarker`, `playhead_marker.py`), and the render shows the overlap of the two colours as
-a tone of its own
-(`render/shaders/lightsimulation.frag`). A tick costs about 0.2 ms per person at 3600 pixels.
+person a `Voice` of the light synth (`light/synth`), paints the voice's output 1 into white and its
+output 2 into blue over the person's window, and draws every mask over the result. Overlapping
+voices combine per channel, the fuller showing; two patterns of different intervals or centres
+make a moiré. Distances are taken from the person's own azimuth and not from their centre pixel,
+so a walking person's lines move smoothly. The instrument draws the playhead's marker over the
+masks (`PlayheadMarker`, `playhead_marker.py`), and the render shows the overlap of the two
+colours as a tone of its own (`render/shaders/lightsimulation.frag`). A tick costs about 0.2 ms
+per person at 3600 pixels. Its place in the states' mixes is in `LAYERS.md`, *pose_instrument*.
 
 ### Sources and connections
 
-The layer reads pose features from the LERP frames and derives nothing. The sources are the
-elements of `Angles` (the four arm joints), `LegDeviation`, `TorsoTilt`, `Distance`, and
-`AngleSymmetry` (`modules/pose`): one signed scalar per pair, left minus right, normalised to −1..1, made by its
-own extractor (`AngleSymExtractor`) and windowed, graphed and sent to Max like the leg deviation.
-The pairs: the shoulder, the elbow, the hip and the knee (the joint angles), the arms (shoulder and
-elbow together per side), the legs (hip and knee together per side, weighted as the leg deviation
-is, by its settings).
+The layer reads its sources from the LERP frames: the elements of `Angles` (the four arm joints),
+`LegDeviation`, `TorsoTilt`, `Distance` and `AngleSymmetry` (*The body*, *Symmetry*).
 
-The connections are code, not settings: one method, `PoseInstrument.connect`, takes a person's
-measures, through their dead zones (*The body*), and returns the sources of the white and the
-blue oscillator's slots, and it hot-reloads on save. It is *The connections* written out; `connect_lfo` beside it gives the LFO's level its
-source, and runs first each tick so `connect` can read the LFO's output. The bases and the amounts,
-the range and the direction of every connection, are settings, so the panel keeps the values and
-the code keeps the routing. The preset carries values only.
+The connections are code, not settings: `PoseInstrument.connect` takes a person's measures,
+through their dead zones (*The body*), and returns the sources of the white and the blue
+oscillator's slots. It is *The connections* written out. `connect_lfo` beside it gives the LFO's
+level its source and runs first each tick, so `connect` can read the LFO's output. The bases and
+the amounts, the range and the direction of every connection, are settings: the panel keeps the
+values and the code keeps the routing.
 
 ### People
 
-The bridge sets each side's **reach** every tick: `reach.width`, grown by sync toward every
-similarity-matched partner along the shorter arc, full reaching the partner; the partner's
-presence scales the growth, so a partner leaving lets go smoothly. The voice multiplies the reach
-by presence (attack from 0, release to 0) and thins the lines to nothing over the taper
-(`LIGHT_SYNTH.md`, *The window*). On release the window closes and the mask fades with it.
+A person is present while their pose exists (`LAYERS.md`, *Inputs*); a pose with a NaN azimuth
+has no place in the projection and counts as absent, the one presence test a layer adds.
+Presence opens the window from the mask over `window.attack_seconds` and closes it over
+`window.release_seconds`, the last pose held while it closes and the mask dimming with it.
+
+The bridge sets each side's **reach** every tick: `window.width`, grown by sync toward every
+partner along the shorter arc. Sync starts at `window.sync_threshold`, on the mean of both
+directions' similarity; the threshold is the bridge's remap of the similarity, which is well above
+0 for most pairs out of neutral (`SIMILARITY.md`, *Interdependence*). The reach grows eased until
+it meets the partner at similarity 1: full sync is full overlap, one pattern. Only the partner's side opens, over any
+person between them, whose own pattern is unchanged. The partner's presence scales the growth, so
+a partner leaving lets go smoothly. A pair with a person at neutral reads 0 and does not open
+(`STATES.md`, *Vocabulary*). The voice multiplies the reach by presence and thins the lines to
+nothing over the taper (`LIGHT_SYNTH.md`, *The window*).
 
 The **mask** is a band `mask.width` wide at the person, each channel at its level (`mask.white`,
 `mask.blue`) times presence, and goes over everything at the person: the patterns of every voice.
-In the preset the white is 0, so the mask is the dim blue band. The playhead's **marker**
+A mask cuts a line where it falls, so lines slide out from under it; the window cuts nothing. In
+the preset the white is 0, so the mask is the dim blue band. The playhead's **marker**
 (`PI.playhead`: its width, its white and blue) is drawn by the instrument over the masks, dimmed
 to `playhead.at_mask` inside one, so the marker never blinds and no other layer shares a mix with
 the instrument at a person.
 
 ### The hit
 
-On the tick the playhead is closest to a person (`PlayheadCrossing`, `PoseInstrument.HIT_TICKS`,
-as the beam flash), each of the person's oscillators is pushed (its `push`, falling back over its
-`push_release_seconds`) and the mask goes to its flash levels (`mask.flash_white`,
-`mask.flash_blue`), falling back to its own over `mask.flash_release_seconds`. Every mark has a
-white and a blue level, and 0 is off.
+On the tick the playhead is closest to a person (`PlayheadCrossing` in `pose/playhead_offset.py`,
+`PoseInstrument.HIT_TICKS`, the same rule as `beam_flash`), each of the person's oscillators is
+pushed (its `push`, falling back over its `push_release_seconds`) and the mask goes to its flash
+levels (`mask.flash_white`, `mask.flash_blue`), falling back to its own over
+`mask.flash_release_seconds`. Every mark has a white and a blue level, and 0 is off. The crossing
+is measured in playhead steps at `beam_rpm`, the rate the playhead free-runs at in PROJECTION.
 
 ### Settings
 
@@ -369,25 +368,23 @@ white and a blue level, and 0 is off.
 (`PoseInstrumentSettings`, `light/layers/projection/pose_instrument.py`), grouped by what is
 tuned together, knobs throughout:
 
-| Group           | What it holds                                                                     |
-|-----------------|-----------------------------------------------------------------------------------|
-| `max_lines`     | the visual limit: the pitch ceiling                                               |
-| `mask`          | the mask: width, its white and blue; the flash: its white and blue, its release  |
-| `playhead`      | the playhead's marker: width, its white and blue, its level inside a mask         |
-| `window`        | how far the pattern shows and when: the shape (taper, attack, release) and the reach (width, its bypass, the sync threshold) |
-| `measures`      | the dead zones on the measures: the arms in degrees, the bend and the legs as fractions (*The body*) |
-| `white_lines`, `blue_lines` | an oscillator: its On and Mirror switches and Bypass All button, a slot per parameter, its push (amount, release) |
-| `lfo`           | the LFO: rate, phase, and the level's row                                         |
-| `dummy`         | *The dummy*                                                                       |
+| Group                       | What it holds                                                   |
+|-----------------------------|-----------------------------------------------------------------|
+| `max_lines`                 | the visual limit: the pitch ceiling                             |
+| `mask`                      | the mask's width, white and blue; the flash's levels, release   |
+| `playhead`                  | the marker's width, white and blue; its level inside a mask     |
+| `window`                    | shape: taper, attack, release; reach: width, bypass, sync       |
+| `measures`                  | the dead zones (*The body*)                                     |
+| `white_lines`, `blue_lines` | On, Mirror, Bypass All; a slot per parameter; the push          |
+| `lfo`                       | the LFO: rate, phase, the level's slot                          |
+| `dummy`                     | *The dummy*                                                     |
 
 The groups run from the person outward: the mask at the person, the marker that passes them, the
 window around them, what the body gives, then what fills the window, then the tool. Wherever a
-mark has a level per channel the two settings are `white` and `blue`; the oscillators are the
-lines.
+mark has a level per channel the two settings are `white` and `blue`.
 
-A slot is a row titled with its parameter's name and reads Base · Amount · Curve · Bypass
-(`LIGHT_SYNTH.md`, *Modulation*); every other row has its title too (Push, LFO, Shape, Reach,
-Mask, Flash, Playhead, Arms, Bend, Legs), so the panel reads the same way throughout.
+Every row of the panel is titled. A slot's row is titled with its parameter's name and reads
+Base · Amount · Curve · Bypass (`LIGHT_SYNTH.md`, *Modulation*).
 
 The synth's settings classes (`OscillatorSettings`, `LfoSettings`, `WindowSettings`) are extended
 by the bridge's where a concept spans both (`window`); the voice reads only its own fields. The
@@ -419,8 +416,8 @@ already built (a settings instance keeps its fields). Hence the rules:
 ### Playing by hand
 
 A parameter's base is already the hand's value, so playing by hand is bypassing modulation. Every
-slot has a **Bypass** (`PI.white_lines`, `PI.blue_lines`, and the level of `PI.lfo`): bypassed, the parameter
-is its base while every other parameter keeps following the body, so a pose can be taken apart
+slot has a **Bypass** (`PI.white_lines`, `PI.blue_lines`, and the level of `PI.lfo`): bypassed,
+the parameter is its base while every other parameter keeps following the body, so a pose can be taken apart
 parameter by parameter; lifted, it follows again with its amount as it was. An oscillator's
 **Bypass All** button sets its five ticks at once, and pressed again with all set clears them, so
 the panel draws that colour for everyone, live people and the dummy alike, while the other colour
@@ -432,8 +429,8 @@ and closing them. What the body gives is read in the render's data graphs, per p
 ### Tests
 
 `apps/white_space/tests`: the synth in `test_synth_oscillator.py` (among them the no-jumps rule,
-each parameter swept in small steps), `test_synth_envelope.py` and `test_synth_voice.py`; the bridge
-in `test_pose_instrument.py`.
+each parameter swept in small steps), `test_synth_envelope.py` and `test_synth_voice.py`; the
+bridge in `test_pose_instrument.py`; the dummy in `test_dummy.py`.
 
 ### The pose results now
 
@@ -446,36 +443,15 @@ the picture). What they draw on the machine has not been judged yet.
 ### The dummy
 
 The dummy (`pose/dummy.py`, settings `PI.dummy`) stands in for a person while the instrument is
-judged: a figure of the pipeline's 17 landmarks whose joints are set by the panel, each joint's
-degrees the angle the angle extractor reads at it when the figure is upright, the signed angle
-from the segment above to the limb below, the right side mirrored as the extractor mirrors it
-(the shoulder 0 hanging, 90 across the body, 180 up, 270 out; the elbow 180 straight, 0 folded;
-the hip 180 standing, 90 leg out level; the knee 180 straight, 90 bent), standing at `azimuth`.
-What is set is what the extractor reads. The `torso` leans the upper body over standing legs, as
-a person leans: the arms, measured against the leaning torso line, still read as set; the hips
-read off neutral by the lean, as a person's do. Its sides are named as the pipeline names
-people's, the left on image-right.
-Its frame joins the interpolated
-poses before the LERP filters at its own id, `max_players`, between the live players and the
-ghosts (which start one above it), so it is a pose like any other from there: the filters stamp
-the playhead offset, the symmetries, the leg deviation and the bend on it, the render draws its
-figure over the projection row where it stands (as it does every pose, `render.pose_figures`)
-and its skeleton with the same data graphs as a player's in the pose row's last column,
-the azimuth overlay marks it, Max plays it at its slot and the instrument lights it. Only the
-joints are set; the leg deviation and the bend are the pipeline's, derived from the figure as for
-a person, and its angles pass through the angle extractor and the calibrator as a person's do.
-Where it stands is set, as no tracker sees it: the `azimuth`, and the `distance`, 0..1 as the
-`Distance` feature is.
-With `solo` the live players' frames are left out at the merge, so from the LERP filters on the
-dummy is the only pose; the tracker and the earlier stages still see them.
-What the pipeline reads of its poses is what the calibrator is read against: the preset's
-calibration is the dummy's raw readings, so its hanging arm reads 0 and its vertical arm π.
+judged: a figure whose joints and torso lean are set in the panel, in the degrees the angle
+extractor reads. Its frame joins the poses before the LERP filters at its own id, `max_players`,
+so from there it is a pose like any other: extracted, drawn, heard in Max and lit. With `solo` it
+is the only pose from the LERP filters on. The preset's calibration is the dummy's raw readings,
+so its hanging arm reads 0 and its vertical arm π. How the figure is built is the module's
+docstring.
 
 Its poses are named in `data/poses.json`, the rows of *Pose results*, picked in the `pose`
-select and saved under `name` with `save`. A change of any measure morphs over `morph` seconds
-(`easeInOutSine`), the azimuth and the arms the shortest way round, an exact opposite going up
-through the front on both sides. `enabled` comes back as the preset saved it; in the show the
-dummy is never in the room, so the site's preset is saved with it off.
+select and saved under `name` with `save`. A change of any measure morphs over `morph` seconds.
 
 ---
 
@@ -512,7 +488,8 @@ Not yet in the design:
 
 From the machine **(site facts)**:
 
-- The mask is too narrow and the window too wide at the preset's values
+- Whether the preset's mask width and window width are right, and what the *Pose results* draw;
+  judged on location
 - Whether the 90-line limit holds with the moiré of two synced patterns
 - A pitched wide-FOV camera reads a small spurious body bend near the frame edges, a bend nobody
   played; check a straight person at the edge

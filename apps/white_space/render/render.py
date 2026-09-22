@@ -8,7 +8,7 @@ from modules.render.layers import ImageSourceLayer, CropSourceLayer
 from modules.render.layers import TrackerCompositor, PoseCompositor
 from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer, PoseLineLayer, PoseLineSettings
 from modules.render.layers import Compositor, PanoramaLayerSettings, CameraReadingsLayer
-from modules.oak import CameraSettings, CameraCheckSettings, mono_frame_size
+from modules.oak import CameraSettings, CameraCheckSettings, mono_frame_size, delivered_height
 from modules.tracker import PanoramicTrackerSettings
 from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
 from apps.white_space.render.layers.beam_light_simulation_layer import BeamLightSimulationLayer
@@ -175,10 +175,12 @@ class Render(RenderBase):
     def _track_row(self) -> SubdivisionRow:
         """Row 1: one view per camera, always — the raw frames the strip below is derived from.
 
-        Mono and landscape, as this app has always been; the frame's shape follows the configured
-        sensor mode and the delivered height, so switching either reshapes the row with it.
+        Mono and landscape; the frame's shape is derived from the tracker's camera fields as the
+        camera derives it, so a change of sensor mode or tilt reshapes the row with it.
         """
-        frame_w, frame_h = mono_frame_size(self.settings.resolution, height=self.settings.frame_height)
+        T = self.tracker_settings
+        rows = delivered_height(False, T.resolution, T.fov, T.tilt, T.lens_fov, (T.lens_centre_x, T.lens_centre_y))
+        frame_w, frame_h = mono_frame_size(T.resolution, height=rows)
         return SubdivisionRow(name='track', columns=self.num_cams, rows=1,
                               src_aspect_ratio=frame_w / frame_h, padding=Point2f(1.0, 1.0))
 

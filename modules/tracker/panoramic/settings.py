@@ -81,8 +81,6 @@ class TrackerSettings(BaseSettings):
     # The frame geometry, shared from the camera group: what the warp was built with.
     resolution: Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT,
                                                 description="Sensor mode, shared — the frame's shape")
-    frame_height: Field[int] = Field(0, access=Field.INIT,
-                                    description="Delivered frame height (px), shared; 0 = derived from the tilt")
     tilt: Field[float] = Field(0.0, access=Field.INIT, description="Camera up-tilt (°), shared")
     lens_fov: Field[float] = Field(0.0, access=Field.INIT, description="Lens field (°) across the sensor width, shared; 0 = fov")
     lens_centre_x: Field[float] = Field(0.0, access=Field.INIT, description="Optical centre offset (px), shared")

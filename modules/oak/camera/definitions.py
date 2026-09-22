@@ -17,18 +17,15 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 #  Frame geometry — the one source for every camera dimension
 # ---------------------------------------------------------------------------
-# Two knobs: the sensor mode (`resolution`) and the delivered frame's height (`frame_height`).
-# Every width, height, aspect ratio and buffer size in the pipeline and in the render derives
-# from them. Nothing downstream may restate a frame dimension as a literal — that is how the
-# two silently drift.
+# One knob: the sensor mode (`resolution`), a setting so it sits beside every preset value that
+# depends on it. Every width, height, aspect ratio and buffer size in the pipeline and in the
+# render derives from it and the mount. Nothing downstream may restate a frame dimension as a
+# literal — that is how the two silently drift.
 #
-# Both are SETTINGS, not constants here. `resolution` used to be a constant, which put it in a
-# different place from every preset value that depends on it; they could disagree and nothing
-# noticed. `frame_height` exists because the warp's rows are tangents of elevation
-# (`FrameWindow`), which spend rows at the top: a tilted camera's full reach needs more rows
-# than the sensor has (1152 at P800 and tilt 16; 960 at P720 and tilt 15 — `full_frame_height`
-# computes it and the open log prints it), and 0 keeps the sensor's own row count. The warp's
-# output size is free; only its alignment is not.
+# The delivered frame's height is derived, not set: the warp's rows are tangents of elevation
+# (`FrameWindow`), which spend rows at the top, so a tilted camera's full reach needs more rows
+# than the sensor has (1152 at P800 and tilt 16; 960 at P720 and tilt 15). `delivered_height`
+# computes it and the open log prints it. The warp's output size is free; only its alignment is not.
 
 # `dai.node.Warp` needs both output dimensions divisible by this.
 WARP_ALIGNMENT: int = 16
@@ -128,7 +125,7 @@ def aligned_height(height: int) -> int:
     aligned: int = int(round(height / WARP_ALIGNMENT)) * WARP_ALIGNMENT
     if aligned != height and height not in _warned_heights:
         _warned_heights.add(height)
-        logger.warning("frame_height %d is not a multiple of %d — using %d", height, WARP_ALIGNMENT, aligned)
+        logger.warning("frame height %d is not a multiple of %d — using %d", height, WARP_ALIGNMENT, aligned)
     return max(WARP_ALIGNMENT, aligned)
 
 
@@ -157,23 +154,16 @@ def frame_size(color: bool, resolution: CameraResolution, square: bool = False,
                height: int = 0) -> tuple[int, int]:
     """The frame size a camera configuration produces, whichever path it takes. Anything that
     needs the camera's aspect ratio — the render's layout, a texture allocation — asks here
-    instead of restating it. `height` is the `frame_height` setting."""
+    instead of restating it. `height` is the delivered height (`delivered_height`)."""
     return (color_frame_size(resolution, square, height) if color
             else mono_frame_size(resolution, square, height))
 
 
 def delivered_height(color: bool, resolution: CameraResolution, fov_h: float, tilt: float,
-                     lens_fov: float = 0.0, lens_centre: tuple[float, float] = (0.0, 0.0),
-                     frame_height: int = 0) -> int:
-    """The `frame_height` setting resolved: the explicit value (aligned) when it is non-zero,
-    otherwise the sensor's full reach at this tilt (`full_frame_height`).
-
-    The one place 0 is given its meaning. The app fills the shared root field with this at
-    startup so every consumer sees the same number, and the tracker calls it too, so it is
-    right whether or not the app has done that yet.
-    """
-    if frame_height > 0:
-        return aligned_height(frame_height)
+                     lens_fov: float = 0.0, lens_centre: tuple[float, float] = (0.0, 0.0)) -> int:
+    """The delivered frame's rows: the sensor's full reach at this tilt (`full_frame_height`).
+    Every consumer of the frame's shape (the camera, the tracker, the render) calls it with the
+    same shared settings, so they agree without the number being stored anywhere."""
     src: tuple[int, int] = mode_size(color, resolution)
     return full_frame_height(src, src[0], fov_h, tilt, lens_fov, lens_centre)
 
@@ -181,7 +171,7 @@ def delivered_height(color: bool, resolution: CameraResolution, fov_h: float, ti
 def full_frame_height(src_size: tuple[int, int], mode_width: int, fov_h: float, tilt: float,
                       lens_fov: float = 0.0,
                       lens_centre: tuple[float, float] = (0.0, 0.0)) -> int:
-    """The `frame_height` (aligned) at which the centre column carries every sensor row: the
+    """The frame height (aligned) at which the centre column carries every sensor row: the
     window pinned at the sensor's bottom reach needs this many tangent rows to reach its top.
     Logged at open so the number to put in the preset is never worked out by hand."""
     focal: float = output_focal(fov_h, mode_width)

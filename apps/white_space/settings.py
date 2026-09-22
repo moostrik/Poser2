@@ -98,7 +98,6 @@ class OakGroup(BaseSettings):
     square            : Field[bool]            = Field(True, access=Field.INIT, description="Use square aspect ratio")
     stereo            : Field[bool]            = Field(False, access=Field.INIT, description="Enable stereo mode")
     resolution        : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode, all four cameras. P800 is the full readout, P720 a vertical crop")
-    frame_height      : Field[int]             = Field(0, access=Field.INIT, step=16, description="Delivered frame height (px, multiple of 16); 0 = derived from the tilt at startup")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, description="Model files directory")
     ir_flood_light    : Field[float]           = Field(0.8, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
@@ -108,7 +107,7 @@ class OakGroup(BaseSettings):
     lens_centre_y     : Field[float]           = Field(0.0, access=Field.INIT, step=0.5, description="Optical centre offset from the frame centre (px), positive = down")
     mono_auto_exposure: Field[bool]            = Field(True, widget=Widget.switch, description="Mono auto exposure, all four cameras")
 
-    _cam_share: list = [fps, color, square, stereo, yolo, resolution, frame_height, model_path, ir_flood_light, fov, tilt,
+    _cam_share: list = [fps, color, square, stereo, yolo, resolution, model_path, ir_flood_light, fov, tilt,
                         lens_fov, lens_centre_x, lens_centre_y, mono_auto_exposure]
 
     cam_0     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
@@ -364,8 +363,6 @@ class RenderSettings(BaseSettings):
     num_cams:    Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     max_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Players tracked at most (shared from the root): the pose row's columns")
     tilt:        Field[float] = Field(0.0, access=Field.INIT, visible=False, description="Camera up-tilt (°), shared from the root — relayed to the panorama layer")
-    resolution:  Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, visible=False, description="Sensor mode, shared from the root — the camera row's aspect follows it")
-    frame_height: Field[int] = Field(0, access=Field.INIT, visible=False, description="Delivered frame height, shared from the root — the camera row's aspect follows it")
     preview:     Group[PreviewGroup]        = Group(PreviewGroup)
     data_time:   Group[_MTimeSettings]      = Group(_MTimeSettings)
     data:        Group[_DataLayerSettings]  = Group(_DataLayerSettings)
@@ -391,7 +388,6 @@ class Settings(BaseSettings):
     light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="Projection resolution (pixels per turn)")
     fov             : Field[float] = Field(127.0, access=Field.INIT, description="Azimuth span (°) of each delivered camera frame — the tracker's contract, baked in at open")
     resolution      : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode for all cameras")
-    frame_height    : Field[int]   = Field(0, access=Field.INIT, step=16, description="Delivered frame height (px, multiple of 16); 0 = derived: the sensor's full reach at this tilt")
     tilt            : Field[float] = Field(0.0, access=Field.INIT, description="Camera up-tilt (°), positive = aimed up, the same for all four")
     # The lens, shared by all four — read off their calibrations; see CALIBRATION.md, Camera.
     lens_fov        : Field[float] = Field(0.0, access=Field.INIT, step=0.1, description="Field (°) the lens spans across the full sensor width; 0 = same as fov")
@@ -401,14 +397,14 @@ class Settings(BaseSettings):
 
     # In panel order: what you look at, what you capture, the wires out, the sensors, what is made of
     # them, and what the show does with it.
-    render : Group[RenderSettings]  = Group(RenderSettings, share=[max_players, num_cameras.as_('num_cams'), tilt, resolution, frame_height])
+    render : Group[RenderSettings]  = Group(RenderSettings, share=[max_players, num_cameras.as_('num_cams'), tilt])
     record : Group[RecordingGroup]  = Group(RecordingGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])
     inout  : Group[InOutGroup]      = Group(InOutGroup, share=[max_players, num_virtual.as_('num_virtual'), light_resolution.as_('resolution')])
-    camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov, tilt, resolution, frame_height,
+    camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov, tilt, resolution,
                                                              lens_fov, lens_centre_x, lens_centre_y])
     # Its own group, not under `camera`: the tracker fuses the cameras' output, as `pose` does, and
     # nothing in it is a camera setting. The frame's shape is shared in straight from the root.
-    track  : Group[PanoramicTrackerSettings] = Group(PanoramicTrackerSettings, share=[fov, resolution, frame_height, tilt,
+    track  : Group[PanoramicTrackerSettings] = Group(PanoramicTrackerSettings, share=[fov, resolution, tilt,
                                                                                       lens_fov, lens_centre_x, lens_centre_y])
     # The LERP stage is ticked by the light conductor, so its interpolators step at the light rate.
     pose   : Group[PoseGroup]       = Group(PoseGroup, share=[max_players, num_virtual.as_('ghost_slots'), input_fps.as_('frequency'), light_rate.as_('output_frequency')])

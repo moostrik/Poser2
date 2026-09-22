@@ -25,11 +25,11 @@ Calibrate in this order. Cameras first: everything else is tuned against the fra
 1. **Cameras.**
    - Set `fov`, `resolution`, `tilt` and the three lens numbers (`lens_fov`, `lens_centre_x`,
      `lens_centre_y`) in the preset — `tilt` from the table under *Tilt — derived from the build*,
-     the lens from *The lens* — leave `frame_height` at 0, and relaunch. All of them are baked in
-     when the devices open, and the frame height is derived from the tilt at startup.
-   - Read the open log: the `frame_height` line (the derived height), then per camera one `lens:`
-     line (its field, centre offset and `lens_error`, which must match the table under *The lens*)
-     and one `frame:` line (the elevation window, the horizon row, the rows covered).
+     the lens from *The lens* — and relaunch. All of them are baked in when the devices open, and
+     the frame height is derived from them.
+   - Read the open log: per camera one `lens:` line (its field, centre offset and `lens_error`,
+     which must match the table under *The lens*) and one `frame:` line (the delivered size, the
+     elevation window, the horizon row, the rows covered).
    - Read the pinned indicator (`camera.camera_check.mount`). It must be a green `Mount OK`. On a red
      `Mount WARNING` the camera row names the camera and the axis: each view shows its tilt and roll
      error, red past the tolerance.
@@ -258,21 +258,19 @@ changed by editing the preset and relaunching:
 - **`resolution`** — `P720` or `P800`. P720 is a pure vertical crop of the 800-row sensor, so the
   horizontal field and the whole column-to-azimuth mapping are identical; only the bottom of the
   window moves (4° higher, so the feet run out of frame sooner).
-- **`frame_height`** — the delivered frame's rows, a multiple of 16. 0 means derived: at startup
-  `main.py` sets it to the sensor's full reach for the preset's mode, tilt and lens
-  (`full_frame_height`), and logs it — 848 at P720 and tilt 0, 960 at P720 and tilt 15, 1152 at P800
-  and tilt 16. The rows are tangents, so the full reach needs more of them than the sensor has. A
-  number in the preset is an explicit override, for when the tilt is final and a detector blob
-  matching the frame is worth making. Getting it wrong costs, per direction: too many rows give a flat
-  black bar of dead pixels across the top (113 rows at tilt 0 with 960); too few cut the centre of the
-  top, the raised-arm zone on each camera's axis (4.5°, 45 sensor rows, at tilt 15 with 848), while
-  the sides, which never reach that high, lose nothing.
+- **The frame height** is derived, not set: the camera, the tracker and the render each compute the
+  sensor's full reach for the mode, tilt and lens (`delivered_height` in `modules/oak`), a multiple
+  of 16 — 848 at P720 and tilt 0, 960 at P720 and tilt 15, 1152 at P800 and tilt 16. The rows are
+  tangents, so the full reach needs more of them than the sensor has. Any other height costs, per
+  direction: too many rows give a flat black bar of dead pixels across the top (113 rows at tilt 0
+  with 960); too few cut the centre of the top, the raised-arm zone on each camera's axis (4.5°,
+  45 sensor rows, at tilt 15 with 848), while the sides, which never reach that high, lose nothing.
 - **`tilt`** — up-tilt in degrees, positive = aimed up, shared by all four. The warp re-aims the camera
   by it.
 
 **The window is pinned at the bottom.** The last row is the sensor's lowest reach on the centre column
 — `tilt − 35.1°` at P720, `tilt − 39.2°` at P800, with the lens centre 10.5 px low — and the rows run
-upward from there for as many as `frame_height` gives. It is pinned there because the feet are what
+upward from there for the frame's height. It is pinned there because the feet are what
 the tilt rule pins — the floor-plane distance reads off the feet — and because the tangent spends its
 rows at the top. At the full-reach height the top row is the sensor's top on the centre column:
 −20.1° to +52.3° at P720 and tilt 15 on 960 rows, −23.2° to +57.3° at P800 and tilt 16 on 1152. The
@@ -336,7 +334,7 @@ reads. On the R 1.35 m circle, on a camera's axis, they stand 0.99 m from the le
 hands at +59.8°, head at +52.7° and feet at −26.8°. A camera aimed up by `tilt` sees from
 `tilt − 39.2°` to `tilt + 41.3°` on its centre column (P800 with the shared lens; 35.1° and 37.3° at
 P720 — the sensor's own vertical field, which the frame delivers in full at the derived
-`frame_height`); fitting hands and feet at R 1.35 would need 120° of it, against 80°. So the tilt is a
+height); fitting hands and feet at R 1.35 would need 120° of it, against 80°. So the tilt is a
 trade, and it is resolved in favour of the top: losing the feet degrades the distance estimate (it
 extrapolates the box bottom), losing the arms loses a gesture outright.
 
@@ -370,7 +368,7 @@ the tilt off axis, so what a camera sees at tilt 16 (P800, the shared lens) by b
 
 The feet rule holds all round; the overhead reach is a four-leaf pattern, R 1.5 on the axes and R 1.75
 at the seams. That is the mount, the same in any projection or frame height: a shorter frame can only
-equalise it by cutting the middle. The frame delivers all of it at the full-reach `frame_height` (1152
+equalise it by cutting the middle. The frame delivers all of it at the full-reach height (1152
 rows at P800 and tilt 16); at the sensor's own 800 rows the tangent rows would cap the top at 43.7°
 everywhere — hands from R 2.1, head from R 1.7 — which is why the frame is taller than the sensor.
 
@@ -385,20 +383,17 @@ publishes, as radii from the fixture:
 | `hands_seam` | the same along a seam line, the worse of its two sides                  |
 
 All three are measured against what the sensor fills per column (`frame_coverage`), not the frame's
-rows, so the black arch counts. The gap between the two hands read-outs says which limit the frame is
-running into. Wide: the rows reach past the sensor, so the top is the sensor's own edge, falling
-toward the seams. Near zero: the rows run out first and cap the top at one angle on every column,
-leaving only the rig's parallax. The studio preset (P720, tilt 15, the derived 960 rows) is the
-first: feet from R 1.72, hands from R 1.67 on the axis and R 2.0 on the seam. The seam line is
+rows, so the black arch counts. At the derived height the top is the sensor's own edge, falling
+toward the seams, so the seam read-out is the worse of the two hands read-outs. The studio preset
+(P720, tilt 15, the derived 960 rows): feet from R 1.72, hands from R 1.67 on the axis and R 2.0 on
+the seam. The seam line is
 searched, not read off the 45° column: a person on it near the fixture is seen by the camera ≈9°
 wider than the seam's own bearing, because the camera sits 0.36 m out.
 
 Three facts about what `tilt` moves. `angle_bottom` follows it 1:1: the frame is pinned at the
-sensor's lowest reach, a lens constant below the tilt. `angle_top` does not — +1° to +1.5° per +3° of
-tilt at a fixed `frame_height` (the taller the frame, the less) — because a fixed number of tangent
-rows spend themselves at the top. And the row scale does not depend on it at all at a fixed
-`frame_height`: that is `fov` and the frame's shape. Tilt reaches it only when `frame_height` is 0 and
-the height is derived from the tilt.
+sensor's lowest reach, a lens constant below the tilt. `angle_top` follows it too, since the derived
+height ends the frame at the sensor's top on the centre column. The row scale is `fov` and the
+frame's shape; tilt reaches it through the derived height.
 
 ### What the horizontal field allows
 
@@ -937,7 +932,7 @@ to check against the parts.
                       50 cm tripod; IR filter, does not see the light             (spec / site fact)
     lens, shared:     lens_fov 128.9 (568.6 px/rad), centre (-10.5, +10.5) px    (mean of the four calibrations)
     lens, per unit:   see the table under The lens; F124 is the outlier (1.4°)   (read 2026-09-12)
-    frame_height:     0 = derived at startup: 960 at P720 / tilt 15, 1152 at P800 / tilt 16 (the open log names it)
+    frame height:     derived: 960 at P720 / tilt 15, 1152 at P800 / tilt 16 (the open log names it)
     drawing:          "White Space Layout Sheet.pdf", two A3 pages, to scale
     blue[0]:          wired to the strip labelled "blue left" / "blue right"     (confirm)
     LED strips:       the two arms' LEDs are mounted out of phase and interlace   (site fact)
@@ -949,7 +944,7 @@ to check against the parts.
     interlace:          white_1 +5, blue_0 −10, blue_1 +9 px     (tuned)
     resolution / tilt:  target P800, tilt 16°                    (the table under Camera; next recording)
                         the preset's P720 / tilt 15 is for playing back the old 720-row footage,
-                        whose capture tilt is unknown; frame_height follows either at startup
+                        whose capture tilt is unknown; the frame height follows either
     tilt, measured:     reads as configured on all four          (IMU)
     roll offsets:       cam_0 −1.00, cam_1 −0.91,
                         cam_2 −2.25, cam_3 −0.70                 (against a level; cam_2 is a sensor error)

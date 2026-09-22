@@ -132,7 +132,7 @@ class Simulator(Camera):
         shot at and the whole chain derives correctly again.
 
         A clip that is being warped (`apply_warp`) feeds the warp's INPUT, so it must be the
-        sensor's size; one that passes through must be the delivered size, `frame_height` and all.
+        sensor's size; one that passes through must be the delivered size, its derived height and all.
         """
         expected: tuple[int, int] = (mode_size(self.do_color, self.resolution) if self.warp_clips
                                      else frame_size(self.do_color, self.resolution, self.square, self.frame_height))
