@@ -15,11 +15,10 @@ the window's **reach** each side. The bridge is everything the synth does not kn
 - the **mask**: a dim blue band at the person, over every pattern and lit by presence.
 - the colours: output 1 is white, output 2 is blue; where voices overlap the fuller one shows.
 
-Playing by hand: every input is a modulation matrix row in the panel (``PI.white``, ``PI.blue``,
-``PI.lfo``): its knob, the Amount, a read-only Source knob showing the live source (the shown
-person's: the dummy while it is enabled, else the first person present), a Curve and a Bypass. A
-bypassed input is its knob while the others follow the body, so a pose can be taken apart input
-by input. ``PI.bypass_all`` is the master: every source is muted and the panel draws for everyone;
+Playing by hand: every parameter has its slot as a row in the panel (``PI.white``, ``PI.blue``,
+``PI.lfo``): Base, Amount, Curve and Bypass. A bypassed parameter is its base while the others
+follow the body, so a pose can be taken apart parameter by parameter. ``PI.bypass_all`` is the
+master: every source is muted and the panel draws for everyone;
 ``window.width_bypass`` holds both reaches without a partner; ``hit.hit`` marks everyone as the
 playhead would.
 
@@ -40,7 +39,7 @@ from modules.utils import HotReloadMethods
 from .._base_layer import ProjectionLayer, LayerSettings
 from .._utilities import normalize_azimuth, mask_half_width
 from ...frame import Frame
-from ...synth import (Voice, Input, Sources, Oscillator, Envelope, Slot,
+from ...synth import (Voice, Parameter, Sources, Oscillator, Envelope, Slot,
                       OscillatorSettings, WindowSettings as SynthWindowSettings, PushSettings, LfoSettings)
 from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step, DummySettings
 
@@ -74,10 +73,10 @@ class MaskSettings(BaseSettings):
 
 class PoseInstrumentSettings(BaseSettings):
     """The ``PI`` root group, a group per concept: the two oscillators and the LFO (the synth's
-    patch, a matrix row per input), the window, the hit, the mask, the dummy. The wiring is
-    ``connect``; ``bypass_all`` is the master bypass: every source muted, every input its knob."""
+    patch, a slot per parameter), the window, the hit, the mask, the dummy. The wiring is
+    ``connect``; ``bypass_all`` is the master bypass: every source muted, every parameter its base."""
     max_lines:  Field[int]  = Field(90, min=10, max=360, step=1, description="Visual limit: lines per revolution; no interval goes below one period")
-    bypass_all: Field[bool] = Field(False,                       description="Master bypass: mute every source, every input is its knob; the panel draws")
+    bypass_all: Field[bool] = Field(False,                       description="Master bypass: mute every source, every parameter is its base; the panel draws")
     white:      Group[OscillatorSettings] = Group(OscillatorSettings)
     blue:       Group[OscillatorSettings] = Group(OscillatorSettings)
     lfo:        Group[LfoSettings]        = Group(LfoSettings)
@@ -205,25 +204,6 @@ class PoseInstrument(ProjectionLayer):
                 gone.append(id)
         for id in gone:
             del self._players[id]
-        self._show_sources()
-
-    def _show_sources(self) -> None:
-        """The panel's Source knobs: the live sources of the shown person, the dummy while it is
-        enabled (its id is above every live player's, and the ghosts are not among the poses), else
-        the first person present; 0 for an input nobody plays. The one place the bridge writes
-        settings, and the fields are read-only to the panel."""
-        P = self._instrument
-        present = sorted(id for id, p in self._players.items() if p.present)
-        shown = self._players[present[-1] if P.dummy.enabled else present[0]] if present else None
-        white, blue = self._sources(shown) if shown is not None else ({}, {})
-        lfo_level = self.connect_lfo(shown) if shown is not None and not P.bypass_all else 0.0
-        for patch, sources in ((P.white, white), (P.blue, blue)):
-            patch.interval_source = float(sources.get(Input.INTERVAL, 0.0))
-            patch.pulse_width_source = float(sources.get(Input.PULSE_WIDTH, 0.0))
-            patch.phase_source = float(sources.get(Input.PHASE, 0.0))
-            patch.speed_source = float(sources.get(Input.SPEED, 0.0))
-            patch.hardness_source = float(sources.get(Input.HARDNESS, 0.0))
-        P.lfo.level_source = float(lfo_level)
 
     @staticmethod
     def _value(x: float, fallback: float) -> float:
@@ -251,15 +231,15 @@ class PoseInstrument(ProjectionLayer):
         """
         flow = min(max(p.tilt, -1.0), 1.0)
         white = {
-            Input.PULSE_WIDTH: self._measure(p.left_shoulder),
-            Input.INTERVAL:    self._measure(p.left_elbow),
-            Input.SPEED:       flow,
-            Input.PHASE:       p.voice.lfo,
+            Parameter.PULSE_WIDTH: self._measure(p.left_shoulder),
+            Parameter.INTERVAL:    self._measure(p.left_elbow),
+            Parameter.SPEED:       flow,
+            Parameter.PHASE:       p.voice.lfo,
         }
         blue = {
-            Input.PULSE_WIDTH: self._measure(p.right_shoulder),
-            Input.INTERVAL:    self._measure(p.right_elbow),
-            Input.SPEED:       flow,
+            Parameter.PULSE_WIDTH: self._measure(p.right_shoulder),
+            Parameter.INTERVAL:    self._measure(p.right_elbow),
+            Parameter.SPEED:       flow,
         }
         return white, blue
 

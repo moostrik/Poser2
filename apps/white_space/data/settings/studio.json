@@ -151,11 +151,11 @@
     "window": {
       "title": "Poser",
       "v_sync": true,
-      "monitor": "M0",
-      "x": 275,
-      "y": 31,
-      "width": 1874,
-      "height": 2080,
+      "monitor": "M1",
+      "x": 300,
+      "y": 41,
+      "width": 3000,
+      "height": 2000,
       "secondary_list": [],
       "secondary_fullscreen": true,
       "fullscreen_mode": "WINDOWED"

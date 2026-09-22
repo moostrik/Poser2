@@ -1,6 +1,6 @@
 """Slot — the light synth's modulation slot (``docs/LIGHT_SYNTH.md``, *Modulation*).
 
-Every input has one, a modulation matrix row: the input's own value (its base), what is connected
+Every parameter has one, a modulation matrix row: the parameter's own value (its base), what is connected
 to it (the source), how far and which way the source moves it (the amount), the source's curve,
 and a bypass that switches the modulation off. A source is one value per tick or one per position:
 0..1, or −1..1 for an LFO. The slot adds no smoothing and no steps; a curve is smooth and keeps the
@@ -16,7 +16,7 @@ Value = float | np.ndarray
 
 
 class Curve(IntEnum):
-    """How a source's magnitude is eased before it moves the input; the sign is kept. The curves
+    """How a source's magnitude is eased before it moves the parameter; the sign is kept. The curves
     are pytweening's, every family in its three forms: in (little at first), out (much at first)
     and in-out. Back and Elastic overshoot on the way; Bounce turns back on itself."""
     LINEAR              = 0
@@ -56,11 +56,11 @@ _GRID = np.linspace(0.0, 1.0, 1025)     # where a curve is sampled; read between
 
 
 class Slot:
-    """``input = base + amount × source``; static methods so ``HotReloadMethods`` can patch them."""
+    """``parameter = base + amount × source``; static methods so ``HotReloadMethods`` can patch them."""
 
     @staticmethod
     def bypassed(bypass: bool, source: Value) -> Value:
-        """The source, or nothing while the modulation is bypassed: bypassed, an input is exactly
+        """The source, or nothing while the modulation is bypassed: bypassed, a parameter is exactly
         its base, and its amount is left as it is for when the bypass is lifted."""
         return 0.0 if bypass else source
 
@@ -90,7 +90,7 @@ class Slot:
 
     @staticmethod
     def modulate(base: float, amount: float, source: Value) -> Value:
-        """The amount in the input's own unit."""
+        """The amount in the parameter's own unit."""
         return base + amount * source
 
     @staticmethod
@@ -100,5 +100,5 @@ class Slot:
 
     @staticmethod
     def unit(value: Value) -> Value:
-        """The end of an input that lives in 0..1 (pulse width, hardness): a stop, not a step."""
+        """The end of a parameter that lives in 0..1 (pulse width, hardness): a stop, not a step."""
         return np.clip(value, 0.0, 1.0)

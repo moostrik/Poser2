@@ -19,8 +19,8 @@ from .slot import Slot
 _LFO_POSITION = np.zeros(1)              # an LFO in time has one position
 
 
-class Input(IntEnum):
-    """An oscillator's inputs: the keys of its sources."""
+class Parameter(IntEnum):
+    """An oscillator's parameters: the keys of its sources."""
     INTERVAL    = 0
     PULSE_WIDTH = auto()
     PHASE       = auto()
@@ -28,7 +28,7 @@ class Input(IntEnum):
     HARDNESS    = auto()
 
 
-Sources = dict[Input, Value]            # a missing input has no source: it is its base
+Sources = dict[Parameter, Value]        # a parameter with no source is its base
 
 
 class Voice:
@@ -85,10 +85,10 @@ class Voice:
         self._presence.update(present, dt, W.attack_seconds, W.release_seconds)
         push = self._push.update(hit, dt, 0.0, self._push_settings.settle_seconds)
         for i, (oscillator, patch, source) in enumerate(zip(self._oscillators, self._patches, sources)):
-            interval_source = self._played(patch.interval_bypass, patch.interval_curve, float(source.get(Input.INTERVAL, 0.0)))
+            interval_source = self._played(patch.interval_bypass, patch.interval_curve, float(source.get(Parameter.INTERVAL, 0.0)))
             interval = Slot.modulate_octaves(patch.interval, patch.interval_amount, interval_source)
             self._intervals[i] = max(float(interval), min_interval)
-            speed_source = self._played(patch.speed_bypass, patch.speed_curve, float(source.get(Input.SPEED, 0.0)))
+            speed_source = self._played(patch.speed_bypass, patch.speed_curve, float(source.get(Parameter.SPEED, 0.0)))
             speed = Slot.modulate(patch.speed, patch.speed_amount, speed_source)
             oscillator.update(dt, self._intervals[i], float(speed) + patch.push * push)
 
@@ -107,9 +107,9 @@ class Voice:
         taper = reach * self._window.taper
         outputs = []
         for oscillator, patch, source, interval in zip(self._oscillators, self._patches, sources, self._intervals):
-            pulse_width_source = self._played(patch.pulse_width_bypass, patch.pulse_width_curve, source.get(Input.PULSE_WIDTH, 0.0))
-            phase_source = self._played(patch.phase_bypass, patch.phase_curve, source.get(Input.PHASE, 0.0))
-            hardness_source = self._played(patch.hardness_bypass, patch.hardness_curve, source.get(Input.HARDNESS, 0.0))
+            pulse_width_source = self._played(patch.pulse_width_bypass, patch.pulse_width_curve, source.get(Parameter.PULSE_WIDTH, 0.0))
+            phase_source = self._played(patch.phase_bypass, patch.phase_curve, source.get(Parameter.PHASE, 0.0))
+            hardness_source = self._played(patch.hardness_bypass, patch.hardness_curve, source.get(Parameter.HARDNESS, 0.0))
             pulse_width = Slot.unit(Slot.modulate(patch.pulse_width, patch.pulse_width_amount, pulse_width_source))
             phase = Slot.modulate(patch.phase, patch.phase_amount, phase_source)
             hardness = Slot.unit(Slot.modulate(patch.hardness, patch.hardness_amount, hardness_source))

@@ -8,7 +8,7 @@ body takes the place of the keyboard.
 |--------------------------------|--------------------------|------------------------------------------------------------|
 | what the player acts on        | keyboard, wheels, pedals | the body, as the pose pipeline measures it (*The body*)    |
 | what makes the result          | the synth engine         | the light synth (`LIGHT_SYNTH.md`)                         |
-| what ties them                 | the patch                | which measure goes into which input, and by how much       |
+| what ties them                 | the patch                | which measure goes into which parameter, and by how much   |
 | the whole                      | the instrument           | the pose instrument                                        |
 
 One body plays two engines: the same measures drive the sound synth in Max and the light synth.
@@ -25,7 +25,7 @@ The layer's place among the other layers is in `LAYERS.md`; the states that run 
 
 ## The instrument
 
-Each person is a source of light in the projection. At their azimuth sits a dim blue **mask**: it
+Each person makes light in the projection. At their azimuth sits a dim blue **mask**: it
 goes over everything at the person, the patterns of everyone and the light of the other layers;
 the playhead passes through it dimmed by a setting. Around the mask, mirrored about the person,
 their **pattern**: lines of full white and full blue, generated behind the mask and coming out from
@@ -65,19 +65,26 @@ The ground rules, as set:
 
 # Part 1 — Vocabulary
 
-The language of the pattern is the light synth's and is in `LIGHT_SYNTH.md`: oscillator, interval,
-pulse width, phase, speed, hardness, LFO, envelope, window, reach, taper, push, slot, voice. The
-words of the bridge:
+The language of the pattern is the light synth's and is in `LIGHT_SYNTH.md` (*Terms and what
+belongs where*): oscillator, parameter, slot, source, output, interval, pulse width, phase,
+speed, hardness, LFO, envelope, window, reach, taper, push, voice. Standard synth terminology
+where the synth is a synth; our own word where the wall differs. The words of the bridge:
 
-| Word       | What it is                                                                          |
-|------------|-------------------------------------------------------------------------------------|
-| measure    | a value of the body, measured by the pose pipeline (*The body*)                     |
-| input      | an input of the light synth                                                         |
-| source     | what is plugged into an input's slot: a measure, an LFO, an envelope                |
-| connection | a measure in a slot: the source, the input, the base and the amount                 |
-| patch      | everything set for the synth, the connections among it; shared by all voices        |
-| voice      | one person's instance of the light synth                                            |
-| event      | what the instrument triggers in a voice: presence, the hit, sync (*Events*)         |
+| Word       | What it is                                                                            |
+|------------|---------------------------------------------------------------------------------------|
+| measure    | a value of the body, measured by the pose pipeline (*The body*); ours: the body is the controller |
+| source     | what is plugged into a parameter's slot: a measure, an LFO's or an envelope's output  |
+| connection | a measure as the source in a slot: the measure, the parameter, the base, the amount   |
+| patch      | everything set for the synth, the connections among it; shared by all voices          |
+| voice      | one person's instance of the light synth                                              |
+| event      | what the instrument triggers in a voice: presence, the hit, sync (*Events*)           |
+
+What is the instrument's and what is the synth's (`LIGHT_SYNTH.md` states the same split from the
+synth's side): the instrument decides what each source is, which measure, and any shaping of a
+measure before it is handed over (a dead zone, a remap, a mean of two joints, each of which makes
+one source out of measures); when the gates open (presence, the hit); the reaches; which output
+is white and which blue; and the mask. Everything from the slot on is the synth's, and the synth
+never changes a source before the slot and never adds two.
 
 ---
 
@@ -100,14 +107,14 @@ points is tied to a pose.
 3. Groups of measures (both arms, both elbows) and poses are consequences of the measures'
    meanings. They are read back in Part 3, never written here.
 4. Raising one arm never means the same as raising the other, and the two arms are connected by a
-   relation from the vocabulary of the light synth: not by a colour, and not by whatever two inputs
-   were free.
+   relation from the vocabulary of the light synth: not by a colour, and not by whatever two
+   parameters were free.
 5. The same holds for every pair of joints: a pair acts through a musical relation, or through its
    symmetry.
 6. A meaning is spoken in the vocabulary: it names a term of the light synth.
 7. Every combination of the measures draws differently.
 8. Few connections, much meaning. A measure may mean nothing on its own; then its symmetry may.
-   Not every input of the synth needs a measure.
+   Not every parameter of the synth needs a measure.
 9. Primary measures make the note, secondary measures modulate it. A secondary meaning needs a
    note to act on, so it is judged on a pattern, never on the fixed points.
 
@@ -120,7 +127,7 @@ told apart by a colour, each arm playing one oscillator.
 
 ## What each measure means
 
-Each measure is a musical term of the light synth: an input of an oscillator (interval, pulse
+Each measure is a musical term of the light synth: a parameter of an oscillator (interval, pulse
 width, phase, speed), the level of an LFO, a reach. **Primary** measures make the note: the arms,
 each arm one oscillator, the left the white and the right the blue. **Secondary** measures
 modulate a note that is already sounding: the legs and the body bend. The distance, how far the
@@ -143,11 +150,11 @@ of two people opening toward each other until the two patterns overlap and becom
 
 ## Composition
 
-The aim is a balanced composition that people recognise they influence. Not every input of the
-synth has to be used; they are there to be tried, because several may mean the same thing to the
-eye, or the pattern's own workings may already produce what an input would add. A connection earns
-its place when a person can find it with their body. Few connections, much meaning: a measure may
-drive more than one input, and an input may stay at its base.
+The aim is a balanced composition that people recognise they influence. Not every parameter of
+the synth has to be used; they are there to be tried, because several may mean the same thing to
+the eye, or the pattern's own workings may already produce what a parameter would add. A
+connection earns its place when a person can find it with their body. Few connections, much
+meaning: a measure may drive more than one parameter, and a parameter may stay at its base.
 
 ---
 
@@ -218,15 +225,15 @@ value or its absolute can be used. A person and their mirror image draw differen
 
 ## The connections
 
-A **connection** is one measure in the slot of one input (`LIGHT_SYNTH.md`, *Modulation*): the
-measure is the source, 0..1, and the slot's base and amount carry the rest, the range and the
-direction. A measure may feed several inputs; an input has one source; two measures never sum
-into one input.
+A **connection** is one measure as the source in one parameter's slot (`LIGHT_SYNTH.md`,
+*Modulation*): the measure is the source, 0..1, and the slot's base and amount carry the rest,
+the range and the direction. A measure may feed several parameters; a slot has one source; two
+measures never sum into one parameter.
 
 Each arm plays one oscillator, the left the white and the right the blue. The bases and amounts
 are the preset's starting values, tuned on the machine:
 
-| Source         | Range | Input             | Base     | Amount       | At full                                       |
+| Source         | Range | Parameter         | Base     | Amount       | At full                                       |
 |----------------|-------|-------------------|----------|--------------|-----------------------------------------------|
 | left shoulder  | 0..1  | white pulse width | 0        | 1            | solid white                                   |
 | right shoulder | 0..1  | blue pulse width  | 1        | −1           | no blue                                       |
@@ -343,23 +350,22 @@ tuned together, knobs throughout:
 | Group           | What it holds                                                                     |
 |-----------------|-----------------------------------------------------------------------------------|
 | `max_lines`     | the visual limit                                                                  |
-| `bypass_all`    | the master bypass: every source muted, every input its base (*Playing by hand*)   |
-| `white`, `blue` | an oscillator's patch: a matrix row per input, and its push                       |
+| `bypass_all`    | the master bypass: every source muted, every parameter its base (*Playing by hand*) |
+| `white`, `blue` | an oscillator's patch: a slot per parameter, and its push                         |
 | `lfo`           | the LFO: rate, phase, and the level's row                                         |
 | `window`        | how far the pattern shows and when: the shape (taper, attack, release) and the reach (width, its bypass, the sync threshold) |
 | `hit`           | the hit: the push's settle time, frames, the mask's flash, the hit button         |
 | `mask`          | width, brightness, the playhead's level in it                                     |
 | `dummy`         | *The dummy*                                                                       |
 
-A matrix row is titled with its input's name and reads Base · Amount · Curve · Source · Bypass
+A slot is a row titled with its parameter's name and reads Base · Amount · Curve · Bypass
 (`LIGHT_SYNTH.md`, *Modulation*); every other row has its title too (Push, LFO, Shape, Reach,
 Hit), so the panel reads the same way throughout.
 
 The synth's settings classes (`OscillatorSettings`, `LfoSettings`, `WindowSettings`,
 `PushSettings`) are extended by the bridge's where a concept spans both (`window`, `hit`); the
 voice reads only its own fields. The layer keeps its `blend`. No setting routes anything: an
-amount does nothing until `connect` gives its input a source, and the row's read-only Source knob
-shows what it gets.
+amount does nothing until `connect` gives its parameter a source.
 
 ### Hot reload
 
@@ -375,33 +381,29 @@ already built (a settings instance keeps its fields). Hence the rules:
 
 - Everything that may change lives in a class method or a module constant, never in a module-level
   function.
-- The synth's `Input` is an `IntEnum`, so a source's key still matches after a reload redefines
+- The synth's `Parameter` is an `IntEnum`, so a source's key still matches after a reload redefines
   the class.
 - The numbers of a connection are its slot's base and amount, settings, never literals in
   `connect`, so the preset keeps describing the show.
-- A new setting, feature or input needs a restart; a new connection does not.
+- A new setting, feature or parameter needs a restart; a new connection does not.
 - The table of *The connections* is `connect` in words; when one changes, the other follows in
   the same change.
 
 ### Playing by hand
 
-An input's knob is already the hand's value, so playing by hand is bypassing modulation. Every
-row has a **Bypass** (`PI.white`, `PI.blue`, and the level of `PI.lfo`): bypassed, the input is
-its knob while every other input keeps following the body, so a pose can be taken apart input by
-input; lifted, it follows again with its amount as it was. `PI.bypass_all` is the master: `connect`
-is skipped and every input is its knob, for everyone, live people and the dummy alike: the panel
-draws. `window.width_bypass` holds both reaches at the width without a partner, presence still
-opening and closing them. `hit.hit` marks everyone for `hit.frames` ticks as the playhead would.
-
-The row's **Source** knob is read-only and shows the live source of the shown person: the dummy's
-while the dummy is enabled (its id is above every live player's), else the first person present's;
-0 for an input nobody plays, and 0 while the master bypass is on. It is the one setting the bridge
-writes, so what the body gives can be read off the panel next to what it does.
+A parameter's base is already the hand's value, so playing by hand is bypassing modulation. Every
+slot has a **Bypass** (`PI.white`, `PI.blue`, and the level of `PI.lfo`): bypassed, the parameter
+is its base while every other parameter keeps following the body, so a pose can be taken apart
+parameter by parameter; lifted, it follows again with its amount as it was. `PI.bypass_all` is
+the master: `connect` is skipped and every parameter is its base, for everyone, live people and
+the dummy alike: the panel draws. `window.width_bypass` holds both reaches at the width without a
+partner, presence still opening and closing them. `hit.hit` marks everyone for `hit.frames` ticks
+as the playhead would. What the body gives is read in the render's data graphs, per person.
 
 ### Tests
 
 `apps/white_space/tests`: the synth in `test_synth_oscillator.py` (among them the no-jumps rule,
-each input swept in small steps), `test_synth_envelope.py` and `test_synth_voice.py`; the bridge
+each parameter swept in small steps), `test_synth_envelope.py` and `test_synth_voice.py`; the bridge
 in `test_pose_instrument.py`.
 
 ### The pose results now

@@ -1,9 +1,9 @@
 # White Space — The Pose Instrument's Light Synth
 
 The light of the pose instrument is made by a light synth. This document describes that part and
-nothing else: the lines the oscillators draw, their inputs and what each looks like on the
-projection, how an input is connected, and the building blocks. What plays the inputs is not part
-of it: the instrument, its measures, meanings, connections and events, are in
+nothing else: the lines the oscillators draw, their parameters and what each looks like on the
+projection, how a parameter is connected, and the building blocks. What plays the parameters is
+not part of it: the instrument, its measures, meanings, connections and events, are in
 `POSE_INSTRUMENT.md`. The code is the package `light/synth`: `Oscillator`, `Envelope`, `Slot` and
 `Voice`.
 
@@ -12,8 +12,39 @@ The synth has three levels, and only the last knows of colour or of pose data:
 | Level                | What it is                                                         | Knows colour |
 |----------------------|--------------------------------------------------------------------|--------------|
 | oscillator, envelope | the building blocks (*The oscillator*, *The envelope*)             | no           |
-| voice                | two oscillators, one time, one amp stage, its LFOs; two outputs    | no           |
+| voice                | two oscillators, one time, one amp stage, its LFO; two outputs     | no           |
 | pose instrument      | the bridge between pose data and synth (*In the pose instrument*)  | yes          |
+
+## Terms and what belongs where
+
+The terms are a synth's wherever the synth is a synth, and our own where the wall differs. One
+value walked through, the left shoulder:
+
+| Term          | What it is                                                                          |
+|---------------|-------------------------------------------------------------------------------------|
+| **measure**   | what the pose pipeline says about the body: the left shoulder's angle, 0 hanging, π raised. The body's, whether or not the light uses it; the sound reads the same one. Ours: the body is our controller |
+| **source**    | that measure once the bridge hands it to the synth to move something: 0..1, plugged into a slot. Also an LFO's or an envelope's output. The word is a role: whatever is in a slot's socket, one per slot |
+| **parameter** | a knob of the oscillator, the thing being moved: interval, pulse width, phase, speed, hardness; the LFO's level. Its value each tick is its base plus what its source adds |
+| **slot**      | the parameter's modulation row, its mechanism: base, amount, curve, bypass, and the one socket the source goes into |
+| **output**    | what the oscillator makes of its parameters: on or off per pixel along the wall; two per voice, sent to white and to blue |
+
+In one line: the measure (the angle) is made a source by the bridge (0..1, into white's pulse
+width slot), moves a parameter through its slot (`base + amount × curve(source)`), and the
+oscillator turns its parameters into an output (white lines of that width). The wall's own words
+are kept where a synth's would mislead: the interval is a pitch in degrees, the speed a rate in
+degrees per second; reach, taper, window, presence, push and hardness are the amp stage and the
+slew, which here act on width instead of level (*A light synth*).
+
+What belongs where:
+
+- **The synth owns** how a source becomes a parameter's value (the slot), how the amp stage acts
+  on the parameters (the window, presence), how an LFO or an envelope makes its output, and how
+  the parameters become an output (the waveform). A slot has one source, so the synth never adds
+  two sources; and it never changes a source before the slot: what arrives is what it uses.
+- **The instrument owns** what each source is: which measure, and any shaping of the measure
+  before it is handed over (a dead zone, a remap, a mean of two joints: each makes one source out
+  of measures); when the gates open (presence, the hit); the reaches; which output is white and
+  which blue; the mask (`POSE_INSTRUMENT.md`, Part 1).
 
 ## A light synth
 
@@ -21,16 +52,16 @@ The design is a synthesizer's, part for part, so it can be reasoned about as one
 
 | Synth                          | Here                                                          |
 |--------------------------------|---------------------------------------------------------------|
-| oscillator, a pulse wave       | an oscillator (*Inputs*); its pitch is the interval           |
+| oscillator, a pulse wave       | an oscillator (*Parameters*); its pitch is the interval       |
 | pulse width                    | pulse width                                                   |
 | LFO                            | an LFO: an oscillator used as a source (*Modulation*)         |
 | envelope with a gate           | the envelope: push, presence (*The envelope*)                 |
 | amp envelope and VCA           | the window, over distance, on the pulse width (*The window*)  |
-| modulation matrix              | the slot: `input = base + amount × source`                    |
+| modulation matrix              | the slot: `parameter = base + amount × curve(source)`         |
 | slew, lag                      | hardness                                                      |
 | clock                          | the time, which can run faster or slower                      |
 | a voice, its two oscillators   | a voice (*The voice*): one per person, while present          |
-| keyboard and controllers       | what plays the inputs: not in this document                   |
+| keyboard and controllers       | what plays the parameters: not in this document               |
 
 Where it is not a synth:
 
@@ -59,17 +90,17 @@ Where it is not a synth:
 
 A **voice** is one person's pattern, for as long as they are present. It knows nothing of colour:
 it has two outputs, and what each is projected in is the instrument's choice. There is one synth
-and it is polyphonic. The patch is shared: what is connected to which input, with what base and
-amount, is set once and holds for every voice. The values are each voice's own: what
-flows through a connection comes from that person, so each person's body drives their own
-pattern, and the same patch draws differently for every person. A voice also has its own time and
-its own presence. Put another way, each person gets their own instance of the light synth, and
-every instance is given the same settings.
+and it is polyphonic. The patch is shared: what is connected to which parameter, with what base
+and amount, is set once and holds for every voice. The values are each voice's own: what flows
+through a connection comes from that person, so each person's body drives their own pattern, and
+the same patch draws differently for every person. A voice also has its own time and its own
+presence. Put another way, each person gets their own instance of the light synth, and every
+instance is given the same settings.
 
 | Part       | How many | What it is                                                          |
 |------------|----------|---------------------------------------------------------------------|
-| oscillator | 2        | one per output, the same inputs, each its own values (*Inputs*)     |
-| time       | 1        | shared by the oscillators and the LFOs (*Distance and time*)        |
+| oscillator | 2        | one per output, the same parameters, each its own values (*Parameters*) |
+| time       | 1        | shared by the oscillators and the LFO (*Distance and time*)         |
 | amp stage  | 1        | each side's window, and presence; for both outputs (*The window*)   |
 | LFO        | 1        | in time; its output a source for the caller to wire (*Modulation*)  |
 
@@ -87,13 +118,13 @@ unequal speeds the places travel. One source into both intervals with the same a
 ratio, since the amount is in octaves (*Modulation*): the two outputs change pitch together and
 stay tuned.
 
-## Inputs
+## Parameters
 
-Per oscillator, five inputs and nothing else. Each has a base value and can be connected to a source
-(*Modulation*). The hardness is an input like the others, its base 1, hard; it will probably
-never be connected to anything.
+Per oscillator, five parameters and nothing else. Each has a base value and can be connected to a
+source (*Modulation*). The hardness is a parameter like the others, its base 1, hard; it will
+probably never be connected to anything.
 
-| Input       | Unit                 | What it is                                              |
+| Parameter   | Unit                 | What it is                                              |
 |-------------|----------------------|---------------------------------------------------------|
 | interval    | degrees              | the distance from one line to the next                  |
 | pulse width | fraction of interval | the thickness of a line: 0 none, 1 solid                |
@@ -102,7 +133,7 @@ never be connected to anything.
 | hardness    | 0..1                 | the flanks of a line: 1 hard (default), 0 softest       |
 
 An oscillator also has its `push`, the speed a push adds to it (*Distance and time*): the amount
-of that one envelope, not an input, so it has no slot.
+of that one envelope, not a parameter, so it has no slot.
 
 **Interval** spaces the lines. A change of interval moves a far line more than a near one, as an
 accordion opens from the person.
@@ -158,10 +189,10 @@ Only a window of the lines shows each side of the person. The window is an envel
 (*The envelope*: rise 0, length the reach, fall the taper's part of it): 1 from the person on,
 falling smoothly to 0 over the last part of the **reach**. Every line's pulse width is multiplied
 by it, so the lines are alike over most of the window, thin out at its end and stop at nothing. No
-line is cut: a cut would leave a last line of a width no input asked for. A thin line is faint
+line is cut: a cut would leave a last line of a width no parameter asked for. A thin line is faint
 (*The rules*), so the pattern fades out with every pixel still off or full.
 
-| Input       | Unit    | What it is                                                               |
+| Parameter   | Unit    | What it is                                                               |
 |-------------|---------|--------------------------------------------------------------------------|
 | reach left  | degrees | how far the lines extend on the person's left                            |
 | reach right | degrees | how far the lines extend on the person's right                           |
@@ -185,18 +216,18 @@ reach that has to land on something, as sync's on a partner, cannot be reached t
 an amount without reading the patch back, so it is set whole.
 
 The window and **presence** are the amp stage, a synth's amp envelope, and sit after the slots
-and not in them, so the pulse width stays free to be connected. Presence is an
-envelope over time (*The envelope*) that multiplies both reaches: the window opens from the person
-when they arrive and closes to the person when they leave. The pulse width is the most a line can
-be; the window only thins it, so a dark output stays dark. A solid output is solid over most of
-the window and opens into thinning lines over the taper. A change of reach is smooth: the lines in
-the taper grow or thin a little, and nothing appears or disappears.
+and not in them, so the pulse width stays free to be connected. Presence is an envelope over time
+(*The envelope*) that multiplies both reaches: the window opens from the person when they arrive
+and closes to the person when they leave. The pulse width is the most a line can be; the window
+only thins it, so a dark output stays dark. A solid output is solid over most of the window and
+opens into thinning lines over the taper. A change of reach is smooth: the lines in the taper grow
+or thin a little, and nothing appears or disappears.
 
 ## The rules
 
-- Each input does one visible thing, whatever the others are.
-- Every input is continuous: a smooth change of an input is a smooth change on the projection.
-  Nothing appears, disappears or changes width in a step.
+- Each parameter does one visible thing, whatever the others are.
+- Every parameter is continuous: a smooth change of a parameter is a smooth change on the
+  projection. Nothing appears, disappears or changes width in a step.
 - A thin line is faint on the fixture **(site fact)**, and there is no reason not to show it. That
   is how a line arrives and leaves.
 - Many small lines do not register as lines **(site fact)**: about 90 per revolution, line and gap
@@ -206,21 +237,21 @@ the taper grow or thin a little, and nothing appears or disappears.
 
 ## Modulation
 
-Every input has a modulation slot, a modulation matrix row, as a synth's inputs have. What the
-source is does not matter to the slot. In the panel a row is titled with the input's name and
-reads Base · Amount · Curve · Source · Bypass, the matrix's own words.
+Every parameter has a modulation slot, a modulation matrix row, as a synth's parameters have.
+What the source is does not matter to the slot. In the panel a slot is a row titled with the
+parameter's name and reads Base · Amount · Curve · Bypass, the matrix's own words.
 
 | Part   | What it is                                                                          |
 |--------|-------------------------------------------------------------------------------------|
-| base   | the input's own knob: its value with nothing connected, and the hand's value        |
-| amount | how far the source moves the input from its base, in the input's unit, signed       |
+| base   | the parameter's own knob: its value with nothing connected, and the hand's value    |
+| amount | how far the source moves the parameter from its base, in the parameter's unit, signed |
 | curve  | how the source's magnitude is eased, its sign kept: one of pytweening's easings     |
 | source | what is connected: a value 0..1, or −1..1 for an LFO; one per tick or one per pixel |
-| bypass | bypassed, the modulation is off: the input is its base, and the amount is kept      |
+| bypass | bypassed, the modulation is off: the parameter is its base, and the amount is kept  |
 
 ```
-input    = base + amount × curve(source)     amount in the input's unit
-interval = base × 2 ^ (amount × curve(source))   amount in octaves
+parameter = base + amount × curve(source)         amount in the parameter's unit
+interval  = base × 2 ^ (amount × curve(source))   amount in octaves
 ```
 
 At pulse width base 0.2 and amount 0.6 the lines are 0.2 wide with the source at 0 and 0.8 wide
@@ -228,39 +259,39 @@ with the source at 1. The interval is a pitch and is moved in octaves, as a synt
 is a large change at a 5° interval and a small one at 40°, and a doubling looks the same size
 anywhere. At base 10° and amount 1 octave the interval goes from 10° to 20°; at −1 to 5°.
 
-- An input has one source. A source may feed several inputs, each with its own amount.
-- The bypass is how one input is played by hand while the others follow their sources: a base is
-  already the hand's value, so bypassing the modulation is all that is needed, and lifting it
+- A slot has one source. A source may feed several parameters, each with its own amount.
+- The bypass is how one parameter is played by hand while the others follow their sources: a base
+  is already the hand's value, so bypassing the modulation is all that is needed, and lifting it
   brings the source back with the amount as it was.
-- The panel's Source knob is read-only and shows the live source, the synth's modulation ring: so
-  a row shows what the body gives, and an LFO's ± swing, where the wiring itself is code.
-- A source has a synth's ranges: an LFO swings both ways, −1..1, so the input moves around its
-  base; an envelope and everything else is 0..1 and moves the input one way from its base. Any
-  source fits any input, and the amount alone carries the unit and the direction.
+- A source has a synth's ranges: an LFO swings both ways, −1..1, so the parameter moves around its
+  base; an envelope and everything else is 0..1 and moves the parameter one way from its base. Any
+  source fits any parameter, and the amount alone carries the unit and the direction.
 - A per-pixel source on the phase bunches and spreads the lines along the wall, a synth's FM, and
   can take them past the visual limit locally. The synth allows it; whether it is used is the
   instrument's choice.
 - Pulse width, phase and hardness take a source per tick or per pixel; interval and speed take one
   per tick, since the travelled (*The oscillator*) is one count.
-- Where an input ends: pulse width and hardness stop at 0 and 1, the interval stops at the visual
-  limit, phase wraps, speed has no ends. A stop is a standstill, not a step.
+- Where a parameter ends: pulse width and hardness stop at 0 and 1, the interval stops at the
+  visual limit, phase wraps, speed has no ends. A stop is a standstill, not a step.
 - The slot adds no smoothing and no steps. Its curve is the one shaping it does, so a
-  connection's feel is tuned in its row. The curves are `pytweening`'s: linear, and ten families
-  (quad, cubic, quart, quint, sine, expo, circ, back, elastic, bounce) each as ease in (little at
-  first), ease out (much at first) and ease in-out. A curve is continuous and odd: 0 and ±1 stay
-  where they are and the sign is kept, so a bipolar source stays symmetric. Back and elastic
-  overshoot on the way, so an input may pass its base or its end for a moment, and bounce turns
-  back on itself; pulse width and hardness still stop at 0 and 1. `pytweening`'s functions take
-  one number, so a curve is sampled once into a table and read between, which also serves a
-  source per pixel; the table's ends are pinned, since `pytweening`'s elastic ends a hair past 1.
+  connection's feel is tuned in its row. A curve shapes a value, what a source is worth at each of
+  its positions; an envelope shapes time (*The envelope*): two different things that share the
+  same easings. The curves are `pytweening`'s: linear, and ten families (quad, cubic, quart,
+  quint, sine, expo, circ, back, elastic, bounce) each as ease in (little at first), ease out
+  (much at first) and ease in-out. A curve is continuous and odd: 0 and ±1 stay where they are
+  and the sign is kept, so a bipolar source stays symmetric. Back and elastic overshoot on the
+  way, so a parameter may pass its base or its end for a moment, and bounce turns back on itself;
+  pulse width and hardness still stop at 0 and 1. `pytweening`'s functions take one number, so a
+  curve is sampled once into a table and read between, which also serves a source per pixel; the
+  table's ends are pinned, since `pytweening`'s elastic ends a hair past 1.
 
 ### An LFO as a source
 
-An **LFO** is an oscillator used as a source: its output feeds an input of another oscillator. An
-LFO is not drawn: its output is a sine, −1..1, so what it feeds moves around its base without a
-step. It has one input more, its **level**, 0..1, which scales its output and has a slot of its
-own. At level 0 the LFO is silent and the input it feeds is at its base: the level is what is
-played, as a synth's mod wheel brings in the vibrato, and an envelope into it is a fade-in.
+An **LFO** is an oscillator used as a source: its output feeds a parameter of another oscillator.
+An LFO is not drawn: its output is a sine, −1..1, so what it feeds moves around its base without
+a step. It has one parameter more, its **level**, 0..1, which scales its output and has a slot of
+its own. At level 0 the LFO is silent and the parameter it feeds is at its base: the level is what
+is played, as a synth's mod wheel brings in the vibrato, and an envelope into it is a fade-in.
 
 A voice has one LFO, **in time**: it has one position, so no interval and no speed, and what it
 has is a **rate**, in cycles per second, and a phase. Its output is one value per tick, and where
@@ -303,19 +334,19 @@ sine   value = level · cos(2π · cycle)                    highest at every wh
 pulse  on where |frac(cycle + ½) − ½| ≤ pulse width / 2   centred on every whole cycle
 ```
 
-- Interval, phase and speed are the core's inputs, in the units of the positions. The ordinary
-  LFO's rate is a consequence: `speed / interval` cycles per second.
+- Interval, phase and speed are the core's parameters, in the units of the positions. The
+  ordinary LFO's rate is a consequence: `speed / interval` cycles per second.
 - The travelled is counted in cycles and not in position units, so a change of interval opens the
   wave from position 0 and not from wherever it has travelled to.
-- The sine gives a smooth value −1..1 and has one input more, the level. The pulse gives on or off
-  and has one input more, the pulse width.
+- The sine gives a smooth value −1..1 and has one parameter more, the level. The pulse gives on or
+  off and has one parameter more, the pulse width.
 
-| Use                       | Positions                   | Waveform | Output                                         |
-|---------------------------|-----------------------------|----------|------------------------------------------------|
-| drawing lines             | every pixel's distance      | pulse    | on or off per pixel                            |
-| an LFO along the wall     | every pixel's distance      | sine     | a value per pixel, into an oscillator's input  |
-| an LFO in time            | one position                | sine     | one value per tick, into any input             |
-| elsewhere                 | whatever the user's axis is | either   | a value per position                           |
+| Use                       | Positions                   | Waveform | Output                                             |
+|---------------------------|-----------------------------|----------|----------------------------------------------------|
+| drawing lines             | every pixel's distance      | pulse    | on or off per pixel                                |
+| an LFO along the wall     | every pixel's distance      | sine     | a value per pixel, into an oscillator's parameter  |
+| an LFO in time            | one position                | sine     | one value per tick, into any parameter             |
+| elsewhere                 | whatever the user's axis is | either   | a value per position                               |
 
 The hardness is not part of the oscillator: it is a slew on the pulse's output, as a lag after an
 LFO softens a square.
@@ -333,12 +364,21 @@ The second building block, reusable as the oscillator is. An oscillator repeats;
 up once, holds and comes down once. It knows nothing of people or colours: positions or time steps
 go in, values 0..1 come out, smoothly.
 
-| Input  | What it is                                                                       |
-|--------|----------------------------------------------------------------------------------|
-| rise   | how long the way up takes: 0 is at once                                          |
-| fall   | how long the way down takes                                                      |
-| length | over positions: where the envelope ends                                          |
-| gate   | over time: open or closed, opened and closed from outside                        |
+An envelope gives a shape over time to something that has none of its own. A synth needs one for
+every note, since a key is only down or up. Here the player is a body, which moves through time by
+itself, so a played parameter needs no envelope: the arm's own motion is the shape, and an
+envelope on top of it would be a second motion (`POSE_INSTRUMENT.md`, *The instrument*: no
+smoothing but the pipeline's). Envelopes exist only where there is an event with no motion of its
+own: a person arriving or leaving, the playhead crossing, and the end of the window, an edge given
+a shape along the wall. That is why there are three, and why there will be no more unless an event
+is added.
+
+| Parameter | What it is                                                                       |
+|-----------|----------------------------------------------------------------------------------|
+| rise      | how long the way up takes: 0 is at once                                          |
+| fall      | how long the way down takes                                                      |
+| length    | over positions: where the envelope ends                                          |
+| gate      | over time: open or closed, opened and closed from outside                        |
 
 ```
 over positions   level = position / rise, up to 1; from length − fall on, (length − position) / fall
@@ -361,11 +401,12 @@ without a step. What opens a gate is not part of this document.
 
 The pose instrument is the bridge between the pose data and the synth (`POSE_INSTRUMENT.md`). It
 gives every person a voice, sends the voice's two outputs to white and to blue, connects the
-body's measures to the inputs, triggers the events (presence, the hit, sync) and draws the mask.
+body's measures to the parameters, triggers the events (presence, the hit, sync) and draws the
+mask.
 
 Where white and blue are both lit the overlap is a tone of its own: the palette is dark, blue,
 white, both (`POSE_INSTRUMENT.md`, *The instrument*). How the two meet is a consequence of their
-oscillators' inputs, not an input of its own:
+oscillators' parameters, not a parameter of its own:
 
 | The two oscillators                            | On the projection                                   |
 |------------------------------------------------|-----------------------------------------------------|

@@ -13,7 +13,7 @@ from modules.pose import features
 from apps.white_space.light import Tick, MotorCommand, MotorMode, LayerSettings
 from apps.white_space.light.frame import Frame
 from apps.white_space.light.layers import PoseInstrument, PoseInstrumentSettings
-from apps.white_space.light.synth import Input, Curve
+from apps.white_space.light.synth import Parameter, Curve
 from apps.white_space.pose import PlayheadOffset
 
 IRES = 3600                 # one pixel per 0.1°
@@ -139,21 +139,21 @@ class PoseInstrumentTest(unittest.TestCase):
     def test_each_arm_plays_its_own_oscillator(self) -> None:
         white, blue = self._connect(_pose(0.5, left_shoulder=shoulder(0.25), right_shoulder=shoulder(0.75),
                                           left_elbow=shoulder(0.5), right_elbow=shoulder(1.0)))
-        self.assertAlmostEqual(white[Input.PULSE_WIDTH], 0.25, places=5)    # the left arm: the white
-        self.assertAlmostEqual(white[Input.INTERVAL], 0.5, places=5)
-        self.assertAlmostEqual(blue[Input.PULSE_WIDTH], 0.75, places=5)     # the right arm: the blue
-        self.assertAlmostEqual(blue[Input.INTERVAL], 1.0, places=5)
+        self.assertAlmostEqual(white[Parameter.PULSE_WIDTH], 0.25, places=5)    # the left arm: the white
+        self.assertAlmostEqual(white[Parameter.INTERVAL], 0.5, places=5)
+        self.assertAlmostEqual(blue[Parameter.PULSE_WIDTH], 0.75, places=5)     # the right arm: the blue
+        self.assertAlmostEqual(blue[Parameter.INTERVAL], 1.0, places=5)
 
     def test_the_body_bend_is_a_signed_source_for_both_speeds(self) -> None:
         for tilt in (-1.0, 0.0, 0.4):
             white, blue = self._connect(_pose(0.5, tilt=tilt))
-            self.assertAlmostEqual(white[Input.SPEED], tilt, places=5)
-            self.assertAlmostEqual(blue[Input.SPEED], tilt, places=5)
+            self.assertAlmostEqual(white[Parameter.SPEED], tilt, places=5)
+            self.assertAlmostEqual(blue[Parameter.SPEED], tilt, places=5)
 
     def test_the_sign_of_an_angle_is_not_a_measure(self) -> None:
         # The sign is the side of the body the arm passes; straight up is π from either side.
         for angle in (shoulder(0.5), -shoulder(0.5)):
-            self.assertAlmostEqual(self._connect(_pose(0.5, left_shoulder=angle))[0][Input.PULSE_WIDTH], 0.5, places=5)
+            self.assertAlmostEqual(self._connect(_pose(0.5, left_shoulder=angle))[0][Parameter.PULSE_WIDTH], 0.5, places=5)
 
     def test_the_distance_is_a_source_that_plays_nothing_yet(self) -> None:
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, distance=0.0)})
@@ -451,29 +451,6 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertEqual({l for _, l in white}, {INTERVAL // 4})            # white from the panel,
         self.assertEqual(float(f.blue[self._outside_mask()].sum()), 0.0)    # blue still following the body
         self.assertFalse(self.cfg.bypass_all)                               # without the master
-
-    def test_the_source_knobs_show_the_shown_persons_sources(self) -> None:
-        W, B = self.cfg.white, self.cfg.blue
-        self._people({1: _pose(0.3, left_shoulder=shoulder(0.25), right_shoulder=shoulder(0.75), tilt=0.4, legs=0.6),
-                      2: _pose(0.7, left_shoulder=shoulder(1.0), legs=1.0)})
-        self._render()
-        self.assertAlmostEqual(W.pulse_width_source, 0.25, places=5)        # the first person present
-        self.assertAlmostEqual(B.pulse_width_source, 0.75, places=5)
-        self.assertAlmostEqual(W.speed_source, 0.4, places=5)
-        self.assertAlmostEqual(self.cfg.lfo.level_source, 0.6, places=5)
-        self.assertEqual(W.hardness_source, 0.0)                            # nobody plays the hardness
-        self.cfg.dummy.enabled = True                                       # the dummy: the highest id
-        self._render()
-        self.assertAlmostEqual(W.pulse_width_source, 1.0, places=5)
-        self.assertAlmostEqual(self.cfg.lfo.level_source, 1.0, places=5)
-        self.cfg.bypass_all = True                                          # muted: the knobs rest
-        self._render()
-        self.assertEqual(W.pulse_width_source, 0.0)
-        self.cfg.bypass_all = False
-        self._people({})
-        for _ in range(60):
-            self._render()
-        self.assertEqual(W.pulse_width_source, 0.0)                         # nobody there
 
     def test_a_curve_eases_a_source_and_keeps_its_ends(self) -> None:
         self.cfg.white.pulse_width_curve = Curve.EASE_IN_QUAD               # little at first
