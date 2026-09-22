@@ -158,8 +158,8 @@ motor stop and blank after several revolutions) covers only the crash path, wher
 
 Each state composes its **mix**: a weighted list of layers, returned every tick (`p` = the state's
 progress; weights may differ per channel). The layers' modes, inputs and settings are indexed in
-`LAYERS.md` (*Index — show layers*). `beam_playhead` and `projection_playhead` are two layers because the
-light data protocol differs between beam mode and projection mode. Debug layers are never in a state's
+`LAYERS.md` (*Index — show layers*). The playhead is `beam_playhead` in beam mode and the pose instrument's
+marker in projection mode, since the light data protocol differs between the two. Debug layers are never in a state's
 mix; they are reached through the `light.debug` select, and OFF there returns the show where it would
 have been (see `LAYERS.md`).
 
@@ -284,7 +284,7 @@ line during the spin-up, and the sound enhances the accelerating chaos.
   1. elapsed ≥ `spin_up_seconds` → S7 PLAY *(stands in for "at motor top speed": the sensor is blind above
      200 rpm, so time approximates it)*
 - **Mix**: `beam_playhead` DIM until **projecting**, then `pose_instrument` white 1.0 (hard) / blue
-  ease-in · `projection_playhead` 1.0 — per-channel weights. `pose_instrument` is reset on entry, so each
+  ease-in — per-channel weights. `pose_instrument` is reset on entry, so each
   show cycle starts a fresh instrument; PLAY does not reset it, because END's wind-back re-enters PLAY with
   the running instrument.
 - **White**: dark until projecting — the fixture is in projection mode from the first packet, so the
@@ -305,7 +305,7 @@ holding the same pose fills with light.
   1. stand-alone: P < min_players (debounced) → S8 END
   2. session: elapsed ≥ `session.play_seconds` → S8 END *(the count is not checked: a session plays out
      its time)*
-- **Mix**: `pose_instrument` 1.0 · `projection_playhead` 1.0
+- **Mix**: `pose_instrument` 1.0
 - **White**: the pose instrument — patterns per pose plus the sync fill between similarly-posed
   players — and the playhead line at full white
 - **Blue**: pose instrument (`pose_instrument`'s blue)
@@ -324,7 +324,7 @@ runs both ways, never jumping, and at p = 0 the mix equals PLAY's, so the hand-o
   2. wound down (p ≥ 1) and P == 0 → S10 END_IDLE
   3. wound back (p ≤ 0) and P ≥ min_players → S7 PLAY *(stand-alone only; in session mode the wind-back is disabled
      so a session always concludes)*
-- **Mix**: `pose_instrument` 1−p · `projection_playhead` 1−p · `flood` ease-out(p)
+- **Mix**: `pose_instrument` 1−p · `flood` ease-out(p)
 - **White**: instrument and playhead line fade as the flood crosses to full white
 - **Blue**: fades out with the instrument — `pose_instrument` is the only blue source, so one ramp crosses
   the white to full and fades the blue out together

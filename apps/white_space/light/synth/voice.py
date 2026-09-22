@@ -1,8 +1,8 @@
 """Voice — one person's instance of the light synth (``docs/LIGHT_SYNTH.md``, *The voice*).
 
 Two oscillators, one per output, on one time; the amp stage (each side's window, and presence)
-after the slots; the push on the speed; one LFO in time, whose output is a source for the caller
-to wire. The patch, the settings objects given to the constructor,
+after the slots; each oscillator's push on its speed; one LFO in time, whose output is a source
+for the caller to wire. The patch, the settings objects given to the constructor,
 is shared by every voice; what flows through it, the sources, is each voice's own. A voice knows
 nothing of colour or pose: what its outputs are projected in, what feeds its sources, what its
 reaches are and when it is hit are the caller's.
@@ -12,7 +12,7 @@ from enum import IntEnum, auto
 
 import numpy as np
 
-from .envelope import Envelope, WindowSettings, PushSettings
+from .envelope import Envelope, WindowSettings
 from .oscillator import Oscillator, OscillatorSettings, LfoSettings, Value
 from .slot import Slot
 
@@ -35,19 +35,18 @@ class Voice:
     """One person's pattern; see the module docstring."""
 
     def __init__(self, oscillator_1: OscillatorSettings, oscillator_2: OscillatorSettings,
-                 window: WindowSettings, push: PushSettings, lfo: LfoSettings, turn: float = 360.0) -> None:
+                 window: WindowSettings, lfo: LfoSettings, turn: float = 360.0) -> None:
         """``turn`` is one revolution in the positions' units: a pitch of *n* lines per revolution
         is an interval of ``turn / n``."""
         self._patches = (oscillator_1, oscillator_2)
         self._window = window
-        self._push_settings = push
         self._lfo_settings = lfo
         self._turn = turn
         self._oscillators = (Oscillator(), Oscillator())
         self._lfo_oscillator = Oscillator()
         self._lfo = 0.0                                                     # this tick's LFO output, −1..1
         self._presence = Envelope()
-        self._push = Envelope()
+        self._pushes = (Envelope(), Envelope())                             # each oscillator's push
         self._intervals = [self._interval(oscillator_1.pitch, 0.0), self._interval(oscillator_2.pitch, 0.0)]   # this tick's, after the slot
 
     def _interval(self, pitch: float, min_interval: float) -> float:
@@ -60,7 +59,8 @@ class Voice:
             oscillator.reset()
         self._lfo = 0.0
         self._presence.reset()
-        self._push.reset()
+        for push in self._pushes:
+            push.reset()
 
     @property
     def lfo(self) -> float:
@@ -86,19 +86,19 @@ class Voice:
         return self._presence.value
 
     def update(self, dt: float, present: bool, hit: bool, sources: tuple[Sources, Sources], min_interval: float) -> None:
-        """Advance the voice one tick: presence follows its gate, a hit opens the push, and both
-        oscillators travel at their speed plus what the push adds. ``min_interval`` is the visual
-        limit's floor on the interval, in the positions' units."""
+        """Advance the voice one tick: presence follows its gate, a hit opens each oscillator's
+        push, and each travels at its speed plus what its push adds. ``min_interval`` is the
+        visual limit's floor on the interval, in the positions' units."""
         W = self._window
         self._presence.update(present, dt, W.attack_seconds, W.release_seconds)
-        push = self._push.update(hit, dt, 0.0, self._push_settings.settle_seconds)
-        for i, (oscillator, patch, source) in enumerate(zip(self._oscillators, self._patches, sources)):
+        for i, (oscillator, patch, source, push) in enumerate(zip(self._oscillators, self._patches, sources, self._pushes)):
             pitch_source = self._played(patch.pitch_bypass, patch.pitch_curve, float(source.get(Parameter.PITCH, 0.0)))
             pitch = Slot.modulate(patch.pitch, patch.pitch_amount, pitch_source)
             self._intervals[i] = self._interval(pitch, min_interval)
             speed_source = self._played(patch.speed_bypass, patch.speed_curve, float(source.get(Parameter.SPEED, 0.0)))
             speed = Slot.modulate(patch.speed, patch.speed_amount, speed_source)
-            oscillator.update(dt, self._intervals[i], float(speed) + patch.push * push)
+            pushed = push.update(hit, dt, 0.0, patch.push_release_seconds)
+            oscillator.update(dt, self._intervals[i], float(speed) + patch.push * pushed)
 
     @staticmethod
     def _played(bypass: bool, curve: int, source: Value) -> Value:

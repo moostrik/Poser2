@@ -683,8 +683,6 @@
         "blend": "ADD"
       },
       "projection_playhead": {
-        "level": 1.0,
-        "width": 1.0,
         "blend": "ADD"
       },
       "flood": {
@@ -859,8 +857,17 @@
     "max_lines": 90,
     "mask": {
       "width": 4.0,
-      "brightness": 0.5,
-      "playhead_at_mask": 0.3
+      "white": 0.0,
+      "blue": 0.5,
+      "flash_white": 0.0,
+      "flash_blue": 1.0,
+      "flash_release_seconds": 0.3
+    },
+    "playhead": {
+      "width": 1.0,
+      "white": 1.0,
+      "blue": 0.0,
+      "at_mask": 0.3
     },
     "window": {
       "width": 33.0,
@@ -870,12 +877,7 @@
       "attack_seconds": 1.0,
       "release_seconds": 1.5
     },
-    "hit": {
-      "frames": 1,
-      "flash_brightness": 1.0,
-      "settle_seconds": 0.15
-    },
-    "white": {
+    "white_lines": {
       "enabled": true,
       "pitch": 25.7,
       "pitch_amount": 46.3,
@@ -897,9 +899,10 @@
       "hardness_amount": 0.0,
       "hardness_curve": "LINEAR",
       "hardness_bypass": false,
-      "push": 14.0
+      "push": 14.0,
+      "push_release_seconds": 0.15
     },
-    "blue": {
+    "blue_lines": {
       "enabled": true,
       "pitch": 25.7,
       "pitch_amount": 46.3,
@@ -921,7 +924,8 @@
       "hardness_amount": 0.0,
       "hardness_curve": "LINEAR",
       "hardness_bypass": false,
-      "push": -14.0
+      "push": -14.0,
+      "push_release_seconds": 0.15
     },
     "lfo": {
       "rate": 0.5,

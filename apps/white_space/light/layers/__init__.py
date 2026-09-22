@@ -10,7 +10,8 @@ from .beam.wind_down                import BeamWindDown,        BeamWindDownSett
 from .beam.haunted                  import BeamHaunted,         BeamHauntedSettings
 from .beam.test                     import BeamTest,            BeamTestSettings
 from .projection.pose_instrument    import PoseInstrument,      PoseInstrumentSettings
-from .projection.projection_playhead import ProjectionPlayhead, ProjectionPlayheadSettings
+from .projection.playhead_marker    import PlayheadMarker,      PlayheadMarkerSettings
+from .projection.projection_playhead import ProjectionPlayhead
 from .projection.flood              import Flood,               FloodSettings
 from .projection.test_player_lines  import TestPlayerLines,     TestPlayerLinesSettings
 from .projection.test_calibration   import TestCalibration,     TestCalibrationSettings

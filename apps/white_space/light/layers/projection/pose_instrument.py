@@ -9,17 +9,19 @@ the window's **reach** each side. The bridge is everything the synth does not kn
 - the **measures**: pose features and nothing else, read from the LERP frames; ``connect`` is the
   wiring of the document's *The connections* written out, a person's measures into the sources of
   the synth's slots. The bases and amounts are settings of the ``PI`` group; the wiring is code.
-- the **events**: presence (a pose is seen), the hit (``PlayheadCrossing``, ``hit.frames``: a
-  push on both oscillators and the mask's flash), and sync, which grows the reach on a partner's
-  side until it reaches them, from ``window.sync_threshold`` on.
-- the **mask**: a dim blue band at the person, over every pattern and lit by presence.
+- the **events**: presence (a pose is seen), the hit (``PlayheadCrossing``, the tick closest to
+  the crossing: each oscillator's push and the mask's flash), and sync, which grows the reach on
+  a partner's side until it reaches them, from ``window.sync_threshold`` on.
+- the **mask**: a band at the person, over every pattern, lit at its levels by presence (dim blue
+  in the preset) and flashing to its flash levels on a hit; and the playhead's **marker** over
+  it all (``PlayheadMarker``), dimmed inside the masks.
 - the colours: output 1 is white, output 2 is blue; where voices overlap the fuller one shows.
 
-Playing by hand: every parameter has its slot as a row in the panel (``PI.white``, ``PI.blue``,
-``PI.lfo``): Base, Amount, Curve and Bypass. A bypassed parameter is its base while the others
-follow the body, so a pose can be taken apart parameter by parameter; an oscillator's Bypass All
-button sets its five at once, and clears them when all are set. ``window.width_bypass`` holds both reaches
-without a partner; ``hit.hit`` marks everyone as the playhead would.
+Playing by hand: every parameter has its slot as a row in the panel (``PI.white_lines``,
+``PI.blue_lines``, ``PI.lfo``): Base, Amount, Curve and Bypass. A bypassed parameter is its base
+while the others follow the body, so a pose can be taken apart parameter by parameter; an
+oscillator's Bypass All button sets its five at once, and clears them when all are set.
+``window.width_bypass`` holds both reaches without a partner.
 
 ``connect``, the drawing methods and the synth's classes are hot-reloaded while the app runs.
 """
@@ -38,9 +40,10 @@ from modules.utils import HotReloadMethods
 
 from .._base_layer import ProjectionLayer, LayerSettings
 from .._utilities import normalize_azimuth, mask_half_width
+from .playhead_marker import PlayheadMarker, PlayheadMarkerSettings
 from ...frame import Frame
 from ...synth import (Voice, Parameter, Sources, Oscillator, Envelope, Slot,
-                      OscillatorSettings, WindowSettings as SynthWindowSettings, PushSettings, LfoSettings)
+                      OscillatorSettings, WindowSettings as SynthWindowSettings, LfoSettings)
 from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step, DummySettings
 
 KNOB = Widget.knob
@@ -56,33 +59,29 @@ class WindowSettings(SynthWindowSettings):
     sync_threshold: Field[float] = Field(0.75, min=0.0, max=0.99,  step=0.01, widget=KNOB, label="Sync Threshold", description="Pair similarity from which the reach grows toward the partner, fully at 1 (alike)")
 
 
-class HitSettings(PushSettings):
-    """The hit: the playhead crossing a person. The synth's push (its settle time) with the
-    bridge's: how many ticks, the mask's flash, and the button that hits everyone."""
-    frames:           Field[int]   = Field(1,   min=1,   max=3,   step=1,    widget=KNOB, label="Frames", description="Hit length: the ticks closest to the crossing, 1-3", row_label="Hit", newline=True)
-    flash_brightness: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Flash",  description="Mask blue level on a hit")
-    hit:              Field[bool]  = Field(False, widget=Widget.button,                     label="Hit",    description="Hit everyone on the next ticks")
-
-
 class MaskSettings(BaseSettings):
-    """The dim blue mask at the person."""
-    width:            Field[float] = Field(3.0, min=0.5, max=20.0, step=0.1,  widget=KNOB, label="Width",      description="Mask width (deg)")
-    brightness:       Field[float] = Field(0.3, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Brightness", description="Mask blue level")
-    playhead_at_mask: Field[float] = Field(0.3, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Playhead",   description="Playhead level inside a mask (fraction)")
+    """The mask at the person: its width and its level per channel (0 is off), and the flash, the
+    levels it goes to on a hit and the release it falls back over."""
+    width:                 Field[float] = Field(3.0, min=0.5, max=20.0, step=0.1,  widget=KNOB, label="Width",   description="Mask width (deg)", row_label="Mask", newline=True)
+    white:                 Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="White",   description="Mask white level")
+    blue:                  Field[float] = Field(0.3, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Blue",    description="Mask blue level")
+    flash_white:           Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="White",   description="Mask white level at a hit", row_label="Flash", newline=True)
+    flash_blue:            Field[float] = Field(1.0, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Blue",    description="Mask blue level at a hit")
+    flash_release_seconds: Field[float] = Field(0.3, min=0.0, max=2.0,  step=0.05, widget=KNOB, label="Release", description="Flash falls back to the mask's levels over (s)")
 
 
 class PoseInstrumentSettings(BaseSettings):
-    """The ``PI`` root group, a group per concept: the two oscillators and the LFO (the synth's
-    patch, a slot per parameter), the window, the hit, the mask, the dummy. The wiring is
-    ``connect``."""
-    max_lines:  Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
-    mask:      Group[MaskSettings]       = Group(MaskSettings)
-    window:     Group[WindowSettings]     = Group(WindowSettings)
-    hit:        Group[HitSettings]        = Group(HitSettings)
-    white:      Group[OscillatorSettings] = Group(OscillatorSettings)
-    blue:       Group[OscillatorSettings] = Group(OscillatorSettings)
-    lfo:        Group[LfoSettings]        = Group(LfoSettings)
-    dummy:      Group[DummySettings]      = Group(DummySettings)
+    """The ``PI`` root group, a group per concept: the mask, the playhead's marker, the window,
+    the two oscillators and the LFO (the synth's patch, a slot per parameter), the dummy. The
+    wiring is ``connect``."""
+    max_lines:   Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
+    mask:        Group[MaskSettings]           = Group(MaskSettings)
+    playhead:    Group[PlayheadMarkerSettings] = Group(PlayheadMarkerSettings)
+    window:      Group[WindowSettings]         = Group(WindowSettings)
+    white_lines: Group[OscillatorSettings]     = Group(OscillatorSettings)
+    blue_lines:  Group[OscillatorSettings]     = Group(OscillatorSettings)
+    lfo:         Group[LfoSettings]            = Group(LfoSettings)
+    dummy:       Group[DummySettings]          = Group(DummySettings)
 
 
 # -- A person ------------------------------------------------------------------------------------
@@ -103,12 +102,15 @@ class _Player:
     similarity:     np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float32))
     present:        bool  = False   # seen this tick
     hit:            bool  = False   # the playhead crosses this person this tick
+    flash:          Envelope = field(default_factory=Envelope)   # the mask's flash: up on the hit, then its release
     reach_left:     float = 0.0     # this tick's reach each side (deg), before presence
     reach_right:    float = 0.0
 
 
 class PoseInstrument(ProjectionLayer):
     """The pose instrument; see the module docstring."""
+
+    HIT_TICKS = 1                   # a hit is the one tick closest to the crossing
 
     def __init__(self, resolution: int, config: LayerSettings, instrument: PoseInstrumentSettings, board,
                  pose_stage: int) -> None:
@@ -119,18 +121,16 @@ class PoseInstrument(ProjectionLayer):
         self._crossing = PlayheadCrossing()
         self._offsets = np.arange(-(resolution // 2), resolution // 2 + 1, dtype=np.float64)   # px from a person
         self._mask = np.zeros(resolution, dtype=bool)
-        self._mask_level = np.zeros(resolution, dtype=np.float32)
-        self._manual_hits = 0                                             # ticks left of a hit from the panel
-        instrument.hit.bind(HitSettings.hit, self._on_hit)
-        for patch in (instrument.white, instrument.blue):
+        self._mask_white = np.zeros(resolution, dtype=np.float32)
+        self._mask_blue = np.zeros(resolution, dtype=np.float32)
+        for patch in (instrument.white_lines, instrument.blue_lines):
             patch.bind(OscillatorSettings.bypass_all, partial(self._bypass_all, patch))
-        self._hot_reloaders = tuple(HotReloadMethods(cls, True) for cls in (self.__class__, Voice, Oscillator, Envelope, Slot))
+        self._hot_reloaders = tuple(HotReloadMethods(cls, True) for cls in (self.__class__, Voice, Oscillator, Envelope, Slot, PlayheadMarker))
 
     def reset(self) -> None:
         """A fresh instrument (S6 entry): forget every player and pass."""
         self._players.clear()
         self._crossing.reset()
-        self._manual_hits = 0
 
     @staticmethod
     def _bypass_all(patch: OscillatorSettings, _: bool) -> None:
@@ -141,29 +141,25 @@ class PoseInstrument(ProjectionLayer):
         patch.pitch_bypass = patch.pulse_width_bypass = patch.phase_bypass = bypass
         patch.speed_bypass = patch.hardness_bypass = bypass
 
-    def _on_hit(self, _: bool) -> None:
-        """The panel's hit button: everyone is hit for ``hit.frames`` ticks, from the next one."""
-        self._manual_hits = int(self._instrument.hit.frames)
-
     # -- Per tick --------------------------------------------------------------
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         self._update_players(frame)
-        if not self._players:
-            return
         self._set_reaches()
-        mask, mask_level = self._mask, self._mask_level
+        mask, mask_white, mask_blue = self._mask, self._mask_white, self._mask_blue
         mask.fill(False)
-        mask_level.fill(0.0)
+        mask_white.fill(0.0)
+        mask_blue.fill(0.0)
 
         for p in self._players.values():
             centre = int(round(p.position * self.resolution)) % self.resolution
             self._draw_voice(white, blue, p, centre)
-            self._draw_mask(mask, mask_level, p, centre)
+            self._draw_mask(mask, mask_white, mask_blue, p, centre)
 
-        # The masks go over every pattern: no white at a person, and the mask's own blue.
-        white[mask] = 0.0
-        np.copyto(blue, mask_level, where=mask)
+        # The masks go over every pattern, each channel at the mask's level; the marker over all.
+        np.copyto(white, mask_white, where=mask)
+        np.copyto(blue, mask_blue, where=mask)
+        PlayheadMarker.draw(white, blue, self.resolution, frame.playhead, self._instrument.playhead, mask)
 
     def _min_interval(self) -> float:
         """The visual limit on the interval, in degrees: one period of ``max_lines`` per revolution."""
@@ -182,7 +178,7 @@ class PoseInstrument(ProjectionLayer):
                 continue
             p = self._players.get(id)
             if p is None:
-                p = self._players[id] = _Player(Voice(P.white, P.blue, P.window, P.hit, P.lfo, turn=360.0))
+                p = self._players[id] = _Player(Voice(P.white_lines, P.blue_lines, P.window, P.lfo, turn=360.0))
             p.present = True
             p.position = normalize_azimuth(azimuth)
             angles = pose[features.Angles].values
@@ -198,17 +194,15 @@ class PoseInstrument(ProjectionLayer):
             offsets[id] = pose[PlayheadOffset].value
 
         step = playhead_step(frame.motor_command.beam_rpm, frame.tick.interval)
-        hits = self._crossing.update(offsets, step, int(P.hit.frames))
-        manual = self._manual_hits > 0
-        if manual:
-            self._manual_hits -= 1
+        hits = self._crossing.update(offsets, step, self.HIT_TICKS)
 
         min_interval = self._min_interval()
         gone: list[int] = []
         for id, p in self._players.items():
-            p.hit = manual or id in hits
+            p.hit = id in hits
             p.voice.update_lfo(frame.tick.dt, self.connect_lfo(p))              # first: connect reads its output
             p.voice.update(frame.tick.dt, p.present, p.hit, self._sources(p), min_interval)
+            p.flash.update(p.hit, frame.tick.dt, 0.0, P.mask.flash_release_seconds)
             if not p.present and not p.voice.alive:
                 gone.append(id)
         for id in gone:
@@ -227,7 +221,8 @@ class PoseInstrument(ProjectionLayer):
     def connect(self, p: _Player) -> tuple[Sources, Sources]:
         """The connections (``docs/POSE_INSTRUMENT.md``, *The connections*) written out: a person's
         measures into the sources of the white and the blue oscillator's slots. The bases and the
-        amounts, the range and the direction, are the ``PI.white`` / ``PI.blue`` settings.
+        amounts, the range and the direction, are the ``PI.white_lines`` / ``PI.blue_lines``
+        settings.
 
         Each arm plays one oscillator, the left the white and the right the blue:
 
@@ -336,13 +331,17 @@ class PoseInstrument(ProjectionLayer):
         white[idx] = np.maximum(white[idx], output_1)
         blue[idx] = np.maximum(blue[idx], output_2)
 
-    def _draw_mask(self, mask: np.ndarray, mask_level: np.ndarray, p: _Player, centre: int) -> None:
-        """Mark the person's mask: it goes over every pattern, lit dim blue by presence, and
-        flashes on the hit."""
+    def _draw_mask(self, mask: np.ndarray, mask_white: np.ndarray, mask_blue: np.ndarray, p: _Player,
+                   centre: int) -> None:
+        """Mark the person's mask: it goes over every pattern, each channel lit at the mask's level
+        by presence, raised to the flash's level as far as the flash is up."""
         P = self._instrument.mask
         R = self.resolution
         half = mask_half_width(P.width, R)
         idx = (centre + np.arange(-half, half + 1)) % R
         mask[idx] = True
-        brightness = self._instrument.hit.flash_brightness if p.hit else P.brightness
-        mask_level[idx] = np.maximum(mask_level[idx], brightness * p.voice.presence)
+        flash = p.flash.value
+        presence = p.voice.presence
+        for levels, base, at_hit in ((mask_white, P.white, P.flash_white), (mask_blue, P.blue, P.flash_blue)):
+            level = (base + (at_hit - base) * flash) * presence
+            levels[idx] = np.maximum(levels[idx], level)

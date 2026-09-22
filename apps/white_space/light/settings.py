@@ -9,7 +9,7 @@ from .layers import (
     LayerSettings,
     BeamBlueSoundSettings, BeamPlayheadSettings, BeamFlashSettings, BeamWindDownSettings,
     BeamHauntedSettings, BeamTestSettings,
-    ProjectionPlayheadSettings, FloodSettings,
+    FloodSettings,
     TestPlayerLinesSettings, TestCalibrationSettings, TestFillSettings, TestPulseSettings,
     TestChaseSettings, TestLinesSettings, TestRandomSettings, TestPoseWavesSettings,
     TestHarmonicSettings,
@@ -34,7 +34,7 @@ class LayerId(IntEnum):
     beam_test           = auto()   # beam: direct levels for the four physical lamps (debug)
     # projection mode — the projection
     pose_instrument     = auto()   # projection: the pose instrument — each person's pose-patched line pattern (see LAYERS.md)
-    projection_playhead = auto()   # projection: bright marker visualising the content playhead
+    projection_playhead = auto()   # projection: the content playhead's marker alone (debug; the show's is the instrument's)
     flood               = auto()   # projection: the whole projection constant white (S8's wall)
     test_player_lines   = auto()
     test_calibration    = auto()
@@ -97,7 +97,7 @@ class ProjectionLayersSettings(BaseSettings):
     values are the root ``PI`` group; here it keeps only its blend."""
     fov: Field[float] = Field(110.0, access=Field.INIT, description="Camera horizontal FOV — relay to test_calibration")
     pose_instrument:    Group[LayerSettings]               = Group(LayerSettings)
-    projection_playhead: Group[ProjectionPlayheadSettings]   = Group(ProjectionPlayheadSettings)
+    projection_playhead: Group[LayerSettings]          = Group(LayerSettings)
     flood:              Group[FloodSettings]           = Group(FloodSettings)
     test_player_lines:  Group[TestPlayerLinesSettings] = Group(TestPlayerLinesSettings)
     test_calibration:   Group[TestCalibrationSettings] = Group(TestCalibrationSettings, share=[fov.as_('fov')])

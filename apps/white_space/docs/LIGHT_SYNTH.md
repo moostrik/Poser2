@@ -132,8 +132,9 @@ probably never be connected to anything.
 | speed       | degrees per second   | how fast the lines travel: positive outward, 0 still    |
 | hardness    | 0..1                 | the flanks of a line: 1 hard (default), 0 softest       |
 
-An oscillator also has its `push`, the speed a push adds to it (*Distance and time*): the amount
-of that one envelope, not a parameter, so it has no slot. And it has a switch, `enabled`: off,
+An oscillator also has its push (*Distance and time*): `push`, the speed a hit adds to it, and
+`push_release_seconds`, the release of its own push envelope; the amount and the time of an
+envelope, not a parameter, so no slot. And it has a switch, `enabled`: off,
 its output is dark whatever its slots say. The switch and the bypasses are the panel's, not the
 body's, so flipping them is the one allowed step.
 
@@ -178,8 +179,9 @@ time becomes lines along the wall.
 as a row. A voice has one time. Only its steps are used, so the time can run faster or slower,
 stand still or run backward, all smoothly.
 
-A **push** is a moment of added speed: an envelope over time (*The envelope*) that adds each
-oscillator's `push`, in degrees per second and signed, to its speed, and settles back. The lines
+A **push** is a moment of added speed: each oscillator's own envelope over time (*The envelope*),
+opened by a hit at once, that adds the oscillator's `push`, in degrees per second and signed, to
+its speed, and falls back over the oscillator's release. The lines
 keep the distance they gained and never move back, and standing lines are moved too, since the
 push is added to the speed and not multiplied into it. The push changes how fast the lines travel
 at once, which is not a step on the projection: where the lines are stays continuous.
@@ -396,7 +398,7 @@ without a step. What opens a gate is not part of this document.
 | Envelope | Over     | Rise, hold, fall                                       | Acts on                         |
 |----------|----------|--------------------------------------------------------|---------------------------------|
 | window   | distance | 0; to the reach less the taper; the taper              | the pulse width, after its slot |
-| push     | time     | 0; a gate open for a moment; the settle time           | the speeds, after their slots   |
+| push     | time     | 0; a gate open for a tick; the oscillator's release    | its speed, after its slot; one per oscillator |
 | presence | time     | the attack; a gate open while present; the release     | both reaches                    |
 
 ## In the pose instrument

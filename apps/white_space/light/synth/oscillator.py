@@ -52,7 +52,8 @@ class OscillatorSettings(BaseSettings):
     hardness_amount:    Field[float] = Field(0.0,  min=-1.0,   max=1.0,   step=0.01, widget=KNOB, label="Amount", description="How far the source moves the hardness")
     hardness_curve:     Field[Curve] = Field(Curve.LINEAR,                           width=CURVE, label="Curve",  description="How the source's magnitude is eased")
     hardness_bypass:    Field[bool]  = Field(False,                                               label="Bypass", description="Switch the modulation off: the hardness is its base")
-    push:               Field[float] = Field(0.0,  min=-45.0,  max=45.0,  step=0.5,  widget=KNOB, label="Amount", description="Speed a hit adds for a moment: positive outward (deg/s)", row_label="Push", newline=True)
+    push:                 Field[float] = Field(0.0,  min=-45.0,  max=45.0,  step=0.5,  widget=KNOB, label="Amount",  description="Speed a hit adds for a moment: positive outward (deg/s)", row_label="Push", newline=True)
+    push_release_seconds: Field[float] = Field(1.0,  min=0.05,   max=5.0,   step=0.05, widget=KNOB, label="Release", description="Push falls back over (s)")
 
 
 class LfoSettings(BaseSettings):

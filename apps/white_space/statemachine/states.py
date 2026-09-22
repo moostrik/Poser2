@@ -154,7 +154,7 @@ class PlayState(StateBase):
     MOTOR = MotorMode.PROJECTION
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.pose_instrument, 1.0), (LayerId.projection_playhead, 1.0)]
+        return [(LayerId.pose_instrument, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.session:                 # a session plays out its time, whatever the count
@@ -239,7 +239,7 @@ class IntroPlayState(StateBase):
             return [(LayerId.beam_playhead, self._config.dim_level)]   # not projecting yet: hold INTRO's dim line
         remaining = max(self._config.spin_up_seconds - self._projecting_elapsed, 1e-6)
         blue = _ease((ctx.elapsed - self._projecting_elapsed) / remaining)
-        return [(LayerId.pose_instrument, (1.0, blue)), (LayerId.projection_playhead, 1.0)]
+        return [(LayerId.pose_instrument, (1.0, blue))]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.elapsed >= self._config.spin_up_seconds:
@@ -268,7 +268,6 @@ class EndState(StateBase):
         # One ramp gives both CSV behaviors: the flood crosses the white to full while the
         # blue fades out with the instrument (the instrument is the only blue source).
         return [(LayerId.pose_instrument, 1.0 - self._p),
-                (LayerId.projection_playhead, 1.0 - self._p),
                 (LayerId.flood, pytweening.easeOutSine(_clamp(self._p)))]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:

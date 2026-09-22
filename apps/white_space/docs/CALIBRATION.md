@@ -774,7 +774,8 @@ Across a spin-up and a spin-down the playhead is never reset; only its rate sour
 (`light/playhead.py`):
 
 - *Spin-up:* it stops tracking the bar and free-runs at `beam_rpm` from wherever it was. The beam at
-  azimuth θ becomes the `projection_playhead` marker at θ, continuing at the same rate. (What the wall
+  azimuth θ becomes the pose instrument's playhead marker at θ (`PlayheadMarker`; alone in the
+  `projection_playhead` debug layer), continuing at the same rate. (What the wall
   shows during the acceleration is covered in `STATES.md`.)
 - *Spin-down:* the bar lands at an angle unrelated to the content clock. The playhead keeps
   free-running until the sensor settles near `beam_rpm` (a two-stage re-lock gate), then `tracking`
@@ -815,7 +816,7 @@ each channel, `FIRMWARE_LIGHT_SLOT_AZIMUTHS`), which the projection offset and i
 beam layer that reacts to people (`beam_flash`, `beam_haunted`) depends on `PlayheadOffset`.
 
 **Projection layers** draw the projection at normalized azimuths — `pose_instrument` at each person's
-`Azimuth`, `projection_playhead` at the playhead (`ProjectionLayer`). No calibration of their own: they
+`Azimuth` and its playhead marker at the playhead (`ProjectionLayer`). No calibration of their own: they
 author in azimuth, and the sender applies the projection offset and interlace on the way out.
 
 ---

@@ -1,12 +1,10 @@
-"""ProjectionPlayhead — visualises the content playhead as a bright marker in the projection.
+"""ProjectionPlayhead — the playhead's marker alone (debug-only, never in a state's mix).
 
-Draws a marker at the normalized azimuth of ``frame.playhead`` (the continuous content playhead,
-radians [-π, π); NaN → nothing drawn). Inside a person's **mask** (the pose instrument's dim blue
-band at their azimuth, ``PI.mask``) the marker dims itself to ``playhead_at_mask`` of its level: it
-reads the poses' azimuth from the LERP frames and the mask width from the same settings the
-instrument draws with, so the instrument never blinds and no layer shares a mix at a person.
-Distinct from the beam-mode ``BeamPlayhead`` and the motor/content ``Playhead`` (the NCO in
-``light/playhead.py``).
+The show's marker is drawn by the pose instrument over its masks (``pose_instrument.py``); this
+layer draws the same ``PlayheadMarker``, with the same ``PI.playhead`` settings, on an otherwise
+dark projection, so the playhead can be looked at by itself (``docs/CALIBRATION.md``: the
+spin-up hands the beam over to it). It finds the masks from the LERP poses' azimuth and the mask
+width the instrument draws with.
 """
 
 import math
@@ -14,42 +12,27 @@ import math
 import numpy as np
 
 from modules.pose import features
-from modules.settings import Field
 
 from .._base_layer import ProjectionLayer, LayerSettings
 from .._utilities import normalize_azimuth, mask_half_width
+from .playhead_marker import PlayheadMarker, PlayheadMarkerSettings
 from .pose_instrument import MaskSettings
 from ...frame import Frame
 
 
-class ProjectionPlayheadSettings(LayerSettings):
-    level: Field[float] = Field(1.0, min=0.0, max=1.0,  step=0.01, description="Marker brightness")
-    width: Field[float] = Field(3.6, min=0.1, max=36.0, step=0.1,  description="Marker width (deg)")
-
-
 class ProjectionPlayhead(ProjectionLayer):
-    """A bright marker at the playhead's position in the projection, dimmed inside the masks."""
+    """The marker by itself; see the module docstring."""
 
-    def __init__(self, resolution: int, config: ProjectionPlayheadSettings, mask: MaskSettings, board,
-                 pose_stage: int) -> None:
+    def __init__(self, resolution: int, config: LayerSettings, marker: PlayheadMarkerSettings,
+                 mask: MaskSettings, board, pose_stage: int) -> None:
         super().__init__(resolution, config, board)
-        self._config = config
+        self._marker = marker
         self._mask = mask
         self._pose_stage = pose_stage
         self._masked = np.zeros(resolution, dtype=bool)
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
-        ph = frame.playhead
-        if math.isnan(ph):
-            return
-        P = self._config
-        center = int(normalize_azimuth(ph) * self.resolution)   # [0, R)
-        w      = max(1, round(P.width / 360.0 * self.resolution))     # deg → pixel count
-        start  = center - w // 2
-        idx    = np.arange(start, start + w) % self.resolution
-        level  = np.full(w, P.level, dtype=white.dtype)
-        level[self._in_masks()[idx]] *= self._mask.playhead_at_mask
-        white[idx] += level
+        PlayheadMarker.draw(white, blue, self.resolution, frame.playhead, self._marker, self._in_masks())
 
     def _in_masks(self) -> np.ndarray:
         """The pixels under a person's mask this tick, as the instrument draws it."""

@@ -6,7 +6,8 @@ named after its file (``test_fill.py`` → ``TestFill``), which is also its ``La
 """
 
 from .pose_instrument     import PoseInstrument,     PoseInstrumentSettings
-from .projection_playhead import ProjectionPlayhead, ProjectionPlayheadSettings
+from .playhead_marker     import PlayheadMarker,     PlayheadMarkerSettings
+from .projection_playhead import ProjectionPlayhead
 from .flood               import Flood,              FloodSettings
 from .test_pose_waves     import TestPoseWaves,      TestPoseWavesSettings
 from .test_harmonic       import TestHarmonic,       TestHarmonicSettings, TestHarmonicSourceSettings

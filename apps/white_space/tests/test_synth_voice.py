@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from apps.white_space.light.synth import Voice, Parameter, Curve, OscillatorSettings, WindowSettings, PushSettings, LfoSettings
+from apps.white_space.light.synth import Voice, Parameter, Curve, OscillatorSettings, WindowSettings, LfoSettings
 
 STEP = 0.1                                              # degrees per pixel
 OFFSETS = np.arange(-600, 601) * STEP                   # a strip 60° each side of the person
@@ -36,13 +36,13 @@ def has_line_at(output: np.ndarray, position: float) -> bool:
 class VoiceTest(unittest.TestCase):
     def setUp(self) -> None:
         self.one, self.two = OscillatorSettings(), OscillatorSettings()
-        self.window, self.push, self.lfo = WindowSettings(), PushSettings(), LfoSettings()
+        self.window, self.lfo = WindowSettings(), LfoSettings()
         self.window.attack_seconds = 0.0                # present at once, unless a test says otherwise
         self.one.pitch = self.two.pitch = 36.0        # 36 lines per turn: a 10° interval
         self.one.pulse_width = self.two.pulse_width = 0.3
 
     def _voice(self) -> Voice:
-        return Voice(self.one, self.two, self.window, self.push, self.lfo)
+        return Voice(self.one, self.two, self.window, self.lfo)
 
     def _arrived(self) -> Voice:
         voice = self._voice()
@@ -115,7 +115,7 @@ class VoiceTest(unittest.TestCase):
 
     def test_a_push_moves_each_output_its_own_way_and_the_lines_keep_the_gain(self) -> None:
         self.one.push, self.two.push = 6.0, -6.0       # output 1 outward, output 2 inward; both standing
-        self.push.settle_seconds = 1.0
+        self.one.push_release_seconds = self.two.push_release_seconds = 1.0
         voice = self._arrived()
         self.assertTrue(has_line_at(self._render(voice)[0], 10.0))
         voice.update(0.01, True, True, NO_SOURCES, MIN_INTERVAL)           # the hit
@@ -128,6 +128,19 @@ class VoiceTest(unittest.TestCase):
         for _ in range(100):
             voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL)
         self.assertEqual(centres(self._render(voice)[0]), settled)         # settled: nothing comes back
+
+    def test_each_oscillator_releases_its_push_on_its_own_time(self) -> None:
+        self.one.push = self.two.push = 6.0
+        self.one.push_release_seconds, self.two.push_release_seconds = 0.1, 2.0
+        voice = self._arrived()
+        voice.update(0.01, True, True, NO_SOURCES, MIN_INTERVAL)           # the hit
+        for _ in range(50):                                                # half a second on
+            voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL)
+        one_before, two_before = (centres(o) for o in self._render(voice))
+        voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL)
+        one_after, two_after = (centres(o) for o in self._render(voice))
+        self.assertEqual(one_after, one_before)                            # released: standing again
+        self.assertNotEqual(two_after, two_before)                         # still being pushed
 
     def test_both_oscillators_travel_on_the_voices_time(self) -> None:
         self.one.speed, self.two.speed = 2.0, -2.0

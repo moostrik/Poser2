@@ -200,12 +200,11 @@ class StateMachineTest(unittest.TestCase):
         white, blue = mix[LayerId.pose_instrument]
         self.assertEqual(white, 1.0)                          # hard
         self.assertLess(blue, 1.0)                            # easing in from projecting
-        self.assertEqual(mix[LayerId.projection_playhead], 1.0)
+        self.assertNotIn(LayerId.projection_playhead, mix)    # the marker is the instrument's
         self.assertNotIn(LayerId.beam_playhead, mix)
         self.tick(dt=self.config.spin_up_seconds)
         self.assertEqual(self.current, StateId.PLAY)
-        self.assertEqual(self.mixes[-1], [(LayerId.pose_instrument, 1.0),
-                                          (LayerId.projection_playhead, 1.0)])
+        self.assertEqual(self.mixes[-1], [(LayerId.pose_instrument, 1.0)])
 
     def _to_play(self) -> None:
         self.test_intro_to_intro_play_on_sync_and_through_to_play()

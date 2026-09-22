@@ -23,11 +23,6 @@ class WindowSettings(BaseSettings):
     release_seconds: Field[float] = Field(1.5, min=0.0, max=5.0,  step=0.1,  widget=Widget.knob, label="Release", description="Window closes after leaving (s)")
 
 
-class PushSettings(BaseSettings):
-    """The push: the envelope over time on the speed a hit adds."""
-    settle_seconds: Field[float] = Field(1.0, min=0.05, max=5.0,  step=0.05, widget=Widget.knob, label="Settle", description="Push settle time (s)", row_label="Push", newline=True)
-
-
 class Envelope:
     """An envelope over time (an instance, following its gate) or over positions (``over_positions``)."""
 

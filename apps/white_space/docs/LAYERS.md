@@ -2,7 +2,7 @@
 
 The light layers behind the states' mixes (see `STATES.md` for the choreography; this
 document covers the layers themselves). All show layers are **indexed** below. For
-`beam_playhead`, `beam_flash` and `projection_playhead` the module docstrings are the source of
+`beam_playhead` and `beam_flash` the module docstrings are the source of
 truth for behavior; `beam_blue_sound`, `flood` and `beam_wind_down` keep their full design sections
 here; `pose_instrument`'s design (its voice, controls, patch and poses) is `POSE_INSTRUMENT.md`, and
 its section here covers the layer alone.
@@ -47,8 +47,7 @@ projection row at its azimuth (`render.pose_figures`). How the tracker produces 
 |-----------------------|------------|-------------------------------|------------------------------------------|---------------------------|
 | `beam_playhead`       | beam       | — (settings only)             | front white lamp                         | S1–S6, S9, S10            |
 | `beam_flash`          | beam       | LERP frames (PlayheadOffset)  | front white + blue lamps; board flashes  | S4                        |
-| `projection_playhead` | projection | frame playhead phase; LERP frames (Azimuth) | white playhead marker, dim in a mask | S6 (projecting), S7, S8 |
-| `pose_instrument`     | projection | LERP frames (PlayheadOffset)  | white and blue lines, dim blue masks     | S6 (projecting), S7, S8   |
+| `pose_instrument`     | projection | LERP frames; frame playhead phase | white and blue lines, the masks, the playhead marker | S6 (projecting), S7, S8 |
 | `flood`               | projection | — (settings only)             | whole projection white                   | S8                        |
 | `beam_wind_down`      | beam       | tick clock                    | both white lamps, fading                 | S9, S10                   |
 | `beam_blue_sound`     | beam       | sound levels from Max (board) | left/right blue lamps                    | S1, S2, S3, S5, S10       |
@@ -66,7 +65,9 @@ layer IS turning debug on**: it shows solo at full weight and the motor auto-fol
 mode, OFF returns the show): the two beam tools `beam_haunted` (the ghost flash;
 pairs with `pose.ghoster.enabled` for solo experimentation) and `beam_test` (direct
 levels for the four physical lamps: front/back white, left/right blue — beam mode's
-hardware check), plus the projection `test_`-prefixed patterns: `test_pose_waves` (the old
+hardware check), the projection `projection_playhead` (the playhead's marker alone, with the
+instrument's `PI.playhead` settings, for looking at the playhead by itself: `CALIBRATION.md`),
+plus the projection `test_`-prefixed patterns: `test_pose_waves` (the old
 wave/void instrument, kept as a reference/montage visual), `test_harmonic`,
 `test_player_lines`, `test_calibration`, `test_fill`, `test_pulse`, `test_chase`,
 `test_lines`, `test_random`.
@@ -163,9 +164,11 @@ composes people, and what it exposes.
   different intervals or centres make a moiré.
 - **The visual limit**: `max_lines` per revolution floors every interval at one period of it
   (4° at 90). It does not bound a line's or a gap's width: a thin line is drawn as it is.
-- **Masks**: every mask goes over every pattern, in both channels, and lights dim blue
-  (`mask.brightness`, `mask.width` wide). A mask cuts a line where it falls, so lines slide out
-  from behind it; the window cuts nothing, its lines thin to nothing over the taper.
+- **Masks**: every mask goes over every pattern, each channel set to the mask's level
+  (`mask.white`, `mask.blue`; white 0 in the preset, so a dim blue band `mask.width` wide). A
+  mask cuts a line where it falls, so lines slide out from behind it; the window cuts nothing,
+  its lines thin to nothing over the taper. The playhead's marker (`PI.playhead`: width, white,
+  blue) is drawn over the masks, dimmed to `playhead.at_mask` inside one.
 - **Sync**: above `window.sync_threshold` (mean of both directions' similarity) a pair's reach grows
   toward each other along the shorter arc, eased, until each pattern reaches the partner at similarity 1:
   full sync is full overlap, one pattern. The threshold is the layer's own remap of the similarity, which is
@@ -176,10 +179,11 @@ composes people, and what it exposes.
 
 ### Hit
 
-On the ticks the playhead is closest to a person (`PlayheadCrossing` in `pose/playhead_offset.py`,
-the same closest-tick rule as `beam_flash`, `hit.frames` of them), the person is marked: the
-mask flashes to `hit.flash_brightness`, and the push adds each colour's `push` to its speed,
-settling back over `hit.settle_seconds` while the lines keep what they gained
+On the tick the playhead is closest to a person (`PlayheadCrossing` in `pose/playhead_offset.py`,
+the same closest-tick rule as `beam_flash`), the person is marked: the mask goes to its flash
+levels (`mask.flash_white`, `mask.flash_blue`) and falls back over `mask.flash_release_seconds`,
+and each colour's push adds its `push` to its speed, falling back over its own
+`push_release_seconds` while the lines keep what they gained
 (`POSE_INSTRUMENT.md`, *Events*). The crossing is measured in
 playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJECTION.
 
@@ -191,8 +195,8 @@ playhead steps at `beam_rpm`, the rate the content playhead free-runs at in PROJ
   the one exception to *Inputs*' no-presence-test rule.
 - **Tuning**: the values are the root `PI` settings group (`POSE_INSTRUMENT.md`, *Settings*), live
   from the panel and saved in the preset; the connections are code. `connect`, the drawing and
-  the synth's classes (`Voice`, `Oscillator`, `Envelope`, `Slot`) hot-reload on save; adding a
-  setting needs a restart.
+  the synth's classes (`Voice`, `Oscillator`, `Envelope`, `Slot`) and `PlayheadMarker` hot-reload
+  on save; adding a setting needs a restart.
 - **Settings**: the layer's own group holds only `blend`; everything else is `PI`
 - **Reset**: forgets every player and pass (S6's entry, a fresh instrument per cycle)
 - **Relation to `pose_waves`**: the old wave/void instrument lives on as `test_pose_waves` (debug

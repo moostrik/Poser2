@@ -58,7 +58,8 @@ The ground rules, as set:
 - Blue and white can behave differently; line thickness and interval can change.
 - A hit (the playhead crossing the person) marks that person. Wider lines do not read, and a tint
   of the lines did not read **(site facts)**; the mark is the push and the mask's flash
-  (*Events*).
+  (*Events*), with the playhead's marker passing the person; each mark is optional through its
+  levels.
 - Sync makes more of the pattern visible: the window opens, the lines stay what they are.
 
 ---
@@ -253,14 +254,15 @@ What the instrument triggers in a person's voice, beside the measures:
 | Event    | When                                                        | Acts on                                                     |
 |----------|-------------------------------------------------------------|-------------------------------------------------------------|
 | presence | the person is seen: a gate open while they are there        | the presence envelope, on both reaches                      |
-| hit      | the playhead crosses the person: the ticks closest to it    | a push on both oscillators' speed, and the mask's flash     |
+| hit      | the playhead crosses the person: the tick closest to it     | each oscillator's push, and the mask's flash                |
 | sync     | the similarity of a pair is over its threshold              | the reach on the partner's side: full reaches the partner   |
 
-Presence and the push are envelopes of the synth (`LIGHT_SYNTH.md`, *The envelope*). The reaches
-are the bridge's: it gives each side's reach to the voice as a value, the rest width grown toward
-the partner by sync, since only the bridge knows where the partner stands. The
-mask's flash is the mask going to its flash level for the hit's ticks; the mask is the bridge's
-and not the synth's.
+Presence and the pushes are envelopes of the synth (`LIGHT_SYNTH.md`, *The envelope*). The
+reaches are the bridge's: it gives each side's reach to the voice as a value, the rest width grown
+toward the partner by sync, since only the bridge knows where the partner stands. The mask's
+flash is the bridge's own envelope of the same block, opened by the hit at once and falling back
+over its release: the mask goes to its flash levels and returns to its own. The mask is the
+bridge's and not the synth's.
 
 ## Consequences
 
@@ -300,8 +302,9 @@ paints the voice's output 1 into white and its output 2 into blue over the perso
 fuller of overlapping voices showing, and draws every mask over the result. Distances are taken
 from the person's own azimuth and not from their centre pixel, so a walking person's lines move
 smoothly. How people compose (union, the masks, sync, the hit, presence) is in `LAYERS.md`,
-*pose_instrument*. The projection playhead dims itself at the masks (`projection_playhead.py`),
-and the render shows the overlap of the two colours as a tone of its own
+*pose_instrument*. The instrument draws the playhead's marker over the masks, dimmed inside them
+(`PlayheadMarker`, `playhead_marker.py`), and the render shows the overlap of the two colours as
+a tone of its own
 (`render/shaders/lightsimulation.frag`). A tick costs about 0.2 ms per person at 3600 pixels.
 
 ### Sources and connections
@@ -329,17 +332,20 @@ presence scales the growth, so a partner leaving lets go smoothly. The voice mul
 by presence (attack from 0, release to 0) and thins the lines to nothing over the taper
 (`LIGHT_SYNTH.md`, *The window*). On release the window closes and the mask fades with it.
 
-The **mask** is a dim blue band, `mask.width` wide at `mask.brightness` times presence, and goes
-over everything at the person: the patterns of every voice, and the playhead. The projection
-playhead dims itself to `playhead_at_mask` inside a mask: it reads the poses and the mask width as
-the layer does, so there is no store and no compositor change. No other layer shares a mix
-with the instrument at a person.
+The **mask** is a band `mask.width` wide at the person, each channel at its level (`mask.white`,
+`mask.blue`) times presence, and goes over everything at the person: the patterns of every voice.
+In the preset the white is 0, so the mask is the dim blue band. The playhead's **marker**
+(`PI.playhead`: its width, its white and blue) is drawn by the instrument over the masks, dimmed
+to `playhead.at_mask` inside one, so the marker never blinds and no other layer shares a mix with
+the instrument at a person.
 
 ### The hit
 
-On the ticks the playhead is closest to a person (`PlayheadCrossing`, `hit.frames` 1 to 3, as the
-beam flash), the person's voice is pushed (each oscillator's `push`, settling over
-`hit.settle_seconds`) and the mask's blue goes to `hit.flash_brightness` for those ticks.
+On the tick the playhead is closest to a person (`PlayheadCrossing`, `PoseInstrument.HIT_TICKS`,
+as the beam flash), each of the person's oscillators is pushed (its `push`, falling back over its
+`push_release_seconds`) and the mask goes to its flash levels (`mask.flash_white`,
+`mask.flash_blue`), falling back to its own over `mask.flash_release_seconds`. Every mark has a
+white and a blue level, and 0 is off.
 
 ### Settings
 
@@ -350,24 +356,25 @@ tuned together, knobs throughout:
 | Group           | What it holds                                                                     |
 |-----------------|-----------------------------------------------------------------------------------|
 | `max_lines`     | the visual limit: the pitch ceiling                                               |
-| `mask`          | width, brightness, the playhead's level in it                                     |
+| `mask`          | the mask: width, its white and blue; the flash: its white and blue, its release  |
+| `playhead`      | the playhead's marker: width, its white and blue, its level inside a mask         |
 | `window`        | how far the pattern shows and when: the shape (taper, attack, release) and the reach (width, its bypass, the sync threshold) |
-| `hit`           | the hit: the push's settle time, frames, the mask's flash, the hit button         |
-| `white`, `blue` | an oscillator: its On switch and Bypass All button, a slot per parameter, its push |
+| `white_lines`, `blue_lines` | an oscillator: its On switch and Bypass All button, a slot per parameter, its push (amount, release) |
 | `lfo`           | the LFO: rate, phase, and the level's row                                         |
 | `dummy`         | *The dummy*                                                                       |
 
-The groups run from the person outward: the mask at the person, the window around them, the hit
-that marks them, then what fills the window, then the tool.
+The groups run from the person outward: the mask at the person, the marker that passes them, the
+window around them, then what fills the window, then the tool. Wherever a mark has a level per
+channel the two settings are `white` and `blue`; the oscillators are the lines.
 
 A slot is a row titled with its parameter's name and reads Base · Amount · Curve · Bypass
 (`LIGHT_SYNTH.md`, *Modulation*); every other row has its title too (Push, LFO, Shape, Reach,
-Hit), so the panel reads the same way throughout.
+Mask, Flash, Playhead), so the panel reads the same way throughout.
 
-The synth's settings classes (`OscillatorSettings`, `LfoSettings`, `WindowSettings`,
-`PushSettings`) are extended by the bridge's where a concept spans both (`window`, `hit`); the
-voice reads only its own fields. The layer keeps its `blend`. No setting routes anything: an
-amount does nothing until `connect` gives its parameter a source.
+The synth's settings classes (`OscillatorSettings`, `LfoSettings`, `WindowSettings`) are extended
+by the bridge's where a concept spans both (`window`); the voice reads only its own fields. The
+layer keeps its `blend`. No setting routes anything: an amount does nothing until `connect` gives
+its parameter a source.
 
 ### Hot reload
 
@@ -394,7 +401,7 @@ already built (a settings instance keeps its fields). Hence the rules:
 ### Playing by hand
 
 A parameter's base is already the hand's value, so playing by hand is bypassing modulation. Every
-slot has a **Bypass** (`PI.white`, `PI.blue`, and the level of `PI.lfo`): bypassed, the parameter
+slot has a **Bypass** (`PI.white_lines`, `PI.blue_lines`, and the level of `PI.lfo`): bypassed, the parameter
 is its base while every other parameter keeps following the body, so a pose can be taken apart
 parameter by parameter; lifted, it follows again with its amount as it was. An oscillator's
 **Bypass All** button sets its five ticks at once, and pressed again with all set clears them, so
@@ -402,8 +409,7 @@ the panel draws that colour for everyone, live people and the dummy alike, while
 and the LFO keep following the body; the ticks are the one state, and can be changed one by one
 after. An oscillator's **On** switch, off, draws nothing for that colour.
 `window.width_bypass` holds both reaches at the width without a partner, presence still opening
-and closing them. `hit.hit` marks everyone for `hit.frames` ticks as the playhead would. What the
-body gives is read in the render's data graphs, per person.
+and closing them. What the body gives is read in the render's data graphs, per person.
 
 ### Tests
 
