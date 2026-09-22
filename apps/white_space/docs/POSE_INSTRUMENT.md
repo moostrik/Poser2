@@ -27,9 +27,9 @@ The layer's place among the other layers is in `LAYERS.md`; the states that run 
 
 Each person makes light in the projection. At their azimuth sits a dim blue **mask**: it
 goes over everything at the person, the patterns of everyone and the light of the other layers;
-the playhead passes through it dimmed by a setting. Around the mask, mirrored about the person,
-their **pattern**: lines of full white and full blue, generated behind the mask and coming out from
-under it. Only a **window** of the pattern is visible each side of the person; sync opens the
+the playhead passes through it dimmed by a setting. Around the mask, mirrored about the person
+(or, per oscillator, passing behind them), their **pattern**: lines of full white and full blue,
+generated behind the mask and coming out from under it. Only a **window** of the pattern is visible each side of the person; sync opens the
 window wider.
 
 The ground rules, as set:
@@ -50,7 +50,8 @@ The ground rules, as set:
   of the body is a smooth change on the projection.
 - Lines follow the pose. On top of that they travel by themselves, slowly and peacefully, blue
   inward and white outward: a low speed that may be 0.
-- The output each side of a person is symmetric, except the window's reach: sync opens one side.
+- The output each side of a person is symmetric while its oscillators mirror (the default),
+  except the window's reach: sync opens one side.
 - The pattern is the light synth's; the six measures play it; every combination of the six draws
   differently; the arms come first, legs and body bend second.
 - Arms down is neutral: full blue over the window. Arms up: full white. In between, the pattern.
@@ -359,7 +360,7 @@ tuned together, knobs throughout:
 | `mask`          | the mask: width, its white and blue; the flash: its white and blue, its release  |
 | `playhead`      | the playhead's marker: width, its white and blue, its level inside a mask         |
 | `window`        | how far the pattern shows and when: the shape (taper, attack, release) and the reach (width, its bypass, the sync threshold) |
-| `white_lines`, `blue_lines` | an oscillator: its On switch and Bypass All button, a slot per parameter, its push (amount, release) |
+| `white_lines`, `blue_lines` | an oscillator: its On and Mirror switches and Bypass All button, a slot per parameter, its push (amount, release) |
 | `lfo`           | the LFO: rate, phase, and the level's row                                         |
 | `dummy`         | *The dummy*                                                                       |
 

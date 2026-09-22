@@ -3,8 +3,9 @@
 pose_instrument).
 
 Each person gets a **voice** of the light synth (``light/synth``): two oscillators drawing lines
-outward from the person, mirrored, one sent to white and one to blue, thinned to nothing toward
-the window's **reach** each side. The bridge is everything the synth does not know:
+outward from the person, mirrored (or, with an oscillator's Mirror off, passing behind them), one
+sent to white and one to blue, thinned to nothing toward the window's **reach** each side. The
+bridge is everything the synth does not know:
 
 - the **measures**: pose features and nothing else, read from the LERP frames; ``connect`` is the
   wiring of the document's *The connections* written out, a person's measures into the sources of
@@ -326,7 +327,7 @@ class PoseInstrument(ProjectionLayer):
         mid = R // 2
         offsets = self._offsets[mid - left:mid + right + 1]                # px from the centre pixel
         signed = (offsets - (p.position * R - round(p.position * R))) / px_per_degree    # deg from the person
-        output_1, output_2 = p.voice.render(np.abs(signed), signed < 0.0, p.reach_left, p.reach_right, self._sources(p))
+        output_1, output_2 = p.voice.render(signed, p.reach_left, p.reach_right, self._sources(p))
         idx = (centre + offsets.astype(np.int64)) % R
         white[idx] = np.maximum(white[idx], output_1)
         blue[idx] = np.maximum(blue[idx], output_2)

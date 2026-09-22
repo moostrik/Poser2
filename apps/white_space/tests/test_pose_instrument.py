@@ -117,6 +117,11 @@ class PoseInstrumentTest(unittest.TestCase):
         """(start, length) of the runs on the person's right, clear of the mask."""
         return [(s, l) for s, l in _runs(channel) if C + MASK + 1 < s]
 
+    @staticmethod
+    def _left(channel: np.ndarray) -> list[tuple[int, int]]:
+        """(start, length) of the runs on the person's left, clear of the mask."""
+        return [(s, l) for s, l in _runs(channel) if s + l < C - MASK]
+
     @classmethod
     def _inner(cls, channel: np.ndarray) -> list[tuple[int, int]]:
         """The right side's runs in the window's full part: clear of the mask and the taper."""
@@ -447,6 +452,19 @@ class PoseInstrumentTest(unittest.TestCase):
             f = self._render()
         self._on_grid(self._inner(f.white), INTERVAL)                       # a full interval on: the grid again
         self._on_grid(self._inner(f.blue), INTERVAL)
+
+    def test_an_unmirrored_oscillator_passes_behind_the_person(self) -> None:
+        self.cfg.white_lines.mirror = False
+        self.cfg.white_lines.speed = 7.0                        # half an interval per second
+        self._people({0: _pose(0.5, left_shoulder=self.HALFWAY)})
+        first = self._render()
+        for _ in range(29):                                     # a second in all
+            f = self._render()
+        self._on_grid(self._inner(f.white), INTERVAL, INTERVAL / 2)            # right: away from the person
+        before_left = self._centres(self._left(first.white))[-1]
+        after_left = self._centres(self._left(f.white))[-1]
+        self.assertAlmostEqual(after_left - before_left, 29 * 7.0 * TICK * 10, delta=1.0)   # left: toward the person
+        self._on_grid(self._inner(f.blue), INTERVAL, INTERVAL / 2)             # blue, mirrored: as before
 
     def test_reset_starts_a_new_pass(self) -> None:
         M = self.cfg.mask

@@ -152,9 +152,11 @@ composes people, and what it exposes.
   LERP poses are the pipeline's smoothed output.
 - **Per person**: a voice of the light synth (`light/synth`, `LIGHT_SYNTH.md`), its output 1
   drawn in white and its output 2 in blue. `PoseInstrument.connect` turns the measures into the
-  sources of the voice's slots (`POSE_INSTRUMENT.md`, *The connections*). The pattern is mirrored
-  about the person's own azimuth, not their centre pixel, so it is symmetric, moves with them as
-  one piece and smoothly; a neighbour walking never re-spaces it. On top of the pose each colour
+  sources of the voice's slots (`POSE_INSTRUMENT.md`, *The connections*). The pattern is drawn
+  from the person's own azimuth, not their centre pixel, so it moves with them as one piece and
+  smoothly; a neighbour walking never re-spaces it. An oscillator with Mirror on (the default)
+  draws the same both sides, symmetric; with Mirror off its lines pass behind the person as one
+  grid. On top of the pose each colour
   travels at its own `speed`, white outward and blue inward. At the default hardness every pixel
   is 0 or 1 per channel; only the mask is dim.
 

@@ -5,7 +5,9 @@ after the slots; each oscillator's push on its speed; one LFO in time, whose out
 for the caller to wire. The patch, the settings objects given to the constructor,
 is shared by every voice; what flows through it, the sources, is each voice's own. A voice knows
 nothing of colour or pose: what its outputs are projected in, what feeds its sources, what its
-reaches are and when it is hit are the caller's.
+reaches are and when it is hit are the caller's. The caller gives each pixel's signed position
+from the person; each oscillator mirrors it (both sides the same) or runs through it (one pattern
+passing behind the person), by its ``mirror`` switch.
 """
 
 from enum import IntEnum, auto
@@ -105,18 +107,19 @@ class Voice:
         """A source as its slot sees it: nothing while bypassed, else eased by its curve."""
         return Slot.curve(Slot.bypassed(bypass, source), int(curve))
 
-    def render(self, distance: np.ndarray, left: np.ndarray, reach_left: float, reach_right: float,
+    def render(self, position: np.ndarray, reach_left: float, reach_right: float,
                sources: tuple[Sources, Sources]) -> tuple[np.ndarray, np.ndarray]:
-        """The two outputs over a strip of pixels, 0..1. ``distance`` is each pixel's unsigned
-        distance from the person and ``left`` which pixels are on their left; the reaches are the
-        caller's, in the same units, and presence multiplies them. The window thins the pulse
-        width after its slot, so a dark output stays dark."""
-        reach = np.where(left, reach_left, reach_right) * self._presence.value
+        """The two outputs over a strip of pixels, 0..1. ``position`` is each pixel's signed
+        angle from the person, negative on their left; the reaches are the caller's, in the same
+        units, and presence multiplies them. A mirrored oscillator reads the position without its
+        sign, an unmirrored one as it is. The window thins the pulse width after its slot, so a
+        dark output stays dark."""
+        reach = np.where(position < 0.0, reach_left, reach_right) * self._presence.value
         taper = reach * self._window.taper
         outputs = []
         for oscillator, patch, source, interval in zip(self._oscillators, self._patches, sources, self._intervals):
             if not patch.enabled:                                           # switched off: dark, whatever its slots say
-                outputs.append(np.zeros(distance.shape, dtype=np.float32))
+                outputs.append(np.zeros(position.shape, dtype=np.float32))
                 continue
             pulse_width_source = self._played(patch.pulse_width_bypass, patch.pulse_width_curve, source.get(Parameter.PULSE_WIDTH, 0.0))
             phase_source = self._played(patch.phase_bypass, patch.phase_curve, source.get(Parameter.PHASE, 0.0))
@@ -124,10 +127,11 @@ class Voice:
             pulse_width = Slot.unit(Slot.modulate(patch.pulse_width, patch.pulse_width_amount, pulse_width_source))
             phase = Slot.modulate(patch.phase, patch.phase_amount, phase_source)
             hardness = Slot.unit(Slot.modulate(patch.hardness, patch.hardness_amount, hardness_source))
-            cycle = oscillator.cycle(distance, interval, phase)
+            positions = np.abs(position) if patch.mirror else position
+            cycle = oscillator.cycle(positions, interval, phase)
             # The window is read at the centre of the line a pixel belongs to, not at the pixel, so
             # a line in the taper has one width: thinned, whole and still centred where it belongs.
-            line_centre = np.abs(distance - ((cycle + 0.5) % 1.0 - 0.5) * interval)
+            line_centre = np.abs(positions - ((cycle + 0.5) % 1.0 - 0.5) * interval)
             window = Envelope.over_positions(line_centre, 0.0, taper, reach)
             outputs.append(Oscillator.pulse(cycle, pulse_width * window, hardness))
         return outputs[0], outputs[1]

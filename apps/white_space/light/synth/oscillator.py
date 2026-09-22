@@ -28,10 +28,12 @@ class OscillatorSettings(BaseSettings):
     parameter's name: **Base** (the parameter's own knob), the **Amount** its source moves it by,
     the source's **Curve**, and **Bypass**, which switches the modulation off and leaves the base.
     The button sets every Bypass of the oscillator, or clears them when all are set; what it does
-    is the caller's. ``enabled`` is the oscillator's switch: off, its output is dark whatever its
-    slots say."""
+    is the caller's. Two switches: ``enabled`` (off, its output is dark whatever its slots say)
+    and ``mirror`` (on, both sides of the person draw the same; off, one pattern passes behind
+    them)."""
     enabled:            Field[bool]  = Field(True,                                                label="On",         description="Off: this oscillator draws nothing", newline=True)
     bypass_all:         Field[bool]  = Field(False, widget=Widget.button,                         label="Bypass All", description="Bypass every slot, so the panel draws this oscillator; again to lift them all")
+    mirror:             Field[bool]  = Field(True,                                                label="Mirror",     description="On: lines come from the person both ways; off: one pattern passing behind the person")
     pitch:              Field[float] = Field(25.7, min=2.0,    max=180.0, step=0.1,  widget=KNOB, label="Base",   description="Lines per revolution: 25.7 is a 14° interval", row_label="Pitch", newline=True)
     pitch_amount:       Field[float] = Field(0.0,  min=-90.0,  max=90.0,  step=0.5,  widget=KNOB, label="Amount", description="How far the source moves the pitch (lines per revolution)")
     pitch_curve:        Field[Curve] = Field(Curve.LINEAR,                           width=CURVE, label="Curve",  description="How the source's magnitude is eased")

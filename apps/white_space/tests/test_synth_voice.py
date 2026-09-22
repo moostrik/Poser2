@@ -8,29 +8,30 @@ import numpy as np
 from apps.white_space.light.synth import Voice, Parameter, Curve, OscillatorSettings, WindowSettings, LfoSettings
 
 STEP = 0.1                                              # degrees per pixel
-OFFSETS = np.arange(-600, 601) * STEP                   # a strip 60° each side of the person
+OFFSETS = np.arange(-600, 601) * STEP                   # a strip 60° each side of the person, signed
 DISTANCE = np.abs(OFFSETS)
-LEFT = OFFSETS < 0.0
 RIGHT = OFFSETS > 0.0
+LEFT = OFFSETS < 0.0
 NO_SOURCES = ({}, {})
 MIN_INTERVAL = 4.0
 
 
-def lines(output: np.ndarray) -> list[tuple[float, float]]:
-    """(centre, width) in degrees of the whole lines on the person's right: the half line a
-    phase of 0 leaves at the person is not one."""
-    lit = (output > 0.5) & RIGHT
+def lines(output: np.ndarray, side: np.ndarray = RIGHT) -> list[tuple[float, float]]:
+    """(centre, width) in degrees of the whole lines on one side of the person (the right unless
+    given): the half line a phase of 0 leaves at the person is not one."""
+    lit = (output > 0.5) & side
     edges = np.flatnonzero(np.diff(np.concatenate(([False], lit, [False])).astype(int)))
     found = [(float((OFFSETS[s] + OFFSETS[e - 1]) / 2.0), float((e - s) * STEP)) for s, e in zip(edges[::2], edges[1::2])]
-    return [(centre, width) for centre, width in found if centre - width / 2.0 > 2 * STEP]
+    return [(centre, width) for centre, width in found if abs(centre) - width / 2.0 > 2 * STEP]
 
 
-def centres(output: np.ndarray) -> list[float]:
-    return [centre for centre, _ in lines(output)]
+def centres(output: np.ndarray, side: np.ndarray = RIGHT) -> list[float]:
+    return [centre for centre, _ in lines(output, side)]
 
 
 def has_line_at(output: np.ndarray, position: float) -> bool:
-    return any(abs(centre - position) < 0.2 for centre in centres(output))
+    """A line centred at ``position`` (signed: negative on the left), to a pixel or two."""
+    return any(abs(centre - position) < 0.2 for centre in centres(output, LEFT if position < 0.0 else RIGHT))
 
 
 class VoiceTest(unittest.TestCase):
@@ -50,13 +51,33 @@ class VoiceTest(unittest.TestCase):
         return voice
 
     def _render(self, voice: Voice, reach_left: float = 40.0, reach_right: float = 40.0, sources=NO_SOURCES):
-        return voice.render(DISTANCE, LEFT, reach_left, reach_right, sources)
+        return voice.render(OFFSETS, reach_left, reach_right, sources)
 
     # -- the two sides and the window --
 
     def test_equal_reaches_draw_the_same_on_both_sides(self) -> None:
         for output in self._render(self._arrived()):
             np.testing.assert_array_equal(output, output[::-1])
+
+    def test_an_unmirrored_oscillator_is_one_grid_across_the_person(self) -> None:
+        self.one.phase = self.two.phase = 0.25                 # a quarter interval past the person
+        self.two.mirror = False
+        one, two = self._render(self._arrived())
+        self.assertTrue(has_line_at(one, 2.5) and has_line_at(one, -2.5))          # mirrored: ±2.5°
+        self.assertTrue(has_line_at(two, 2.5) and has_line_at(two, -7.5))          # through: one grid
+
+    def test_an_unmirrored_oscillator_travels_one_way(self) -> None:
+        self.one.speed = self.two.speed = 3.0                  # 3° in a second
+        self.two.mirror = False
+        voice = self._arrived()
+        one, two = self._render(voice)
+        self.assertTrue(has_line_at(one, 10.0) and has_line_at(one, -10.0))
+        self.assertTrue(has_line_at(two, 10.0) and has_line_at(two, -10.0))
+        for _ in range(100):
+            voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL)
+        one, two = self._render(voice)
+        self.assertTrue(has_line_at(one, 13.0) and has_line_at(one, -13.0))        # mirrored: out both sides
+        self.assertTrue(has_line_at(two, 13.0) and has_line_at(two, -7.0))         # through: all to the right
 
     def test_the_reach_is_the_one_thing_that_differs_between_the_sides(self) -> None:
         output, _ = self._render(self._arrived(), reach_left=20.0, reach_right=50.0)

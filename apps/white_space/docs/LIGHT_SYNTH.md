@@ -105,9 +105,10 @@ instance is given the same settings.
 | LFO        | 1        | in time; its output a source for the caller to wire (*Modulation*)  |
 
 An oscillator draws a line, a gap, a line, a gap, outward from the person, the same on both
-sides. A line is full and a gap is off. The two sides are not voices or oscillators: an oscillator
-is given each pixel's distance without its sign, so it cannot tell left from right, and only the
-window knows the side.
+sides (or, unmirrored, one grid passing behind the person; *Distance and time*). A line is full
+and a gap is off. The two sides are not voices or oscillators: a mirrored oscillator is given each
+pixel's position without its sign, so it cannot tell left from right, and only the window knows
+the side.
 
 Where the windows of two voices overlap their lines join per output: a pixel of an output is lit
 where either voice's oscillator lights it.
@@ -134,9 +135,10 @@ probably never be connected to anything.
 
 An oscillator also has its push (*Distance and time*): `push`, the speed a hit adds to it, and
 `push_release_seconds`, the release of its own push envelope; the amount and the time of an
-envelope, not a parameter, so no slot. And it has a switch, `enabled`: off,
-its output is dark whatever its slots say. The switch and the bypasses are the panel's, not the
-body's, so flipping them is the one allowed step.
+envelope, not a parameter, so no slot. And it has two switches: `enabled`, off, its output is
+dark whatever its slots say; and `mirror` (*Distance and time*), on, both sides of the person
+draw the same, off, one pattern passes behind them. The switches and the bypasses are the
+panel's, not the body's, so flipping them is the one allowed step.
 
 **Pitch** is how many lines fit in a revolution, the site fact's own unit; the **interval** is the
 spacing it gives, `360° / pitch`, in which phase and pulse width are measured. The pitch never
@@ -166,14 +168,17 @@ Two more things go into every oscillator and are not played.
 
 | Goes in  | Unit    | What it is                                                         |
 |----------|---------|--------------------------------------------------------------------|
-| distance | degrees | how far a pixel is from the person: what the lines run along       |
+| position | degrees | a pixel's angle from the person, signed: what the lines run along  |
 | time     | seconds | what makes the lines travel: normally the clock                    |
 
-**Distance** is each pixel's angle from the person's azimuth, without its sign, so both sides draw
-the same. It is the one thing the person's position feeds: when they walk, the picture goes with
-them. To the oscillator a distance is a phase offset: the pixel at the person shows the wave as it
-is, the pixel one interval out shows it one cycle late, which is the same. That is how a wave in
-time becomes lines along the wall.
+**Position** is each pixel's angle from the person's azimuth, negative on their left. It is the
+one thing the person's position feeds: when they walk, the picture goes with them. Mirrored
+(`mirror` on, the default), the oscillator takes the position without its sign, so both sides
+draw the same and the lines come out of the person, or go in, on both sides. With `mirror` off it
+takes the signed position: one pattern across the person, the lines passing behind them, a
+positive speed moving every line toward the positive side. To the oscillator a position is a
+phase offset: the pixel at the person shows the wave as it is, the pixel one interval out shows
+it one cycle late, which is the same. That is how a wave in time becomes lines along the wall.
 
 **Time** enters only through the speed: with the speed at 0 it has no effect and the lines stand
 as a row. A voice has one time. Only its steps are used, so the time can run faster or slower,
@@ -186,7 +191,7 @@ keep the distance they gained and never move back, and standing lines are moved 
 push is added to the speed and not multiplied into it. The push changes how fast the lines travel
 at once, which is not a step on the projection: where the lines are stays continuous.
 
-The two combine as a difference, the distance less what the lines have travelled, because the
+The two combine as a difference, the position less what the lines have travelled, because the
 lines move outward: a pixel further out shows what a nearer pixel showed a moment before.
 
 ## The window
@@ -215,8 +220,8 @@ and sit off its place. Read per line, a line in the taper is thinner, whole and 
 solid output is lines that touch, so its solid part ends at a line's boundary within half an
 interval of the taper and not exactly at it.
 
-The reach is the one thing that may differ between the two sides of a person: the lines are the
-same on both, the window need not be. With both reaches equal the picture is symmetric. The
+The reach is the one thing that may differ between the two sides of a person: mirrored, the lines
+are the same on both, the window need not be. With both reaches equal the picture is symmetric. The
 reaches have no slot: they are given to the voice as values, each tick, by whoever uses it. A
 reach that has to land on something, as sync's on a partner, cannot be reached through a base and
 an amount without reading the patch back, so it is set whole.
