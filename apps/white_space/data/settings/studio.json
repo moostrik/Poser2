@@ -151,9 +151,9 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 851,
+      "x": 1708,
       "y": 31,
-      "width": 1708,
+      "width": 851,
       "height": 1360,
       "secondary_list": [],
       "secondary_fullscreen": true,
@@ -286,7 +286,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 1300,
+        "iso": 1314,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -623,12 +623,12 @@
     }
   },
   "light": {
-    "brightness": 0.58,
+    "brightness": 1.0,
     "debug": "OFF",
     "motor_simulate": false,
     "clock": {},
     "motor": {
-      "beam_rpm": 12.0,
+      "beam_rpm": 32.0,
       "projection_rpm": 1800.0
     },
     "playhead": {
@@ -854,7 +854,7 @@
   },
   "PI": {
     "max_lines": 90,
-    "opposite": true,
+    "opposite": false,
     "mask": {
       "width": 4.0,
       "white": 0.0,
@@ -873,7 +873,7 @@
       "width": 33.0,
       "width_bypass": false,
       "sync_threshold": 0.9,
-      "taper": 0.2,
+      "taper": 0.19,
       "attack_seconds": 1.0,
       "release_seconds": 1.5
     },
@@ -896,7 +896,7 @@
       "pitch_curve": "LINEAR",
       "pitch_bypass": false,
       "pulse_width": 0.0,
-      "pulse_width_amount": 1.0,
+      "pulse_width_amount": 0.94,
       "pulse_width_curve": "LINEAR",
       "pulse_width_bypass": false,
       "phase": 0.0,
@@ -912,7 +912,7 @@
       "hardness_curve": "LINEAR",
       "hardness_bypass": false,
       "push": 0.0,
-      "push_release_seconds": 0.15
+      "push_release_seconds": 0.4
     },
     "blue_lines": {
       "enabled": true,
@@ -954,31 +954,30 @@
       "azimuth": 180.0,
       "distance": 0.5,
       "torso": 0.0,
-      "left_shoulder": -20.0,
-      "right_shoulder": -20.0,
-      "left_elbow": 12.0,
-      "right_elbow": 12.0,
+      "left_shoulder": -95.0,
+      "right_shoulder": -95.0,
+      "left_elbow": -1.0,
+      "right_elbow": -90.0,
       "left_hip": -10.0,
       "right_hip": -9.0,
       "left_knee": 8.0,
       "right_knee": 8.0,
       "morph": 1.2,
-      "pose": "neutral",
+      "pose": "|__",
       "name": ""
     }
   },
   "states": {
     "blackout": false,
     "spin_up_seconds": 14.0,
-    "off_idle_bars": 1.0,
+    "off_idle_bars": 2.0,
     "intro_idle_bars": 2.0,
-    "end_bars": 8.0,
+    "end_bars": 4.0,
     "dim_level": 0.4,
     "min_players": 3,
-    "count_hold_seconds": 1.0,
     "sync": {},
     "manual": {
-      "select": "END_IDLE",
+      "select": "IDLE",
       "hold": false
     },
     "session": {

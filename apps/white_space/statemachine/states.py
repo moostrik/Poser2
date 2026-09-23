@@ -108,7 +108,7 @@ class IdleState(StateBase):
         return [(LayerId.beam_playhead, 1.0), (LayerId.beam_blue_sound, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
-        if ctx.hit:                     # swept before the count debounce settled → the intro begins
+        if ctx.hit:                     # swept on arrival → the intro begins
             return StateId.INTRO
         if ctx.players > 0:
             return StateId.IDLE_INTRO

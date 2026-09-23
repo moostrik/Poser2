@@ -43,7 +43,7 @@ class StateContext:
     bars:    float          # playhead bars since state entry (one-way bar ramps)
     dt:      float          # this tick's wall-clock delta (bidirectional ramps integrate these)
     dbar:    float          # this tick's bar delta
-    players: int            # debounced live player count (ghosts excluded)
+    players: int            # live player count (ghosts excluded)
     sync_hits: int          # hits in a row, within one round, that struck alike poses (HitSync's streak)
     hit:     bool           # this tick the playhead is closest to a live player (the flash tick)
     session: bool           # session mode active — states consult it in needs_state_change()
@@ -95,9 +95,6 @@ class StateMachine:
         self._prev_state: StateId | None = None   # where the current state was entered from
 
         # Condition inputs
-        self._eff_players: int | None = None   # debounced count (None until first tick)
-        self._pending_count: int = 0
-        self._pending_since: float = 0.0
         self._streak: HitStreak = HitStreak()       # this tick's hit and hit streak, from the board
 
         self._goto_requested: bool = False
@@ -120,22 +117,6 @@ class StateMachine:
             self._goto_requested = True
 
     # -- Inputs --------------------------------------------------------------
-
-    def _debounced_players(self, now: float, live_ids: set[int]) -> int:
-        """Live player count — the people with a pose — debounced by count_hold_seconds so
-        occlusion/re-acquisition flicker can't fire transitions."""
-        raw = len(live_ids)
-        if self._eff_players is None:
-            self._eff_players = raw            # first tick: no startup delay
-            self._pending_count = raw
-        elif raw == self._eff_players:
-            self._pending_count = raw               # settled — disarm any pending change
-        elif raw != self._pending_count:
-            self._pending_count = raw               # new candidate — start the hold window
-            self._pending_since = now
-        elif now - self._pending_since >= self._config.count_hold_seconds:
-            self._eff_players = raw            # candidate held long enough
-        return self._eff_players
 
     def _build_context(self, now: float, dt: float, signals,
                        players: int, hit: bool) -> StateContext:
@@ -164,7 +145,7 @@ class StateMachine:
 
         # The people present are the people with a pose: `pose.tracklets.detection_timeout` decides.
         frames = self._board.get_frames(self._pose_stage)
-        players = self._debounced_players(now, set(frames.keys()))
+        players = len(frames)
         # This tick's hit and the hit streak: HitSync's, published on the board just before this tick.
         self._streak = self._board.get_hit_streak()
         hit = self._streak.hit

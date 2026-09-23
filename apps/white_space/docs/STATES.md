@@ -6,8 +6,9 @@ tunables live in the `states` settings group; each state returns its mix from `u
 
 Vocabulary:
 
-- **P** — the live player count: the LERP poses (`LAYERS.md`, *Inputs*), debounced
-  by `states.count_hold_seconds`
+- **P** — the live player count: the LERP poses on the board (`LAYERS.md`, *Inputs*). Presence is the
+  pose itself; how long a person keeps one after their last detection is
+  `pose.tracklets.detection_timeout` (`modules/tracker/poses_from_tracklets.py`)
 - **min_players** — `states.min_players`, the players the show needs (`studio.json`: 2): that many alike hits
   in a row spin it up, fewer present end it, and END winds back to PLAY once they are back
 - **in sync** — the most recent hits, within one round, whose poses are alike: every pair of them fully
@@ -314,7 +315,7 @@ holding the same pose fills with light.
 
 - **Players**: ≥ min_players (session: any) · **Duration**: ∞ (session: `session.play_seconds`) · **Motor**: PROJECTION
 - **Transitions**
-  1. stand-alone: P < min_players (debounced) → S8 END
+  1. stand-alone: P < min_players → S8 END
   2. session: elapsed ≥ `session.play_seconds` → S8 END *(the count is not checked: a session plays out
      its time)*
 - **Mix**: `pose_instrument` 1.0

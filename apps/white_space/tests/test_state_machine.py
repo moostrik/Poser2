@@ -1,5 +1,5 @@
 """Tests for the show StateMachine — the CSV transition graph in both modes,
-player debounce, bar-denominated durations, goto/hold, motor commands, and looks. The hits and the
+bar-denominated durations, goto/hold, motor commands, and looks. The hits and the
 streak of alike ones come from the board (HitSync's, tested in test_hit_sync.py)."""
 
 import unittest
@@ -72,12 +72,10 @@ class StateMachineTest(unittest.TestCase):
         self.board.bars += dbar
         self.machine.update()
 
-    def set_players(self, n: int, settle: bool = True) -> None:
-        """Set the raw pose count (no playhead offset yet); when settle, tick past the debounce hold."""
+    def set_players(self, n: int) -> None:
+        """Put this many poses on the board (no playhead offset yet) and tick once so the machine sees them."""
         self.board.frames = {i: FakeFrame() for i in range(n)}
-        if settle:
-            self.tick()   # register the pending count
-            self.tick(dt=self.config.count_hold_seconds + 0.01)
+        self.tick()
 
     def hit(self, dbar: float = 0.0) -> None:
         """This tick the playhead crosses a player (HitSync's hit flag on the board), then the pass is over."""
@@ -155,22 +153,28 @@ class StateMachineTest(unittest.TestCase):
         self.hit()
         self.assertEqual(self.current, StateId.INTRO)
 
-    def test_idle_to_intro_on_hit_before_the_debounce(self) -> None:
-        # The count is debounced, the sweep is not: a player the light reaches inside the hold
-        # starts the intro on that hit, instead of waiting a whole bar for the next pass.
+    def test_idle_to_intro_on_hit(self) -> None:
+        # The sweep reaches a player the tick they appear: the intro begins on that hit and holds —
+        # the count is the poses on the board, so it agrees with the hit that proves someone is there.
         self.boot()
-        self.set_players(1, settle=False)
+        self.board.frames = {0: FakeFrame()}
         self.hit()
+        self.assertEqual(self.current, StateId.INTRO)
+        for _ in range(5):
+            self.tick(dt=0.5)
         self.assertEqual(self.current, StateId.INTRO)
 
     def test_intro_idle_returns_to_intro_on_hit(self) -> None:
-        # Someone returns mid-fade and is swept: the intro resumes on that first hit.
+        # Someone returns mid-fade and is swept: the intro resumes on that first hit and holds.
         self.boot()
         self.set_players(1)
         self.set_players(0)
         self.assertEqual(self.current, StateId.INTRO_IDLE)
-        self.set_players(1, settle=False)
+        self.board.frames = {0: FakeFrame()}
         self.hit(dbar=self.config.intro_idle_bars / 2.0)    # well inside the fade
+        self.assertEqual(self.current, StateId.INTRO)
+        for _ in range(5):
+            self.tick(dt=0.5)
         self.assertEqual(self.current, StateId.INTRO)
 
     def test_idle_intro_winds_back_when_left_before_hit(self) -> None:
@@ -255,8 +259,11 @@ class StateMachineTest(unittest.TestCase):
         for _ in range(4):
             self.tick(dbar=self.config.end_bars / 3)
         self.assertEqual(self.current, StateId.END_IDLE)
-        self.set_players(1, settle=False)
+        self.board.frames = {0: FakeFrame()}
         self.hit()
+        self.assertEqual(self.current, StateId.END_IDLE)
+        for _ in range(5):
+            self.tick(dt=0.5)
         self.assertEqual(self.current, StateId.END_IDLE)
 
     def test_end_lands_in_end_intro_with_people_then_intro(self) -> None:
@@ -572,16 +579,6 @@ class StateMachineTest(unittest.TestCase):
         self.config.dim_level = 0.25
         self._to_intro(players=1)
         self.assertEqual(dict(self.mixes[-1])[LayerId.beam_playhead], 0.25)
-
-    def test_player_flicker_is_debounced(self) -> None:
-        self.boot()
-        self.board.frames = {0: FakeFrame()}
-        self.tick()                                   # pending, not yet effective
-        self.assertEqual(self.current, StateId.IDLE)
-        self.board.frames = {}
-        self.tick()                                   # flicker back before the hold expired
-        self.tick(dt=self.config.count_hold_seconds + 0.1)
-        self.assertEqual(self.current, StateId.IDLE)
 
 
 if __name__ == "__main__":

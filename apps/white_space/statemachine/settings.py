@@ -58,9 +58,9 @@ class StateMachineSettings(BaseSettings):
     blackout: Field[bool] = Field(False, pinned=True, description="Switch the installation OFF: dark and silent, still sweeping at BEAM")
 
     # Telemetry (read-only) — the show at a glance
-    current:      Field[StateId] = Field(StateId.OFF, access=Field.READ, description="Current show state")
+    current:      Field[StateId] = Field(StateId.OFF, access=Field.READ, description="Current show state", pinned=True)
     progress:     Field[float]     = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Active state progress")
-    players: Field[int]       = Field(0, access=Field.READ, pinned=True, description="Debounced player count")
+    players: Field[int]       = Field(0, access=Field.READ, pinned=True, description="Live player count")
 
     # Transition-state durations — one per state. spin_down_seconds is shared (via the
     # root) into the beam_wind_down layer, which runs the S9/S10 wall fade on it; those
@@ -76,7 +76,6 @@ class StateMachineSettings(BaseSettings):
 
     # Condition tunables
     min_players:        Field[int]   = Field(3, min=2, max=16, description="Players the show needs at least: present to play, alike hits in a row to start", newline=True)
-    count_hold_seconds: Field[float] = Field(1.0,  min=0.0, max=10.0, step=0.1, description="Player-count debounce: a new count must persist this long before conditions see it")
 
     # The sync condition's group is HitSync's settings (pose/hit_sync.py): it fills the telemetry.
     sync:    Group[HitSyncSettings]     = Group(HitSyncSettings)
