@@ -155,6 +155,24 @@ class StateMachineTest(unittest.TestCase):
         self.hit()
         self.assertEqual(self.current, StateId.INTRO)
 
+    def test_idle_to_intro_on_hit_before_the_debounce(self) -> None:
+        # The count is debounced, the sweep is not: a player the light reaches inside the hold
+        # starts the intro on that hit, instead of waiting a whole bar for the next pass.
+        self.boot()
+        self.set_players(1, settle=False)
+        self.hit()
+        self.assertEqual(self.current, StateId.INTRO)
+
+    def test_intro_idle_returns_to_intro_on_hit(self) -> None:
+        # Someone returns mid-fade and is swept: the intro resumes on that first hit.
+        self.boot()
+        self.set_players(1)
+        self.set_players(0)
+        self.assertEqual(self.current, StateId.INTRO_IDLE)
+        self.set_players(1, settle=False)
+        self.hit(dbar=self.config.intro_idle_bars / 2.0)    # well inside the fade
+        self.assertEqual(self.current, StateId.INTRO)
+
     def test_idle_intro_winds_back_when_left_before_hit(self) -> None:
         self.boot()
         self.set_players(1)
@@ -227,6 +245,19 @@ class StateMachineTest(unittest.TestCase):
         self.light.beam_layers.beam_wind_down.progress = 1.0   # fade complete + lock → hand over
         self.tick()
         self.assertEqual(self.current, StateId.IDLE)
+
+    def test_end_idle_ignores_the_hit(self) -> None:
+        # The hit starts the intro from every lit idle state, but a wind-down is not one: the wall
+        # of white is still up and the playhead is not locked, so a crossing there is not an event
+        # anyone can see. END_IDLE leaves on its fade and the lock, never on a hit.
+        self._to_play()
+        self.set_players(0)
+        for _ in range(4):
+            self.tick(dbar=self.config.end_bars / 3)
+        self.assertEqual(self.current, StateId.END_IDLE)
+        self.set_players(1, settle=False)
+        self.hit()
+        self.assertEqual(self.current, StateId.END_IDLE)
 
     def test_end_lands_in_end_intro_with_people_then_intro(self) -> None:
         self._to_play()

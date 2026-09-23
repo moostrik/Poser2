@@ -108,6 +108,8 @@ class IdleState(StateBase):
         return [(LayerId.beam_playhead, 1.0), (LayerId.beam_blue_sound, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
+        if ctx.hit:                     # swept before the count debounce settled → the intro begins
+            return StateId.INTRO
         if ctx.players > 0:
             return StateId.IDLE_INTRO
         return None
@@ -209,6 +211,8 @@ class IntroIdleState(StateBase):
                 (LayerId.beam_blue_sound, _lerp(self._start_sound, 1.0, e))]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
+        if ctx.hit:                     # someone returned and was swept mid-fade → back to the intro
+            return StateId.INTRO
         if ctx.bars >= self._config.intro_idle_bars:
             return StateId.IDLE
         return None

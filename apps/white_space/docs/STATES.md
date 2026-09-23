@@ -42,19 +42,19 @@ What **in sync** means in degrees, the settings behind it and how they depend on
 
 ## Summary
 
-| #   | State      | P                 | Duration                       | Motor      | White                              | Blue                 | Pose sound | Secondary sound               |
-|-----|------------|-------------------|--------------------------------|------------|------------------------------------|----------------------|------------|-------------------------------|
-| S0  | OFF        | —                 | until unpinned and locked      | BEAM       | none                               | none                 | no         | none                          |
-| S1  | OFF_IDLE   | —                 | `off_idle_bars`                | BEAM       | dark → BRIGHT line                 | none → sound visuals | no         | none → soundscape             |
-| S2  | IDLE       | 0                 | ∞                              | BEAM       | BRIGHT line                        | sound visuals        | no         | soundscape                    |
-| S3  | IDLE_INTRO | > 0               | until hit                      | BEAM       | BRIGHT line                        | sound visuals        | before hit | soundscape + anticipatory cue |
-| S4  | INTRO      | > 0               | ∞                              | BEAM       | DIM line + flash on hit            | none                 | yes        | none                          |
-| S5  | INTRO_IDLE | 0                 | `intro_idle_bars`              | BEAM       | DIM → BRIGHT line                  | none → sound visuals | no         | none → soundscape             |
-| S6  | INTRO_PLAY | ≥ min_players     | `spin_up_seconds`              | PROJECTION | dark → instrument + playhead       | none → instrument    | yes        | enhance spin-up chaos         |
-| S7  | PLAY       | ≥ min_players     | ∞                              | PROJECTION | instrument + playhead              | instrument           | yes        | enhance spin                  |
-| S8  | END        | < min_players     | `end_bars`, both ways          | PROJECTION | instrument + playhead → full white | instrument → none    | open       | enhance spin → none           |
-| S9  | END_INTRO  | < min_players, >0 | `spin_down_seconds`, then lock | BEAM       | wall → DIM line                    | none                 | open       | open                          |
-| S10 | END_IDLE   | 0                 | `spin_down_seconds`, then lock | BEAM       | wall → BRIGHT line                 | none → sound visuals | open       | open                          |
+| #   | State      | P                 | Duration                        | Motor      | White                              | Blue                 | Pose sound | Secondary sound               |
+|-----|------------|-------------------|---------------------------------|------------|------------------------------------|----------------------|------------|-------------------------------|
+| S0  | OFF        | —                 | until unpinned and locked       | BEAM       | none                               | none                 | no         | none                          |
+| S1  | OFF_IDLE   | —                 | `off_idle_bars`                 | BEAM       | dark → BRIGHT line                 | none → sound visuals | no         | none → soundscape             |
+| S2  | IDLE       | 0                 | ∞, or until hit                 | BEAM       | BRIGHT line                        | sound visuals        | no         | soundscape                    |
+| S3  | IDLE_INTRO | > 0               | until hit                       | BEAM       | BRIGHT line                        | sound visuals        | before hit | soundscape + anticipatory cue |
+| S4  | INTRO      | > 0               | ∞                               | BEAM       | DIM line + flash on hit            | none                 | yes        | none                          |
+| S5  | INTRO_IDLE | 0                 | `intro_idle_bars`, or until hit | BEAM       | DIM → BRIGHT line                  | none → sound visuals | no         | none → soundscape             |
+| S6  | INTRO_PLAY | ≥ min_players     | `spin_up_seconds`               | PROJECTION | dark → instrument + playhead       | none → instrument    | yes        | enhance spin-up chaos         |
+| S7  | PLAY       | ≥ min_players     | ∞                               | PROJECTION | instrument + playhead              | instrument           | yes        | enhance spin                  |
+| S8  | END        | < min_players     | `end_bars`, both ways           | PROJECTION | instrument + playhead → full white | instrument → none    | open       | enhance spin → none           |
+| S9  | END_INTRO  | < min_players, >0 | `spin_down_seconds`, then lock  | BEAM       | wall → DIM line                    | none                 | open       | open                          |
+| S10 | END_IDLE   | 0                 | `spin_down_seconds`, then lock  | BEAM       | wall → BRIGHT line                 | none → sound visuals | open       | open                          |
 
 Durations name settings in the `states` group; `studio.json` sets `off_idle_bars` 1, `intro_idle_bars` 2,
 `spin_up_seconds` 14, `end_bars` 8 and `spin_down_seconds` 6. `open` cells are listed under *Open*. The
@@ -86,6 +86,7 @@ stateDiagram-v2
     OFF_IDLE   --> INTRO      : light hits a player
     OFF_IDLE   --> IDLE       : fade-in done
 
+    IDLE       --> INTRO      : light hits a player
     IDLE       --> IDLE_INTRO : someone enters (P > 0)
 
     IDLE_INTRO --> INTRO      : light hits a player
@@ -94,6 +95,7 @@ stateDiagram-v2
     INTRO      --> INTRO_IDLE : everyone left (P == 0)
     INTRO      --> INTRO_PLAY : hits in sync (P ≥ min_players)
 
+    INTRO_IDLE --> INTRO      : light hits a player
     INTRO_IDLE --> IDLE       : fade-back done
 
     INTRO_PLAY --> PLAY       : spin-up done
@@ -110,6 +112,15 @@ stateDiagram-v2
 
 The graph is the stand-alone show; the exact conditions and their settings are in each state's
 *Transitions* list.
+
+**A hit starts the intro, from every lit idle state.** S1 OFF_IDLE, S2 IDLE, S3 IDLE_INTRO and S5
+INTRO_IDLE each take the hit first, above their own timed or count condition: in all four the
+searchlight is the visible sweep and the playhead is locked, so the hit is an event the person sees
+land on them, and waiting a bar for the next pass would read as the light ignoring them. The two
+exclusions follow from the same sentence. **S0 OFF** is not idle, it is off — dark and possibly
+blackout-pinned. **S9 END_INTRO / S10 END_IDLE** are the wind-down: the wall of white is still up and
+the playhead is not yet locked — they exit *on* that lock — so a crossing there is a number, not
+something anyone can see.
 
 The machine always **boots into OFF** — dark, motor at BEAM — and wakes through OFF_IDLE by itself once
 the playhead has locked, so power-on is the same wake as a blackout release. The persisted
@@ -193,10 +204,9 @@ The wake, at boot and after a blackout alike. OFF has let go (blackout released,
 `off_idle_bars` the searchlight and the soundscape fade up out of the dark into IDLE's look. The sweep is already
 running and locked underneath; only the light returns.
 
-If the sweep crosses a player mid-fade the intro begins right there (the hit's own flash covers the
-step from the fading level to INTRO's dim line). With people present but not yet hit it lands in IDLE and
-moves straight on to IDLE_INTRO — the identical look, so seamless — to wait for the sweep: the room is
-re-introduced by the light rather than dropped into the middle of INTRO.
+With people present but not yet hit the fade lands in IDLE and moves straight on to IDLE_INTRO — the
+identical look, so seamless — to wait for the sweep: the room is re-introduced by the light rather than
+dropped into the middle of INTRO.
 
 - **Players**: — (either way) · **Duration**: `off_idle_bars` · **Motor**: BEAM
 - **Transitions**
@@ -211,9 +221,10 @@ re-introduced by the light rather than dropped into the middle of INTRO.
 The white searchlight (playhead) spins slowly through the empty space, supported by an atmospheric
 soundscape that evokes curiosity and plays on both blue lamps.
 
-- **Players**: 0 · **Duration**: ∞ · **Motor**: BEAM
+- **Players**: 0 · **Duration**: ∞, or until hit · **Motor**: BEAM
 - **Transitions**
-  1. P > 0 → S3 IDLE_INTRO
+  1. hit → S4 INTRO
+  2. P > 0 → S3 IDLE_INTRO
 - **Mix**: `beam_playhead` 1.0 · `beam_blue_sound` 1.0
 - **White**: BRIGHT line — `beam_playhead` full
 - **Blue**: sound visuals — `beam_blue_sound`
@@ -264,9 +275,10 @@ sound `min_players` times in a row.
 The players have left mid-intro. Over `intro_idle_bars` the dim line fades back to the bright searchlight and
 the soundscape fades back in.
 
-- **Players**: 0 · **Duration**: `intro_idle_bars` · **Motor**: BEAM
+- **Players**: 0 · **Duration**: `intro_idle_bars`, or until hit · **Motor**: BEAM
 - **Transitions**
-  1. bars ≥ `intro_idle_bars` → S2 IDLE
+  1. hit → S4 INTRO
+  2. bars ≥ `intro_idle_bars` → S2 IDLE
 - **Mix**: `beam_playhead` ramp(entry level → 1.0) · `beam_blue_sound` ramp(entry level → 1.0)
 - **White**: fade DIM → BRIGHT, from wherever the lamp was on entry — no dip
 - **Blue**: fade-in sound visuals, also from the entry level (0 arriving from INTRO, already 1.0 on the
