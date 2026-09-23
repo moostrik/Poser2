@@ -6,8 +6,8 @@
   "light_rate": 30.0,
   "light_resolution": 3600,
   "fov": 127.0,
-  "resolution": "P720",
-  "tilt": 15.0,
+  "resolution": "P800",
+  "tilt": 16.0,
   "lens_fov": 128.9,
   "lens_centre_x": -10.5,
   "lens_centre_y": 10.5,
@@ -150,11 +150,11 @@
     "window": {
       "title": "Poser",
       "v_sync": true,
-      "monitor": "M1",
-      "x": 1,
+      "monitor": "M0",
+      "x": 1708,
       "y": 31,
-      "width": 1918,
-      "height": 2080,
+      "width": 851,
+      "height": 1360,
       "secondary_list": [],
       "secondary_fullscreen": true,
       "fullscreen_mode": "WINDOWED"
@@ -194,7 +194,7 @@
       "curve": 2.0,
       "startup_delay": 2.0,
       "chunk_interval": 0.0,
-      "projection_offset": 198.0,
+      "projection_offset": 244.0,
       "interlace": {
         "white_0": 0,
         "white_1": 5,
@@ -226,7 +226,7 @@
     "color": false,
     "square": false,
     "stereo": false,
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "ir_flood_light": 0.75,
     "mono_auto_exposure": true,
@@ -251,8 +251,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 30001,
+        "iso": 1549,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -285,8 +285,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 29992,
+        "iso": 1240,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -319,8 +319,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 30001,
+        "iso": 1549,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -353,8 +353,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 30001,
+        "iso": 1549,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -387,9 +387,9 @@
   },
   "track": {
     "age_filter": 3,
-    "height_filter": 0.2,
+    "height_filter": 0.3,
     "zone_filter": true,
-    "foot_offset": 0.03,
+    "foot_offset": 0.02,
     "reacquire_angle": 7.0,
     "lost_timeout": 2.0,
     "seam": {
@@ -403,7 +403,7 @@
       "camera_radius": 0.36,
       "camera_height": 0.5,
       "zone_min_radius": 1.5,
-      "zone_max_radius": 3.5
+      "zone_max_radius": 4.0
     }
   },
   "pose": {
@@ -624,15 +624,15 @@
   },
   "light": {
     "brightness": 1.0,
-    "debug": "pose_instrument",
-    "motor_simulate": true,
+    "debug": "OFF",
+    "motor_simulate": false,
     "clock": {},
     "motor": {
       "beam_rpm": 36.0,
-      "projection_rpm": 2000.0
+      "projection_rpm": 1800.0
     },
     "playhead": {
-      "pulse_offset": 262.8,
+      "pulse_offset": 220.0,
       "tracking": 0.12,
       "speed_smoothing": 0.66
     },
@@ -883,6 +883,10 @@
       "legs_neutral": 0.1,
       "legs_full": 0.0
     },
+    "breath": {
+      "rate": 0.5,
+      "depth": 0.4
+    },
     "white_lines": {
       "enabled": true,
       "mirror": true,
@@ -944,21 +948,21 @@
       "level_bypass": false
     },
     "dummy": {
-      "enabled": true,
-      "solo": true,
+      "enabled": false,
+      "solo": false,
       "azimuth": 180.0,
       "distance": 0.5,
       "torso": 0.0,
-      "left_shoulder": -95.0,
-      "right_shoulder": -95.0,
-      "left_elbow": -1.0,
-      "right_elbow": -90.0,
+      "left_shoulder": -20.0,
+      "right_shoulder": -20.0,
+      "left_elbow": 12.0,
+      "right_elbow": 12.0,
       "left_hip": -10.0,
       "right_hip": -9.0,
       "left_knee": 8.0,
       "right_knee": 8.0,
       "morph": 1.2,
-      "pose": "|__",
+      "pose": "neutral",
       "name": ""
     }
   },
@@ -969,11 +973,11 @@
     "intro_idle_bars": 2.0,
     "end_bars": 8.0,
     "dim_level": 0.4,
-    "min_players": 2,
+    "min_players": 3,
     "count_hold_seconds": 1.0,
     "sync": {},
     "manual": {
-      "select": "IDLE",
+      "select": "END_IDLE",
       "hold": false
     },
     "session": {
