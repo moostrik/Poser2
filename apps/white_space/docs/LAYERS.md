@@ -147,7 +147,8 @@ and the light synth that draws the lines is `LIGHT_SYNTH.md`.
   `AngleSymmetry`, `Similarity` and `PlayheadOffset` (`POSE_INSTRUMENT.md`, *The body*). The
   layer adds no smoothing.
 - **Settings**: the layer's own group holds only `blend`; everything else is the root `PI` group
-  (`POSE_INSTRUMENT.md`, *Settings*)
+  (`POSE_INSTRUMENT.md`, *Settings*), among them `opposite`, which draws the patterns half a turn
+  from their people while the masks stay on them
 - **Reset**: forgets every player and pass (S6's entry, a fresh instrument per cycle)
 
 ---

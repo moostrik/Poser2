@@ -15,7 +15,8 @@ bridge is everything the synth does not know:
   a partner's side until it reaches them, from ``window.sync_threshold`` on.
 - the **mask**: a band at the person, over every pattern, lit at its levels by presence (dim blue
   in the preset) and flashing to its flash levels on a hit; and the playhead's **marker** over
-  it all (``PlayheadMarker``), dimmed inside the masks.
+  it all (``PlayheadMarker``), dimmed inside the masks. With ``PI.opposite`` the patterns are
+  drawn half a turn from their people while the masks stay on them.
 - the colours: output 1 is white, output 2 is blue; where voices overlap the fuller one shows.
 
 Playing by hand: every parameter has its slot as a row in the panel (``PI.white_lines``,
@@ -94,6 +95,7 @@ class PoseInstrumentSettings(BaseSettings):
     the measures' dead zones, the breath, the two oscillators and the LFO (the synth's patch, a slot per
     parameter), the dummy. The wiring is ``connect``."""
     max_lines:   Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
+    opposite:    Field[bool] = Field(False, description="Draw each person's lines half a turn away; the masks stay on the people")
     mask:        Group[MaskSettings]           = Group(MaskSettings)
     playhead:    Group[PlayheadMarkerSettings] = Group(PlayheadMarkerSettings)
     window:      Group[WindowSettings]         = Group(WindowSettings)
@@ -173,9 +175,10 @@ class PoseInstrument(ProjectionLayer):
         mask_white.fill(0.0)
         mask_blue.fill(0.0)
 
+        half_turn = (self.resolution // 2) if self._instrument.opposite else 0
         for p in self._players.values():
             centre = int(round(p.position * self.resolution)) % self.resolution
-            self._draw_voice(white, blue, p, centre)
+            self._draw_voice(white, blue, p, (centre + half_turn) % self.resolution)
             self._draw_mask(mask, mask_white, mask_blue, p, centre)
 
         # The masks go over every pattern, each channel at the mask's level; the marker over all.
@@ -363,8 +366,10 @@ class PoseInstrument(ProjectionLayer):
 
     def _draw_voice(self, white: np.ndarray, blue: np.ndarray, p: _Player, centre: int) -> None:
         """Paint a person's two outputs over their window: output 1 into white, output 2 into
-        blue, the fuller of overlapping voices showing. Distances are taken from the person's own
-        azimuth, not from their centre pixel, so a walking person's lines move smoothly."""
+        blue, the fuller of overlapping voices showing. ``centre`` is where the pattern is drawn,
+        the person or, with ``opposite``, half a turn from them. Distances are taken from the
+        person's own azimuth, not from their centre pixel, so a walking person's lines move
+        smoothly."""
         R = self.resolution
         px_per_degree = R / 360.0
         presence = p.voice.presence

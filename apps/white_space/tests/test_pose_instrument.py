@@ -436,6 +436,24 @@ class PoseInstrumentTest(unittest.TestCase):
         np.testing.assert_allclose(f.blue[b - MASK:b + MASK + 1], self.cfg.mask.blue, atol=1e-6)
         self.assertEqual(float(f.white[b + MASK + 5]), 1.0)                 # A's white continues past B
 
+    def test_opposite_draws_the_lines_half_a_turn_from_the_person(self) -> None:
+        self.cfg.opposite = True
+        quarter, three_quarters = IRES // 4, 3 * IRES // 4
+        self._people({0: _pose(0.25, left_shoulder=shoulder(1.0))})            # full white
+        f = self._render()
+        np.testing.assert_array_equal(f.white[three_quarters + MASK + 1:three_quarters + SOLID], 1.0)
+        self.assertEqual(float(f.white[quarter - FULL:quarter + FULL].sum()), 0.0)    # nothing at the person
+        np.testing.assert_allclose(f.blue[quarter - MASK:quarter + MASK + 1], self.cfg.mask.blue, atol=1e-6)
+        self.assertEqual(float(f.blue[three_quarters]), 0.0)                  # the mask stays behind
+
+    def test_opposite_lets_the_masks_cut_the_patterns_they_fall_on(self) -> None:
+        self.cfg.opposite = True
+        b = round(0.75 * IRES)
+        self._people({0: _pose(0.25, left_shoulder=shoulder(1.0)), 1: _pose(0.75)})   # B stands in A's opposite white
+        f = self._render()
+        np.testing.assert_array_equal(f.white[b - MASK:b + MASK + 1], 0.0)
+        self.assertEqual(float(f.white[b + MASK + 5]), 1.0)                   # A's white continues past B
+
     def test_overlapping_voices_show_the_fuller_one(self) -> None:
         self._people({0: _pose(0.5), 1: _pose(0.52)})                       # two full blues over each other
         f = self._render()

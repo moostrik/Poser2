@@ -62,6 +62,8 @@ The ground rules, as set:
   (*Events*), with the playhead's marker passing the person; each mark is optional through its
   levels.
 - Sync makes more of the pattern visible: the window opens, the lines stay what they are.
+- A person's pattern can be drawn half a turn from them (`opposite`), their mask staying on them:
+  a switch for looking at the two apart, not for the show.
 
 ---
 
@@ -331,7 +333,10 @@ person a `Voice` of the light synth (`light/synth`), paints the voice's output 1
 output 2 into blue over the person's window, and draws every mask over the result. Overlapping
 voices combine per channel, the fuller showing; two patterns of different intervals or centres
 make a moiré. Distances are taken from the person's own azimuth and not from their centre pixel,
-so a walking person's lines move smoothly. The instrument draws the playhead's marker over the
+so a walking person's lines move smoothly. With `opposite` the pattern is drawn half a turn from
+its person while the mask stays on them; the masks still go over every pattern, so they cut the
+patterns that fall on them. Sync still grows a reach toward the partner as seen from the person,
+so with the switch on a pair's patterns open away from each other. The instrument draws the playhead's marker over the
 masks (`PlayheadMarker`, `playhead_marker.py`), and the render shows the overlap of the two
 colours as a tone of its own (`render/shaders/lightsimulation.frag`). A tick costs about 0.2 ms
 per person at 3600 pixels. Its place in the states' mixes is in `LAYERS.md`, *pose_instrument*.
@@ -391,6 +396,7 @@ tuned together, knobs throughout:
 | Group                       | What it holds                                                   |
 |-----------------------------|-----------------------------------------------------------------|
 | `max_lines`                 | the visual limit: the pitch ceiling                             |
+| `opposite`                  | draw the patterns half a turn from their people                 |
 | `mask`                      | the mask's width, white and blue; the flash's levels, release   |
 | `playhead`                  | the marker's width, white and blue; its level inside a mask     |
 | `window`                    | shape: taper, attack, release; reach: width, bypass, sync       |

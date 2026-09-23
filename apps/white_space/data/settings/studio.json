@@ -151,9 +151,9 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 1708,
+      "x": 851,
       "y": 31,
-      "width": 851,
+      "width": 1708,
       "height": 1360,
       "secondary_list": [],
       "secondary_fullscreen": true,
@@ -286,7 +286,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 1240,
+        "iso": 1300,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -400,10 +400,10 @@
       "hold": 0.5
     },
     "rig": {
-      "camera_radius": 0.36,
-      "camera_height": 0.5,
+      "camera_radius": 0.32,
+      "camera_height": 0.52,
       "zone_min_radius": 1.5,
-      "zone_max_radius": 4.0
+      "zone_max_radius": 5.0
     }
   },
   "pose": {
@@ -623,12 +623,12 @@
     }
   },
   "light": {
-    "brightness": 1.0,
+    "brightness": 0.58,
     "debug": "OFF",
     "motor_simulate": false,
     "clock": {},
     "motor": {
-      "beam_rpm": 36.0,
+      "beam_rpm": 12.0,
       "projection_rpm": 1800.0
     },
     "playhead": {
@@ -854,6 +854,7 @@
   },
   "PI": {
     "max_lines": 90,
+    "opposite": true,
     "mask": {
       "width": 4.0,
       "white": 0.0,
