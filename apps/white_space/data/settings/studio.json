@@ -286,7 +286,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 1314,
+        "iso": 1233,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -854,23 +854,23 @@
   },
   "PI": {
     "max_lines": 90,
-    "opposite": false,
+    "opposite": true,
     "mask": {
-      "width": 4.0,
+      "width": 15.0,
       "white": 0.0,
-      "blue": 0.5,
-      "flash_white": 0.0,
-      "flash_blue": 1.0,
+      "blue": 0.4,
+      "flash_white": 0.24,
+      "flash_blue": 0.98,
       "flash_release_seconds": 0.3
     },
     "playhead": {
       "width": 1.0,
       "white": 1.0,
       "blue": 0.0,
-      "at_mask": 0.3
+      "at_mask": 0.23
     },
     "window": {
-      "width": 33.0,
+      "width": 30.0,
       "width_bypass": false,
       "sync_threshold": 0.9,
       "taper": 0.19,
@@ -951,19 +951,19 @@
     "dummy": {
       "enabled": false,
       "solo": false,
-      "azimuth": 180.0,
+      "azimuth": 129.0,
       "distance": 0.5,
       "torso": 0.0,
-      "left_shoulder": -95.0,
-      "right_shoulder": -95.0,
-      "left_elbow": -1.0,
-      "right_elbow": -90.0,
+      "left_shoulder": -170.0,
+      "right_shoulder": -170.0,
+      "left_elbow": -14.0,
+      "right_elbow": -14.0,
       "left_hip": -10.0,
       "right_hip": -9.0,
       "left_knee": 8.0,
       "right_knee": 8.0,
       "morph": 1.2,
-      "pose": "|__",
+      "pose": "raised",
       "name": ""
     }
   },
@@ -974,11 +974,11 @@
     "intro_idle_bars": 2.0,
     "end_bars": 4.0,
     "dim_level": 0.4,
-    "min_players": 3,
+    "min_players": 2,
     "sync": {},
     "manual": {
-      "select": "IDLE",
-      "hold": false
+      "select": "PLAY",
+      "hold": true
     },
     "session": {
       "enabled": false,
