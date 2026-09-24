@@ -249,7 +249,7 @@ strobed. It acts after the window, so a dark output stays dark and a thinned lin
 | rate      | strobes per second  | 0 off; else 1, 2, 4, 8 or 16: the slot's value quantized to the nearest power of two on a log scale, at most half the tick rate |
 | width     | fraction of a cycle | the lit part of every cycle: 0 always dark, 1 always lit            |
 | phase     | cycles              | where the cycle starts                                              |
-| spread    | cycles per line     | each line's offset from the one before it, signed: 0 all lines together, ¼ every fourth line in step and the dark running outward, negative inward |
+| delay     | seconds per line    | the time between one line's strobe and the next, signed: 0 all lines together, positive the dark runs outward, negative inward |
 
 Each has a slot (*Modulation*). Time is the clock's tick index, shared by every voice, so two
 people at one rate go dark on the same ticks. The powers of two nest, the 4 grid's dark ticks being
@@ -257,12 +257,26 @@ dark ticks of the 8 grid, so a change of rate is seamless. In ticks, with `T` th
 
 ```
 T                = round(ticks per second / rate)
-on(tick, line k) = ((tick − round(phase · T) − round(spread · T · k)) mod T) < round(width · T)
+offset(k)        = round(phase · T) + round(delay · ticks per second · k)
+on(tick, line k) = ((tick − offset(k)) mod T) < round(width · T)
 ```
 
 The lit ticks are the first `round(width · T)` of a cycle and the dark ticks the rest. `k` is a
 line's count from the person in intervals: whole for standing lines, and drifting smoothly as a
 line travels, so a travelling line's timing drifts with it and nothing jumps.
+
+The delay is in seconds, so a run's speed, one line per delay, is the same at every rate. The
+offsets are modulo `T`, so the run repeats every `T / (delay · ticks per second)` lines, and one
+dark line at a time needs the dark part of the cycle to last one delay: `width = 1 − delay · rate`.
+A slow run over many lines wants a low rate. At the studio preset's 32 fps:
+
+| delay (s) | lines per second | rate | repeats every (lines) | width for one dark line |
+|-----------|------------------|------|-----------------------|-------------------------|
+| 0.125     | 8                | 1    | 8                     | 0.875                   |
+| 0.125     | 8                | 2    | 4                     | 0.75                    |
+| 0.125     | 8                | 4    | 2                     | 0.5                     |
+| 0.25      | 4                | 1    | 4                     | 0.75                    |
+| 0.0625    | 16               | 1    | 16                    | 0.9375                  |
 
 One dark tick per cycle, black frame insertion, at the studio preset's 32 fps:
 

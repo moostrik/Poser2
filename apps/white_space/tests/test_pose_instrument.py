@@ -635,12 +635,12 @@ class PoseInstrumentTest(unittest.TestCase):
 
     # -- the strobe --
 
-    def _strobing(self, rate: float, width: float, spread: float = 0.0, **pose) -> None:
+    def _strobing(self, rate: float, width: float, delay: float = 0.0, **pose) -> None:
         """The white strobe set by hand, at 32 fps, one person at C with the given pose (arms
         halfway by default: alternating lines)."""
         self.dt = 1 / 32
         S = self.cfg.white_strobe
-        S.rate, S.width, S.spread = rate, width, spread
+        S.rate, S.width, S.delay = rate, width, delay
         self._people({0: _pose(0.5, **(pose or dict(left_shoulder=self.HALFWAY)))})
 
     def test_a_strobe_darkens_the_whole_output_on_its_dark_ticks_and_leaves_the_rest(self) -> None:
@@ -669,8 +669,8 @@ class PoseInstrumentTest(unittest.TestCase):
                 self.assertEqual(a_lit, b_lit)
                 self.assertEqual(a_lit, 0.0 if tick == 7 else 1.0)
 
-    def test_the_spread_runs_the_dark_outward_one_line_at_a_time(self) -> None:
-        self._strobing(rate=4, width=7 / 8, spread=1 / 8)             # a tick per line: line k dark at tick 7 + k
+    def test_the_delay_runs_the_dark_outward_one_line_at_a_time(self) -> None:
+        self._strobing(rate=4, width=7 / 8, delay=1 / 32)             # a tick per line: line k dark at tick 7 + k
         lines = [C + 20, C + INTERVAL, C + 2 * INTERVAL, C + 3 * INTERVAL]    # a pixel in lines 0..3 (0 seen past the mask)
         for tick in range(12):
             f = self._render()
@@ -683,7 +683,7 @@ class PoseInstrumentTest(unittest.TestCase):
         for _ in range(4):
             self.assertGreaterEqual(len(self._inner(self._render().white)), 2)
 
-    STROBE_BYPASSES = ("rate_bypass", "width_bypass", "phase_bypass", "spread_bypass")
+    STROBE_BYPASSES = ("rate_bypass", "width_bypass", "phase_bypass", "delay_bypass")
 
     def test_a_strobes_bypass_all_sets_its_four_and_again_clears_them(self) -> None:
         S, T = self.cfg.white_strobe, self.cfg.blue_strobe

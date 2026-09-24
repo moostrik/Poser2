@@ -11,10 +11,10 @@ FPS = 32
 LINES = np.arange(0, 6, dtype=np.float64)       # six standing lines, counted from the person
 
 
-def dark_ticks(rate: int, width: float, ticks: int = 64, phase: float = 0.0, spread: float = 0.0,
+def dark_ticks(rate: int, width: float, ticks: int = 64, phase: float = 0.0, delay: float = 0.0,
                line: float = 0.0) -> list[int]:
     return [t for t in range(ticks)
-            if Strobe.gate(t, np.array([line]), rate, width, phase, spread, FPS)[0] == 0.0]
+            if Strobe.gate(t, np.array([line]), rate, width, phase, delay, FPS)[0] == 0.0]
 
 
 class StrobeRateTest(unittest.TestCase):
@@ -61,10 +61,20 @@ class StrobeGateTest(unittest.TestCase):
     def test_the_phase_shifts_the_cycle(self) -> None:
         self.assertEqual(dark_ticks(4, 7 / 8, ticks=8, phase=0.25), [1])         # two ticks later at T 8
 
-    def test_the_spread_delays_each_line_by_its_count(self) -> None:
-        for k in range(4):
-            self.assertEqual(dark_ticks(4, 7 / 8, ticks=16, spread=1 / 8, line=k), [t for t in range(16) if (t - k) % 8 == 7], k)
-        self.assertEqual(dark_ticks(4, 7 / 8, ticks=16, spread=-1 / 8, line=1), [6, 14])   # inward: earlier
+    def test_the_delay_puts_each_line_its_count_of_delays_later(self) -> None:
+        for k in range(4):                                                        # a tick per line at 32 fps
+            self.assertEqual(dark_ticks(4, 7 / 8, ticks=16, delay=1 / 32, line=k), [t for t in range(16) if (t - k) % 8 == 7], k)
+        self.assertEqual(dark_ticks(4, 7 / 8, ticks=16, delay=-1 / 32, line=1), [6, 14])   # inward: earlier
+
+    def test_the_delay_is_in_seconds_so_the_run_is_the_same_at_every_rate(self) -> None:
+        for rate in (1, 2, 4):
+            T = Strobe.period(rate, FPS)
+            first = [dark_ticks(rate, 1.0 - 1.0 / T, ticks=T, delay=0.125, line=k)[0] for k in range(2)]
+            self.assertEqual((first[1] - first[0]) % T, 4, rate)                  # 0.125 s: four ticks per line
+
+    def test_a_small_delay_accumulates_line_by_line(self) -> None:
+        firsts = [dark_ticks(1, 31 / 32, ticks=64, delay=0.05, line=k)[0] for k in range(5)]   # 1.6 ticks per line
+        self.assertEqual([(t - 31) % 32 for t in firsts], [0, 2, 3, 5, 6])
 
     def test_a_gate_is_off_or_full(self) -> None:
         for t in range(16):

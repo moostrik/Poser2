@@ -513,10 +513,11 @@ The open questions of the synth itself are in `LIGHT_SYNTH.md`, *Open*.
 Meaning and connections:
 
 - Whether the connections of Part 3 can be found with the body: the shoulders' balance and
-  breath, the elbows' pitch and flow, the lean; what the legs and the symmetries should play
-- Which way is "right": a positive `TorsoTilt` is shoulders toward image right; whether that
-  lean makes the white faster on the wall as meant is to be checked on the dummy
-- The breath's rate and depth, and whether a breath reads as the higher arm's
+  breath, the elbows' pitch and shift, the lean; what the legs and the symmetries should play
+- Which way is "right": a positive `TorsoTilt` is shoulders toward image right; which way that
+  lean carries the lines on the wall is to be checked on the dummy
+- The breath's rate and depth, and whether its two relations read as a pair: the colours together
+  for one arm and complementary for the other
 - Which of the instrument's departures from the rules of meaning stay, and which calculations move
   into the pose pipeline, once the result is liked
 - The lean moves the hips' reading by the lean, on the dummy as on a person, so at full lean the

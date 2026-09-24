@@ -151,9 +151,9 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 1708,
+      "x": 1256,
       "y": 31,
-      "width": 851,
+      "width": 1303,
       "height": 1360,
       "secondary_list": [],
       "secondary_fullscreen": true,
@@ -162,7 +162,7 @@
   },
   "record": {
     "output_path": "recordings",
-    "name": "flabber",
+    "name": "2_person",
     "split_seconds": 10,
     "osc": {
       "port_in": 9000,
@@ -208,7 +208,7 @@
     },
     "osc_sound_sender": {
       "stage": "LERP",
-      "volume": 0.85,
+      "volume": 0.74,
       "speaker_offset": 0.0,
       "ip_addresses": "192.168.1.40",
       "port": 8000
@@ -286,7 +286,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 892,
+        "iso": 1366,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -393,17 +393,17 @@
     "reacquire_angle": 7.0,
     "lost_timeout": 2.0,
     "seam": {
-      "dead_zone": 6.5,
+      "dead_zone": 9.0,
       "link_angle": 15.0,
-      "link_height": 0.2,
+      "link_height": 0.25,
       "hysteresis": 0.6,
-      "hold": 0.5
+      "hold": 1.0
     },
     "rig": {
       "camera_radius": 0.32,
       "camera_height": 0.52,
       "zone_min_radius": 1.5,
-      "zone_max_radius": 5.0
+      "zone_max_radius": 5.5
     }
   },
   "pose": {
@@ -653,7 +653,7 @@
         "blend": "ADD"
       },
       "beam_playhead": {
-        "level": 1.0,
+        "level": 0.63,
         "blend": "ADD"
       },
       "beam_flash": {
@@ -700,7 +700,7 @@
         "flank_width": 3.6,
         "depth_scale": 2.0,
         "invert": false,
-        "level_center": 0.5,
+        "level_center": 1.0,
         "level_flank": 1.0,
         "blend": "ADD"
       },
@@ -911,7 +911,7 @@
       "phase_amount": 0.0,
       "phase_curve": "LINEAR",
       "phase_bypass": false,
-      "speed": 3.9,
+      "speed": 0.0,
       "speed_amount": 15.0,
       "speed_curve": "LINEAR",
       "speed_bypass": false,
@@ -937,7 +937,7 @@
       "phase_amount": 0.0,
       "phase_curve": "LINEAR",
       "phase_bypass": false,
-      "speed": -4.5,
+      "speed": 0.0,
       "speed_amount": 15.0,
       "speed_curve": "LINEAR",
       "speed_bypass": false,
@@ -949,7 +949,7 @@
       "push_release_seconds": 0.15
     },
     "white_strobe": {
-      "rate": 3.0,
+      "rate": 0.0,
       "rate_amount": 0.0,
       "rate_curve": "LINEAR",
       "rate_bypass": false,
@@ -961,10 +961,10 @@
       "phase_amount": 0.0,
       "phase_curve": "LINEAR",
       "phase_bypass": false,
-      "spread": 0.19,
-      "spread_amount": 0.0,
-      "spread_curve": "LINEAR",
-      "spread_bypass": false
+      "delay": 0.0,
+      "delay_amount": 0.0,
+      "delay_curve": "LINEAR",
+      "delay_bypass": false
     },
     "blue_strobe": {
       "rate": 0.0,
@@ -979,10 +979,10 @@
       "phase_amount": 0.0,
       "phase_curve": "LINEAR",
       "phase_bypass": false,
-      "spread": 0.0,
-      "spread_amount": 0.0,
-      "spread_curve": "LINEAR",
-      "spread_bypass": false
+      "delay": 0.0,
+      "delay_amount": 0.0,
+      "delay_curve": "LINEAR",
+      "delay_bypass": false
     },
     "lfo": {
       "rate": 0.5,
@@ -993,21 +993,21 @@
       "level_bypass": false
     },
     "dummy": {
-      "enabled": true,
+      "enabled": false,
       "solo": false,
       "azimuth": 22.5,
       "distance": 0.5,
       "torso": 0.0,
-      "left_shoulder": -95.0,
-      "right_shoulder": -95.0,
-      "left_elbow": 179.0,
-      "right_elbow": 179.0,
+      "left_shoulder": -20.0,
+      "right_shoulder": -20.0,
+      "left_elbow": 12.0,
+      "right_elbow": 12.0,
       "left_hip": -10.0,
       "right_hip": -9.0,
       "left_knee": 8.0,
       "right_knee": 8.0,
       "morph": 1.2,
-      "pose": "a T, both elbows folded",
+      "pose": "neutral",
       "name": ""
     }
   },
@@ -1017,12 +1017,12 @@
     "off_idle_bars": 2.0,
     "intro_idle_bars": 2.0,
     "end_bars": 4.0,
-    "dim_level": 0.4,
+    "dim_level": 0.6,
     "min_players": 2,
     "sync": {},
     "manual": {
-      "select": "PLAY",
-      "hold": true
+      "select": "INTRO",
+      "hold": false
     },
     "session": {
       "enabled": false,
