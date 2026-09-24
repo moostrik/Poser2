@@ -72,8 +72,9 @@ hardware check), the projection `projection_playhead` (the playhead's marker alo
 instrument's `PI.playhead` settings, for looking at the playhead by itself: `CALIBRATION.md`),
 plus the projection `test_`-prefixed patterns: `test_pose_waves` (a wave/void
 instrument, a reference/montage visual), `test_harmonic`,
-`test_player_lines`, `test_calibration`, `test_fill`, `test_pulse`, `test_chase`,
-`test_lines`, `test_random`.
+`test_player_lines`, `test_calibration`, `test_fill`, `test_random`, and the waveform
+patterns `test_pulse`, `test_chase`, `test_lines`, which draw the light synth's pulse with
+`width` and `hardness` as in `LIGHT_SYNTH.md`.
 
 ---
 

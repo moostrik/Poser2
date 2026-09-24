@@ -286,7 +286,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 1338,
+        "iso": 1329,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -631,7 +631,7 @@
   },
   "light": {
     "brightness": 1.0,
-    "debug": "OFF",
+    "debug": "test_pulse",
     "motor_simulate": false,
     "clock": {},
     "motor": {
@@ -722,31 +722,35 @@
           "speed": 0.5,
           "phase": 0.0,
           "width": 0.5,
-          "amount": 36
+          "amount": 36,
+          "hardness": 1.0
         },
         "blue": {
           "level": 0.5,
           "speed": 0.5,
           "phase": 0.5,
           "width": 0.5,
-          "amount": 36
+          "amount": 36,
+          "hardness": 1.0
         }
       },
       "test_pulse": {
         "blend": "ADD",
         "white": {
-          "level": 0.5,
-          "speed": 16.0,
+          "level": 1.0,
+          "speed": 8.0,
           "phase": 0.0,
           "width": 0.5,
-          "amount": 36
+          "amount": 36,
+          "hardness": 1.0
         },
         "blue": {
-          "level": 0.0,
-          "speed": 0.17,
+          "level": 1.0,
+          "speed": 16.0,
           "phase": 0.5,
           "width": 0.5,
-          "amount": 36
+          "amount": 36,
+          "hardness": 0.0
         }
       },
       "test_chase": {
@@ -755,15 +759,17 @@
           "level": 1.0,
           "speed": 0.08,
           "phase": 0.0,
-          "width": 0.2,
-          "amount": 22
+          "width": 0.5,
+          "amount": 22,
+          "hardness": 0.0
         },
         "blue": {
           "level": 0.5,
           "speed": 0.17,
           "phase": 0.5,
           "width": 0.5,
-          "amount": 36
+          "amount": 36,
+          "hardness": 0.0
         }
       },
       "test_lines": {
@@ -772,15 +778,17 @@
           "level": 1.0,
           "speed": 0.33,
           "phase": 0.3,
-          "width": 0.1,
-          "amount": 16
+          "width": 0.2,
+          "amount": 16,
+          "hardness": 1.0
         },
         "blue": {
           "level": 1.0,
           "speed": -1.19,
           "phase": 0.5,
-          "width": 0.1,
-          "amount": 16
+          "width": 0.2,
+          "amount": 16,
+          "hardness": 1.0
         }
       },
       "test_random": {

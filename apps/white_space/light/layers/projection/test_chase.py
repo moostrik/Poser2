@@ -1,6 +1,5 @@
-"""TestChase composition — sine wave scrolling around the projection."""
-
-import math
+"""TestChase composition — a pulse wave scrolling around the projection, drawn with the light synth's
+pulse. At width 0.5 and hardness 0 it is a sine."""
 
 import numpy as np
 
@@ -8,6 +7,7 @@ from modules.settings import Group
 
 from .._base_layer import ProjectionLayer, ChannelSettings, LayerSettings
 from ...frame import Frame
+from ...synth import Oscillator
 
 
 class TestChaseSettings(LayerSettings):
@@ -16,7 +16,9 @@ class TestChaseSettings(LayerSettings):
 
 
 class TestChase(ProjectionLayer):
-    """Sine wave chase pattern scrolling continuously around the projection."""
+    """Chase pattern scrolling continuously around the projection: ``amount`` waves per revolution,
+    each ``width`` of its interval wide, flanks by ``hardness`` (``Oscillator.pulse``); width 0.5 and
+    hardness 0 is a sine."""
 
     def __init__(self, resolution: int, config: TestChaseSettings, board) -> None:
         super().__init__(resolution, config, board)
@@ -30,9 +32,9 @@ class TestChase(ProjectionLayer):
         B         = self._config.blue
 
         adj_w    = W.speed * W.amount / 10.0
-        phases_w = self._indices * (W.amount * math.tau / res) - t * adj_w * math.tau + W.phase * math.tau
-        white   += ((0.5 * np.sin(phases_w) + 0.5) * W.level).astype(white.dtype)
+        cycle_w  = self._indices * (W.amount / res) - t * adj_w + W.phase    # in cycles: whole numbers at wave crests
+        white   += Oscillator.pulse(cycle_w, W.width, W.hardness) * W.level
 
         adj_b    = B.speed * B.amount / 10.0
-        phases_b = self._indices * (B.amount * math.tau / res) - t * adj_b * math.tau + B.phase * math.tau
-        blue    += ((0.5 * np.sin(phases_b) + 0.5) * B.level).astype(blue.dtype)
+        cycle_b  = self._indices * (B.amount / res) - t * adj_b + B.phase
+        blue    += Oscillator.pulse(cycle_b, B.width, B.hardness) * B.level

@@ -1,6 +1,4 @@
-"""TestLines composition — discrete scrolling line pattern."""
-
-import math
+"""TestLines composition — discrete scrolling line pattern, drawn with the light synth's pulse."""
 
 import numpy as np
 
@@ -8,6 +6,7 @@ from modules.settings import Group
 
 from .._base_layer import ProjectionLayer, ChannelSettings, LayerSettings
 from ...frame import Frame
+from ...synth import Oscillator
 
 
 class TestLinesSettings(LayerSettings):
@@ -16,7 +15,8 @@ class TestLinesSettings(LayerSettings):
 
 
 class TestLines(ProjectionLayer):
-    """Discrete bright lines scrolling around the projection."""
+    """Bright lines scrolling around the projection: ``amount`` lines per revolution, each ``width``
+    of its interval wide, flanks by ``hardness`` (``Oscillator.pulse``)."""
 
     def __init__(self, resolution: int, config: TestLinesSettings, board) -> None:
         super().__init__(resolution, config, board)
@@ -30,11 +30,9 @@ class TestLines(ProjectionLayer):
         B         = self._config.blue
 
         adj_w    = W.speed * W.amount / 10.0
-        phases_w = self._indices * (W.amount * math.tau / res) - t * adj_w * math.tau + W.phase * math.tau + math.pi
-        vals_w   = 0.5 * np.sin(phases_w) + 0.5
-        white   += np.where(vals_w < W.width, W.level, 0.0).astype(white.dtype)
+        cycle_w  = self._indices * (W.amount / res) - t * adj_w + W.phase    # in cycles: whole numbers at line centres
+        white   += Oscillator.pulse(cycle_w, W.width, W.hardness) * W.level
 
         adj_b    = B.speed * B.amount / 10.0
-        phases_b = self._indices * (B.amount * math.tau / res) - t * adj_b * math.tau + B.phase * math.tau + math.pi
-        vals_b   = 0.5 * np.sin(phases_b) + 0.5
-        blue    += np.where(vals_b < B.width, B.level, 0.0).astype(blue.dtype)
+        cycle_b  = self._indices * (B.amount / res) - t * adj_b + B.phase
+        blue    += Oscillator.pulse(cycle_b, B.width, B.hardness) * B.level

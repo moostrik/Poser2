@@ -38,6 +38,7 @@ class ChannelSettings(BaseSettings):
     phase:  Field[float] = Field(0.0,  min=0.0,   max=1.0,  step=0.01, description="Phase offset (0–1)")
     width:  Field[float] = Field(0.5,  min=0.0,   max=1.0,  step=0.01, description="Pattern width")
     amount: Field[int]   = Field(36,   min=1,     max=200,  step=1,    description="Pattern count")
+    hardness: Field[float] = Field(1.0, min=0.0,  max=1.0,  step=0.01, description="Line flanks: 1 hard, 0 softest")
 
 
 class BaseLayer(ABC):
