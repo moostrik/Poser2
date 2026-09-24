@@ -151,9 +151,9 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 1256,
+      "x": 1708,
       "y": 31,
-      "width": 1303,
+      "width": 851,
       "height": 1360,
       "secondary_list": [],
       "secondary_fullscreen": true,
@@ -208,7 +208,7 @@
     },
     "osc_sound_sender": {
       "stage": "LERP",
-      "volume": 0.74,
+      "volume": 0.75,
       "speaker_offset": 0.0,
       "ip_addresses": "192.168.1.40",
       "port": 8000
@@ -286,7 +286,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 1366,
+        "iso": 1379,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -560,7 +560,7 @@
     },
     "similarity": {
       "posture": {
-        "angle_tolerance": 30.0,
+        "angle_tolerance": 20.0,
         "forgiveness": 1.4,
         "joints": {
           "left_shoulder": true,
@@ -653,7 +653,7 @@
         "blend": "ADD"
       },
       "beam_playhead": {
-        "level": 0.63,
+        "level": 1.0,
         "blend": "ADD"
       },
       "beam_flash": {
@@ -1018,7 +1018,7 @@
     "intro_idle_bars": 2.0,
     "end_bars": 4.0,
     "dim_level": 0.6,
-    "min_players": 2,
+    "min_players": 3,
     "sync": {},
     "manual": {
       "select": "INTRO",
