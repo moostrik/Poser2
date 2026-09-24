@@ -98,6 +98,8 @@ class PoseInstrumentTest(unittest.TestCase):
         B.pulse_width, B.pulse_width_amount, B.phase = 1.0, -1.0, -0.5 + self.QUARTER
         self.board = InstrumentBoard(frames={})
         self.layer = PoseInstrument(IRES, LayerSettings(), self.cfg, self.board, pose_stage=4)
+        self.dt = TICK                                    # the tick's interval; the strobe tests run at 32 fps
+        self.tick = 0                                     # the clock's tick index, counted by _render
 
     def _people(self, poses: dict[int, FakePose]) -> None:
         self.board.frames = poses
@@ -105,8 +107,9 @@ class PoseInstrumentTest(unittest.TestCase):
     def _render(self, playhead: float = float("nan")) -> Frame:
         """One tick; ``playhead`` is the content playhead as a normalized azimuth, none by
         default so the marker stays out of the picture."""
-        f = Frame(IRES, Tick(0.0, TICK), motor_command=MotorCommand(mode=MotorMode.PROJECTION, beam_rpm=36.0),
+        f = Frame(IRES, Tick(0.0, self.dt, index=self.tick), motor_command=MotorCommand(mode=MotorMode.PROJECTION, beam_rpm=36.0),
                   playhead=playhead * math.tau)
+        self.tick += 1
         self.layer.render(f)
         return f
 
@@ -624,6 +627,66 @@ class PoseInstrumentTest(unittest.TestCase):
         np.testing.assert_array_equal(f.blue[C + MASK + 1:C + 2 * FULL - INTERVAL // 2 + 1], 1.0)
         np.testing.assert_array_equal(f.blue[C - 2 * FULL + INTERVAL // 2:C - MASK], 1.0)
         self.assertEqual(float(f.blue[C + 2 * REACH + 1:].sum() + f.blue[:C - 2 * REACH].sum()), 0.0)
+
+    # -- the strobe --
+
+    def _strobing(self, rate: float, width: float, spread: float = 0.0, **pose) -> None:
+        """The white strobe set by hand, at 32 fps, one person at C with the given pose (arms
+        halfway by default: alternating lines)."""
+        self.dt = 1 / 32
+        S = self.cfg.white_strobe
+        S.rate, S.width, S.spread = rate, width, spread
+        self._people({0: _pose(0.5, **(pose or dict(left_shoulder=self.HALFWAY)))})
+
+    def test_a_strobe_darkens_the_whole_output_on_its_dark_ticks_and_leaves_the_rest(self) -> None:
+        self._strobing(rate=4, width=7 / 8)                           # an 8 tick cycle, its last tick dark
+        outside = self._outside_mask()
+        for tick in range(16):
+            f = self._render()
+            with self.subTest(tick=tick):
+                if tick % 8 == 7:
+                    self.assertEqual(float(f.white.sum()), 0.0)                        # every white line off
+                else:
+                    self.assertGreaterEqual(len(self._inner(f.white)), 2)              # the lines as drawn
+                    self.assertTrue(np.isin(f.white, (0.0, 1.0)).all())                # off or full, nothing between
+                self.assertGreaterEqual(len(self._inner(f.blue)), 2)                   # the blue strobe is off
+                np.testing.assert_allclose(f.blue[C - MASK:C + MASK + 1], self.cfg.mask.blue, atol=1e-6)   # the mask stays
+        self.assertTrue(np.isin(f.blue[outside], (0.0, 1.0)).all())
+
+    def test_two_people_at_one_rate_go_dark_on_the_same_tick(self) -> None:
+        self._strobing(rate=4, width=7 / 8)
+        b = round(0.7 * IRES)
+        self._people({0: _pose(0.5, left_shoulder=shoulder(1.0)), 1: _pose(0.7, left_shoulder=shoulder(1.0))})   # both full white
+        for tick in range(8):
+            f = self._render()
+            a_lit, b_lit = float(f.white[C + 100]), float(f.white[b + 100])
+            with self.subTest(tick=tick):
+                self.assertEqual(a_lit, b_lit)
+                self.assertEqual(a_lit, 0.0 if tick == 7 else 1.0)
+
+    def test_the_spread_runs_the_dark_outward_one_line_at_a_time(self) -> None:
+        self._strobing(rate=4, width=7 / 8, spread=1 / 8)             # a tick per line: line k dark at tick 7 + k
+        lines = [C + 20, C + INTERVAL, C + 2 * INTERVAL, C + 3 * INTERVAL]    # a pixel in lines 0..3 (0 seen past the mask)
+        for tick in range(12):
+            f = self._render()
+            with self.subTest(tick=tick):
+                self.assertEqual([float(f.white[px]) for px in lines],
+                                 [0.0 if (tick - k) % 8 == 7 else 1.0 for k in range(4)])
+
+    def test_a_strobe_at_zero_is_no_strobe(self) -> None:
+        self._strobing(rate=0, width=0.0)                             # width 0 would be all dark, were it on
+        for _ in range(4):
+            self.assertGreaterEqual(len(self._inner(self._render().white)), 2)
+
+    STROBE_BYPASSES = ("rate_bypass", "width_bypass", "phase_bypass", "spread_bypass")
+
+    def test_a_strobes_bypass_all_sets_its_four_and_again_clears_them(self) -> None:
+        S, T = self.cfg.white_strobe, self.cfg.blue_strobe
+        type(S).bypass_all.fire(S)
+        self.assertTrue(all(getattr(S, name) for name in self.STROBE_BYPASSES))
+        self.assertFalse(any(getattr(T, name) for name in self.STROBE_BYPASSES))
+        type(S).bypass_all.fire(S)
+        self.assertFalse(any(getattr(S, name) for name in self.STROBE_BYPASSES))
 
     # -- sync --
 

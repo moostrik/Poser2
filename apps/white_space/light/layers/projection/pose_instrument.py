@@ -22,10 +22,11 @@ bridge is everything the synth does not know:
 - the colours: output 1 is white, output 2 is blue; where voices overlap the fuller one shows.
 
 Playing by hand: every parameter has its slot as a row in the panel (``PI.white_lines``,
-``PI.blue_lines``, ``PI.lfo``): Base, Amount, Curve and Bypass. A bypassed parameter is its base
-while the others follow the body, so a pose can be taken apart parameter by parameter; an
-oscillator's Bypass All button sets its five at once, and clears them when all are set.
-``window.width_bypass`` holds both reaches without a partner.
+``PI.blue_lines``, ``PI.white_strobe``, ``PI.blue_strobe``, ``PI.lfo``): Base, Amount, Curve and
+Bypass. A bypassed parameter is its base while the others follow the body, so a pose can be taken
+apart parameter by parameter; an oscillator's Bypass All button sets its five at once, a strobe's
+its four, and clears them when all are set. ``window.width_bypass`` holds both reaches without a
+partner.
 
 ``connect``, the drawing methods and the synth's classes are hot-reloaded while the app runs.
 """
@@ -46,8 +47,8 @@ from .._base_layer import ProjectionLayer, LayerSettings
 from .._utilities import normalize_azimuth, mask_half_width
 from .playhead_marker import PlayheadMarker, PlayheadMarkerSettings
 from ...frame import Frame
-from ...synth import (Voice, Parameter, Sources, Oscillator, Envelope, Slot,
-                      OscillatorSettings, WindowSettings as SynthWindowSettings, LfoSettings)
+from ...synth import (Voice, Parameter, Sources, Oscillator, Envelope, Slot, Strobe,
+                      OscillatorSettings, WindowSettings as SynthWindowSettings, LfoSettings, StrobeSettings)
 from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step, DummySettings
 
 KNOB = Widget.knob
@@ -84,18 +85,20 @@ class BreathSettings(BaseSettings):
 
 class PoseInstrumentSettings(BaseSettings):
     """The ``PI`` root group, a group per concept: the mask, the playhead's marker, the window,
-    the breath, the two oscillators and the LFO (the synth's patch, a slot per parameter), the
-    dummy. The wiring is ``connect``; the measures' dead zones are the pipeline's."""
-    max_lines:   Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
-    opposite:    Field[bool] = Field(False, description="Draw each person's lines half a turn away; the masks stay on the people")
-    mask:        Group[MaskSettings]           = Group(MaskSettings)
-    playhead:    Group[PlayheadMarkerSettings] = Group(PlayheadMarkerSettings)
-    window:      Group[WindowSettings]         = Group(WindowSettings)
-    breath:      Group[BreathSettings]         = Group(BreathSettings)
-    white_lines: Group[OscillatorSettings]     = Group(OscillatorSettings)
-    blue_lines:  Group[OscillatorSettings]     = Group(OscillatorSettings)
-    lfo:         Group[LfoSettings]            = Group(LfoSettings)
-    dummy:       Group[DummySettings]          = Group(DummySettings)
+    the breath, the two oscillators, their strobes and the LFO (the synth's patch, a slot per
+    parameter), the dummy. The wiring is ``connect``; the measures' dead zones are the pipeline's."""
+    max_lines:    Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
+    opposite:     Field[bool] = Field(False, description="Draw each person's lines half a turn away; the masks stay on the people")
+    mask:         Group[MaskSettings]           = Group(MaskSettings)
+    playhead:     Group[PlayheadMarkerSettings] = Group(PlayheadMarkerSettings)
+    window:       Group[WindowSettings]         = Group(WindowSettings)
+    breath:       Group[BreathSettings]         = Group(BreathSettings)
+    white_lines:  Group[OscillatorSettings]     = Group(OscillatorSettings)
+    blue_lines:   Group[OscillatorSettings]     = Group(OscillatorSettings)
+    white_strobe: Group[StrobeSettings]         = Group(StrobeSettings)
+    blue_strobe:  Group[StrobeSettings]         = Group(StrobeSettings)
+    lfo:          Group[LfoSettings]            = Group(LfoSettings)
+    dummy:        Group[DummySettings]          = Group(DummySettings)
 
 
 # -- A person ------------------------------------------------------------------------------------
@@ -142,7 +145,9 @@ class PoseInstrument(ProjectionLayer):
         self._mask_blue = np.zeros(resolution, dtype=np.float32)
         for patch in (instrument.white_lines, instrument.blue_lines):
             patch.bind(OscillatorSettings.bypass_all, partial(self._bypass_all, patch))
-        self._hot_reloaders = tuple(HotReloadMethods(cls, True) for cls in (self.__class__, Voice, Oscillator, Envelope, Slot, PlayheadMarker))
+        for strobe in (instrument.white_strobe, instrument.blue_strobe):
+            strobe.bind(StrobeSettings.bypass_all, partial(self._strobe_bypass_all, strobe))
+        self._hot_reloaders = tuple(HotReloadMethods(cls, True) for cls in (self.__class__, Voice, Oscillator, Envelope, Slot, Strobe, PlayheadMarker))
 
     def reset(self) -> None:
         """A fresh instrument (S6 entry): forget every player and pass."""
@@ -157,6 +162,13 @@ class PoseInstrument(ProjectionLayer):
                       and patch.speed_bypass and patch.hardness_bypass)
         patch.pitch_bypass = patch.pulse_width_bypass = patch.phase_bypass = bypass
         patch.speed_bypass = patch.hardness_bypass = bypass
+
+    @staticmethod
+    def _strobe_bypass_all(strobe: StrobeSettings, _: bool) -> None:
+        """The panel's Bypass All button of a strobe: its four slots set, or cleared when all are
+        already set."""
+        bypass = not (strobe.rate_bypass and strobe.width_bypass and strobe.phase_bypass and strobe.spread_bypass)
+        strobe.rate_bypass = strobe.width_bypass = strobe.phase_bypass = strobe.spread_bypass = bypass
 
     # -- Per tick --------------------------------------------------------------
 
@@ -196,7 +208,8 @@ class PoseInstrument(ProjectionLayer):
                 continue
             p = self._players.get(id)
             if p is None:
-                p = self._players[id] = _Player(Voice(P.white_lines, P.blue_lines, P.window, P.lfo, turn=360.0))
+                p = self._players[id] = _Player(Voice(P.white_lines, P.blue_lines, P.window, P.lfo,
+                                                      P.white_strobe, P.blue_strobe, turn=360.0))
             p.present = True
             p.position = normalize_azimuth(azimuth)
             travel = np.abs(pose[features.ArmTravel].values)
@@ -218,12 +231,14 @@ class PoseInstrument(ProjectionLayer):
         hits = self._crossing.update(offsets, step, self.HIT_TICKS)
 
         min_interval = self._min_interval()
+        ticks_per_second = max(1, round(1.0 / max(frame.tick.interval, 1e-3)))   # the strobes' grid
         gone: list[int] = []
         for id, p in self._players.items():
             p.hit = id in hits
             p.breath.update(frame.tick.dt, 1.0, P.breath.rate)                  # before connect reads it
             p.voice.update_lfo(frame.tick.dt, self.connect_lfo(p))              # first: connect reads its output
-            p.voice.update(frame.tick.dt, p.present, p.hit, self._sources(p), min_interval)
+            p.voice.update(frame.tick.dt, p.present, p.hit, self._sources(p), min_interval,
+                           frame.tick.index, ticks_per_second)
             p.flash.update(p.hit, frame.tick.dt, 0.0, P.mask.flash_release_seconds)
             if not p.present and not p.voice.alive:
                 gone.append(id)
@@ -258,7 +273,7 @@ class PoseInstrument(ProjectionLayer):
           other at −90°, still when straight and when fully folded
         - the body bend, signed, added to both elbow turns: white drifts outward and blue inward,
           so a lean one way makes the white faster and the blue slower, the other way the reverse
-        - the LFO, the symmetries, the distance, the phases, the hardness: unconnected
+        - the LFO, the symmetries, the distance, the phases, the hardness, the strobes: unconnected
 
         The measures come with their dead zones from the pipeline: the arm travels
         (``ArmTravel``, ``pose.arm_travel_extractor``), the absolute taken since the sign is the

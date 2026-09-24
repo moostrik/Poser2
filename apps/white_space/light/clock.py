@@ -44,10 +44,12 @@ class ClockSettings(BaseSettings):
 class Tick:
     """Clock snapshot produced once per render tick. ``dt`` is measured and jitters; ``interval`` is the
     target the tick was paced at (``1 / light_rate``), the step anything advancing per tick uses — the
-    layers' playhead step, never ``dt``. Left 0 it takes ``dt``."""
+    layers' playhead step, never ``dt``. Left 0 it takes ``dt``. ``index`` counts the ticks from
+    the first: the one grid everything gated per tick (the strobe) shares."""
     time:     float         # monotonic elapsed seconds since the first tick
     dt:       float         # seconds elapsed since the previous tick
     interval: float = 0.0   # the tick's target interval (s)
+    index:    int   = 0     # the tick's number, 0 at the first
 
     def __post_init__(self) -> None:
         if self.interval <= 0.0:
@@ -66,6 +68,7 @@ class Clock:
         self._start: float | None = None   # baselines set lazily on the first tick
         self._last:  float = 0.0
         self._next:  float = 0.0
+        self._index: int   = -1            # the last tick's number
         # Diagnostics: running maxima since the last publish, and the cumulative resync count.
         self._late_max: float = 0.0
         self._dt_max:   float = 0.0
@@ -111,7 +114,8 @@ class Clock:
         if dt > self._dt_max:
             self._dt_max = dt
 
-        t = Tick(time=now - self._start, dt=dt, interval=interval)
+        self._index += 1
+        t = Tick(time=now - self._start, dt=dt, interval=interval, index=self._index)
         self._settings.time = t.time
         if now - self._stats_at >= _STATS_INTERVAL:
             self._publish_stats(now)

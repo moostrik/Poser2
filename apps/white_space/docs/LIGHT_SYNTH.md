@@ -4,8 +4,8 @@ The light of the pose instrument is made by a light synth. This document describ
 nothing else: the lines the oscillators draw, their parameters and what each looks like on the
 projection, how a parameter is connected, and the building blocks. What plays the parameters is
 not part of it: the instrument, its measures, meanings, connections and events, are in
-`POSE_INSTRUMENT.md`. The code is the package `light/synth`: `Oscillator`, `Envelope`, `Slot` and
-`Voice`.
+`POSE_INSTRUMENT.md`. The code is the package `light/synth`: `Oscillator`, `Envelope`, `Slot`,
+`Strobe` and `Voice`.
 
 The synth has three levels, and only the last knows of colour or of pose data:
 
@@ -59,6 +59,7 @@ The design is a synthesizer's, part for part, so it can be reasoned about as one
 | amp envelope and VCA           | the window, over distance, on the pulse width (*The window*)  |
 | modulation matrix              | the slot: `parameter = base + amount × curve(source)`         |
 | slew, lag                      | hardness                                                      |
+| a gate, a tremolo's square     | the strobe: whole lines on or off in time (*The strobe*)      |
 | clock                          | the time, which can run faster or slower                      |
 | a voice, its two oscillators   | a voice (*The voice*): one per person, while present          |
 | keyboard and controllers       | what plays the parameters: not in this document               |
@@ -85,6 +86,7 @@ Where it is not a synth:
   freely in its control: square and sample-and-hold modulators, quantisers, hard sync. Here a step
   in control is a step on the wall, so every source is smooth: the sine, the eased envelope. Only a
   deliberate event, as the push, changes something at once, and it changes a rate, not the picture.
+  The strobe is the one exception: a gate whose steps are its purpose (*The strobe*).
 
 ## The voice
 
@@ -102,6 +104,7 @@ instance is given the same settings.
 | oscillator | 2        | one per output, the same parameters, each its own values (*Parameters*) |
 | time       | 1        | shared by the oscillators and the LFO (*Distance and time*)         |
 | amp stage  | 1        | each side's window, and presence; for both outputs (*The window*)   |
+| strobe     | 2        | one per oscillator: a gate in time on its lines (*The strobe*)      |
 | LFO        | 1        | in time; its output a source for the caller to wire (*Modulation*)  |
 
 An oscillator draws a line, a gap, a line, a gap, outward from the person, the same on both
@@ -232,6 +235,49 @@ and closes to the person when they leave. The pulse width is the most a line can
 only thins it, so a dark output stays dark. A solid output is solid over most of the window and
 opens into thinning lines over the taper. A change of reach is smooth: the lines in the taper grow
 or thin a little, and nothing appears or disappears.
+
+## The strobe
+
+A gate in time on an oscillator's lines: each tick, each line is on or off. The rule that a pixel
+is off or full holds; the strobe is the synth's one deliberate step in time (*The rules*). Each
+oscillator has its own, so white and blue can strobe apart. The gate is read once per line, at the
+line's count from the person, as the window is read at the line's centre: a line is never half
+strobed. It acts after the window, so a dark output stays dark and a thinned line strobes whole.
+
+| Parameter | Unit                | What it is                                                          |
+|-----------|---------------------|---------------------------------------------------------------------|
+| rate      | strobes per second  | 0 off; else 1, 2, 4, 8 or 16: the slot's value quantized to the nearest power of two on a log scale, at most half the tick rate |
+| width     | fraction of a cycle | the lit part of every cycle: 0 always dark, 1 always lit            |
+| phase     | cycles              | where the cycle starts                                              |
+| spread    | cycles per line     | each line's offset from the one before it, signed: 0 all lines together, ¼ every fourth line in step and the dark running outward, negative inward |
+
+Each has a slot (*Modulation*). Time is the clock's tick index, shared by every voice, so two
+people at one rate go dark on the same ticks. The powers of two nest, the 4 grid's dark ticks being
+dark ticks of the 8 grid, so a change of rate is seamless. In ticks, with `T` the ticks per cycle:
+
+```
+T                = round(ticks per second / rate)
+on(tick, line k) = ((tick − round(phase · T) − round(spread · T · k)) mod T) < round(width · T)
+```
+
+The lit ticks are the first `round(width · T)` of a cycle and the dark ticks the rest. `k` is a
+line's count from the person in intervals: whole for standing lines, and drifting smoothly as a
+line travels, so a travelling line's timing drifts with it and nothing jumps.
+
+One dark tick per cycle, black frame insertion, at the studio preset's 32 fps:
+
+| rate | ticks per cycle | width for one dark tick |
+|------|-----------------|-------------------------|
+| 1    | 32              | 31/32                   |
+| 2    | 16              | 15/16                   |
+| 4    | 8               | 7/8                     |
+| 8    | 4               | 3/4                     |
+| 16   | 2               | 1/2                     |
+
+A dark tick is one dark revolution on the fixture when the frame rate equals the revolution rate,
+32 fps and 1920 rpm in the studio preset **(deduction)**: the fixture takes a frame mid-revolution,
+so every frame boundary is a seam in the room, and the seam stands still only at that ratio. At a
+tick rate that is no power of two the cycles are uneven by a tick.
 
 ## The rules
 

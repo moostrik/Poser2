@@ -150,6 +150,9 @@ and the light synth that draws the lines is `LIGHT_SYNTH.md`.
 - **Settings**: the layer's own group holds only `blend`; everything else is the root `PI` group
   (`POSE_INSTRUMENT.md`, *Settings*), among them `opposite`, which draws the patterns half a turn
   from their people while the masks stay on them
+- **Strobe**: each oscillator's lines can be gated whole, on or off per tick, on the clock's shared
+  tick grid (`LIGHT_SYNTH.md`, *The strobe*); a dark tick is one dark revolution because the frame
+  rate equals the revolution rate (32 fps and 1920 rpm in the studio preset)
 - **Reset**: forgets every player and pass (S6's entry, a fresh instrument per cycle)
 
 ---

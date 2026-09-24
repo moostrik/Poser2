@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from apps.white_space.light.synth import Voice, Parameter, Curve, OscillatorSettings, WindowSettings, LfoSettings
+from apps.white_space.light.synth import Voice, Parameter, Curve, OscillatorSettings, WindowSettings, LfoSettings, StrobeSettings
 
 STEP = 0.1                                              # degrees per pixel
 OFFSETS = np.arange(-600, 601) * STEP                   # a strip 60° each side of the person, signed
@@ -38,16 +38,17 @@ class VoiceTest(unittest.TestCase):
     def setUp(self) -> None:
         self.one, self.two = OscillatorSettings(), OscillatorSettings()
         self.window, self.lfo = WindowSettings(), LfoSettings()
+        self.strobe_one, self.strobe_two = StrobeSettings(), StrobeSettings()
         self.window.attack_seconds = 0.0                # present at once, unless a test says otherwise
         self.one.pitch = self.two.pitch = 36.0        # 36 lines per turn: a 10° interval
         self.one.pulse_width = self.two.pulse_width = 0.3
 
     def _voice(self) -> Voice:
-        return Voice(self.one, self.two, self.window, self.lfo)
+        return Voice(self.one, self.two, self.window, self.lfo, self.strobe_one, self.strobe_two)
 
     def _arrived(self) -> Voice:
         voice = self._voice()
-        voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL)
+        voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL, 0, 32)
         return voice
 
     def _render(self, voice: Voice, reach_left: float = 40.0, reach_right: float = 40.0, sources=NO_SOURCES):
@@ -74,7 +75,7 @@ class VoiceTest(unittest.TestCase):
         self.assertTrue(has_line_at(one, 10.0) and has_line_at(one, -10.0))
         self.assertTrue(has_line_at(two, 10.0) and has_line_at(two, -10.0))
         for _ in range(100):
-            voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL)
+            voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL, 0, 32)
         one, two = self._render(voice)
         self.assertTrue(has_line_at(one, 13.0) and has_line_at(one, -13.0))        # mirrored: out both sides
         self.assertTrue(has_line_at(two, 13.0) and has_line_at(two, -7.0))         # through: all to the right
@@ -120,15 +121,15 @@ class VoiceTest(unittest.TestCase):
         self.window.attack_seconds, self.window.release_seconds = 1.0, 1.0
         voice = self._voice()
         self.assertFalse(voice.alive)
-        voice.update(0.5, True, False, NO_SOURCES, MIN_INTERVAL)
+        voice.update(0.5, True, False, NO_SOURCES, MIN_INTERVAL, 0, 32)
         half, _ = self._render(voice)
         self.assertTrue(half[DISTANCE < 2.0].any())
         self.assertFalse(half[DISTANCE >= 20.0].any())                    # half open: half the reach
-        voice.update(0.5, True, False, NO_SOURCES, MIN_INTERVAL)
+        voice.update(0.5, True, False, NO_SOURCES, MIN_INTERVAL, 0, 32)
         self.assertTrue(self._render(voice)[0][DISTANCE > 25.0].any())
-        voice.update(0.5, False, False, NO_SOURCES, MIN_INTERVAL)
+        voice.update(0.5, False, False, NO_SOURCES, MIN_INTERVAL, 0, 32)
         self.assertTrue(voice.alive)
-        voice.update(0.5, False, False, NO_SOURCES, MIN_INTERVAL)
+        voice.update(0.5, False, False, NO_SOURCES, MIN_INTERVAL, 0, 32)
         self.assertFalse(voice.alive)
         self.assertFalse(self._render(voice)[0].any())
 
@@ -139,26 +140,26 @@ class VoiceTest(unittest.TestCase):
         self.one.push_release_seconds = self.two.push_release_seconds = 1.0
         voice = self._arrived()
         self.assertTrue(has_line_at(self._render(voice)[0], 10.0))
-        voice.update(0.01, True, True, NO_SOURCES, MIN_INTERVAL)           # the hit
+        voice.update(0.01, True, True, NO_SOURCES, MIN_INTERVAL, 0, 32)           # the hit
         for _ in range(150):
-            voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL)
+            voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL, 0, 32)
         one, two = self._render(voice)
         self.assertTrue(has_line_at(one, 13.0))                            # 6 deg/s eased over a second: 3° out
         self.assertTrue(has_line_at(two, 7.0))                             # and 3° in
         settled = centres(one)
         for _ in range(100):
-            voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL)
+            voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL, 0, 32)
         self.assertEqual(centres(self._render(voice)[0]), settled)         # settled: nothing comes back
 
     def test_each_oscillator_releases_its_push_on_its_own_time(self) -> None:
         self.one.push = self.two.push = 6.0
         self.one.push_release_seconds, self.two.push_release_seconds = 0.1, 2.0
         voice = self._arrived()
-        voice.update(0.01, True, True, NO_SOURCES, MIN_INTERVAL)           # the hit
+        voice.update(0.01, True, True, NO_SOURCES, MIN_INTERVAL, 0, 32)           # the hit
         for _ in range(50):                                                # half a second on
-            voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL)
+            voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL, 0, 32)
         one_before, two_before = (centres(o) for o in self._render(voice))
-        voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL)
+        voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL, 0, 32)
         one_after, two_after = (centres(o) for o in self._render(voice))
         self.assertEqual(one_after, one_before)                            # released: standing again
         self.assertNotEqual(two_after, two_before)                         # still being pushed
@@ -167,7 +168,7 @@ class VoiceTest(unittest.TestCase):
         self.one.speed, self.two.speed = 2.0, -2.0
         voice = self._voice()
         for _ in range(100):
-            voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL)      # one second
+            voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL, 0, 32)      # one second
         one, two = self._render(voice)
         self.assertTrue(has_line_at(one, 12.0))                            # 2° outward
         self.assertTrue(has_line_at(two, 8.0))                             # 2° inward
@@ -192,7 +193,7 @@ class VoiceTest(unittest.TestCase):
         self.one.pitch_amount = -18.0                   # from 36 to 18 lines per turn: the interval doubles
         self.one.pulse_width = 0.2
         voice = self._voice()
-        voice.update(0.01, True, False, ({Parameter.PITCH: 1.0}, {}), MIN_INTERVAL)
+        voice.update(0.01, True, False, ({Parameter.PITCH: 1.0}, {}), MIN_INTERVAL, 0, 32)
         found = centres(self._render(voice, 60.0, 60.0)[0])
         self.assertAlmostEqual(found[1] - found[0], 20.0, delta=2 * STEP)
 
@@ -201,7 +202,7 @@ class VoiceTest(unittest.TestCase):
         self.one.pitch_amount = self.two.pitch_amount = 18.0
         self.one.pulse_width = self.two.pulse_width = 0.2
         voice = self._voice()
-        voice.update(0.01, True, False, ({Parameter.PITCH: 1.0}, {Parameter.PITCH: 1.0}), MIN_INTERVAL)
+        voice.update(0.01, True, False, ({Parameter.PITCH: 1.0}, {Parameter.PITCH: 1.0}), MIN_INTERVAL, 0, 32)
         one, two = (centres(output) for output in self._render(voice, 60.0, 60.0))
         self.assertAlmostEqual(one[1] - one[0], 360.0 / 54.0, delta=2 * STEP)      # 54 and 90 lines: the
         self.assertAlmostEqual(two[1] - two[0], 360.0 / 90.0, delta=2 * STEP)      # difference of 36 kept, not the ratio
@@ -210,7 +211,7 @@ class VoiceTest(unittest.TestCase):
         self.one.pitch, self.one.pulse_width = 2.0, 0.1
         self.one.pitch_amount = -10.0                   # would ask for a negative pitch
         voice = self._voice()
-        voice.update(0.01, True, False, ({Parameter.PITCH: 1.0}, {}), MIN_INTERVAL)
+        voice.update(0.01, True, False, ({Parameter.PITCH: 1.0}, {}), MIN_INTERVAL, 0, 32)
         found = lines(self._render(voice, 60.0, 60.0)[0])
         self.assertEqual(len(found), 0)                 # the first whole line sits at 180°, out of reach
         self.assertTrue(self._render(voice, 60.0, 60.0)[0][DISTANCE < 9.0].all())   # the half line at the person, 18° wide
@@ -263,7 +264,7 @@ class VoiceTest(unittest.TestCase):
         self.one.pitch_amount = -18.0                   # the interval doubles to 20°
         sources = ({Parameter.PULSE_WIDTH: 1.0, Parameter.PITCH: 1.0}, {})
         voice = self._voice()
-        voice.update(0.01, True, False, sources, MIN_INTERVAL)
+        voice.update(0.01, True, False, sources, MIN_INTERVAL, 0, 32)
         followed = lines(self._render(voice, 60.0, 60.0, sources)[0])
         self.assertAlmostEqual(followed[0][1], 0.8 * 20.0, delta=2 * STEP)      # width and pitch both from the source
         self.one.pulse_width_bypass = True
@@ -281,7 +282,7 @@ class VoiceTest(unittest.TestCase):
         self.one.pulse_width = 0.2
         voice = self._voice()
         for _ in range(100):
-            voice.update(0.01, True, False, ({Parameter.PITCH: 1.0, Parameter.SPEED: 1.0}, {}), MIN_INTERVAL)
+            voice.update(0.01, True, False, ({Parameter.PITCH: 1.0, Parameter.SPEED: 1.0}, {}), MIN_INTERVAL, 0, 32)
         found = centres(self._render(voice)[0])
         self.assertAlmostEqual(found[0], 10.0, delta=0.2)                       # not doubled, not travelled
 

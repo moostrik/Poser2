@@ -283,7 +283,7 @@ when fully folded, where +180° and −180° are one pose. The body bend, signed
 added to both turns with one sign: white drifts outward and blue inward, so a lean one way makes
 the white faster and the blue slower, the other way the reverse. A turn and a lean share the
 amount, so a forearm and a lean can add or cancel. Unconnected: the LFO, the symmetries, the
-distance, the phases, the hardness.
+distance, the phases, the hardness, the strobes.
 
 ## Events
 
@@ -402,17 +402,18 @@ is measured in playhead steps at `beam_rpm`, the rate the playhead free-runs at 
 (`PoseInstrumentSettings`, `light/layers/projection/pose_instrument.py`), grouped by what is
 tuned together, knobs throughout:
 
-| Group                       | What it holds                                                   |
-|-----------------------------|-----------------------------------------------------------------|
-| `max_lines`                 | the visual limit: the pitch ceiling                             |
-| `opposite`                  | draw the patterns half a turn from their people                 |
-| `mask`                      | the mask's width, white and blue; the flash's levels, release   |
-| `playhead`                  | the marker's width, white and blue; its level inside a mask     |
-| `window`                    | shape: taper, attack, release; reach: width, bypass, sync       |
-| `breath`                    | the breath's rate and depth (*The connections*)                 |
-| `white_lines`, `blue_lines` | On, Mirror, Bypass All; a slot per parameter; the push          |
-| `lfo`                       | the LFO: rate, phase, the level's slot                          |
-| `dummy`                     | *The dummy*                                                     |
+| Group                         | What it holds                                                   |
+|-------------------------------|-----------------------------------------------------------------|
+| `max_lines`                   | the visual limit: the pitch ceiling                             |
+| `opposite`                    | draw the patterns half a turn from their people                 |
+| `mask`                        | the mask's width, white and blue; the flash's levels, release   |
+| `playhead`                    | the marker's width, white and blue; its level inside a mask     |
+| `window`                      | shape: taper, attack, release; reach: width, bypass, sync       |
+| `breath`                      | the breath's rate and depth (*The connections*)                 |
+| `white_lines`, `blue_lines`   | On, Mirror, Bypass All; a slot per parameter; the push          |
+| `white_strobe`, `blue_strobe` | Bypass All; a slot per parameter of the strobe (`LIGHT_SYNTH.md`, *The strobe*) |
+| `lfo`                         | the LFO: rate, phase, the level's slot                          |
+| `dummy`                       | *The dummy*                                                     |
 
 The groups run from the person outward: the mask at the person, the marker that passes them, the
 window around them, then what fills the window, then the tool. The dead zones on what the body
@@ -422,7 +423,7 @@ mark has a level per channel the two settings are `white` and `blue`.
 Every row of the panel is titled. A slot's row is titled with its parameter's name and reads
 Base · Amount · Curve · Bypass (`LIGHT_SYNTH.md`, *Modulation*).
 
-The synth's settings classes (`OscillatorSettings`, `LfoSettings`, `WindowSettings`) are extended
+The synth's settings classes (`OscillatorSettings`, `StrobeSettings`, `LfoSettings`, `WindowSettings`) are extended
 by the bridge's where a concept spans both (`window`); the voice reads only its own fields. The
 layer keeps its `blend`. No setting routes anything: an amount does nothing until `connect` gives
 its parameter a source.
