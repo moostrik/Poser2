@@ -1,4 +1,4 @@
-"""Conductor — the light system's threaded tick loop: owns the 30 Hz time base and the
+"""Conductor — the light system's threaded tick loop: owns the ``light_rate`` time base and the
 fixed per-tick order (motor → playhead → update callbacks → command → compositor → output).
 
 It draws nothing and decides nothing itself: the state machine (an update callback) decides

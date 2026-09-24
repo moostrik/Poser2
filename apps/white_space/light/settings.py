@@ -116,7 +116,7 @@ class LightSettings(BaseSettings):
     # Construction / wiring (INIT — requires restart to take effect)
     max_players:      Field[int]   = Field(3,    min=1,   max=16,   access=Field.INIT, description="Players tracked at most (shared from the root)")
     num_cameras:      Field[int]   = Field(1,    min=1,   max=16,   access=Field.INIT, description="Number of cameras")
-    light_rate:       Field[float] = Field(30.0, min=1,   max=120,  description="Light tick rate (fps, shared from the root)")
+    light_rate:       Field[float] = Field(32.0, min=1,   max=120,  description="Light tick rate (fps, shared from the root)")
     light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, description="Projection resolution (pixels per turn)")
     fov: Field[float] = Field(110.0, access=Field.INIT, description="Camera horizontal FOV — relay from root to test_calibration; its visible home is the camera panel")
     spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — hidden relay from states (via the root) into wind_down")
@@ -132,7 +132,7 @@ class LightSettings(BaseSettings):
     motor_simulate: Field[bool] = Field(False, description="Simulate the motor + fall sensor; while on, nothing is sent to the fixture", pinned=True)
 
     clock:        Group[ClockSettings]        = Group(ClockSettings, share=[light_rate])
-    motor:        Group[MotorSettings]        = Group(MotorSettings, share=[motor_simulate.as_('simulate')])
+    motor:        Group[MotorSettings]        = Group(MotorSettings, share=[motor_simulate.as_('simulate'), light_rate])
     playhead:     Group[PlayheadSettings]     = Group(PlayheadSettings)
 
     # The per-layer composition settings pool, grouped by mode (mirrors layers/beam|projection/).

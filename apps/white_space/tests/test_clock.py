@@ -17,7 +17,7 @@ class ClockRateTest(unittest.TestCase):
     def test_interval_follows_the_setting_live(self) -> None:
         settings = ClockSettings()
         clock = Clock(settings)
-        self.assertAlmostEqual(clock.interval, 1.0 / 30.0, places=9)
+        self.assertAlmostEqual(clock.interval, 1.0 / 32.0, places=9)
         settings.light_rate = 60.0
         self.assertAlmostEqual(clock.interval, 1.0 / 60.0, places=9)
 

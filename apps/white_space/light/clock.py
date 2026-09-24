@@ -32,7 +32,7 @@ _STATS_INTERVAL: float = 1.0
 
 
 class ClockSettings(BaseSettings):
-    light_rate:  Field[float] = Field(30.0, min=1.0, max=120.0, description="Light tick rate (fps, shared from the light settings)")
+    light_rate:  Field[float] = Field(32.0, min=1.0, max=120.0, description="Light tick rate (fps, shared from the light settings)")
     time:        Field[float] = Field(0.0, access=Field.READ, description="Elapsed wall-clock time (s)")
     late_max_ms: Field[float] = Field(0.0, access=Field.READ, description="Worst tick lateness vs. its deadline over the last second (ms)")
     dt_max_ms:   Field[float] = Field(0.0, access=Field.READ, description="Longest tick interval over the last second (ms)")

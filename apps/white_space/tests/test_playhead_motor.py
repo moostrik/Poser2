@@ -58,7 +58,7 @@ class MotorTest(unittest.TestCase):
         self.assertEqual(m.command.target_rpm, 72.0)   # beam_rpm default, derived from mode
 
     def test_mode_drives_target_rpm(self) -> None:
-        self.assertEqual(self._locked(MotorMode.PROJECTION).command.target_rpm, 2000.0)
+        self.assertEqual(self._locked(MotorMode.PROJECTION).command.target_rpm, 1920.0)   # projection_rpm default
         self.assertEqual(self._locked(MotorMode.STOPPED).command.target_rpm, 0.0)
 
     def test_unlocked_when_no_falls(self) -> None:
@@ -127,7 +127,7 @@ class MotorTest(unittest.TestCase):
         self.assertTrue(math.isnan(st.phase))
         self.assertEqual(st.measured_rpm, 0.0)
         self.assertEqual(m.command.mode, MotorMode.PROJECTION)
-        self.assertEqual(m.command.target_rpm, 2000.0)  # commanded speed (no measurement yet)
+        self.assertEqual(m.command.target_rpm, 1920.0)  # commanded speed (no measurement yet)
 
     def test_high_ignores_stale_fall(self) -> None:
         # The motor sends no sync pulses above the ceiling, so PROJECTION ignores any leftover/stale fall
@@ -139,7 +139,7 @@ class MotorTest(unittest.TestCase):
         self.assertFalse(st.locked)
         self.assertEqual(st.measured_rpm, 0.0)        # stale reading not used in PROJECTION
         self.assertTrue(math.isnan(st.phase))
-        self.assertEqual(m.command.target_rpm, 2000.0)
+        self.assertEqual(m.command.target_rpm, 1920.0)
 
     def test_above_ceiling_measurement_not_trusted(self) -> None:
         # Spinning down from PROJECTION: commanded BEAM but still physically fast → the >ceiling reading

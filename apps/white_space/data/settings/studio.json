@@ -286,7 +286,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 1329,
+        "iso": 1435,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -631,7 +631,7 @@
   },
   "light": {
     "brightness": 1.0,
-    "debug": "test_pulse",
+    "debug": "OFF",
     "motor_simulate": false,
     "clock": {},
     "motor": {

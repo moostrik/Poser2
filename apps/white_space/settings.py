@@ -155,12 +155,12 @@ class InOutGroup(BaseSettings):
 
 class BboxFeature(BaseSettings):
     frequency        : Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency : Field[float] = Field(30.0)
+    output_frequency : Field[float] = Field(32.0)
 
 
 class PointFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency: Field[float] = Field(30.0)
+    output_frequency: Field[float] = Field(32.0)
 
     confidence      : Group[nodes.DualConfFilterSettings]    = Group(nodes.DualConfFilterSettings)
     sticky          : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
@@ -173,7 +173,7 @@ class PointFeature(BaseSettings):
 
 class AngleFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency: Field[float] = Field(30.0)
+    output_frequency: Field[float] = Field(32.0)
 
     smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
     prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
@@ -183,7 +183,7 @@ class AngleFeature(BaseSettings):
 
 class AzimuthFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency: Field[float] = Field(30.0)
+    output_frequency: Field[float] = Field(32.0)
 
     smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
     prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
@@ -192,7 +192,7 @@ class AzimuthFeature(BaseSettings):
 
 class DistanceFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency: Field[float] = Field(30.0)
+    output_frequency: Field[float] = Field(32.0)
 
     smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
     interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
@@ -200,7 +200,7 @@ class DistanceFeature(BaseSettings):
 
 class VelocityFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency: Field[float] = Field(30.0)
+    output_frequency: Field[float] = Field(32.0)
 
     extractor   : Group[nodes.AngleVelExtractorSettings] = Group(nodes.AngleVelExtractorSettings, share=[frequency])
     smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
@@ -216,7 +216,7 @@ class MotionFeature(BaseSettings):
 
 class SimilarityFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency: Field[float] = Field(30.0)
+    output_frequency: Field[float] = Field(32.0)
     max_players     : Field[int]   = Field(3, min=1, max=16, access=Field.INIT, description="Players tracked at most (shared from root max_players): the similarity row's width")
 
     # In pipeline order. On the SMOOTH poses, synchronously: the posture similarity (distance in degrees →
@@ -243,7 +243,7 @@ class PoseGroup(BaseSettings):
     model_path       : Field[str]       = Field("", access=Field.INIT, visible=False)
     verbose          : Field[bool]      = Field(False, access=Field.INIT)
     frequency        : Field[float]     = Field(30.0, access=Field.INIT)
-    output_frequency : Field[float]     = Field(30.0, min=1.0, max=120.0, description="LERP tick rate (fps, shared from the root light_rate)")
+    output_frequency : Field[float]     = Field(32.0, min=1.0, max=120.0, description="LERP tick rate (fps, shared from the root light_rate)")
 
     _feature_share: list = [frequency, output_frequency]
 
@@ -385,7 +385,7 @@ class Settings(BaseSettings):
     num_virtual     : Field[int]   = Field(8, access=Field.INIT)
     num_cameras     : Field[int]   = Field(4, access=Field.INIT)
     input_fps       : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
-    light_rate      : Field[float] = Field(30.0, min=1.0, max=120.0, description="Light tick rate (fps): the fixture's frame rate, the conductor's clock and the LERP stage's step")
+    light_rate      : Field[float] = Field(32.0, min=1.0, max=120.0, description="Light tick rate (fps): the fixture's frame rate, the conductor's clock and the LERP stage's step")
     light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="Projection resolution (pixels per turn)")
     fov             : Field[float] = Field(127.0, access=Field.INIT, description="Azimuth span (°) of each delivered camera frame — the tracker's contract, baked in at open")
     resolution      : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode for all cameras")

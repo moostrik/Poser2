@@ -90,7 +90,7 @@ sound Max is playing.
   messages (`SOUND.md`).
 - **Behavior**: left level → left blue lamp, right level → right blue lamp; a gain scales
   the mapping. Latency first: no softening — only a minimal smoothing window of at
-  most 2–3 light frames (~66–100 ms), there purely to bridge OSC-arrival vs 30 Hz tick
+  most 2–3 light frames (63–94 ms at the studio preset's 32 fps), there purely to bridge OSC-arrival vs light-tick
   timing jitter, never to shape the response (Max shapes the envelope; the lamps follow).
 - **Stale input**: when no message has arrived for `stale_seconds`, the layer falls back —
   either off, or a gentle idle pulse (tunable choice) — so a silent or disconnected Max

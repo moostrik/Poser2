@@ -141,7 +141,7 @@ loop's output delay. The playhead is never reset at spin-up, so it keeps that le
 playhead line reaches the wall one output delay later — exactly where the beam would have been. So
 the playhead needs no offset of its own in projection mode, and tuning the projection offset onto the
 moving line would rotate the whole projection by that delay. (The firmware applies a frame on the next fast
-revolution, so the line may lag up to 30 ms more — a degree or two, within the half playhead step
+revolution, so the line may lag up to one light tick more (31 ms at the studio preset's 32 fps) — a degree or two, within the half playhead step
 (3.6° at 36 rpm) the flash tick can sit from the person; deduction.) The hit and the sound fire on the internal playhead in both modes, so their timing
 against the light matches too.
 
@@ -160,7 +160,7 @@ A readout, not a step. With θ the front lamp's azimuth at the pulse and *d* the
 
 This build: 262.8° + 198.0° = 100.8°, so θ = 252° and the 10.8° residual is the delay — 50 ms at
 36 rpm, or 42–58 ms given the 3.6° slider both were tuned on. That is about what a fall message, a
-30 Hz tick and a frame on the wire cost.
+light tick and a frame on the wire cost.
 
 ### Interlacing
 

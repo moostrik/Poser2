@@ -40,9 +40,6 @@ FIXTURE_PROJECTION_RPM: float = 200.0
 # it so it can't corrupt the measured period.
 _MIN_FALL_INTERVAL_S: float = 60.0 / FIXTURE_PROJECTION_RPM
 
-# Simulation loop cadence (s). The ramp + fall timing are sub-tick accurate regardless.
-_SIM_TICK: float = 1.0 / 30.0 # same as the motor
-
 # Simulated spin-up / spin-down rates (RPM/s). The real motor brakes ~3× faster than it
 # accelerates: ≈6 s up to 2000, ≈2 s back down.
 _SIM_ACCEL: float = 333.0
@@ -83,7 +80,8 @@ class MotorSettings(BaseSettings):
     simulate:             Field[bool] = Field(False,                              description="Simulate the motor + fall sensor (no hardware): obeys the commanded mode with modeled inertia")
     active_mode:          Field[MotorMode] = Field(MotorMode.STOPPED, access=Field.READ, description="Active mode — the arbitrated mode actually driven (debug > state machine; no command = STOPPED)")
     beam_rpm:             Field[float] = Field(72.0,   min=0.0, max=300.0,  step=1.0,  description="Target rpm in BEAM mode", newline=True)
-    projection_rpm:       Field[float] = Field(2000.0, min=0.0, max=2400.0, step=1.0,  description="Target rpm in PROJECTION mode")
+    projection_rpm:       Field[float] = Field(1920.0, min=0.0, max=2400.0, step=1.0,  description="Target rpm in PROJECTION mode")
+    light_rate:           Field[float] = Field(32.0,   min=1.0, max=120.0, description="Light tick rate (fps, shared from the light settings): the simulation loop's cadence")
     measured_rpm:         Field[float] = Field(0.0,   min=0.0, max=FIXTURE_PROJECTION_RPM, step=0.01,  access=Field.READ, description="Current measured RPM", newline=True)
     phase:                Field[float] = Field(0.0,   min=0.0, max=360.0, step=0.1, access=Field.READ, widget=Widget.slider, description="Measured motor phase since the sensor pulse (degrees)")
 
@@ -233,7 +231,9 @@ class MotorController:
             else:
                 revs = 0.0
 
-            self._wakeup.wait(_SIM_TICK)
+            # One light tick per iteration, read live; the ramp and fall timing are sub-tick
+            # accurate regardless.
+            self._wakeup.wait(1.0 / max(1e-3, float(self._settings.light_rate)))
             self._wakeup.clear()
 
     # ------------------------------------------------------------------
