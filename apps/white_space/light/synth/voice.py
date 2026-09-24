@@ -33,7 +33,7 @@ class Parameter(IntEnum):
     STROBE_RATE   = auto()
     STROBE_WIDTH  = auto()
     STROBE_PHASE  = auto()
-    STROBE_DELAY  = auto()
+    STROBE_SHIFT  = auto()
 
 
 Sources = dict[Parameter, Value]        # a parameter with no source is its base
@@ -58,7 +58,7 @@ class Voice:
         self._presence = Envelope()
         self._pushes = (Envelope(), Envelope())                             # each oscillator's push
         self._intervals = [self._interval(oscillator_1.pitch, 0.0), self._interval(oscillator_2.pitch, 0.0)]   # this tick's, after the slot
-        self._strobes: list[tuple[int, float, float, float]] = [(0, 1.0, 0.0, 0.0)] * 2   # this tick's rate, width, phase, delay, after the slots
+        self._strobes: list[tuple[int, float, float, float]] = [(0, 1.0, 0.0, 0.0)] * 2   # this tick's rate, width, phase, shift, after the slots
         self._tick = 0                                                      # the clock's tick index this tick
         self._ticks_per_second = 1
 
@@ -119,12 +119,12 @@ class Voice:
 
     def _strobe(self, S: StrobeSettings, source: Sources) -> tuple[int, float, float, float]:
         """A strobe's four parameters this tick, each through its slot: the rate quantized to the
-        powers of two, the width a fraction, the phase and the delay as they come."""
+        powers of two, the width a fraction, the phase and the shift as they come."""
         rate   = Strobe.rate(float(Slot.modulate(S.rate, S.rate_amount, self._played(S.rate_bypass, S.rate_curve, float(source.get(Parameter.STROBE_RATE, 0.0))))), self._ticks_per_second)
         width  = float(Slot.unit(Slot.modulate(S.width, S.width_amount, self._played(S.width_bypass, S.width_curve, float(source.get(Parameter.STROBE_WIDTH, 0.0))))))
         phase  = float(Slot.modulate(S.phase, S.phase_amount, self._played(S.phase_bypass, S.phase_curve, float(source.get(Parameter.STROBE_PHASE, 0.0)))))
-        delay  = float(Slot.modulate(S.delay, S.delay_amount, self._played(S.delay_bypass, S.delay_curve, float(source.get(Parameter.STROBE_DELAY, 0.0)))))
-        return rate, width, phase, delay
+        shift  = float(Slot.modulate(S.shift, S.shift_amount, self._played(S.shift_bypass, S.shift_curve, float(source.get(Parameter.STROBE_SHIFT, 0.0)))))
+        return rate, width, phase, shift
 
     @staticmethod
     def _played(bypass: bool, curve: int, source: Value) -> Value:

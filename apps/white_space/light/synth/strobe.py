@@ -6,17 +6,16 @@ each have a slot. Time is the clock's tick index, so every voice's strobe sits o
 people at the same rate go dark on the same ticks. The rates are powers of two, so the grids nest
 and a change of rate is seamless.
 
-The gate, in ticks, with ``T = round(ticks per second / rate)`` ticks per cycle and the delay in
-seconds per line:
+The gate, in ticks, with ``T = round(ticks per second / rate)`` ticks per cycle and the shift the
+one from each line to the next in half cycles (1 is opposite, 0.5 a quarter cycle):
 
-    offset(k)        = round(phase · T) + round(delay · ticks per second · k)
+    offset(k)        = round(phase · T) + round(shift · T / 2 · k)
     on(tick, line k) = ((tick − offset(k)) mod T) < round(width · T)
 
 The lit ticks are the first ``round(width · T)`` of a cycle and the dark ticks the rest, so the
 dark ticks of nested rates coincide. ``k`` is a line's count from the person, in intervals: whole
-for standing lines, drifting smoothly as a line travels. The delay is in seconds, not cycles, so a
-run's speed (one line per delay) is the same at every rate; the offsets are modulo ``T``, so the
-run repeats every ``T / (delay · ticks per second)`` lines.
+for standing lines, drifting smoothly as a line travels. The shift is on the strobe's own cycle,
+so the wave it makes is ``2 / shift`` lines long and runs that many lines per cycle.
 
 The methods are static so ``HotReloadMethods`` can patch them while the app runs.
 """
@@ -51,10 +50,10 @@ class StrobeSettings(BaseSettings):
     phase_amount:  Field[float] = Field(0.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Amount", description="How far the source moves the phase (cycles)")
     phase_curve:   Field[Curve] = Field(Curve.LINEAR,                        width=CURVE, label="Curve",  description="How the source's magnitude is eased")
     phase_bypass:  Field[bool]  = Field(False,                                            label="Bypass", description="Switch the modulation off: the phase is its base")
-    delay:         Field[float] = Field(0.0,  min=-0.5, max=0.5,  step=0.005, widget=KNOB, label="Base",   description="Seconds between one line's strobe and the next: 0 all together, positive the dark runs outward", row_label="Delay", newline=True)
-    delay_amount:  Field[float] = Field(0.0,  min=-0.5, max=0.5,  step=0.005, widget=KNOB, label="Amount", description="How far the source moves the delay (s per line)")
-    delay_curve:   Field[Curve] = Field(Curve.LINEAR,                         width=CURVE, label="Curve",  description="How the source's magnitude is eased")
-    delay_bypass:  Field[bool]  = Field(False,                                             label="Bypass", description="Switch the modulation off: the delay is its base")
+    shift:         Field[float] = Field(0.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Base",   description="Shift from one line to the next: 0 in step, 0.5 a quarter cycle, 1 opposite; negative runs inward", row_label="Shift", newline=True)
+    shift_amount:  Field[float] = Field(0.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Amount", description="How far the source moves the shift (half cycles per line)")
+    shift_curve:   Field[Curve] = Field(Curve.LINEAR,                        width=CURVE, label="Curve",  description="How the source's magnitude is eased")
+    shift_bypass:  Field[bool]  = Field(False,                                            label="Bypass", description="Switch the modulation off: the shift is its base")
 
 
 class Strobe:
@@ -76,15 +75,15 @@ class Strobe:
         return max(1, round(ticks_per_second / rate))
 
     @staticmethod
-    def gate(tick: int, line: np.ndarray, rate: int, width: float, phase: float, delay: float,
+    def gate(tick: int, line: np.ndarray, rate: int, width: float, phase: float, shift: float,
              ticks_per_second: int) -> np.ndarray:
         """On (1) or off (0) this tick for each line, ``line`` being each pixel's line count from
-        the person in intervals and ``delay`` the seconds between one line and the next. Rate 0 is
-        always on."""
+        the person in intervals and ``shift`` the one from each line to the next in half cycles.
+        Rate 0 is always on."""
         if rate <= 0:
             return np.ones(line.shape, dtype=np.float32)
         T = Strobe.period(rate, ticks_per_second)
         lit = int(round(min(max(width, 0.0), 1.0) * T))
-        offset = int(round(phase * T)) + np.rint(delay * ticks_per_second * line).astype(np.int64)
+        offset = int(round(phase * T)) + np.rint(shift * T / 2.0 * line).astype(np.int64)
         position = (int(tick) - offset) % T
         return np.where(position < lit, 1.0, 0.0).astype(np.float32)

@@ -167,8 +167,8 @@ class PoseInstrument(ProjectionLayer):
     def _strobe_bypass_all(strobe: StrobeSettings, _: bool) -> None:
         """The panel's Bypass All button of a strobe: its four slots set, or cleared when all are
         already set."""
-        bypass = not (strobe.rate_bypass and strobe.width_bypass and strobe.phase_bypass and strobe.delay_bypass)
-        strobe.rate_bypass = strobe.width_bypass = strobe.phase_bypass = strobe.delay_bypass = bypass
+        bypass = not (strobe.rate_bypass and strobe.width_bypass and strobe.phase_bypass and strobe.shift_bypass)
+        strobe.rate_bypass = strobe.width_bypass = strobe.phase_bypass = strobe.shift_bypass = bypass
 
     # -- Per tick --------------------------------------------------------------
 

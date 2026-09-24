@@ -11,10 +11,10 @@ FPS = 32
 LINES = np.arange(0, 6, dtype=np.float64)       # six standing lines, counted from the person
 
 
-def dark_ticks(rate: int, width: float, ticks: int = 64, phase: float = 0.0, delay: float = 0.0,
+def dark_ticks(rate: int, width: float, ticks: int = 64, phase: float = 0.0, shift: float = 0.0,
                line: float = 0.0) -> list[int]:
     return [t for t in range(ticks)
-            if Strobe.gate(t, np.array([line]), rate, width, phase, delay, FPS)[0] == 0.0]
+            if Strobe.gate(t, np.array([line]), rate, width, phase, shift, FPS)[0] == 0.0]
 
 
 class StrobeRateTest(unittest.TestCase):
@@ -61,19 +61,24 @@ class StrobeGateTest(unittest.TestCase):
     def test_the_phase_shifts_the_cycle(self) -> None:
         self.assertEqual(dark_ticks(4, 7 / 8, ticks=8, phase=0.25), [1])         # two ticks later at T 8
 
-    def test_the_delay_puts_each_line_its_count_of_delays_later(self) -> None:
-        for k in range(4):                                                        # a tick per line at 32 fps
-            self.assertEqual(dark_ticks(4, 7 / 8, ticks=16, delay=1 / 32, line=k), [t for t in range(16) if (t - k) % 8 == 7], k)
-        self.assertEqual(dark_ticks(4, 7 / 8, ticks=16, delay=-1 / 32, line=1), [6, 14])   # inward: earlier
+    def test_the_shift_puts_each_line_its_count_of_shifts_later(self) -> None:
+        for k in range(4):                                                        # a quarter of 8 ticks: a tick per line
+            self.assertEqual(dark_ticks(4, 7 / 8, ticks=16, shift=0.25, line=k), [t for t in range(16) if (t - k) % 8 == 7], k)
+        self.assertEqual(dark_ticks(4, 7 / 8, ticks=16, shift=-0.25, line=1), [6, 14])   # inward: earlier
 
-    def test_the_delay_is_in_seconds_so_the_run_is_the_same_at_every_rate(self) -> None:
+    def test_full_is_opposite_and_a_half_a_quarter_cycle(self) -> None:
+        self.assertEqual(dark_ticks(4, 0.5, ticks=8, shift=1.0, line=0), [4, 5, 6, 7])
+        self.assertEqual(dark_ticks(4, 0.5, ticks=8, shift=1.0, line=1), [0, 1, 2, 3])      # opposite the line before
+        self.assertEqual(dark_ticks(4, 0.5, ticks=8, shift=0.5, line=1), [0, 1, 6, 7])         # two ticks later: 6, 7, 0, 1
+
+    def test_the_shift_is_the_same_fraction_of_the_cycle_at_every_rate(self) -> None:
         for rate in (1, 2, 4):
             T = Strobe.period(rate, FPS)
-            first = [dark_ticks(rate, 1.0 - 1.0 / T, ticks=T, delay=0.125, line=k)[0] for k in range(2)]
-            self.assertEqual((first[1] - first[0]) % T, 4, rate)                  # 0.125 s: four ticks per line
+            first = [dark_ticks(rate, 1.0 - 1.0 / T, ticks=T, shift=0.5, line=k)[0] for k in range(2)]
+            self.assertEqual((first[1] - first[0]) % T, T // 4, rate)             # a quarter cycle per line
 
-    def test_a_small_delay_accumulates_line_by_line(self) -> None:
-        firsts = [dark_ticks(1, 31 / 32, ticks=64, delay=0.05, line=k)[0] for k in range(5)]   # 1.6 ticks per line
+    def test_a_small_shift_accumulates_line_by_line(self) -> None:
+        firsts = [dark_ticks(1, 31 / 32, ticks=64, shift=0.1, line=k)[0] for k in range(5)]   # 1.6 ticks per line
         self.assertEqual([(t - 31) % 32 for t in firsts], [0, 2, 3, 5, 6])
 
     def test_a_gate_is_off_or_full(self) -> None:
