@@ -263,13 +263,27 @@ class DummyTest(unittest.TestCase):
         self.assertEqual(self.cfg.left_shoulder, 180.0)
         self.assertEqual(self.cfg.right_shoulder, 180.0)
 
+    def test_picking_a_pose_leaves_the_placement_alone(self) -> None:
+        self.path.write_text(json.dumps({'old': {'azimuth': 180.0, 'distance': 0.5, 'left_shoulder': 180.0}}), encoding='utf-8')
+        cfg = DummySettings()
+        Dummy(cfg, AngleExtractorSettings(), AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
+        cfg.azimuth, cfg.distance = 90.0, 0.2
+        cfg.pose = 'old'
+        self.assertEqual(cfg.left_shoulder, 180.0)
+        self.assertEqual(cfg.azimuth, 90.0)                       # a pose file's placement keys are ignored
+        self.assertEqual(cfg.distance, 0.2)
+
     def test_saving_adds_a_pose_to_the_file_and_the_select(self) -> None:
         self.cfg.left_elbow = 120.0
+        self.cfg.azimuth, self.cfg.distance = 90.0, 0.2
         self.cfg.name = 'bent'
         DummySettings.save.fire(self.cfg)
         self.assertEqual(self.cfg.poses, ['up', 'bent'])
         self.assertEqual(self.cfg.pose, 'bent')
-        self.assertEqual(json.loads(self.path.read_text(encoding='utf-8'))['bent']['left_elbow'], 120.0)
+        saved = json.loads(self.path.read_text(encoding='utf-8'))['bent']
+        self.assertEqual(saved['left_elbow'], 120.0)
+        self.assertNotIn('azimuth', saved)                        # where the dummy stands is not part of a pose
+        self.assertNotIn('distance', saved)
 
     # -- the morph --
 

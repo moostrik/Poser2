@@ -1,6 +1,5 @@
 {
   "neutral": {
-    "azimuth": 180.0,
     "torso": 0.0,
     "left_shoulder": -20.0,
     "right_shoulder": -20.0,
@@ -12,7 +11,6 @@
     "right_knee": 8.0
   },
   "raised": {
-    "azimuth": 180.0,
     "torso": 0.0,
     "left_shoulder": -170.0,
     "right_shoulder": -170.0,
@@ -24,7 +22,6 @@
     "right_knee": 8.0
   },
   "arms out level, a T": {
-    "azimuth": 180.0,
     "torso": 0.0,
     "left_shoulder": -95.0,
     "right_shoulder": -95.0,
@@ -36,7 +33,6 @@
     "right_knee": 8.0
   },
   "left arm up, right hanging": {
-    "azimuth": 180.0,
     "torso": 0.0,
     "left_shoulder": -170.0,
     "right_shoulder": -20.0,
@@ -48,7 +44,6 @@
     "right_knee": 8.0
   },
   "right arm up, left hanging": {
-    "azimuth": 180.0,
     "torso": 0.0,
     "left_shoulder": -20.0,
     "right_shoulder": -170.0,
@@ -60,7 +55,6 @@
     "right_knee": 8.0
   },
   "a T, both elbows folded": {
-    "azimuth": 180.0,
     "torso": 0.0,
     "left_shoulder": -95.0,
     "right_shoulder": -95.0,
@@ -72,7 +66,6 @@
     "right_knee": 8.0
   },
   "a T, left elbow folded": {
-    "azimuth": 180.0,
     "torso": 0.0,
     "left_shoulder": -95.0,
     "right_shoulder": -95.0,
@@ -84,7 +77,6 @@
     "right_knee": 8.0
   },
   "a T, right elbow folded": {
-    "azimuth": 180.0,
     "torso": 0.0,
     "left_shoulder": -95.0,
     "right_shoulder": -95.0,
@@ -96,7 +88,6 @@
     "right_knee": 8.0
   },
   "a T, leaning left": {
-    "azimuth": 180.0,
     "torso": -45.0,
     "left_shoulder": -95.0,
     "right_shoulder": -95.0,
@@ -108,7 +99,6 @@
     "right_knee": 8.0
   },
   "a T, leaning right": {
-    "azimuth": 180.0,
     "torso": 45.0,
     "left_shoulder": -95.0,
     "right_shoulder": -95.0,
@@ -120,7 +110,6 @@
     "right_knee": 8.0
   },
   "a T, in a crouch": {
-    "azimuth": 180.0,
     "torso": 0.0,
     "left_shoulder": -95.0,
     "right_shoulder": -95.0,
@@ -132,8 +121,6 @@
     "right_knee": 98.0
   },
   "|__": {
-    "azimuth": 180.0,
-    "distance": 0.5,
     "torso": 0.0,
     "left_shoulder": -95.0,
     "right_shoulder": -95.0,
@@ -145,8 +132,6 @@
     "right_knee": 8.0
   },
   "__|": {
-    "azimuth": 180.0,
-    "distance": 0.5,
     "torso": 0.0,
     "left_shoulder": -95.0,
     "right_shoulder": -95.0,

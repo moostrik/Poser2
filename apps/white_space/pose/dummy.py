@@ -13,8 +13,10 @@ The torso leans the upper body over standing legs, as a person leans: the arms s
 the hips read off by the lean. Only the joints and the torso are set: the leg deviation and the
 body bend are the pipeline's, derived from the figure as for a person, and the pipeline's readings
 of its poses are what the angle calibrator is read against. Its poses are named in
-``data/poses.json``, seeded with the rows of the design's pose results; a change of any measure
-morphs over ``morph`` seconds, the shortest way round for the azimuth and the joints.
+``data/poses.json``, seeded with the rows of the design's pose results; a pose is the torso and
+the joints, and where the dummy stands (``azimuth``, ``distance``) is a setting of its own, not
+part of a pose. A change of any measure morphs over ``morph`` seconds, the shortest way round for
+the azimuth and the joints.
 """
 
 from __future__ import annotations
@@ -79,6 +81,8 @@ class Measures:
 
 
 MEASURES: tuple[str, ...] = tuple(f.name for f in fields(Measures))
+PLACEMENT: tuple[str, ...] = ('azimuth', 'distance')             # where the dummy stands: a setting of its own, not part of a pose
+POSE: tuple[str, ...] = tuple(n for n in MEASURES if n not in PLACEMENT)   # what a saved pose stores: the torso and the joints
 NEUTRAL = 'neutral'                                               # the saved pose the dummy starts in
 CIRCULAR: frozenset[str] = frozenset(MEASURES) - {'torso', 'distance'}
 # What the angle extractor reads at each joint at rest (deg): a joint's setting is measured from it.
@@ -304,7 +308,7 @@ class Dummy(FrameDictCallbackMixin):
         values = self._poses.get(name)
         if values is None:
             return
-        for n in MEASURES:
+        for n in POSE:
             if n in values:
                 setattr(self._settings, n, float(values[n]))
 
@@ -313,7 +317,7 @@ class Dummy(FrameDictCallbackMixin):
         if not name:
             logger.warning("Dummy pose not saved: no name")
             return
-        self._poses[name] = {n: float(getattr(self._settings, n)) for n in MEASURES}
+        self._poses[name] = {n: float(getattr(self._settings, n)) for n in POSE}
         self._write_poses()
         self._settings.poses = list(self._poses)
         self._settings.pose = name

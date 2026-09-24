@@ -208,7 +208,7 @@
     },
     "osc_sound_sender": {
       "stage": "LERP",
-      "volume": 1.0,
+      "volume": 0.8,
       "speaker_offset": 0.0,
       "ip_addresses": "192.168.1.40",
       "port": 8000
@@ -286,7 +286,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 1435,
+        "iso": 1211,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -947,6 +947,42 @@
       "hardness_bypass": false,
       "push": 0.0,
       "push_release_seconds": 0.15
+    },
+    "white_strobe": {
+      "rate": 0.0,
+      "rate_amount": 0.0,
+      "rate_curve": "LINEAR",
+      "rate_bypass": false,
+      "width": 0.5,
+      "width_amount": 0.0,
+      "width_curve": "LINEAR",
+      "width_bypass": false,
+      "phase": 0.0,
+      "phase_amount": 0.0,
+      "phase_curve": "LINEAR",
+      "phase_bypass": false,
+      "spread": 0.0,
+      "spread_amount": 0.0,
+      "spread_curve": "LINEAR",
+      "spread_bypass": false
+    },
+    "blue_strobe": {
+      "rate": 0.0,
+      "rate_amount": 0.0,
+      "rate_curve": "LINEAR",
+      "rate_bypass": false,
+      "width": 0.5,
+      "width_amount": 0.0,
+      "width_curve": "LINEAR",
+      "width_bypass": false,
+      "phase": 0.0,
+      "phase_amount": 0.0,
+      "phase_curve": "LINEAR",
+      "phase_bypass": false,
+      "spread": 0.0,
+      "spread_amount": 0.0,
+      "spread_curve": "LINEAR",
+      "spread_bypass": false
     },
     "lfo": {
       "rate": 0.5,

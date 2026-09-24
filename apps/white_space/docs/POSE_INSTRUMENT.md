@@ -490,7 +490,9 @@ so its hanging arm reads 0 and its vertical arm π. How the figure is built is t
 docstring.
 
 Its poses are named in `data/poses.json`, the rows of *Pose results*, picked in the `pose`
-select and saved under `name` with `save`. A change of any measure morphs over `morph` seconds.
+select and saved under `name` with `save`. A pose is the torso and the eight joints; where the
+dummy stands (`azimuth`, `distance`) is a setting of its own, kept in the app preset and left
+alone when a pose is picked. A change of any measure morphs over `morph` seconds.
 
 ---
 
