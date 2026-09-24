@@ -3,7 +3,7 @@
   "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
-  "light_rate": 30.0,
+  "light_rate": 32.0,
   "light_resolution": 3600,
   "fov": 127.0,
   "resolution": "P800",
@@ -286,7 +286,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 1361,
+        "iso": 1338,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -636,7 +636,7 @@
     "clock": {},
     "motor": {
       "beam_rpm": 32.0,
-      "projection_rpm": 1800.0
+      "projection_rpm": 1920.0
     },
     "playhead": {
       "pulse_offset": 220.0,
@@ -736,13 +736,13 @@
         "blend": "ADD",
         "white": {
           "level": 0.5,
-          "speed": 0.17,
+          "speed": 16.0,
           "phase": 0.0,
           "width": 0.5,
           "amount": 36
         },
         "blue": {
-          "level": 0.5,
+          "level": 0.0,
           "speed": 0.17,
           "phase": 0.5,
           "width": 0.5,
@@ -977,8 +977,8 @@
     "min_players": 2,
     "sync": {},
     "manual": {
-      "select": "PLAY",
-      "hold": true
+      "select": "OFF",
+      "hold": false
     },
     "session": {
       "enabled": false,
