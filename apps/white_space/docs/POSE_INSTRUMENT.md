@@ -85,7 +85,8 @@ where the synth is a synth; our own word where the wall differs. The words of th
 
 What is the instrument's and what is the synth's (`LIGHT_SYNTH.md` states the same split from the
 synth's side): the instrument decides what each source is, which measure, and the shaping of that
-measure before it is handed over (a dead zone, a remap); when the gates open (presence, the hit);
+measure before it is handed over (the absolute of a travel, a remap; the dead zones are the
+pipeline's, *The body*); when the gates open (presence, the hit);
 the reaches; which output is white and which blue; and the mask. A source may also move in time
 by the bridge's own hand, as the mask's flash does: the breath, a sine per person that swings a
 width (*The connections*). Everything from the slot on is the synth's, and the synth never
@@ -199,33 +200,40 @@ and publishes with every frame, smoothed. The pipeline derives the leg deviation
 of a pair from the joint angles. The distance is the tracker's, read from where the feet meet the
 floor (`TRACKING.md`, *The pose's distance*).
 
-| Feature           | Measure                                                  | In the pipeline |
-|-------------------|----------------------------------------------------------|-----------------|
-| left shoulder     | 0 hanging → ±π straight up, the sign the side it passes  | `Angles`        |
-| right shoulder    | 0 hanging → ±π straight up, the sign the side it passes  | `Angles`        |
-| left elbow        | 0 straight → ±π folded                                   | `Angles`        |
-| right elbow       | 0 straight → ±π folded                                   | `Angles`        |
-| leg deviation     | 0 standing straight → 1 a leg fully bent                 | `LegDeviation`  |
-| body bend         | −1 left → 0 upright → 1 right                            | `TorsoTilt`     |
-| distance          | 0 the zone's near edge → 1 its far edge                  | `Distance`      |
-| symmetry, a pair  | signed, left minus right: how unequal the two sides are  | `AngleSymmetry` |
+| Feature           | Measure                                                  | In the pipeline       |
+|-------------------|----------------------------------------------------------|-----------------------|
+| left shoulder     | 0 hanging → ±1 straight up, the sign the side it passes  | `ArmTravel`           |
+| right shoulder    | 0 hanging → ±1 straight up, the sign the side it passes  | `ArmTravel`           |
+| left elbow        | 0 straight → ±1 folded; its turn 0 straight → ±π folded  | `ArmTravel`, `Angles` |
+| right elbow       | 0 straight → ±1 folded; its turn 0 straight → ±π folded  | `ArmTravel`, `Angles` |
+| leg deviation     | 0 standing straight → 1 a leg fully bent                 | `LegDeviation`        |
+| body bend         | −1 left → 0 upright → 1 right                            | `TorsoTilt`           |
+| distance          | 0 the zone's near edge → 1 its far edge                  | `Distance`            |
+| symmetry, a pair  | signed, left minus right: how unequal the two sides are  | `AngleSymmetry`       |
 
 The angles are calibrated from two reference poses, arms hanging and arms raised
 (`AngleCalibrator` in `modules/pose/nodes/filters`, settings `pose.angle_calibrator`), so the
-fixed points are the feature's 0 and π for sound and light alike. The sign of an angle is the side
-of the body the limb passes and means nothing to the instrument: a measure is the absolute over π,
-0..1, so an arm raised outward and one raised across the body read alike.
+fixed points are 0 and π for sound and light alike. The sign of an angle is the side of the body
+the limb passes and means nothing to the instrument: it takes the absolute, so an arm raised
+outward and one raised across the body read alike.
 
-The bridge puts a **dead zone** on each measure before it becomes a source (`PI.measures`): the
-measure reads 0 up to its neutral zone, 1 from its far zone on, and linear between; continuous,
-so never a jump. A hanging arm reads a few degrees and a raised one stops short of π, so without
-the zones the two fixed points are never quite reached and the pattern never quite rests.
+Every measure comes through a **dead zone** in the pipeline: it reads 0 up to its neutral zone, 1
+from its far zone on, and linear between; continuous, so never a jump. A hanging arm reads a few
+degrees and a raised one stops short of π, so without the zones the two fixed points are never
+quite reached and the pattern never quite rests. The arms' zones make a feature of their own, the
+**travel** (`ArmTravel`, from `ArmTravelExtractor` in `modules/pose/nodes/extractors`): where each
+arm joint is along its travel from neutral to the far pose, the calibrated angle's magnitude taken
+from the band between the two zones onto 0..1 with the sign kept. The angles themselves stay raw,
+so the similarity, the symmetry, the velocity and the elbow's turn read the angles and only the
+instruments read the travel, the light and the sound alike (`SOUND.md`). The body bend's and the
+leg deviation's zones are in their extractors.
 
-| Measure       | Dead zone                                 | Setting                                  |
-|---------------|-------------------------------------------|------------------------------------------|
-| arm angles    | around neutral and around raised, degrees | `measures.arm_neutral`, `arm_raised`     |
-| body bend     | around upright, a fraction                | `measures.bend_neutral`                  |
-| leg deviation | at standing and at full, fractions        | `measures.legs_neutral`, `legs_full`     |
+| Measure       | Dead zone                                  | Settings, under `pose`                                                          |
+|---------------|--------------------------------------------|---------------------------------------------------------------------------------|
+| shoulders     | around hanging and around raised, degrees  | `arm_travel_extractor.shoulder_neutral_dead_zone`, `shoulder_raised_dead_zone`  |
+| elbows        | around straight and around folded, degrees | `arm_travel_extractor.elbow_neutral_dead_zone`, `elbow_folded_dead_zone`        |
+| body bend     | around upright, degrees; full at the tilt  | `torso_tilt_extractor.neutral_dead_zone`, `tilt_degrees`                        |
+| leg deviation | at standing, degrees; full at each top     | `leg_deviation_extractor.neutral_dead_zone`, `hip_max_degrees`, `knee_max_degrees` |
 
 The distance and the symmetries get theirs with their connection; the similarity has its own
 remap, `window.sync_threshold`.
@@ -271,7 +279,7 @@ The breath is a sine in time, −1..1, one per person, at `PI.breath.rate`; the 
 `PI.breath.depth`. Level shoulders have no excess, so the fixed points and a T are still; a depth
 of ½ or less keeps every breath inside none and full, so both fixed points stay exact
 (`MATRIX.md`, Option 3). An elbow's turn is the sine of its signed angle: still when straight and
-when fully folded, where +180° and −180° are one pose. The body bend, through its dead zone, is
+when fully folded, where +180° and −180° are one pose. The body bend, signed, is
 added to both turns with one sign: white drifts outward and blue inward, so a lean one way makes
 the white faster and the blue slower, the other way the reverse. A turn and a lean share the
 amount, so a forearm and a lean can add or cancel. Unconnected: the LFO, the symmetries, the
@@ -343,11 +351,12 @@ per person at 3600 pixels. Its place in the states' mixes is in `LAYERS.md`, *po
 
 ### Sources and connections
 
-The layer reads its sources from the LERP frames: the elements of `Angles` (the four arm joints),
-`LegDeviation`, `TorsoTilt`, `Distance` and `AngleSymmetry` (*The body*, *Symmetry*).
+The layer reads its sources from the LERP frames: the elements of `ArmTravel` (the four arm
+joints, the absolute taken), the elbows' elements of `Angles` (the turn), `LegDeviation`,
+`TorsoTilt`, `Distance` and `AngleSymmetry` (*The body*, *Symmetry*).
 
-The connections are code, not settings: `PoseInstrument.connect` takes a person's measures,
-through their dead zones (*The body*), and returns the sources of the white and the blue
+The connections are code, not settings: `PoseInstrument.connect` takes a person's measures, the
+dead zones already on them (*The body*), and returns the sources of the white and the blue
 oscillator's slots. It is *The connections* written out. `connect_lfo` beside it gives the LFO's
 level its source and runs first each tick, so `connect` can read the LFO's output. The bases and
 the amounts, the range and the direction of every connection, are settings: the panel keeps the
@@ -400,14 +409,14 @@ tuned together, knobs throughout:
 | `mask`                      | the mask's width, white and blue; the flash's levels, release   |
 | `playhead`                  | the marker's width, white and blue; its level inside a mask     |
 | `window`                    | shape: taper, attack, release; reach: width, bypass, sync       |
-| `measures`                  | the dead zones (*The body*)                                     |
 | `breath`                    | the breath's rate and depth (*The connections*)                 |
 | `white_lines`, `blue_lines` | On, Mirror, Bypass All; a slot per parameter; the push          |
 | `lfo`                       | the LFO: rate, phase, the level's slot                          |
 | `dummy`                     | *The dummy*                                                     |
 
 The groups run from the person outward: the mask at the person, the marker that passes them, the
-window around them, what the body gives, then what fills the window, then the tool. Wherever a
+window around them, then what fills the window, then the tool. The dead zones on what the body
+gives are the pipeline's settings (*The body*). Wherever a
 mark has a level per channel the two settings are `white` and `blue`.
 
 Every row of the panel is titled. A slot's row is titled with its parameter's name and reads

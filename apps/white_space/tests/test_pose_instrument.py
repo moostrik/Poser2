@@ -47,18 +47,21 @@ def _pose(azimuth_pos: float, sims: dict[int, float] | None = None, left_shoulde
           offset_deg: float = float("nan")) -> FakePose:
     """A fake pose at normalized azimuth ``azimuth_pos`` (0..1) with the arm angles (radians; the
     right shoulder follows the left unless given), leg deviation, body bend, distance, pairwise
-    sims and playhead offset."""
+    sims and playhead offset. The arm travel is the angles over π, no dead zones, as the
+    pipeline's extractor gives it with zero zones."""
     angles = np.full(len(features.AngleLandmark), np.nan)
     angles[features.AngleLandmark.left_shoulder] = left_shoulder
     angles[features.AngleLandmark.right_shoulder] = left_shoulder if right_shoulder is None else right_shoulder
     angles[features.AngleLandmark.left_elbow] = left_elbow
     angles[features.AngleLandmark.right_elbow] = right_elbow
+    travel = angles[:len(features.TravelElement)] / math.pi
     sim_values = np.full(16, np.nan)
     for j, v in (sims or {}).items():
         sim_values[j] = v
     return FakePose({
         features.Azimuth: SimpleNamespace(value=azimuth_pos * math.tau),
         features.Angles: SimpleNamespace(values=angles),
+        features.ArmTravel: SimpleNamespace(values=travel),
         features.AngleSymmetry: SimpleNamespace(values=np.full(len(features.SymmetryElement), np.nan)),
         features.Similarity: SimpleNamespace(values=sim_values),
         features.LegDeviation: SimpleNamespace(value=legs),
@@ -90,8 +93,6 @@ class PoseInstrumentTest(unittest.TestCase):
     def setUp(self) -> None:
         self.cfg = PoseInstrumentSettings()
         self.cfg.window.attack_seconds = 0.0              # present at once — geometry tests read one frame
-        M = self.cfg.measures                             # no dead zones: the tests read the raw measures
-        M.arm_neutral = M.arm_raised = M.bend_neutral = M.legs_neutral = M.legs_full = 0.0
         W, B = self.cfg.white_lines, self.cfg.blue_lines              # the placeholder's patch: white out, blue in
         W.pulse_width, W.pulse_width_amount, W.phase = 0.0, 1.0, self.QUARTER
         B.pulse_width, B.pulse_width_amount, B.phase = 1.0, -1.0, -0.5 + self.QUARTER
@@ -174,12 +175,6 @@ class PoseInstrumentTest(unittest.TestCase):
             self.assertAlmostEqual(white[Parameter.SPEED], 0.5 + tilt, places=5, msg=f"tilt {tilt}")   # the turn plus the bend
             self.assertAlmostEqual(blue[Parameter.SPEED], tilt, places=5, msg=f"tilt {tilt}")         # the same bend, one sign
 
-    def test_the_bend_has_a_dead_zone(self) -> None:
-        self.cfg.measures.bend_neutral = 0.1
-        for tilt, expected in ((0.05, 0.0), (-0.05, 0.0), (-0.55, -0.5), (1.0, 1.0)):
-            white, _ = self._connect(_pose(0.5, tilt=tilt))
-            self.assertAlmostEqual(white[Parameter.SPEED], expected, places=5, msg=f"tilt {tilt}")
-
     def test_a_lean_makes_the_white_faster_and_the_blue_slower_and_back(self) -> None:
         W, B = self.cfg.white_lines, self.cfg.blue_lines
         W.speed, B.speed = 3.5, -3.5                                   # white out, blue in: a quarter interval a second
@@ -192,24 +187,15 @@ class PoseInstrumentTest(unittest.TestCase):
             self._on_grid(self._inner(f.white), INTERVAL, white_moved % INTERVAL)
             self._on_grid(self._inner(f.blue), INTERVAL, (INTERVAL / 2 + blue_moved) % INTERVAL)
 
-    def test_the_sign_of_an_angle_is_not_a_measure(self) -> None:
+    def test_the_sign_of_a_travel_is_not_a_measure(self) -> None:
         # The sign is the side of the body the arm passes; straight up is π from either side.
         for angle in (shoulder(0.5), -shoulder(0.5)):
             self.assertAlmostEqual(self._connect(_pose(0.5, left_shoulder=angle))[0][Parameter.PULSE_WIDTH], 0.5, places=5)
 
-    def test_the_dead_zones_come_off_either_end_of_an_arm_angle(self) -> None:
-        M = self.cfg.measures
-        M.arm_neutral = M.arm_raised = 10.0
-        for degrees, expected in ((5.0, 0.0), (10.0, 0.0), (20.0, 10 / 160), (90.0, 0.5), (170.0, 1.0), (175.0, 1.0)):
-            white, _ = self._connect(_pose(0.5, left_shoulder=math.radians(degrees)))
-            self.assertAlmostEqual(white[Parameter.PULSE_WIDTH], expected, places=5, msg=f"{degrees}°")
-
-    def test_the_legs_have_dead_zones_too(self) -> None:
-        M = self.cfg.measures
-        M.legs_neutral, M.legs_full = 0.1, 0.05
-        for legs, expected in ((0.05, 0.0), (0.1, 0.0), (0.525, 0.5), (0.95, 1.0)):
+    def test_the_legs_are_the_lfos_level_as_they_come(self) -> None:
+        for legs in (0.0, 0.525, 1.0):
             self._connect(_pose(0.5, legs=legs))
-            self.assertAlmostEqual(self.layer.connect_lfo(self.layer._players[0]), expected, places=5, msg=f"legs {legs}")
+            self.assertAlmostEqual(self.layer.connect_lfo(self.layer._players[0]), legs, places=5, msg=f"legs {legs}")
 
     def test_the_distance_is_a_source_that_plays_nothing_yet(self) -> None:
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, distance=0.0)})

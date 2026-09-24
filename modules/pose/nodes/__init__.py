@@ -10,6 +10,7 @@ from .extractors.AgeExtractor import            AgeExtractor
 from .extractors.MotionTimeExtractor import     MotionTimeExtractor
 from .extractors.LegDeviationExtractor import   LegDeviationExtractor, LegDeviationExtractorSettings
 from .extractors.ArmDeviationExtractor import   ArmDeviationExtractor, ArmDeviationExtractorSettings
+from .extractors.ArmTravelExtractor import      ArmTravelExtractor, ArmTravelExtractorSettings
 from .extractors.TorsoTiltExtractor import      TorsoTiltExtractor, TorsoTiltExtractorSettings
 from .extractors.AzimuthExtractor import        AzimuthExtractor
 

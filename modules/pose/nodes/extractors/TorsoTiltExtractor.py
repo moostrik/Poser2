@@ -18,7 +18,9 @@ _MIN_SPINE: float = 0.02
 
 
 class TorsoTiltExtractorSettings(BaseSettings):
-    """Configuration for TorsoTiltExtractor."""
+    """The lean's range: 0 inside the dead zone around upright, ±1 from ``tilt_degrees`` on."""
+    neutral_dead_zone: Field[float] = Field(0.0, min=0.0, max=30.0, step=0.5, row_label="Torso", newline=True, label="Neutral Dead Zone",
+                                            description="Lean within this of upright reads 0 (°)")
     tilt_degrees: Field[float] = Field(45.0, min=1.0, max=90.0, step=0.5,
                                        description="Spine angle from vertical (°) that counts as full lean (±1.0)")
     aspect_ratio: Field[float] = Field(0.75, access=Field.INIT,
@@ -30,8 +32,9 @@ class TorsoTiltExtractor(FilterNode):
 
     Spine = hip midpoint → shoulder midpoint, with y scaled by 1/aspect_ratio exactly as
     ``AngleUtils.from_points`` does, so the angle is geometrically true. The signed angle from
-    vertical (arctan2) is normalised by ``tilt_degrees`` and clipped to [-1, 1]: 0 = upright,
-    positive = shoulders toward image right of the hips. Forward/backward lean is not
+    vertical (arctan2) goes through the ``neutral_dead_zone`` around upright, then is
+    normalised so ``tilt_degrees`` reads ±1, clipped to [-1, 1]: 0 = upright, positive = shoulders
+    toward image right of the hips. Forward/backward lean is not
     measured — in 2D it is only foreshortening. Leaves the frame unchanged when any spine
     keypoint is missing or the spine is degenerate.
 
@@ -54,6 +57,9 @@ class TorsoTiltExtractor(FilterNode):
             return pose
 
         angle = math.atan2(float(spine[0]), float(-spine[1]))   # 0 upright, +x = image right
-        tilt = max(-1.0, min(1.0, angle / math.radians(self._config.tilt_degrees)))
+        neutral = math.radians(self._config.neutral_dead_zone)
+        span = max(math.radians(self._config.tilt_degrees) - neutral, 1e-6)    # a zero-width range is a step at neutral
+        lean = math.copysign(max(abs(angle) - neutral, 0.0), angle)
+        tilt = max(-1.0, min(1.0, lean / span))
         score = float(min(points.get_scores(_SPINE)))
         return replace(pose, {TorsoTilt: TorsoTilt.from_value(tilt, score)})

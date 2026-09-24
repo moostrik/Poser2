@@ -7,9 +7,11 @@ outward from the person, mirrored (or, with an oscillator's Mirror off, passing 
 sent to white and one to blue, thinned to nothing toward the window's **reach** each side. The
 bridge is everything the synth does not know:
 
-- the **measures**: pose features and nothing else, read from the LERP frames; ``connect`` is the
-  wiring of the document's *The connections* written out, a person's measures into the sources of
-  the synth's slots. The bases and amounts are settings of the ``PI`` group; the wiring is code.
+- the **measures**: pose features and nothing else, read from the LERP frames, their dead zones
+  already applied by the pipeline (``ArmTravel``, the body bend's and the leg deviation's
+  extractors); ``connect`` is the wiring of the document's *The connections* written out, a
+  person's measures into the sources of the synth's slots. The bases and amounts are settings of
+  the ``PI`` group; the wiring is code.
 - the **events**: presence (a pose is seen), the hit (``PlayheadCrossing``, the tick closest to
   the crossing: each oscillator's push and the mask's flash), and sync, which grows the reach on
   a partner's side until it reaches them, from ``window.sync_threshold`` on.
@@ -73,16 +75,6 @@ class MaskSettings(BaseSettings):
     flash_release_seconds: Field[float] = Field(0.3, min=0.0, max=2.0,  step=0.05, widget=KNOB, label="Release", description="Flash falls back to the mask's levels over (s)")
 
 
-class MeasureSettings(BaseSettings):
-    """The measures: the dead zones the bridge puts on what the body gives before it becomes a
-    source. A measure reads 0 up to its neutral zone, 1 from its far zone on, linear between."""
-    arm_neutral:  Field[float] = Field(10.0, min=0.0, max=45.0, step=0.5,  widget=KNOB, label="Neutral", description="Arm angles within this of neutral read 0 (deg)", row_label="Arms", newline=True)
-    arm_raised:   Field[float] = Field(10.0, min=0.0, max=45.0, step=0.5,  widget=KNOB, label="Raised",  description="Arm angles within this of raised read 1 (deg)")
-    bend_neutral: Field[float] = Field(0.1,  min=0.0, max=0.5,  step=0.01, widget=KNOB, label="Neutral", description="Body bend within this of straight reads 0 (fraction)", row_label="Bend", newline=True)
-    legs_neutral: Field[float] = Field(0.1,  min=0.0, max=0.5,  step=0.01, widget=KNOB, label="Neutral", description="Leg deviation within this of standing reads 0 (fraction)", row_label="Legs", newline=True)
-    legs_full:    Field[float] = Field(0.0,  min=0.0, max=0.5,  step=0.01, widget=KNOB, label="Full",    description="Leg deviation within this of full reads 1 (fraction)")
-
-
 class BreathSettings(BaseSettings):
     """The breath: a sine in time the bridge makes per person, swinging the width of the colour
     whose shoulder is the higher. A depth of ½ or less keeps both fixed points exact."""
@@ -92,14 +84,13 @@ class BreathSettings(BaseSettings):
 
 class PoseInstrumentSettings(BaseSettings):
     """The ``PI`` root group, a group per concept: the mask, the playhead's marker, the window,
-    the measures' dead zones, the breath, the two oscillators and the LFO (the synth's patch, a slot per
-    parameter), the dummy. The wiring is ``connect``."""
+    the breath, the two oscillators and the LFO (the synth's patch, a slot per parameter), the
+    dummy. The wiring is ``connect``; the measures' dead zones are the pipeline's."""
     max_lines:   Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
     opposite:    Field[bool] = Field(False, description="Draw each person's lines half a turn away; the masks stay on the people")
     mask:        Group[MaskSettings]           = Group(MaskSettings)
     playhead:    Group[PlayheadMarkerSettings] = Group(PlayheadMarkerSettings)
     window:      Group[WindowSettings]         = Group(WindowSettings)
-    measures:    Group[MeasureSettings]        = Group(MeasureSettings)
     breath:      Group[BreathSettings]         = Group(BreathSettings)
     white_lines: Group[OscillatorSettings]     = Group(OscillatorSettings)
     blue_lines:  Group[OscillatorSettings]     = Group(OscillatorSettings)
@@ -114,10 +105,12 @@ class _Player:
     """One person: their voice, their measures, and this tick's events."""
     voice:          Voice
     position:       float = 0.0     # normalized azimuth
-    left_shoulder:  float = 0.0     # the four arm angles (rad)
+    left_shoulder:  float = 0.0     # the four arm travels, the absolute of ArmTravel [0, 1]
     right_shoulder: float = 0.0
     left_elbow:     float = 0.0
     right_elbow:    float = 0.0
+    left_turn:      float = 0.0     # the two elbow angles (rad), for the turn
+    right_turn:     float = 0.0
     legs:           float = 0.0     # LegDeviation [0, 1]
     tilt:           float = 0.0     # TorsoTilt [-1, 1]
     distance:       float = 0.0     # Distance [0, 1]
@@ -206,11 +199,14 @@ class PoseInstrument(ProjectionLayer):
                 p = self._players[id] = _Player(Voice(P.white_lines, P.blue_lines, P.window, P.lfo, turn=360.0))
             p.present = True
             p.position = normalize_azimuth(azimuth)
+            travel = np.abs(pose[features.ArmTravel].values)
+            p.left_shoulder  = self._value(travel[features.TravelElement.left_shoulder],  p.left_shoulder)
+            p.right_shoulder = self._value(travel[features.TravelElement.right_shoulder], p.right_shoulder)
+            p.left_elbow     = self._value(travel[features.TravelElement.left_elbow],     p.left_elbow)
+            p.right_elbow    = self._value(travel[features.TravelElement.right_elbow],    p.right_elbow)
             angles = pose[features.Angles].values
-            p.left_shoulder  = self._value(angles[features.AngleLandmark.left_shoulder],  p.left_shoulder)
-            p.right_shoulder = self._value(angles[features.AngleLandmark.right_shoulder], p.right_shoulder)
-            p.left_elbow     = self._value(angles[features.AngleLandmark.left_elbow],     p.left_elbow)
-            p.right_elbow    = self._value(angles[features.AngleLandmark.right_elbow],    p.right_elbow)
+            p.left_turn  = self._value(angles[features.AngleLandmark.left_elbow],  p.left_turn)
+            p.right_turn = self._value(angles[features.AngleLandmark.right_elbow], p.right_turn)
             p.legs = self._value(pose[features.LegDeviation].value, p.legs)
             p.tilt = self._value(pose[features.TorsoTilt].value, p.tilt)
             p.distance = self._value(pose[features.Distance].value, p.distance)
@@ -264,24 +260,25 @@ class PoseInstrument(ProjectionLayer):
           so a lean one way makes the white faster and the blue slower, the other way the reverse
         - the LFO, the symmetries, the distance, the phases, the hardness: unconnected
 
-        Every measure but the turn passes its dead zones first (``PI.measures``). The mean, the
-        excess, the turn and the sums are computed here while the matrix is tried; once liked
-        they move into the pipeline. The breath is the bridge's own, as the mask's flash is.
+        The measures come with their dead zones from the pipeline: the arm travels
+        (``ArmTravel``, ``pose.arm_travel_extractor``), the absolute taken since the sign is the
+        side of the body the limb passes, which the design gives no meaning; the body bend
+        (``pose.torso_tilt_extractor``). The turn is the raw elbow angle. The mean, the excess,
+        the turn and the sums are computed here while the matrix is tried; once liked they move
+        into the pipeline. The breath is the bridge's own, as the mask's flash is.
         """
-        M = self._instrument.measures
-        bend = math.copysign(self._remap(abs(p.tilt), M.bend_neutral, 1.0), p.tilt)
-        left, right = self._measure(p.left_shoulder), self._measure(p.right_shoulder)
+        left, right = p.left_shoulder, p.right_shoulder
         shoulders = (left + right) / 2.0
         swing = self._instrument.breath.depth * self._breath(p)
         white = {
             Parameter.PULSE_WIDTH: shoulders + swing * max(0.0, left - right),
-            Parameter.PITCH:       self._measure(p.left_elbow),
-            Parameter.SPEED:       math.sin(p.left_elbow) + bend,
+            Parameter.PITCH:       p.left_elbow,
+            Parameter.SPEED:       math.sin(p.left_turn) + p.tilt,
         }
         blue = {
             Parameter.PULSE_WIDTH: shoulders + swing * max(0.0, right - left),
-            Parameter.PITCH:       self._measure(p.right_elbow),
-            Parameter.SPEED:       math.sin(p.right_elbow) + bend,
+            Parameter.PITCH:       p.right_elbow,
+            Parameter.SPEED:       math.sin(p.right_turn) + p.tilt,
         }
         return white, blue
 
@@ -291,25 +288,10 @@ class PoseInstrument(ProjectionLayer):
         return float(Oscillator.sine(p.breath.cycle(_BREATH_POSITION, 1.0, 0.0), 1.0)[0])
 
     def connect_lfo(self, p: _Player) -> float:
-        """The source of the LFO's level: the leg deviation, through its dead zones
-        (``PI.measures``). The LFO feeds no parameter in Option 1; it is there when one needs it."""
-        M = self._instrument.measures
-        return self._remap(p.legs, M.legs_neutral, 1.0 - M.legs_full)
-
-    def _measure(self, angle: float) -> float:
-        """An angle as a measure 0..1: the pipeline's angles are calibrated so neutral is 0 and
-        the raised pose π (``AngleCalibrator``), and π is the feature's range, not a tunable. The
-        sign is the side of the body the limb passes, which the design gives no meaning, so the
-        absolute is taken. The dead zones of ``PI.measures`` around neutral and raised come off
-        either end, so both fixed points are reached."""
-        M = self._instrument.measures
-        return self._remap(abs(angle), math.radians(M.arm_neutral), math.pi - math.radians(M.arm_raised))
-
-    @staticmethod
-    def _remap(x: float, lo: float, hi: float) -> float:
-        """``x`` as 0..1 between ``lo`` and ``hi``, clamped: a dead zone below ``lo`` and above
-        ``hi``, linear between; continuous, so never a jump."""
-        return min(max((x - lo) / max(hi - lo, 1e-6), 0.0), 1.0)
+        """The source of the LFO's level: the leg deviation, its dead zone the pipeline's
+        (``pose.leg_deviation_extractor``). The LFO feeds no parameter in Option 1; it is there
+        when one needs it."""
+        return p.legs
 
     # -- Reach and sync ---------------------------------------------------------------
 

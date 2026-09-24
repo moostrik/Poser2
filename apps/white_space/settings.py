@@ -254,6 +254,7 @@ class PoseGroup(BaseSettings):
     angle_calibrator: Group[nodes.AngleCalibratorSettings]   = Group(nodes.AngleCalibratorSettings)
     leg_deviation_extractor: Group[nodes.LegDeviationExtractorSettings] = Group(nodes.LegDeviationExtractorSettings)
     arm_deviation_extractor: Group[nodes.ArmDeviationExtractorSettings] = Group(nodes.ArmDeviationExtractorSettings)
+    arm_travel_extractor: Group[nodes.ArmTravelExtractorSettings] = Group(nodes.ArmTravelExtractorSettings)
     torso_tilt_extractor: Group[nodes.TorsoTiltExtractorSettings] = Group(nodes.TorsoTiltExtractorSettings)
     bbox            : Group[BboxFeature]                     = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                    = Group(PointFeature, share=_feature_share)

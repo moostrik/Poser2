@@ -156,6 +156,8 @@ smoothed angles; this stage only takes the edge off.
 - **Angle smoothing feeds both.** `pose.angle.smoother` shapes the angles the feature compares (SMOOTH) and
   the angles the hit reads (LERP, after prediction and the chase). The similarity smoothers shape only the
   feature.
+- **The dead zones do not.** Both compare `Angles`, never the arm travel (`POSE_INSTRUMENT.md`, *The body*),
+  so the instruments' dead zones widen no match and the degrees above stay true.
 - **`max_players`** (root) is the `Similarity` row's width; a player id beyond it has no slot.
 - **hd_trio** compares movement over time with `WindowSimilarity` (`window_similarity.py`), a bell kernel
   with its own remap; White Space does not use it. The joint selection (`joint_select.py`) is shared.

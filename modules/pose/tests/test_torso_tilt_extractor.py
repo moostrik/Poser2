@@ -65,6 +65,19 @@ class TorsoTiltExtractorTest(unittest.TestCase):
     def test_beyond_full_lean_clamps(self) -> None:
         self.assertAlmostEqual(self._tilt(_lean(math.pi / 2.0 - 0.1)), 1.0, places=5)
 
+    def test_the_neutral_zone_reads_zero_and_full_lean_still_one(self) -> None:
+        cfg = TorsoTiltExtractorSettings()
+        cfg.tilt_degrees = TILT_DEGREES
+        cfg.aspect_ratio = ASPECT
+        cfg.neutral_dead_zone = 5.0
+        extractor = TorsoTiltExtractor(cfg)
+        for degrees, expected in ((3.0, 0.0), (-3.0, 0.0), (5.0, 0.0), (25.0, 0.5), (-25.0, -0.5), (TILT_DEGREES, 1.0), (60.0, 1.0)):
+            tilt = extractor.process(_lean(math.radians(degrees)))[TorsoTilt].value
+            self.assertAlmostEqual(tilt, expected, places=3, msg=f"{degrees}°")
+        just_in = extractor.process(_lean(math.radians(4.9)))[TorsoTilt].value
+        just_out = extractor.process(_lean(math.radians(5.1)))[TorsoTilt].value
+        self.assertLess(abs(just_out - just_in), 0.01)                  # continuous at the zone's edge
+
     def test_aspect_correction_matters(self) -> None:
         # Without the y correction the same crop-space geometry reads as a bigger lean.
         cfg = TorsoTiltExtractorSettings()

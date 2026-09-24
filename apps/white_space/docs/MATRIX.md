@@ -15,7 +15,8 @@ above it.
 
 ## Measures
 
-Each 0..1 after the dead zones: 0 at neutral; the shoulders 1 at raised, the elbows 0 at raised.
+Each 0..1 after the pipeline's dead zones (`POSE_INSTRUMENT.md`, *The body*): 0 at neutral; the
+shoulders 1 at raised, the elbows 0 at raised.
 
 | Measure             | What it is                                                              |
 |---------------------|-------------------------------------------------------------------------|

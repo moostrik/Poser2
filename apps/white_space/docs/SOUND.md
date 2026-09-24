@@ -16,10 +16,10 @@ The measures (`POSE_INSTRUMENT.md`, *What each measure means*):
 
 | In the light instrument | Pose feature       | OSC address                  | Index | On the wire                    | The light reads it as   |
 |-------------------------|--------------------|------------------------------|-------|--------------------------------|-------------------------|
-| left shoulder           | `Angles`           | `/pose/{id}/angle/rad`       | 0     | −π..π; 0 hanging, ±π up        | absolute over π, 0..1   |
-| right shoulder          | `Angles`           | `/pose/{id}/angle/rad`       | 1     | −π..π; 0 hanging, ±π up        | absolute over π, 0..1   |
-| left elbow              | `Angles`           | `/pose/{id}/angle/rad`       | 2     | −π..π; 0 straight, ±π folded   | absolute over π, 0..1   |
-| right elbow             | `Angles`           | `/pose/{id}/angle/rad`       | 3     | −π..π; 0 straight, ±π folded   | absolute over π, 0..1   |
+| left shoulder           | `ArmTravel` × π    | `/pose/{id}/angle/rad`       | 0     | −π..π; 0 hanging, ±π up        | absolute over π, 0..1   |
+| right shoulder          | `ArmTravel` × π    | `/pose/{id}/angle/rad`       | 1     | −π..π; 0 hanging, ±π up        | absolute over π, 0..1   |
+| left elbow              | `ArmTravel` × π    | `/pose/{id}/angle/rad`       | 2     | −π..π; 0 straight, ±π folded   | absolute over π, 0..1   |
+| right elbow             | `ArmTravel` × π    | `/pose/{id}/angle/rad`       | 3     | −π..π; 0 straight, ±π folded   | absolute over π, 0..1   |
 | leg deviation           | `LegDeviation`     | `/pose/{id}/angle/legs`      | –     | 0..1; 0 standing, 1 bent       | as sent                 |
 | body bend               | `TorsoTilt`        | `/pose/{id}/angle/tilt`      | –     | −1..1; −1 left, 1 right        | as sent                 |
 | distance                | `Distance`         | `/pose/{id}/distance`        | –     | 0..1; 0 near edge, 1 far edge  | unconnected             |
@@ -35,10 +35,12 @@ The events and the place (`POSE_INSTRUMENT.md`, *Events*):
 | presence                | the pose itself    | `/pose/{id}/active`          | –     | 1 present, 0 gone              | the presence envelope's gate                |
 | where the person stands | `Azimuth`          | `/pose/{id}/azimuth`         | –     | radians                        | the centre of the window and the mask       |
 
-The angles are calibrated before they are sent (`POSE_INSTRUMENT.md`, *The body*), so the two fixed
-points are 0 and π for sound and light alike. They go out signed: the sign is the side of the body
-the limb passes. The light takes the absolute over π (`PoseInstrument._measure`); Max does the same
-to read an arm as the light reads it.
+The four arm entries of `angle/rad` are the arm travel times π (`POSE_INSTRUMENT.md`, *The body*):
+the calibrated angle through the pipeline's dead zones, so a hanging arm sends exactly 0 and a
+raised one exactly ±π, and the two fixed points are the same for sound and light. The other five
+entries are the calibrated angles as they are. Every entry goes out signed: the sign is the side of
+the body the limb passes. The light takes the absolute over π; Max does the same to read an arm as
+the light reads it. `OscSoundSender._angle_values` builds the list.
 
 The distance is how far the person stands from the fixture within the tracked zone: 0 at
 `track.rig.zone_min_radius`, 1 at `track.rig.zone_max_radius`, clamped. The tracker reads it from
@@ -164,6 +166,8 @@ its term. With it:
 
 As the wire is now:
 
+- `/pose/{id}/angle/vel` is the raw angles' velocity, so inside a dead zone the wire reports an arm
+  moving at a fixed position; whether the patch reads the velocity
 - The reset of `/pose/{id}/angle/rad` and `/pose/{id}/angle/vel` sends 17 zeros, the live message
   9 values (`OscSound._add_inactive_frame_messages`); whether Max depends on the list length
 - `/pose/{id}/similarity/motion` sends the plain similarity row although its comment says

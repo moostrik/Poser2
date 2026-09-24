@@ -286,7 +286,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 1233,
+        "iso": 1361,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -437,7 +437,7 @@
       "elbow_raised": 166.0
     },
     "leg_deviation_extractor": {
-      "min_degrees": 20.0,
+      "neutral_dead_zone": 20.0,
       "hip_max_degrees": 60.0,
       "knee_max_degrees": 90.0,
       "n_top": 2
@@ -447,8 +447,15 @@
       "max_degrees": 45.0,
       "n_top": 1
     },
+    "arm_travel_extractor": {
+      "shoulder_neutral_dead_zone": 10.0,
+      "shoulder_raised_dead_zone": 10.0,
+      "elbow_neutral_dead_zone": 10.0,
+      "elbow_folded_dead_zone": 10.0
+    },
     "torso_tilt_extractor": {
-      "tilt_degrees": 22.9,
+      "neutral_dead_zone": 6.0,
+      "tilt_degrees": 24.0,
       "aspect_ratio": 0.75
     },
     "bbox": {},
@@ -877,13 +884,6 @@
       "attack_seconds": 1.0,
       "release_seconds": 1.5
     },
-    "measures": {
-      "arm_neutral": 10.0,
-      "arm_raised": 10.0,
-      "bend_neutral": 0.1,
-      "legs_neutral": 0.1,
-      "legs_full": 0.0
-    },
     "breath": {
       "rate": 0.5,
       "depth": 0.4
@@ -951,19 +951,19 @@
     "dummy": {
       "enabled": false,
       "solo": false,
-      "azimuth": 129.0,
+      "azimuth": 180.0,
       "distance": 0.5,
       "torso": 0.0,
-      "left_shoulder": -170.0,
-      "right_shoulder": -170.0,
-      "left_elbow": -14.0,
-      "right_elbow": -14.0,
+      "left_shoulder": -20.0,
+      "right_shoulder": -20.0,
+      "left_elbow": 12.0,
+      "right_elbow": 12.0,
       "left_hip": -10.0,
       "right_hip": -9.0,
       "left_knee": 8.0,
       "right_knee": 8.0,
       "morph": 1.2,
-      "pose": "raised",
+      "pose": "neutral",
       "name": ""
     }
   },

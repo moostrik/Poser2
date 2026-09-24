@@ -272,6 +272,11 @@ class OscSound:
             leader_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(leader_reset_msg.build()) # type: ignore
 
+    def _angle_values(self, frame: Frame) -> list[float]:
+        """The nine values of ``/pose/{id}/angle/rad``, in ``AngleLandmark`` order; a subclass may
+        shape some of them."""
+        return frame[Angles].values.tolist()
+
     def _add_active_frame_messages(self, bundle_builder: OscBundleBuilder, frame: Frame, frames: FrameDict, num_players: int) -> None:
         id: int = frame.track_id
         active_msg = OscMessageBuilder(address=f"/pose/{id}/active")
@@ -298,7 +303,7 @@ class OscSound:
         bundle_builder.add_content(change_msg.build()) # type: ignore
 
         # range [-pi, pi]
-        angle_rad_values: list[float] = frame[Angles].values.tolist()
+        angle_rad_values: list[float] = self._angle_values(frame)
         angle_rad_msg = OscMessageBuilder(address=f"/pose/{id}/angle/rad")
         for angle in angle_rad_values:
             angle_rad_msg.add_arg(angle, OscMessageBuilder.ARG_TYPE_FLOAT)

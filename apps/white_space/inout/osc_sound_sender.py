@@ -6,7 +6,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 
 from modules.inout import OscSound as BaseOscSound, OscSoundSettings
 from modules.pose.frame import Frame as PoseFrame, FrameDict
-from modules.pose.features import Azimuth, Distance
+from modules.pose.features import Azimuth, Distance, Angles, ArmTravel, TravelElement
 from modules.session import SequencerState
 from ..light import Frame
 from ..pose import GhostElement, GhostFeature, PlayheadOffset
@@ -28,6 +28,10 @@ class OscSoundSender(BaseOscSound):
     as an azimuth. With the speakers placed by the fixed layout (speaker 0 on the connection
     side, counter-clockwise from there) it is 0 and Max needs no constant at all — see
     ``docs/CALIBRATION.md``. Radians on the wire, like every other azimuth here.
+
+    The four arm entries of ``/pose/{id}/angle/rad`` carry the arm travel times π
+    (``ArmTravel``: the calibrated angle through the pipeline's dead zones), so Max's absolute
+    over π reads the value the light reads; the other entries are the angles (``docs/SOUND.md``).
 
     Also owns the id-slot count: it sends ``max_players`` live slots plus ``virtual_players``
     ghost slots (ids Ghoster injects beyond the tracked players). It overrides the base's
@@ -106,6 +110,13 @@ class OscSoundSender(BaseOscSound):
         speaker_msg = OscMessageBuilder(address="/global/speaker/offset")
         speaker_msg.add_arg(math.radians(self._config.speaker_offset), OscMessageBuilder.ARG_TYPE_FLOAT)  # type: ignore[attr-defined]
         bundle_builder.add_content(speaker_msg.build())  # type: ignore
+
+    def _angle_values(self, frame: PoseFrame) -> list[float]:
+        """The angles, the four arm entries replaced by the travel × π (see the class doc)."""
+        values = frame[Angles].values.astype(np.float64)
+        if ArmTravel in frame:
+            values[:len(TravelElement)] = frame[ArmTravel].values * math.pi
+        return values.tolist()
 
     def _add_active_frame_messages(self, bundle_builder: OscBundleBuilder, frame: PoseFrame, frames: FrameDict, num_players: int) -> None:
         super()._add_active_frame_messages(bundle_builder, frame, frames, num_players)
