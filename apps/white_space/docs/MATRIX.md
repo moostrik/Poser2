@@ -105,8 +105,8 @@ outward is the sign of the amount.
 
 ## Option 3 Matrix
 
-The wired option (`PoseInstrument.connect`): Option 2 with a breathing width. The instrument
-makes the breath as part of the source it hands to each pulse width slot, as it makes the mask's
+Option 2 with a breathing width. The instrument makes the breath as part of the source it hands
+to each pulse width slot, as it makes the mask's
 flash: the shoulders' mean sets where the width rests, and the higher shoulder makes its own
 colour's width swing around it. The synth is unchanged. The phases go: they showed the shoulder
 difference only while moving.
@@ -154,6 +154,59 @@ at most twice the smaller of the mean and one less the mean, so with a depth of 
 never passes full or none, and the width reaches both fixed points exactly. The breathing colour
 no longer tiles with the still one: as it swells past the other's gap the overlap tone shows, as
 it thins, dark.
+
+## Option 4 Matrix
+
+The wired option (`PoseInstrument.connect`): Option 3 with the breath symmetric, the turns on the
+phases and the speed the body bend's alone.
+
+Both colours breathe, as far as the shoulders are apart; which shoulder is the higher sets the
+relation between them, not which one breathes. One colour breathing while the other stood still
+read as one arm doing much more than the other, since white breathing shows far stronger than
+blue.
+
+| Source      | What it is                                                               |
+|-------------|--------------------------------------------------------------------------|
+| breath      | a sine in time, −1..1, at the breath's rate (0.5 Hz), one per person     |
+| gap         | how far apart the shoulders are: the difference, unsigned                |
+| swing       | depth × gap × breath                                                     |
+| white width | shoulders + swing                                                        |
+| blue width  | shoulders − swing with the left higher, shoulders + swing with the right |
+
+The depth is a setting, 0.4; at most ½ (below).
+
+| Oscillator | Parameter   | Source           | Base   | Amount |
+|------------|-------------|------------------|--------|--------|
+| white      | pitch       | left elbow       | 25.7   | 46.3   |
+| white      | pulse width | white width      | 0      | 1      |
+| white      | phase       | left elbow turn  | 0      | ¼      |
+| white      | speed       | body bend        | 0°/s   | 15°/s  |
+| white      | hardness    |                  | 1      |        |
+| blue       | pitch       | right elbow      | 25.7   | 46.3   |
+| blue       | pulse width | blue width       | 1      | −1     |
+| blue       | phase       | right elbow turn | ½      | ¼      |
+| blue       | speed       | body bend        | 0°/s   | 15°/s  |
+| blue       | hardness    |                  | 1      |        |
+
+| Pose                   | White               | Blue                          |
+|------------------------|---------------------|-------------------------------|
+| neutral                | none, still         | full, still                   |
+| raised                 | full, still         | none, still                   |
+| T                      | ½, still            | ½, still                      |
+| left up, right hanging | ½, breathing        | ½, breathing in step          |
+| right up, left hanging | ½, breathing        | ½, breathing complementary    |
+
+Blue's slot inverts its source, so the same swing on both is the two colours breathing together,
+between dark and the overlap tone, and the opposite swing keeps them complementary, the boundary
+between them sliding. The sign turns where the shoulders are level and the swing is 0 there, so
+nothing jumps. Level shoulders have no gap, so neutral, raised and a T are still; the gap is at
+most twice the smaller of the mean and one less the mean, so a depth of ½ or less never takes a
+width past none or full and both fixed points stay exact.
+
+The speed is the body bend's alone, its base 0: a straight body leaves the lines standing and
+every movement of a still pose comes from moving the arms. A lean carries both colours the same
+way, the amounts being the knobs if they should ever counter-flow. A turn shifts its own colour's
+lines a quarter interval at ±90° and holds them where they are.
 
 ## Parked
 

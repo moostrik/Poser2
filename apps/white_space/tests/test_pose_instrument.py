@@ -154,41 +154,40 @@ class PoseInstrumentTest(unittest.TestCase):
         self.cfg.breath.rate, self.cfg.breath.depth = 0.0, 0.4                          # the breath held at its crest, 1
         white, blue = self._connect(_pose(0.5, left_shoulder=shoulder(0.25), right_shoulder=shoulder(0.75),
                                           left_elbow=shoulder(0.5), right_elbow=shoulder(1.0)))
-        self.assertAlmostEqual(white[Parameter.PULSE_WIDTH], 0.5, places=5)          # the mean; the left is lower: still
-        self.assertAlmostEqual(blue[Parameter.PULSE_WIDTH], 0.5 + 0.4 * 0.5, places=5)   # the right higher: its excess swings
-        self.assertNotIn(Parameter.PHASE, white)
-        self.assertNotIn(Parameter.PHASE, blue)
+        gap = 0.4 * 0.5                                                              # the depth times the shoulders' gap
+        self.assertAlmostEqual(white[Parameter.PULSE_WIDTH], 0.5 + gap, places=5)    # the mean, swung by the breath
+        self.assertAlmostEqual(blue[Parameter.PULSE_WIDTH], 0.5 + gap, places=5)     # the right higher: complementary
         self.assertAlmostEqual(white[Parameter.PITCH], 0.5, places=5)                # the left elbow: the white
         self.assertAlmostEqual(blue[Parameter.PITCH], 1.0, places=5)                 # the right elbow: the blue
 
-    def test_each_elbows_turn_is_its_colours_speed(self) -> None:
+    def test_each_elbows_turn_is_its_colours_phase(self) -> None:
         for degrees, turn in ((90.0, 1.0), (-90.0, -1.0), (0.0, 0.0), (180.0, 0.0), (-180.0, 0.0), (30.0, 0.5)):
             white, blue = self._connect(_pose(0.5, left_elbow=math.radians(degrees), right_elbow=-math.radians(degrees)))
-            self.assertAlmostEqual(white[Parameter.SPEED], turn, places=5, msg=f"{degrees}°")    # the left elbow: the white
-            self.assertAlmostEqual(blue[Parameter.SPEED], -turn, places=5, msg=f"{degrees}°")    # the right elbow: the blue
+            self.assertAlmostEqual(white[Parameter.PHASE], turn, places=5, msg=f"{degrees}°")    # the left elbow: the white
+            self.assertAlmostEqual(blue[Parameter.PHASE], -turn, places=5, msg=f"{degrees}°")    # the right elbow: the blue
 
     def test_the_turn_is_continuous_where_the_elbow_folds_through_180(self) -> None:
-        a = self._connect(_pose(0.5, left_elbow=math.radians(179.0)))[0][Parameter.SPEED]
-        b = self._connect(_pose(0.5, left_elbow=math.radians(-179.0)))[0][Parameter.SPEED]
+        a = self._connect(_pose(0.5, left_elbow=math.radians(179.0)))[0][Parameter.PHASE]
+        b = self._connect(_pose(0.5, left_elbow=math.radians(-179.0)))[0][Parameter.PHASE]
         self.assertLess(abs(a - b), 0.04)
 
-    def test_the_body_bend_is_added_to_both_elbow_turns(self) -> None:
+    def test_the_body_bend_alone_is_both_speeds(self) -> None:
         for tilt in (-1.0, 0.0, 0.4):
             white, blue = self._connect(_pose(0.5, tilt=tilt, left_elbow=math.radians(30.0)))
-            self.assertAlmostEqual(white[Parameter.SPEED], 0.5 + tilt, places=5, msg=f"tilt {tilt}")   # the turn plus the bend
-            self.assertAlmostEqual(blue[Parameter.SPEED], tilt, places=5, msg=f"tilt {tilt}")         # the same bend, one sign
+            self.assertAlmostEqual(white[Parameter.SPEED], tilt, places=5, msg=f"tilt {tilt}")   # the turn plays no speed
+            self.assertAlmostEqual(blue[Parameter.SPEED], tilt, places=5, msg=f"tilt {tilt}")
 
-    def test_a_lean_makes_the_white_faster_and_the_blue_slower_and_back(self) -> None:
+    def test_a_straight_body_stands_still_and_a_lean_carries_the_lines(self) -> None:
         W, B = self.cfg.white_lines, self.cfg.blue_lines
-        W.speed, B.speed = 3.5, -3.5                                   # white out, blue in: a quarter interval a second
-        W.speed_amount = B.speed_amount = 3.5                          # a full lean: plus a quarter interval a second
-        for tilt, white_moved, blue_moved in ((1.0, 70, 0), (-1.0, 0, -70), (0.0, 35, -35)):   # px after a second
+        W.speed = B.speed = 0.0                                        # the preset's base: nothing travels by itself
+        W.speed_amount = B.speed_amount = 3.5                          # a full lean: a quarter interval a second
+        for tilt, moved in ((0.0, 0), (1.0, 35), (-1.0, -35)):         # px after a second
             self.layer.reset()
             self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, tilt=tilt)})
             for _ in range(30):
                 f = self._render()
-            self._on_grid(self._inner(f.white), INTERVAL, white_moved % INTERVAL)
-            self._on_grid(self._inner(f.blue), INTERVAL, (INTERVAL / 2 + blue_moved) % INTERVAL)
+            self._on_grid(self._inner(f.white), INTERVAL, moved % INTERVAL)
+            self._on_grid(self._inner(f.blue), INTERVAL, (INTERVAL / 2 + moved) % INTERVAL)
 
     def test_the_sign_of_a_travel_is_not_a_measure(self) -> None:
         # The sign is the side of the body the arm passes; straight up is π from either side.
@@ -230,7 +229,7 @@ class PoseInstrumentTest(unittest.TestCase):
         np.testing.assert_array_equal(f.white[C - MASK:C + MASK + 1], 0.0)    # the mask goes over white
         self.assertEqual(float(f.blue[self._outside_mask()].sum()), 0.0)
 
-    # -- the breath: the higher shoulder's colour --
+    # -- the breath: the shoulders' gap, in step or complementary --
 
     BREATH = 60                                          # ticks in one breath at 0.5 Hz
 
@@ -250,15 +249,22 @@ class PoseInstrumentTest(unittest.TestCase):
         for _ in range(self.BREATH):
             np.testing.assert_array_equal(self._render().light_img, first)
 
-    def test_the_higher_shoulder_breathes_its_own_colour(self) -> None:
+    def test_both_colours_breathe_whichever_shoulder_is_higher(self) -> None:
         depth = self.cfg.breath.depth
-        white, blue = self._widths(1.0, 0.0)                                     # the left up alone
-        self.assertAlmostEqual(max(white) - min(white), 2 * depth, delta=0.02)   # white swings around the mean,
-        self.assertAlmostEqual(sum(white) / len(white), 0.5, delta=0.02)
-        self.assertEqual(set(blue), {0.5})                                       # blue still
-        white, blue = self._widths(0.0, 1.0)                                     # the right up alone
-        self.assertEqual(set(white), {0.5})
-        self.assertAlmostEqual(max(blue) - min(blue), 2 * depth, delta=0.02)
+        for left, right in ((1.0, 0.0), (0.0, 1.0)):
+            white, blue = self._widths(left, right)
+            with self.subTest(left=left, right=right):
+                for widths in (white, blue):                                     # neither colour is left out
+                    self.assertAlmostEqual(max(widths) - min(widths), 2 * depth, delta=0.02)
+                    self.assertAlmostEqual(sum(widths) / len(widths), 0.5, delta=0.02)
+
+    def test_the_left_higher_swings_the_colours_together_and_the_right_higher_apart(self) -> None:
+        white, blue = self._widths(1.0, 0.0)                                     # the left up alone: in step
+        for w, b in zip(white, blue):                                            # blue's slot inverts its source,
+            self.assertAlmostEqual(w, 1.0 - b, places=5)                         # so its width is 1 − b: one breath
+        white, blue = self._widths(0.0, 1.0)                                     # the right up alone: complementary
+        for w, b in zip(white, blue):
+            self.assertAlmostEqual(w, b, places=5)                               # width and 1 − b swing opposite ways
 
     def test_left_up_and_right_up_draw_differently(self) -> None:
         drawn = []
@@ -316,16 +322,15 @@ class PoseInstrumentTest(unittest.TestCase):
             f = self._render()
             self.assertEqual(self._spacings(f.white), self._spacings(f.blue))
 
-    # -- the elbows' turn: the flow --
+    # -- the elbows' turn: the shift --
 
-    def test_an_elbows_turn_flows_its_own_colour_either_way(self) -> None:
-        self.cfg.white_lines.speed_amount = self.cfg.blue_lines.speed_amount = 15.0      # deg/s at a 90° turn
+    def test_an_elbows_turn_shifts_its_own_colour_either_way(self) -> None:
+        self.cfg.white_lines.phase_amount = self.cfg.blue_lines.phase_amount = 0.25      # a quarter interval at a 90° turn
         self.cfg.white_lines.pitch_amount = self.cfg.blue_lines.pitch_amount = 0.0       # the fold leaves the pitch
-        for degrees, moved in ((90.0, 150), (-90.0, -150), (0.0, 0)):                    # px after a second
+        for degrees, moved in ((90.0, 35), (-90.0, -35), (0.0, 0)):                      # px: a quarter interval out
             self.layer.reset()
             self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, left_elbow=math.radians(degrees))})
-            for _ in range(30):
-                f = self._render()
+            f = self._render()
             self._on_grid(self._inner(f.white), INTERVAL, moved % INTERVAL)
             self._on_grid(self._inner(f.blue), INTERVAL, INTERVAL / 2)                   # the right elbow straight: still
 
@@ -334,7 +339,7 @@ class PoseInstrumentTest(unittest.TestCase):
     def test_a_small_move_of_any_measure_is_a_small_change(self) -> None:
         W, B = self.cfg.white_lines, self.cfg.blue_lines
         W.pitch_amount = B.pitch_amount = 46.3
-        self.cfg.breath.rate = 0.0                           # the speed and the breath move the lines in time, not a pose's picture
+        self.cfg.breath.depth = 0.0                          # the breath moves the lines in time, not a pose's picture
         base = dict(left_shoulder=shoulder(0.4), right_shoulder=shoulder(0.6), left_elbow=shoulder(0.3),
                     right_elbow=shoulder(0.5), tilt=0.0)
         # A step that moves an edge by about a pixel: a shoulder's moves a width, an elbow's the

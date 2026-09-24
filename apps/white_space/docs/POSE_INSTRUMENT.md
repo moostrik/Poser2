@@ -144,11 +144,11 @@ measure that is not of the body's pose.
 | Measure             | Role      | Term                                                            |
 |---------------------|-----------|-----------------------------------------------------------------|
 | shoulders (mean)    | primary   | the balance of white and blue: both pulse widths                |
-| shoulder excess     | primary   | which arm is higher: its own colour's width breathes            |
-| left elbow          | primary   | the white: its fold the pitch, its turn the flow                |
-| right elbow         | primary   | the blue: its fold the pitch, its turn the flow                 |
+| shoulders apart     | primary   | both widths breathe; which is higher sets their relation        |
+| left elbow          | primary   | the white: its fold the pitch, its turn a shift                 |
+| right elbow         | primary   | the blue: its fold the pitch, its turn a shift                  |
 | leg deviation       | secondary | open                                                            |
-| body bend           | secondary | the flow: one way the white faster and the blue slower          |
+| body bend           | secondary | the flow: the lines travel by the lean and stand without it     |
 | distance            | secondary | open                                                            |
 | elbow symmetry      | secondary | open: it shows unconnected, as the colours in or out of tune    |
 
@@ -182,16 +182,16 @@ not described.
 | neutral                                     | full blue over the window: the blue ping                         |
 | raised                                      | full white over the window, no blue: the bass                    |
 | arms out level, a T                         | white and blue lines, each half the interval, touching           |
-| left arm up, right hanging                  | the T's widths, the white breathing, the blue still              |
-| right arm up, left hanging                  | the T's widths, the blue breathing, the white still              |
+| left arm up, right hanging                  | the T's widths, both colours breathing together: dark to overlap |
+| right arm up, left hanging                  | the T's widths, both breathing complementary: the edges sliding  |
 | a T, both elbows folded                     | the T's lines, finer, white and blue still in tune               |
 | a T, left elbow folded                      | the white lines finer than the blue: the colours slide apart     |
 | a T, right elbow folded                     | the blue lines finer than the white: the colours slide apart     |
-| a T, leaning left                           | the T, the white slower and the blue faster                      |
-| a T, leaning right                          | the T, the white faster and the blue slower                      |
+| a T, leaning left                           | the T, both colours travelling one way                           |
+| a T, leaning right                          | the T, both travelling the other                                 |
 | a T, in a crouch                            | the T: the legs play nothing                                     |
-| \|__ (a T, the right forearm turned 90°)    | the blue finer and flowing against the white: a moving moiré     |
-| \_\_\| (a T, the left forearm turned 90°)   | the white finer and flowing against the blue: a moving moiré     |
+| \|__ (a T, the right forearm turned 90°)    | the blue finer and shifted against the white: a standing moiré   |
+| \_\_\| (a T, the left forearm turned 90°)   | the white finer and shifted against the blue: a standing moiré   |
 
 ## The body
 
@@ -255,7 +255,7 @@ A **connection** is one measure as the source in one parameter's slot (`LIGHT_SY
 the range and the direction. A measure may feed several parameters; a slot has one source; two
 measures never sum into one parameter.
 
-The arms are `MATRIX.md`'s Option 3. The bases and amounts are the preset's starting values,
+The arms are `MATRIX.md`'s Option 4. The bases and amounts are the preset's starting values,
 tuned on the machine:
 
 | Source              | Range | Parameter         | Base    | Amount     | At full                                        |
@@ -264,25 +264,29 @@ tuned on the machine:
 | blue width          | 0..1  | blue pulse width  | 1       | −1         | no blue                                        |
 | left elbow          | 0..1  | white pitch       | 25.7    | 46.3 lines | 72 lines, one every 5°: finer as the arm folds |
 | right elbow         | 0..1  | blue pitch        | 25.7    | 46.3 lines | 72 lines                                       |
-| left turn + bend    | −2..2 | white speed       | 3.9°/s  | 15°/s      | white flowing one way at +90°, back at −90°    |
-| right turn + bend   | −2..2 | blue speed        | −4.5°/s | 15°/s      | as white's                                     |
+| left elbow turn     | −1..1 | white phase       | 0       | ¼ interval | white a quarter interval out at +90°, in at −90° |
+| right elbow turn    | −1..1 | blue phase        | ½       | ¼ interval | as white's                                     |
+| body bend           | −1..1 | white speed       | 0°/s    | 15°/s      | the lines travelling, a lean carrying them     |
+| body bend           | −1..1 | blue speed        | 0°/s    | 15°/s      | as white's                                     |
 | leg deviation       | 0..1  | the LFO's level   | 0       | 1          | the LFO at full swing; the LFO feeds nothing   |
 
-The widths are the shoulders' mean with the breath on the higher shoulder's colour:
+The widths are the shoulders' mean, breathing as far as the shoulders are apart:
 
 ```
-white width = shoulders + depth × left excess  × breath       left excess  = max(0, left − right)
-blue width  = shoulders + depth × right excess × breath       right excess = max(0, right − left)
+swing       = depth × |left − right| × breath
+white width = shoulders + swing
+blue width  = shoulders − swing with the left higher, shoulders + swing with the right higher
 ```
 
 The breath is a sine in time, −1..1, one per person, at `PI.breath.rate`; the depth is
-`PI.breath.depth`. Level shoulders have no excess, so the fixed points and a T are still; a depth
-of ½ or less keeps every breath inside none and full, so both fixed points stay exact
-(`MATRIX.md`, Option 3). An elbow's turn is the sine of its signed angle: still when straight and
-when fully folded, where +180° and −180° are one pose. The body bend, signed, is
-added to both turns with one sign: white drifts outward and blue inward, so a lean one way makes
-the white faster and the blue slower, the other way the reverse. A turn and a lean share the
-amount, so a forearm and a lean can add or cancel. Unconnected: the LFO, the symmetries, the
+`PI.breath.depth`. Blue's slot inverts its source, so the same swing on both is the two colours
+breathing together and the opposite swing keeps them complementary (*Consequences*). Level
+shoulders have no gap, so the fixed points and a T are still; a depth of ½ or less keeps every
+breath inside none and full, so both fixed points stay exact (`MATRIX.md`, Option 4). An elbow's
+turn is the sine of its signed angle: no shift when straight and when fully folded, where +180°
+and −180° are one pose. The body bend is the only source on the speeds, its base 0, so a straight
+body leaves the lines standing and every movement of a held pose comes from moving the arms.
+Unconnected: the LFO, the symmetries, the
 distance, the phases, the hardness, the strobes.
 
 ## Events
@@ -308,15 +312,19 @@ What follows from the connections, before the machine has been judged **(deducti
 
 - Level shoulders tile the wall: white's width and blue's add up to the interval and blue sits half
   an interval from white, so every pixel is one colour, from full blue through the T to full white.
-  With one shoulder higher its colour breathes against the still other, so the tiling opens and
-  closes: the overlap tone as it swells, dark as it thins; which colour breathes says which arm.
+  Shoulders apart set both colours breathing, so the tiling opens and closes. Which shoulder is
+  the higher says how: the left higher breathes them together, the wall swinging between dark and
+  the overlap tone; the right higher keeps them complementary, so the widths trade and the
+  boundary between the colours slides. Neither arm is the weaker, since both colours move either
+  way.
 - The elbows' symmetry shows by itself, unconnected: equally folded, white and blue share one
   interval and stay in tune; unequally, the colours slide past each other with distance
   (`LIGHT_SYNTH.md`, *In the pose instrument*).
 - An elbow shows nothing while its own colour is solid or dark: the pitch needs a note.
 - An elbow's turn, like its fold, shows nothing while its colour is solid or dark.
-- Unequal elbows also open the tiling, as a moiré that changes along the wall and travels; the
-  breath opens it in time, evenly along the wall.
+- Unequal elbows open the tiling as a moiré that changes along the wall and stands still; the
+  breath opens it in time, evenly along the wall; a lean sets the whole picture travelling. The
+  three read apart because each moves in a different way.
 
 Once the connections have been played on the machine, the *Pose results* are read back here: what
 each row draws, against what it should.
@@ -473,10 +481,12 @@ bridge in `test_pose_instrument.py`; the dummy in `test_dummy.py`.
 
 The rows of *Pose results* draw what that table says, in the unit tests
 (`tests/test_pose_instrument.py`: the two fixed points, exact at any breath, one shoulder moving
-both colours, a T still over a breath, the higher shoulder breathing its own colour, left and
-right up drawn differently, level shoulders tiling, an elbow making its own colour finer, equal
-elbows in tune, an elbow's turn flowing its own colour either way, a lean making the white faster
-and the blue slower and back, and a small move of any arm measure a small change of the picture). What they draw on the machine has not been judged yet.
+both colours, a T still over a breath, both colours breathing whichever shoulder is higher and the
+left higher swinging them together against the right higher's complementary swing, left and right
+up drawn differently, level shoulders tiling, an elbow making its own colour finer, equal elbows in
+tune, an elbow's turn shifting its own colour either way, a straight body standing still while a
+lean carries the lines, and a small move of any arm measure a small change of the picture). What
+they draw on the machine has not been judged yet.
 
 ### The dummy
 
