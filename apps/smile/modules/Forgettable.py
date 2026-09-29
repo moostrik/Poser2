@@ -13,13 +13,12 @@ from enum import Enum
 import numpy as np
 
 class CamType(Enum):
-    DEPTH   = 1
     VIMBA   = 2
     WEB     = 3
     IMAGE   = 4
 
 class Forgettable():
-    def __init__(self, path: str, width: int, height: int, portraitMode: bool = False, guiTop: bool = False, camType: CamType = CamType.DEPTH) -> None:
+    def __init__(self, path: str, width: int, height: int, portraitMode: bool = False, guiTop: bool = False, camType: CamType = CamType.VIMBA) -> None:
         self.path: str = path
         self.width: int = width
         self.height: int = height
@@ -33,8 +32,8 @@ class Forgettable():
         self.gui: Gui = Gui('AIIA', path + '/settings/', 'default')
         self.render: Render = Render(self.gui, self.width, self.height , self.width, self.height, 'aiia', fullscreen=False, v_sync=True, stretch=False)
         self.person: PF = PF(self.gui)
+        self.face: FF = FF(self.gui, self.width, self.height)
         self.diffuse = SD(self.gui, path + '/stable-diffusion-webui/')
-        self.face: FF = FF(self.gui, self.width, self.height, self.diffuse)
         self.diffuse.set_portrait_mode(self.portraitMode)
 
         if camType == CamType.VIMBA:
@@ -43,12 +42,9 @@ class Forgettable():
         elif camType == CamType.WEB:
             from modules.cam.WebCamGui import WebCamGui as WebCam
             self.camera = WebCam(self.gui, (self.width, self.height), False)
-        elif camType == CamType.IMAGE:
+        else:
             from modules.cam.ImageGui import ImageGui as ImageCam
             self.camera = ImageCam(self.gui, (self.width, self.height), False)
-        else:
-            from modules.cam.DepthAiGui import DepthAiGui as DepthCam
-            self.camera = DepthCam(self.gui, (self.width, self.height), False)
         self.camera.setRotate90(self.portraitMode)
 
         self.audio: AudioDB = AudioDB(self.gui, 'files/music_map.json')
@@ -157,11 +153,13 @@ class Forgettable():
         if seq == SequenceType.CAMERA_SHOW:
             self.face_messages = []
             self.person_messages = []
+            self.face.reset()
 
         if seq >= SequenceType.CAMERA_SHOW and seq <= SequenceType.CAMERA_REC:
             if continue_type == ContinueType.PERSON:
                 self.person.set_image(cam_image)
-            self.face.set_image(cam_image)
+            if continue_type == ContinueType.FACE:
+                self.face.set_image(cam_image)
 
         if seq == SequenceType.FLASH:
             if message.initial == True:
@@ -170,22 +168,16 @@ class Forgettable():
 
         if seq == SequenceType.CAPTURE:
             cap_image: np.ndarray = cam_image
-            face_prompt: str = self.get_last_face().prompt
-            display_prompt_list = []
 
             if continue_type == ContinueType.PERSON:
                 cap_image = self.get_last_person(cam_image)
 
             if continue_type == ContinueType.FACE:
-                portrait: FaceMessage = self.get_last_face()
-                if portrait.image is not None:
+                portrait: FaceMessage | None = self.get_best_face()
+                if portrait is not None:
                     cap_image = portrait.image
-                    face_prompt = portrait.prompt
-                    display_prompt_list = portrait.holland
 
             self.render.set_cap_image(cap_image)
-            self.render.set_cap_prompt(display_prompt_list)
-            self.diffuse.prompter.set_face_prompt(face_prompt)
             self.diffuse.set_image(cap_image)
             self.save.new_sequence()
             self.save.save_image(cap_image)
@@ -212,12 +204,14 @@ class Forgettable():
         print('warning, persons not set')
         return image
 
-    def get_best_face(self) -> FaceMessage:
-        return max(self.face_messages, key=lambda p: p.score)
-
-    def get_last_face(self) -> FaceMessage:
-        return self.face_messages[-1]
-
+    def get_best_face(self, window: float = 1.0) -> FaceMessage | None:
+        # highest scoring face of the last second, so a blink or a turned head at the last frame is not used
+        if not self.face_messages:
+            print('warning, faces not set')
+            return None
+        latest: float = self.face_messages[-1].time
+        recent: list[FaceMessage] = [f for f in self.face_messages if f.time >= latest - window]
+        return max(recent, key=lambda f: f.score)
 
     def person_callback(self, message: PersonMessage) -> None:
         self.person_messages.append(message)
@@ -225,13 +219,12 @@ class Forgettable():
             self.render.sequencer.set_person_found()
 
     def face_callback(self, message: FaceMessage) -> None:
-        # if message.portrait_found:
         self.face_messages.append(message)
-        self.render.sequencer.set_face_found()
+        if message.stable:
+            self.render.sequencer.set_face_found()
 
     def diffusion_callback(self, message: WebUiMessage) -> None:
         if message.state == WebUiState.DIFFUSION or message.state == WebUiState.DIFF_LOOP:
-            # self.render.set_cap_prompt(message.prompt)
             if message.image is not None:
                 self.save.save_image(message.image)
 

@@ -33,7 +33,7 @@ class RenderWindow(Thread):
         glut.glutInitDisplayMode(glut.GLUT_RGBA | glut.GLUT_DOUBLE | glut.GLUT_DEPTH) # type: ignore
         glut.glutInitWindowSize(self.window_width, self.window_height)
         glut.glutInitWindowPosition(self.posX, self.posY)
-        glut.glutCreateWindow(self.windowName)
+        glut.glutCreateWindow(self.windowName.encode())
         if self.fullscreen :
             glut.glutFullScreen()
             glut.glutSetCursor(glut.GLUT_CURSOR_NONE)
@@ -94,7 +94,7 @@ class RenderWindow(Thread):
     def draw_window(self) -> None:
         self.fps.tick()
         fps = str(self.fps.get_fps())
-        glut.glutSetWindowTitle(' FPS: ' + fps + '          ' + self.windowName)
+        glut.glutSetWindowTitle((' FPS: ' + fps + '          ' + self.windowName).encode())
 
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) # type: ignore

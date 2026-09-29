@@ -49,7 +49,7 @@ start "" "%CURRENT_DIR%.venv\Scripts\pythonw.exe" pl_player.py -pX %PLAYER_2_POS
 timeout /t 2 /nobreak >nul
 
 echo Opening Main App
-start "" "%CURRENT_DIR%.venv\Scripts\pythonw.exe" aiia.py -pm
+start "" "%CURRENT_DIR%.venv\Scripts\pythonw.exe" smile.py -pm
 timeout /t 2 /nobreak >nul
 
 @REM echo Press any key to continue . . .

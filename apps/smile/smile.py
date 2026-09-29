@@ -19,7 +19,6 @@ parser.add_argument('-dh',  '--height',         type=int,   default=896,    help
 parser.add_argument('-gt',  '--guiTop',         action='store_true',        help='gui window always on top')
 parser.add_argument('-wc',  '--useWebCam',      action='store_true',        help='use webcam instead of default cam')
 parser.add_argument('-vc',  '--useVimbaCam',    action='store_true',        help='use vimba camera instead of default cam')
-parser.add_argument('-dc',  '--useDepthCam',    action='store_true',        help='use DepthAI instead of default cam')
 parser.add_argument('-ic',  '--useImageCam',    action='store_true',        help='use image instead of default cam')
 parser.add_argument('-pm',  '--portraitMode',   action='store_true',        help='use portrait mode (default)')
 parser.add_argument('-lm',  '--landscapeMode',  action='store_true',        help='use landscape mode')
@@ -35,8 +34,6 @@ if args.useVimbaCam:
     camType = CamType.VIMBA
 if args.useWebCam:
     camType = CamType.WEB
-if args.useDepthCam:
-    camType = CamType.DEPTH
 if args.useImageCam:
     camType = CamType.IMAGE
 

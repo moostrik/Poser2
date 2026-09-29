@@ -60,16 +60,8 @@ def Check_control() -> bool:
 
 def start_sd(webuiPath: str) -> bool:
     if not check_sd_running():
-        original_dir: str = os.getcwd()
-        os.chdir(webuiPath)
-        os.system('start /MIN "my_window_title" "webui.bat" --xformers --api')
-        os.chdir(original_dir)
-        stringbar: str = ''
-        while not check_sd_running():
-            print(f'waiting for SD Webui to start.{stringbar}\r', end='')
-            stringbar += '.'
-            time.sleep(0.33)
-        print('waiting for SD Webui to start')
+        print('no image generator running')
+        return False
     time.sleep(0.33)
     if not check_sd_api_acces():
         return False

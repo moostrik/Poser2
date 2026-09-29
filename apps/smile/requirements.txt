@@ -1,23 +1,17 @@
---extra-index-url https://download.pytorch.org/whl/cu130
-
 # Fixed versions, same as the comfy venv
-torch==2.14.0+cu130
-torchvision==0.29.0+cu130
 numpy==2.5.3
+onnxruntime-gpu[cuda,cudnn]==1.30.0     # extras install the CUDA and cuDNN libraries
 
-# Latest versions, pin after first install
-depthai
-ndi-python
-opencv-python
-Pillow
-PyOpenGL
-PyOpenGL-accelerate
-python-osc
-pytweening
-requests
-stupidArtnet
-ultralytics
-watchdog
+# Latest versions as of sep 2026
+opencv-python==5.0.0.93
+Pillow==12.3.0
+PyOpenGL==3.1.10
+PyOpenGL-accelerate==3.1.10
+python-osc==1.10.2
+pytweening==1.2.0
+requests==2.34.2
+stupidArtnet==1.6.0
+watchdog==6.0.0
 
 
 

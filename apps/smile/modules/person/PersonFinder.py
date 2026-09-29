@@ -1,6 +1,3 @@
-from ultralytics import YOLO
-from ultralytics.engine.results import Results
-
 import numpy as np
 from json import loads
 from time import sleep
@@ -38,12 +35,18 @@ class PersonFinder(Thread):
     def run(self) -> None:
         self._thread_running = True
 
+        try:
+            from ultralytics import YOLO
+        except ImportError:
+            print('ultralytics not installed, person finder disabled')
+            return
+
         model = YOLO('files/yolov8n.pt')
         while self._thread_running:
             image: np.ndarray | None = self.get_image()
             self.set_image(None)
             if image is not None:
-                results: Results = model.track(source=image, stream=False, show=False, conf=self._confidence, imgsz= 640, verbose = False, persist = True, classes=0)
+                results = model.track(source=image, stream=False, show=False, conf=self._confidence, imgsz= 640, verbose = False, persist = True, classes=0)
                 json_string: str | None = results[0].tojson(True)
                 if json_string:
                     res_dict: list = loads(json_string)

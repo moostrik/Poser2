@@ -119,12 +119,6 @@ class WebUiGui(SdWebUi.WebUi):
                      E(eT.SLDR, 'Start_3',      self.set_cn_guide_start_3,  0,      (0,1),      .01,    False),
                      E(eT.TEXT, 'end'),
                      E(eT.SLDR, 'End_3',        self.set_cn_guide_end_3,    1.0,    (0,1),      .01,    False)])
-        elem.append([E(eT.SEPR, '')])
-        elem.append([E(eT.TEXT, 'NDI      '),
-                     E(eT.CHCK, 'Capture',      self.set_capture_ndi,       False),
-                     E(eT.CHCK, 'Steps',        self.set_ndi_steps,         True),
-                     E(eT.CHCK, 'Last',         self.set_ndi_result,        True),
-                     E(eT.CHCK, 'Prompt',       self.set_ndi_prompt,        True)])
 
         self.diff_frame = Frame('DIFFUSER', elem, 540)
 

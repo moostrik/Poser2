@@ -12,9 +12,6 @@ from modules.sd.ApiConnect import *
 from modules.sd.Progress import Progress, ProgressMessage
 from modules.sd.Prompter import Prompter
 
-from modules.ndi.NdiReceiver import NdiReceiver as Ndi
-from modules.ndi.TouchDesignerXML import readXml
-
 class WebUiState(Enum):
             NONE        = 0
             IDLE        = 1
@@ -61,14 +58,6 @@ class WebUi(Thread):
         self.repeat_prompt_begin: float = 0.5
         self.repeat_prompt_end: float = 1.5
 
-        # NDI
-        self.ndi_name: str = 'diffuser'
-        self.ndi_receiver: Ndi | None = None
-        self.ndi_steps: bool = True
-        self.ndi_result: bool = True
-        self.ndi_prompt: bool = True
-        self.ndi_progress = 0.0
-
         # SD
         self.sd_enabled: bool = True
         self._sd_txt2img_settings = txt2img_settings()
@@ -88,6 +77,8 @@ class WebUi(Thread):
         self.controlnetModels: list[str] = []
         self.controlnetModules: list[str] = []
 
+        self.is_diffusing: bool = False
+
         # CONNECT TO API
         self.sd_api_connected = False
         if not start_sd(webuiPath): return
@@ -101,8 +92,6 @@ class WebUi(Thread):
         self.controlnetModels = get_control_models()
         self.controlnetModules = get_control_modules()
 
-        self.is_diffusing: bool = False
-
     def start(self) -> None:
         self._thread_running = True
         super().start()
@@ -115,10 +104,11 @@ class WebUi(Thread):
             self._thread_running = False
             self.join()
 
-        self.set_capture_ndi(False)
-
     def run(self) -> None:
         while self._thread_running:
+            if not self.sd_api_connected:
+                time.sleep(0.01)
+                continue
             in_image_bgr: np.ndarray | None = self.get_image()
             if in_image_bgr is not None:
                 # self.set_image(None)
@@ -159,8 +149,7 @@ class WebUi(Thread):
                     sd_settings.subseed_strength = self.sub_seed_strength
 
                     #SCRIPTS
-                    alwayson_scripts: dict = {'NDI Out': {'args': [True, self.ndi_name, self.ndi_result, self.ndi_steps, self.ndi_prompt]},
-                                              'ControlNet' : {'args': []}}
+                    alwayson_scripts: dict = {'ControlNet' : {'args': []}}
 
                     #CONTROL NET
                     for index in range(self.control_net_amount):
@@ -206,9 +195,6 @@ class WebUi(Thread):
                                 print('stop SD loop')
                                 break
 
-                            if 'NDI Out' in alwayson_scripts:
-                                del alwayson_scripts['NDI Out']
-
                         if sd_imgs != None and self.is_diffusing:
                             self.message_callback(WebUiMessage(WebUiState.IDLE, image = cv2_img(get_depth_img(sd_imgs[0], control_res))))
 
@@ -246,39 +232,6 @@ class WebUi(Thread):
         with self._input_mutex:
             return self._message_callbacks.copy()
 
-
-# NDI
-    def set_capture_ndi(self, value) -> None:
-        if value and not self.ndi_receiver:
-            self.ndi_receiver = Ndi([self.ndi_frame_callback], self.ndi_name)
-            self.ndi_receiver.start()
-        elif not value and self.ndi_receiver:
-            self.ndi_receiver.stop()
-            self.ndi_receiver = None
-
-    def ndi_frame_callback(self, image: np.ndarray, timecode: int, metadata) -> None:
-        progress, prompt, negPrompt, error_message = readXml(metadata)
-        if error_message:
-            self.interrupt()
-            self.message_callback(WebUiMessage(WebUiState.DIFFUSION, progress, self.get_image(True), prompt, negPrompt))
-
-        if self.is_diffusing:
-            self.message_callback(WebUiMessage(WebUiState.DIFFUSION, progress, image, prompt, negPrompt))
-
-    def set_ndi_result(self, value:bool) -> None:
-        self.ndi_result = value
-    def get_ndi_result(self) -> bool:
-        return self.ndi_result
-
-    def set_ndi_steps(self, value:bool) -> None:
-        self.ndi_steps = value
-    def get_ndi_steps(self) -> bool:
-        return self.ndi_steps
-
-    def set_ndi_prompt(self, value:bool) -> None:
-        self.ndi_prompt = value
-    def get_ndi_prompt(self) -> bool:
-        return self.ndi_prompt
 
 # PROGRESS
     def progress_callback(self, message: ProgressMessage) -> None:
