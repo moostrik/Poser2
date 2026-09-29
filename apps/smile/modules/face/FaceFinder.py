@@ -28,7 +28,7 @@ def portrait_crop(img: np.ndarray, face: Face, min_size: float, portrait_zoom: f
 
     zoom: portrait width relative to the face height; offset: shift up, relative to the face height.
     """
-    image_height, image_width = img.shape[:2]
+    image_height: int = img.shape[0]
     x0, y0, x1, y1 = face.bbox
     real_size: float = y1 - y0
     normalized_size: float = real_size / float(image_height)
@@ -50,16 +50,14 @@ def portrait_crop(img: np.ndarray, face: Face, min_size: float, portrait_zoom: f
 
     half_x: np.ndarray = axis_x * crop_width * 0.5
     half_y: np.ndarray = axis_y * crop_height * 0.5
-    corners: np.ndarray = np.array([centre - half_x - half_y, centre + half_x - half_y, centre + half_x + half_y, centre - half_x + half_y])
-    if corners[:, 0].min() < 0 or corners[:, 0].max() > image_width or corners[:, 1].min() < 0 or corners[:, 1].max() > image_height:
-        raise ValueError('portrait out of bounds')
 
     # map each portrait pixel to the image: origin at the top left corner, axes scaled to pixels
     scale: float = crop_width / portrait_width
-    origin: np.ndarray = corners[0]
+    origin: np.ndarray = centre - half_x - half_y
     matrix: np.ndarray = np.array([[axis_x[0] * scale, axis_y[0] * scale, origin[0]],
                                    [axis_x[1] * scale, axis_y[1] * scale, origin[1]]])
-    portrait_img: np.ndarray = cv2.warpAffine(img, matrix, (portrait_width, portrait_height), flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP)
+    # the crop may extend past the image edge: fill that part with the edge pixels instead of black
+    portrait_img: np.ndarray = cv2.warpAffine(img, matrix, (portrait_width, portrait_height), flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP, borderMode=cv2.BORDER_REPLICATE)
     return portrait_img, normalized_size
 
 class FaceFinder(Thread):

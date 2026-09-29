@@ -16,25 +16,25 @@
     "timeout": 5.0
   },
   "render": {
-    "window": {
-      "title": "SMILE",
-      "v_sync": true,
-      "monitor": "M0",
-      "x": 100,
-      "y": 100,
-      "width": 720,
-      "height": 900,
-      "secondary_list": [],
-      "secondary_fullscreen": false,
-      "fullscreen_mode": "FULLSCREEN"
-    },
     "show_camera": false,
     "freeze": false,
     "trail_active": true,
     "trail": 0.995,
     "loop_trail": 0.5,
     "destroy_blur": 0.1,
-    "destroy_bloom": 0.6
+    "destroy_bloom": 0.6,
+    "window": {
+      "title": "SMILE",
+      "v_sync": true,
+      "monitor": "M0",
+      "x": 1281,
+      "y": 31,
+      "width": 638,
+      "height": 1000,
+      "secondary_list": [],
+      "secondary_fullscreen": false,
+      "fullscreen_mode": "WINDOWED"
+    }
   },
   "comfy": {
     "host": "127.0.0.1",
@@ -48,7 +48,7 @@
     "job_timeout": 90.0
   },
   "face": {
-    "size_filter": 0.1,
+    "size_filter": 0.11,
     "confidence": 0.7,
     "stable_frames": 3,
     "zoom": 1.2,
