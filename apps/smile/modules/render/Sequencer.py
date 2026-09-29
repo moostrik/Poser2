@@ -56,14 +56,6 @@ def ani_type_from_seq_type(seq: SequenceType) -> AnimationType:
         return AnimationType.DIFFUSE_OUT
     return AnimationType.NONE
 
-class ContinueType(IntEnum):
-    NEVER           = 0
-    ALWAYS          = 1
-    PERSON          = 2
-    FACE            = 3
-
-ContinueTypeNames: list[str] = [member.name for member in ContinueType]
-
 class SeqenceState():
     def __init__(self) -> None:
         self.type: SequenceType = SequenceType.NONE
@@ -239,15 +231,13 @@ def timeout_message(state: SeqenceState, duration: float, easing: Easing = easin
         state.type = SequenceType.RESET
         return SeqenceMessage(state.type, 0, initial, 0)
 
-def reset_message(state: SeqenceState, restart: bool) -> SeqenceMessage:
+def reset_message(state: SeqenceState) -> SeqenceMessage:
     initial = False
     if state.previous_type != state.type:
         initial = True
         state.previous_type = state.type
 
     state.type = SequenceType.BLOOM
-    if restart:
-        state.type = SequenceType.CAMERA_DETECT
 
     return SeqenceMessage(state.previous_type, 1.0, initial)
 
@@ -262,8 +252,6 @@ class Sequencer():
         self._state: SeqenceState = SeqenceState()
         self._state.type = SequenceType.CAMERA_SHOW
         self._state.previous_type = SequenceType.NONE
-
-        self.continue_type: ContinueType = ContinueType.PERSON
 
         self.destroy_in_duration: float = 1.0
         self.destroy_in_ease: Callable[[float], float] = easing.linear
@@ -323,7 +311,7 @@ class Sequencer():
         elif self._state.type == SequenceType.TIMEOUT:
             self.message = timeout_message(self._state, self.timout_duration)
         elif self._state.type == SequenceType.RESET:
-            self.message = reset_message(self._state, (self.continue_type == ContinueType.ALWAYS))
+            self.message = reset_message(self._state)
 
         self.flash_out_duration = self.calculate_flash_out_duration(self.message, self.flash_out_duration)
 
@@ -333,22 +321,7 @@ class Sequencer():
     def reset(self) -> None:
         self.set_sequence(SequenceType.RESET)
 
-    def set_continue_type(self, value: ContinueType) -> None:
-        self.continue_type = value
-        if self._state.type == SequenceType.NONE and value == ContinueType.ALWAYS:
-            self.reset()
-
-    def get_continue_type(self) -> ContinueType:
-        return self.continue_type
-
     def set_face_found(self) -> None:
-        if self.get_continue_type() != ContinueType.FACE:
-            return
-        self.start_sequence()
-
-    def set_person_found(self) -> None:
-        if self.get_continue_type() != ContinueType.PERSON:
-            return
         self.start_sequence()
 
     def start_sequence(self) -> None:

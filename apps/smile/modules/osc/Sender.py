@@ -144,7 +144,7 @@ class Sender(Thread):
 
     def set_fps(self, fps: int | float) -> None:
         self.fps = fps
-        self.interval: float = 1.0 / float(self.fps)
+        self.update_interval: float = 1.0 / float(self.fps)
 
     def set_port(self, port: int | str) -> None:
         if not is_valid_port(port):

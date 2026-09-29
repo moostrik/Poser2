@@ -63,7 +63,7 @@ def setup_camera(camera: Camera, user_set: Optional[str]) -> bool:
 
 
 class VimbaCam(Thread):
-    def __init__(self, forceSize: tuple[int, int] | None = None, doDepth: bool = True, doPerson: bool = True) -> None:
+    def __init__(self, forceSize: tuple[int, int] | None = None) -> None:
         super().__init__()
 
         self.user_set: str = 'UserSet2'
@@ -208,15 +208,9 @@ class VimbaCam(Thread):
         self.frameNew = False
         return value
 
-    def isDepthFrameNew(self) -> bool:
-        return False
-
     def getColorImg(self) -> np.ndarray:
         with self.frameMutex:
             return self.outputFrame
-
-    def getDepthImg(self) -> np.ndarray:
-        return self.getColorImg()
 
     def iscapturing(self) ->bool:
         return self.capturing
@@ -229,9 +223,6 @@ class VimbaCam(Thread):
 
     def clearColorCallbacks(self) -> None:
         self.frameCallbacks = []
-
-    def setDepthCallback(self, callback) -> None:
-        self.frameCallbacks.append(callback)
 
     def setFlipH(self, flipH: bool) -> None:
         self.flipH = flipH

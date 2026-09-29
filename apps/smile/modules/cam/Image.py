@@ -6,7 +6,7 @@ from time import sleep
 
 
 class Image(Thread):
-    def __init__(self, forceSize: tuple[int, int] | None = None, doDepth: bool = True, doPerson: bool = True) -> None:
+    def __init__(self, forceSize: tuple[int, int] | None = None) -> None:
         super().__init__()
 
         self.colorMutex: Lock = Lock()
@@ -95,15 +95,9 @@ class Image(Thread):
         # self.colorFrameNew = False
         return value
 
-    def isDepthFrameNew(self) -> bool:
-        return self.isColorFrameNew()
-
     def getColorImg(self) -> cv2.Mat:
         with self.colorMutex:
             return self.outputColor
-
-    def getDepthImg(self) -> cv2.Mat:
-        return self.getColorImg()
 
     def iscapturing(self) ->bool:
         return self.capturing
@@ -116,9 +110,6 @@ class Image(Thread):
 
     def clearColorCallbacks(self) -> None:
         self.colorCallbacks = []
-
-    def setDepthCallback(self, callback) -> None:
-        self.colorCallbacks.append(callback)
 
     def setFlipH(self, flipH: bool) -> None:
         self.flipH = flipH

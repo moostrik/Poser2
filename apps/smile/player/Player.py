@@ -8,7 +8,7 @@ import random
 
 class Player():
     def __init__(self, osc_port: str, images_dir = 'images/', posX: int = 0, posY: int = 0, trail = 0.9, interval = 1.0, wait = 5.0, num_portraits = 10) -> None:
-        self.osc:Osc = Osc('127.0.0.1', 4115)
+        self.osc:Osc = Osc('127.0.0.1', int(osc_port))
 
         self._running: bool = False
         self.numImages: int = 24

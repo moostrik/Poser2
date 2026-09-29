@@ -1,10 +1,9 @@
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
 from modules.render.Render import Render
-from modules.render.Sequencer import SequenceType, SeqenceMessage, SequenceTypeNames, ContinueType, ContinueTypeNames
+from modules.render.Sequencer import SequenceType, SeqenceMessage, SequenceTypeNames
 import pytweening as easing
 from typing import Callable
-from OpenGL.GLUT import GLUT_KEY_UP, GLUT_KEY_DOWN, GLUT_KEY_LEFT, GLUT_KEY_RIGHT
 
 EasingNames: list[str] = ['Linear',
                           'Sine In', 'Sine Out', 'Sine In Out',
@@ -29,8 +28,6 @@ class RenderGui(Render):
         elem.append([E(eT.SEPR, '')])
         elem.append([E(eT.TEXT, 'PLAY     '),
                      E(eT.BTTN, 'Start',        self.sequencer.start_sequence),
-                     E(eT.TEXT, 'Auto'),
-                     E(eT.CMBO, 'Always',       self.set_continue_type_string,      ContinueTypeNames[ContinueType.PERSON], ContinueTypeNames, expand = False, size = (12,1)),
                      E(eT.BTTN, 'Reset',        self.sequencer.reset)])
         elem.append([E(eT.SEPR, '')])
         elem.append([E(eT.TEXT, 'PROGRESS '),
@@ -72,21 +69,8 @@ class RenderGui(Render):
 
         self.frame = Frame('SEQUENCE', elem, 540)
 
-        elem: list = []
-        elem.append([E(eT.BTTN, 'Visual',       self.vote_visual,),
-                     E(eT.BTTN, 'Audio',        self.vote_audio,),
-                     E(eT.BTTN, 'Bad Audio',    self.remove_audio,)])
-
-        self.vote_frame = Frame('VOTE', elem, 60)
-        self._vote_visual_callback: Callable | None = None
-        self._vote_audio_callback: Callable | None = None
-        self._remove_audio_callback: Callable | None = None
-
     def get_gui_frame(self):
         return self.frame
-
-    def get_vote_frame(self):
-        return self.vote_frame
 
     def draw(self) -> None: # override
         super().draw()
@@ -115,22 +99,8 @@ class RenderGui(Render):
         if key == b'r' or key == b'R':
             self.reload_shaders()
 
-        if key == b' ':
-            self.vote_visual()
-
         if key == b'\r':
             self.sequencer.start_sequence()
-
-    def special_key_callback(self, key, x, y) -> None: # override
-        if key == GLUT_KEY_UP:
-            self.vote_audio()
-        elif key == GLUT_KEY_DOWN:
-            self.remove_audio()
-        elif key == GLUT_KEY_LEFT:
-            pass
-        elif key == GLUT_KEY_RIGHT:
-            pass
-
 
     def gui_set_draw_cam(self, value: bool) -> None:
         self.draw_camera = value
@@ -140,13 +110,6 @@ class RenderGui(Render):
 
     def set_show_prompt(self, value: bool) -> None:
         self.show_prompt = value
-
-    def set_continue_type_string(self, value: str) -> None:
-        for n in ContinueType:
-            if value == ContinueTypeNames[n]:
-                self.sequencer.set_continue_type(n)
-                return
-        self.sequencer.set_continue_type(ContinueType.NEVER)
 
 
     def set_destroy_in_duration(self, value: float) -> None:
@@ -205,27 +168,6 @@ class RenderGui(Render):
     def set_dstr_bloom(self, value: float) -> None:
         self.dstry_bloom = value
 
-
-    def vote_visual(self) -> None:
-        if self._vote_visual_callback:
-            self._vote_visual_callback()
-
-    def vote_audio(self) -> None:
-        if self._vote_audio_callback:
-            self._vote_audio_callback()
-
-    def remove_audio(self) -> None:
-        if self._remove_audio_callback:
-            self._remove_audio_callback()
-
-    def set_vote_visual_callback(self, callback) -> None:
-        self._vote_visual_callback = callback
-
-    def set_vote_audio_callback(self, callback) -> None:
-        self._vote_audio_callback = callback
-
-    def set_remove_audio_callback(self, callback) -> None:
-        self._remove_audio_callback = callback
 
     def emptyFunction(self, value) -> None:
         pass

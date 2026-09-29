@@ -1026,7 +1026,7 @@
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
 									"patching_rect" : [ -419.0, 419.842107057571411, 648.0, 22.0 ],
-									"text" : "readfolder C:/Developer/aiia2/audio/laughter"
+									"text" : "readfolder C:/Developer/SMILE/audio/laughter"
 								}
 
 							}
@@ -5859,7 +5859,7 @@
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
 									"patching_rect" : [ 41.964285790920258, 257.595232129096985, 398.0, 49.0 ],
-									"text" : "C:/Developer/aiia2/audio/SMILE-BS-Music"
+									"text" : "C:/Developer/SMILE/audio/SMILE-BS-Music"
 								}
 
 							}
@@ -5937,7 +5937,7 @@
 									"numoutlets" : 1,
 									"outlettype" : [ "" ],
 									"patching_rect" : [ 174.345178246498108, 659.976245045661926, 555.0, 49.0 ],
-									"text" : "\"C:/Developer/aiia2/audio/SMILE-BS-Music/0023 Rires en Réverie.mp3\""
+									"text" : "\"C:/Developer/SMILE/audio/SMILE-BS-Music/0023 Rires en Réverie.mp3\""
 								}
 
 							}
@@ -9433,7 +9433,7 @@
 ,
 		"dependency_cache" : [ 			{
 				"name" : "smileSamplepoly.maxpat",
-				"bootpath" : "C:/Developer/aiia2/audio",
+				"bootpath" : "C:/Developer/SMILE/audio",
 				"patcherrelativepath" : ".",
 				"type" : "JSON",
 				"implicit" : 1

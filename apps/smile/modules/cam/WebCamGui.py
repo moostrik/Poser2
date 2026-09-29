@@ -4,9 +4,9 @@ from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
 
 
 class WebCamGui(WebCam):
-    def __init__(self, gui: Gui | None, forceSize: tuple[int, int] | None = None, doDepth: bool = True, doPerson: bool = True) -> None:
+    def __init__(self, gui: Gui | None, forceSize: tuple[int, int] | None = None) -> None:
         self.gui: Gui | None = gui
-        super().__init__(forceSize, doDepth, doPerson)
+        super().__init__(forceSize)
 
         elem: list = []
         elem.append([E(eT.TEXT, 'TRANSFORM'),

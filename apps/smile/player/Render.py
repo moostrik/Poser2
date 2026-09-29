@@ -180,7 +180,7 @@ class Render(RenderWindow):
 
         if not self.white_set:
             self.white_set = True
-            white: np.ndarray = cv2.imread('images/white.jpg')
+            white: np.ndarray = np.full((self.img_height, self.img_width, 3), 255, dtype=np.uint8)
             self.white_texture: Texture = Texture()
             self.white_texture.set_from_image(white)
 
