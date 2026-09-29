@@ -1,0 +1,25 @@
+# project
+.venv/
+temp/
+audio/*
+!audio/.gitkeep
+!audio/*.maxpat
+images/*
+!images/.gitkeep
+input/*
+!input/.gitkeep
+logos/*
+!logos/.gitkeep
+*.log
+
+
+comfy/*
+
+# Claude Code
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/

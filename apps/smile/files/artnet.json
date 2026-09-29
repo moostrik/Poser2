@@ -1,0 +1,7 @@
+{
+
+    "pc":       {"type": "Core", "num_rgb": 3},
+    "mako":     {"type": "Camera", "num_rgb": 24},
+    "audio":    {"type": "Core", "num_rgb": 3},
+    "video":    {"type": "Core", "num_rgb": 3}
+}

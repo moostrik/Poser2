@@ -1,0 +1,57 @@
+platinum
+gold
+silver
+bronze
+copper
+chrome
+brass
+
+white
+grey
+black
+
+amber
+azure
+beige
+camel
+carmine
+khaki
+taupe
+ecru
+fandango
+ivory
+lemon
+lavender
+lilac
+mahogany
+marigold
+mint
+opal
+pistachio
+ruby
+sienna
+
+red
+burgyndy
+maroon
+scarlet
+vermilion
+chestnut
+orange red
+orange
+yellow
+green yellow
+light green
+green
+aquamarine
+turquoise 
+blue green
+blue
+cyan
+indigo
+violet
+ultramarine
+pink
+magenta
+brown
+sepia

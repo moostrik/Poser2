@@ -1,0 +1,25 @@
+--extra-index-url https://download.pytorch.org/whl/cu130
+
+# Fixed versions, same as the comfy venv
+torch==2.14.0+cu130
+torchvision==0.29.0+cu130
+numpy==2.5.3
+
+# Latest versions, pin after first install
+depthai
+ndi-python
+opencv-python
+Pillow
+PyOpenGL
+PyOpenGL-accelerate
+python-osc
+pytweening
+requests
+stupidArtnet
+ultralytics
+watchdog
+
+
+
+
+# Check for updates with:   pip list --outdated
