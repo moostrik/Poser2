@@ -1,0 +1,1900 @@
+# Deferred: revisit Shift+Arrow 10x stepping after the panel layout structure settles.
+
+
+
+"""NiceGUI settings panel — auto-generates a tabbed UI from a Settings root.
+
+Design principles for settings widgets and layout:
+- Prefer vanilla NiceGUI and Quasar primitives over custom-composed pseudo-widgets.
+- Do not invent new visual widget types when an existing NiceGUI control can
+    express the behavior.
+- Keep builder logic thin: layout, labels, descriptions, and spacing should be
+    centralized instead of reimplemented inside each builder.
+- Controls should have one obvious title or label area when the control already
+    has one; descriptions belong to that existing title area only, and should
+    not cause a new title or label area to be introduced just to host a
+    description.
+- Avoid absolute positioning, magic offsets, and one-off spacing hacks for
+    field metadata.
+- Compound controls are allowed only when one vanilla control cannot express
+    the behavior cleanly; when used, they should still read like a standard
+    field, not a special gadget.
+- Reuse shared field structure for label, description, body, and optional
+    actions so widgets align consistently.
+- Prefer fewer nested rows and columns; use the smallest NiceGUI structure that
+    expresses the layout clearly.
+- Preserve declaration order and predictable placement.
+- Treat mobile collapse behavior as a first-class requirement.
+- Prefer simple CSS-based solutions (parent-class toggling, cascading
+    selectors) over client-side JavaScript for show/hide and styling changes.
+    Resort to ``ui.run_javascript`` only when no CSS or NiceGUI API equivalent
+    exists.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+import socket
+from enum import Enum
+from pathlib import Path
+from typing import Callable, get_origin, get_args
+
+from nicegui import ui
+
+from .base_settings import BaseSettings
+from .nice_log import LOG_DRAWER_DEFAULT_HEIGHT, build_log_drawer
+from .nice_util import SafeTimer
+from . import presets
+from .field import Field, Access
+from .widget import Widget
+from .nice_knob import Knob, CHANGE_THROTTLE
+from modules.utils import Color, Point2f, Rect
+
+# ---------------------------------------------------------------------------
+# Poll rate for setting → UI synchronisation.
+# All UI updates run on NiceGUI's event-loop timer, never on the thread that
+# writes the setting.  This avoids WebSocket flooding (bind fired per-write)
+# and thread-safety issues (GL thread calling NiceGUI API).
+# ---------------------------------------------------------------------------
+POLL_INTERVAL = 0.25  # seconds
+# ---------------------------------------------------------------------------
+# Expansion state persistence — remembers which sections are open/closed.
+# ---------------------------------------------------------------------------
+_UI_STATE_FILE = ".ui_state.json"
+_expansion_state: dict[str, bool | str] = {}
+
+def _state_path() -> Path:
+    """Return the app-scoped UI state file path."""
+    return presets._app_dir() / _UI_STATE_FILE
+
+def _load_expansion_state() -> None:
+    global _expansion_state
+    p = _state_path()
+    if p.exists():
+        try:
+            _expansion_state = json.loads(p.read_text())
+        except Exception:
+            _expansion_state = {}
+
+def _save_expansion_state() -> None:
+    try:
+        p = _state_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(_expansion_state))
+    except Exception:
+        pass
+
+
+def generate_label(name):
+    """Convert field/config name to a human-readable label.
+
+    Examples:
+        "min_cutoff"  -> "Min Cutoff"
+        "TCP_PORT"    -> "TCP PORT"
+        "x"           -> "X"
+    """
+    parts = name.split("_")
+    result = []
+    for part in parts:
+        if part.isupper() and len(part) > 1:
+            result.append(part)
+        else:
+            result.append(part.capitalize())
+    return " ".join(result)
+
+
+def _field_label(name: str, field: Field) -> str:
+    """The control's title: the field's own ``label`` when it has one, else its name made readable."""
+    return field.label if field.label is not None else generate_label(name)
+
+
+def _build_field_title(label: str, description: str | None, *, classes: str = ""):
+    """Create a shared field title area with an optional hover description."""
+    title = ui.label(label).classes(classes)
+    if description:
+        with title:
+            ui.tooltip(description).props('delay=500')
+    return title
+
+
+def _attach_description_tooltip(element, description: str | None):
+    """Attach a tooltip to a native labeled control when a description exists."""
+    if description:
+        with element:
+            ui.tooltip(description).props('delay=500')
+    return element
+
+
+def _is_field_read_only(settings, name: str, field: Field) -> bool:
+    """Return True when a field should render read-only in this settings instance."""
+    return field.access is Access.READ
+
+
+def _lock_prop(locked: bool, *, readonly: bool = True) -> str:
+    """Return the Quasar prop suffix that locks a read-only control.
+
+    ``readonly`` keeps hover events alive (tooltips) and the value legible;
+    ``disable`` sets ``pointer-events:none`` on q-field controls, so it is used
+    only for components without a ``readonly`` prop (QToggle, QBtn).
+    """
+    if not locked:
+        return ""
+    return " readonly" if readonly else " disable"
+
+
+def _field_needs_poll(settings, name: str, field: Field) -> bool:
+    """Return True when UI should poll external updates for this field."""
+    if settings.is_shared(name):
+        return True
+    return field.access is not Access.WRITE
+
+
+def _wiring_css_class(settings, name: str) -> str:
+    """Return a CSS class for the field's wiring state, or empty string."""
+    if settings.is_shared(name):
+        return "poser-synced"
+    if settings.is_share_source(name):
+        return "poser-source"
+    return ""
+
+
+def _wiring_tooltip(settings, name: str, description: str) -> str:
+    """Append wiring info to a field's description for the tooltip."""
+    label = settings.wiring_label(name)
+    if label is None:
+        return description
+    if description:
+        return f"{description}\n({label})"
+    return label
+
+
+def _build_field_header(
+    label: str,
+    description: str | None,
+    *,
+    title_classes: str = "",
+    row_classes: str = "w-full items-center justify-between gap-2",
+    actions: Callable[[], None] | None = None,
+    action_classes: str = "items-center gap-0",
+):
+    """Create a shared header row for compound fields with title and optional actions."""
+    with ui.row().classes(row_classes):
+        _build_field_title(label, description, classes=title_classes)
+        if actions is not None:
+            with ui.row().classes(action_classes):
+                actions()
+
+
+def _build_init_field(settings, name: str, field: Field) -> None:
+    """Render a single init-only field without forcing it into a separate section."""
+    with ui.row().classes("items-center gap-2 poser-init"):
+        _build_field_title(_field_label(name, field), _wiring_tooltip(settings, name, field.description))
+        ui.label(str(getattr(settings, name))).classes("text-secondary italic")
+
+
+def _access_css_class(field: Field) -> str:
+    """Return a CSS marker class for the field's access level."""
+    if field.access is Access.INIT:
+        return "poser-init"
+    if field.access is Access.READ:
+        return "poser-feedback"
+    return "poser-input"  # WRITE or READWRITE
+
+
+def _build_settings_entry(settings, name: str, field: Field, polls) -> None:
+    """Render one visible field in declaration order."""
+    css = _access_css_class(field)
+    wiring = _wiring_css_class(settings, name)
+    if wiring:
+        css = f"{css} {wiring}"
+    if field.widget == Widget.button:
+        with ui.element("div").classes(css):
+            _build_action_button(settings, name, field)
+        return
+    if field.access is Access.INIT:
+        _build_init_field(settings, name, field)
+        return
+    with ui.element("div").classes(css):
+        _build_field_control(settings, name, field, polls)
+
+
+
+def _build_field_control(settings, name, field, polls):
+    """Create a NiceGUI control for a single Setting field.
+
+    *polls* collects ``(settings, name, [last_value], setter)`` tuples.
+    A timer created by the caller will poll these periodically to push
+    external changes into the UI — thread-safe by construction.
+    """
+    resolved = Widget.resolve(field)
+    builder = _BUILDERS.get(resolved)
+    if builder is not None:
+        return builder(settings, name, field, polls)
+    return _build_fallback(settings, name, field, polls)
+
+
+# ---------------------------------------------------------------------------
+# Builder registry — maps Widget constants to NiceGUI builder functions.
+# Each builder receives (settings, name, field, polls) and emits its control.
+# Use @widget_builder(Widget.xxx) to register.
+# ---------------------------------------------------------------------------
+
+_BUILDERS: dict[Widget, Callable] = {}
+
+
+def widget_builder(widget: Widget):
+    """Decorator: register a panel builder for a Widget constant."""
+    def decorator(fn: Callable) -> Callable:
+        _BUILDERS[widget] = fn
+        return fn
+    return decorator
+
+
+def _commit_typed(element, commit, *, on_enter=True):
+    """Commit a typed input's value on commit-style events rather than per keystroke.
+
+    Uses the native ``change`` DOM event, which bubbles (so it reaches NiceGUI even for the
+    custom ``ui.input`` component) and fires on defocus-with-change *and* on each spinner-arrow
+    click of a ``<input type=number>``. ``keydown.enter`` covers explicit Enter and ``blur`` is a
+    harmless backup for the plain ``q-input`` path. All are idempotent — ``Field._apply`` no-ops
+    when the value is unchanged."""
+    if on_enter:
+        element.on("keydown.enter", lambda _e: commit(element.value))
+    element.on("change", lambda _e: commit(element.value), [])
+    element.on("blur", lambda _e: commit(element.value), [])
+
+
+def _commit_while_dragging(element, commit):
+    """Commit a slider's value as it is dragged, throttled; the last value always arrives."""
+    element.on("update:model-value", lambda e: commit(e.args), [None], throttle=CHANGE_THROTTLE)
+
+
+# -- bool builders -----------------------------------------------------------
+
+@widget_builder(Widget.switch)
+def _build_switch(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+
+    sw = _attach_description_tooltip(ui.switch(label, value=value).props(
+        "dense" + _lock_prop(is_disabled, readonly=False)
+    ), desc)
+
+    if not is_disabled:
+        def on_switch_change(e):
+            setattr(settings, name, e.value)
+        sw.on_value_change(on_switch_change)
+
+    if _field_needs_poll(settings, name, field):
+        polls.append((settings, name, [value], lambda v, sw=sw: sw.set_value(v)))
+
+
+@widget_builder(Widget.status)
+def _build_status(settings, name, field, polls):
+    """Read-only good/bad indicator: one badge carrying the field's label, green with OK or red
+    with WARNING.
+
+    Both texts sit in the same grid cell and only one is visible, so the badge is always as wide as
+    the longer one and does not jump in size when the value flips.
+    """
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+
+    with ui.badge().classes("text-weight-bold px-2 py-1").style("display: inline-grid") as badge:
+        ok_text = ui.label(f"{label} OK").classes("text-center").style("grid-area: 1 / 1")
+        warning_text = ui.label(f"{label} WARNING").classes("text-center").style("grid-area: 1 / 1")
+    _attach_description_tooltip(badge, desc)
+
+    def _apply_style(ok: bool):
+        shown, hidden = (ok_text, warning_text) if ok else (warning_text, ok_text)
+        shown.classes(remove="invisible")
+        hidden.classes(add="invisible")
+        badge._props["color"] = "positive" if ok else "negative"
+        badge.update()
+
+    _apply_style(value)
+
+    polls.append((settings, name, [value], lambda v: _apply_style(v)))
+
+
+@widget_builder(Widget.toggle)
+def _build_toggle(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+
+    def _apply_style(btn, active: bool):
+        if active:
+            btn.props(remove="outline")
+            btn._props["color"] = "primary"
+        else:
+            btn.props(add="outline")
+            btn._props["color"] = "grey"
+        btn.update()
+
+    btn = _attach_description_tooltip(ui.button(label).props(
+        "dense" + _lock_prop(is_disabled, readonly=False)
+    ), desc)
+    _apply_style(btn, value)
+
+    if not is_disabled:
+        def on_click(b=btn):
+            new_val = not getattr(settings, name)
+            setattr(settings, name, new_val)
+            _apply_style(b, new_val)
+        btn.on_click(on_click)
+
+    if _field_needs_poll(settings, name, field):
+        def _poll_toggle(v, b=btn):
+            _apply_style(b, v)
+        polls.append((settings, name, [value], _poll_toggle))
+
+
+# -- numeric builders --------------------------------------------------------
+
+
+
+@widget_builder(Widget.slider)
+def _build_slider(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+    step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
+    color = getattr(field, "color", "primary")
+
+    with ui.column().classes("w-48 max-w-full gap-1"):
+        with ui.row().classes("w-full items-center justify-between flex-nowrap"):
+            _build_field_title(label, desc, classes="flex-1 truncate")
+            fmt = "%.0f" if field.type_ is int else "%.2f"
+            val_input = ui.number(
+                value=value,
+                step=step,
+                format=fmt,
+            ).props(
+                "dense borderless"
+                + _lock_prop(is_disabled)
+            ).classes("w-16")
+        sl = ui.slider(
+            min=field.min, max=field.max, step=step, value=value
+        ).props(
+            f"dense color={color}"
+            + _lock_prop(is_disabled)
+        ).classes("w-full")
+
+    _updating = {"lock": False}
+    # The poll's last-seen value: a commit records what it wrote, so the poll does not push it
+    # back into the slider while the user is still dragging.
+    last = [value]
+
+    if not is_disabled:
+        def on_slider_change(e):
+            if not _updating["lock"]:
+                _updating["lock"] = True
+                val_input.set_value(e.value)
+                _updating["lock"] = False
+        sl.on_value_change(on_slider_change)
+
+        def commit_slider(val):
+            if val is None:
+                return
+            setattr(settings, name, field.type_(val))
+            last[0] = getattr(settings, name)
+        _commit_while_dragging(sl, commit_slider)
+
+        def commit_input(val):
+            if _updating["lock"] or val is None:
+                return
+            _updating["lock"] = True
+            clamped = max(field.min, min(field.max, field.type_(val)))
+            setattr(settings, name, clamped)
+            last[0] = getattr(settings, name)
+            sl.set_value(clamped)
+            val_input.set_value(clamped)
+            _updating["lock"] = False
+        _commit_typed(val_input, commit_input)
+
+    if _field_needs_poll(settings, name, field):
+        def _poll_slider(v, _sl=sl, _vi=val_input):
+            _sl.set_value(v)
+            _vi.set_value(v)
+        polls.append((settings, name, last, _poll_slider))
+
+
+@widget_builder(Widget.log_slider)
+def _build_log_slider(settings, name, field, polls):
+    """Slider over log10(min)..log10(max); the number input holds the real value."""
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+    color = getattr(field, "color", "primary")
+
+    def clamp(v: float) -> float:
+        return max(field.min, min(field.max, v))
+
+    with ui.column().classes("w-48 max-w-full gap-1"):
+        with ui.row().classes("w-full items-center justify-between flex-nowrap"):
+            _build_field_title(label, desc, classes="flex-1 truncate")
+            # HTML min is 0, not field.min: the browser steps in multiples of step counted
+            # from min, so 0 keeps the values round. field.min is enforced on commit.
+            val_input = ui.number(
+                value=value,
+                min=0,
+                max=field.max,
+                step=Widget.log_step(clamp(value)),
+                format="%.3g",
+            ).props(
+                "dense borderless"
+                + _lock_prop(is_disabled)
+            ).classes("w-16")
+        sl = ui.slider(
+            min=Widget.log_position(field.min),
+            max=Widget.log_position(field.max),
+            step=0.01,
+            value=Widget.log_position(clamp(value)),
+        ).props(
+            f"dense color={color}"
+            + _lock_prop(is_disabled)
+        ).classes("w-full")
+
+    _updating = {"lock": False}
+
+    def set_input(v: float) -> None:
+        val_input.set_value(v)
+
+    def on_input_change(e):
+        # The arrow step follows the value (a tenth of its decade) on every change, not
+        # only on commit: a held arrow keeps stepping in the browser without committing.
+        if e.value is not None and e.value > 0:
+            val_input.props(f"step={Widget.log_step(clamp(e.value))}")
+    val_input.on_value_change(on_input_change)
+
+    # The poll's last-seen value: a commit records what it wrote, so the poll does not push it
+    # back into the slider while the user is still dragging.
+    last = [value]
+
+    if not is_disabled:
+        def on_slider_change(e):
+            if not _updating["lock"]:
+                _updating["lock"] = True
+                set_input(Widget.log_value(e.value))
+                _updating["lock"] = False
+        sl.on_value_change(on_slider_change)
+
+        def commit_slider(pos):
+            if pos is None:
+                return
+            setattr(settings, name, field.type_(clamp(Widget.log_value(pos))))
+            last[0] = getattr(settings, name)
+        _commit_while_dragging(sl, commit_slider)
+
+        def commit_input(val):
+            if _updating["lock"] or val is None:
+                return
+            _updating["lock"] = True
+            clamped = field.type_(clamp(float(f"{val:.3g}")))
+            setattr(settings, name, clamped)
+            last[0] = getattr(settings, name)
+            sl.set_value(Widget.log_position(clamped))
+            set_input(clamped)
+            _updating["lock"] = False
+        _commit_typed(val_input, commit_input)
+
+    if _field_needs_poll(settings, name, field):
+        def _poll_log_slider(v, _sl=sl):
+            _updating["lock"] = True
+            _sl.set_value(Widget.log_position(clamp(v)))
+            set_input(v)
+            _updating["lock"] = False
+        polls.append((settings, name, last, _poll_log_slider))
+
+
+@widget_builder(Widget.number)
+def _build_number(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+
+    num = _attach_description_tooltip(ui.number(
+        label=label,
+        value=value,
+        step=field.step if field.step is not None else (1 if field.type_ is int else 0.01),
+        format="%.0f" if field.type_ is int else "%.2f",
+    ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24"), desc)
+
+    if not is_disabled:
+        def commit_num(val):
+            if val is not None:
+                setattr(settings, name, field.type_(val))
+        _commit_typed(num, commit_num)
+
+    if _field_needs_poll(settings, name, field):
+        polls.append((settings, name, [value], lambda v, num=num: num.set_value(v)))
+
+
+@widget_builder(Widget.knob)
+def _build_knob(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+    step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
+    min_val = field.min if field.min is not None else 0
+    max_val = field.max if field.max is not None else 100
+    # The knob shows its value as it is, so a value that is not on the step's grid (a read-only
+    # knob fed by the app) is shown to the step's decimals and not with a float's tail.
+    decimals = 0 if field.type_ is int else max(0, -math.floor(math.log10(step))) if step > 0 else 2
+
+    def shown(v):
+        return field.type_(round(v, decimals)) if v is not None else v
+
+    # The title goes into the knob's caption, above the value and beside the dial.
+    with Knob(
+        shown(value), min=min_val, max=max_val, step=step,
+        default=field.default, decimals=decimals, readonly=is_disabled,
+    ) as kn:
+        _build_field_title(label, desc, classes="truncate max-w-full")
+
+    # The poll's last-seen value: a change records what it wrote, so the poll does not echo it.
+    last = [value]
+
+    if not is_disabled:
+        # Answer every change with the setting's value: the knob shows its own value until then.
+        def commit_knob(val):
+            if val is not None:
+                setattr(settings, name, field.type_(val))
+            last[0] = getattr(settings, name)
+            kn.set_value(shown(last[0]))
+        kn.on_change(commit_knob)
+
+    if _field_needs_poll(settings, name, field):
+        polls.append((settings, name, last, lambda v, kn=kn: kn.set_value(shown(v))))
+
+
+# -- enum builders -----------------------------------------------------------
+
+@widget_builder(Widget.select)
+def _build_select(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+
+    options = {m: generate_label(m.name) for m in field.type_}
+    width = f"w-{field.width}" if field.width is not None else "w-48"
+    sel = _attach_description_tooltip(ui.select(
+        options=options,
+        value=value,
+        label=label,
+    ).props("dense outlined" + _lock_prop(is_disabled)).classes(f"{width} max-w-full"), desc)
+
+    if not is_disabled:
+        def on_select_change(e):
+            setattr(settings, name, e.value)
+        sel.on_value_change(on_select_change)
+
+    if _field_needs_poll(settings, name, field):
+        polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v)))
+
+
+@widget_builder(Widget.text_select)
+def _build_text_select(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+
+    # Resolve the options Field → current list[str] value
+    options_field = field.options
+    option_list = getattr(settings, options_field.name) if options_field else []
+    sel = _attach_description_tooltip(ui.select(
+        options=option_list,
+        value=value if value in option_list else None,
+        label=label,
+    ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-48 max-w-full"), desc)
+
+    if not is_disabled:
+        def on_select_change(e):
+            if e.value is None:         # the select clears itself when its options change; not a choice
+                return
+            setattr(settings, name, e.value)
+        sel.on_value_change(on_select_change)
+
+    polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v)))
+    # Add a custom poll for the options field too; re-apply the value the new options may have cleared
+    if options_field:
+        def on_options_change(v, s=sel):
+            s.options = v
+            s.update()
+            current = getattr(settings, name)
+            s.set_value(current if current in v else None)
+        polls.append((settings, options_field.name, [list(option_list)], on_options_change))
+
+
+@widget_builder(Widget.radio)
+def _build_radio(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+
+    options = {m: generate_label(m.name) for m in field.type_}
+    with ui.column().classes("gap-1"):
+        _build_field_title(label, desc)
+        rg = ui.toggle(options=options, value=value).props(
+            "dense" + _lock_prop(is_disabled)
+        )
+
+    if not is_disabled:
+        def on_radio_change(e):
+            setattr(settings, name, e.value)
+        rg.on_value_change(on_radio_change)
+
+    if _field_needs_poll(settings, name, field):
+        polls.append((settings, name, [value], lambda v, rg=rg: rg.set_value(v)))
+
+
+# -- string builders ---------------------------------------------------------
+
+@widget_builder(Widget.input)
+def _build_input(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+
+    inp = _attach_description_tooltip(ui.input(label=label, value=value).props(
+        "dense outlined" + _lock_prop(is_disabled)
+    ), desc)
+
+    if not is_disabled:
+        def commit_input(val):
+            setattr(settings, name, val)
+        _commit_typed(inp, commit_input)
+
+    if _field_needs_poll(settings, name, field):
+        polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
+
+
+@widget_builder(Widget.ip_field)
+def _build_ip(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+
+    def is_valid_ip(v: str) -> bool:
+        parts = v.split(".")
+        return len(parts) == 4 and all(p.isdigit() and 0 <= int(p) <= 255 for p in parts)
+
+    inp = _attach_description_tooltip(ui.input(
+        label=label, value=value,
+        validation={"": is_valid_ip},
+    ).props(
+        'dense outlined hide-bottom-space' + _lock_prop(is_disabled)
+    ).classes("w-36"), desc)
+
+    if not is_disabled:
+        def commit_ip(val):
+            if is_valid_ip(val):
+                setattr(settings, name, val)
+        _commit_typed(inp, commit_ip)
+
+    if _field_needs_poll(settings, name, field):
+        polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
+
+
+@widget_builder(Widget.number_field)
+def _build_number_input(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+    lo = field.min
+    hi = field.max
+    ft = field.type_
+
+    def is_valid(v: str) -> bool:
+        try:
+            n = ft(v)
+            if lo is not None and n < lo:
+                return False
+            if hi is not None and n > hi:
+                return False
+            return True
+        except (ValueError, TypeError):
+            return False
+
+    inp = _attach_description_tooltip(ui.input(
+        label=label, value=str(value),
+        validation={"": is_valid},
+    ).props(
+        'dense outlined hide-bottom-space' + _lock_prop(is_disabled)
+    ).classes("w-24"), desc)
+
+    if not is_disabled:
+        def commit_field(val):
+            if is_valid(val):
+                setattr(settings, name, ft(val))
+        _commit_typed(inp, commit_field)
+
+    if _field_needs_poll(settings, name, field):
+        polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(str(v))))
+
+
+@widget_builder(Widget.textarea)
+def _build_textarea(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+
+    ta = _attach_description_tooltip(ui.textarea(label=label, value=value).props(
+        "dense outlined" + _lock_prop(is_disabled)
+    ), desc)
+
+    if not is_disabled:
+        # Enter inserts a newline in a textarea, so commit on focus-out / change only.
+        _commit_typed(ta, lambda val: setattr(settings, name, val), on_enter=False)
+
+    if _field_needs_poll(settings, name, field):
+        polls.append((settings, name, [value], lambda v, ta=ta: ta.set_value(v)))
+
+
+# -- color builders ----------------------------------------------------------
+
+@widget_builder(Widget.color)
+def _build_color(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+
+    def _color_style(hex_val: str) -> str:
+        c = Color.from_hex(hex_val)
+        luminance = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
+        text = '#000000' if luminance > 0.5 else '#ffffff'
+        return f'background:{hex_val};border-radius:4px;color:{text}'
+
+    hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
+
+    ci = _attach_description_tooltip(ui.color_input(
+        label=label, value=hex_val
+    ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-36").style(
+        _color_style(hex_val)
+    ), desc)
+
+    if is_disabled:
+        ci.button.disable()  # readonly does not block the picker button
+    else:
+        def on_color_change(e):
+            if e.value:
+                c = Color.from_hex(e.value)
+                setattr(settings, name, Color(c.r, c.g, c.b, 1.0))
+                ci.style(_color_style(e.value))
+        ci.on_value_change(on_color_change)
+
+    if _field_needs_poll(settings, name, field):
+        def _poll_color(v, _ci=ci):
+            h = v.to_hex() if isinstance(v, Color) else '#000000'
+            _ci.set_value(h)
+            _ci.style(_color_style(h))
+        polls.append((settings, name, [value], _poll_color))
+
+
+@widget_builder(Widget.color_alpha)
+def _build_color_alpha(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    is_disabled = _is_field_read_only(settings, name, field)
+
+    hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
+    alpha = value.a if isinstance(value, Color) else 1.0
+
+    with ui.column().classes("w-full gap-1"):
+        _build_field_title(label, _wiring_tooltip(settings, name, field.description))
+        with ui.row().classes("items-end gap-2"):
+            ci = ui.color_input(
+                label="Color", value=hex_val
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-36")
+
+            alpha_num = ui.number(
+                label="A", value=alpha,
+                min=0.0, max=1.0, step=0.01,
+                format="%.2f",
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
+
+    if is_disabled:
+        ci.button.disable()  # readonly does not block the picker button
+    else:
+        def on_color_change(e):
+            if e.value:
+                c = Color.from_hex(e.value)
+                cur_alpha = alpha_num.value or 1.0
+                setattr(settings, name, Color(c.r, c.g, c.b, float(cur_alpha)))
+        ci.on_value_change(on_color_change)
+
+        def commit_alpha(val):
+            if val is not None:
+                cur = getattr(settings, name)
+                setattr(settings, name, Color(cur.r, cur.g, cur.b, float(val)))
+        _commit_typed(alpha_num, commit_alpha)
+
+    def _color_alpha_setter(v, _ci=ci, _an=alpha_num):
+        if isinstance(v, Color):
+            _ci.set_value(v.to_hex())
+            _an.set_value(v.a)
+
+    if _field_needs_poll(settings, name, field):
+        polls.append((settings, name, [value], _color_alpha_setter))
+
+
+# -- list builders -----------------------------------------------------------
+
+def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool, with_order: bool = True):
+    """Shared implementation for checklist, playlist, and order widgets."""
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+
+    elem_type = get_args(field.type_)[0] if get_args(field.type_) else None
+    if elem_type is None or not (isinstance(elem_type, type) and issubclass(elem_type, Enum)):
+        # Fallback for non-enum lists
+        return _build_fallback(settings, name, field, polls)
+
+    all_members = list(elem_type)
+    active_set = set(value)
+
+    with ui.column().classes("w-72 max-w-full gap-1"):
+        _build_field_header(
+            label,
+            desc,
+            title_classes="flex-1",
+            row_classes="w-full items-center gap-1",
+        )
+        container = ui.column().classes("w-full gap-0 border rounded p-1")
+
+        if with_checkboxes and with_order:
+            # Playlist: active first, then inactive
+            ordered = list(value) + [m for m in all_members if m not in active_set]
+        elif with_checkboxes:
+            # Checklist: stable enum order, no reordering
+            ordered = list(all_members)
+        else:
+            # Order-only: all members always active, ordered as in value
+            ordered = list(value)
+        state = {
+            "order": ordered,
+            "active": set(value) if with_checkboxes else set(all_members),
+        }
+
+        def _rebuild(cont, st, _settings=settings, _name=name, _elem=elem_type, _cb=with_checkboxes, _ord=with_order, _ro=is_disabled):
+            cont.clear()
+            with cont:
+                visible_members = list(st["order"])
+                for idx, member in enumerate(visible_members):
+                    is_active = member in st["active"]
+                    with ui.row().classes(
+                        "w-full items-center gap-2 px-2 py-0.5 rounded"
+                        + ("" if _ro else " cursor-move")
+                        + ("" if is_active else " opacity-50")
+                    ).style(
+                        "background: color-mix(in srgb, var(--q-primary) 15%, transparent);"
+                        if is_active else ""
+                    ):
+                        if _cb and not _ro:
+                            cb_widget = ui.checkbox(
+                                value=is_active,
+                            ).props("dense").classes("my-0")
+
+                        ui.label(generate_label(member.name)).classes("flex-1")
+
+                        if _ord and not _ro:
+                            # Find the real index in st["order"] for move operations
+                            real_idx = st["order"].index(member)
+
+                            up_btn = ui.button(
+                                icon="arrow_upward",
+                                on_click=lambda _, ri=real_idx: _move(cont, st, ri, -1),
+                            ).props("dense flat size=xs").classes("my-0")
+                            down_btn = ui.button(
+                                icon="arrow_downward",
+                                on_click=lambda _, ri=real_idx: _move(cont, st, ri, 1),
+                            ).props("dense flat size=xs").classes("my-0")
+
+                            if idx == 0:
+                                up_btn.props("disable")
+                            if idx == len(visible_members) - 1:
+                                down_btn.props("disable")
+
+                        if _cb and not _ro:
+                            def _on_check(e, m=member):
+                                if e.value:
+                                    st["active"].add(m)
+                                else:
+                                    st["active"].discard(m)
+                                _apply(cont, st)
+                            cb_widget.on_value_change(_on_check)
+
+        def _move(cont, st, idx, direction):
+            new_idx = idx + direction
+            if 0 <= new_idx < len(st["order"]):
+                st["order"][idx], st["order"][new_idx] = st["order"][new_idx], st["order"][idx]
+                _apply(cont, st)
+
+        def _apply(cont, st):
+            # Playlist: active items first, then inactive (preserving relative order)
+            if with_checkboxes and with_order:
+                st["order"] = (
+                    [m for m in st["order"] if m in st["active"]]
+                    + [m for m in st["order"] if m not in st["active"]]
+                )
+            new_list = [m for m in st["order"] if m in st["active"]]
+            setattr(settings, name, new_list)
+            _rebuild(cont, st)
+
+        _rebuild(container, state)
+
+    def _list_setter(v, _cont=container, _st=state, _elem=elem_type, _cb=with_checkboxes, _ord=with_order):
+        active_set_inner = set(v)
+        _st["active"] = active_set_inner
+        if _cb and _ord:
+            # Playlist: active first, then inactive
+            _st["order"] = list(v) + [m for m in list(_elem) if m not in active_set_inner]
+        elif _cb:
+            # Checklist: keep stable enum order
+            _st["order"] = list(_elem)
+        else:
+            _st["order"] = list(v)
+        _rebuild(_cont, _st)
+
+    if _field_needs_poll(settings, name, field):
+        polls.append((settings, name, [list(value)], _list_setter))
+
+
+@widget_builder(Widget.checklist)
+def _build_checklist(settings, name, field, polls):
+    return _build_sortable_list(settings, name, field, polls, with_checkboxes=True, with_order=False)
+
+
+@widget_builder(Widget.playlist)
+def _build_playlist(settings, name, field, polls):
+    return _build_sortable_list(settings, name, field, polls, with_checkboxes=True, with_order=True)
+
+
+@widget_builder(Widget.order)
+def _build_order(settings, name, field, polls):
+    return _build_sortable_list(settings, name, field, polls, with_checkboxes=False, with_order=True)
+
+
+@widget_builder(Widget.number_list)
+def _build_number_list(settings, name, field, polls):
+    """Render a fixed-length list of numbers as styled rows (matches sortable list look)."""
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+    elem_type = get_args(field.type_)[0] if get_args(field.type_) else float
+    step = field.step if field.step is not None else (1 if elem_type is int else 0.01)
+    fmt = "{:.0f}" if elem_type is int else "{:.2f}"
+
+    labels: list = []
+    with ui.column().classes("w-72 max-w-full gap-1"):
+        _build_field_title(label, desc)
+        with ui.column().classes("w-full gap-0 border rounded p-1"):
+            for i, v in enumerate(value):
+                with ui.row().classes(
+                    "w-full items-center gap-2 px-2 py-0.5 rounded"
+                ).style(
+                    "background: color-mix(in srgb, var(--q-primary) 15%, transparent);"
+                ):
+                    lbl = ui.label(fmt.format(v)).classes("flex-1")
+                    labels.append(lbl)
+
+                    if not is_disabled:
+                        def on_click(e, idx=i, _lbl=lbl):
+                            cur = getattr(settings, name)
+                            slot = _lbl.parent_slot
+                            if slot is None:
+                                return
+                            parent = slot.parent
+
+                            parent.clear()
+                            with parent:
+                                num = ui.number(
+                                    value=cur[idx], step=step,
+                                    min=field.min, max=field.max,
+                                ).props("dense autofocus borderless").classes("flex-1")
+
+                                def on_blur(_e, _idx=idx, _parent=parent, _num=num):
+                                    val = _num.value
+                                    if val is not None:
+                                        cur2 = getattr(settings, name)
+                                        cur2[_idx] = elem_type(val)
+                                        setattr(settings, name, cur2)
+                                    _parent.clear()
+                                    with _parent:
+                                        new_lbl = ui.label(fmt.format(getattr(settings, name)[_idx])).classes("flex-1")
+                                        new_lbl.on("click", lambda _e, _i=_idx, _nl=new_lbl: on_click(_e, _i, _nl))
+                                        labels[_idx] = new_lbl
+                                num.on("blur", on_blur)
+                        lbl.on("click", on_click)
+
+    if _field_needs_poll(settings, name, field):
+        def _poll_number_list(v, _labels=labels, _fmt=fmt):
+            for idx, lbl in enumerate(_labels):
+                if idx < len(v):
+                    lbl.set_text(_fmt.format(v[idx]))
+        polls.append((settings, name, [list(value)], _poll_number_list))
+
+
+@widget_builder(Widget.point2f)
+def _build_point2f(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    is_disabled = _is_field_read_only(settings, name, field)
+
+    with ui.column().classes("w-full gap-1"):
+        _build_field_title(label, _wiring_tooltip(settings, name, field.description))
+        with ui.row().classes("items-end gap-2"):
+            x_num = ui.number(
+                label="X", value=value.x if isinstance(value, Point2f) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
+            y_num = ui.number(
+                label="Y", value=value.y if isinstance(value, Point2f) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
+
+    if not is_disabled:
+        def commit_x(val):
+            if val is not None:
+                cur = getattr(settings, name)
+                setattr(settings, name, Point2f(float(val), cur.y))
+        _commit_typed(x_num, commit_x)
+
+        def commit_y(val):
+            if val is not None:
+                cur = getattr(settings, name)
+                setattr(settings, name, Point2f(cur.x, float(val)))
+        _commit_typed(y_num, commit_y)
+
+    def _point_setter(v, _x=x_num, _y=y_num):
+        if isinstance(v, Point2f):
+            _x.set_value(v.x)
+            _y.set_value(v.y)
+
+    if _field_needs_poll(settings, name, field):
+        polls.append((settings, name, [value], _point_setter))
+
+
+@widget_builder(Widget.rect)
+def _build_rect(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    is_disabled = _is_field_read_only(settings, name, field)
+
+    with ui.column().classes("w-full gap-1"):
+        _build_field_title(label, _wiring_tooltip(settings, name, field.description))
+        with ui.row().classes("items-end gap-2 flex-wrap"):
+            rx = ui.number(
+                label="X", value=value.x if isinstance(value, Rect) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
+            ry = ui.number(
+                label="Y", value=value.y if isinstance(value, Rect) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
+            rw = ui.number(
+                label="W", value=value.width if isinstance(value, Rect) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
+            rh = ui.number(
+                label="H", value=value.height if isinstance(value, Rect) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
+
+    if not is_disabled:
+        def commit_rx(val):
+            if val is not None:
+                cur = getattr(settings, name)
+                setattr(settings, name, Rect(float(val), cur.y, cur.width, cur.height))
+        _commit_typed(rx, commit_rx)
+
+        def commit_ry(val):
+            if val is not None:
+                cur = getattr(settings, name)
+                setattr(settings, name, Rect(cur.x, float(val), cur.width, cur.height))
+        _commit_typed(ry, commit_ry)
+
+        def commit_rw(val):
+            if val is not None:
+                cur = getattr(settings, name)
+                setattr(settings, name, Rect(cur.x, cur.y, float(val), cur.height))
+        _commit_typed(rw, commit_rw)
+
+        def commit_rh(val):
+            if val is not None:
+                cur = getattr(settings, name)
+                setattr(settings, name, Rect(cur.x, cur.y, cur.width, float(val)))
+        _commit_typed(rh, commit_rh)
+
+    def _rect_setter(v, _rx=rx, _ry=ry, _rw=rw, _rh=rh):
+        if isinstance(v, Rect):
+            _rx.set_value(v.x)
+            _ry.set_value(v.y)
+            _rw.set_value(v.width)
+            _rh.set_value(v.height)
+
+    if _field_needs_poll(settings, name, field):
+        polls.append((settings, name, [value], _rect_setter))
+
+
+# -- Pinned read-outs ----------------------------------------------------------
+
+def _format_readout(value) -> str:
+    """A read-only value as short text for a pinned chip."""
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    if isinstance(value, Enum):
+        return value.name
+    if isinstance(value, float):
+        return f"{value:.1f}"
+    return str(value)
+
+
+def _build_pinned_readout(settings, name, field, polls):
+    """A read-only pinned field as one compact chip, "<Label> <value>", instead of a locked input."""
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+
+    chip = _attach_description_tooltip(
+        ui.label(f"{label} {_format_readout(value)}").classes("bg-grey-8 rounded px-2 py-1"),
+        desc,
+    )
+    polls.append((settings, name, [value],
+                  lambda v, c=chip: c.set_text(f"{label} {_format_readout(v)}")))
+
+
+# -- Fallback for unregistered / unsupported types --------------------------
+
+def _build_fallback(settings, name, field, polls):
+    """Build a control for types without a registered Widget builder."""
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+
+    # -- Generic fallback: read-only label -----------------------------------
+    with ui.row().classes("items-center gap-2"):
+        _build_field_title(label, _wiring_tooltip(settings, name, field.description))
+        lbl = ui.label(str(value)).classes("text-secondary")
+
+    if _field_needs_poll(settings, name, field):
+        polls.append((settings, name, [value], lambda v, lbl=lbl: lbl.set_text(str(v))))
+
+
+def _build_action_button(settings, name, field):
+    """Create a NiceGUI button for a Widget.button Setting."""
+    label = _field_label(name, field)
+    description = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+    props = "dense disable" if is_disabled else "dense"
+    btn = ui.button(label, on_click=lambda: field.fire(settings)).props(props)
+    _attach_description_tooltip(btn, description or None)
+    if is_disabled:
+        btn.disable()
+
+
+def _has_visible_content(settings):
+    """Return True if settings has any visible fields, actions, or children with visible content."""
+    if any(f.visible for f in settings.fields.values()):
+        return True
+    if settings.actions:
+        return True
+    if any(_has_visible_content(c) for c in settings.children.values()):
+        return True
+    return False
+
+
+def _content_access_types(settings) -> frozenset:
+    """Return the set of Access types present in visible fields (recursive).
+
+    Actions are not counted — groups with actions are never auto-hidden.
+    """
+    if settings.actions:
+        return frozenset({Access.WRITE, Access.READ, Access.INIT})  # mixed — never hide
+    types: set = set()
+    for f in settings.fields.values():
+        if f.visible:
+            if f.access in (Access.WRITE, Access.READWRITE):
+                types.add(Access.WRITE)  # normalize READWRITE → WRITE bucket
+            else:
+                types.add(f.access)
+    for child in settings.children.values():
+        if _has_visible_content(child):
+            types |= _content_access_types(child)
+    return frozenset(types)
+
+
+# Map access-type combinations to CSS class names for group hiding.
+_ACCESS_CLASS_MAP: dict[frozenset, str] = {
+    frozenset({Access.INIT}):                          "poser-only-init",
+    frozenset({Access.READ}):                          "poser-only-feedback",
+    frozenset({Access.WRITE}):                         "poser-only-input",
+    frozenset({Access.INIT, Access.READ}):              "poser-only-init-feedback",
+    frozenset({Access.INIT, Access.WRITE}):             "poser-only-init-input",
+    frozenset({Access.READ, Access.WRITE}):             "poser-only-feedback-input",
+    frozenset({Access.INIT, Access.READ, Access.WRITE}): "poser-only-all",
+}
+
+
+def _register_polls(polls, all_polls):
+    """Append local poll entries into the page-level poll list.
+
+    Each entry is ``(settings, name, [last_value], setter)``.
+    The actual timer is created once per page after all controls have been built.
+    """
+    if polls:
+        all_polls.extend(polls)
+
+
+def _make_poll_timer(polls, timers):
+    """Create a single page-level ``SafeTimer`` that polls all collected entries.
+
+    Each entry is ``(settings, name, [last_value], setter)``.
+    The timer runs on NiceGUI's event loop so UI calls are thread-safe.
+    *timers* collects the timer for later cleanup reference. ``SafeTimer``
+    cancels itself once the client's parent slot is torn down.
+    """
+    if not polls:
+        return
+
+    def _tick():
+        try:
+            for s, fname, last, setter in polls:
+                cur = getattr(s, fname)
+                if cur != last[0]:
+                    last[0] = cur
+                    setter(cur)
+        except Exception:
+            pass  # Transient error (e.g. WebSocket drop) — skip this tick, retry next
+
+    timers.append(SafeTimer(POLL_INTERVAL, _tick))
+
+
+def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=""):
+    """Emit the controls for a single Settings instance (no wrapper).
+
+    Renders fields strictly in **declaration order** inside a single flex-wrap
+    container.  ``field.newline`` inserts a full-width zero-height break element
+    that carries the field's access CSS class so it hides with the field.
+
+    *depth* tracks nesting level (0 = top, 1+ = child of child).
+    *expansions* collects ``ui.expansion`` elements for expand/collapse-all.
+    """
+    polls: list[tuple] = []
+
+    visible_fields = [
+        (field_name, field)
+        for field_name, field in settings.fields.items()
+        if field.visible
+    ]
+
+    with ui.row().classes("w-full gap-4 flex-wrap items-center content-start"):
+        for field_name, field in visible_fields:
+            if field.newline:
+                # Full-width break element with the field's access class so it
+                # hides together with the field when that access type is toggled off.
+                ui.element("div").classes(
+                    f"{_access_css_class(field)} pt-2"
+                ).style("flex-basis: 100%; height: 0")
+            if field.row_label is not None:
+                # The row's title: a fixed width, so the controls of successive rows line up.
+                ui.label(field.row_label).classes(f"{_access_css_class(field)} w-24 font-bold")
+            _build_settings_entry(settings, field_name, field, polls)
+
+    # Register this card's polls with the page-level timer.
+    _register_polls(polls, all_polls)
+
+    # Children (recursive)
+    for child_name, child in settings.children.items():
+        if _has_visible_content(child):
+            _build_settings_card(child_name, child, all_polls, depth=depth, expansions=expansions, path=path)
+
+
+# Depth-based Quasar background classes (dark mode: increasingly lighter).
+# _DEPTH_BG = ["bg-grey-10", "bg-grey-9", "bg-grey-8"]
+_DEPTH_BG = ["bg-grey-9", "bg-grey-8", "bg-grey-7", "bg-grey-6", "bg-grey-5"]  # extended for deeper nesting
+
+
+def _build_settings_card(name, settings, all_polls, *, depth=0, expansions=None, path=""):
+    """Build a card for one Settings instance.
+
+    Always renders as a collapsible ``ui.expansion`` at any depth.
+    Every layer gets a consistent custom header with an icon and an
+    expand/collapse-all button (functional when children exist, hidden
+    otherwise so the layout stays uniform).
+    """
+    has_children = bool(settings.children)
+    key = f"{path}.{name}" if path else name
+    is_open: bool = _expansion_state.get(key) is True
+
+    # Tag expansion with the access types it contains so it hides when
+    # all its types are toggled off.
+    _access_cls = _ACCESS_CLASS_MAP.get(_content_access_types(settings), "")
+    bg = _DEPTH_BG[min(depth, len(_DEPTH_BG) - 1)]
+    exp = ui.expansion(
+        generate_label(name),
+        value=is_open,
+    ).props("duration=0 dense dense-toggle").classes(f"w-full rounded {bg}" + (f" {_access_cls}" if _access_cls else ""))
+    exp.on("show", lambda: (_expansion_state.update({key: True}), _save_expansion_state()))
+    exp.on("hide", lambda: (_expansion_state.update({key: False}), _save_expansion_state()))
+
+    # Always use a custom header slot for consistent appearance.
+    child_expansions_ref: list = []
+    _state = {"all": False}
+
+    def _toggle_children():
+        _state["all"] = not _state["all"]
+        if _state["all"]:
+            # Ensure the parent expansion is open so children are visible
+            exp.open()
+            for e in child_expansions_ref:
+                e.open()
+        else:
+            for e in child_expansions_ref:
+                e.close()
+            exp.close()
+
+    with exp.add_slot("header"):
+        with ui.row().classes("w-full items-center gap-1"):
+            ui.label(generate_label(name).upper()).classes("flex-1")
+            if has_children:
+                unfold_btn = ui.button(
+                    icon="unfold_more",
+                    on_click=_toggle_children,
+                ).props("dense flat round size=xs").tooltip(
+                    "Expand / Collapse All"
+                )
+                # Prevent the button click from toggling the expansion header
+                unfold_btn.on("click.stop", lambda: None)
+
+    if expansions is not None:
+        expansions.append(exp)
+
+    with exp:
+        child_expansions: list = []
+
+        _build_settings_body(
+            settings, all_polls,
+            depth=depth + 1, expansions=child_expansions, path=key,
+        )
+
+        if expansions is not None:
+            expansions.extend(child_expansions)
+
+        # Wire up the header button to the actual child expansions
+        if has_children:
+            child_expansions_ref.extend(child_expansions)
+
+
+def _build_preset_controls(root):
+    """Emit preset dropdown + action buttons (no wrapping row — caller provides layout)."""
+    preset_list = presets.scan()
+    startup = presets.get_startup()
+    initial = startup if startup in preset_list else (preset_list[0] if preset_list else None)
+
+    # -- Star button (left of dropdown) ------------------------------------
+    def do_set_startup():
+        preset_name = dropdown.value
+        if not preset_name:
+            ui.notify("Select a preset first", type="warning")
+            return
+        presets.set_startup(preset_name)
+        _update_star(preset_name)
+        ui.notify(f"'{preset_name}' will load on next startup", type="positive")
+
+    star_btn = ui.button(
+        icon="star", on_click=do_set_startup,
+    ).props("dense flat").tooltip("Set as startup preset")
+
+    def _update_star(selected):
+        if selected and selected == presets.get_startup():
+            star_btn._props["color"] = "warning"
+            star_btn._props.pop("outline", None)
+        else:
+            star_btn._props["color"] = "grey"
+            star_btn._props["outline"] = True
+        star_btn.update()
+
+    _update_star(initial)
+
+    # -- Preset dropdown ---------------------------------------------------
+    dropdown = ui.select(
+        options=preset_list,
+        value=initial,
+        label="Preset",
+    ).props("dense outlined").classes("min-w-[180px]")
+
+    def _refresh_dropdown():
+        dropdown.set_options(presets.scan())
+
+    def _on_preset_change(e):
+        name = e.value
+        _update_star(name)
+        if not name:
+            return
+        p = presets.path(name)
+        if p.exists():
+            presets.load(root, p)
+            ui.notify(f"Loaded '{name}'", type="positive")
+
+    dropdown.on_value_change(_on_preset_change)
+
+    # -- Action buttons ----------------------------------------------------
+    def do_load():
+        name = dropdown.value
+        if not name:
+            ui.notify("Select a preset first", type="warning")
+            return
+        p = presets.path(name)
+        if p.exists():
+            presets.load(root, p)
+            ui.notify(f"Loaded '{name}'", type="positive")
+        else:
+            ui.notify(f"Preset '{name}' not found", type="negative")
+
+    def do_save():
+        preset_name = dropdown.value
+        if not preset_name:
+            ui.notify("Select a preset to overwrite, or use Save As", type="warning")
+            return
+        presets.save(root, presets.path(preset_name))
+        ui.notify(f"Saved '{preset_name}'", type="positive")
+
+    async def do_save_as():
+        with ui.dialog() as dialog, ui.card().classes("min-w-[300px]"):
+            ui.label("Save As").classes("text-lg font-bold")
+            name_input = ui.input(label="Preset name", value=dropdown.value or "").props("dense outlined autofocus")
+
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button("Cancel", on_click=dialog.close).props("flat")
+
+                def confirm():
+                    preset_name = (name_input.value or "").strip()
+                    if not preset_name:
+                        ui.notify("Enter a preset name", type="warning")
+                        return
+                    try:
+                        presets.validate_name(preset_name)
+                    except ValueError:
+                        ui.notify("Invalid preset name — no slashes or leading dots", type="negative")
+                        return
+                    presets.save(root, presets.path(preset_name))
+                    _refresh_dropdown()
+                    dropdown.set_value(preset_name)
+                    ui.notify(f"Saved '{preset_name}'", type="positive")
+                    dialog.close()
+
+                ui.button("Save", on_click=confirm).props("flat color=primary")
+
+            # Allow Enter key to confirm
+            name_input.on("keydown.enter", lambda _: confirm())
+
+        dialog.open()
+
+    async def do_delete():
+        preset_name = dropdown.value
+        if not preset_name:
+            ui.notify("Select a preset to delete", type="warning")
+            return
+
+        with ui.dialog() as dialog, ui.card():
+            ui.label(f"Delete '{preset_name}'?")
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button("Cancel", on_click=dialog.close).props("flat")
+
+                def confirm_delete():
+                    p = presets.path(preset_name)
+                    if p.exists():
+                        p.unlink()
+                    _refresh_dropdown()
+                    dropdown.set_value(None)
+                    ui.notify(f"Deleted '{preset_name}'", type="info")
+                    dialog.close()
+
+                ui.button("Delete", on_click=confirm_delete).props("flat color=negative")
+
+        dialog.open()
+
+    ui.button(icon="refresh", on_click=do_load).props("dense flat").tooltip("Reload selected preset")
+    ui.button(icon="save", on_click=do_save).props("dense flat").tooltip("Save (overwrite selected)")
+    ui.button(icon="save_as", on_click=do_save_as).props("dense flat").tooltip("Save as new preset")
+    ui.button(icon="delete", on_click=do_delete).props("dense flat color=negative").tooltip("Delete preset")
+
+
+def _get_local_ips() -> list[str]:
+    """Return all non-loopback IPv4 addresses for this machine."""
+    try:
+        hostname = socket.gethostname()
+        _, _, ips = socket.gethostbyname_ex(hostname)
+        return [ip for ip in ips if not ip.startswith("127.") and not ip.startswith("169.254.")]
+    except Exception:
+        return []
+
+
+def create_settings_panel(
+    root,
+    *,
+    title: str = "",
+    port: int | None = None,
+    on_exit=None,
+) -> None:
+    """Build a full tabbed settings panel from a root Settings.
+
+    Call this inside a NiceGUI page context::
+
+        @ui.page("/")
+        def index():
+            create_settings_panel(app_settings, title="POSER", port=8080, on_exit=stop)
+    """
+
+    # Force dark mode for consistent styling
+    ui.dark_mode(True)
+
+    # Load UI state (expansion, active tab) from app-scoped file
+    _load_expansion_state()
+
+    # Timers for this client session — self-cancel if parent slot is deleted.
+    timers: list = []
+    all_polls: list[tuple] = []
+
+    # -- Responsive CSS via @media (works on all browsers) -----------------
+    ui.add_css('''
+    html { overflow-y: scroll; }
+    #popup.nicegui-error-popup { display: none !important; }
+    .hide-init .poser-init { display: none !important; }
+    .hide-feedback .poser-feedback { display: none !important; }
+    .hide-input .poser-input { display: none !important; }
+    .hide-init .poser-only-init { display: none !important; }
+    .hide-feedback .poser-only-feedback { display: none !important; }
+    .hide-input .poser-only-input { display: none !important; }
+    .hide-init.hide-feedback .poser-only-init-feedback { display: none !important; }
+    .hide-init.hide-input .poser-only-init-input { display: none !important; }
+    .hide-feedback.hide-input .poser-only-feedback-input { display: none !important; }
+    .hide-init.hide-feedback.hide-input .poser-only-all { display: none !important; }
+
+    .poser-source { border-left: 2px solid #26a69a; padding-left: 6px; }
+    .poser-synced { border-left: 2px solid #ffa726; padding-left: 6px; }
+
+    .poser-knob { display: flex; align-items: center; gap: 6px; }
+    .poser-knob-caption { display: flex; flex-direction: column; align-items: flex-end; min-width: 56px; max-width: 110px; }
+    .poser-knob-dial { width: 40px; height: 40px; flex: none; cursor: grab; touch-action: none; user-select: none; }
+    .poser-knob-dragging .poser-knob-dial { cursor: grabbing; }
+    .poser-knob-readonly .poser-knob-dial { cursor: default; }
+    .poser-knob-track { fill: none; stroke: #424242; stroke-width: 8; stroke-linecap: round; }
+    .poser-knob-value { fill: none; stroke: var(--q-primary); stroke-width: 8; stroke-linecap: round; }
+    .poser-knob-body { stroke: #0e0e0e; stroke-width: 2; }
+    .poser-knob-pointer { stroke: #e0e0e0; stroke-width: 5; stroke-linecap: round; }
+    /* The value and its editor share one box (border, padding, font), so the digits do not move
+       when editing starts; the editor only lights the border. */
+    .poser-knob-text { width: 100%; box-sizing: border-box; margin: 0; padding: 0 3px;
+                       border: 1px solid #424242; border-radius: 3px;
+                       font-family: inherit; font-size: 12px; line-height: 18px; text-align: right;
+                       font-variant-numeric: tabular-nums; cursor: text; }
+    .poser-knob-readonly .poser-knob-text { cursor: default; border-color: transparent; }
+    .poser-knob-value-box { position: relative; width: 100%; }
+    .poser-knob-editor { position: absolute; inset: 0; min-width: 0; height: 100%;
+                         background: #2a2a2a; color: inherit; border-color: var(--q-primary); outline: none; }
+
+    /* Scaled with transform, not zoom: zoom puts getBoundingClientRect and pointer clientX in
+       different spaces in some browsers, and Quasar sliders compare the two. A transform keeps
+       its layout size, so the bar is laid out wider and the frame is sized by script. */
+    .poser-pinned-frame { --scale: 0.8; overflow: hidden; }
+    .poser-pinned {
+        width: calc(100% / var(--scale));
+        transform: scale(var(--scale));
+        transform-origin: top left;
+    }
+    ''')
+
+    # -- Shutdown overlay (client-side JS) ---------------------------------
+    # Defines showShutdownScreen() and auto-shows it when the WebSocket
+    # disconnects (external quit, Ctrl-C, stop() from code, etc.).
+    _title_esc = title.replace('\\', '\\\\').replace("'", "\\'") if title else ''
+    _title_markup = (
+        f'<div style="font-size:1.5rem;font-weight:bold;color:#3f3f46;'
+        f'margin-bottom:1rem">{_title_esc}</div>'
+        if title else ''
+    )
+    ui.add_head_html(f'''<script>(function() {{
+      window.showShutdownScreen = function() {{
+        if (document.getElementById("shutdown-overlay")) return;
+        var d = document.createElement("div");
+        d.id = "shutdown-overlay";
+                d.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9998;"
+                    + "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);";
+                d.innerHTML = '<div style="position:absolute;left:50%;top:calc((100vh - {LOG_DRAWER_DEFAULT_HEIGHT}) / 2);transform:translate(-50%, -50%);text-align:center;color:#e4e4e7">'
+          + '{_title_markup}'
+          + '<span class="material-icons" style="font-size:64px;color:#71717a;margin-bottom:0.75rem;display:block">'
+          + 'cloud_off</span>'
+          + '<div style="font-size:1rem;font-weight:500;color:#a1a1aa">No connection</div>'
+          + '<div style="font-size:0.8rem;color:#71717a;margin-top:0.25rem">Waiting for server\u2026</div>'
+          + '</div>';
+        document.body.appendChild(d);
+      }};
+      var _t = null;
+      var _i = setInterval(function() {{
+        if (window.socket) {{
+          window.socket.on("disconnect", function() {{
+            _t = setTimeout(window.showShutdownScreen, 1500);
+          }});
+          window.socket.on("connect", function() {{
+            if (_t) {{ clearTimeout(_t); _t = null; }}
+            var el = document.getElementById("shutdown-overlay");
+            if (el) el.remove();
+          }});
+          clearInterval(_i);
+        }}
+      }}, 100);
+    }})();</script>''')
+
+    # -- Header row: title | preset controls | exit button -----------------
+    # Collect tab entries early so we can build tabs inside the sticky header.
+    tab_entries: list[tuple[str, BaseSettings]] = []  # (name, settings)
+    for child_name, child in root.children.items():
+        if _has_visible_content(child):
+            tab_entries.append((child_name, child))
+
+    with ui.column().classes("w-full sticky top-0 z-50 bg-[#121212] text-white gap-2 px-3 pt-3 pb-2"):
+        with ui.row().classes("w-full items-center flex-wrap gap-1"):
+            if title:
+                ui.label(title).classes("text-2xl font-bold")
+
+            # Log drawer toggle — drawer itself is built outside the header below
+            _log_toggle_holder: list = []
+            ui.button(icon="terminal", on_click=lambda: _log_toggle_holder[0]() if _log_toggle_holder else None).props(
+                "dense flat"
+            ).tooltip("Log panel")
+
+            if port is not None:
+                local_ip_links_loaded = {"value": False}
+
+                connection_btn = ui.button(icon="lan").props("dense flat").tooltip("Connection info")
+                with connection_btn:
+                    with ui.menu().props('anchor="bottom middle" self="top middle"'):
+                        with ui.card().classes("gap-1").props("flat"):
+                            ui.label("Connect").classes("text-base font-bold")
+                            ui.separator()
+                            local_ip_links = ui.column().classes("gap-0")
+                            _url_local = f"http://localhost:{port}"
+                            ui.link(_url_local, _url_local, new_tab=True).classes("text-sm")
+
+                def _populate_local_ip_links() -> None:
+                    if local_ip_links_loaded["value"]:
+                        return
+                    local_ip_links_loaded["value"] = True
+                    with local_ip_links:
+                        for _ip in _get_local_ips():
+                            _url = f"http://{_ip}:{port}"
+                            ui.link(_url, _url, new_tab=True).classes("text-sm")
+
+                connection_btn.on("click", lambda: _populate_local_ip_links())
+
+            with ui.row().classes("flex-1 items-center gap-1 flex-nowrap justify-center"):
+                _build_preset_controls(root)
+
+            if on_exit:
+                async def _do_exit():
+                    await ui.run_javascript('showShutdownScreen()')
+                    on_exit()
+                ui.button(icon="power_settings_new", on_click=_do_exit).props(
+                    "dense flat color=negative"
+                ).tooltip("Exit application")
+
+        # Collect pinned fields and actions from all registered modules
+        pinned_fields: list[tuple[BaseSettings, str, Field]] = []
+        pinned_actions: list[tuple[BaseSettings, str, Field]] = []
+
+        def _collect_pinned(settings: BaseSettings) -> None:
+            for field_name, field in settings.fields.items():
+                if field.pinned and field.visible:
+                    pinned_fields.append((settings, field_name, field))
+            for action_name, action_field in settings.actions.items():
+                if action_field.pinned and action_field.visible:
+                    pinned_actions.append((settings, action_name, action_field))
+            for child in settings.children.values():
+                _collect_pinned(child)
+
+        _collect_pinned(root)
+
+        # Render pinned fields above the tabs, scaled down: a controls row (what can be changed)
+        # and a status row (what can only be read), status indicators first.
+        if pinned_fields or pinned_actions:
+            pinned_polls: list[tuple] = []
+            controls = [p for p in pinned_fields if p[2].access in (Access.WRITE, Access.READWRITE)]
+            readouts = [p for p in pinned_fields if p[2].access in (Access.READ, Access.INIT)]
+            readouts.sort(key=lambda p: p[2].widget is not Widget.status)   # stable: tree order otherwise
+            # The frame follows the bar's scaled height (see .poser-pinned in the CSS above).
+            ui.add_head_html('''<script>(function() {
+              var _i = setInterval(function() {
+                var frame = document.querySelector(".poser-pinned-frame");
+                var bar = frame && frame.querySelector(".poser-pinned");
+                if (!bar) return;
+                clearInterval(_i);
+                var scale = parseFloat(getComputedStyle(frame).getPropertyValue("--scale"));
+                new ResizeObserver(function() {
+                  frame.style.height = bar.offsetHeight * scale + "px";
+                }).observe(bar);
+              }, 100);
+            })();</script>''')
+            with ui.element("div").classes("poser-pinned-frame w-full mt-2"), \
+                    ui.column().classes("poser-pinned gap-2 bg-grey-9 rounded px-3 py-2"):
+                if controls or pinned_actions:
+                    with ui.row().classes("w-full gap-4 flex-wrap items-end"):
+                        for settings, field_name, field in controls:
+                            _build_field_control(settings, field_name, field, pinned_polls)
+                        for settings, action_name, action_field in pinned_actions:
+                            _build_action_button(settings, action_name, action_field)
+                if readouts:
+                    with ui.row().classes("w-full gap-3 flex-wrap items-center"):
+                        for settings, field_name, field in readouts:
+                            if field.widget is Widget.status:
+                                _build_field_control(settings, field_name, field, pinned_polls)
+                            else:
+                                _build_pinned_readout(settings, field_name, field, pinned_polls)
+            _register_polls(pinned_polls, all_polls)
+
+        # Tabs inside the sticky header
+        if not tab_entries:
+            ui.label("No settings registered.")
+
+        # Visibility toggle definitions: (icon, state_suffix, css_class, tooltip, default_hidden)
+        _TOGGLES = [
+            ("construction",   "__hide_init__",     "hide-init",     "Init fields",     True),
+            ("monitor_heart",  "__hide_feedback__", "hide-feedback", "Feedback fields",  False),
+            ("tune",           "__hide_input__",    "hide-input",    "Input fields",     False),
+        ]
+
+        # Forward-populated by tab panel loop below.
+        _tab_data: dict[str, dict] = {}   # label -> {"panel": ..., "expansions": [...]}
+        _active = {"label": ""}
+
+        if tab_entries:
+            saved_tab = _expansion_state.get("__active_tab__")
+            initial_tab_label = saved_tab if saved_tab in dict(tab_entries) else tab_entries[0][0]
+            _active["label"] = initial_tab_label
+
+            with ui.tabs().classes("w-full bg-[#121212] rounded").props("dense active-color=primary no-indicator") as tabs:
+                tab_map = {}
+                for label, _ in tab_entries:
+                    t = ui.tab(generate_label(label))
+                    def _on_tab_click(l=label):
+                        _expansion_state["__active_tab__"] = l
+                        _save_expansion_state()
+                        _active["label"] = l
+                        _sync_toolbar_to_tab()
+                    t.on("click", _on_tab_click)
+                    tab_map[label] = t
+
+            # Toolbar row: visibility toggles (left) + expand/collapse-all (right)
+            _toggle_btns: list[tuple] = []   # [(btn, suffix, css, default), ...]
+            _expand_btn_ref: list = [None]
+
+            def _sync_toolbar_to_tab():
+                """Update toggle button appearance for the active tab."""
+                lbl = _active["label"]
+                for btn, suffix, css, default in _toggle_btns:
+                    is_hidden = _expansion_state.get(f"{lbl}.{suffix}", default)
+                    if is_hidden:
+                        btn.classes(add="text-grey-7")
+                    else:
+                        btn.classes(remove="text-grey-7")
+
+            with ui.row().classes("w-full items-center"):
+                for icon, suffix, css, tip, default in _TOGGLES:
+                    btn_ref: list = [None]
+
+                    def _make_toggle(sf=suffix, cc=css, dh=default, br=btn_ref):
+                        def _toggle():
+                            lbl = _active["label"]
+                            td = _tab_data.get(lbl)
+                            if not td:
+                                return
+                            state_key = f"{lbl}.{sf}"
+                            is_hidden = not _expansion_state.get(state_key, dh)
+                            _expansion_state[state_key] = is_hidden
+                            _save_expansion_state()
+                            if is_hidden:
+                                td["panel"].classes(add=cc)
+                                br[0].classes(add="text-grey-7")
+                            else:
+                                td["panel"].classes(remove=cc)
+                                br[0].classes(remove="text-grey-7")
+                        return _toggle
+
+                    btn = ui.button(
+                        icon=icon, on_click=_make_toggle(),
+                    ).props("dense flat size=sm").tooltip(tip)
+                    is_hidden = _expansion_state.get(f"{initial_tab_label}.{suffix}", default)
+                    if is_hidden:
+                        btn.classes(add="text-grey-7")
+                    btn_ref[0] = btn
+                    _toggle_btns.append((btn, suffix, css, default))
+
+                # Spacer pushes expand/collapse to the right
+                ui.element("div").classes("flex-1")
+
+                def _toggle_all_expansions():
+                    td = _tab_data.get(_active["label"])
+                    if not td or not td["expansions"]:
+                        return
+                    _expand_state = td.setdefault("_expanded", False)
+                    td["_expanded"] = not _expand_state
+                    for e in td["expansions"]:
+                        if td["_expanded"]:
+                            e.open()
+                        else:
+                            e.close()
+
+                ui.button(
+                    icon="unfold_more",
+                    on_click=_toggle_all_expansions,
+                ).props("dense flat size=sm").tooltip("Expand / Collapse All")
+
+    # -- end of sticky header --
+
+    # Build log drawer outside the header so it's a top-level fixed element
+    _, _toggle_log_fn = build_log_drawer(timers, poll_interval=POLL_INTERVAL)
+    _log_toggle_holder.append(_toggle_log_fn)
+
+    _make_poll_timer(all_polls, timers)
+
+    if not tab_entries:
+        return
+
+    with ui.tab_panels(tabs, value=tab_map[initial_tab_label]).classes("w-full bg-grey-10 rounded ").style("padding-bottom: 320px;"):
+        for label, root_settings in tab_entries:
+            with ui.tab_panel(tab_map[label]) as panel:
+                # Apply persisted visibility classes to this panel
+                for _, suffix, css, _, default in _TOGGLES:
+                    if _expansion_state.get(f"{label}.{suffix}", default):
+                        panel.classes(add=css)
+
+                expansions: list = []
+
+                _build_settings_body(
+                    root_settings, all_polls,
+                    depth=0, expansions=expansions, path=label,
+                )
+
+                _tab_data[label] = {"panel": panel, "expansions": expansions}
+

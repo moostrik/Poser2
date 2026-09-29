@@ -11,6 +11,8 @@ input/*
 logos/*
 !logos/.gitkeep
 *.log
+logs/*
+data/settings/.*
 
 
 comfy/*

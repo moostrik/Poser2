@@ -11,6 +11,7 @@ from os import path
 from signal import signal, SIGINT
 from sys import exit
 from time import sleep
+from modules.log_config import setup_logging, install_thread_excepthook
 from modules.Forgettable import Forgettable, CamType
 
 parser: ArgumentParser = ArgumentParser()
@@ -22,7 +23,11 @@ parser.add_argument('-vc',  '--useVimbaCam',    action='store_true',        help
 parser.add_argument('-ic',  '--useImageCam',    action='store_true',        help='use image instead of default cam')
 parser.add_argument('-pm',  '--portraitMode',   action='store_true',        help='use portrait mode (default)')
 parser.add_argument('-lm',  '--landscapeMode',  action='store_true',        help='use landscape mode')
+parser.add_argument('-v',   '--verbose',        action='store_true',        help='enable verbose (DEBUG) console output')
 args = parser.parse_args()
+
+setup_logging(verbose=args.verbose)
+install_thread_excepthook()
 
 currentPath: str = path.dirname(__file__)
 

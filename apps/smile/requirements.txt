@@ -2,6 +2,9 @@
 numpy==2.5.3
 onnxruntime-gpu[cuda,cudnn]==1.30.0     # extras install the CUDA and cuDNN libraries
 
+# Same as poser2
+nicegui==3.11.1
+
 # Latest versions as of sep 2026
 opencv-python==5.0.0.93
 Pillow==12.3.0
@@ -12,6 +15,9 @@ pytweening==1.2.0
 requests==2.34.2
 stupidArtnet==1.6.0
 watchdog==6.0.0
+
+# Development
+pytest==9.1.1
 
 
 

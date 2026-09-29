@@ -8,8 +8,13 @@ from modules.osc.SenderGui import SenderGui as Osc
 from modules.audio.DBGui import DBGui as AudioDB
 from modules.save.ImgFolderGui import ImgFolderGui
 from modules.artnet.SenderGui import SenderGui as Artnet
+from modules.settings import presets, NiceServer
+from modules.smile_settings import Settings
 from enum import Enum
+import logging
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 class CamType(Enum):
     VIMBA   = 2
@@ -27,6 +32,17 @@ class Forgettable():
             self.height: int = width
 
         self.guiTop: bool = guiTop
+
+        # SETTINGS
+        presets.set_app('smile')
+        self.settings = Settings()
+        self.settings.server.title = 'SMILE'
+        self.settings.server.port = 667
+        preset_file = presets.startup_path()
+        if not presets.load(self.settings, preset_file):
+            logger.warning('No preset at %s, using defaults', preset_file)
+        self.settings.initialize()
+        self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
         self.gui: Gui = Gui('AIIA', path + '/settings/', 'Smile')
         self.render: Render = Render(self.gui, self.width, self.height , self.width, self.height, 'aiia', fullscreen=False, v_sync=True, stretch=False)
@@ -76,6 +92,8 @@ class Forgettable():
         self.osc.start()
         self.artnet.start()
 
+        self.settings_server.start()
+
         self.gui.exit_callback = self.stop
 
         if self.width < self.height:
@@ -116,6 +134,7 @@ class Forgettable():
         self.gui.exit_callback = None
         self.gui.stop()
 
+        self.settings_server.stop()
 
         self._running = False
 
