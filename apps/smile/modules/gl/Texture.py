@@ -131,6 +131,9 @@ class Texture():
         if not self.allocated: return
 
         self.bind()
+        # rows are tightly packed in numpy; the default alignment of 4 shears images whose row is
+        # not a multiple of 4 bytes (e.g. an 878 px wide RGB depth map)
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
         glTexImage2D(GL_TEXTURE_2D, 0, self.internal_format, width, height, 0, self.format, self.data_type, image)
         self.unbind()
 

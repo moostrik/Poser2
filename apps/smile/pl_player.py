@@ -13,8 +13,8 @@ args = parser.parse_args()
 
 currentPath: str = path.dirname(__file__)
 
-trail = 0.95
-interval = 0.5
+trail = 0.5         # the grin plays at 15 fps; a long trail would smear it
+interval = 1.0 / 15.0
 wait = 3.0
 num_portraits = 24
 player: Player = Player(args.osc_port, 'images/', args.posX, args.posY, trail, interval, wait, num_portraits)

@@ -26,7 +26,7 @@ from modules.gl.Utils import lfo, fit, fill
 
 from modules.render.Sequencer import Sequencer, SequenceType, SeqenceMessage
 from modules.render.settings import RenderSettings, SequencerSettings
-from modules.sd.WebUi import WebUiMessage, WebUiState
+from modules.comfy.messages import GenMessage, GenState
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -180,8 +180,10 @@ class Render(RenderWindow):
     def draw(self) -> None: # override
         if not self.is_allocated: self.allocate()
 
-        self.update_textures()
+        # sequencer first: images handed over with a state change (e.g. the depth with CONTROL_0)
+        # are then always uploaded before the frame that uses them
         self.sequencer.update()
+        self.update_textures()
 
         self.draw_sequence(self.sequencer.message)
         if self.settings.show_camera:
@@ -312,7 +314,7 @@ class Render(RenderWindow):
             drawFbo = self.diffusion_fbo
 
         if message.sequence_type == SequenceType.DIFF_LOOP:
-            self.update_trails(self.textures[ImageType.SDF], self.diffusion_fbo, self._trail())
+            self.update_trails(self.textures[ImageType.SDF], self.diffusion_fbo, self.settings.loop_trail)
             drawFbo = self.diffusion_fbo
 
         if message.sequence_type == SequenceType.TIMEOUT:
@@ -346,6 +348,9 @@ class Render(RenderWindow):
                 self.draw_string_field(self.window_width, self.window_height)
 
     def draw_string_field(self, d_w: int, d_h:int) -> None:
+        # an empty texture binds nothing and would draw a plain white bar
+        if not self.textures[ImageType.TEXT].allocated:
+            return
         w: int = int(d_w * 1.0)
         h: int = int(d_w * 0.2)
         x: int = int((d_w - w) / 2)
@@ -413,30 +418,30 @@ class Render(RenderWindow):
         image: np.ndarray = draw_text(prompt, 1920, 384)
         self.set_image(ImageType.TEXT, image)
 
-    def set_diffusion_message(self, message: WebUiMessage) -> None:
-        if message.state == WebUiState.CAM_DEPTH:
+    def set_diffusion_message(self, message: GenMessage) -> None:
+        if message.state == GenState.CAM_DEPTH:
             if message.image is not None:
                 self.set_cap_depth(message.image)
             self.sequencer.set_sequence(SequenceType.CONTROL_0)
-        if message.state == WebUiState.CN_POSE:
+        if message.state == GenState.CN_POSE:
             if message.image is not None:
                 self.set_cn1_image(message.image)
             self.sequencer.set_sequence(SequenceType.CONTROL_1)
-        elif message.state == WebUiState.CN_DETAIL:
+        elif message.state == GenState.CN_DETAIL:
             if message.image is not None:
                 self.set_cn2_image(message.image)
             self.sequencer.set_sequence(SequenceType.CONTROL_2)
-        elif message.state == WebUiState.DIFFUSION:
+        elif message.state == GenState.DIFFUSION:
             if message.image is not None:
                 self.set_sdf_image(message.image)
             self.sequencer.set_sequence(SequenceType.DIFFUSION)
             self.sequencer.set_diffusion_progress(message.progress)
-        elif message.state == WebUiState.DIFF_LOOP:
+        elif message.state == GenState.DIFF_LOOP:
             if message.image is not None:
                 self.set_sdf_image(message.image)
             self.sequencer.set_sequence(SequenceType.DIFF_LOOP)
             self.sequencer.set_diffusion_progress(message.progress)
-        elif message.state == WebUiState.IDLE:
+        elif message.state == GenState.IDLE:
             if message.image is not None:
                 self.set_sdf_depth(message.image)
             self.sequencer.set_sequence(SequenceType.TIMEOUT)

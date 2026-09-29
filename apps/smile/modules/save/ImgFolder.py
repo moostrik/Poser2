@@ -11,11 +11,11 @@ from modules.save.settings import ImgFolderSettings
 
 
 class ImgFolder:
-    def __init__(self, settings: ImgFolderSettings, max_queue_size=100, output_path: str = 'images/', temp_path: str = 'temp/') -> None:
+    def __init__(self, settings: ImgFolderSettings, max_queue_size=300, output_path: str = 'images/', temp_path: str = 'temp/', size: tuple[int, int] = (512, 640)) -> None:
         self.settings: ImgFolderSettings = settings
         self.save_path: str = output_path
         self.temp_path: str = temp_path
-        self.scale: float = 0.5
+        self.size: tuple[int, int] = size   # the grin frame size; the players show these rotated in 640x512 cells
         self.id: str = ''
         self.temp_dir: str = ''
         self.sequence_index: int = 0
@@ -108,5 +108,7 @@ class ImgFolder:
             self.queue.queue.clear()
 
     def _scale_image(self, image: np.ndarray) -> np.ndarray:
-        scaled_image: np.ndarray = cv2.resize(image, None, fx=self.scale, fy=self.scale, interpolation=cv2.INTER_AREA)
+        if (image.shape[1], image.shape[0]) == self.size:
+            return image
+        scaled_image: np.ndarray = cv2.resize(image, self.size, interpolation=cv2.INTER_AREA)
         return scaled_image

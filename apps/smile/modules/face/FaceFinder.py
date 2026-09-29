@@ -9,7 +9,7 @@ from modules.face.settings import FaceSettings
 
 class FaceMessage():
     def __init__(self, image: np.ndarray, size: float, score: float, stable: bool) -> None:
-        self.image: np.ndarray = image      # portrait crop at composition size
+        self.image: np.ndarray = image      # rotated portrait crop at the generator's portrait size
         self.size: float = round(size, 3)   # face height relative to image height
         self.score: float = round(score, 3)
         self.stable: bool = stable          # found in enough consecutive frames
@@ -24,6 +24,10 @@ def largest_face(faces: list[Face], min_score: float) -> Face | None:
     return max(faces, key=lambda f: f.width * f.height)
 
 def portrait_crop(img: np.ndarray, face: Face, min_size: float, portrait_zoom: float, portrait_offset: float, portrait_width: int, portrait_height: int) -> tuple[np.ndarray, float]:
+    """Crop a portrait around the face, rotated so the eyes are level (as ComfyUI's face crop did).
+
+    zoom: portrait width relative to the face height; offset: shift up, relative to the face height.
+    """
     image_height, image_width = img.shape[:2]
     x0, y0, x1, y1 = face.bbox
     real_size: float = y1 - y0
@@ -32,18 +36,30 @@ def portrait_crop(img: np.ndarray, face: Face, min_size: float, portrait_zoom: f
     if normalized_size < min_size:
         raise ValueError('face to small')
 
-    x_centre: float = (x0 + x1) * 0.5
-    y_centre: float = (y0 + y1) * 0.5
+    # eye line -> roll angle; order the eyes left to right in the image
+    eye_a, eye_b = face.kps[0], face.kps[1]
+    if eye_a[0] > eye_b[0]:
+        eye_a, eye_b = eye_b, eye_a
+    angle: float = float(np.arctan2(eye_b[1] - eye_a[1], eye_b[0] - eye_a[0]))
+    axis_x: np.ndarray = np.array([np.cos(angle), np.sin(angle)])     # portrait x axis in the image
+    axis_y: np.ndarray = np.array([-np.sin(angle), np.cos(angle)])    # portrait y axis (down) in the image
 
-    p_AR: float = portrait_width / portrait_height
-    p_x0: int = int(x_centre - real_size * portrait_zoom * 0.5)
-    p_x1: int = int(x_centre + real_size * portrait_zoom * 0.5)
-    p_y0: int = int(y_centre - real_size * portrait_zoom * 0.5 / p_AR - (portrait_offset * real_size))
-    p_y1: int = int(y_centre + real_size * portrait_zoom * 0.5 / p_AR - (portrait_offset * real_size))
-    if p_x0 < 0 or p_x1 > image_width or p_y0 < 0 or p_y1 > image_height:
+    crop_width: float = real_size * portrait_zoom
+    crop_height: float = crop_width * portrait_height / portrait_width
+    centre: np.ndarray = np.array([(x0 + x1) * 0.5, (y0 + y1) * 0.5]) - axis_y * portrait_offset * real_size
+
+    half_x: np.ndarray = axis_x * crop_width * 0.5
+    half_y: np.ndarray = axis_y * crop_height * 0.5
+    corners: np.ndarray = np.array([centre - half_x - half_y, centre + half_x - half_y, centre + half_x + half_y, centre - half_x + half_y])
+    if corners[:, 0].min() < 0 or corners[:, 0].max() > image_width or corners[:, 1].min() < 0 or corners[:, 1].max() > image_height:
         raise ValueError('portrait out of bounds')
 
-    portrait_img: np.ndarray = cv2.resize(img[p_y0:p_y1, p_x0:p_x1], (portrait_width, portrait_height))
+    # map each portrait pixel to the image: origin at the top left corner, axes scaled to pixels
+    scale: float = crop_width / portrait_width
+    origin: np.ndarray = corners[0]
+    matrix: np.ndarray = np.array([[axis_x[0] * scale, axis_y[0] * scale, origin[0]],
+                                   [axis_x[1] * scale, axis_y[1] * scale, origin[1]]])
+    portrait_img: np.ndarray = cv2.warpAffine(img, matrix, (portrait_width, portrait_height), flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP)
     return portrait_img, normalized_size
 
 class FaceFinder(Thread):

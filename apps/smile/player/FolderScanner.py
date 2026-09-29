@@ -15,10 +15,12 @@ class imagePathInfo():
 
 ImageDictType = dict[str, imagePathInfo]
 
+SKIP_FILES: int = 2     # a sequence folder starts with the capture and the portrait; the players show the grin
+
 def get_image_paths(folder) -> list[str]:
     image_files: list[str] = [file for file in os.listdir(folder) if file.endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
-    image_files: list[str] = image_files[6:]
     image_files.sort()
+    image_files = image_files[SKIP_FILES:]
     return [os.path.join(folder, file) for file in image_files]
 
 # def get_image_folder_dict(images_dir: str, max_folders: int) -> ImageDictType:

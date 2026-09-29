@@ -19,18 +19,30 @@
     "fullscreen": true,
     "show_camera": false,
     "freeze": false,
-    "show_prompt": true,
+    "show_prompt": false,
     "trail_active": true,
     "trail": 0.995,
+    "loop_trail": 0.5,
     "destroy_blur": 0.1,
     "destroy_bloom": 0.6
+  },
+  "comfy": {
+    "host": "127.0.0.1",
+    "port": 8188,
+    "workflow": "data/comfy/AIIAv3 portrait grin v2.json",
+    "styles": "prompts/smile.json",
+    "frames": 150,
+    "fps": 15.0,
+    "prebuffer": 8,
+    "style_repeat": 26,
+    "job_timeout": 90.0
   },
   "face": {
     "size_filter": 0.1,
     "confidence": 0.7,
     "stable_frames": 3,
     "zoom": 1.2,
-    "offset": 0.1
+    "offset": 0.02
   },
   "camera": {
     "flip_h": false,

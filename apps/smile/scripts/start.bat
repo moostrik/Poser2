@@ -30,6 +30,14 @@ set "PLAYER_2_OSC_PORT=4116"
 set "CURRENT_DIR=%~dp0..\"
 cd /d "%CURRENT_DIR%"
 
+echo Opening Image Generator (ComfyUI)
+curl -s -o nul http://127.0.0.1:8188/system_stats
+IF "%ERRORLEVEL%"=="0" (
+    echo ComfyUI is already running.
+) ELSE (
+    start "ComfyUI" /MIN /D "%CURRENT_DIR%ComfyUI" "%CURRENT_DIR%ComfyUI\.venv\Scripts\python.exe" main.py --preview-method auto
+)
+
 echo Opening Music Player
 tasklist /FI "IMAGENAME eq Max.exe" 2>NUL | find /I /N "Max.exe">NUL
 IF "%ERRORLEVEL%"=="0" (

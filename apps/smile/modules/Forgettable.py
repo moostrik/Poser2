@@ -1,7 +1,8 @@
 from modules.face.FaceFinder import FaceFinder, FaceMessage
 from modules.render.Render import Render
 from modules.render.Sequencer import SeqenceMessage, SequenceType, AnimationType, AnimationTypeNames
-from modules.sd.WebUi import WebUi as SD, WebUiMessage, WebUiState
+from modules.comfy.Generator import Generator
+from modules.comfy.messages import GenMessage, GenState
 from modules.osc.Sender import Sender as Osc
 from modules.audio.DB import DB as AudioDB
 from modules.save.ImgFolder import ImgFolder
@@ -41,9 +42,10 @@ class Forgettable():
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
         self.render: Render = Render(self.settings.render, self.settings.sequence, self.width, self.height , self.width, self.height, 'aiia', v_sync=True, stretch=False)
-        self.face: FaceFinder = FaceFinder(self.settings.face, self.width, self.height)
-        self.diffuse = SD(path + '/stable-diffusion-webui/')
-        self.diffuse.set_portrait_mode(self.portraitMode)
+        self.diffuse: Generator = Generator(self.settings.comfy)
+        # the face crop is the image ComfyUI generates from, so it has the workflow's portrait size
+        portrait_width, portrait_height = self.diffuse.workflow.portrait_size
+        self.face: FaceFinder = FaceFinder(self.settings.face, portrait_width, portrait_height)
 
         if camType == CamType.VIMBA:
             from modules.cam.VimbaCam import VimbaCam
@@ -149,7 +151,8 @@ class Forgettable():
 
         if seq == SequenceType.FLASH:
             if message.initial == True:
-                movement_id: str = self.diffuse.prompter.get_keyword_next_id('smile')
+                # one style per visitor; the style id is also the movement id that picks the music
+                movement_id: str = self.diffuse.next_style()
                 self.audio.update(movement_id)
 
         if seq == SequenceType.CAPTURE:
@@ -158,10 +161,12 @@ class Forgettable():
             if portrait is not None:
                 cap_image = portrait.image
 
-            self.render.set_cap_image(cap_image)
+            # ComfyUI gets the whole aligned crop; shown and saved is the part the grin frames show
             self.diffuse.set_image(cap_image)
+            cap_display: np.ndarray = self.diffuse.display_crop(cap_image)
+            self.render.set_cap_image(cap_display)
             self.save.new_sequence()
-            self.save.save_image(cap_image)
+            self.save.save_image(cap_display)
 
 
         if seq == SequenceType.TIMEOUT:
@@ -185,10 +190,12 @@ class Forgettable():
         if message.stable:
             self.render.sequencer.set_face_found()
 
-    def diffusion_callback(self, message: WebUiMessage) -> None:
-        if message.state == WebUiState.DIFFUSION or message.state == WebUiState.DIFF_LOOP:
-            if message.image is not None:
-                self.save.save_image(message.image)
+    def diffusion_callback(self, message: GenMessage) -> None:
+        # a sequence folder: capture, portrait, grin frames (not the step previews)
+        if message.image is None:
+            return
+        if message.state == GenState.DIFF_LOOP or (message.state == GenState.DIFFUSION and message.final):
+            self.save.save_image(message.image)
 
     def isRunning(self) -> bool :
         return self._running

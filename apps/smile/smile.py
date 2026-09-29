@@ -7,7 +7,7 @@ from modules.log_config import setup_logging, install_thread_excepthook
 from modules.Forgettable import Forgettable, CamType
 
 parser: ArgumentParser = ArgumentParser()
-parser.add_argument('-dw',  '--width',          type=int,   default=1152,    help='image width')
+parser.add_argument('-dw',  '--width',          type=int,   default=1120,    help='image width (4:5 like the generated portraits)')
 parser.add_argument('-dh',  '--height',         type=int,   default=896,    help='image height')
 parser.add_argument('-wc',  '--useWebCam',      action='store_true',        help='use webcam instead of default cam')
 parser.add_argument('-vc',  '--useVimbaCam',    action='store_true',        help='use vimba camera instead of default cam')

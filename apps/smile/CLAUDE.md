@@ -5,6 +5,15 @@ result is shown with music (Max patch via OSC) and lights (Art-Net). Entry point
 (main app, `modules/Forgettable.py`) and `pl_player.py` (image players). Python 3.12, venv in
 `.venv`, installed with `scripts/install.bat`.
 
+## Image generator
+
+ComfyUI server (installed in `ComfyUI/` from the `comfy/` bundle, both git-ignored, API on
+127.0.0.1:8188). `modules/comfy/`: `Generator` sends each capture to ComfyUI and turns its
+websocket events into `GenMessage`s for the render (CAM_DEPTH → DIFFUSION → DIFF_LOOP → IDLE);
+`workflow.py` adapts the API export in `data/comfy/` (face crop removed — SMILE crops and rotates
+the face itself — depth outputs added). Keep one workflow per visitor: a second workflow in
+between drops the first from ComfyUI's cache and reloads the models.
+
 ## Settings
 
 Settings system copied from poser2 (`modules/settings/`); root tree in `modules/smile_settings.py`,

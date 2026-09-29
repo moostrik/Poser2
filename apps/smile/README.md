@@ -38,6 +38,11 @@ semi real time webcam diffusers
 ### Install Script
 * in the terminal run ```scripts\install.bat```
 
+### Image Generator (ComfyUI)
+* copy the ComfyUI bundle (with its models) into the repo as `comfy\` and follow `comfy\README.md` (`setup.ps1` installs ComfyUI in `ComfyUI\`); both folders stay out of git
+* SMILE uses the API export of the workflow in `data\comfy\` (re-export with **Export (API)** after changing the workflow in ComfyUI)
+* optional: put a portrait photo at `data\comfy\warmup.jpg`, SMILE then runs one generation at startup so the first visitor doesn't wait for the models to load
+
 ### Run Project
 * run ```scripts\start.bat```
 * settings panel: open http://localhost:667 in a browser (also reachable from other devices on the network)
