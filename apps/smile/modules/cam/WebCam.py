@@ -3,10 +3,13 @@ import numpy as np
 from threading import Thread, Lock
 from time import sleep
 
+from modules.cam.settings import CameraSettings
+
 
 class WebCam(Thread):
-    def __init__(self, forceSize: tuple[int, int] | None = None) -> None:
+    def __init__(self, settings: CameraSettings, forceSize: tuple[int, int] | None = None) -> None:
         super().__init__()
+        self.settings: CameraSettings = settings
 
         self.colorMutex: Lock = Lock()
         self.colorFrameNew: bool = False
@@ -20,9 +23,6 @@ class WebCam(Thread):
             self.outWidth, self.outHeight = forceSize
         self.outputColor: cv2.Mat = np.zeros((self.outWidth, self.outHeight,3)) # type: ignore
 
-        # TRANSFORMATION SETTINGS
-        self.flipV: bool            = False
-        self.flipH: bool            = False
         self.rotate90: bool         = False
 
         self.deviceOpen: bool = False
@@ -37,9 +37,9 @@ class WebCam(Thread):
                 if ret:
                     if self.rotate90:
                         frame = cv2.transpose(frame)
-                    if self.flipV:
+                    if self.settings.flip_v:
                         frame = cv2.flip(frame, 0)
-                    if self.flipH:
+                    if self.settings.flip_h:
                         frame = cv2.flip(frame, 1)
                     frame = cv2.resize(frame, (self.outWidth, self.outHeight))
                     with self.colorMutex:
@@ -106,12 +106,6 @@ class WebCam(Thread):
 
     def clearColorCallbacks(self) -> None:
         self.colorCallbacks = []
-
-    def setFlipH(self, flipH: bool) -> None:
-        self.flipH = flipH
-
-    def setFlipV(self, flipV: bool) -> None:
-        self.flipV = flipV
 
     def setRotate90(self, rotate90: bool) -> None:
         self.rotate90 = rotate90

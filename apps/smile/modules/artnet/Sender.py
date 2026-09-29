@@ -6,7 +6,11 @@ from typing import Optional, Any
 import json
 import math
 from modules.render.Sequencer import AnimationType
+from modules.artnet.settings import ArtnetSettings
+import logging
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def read_json_file(file_path):
@@ -27,28 +31,8 @@ def is_valid_ip_address(ip: str) -> bool:
     except ValueError:
         return False
 
-def is_valid_universe(value: int | str) -> bool:
-    if type(value) == str:
-        try:
-            value = int(value)
-        except ValueError:
-            return False
-    value = int(value)
-    if value in range(0, 255):
-        return True
-    return False
-
-
-def is_valid_fps(value: float | str) -> bool:
-    if type(value) == str:
-        try:
-            value = float(value)
-        except ValueError:
-            return False
-    value = float(value)
-    if 1.0 <= value <= 60.0:
-        return True
-    return False
+def is_valid_universe(value: int) -> bool:
+    return value in range(0, 255)
 
 def get_counter_active_light(value: float)  -> list[int]:
     if value < 1:
@@ -88,18 +72,13 @@ def get_counter_lights(value: float)  -> list[int]:
 
 
 class Sender(Thread):
-    def __init__(self, settings_file: str, ip: str = "127.0.0.1", universe: int = 1, fps: float = 30.0):
+    def __init__(self, settings: ArtnetSettings, settings_file: str):
         super().__init__()
+        self.settings: ArtnetSettings = settings
 
         self.mutex: Lock = Lock()
 
         self.running: bool = False
-        self.sending: bool = False
-
-        self.ip: str = '10.0.0.11'
-        # self.ip: str = '192.168.0.111'
-        self.universe: int = 1
-        self.fps: float = 40.0
 
         self.core_led_num = 3
         self.camera_led_num = 24
@@ -134,19 +113,24 @@ class Sender(Thread):
 
     def start(self) -> None :
         self.updateSender()
+        self.settings.bind(ArtnetSettings.ip, self._on_address)
+        self.settings.bind(ArtnetSettings.universe, self._on_address)
+        self.settings.bind(ArtnetSettings.active, self._on_active)
         self.running = True
-        self.sending = True
         super().start()
 
     def stop(self) -> None :
         if not self.is_alive():
             return
 
+        self.settings.unbind(ArtnetSettings.ip, self._on_address)
+        self.settings.unbind(ArtnetSettings.universe, self._on_address)
+        self.settings.unbind(ArtnetSettings.active, self._on_active)
         self.running = False
 
         if self.sender:
             self.sender.flash_all()
-            time.sleep(1.0/self.fps)
+            time.sleep(self._interval())
             self.sender.blackout()
 
         self.join()
@@ -154,13 +138,16 @@ class Sender(Thread):
     def run(self) -> None:
         while self.running:
             self.update()
-            time.sleep(1.0/self.fps)
+            time.sleep(self._interval())
+
+    def _interval(self) -> float:
+        return 1.0 / max(self.settings.fps, 1.0)
 
     def update(self) -> None:
         self.update_module()
         self.update_cameras()
 
-        if self.sender and self.sending:
+        if self.sender and self.settings.active:
             with self.mutex:
                 self.sender.send(self.packet)
 
@@ -199,63 +186,41 @@ class Sender(Thread):
         base *= fade
         return base ** power
 
-    def set_universe(self, value: int | str) -> None:
-        if not is_valid_universe(value):
-            return
-        value = int(value)
-        if self.universe == value:
-            return
-        self.universe = value
-        if self.sender:
-            self.sender.set_universe(value)
+    def _on_address(self, _=None) -> None:
+        self.updateSender()
+
+    def _on_active(self, _=None) -> None:
         self.flash()
-
-    def set_sending(self, value: bool) -> None:
-        self.sending = value
-        self.flash()
-
-    def set_fps(self, value: float | str) -> None:
-        if not is_valid_fps(value):
-            return
-        value = float(value)
-        if self.fps == value:
-            return
-        self.fps = value
-
-        self.flash()
-
-    def set_ip(self, value: str) -> None:
-        if not is_valid_ip_address(value):
-            return
-        if self.ip == value:
-            return
-        self.ip = value
-        if self.running:
-            self.updateSender()
 
     def updateSender(self) -> None:
+        ip: str = self.settings.ip
+        universe: int = self.settings.universe
+        if not is_valid_ip_address(ip) or not is_valid_universe(universe):
+            logger.warning('Invalid Art-Net address %s universe %s, keeping the current sender', ip, universe)
+            return
+
         with self.mutex:
 
             if self.sender:
                 self.sender.stop()
 
-            self.sender = StupidArtnet(target_ip = self.ip,
-                                       universe = self.universe,
+            self.sender = StupidArtnet(target_ip = ip,
+                                       universe = universe,
                                        packet_size = self.packet_size,
-                                       fps = int(self.fps))
-            print('Artnet sending to', self.ip, 'on universe', self.universe)
+                                       fps = int(self.settings.fps))
+            logger.info('Artnet sending to %s on universe %s', ip, universe)
 
         self.flash()
 
     def flash(self) -> None:
-        if not self.sending:
+        if not self.settings.active:
             return
         if not self.sender:
             return
 
         with self.mutex:
             self.sender.flash_all()
-            time.sleep(1.0/self.fps)
+            time.sleep(self._interval())
 
 
     def set_camera_counter(self, value: float, red: bool = False) -> None:

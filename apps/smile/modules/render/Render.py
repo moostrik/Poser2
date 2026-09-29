@@ -25,6 +25,7 @@ from modules.gl.shaders.Hsv import Hsv
 from modules.gl.Utils import lfo, fit, fill
 
 from modules.render.Sequencer import Sequencer, SequenceType, SeqenceMessage
+from modules.render.settings import RenderSettings, SequencerSettings
 from modules.sd.WebUi import WebUiMessage, WebUiState
 
 from PIL import Image, ImageDraw, ImageFont
@@ -62,8 +63,9 @@ class ImageType(Enum):
     TEXT = 8
 
 class Render(RenderWindow):
-    def __init__(self, composition_width: int, composition_height: int, window_width: int, window_height: int, name: str, fullscreen: bool = False, v_sync = False, stretch = False) -> None:
-        super().__init__(window_width, window_height, name, fullscreen, v_sync)
+    def __init__(self, settings: RenderSettings, sequencer_settings: SequencerSettings, composition_width: int, composition_height: int, window_width: int, window_height: int, name: str, v_sync = False, stretch = False) -> None:
+        super().__init__(window_width, window_height, name, settings.fullscreen, v_sync)
+        self.settings: RenderSettings = settings
 
         self.input_mutex: Lock = Lock()
         self._sequence_message: SeqenceMessage
@@ -117,21 +119,15 @@ class Render(RenderWindow):
         self.hsv_shader = Hsv()
         self.shaders.append(self.hsv_shader)
 
-        self.draw_camera: bool = False
         self.stretch: bool = stretch
-
-        self.trail: float = 0.996
-        self.dstry_blur: float = 0.1
-        self.dstry_bloom: float = 0.7
-        self.show_prompt: bool = False
 
         self.prompt: str = ''
         self.negative: str = ''
 
-        self.freeze: bool = False
         self.prev_freeze: bool = False
 
-        self.sequencer = Sequencer()
+        self.sequencer = Sequencer(sequencer_settings)
+        self.settings.bind(RenderSettings.fullscreen, self.set_fullscreen)
 
         self.logo_folder_path = 'logos'
         self.logo_files = [f for f in os.listdir(self.logo_folder_path) if f.endswith('.jpg')]
@@ -146,6 +142,23 @@ class Render(RenderWindow):
 
     def reload_shaders(self) -> None :
         for s in self.shaders: s.load(True)
+
+    def stop(self) -> None: # override
+        self.settings.unbind(RenderSettings.fullscreen, self.set_fullscreen)
+        self.sequencer.close()
+        super().stop()
+
+    def keyboard_callback(self, key, x, y) -> None: # override
+        super().keyboard_callback(key, x, y)
+        if key == b'f' or key == b'F':
+            self.settings.fullscreen = not self.settings.fullscreen
+        if key == b'r' or key == b'R':
+            self.reload_shaders()
+        if key == b'\r':
+            self.sequencer.start_sequence()
+
+    def _trail(self) -> float:
+        return self.settings.trail if self.settings.trail_active else 0.0
 
     def load_logo(self) -> None :
         selected_file: str = random.choice(self.logo_files)
@@ -171,7 +184,7 @@ class Render(RenderWindow):
         self.sequencer.update()
 
         self.draw_sequence(self.sequencer.message)
-        if self.draw_camera:
+        if self.settings.show_camera:
             self.draw_texture(ImageType.CAM)
 
     def draw_sequence(self, message: SeqenceMessage) -> None:
@@ -198,7 +211,7 @@ class Render(RenderWindow):
                                      self.diffusion_fbo.tex_id,
                                      self.camera_fbo.tex_id,
                                      self.dif_depth_fbo.tex_id,
-                                     message.value_1 * self.dstry_bloom,
+                                     message.value_1 * self.settings.destroy_bloom,
                                      message.value_2,
                                      self.width, self.height)
 
@@ -210,17 +223,17 @@ class Render(RenderWindow):
             self.diffusion_fbo.swap()
             self.blurH_shader.use(self.diffusion_fbo.fbo_id,
                                   self.diffusion_fbo.back_tex_id,
-                                  self.dstry_blur, self.width, self.height)
+                                  self.settings.destroy_blur, self.width, self.height)
             self.diffusion_fbo.swap()
             self.blurV_shader.use(self.diffusion_fbo.fbo_id,
                                   self.diffusion_fbo.back_tex_id,
-                                  self.dstry_blur, self.width, self.height)
+                                  self.settings.destroy_blur, self.width, self.height)
 
             self.omission_shader.use(self.seq_fbo.fbo_id,
                                      self.diffusion_fbo.tex_id,
                                      self.camera_fbo.tex_id,
                                      self.dif_depth_fbo.tex_id,
-                                     message.value_2 * self.dstry_bloom,
+                                     message.value_2 * self.settings.destroy_bloom,
                                      message.value_1,
                                      self.width, self.height)
 
@@ -295,30 +308,30 @@ class Render(RenderWindow):
             drawFbo = self.seq_fbo
 
         if message.sequence_type == SequenceType.DIFFUSION:
-            self.update_trails(self.textures[ImageType.SDF], self.diffusion_fbo, self.trail)
+            self.update_trails(self.textures[ImageType.SDF], self.diffusion_fbo, self._trail())
             drawFbo = self.diffusion_fbo
 
         if message.sequence_type == SequenceType.DIFF_LOOP:
-            self.update_trails(self.textures[ImageType.SDF], self.diffusion_fbo, self.trail)
+            self.update_trails(self.textures[ImageType.SDF], self.diffusion_fbo, self._trail())
             drawFbo = self.diffusion_fbo
 
         if message.sequence_type == SequenceType.TIMEOUT:
-            self.update_trails(self.textures[ImageType.SDF], self.diffusion_fbo, self.trail)
+            self.update_trails(self.textures[ImageType.SDF], self.diffusion_fbo, self._trail())
             drawFbo = self.diffusion_fbo
 
         if message.sequence_type == SequenceType.RESET:
-            self.update_trails(self.textures[ImageType.SDF], self.diffusion_fbo, self.trail)
+            self.update_trails(self.textures[ImageType.SDF], self.diffusion_fbo, self._trail())
             drawFbo = self.diffusion_fbo
 
         if message.sequence_type == SequenceType.NONE:
-            self.update_trails(self.textures[ImageType.SDF], self.diffusion_fbo, self.trail)
+            self.update_trails(self.textures[ImageType.SDF], self.diffusion_fbo, self._trail())
             drawFbo = self.diffusion_fbo
 
-        if self.freeze is True:
-            if self.freeze is not self.prev_freeze:
+        if self.settings.freeze is True:
+            if self.settings.freeze is not self.prev_freeze:
                 self.draw_in_fbo(drawFbo, self.freeze_fbo)
             drawFbo = self.freeze_fbo
-        self.prev_freeze = self.freeze
+        self.prev_freeze = self.settings.freeze
 
 
         self.setView(self.window_width, self.window_height)
@@ -328,7 +341,7 @@ class Render(RenderWindow):
             x, y, w, h = fit(self.width, self.height, self.window_width, self.window_height)
             drawFbo.draw(x, y, w, h)
 
-        if self.show_prompt:
+        if self.settings.show_prompt:
             if message.sequence_type == SequenceType.DIFF_LOOP or message.sequence_type == SequenceType.TIMEOUT:
                 self.draw_string_field(self.window_width, self.window_height)
 

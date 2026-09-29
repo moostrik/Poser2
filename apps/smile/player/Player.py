@@ -3,12 +3,15 @@ from player.Render import Render
 from player.FolderScanner import FolderScanner
 
 from modules.osc.Sender import Sender as Osc
+from modules.osc.settings import OscSettings
 import time
 import random
 
 class Player():
     def __init__(self, osc_port: str, images_dir = 'images/', posX: int = 0, posY: int = 0, trail = 0.9, interval = 1.0, wait = 5.0, num_portraits = 10) -> None:
-        self.osc:Osc = Osc('127.0.0.1', int(osc_port))
+        osc_settings = OscSettings()
+        osc_settings.port = int(osc_port)
+        self.osc:Osc = Osc(osc_settings)
 
         self._running: bool = False
         self.numImages: int = 24

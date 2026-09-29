@@ -7,16 +7,17 @@ import datetime
 import shutil
 import warnings
 
+from modules.save.settings import ImgFolderSettings
+
 
 class ImgFolder:
-    def __init__(self, max_queue_size=100, output_path: str = 'images/', temp_path: str = 'temp/', min_files: int = 10) -> None:
-        self.active: bool = True
+    def __init__(self, settings: ImgFolderSettings, max_queue_size=100, output_path: str = 'images/', temp_path: str = 'temp/') -> None:
+        self.settings: ImgFolderSettings = settings
         self.save_path: str = output_path
         self.temp_path: str = temp_path
         self.scale: float = 0.5
         self.id: str = ''
         self.temp_dir: str = ''
-        self.min_files: int = min_files
         self.sequence_index: int = 0
         self.sequence_count: int = 0
         self.sequence_lock = threading.Lock()
@@ -24,6 +25,7 @@ class ImgFolder:
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._save_loop)
         self.thread.start()
+        self.settings.bind(ImgFolderSettings.active, self._on_active)
 
     def _save_loop(self) -> None:
         while not self.stop_event.is_set():
@@ -42,13 +44,28 @@ class ImgFolder:
                 print(f"Error occurred while saving image: {e}")
 
     def save_image(self, image: np.ndarray) -> None:
-        if not self.active:
+        if not self.settings.active:
             return
         self.queue.put(image)
 
     def new_sequence(self) -> None:
-        if not self.active:
+        if not self.settings.active:
             return
+        self._new_sequence()
+
+    def end_sequence(self) -> None:
+        if not self.settings.active:
+            return
+        self._end_sequence()
+
+    def _on_active(self, value: bool) -> None:
+        # switching off keeps what was captured so far, switching on starts a fresh sequence
+        if value:
+            self._new_sequence()
+        else:
+            self._end_sequence()
+
+    def _new_sequence(self) -> None:
         with self.sequence_lock:
             self.sequence_index = 0
             self._empty_queue()
@@ -59,13 +76,11 @@ class ImgFolder:
                 shutil.rmtree(self.temp_dir)
             os.makedirs(self.temp_dir)
 
-    def end_sequence(self) -> None:
-        if not self.active:
-            return
+    def _end_sequence(self) -> None:
         with self.sequence_lock:
             if self.sequence_index > 0:
                 self._empty_queue()
-                if self.sequence_index >= self.min_files:
+                if self.sequence_index >= self.settings.min_files:
                     destination_folder: str = os.path.join(self.save_path, self.id)
                     shutil.move(self.temp_dir, destination_folder)
                     self.sequence_count += 1
@@ -75,14 +90,8 @@ class ImgFolder:
 
                 self.sequence_index = 0
 
-    def set_active(self, value: bool) -> None:
-        if self.active and not value:
-            self.end_sequence()
-        if not self.active and value:
-            self.new_sequence()
-        self.active = value
-
     def stop(self) -> None:
+        self.settings.unbind(ImgFolderSettings.active, self._on_active)
         self.stop_event.set()
         self.thread.join()
 

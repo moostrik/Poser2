@@ -6,6 +6,11 @@ from threading import Thread, Lock
 from queue import Queue, Empty
 from time import time, sleep
 from typing import List, Tuple, Union, Any, Optional
+import logging
+
+from modules.osc.settings import OscSettings
+
+logger = logging.getLogger(__name__)
 
 ArgValue = Union[str, bytes, bool, int, float, list]
 
@@ -16,32 +21,13 @@ def is_valid_ip_address(ip: str) -> bool:
     except ValueError:
         return False
 
-def is_valid_port(port: int | str) -> bool:
-    if type(port) == str:
-        try:
-            port = int(port)
-        except ValueError:
-            return False
-    port = int(port)
-    if port in range(1, 65535):
-        return True
-    return False
+def is_valid_port(port: int) -> bool:
+    return port in range(1, 65535)
 
 class Sender(Thread):
-    def __init__(self, ip: str = "127.0.0.1", port: int | str = 8000, fps: float = 30.0) -> None:
+    def __init__(self, settings: OscSettings) -> None:
         super().__init__()
-
-        self.ip: str= "127.0.0.1"
-        if is_valid_ip_address(ip):
-            self.ip = ip
-        else:
-            print('ThreadedOscSender', ip, 'is not a valid ip address, defaulting to', self.ip)
-
-        self.port: int = int(port)
-        if is_valid_port(port):
-            self.port = int(port)
-        else:
-            print('ThreadedOscSender', port, 'is not a valid port, defaulting to', self.port)
+        self.settings: OscSettings = settings
 
         self.client: SimpleUDPClient | None = None
 
@@ -49,20 +35,21 @@ class Sender(Thread):
         self.queue: Queue = Queue()
         self.timeout: float = 0.1
         self.mutex: Lock = Lock()
-        self.fps: float = fps
-        self.update_interval: float = 1.0 / float(self.fps)
         self.last_message_time: float = time()
-        self.sending: bool = True
 
     def start(self) -> None:
         if self.running:
             return
         self.updateClient()
+        self.settings.bind(OscSettings.ip, self._on_address)
+        self.settings.bind(OscSettings.port, self._on_address)
         self.running = True
         super().start()
 
     def stop(self) -> None:
         if self.running:
+            self.settings.unbind(OscSettings.ip, self._on_address)
+            self.settings.unbind(OscSettings.port, self._on_address)
             self.running = False
             self.join()
 
@@ -83,25 +70,22 @@ class Sender(Thread):
                 relevant_data = self.get_last_data(data_list)
 
                 # Send the constructed message
-                self.mutex.acquire()
-                try:
-                    if self.client:
-                        bundle = self.process_data(relevant_data)
-                        self.client.send(bundle)
-                        self.last_message_time = time()  # Update last message time
-                except:
-                    self.mutex.release()
-                    print('osc error, stopping')
-                    self.stop()
-
-                finally:
-                    self.mutex.release()
+                with self.mutex:
+                    try:
+                        if self.client:
+                            bundle = self.process_data(relevant_data)
+                            self.client.send(bundle)
+                            self.last_message_time = time()  # Update last message time
+                    except Exception:
+                        logger.exception('osc error, stopping')
+                        self.running = False
 
             # Calculate time elapsed since the start of the loop
             elapsed_time: float = time() - start_time
 
             # Calculate the time to sleep to achieve the desired framerate
-            sleep_time: float = max(0, self.update_interval - elapsed_time)
+            update_interval: float = 1.0 / max(self.settings.fps, 1.0)
+            sleep_time: float = max(0, update_interval - elapsed_time)
 
             # Sleep to control the framerate
             sleep(sleep_time)
@@ -136,35 +120,18 @@ class Sender(Thread):
         return bundle.build()
 
     def send(self, address: str, args: ArgValue) -> None:
-        if self.sending:
+        if self.settings.active:
             self.queue.put((address, args))
 
-    def set_sending(self, value: bool) -> None:
-        self.sending = value
-
-    def set_fps(self, fps: int | float) -> None:
-        self.fps = fps
-        self.update_interval: float = 1.0 / float(self.fps)
-
-    def set_port(self, port: int | str) -> None:
-        if not is_valid_port(port):
-            return
-        p = int(port)
-        if self.port == p:
-            return
-        self.port = p
-        self.updateClient()
-
-    def set_ip(self, ip: str) -> None:
-        if ip == self.ip:
-            return
-        if is_valid_ip_address(ip):
-            self.ip = ip
-        else: return
+    def _on_address(self, _=None) -> None:
         self.updateClient()
 
     def updateClient(self) -> None:
-        self.mutex.acquire()
-        self.client = SimpleUDPClient(self.ip, self.port)
-        print('Osc Client Sending to', self.ip, self.port)
-        self.mutex.release()
+        ip: str = self.settings.ip
+        port: int = self.settings.port
+        if not is_valid_ip_address(ip) or not is_valid_port(port):
+            logger.warning('Invalid OSC address %s:%s, keeping the current client', ip, port)
+            return
+        with self.mutex:
+            self.client = SimpleUDPClient(ip, port)
+        logger.info('Osc Client Sending to %s %s', ip, port)

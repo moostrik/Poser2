@@ -1,0 +1,63 @@
+{
+  "sequence": {
+    "destroy_in": 0.4,
+    "destroy_in_ease": "QUAD_IN",
+    "destroy_out": 1.1,
+    "destroy_out_ease": "CUBIC_OUT",
+    "camera_in": 1.0,
+    "camera_in_ease": "LINEAR",
+    "camera_out": 1.0,
+    "camera_out_ease": "LINEAR",
+    "flash_in": 0.5,
+    "flash_in_ease": "QUAD_IN",
+    "flash_out_auto": true,
+    "flash_out": 2.2,
+    "flash_out_ease": "SINE_OUT",
+    "timeout": 5.0
+  },
+  "render": {
+    "fullscreen": true,
+    "show_camera": false,
+    "freeze": false,
+    "show_prompt": true,
+    "trail_active": true,
+    "trail": 0.995,
+    "destroy_blur": 0.1,
+    "destroy_bloom": 0.6
+  },
+  "face": {
+    "size_filter": 0.1,
+    "confidence": 0.7,
+    "stable_frames": 3,
+    "zoom": 1.2,
+    "offset": 0.1
+  },
+  "camera": {
+    "flip_h": false,
+    "flip_v": false,
+    "gain_auto": false,
+    "gain_target": 40,
+    "image_select": 0
+  },
+  "audio": {},
+  "osc": {
+    "active": true,
+    "ip": "127.0.0.1",
+    "port": 4114,
+    "fps": 30.0
+  },
+  "artnet": {
+    "active": true,
+    "ip": "10.0.0.11",
+    "universe": 1,
+    "fps": 40.0
+  },
+  "save": {
+    "active": true,
+    "min_files": 16
+  },
+  "server": {
+    "title": "SMILE",
+    "port": 667
+  }
+}

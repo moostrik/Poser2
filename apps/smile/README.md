@@ -40,6 +40,8 @@ semi real time webcam diffusers
 
 ### Run Project
 * run ```scripts\start.bat```
+* settings panel: open http://localhost:667 in a browser (also reachable from other devices on the network)
+* presets live in `data/settings/`, `Smile.json` loads at startup
 
 ### Startup
 * make a shortcut to `scripts\start.bat`

@@ -1,13 +1,11 @@
-from modules.face.FaceFinderGui import FaceFinderGui as FF, FaceMessage
-from modules.gui.PyReallySimpleGui import Gui
-from modules.render.RenderGui import RenderGui as Render
+from modules.face.FaceFinder import FaceFinder, FaceMessage
+from modules.render.Render import Render
 from modules.render.Sequencer import SeqenceMessage, SequenceType, AnimationType, AnimationTypeNames
-from modules.sd.WebUiGui import WebUiGui as SD
-from modules.sd.WebUi import WebUiMessage, WebUiState
-from modules.osc.SenderGui import SenderGui as Osc
-from modules.audio.DBGui import DBGui as AudioDB
-from modules.save.ImgFolderGui import ImgFolderGui
-from modules.artnet.SenderGui import SenderGui as Artnet
+from modules.sd.WebUi import WebUi as SD, WebUiMessage, WebUiState
+from modules.osc.Sender import Sender as Osc
+from modules.audio.DB import DB as AudioDB
+from modules.save.ImgFolder import ImgFolder
+from modules.artnet.Sender import Sender as Artnet
 from modules.settings import presets, NiceServer
 from modules.smile_settings import Settings
 from enum import Enum
@@ -22,7 +20,7 @@ class CamType(Enum):
     IMAGE   = 4
 
 class Forgettable():
-    def __init__(self, path: str, width: int, height: int, portraitMode: bool = False, guiTop: bool = False, camType: CamType = CamType.VIMBA) -> None:
+    def __init__(self, path: str, width: int, height: int, portraitMode: bool = False, camType: CamType = CamType.VIMBA) -> None:
         self.path: str = path
         self.width: int = width
         self.height: int = height
@@ -30,8 +28,6 @@ class Forgettable():
         if self.portraitMode:
             self.width: int = height
             self.height: int = width
-
-        self.guiTop: bool = guiTop
 
         # SETTINGS
         presets.set_app('smile')
@@ -44,29 +40,29 @@ class Forgettable():
         self.settings.initialize()
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
-        self.gui: Gui = Gui('AIIA', path + '/settings/', 'Smile')
-        self.render: Render = Render(self.gui, self.width, self.height , self.width, self.height, 'aiia', fullscreen=False, v_sync=True, stretch=False)
-        self.face: FF = FF(self.gui, self.width, self.height)
-        self.diffuse = SD(self.gui, path + '/stable-diffusion-webui/')
+        self.render: Render = Render(self.settings.render, self.settings.sequence, self.width, self.height , self.width, self.height, 'aiia', v_sync=True, stretch=False)
+        self.face: FaceFinder = FaceFinder(self.settings.face, self.width, self.height)
+        self.diffuse = SD(path + '/stable-diffusion-webui/')
         self.diffuse.set_portrait_mode(self.portraitMode)
 
         if camType == CamType.VIMBA:
-            from modules.cam.VimbaCamGui import VimbaCamGui as VimbaCam
-            self.camera = VimbaCam(self.gui, (self.width, self.height))
+            from modules.cam.VimbaCam import VimbaCam
+            self.camera = VimbaCam(self.settings.camera, (self.width, self.height))
         elif camType == CamType.WEB:
-            from modules.cam.WebCamGui import WebCamGui as WebCam
-            self.camera = WebCam(self.gui, (self.width, self.height))
+            from modules.cam.WebCam import WebCam
+            self.camera = WebCam(self.settings.camera, (self.width, self.height))
         else:
-            from modules.cam.ImageGui import ImageGui as ImageCam
-            self.camera = ImageCam(self.gui, (self.width, self.height))
+            from modules.cam.Image import Image as ImageCam
+            self.camera = ImageCam(self.settings.camera, (self.width, self.height))
         self.camera.setRotate90(self.portraitMode)
 
-        self.audio: AudioDB = AudioDB(self.gui, 'files/music_map.json')
-        self.osc: Osc = Osc(self.gui, "127.0.0.1", 4114, 30.0)
-        self.save: ImgFolderGui = ImgFolderGui(self.gui, min_files=16)
-        self.artnet = Artnet(self.gui, 'files/artnet.json')
+        self.audio: AudioDB = AudioDB(self.settings.audio, 'files/music_map.json')
+        self.osc: Osc = Osc(self.settings.osc)
+        self.save: ImgFolder = ImgFolder(self.settings.save)
+        self.artnet = Artnet(self.settings.artnet, 'files/artnet.json')
 
         self._running: bool = False
+        self._stopping: bool = False
 
         self.laststate: str = ''
 
@@ -94,25 +90,14 @@ class Forgettable():
 
         self.settings_server.start()
 
-        self.gui.exit_callback = self.stop
-
-        if self.width < self.height:
-            self.gui.addFrame([self.diffuse.get_frame_diff(), self.diffuse.get_frame_prompt(), self.render.get_gui_frame()])
-            self.gui.addFrame([self.camera.get_gui_frame(), self.face.get_gui_frame()])
-            self.gui.addFrame([self.audio.get_gui_frame(), self.osc.get_gui_frame(), self.artnet.get_gui_frame()])
-        else:
-            self.gui.addFrame([self.diffuse.get_frame_diff(), self.diffuse.get_frame_prompt()])
-            self.gui.addFrame([self.camera.get_gui_frame(), self.render.get_gui_frame()])
-            self.gui.addFrame([self.face.get_gui_frame(), self.save.get_gui_frame()])
-
-        self.gui.start()
-
-        if not self.guiTop:
-            self.gui.sendToBack()
-
         self._running = True
 
     def stop(self) -> None:
+        # called from the render window (Esc), the settings panel (Exit) and Ctrl+C; run once
+        if self._stopping:
+            return
+        self._stopping = True
+
         self.artnet.stop()
         self.osc.stop()
 
@@ -131,9 +116,6 @@ class Forgettable():
         self.render.sequencer.clear_message_callbacks()
         self.render.stop()
 
-        self.gui.exit_callback = None
-        self.gui.stop()
-
         self.settings_server.stop()
 
         self._running = False
@@ -151,7 +133,7 @@ class Forgettable():
             artnet_progress = 0.0
         self.artnet.set_progress(artnet_progress, ani)
 
-        if self.osc.sending:
+        if self.settings.osc.active:
             progress: float = message.progress
             audio_id: str = self.audio.get_audio_id()
             self.osc.send('/music_id', audio_id)
@@ -187,7 +169,7 @@ class Forgettable():
                 self.save.end_sequence()
 
         if seq == SequenceType.RESET:
-            self.diffuse.set_interrupt_gui()
+            self.diffuse.interrupt()
 
     def get_best_face(self, window: float = 1.0) -> FaceMessage | None:
         # highest scoring face of the last second, so a blink or a turned head at the last frame is not used

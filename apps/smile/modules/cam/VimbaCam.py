@@ -1,4 +1,5 @@
 from modules.cam.vimba import *
+from modules.cam.settings import CameraSettings
 import cv2
 import numpy as np
 from threading import Thread, Lock, Event
@@ -63,8 +64,9 @@ def setup_camera(camera: Camera, user_set: Optional[str]) -> bool:
 
 
 class VimbaCam(Thread):
-    def __init__(self, forceSize: tuple[int, int] | None = None) -> None:
+    def __init__(self, settings: CameraSettings, forceSize: tuple[int, int] | None = None) -> None:
         super().__init__()
+        self.settings: CameraSettings = settings
 
         self.user_set: str = 'UserSet2'
 
@@ -84,13 +86,11 @@ class VimbaCam(Thread):
             self.outWidth, self.outHeight = forceSize
         self.outputFrame: np.ndarray = np.zeros((self.outWidth, self.outHeight,3)) # type: ignore
 
-        # TRANSFORMATION SETTINGS
-        self.flipV: bool            = False
-        self.flipH: bool            = False
         self.rotate90: bool         = False
 
-        self.gain_auto: list[bool] = [True, True]
-        self.gain_target: list[int] = [20, 20]
+        # gain values last applied to the camera, compared to the settings every frame
+        self._gain_auto_applied: bool | None = None
+        self._gain_target_applied: int | None = None
 
         self.capturing: bool = False
         self.camera: Camera | None = None
@@ -108,9 +108,9 @@ class VimbaCam(Thread):
                                 newFrame = self._get_internal_frame()
                                 if self.rotate90:
                                     newFrame = cv2.transpose(newFrame)
-                                if self.flipV:
+                                if self.settings.flip_v:
                                     newFrame = cv2.flip(newFrame, 0)
-                                if self.flipH:
+                                if self.settings.flip_h:
                                     newFrame = cv2.flip(newFrame, 1)
                                 newFrame = cv2.resize(newFrame, (self.outWidth, self.outHeight))
 
@@ -121,18 +121,20 @@ class VimbaCam(Thread):
                                     self.outputFrame = newFrame
                                     self.frameNew = True
 
-                                if self.gain_auto[0] != self.gain_auto[1]:
-                                    self.gain_auto[1] = self.gain_auto[0]
+                                gain_auto: bool = self.settings.gain_auto
+                                if gain_auto != self._gain_auto_applied:
+                                    self._gain_auto_applied = gain_auto
                                     feature = self.camera.get_feature_by_name('GainAuto')
-                                    if self.gain_auto[0]:
+                                    if gain_auto:
                                         feature.set('Continuous')
                                     else:
                                         feature.set('Off')
 
-                                if self.gain_target[0] != self.gain_target[1]:
-                                    self.gain_target[1] = self.gain_target[0]
+                                gain_target: int = self.settings.gain_target
+                                if gain_target != self._gain_target_applied:
+                                    self._gain_target_applied = gain_target
                                     feature = self.camera.get_feature_by_name('GainAutoTarget')
-                                    feature.set(self.gain_target[0])
+                                    feature.set(gain_target)
 
                             sleep(0.01)
                         if self.camera:
@@ -224,17 +226,5 @@ class VimbaCam(Thread):
     def clearColorCallbacks(self) -> None:
         self.frameCallbacks = []
 
-    def setFlipH(self, flipH: bool) -> None:
-        self.flipH = flipH
-
-    def setFlipV(self, flipV: bool) -> None:
-        self.flipV = flipV
-
     def setRotate90(self, rotate90: bool) -> None:
         self.rotate90 = rotate90
-
-    def setGainAuto(self, value:bool) -> None:
-        self.gain_auto[0] = value
-
-    def setGainTarget(self, value: int) -> None:
-        self.gain_target[0] = value

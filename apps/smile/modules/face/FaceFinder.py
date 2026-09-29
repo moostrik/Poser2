@@ -5,6 +5,7 @@ from threading import Thread, Lock
 from typing import Callable
 
 from modules.face.FaceDetector import FaceDetector, Face
+from modules.face.settings import FaceSettings
 
 class FaceMessage():
     def __init__(self, image: np.ndarray, size: float, score: float, stable: bool) -> None:
@@ -46,8 +47,9 @@ def portrait_crop(img: np.ndarray, face: Face, min_size: float, portrait_zoom: f
     return portrait_img, normalized_size
 
 class FaceFinder(Thread):
-    def __init__(self, composition_width: int, composition_height: int, model_path: str = 'files/scrfd_10g_bnkps.onnx') -> None:
+    def __init__(self, settings: FaceSettings, composition_width: int, composition_height: int, model_path: str = 'files/scrfd_10g_bnkps.onnx') -> None:
         super().__init__()
+        self.settings: FaceSettings = settings
         self._input_mutex: Lock = Lock()
         self._thread_running: bool = False
         self._image: np.ndarray | None = None
@@ -56,12 +58,6 @@ class FaceFinder(Thread):
         self._composition_width: int = composition_width
         self._composition_height: int = composition_height
         self._model_path: str = model_path
-
-        self.size_filter: float = 0.1
-        self.confidence_filter: float = 0.7
-        self.stable_frames: int = 3
-        self.zoom: float = 1.0
-        self.offset: float = 0.0
 
         self._consecutive: int = 0
 
@@ -77,13 +73,14 @@ class FaceFinder(Thread):
             image: np.ndarray | None = self.get_image()
             self.set_image(None)
             if image is not None:
-                face: Face | None = largest_face(detector.detect(image, 0.5), self.confidence_filter)
+                s: FaceSettings = self.settings
+                face: Face | None = largest_face(detector.detect(image, 0.5), s.confidence)
                 try:
                     if face is None:
                         raise ValueError('no face found')
-                    portrait_img, size = portrait_crop(image, face, self.size_filter, self.zoom, self.offset, self._composition_width, self._composition_height)
+                    portrait_img, size = portrait_crop(image, face, s.size_filter, s.zoom, s.offset, self._composition_width, self._composition_height)
                     self._consecutive += 1
-                    self.message_callback(FaceMessage(portrait_img, size, face.score, self._consecutive >= self.stable_frames))
+                    self.message_callback(FaceMessage(portrait_img, size, face.score, self._consecutive >= s.stable_frames))
                 except ValueError as e:
                     self._consecutive = 0
                     self.error_callback(e)
@@ -101,11 +98,12 @@ class FaceFinder(Thread):
             return self._image
 
     def message_callback(self, message: FaceMessage) -> None:
+        self.settings.result = 'size: ' + str(message.size) + ', score: ' + str(message.score) + ', stable: ' + str(message.stable)
         with self._input_mutex:
             for c in self._message_callbacks: c(message)
 
     def error_callback(self, error: ValueError) -> None:
-        print(error)
+        self.settings.result = 'error: ' + str(error)
 
     def add_message_callback(self, callback: MessageCallback) -> None:
         with self._input_mutex:

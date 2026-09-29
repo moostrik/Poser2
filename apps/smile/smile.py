@@ -1,11 +1,3 @@
-# TODO
-# Clean up old sdw repo
-# Replace PySimpleGui with Gradio
-
-# OPTIONAL
-# clean up sd module
-# less random audio
-
 from argparse import ArgumentParser
 from os import path
 from signal import signal, SIGINT
@@ -17,7 +9,6 @@ from modules.Forgettable import Forgettable, CamType
 parser: ArgumentParser = ArgumentParser()
 parser.add_argument('-dw',  '--width',          type=int,   default=1152,    help='image width')
 parser.add_argument('-dh',  '--height',         type=int,   default=896,    help='image height')
-parser.add_argument('-gt',  '--guiTop',         action='store_true',        help='gui window always on top')
 parser.add_argument('-wc',  '--useWebCam',      action='store_true',        help='use webcam instead of default cam')
 parser.add_argument('-vc',  '--useVimbaCam',    action='store_true',        help='use vimba camera instead of default cam')
 parser.add_argument('-ic',  '--useImageCam',    action='store_true',        help='use image instead of default cam')
@@ -42,7 +33,7 @@ if args.useWebCam:
 if args.useImageCam:
     camType = CamType.IMAGE
 
-aiia = Forgettable(currentPath, modWidth, modHeight, not(bool(args.landscapeMode)), args.guiTop, camType)
+aiia = Forgettable(currentPath, modWidth, modHeight, not(bool(args.landscapeMode)), camType)
 aiia.start()
 
 def signal_handler_exit(sig, frame) -> None:
