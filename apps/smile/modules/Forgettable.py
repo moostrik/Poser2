@@ -140,7 +140,7 @@ class Forgettable():
             self.osc.send('/state', state)
             self.osc.send('/progress', progress)
 
-        if seq == SequenceType.CAMERA_SHOW:
+        if seq == SequenceType.CAMERA_SHOW and message.initial:
             self.face_messages = []
             self.face.reset()
 

@@ -16,6 +16,7 @@ data/settings/.*
 
 
 comfy/*
+/ComfyUI/
 
 # Claude Code
 .claude/settings.local.json

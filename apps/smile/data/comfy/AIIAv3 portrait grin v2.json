@@ -1,0 +1,557 @@
+{
+  "1": {
+    "inputs": {
+      "image": "000.jpg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Portrait photo"
+    }
+  },
+  "1003": {
+    "inputs": {
+      "filename_prefix": "AIIAv3_portrait",
+      "images": [
+        "1002:36",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save portrait"
+    }
+  },
+  "1006": {
+    "inputs": {
+      "images": [
+        "1000:5",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "1007": {
+    "inputs": {
+      "blend_factor": 0.5,
+      "blend_mode": "normal",
+      "image1": [
+        "1006",
+        0
+      ],
+      "image2": [
+        "1002:36",
+        0
+      ]
+    },
+    "class_type": "ImageBlend",
+    "_meta": {
+      "title": "Overlay"
+    }
+  },
+  "1008": {
+    "inputs": {
+      "images": [
+        "1007",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Overlay preview"
+    }
+  },
+  "1024": {
+    "inputs": {
+      "seed": 985826034945614,
+      "frames": 150,
+      "ease": "sine_in_out",
+      "crop_factor": 2,
+      "midpoint": 0.7,
+      "midpoint_deviation": 0.2,
+      "smile": 2,
+      "aaa": -20,
+      "eee": -10,
+      "eyebrow": 7.5,
+      "blink": -9,
+      "wink": 0,
+      "woo": -20,
+      "pupil_x": 0,
+      "pupil_y": 0,
+      "rotate_pitch_min": -15,
+      "rotate_pitch_max": 0,
+      "rotate_yaw_min": -15,
+      "rotate_yaw_max": 15,
+      "rotate_roll_min": -15,
+      "rotate_roll_max": 15,
+      "image": [
+        "1030",
+        0
+      ]
+    },
+    "class_type": "GrinFrames",
+    "_meta": {
+      "title": "Grin Frames"
+    }
+  },
+  "1025": {
+    "inputs": {
+      "frame_rate": 15,
+      "loop_count": 0,
+      "filename_prefix": "AIIAv3_grin",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": false,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true,
+      "images": [
+        "1024",
+        0
+      ]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Save video"
+    }
+  },
+  "1026": {
+    "inputs": {
+      "images": [
+        "1024",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "All frames"
+    }
+  },
+  "1030": {
+    "inputs": {
+      "upscale_method": "lanczos",
+      "width": 512,
+      "height": 640,
+      "crop": "center",
+      "image": [
+        "1031",
+        0
+      ]
+    },
+    "class_type": "ImageScale",
+    "_meta": {
+      "title": "To screen 512x640"
+    }
+  },
+  "1031": {
+    "inputs": {
+      "width": 768,
+      "height": 960,
+      "x": 48,
+      "y": 60,
+      "image": [
+        "1002:36",
+        0
+      ]
+    },
+    "class_type": "ImageCrop",
+    "_meta": {
+      "title": "Crop portrait (keep 4:5)"
+    }
+  },
+  "1000:2": {
+    "inputs": {
+      "precision": "auto"
+    },
+    "class_type": "DownloadAndLoadLivePortraitModels",
+    "_meta": {
+      "title": "(Down)Load LivePortraitModels"
+    }
+  },
+  "1000:3": {
+    "inputs": {
+      "face_detector": "blazeface_back_camera",
+      "landmarkrunner_device": "CUDA",
+      "face_detector_device": "cuda",
+      "face_detector_dtype": "fp16",
+      "keep_model_loaded": true
+    },
+    "class_type": "LivePortraitLoadFaceAlignmentCropper",
+    "_meta": {
+      "title": "LivePortrait Load FaceAlignmentCropper"
+    }
+  },
+  "1000:4": {
+    "inputs": {
+      "dsize": 1152,
+      "scale": 2,
+      "vx_ratio": 0,
+      "vy_ratio": -0.1,
+      "face_index": 0,
+      "face_index_order": "large-small",
+      "rotate": true,
+      "pipeline": [
+        "1000:2",
+        0
+      ],
+      "cropper": [
+        "1000:3",
+        0
+      ],
+      "source_image": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "LivePortraitCropper",
+    "_meta": {
+      "title": "Face crop"
+    }
+  },
+  "1000:5": {
+    "inputs": {
+      "width": 896,
+      "height": 1120,
+      "upscale_method": "lanczos",
+      "keep_proportion": "crop",
+      "pad_color": "0, 0, 0",
+      "crop_position": "center",
+      "divisible_by": 2,
+      "device": "cpu",
+      "image": [
+        "1000:4",
+        0
+      ]
+    },
+    "class_type": "ImageResizeKJv2",
+    "_meta": {
+      "title": "To 896x1120"
+    }
+  },
+  "1000:6": {
+    "inputs": {
+      "images": [
+        "1000:5",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Crop"
+    }
+  },
+  "1001:10": {
+    "inputs": {
+      "model_name": "Qwen3-VL-4B-Instruct",
+      "quantization": "None (FP16)",
+      "attention_mode": "auto",
+      "preset_prompt": "🖼️ Tags",
+      "custom_prompt": "Describe this person for a text-to-image prompt. Only visible physical features: gender, approximate age, hair color and style, eye color, face shape, nose, lips, skin tone, facial hair. No clothing, no background, no expression. Short comma-separated phrases on one line. Output only the phrases. ",
+      "max_tokens": 120,
+      "keep_model_loaded": true,
+      "seed": 909333551,
+      "image": [
+        "1006",
+        0
+      ]
+    },
+    "class_type": "AILab_QwenVL",
+    "_meta": {
+      "title": "QwenVL describe"
+    }
+  },
+  "1002:20": {
+    "inputs": {
+      "ckpt_name": "realvisxlV40_v40LightningBakedvae.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "1002:22": {
+    "inputs": {
+      "text": "BREAK nude portrait by (Mert and Marcus: 1.4), Glamorous Eroticism, High gloss vivid colors, bold contrast., Studio lighting, dramatic chiaroscuro, 2000s BREAK",
+      "clip": [
+        "1002:20",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Prompt: style"
+    }
+  },
+  "1002:23": {
+    "inputs": {
+      "string_a": [
+        "1001:10",
+        0
+      ],
+      "string_b": " model, (serious expression: 2.2)",
+      "delimiter": ""
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Description + model"
+    }
+  },
+  "1002:24": {
+    "inputs": {
+      "text": [
+        "1002:23",
+        0
+      ],
+      "clip": [
+        "1002:20",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Prompt: description"
+    }
+  },
+  "1002:25": {
+    "inputs": {
+      "conditioning_to": [
+        "1002:22",
+        0
+      ],
+      "conditioning_from": [
+        "1002:24",
+        0
+      ]
+    },
+    "class_type": "ConditioningConcat",
+    "_meta": {
+      "title": "Style + description"
+    }
+  },
+  "1002:26": {
+    "inputs": {
+      "text": "blurry, out of focus, illustration, painting, drawing, cartoon, 3d render, crooked teeth, deformed hands, extra fingers, lowres, jpeg artifacts, watermark, text",
+      "clip": [
+        "1002:20",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Negative"
+    }
+  },
+  "1002:27": {
+    "inputs": {
+      "instantid_file": "ip-adapter_instant_id_sdxl.bin"
+    },
+    "class_type": "InstantIDModelLoader",
+    "_meta": {
+      "title": "Load InstantID Model"
+    }
+  },
+  "1002:28": {
+    "inputs": {
+      "provider": "CUDA"
+    },
+    "class_type": "InstantIDFaceAnalysis",
+    "_meta": {
+      "title": "InstantID Face Analysis"
+    }
+  },
+  "1002:29": {
+    "inputs": {
+      "control_net_name": "control_instant_id_sdxl.safetensors"
+    },
+    "class_type": "ControlNetLoader",
+    "_meta": {
+      "title": "InstantID ControlNet"
+    }
+  },
+  "1002:30": {
+    "inputs": {
+      "ip_weight": 1,
+      "cn_strength": 1,
+      "start_at": 0,
+      "end_at": 1,
+      "noise": 0,
+      "combine_embeds": "average",
+      "instantid": [
+        "1002:27",
+        0
+      ],
+      "insightface": [
+        "1002:28",
+        0
+      ],
+      "control_net": [
+        "1002:29",
+        0
+      ],
+      "image": [
+        "1006",
+        0
+      ],
+      "model": [
+        "1002:20",
+        0
+      ],
+      "positive": [
+        "1002:25",
+        0
+      ],
+      "negative": [
+        "1002:26",
+        0
+      ]
+    },
+    "class_type": "ApplyInstantIDAdvanced",
+    "_meta": {
+      "title": "Apply InstantID (aiia2: 1.0 / 1.0, no noise)"
+    }
+  },
+  "1002:31": {
+    "inputs": {
+      "a": 6.283185307179586,
+      "bg_threshold": 0.1,
+      "resolution": 1024,
+      "image": [
+        "1006",
+        0
+      ]
+    },
+    "class_type": "MiDaS-DepthMapPreprocessor",
+    "_meta": {
+      "title": "Depth (MiDaS)"
+    }
+  },
+  "1002:32": {
+    "inputs": {
+      "control_net_name": "t2i-depth_diffusers.safetensors"
+    },
+    "class_type": "ControlNetLoader",
+    "_meta": {
+      "title": "T2I depth adapter"
+    }
+  },
+  "1002:33": {
+    "inputs": {
+      "strength": 1,
+      "start_percent": 0,
+      "end_percent": 0.5,
+      "positive": [
+        "1002:30",
+        1
+      ],
+      "negative": [
+        "1002:30",
+        2
+      ],
+      "control_net": [
+        "1002:32",
+        0
+      ],
+      "image": [
+        "1002:31",
+        0
+      ]
+    },
+    "class_type": "ControlNetApplyAdvanced",
+    "_meta": {
+      "title": "Depth 0.5, off after 50%"
+    }
+  },
+  "1002:34": {
+    "inputs": {
+      "width": 896,
+      "height": 1120,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "1002:35": {
+    "inputs": {
+      "seed": 1050858460348274,
+      "steps": 6,
+      "cfg": 1.5,
+      "sampler_name": "dpmpp_sde",
+      "scheduler": "exponential",
+      "denoise": 1,
+      "model": [
+        "1002:30",
+        0
+      ],
+      "positive": [
+        "1002:33",
+        0
+      ],
+      "negative": [
+        "1002:33",
+        1
+      ],
+      "latent_image": [
+        "1002:34",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "1002:36": {
+    "inputs": {
+      "samples": [
+        "1002:35",
+        0
+      ],
+      "vae": [
+        "1002:20",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "1002:37": {
+    "inputs": {
+      "images": [
+        "1002:36",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Portrait"
+    }
+  },
+  "1002:1004": {
+    "inputs": {
+      "source": [
+        "1002:23",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview as Text"
+    }
+  },
+  "1002:1010": {
+    "inputs": {
+      "value": "Male, young adult,"
+    },
+    "class_type": "PrimitiveString",
+    "_meta": {
+      "title": "Text"
+    }
+  }
+}
