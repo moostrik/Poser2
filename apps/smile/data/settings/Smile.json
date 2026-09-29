@@ -16,10 +16,20 @@
     "timeout": 5.0
   },
   "render": {
-    "fullscreen": true,
+    "window": {
+      "title": "SMILE",
+      "v_sync": true,
+      "monitor": "M0",
+      "x": 100,
+      "y": 100,
+      "width": 720,
+      "height": 900,
+      "secondary_list": [],
+      "secondary_fullscreen": false,
+      "fullscreen_mode": "FULLSCREEN"
+    },
     "show_camera": false,
     "freeze": false,
-    "show_prompt": false,
     "trail_active": true,
     "trail": 0.995,
     "loop_trail": 0.5,

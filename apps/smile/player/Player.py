@@ -1,14 +1,15 @@
 from player.ImgLoader import LoadImages
-from player.Render import Render
+from player.Render import PlayerRender
 from player.FolderScanner import FolderScanner
 
 from modules.osc.Sender import Sender as Osc
 from modules.osc.settings import OscSettings
+from modules.gl import FullscreenMode, MonitorId, WindowSettings
 import time
 import random
 
 class Player():
-    def __init__(self, osc_port: str, images_dir = 'images/', posX: int = 0, posY: int = 0, trail = 0.9, interval = 1.0, wait = 5.0, num_portraits = 10) -> None:
+    def __init__(self, osc_port: str, images_dir = 'images/', monitor: int = 1, trail = 0.9, interval = 1.0, wait = 5.0, num_portraits = 10) -> None:
         osc_settings = OscSettings()
         osc_settings.port = int(osc_port)
         self.osc:Osc = Osc(osc_settings)
@@ -21,7 +22,17 @@ class Player():
             id: str = str(i)
             ids.append(id)
 
-        self.render: Render = Render(3840, 2048, 512, 640, ids, True, True, posX, posY, trail= trail)
+        # borderless fullscreen: exclusive fullscreen minimizes when another player or SMILE gets focus
+        window = WindowSettings()
+        window.title = f'player {monitor}'
+        window.monitor = MonitorId(monitor)
+        window.width = 1920
+        window.height = 1024
+        window.secondary_list = []
+        window.fullscreen_mode = FullscreenMode.WINDOWED_FULLSCREEN
+        window.initialize()
+        self.render: PlayerRender = PlayerRender(window, ids, trail)
+        self.render.add_exit_callback(self.stop)
 
         self.scanner: FolderScanner = FolderScanner(images_dir, num_portraits)
         # self.scanner.update_folder_dict()  # Initial scan

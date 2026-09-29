@@ -1,7 +1,6 @@
 from argparse import ArgumentParser
-from os import path
+from os import path, _exit
 from signal import signal, SIGINT
-from sys import exit
 from time import sleep
 from modules.log_config import setup_logging, install_thread_excepthook
 from modules.Forgettable import Forgettable, CamType
@@ -39,10 +38,11 @@ aiia.start()
 def signal_handler_exit(sig, frame) -> None:
     if aiia.isRunning():
         aiia.stop()
-    exit()
 
 signal(SIGINT, signal_handler_exit)
 
 while aiia.isRunning():
     sleep(0.05)
-    continue
+
+# GLFW does not shut down cleanly outside the main thread (as in poser2)
+_exit(0)

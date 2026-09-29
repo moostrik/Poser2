@@ -1,6 +1,6 @@
 from enum import IntEnum
 import time
-from threading import Lock
+from threading import Lock, RLock
 from typing import Callable
 import pytweening as easing
 
@@ -246,11 +246,15 @@ def reset_message(state: SeqenceState) -> SeqenceMessage:
 MessageCallback = Callable[[SeqenceMessage], None]
 
 class Sequencer():
+    """Time-based state machine of a visitor cycle. update() runs once per render frame, on the render
+    thread; set_sequence() and the other setters are called from the generator, face and key threads."""
+
     def __init__(self, settings: SequencerSettings) -> None:
         self.settings: SequencerSettings = settings
         self._input_mutex: Lock = Lock()
+        self._state_mutex: RLock = RLock()
         self._message_callbacks: list[MessageCallback] = []
-        self.message: SeqenceMessage
+        self.message: SeqenceMessage = SeqenceMessage(SequenceType.NONE, 0.0)
 
         self._state: SeqenceState = SeqenceState()
         self._state.type = SequenceType.CAMERA_SHOW
@@ -274,53 +278,58 @@ class Sequencer():
         self.settings.unbind(SequencerSettings.flash_out_auto, self._on_flash_out_auto)
 
     def update(self) -> SeqenceMessage:
+        # the callbacks run outside the state lock: they may set the sequence themselves
+        with self._state_mutex:
+            self.message = self._next_message()
+        self.message_callback(self.message)
+        return self.message
+
+    def _next_message(self) -> SeqenceMessage:
         s: SequencerSettings = self.settings
-        self.message = SeqenceMessage(SequenceType.NONE, 0.0)
+        message = SeqenceMessage(SequenceType.NONE, 0.0)
 
         if self._state.type == SequenceType.NONE:
             pass
         elif self._state.type == SequenceType.BLOOM:
-            self.message = bloom_message(self._state, s.destroy_in, easing_function(s.destroy_in_ease), s.destroy_out, easing_function(s.destroy_out_ease))
+            message = bloom_message(self._state, s.destroy_in, easing_function(s.destroy_in_ease), s.destroy_out, easing_function(s.destroy_out_ease))
         elif self._state.type == SequenceType.FADE:
-            self.message = fade_message(self._state, s.destroy_in, easing_function(s.destroy_in_ease), s.destroy_out, easing_function(s.destroy_out_ease))
+            message = fade_message(self._state, s.destroy_in, easing_function(s.destroy_in_ease), s.destroy_out, easing_function(s.destroy_out_ease))
         elif self._state.type == SequenceType.CAMERA_SHOW:
-            self.message = cam_show_message(self._state, 1.0)
+            message = cam_show_message(self._state, 1.0)
         elif self._state.type == SequenceType.CAMERA_DETECT:
-            self.message = cam_detect_message(self._state, s.camera_in, easing_function(s.camera_in_ease))
+            message = cam_detect_message(self._state, s.camera_in, easing_function(s.camera_in_ease))
         elif self._state.type == SequenceType.CAMERA_REC:
-            self.message = cam_record_message(self._state, s.camera_out, easing_function(s.camera_out_ease))
+            message = cam_record_message(self._state, s.camera_out, easing_function(s.camera_out_ease))
         elif self._state.type == SequenceType.FLASH:
-            self.message = pre_capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease), 0.5)
+            message = pre_capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease), 0.5)
         elif self._state.type == SequenceType.CAPTURE:
-            self.message = capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease))
+            message = capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease))
         elif self._state.type == SequenceType.ASK:
-            self.message = post_capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease))
+            message = post_capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease))
         elif self._state.type == SequenceType.CONTROL_0:
-            self.message = control_message(self._state, s.flash_out, easing_function(s.flash_out_ease), True)
+            message = control_message(self._state, s.flash_out, easing_function(s.flash_out_ease), True)
         elif self._state.type == SequenceType.CONTROL_1:
-            self.message = control_message(self._state, s.flash_out, easing_function(s.flash_out_ease))
+            message = control_message(self._state, s.flash_out, easing_function(s.flash_out_ease))
         elif self._state.type == SequenceType.CONTROL_2:
-            self.message = control_message(self._state, s.flash_out, easing_function(s.flash_out_ease))
+            message = control_message(self._state, s.flash_out, easing_function(s.flash_out_ease))
         elif self._state.type == SequenceType.DIFFUSION:
-            self.message = diffusion_message(self._state, self.diffusion_progress)
+            message = diffusion_message(self._state, self.diffusion_progress)
         elif self._state.type == SequenceType.DIFF_LOOP:
-            self.message = diffusion_message(self._state, self.diffusion_progress)
+            message = diffusion_message(self._state, self.diffusion_progress)
         elif self._state.type == SequenceType.TIMEOUT:
-            self.message = timeout_message(self._state, s.timeout)
+            message = timeout_message(self._state, s.timeout)
         elif self._state.type == SequenceType.RESET:
-            self.message = reset_message(self._state)
+            message = reset_message(self._state)
 
-        flash_out: float = self.calculate_flash_out_duration(self.message, s.flash_out)
+        flash_out: float = self.calculate_flash_out_duration(message, s.flash_out)
         if flash_out != s.flash_out:
             s.flash_out = flash_out
 
-        s.state = self.message.sequence_type.name
-        s.state_progress = self.message.value_1
-        s.animation = self.message.animation_type.name
-        s.animation_progress = self.message.progress
-
-        self.message_callback(self.message)
-        return self.message
+        s.state = message.sequence_type.name
+        s.state_progress = message.value_1
+        s.animation = message.animation_type.name
+        s.animation_progress = message.progress
+        return message
 
     def _on_start(self, _=None) -> None:
         self.start_sequence()
@@ -338,16 +347,19 @@ class Sequencer():
         self.start_sequence()
 
     def start_sequence(self) -> None:
-        if self.get_sequence() != SequenceType.CAMERA_SHOW:
-            return
-        self.set_sequence(SequenceType.CAMERA_DETECT)
+        with self._state_mutex:
+            if self._state.type != SequenceType.CAMERA_SHOW:
+                return
+            self._state.type = SequenceType.CAMERA_DETECT
 
 
     def set_sequence(self, type: SequenceType) -> None:
-        self._state.type = type
+        with self._state_mutex:
+            self._state.type = type
 
     def get_sequence(self) -> SequenceType:
-        return self._state.type
+        with self._state_mutex:
+            return self._state.type
 
     def set_diffusion_progress(self, value) -> None:
         self.diffusion_progress = value

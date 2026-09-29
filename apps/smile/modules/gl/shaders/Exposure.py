@@ -1,33 +1,32 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from .. import Shader, draw_quad
+from .. import Texture
+
+import logging
+logger = logging.getLogger(__name__)
 
 class Exposure(Shader):
-    def __init__(self) -> None:
-        super().__init__()
-        self.shader_name = self.__class__.__name__
+    def use(self, tex0: Texture, exposure: float, offset: float, gamma: float) -> None:
+        if not self.allocated or not self.shader_program:
+            logger.warning("Exposure shader not allocated or shader program missing.")
+            return
+        if not tex0.allocated:
+            logger.warning("Exposure shader: input texture not allocated.")
+            return
 
-    def allocate(self, monitor_file = False) -> None:
-        super().allocate(self.shader_name, monitor_file)
+        # Activate shader program
+        glUseProgram(self.shader_program)
 
-    def use(self, fbo, tex0, exposure: float, offset: float, gamma: float) -> None :
-        super().use()
-        if not self.allocated: return
-        if not fbo or not tex0: return
+        # Bind input texture
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
-        glBindTexture(GL_TEXTURE_2D, tex0)
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1f(self.get_uniform_loc("exposure"), exposure)
+        glUniform1f(self.get_uniform_loc("offset"), offset)
+        glUniform1f(self.get_uniform_loc("gamma"), gamma)
 
-        s = self.shader_program
-        glUseProgram(s)
-        glUniform1i(glGetUniformLocation(s, "tex0"), 0)
-        glUniform1f(glGetUniformLocation(s, "exposure"), exposure)
-        glUniform1f(glGetUniformLocation(s, "offset"), offset)
-        glUniform1f(glGetUniformLocation(s, "gamma"), gamma)
-
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo)
+        # Render
         draw_quad()
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-        glUseProgram(0)
-
-        glBindTexture(GL_TEXTURE_2D, 0)
 

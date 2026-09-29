@@ -1,13 +1,19 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Texture import Texture
+from .Texture import Texture
+
+_current_viewport: tuple[int, int, int, int] = (0, 0, 0, 0)
 
 class Fbo(Texture):
-    def __init__(self) -> None :
-        super(Fbo, self).__init__()
+    def __init__(self,
+                 interpolation: int = GL_LINEAR,
+                 wrap: int = GL_CLAMP_TO_EDGE,
+                 border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)) -> None:
+        super().__init__(interpolation, wrap, border_color)
         self.fbo_id = 0
 
-    def allocate(self, width: int, height: int, internal_format) -> None :
-        super(Fbo, self).allocate(width, height, internal_format)
+
+    def allocate(self, width: int, height: int, internal_format) -> None:
+        super().allocate(width, height, internal_format)
         if not self.allocated: return
 
         self.fbo_id = glGenFramebuffers(1)
@@ -16,66 +22,131 @@ class Fbo(Texture):
         self.bind()
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.tex_id, 0)
 
-        glClearColor(1.0, 1.0, 1.0, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) # type: ignore
+        glClearColor(0.0, 0.0, 0.0, 0.0)
+        glClear(GL_COLOR_BUFFER_BIT)
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         self.unbind()
 
     def begin(self)  -> None:
+        """Begin rendering to FBO. Uses top-left origin (see COORDINATE_SYSTEM.md)."""
+        global _current_viewport
+
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
+        new_vp = (0, 0, self.width, self.height)
+        if _current_viewport != new_vp:
+            glViewport(*new_vp)
+            _current_viewport = new_vp
+
+        glViewport(*new_vp)
 
     def end(self)  -> None:
+        """End rendering to FBO and restore previous state."""
+        # pass
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-class SwapFbo():
-    def __init__(self) -> None :
-        self.width: int = 0
-        self.height: int = 0
-        self.internal_format: Constant = GL_NONE
-        self.format: Constant = GL_NONE
-        self.data_type: Constant = GL_NONE
-        self.fbos: list[Fbo] = [Fbo(), Fbo()]
-        self.swap_state: bool = False
-        self.allocated: bool = False
-        self.fbo_id = 0
-        self.tex_id = 0
-        self.back_tex_id = 0
+class SwapFbo(Fbo):
+    """Double-buffered FBO that swaps between two buffers.
 
-    def allocate(self, width: int, height: int, internal_format) -> None :
-        self.width = width
-        self.height = height
-        self.internal_format = internal_format
-        self.fbos[0].allocate(width, height, internal_format)
-        self.fbos[1].allocate(width, height, internal_format)
-        self.format = self.fbos[0].format
-        self.data_type = self.fbos[0].data_type
-        self.allocated = self.fbos[0].allocated and self.fbos[1].allocated
+    Inherits from Fbo and delegates all properties to the current write buffer.
+    Use .texture for current buffer and .back_texture for previous buffer.
+    """
 
-        self.fbo_id = self.fbos[self.swap_state].fbo_id
-        self.tex_id = self.fbos[self.swap_state].tex_id
-        self.back_tex_id = self.fbos[not self.swap_state].tex_id
+    def __init__(self,
+                 interpolation: int = GL_LINEAR,
+                 wrap: int = GL_CLAMP_TO_EDGE,
+                 border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)) -> None:
+        # Don't call super().__init__() - we manage internal FBOs
+        self._fbos: list[Fbo] = [Fbo(interpolation, wrap, border_color), Fbo(interpolation, wrap, border_color)]
+        self._swap_state: int = 0
 
-    def swap(self) -> None :
-        self.swap_state = not self.swap_state
-        self.fbo_id = self.fbos[self.swap_state].fbo_id
-        self.tex_id = self.fbos[self.swap_state].tex_id
-        self.back_tex_id = self.fbos[not self.swap_state].tex_id
+    # Override all Fbo/Texture properties to delegate to current buffer
+    @property
+    def fbo_id(self) -> int:
+        return self._fbos[self._swap_state].fbo_id
 
-    def begin(self) -> None :
-        glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
+    @property
+    def tex_id(self) -> int:
+        return self._fbos[self._swap_state].tex_id
 
-    def end(self) -> None :
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+    @property
+    def width(self) -> int:
+        return self._fbos[self._swap_state].width
 
-    def bind(self) -> None :
-        glBindTexture(GL_TEXTURE_2D, self.tex_id)
+    @property
+    def height(self) -> int:
+        return self._fbos[self._swap_state].height
 
-    def unbind(self) -> None :
-        glBindTexture(GL_TEXTURE_2D, 0)
+    @property
+    def internal_format(self) -> Constant:
+        return self._fbos[self._swap_state].internal_format
 
-    def draw(self, x, y, w, h) -> None :
-        self.fbos[self.swap_state].draw(x, y, w, h)
+    @property
+    def format(self) -> Constant:
+        return self._fbos[self._swap_state].format
 
-    def draw_back(self, x, y, w, h) -> None :
-        self.fbos[not self.swap_state].draw(x, y, w, h)
+    @property
+    def data_type(self) -> Constant:
+        return self._fbos[self._swap_state].data_type
+
+    @property
+    def allocated(self) -> bool:
+        return self._fbos[0].allocated and self._fbos[1].allocated
+
+    @property
+    def texture(self) -> Texture:
+        """Current write buffer."""
+        return self._fbos[self._swap_state]
+
+    @property
+    def back_texture(self) -> Texture:
+        """Previous buffer for reading in ping-pong rendering."""
+        return self._fbos[1 - self._swap_state]
+
+    def allocate(self, width: int, height: int, internal_format) -> None:
+        """Allocate both buffers with same parameters."""
+        self._fbos[0].allocate(width, height, internal_format)
+        self._fbos[1].allocate(width, height, internal_format)
+
+    def deallocate(self) -> None:
+        """Deallocate both buffers."""
+        self._fbos[0].deallocate()
+        self._fbos[1].deallocate()
+
+    def swap(self) -> None:
+        """Swap buffers (back becomes front)."""
+        self._swap_state = 1 - self._swap_state
+
+    def begin(self) -> None:
+        """Begin rendering to current buffer. Uses top-left origin."""
+        self._fbos[self._swap_state].begin()
+
+    def end(self) -> None:
+        """End rendering to current buffer."""
+        self._fbos[self._swap_state].end()
+
+    def bind(self) -> None:
+        """Bind current buffer's texture."""
+        self._fbos[self._swap_state].bind()
+
+    def unbind(self) -> None:
+        """Unbind current buffer's texture."""
+        self._fbos[self._swap_state].unbind()
+
+    def clear(self, r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
+        """Clear current buffer."""
+        self._fbos[self._swap_state].clear(r, g, b, a)
+
+    def clear_back(self, r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
+        """Clear previous buffer."""
+        self._fbos[1 - self._swap_state].clear(r, g, b, a)
+
+    def set_wrap(self, wrap: int, border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
+        """Change wrap mode on both buffers at runtime (GL thread only)."""
+        self._fbos[0].set_wrap(wrap, border_color)
+        self._fbos[1].set_wrap(wrap, border_color)
+
+    def clear_all(self, r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
+        """Clear both buffers (useful for initialization/reset)."""
+        self.clear(r, g, b, a)
+        self.clear_back(r, g, b, a)

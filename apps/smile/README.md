@@ -47,6 +47,8 @@ semi real time webcam diffusers
 * run ```scripts\start.bat```
 * settings panel: open http://localhost:667 in a browser (also reachable from other devices on the network)
 * presets live in `data/settings/`, `Smile.json` loads at startup
+* monitors are numbered primary first, then left to right: SMILE uses the one in its preset (`render.window.monitor`), the two image players the ones in `scripts\start.bat` (`PLAYER_1_MONITOR`, `PLAYER_2_MONITOR`)
+* keys in the SMILE window: Enter starts a sequence, F fullscreen, W borderless fullscreen, Esc quits
 
 ### Startup
 * make a shortcut to `scripts\start.bat`

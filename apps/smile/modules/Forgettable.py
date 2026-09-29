@@ -1,6 +1,6 @@
 from modules.face.FaceFinder import FaceFinder, FaceMessage
-from modules.render.Render import Render
-from modules.render.Sequencer import SeqenceMessage, SequenceType, AnimationType, AnimationTypeNames
+from modules.render.SmileRender import SmileRender
+from modules.render.Sequencer import Sequencer, SeqenceMessage, SequenceType, AnimationType, AnimationTypeNames
 from modules.comfy.Generator import Generator
 from modules.comfy.messages import GenMessage, GenState
 from modules.osc.Sender import Sender as Osc
@@ -41,7 +41,8 @@ class Forgettable():
         self.settings.initialize()
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
-        self.render: Render = Render(self.settings.render, self.settings.sequence, self.width, self.height , self.width, self.height, 'aiia', v_sync=True, stretch=False)
+        self.sequencer: Sequencer = Sequencer(self.settings.sequence)
+        self.render: SmileRender = SmileRender(self.settings.render, self.sequencer, self.width, self.height)
         self.diffuse: Generator = Generator(self.settings.comfy)
         # the face crop is the image ComfyUI generates from, so it has the workflow's portrait size
         portrait_width, portrait_height = self.diffuse.workflow.portrait_size
@@ -83,14 +84,15 @@ class Forgettable():
         self.face.add_message_callback(self.face_callback)
         self.face.start()
 
-        self.render.exit_callback = self.stop
-        self.render.sequencer.add_message_callback(self.sequence_callback)
-        self.render.start()
-
         self.osc.start()
         self.artnet.start()
 
         self.settings_server.start()
+
+        # last: its frames drive the sequencer, which drives everything else
+        self.render.add_exit_callback(self.stop)
+        self.sequencer.add_message_callback(self.sequence_callback)
+        self.render.start()
 
         self._running = True
 
@@ -99,6 +101,11 @@ class Forgettable():
         if self._stopping:
             return
         self._stopping = True
+
+        # first: stops the sequencer callbacks
+        self.sequencer.clear_message_callbacks()
+        self.render.stop()
+        self.sequencer.close()
 
         self.artnet.stop()
         self.osc.stop()
@@ -113,10 +120,6 @@ class Forgettable():
         self.face.stop()
 
         self.save.stop()
-
-        self.render.exit_callback = None
-        self.render.sequencer.clear_message_callbacks()
-        self.render.stop()
 
         self.settings_server.stop()
 
@@ -188,7 +191,7 @@ class Forgettable():
     def face_callback(self, message: FaceMessage) -> None:
         self.face_messages.append(message)
         if message.stable:
-            self.render.sequencer.set_face_found()
+            self.sequencer.set_face_found()
 
     def diffusion_callback(self, message: GenMessage) -> None:
         # a sequence folder: capture, portrait, grin frames (not the step previews)

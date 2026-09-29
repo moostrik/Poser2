@@ -3,7 +3,8 @@ from typing import Callable
 
 import pytweening as easing
 
-from modules.settings import BaseSettings, Field, Widget
+from modules.gl import WindowSettings
+from modules.settings import BaseSettings, Field, Group, Widget
 
 
 class Easing(Enum):
@@ -48,10 +49,9 @@ def easing_function(value: Easing) -> Callable[[float], float]:
 
 
 class RenderSettings(BaseSettings):
-    fullscreen:    Field[bool]  = Field(False, widget=Widget.switch, description="Render window fullscreen (key f)")
+    window:        Group[WindowSettings] = Group(WindowSettings)
     show_camera:   Field[bool]  = Field(False, description="Draw the raw camera image on top")
     freeze:        Field[bool]  = Field(False, description="Hold the current frame")
-    show_prompt:   Field[bool]  = Field(False, description="Draw the text field during diffusion")
     trail_active:  Field[bool]  = Field(True, description="Blend new diffusion images over the previous ones")
     trail:         Field[float] = Field(0.995, min=0.98, max=1.0, step=0.001, description="Trail amount")
     loop_trail:    Field[float] = Field(0.5, min=0.0, max=0.99, step=0.01, description="Trail while the grin animation plays (0 = none)")

@@ -14,6 +14,17 @@ websocket events into `GenMessage`s for the render (CAM_DEPTH → DIFFUSION → 
 the face itself — depth outputs added). Keep one workflow per visitor: a second workflow in
 between drops the first from ComfyUI's cache and reloads the models.
 
+## Render
+
+OpenGL engine copied from poser2 (`modules/gl/`: glfw, GL 4.6 core, render thread owned by
+`WindowManager`); keep it identical to poser2 so it can be synced with a diff, and fix shared bugs in
+both. `modules/render/SmileRender.py` runs the `Sequencer` once per frame (it is the app clock:
+Art-Net, OSC and saving hang off its messages), then the stage for the current `SequenceType`
+(`stages.py`) renders the layers (`layers/`) and picks the one to show. Images from other threads go
+through `inputs.py` (`Image.set_image`, uploaded on the render thread). Shaders are
+`classname.frag` next to their `.py` and hot-reload while running. `pl_player.py` uses the same engine
+(`player/Render.py`).
+
 ## Settings
 
 Settings system copied from poser2 (`modules/settings/`); root tree in `modules/smile_settings.py`,

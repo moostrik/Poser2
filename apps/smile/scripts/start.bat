@@ -22,8 +22,8 @@ if "%ERRORLEVEL%"=="0" (
 
 @REM taskkill /IM "python.exe" /F
 
-set "PLAYER_1_POSITION=2000"
-set "PLAYER_2_POSITION=6000"
+set "PLAYER_1_MONITOR=1"
+set "PLAYER_2_MONITOR=2"
 set "PLAYER_1_OSC_PORT=4115"
 set "PLAYER_2_OSC_PORT=4116"
 
@@ -49,11 +49,11 @@ IF "%ERRORLEVEL%"=="0" (
 timeout /t 1 /nobreak >nul
 
 echo Opening Video Player 1
-start "" "%CURRENT_DIR%.venv\Scripts\pythonw.exe" pl_player.py -pX %PLAYER_1_POSITION% -osc %PLAYER_1_OSC_PORT%
+start "" "%CURRENT_DIR%.venv\Scripts\pythonw.exe" pl_player.py -m %PLAYER_1_MONITOR% -osc %PLAYER_1_OSC_PORT%
 timeout /t 2 /nobreak >nul
 
 echo Opening Video Player 2
-start "" "%CURRENT_DIR%.venv\Scripts\pythonw.exe" pl_player.py -pX %PLAYER_2_POSITION% -osc %PLAYER_2_OSC_PORT%
+start "" "%CURRENT_DIR%.venv\Scripts\pythonw.exe" pl_player.py -m %PLAYER_2_MONITOR% -osc %PLAYER_2_OSC_PORT%
 timeout /t 2 /nobreak >nul
 
 echo Opening Main App

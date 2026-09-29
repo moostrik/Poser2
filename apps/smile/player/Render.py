@@ -1,205 +1,124 @@
-from OpenGL.GL import * # type: ignore
+from math import ceil
 from threading import Lock
-# from cv2 import Mat, imread, resize
-import cv2
+
 import numpy as np
+from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA16F, GL_SCISSOR_TEST, glClear, glClearColor,  # type: ignore
+                       glDisable, glEnable, glScissor, glViewport)
 
-from modules.gl.RenderWindow import RenderWindow
-from modules.gl.Texture import Texture
-from modules.gl.Fbo import Fbo, SwapFbo
-from modules.gl.shaders.Blend import Blend
-from modules.gl.Utils import lfo, fit, fill
+from modules.gl import Blit, Fbo, Image, RenderBase, Shader, Style, SwapFbo, WindowSettings, clear_color
+from modules.gl.Utils import fit
+from modules.render.shaders import Blend
+from player.shaders import BlitRotated
 
 
-class Rect():
-     def __init__(self, x: int, y: int, width: int, height: int) -> None:
-         self.x: int = x
-         self.y: int = y
-         self.width: int = width
-         self.height: int = height
+class PlayerRender(RenderBase):
+    """Grin sequences in a grid of cells, each image turned a quarter, with a trail over the whole grid.
+    A cell flashes white for one frame when its next sequence starts. Keys: f fullscreen, w borderless,
+    Esc quit (the window manager)."""
 
-def draw_quad_cw(rect: Rect) -> None :
-    x0: float = rect.x
-    x1: float = rect.x + rect.width
-    y0: float = rect.y
-    y1: float = rect.y + rect.height
-    glBegin(GL_QUADS)
-    glTexCoord2f(1.0, 0.0)
-    glVertex2f(x0, y0)
-    glTexCoord2f(1.0, 1.0)
-    glVertex2f(x1, y0)
-    glTexCoord2f(0.0, 1.0)
-    glVertex2f(x1, y1)
-    glTexCoord2f(0.0, 0.0)
-    glVertex2f(x0, y1)
-    glEnd()
+    COLUMNS: int = 6
+    CELL_WIDTH: int = 640
+    CELL_HEIGHT: int = 512
 
-def draw_quad_ccw(rect: Rect) -> None :
-    x0: float = rect.x
-    x1: float = rect.x + rect.width
-    y0: float = rect.y
-    y1: float = rect.y + rect.height
-    glBegin(GL_QUADS)
-    glTexCoord2f(0.0, 1.0)
-    glVertex2f(x0, y0)
-    glTexCoord2f(0.0, 0.0)
-    glVertex2f(x1, y0)
-    glTexCoord2f(1.0, 0.0)
-    glVertex2f(x1, y1)
-    glTexCoord2f(1.0, 1.0)
-    glVertex2f(x0, y1)
-    glEnd()
-
-class Render(RenderWindow):
-    def __init__(self, composition_width: int, composition_height: int, img_width: int, img_height: int, ids: list[str], fullscreen: bool = False, v_sync = False, posX: int = 0, posY: int = 0, trail = 0.9) -> None:
-        super().__init__(composition_width, composition_height, 'player', fullscreen, v_sync, posX, posY)
-
-        self.input_mutex: Lock = Lock()
-
-        self.width: int = composition_width
-        self.height: int = composition_height
-
-        self.img_width: int = img_width
-        self.img_height: int = img_height
-
-        self._ids: list[str] = ids
-        self._images: dict[str, np.ndarray | None] = {}
-        self._initials: dict[str, int] = {}
-        self.textures: dict[str, Texture] = {}
-
-        self._rects: dict[str, Rect] = {}
-
-        cntr: int = 0
-        for id in ids:
-            self._images[id] = None
-            self.textures[id] = Texture()
-            self._initials[id] = 0
-
-            w = 640
-            h = 512
-            column: int = cntr % 6
-            row: int = cntr // 6
-            rect: Rect = Rect(column * w, row * h, w, h)
-            self._rects[id] = rect
-            cntr += 1
-
-        self.fbos: list[Fbo | SwapFbo] = []
-        self.image_fbo = Fbo()
-        self.fbos.append(self.image_fbo)
-        self.diffusion_fbo = SwapFbo()
-        self.fbos.append(self.diffusion_fbo)
-
-        self.shaders: list = []
-        self.blend_shader = Blend()
-        self.shaders.append(self.blend_shader)
-
-        self.stretch: bool = False
-
+    def __init__(self, window: WindowSettings, ids: list[str], trail: float) -> None:
+        super().__init__(window)
         self.trail: float = trail
 
-        self.white_set: bool = False
+        self.width: int = self.COLUMNS * self.CELL_WIDTH
+        self.height: int = ceil(len(ids) / self.COLUMNS) * self.CELL_HEIGHT
 
+        self._ids: list[str] = ids
+        self._images: dict[str, Image] = {id: Image('BGR') for id in ids}
+        # 1: first image of a sequence arrived (flash white), 2: flashed (draw the image directly), 0: playing
+        self._initials: dict[str, int] = {id: 0 for id in ids}
+        self._mutex: Lock = Lock()
+
+        # cell rectangles in framebuffer pixels (origin bottom left), cell 0 at the top left
+        self._rects: dict[str, tuple[int, int, int, int]] = {}
+        for i, id in enumerate(ids):
+            column: int = i % self.COLUMNS
+            row: int = i // self.COLUMNS
+            self._rects[id] = (column * self.CELL_WIDTH, self.height - (row + 1) * self.CELL_HEIGHT,
+                               self.CELL_WIDTH, self.CELL_HEIGHT)
+
+        self._image_fbo: Fbo = Fbo()
+        self._trail_fbo: SwapFbo = SwapFbo()
+        self._blend: Blend = Blend()
+        self._rotated: BlitRotated = BlitRotated()
+
+    # RENDER THREAD
     def allocate(self) -> None:
-        for fbo in self.fbos: fbo.allocate(self.width, self.height, GL_RGBA32F)
-        for shader in self.shaders: shader.allocate(True)
+        self._image_fbo.allocate(self.width, self.height, GL_RGBA16F)
+        self._trail_fbo.allocate(self.width, self.height, GL_RGBA16F)
+        self._blend.allocate()
+        self._rotated.allocate()
+        Shader.enable_hot_reload()
 
-    def reload_shaders(self) -> None :
-        for s in self.shaders: s.load(True)
+    def deallocate(self) -> None:
+        self._image_fbo.deallocate()
+        self._trail_fbo.deallocate()
+        self._blend.deallocate()
+        self._rotated.deallocate()
+        for image in self._images.values():
+            image.deallocate()
 
-    def draw(self) -> None: # override
-        if not self.is_allocated: self.allocate()
+    def update(self) -> None:
+        self._notify_update()
+        self._blend.reload()
+        self._rotated.reload()
 
-        self.update_textures()
+        flashes: list[str] = []
+        starts: list[str] = []
+        with self._mutex:
+            for id in self._ids:
+                if self._initials[id] == 2:
+                    self._initials[id] = 0
+                    starts.append(id)
+                elif self._initials[id] == 1:
+                    self._initials[id] = 2
+                    flashes.append(id)
+        for image in self._images.values():
+            image.update()
 
-        # draw images in FBO
+        Style.reset_state()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
+
+        self._image_fbo.begin()
         for id in self._ids:
-            texture: Texture = self.textures[id]
-            rect: Rect = self._rects[id]
-            self.draw_in_fbo_rotated(texture, self.image_fbo, rect)
+            glViewport(*self._rects[id])
+            self._rotated.use(self._images[id])
+        self._image_fbo.end()
 
-        self.setView(self.width, self.height, False, True)
-        self.update_trails(self.image_fbo, self.diffusion_fbo, self.trail)
-        for id in self._ids:
-            if self._initials[id] == 2:
-                self._initials[id] = 0
-                texture: Texture = self.textures[id]
-                rect: Rect = self._rects[id]
-                self.draw_in_fbo_rotated(texture, self.diffusion_fbo, rect)
-            elif self._initials[id] == 1:
-                self._initials[id] = 2
-                rect: Rect = self._rects[id]
-                self.draw_in_fbo_rotated(self.white_texture, self.diffusion_fbo, rect)
+        self._trail_fbo.swap()
+        self._trail_fbo.begin()
+        self._blend.use(self._image_fbo, self._trail_fbo.back_texture, self.trail)
+        # a new sequence skips the trail: one white frame, then its first image
+        glEnable(GL_SCISSOR_TEST)
+        glClearColor(1.0, 1.0, 1.0, 1.0)
+        for id in flashes:
+            glScissor(*self._rects[id])
+            glClear(GL_COLOR_BUFFER_BIT)
+        glDisable(GL_SCISSOR_TEST)
+        for id in starts:
+            glViewport(*self._rects[id])
+            self._rotated.use(self._images[id])
+        self._trail_fbo.end()
 
-        drawFbo: SwapFbo | Fbo = self.diffusion_fbo
+    def draw_main(self, width: int, height: int) -> None:
+        clear_color(0, 0, 0, 1)
+        Style.reset_state()
+        x, y, w, h = fit(self.width, self.height, width, height)
+        glViewport(int(x), int(y), int(w), int(h))
+        Blit.use(self._trail_fbo.texture)
 
-        self.setView(self.window_width, self.window_height)
-        if self.stretch:
-            drawFbo.draw(0, 0, self.window_width, self.window_height)
-        else:
-            x, y, w, h = fit(self.width, self.height, self.window_width, self.window_height)
-            drawFbo.draw(x, y, w, h)
+    def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
+        pass
 
-    def update_trails(self, tex: Texture | Fbo | SwapFbo, fbo: SwapFbo, trail: float) -> None:
-        self.setView(fbo.width, fbo.height, False, True)
-        fbo.swap()
-        self.blend_shader.use(fbo.fbo_id,
-                              tex.tex_id,
-                              fbo.back_tex_id,
-                              trail)
+    def on_main_window_resize(self, width: int, height: int) -> None:
+        pass
 
-    def draw_in_fbo(self, tex: Texture | Fbo | SwapFbo, fbo: Fbo | SwapFbo, rect: Rect) -> None:
-        self.setView(fbo.width, fbo.height, False, True)
-        fbo.begin()
-        tex.draw(rect.x, rect.y, rect.width, rect.height)
-        fbo.end()
-
-    def draw_in_fbo_rotated(self, tex: Texture | Fbo | SwapFbo, fbo: Fbo | SwapFbo, rect: Rect, clockwise: bool = True) -> None:
-        self.setView(fbo.width, fbo.height, False, True)
-        fbo.begin()
-        tex.bind()
-        if clockwise:
-            draw_quad_cw(rect)
-        else:
-            draw_quad_ccw(rect)
-        tex.unbind()
-        fbo.end()
-
-
-    def update_textures(self) -> None:
-        for id in self._ids:
-            image: np.ndarray | None = self.get_image(id)
-            texture: Texture = self.textures[id]
-            if image is not None:
-                height, width = image.shape[:2]
-                texture.set_from_image(image)
-                # if width == self.img_width and  height == self.img_height:
-                #     pass
-                # #     texture.set_from_image(image)
-                # else:
-                #     print (width, height, self.img_width, self.img_height)
-
-        if not self.white_set:
-            self.white_set = True
-            white: np.ndarray = np.full((self.img_height, self.img_width, 3), 255, dtype=np.uint8)
-            self.white_texture: Texture = Texture()
-            self.white_texture.set_from_image(white)
-
-    def set_image(self, id: str, image: np.ndarray, initial: bool) -> None :
-        with self.input_mutex:
-            self._images[id] = image
+    # ANY THREAD
+    def set_image(self, id: str, image: np.ndarray, initial: bool) -> None:
+        self._images[id].set_image(image)
+        with self._mutex:
             self._initials[id] = int(initial)
-
-
-    def get_image(self, id: str) -> np.ndarray | None :
-        with self.input_mutex:
-            ret_image: np.ndarray | None = self._images[id]
-            self._images[id] = None
-            return ret_image
-
-    def keyboard_callback(self, key, x, y) -> None: # override
-        super().keyboard_callback(key, x, y)
-        if key == b'f' or key == b'F':
-            self.set_fullscreen(not self.fullscreen)
-
-        if key == b'r' or key == b'R':
-            self.reload_shaders()
