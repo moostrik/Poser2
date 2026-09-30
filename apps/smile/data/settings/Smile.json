@@ -5,9 +5,7 @@
     "gain_auto": false,
     "gain_target": 40,
     "face": {
-      "size_filter": 0.11,
       "confidence": 0.7,
-      "stable_frames": 3,
       "zoom": 1.2,
       "offset": -0.05
     }

@@ -359,8 +359,7 @@ def _build_toggle(settings, name, field, polls):
 
 # -- numeric builders --------------------------------------------------------
 
-# a row label and three sliders fit side by side at this width
-SLIDER_WIDTH: int = 40
+SLIDER_WIDTH: int = 48
 
 
 def _slider_width(field) -> str:

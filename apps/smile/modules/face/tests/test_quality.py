@@ -1,4 +1,4 @@
-"""Tests for the face checks: pose from the 5 keypoints, the gate, eye openness and the quality
+"""Tests for the face checks: pose from the 5 keypoints, the gate, eye openness and the labels
 (synthetic points, no model)."""
 
 import math
@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from modules.face.quality import LEFT_EYE, RIGHT_EYE, NOSE_NEUTRAL, FaceObservation, Pose, Rejection, eye_openness, gate, head_pose, quality, rejection_label
+from modules.face.quality import LEFT_EYE, RIGHT_EYE, NOSE_NEUTRAL, FaceObservation, Pose, Rejection, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
 
 
 def keypoints(nose_dx: float = 0.0, nose_ratio: float = NOSE_NEUTRAL, roll: float = 0.0) -> np.ndarray:
@@ -71,36 +71,48 @@ class TestHeadPose(unittest.TestCase):
         self.assertEqual(head_pose(points), head_pose(swapped))
 
 
+class TestEyeDistance(unittest.TestCase):
+    def test_distance_between_the_eye_keypoints_whatever_the_roll(self):
+        self.assertAlmostEqual(eye_distance(keypoints()), 100.0, places=5)
+        self.assertAlmostEqual(eye_distance(keypoints(roll=30.0)), 100.0, places=5)
+
+
 class TestGate(unittest.TestCase):
-    def check(self, score=0.9, size=0.2, yaw=0.0, pitch=0.0, roll=0.0):
-        return gate(score, size, Pose(yaw, pitch, roll, 0.48), confidence=0.7, size_filter=0.1, max_yaw=20.0, max_pitch=25.0, max_roll=30.0)
+    def check(self, score=0.9, eye_dist=0.1, yaw=0.0, pitch=0.0, roll=0.0):
+        return gate(score, eye_dist, Pose(yaw, pitch, roll, 0.48), confidence=0.7, eye_min=0.05, eye_max=0.25, max_yaw=20.0, max_pitch=25.0, max_roll=30.0)
 
     def test_a_good_face_passes(self):
         self.assertIsNone(self.check())
 
     def test_each_check_in_order(self):
         self.assertEqual(self.check(score=0.5), Rejection.LOW_SCORE)
-        self.assertEqual(self.check(size=0.05), Rejection.SMALL)
+        self.assertEqual(self.check(eye_dist=0.03), Rejection.SMALL)
+        self.assertEqual(self.check(eye_dist=0.3), Rejection.LARGE)
         self.assertEqual(self.check(yaw=-25.0), Rejection.TURNED)
         self.assertEqual(self.check(pitch=30.0), Rejection.PITCHED)
         self.assertEqual(self.check(roll=-40.0), Rejection.TILTED)
 
     def test_the_first_failing_check_is_the_reason(self):
-        self.assertEqual(self.check(size=0.05, yaw=40.0), Rejection.SMALL)
+        self.assertEqual(self.check(eye_dist=0.03, yaw=40.0), Rejection.SMALL)
 
 
-class TestRejectionLabel(unittest.TestCase):
-    def face(self, rejection, limit, pose=Pose(0.0, 0.0, 0.0, 0.48), eyes=None, score=0.9, size=0.3):
-        return FaceObservation(bbox=(0, 0, 1, 1), kps=(), score=score, size=size, pose=pose, eyes=eyes,
-                               quality=0.5, rejection=rejection, limit=limit, subject=False)
+class TestLabels(unittest.TestCase):
+    def face(self, rejection, limit, pose=Pose(0.0, 0.0, 0.0, 0.48), eyes=None, score=0.9, eye_dist=0.06):
+        return FaceObservation(bbox=(0, 0, 1, 1), kps=(), score=score, eye_dist=eye_dist, pose=pose, eyes=eyes,
+                               rejection=rejection, limit=limit, subject=False)
+
+    def test_the_readout_shows_every_filtered_value(self):
+        self.assertEqual(readout(self.face(None, 0.0, pose=Pose(4.4, -6.0, 2.0, 0.48), eyes=0.34)), 'conf 0.90 eyes 0.06 yaw 4 pitch -6 roll 2 open 0.34')
+        self.assertEqual(readout(self.face(None, 0.0)), 'conf 0.90 eyes 0.06 yaw 0 pitch 0 roll 0 open -')
 
     def test_every_reason_names_the_check_the_value_and_the_limit(self):
-        self.assertEqual(rejection_label(self.face(Rejection.LOW_SCORE, 0.7, score=0.55)), 'score 0.55 < 0.70')
-        self.assertEqual(rejection_label(self.face(Rejection.SMALL, 0.11, size=0.08)), 'size 0.08 < 0.11')
+        self.assertEqual(rejection_label(self.face(Rejection.LOW_SCORE, 0.7, score=0.55)), 'conf 0.55 < 0.70')
+        self.assertEqual(rejection_label(self.face(Rejection.SMALL, 0.05, eye_dist=0.03)), 'eyes 0.03 < 0.05')
+        self.assertEqual(rejection_label(self.face(Rejection.LARGE, 0.25, eye_dist=0.3)), 'eyes 0.30 > 0.25')
         self.assertEqual(rejection_label(self.face(Rejection.TURNED, 20.0, pose=Pose(32.0, 0.0, 0.0, 0.48))), 'yaw 32 > 20')
         self.assertEqual(rejection_label(self.face(Rejection.PITCHED, 25.0, pose=Pose(0.0, -41.0, 0.0, 0.48))), 'pitch -41 > 25')
         self.assertEqual(rejection_label(self.face(Rejection.TILTED, 30.0, pose=Pose(0.0, 0.0, 35.0, 0.48))), 'roll 35 > 30')
-        self.assertEqual(rejection_label(self.face(Rejection.EYES, 0.2, eyes=0.12)), 'eyes 0.12 < 0.20')
+        self.assertEqual(rejection_label(self.face(Rejection.EYES, 0.2, eyes=0.12)), 'open 0.12 < 0.20')
         self.assertEqual(rejection_label(self.face(None, 0.0)), '')
 
 
@@ -111,21 +123,6 @@ class TestEyeOpenness(unittest.TestCase):
 
     def test_a_rolled_head_is_measured_level(self):
         self.assertAlmostEqual(eye_openness(landmarks(12.0, 12.0, roll=20.0), 20.0), 0.4, places=5)
-
-
-class TestQuality(unittest.TestCase):
-    def test_frontal_open_sharp_is_best(self):
-        best = quality(Pose(0.0, 0.0, 0.0, 0.48), 0.4, 1e9, 20.0, 25.0, 0.2)
-        self.assertAlmostEqual(best, 1.0, places=3)
-        self.assertLess(quality(Pose(15.0, 0.0, 0.0, 0.48), 0.4, 1e9, 20.0, 25.0, 0.2), best)
-        self.assertLess(quality(Pose(0.0, 0.0, 0.0, 0.48), 0.25, 1e9, 20.0, 25.0, 0.2), best)
-        self.assertLess(quality(Pose(0.0, 0.0, 0.0, 0.48), 0.4, 50.0, 20.0, 25.0, 0.2), best)
-
-    def test_the_limit_halves_the_pose_term(self):
-        self.assertAlmostEqual(quality(Pose(20.0, 0.0, 0.0, 0.48), 0.4, 1e9, 20.0, 25.0, 0.2), 0.5, places=3)
-
-    def test_unmeasured_eyes_count_half(self):
-        self.assertAlmostEqual(quality(Pose(0.0, 0.0, 0.0, 0.48), None, 1e9, 20.0, 25.0, 0.2), 0.5, places=3)
 
 
 if __name__ == '__main__':

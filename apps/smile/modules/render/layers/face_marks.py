@@ -4,7 +4,7 @@ No GL: arithmetic and text, built once per frame for the FaceOverlayLayer (after
 from dataclasses import dataclass
 
 from modules.face.FaceFinder import FaceFrame
-from modules.face.quality import FaceObservation, rejection_label
+from modules.face.quality import FaceObservation, readout, rejection_label
 
 Color = tuple[float, float, float, float]
 
@@ -33,9 +33,7 @@ def face_label(face: FaceObservation) -> str:
     """The readout of a qualifying face; the failed check, its value and the limit of a rejected one."""
     if face.rejection is not None:
         return rejection_label(face)
-    p = face.pose
-    eyes: str = '-' if face.eyes is None else f'{face.eyes:.2f}'
-    return f'q{face.quality:.2f} yaw {p.yaw:.0f} pitch {p.pitch:.0f} roll {p.roll:.0f} eyes {eyes}'
+    return readout(face)
 
 
 def build_marks(frame: FaceFrame) -> list[Mark]:

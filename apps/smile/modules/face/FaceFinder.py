@@ -7,8 +7,7 @@ from typing import Callable
 
 from modules.face.FaceDetector import FaceDetector, Face
 from modules.face.FaceLandmarks import FaceLandmarks
-from modules.face.BestFace import BestFace, BestEntry
-from modules.face.quality import FaceObservation, Pose, Rejection, eye_openness, gate, head_pose, quality, rejection_label, sharpness
+from modules.face.quality import FaceObservation, Pose, Rejection, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
 from modules.face.settings import FaceSettings
 
 DETECT_THRESHOLD: float = 0.5
@@ -18,7 +17,7 @@ DETECT_THRESHOLD: float = 0.5
 class FaceFrame:
     """Every face of one camera frame, for the overlay and the sequence start."""
     faces: tuple[FaceObservation, ...]
-    stable: bool                        # the subject qualified in enough consecutive frames
+    stable: bool                        # the subject qualified for stable_time without interruption
     time: float
 
     @property
@@ -70,25 +69,32 @@ def portrait_crop(img: np.ndarray, face: Face, portrait_zoom: float, portrait_of
 @dataclass(frozen=True)
 class _Assessed:
     face: Face
-    size: float
+    eye_dist: float
     pose: Pose
     eyes: float | None
     rejection: Rejection | None
     limit: float
-    quality: float
+
+
+@dataclass(frozen=True)
+class _Saved:
+    """A camera frame and the subject in it, for the capture."""
+    image: np.ndarray
+    face: Face
 
 
 class FaceFinder(Thread):
-    """Detects the faces of each camera frame, judges them (pose, eyes, sharpness) and keeps the
-    best one of the last `window` seconds for the capture. The subject of a frame is its largest
-    qualifying face; every face goes to the frame callbacks, for the overlay."""
+    """Detects the faces of each camera frame and checks them (confidence, eye distance, pose, eyes). The
+    subject of a frame is its largest qualifying face. The capture is the last frame in which the
+    subject qualified (`best()`), or the last frame at all when none did. Every face goes to the
+    frame callbacks, for the overlay."""
 
     def __init__(self, settings: FaceSettings, composition_width: int, composition_height: int,
                  model_path: str = 'files/scrfd_10g_bnkps.onnx', landmark_path: str = 'files/2d106det.onnx') -> None:
         super().__init__()
         self.settings: FaceSettings = settings
         self._input_mutex: Lock = Lock()
-        self._window_mutex: Lock = Lock()
+        self._saved_mutex: Lock = Lock()
         self._thread_running: bool = False
         self._image: np.ndarray | None = None
         self._frame_callbacks: list[FrameCallback] = []
@@ -98,9 +104,10 @@ class FaceFinder(Thread):
         self._model_path: str = model_path
         self._landmark_path: str = landmark_path
 
-        self._consecutive: int = 0
-        self._best: BestFace = BestFace()
-        self._nose_ratio: float | None = None   # of the last subject, for the pitch calibration
+        self._stable_since: float | None = None     # when the subject started qualifying without interruption
+        self._qualified: _Saved | None = None       # the last frame in which the subject qualified
+        self._last: _Saved | None = None            # the last frame with a subject at all
+        self._nose_ratio: float | None = None       # of the last subject, for the pitch calibration
 
         self.settings.bind(FaceSettings.calibrate, self._on_calibrate)
 
@@ -111,7 +118,7 @@ class FaceFinder(Thread):
             self.join()
 
     def _on_calibrate(self, _=None) -> None:
-        """The face in front of the camera looks straight at it: its nose position is the neutral."""
+        """The face in front of the camera looks straight at it: its nose position is the pitch zero."""
         ratio: float | None = self._nose_ratio
         if ratio is None:
             return
@@ -136,9 +143,9 @@ class FaceFinder(Thread):
 
         assessed: list[_Assessed] = []
         for face in detector.detect(image, DETECT_THRESHOLD):
-            size: float = face.height / float(image_height)
+            eye_dist: float = eye_distance(face.kps) / float(image_width)
             pose: Pose = head_pose(face.kps, s.pitch_zero)
-            rejection: Rejection | None = gate(face.score, size, pose, s.confidence, s.size_filter, s.max_yaw, s.max_pitch, s.max_roll)
+            rejection: Rejection | None = gate(face.score, eye_dist, pose, s.confidence, s.eye_min, s.eye_max, s.max_yaw, s.max_pitch, s.max_roll)
             eyes: float | None = None
             if rejection is None:
                 # the landmarks only for faces that passed the cheap checks
@@ -146,11 +153,11 @@ class FaceFinder(Thread):
                 if eyes < s.eye_open:
                     rejection = Rejection.EYES
             # the setting the failed check compared to, for the label
-            limits: dict[Rejection, float] = {Rejection.LOW_SCORE: s.confidence, Rejection.SMALL: s.size_filter, Rejection.TURNED: s.max_yaw,
-                                              Rejection.PITCHED: s.max_pitch, Rejection.TILTED: s.max_roll, Rejection.EYES: s.eye_open}
+            limits: dict[Rejection, float] = {Rejection.LOW_SCORE: s.confidence, Rejection.SMALL: s.eye_min, Rejection.LARGE: s.eye_max,
+                                              Rejection.TURNED: s.max_yaw, Rejection.PITCHED: s.max_pitch, Rejection.TILTED: s.max_roll,
+                                              Rejection.EYES: s.eye_open}
             limit: float = limits[rejection] if rejection is not None else 0.0
-            q: float = quality(pose, eyes, sharpness(image, face.bbox), s.max_yaw, s.max_pitch, s.eye_open)
-            assessed.append(_Assessed(face, size, pose, eyes, rejection, limit, q))
+            assessed.append(_Assessed(face, eye_dist, pose, eyes, rejection, limit))
 
         # the subject: the largest qualifying face, or the largest face at all
         subject: _Assessed | None = None
@@ -158,18 +165,20 @@ class FaceFinder(Thread):
         candidates: list[_Assessed] = accepted if accepted else assessed
         if candidates:
             subject = max(candidates, key=lambda a: a.face.width * a.face.height)
+        qualified: bool = subject is not None and subject.rejection is None
 
         if subject is not None:
             self._nose_ratio = subject.pose.nose_ratio
-        if subject is not None and subject.rejection is None:
-            self._consecutive += 1
-        else:
-            self._consecutive = 0
-        stable: bool = subject is not None and subject.rejection is None and self._consecutive >= s.stable_frames
+            with self._saved_mutex:
+                self._last = _Saved(image, subject.face)
+                if qualified:
+                    self._qualified = self._last
 
-        if subject is not None:
-            with self._window_mutex:
-                self._best.add(BestEntry(now, subject.rejection is None, subject.quality, image, subject.face), s.window)
+        if not qualified:
+            self._stable_since = None
+        elif self._stable_since is None:
+            self._stable_since = now
+        stable: bool = self._stable_since is not None and now - self._stable_since >= s.stable_time
 
         frame = FaceFrame(tuple(self._observation(a, a is subject, image_width, image_height) for a in assessed), stable, now)
         s.result = self._result(frame.subject)
@@ -182,10 +191,9 @@ class FaceFinder(Thread):
             bbox=(float(x0) / width, float(y0) / height, float(x1) / width, float(y1) / height),
             kps=tuple((float(k[0]) / width, float(k[1]) / height) for k in a.face.kps),
             score=round(a.face.score, 3),
-            size=round(a.size, 3),
+            eye_dist=round(a.eye_dist, 3),
             pose=a.pose,
             eyes=a.eyes,
-            quality=round(a.quality, 3),
             rejection=a.rejection,
             limit=a.limit,
             subject=subject,
@@ -195,24 +203,25 @@ class FaceFinder(Thread):
     def _result(subject: FaceObservation | None) -> str:
         if subject is None:
             return 'no face'
-        p: Pose = subject.pose
-        eyes: str = '-' if subject.eyes is None else f'{subject.eyes:.2f}'
-        reason: str = '' if subject.rejection is None else f' | {rejection_label(subject)}'
-        return f'q {subject.quality:.2f} yaw {p.yaw:.0f} pitch {p.pitch:.0f} roll {p.roll:.0f} eyes {eyes}{reason}'
+        if subject.rejection is None:
+            return readout(subject)
+        return f'{readout(subject)} | {rejection_label(subject)}'
 
     def best(self) -> np.ndarray | None:
-        """The portrait crop of the best face in the window, None when no face was seen."""
-        with self._window_mutex:
-            entry: BestEntry | None = self._best.best()
-        if entry is None:
+        """The portrait crop of the last frame in which the subject qualified, else of the last frame
+        with a face; None when no face was seen since the reset."""
+        with self._saved_mutex:
+            saved: _Saved | None = self._qualified if self._qualified is not None else self._last
+        if saved is None:
             return None
         s: FaceSettings = self.settings
-        return portrait_crop(entry.image, entry.face, s.zoom, s.offset, self._composition_width, self._composition_height)
+        return portrait_crop(saved.image, saved.face, s.zoom, s.offset, self._composition_width, self._composition_height)
 
     def reset(self) -> None:
-        self._consecutive = 0
-        with self._window_mutex:
-            self._best.clear()
+        self._stable_since = None
+        with self._saved_mutex:
+            self._qualified = None
+            self._last = None
 
     def set_image(self, image: np.ndarray | None) -> None:
         with self._input_mutex:

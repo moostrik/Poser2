@@ -1,19 +1,19 @@
-"""Is a detected face a good portrait? Pose from the detector's 5 keypoints, eye openness from the
-106 landmarks, sharpness from the pixels; a rejection reason and a quality per face. Pure arithmetic:
-no model, no thread, no settings object, so it is testable with synthetic points."""
+"""Does a detected face qualify for a portrait? Pose from the detector's 5 keypoints, eye openness
+from the 106 landmarks; the first failing check is the face's rejection. Pure arithmetic: no model,
+no thread, no settings object, so it is testable with synthetic points."""
 
 from dataclasses import dataclass
 from enum import IntEnum, auto
 import math
 
-import cv2
 import numpy as np
 
 
 class Rejection(IntEnum):
     """Why a face does not qualify; the first failing check, in this order."""
     LOW_SCORE = auto()  # detector score below confidence
-    SMALL     = auto()  # face height below size_filter
+    SMALL     = auto()  # eye distance below eye_min: too few pixels for the portrait
+    LARGE     = auto()  # eye distance past eye_max: the portrait crop would leave the frame
     TURNED    = auto()  # yaw past max_yaw
     PITCHED   = auto()  # pitch past max_pitch
     TILTED    = auto()  # roll past max_roll
@@ -34,10 +34,9 @@ class FaceObservation:
     bbox: tuple[float, float, float, float]     # x0, y0, x1, y1
     kps: tuple[tuple[float, float], ...]        # eyes, nose, mouth corners
     score: float
-    size: float                                 # face height relative to the image height
+    eye_dist: float                             # distance between the eyes relative to the image width
     pose: Pose
     eyes: float | None                          # openness of the less open eye, None if not measured
-    quality: float
     rejection: Rejection | None
     limit: float                                # the setting the failed check compared to; 0 when accepted
     subject: bool                               # the face the sequence uses
@@ -47,6 +46,13 @@ class FaceObservation:
         return self.rejection is None
 
 
+def readout(face: FaceObservation) -> str:
+    """The measured values, in the panel's names: `conf 0.92 eyes 0.06 yaw 4 pitch -6 roll 2 open 0.34`."""
+    p: Pose = face.pose
+    open_: str = '-' if face.eyes is None else f'{face.eyes:.2f}'
+    return f'conf {face.score:.2f} eyes {face.eye_dist:.2f} yaw {p.yaw:.0f} pitch {p.pitch:.0f} roll {p.roll:.0f} open {open_}'
+
+
 def rejection_label(face: FaceObservation) -> str:
     """Why the face was rejected, in the panel's names: the value measured and the limit it missed,
     e.g. `yaw 32 > 20` (an angle keeps its sign: `yaw -32 > 20` is beyond 20 the other way)."""
@@ -54,17 +60,19 @@ def rejection_label(face: FaceObservation) -> str:
     if face.rejection is None:
         return ''
     if face.rejection == Rejection.LOW_SCORE:
-        return f'score {face.score:.2f} < {face.limit:.2f}'
+        return f'conf {face.score:.2f} < {face.limit:.2f}'
     if face.rejection == Rejection.SMALL:
-        return f'size {face.size:.2f} < {face.limit:.2f}'
+        return f'eyes {face.eye_dist:.2f} < {face.limit:.2f}'
+    if face.rejection == Rejection.LARGE:
+        return f'eyes {face.eye_dist:.2f} > {face.limit:.2f}'
     if face.rejection == Rejection.TURNED:
         return f'yaw {p.yaw:.0f} > {face.limit:.0f}'
     if face.rejection == Rejection.PITCHED:
         return f'pitch {p.pitch:.0f} > {face.limit:.0f}'
     if face.rejection == Rejection.TILTED:
         return f'roll {p.roll:.0f} > {face.limit:.0f}'
-    eyes: str = '-' if face.eyes is None else f'{face.eyes:.2f}'
-    return f'eyes {eyes} < {face.limit:.2f}'
+    open_: str = '-' if face.eyes is None else f'{face.eyes:.2f}'
+    return f'open {open_} < {face.limit:.2f}'
 
 
 # Approximate face proportions, for the 5 keypoints. Nose tip depth in front of the eye plane relative
@@ -79,10 +87,6 @@ NOSE_NEUTRAL: float = 0.48
 # Eye contour indices of the 106 landmarks (insightface 2d106det)
 LEFT_EYE: tuple[int, ...] = tuple(range(33, 43))
 RIGHT_EYE: tuple[int, ...] = tuple(range(87, 97))
-
-# Laplacian variance of a 128 px face at which the sharpness term is 0.5
-SHARPNESS_HALF: float = 150.0
-SHARPNESS_SIZE: int = 128
 
 
 def _derolled(points: np.ndarray, roll: float, origin: np.ndarray) -> np.ndarray:
@@ -130,25 +134,20 @@ def eye_openness(landmarks: np.ndarray, roll: float) -> float:
     return min(openness)
 
 
-def sharpness(image: np.ndarray, bbox: np.ndarray) -> float:
-    """Laplacian variance of the face box, at a fixed size so it does not depend on the face size."""
-    height, width = image.shape[:2]
-    x0, y0 = max(0, int(bbox[0])), max(0, int(bbox[1]))
-    x1, y1 = min(width, int(bbox[2])), min(height, int(bbox[3]))
-    if x1 - x0 < 2 or y1 - y0 < 2:
-        return 0.0
-    face: np.ndarray = cv2.resize(image[y0:y1, x0:x1], (SHARPNESS_SIZE, SHARPNESS_SIZE), interpolation=cv2.INTER_AREA)
-    gray: np.ndarray = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
-    return float(cv2.Laplacian(gray, cv2.CV_64F).var())
+def eye_distance(kps: np.ndarray) -> float:
+    """Distance between the two eye keypoints, in pixels: the face's scale, whatever the roll."""
+    return float(np.linalg.norm(np.asarray(kps[1], dtype=np.float64) - np.asarray(kps[0], dtype=np.float64)))
 
 
-def gate(score: float, size: float, pose: Pose, confidence: float, size_filter: float,
+def gate(score: float, eye_dist: float, pose: Pose, confidence: float, eye_min: float, eye_max: float,
          max_yaw: float, max_pitch: float, max_roll: float) -> Rejection | None:
     """The checks before the eyes, in order; None when the face passes them all."""
     if score < confidence:
         return Rejection.LOW_SCORE
-    if size < size_filter:
+    if eye_dist < eye_min:
         return Rejection.SMALL
+    if eye_dist > eye_max:
+        return Rejection.LARGE
     if abs(pose.yaw) > max_yaw:
         return Rejection.TURNED
     if abs(pose.pitch) > max_pitch:
@@ -156,13 +155,3 @@ def gate(score: float, size: float, pose: Pose, confidence: float, size_filter: 
     if abs(pose.roll) > max_roll:
         return Rejection.TILTED
     return None
-
-
-def quality(pose: Pose, eyes: float | None, sharp: float, max_yaw: float, max_pitch: float, eye_open: float) -> float:
-    """0..1, higher is a better portrait. Each pose axis halves the quality at its limit and falls
-    off smoothly past it; the eyes count fully open at twice eye_open; an unmeasured eye counts half."""
-    pose_term: float = 1.0 / (1.0 + (pose.yaw / max(1e-6, max_yaw)) ** 2)
-    pose_term *= 1.0 / (1.0 + (pose.pitch / max(1e-6, max_pitch)) ** 2)
-    eye_term: float = 0.5 if eyes is None else min(1.0, eyes / max(1e-6, 2.0 * eye_open))
-    sharp_term: float = sharp / (sharp + SHARPNESS_HALF)
-    return pose_term * eye_term * sharp_term

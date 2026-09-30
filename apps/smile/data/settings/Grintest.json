@@ -1,21 +1,21 @@
 {
   "camera": {
     "use_image": true,
-    "image": "2024_09_09_11_39_48_A.jpg",
+    "image": "2024_09_09_13_21_52_A.jpg",
     "flip_h": false,
     "flip_v": false,
     "gain_auto": false,
     "gain_target": 40,
     "face": {
       "confidence": 0.5,
-      "size_filter": 0.11,
-      "stable_frames": 3,
+      "eye_min": 0.05,
+      "eye_max": 0.33,
+      "stable_time": 0.3,
       "max_yaw": 17.0,
       "max_pitch": 25.0,
       "max_roll": 30.0,
       "pitch_zero": 0.48,
       "eye_open": 0.2,
-      "window": 1.0,
       "zoom": 1.2,
       "offset": -0.05
     }

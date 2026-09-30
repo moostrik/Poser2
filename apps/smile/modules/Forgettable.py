@@ -161,7 +161,7 @@ class Forgettable():
                 self.audio.update(movement_id)
 
         if seq == SequenceType.CAPTURE:
-            # the best face of the window before the flash; the full camera frame without one
+            # the last frame of the recording in which the face qualified; the full camera frame without one
             cap_image: np.ndarray = cam_image
             portrait: np.ndarray | None = self.face.best()
             if portrait is not None:
