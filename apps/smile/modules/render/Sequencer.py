@@ -354,6 +354,8 @@ class Sequencer():
         self.set_sequence(SequenceType.RESET)
 
     def set_face_found(self) -> None:
+        if self.settings.pause:
+            return      # no new visitors; the start button and the Enter key still work
         self.start_sequence()
 
     def start_sequence(self) -> None:

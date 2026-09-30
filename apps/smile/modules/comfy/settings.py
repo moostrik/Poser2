@@ -1,4 +1,5 @@
-"""Settings of the image generator: one card per stage of the ComfyUI pipeline.
+"""Settings of the pipeline from camera image to grin: one card per stage, the face crop (SMILE's
+own) and then the stages of the ComfyUI workflow.
 
 The panel is the source of truth: every run fills these values into the workflow, whose own values
 only served as the defaults here.
@@ -6,6 +7,7 @@ only served as the defaults here.
 
 from enum import Enum
 
+from modules.face.settings import FaceSettings
 from modules.settings import BaseSettings, Field, Group, Widget
 
 
@@ -17,7 +19,7 @@ class ConnectionSettings(BaseSettings):
 
     connected:     Field[bool]  = Field(False, access=Field.READ, description="Connected to ComfyUI")
     status:        Field[str]   = Field("", access=Field.READ, description="Generator status")
-    last_duration: Field[float] = Field(0.0, access=Field.READ, description="Duration of the last generation (s)")
+    last_duration: Field[float] = Field(0.0, access=Field.READ, pinned=True, description="Duration of the last generation (s)")
 
 
 class DescribeSettings(BaseSettings):
@@ -134,9 +136,10 @@ class GrinSettings(BaseSettings):
     roll_prefer:    Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
 
 
-class ComfySettings(BaseSettings):
+class PipelineSettings(BaseSettings):
     connection: Group[ConnectionSettings] = Group(ConnectionSettings)
-    describe:   Group[DescribeSettings]   = Group(DescribeSettings)
+    face:       Group[FaceSettings]       = Group(FaceSettings)     # SMILE's own face crop, the image ComfyUI starts from
+    describe:  Group[DescribeSettings]   = Group(DescribeSettings)
     style:      Group[StyleSettings]      = Group(StyleSettings)
     portrait:   Group[PortraitSettings]   = Group(PortraitSettings)
     lora:       Group[LoraSettings]       = Group(LoraSettings)

@@ -7,12 +7,15 @@ import datetime
 import shutil
 import warnings
 
-from modules.save.settings import ImgFolderSettings
+from modules.render.settings import SequencerSettings
 
 
 class ImgFolder:
-    def __init__(self, settings: ImgFolderSettings, max_queue_size=300, output_path: str = 'images/', temp_path: str = 'temp/', size: tuple[int, int] = (512, 640)) -> None:
-        self.settings: ImgFolderSettings = settings
+    """Saves the images of each visitor (capture, portrait, grin frames) as a folder for the players.
+    A folder is built in temp/ and moved to images/ when its sequence ends complete."""
+
+    def __init__(self, settings: SequencerSettings, max_queue_size=300, output_path: str = 'images/', temp_path: str = 'temp/', size: tuple[int, int] = (512, 640)) -> None:
+        self.settings: SequencerSettings = settings
         self.save_path: str = output_path
         self.temp_path: str = temp_path
         self.size: tuple[int, int] = size   # saved size (4:5 as the portrait); the players show these rotated in 640x512 cells
@@ -25,7 +28,7 @@ class ImgFolder:
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._save_loop)
         self.thread.start()
-        self.settings.bind(ImgFolderSettings.active, self._on_active)
+        self.settings.bind(SequencerSettings.save, self._on_save)
 
     def _save_loop(self) -> None:
         while not self.stop_event.is_set():
@@ -44,26 +47,27 @@ class ImgFolder:
                 print(f"Error occurred while saving image: {e}")
 
     def save_image(self, image: np.ndarray) -> None:
-        if not self.settings.active:
+        if not self.settings.save:
             return
         self.queue.put(image)
 
     def new_sequence(self) -> None:
-        if not self.settings.active:
+        if not self.settings.save:
             return
         self._new_sequence()
 
-    def end_sequence(self) -> None:
-        if not self.settings.active:
+    def end_sequence(self, keep: bool) -> None:
+        """Close the visitor's folder: kept for the players when the sequence is complete, else deleted."""
+        if not self.settings.save:
             return
-        self._end_sequence()
+        self._end_sequence(keep)
 
-    def _on_active(self, value: bool) -> None:
-        # switching off keeps what was captured so far, switching on starts a fresh sequence
+    def _on_save(self, value: bool) -> None:
+        # switching off drops the unfinished folder, switching on starts a fresh one
         if value:
             self._new_sequence()
         else:
-            self._end_sequence()
+            self._end_sequence(keep=False)
 
     def _new_sequence(self) -> None:
         with self.sequence_lock:
@@ -76,22 +80,21 @@ class ImgFolder:
                 shutil.rmtree(self.temp_dir)
             os.makedirs(self.temp_dir)
 
-    def _end_sequence(self) -> None:
+    def _end_sequence(self, keep: bool) -> None:
         with self.sequence_lock:
             if self.sequence_index > 0:
                 self._empty_queue()
-                if self.sequence_index >= self.settings.min_files:
+                if keep:
                     destination_folder: str = os.path.join(self.save_path, self.id)
                     shutil.move(self.temp_dir, destination_folder)
                     self.sequence_count += 1
                 else:
-                    # print("Not enough images to save sequence" , self.sequence_index, " instead of ", self.min_files)
                     shutil.rmtree(self.temp_dir)
 
                 self.sequence_index = 0
 
     def stop(self) -> None:
-        self.settings.unbind(ImgFolderSettings.active, self._on_active)
+        self.settings.unbind(SequencerSettings.save, self._on_save)
         self.stop_event.set()
         self.thread.join()
 

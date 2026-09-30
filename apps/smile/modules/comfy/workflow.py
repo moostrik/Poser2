@@ -6,7 +6,7 @@ overlay check are removed too, and the saved portrait becomes a preview (nothing
 ComfyUI's output folder). The crop and scale in front of the grin are removed as well: the grin
 animates the whole portrait. Nodes are found by class type or title, not by id.
 
-The workflow only provides the structure: every run fills in the values from ComfySettings.
+The workflow only provides the structure: every run fills in the values from PipelineSettings.
 """
 
 import copy
@@ -16,7 +16,7 @@ from typing import Callable
 
 import pytweening as easing
 
-from modules.comfy.settings import ComfySettings, Prefer
+from modules.comfy.settings import PipelineSettings, Prefer
 
 MAX_SEED: int = 2 ** 32 - 1     # the smallest maximum of the seeded nodes (QwenVL: 1 .. 4294967295)
 FIXED_SEED: int = 1             # with portrait.fixed_seed: the description and the grin too, or the runs still differ
@@ -132,7 +132,7 @@ class Workflow():
         self.portrait_size: tuple[int, int] = (latent['width'], latent['height'])
         self._template: dict = workflow
 
-    def build(self, image_name: str, style: str, negative: str, s: ComfySettings) -> dict:
+    def build(self, image_name: str, style: str, negative: str, s: PipelineSettings) -> dict:
         workflow: dict = copy.deepcopy(self._template)
         workflow[self.load_image]['inputs']['image'] = image_name
 
@@ -164,14 +164,14 @@ class Workflow():
         self._fill_grin(workflow, s)
         return workflow
 
-    def build_replay(self, previous: dict, s: ComfySettings) -> dict:
+    def build_replay(self, previous: dict, s: PipelineSettings) -> dict:
         """The previous workflow with only the grin filled in again (the grin loop). Everything up to
         the portrait is unchanged, so ComfyUI takes it from its cache and only makes the grin."""
         workflow: dict = copy.deepcopy(previous)
         self._fill_grin(workflow, s)
         return workflow
 
-    def _fill_grin(self, workflow: dict, s: ComfySettings) -> None:
+    def _fill_grin(self, workflow: dict, s: PipelineSettings) -> None:
         g = s.grin
         grin: dict = workflow[self.grin]['inputs']
         grin.update(frames=g.frames, ease=g.ease.value, crop_factor=g.face_region, midpoint=g.midpoint,
@@ -204,7 +204,7 @@ class Workflow():
         return 1 if grin['still'] else grin['frames']
 
     @staticmethod
-    def _seed(s: ComfySettings) -> int:
+    def _seed(s: PipelineSettings) -> int:
         return FIXED_SEED if s.portrait.fixed_seed else random.randint(1, MAX_SEED)
 
 

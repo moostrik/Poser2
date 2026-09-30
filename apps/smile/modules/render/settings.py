@@ -62,6 +62,8 @@ class RenderSettings(BaseSettings):
 class SequencerSettings(BaseSettings):
     start:              Field[bool]   = Field(False, widget=Widget.button, description="Start a sequence (key Enter)")
     reset:              Field[bool]   = Field(False, widget=Widget.button, description="Reset the sequence")
+    pause:              Field[bool]   = Field(False, pinned=True, description="No new visitors: a found face does not start a cycle (Start still works)")
+    save:               Field[bool]   = Field(True, pinned=True, newline=True, label="Save images", description="Save each finished visitor (capture, portrait, grin) to images/ for the players")
 
     state:              Field[str]    = Field("", access=Field.READ, newline=True, description="Current sequence state")
     state_progress:     Field[float]  = Field(0.0, access=Field.READ, description="Progress of the current state")

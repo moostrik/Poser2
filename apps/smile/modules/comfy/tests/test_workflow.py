@@ -4,7 +4,7 @@ import os
 import random
 import unittest
 
-from modules.comfy.settings import ComfySettings, Ease, Prefer
+from modules.comfy.settings import PipelineSettings, Ease, Prefer
 from modules.comfy.styles import Styles
 from modules.comfy.workflow import FIXED_SEED, GRIN_ROTATIONS, GRIN_TARGETS, MAX_SEED, Workflow
 
@@ -21,7 +21,7 @@ def links(workflow: dict) -> list[tuple[str, str, str]]:
 class TestWorkflow(unittest.TestCase):
     def setUp(self):
         self.wf = Workflow(WORKFLOW)
-        self.settings = ComfySettings()
+        self.settings = PipelineSettings()
         self.settings.grin.frames = 120
         self.built = self.wf.build('smile_capture.png', 'a style', 'a negative', self.settings)
 
@@ -52,7 +52,7 @@ class TestWorkflow(unittest.TestCase):
         self.assertEqual(self.built[self.wf.last_frame]['inputs']['batch_index'], 119)
 
     def test_settings_fill_the_nodes(self):
-        s = ComfySettings()
+        s = PipelineSettings()
         s.describe.instruction = 'describe'
         s.describe.max_tokens = 200
         s.describe.prefix = 'prefix'
@@ -255,7 +255,7 @@ class TestWorkflow(unittest.TestCase):
 
 class TestStyles(unittest.TestCase):
     def test_cycle(self):
-        settings = ComfySettings()
+        settings = PipelineSettings()
         settings.style.repeat = 2
         settings.style.negative_a = 'negative a'
         settings.style.negative_b = 'negative b'

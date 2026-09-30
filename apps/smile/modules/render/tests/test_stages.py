@@ -35,6 +35,13 @@ class TestSequencer(unittest.TestCase):
         self.sequencer.start_sequence()
         self.assertEqual(self.sequencer.get_sequence(), SequenceType.DIFFUSION)
 
+    def test_pause_ignores_a_found_face_but_not_the_start(self):
+        self.sequencer.settings.pause = True
+        self.sequencer.set_face_found()
+        self.assertEqual(self.sequencer.get_sequence(), SequenceType.CAMERA_SHOW)
+        self.sequencer.start_sequence()
+        self.assertEqual(self.sequencer.get_sequence(), SequenceType.CAMERA_DETECT)
+
     def test_update_reports_state_and_calls_back(self):
         messages = []
         self.sequencer.add_message_callback(messages.append)

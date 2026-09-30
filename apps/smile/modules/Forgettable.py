@@ -46,10 +46,10 @@ class Forgettable():
         # the generator fills the player with the grin frames, the render plays them on its own clock
         self.player: GrinPlayer = GrinPlayer(self.settings.sequence)
         self.render: SmileRender = SmileRender(self.settings.render, self.sequencer, self.player, self.width, self.height)
-        self.diffuse: Generator = Generator(self.settings.comfy, self.player)
+        self.diffuse: Generator = Generator(self.settings.pipeline, self.player)
         # the face crop is the image ComfyUI generates from, so it has the workflow's portrait size
         portrait_width, portrait_height = self.diffuse.workflow.portrait_size
-        self.face: FaceFinder = FaceFinder(self.settings.face, portrait_width, portrait_height)
+        self.face: FaceFinder = FaceFinder(self.settings.pipeline.face, portrait_width, portrait_height)
 
         if camType == CamType.VIMBA:
             from modules.cam.VimbaCam import VimbaCam
@@ -64,7 +64,8 @@ class Forgettable():
 
         self.audio: AudioDB = AudioDB(self.settings.audio, 'files/music_map.json')
         self.osc: Osc = Osc(self.settings.osc)
-        self.save: ImgFolder = ImgFolder(self.settings.save)
+        self.save: ImgFolder = ImgFolder(self.settings.sequence)
+        self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self.artnet = Artnet(self.settings.artnet, 'files/artnet.json')
 
         self._running: bool = False
@@ -171,11 +172,13 @@ class Forgettable():
             self.render.set_cap_image(cap_image)
             self.save.new_sequence()
             self.save.save_image(cap_image)
+            self._grin_saved = False
 
 
         if seq == SequenceType.TIMEOUT:
             if message.initial == True:
-                self.save.end_sequence()
+                # a failed or stopped visitor has no complete grin: its folder is not kept
+                self.save.end_sequence(keep=self._grin_saved)
 
         if seq == SequenceType.RESET:
             self.diffuse.interrupt()
@@ -199,11 +202,13 @@ class Forgettable():
         if message.image is None:
             return
         # the grin loop and still are for testing: their frames would fill the sequence folder without end
-        grin = self.settings.comfy.grin
+        grin = self.settings.pipeline.grin
         if message.state == GenState.DIFF_LOOP and (grin.loop or grin.still):
             return
         if message.state == GenState.DIFF_LOOP or (message.state == GenState.DIFFUSION and message.final):
             self.save.save_image(message.image)
+        if message.state == GenState.DIFF_LOOP and message.progress >= 1.0:
+            self._grin_saved = True
 
     def isRunning(self) -> bool :
         return self._running

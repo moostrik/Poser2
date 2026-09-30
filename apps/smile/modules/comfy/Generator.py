@@ -22,7 +22,7 @@ from requests import RequestException
 from modules.comfy.client import ComfyClient, Event as ComfyEvent
 from modules.render.GrinPlayer import GrinPlayer
 from modules.comfy.messages import GenMessage, GenState, MessageCallback
-from modules.comfy.settings import ComfySettings
+from modules.comfy.settings import PipelineSettings
 from modules.comfy.styles import Styles
 from modules.comfy.workflow import Workflow
 
@@ -37,9 +37,9 @@ class Interrupted(Exception):
 
 
 class Generator(Thread):
-    def __init__(self, settings: ComfySettings, player: GrinPlayer) -> None:
+    def __init__(self, settings: PipelineSettings, player: GrinPlayer) -> None:
         super().__init__(name='generator')
-        self.settings: ComfySettings = settings
+        self.settings: PipelineSettings = settings
         self.player: GrinPlayer = player
         self.workflow: Workflow = Workflow(settings.connection.workflow)
         self.styles: Styles = Styles(settings.style)
@@ -201,7 +201,7 @@ class Generator(Thread):
             self.client.receive(0.05)
 
     def _run_job(self, image: np.ndarray, start: float) -> None:
-        s: ComfySettings = self.settings
+        s: PipelineSettings = self.settings
         wf: Workflow = self.workflow
 
         s.connection.status = 'generating'
@@ -239,7 +239,7 @@ class Generator(Thread):
             raise
 
     def _receive_pass(self, workflow: dict, deadline: float, replay: bool) -> tuple[np.ndarray | None, int]:
-        s: ComfySettings = self.settings
+        s: PipelineSettings = self.settings
         wf: Workflow = self.workflow
         total: int = wf.frame_count(workflow)
         if not self._silent:

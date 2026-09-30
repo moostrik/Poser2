@@ -6,19 +6,19 @@
     "gain_target": 40,
     "image_select": 2
   },
-  "face": {
-    "size_filter": 0.11,
-    "confidence": 0.7,
-    "stable_frames": 3,
-    "zoom": 1.2,
-    "offset": -0.05
-  },
-  "comfy": {
+  "pipeline": {
     "connection": {
       "host": "127.0.0.1",
       "port": 8188,
       "workflow": "data/comfy/AIIAv3 portrait grin v3.json",
       "job_timeout": 90.0
+    },
+    "face": {
+      "size_filter": 0.11,
+      "confidence": 0.7,
+      "stable_frames": 3,
+      "zoom": 1.2,
+      "offset": -0.05
     },
     "describe": {
       "instruction": "Describe this person for a text-to-image prompt. Only visible physical features: gender, approximate age, race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no mention of color, no negatives. Short comma-separated phrases on one line. Output only the phrases. ",
@@ -97,10 +97,6 @@
       "roll_max": 10.0,
       "roll_prefer": "ENDS"
     }
-  },
-  "save": {
-    "active": true,
-    "min_files": 16
   },
   "sequence": {
     "camera_in": 1.0,
