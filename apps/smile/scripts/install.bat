@@ -32,6 +32,17 @@ if %errorlevel% neq 0 (
 )
 echo.
 
+echo [44m FFmpeg [0m
+where ffmpeg >nul 2>nul
+if %errorlevel% neq 0 (
+    echo [91mffmpeg is not on the PATH: visitors cannot be saved as clips and the players cannot play them.[0m
+    echo Download the "release full" build from https://www.gyan.dev/ffmpeg/builds/ , extract it to
+    echo C:\Developer\ffmpeg and add C:\Developer\ffmpeg\bin to the PATH.
+) else (
+    echo [92mffmpeg is installed[0m
+)
+echo.
+
 echo [44m Virtual Environment [0m
 
 if exist "%VENV_DIR%" (

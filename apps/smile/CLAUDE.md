@@ -50,6 +50,20 @@ its timings in the sequence settings. Shaders are
 `classname.frag` next to their `.py` and hot-reload while running. `pl_player.py` uses the same engine
 (`player/Render.py`).
 
+## Recordings
+
+`modules/save/ClipSaver.py` saves each finished visitor for the players under `recordings/` (git-ignored):
+the grin as `grins/<id>.mp4` (h264 at the full portrait size, at `grin_fps`), the capture and the
+portrait as `portraits/<id>_capture.jpg` and `<id>_portrait.jpg`. Files are built in `recordings/temp/`
+and renamed into place when the grin is complete, so the players never see a partial file.
+Encoding and decoding run `ffmpeg`/`ffprobe` subprocesses through `modules/video/ffmpeg.py` (ffmpeg
+must be on the PATH: the gyan.dev full build); the encoder is picked at startup by a trial encode
+(Intel Quick Sync on the iGPU, then Nvidia, then libx264; `sequence.encoder` forces one). Never start
+those processes any other way: the apps run under pythonw, so they need `CREATE_NO_WINDOW` and no
+inherited handles. The players (`player/`) decode each of the newest clips once into RAM
+(`ClipPool`, 512x640, about 200 MB per clip) and play from memory; `pl_player.py -n` sets the number
+of cells, `--pool` the clips kept.
+
 ## Settings
 
 Settings system copied from poser2 (`modules/settings/`); root tree in `modules/smile_settings.py`,

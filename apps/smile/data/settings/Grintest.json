@@ -1,23 +1,23 @@
 {
   "camera": {
     "use_image": true,
-    "image": "2024_09_09_13_21_52_A.jpg",
+    "image": "2024_09_15_14_47_39_A.jpg",
     "flip_h": false,
     "flip_v": false,
     "gain_auto": false,
     "gain_target": 40,
     "face": {
       "confidence": 0.5,
+      "stable_time": 0.3,
       "eye_min": 0.05,
       "eye_max": 0.33,
-      "stable_time": 0.3,
+      "eye_open": 0.2,
       "max_yaw": 17.0,
       "max_pitch": 25.0,
       "max_roll": 30.0,
       "pitch_zero": 0.48,
-      "eye_open": 0.2,
       "zoom": 1.2,
-      "offset": -0.05
+      "offset": 0.0
     }
   },
   "pipeline": {
@@ -48,7 +48,7 @@
       "embedding_strength": 1.0,
       "keypoint_strength": 1.0,
       "depth_strength": 1.0,
-      "depth_end": 0.5,
+      "depth_end": 0.55,
       "full_preview": true,
       "fixed_seed": false
     },
@@ -63,7 +63,7 @@
       "still_position": 1.0,
       "frames": 210,
       "face_region": 1.7,
-      "stitching": false,
+      "stitching": true,
       "ease": "SINE_IN_OUT",
       "midpoint": 0.72,
       "midpoint_deviation": 0.18,
@@ -106,7 +106,7 @@
     }
   },
   "sequence": {
-    "pause": true,
+    "pause": false,
     "save": true,
     "camera_in": 1.0,
     "camera_in_ease": "LINEAR",
@@ -116,7 +116,7 @@
     "flash_in_ease": "QUAD_IN",
     "flash_hold": 0.5,
     "flash_out_auto": true,
-    "flash_out": 3.3198404788970945,
+    "flash_out": 3.166951251029968,
     "flash_out_ease": "SINE_OUT",
     "grin_delay": 0.5,
     "grin_fps": 13.0,

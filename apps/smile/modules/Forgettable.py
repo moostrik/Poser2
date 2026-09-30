@@ -7,7 +7,7 @@ from modules.render.GrinPlayer import GrinPlayer
 from modules.comfy.messages import GenMessage, GenState
 from modules.osc.Sender import Sender as Osc
 from modules.audio.DB import DB as AudioDB
-from modules.save.ImgFolder import ImgFolder
+from modules.save.ClipSaver import ClipSaver
 from modules.artnet.Sender import Sender as Artnet
 from modules.settings import presets, NiceServer
 from modules.smile_settings import Settings
@@ -65,7 +65,7 @@ class Forgettable():
 
         self.audio: AudioDB = AudioDB(self.settings.audio, 'files/music_map.json')
         self.osc: Osc = Osc(self.settings.osc)
-        self.save: ImgFolder = ImgFolder(self.settings.sequence)
+        self.save: ClipSaver = ClipSaver(self.settings.sequence)
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self.artnet = Artnet(self.settings.artnet, 'files/artnet.json')
 
@@ -171,8 +171,7 @@ class Forgettable():
 
             self.diffuse.set_image(cap_image)
             self.render.set_cap_image(cap_image)
-            self.save.new_sequence()
-            self.save.save_image(cap_image)
+            self.save.new_sequence(cap_image)
             self._grin_saved = False
 
 
@@ -189,17 +188,19 @@ class Forgettable():
             self.sequencer.set_face_found()
 
     def diffusion_callback(self, message: GenMessage) -> None:
-        # a sequence folder: capture, portrait, grin frames (not the step previews)
+        # a visitor's recording: the portrait still and the grin clip (not the step previews)
         if message.image is None:
             return
-        # the grin loop and still are for testing: their frames would fill the sequence folder without end
+        # the grin loop and still are for testing: their frames would fill the clip without end
         grin = self.settings.pipeline.grin
         if message.state == GenState.DIFF_LOOP and (grin.loop or grin.still):
             return
-        if message.state == GenState.DIFF_LOOP or (message.state == GenState.DIFFUSION and message.final):
-            self.save.save_image(message.image)
-        if message.state == GenState.DIFF_LOOP and message.progress >= 1.0:
-            self._grin_saved = True
+        if message.state == GenState.DIFFUSION and message.final:
+            self.save.save_portrait(message.image)
+        if message.state == GenState.DIFF_LOOP:
+            self.save.save_frame(message.image)
+            if message.progress >= 1.0:
+                self._grin_saved = True
 
     def isRunning(self) -> bool :
         return self._running

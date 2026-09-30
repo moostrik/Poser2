@@ -1,11 +1,10 @@
 # project
 .venv/
-temp/
 audio/*
 !audio/.gitkeep
 !audio/*.maxpat
-images/*
-!images/.gitkeep
+recordings/*
+!recordings/.gitkeep
 input/*
 !input/.gitkeep
 logos/*
