@@ -88,6 +88,11 @@ class Workflow():
 
         self.style: str = _find(workflow, title='Prompt: style')
         self.suffix: str = _find(workflow, title='Description + model')
+        # the workflow joins description + suffix; a node in front of it adds the prefix
+        self.prefix: str = 'smile_prefix'
+        workflow[self.prefix] = {'class_type': 'StringConcatenate',
+                                 'inputs': {'string_a': '', 'string_b': workflow[self.suffix]['inputs']['string_a'], 'delimiter': ''}}
+        workflow[self.suffix]['inputs']['string_a'] = [self.prefix, 0]
         self.negative: str = _find(workflow, title='Negative')
         self.sampler: str = _find(workflow, class_type='KSampler')
         # KSamplerFullPreview (comfy/aiia_grin) previews every step with the real VAE; it needs the VAE
@@ -117,19 +122,21 @@ class Workflow():
         self.portrait_size: tuple[int, int] = (latent['width'], latent['height'])
         self._template: dict = workflow
 
-    def build(self, image_name: str, style: str, s: ComfySettings) -> dict:
+    def build(self, image_name: str, style: str, negative: str, s: ComfySettings) -> dict:
         workflow: dict = copy.deepcopy(self._template)
         workflow[self.load_image]['inputs']['image'] = image_name
 
         describe: dict = workflow[self.describe]['inputs']
         describe['custom_prompt'] = s.describe.instruction
         describe['max_tokens'] = s.describe.max_tokens
-        describe['quantization'] = s.describe.quantization
 
         p = s.portrait
         workflow[self.style]['inputs']['text'] = style
+        # a space between the prefix and the description, nothing in front without a prefix
+        prefix: str = s.describe.prefix.strip()
+        workflow[self.prefix]['inputs'].update(string_a=prefix, delimiter=' ' if prefix else '')
         workflow[self.suffix]['inputs']['string_b'] = s.describe.suffix
-        workflow[self.negative]['inputs']['text'] = s.style.negative
+        workflow[self.negative]['inputs']['text'] = negative
         sampler: dict = workflow[self.sampler]
         sampler['inputs'].update(steps=p.steps, cfg=p.cfg, sampler_name=p.sampler, scheduler=p.scheduler)
         if p.full_preview:

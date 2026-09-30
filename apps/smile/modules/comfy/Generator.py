@@ -123,12 +123,10 @@ class Generator(Thread):
     def _load_options(self) -> None:
         """The choices the panel offers, as this ComfyUI server has them."""
         try:
-            describe: dict = self.client.object_info('AILab_QwenVL')['input']['required']
             sampler: dict = self.client.object_info('KSampler')['input']['required']
         except Exception:
             logger.warning('Could not read the option lists from ComfyUI', exc_info=True)
             return
-        self.settings.describe.quantization_options = list(describe['quantization'][0])
         self.settings.portrait.sampler_options = list(sampler['sampler_name'][0])
         self.settings.portrait.scheduler_options = list(sampler['scheduler'][0])
 
@@ -205,7 +203,7 @@ class Generator(Thread):
         s.connection.status = 'generating'
         wf: Workflow = self.workflow
         name: str = self.client.upload(image, 'smile_capture.png')
-        workflow: dict = wf.build(name, self.styles.current_text(), s)
+        workflow: dict = wf.build(name, self.styles.current_text(), self.styles.current_negative(), s)
         total: int = workflow[wf.grin]['inputs']['frames']
         main_id: str = self.client.queue(workflow)
 

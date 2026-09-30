@@ -23,14 +23,15 @@
     "describe": {
       "instruction": "Describe this person for a text-to-image prompt. Only visible physical features: gender, approximate age, race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no mention of color, no negatives. Short comma-separated phrases on one line. Output only the phrases. ",
       "max_tokens": 120,
-      "quantization": "None (FP16)",
-      "suffix": " (super model: 1.5), (serious expression: 2.2)"
+      "prefix": "nude ",
+      "suffix": ", super model, (serious expression: 2.2)"
     },
     "style": {
       "repeat": 1,
-      "style_a": "portrait by (Mert and Marcus: 2.0), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 2.0)",
+      "style_a": "(nude) portrait by (Mert and Marcus: 2.0), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 1.5)",
+      "negative_a": "(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
       "style_b": "portrait by (Mert and Marcus: 2.0), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 2.0)",
-      "negative": "(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth"
+      "negative_b": "(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth"
     },
     "portrait": {
       "steps": 6,
@@ -39,7 +40,7 @@
       "scheduler": "karras",
       "embedding_strength": 1.0,
       "keypoint_strength": 1.0,
-      "depth_strength": 0.0,
+      "depth_strength": 1.0,
       "depth_end": 0.5,
       "full_preview": true,
       "fixed_seed": false
@@ -52,12 +53,12 @@
     "grin": {
       "crop_size": 1.0,
       "width": 896,
-      "frames": 180,
-      "ease": "SINE_IN_OUT",
+      "frames": 210,
       "crop_factor": 1.9,
+      "stitching": true,
+      "ease": "SINE_IN_OUT",
       "midpoint": 0.7,
       "midpoint_deviation": 0.2,
-      "stitching": true,
       "smile": 2.0,
       "aaa": -20.0,
       "eee": -10.0,
@@ -95,16 +96,16 @@
     "flash_in": 0.5,
     "flash_in_ease": "QUAD_IN",
     "flash_out_auto": true,
-    "flash_out": 3.1366612792015074,
+    "flash_out": 3.6536741336186727,
     "flash_out_ease": "SINE_OUT",
     "timeout": 1.0
   },
   "render": {
     "show_camera": false,
     "freeze": false,
-    "trail_active": false,
-    "trail": 0.98,
-    "loop_trail": 0.9,
+    "trail_active": true,
+    "trail": 0.985,
+    "loop_trail": 0.8,
     "destroy_blur": 0.1,
     "destroy_bloom": 0.6,
     "window": {

@@ -21,25 +21,25 @@ class ConnectionSettings(BaseSettings):
 
 
 class DescribeSettings(BaseSettings):
-    quantization_options: Field[list[str]] = Field(["None (FP16)"], access=Field.READ, visible=False, description="QwenVL quantizations offered by ComfyUI")
-
     instruction:  Field[str] = Field("Describe this person for a text-to-image prompt. Only visible physical features: gender, approximate age, race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no mention of color, no negatives. Short comma-separated phrases on one line. Output only the phrases. ",
                                      widget=Widget.textarea, description="What QwenVL is asked about the face")
     max_tokens:   Field[int] = Field(120, min=64, max=512, step=8, description="Maximum length of the description (tokens)")
-    quantization: Field[str] = Field("None (FP16)", widget=Widget.text_select, options=quantization_options, description="QwenVL precision (8-bit saves VRAM, FP16 is faster)")
+    prefix:       Field[str] = Field("", description="Text before the description")
     suffix:       Field[str] = Field(" (super model: 1.5), (serious expression: 2.2)", description="Text after the description")
-    description:  Field[str] = Field("", access=Field.READ, widget=Widget.textarea, description="Last prompt: description + suffix")
+    description:  Field[str] = Field("", access=Field.READ, widget=Widget.textarea, description="Last prompt: prefix + description + suffix")
 
 
 class StyleSettings(BaseSettings):
-    repeat:   Field[int] = Field(26, min=1, max=100, step=1, description="Visitors per style before switching to the next")
-    style_a:  Field[str] = Field("BREAK nude portrait by (David LaChapelle: 1.4), bold artificial hues, high contrast, harsh dramatic light, 2000s BREAK",
-                                 widget=Widget.textarea, description="Style of movement 0000 (music: Smooth)")
-    style_b:  Field[str] = Field("portrait by (Mert and Marcus: 2.0), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 2.0)",
-                                 widget=Widget.textarea, description="Style of movement 0001 (music: Party)")
-    negative: Field[str] = Field("(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
-                                 widget=Widget.textarea, description="Negative prompt")
-    current:  Field[str] = Field("", access=Field.READ, description="Current movement id")
+    repeat:     Field[int] = Field(26, min=1, max=100, step=1, description="Visitors per style before switching to the next")
+    current:    Field[str] = Field("A", access=Field.READ, description="Style of the current visitor: A or B")
+    style_a:    Field[str] = Field("BREAK nude portrait by (David LaChapelle: 1.4), bold artificial hues, high contrast, harsh dramatic light, 2000s BREAK",
+                                   widget=Widget.textarea, description="Style of movement 0000 (music: Smooth)")
+    negative_a: Field[str] = Field("(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
+                                   widget=Widget.textarea, description="Negative prompt of style A")
+    style_b:    Field[str] = Field("portrait by (Mert and Marcus: 2.0), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 2.0)",
+                                   widget=Widget.textarea, description="Style of movement 0001 (music: Party)")
+    negative_b: Field[str] = Field("(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
+                                   widget=Widget.textarea, description="Negative prompt of style B")
 
 
 class PortraitSettings(BaseSettings):
@@ -76,27 +76,27 @@ class GrinSettings(BaseSettings):
     crop_size:          Field[float] = Field(0.857, min=0.5, max=1.0, step=0.01, description="Part of the portrait the grin shows (centred, 4:5)")
     width:              Field[int]   = Field(512, min=256, max=896, step=64, description="Grin frame width (height = 1.25 x width)")
     frames:             Field[int]   = Field(150, min=10, max=300, step=10, description="Frames of the animation")
-    ease:               Field[Ease]  = Field(Ease.SINE_IN_OUT, description="Curve from neutral to the peak and back")
     crop_factor:        Field[float] = Field(2.0, min=1.5, max=3.0, step=0.1, description="LivePortrait face region, relative to the face")
+    stitching:          Field[bool]  = Field(True, description="LivePortrait stitching (shifts the head; off keeps it in place)")
+    ease:               Field[Ease]  = Field(Ease.SINE_IN_OUT, newline=True, description="Curve from neutral to the peak and back")
     midpoint:           Field[float] = Field(0.7, min=0.0, max=1.0, step=0.01, description="Moment of the peak, as part of the animation")
     midpoint_deviation: Field[float] = Field(0.2, min=0.0, max=0.5, step=0.01, description="Each parameter peaks at a random moment within midpoint +- this")
-    stitching:          Field[bool]  = Field(True, description="LivePortrait stitching (shifts the head; off keeps it in place)")
 
-    smile:   Field[float] = Field(2.0, min=-30.0, max=30.0, step=0.1, description="Smile at the peak")
-    aaa:     Field[float] = Field(-20.0, min=-30.0, max=30.0, step=0.1, description="Mouth 'aaa' at the peak")
+    smile:   Field[float] = Field(2.0, min=-30.0, max=30.0, step=0.1, newline=True, description="Smile at the peak")
+    aaa:     Field[float] = Field(-20.0, min=-30.0, max=30.0, step=0.1, newline=True, description="Mouth 'aaa' at the peak")
     eee:     Field[float] = Field(-10.0, min=-30.0, max=30.0, step=0.1, description="Mouth 'eee' at the peak")
     woo:     Field[float] = Field(-20.0, min=-30.0, max=30.0, step=0.1, description="Mouth 'woo' at the peak")
-    eyebrow: Field[float] = Field(7.5, min=-30.0, max=30.0, step=0.1, description="Eyebrows at the peak")
+    eyebrow: Field[float] = Field(7.5, min=-30.0, max=30.0, step=0.1, newline=True, description="Eyebrows at the peak")
     blink:   Field[float] = Field(-9.0, min=-30.0, max=30.0, step=0.1, description="Eyes open (-) / closed (+) at the peak")
     wink:    Field[float] = Field(0.0, min=-30.0, max=30.0, step=0.1, description="Wink at the peak")
-    pupil_x: Field[float] = Field(0.0, min=-15.0, max=15.0, step=0.1, description="Gaze left / right at the peak")
+    pupil_x: Field[float] = Field(0.0, min=-15.0, max=15.0, step=0.1, newline=True, description="Gaze left / right at the peak")
     pupil_y: Field[float] = Field(0.0, min=-15.0, max=15.0, step=0.1, description="Gaze up / down at the peak")
 
-    pitch_min: Field[float] = Field(-15.0, min=-30.0, max=30.0, step=0.5, description="Head nod, random between min and max (degrees)")
+    pitch_min: Field[float] = Field(-15.0, min=-30.0, max=30.0, step=0.5, newline=True, description="Head nod, random between min and max (degrees)")
     pitch_max: Field[float] = Field(0.0, min=-30.0, max=30.0, step=0.5, description="Head nod, random between min and max (degrees)")
-    yaw_min:   Field[float] = Field(-15.0, min=-30.0, max=30.0, step=0.5, description="Head turn, random between min and max (degrees)")
+    yaw_min:   Field[float] = Field(-15.0, min=-30.0, max=30.0, step=0.5, newline=True, description="Head turn, random between min and max (degrees)")
     yaw_max:   Field[float] = Field(15.0, min=-30.0, max=30.0, step=0.5, description="Head turn, random between min and max (degrees)")
-    roll_min:  Field[float] = Field(-15.0, min=-30.0, max=30.0, step=0.5, description="Head tilt, random between min and max (degrees)")
+    roll_min:  Field[float] = Field(-15.0, min=-30.0, max=30.0, step=0.5, newline=True, description="Head tilt, random between min and max (degrees)")
     roll_max:  Field[float] = Field(15.0, min=-30.0, max=30.0, step=0.5, description="Head tilt, random between min and max (degrees)")
 
 

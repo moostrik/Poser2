@@ -22,7 +22,7 @@ class TestWorkflow(unittest.TestCase):
         self.wf = Workflow(WORKFLOW)
         self.settings = ComfySettings()
         self.settings.grin.frames = 120
-        self.built = self.wf.build('smile_capture.png', 'a style', self.settings)
+        self.built = self.wf.build('smile_capture.png', 'a style', 'a negative', self.settings)
 
     def test_all_links_point_to_existing_nodes(self):
         for node_id, name, source in links(self.built):
@@ -46,6 +46,7 @@ class TestWorkflow(unittest.TestCase):
     def test_per_run_values(self):
         self.assertEqual(self.built[self.wf.load_image]['inputs']['image'], 'smile_capture.png')
         self.assertEqual(self.built[self.wf.style]['inputs']['text'], 'a style')
+        self.assertEqual(self.built[self.wf.negative]['inputs']['text'], 'a negative')
         self.assertEqual(self.built[self.wf.grin]['inputs']['frames'], 120)
         self.assertEqual(self.built[self.wf.last_frame]['inputs']['batch_index'], 119)
 
@@ -53,8 +54,8 @@ class TestWorkflow(unittest.TestCase):
         s = ComfySettings()
         s.describe.instruction = 'describe'
         s.describe.max_tokens = 200
+        s.describe.prefix = 'prefix'
         s.describe.suffix = ' suffix'
-        s.style.negative = 'negative'
         s.portrait.steps = 8
         s.portrait.cfg = 2.0
         s.portrait.sampler = 'euler'
@@ -70,10 +71,15 @@ class TestWorkflow(unittest.TestCase):
         s.grin.smile = 3.0
         s.grin.yaw_max = 10.0
         s.grin.stitching = False
-        b = self.wf.build('x.png', 'style', s)
+        b = self.wf.build('x.png', 'style', 'negative', s)
         describe = b[self.wf.describe]['inputs']
         self.assertEqual((describe['custom_prompt'], describe['max_tokens']), ('describe', 200))
-        self.assertEqual(b[self.wf.suffix]['inputs']['string_b'], ' suffix')
+        # prefix + space + description, then + suffix
+        prefix = b[self.wf.prefix]['inputs']
+        self.assertEqual((prefix['string_a'], prefix['delimiter'], prefix['string_b']), ('prefix', ' ', [self.wf.describe, 0]))
+        self.assertEqual(self.built[self.wf.prefix]['inputs']['delimiter'], '')     # no prefix: no leading space
+        suffix = b[self.wf.suffix]['inputs']
+        self.assertEqual((suffix['string_a'], suffix['string_b']), ([self.wf.prefix, 0], ' suffix'))
         self.assertEqual(b[self.wf.negative]['inputs']['text'], 'negative')
         sampler = b[self.wf.sampler]['inputs']
         self.assertEqual((sampler['steps'], sampler['cfg'], sampler['sampler_name'], sampler['scheduler']), (8, 2.0, 'euler', 'karras'))
@@ -88,7 +94,7 @@ class TestWorkflow(unittest.TestCase):
         self.assertEqual((grin['ease'], grin['smile'], grin['rotate_yaw_max'], grin['stitching']), ('linear', 3.0, 10.0, False))
 
     def test_seeds_random_and_in_range(self):
-        other = self.wf.build('smile_capture.png', 'a style', self.settings)
+        other = self.wf.build('smile_capture.png', 'a style', 'a negative', self.settings)
         for node_id in (self.wf.sampler, self.wf.describe, self.wf.grin):
             seed = self.built[node_id]['inputs']['seed']
             self.assertTrue(1 <= seed <= MAX_SEED)
@@ -96,8 +102,8 @@ class TestWorkflow(unittest.TestCase):
 
     def test_fixed_seed(self):
         self.settings.portrait.fixed_seed = True
-        first = self.wf.build('smile_capture.png', 'a style', self.settings)
-        second = self.wf.build('smile_capture.png', 'a style', self.settings)
+        first = self.wf.build('smile_capture.png', 'a style', 'a negative', self.settings)
+        second = self.wf.build('smile_capture.png', 'a style', 'a negative', self.settings)
         for node_id in (self.wf.sampler, self.wf.describe, self.wf.grin):
             self.assertEqual(first[node_id]['inputs']['seed'], FIXED_SEED)
             self.assertEqual(second[node_id]['inputs']['seed'], FIXED_SEED)
@@ -108,7 +114,7 @@ class TestWorkflow(unittest.TestCase):
         decode = next(node for node in self.built.values() if node['class_type'] == 'VAEDecode')
         self.assertEqual(sampler['inputs']['vae'], decode['inputs']['vae'])
         self.settings.portrait.full_preview = False
-        plain = self.wf.build('x.png', 'style', self.settings)[self.wf.sampler]
+        plain = self.wf.build('x.png', 'style', 'negative', self.settings)[self.wf.sampler]
         self.assertEqual(plain['class_type'], 'KSampler')
         self.assertNotIn('vae', plain['inputs'])
 
@@ -131,7 +137,7 @@ class TestWorkflow(unittest.TestCase):
             self.assertEqual(self.built[node_id]['class_type'], 'PreviewImage')
 
     def test_template_not_changed_by_build(self):
-        again = self.wf.build('other.png', 'other', self.settings)
+        again = self.wf.build('other.png', 'other', 'other negative', self.settings)
         self.assertEqual(self.built[self.wf.load_image]['inputs']['image'], 'smile_capture.png')
         self.assertEqual(again[self.wf.load_image]['inputs']['image'], 'other.png')
 
@@ -152,11 +158,17 @@ class TestStyles(unittest.TestCase):
     def test_cycle(self):
         settings = ComfySettings()
         settings.style.repeat = 2
+        settings.style.negative_a = 'negative a'
+        settings.style.negative_b = 'negative b'
         styles = Styles(settings.style)
-        ids = [styles.advance() for _ in range(5)]
-        self.assertEqual(ids, ['0000', '0000', '0001', '0001', '0000'])
-        self.assertEqual(settings.style.current, '0000')
-        self.assertEqual(styles.current_text(), settings.style.style_a)
+        ids = [styles.advance() for _ in range(3)]
+        self.assertEqual(ids, ['0000', '0000', '0001'])
+        self.assertEqual(settings.style.current, 'B')
+        self.assertEqual((styles.current_text(), styles.current_negative()), (settings.style.style_b, 'negative b'))
+        ids = [styles.advance() for _ in range(2)]
+        self.assertEqual(ids, ['0001', '0000'])
+        self.assertEqual(settings.style.current, 'A')
+        self.assertEqual((styles.current_text(), styles.current_negative()), (settings.style.style_a, 'negative a'))
 
 
 if __name__ == '__main__':
