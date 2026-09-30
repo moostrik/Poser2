@@ -3,7 +3,8 @@
 SMILE crops and rotates the face itself (modules/face/FaceFinder.py), so the workflow's own
 face crop is removed and its consumers read the uploaded image directly. The video and the
 overlay check are removed too, and the saved portrait becomes a preview (nothing piles up in
-ComfyUI's output folder). Nodes are found by class type or title, not by id.
+ComfyUI's output folder). The crop and scale in front of the grin are removed as well: the grin
+animates the whole portrait. Nodes are found by class type or title, not by id.
 
 The workflow only provides the structure: every run fills in the values from ComfySettings.
 """
@@ -11,8 +12,11 @@ The workflow only provides the structure: every run fills in the values from Com
 import copy
 import json
 import random
+from typing import Callable
 
-from modules.comfy.settings import ComfySettings
+import pytweening as easing
+
+from modules.comfy.settings import ComfySettings, Prefer
 
 MAX_SEED: int = 2 ** 32 - 1     # the smallest maximum of the seeded nodes (QwenVL: 1 .. 4294967295)
 FIXED_SEED: int = 1             # with portrait.fixed_seed: the description and the grin too, or the runs still differ
@@ -23,14 +27,17 @@ LORAS: dict[str, str] = {'clothing': 'LoRA: clothing', 'looking': 'LoRA: looking
 GRIN_TARGETS: tuple[str, ...] = ('smile', 'aaa', 'eee', 'woo', 'eyebrow', 'blink', 'wink', 'pupil_x', 'pupil_y')
 GRIN_ROTATIONS: tuple[str, ...] = ('pitch', 'yaw', 'roll')
 
-
-def grin_box(portrait_size: tuple[int, int], crop_size: float) -> tuple[int, int, int, int]:
-    """The centred 4:5 part of the portrait the grin shows: (x, y, width, height) in pixels."""
-    portrait_width, portrait_height = portrait_size
-    # a multiple of 8 keeps 4:5 exact and both margins even, so the crop is exactly centred
-    width: int = max(8, int(round(portrait_width * crop_size / 8)) * 8)
-    height: int = width * 5 // 4
-    return (portrait_width - width) // 2, (portrait_height - height) // 2, width, height
+# a curve over the random draw (0..1) of a grin value: where the curve is flat the picks bunch up,
+# so an ease-in prefers min, an ease-out max and an in-out both ends; quint pulls harder than quad
+PREFER_CURVES: dict[Prefer, Callable[[float], float]] = {
+    Prefer.EVEN:        easing.linear,
+    Prefer.MIN:         easing.easeInQuad,
+    Prefer.MIN_STRONG:  easing.easeInQuint,
+    Prefer.MAX:         easing.easeOutQuad,
+    Prefer.MAX_STRONG:  easing.easeOutQuint,
+    Prefer.ENDS:        easing.easeInOutQuad,
+    Prefer.ENDS_STRONG: easing.easeInOutQuint,
+}
 
 
 def _find(workflow: dict, class_type: str | None = None, title: str | None = None) -> str:
@@ -102,9 +109,12 @@ class Workflow():
         self.depth: str = _find(workflow, class_type='ControlNetApplyAdvanced')
         self.describe: str = _find(workflow, class_type='AILab_QwenVL')
         self.description: str = _find(workflow, title='Preview as Text')
-        self.grin_crop: str = _find(workflow, class_type='ImageCrop')
-        self.grin_scale: str = _find(workflow, class_type='ImageScale')
         self.grin: str = _find(workflow, class_type='GrinFrames')
+
+        # the grin animates the whole portrait at its own size: FaceFinder already sets the framing
+        grin_crop: str = _find(workflow, class_type='ImageCrop')
+        grin_scale: str = _find(workflow, class_type='ImageScale')
+        _remove(workflow, {grin_crop, grin_scale}, workflow[grin_crop]['inputs']['image'])
 
         # depth maps, as the old A1111 depth: of the capture (mask of the flash out) and of the
         # last grin frame (mask of the bloom). Part of this workflow on purpose: a second workflow
@@ -149,23 +159,53 @@ class Workflow():
             strength: float = getattr(s.lora, name)
             workflow[node_id]['inputs'].update(strength_model=strength, strength_clip=strength)
 
-        g = s.grin
-        x, y, width, height = grin_box(self.portrait_size, g.crop_size)
-        workflow[self.grin_crop]['inputs'].update(x=x, y=y, width=width, height=height)
-        workflow[self.grin_scale]['inputs'].update(width=g.width, height=g.width * 5 // 4)
-        grin: dict = workflow[self.grin]['inputs']
-        grin.update(frames=g.frames, ease=g.ease.value, crop_factor=g.crop_factor, midpoint=g.midpoint,
-                    midpoint_deviation=g.midpoint_deviation, stitching=g.stitching)
-        for name in GRIN_TARGETS:
-            grin[name] = getattr(g, name)
-        for name in GRIN_ROTATIONS:
-            grin[f'rotate_{name}_min'] = getattr(g, f'{name}_min')
-            grin[f'rotate_{name}_max'] = getattr(g, f'{name}_max')
-        workflow[self.last_frame]['inputs']['batch_index'] = g.frames - 1
-
-        for node_id in (self.sampler, self.describe, self.grin):
-            workflow[node_id]['inputs']['seed'] = FIXED_SEED if p.fixed_seed else random.randint(1, MAX_SEED)
+        for node_id in (self.sampler, self.describe):
+            workflow[node_id]['inputs']['seed'] = self._seed(s)
+        self._fill_grin(workflow, s)
         return workflow
+
+    def build_replay(self, previous: dict, s: ComfySettings) -> dict:
+        """The previous workflow with only the grin filled in again (the grin loop). Everything up to
+        the portrait is unchanged, so ComfyUI takes it from its cache and only makes the grin."""
+        workflow: dict = copy.deepcopy(previous)
+        self._fill_grin(workflow, s)
+        return workflow
+
+    def _fill_grin(self, workflow: dict, s: ComfySettings) -> None:
+        g = s.grin
+        grin: dict = workflow[self.grin]['inputs']
+        grin.update(frames=g.frames, ease=g.ease.value, crop_factor=g.face_region, midpoint=g.midpoint,
+                    midpoint_deviation=g.midpoint_deviation, stitching=g.stitching)
+
+        # a still has nothing random left, so its seed is fixed: unchanged settings give an identical workflow
+        still: bool = g.still
+        seed: int = FIXED_SEED if still else self._seed(s)
+        rng: random.Random = random.Random(seed)
+
+        def peak(name: str) -> float:
+            """This pass's peak of one value: its place between min and max for a still, else a random draw
+            shaped by its prefer curve. The two ends are used as set (min may be the higher number), so
+            still position 1 is the max field."""
+            low, high = getattr(g, f'{name}_min'), getattr(g, f'{name}_max')
+            position: float = g.still_position if still else PREFER_CURVES[getattr(g, f'{name}_prefer')](rng.random())
+            return low + position * (high - low)
+
+        # SMILE picks the pose and the node animates to it, so the node's rotation ranges hold one value
+        for name in GRIN_TARGETS:
+            grin[name] = peak(name)
+        for name in GRIN_ROTATIONS:
+            grin[f'rotate_{name}_min'] = grin[f'rotate_{name}_max'] = peak(name)
+        grin.update(seed=seed, still=still)
+        workflow[self.last_frame]['inputs']['batch_index'] = 0 if still else g.frames - 1
+
+    def frame_count(self, workflow: dict) -> int:
+        """Grin frames this workflow makes: one for a still."""
+        grin: dict = workflow[self.grin]['inputs']
+        return 1 if grin['still'] else grin['frames']
+
+    @staticmethod
+    def _seed(s: ComfySettings) -> int:
+        return FIXED_SEED if s.portrait.fixed_seed else random.randint(1, MAX_SEED)
 
 
 def _midas(image: list) -> dict:

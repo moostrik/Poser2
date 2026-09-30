@@ -164,12 +164,10 @@ class Forgettable():
             if portrait is not None:
                 cap_image = portrait.image
 
-            # ComfyUI gets the whole aligned crop; shown and saved is the part the grin frames show
             self.diffuse.set_image(cap_image)
-            cap_display: np.ndarray = self.diffuse.display_crop(cap_image)
-            self.render.set_cap_image(cap_display)
+            self.render.set_cap_image(cap_image)
             self.save.new_sequence()
-            self.save.save_image(cap_display)
+            self.save.save_image(cap_image)
 
 
         if seq == SequenceType.TIMEOUT:
@@ -196,6 +194,10 @@ class Forgettable():
     def diffusion_callback(self, message: GenMessage) -> None:
         # a sequence folder: capture, portrait, grin frames (not the step previews)
         if message.image is None:
+            return
+        # the grin loop and still are for testing: their frames would fill the sequence folder without end
+        grin = self.settings.comfy.grin
+        if message.state == GenState.DIFF_LOOP and (grin.loop or grin.still):
             return
         if message.state == GenState.DIFF_LOOP or (message.state == GenState.DIFFUSION and message.final):
             self.save.save_image(message.image)

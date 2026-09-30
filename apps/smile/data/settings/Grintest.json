@@ -1,0 +1,163 @@
+{
+  "camera": {
+    "flip_h": false,
+    "flip_v": false,
+    "gain_auto": false,
+    "gain_target": 40,
+    "image_select": 0
+  },
+  "face": {
+    "size_filter": 0.11,
+    "confidence": 0.7,
+    "stable_frames": 3,
+    "zoom": 1.2,
+    "offset": -0.05
+  },
+  "comfy": {
+    "connection": {
+      "host": "127.0.0.1",
+      "port": 8188,
+      "workflow": "data/comfy/AIIAv3 portrait grin v3.json",
+      "job_timeout": 90.0
+    },
+    "describe": {
+      "instruction": "Describe this person for a text-to-image prompt. Only visible physical features: gender, approximate age, race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no mention of color, no negatives. Short comma-separated phrases on one line. Output only the phrases. ",
+      "max_tokens": 120,
+      "prefix": "nude ",
+      "suffix": ", model, looking at viewer, (serious expression: 2.0)"
+    },
+    "style": {
+      "repeat": 1,
+      "style_a": "(nude) portrait by (Mert and Marcus: 2.0), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 1.5)",
+      "negative_a": "(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
+      "style_b": "portrait by (Mert and Marcus: 2.0), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 2.0)",
+      "negative_b": "(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth"
+    },
+    "portrait": {
+      "steps": 6,
+      "cfg": 1.5,
+      "sampler": "dpmpp_sde",
+      "scheduler": "karras",
+      "embedding_strength": 1.0,
+      "keypoint_strength": 1.0,
+      "depth_strength": 1.0,
+      "depth_end": 0.5,
+      "full_preview": true,
+      "fixed_seed": false
+    },
+    "lora": {
+      "clothing": 5.0,
+      "looking": 5.0,
+      "dark": -0.5
+    },
+    "grin": {
+      "loop": false,
+      "still": false,
+      "still_position": 1.0,
+      "frames": 210,
+      "face_region": 1.9,
+      "stitching": true,
+      "ease": "SINE_IN_OUT",
+      "midpoint": 0.7,
+      "midpoint_deviation": 0.2,
+      "smile_min": 2.0,
+      "smile_max": 2.0,
+      "smile_prefer": "EVEN",
+      "aaa_min": -10.6,
+      "aaa_max": 10.0,
+      "aaa_prefer": "ENDS_STRONG",
+      "eee_min": -20.0,
+      "eee_max": 0.0,
+      "eee_prefer": "MIN",
+      "woo_min": -10.0,
+      "woo_max": -30.0,
+      "woo_prefer": "EVEN",
+      "eyebrow_min": -30.0,
+      "eyebrow_max": 30.0,
+      "eyebrow_prefer": "ENDS_STRONG",
+      "blink_min": -5.0,
+      "blink_max": -20.0,
+      "blink_prefer": "EVEN",
+      "wink_min": 0.0,
+      "wink_max": 0.0,
+      "wink_prefer": "EVEN",
+      "pupil_x_min": 0.0,
+      "pupil_x_max": 0.0,
+      "pupil_x_prefer": "EVEN",
+      "pupil_y_min": 0.0,
+      "pupil_y_max": 0.0,
+      "pupil_y_prefer": "EVEN",
+      "pitch_min": 5.0,
+      "pitch_max": -13.0,
+      "pitch_prefer": "MAX",
+      "yaw_min": -13.0,
+      "yaw_max": 13.0,
+      "yaw_prefer": "ENDS",
+      "roll_min": -10.0,
+      "roll_max": 10.0,
+      "roll_prefer": "ENDS"
+    },
+    "playback": {
+      "fps": 15.0,
+      "prebuffer": 8
+    }
+  },
+  "save": {
+    "active": true,
+    "min_files": 16
+  },
+  "sequence": {
+    "destroy_in": 0.4,
+    "destroy_in_ease": "QUAD_IN",
+    "destroy_out": 1.1,
+    "destroy_out_ease": "CUBIC_OUT",
+    "camera_in": 1.0,
+    "camera_in_ease": "LINEAR",
+    "camera_out": 1.0,
+    "camera_out_ease": "LINEAR",
+    "flash_in": 0.5,
+    "flash_in_ease": "QUAD_IN",
+    "flash_out_auto": true,
+    "flash_out": 3.7454739093780516,
+    "flash_out_ease": "SINE_OUT",
+    "timeout": 1.0
+  },
+  "render": {
+    "show_camera": false,
+    "freeze": false,
+    "trail_active": true,
+    "trail": 0.985,
+    "loop_trail": 0.8,
+    "destroy_blur": 0.1,
+    "destroy_bloom": 0.6,
+    "window": {
+      "title": "SMILE",
+      "v_sync": true,
+      "monitor": "M0",
+      "x": 1281,
+      "y": 31,
+      "width": 638,
+      "height": 1000,
+      "secondary_list": [],
+      "secondary_fullscreen": false,
+      "fullscreen_mode": "WINDOWED"
+    }
+  },
+  "audio": {},
+  "osc": {
+    "active": true,
+    "ip": "127.0.0.1",
+    "port": 4114,
+    "fps": 30.0
+  },
+  "artnet": {
+    "active": true,
+    "ip": "10.0.0.11",
+    "universe": 1,
+    "fps": 40.0
+  },
+  "server": {
+    "title": "SMILE",
+    "port": 667
+  }
+}

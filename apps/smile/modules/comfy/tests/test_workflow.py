@@ -1,11 +1,12 @@
 """Tests for adapting the exported ComfyUI workflow (no ComfyUI server needed)."""
 
 import os
+import random
 import unittest
 
-from modules.comfy.settings import ComfySettings, Ease
+from modules.comfy.settings import ComfySettings, Ease, Prefer
 from modules.comfy.styles import Styles
-from modules.comfy.workflow import FIXED_SEED, MAX_SEED, Workflow, grin_box
+from modules.comfy.workflow import FIXED_SEED, GRIN_ROTATIONS, GRIN_TARGETS, MAX_SEED, Workflow
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 WORKFLOW = os.path.join(ROOT, 'data', 'comfy', 'AIIAv3 portrait grin v3.json')
@@ -68,8 +69,8 @@ class TestWorkflow(unittest.TestCase):
         s.lora.looking = 0.0
         s.lora.dark = -0.3
         s.grin.ease = Ease.LINEAR
-        s.grin.smile = 3.0
-        s.grin.yaw_max = 10.0
+        s.grin.smile_min = s.grin.smile_max = 3.0
+        s.grin.yaw_min = s.grin.yaw_max = 10.0
         s.grin.stitching = False
         b = self.wf.build('x.png', 'style', 'negative', s)
         describe = b[self.wf.describe]['inputs']
@@ -91,7 +92,87 @@ class TestWorkflow(unittest.TestCase):
             lora = b[self.wf.loras[name]]['inputs']
             self.assertEqual((lora['strength_model'], lora['strength_clip']), (strength, strength))
         grin = b[self.wf.grin]['inputs']
-        self.assertEqual((grin['ease'], grin['smile'], grin['rotate_yaw_max'], grin['stitching']), ('linear', 3.0, 10.0, False))
+        self.assertEqual((grin['ease'], grin['smile'], grin['stitching']), ('linear', 3.0, False))
+        self.assertEqual((grin['rotate_yaw_min'], grin['rotate_yaw_max']), (10.0, 10.0))
+
+    def test_peaks_random_within_the_range(self):
+        g = self.settings.grin
+        g.aaa_min, g.aaa_max = -10.0, -20.0      # max may be the lower number
+        g.yaw_min, g.yaw_max = -15.0, 15.0
+        peaks = [self.wf.build('x.png', 'style', 'negative', self.settings)[self.wf.grin]['inputs'] for _ in range(20)]
+        for grin in peaks:
+            self.assertTrue(-20.0 <= grin['aaa'] <= -10.0)
+            self.assertTrue(-15.0 <= grin['rotate_yaw_min'] <= 15.0)
+            self.assertEqual(grin['rotate_yaw_min'], grin['rotate_yaw_max'])     # the node gets the pick, not the range
+            self.assertEqual(grin['smile'], 2.0)                                 # min == max: no variation
+            self.assertFalse(grin['still'])
+        self.assertGreater(len({grin['aaa'] for grin in peaks}), 1)
+        self.settings.portrait.fixed_seed = True
+        self.assertEqual(self.wf.build('x.png', 'style', 'negative', self.settings),
+                         self.wf.build('x.png', 'style', 'negative', self.settings))
+
+    def test_prefer_even_is_the_plain_draw(self):
+        g = self.settings.grin
+        g.aaa_min, g.aaa_max = -10.0, -20.0
+        g.yaw_min, g.yaw_max = -15.0, 15.0
+        self.settings.portrait.fixed_seed = True
+        grin = self.wf.build('x.png', 'style', 'negative', self.settings)[self.wf.grin]['inputs']
+        # one draw per value, in the order of the values
+        rng = random.Random(FIXED_SEED)
+        draws = dict(zip(GRIN_TARGETS + GRIN_ROTATIONS, (rng.random() for _ in range(12))))
+        self.assertAlmostEqual(grin['aaa'], -10.0 - 10.0 * draws['aaa'])
+        self.assertAlmostEqual(grin['rotate_yaw_min'], -15.0 + 30.0 * draws['yaw'])
+
+    def test_prefer_shapes_the_draw(self):
+        g = self.settings.grin
+        g.aaa_min, g.aaa_max = -10.0, -20.0      # max is the lower number: prefer follows the fields
+        g.yaw_min, g.yaw_max = -15.0, 15.0
+        g.smile_min = g.smile_max = 2.0
+
+        def shares(prefer: Prefer) -> tuple[float, float, float]:
+            """Share of the picks within 10% of min, of max (aaa) and of either end (yaw)."""
+            g.aaa_prefer = g.yaw_prefer = g.smile_prefer = prefer
+            runs = 400
+            near_min = near_max = near_end = 0
+            for _ in range(runs):
+                grin = self.wf.build('x.png', 'style', 'negative', self.settings)[self.wf.grin]['inputs']
+                self.assertTrue(-20.0 <= grin['aaa'] <= -10.0)
+                self.assertTrue(-15.0 <= grin['rotate_yaw_min'] <= 15.0)
+                self.assertEqual(grin['smile'], 2.0)     # min == max: exactly that value, whatever the curve
+                near_min += grin['aaa'] > -11.0
+                near_max += grin['aaa'] < -19.0
+                near_end += abs(grin['rotate_yaw_min']) > 12.0
+            return near_min / runs, near_max / runs, near_end / runs
+
+        even = shares(Prefer.EVEN)
+        self.assertTrue(even[0] < 0.2 and even[1] < 0.2 and even[2] < 0.3)       # 10%, 10%, 20%
+        self.assertGreater(shares(Prefer.MIN)[0], 0.22)                          # 32%
+        self.assertGreater(shares(Prefer.MIN_STRONG)[0], 0.5)                    # 63%
+        self.assertGreater(shares(Prefer.MAX)[1], 0.22)
+        self.assertGreater(shares(Prefer.MAX_STRONG)[1], 0.5)
+        self.assertGreater(shares(Prefer.ENDS)[2], 0.35)                         # 45%
+        self.assertGreater(shares(Prefer.ENDS_STRONG)[2], 0.6)                   # 72%
+
+    def test_still(self):
+        g = self.settings.grin
+        g.still = True
+        g.aaa_min, g.aaa_max = -10.0, -20.0
+        g.yaw_min, g.yaw_max = -15.0, 15.0
+        g.aaa_prefer = g.yaw_prefer = Prefer.MIN_STRONG      # a still follows its position, not the curve
+        # position 0 is the min field and 1 the max field, also when max is the lower number
+        for position, aaa, yaw in ((0.0, -10.0, -15.0), (0.5, -15.0, 0.0), (1.0, -20.0, 15.0)):
+            g.still_position = position
+            built = self.wf.build('x.png', 'style', 'negative', self.settings)
+            grin = built[self.wf.grin]['inputs']
+            self.assertEqual((grin['aaa'], grin['rotate_yaw_min'], grin['rotate_yaw_max']), (aaa, yaw, yaw))
+            self.assertEqual((grin['still'], grin['seed']), (True, FIXED_SEED))
+            self.assertEqual(self.wf.frame_count(built), 1)
+            self.assertEqual(built[self.wf.last_frame]['inputs']['batch_index'], 0)
+        self.assertEqual(self.wf.build_replay(built, self.settings), built)      # unchanged: nothing to make again
+        g.still = False
+        animation = self.wf.build_replay(built, self.settings)
+        self.assertEqual(self.wf.frame_count(animation), 120)
+        self.assertEqual(animation[self.wf.last_frame]['inputs']['batch_index'], 119)
 
     def test_seeds_random_and_in_range(self):
         other = self.wf.build('smile_capture.png', 'a style', 'a negative', self.settings)
@@ -107,6 +188,28 @@ class TestWorkflow(unittest.TestCase):
         for node_id in (self.wf.sampler, self.wf.describe, self.wf.grin):
             self.assertEqual(first[node_id]['inputs']['seed'], FIXED_SEED)
             self.assertEqual(second[node_id]['inputs']['seed'], FIXED_SEED)
+
+    def test_replay_only_changes_the_grin(self):
+        self.settings.grin.smile_min = self.settings.grin.smile_max = 9.0
+        self.settings.grin.frames = 60
+        self.settings.portrait.steps = 12       # not a grin value: waits for the next capture
+        replay = self.wf.build_replay(self.built, self.settings)
+        grin = replay[self.wf.grin]['inputs']
+        self.assertEqual((grin['smile'], grin['frames']), (9.0, 60))
+        self.assertEqual(replay[self.wf.last_frame]['inputs']['batch_index'], 59)
+        self.assertNotEqual(grin['seed'], self.built[self.wf.grin]['inputs']['seed'])
+        grin_nodes = {self.wf.grin, self.wf.last_frame}
+        for node_id, node in self.built.items():
+            if node_id not in grin_nodes:
+                self.assertEqual(replay[node_id], node, node_id)     # seeds included: ComfyUI's cache holds
+        self.assertEqual(self.built[self.wf.grin]['inputs']['frames'], 120)     # the previous workflow is not changed
+
+    def test_replay_fixed_seed_without_changes_is_identical(self):
+        self.settings.portrait.fixed_seed = True
+        first = self.wf.build('smile_capture.png', 'a style', 'a negative', self.settings)
+        self.assertEqual(self.wf.build_replay(first, self.settings), first)
+        self.settings.grin.smile_max = 9.0
+        self.assertNotEqual(self.wf.build_replay(first, self.settings), first)
 
     def test_full_preview_sampler(self):
         sampler = self.built[self.wf.sampler]
@@ -141,17 +244,13 @@ class TestWorkflow(unittest.TestCase):
         self.assertEqual(self.built[self.wf.load_image]['inputs']['image'], 'smile_capture.png')
         self.assertEqual(again[self.wf.load_image]['inputs']['image'], 'other.png')
 
-    def test_grin_crop_centred(self):
+    def test_grin_animates_the_whole_portrait(self):
         self.assertEqual(self.wf.portrait_size, (896, 1120))
-        self.assertEqual(grin_box((896, 1120), 0.857), (64, 80, 768, 960))
-        crop = self.built[self.wf.grin_crop]['inputs']
-        self.assertEqual((crop['x'], crop['y'], crop['width'], crop['height']), (64, 80, 768, 960))
-        scale = self.built[self.wf.grin_scale]['inputs']
-        self.assertEqual((scale['width'], scale['height']), (512, 640))
-        for size in (0.5, 0.7, 0.93, 1.0):
-            x, y, w, h = grin_box((896, 1120), size)
-            self.assertEqual(w * 5, h * 4)                       # 4:5
-            self.assertEqual((2 * x + w, 2 * y + h), (896, 1120))  # centred
+        classes = {node['class_type'] for node in self.built.values()}
+        self.assertNotIn('ImageCrop', classes)
+        self.assertNotIn('ImageScale', classes)
+        # the grin reads what the portrait preview shows: the decoded portrait, uncropped and unscaled
+        self.assertEqual(self.built[self.wf.grin]['inputs']['image'], self.built[self.wf.portrait]['inputs']['images'])
 
 
 class TestStyles(unittest.TestCase):

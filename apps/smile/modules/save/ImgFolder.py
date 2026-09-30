@@ -15,7 +15,7 @@ class ImgFolder:
         self.settings: ImgFolderSettings = settings
         self.save_path: str = output_path
         self.temp_path: str = temp_path
-        self.size: tuple[int, int] = size   # the grin frame size; the players show these rotated in 640x512 cells
+        self.size: tuple[int, int] = size   # saved size (4:5 as the portrait); the players show these rotated in 640x512 cells
         self.id: str = ''
         self.temp_dir: str = ''
         self.sequence_index: int = 0

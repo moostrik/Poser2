@@ -72,32 +72,66 @@ class Ease(Enum):
     SINE_IN_OUT = 'sine_in_out'
 
 
+class Prefer(Enum):
+    EVEN        = 'even'
+    MIN         = 'min'
+    MIN_STRONG  = 'min_strong'
+    MAX         = 'max'
+    MAX_STRONG  = 'max_strong'
+    ENDS        = 'ends'
+    ENDS_STRONG = 'ends_strong'
+
+
 class GrinSettings(BaseSettings):
-    crop_size:          Field[float] = Field(0.857, min=0.5, max=1.0, step=0.01, description="Part of the portrait the grin shows (centred, 4:5)")
-    width:              Field[int]   = Field(512, min=256, max=896, step=64, description="Grin frame width (height = 1.25 x width)")
-    frames:             Field[int]   = Field(150, min=10, max=300, step=10, description="Frames of the animation")
-    crop_factor:        Field[float] = Field(2.0, min=1.5, max=3.0, step=0.1, description="LivePortrait face region, relative to the face")
+    loop:               Field[bool]  = Field(False, description="Keep replaying the grin with the current values, without a new portrait (testing)")
+    still:              Field[bool]  = Field(False, description="Show only the peak pose as a still that follows the settings (testing)")
+    still_position:     Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Where the still sits in every range: 0 = min, 1 = max")
+    frames:             Field[int]   = Field(150, min=10, max=300, step=10, newline=True, description="Frames of the animation")
+    face_region:        Field[float] = Field(2.0, min=1.5, max=3.0, step=0.1, description="Area around the face that LivePortrait animates, relative to the face")
     stitching:          Field[bool]  = Field(True, description="LivePortrait stitching (shifts the head; off keeps it in place)")
     ease:               Field[Ease]  = Field(Ease.SINE_IN_OUT, newline=True, description="Curve from neutral to the peak and back")
     midpoint:           Field[float] = Field(0.7, min=0.0, max=1.0, step=0.01, description="Moment of the peak, as part of the animation")
     midpoint_deviation: Field[float] = Field(0.2, min=0.0, max=0.5, step=0.01, description="Each parameter peaks at a random moment within midpoint +- this")
 
-    smile:   Field[float] = Field(2.0, min=-30.0, max=30.0, step=0.1, newline=True, description="Smile at the peak")
-    aaa:     Field[float] = Field(-20.0, min=-30.0, max=30.0, step=0.1, newline=True, description="Mouth 'aaa' at the peak")
-    eee:     Field[float] = Field(-10.0, min=-30.0, max=30.0, step=0.1, description="Mouth 'eee' at the peak")
-    woo:     Field[float] = Field(-20.0, min=-30.0, max=30.0, step=0.1, description="Mouth 'woo' at the peak")
-    eyebrow: Field[float] = Field(7.5, min=-30.0, max=30.0, step=0.1, newline=True, description="Eyebrows at the peak")
-    blink:   Field[float] = Field(-9.0, min=-30.0, max=30.0, step=0.1, description="Eyes open (-) / closed (+) at the peak")
-    wink:    Field[float] = Field(0.0, min=-30.0, max=30.0, step=0.1, description="Wink at the peak")
-    pupil_x: Field[float] = Field(0.0, min=-15.0, max=15.0, step=0.1, newline=True, description="Gaze left / right at the peak")
-    pupil_y: Field[float] = Field(0.0, min=-15.0, max=15.0, step=0.1, description="Gaze up / down at the peak")
-
-    pitch_min: Field[float] = Field(-15.0, min=-30.0, max=30.0, step=0.5, newline=True, description="Head nod, random between min and max (degrees)")
-    pitch_max: Field[float] = Field(0.0, min=-30.0, max=30.0, step=0.5, description="Head nod, random between min and max (degrees)")
-    yaw_min:   Field[float] = Field(-15.0, min=-30.0, max=30.0, step=0.5, newline=True, description="Head turn, random between min and max (degrees)")
-    yaw_max:   Field[float] = Field(15.0, min=-30.0, max=30.0, step=0.5, description="Head turn, random between min and max (degrees)")
-    roll_min:  Field[float] = Field(-15.0, min=-30.0, max=30.0, step=0.5, newline=True, description="Head tilt, random between min and max (degrees)")
-    roll_max:  Field[float] = Field(15.0, min=-30.0, max=30.0, step=0.5, description="Head tilt, random between min and max (degrees)")
+    # every value: one row, the peak is random between min and max (equal = no variation); the still
+    # shows min at position 0 and max at 1, as set, so max can be the lower number
+    # prefer: where the random value tends to land (a curve over the draw, see workflow.PREFER_CURVES)
+    smile_min:   Field[float] = Field(2.0, min=-30.0, max=30.0, step=0.1, newline=True, row_label="Smile", label="Min", description="Smile at the peak: random between min and max")
+    smile_max:   Field[float] = Field(2.0, min=-30.0, max=30.0, step=0.1, label="Max", description="Smile at the peak: random between min and max")
+    smile_prefer:   Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
+    aaa_min:     Field[float] = Field(-20.0, min=-30.0, max=30.0, step=0.1, newline=True, row_label="Aaa", label="Min", description="Mouth 'aaa' at the peak: random between min and max")
+    aaa_max:     Field[float] = Field(-20.0, min=-30.0, max=30.0, step=0.1, label="Max", description="Mouth 'aaa' at the peak: random between min and max")
+    aaa_prefer:     Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
+    eee_min:     Field[float] = Field(-10.0, min=-30.0, max=30.0, step=0.1, newline=True, row_label="Eee", label="Min", description="Mouth 'eee' at the peak: random between min and max")
+    eee_max:     Field[float] = Field(-10.0, min=-30.0, max=30.0, step=0.1, label="Max", description="Mouth 'eee' at the peak: random between min and max")
+    eee_prefer:     Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
+    woo_min:     Field[float] = Field(-20.0, min=-30.0, max=30.0, step=0.1, newline=True, row_label="Woo", label="Min", description="Mouth 'woo' at the peak: random between min and max")
+    woo_max:     Field[float] = Field(-20.0, min=-30.0, max=30.0, step=0.1, label="Max", description="Mouth 'woo' at the peak: random between min and max")
+    woo_prefer:     Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
+    eyebrow_min: Field[float] = Field(7.5, min=-30.0, max=30.0, step=0.1, newline=True, row_label="Eyebrow", label="Min", description="Eyebrows at the peak: random between min and max")
+    eyebrow_max: Field[float] = Field(7.5, min=-30.0, max=30.0, step=0.1, label="Max", description="Eyebrows at the peak: random between min and max")
+    eyebrow_prefer: Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
+    blink_min:   Field[float] = Field(-9.0, min=-30.0, max=30.0, step=0.1, newline=True, row_label="Blink", label="Min", description="Eyes open (-) / closed (+) at the peak: random between min and max")
+    blink_max:   Field[float] = Field(-9.0, min=-30.0, max=30.0, step=0.1, label="Max", description="Eyes open (-) / closed (+) at the peak: random between min and max")
+    blink_prefer:   Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
+    wink_min:    Field[float] = Field(0.0, min=-30.0, max=30.0, step=0.1, newline=True, row_label="Wink", label="Min", description="Wink at the peak: random between min and max")
+    wink_max:    Field[float] = Field(0.0, min=-30.0, max=30.0, step=0.1, label="Max", description="Wink at the peak: random between min and max")
+    wink_prefer:    Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
+    pupil_x_min: Field[float] = Field(0.0, min=-15.0, max=15.0, step=0.1, newline=True, row_label="Pupil X", label="Min", description="Gaze left / right at the peak: random between min and max")
+    pupil_x_max: Field[float] = Field(0.0, min=-15.0, max=15.0, step=0.1, label="Max", description="Gaze left / right at the peak: random between min and max")
+    pupil_x_prefer: Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
+    pupil_y_min: Field[float] = Field(0.0, min=-15.0, max=15.0, step=0.1, newline=True, row_label="Pupil Y", label="Min", description="Gaze up / down at the peak: random between min and max")
+    pupil_y_max: Field[float] = Field(0.0, min=-15.0, max=15.0, step=0.1, label="Max", description="Gaze up / down at the peak: random between min and max")
+    pupil_y_prefer: Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
+    pitch_min:   Field[float] = Field(-15.0, min=-30.0, max=30.0, step=0.5, newline=True, row_label="Pitch", label="Min", description="Head nod (degrees): random between min and max")
+    pitch_max:   Field[float] = Field(0.0, min=-30.0, max=30.0, step=0.5, label="Max", description="Head nod (degrees): random between min and max")
+    pitch_prefer:   Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
+    yaw_min:     Field[float] = Field(-15.0, min=-30.0, max=30.0, step=0.5, newline=True, row_label="Yaw", label="Min", description="Head turn (degrees): random between min and max")
+    yaw_max:     Field[float] = Field(15.0, min=-30.0, max=30.0, step=0.5, label="Max", description="Head turn (degrees): random between min and max")
+    yaw_prefer:     Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
+    roll_min:    Field[float] = Field(-15.0, min=-30.0, max=30.0, step=0.5, newline=True, row_label="Roll", label="Min", description="Head tilt (degrees): random between min and max")
+    roll_max:    Field[float] = Field(15.0, min=-30.0, max=30.0, step=0.5, label="Max", description="Head tilt (degrees): random between min and max")
+    roll_prefer:    Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
 
 
 class PlaybackSettings(BaseSettings):
