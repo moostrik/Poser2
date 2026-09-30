@@ -4,13 +4,33 @@ SMILE crops and rotates the face itself (modules/face/FaceFinder.py), so the wor
 face crop is removed and its consumers read the uploaded image directly. The video and the
 overlay check are removed too, and the saved portrait becomes a preview (nothing piles up in
 ComfyUI's output folder). Nodes are found by class type or title, not by id.
+
+The workflow only provides the structure: every run fills in the values from ComfySettings.
 """
 
 import copy
 import json
 import random
 
+from modules.comfy.settings import ComfySettings
+
 MAX_SEED: int = 2 ** 32 - 1     # the smallest maximum of the seeded nodes (QwenVL: 1 .. 4294967295)
+FIXED_SEED: int = 1             # with portrait.fixed_seed: the description and the grin too, or the runs still differ
+
+# LoraSettings field: title of its node
+LORAS: dict[str, str] = {'clothing': 'LoRA: clothing', 'looking': 'LoRA: looking at viewer', 'dark': 'LoRA: dark'}
+
+GRIN_TARGETS: tuple[str, ...] = ('smile', 'aaa', 'eee', 'woo', 'eyebrow', 'blink', 'wink', 'pupil_x', 'pupil_y')
+GRIN_ROTATIONS: tuple[str, ...] = ('pitch', 'yaw', 'roll')
+
+
+def grin_box(portrait_size: tuple[int, int], crop_size: float) -> tuple[int, int, int, int]:
+    """The centred 4:5 part of the portrait the grin shows: (x, y, width, height) in pixels."""
+    portrait_width, portrait_height = portrait_size
+    # a multiple of 8 keeps 4:5 exact and both margins even, so the crop is exactly centred
+    width: int = max(8, int(round(portrait_width * crop_size / 8)) * 8)
+    height: int = width * 5 // 4
+    return (portrait_width - width) // 2, (portrait_height - height) // 2, width, height
 
 
 def _find(workflow: dict, class_type: str | None = None, title: str | None = None) -> str:
@@ -67,14 +87,18 @@ class Workflow():
                                 '_meta': workflow[all_frames]['_meta']}
 
         self.style: str = _find(workflow, title='Prompt: style')
-
-        # the sampler previews every step with the real VAE (comfy/aiia_grin, KSamplerFullPreview)
-        # instead of ComfyUI's approximate latent previews; the result is the same
+        self.suffix: str = _find(workflow, title='Description + model')
+        self.negative: str = _find(workflow, title='Negative')
         self.sampler: str = _find(workflow, class_type='KSampler')
-        workflow[self.sampler]['class_type'] = 'KSamplerFullPreview'
-        workflow[self.sampler]['inputs']['vae'] = list(workflow[_find(workflow, class_type='VAEDecode')]['inputs']['vae'])
+        # KSamplerFullPreview (comfy/aiia_grin) previews every step with the real VAE; it needs the VAE
+        self.vae: list = list(workflow[_find(workflow, class_type='VAEDecode')]['inputs']['vae'])
+        self.loras: dict[str, str] = {name: _find(workflow, title=title) for name, title in LORAS.items()}
+        self.instantid: str = _find(workflow, class_type='ApplyInstantIDAdvanced')
+        self.depth: str = _find(workflow, class_type='ControlNetApplyAdvanced')
         self.describe: str = _find(workflow, class_type='AILab_QwenVL')
         self.description: str = _find(workflow, title='Preview as Text')
+        self.grin_crop: str = _find(workflow, class_type='ImageCrop')
+        self.grin_scale: str = _find(workflow, class_type='ImageScale')
         self.grin: str = _find(workflow, class_type='GrinFrames')
 
         # depth maps, as the old A1111 depth: of the capture (mask of the flash out) and of the
@@ -89,22 +113,51 @@ class Workflow():
         workflow['smile_last_midas'] = _midas([self.last_frame, 0])
         workflow[self.last_depth] = {'class_type': 'PreviewImage', 'inputs': {'images': ['smile_last_midas', 0]}}
 
-        # the grin frames are the centre of the portrait: (x, y, w, h) relative to the portrait
         latent: dict = workflow[_find(workflow, class_type='EmptyLatentImage')]['inputs']
-        crop: dict = workflow[_find(workflow, class_type='ImageCrop')]['inputs']
         self.portrait_size: tuple[int, int] = (latent['width'], latent['height'])
-        self.grin_crop: tuple[float, float, float, float] = (crop['x'] / latent['width'], crop['y'] / latent['height'],
-                                                             crop['width'] / latent['width'], crop['height'] / latent['height'])
         self._template: dict = workflow
 
-    def build(self, image_name: str, style: str, frames: int) -> dict:
+    def build(self, image_name: str, style: str, s: ComfySettings) -> dict:
         workflow: dict = copy.deepcopy(self._template)
         workflow[self.load_image]['inputs']['image'] = image_name
+
+        describe: dict = workflow[self.describe]['inputs']
+        describe['custom_prompt'] = s.describe.instruction
+        describe['max_tokens'] = s.describe.max_tokens
+        describe['quantization'] = s.describe.quantization
+
+        p = s.portrait
         workflow[self.style]['inputs']['text'] = style
-        workflow[self.grin]['inputs']['frames'] = frames
-        workflow[self.last_frame]['inputs']['batch_index'] = frames - 1
+        workflow[self.suffix]['inputs']['string_b'] = s.describe.suffix
+        workflow[self.negative]['inputs']['text'] = s.style.negative
+        sampler: dict = workflow[self.sampler]
+        sampler['inputs'].update(steps=p.steps, cfg=p.cfg, sampler_name=p.sampler, scheduler=p.scheduler)
+        if p.full_preview:
+            sampler['class_type'] = 'KSamplerFullPreview'
+            sampler['inputs']['vae'] = list(self.vae)
+        workflow[self.instantid]['inputs'].update(ip_weight=p.embedding_strength, cn_strength=p.keypoint_strength)
+        workflow[self.depth]['inputs'].update(strength=p.depth_strength, end_percent=p.depth_end)
+        # one strength for the model and the text encoder, as A1111's <lora:name:strength>; 0 is off
+        for name, node_id in self.loras.items():
+            strength: float = getattr(s.lora, name)
+            workflow[node_id]['inputs'].update(strength_model=strength, strength_clip=strength)
+
+        g = s.grin
+        x, y, width, height = grin_box(self.portrait_size, g.crop_size)
+        workflow[self.grin_crop]['inputs'].update(x=x, y=y, width=width, height=height)
+        workflow[self.grin_scale]['inputs'].update(width=g.width, height=g.width * 5 // 4)
+        grin: dict = workflow[self.grin]['inputs']
+        grin.update(frames=g.frames, ease=g.ease.value, crop_factor=g.crop_factor, midpoint=g.midpoint,
+                    midpoint_deviation=g.midpoint_deviation, stitching=g.stitching)
+        for name in GRIN_TARGETS:
+            grin[name] = getattr(g, name)
+        for name in GRIN_ROTATIONS:
+            grin[f'rotate_{name}_min'] = getattr(g, f'{name}_min')
+            grin[f'rotate_{name}_max'] = getattr(g, f'{name}_max')
+        workflow[self.last_frame]['inputs']['batch_index'] = g.frames - 1
+
         for node_id in (self.sampler, self.describe, self.grin):
-            workflow[node_id]['inputs']['seed'] = random.randint(1, MAX_SEED)
+            workflow[node_id]['inputs']['seed'] = FIXED_SEED if p.fixed_seed else random.randint(1, MAX_SEED)
         return workflow
 
 

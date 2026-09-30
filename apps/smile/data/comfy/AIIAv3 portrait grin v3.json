@@ -272,11 +272,68 @@
       "title": "Load Checkpoint"
     }
   },
+  "1002:1040": {
+    "inputs": {
+      "lora_name": "clothing_slider.safetensors",
+      "strength_model": 1,
+      "strength_clip": 1,
+      "model": [
+        "1002:20",
+        0
+      ],
+      "clip": [
+        "1002:20",
+        1
+      ]
+    },
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "LoRA: clothing"
+    }
+  },
+  "1002:1043": {
+    "inputs": {
+      "lora_name": "looking_at_viewer.safetensors",
+      "strength_model": 1,
+      "strength_clip": 1,
+      "model": [
+        "1002:1040",
+        0
+      ],
+      "clip": [
+        "1002:1040",
+        1
+      ]
+    },
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "LoRA: looking at viewer"
+    }
+  },
+  "1002:1045": {
+    "inputs": {
+      "lora_name": "dark.safetensors",
+      "strength_model": 1,
+      "strength_clip": 1,
+      "model": [
+        "1002:1043",
+        0
+      ],
+      "clip": [
+        "1002:1043",
+        1
+      ]
+    },
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "LoRA: dark"
+    }
+  },
   "1002:22": {
     "inputs": {
       "text": "BREAK nude portrait by (Mert and Marcus: 1.4), Glamorous Eroticism, High gloss vivid colors, bold contrast., Studio lighting, dramatic chiaroscuro, 2000s BREAK",
       "clip": [
-        "1002:20",
+        "1002:1045",
         1
       ]
     },
@@ -306,7 +363,7 @@
         0
       ],
       "clip": [
-        "1002:20",
+        "1002:1045",
         1
       ]
     },
@@ -335,7 +392,7 @@
     "inputs": {
       "text": "blurry, out of focus, illustration, painting, drawing, cartoon, 3d render, crooked teeth, deformed hands, extra fingers, lowres, jpeg artifacts, watermark, text",
       "clip": [
-        "1002:20",
+        "1002:1045",
         1
       ]
     },
@@ -396,7 +453,7 @@
         0
       ],
       "model": [
-        "1002:20",
+        "1002:1045",
         0
       ],
       "positive": [

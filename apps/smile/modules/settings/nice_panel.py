@@ -208,6 +208,8 @@ def _build_settings_entry(settings, name: str, field: Field, polls) -> None:
     wiring = _wiring_css_class(settings, name)
     if wiring:
         css = f"{css} {wiring}"
+    if Widget.resolve(field) is Widget.textarea:
+        css = f"{css} w-full"   # a text area takes a whole row of its card
     if field.widget == Widget.button:
         with ui.element("div").classes(css):
             _build_action_button(settings, name, field)
@@ -758,7 +760,7 @@ def _build_textarea(settings, name, field, polls):
 
     ta = _attach_description_tooltip(ui.textarea(label=label, value=value).props(
         "dense outlined" + _lock_prop(is_disabled)
-    ), desc)
+    ).classes("w-full"), desc)
 
     if not is_disabled:
         # Enter inserts a newline in a textarea, so commit on focus-out / change only.

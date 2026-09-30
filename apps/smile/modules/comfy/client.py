@@ -81,6 +81,12 @@ class ComfyClient():
         response.raise_for_status()
         return decode(response.content)
 
+    def object_info(self, class_type: str) -> dict:
+        """The input definitions of one node type, as this server has it."""
+        response = requests.get(f'{self.base}/object_info/{class_type}', timeout=10)
+        response.raise_for_status()
+        return response.json()[class_type]
+
     def interrupt(self) -> None:
         requests.post(f'{self.base}/queue', json={'clear': True}, timeout=5)
         requests.post(f'{self.base}/interrupt', timeout=5)

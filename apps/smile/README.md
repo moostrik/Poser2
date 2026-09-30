@@ -45,6 +45,7 @@ semi real time webcam diffusers
 
 ### Run Project
 * run ```scripts\start.bat```
+* `smile.py` does not start ComfyUI itself: when running it on its own (e.g. from VSCode), start the server first with ```scripts\start_comfy.bat``` (add `--enable-manager` for the ComfyUI-Manager)
 * settings panel: open http://localhost:667 in a browser (also reachable from other devices on the network)
 * presets live in `data/settings/`, `Smile.json` loads at startup
 * monitors are numbered primary first, then left to right: SMILE uses the one in its preset (`render.window.monitor`), the two image players the ones in `scripts\start.bat` (`PLAYER_1_MONITOR`, `PLAYER_2_MONITOR`)

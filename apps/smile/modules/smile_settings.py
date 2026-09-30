@@ -12,13 +12,13 @@ from modules.save.settings import ImgFolderSettings
 
 
 class Settings(BaseSettings):
+    camera:   Group[CameraSettings]    = Group(CameraSettings)
+    face:     Group[FaceSettings]      = Group(FaceSettings)
+    comfy:    Group[ComfySettings]     = Group(ComfySettings)
+    save:     Group[ImgFolderSettings] = Group(ImgFolderSettings)
     sequence: Group[SequencerSettings] = Group(SequencerSettings)
     render:   Group[RenderSettings]    = Group(RenderSettings)
-    comfy:    Group[ComfySettings]     = Group(ComfySettings)
-    face:     Group[FaceSettings]      = Group(FaceSettings)
-    camera:   Group[CameraSettings]    = Group(CameraSettings)
     audio:    Group[AudioSettings]     = Group(AudioSettings)
     osc:      Group[OscSettings]       = Group(OscSettings)
     artnet:   Group[ArtnetSettings]    = Group(ArtnetSettings)
-    save:     Group[ImgFolderSettings] = Group(ImgFolderSettings)
     server:   Group[NiceSettings]      = Group(NiceSettings)

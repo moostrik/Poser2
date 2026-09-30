@@ -11,8 +11,10 @@ ComfyUI server (installed in `ComfyUI/` from the `comfy/` bundle, both git-ignor
 127.0.0.1:8188). `modules/comfy/`: `Generator` sends each capture to ComfyUI and turns its
 websocket events into `GenMessage`s for the render (CAM_DEPTH → DIFFUSION → DIFF_LOOP → IDLE);
 `workflow.py` adapts the API export in `data/comfy/` (face crop removed — SMILE crops and rotates
-the face itself — depth outputs added). Keep one workflow per visitor: a second workflow in
-between drops the first from ComfyUI's cache and reloads the models.
+the face itself — depth outputs added) and fills in every value from `ComfySettings` per run: the
+panel is the source of truth, the workflow only provides the structure. Keep one workflow per
+visitor: a second workflow in between drops the first from ComfyUI's cache and reloads the models.
+Our own ComfyUI nodes live in `comfy/aiia_grin/` (copied into `ComfyUI/custom_nodes/aiia_grin`).
 
 ## Render
 

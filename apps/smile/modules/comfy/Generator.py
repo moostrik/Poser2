@@ -21,7 +21,7 @@ from modules.comfy.client import ComfyClient, Event as ComfyEvent
 from modules.comfy.messages import GenMessage, GenState, MessageCallback
 from modules.comfy.settings import ComfySettings
 from modules.comfy.styles import Styles
-from modules.comfy.workflow import Workflow
+from modules.comfy.workflow import Workflow, grin_box
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +37,9 @@ class Generator(Thread):
     def __init__(self, settings: ComfySettings) -> None:
         super().__init__(name='generator')
         self.settings: ComfySettings = settings
-        self.workflow: Workflow = Workflow(settings.workflow)
-        self.styles: Styles = Styles(settings.styles)
-        self.client: ComfyClient = ComfyClient(settings.host, settings.port)
+        self.workflow: Workflow = Workflow(settings.connection.workflow)
+        self.styles: Styles = Styles(settings.style)
+        self.client: ComfyClient = ComfyClient(settings.connection.host, settings.connection.port)
 
         self._mutex: Lock = Lock()
         self._callbacks: list[MessageCallback] = []
@@ -68,15 +68,15 @@ class Generator(Thread):
 
     def next_style(self) -> str:
         """Call once per visitor (at the flash); returns the style id, which also picks the music."""
-        style_id: str = self.styles.advance(self.settings.style_repeat)
-        self.settings.style = style_id
-        return style_id
+        return self.styles.advance()
 
     def display_crop(self, image: np.ndarray) -> np.ndarray:
         """The part of a portrait-framed image that the grin frames show, so everything lines up."""
+        portrait_width, portrait_height = self.workflow.portrait_size
+        x, y, width, height = grin_box(self.workflow.portrait_size, self.settings.grin.crop_size)
         h, w = image.shape[:2]
-        x, y, cw, ch = self.workflow.grin_crop
-        return image[int(y * h):int((y + ch) * h), int(x * w):int((x + cw) * w)]
+        x0, y0 = int(x / portrait_width * w), int(y / portrait_height * h)
+        return image[y0:y0 + int(height / portrait_height * h), x0:x0 + int(width / portrait_width * w)]
 
     def add_message_callback(self, callback: MessageCallback) -> None:
         with self._mutex:
@@ -104,19 +104,33 @@ class Generator(Thread):
             except (websocket.WebSocketException, RequestException, ConnectionError, OSError):
                 logger.warning('Lost the connection to ComfyUI', exc_info=True)
                 self.client.close()
-                self.settings.connected = False
+                self.settings.connection.connected = False
 
     def _connect(self) -> bool:
+        c = self.settings.connection
         try:
             self.client.connect()
         except Exception:
-            self.settings.connected = False
-            self.settings.status = f'waiting for ComfyUI at {self.settings.host}:{self.settings.port}'
+            c.connected = False
+            c.status = f'waiting for ComfyUI at {c.host}:{c.port}'
             return False
-        self.settings.connected = True
-        self.settings.status = 'ready'
-        logger.info('Connected to ComfyUI at %s:%s', self.settings.host, self.settings.port)
+        c.connected = True
+        c.status = 'ready'
+        logger.info('Connected to ComfyUI at %s:%s', c.host, c.port)
+        self._load_options()
         return True
+
+    def _load_options(self) -> None:
+        """The choices the panel offers, as this ComfyUI server has them."""
+        try:
+            describe: dict = self.client.object_info('AILab_QwenVL')['input']['required']
+            sampler: dict = self.client.object_info('KSampler')['input']['required']
+        except Exception:
+            logger.warning('Could not read the option lists from ComfyUI', exc_info=True)
+            return
+        self.settings.describe.quantization_options = list(describe['quantization'][0])
+        self.settings.portrait.sampler_options = list(sampler['sampler_name'][0])
+        self.settings.portrait.scheduler_options = list(sampler['scheduler'][0])
 
     def _take_image(self) -> np.ndarray | None:
         with self._mutex:
@@ -132,13 +146,13 @@ class Generator(Thread):
         image: np.ndarray | None = cv2.imread(WARMUP_IMAGE)
         if image is None:
             return
-        self.settings.status = 'warming up'
+        self.settings.connection.status = 'warming up'
         self._silent = True
         try:
             self._generate(image)
         finally:
             self._silent = False
-        self.settings.status = 'ready'
+        self.settings.connection.status = 'ready'
 
     # GENERATION
     def _emit(self, message: GenMessage) -> None:
@@ -166,9 +180,9 @@ class Generator(Thread):
         finally:
             self.is_diffusing = False
             self._interrupt_event.clear()
-            self.settings.last_duration = round(time.time() - start, 1)
-            if self.settings.connected:
-                self.settings.status = 'ready'
+            self.settings.connection.last_duration = round(time.time() - start, 1)
+            if self.settings.connection.connected:
+                self.settings.connection.status = 'ready'
 
     def _check(self, deadline: float) -> None:
         if self._stop_event.is_set() or self._interrupt_event.is_set():
@@ -186,13 +200,14 @@ class Generator(Thread):
 
     def _run_job(self, image: np.ndarray, start: float) -> None:
         s: ComfySettings = self.settings
-        deadline: float = start + s.job_timeout
-        total: int = s.frames
+        deadline: float = start + s.connection.job_timeout
 
-        s.status = 'generating'
+        s.connection.status = 'generating'
         wf: Workflow = self.workflow
         name: str = self.client.upload(image, 'smile_capture.png')
-        main_id: str = self.client.queue(wf.build(name, self.styles.current_text(), total))
+        workflow: dict = wf.build(name, self.styles.current_text(), s)
+        total: int = workflow[wf.grin]['inputs']['frames']
+        main_id: str = self.client.queue(workflow)
 
         frames: deque[np.ndarray] = deque()
         playing: bool = False
@@ -207,7 +222,7 @@ class Generator(Thread):
             now: float = time.time()
 
             # play the grin at a fixed fps once enough frames are buffered
-            if frames and (playing or done or len(frames) >= s.prebuffer):
+            if frames and (playing or done or len(frames) >= s.playback.prebuffer):
                 if not playing:
                     playing = True
                     next_frame = now
@@ -215,7 +230,7 @@ class Generator(Thread):
                     frame: np.ndarray = frames.popleft()
                     played += 1
                     self._emit(GenMessage(GenState.DIFF_LOOP, min(played / total, 1.0), frame))
-                    interval: float = 1.0 / max(s.fps, 1.0)
+                    interval: float = 1.0 / max(s.playback.fps, 1.0)
                     # after running out of frames, continue from now instead of catching up in a burst
                     next_frame = next_frame + interval if now - next_frame < interval else now + interval
             if done and not frames:
@@ -257,7 +272,7 @@ class Generator(Thread):
                 elif node == wf.last_depth and output.get('images'):
                     last_depth = self.client.view(output['images'][0])
                 elif node == wf.description and output.get('text'):
-                    s.description = str(output['text'][0])
+                    s.describe.description = str(output['text'][0])
 
             elif event.type == 'execution_success':
                 done = True
