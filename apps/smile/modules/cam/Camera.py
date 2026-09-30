@@ -166,6 +166,17 @@ class Camera:
             return
         self._image = cover(image, self._width, self._height)
 
+    def next_image(self) -> None:
+        """After a capture: move the image source to the next file of the folder, when asked to."""
+        s: CameraSettings = self.settings
+        if not (s.use_image and s.image_next):
+            return
+        files: list[str] = [f for f in s.image_options if f]
+        if not files:
+            return
+        index: int = files.index(s.image) if s.image in files else -1
+        s.image = files[(index + 1) % len(files)]
+
     def _on_image(self, _: Any = None) -> None:
         self._load()
 

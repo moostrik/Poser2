@@ -173,6 +173,8 @@ class Forgettable():
             self.render.set_cap_image(cap_image)
             self.save.new_sequence(cap_image)
             self._grin_saved = False
+            # a test run on images: the next visitor is the next file
+            self.camera.next_image()
 
 
         if seq == SequenceType.TIMEOUT:

@@ -114,6 +114,26 @@ class TestCamera(unittest.TestCase):
         self.assertEqual(self.settings.image_count, 3)
         self.assertEqual(self.settings.image, 'b.jpg')
 
+    def test_next_image_walks_the_folder_and_wraps(self):
+        self.make(FakeDevice())
+        self.settings.use_image = True
+        self.settings.image_next = True
+        self.assertEqual(self.settings.image, 'a.jpg')
+        self.camera.next_image()
+        self.assertEqual(self.settings.image, 'b.jpg')
+        self.camera.next_image()
+        self.assertEqual(self.settings.image, 'a.jpg')
+
+    def test_next_image_does_nothing_without_the_toggles(self):
+        self.make(FakeDevice())
+        self.settings.use_image = True
+        self.camera.next_image()
+        self.assertEqual(self.settings.image, 'a.jpg')
+        self.settings.use_image = False
+        self.settings.image_next = True
+        self.camera.next_image()
+        self.assertEqual(self.settings.image, 'a.jpg')
+
     def test_close_closes_the_device(self):
         device = FakeDevice()
         self.make(device)

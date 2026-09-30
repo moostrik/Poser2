@@ -62,7 +62,8 @@ must be on the PATH: the gyan.dev full build); the encoder is picked at startup 
 those processes any other way: the apps run under pythonw, so they need `CREATE_NO_WINDOW` and no
 inherited handles. The players (`player/`) decode each of the newest clips once into RAM
 (`ClipPool`, 512x640, about 200 MB per clip) and play from memory; `pl_player.py -n` sets the number
-of cells, `--pool` the clips kept.
+of cells, `--pool` the clips kept. `scripts/start_players.bat` (re)starts both players alone
+(`console` first for logs, other arguments pass through); `scripts/start.bat` calls it.
 
 ## Settings
 

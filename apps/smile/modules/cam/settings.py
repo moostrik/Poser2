@@ -9,6 +9,7 @@ class CameraSettings(BaseSettings):
     image:         Field[str]       = Field("", widget=Widget.text_select, options=image_options, description="Image in input/ used as the source")
     image_count:   Field[int]       = Field(0, access=Field.READ, label="Images", description="Number of images in input/")
     reload:        Field[bool]      = Field(False, widget=Widget.button, description="Rescan input/ for images")
+    image_next:    Field[bool]      = Field(False, label="Next after capture", description="Image source: move to the next image in input/ after each capture")
 
     device:        Field[str]       = Field("none", access=Field.READ, newline=True, description="Camera device in use")
     flip_h:        Field[bool]      = Field(False, description="Mirror the camera image horizontally")
