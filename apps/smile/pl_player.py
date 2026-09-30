@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 from os import path, _exit
 from signal import signal, SIGINT
 from time import sleep
+from modules.log_config import setup_logging, install_thread_excepthook
 from player.Player import Player
 
 parser: ArgumentParser = ArgumentParser()
@@ -11,13 +12,18 @@ parser.add_argument('-n',   '--clips',      type=int,   default=24,     help='nu
 parser.add_argument('--pool',               type=int,   default=24,     help='number of newest clips kept decoded in RAM (about 200 MB each)')
 parser.add_argument('--root',               type=str,   default='recordings/', help='recordings folder (clips in its grins/ subfolder)')
 parser.add_argument('--hwdecode',           type=int,   default=None,   help='decode on the GPU with this DXGI adapter index (default: software)')
+parser.add_argument('--window',             action='store_true',        help='run in a window instead of borderless fullscreen (for testing)')
+parser.add_argument('-v',   '--verbose',    action='store_true',        help='enable verbose (DEBUG) console output')
 args = parser.parse_args()
+
+setup_logging(verbose=args.verbose, name=f'player{args.monitor}')
+install_thread_excepthook()
 
 currentPath: str = path.dirname(__file__)
 
 trail = 0.5         # the grin plays at 15 fps; a long trail would smear it
 wait = 3.0
-player: Player = Player(args.osc_port, args.root, args.monitor, trail, wait, args.clips, args.pool, args.hwdecode)
+player: Player = Player(args.osc_port, args.root, args.monitor, trail, wait, args.clips, args.pool, args.hwdecode, args.window)
 player.start()
 
 def signal_handler_exit(sig, frame) -> None:

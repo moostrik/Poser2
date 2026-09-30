@@ -40,11 +40,17 @@ def available() -> bool:
     return shutil.which(FFMPEG) is not None and shutil.which(FFPROBE) is not None
 
 
-def popen(args: list[str], stdin, stdout, command: str = FFMPEG) -> subprocess.Popen:
-    """Start ffmpeg (or ffprobe) with the arguments after the log options; stderr is always a pipe."""
+BELOW_NORMAL: int = getattr(subprocess, 'BELOW_NORMAL_PRIORITY_CLASS', 0)
+DECODE_THREADS: int = 2     # a background job: the players' render and loaders must keep their cores
+
+
+def popen(args: list[str], stdin, stdout, command: str = FFMPEG, background: bool = False) -> subprocess.Popen:
+    """Start ffmpeg (or ffprobe) with the arguments after the log options; stderr is always a pipe.
+    A background process runs below normal priority."""
+    flags: int = CREATE_NO_WINDOW | (BELOW_NORMAL if background else 0)
     return subprocess.Popen([command, '-hide_banner', '-loglevel', 'error', *args],
                             stdin=stdin, stdout=stdout, stderr=subprocess.PIPE,
-                            creationflags=CREATE_NO_WINDOW)
+                            creationflags=flags)
 
 
 def _stderr(output: bytes | None) -> str:
@@ -176,9 +182,10 @@ def decode_clip(path: str, size: tuple[int, int], hwdecode: int | None = None) -
     frames, fps, _, _ = probe(path)
     width, height = size
     frame_bytes = width * height * 3
-    args = ['-nostdin', *hwdecode_args(hwdecode), '-i', path, '-vf', f'scale={width}:{height}',
+    args = ['-nostdin', '-threads', str(DECODE_THREADS), *hwdecode_args(hwdecode), '-i', path,
+            '-filter_threads', str(DECODE_THREADS), '-vf', f'scale={width}:{height}',
             '-f', 'rawvideo', '-pix_fmt', 'bgr24', 'pipe:1']
-    process = popen(args, subprocess.DEVNULL, subprocess.PIPE)
+    process = popen(args, subprocess.DEVNULL, subprocess.PIPE, background=True)
     assert process.stdout is not None and process.stderr is not None
     if frames > 0:
         # fill a preallocated array, no second copy of the 200 MB

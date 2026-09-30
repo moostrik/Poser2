@@ -24,7 +24,10 @@ class ClipPool:
     """The newest clips, decoded once into RAM at the cell size; playback never decodes.
 
     The scanner adds and removes files; one decode thread works through them newest first. `ready`
-    is set when the initial batch is decoded, so the cells do not all start on the first clip in."""
+    is set when the initial batch is decoded or `START_CLIPS` are in, so the cells neither all start
+    on the first clip in nor wait for the whole pool."""
+
+    START_CLIPS: int = 6
 
     def __init__(self, size: int, cell_size: tuple[int, int], hwdecode: int | None = None, max_usage_count: int = 10) -> None:
         self.size: int = size
@@ -92,7 +95,7 @@ class ClipPool:
                 clip: Clip | None = self._decode(id, path)
                 if clip is not None:
                     self._insert(clip)
-            if self._initial_done and self._pending.empty():
+            if (self._initial_done and self._pending.empty()) or len(self) >= self.START_CLIPS:
                 self.ready.set()
 
     def _is_wanted(self, id: str) -> bool:

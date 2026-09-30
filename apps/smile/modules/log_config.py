@@ -91,11 +91,12 @@ def get_log_buffer() -> LogRingBuffer | None:
     return _log_buffer
 
 
-def setup_logging(verbose: bool = False) -> Path:
+def setup_logging(verbose: bool = False, name: str = "smile") -> Path:
     """Configure root logger with console + file handlers.
 
     Args:
         verbose: If True, console shows DEBUG level; otherwise INFO.
+        name: Prefix of the log file in logs/ (smile, player1, ...).
 
     Returns:
         Path to the log file.
@@ -105,7 +106,7 @@ def setup_logging(verbose: bool = False) -> Path:
     log_dir = Path(__file__).resolve().parent.parent / "logs"
     log_dir.mkdir(exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = log_dir / f"smile_{timestamp}.log"
+    log_file = log_dir / f"{name}_{timestamp}.log"
 
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
