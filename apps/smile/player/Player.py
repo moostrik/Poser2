@@ -1,12 +1,14 @@
 import logging
 import os
+import random
 import threading
+import time
 
 import numpy as np
 
 from player.ImgLoader import LoadImages
 from player.Render import PlayerRender
-from player.ClipPool import ClipPool
+from player.ClipPool import Clip, ClipPool, next_start
 from player.FolderScanner import FolderScanner
 
 from modules.osc.Sender import Sender as Osc
@@ -16,11 +18,14 @@ from modules.gl import FullscreenMode, MonitorId, WindowSettings
 logger = logging.getLogger(__name__)
 
 STATS_INTERVAL: float = 10.0    # s between the log lines with the frame rates
+START_DELAY: float = 0.5        # s between two cells starting when the loaded clips go round again
+MIN_START_GAP: float = 0.1      # s at least between two cells starting, when clips load faster than that
 
 
 class Player():
-    def __init__(self, osc_port: int, root: str = 'recordings/', monitor: int = 1, trail: float = 0.9, wait: float = 5.0,
-                 clips: int = 24, pool: int = 24, hwdecode: int | None = None, windowed: bool = False) -> None:
+    def __init__(self, osc_port: int, root: str = 'recordings/', monitor: int = 1, trail: float = 0.9,
+                 clips: int = 24, pool: int = 24, hwdecode: int | None = None, windowed: bool = False,
+                 fps: float = 30.0) -> None:
         osc_settings = OscSettings()
         osc_settings.port = int(osc_port)
         self.osc:Osc = Osc(osc_settings)
@@ -49,7 +54,7 @@ class Player():
 
         self.loaders: list[LoadImages] = []
         for id in ids:
-            loader = LoadImages(id, self.pool, wait)
+            loader = LoadImages(id, self.pool, fps)
             loader.add_image_callback(self.render.set_image)
             loader.add_image_callback(self._count_frame)
             loader.add_loader_callback(self.send_osc)
@@ -60,8 +65,10 @@ class Player():
         self._frames_lock = threading.Lock()
         self._stats_stop = threading.Event()
         self._stats_thread = threading.Thread(target=self._stats_loop, name='PlayerStats', daemon=True)
-        logger.info('Player %d: %d cells, pool %d, root %s, %s', monitor, clips, pool, root,
-                    'window' if windowed else 'fullscreen')
+        # the cells start one by one, each on the next clip that is loaded
+        self._start_thread = threading.Thread(target=self._start_loop, name='PlayerStart', daemon=True)
+        logger.info('Player %d: %d cells, pool %d, %s, root %s, %s', monitor, clips, pool,
+                    f'{fps:g} fps' if fps > 0 else 'clip fps', root, 'window' if windowed else 'fullscreen')
 
     def start(self) -> None:
         self.pool.start()
@@ -71,7 +78,29 @@ class Player():
         self.osc.start()
         self.render.start()
         self._stats_thread.start()
+        self._start_thread.start()
         self._running = True
+
+    def _start_loop(self) -> None:
+        """Give every cell its first clip: each clip as it is loaded, in a random cell. With fewer
+        clips than cells, go round the loaded clips again, START_DELAY apart."""
+        empty: list[LoadImages] = list(self.loaders)
+        random.shuffle(empty)
+        started: set[str] = set()
+        last_start: float = 0.0
+        while empty and not self._stats_stop.is_set():
+            clip: Clip | None = next_start(self.pool.clips(), started)
+            if clip is not None and (not started or time.time() - last_start >= MIN_START_GAP):
+                self.pool.use(clip)
+                empty.pop().assign(clip)
+                started.add(clip.id)
+                last_start = time.time()
+                logger.info('Cell %d of %d starts on %s', len(self.loaders) - len(empty), len(self.loaders), clip.id)
+                continue
+            if clip is None and started and self.pool.idle and time.time() - last_start >= START_DELAY:
+                started.clear()     # every loaded clip has started a cell: round again from the first
+                continue
+            self._stats_stop.wait(0.02)
 
     def stop(self) -> None:
         self._stats_stop.set()

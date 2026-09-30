@@ -20,26 +20,30 @@ class Clip:
     usage_count: int = field(default=0)
 
 
+def next_start(clips: list[Clip], started: set[str]) -> Clip | None:
+    """The first clip in load order that has not started a cell in this round; None when all have."""
+    for clip in clips:
+        if clip.id not in started:
+            return clip
+    return None
+
+
 class ClipPool:
     """The newest clips, decoded once into RAM at the cell size; playback never decodes.
 
-    The scanner adds and removes files; one decode thread works through them newest first. `ready`
-    is set when the initial batch is decoded or `START_CLIPS` are in, so the cells neither all start
-    on the first clip in nor wait for the whole pool."""
-
-    START_CLIPS: int = 6
+    The scanner adds and removes files; one decode thread works through them newest first. The
+    player starts a cell on each clip as it comes in (`clips`, `idle`)."""
 
     def __init__(self, size: int, cell_size: tuple[int, int], hwdecode: int | None = None, max_usage_count: int = 10) -> None:
         self.size: int = size
         self.cell_size: tuple[int, int] = cell_size
         self.hwdecode: int | None = hwdecode
         self.max_usage_count: int = max_usage_count
-        self.ready = threading.Event()
 
         self._clips: dict[str, Clip] = {}
         self._lock = threading.Lock()
         self._pending: queue.LifoQueue[str] = queue.LifoQueue()
-        self._initial_done: bool = False
+        self._outstanding: int = 0      # files added and not yet decoded or skipped
         self._stop_event = threading.Event()
         self._thread = threading.Thread(target=self._decode_loop, name='ClipPool', daemon=True)
 
@@ -54,19 +58,30 @@ class ClipPool:
     # SCANNER THREAD
 
     def add(self, path: str) -> None:
+        with self._lock:
+            self._outstanding += 1
         self._pending.put(path)
 
     def remove(self, id: str) -> None:
         with self._lock:
             self._clips.pop(id, None)
 
-    def initial_done(self) -> None:
-        """The initial listing is queued; ready follows when it is decoded (at once when it was empty)."""
-        self._initial_done = True
-        if self._pending.empty():
-            self.ready.set()
+    # PLAYER AND LOADER THREADS
 
-    # LOADER THREADS
+    def clips(self) -> list[Clip]:
+        """The clips in the order they were loaded (the newest visitor first at startup)."""
+        with self._lock:
+            return list(self._clips.values())
+
+    @property
+    def idle(self) -> bool:
+        """Nothing is waiting to be decoded."""
+        with self._lock:
+            return self._outstanding == 0
+
+    def use(self, clip: Clip) -> None:
+        with self._lock:
+            clip.usage_count = min(clip.usage_count + 1, self.max_usage_count)
 
     def get_clip(self) -> Clip | None:
         """A random clip, favouring the least played ones; None while the pool is empty."""
@@ -95,8 +110,8 @@ class ClipPool:
                 clip: Clip | None = self._decode(id, path)
                 if clip is not None:
                     self._insert(clip)
-            if (self._initial_done and self._pending.empty()) or len(self) >= self.START_CLIPS:
-                self.ready.set()
+            with self._lock:
+                self._outstanding -= 1
 
     def _is_wanted(self, id: str) -> bool:
         with self._lock:

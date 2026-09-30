@@ -50,7 +50,6 @@ class FolderScanner:
         self.observer.schedule(ClipEventHandler(self), self.folder, recursive=False)
         self.observer.start()
         self.update()
-        self.pool.initial_done()
 
     def stop(self) -> None:
         self.observer.stop()
