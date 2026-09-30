@@ -4,7 +4,7 @@
     "flip_v": false,
     "gain_auto": false,
     "gain_target": 40,
-    "image_select": 0
+    "image_select": 2
   },
   "face": {
     "size_filter": 0.11,
@@ -55,17 +55,17 @@
       "still": false,
       "still_position": 1.0,
       "frames": 210,
-      "face_region": 1.9,
-      "stitching": true,
+      "face_region": 1.7,
+      "stitching": false,
       "ease": "SINE_IN_OUT",
-      "midpoint": 0.7,
-      "midpoint_deviation": 0.2,
+      "midpoint": 0.72,
+      "midpoint_deviation": 0.18,
       "smile_min": 2.0,
       "smile_max": 2.0,
       "smile_prefer": "EVEN",
       "aaa_min": -10.6,
       "aaa_max": 10.0,
-      "aaa_prefer": "ENDS_STRONG",
+      "aaa_prefer": "ENDS",
       "eee_min": -20.0,
       "eee_max": 0.0,
       "eee_prefer": "MIN",
@@ -98,8 +98,8 @@
       "roll_prefer": "ENDS"
     },
     "playback": {
-      "fps": 15.0,
-      "prebuffer": 8
+      "fps": 13.0,
+      "delay": 0.5
     }
   },
   "save": {
@@ -117,8 +117,9 @@
     "camera_out_ease": "LINEAR",
     "flash_in": 0.5,
     "flash_in_ease": "QUAD_IN",
+    "flash_hold": 0.5,
     "flash_out_auto": true,
-    "flash_out": 3.7454739093780516,
+    "flash_out": 2.6114510774612425,
     "flash_out_ease": "SINE_OUT",
     "timeout": 1.0
   },
@@ -126,7 +127,7 @@
     "show_camera": false,
     "freeze": false,
     "trail_active": true,
-    "trail": 0.985,
+    "trail": 0.99,
     "loop_trail": 0.8,
     "destroy_blur": 0.1,
     "destroy_bloom": 0.6,

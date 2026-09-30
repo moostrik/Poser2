@@ -78,6 +78,7 @@ class SequencerSettings(BaseSettings):
     camera_out_ease:    Field[Easing] = Field(Easing.LINEAR, description="Camera out easing")
     flash_in:           Field[float]  = Field(0.5, min=0.1, max=6.0, step=0.1, description="Flash and capture (s)")
     flash_in_ease:      Field[Easing] = Field(Easing.QUAD_IN, description="Flash in easing")
+    flash_hold:         Field[float]  = Field(0.5, min=0.0, max=3.0, step=0.1, description="Hold the full flash at least this long before the capture appears (s)")
     flash_out_auto:     Field[bool]   = Field(True, description="Match the flash out to the measured generation time")
     flash_out:          Field[float]  = Field(2.2, min=0.1, max=6.0, step=0.1, description="Flash out (s), set automatically when auto is on")
     flash_out_ease:     Field[Easing] = Field(Easing.SINE_OUT, description="Flash out easing")

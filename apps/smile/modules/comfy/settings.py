@@ -135,8 +135,12 @@ class GrinSettings(BaseSettings):
 
 
 class PlaybackSettings(BaseSettings):
-    fps:       Field[float] = Field(15.0, min=5.0, max=30.0, step=1.0, description="Grin playback speed (frames per second)")
-    prebuffer: Field[int]   = Field(8, min=1, max=60, step=1, description="Frames buffered before the grin starts playing")
+    fps:         Field[float] = Field(15.0, min=5.0, max=30.0, step=1.0, description="Grin playback speed (frames per second)")
+    delay:       Field[float] = Field(1.0, min=0.0, max=5.0, step=0.1, description="Shortest hold on the portrait before the grin plays, for the blend (s)")
+
+    made_fps:    Field[float] = Field(0.0, access=Field.READ, newline=True, description="Speed at which ComfyUI made the last grin (frames per second)")
+    buffer_wait: Field[float] = Field(0.0, access=Field.READ, description="Wait the last grin needed to play without stalling (s)")
+    start_wait:  Field[float] = Field(0.0, access=Field.READ, description="Wait before the last grin played: the longer of delay and buffer wait (s)")
 
 
 class ComfySettings(BaseSettings):

@@ -1,7 +1,10 @@
+import time
+
 import glfw
 import numpy as np
 from OpenGL.GL import GL_RGBA32F, glViewport  # type: ignore
 
+from modules.comfy.GrinPlayer import GrinPlayer
 from modules.comfy.messages import GenMessage, GenState
 from modules.gl import Blit, Fbo, RenderBase, Shader, Style, Texture, clear_color
 from modules.gl.Utils import fit
@@ -19,12 +22,15 @@ COMPOSITION_FORMAT = GL_RGBA32F
 class SmileRender(RenderBase):
     """The installation display. Runs the sequencer every frame (it is the app clock), then lets the
     stage of the current sequence state render the layers, and fits its output in the window.
+    The grin frames come from the player, which is asked every frame for the one that is due.
     Keys: Enter starts a sequence; f fullscreen, w borderless, Esc quit (the window manager)."""
 
-    def __init__(self, settings: RenderSettings, sequencer: Sequencer, width: int, height: int) -> None:
+    def __init__(self, settings: RenderSettings, sequencer: Sequencer, player: GrinPlayer, width: int, height: int) -> None:
         super().__init__(settings.window)
         self.settings: RenderSettings = settings
         self.sequencer: Sequencer = sequencer
+        self.player: GrinPlayer = player
+        self._plays: int = player.plays
         self.width: int = width
         self.height: int = height
 
@@ -64,6 +70,7 @@ class SmileRender(RenderBase):
         self.inputs.deallocate()
 
     def update(self) -> None:
+        self._play_grin()
         # sequencer first: images handed over with a state change (the depth with CONTROL_0)
         # are then uploaded before the stage uses them
         message = self.sequencer.update()
@@ -87,6 +94,19 @@ class SmileRender(RenderBase):
                 copy(self._output, self._freeze_fbo)
             self._output = self._freeze_fbo
         self._frozen = self.settings.freeze
+
+    def _play_grin(self) -> None:
+        """Show the grin frame that is due. Its first frame arrives during DIFFUSION and blends in as
+        a generation step; DIFF_LOOP starts when the player starts playing."""
+        frame: np.ndarray | None = self.player.update(time.time())
+        if frame is not None:
+            self.inputs.diffusion.set_image(frame)
+        started: bool = self.player.plays != self._plays
+        if started:
+            self._plays = self.player.plays
+            self.sequencer.set_sequence(SequenceType.DIFF_LOOP)
+        if started or (frame is not None and self.player.playing):
+            self.sequencer.set_diffusion_progress(self.player.progress)
 
     def draw_main(self, width: int, height: int) -> None:
         clear_color(0, 0, 0, 1)
@@ -125,12 +145,11 @@ class SmileRender(RenderBase):
         if message.state == GenState.CAM_DEPTH:
             if message.image is not None:
                 self.inputs.capture_depth.set_image(message.image)
-            self.sequencer.set_sequence(SequenceType.CONTROL_0)
-        elif message.state == GenState.DIFFUSION or message.state == GenState.DIFF_LOOP:
+            self.sequencer.start_reveal()
+        elif message.state == GenState.DIFFUSION:
             if message.image is not None:
                 self.inputs.diffusion.set_image(message.image)
-            seq = SequenceType.DIFFUSION if message.state == GenState.DIFFUSION else SequenceType.DIFF_LOOP
-            self.sequencer.set_sequence(seq)
+            self.sequencer.set_sequence(SequenceType.DIFFUSION)
             self.sequencer.set_diffusion_progress(message.progress)
         elif message.state == GenState.IDLE:
             if message.image is not None:

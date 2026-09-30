@@ -13,7 +13,7 @@ class GenState(Enum):
     CN_POSE     = 5
     CN_DETAIL   = 6
     DIFFUSION   = 7     # step previews, then the finished portrait (final=True)
-    DIFF_LOOP   = 8     # grin animation frames
+    DIFF_LOOP   = 8     # a grin frame as it is made (for saving; the render plays them from the GrinPlayer)
     DIF_DEPTH   = 9
 
 

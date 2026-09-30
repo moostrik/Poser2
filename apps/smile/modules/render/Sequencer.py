@@ -187,15 +187,20 @@ def capture_message(state: SeqenceState, duration: float, easing: Easing = easin
     state.type = SequenceType.ASK
     return SeqenceMessage(state.type, progress, initial, value)
 
-def post_capture_message(state: SeqenceState, duration: float, easing: Easing = easing.linear) -> SeqenceMessage:
+def post_capture_message(state: SeqenceState, duration: float, easing: Easing = easing.linear, hold: float = 0.0, reveal: bool = False) -> SeqenceMessage:
     initial = False
     if state.previous_type != state.type:
         initial = True
         state.previous_type = state.type
 
-    progress: float = min((time.time() - state.start_time) / duration, 1.0)
+    elapsed: float = time.time() - state.start_time
+    progress: float = min(elapsed / duration, 1.0)
     value: float = easing(progress)
-    return SeqenceMessage(state.type, progress, initial, value)
+    message = SeqenceMessage(state.type, progress, initial, value)
+    # the flash out starts when the capture's depth is in and the full flash has stood for the hold
+    if reveal and elapsed >= duration + hold:
+        state.type = SequenceType.CONTROL_0
+    return message
 
 def control_message(state: SeqenceState, duration: float, easing: Easing = easing.linear, first: bool = False) -> SeqenceMessage:
     initial = False
@@ -247,7 +252,9 @@ MessageCallback = Callable[[SeqenceMessage], None]
 
 class Sequencer():
     """Time-based state machine of a visitor cycle. update() runs once per render frame, on the render
-    thread; set_sequence() and the other setters are called from the generator, face and key threads."""
+    thread; set_sequence() and the other setters are called from the generator, face and key threads.
+    Two steps wait for the generator: the flash holds (ASK) until start_reveal(), and the grin
+    (DIFF_LOOP) starts when the render's player starts playing."""
 
     def __init__(self, settings: SequencerSettings) -> None:
         self.settings: SequencerSettings = settings
@@ -262,6 +269,7 @@ class Sequencer():
 
         self.first_sequence: bool = True
         self.diffusion_progress: float = 0.0
+        self._reveal: bool = False      # the capture's depth is in: the flash out may start
 
         self.flash_out_start: float = 0.0
         self.flash_out_calculation: bool = False
@@ -302,10 +310,12 @@ class Sequencer():
             message = cam_record_message(self._state, s.camera_out, easing_function(s.camera_out_ease))
         elif self._state.type == SequenceType.FLASH:
             message = pre_capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease), 0.5)
+            if message.initial:
+                self._reveal = False
         elif self._state.type == SequenceType.CAPTURE:
             message = capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease))
         elif self._state.type == SequenceType.ASK:
-            message = post_capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease))
+            message = post_capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease), s.flash_hold, self._reveal)
         elif self._state.type == SequenceType.CONTROL_0:
             message = control_message(self._state, s.flash_out, easing_function(s.flash_out_ease), True)
         elif self._state.type == SequenceType.CONTROL_1:
@@ -352,6 +362,11 @@ class Sequencer():
                 return
             self._state.type = SequenceType.CAMERA_DETECT
 
+
+    def start_reveal(self) -> None:
+        """The capture's depth is in: start the flash out, once the full flash has stood for flash_hold."""
+        with self._state_mutex:
+            self._reveal = True
 
     def set_sequence(self, type: SequenceType) -> None:
         with self._state_mutex:

@@ -1,8 +1,9 @@
 """Image generator: sends each capture to ComfyUI and turns its output into GenMessages.
 
 Per capture: depth of the capture (CAM_DEPTH, starts the flash out) -> sampler previews and the
-finished portrait (DIFFUSION) -> the grin frames, streamed while ComfyUI makes them and played at
-a fixed fps (DIFF_LOOP) -> depth of the last frame (IDLE, the bloom mask) -> IDLE.
+finished portrait (DIFFUSION) -> the grin frames as ComfyUI makes them (DIFF_LOOP, for saving; the
+GrinPlayer gets them too and the render shows them from there on its own clock) -> once the last
+frame has been shown: depth of the last frame (IDLE, the bloom mask) -> IDLE.
 With grin.loop or grin.still on, the grin (or its peak pose as one frame) is made again (DIFF_LOOP)
 with the panel's current grin values until both are off; the portrait comes from ComfyUI's cache.
 Any failure or timeout ends with IDLE so the sequence can't hang; a reset (interrupt) ends
@@ -12,7 +13,6 @@ silently because the sequence has already moved on.
 import logging
 import os
 import time
-from collections import deque
 from threading import Event, Lock, Thread
 
 import numpy as np
@@ -20,6 +20,7 @@ import websocket
 from requests import RequestException
 
 from modules.comfy.client import ComfyClient, Event as ComfyEvent
+from modules.comfy.GrinPlayer import GrinPlayer
 from modules.comfy.messages import GenMessage, GenState, MessageCallback
 from modules.comfy.settings import ComfySettings
 from modules.comfy.styles import Styles
@@ -36,9 +37,10 @@ class Interrupted(Exception):
 
 
 class Generator(Thread):
-    def __init__(self, settings: ComfySettings) -> None:
+    def __init__(self, settings: ComfySettings, player: GrinPlayer) -> None:
         super().__init__(name='generator')
         self.settings: ComfySettings = settings
+        self.player: GrinPlayer = player
         self.workflow: Workflow = Workflow(settings.connection.workflow)
         self.styles: Styles = Styles(settings.style)
         self.client: ComfyClient = ComfyClient(settings.connection.host, settings.connection.port)
@@ -67,6 +69,7 @@ class Generator(Thread):
     def interrupt(self) -> None:
         if self.is_diffusing:
             self._interrupt_event.set()
+            self.player.clear()
 
     def next_style(self) -> str:
         """Call once per visitor (at the flash); returns the style id, which also picks the music."""
@@ -215,10 +218,10 @@ class Generator(Thread):
                 self._idle(0.1)
                 continue
             workflow = replay
-            depth, played = self._run_pass(workflow, time.time() + s.connection.job_timeout, replay=True)
+            depth, made = self._run_pass(workflow, time.time() + s.connection.job_timeout, replay=True)
             if depth is not None:
                 last_depth = depth
-            if played == 0:
+            if made == 0:
                 self._idle(0.5)
 
         # the depth of the last grin frame is the mask for the bloom back to the camera
@@ -226,44 +229,31 @@ class Generator(Thread):
         self._emit(GenMessage(GenState.IDLE))
 
     def _run_pass(self, workflow: dict, deadline: float, replay: bool = False) -> tuple[np.ndarray | None, int]:
-        """Queue the workflow and play its grin; returns the depth of the last frame and the frames played.
-        A replay only plays the grin: ComfyUI reports the cached capture depth and portrait again."""
+        """Queue the workflow and hand its grin to the player; returns, once the last frame has been shown,
+        the depth of that frame and the frames made.
+        A replay only makes the grin: ComfyUI reports the cached capture depth and portrait again."""
+        try:
+            return self._receive_pass(workflow, deadline, replay)
+        except BaseException:
+            self.player.clear()     # after a failure or a reset nothing of the grin is left to play
+            raise
+
+    def _receive_pass(self, workflow: dict, deadline: float, replay: bool) -> tuple[np.ndarray | None, int]:
         s: ComfySettings = self.settings
         wf: Workflow = self.workflow
         total: int = wf.frame_count(workflow)
+        if not self._silent:
+            # the first grin after a portrait holds on its first frame (the blend); the warm-up opens no clip
+            self.player.begin(total, hold=not replay)
         main_id: str = self.client.queue(workflow)
 
-        frames: deque[np.ndarray] = deque()
-        playing: bool = False
-        next_frame: float = 0.0
-        played: int = 0
+        made: int = 0
         last_depth: np.ndarray | None = None
         sampler_progress: float = 0.0
-        done: bool = False
 
         while True:
             self._check(deadline)
-            now: float = time.time()
-
-            # play the grin at a fixed fps once enough frames are buffered
-            if frames and (playing or done or len(frames) >= min(s.playback.prebuffer, total)):
-                if not playing:
-                    playing = True
-                    next_frame = now
-                if now >= next_frame:
-                    frame: np.ndarray = frames.popleft()
-                    played += 1
-                    self._emit(GenMessage(GenState.DIFF_LOOP, min(played / total, 1.0), frame))
-                    interval: float = 1.0 / max(s.playback.fps, 1.0)
-                    # after running out of frames, continue from now instead of catching up in a burst
-                    next_frame = next_frame + interval if now - next_frame < interval else now + interval
-            if done and not frames:
-                break
-
-            wait: float = 0.01
-            if playing and frames:
-                wait = max(0.001, min(0.01, next_frame - time.time()))
-            event: ComfyEvent | None = self.client.receive(wait)
+            event: ComfyEvent | None = self.client.receive(0.05)
             if event is None:
                 continue
             prompt_id: str | None = event.data.get('prompt_id')
@@ -274,7 +264,9 @@ class Generator(Thread):
             if event.type == 'preview' and event.image is not None:
                 node: str | None = event.data.get('node_id')
                 if node == wf.grin:
-                    frames.append(event.image)
+                    made += 1
+                    self.player.add(event.image)
+                    self._emit(GenMessage(GenState.DIFF_LOOP, min(made / total, 1.0), event.image))
                 elif node == wf.sampler and not replay:
                     self._emit(GenMessage(GenState.DIFFUSION, sampler_progress, event.image))
 
@@ -297,15 +289,22 @@ class Generator(Thread):
                     portrait: np.ndarray | None = self.client.view(output['images'][0])
                     if portrait is not None:
                         self._emit(GenMessage(GenState.DIFFUSION, 1.0, portrait, final=True))
+                        self.player.hold_from_now()
                 elif node == wf.description and output.get('text'):
                     s.describe.description = str(output['text'][0])
 
             elif event.type == 'execution_success':
-                done = True
+                break
 
             elif event.type in ('execution_error', 'execution_interrupted'):
                 if self._interrupt_event.is_set():
                     raise Interrupted()
                 raise RuntimeError(f"ComfyUI {event.type}: {event.data.get('exception_message', '')}")
 
-        return last_depth, played
+        # the render shows the frames on its own clock: IDLE and the next pass wait for the last one
+        self.player.end()
+        while self.player.busy:
+            self._check(deadline)
+            self.client.receive(0.02)
+        self._check(deadline)       # a reset empties the player too
+        return last_depth, made

@@ -84,8 +84,7 @@
       "roll_max": 10.0
     },
     "playback": {
-      "fps": 15.0,
-      "prebuffer": 8
+      "fps": 15.0
     }
   },
   "save": {
