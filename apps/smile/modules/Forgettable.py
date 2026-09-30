@@ -1,4 +1,4 @@
-from modules.face.FaceFinder import FaceFinder, FaceMessage
+from modules.face.FaceFinder import FaceFinder, FaceFrame
 from modules.render.SmileRender import SmileRender
 from modules.render.Sequencer import Sequencer, SeqenceMessage, SequenceType, AnimationType, AnimationTypeNames
 from modules.comfy.Generator import Generator
@@ -73,9 +73,6 @@ class Forgettable():
 
         self.laststate: str = ''
 
-        self.face_messages: list[FaceMessage] = []
-
-
     def start(self) -> None:
         self.camera.setColorCallback(self.render.set_cam_image)
         self.camera.open()
@@ -85,7 +82,8 @@ class Forgettable():
         self.diffuse.add_message_callback(self.diffusion_callback)
         self.diffuse.start()
 
-        self.face.add_message_callback(self.face_callback)
+        self.face.add_frame_callback(self.face_callback)
+        self.face.add_frame_callback(self.render.set_faces)
         self.face.start()
 
         self.osc.start()
@@ -120,7 +118,7 @@ class Forgettable():
         self.diffuse.clear_message_callbacks()
         self.diffuse.stop()
 
-        self.face.clear_message_callbacks()
+        self.face.clear_frame_callbacks()
         self.face.stop()
 
         self.save.stop()
@@ -150,7 +148,6 @@ class Forgettable():
             self.osc.send('/progress', progress)
 
         if seq == SequenceType.CAMERA_SHOW and message.initial:
-            self.face_messages = []
             self.face.reset()
 
         if seq >= SequenceType.CAMERA_SHOW and seq <= SequenceType.CAMERA_REC:
@@ -163,10 +160,13 @@ class Forgettable():
                 self.audio.update(movement_id)
 
         if seq == SequenceType.CAPTURE:
+            # the best face of the window before the flash; the full camera frame without one
             cap_image: np.ndarray = cam_image
-            portrait: FaceMessage | None = self.get_best_face()
+            portrait: np.ndarray | None = self.face.best()
             if portrait is not None:
-                cap_image = portrait.image
+                cap_image = portrait
+            else:
+                logger.warning('No face for the capture, using the camera frame')
 
             self.diffuse.set_image(cap_image)
             self.render.set_cap_image(cap_image)
@@ -183,18 +183,8 @@ class Forgettable():
         if seq == SequenceType.RESET:
             self.diffuse.interrupt()
 
-    def get_best_face(self, window: float = 1.0) -> FaceMessage | None:
-        # highest scoring face of the last second, so a blink or a turned head at the last frame is not used
-        if not self.face_messages:
-            print('warning, faces not set')
-            return None
-        latest: float = self.face_messages[-1].time
-        recent: list[FaceMessage] = [f for f in self.face_messages if f.time >= latest - window]
-        return max(recent, key=lambda f: f.score)
-
-    def face_callback(self, message: FaceMessage) -> None:
-        self.face_messages.append(message)
-        if message.stable:
+    def face_callback(self, frame: FaceFrame) -> None:
+        if frame.stable:
             self.sequencer.set_face_found()
 
     def diffusion_callback(self, message: GenMessage) -> None:

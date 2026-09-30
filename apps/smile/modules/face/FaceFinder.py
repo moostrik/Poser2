@@ -1,40 +1,47 @@
 import cv2
 import numpy as np
 import time
+from dataclasses import dataclass
 from threading import Thread, Lock
 from typing import Callable
 
 from modules.face.FaceDetector import FaceDetector, Face
+from modules.face.FaceLandmarks import FaceLandmarks
+from modules.face.BestFace import BestFace, BestEntry
+from modules.face.quality import FaceObservation, Pose, Rejection, REJECTION_LABELS, eye_openness, gate, head_pose, quality, sharpness
 from modules.face.settings import FaceSettings
 
-class FaceMessage():
-    def __init__(self, image: np.ndarray, size: float, score: float, stable: bool) -> None:
-        self.image: np.ndarray = image      # rotated portrait crop at the generator's portrait size
-        self.size: float = round(size, 3)   # face height relative to image height
-        self.score: float = round(score, 3)
-        self.stable: bool = stable          # found in enough consecutive frames
-        self.time: float = time.time()
+DETECT_THRESHOLD: float = 0.5
 
-MessageCallback = Callable[[FaceMessage], None]
 
-def largest_face(faces: list[Face], min_score: float) -> Face | None:
-    faces = [f for f in faces if f.score >= min_score]
+@dataclass(frozen=True)
+class FaceFrame:
+    """Every face of one camera frame, for the overlay and the sequence start."""
+    faces: tuple[FaceObservation, ...]
+    stable: bool                        # the subject qualified in enough consecutive frames
+    time: float
+
+    @property
+    def subject(self) -> FaceObservation | None:
+        return next((f for f in self.faces if f.subject), None)
+
+
+FrameCallback = Callable[[FaceFrame], None]
+
+
+def largest(faces: list[Face]) -> Face | None:
     if not faces:
         return None
     return max(faces, key=lambda f: f.width * f.height)
 
-def portrait_crop(img: np.ndarray, face: Face, min_size: float, portrait_zoom: float, portrait_offset: float, portrait_width: int, portrait_height: int) -> tuple[np.ndarray, float]:
+
+def portrait_crop(img: np.ndarray, face: Face, portrait_zoom: float, portrait_offset: float, portrait_width: int, portrait_height: int) -> np.ndarray:
     """Crop a portrait around the face, rotated so the eyes are level (as ComfyUI's face crop did).
 
     zoom: portrait width relative to the face height; offset: shift up, relative to the face height.
     """
-    image_height: int = img.shape[0]
     x0, y0, x1, y1 = face.bbox
     real_size: float = y1 - y0
-    normalized_size: float = real_size / float(image_height)
-
-    if normalized_size < min_size:
-        raise ValueError('face to small')
 
     # eye line -> roll angle; order the eyes left to right in the image
     eye_a, eye_b = face.kps[0], face.kps[1]
@@ -57,23 +64,41 @@ def portrait_crop(img: np.ndarray, face: Face, min_size: float, portrait_zoom: f
     matrix: np.ndarray = np.array([[axis_x[0] * scale, axis_y[0] * scale, origin[0]],
                                    [axis_x[1] * scale, axis_y[1] * scale, origin[1]]])
     # the crop may extend past the image edge: fill that part with the edge pixels instead of black
-    portrait_img: np.ndarray = cv2.warpAffine(img, matrix, (portrait_width, portrait_height), flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP, borderMode=cv2.BORDER_REPLICATE)
-    return portrait_img, normalized_size
+    return cv2.warpAffine(img, matrix, (portrait_width, portrait_height), flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP, borderMode=cv2.BORDER_REPLICATE)
+
+
+@dataclass(frozen=True)
+class _Assessed:
+    face: Face
+    size: float
+    pose: Pose
+    eyes: float | None
+    rejection: Rejection | None
+    quality: float
+
 
 class FaceFinder(Thread):
-    def __init__(self, settings: FaceSettings, composition_width: int, composition_height: int, model_path: str = 'files/scrfd_10g_bnkps.onnx') -> None:
+    """Detects the faces of each camera frame, judges them (pose, eyes, sharpness) and keeps the
+    best one of the last `window` seconds for the capture. The subject of a frame is its largest
+    qualifying face; every face goes to the frame callbacks, for the overlay."""
+
+    def __init__(self, settings: FaceSettings, composition_width: int, composition_height: int,
+                 model_path: str = 'files/scrfd_10g_bnkps.onnx', landmark_path: str = 'files/2d106det.onnx') -> None:
         super().__init__()
         self.settings: FaceSettings = settings
         self._input_mutex: Lock = Lock()
+        self._window_mutex: Lock = Lock()
         self._thread_running: bool = False
         self._image: np.ndarray | None = None
-        self._message_callbacks: list[MessageCallback] = []
+        self._frame_callbacks: list[FrameCallback] = []
 
         self._composition_width: int = composition_width
         self._composition_height: int = composition_height
         self._model_path: str = model_path
+        self._landmark_path: str = landmark_path
 
         self._consecutive: int = 0
+        self._best: BestFace = BestFace()
 
     def stop(self) -> None:
         if (self._thread_running):
@@ -83,26 +108,93 @@ class FaceFinder(Thread):
     def run(self) -> None:
         self._thread_running = True
         detector: FaceDetector = FaceDetector(self._model_path)
+        landmarks: FaceLandmarks = FaceLandmarks(self._landmark_path)
         while self._thread_running:
             image: np.ndarray | None = self.get_image()
             self.set_image(None)
             if image is not None:
-                s: FaceSettings = self.settings
-                face: Face | None = largest_face(detector.detect(image, 0.5), s.confidence)
-                try:
-                    if face is None:
-                        raise ValueError('no face found')
-                    portrait_img, size = portrait_crop(image, face, s.size_filter, s.zoom, s.offset, self._composition_width, self._composition_height)
-                    self._consecutive += 1
-                    self.message_callback(FaceMessage(portrait_img, size, face.score, self._consecutive >= s.stable_frames))
-                except ValueError as e:
-                    self._consecutive = 0
-                    self.error_callback(e)
+                self._process(image, detector, landmarks)
             else:
                 time.sleep(0.01)
 
+    def _process(self, image: np.ndarray, detector: FaceDetector, landmarks: FaceLandmarks) -> None:
+        s: FaceSettings = self.settings
+        now: float = time.time()
+        image_height, image_width = image.shape[:2]
+
+        assessed: list[_Assessed] = []
+        for face in detector.detect(image, DETECT_THRESHOLD):
+            size: float = face.height / float(image_height)
+            pose: Pose = head_pose(face.kps)
+            rejection: Rejection | None = gate(face.score, size, pose, s.confidence, s.size_filter, s.max_yaw, s.max_pitch, s.max_roll)
+            eyes: float | None = None
+            if rejection is None:
+                # the landmarks only for faces that passed the cheap checks
+                eyes = eye_openness(landmarks.detect(image, face, pose.roll), pose.roll)
+                if eyes < s.eye_open:
+                    rejection = Rejection.EYES
+            q: float = quality(pose, eyes, sharpness(image, face.bbox), s.max_yaw, s.max_pitch, s.eye_open)
+            assessed.append(_Assessed(face, size, pose, eyes, rejection, q))
+
+        # the subject: the largest qualifying face, or the largest face at all
+        subject: _Assessed | None = None
+        accepted: list[_Assessed] = [a for a in assessed if a.rejection is None]
+        candidates: list[_Assessed] = accepted if accepted else assessed
+        if candidates:
+            subject = max(candidates, key=lambda a: a.face.width * a.face.height)
+
+        if subject is not None and subject.rejection is None:
+            self._consecutive += 1
+        else:
+            self._consecutive = 0
+        stable: bool = subject is not None and subject.rejection is None and self._consecutive >= s.stable_frames
+
+        if subject is not None:
+            with self._window_mutex:
+                self._best.add(BestEntry(now, subject.rejection is None, subject.quality, image, subject.face), s.window)
+
+        faces: tuple[FaceObservation, ...] = tuple(
+            self._observation(a, a is subject, image_width, image_height) for a in assessed)
+        s.result = self._result(subject)
+        self.frame_callback(FaceFrame(faces, stable, now))
+
+    @staticmethod
+    def _observation(a: _Assessed, subject: bool, width: int, height: int) -> FaceObservation:
+        x0, y0, x1, y1 = a.face.bbox
+        return FaceObservation(
+            bbox=(float(x0) / width, float(y0) / height, float(x1) / width, float(y1) / height),
+            kps=tuple((float(k[0]) / width, float(k[1]) / height) for k in a.face.kps),
+            score=round(a.face.score, 3),
+            size=round(a.size, 3),
+            pose=a.pose,
+            eyes=a.eyes,
+            quality=round(a.quality, 3),
+            rejection=a.rejection,
+            subject=subject,
+        )
+
+    @staticmethod
+    def _result(subject: _Assessed | None) -> str:
+        if subject is None:
+            return 'no face'
+        p: Pose = subject.pose
+        eyes: str = '-' if subject.eyes is None else f'{subject.eyes:.2f}'
+        reason: str = '' if subject.rejection is None else f' {REJECTION_LABELS[subject.rejection]}'
+        return f'q {subject.quality:.2f} yaw {p.yaw:.0f} pitch {p.pitch:.0f} roll {p.roll:.0f} eyes {eyes}{reason}'
+
+    def best(self) -> np.ndarray | None:
+        """The portrait crop of the best face in the window, None when no face was seen."""
+        with self._window_mutex:
+            entry: BestEntry | None = self._best.best()
+        if entry is None:
+            return None
+        s: FaceSettings = self.settings
+        return portrait_crop(entry.image, entry.face, s.zoom, s.offset, self._composition_width, self._composition_height)
+
     def reset(self) -> None:
         self._consecutive = 0
+        with self._window_mutex:
+            self._best.clear()
 
     def set_image(self, image: np.ndarray | None) -> None:
         with self._input_mutex:
@@ -111,23 +203,19 @@ class FaceFinder(Thread):
         with self._input_mutex:
             return self._image
 
-    def message_callback(self, message: FaceMessage) -> None:
-        self.settings.result = 'size: ' + str(message.size) + ', score: ' + str(message.score) + ', stable: ' + str(message.stable)
+    def frame_callback(self, frame: FaceFrame) -> None:
         with self._input_mutex:
-            for c in self._message_callbacks: c(message)
+            for c in self._frame_callbacks: c(frame)
 
-    def error_callback(self, error: ValueError) -> None:
-        self.settings.result = 'error: ' + str(error)
-
-    def add_message_callback(self, callback: MessageCallback) -> None:
+    def add_frame_callback(self, callback: FrameCallback) -> None:
         with self._input_mutex:
-            self._message_callbacks.append(callback)
+            self._frame_callbacks.append(callback)
 
-    def remove_message_callback(self, callback: MessageCallback) -> None:
+    def remove_frame_callback(self, callback: FrameCallback) -> None:
         with self._input_mutex:
-            if callback in self._message_callbacks:
-                self._message_callbacks.remove(callback)
+            if callback in self._frame_callbacks:
+                self._frame_callbacks.remove(callback)
 
-    def clear_message_callbacks(self) -> None:
+    def clear_frame_callbacks(self) -> None:
         with self._input_mutex:
-            self._message_callbacks = []
+            self._frame_callbacks = []

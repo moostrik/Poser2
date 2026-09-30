@@ -1,4 +1,5 @@
 import time
+from threading import Lock
 
 import glfw
 import numpy as np
@@ -6,10 +7,12 @@ from OpenGL.GL import GL_RGBA32F, glViewport  # type: ignore
 
 from modules.render.GrinPlayer import GrinPlayer
 from modules.comfy.messages import GenMessage, GenState
+from modules.face.FaceFinder import FaceFrame
 from modules.gl import Blit, Fbo, RenderBase, Shader, Style, Texture, clear_color
 from modules.gl.Utils import fit
 from modules.render.inputs import Inputs
-from modules.render.layers import CameraLayer, DestructLayer, DiffusionLayer, FlashLayer, LayerBase, RevealLayer
+from modules.render.layers import CameraLayer, DestructLayer, DiffusionLayer, FaceOverlayLayer, FlashLayer, LayerBase, RevealLayer
+from modules.render.layers.face_marks import build_marks
 from modules.render.layers.passes import copy
 from modules.render.Sequencer import SequenceType, Sequencer
 from modules.render.settings import RenderSettings
@@ -17,6 +20,9 @@ from modules.render.stages import STAGES, Layers, Stage
 
 # 32 bit: the trail (0.995) adds steps too small for half floats
 COMPOSITION_FORMAT = GL_RGBA32F
+
+# the face overlay shows no faces older than this: the detector only runs in the camera states
+FACES_STALE: float = 0.5
 
 
 class SmileRender(RenderBase):
@@ -43,7 +49,11 @@ class SmileRender(RenderBase):
             diffusion=DiffusionLayer(self.inputs.diffusion),
             destruct=DestructLayer(self.inputs.diffusion_depth),
         )
-        self._all_layers: list[LayerBase] = list(vars(self.layers).values())
+        # the operator's face overlay is no stage layer: drawn on top when show_faces is on
+        self._faces: FaceOverlayLayer = FaceOverlayLayer(self.inputs.camera)
+        self._all_layers: list[LayerBase] = list(vars(self.layers).values()) + [self._faces]
+        self._faces_mutex: Lock = Lock()
+        self._face_frame: FaceFrame | None = None
 
         # one instance per stage class, shared by the sequence types it covers
         stages: dict[type[Stage], Stage] = {cls: cls(self.inputs, self.layers, settings) for cls in set(STAGES.values())}
@@ -89,6 +99,8 @@ class SmileRender(RenderBase):
         stage.update(message)
 
         self._output = stage.output
+        if self.settings.show_faces:
+            self._render_faces()
         if self.settings.freeze:
             if not self._frozen:
                 copy(self._output, self._freeze_fbo)
@@ -108,12 +120,23 @@ class SmileRender(RenderBase):
         if started or (frame is not None and self.player.playing):
             self.sequencer.set_diffusion_progress(self.player.progress)
 
+    def _render_faces(self) -> None:
+        with self._faces_mutex:
+            frame: FaceFrame | None = self._face_frame
+        if frame is None or time.time() - frame.time > FACES_STALE:
+            self._faces.set_marks([])
+        else:
+            self._faces.set_marks(build_marks(frame))
+        self._faces.render()
+
     def draw_main(self, width: int, height: int) -> None:
         clear_color(0, 0, 0, 1)
         Style.reset_state()
         self._draw_fit(self._output, width, height)
         if self.settings.show_camera and self.inputs.camera.allocated:
             self._draw_fit(self.inputs.camera, width, height)
+        if self.settings.show_faces:
+            self._draw_fit(self._faces.texture, width, height)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         pass
@@ -139,6 +162,10 @@ class SmileRender(RenderBase):
 
     def set_cap_image(self, image: np.ndarray) -> None:
         self.inputs.capture.set_image(image)
+
+    def set_faces(self, frame: FaceFrame) -> None:
+        with self._faces_mutex:
+            self._face_frame = frame
 
     def set_diffusion_message(self, message: GenMessage) -> None:
         # the image first, so it is uploaded no later than the frame the new state starts

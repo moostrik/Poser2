@@ -3,7 +3,19 @@
 Art installation: a camera captures a face, an image generator turns it into a portrait, and the
 result is shown with music (Max patch via OSC) and lights (Art-Net). Entry points: `smile.py`
 (main app, `modules/Forgettable.py`) and `pl_player.py` (image players). Python 3.12, venv in
-`.venv`, installed with `scripts/install.bat`.
+`.venv`, installed with `scripts/install.bat`. Tests: `.venv\Scripts\python -m pytest` from the repo root.
+
+## Face
+
+`modules/face/`: `FaceFinder` (own thread) detects every face of a camera frame (SCRFD,
+`files/scrfd_10g_bnkps.onnx`) and judges it in `quality.py`: pose from the 5 keypoints, eye
+openness from the 106 landmarks (`FaceLandmarks`, `files/2d106det.onnx`, only run for faces that
+passed the pose checks), sharpness from the pixels; the first failing check is the face's
+`Rejection`. The subject of a frame is its largest qualifying face; `stable_frames` qualifying
+frames in a row start a sequence. `BestFace` keeps the best subject of the last `window` seconds
+(qualifying before rejected, then by quality), and the capture crops that one (`portrait_crop`,
+eyes levelled, at the workflow's portrait size). Every frame's faces go to the render for the
+operator overlay (`render.show_faces`: `FaceOverlayLayer`, marks built in `face_marks.py`).
 
 ## Image generator
 
