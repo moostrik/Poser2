@@ -359,6 +359,13 @@ def _build_toggle(settings, name, field, polls):
 
 # -- numeric builders --------------------------------------------------------
 
+# a row label and three sliders fit side by side at this width
+SLIDER_WIDTH: int = 40
+
+
+def _slider_width(field) -> str:
+    return f"w-{field.width}" if field.width is not None else f"w-{SLIDER_WIDTH}"
+
 
 
 @widget_builder(Widget.slider)
@@ -370,7 +377,7 @@ def _build_slider(settings, name, field, polls):
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
     color = getattr(field, "color", "primary")
 
-    with ui.column().classes("w-48 max-w-full gap-1"):
+    with ui.column().classes(f"{_slider_width(field)} max-w-full gap-1"):
         with ui.row().classes("w-full items-center justify-between flex-nowrap"):
             _build_field_title(label, desc, classes="flex-1 truncate")
             fmt = "%.0f" if field.type_ is int else "%.2f"
@@ -440,7 +447,7 @@ def _build_log_slider(settings, name, field, polls):
     def clamp(v: float) -> float:
         return max(field.min, min(field.max, v))
 
-    with ui.column().classes("w-48 max-w-full gap-1"):
+    with ui.column().classes(f"{_slider_width(field)} max-w-full gap-1"):
         with ui.row().classes("w-full items-center justify-between flex-nowrap"):
             _build_field_title(label, desc, classes="flex-1 truncate")
             # HTML min is 0, not field.min: the browser steps in multiples of step counted

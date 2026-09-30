@@ -10,7 +10,6 @@ parser.add_argument('-dw',  '--width',          type=int,   default=1120,    hel
 parser.add_argument('-dh',  '--height',         type=int,   default=896,    help='image height')
 parser.add_argument('-wc',  '--useWebCam',      action='store_true',        help='use webcam instead of default cam')
 parser.add_argument('-vc',  '--useVimbaCam',    action='store_true',        help='use vimba camera instead of default cam')
-parser.add_argument('-ic',  '--useImageCam',    action='store_true',        help='use image instead of default cam')
 parser.add_argument('-pm',  '--portraitMode',   action='store_true',        help='use portrait mode (default)')
 parser.add_argument('-lm',  '--landscapeMode',  action='store_true',        help='use landscape mode')
 parser.add_argument('-v',   '--verbose',        action='store_true',        help='enable verbose (DEBUG) console output')
@@ -29,8 +28,6 @@ if args.useVimbaCam:
     camType = CamType.VIMBA
 if args.useWebCam:
     camType = CamType.WEB
-if args.useImageCam:
-    camType = CamType.IMAGE
 
 aiia = Forgettable(currentPath, modWidth, modHeight, not(bool(args.landscapeMode)), camType)
 aiia.start()

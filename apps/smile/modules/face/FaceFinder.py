@@ -8,7 +8,7 @@ from typing import Callable
 from modules.face.FaceDetector import FaceDetector, Face
 from modules.face.FaceLandmarks import FaceLandmarks
 from modules.face.BestFace import BestFace, BestEntry
-from modules.face.quality import FaceObservation, Pose, Rejection, REJECTION_LABELS, eye_openness, gate, head_pose, quality, sharpness
+from modules.face.quality import FaceObservation, Pose, Rejection, eye_openness, gate, head_pose, quality, rejection_label, sharpness
 from modules.face.settings import FaceSettings
 
 DETECT_THRESHOLD: float = 0.5
@@ -74,6 +74,7 @@ class _Assessed:
     pose: Pose
     eyes: float | None
     rejection: Rejection | None
+    limit: float
     quality: float
 
 
@@ -99,11 +100,22 @@ class FaceFinder(Thread):
 
         self._consecutive: int = 0
         self._best: BestFace = BestFace()
+        self._nose_ratio: float | None = None   # of the last subject, for the pitch calibration
+
+        self.settings.bind(FaceSettings.calibrate, self._on_calibrate)
 
     def stop(self) -> None:
+        self.settings.unbind(FaceSettings.calibrate, self._on_calibrate)
         if (self._thread_running):
             self._thread_running = False
             self.join()
+
+    def _on_calibrate(self, _=None) -> None:
+        """The face in front of the camera looks straight at it: its nose position is the neutral."""
+        ratio: float | None = self._nose_ratio
+        if ratio is None:
+            return
+        self.settings.pitch_zero = round(min(max(ratio, 0.3), 0.7), 2)
 
     def run(self) -> None:
         self._thread_running = True
@@ -125,7 +137,7 @@ class FaceFinder(Thread):
         assessed: list[_Assessed] = []
         for face in detector.detect(image, DETECT_THRESHOLD):
             size: float = face.height / float(image_height)
-            pose: Pose = head_pose(face.kps)
+            pose: Pose = head_pose(face.kps, s.pitch_zero)
             rejection: Rejection | None = gate(face.score, size, pose, s.confidence, s.size_filter, s.max_yaw, s.max_pitch, s.max_roll)
             eyes: float | None = None
             if rejection is None:
@@ -133,8 +145,12 @@ class FaceFinder(Thread):
                 eyes = eye_openness(landmarks.detect(image, face, pose.roll), pose.roll)
                 if eyes < s.eye_open:
                     rejection = Rejection.EYES
+            # the setting the failed check compared to, for the label
+            limits: dict[Rejection, float] = {Rejection.LOW_SCORE: s.confidence, Rejection.SMALL: s.size_filter, Rejection.TURNED: s.max_yaw,
+                                              Rejection.PITCHED: s.max_pitch, Rejection.TILTED: s.max_roll, Rejection.EYES: s.eye_open}
+            limit: float = limits[rejection] if rejection is not None else 0.0
             q: float = quality(pose, eyes, sharpness(image, face.bbox), s.max_yaw, s.max_pitch, s.eye_open)
-            assessed.append(_Assessed(face, size, pose, eyes, rejection, q))
+            assessed.append(_Assessed(face, size, pose, eyes, rejection, limit, q))
 
         # the subject: the largest qualifying face, or the largest face at all
         subject: _Assessed | None = None
@@ -143,6 +159,8 @@ class FaceFinder(Thread):
         if candidates:
             subject = max(candidates, key=lambda a: a.face.width * a.face.height)
 
+        if subject is not None:
+            self._nose_ratio = subject.pose.nose_ratio
         if subject is not None and subject.rejection is None:
             self._consecutive += 1
         else:
@@ -153,10 +171,9 @@ class FaceFinder(Thread):
             with self._window_mutex:
                 self._best.add(BestEntry(now, subject.rejection is None, subject.quality, image, subject.face), s.window)
 
-        faces: tuple[FaceObservation, ...] = tuple(
-            self._observation(a, a is subject, image_width, image_height) for a in assessed)
-        s.result = self._result(subject)
-        self.frame_callback(FaceFrame(faces, stable, now))
+        frame = FaceFrame(tuple(self._observation(a, a is subject, image_width, image_height) for a in assessed), stable, now)
+        s.result = self._result(frame.subject)
+        self.frame_callback(frame)
 
     @staticmethod
     def _observation(a: _Assessed, subject: bool, width: int, height: int) -> FaceObservation:
@@ -170,16 +187,17 @@ class FaceFinder(Thread):
             eyes=a.eyes,
             quality=round(a.quality, 3),
             rejection=a.rejection,
+            limit=a.limit,
             subject=subject,
         )
 
     @staticmethod
-    def _result(subject: _Assessed | None) -> str:
+    def _result(subject: FaceObservation | None) -> str:
         if subject is None:
             return 'no face'
         p: Pose = subject.pose
         eyes: str = '-' if subject.eyes is None else f'{subject.eyes:.2f}'
-        reason: str = '' if subject.rejection is None else f' {REJECTION_LABELS[subject.rejection]}'
+        reason: str = '' if subject.rejection is None else f' | {rejection_label(subject)}'
         return f'q {subject.quality:.2f} yaw {p.yaw:.0f} pitch {p.pitch:.0f} roll {p.roll:.0f} eyes {eyes}{reason}'
 
     def best(self) -> np.ndarray | None:

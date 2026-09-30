@@ -4,7 +4,7 @@ No GL: arithmetic and text, built once per frame for the FaceOverlayLayer (after
 from dataclasses import dataclass
 
 from modules.face.FaceFinder import FaceFrame
-from modules.face.quality import FaceObservation, Rejection, REJECTION_LABELS
+from modules.face.quality import FaceObservation, rejection_label
 
 Color = tuple[float, float, float, float]
 
@@ -30,20 +30,12 @@ class Mark:
 
 
 def face_label(face: FaceObservation) -> str:
-    """The readout of a qualifying face; the failed check with its value of a rejected one."""
+    """The readout of a qualifying face; the failed check, its value and the limit of a rejected one."""
+    if face.rejection is not None:
+        return rejection_label(face)
     p = face.pose
-    if face.rejection is None:
-        eyes: str = '-' if face.eyes is None else f'{face.eyes:.2f}'
-        return f'q{face.quality:.2f} yaw {p.yaw:.0f} pitch {p.pitch:.0f} roll {p.roll:.0f} eyes {eyes}'
-    value: str = {
-        Rejection.LOW_SCORE: f'{face.score:.2f}',
-        Rejection.SMALL:     f'{face.size:.2f}',
-        Rejection.TURNED:    f'{p.yaw:.0f}',
-        Rejection.PITCHED:   f'{p.pitch:.0f}',
-        Rejection.TILTED:    f'{p.roll:.0f}',
-        Rejection.EYES:      '-' if face.eyes is None else f'{face.eyes:.2f}',
-    }[face.rejection]
-    return f'{REJECTION_LABELS[face.rejection]} {value}'
+    eyes: str = '-' if face.eyes is None else f'{face.eyes:.2f}'
+    return f'q{face.quality:.2f} yaw {p.yaw:.0f} pitch {p.pitch:.0f} roll {p.roll:.0f} eyes {eyes}'
 
 
 def build_marks(frame: FaceFrame) -> list[Mark]:

@@ -20,21 +20,12 @@ class Rejection(IntEnum):
     EYES      = auto()  # an eye less open than eye_open
 
 
-REJECTION_LABELS: dict[Rejection, str] = {
-    Rejection.LOW_SCORE: 'score',
-    Rejection.SMALL:     'small',
-    Rejection.TURNED:    'turned',
-    Rejection.PITCHED:   'pitched',
-    Rejection.TILTED:    'tilted',
-    Rejection.EYES:      'eyes',
-}
-
-
 @dataclass(frozen=True)
 class Pose:
-    yaw: float      # degrees, positive when the nose moves to the image right
-    pitch: float    # degrees, positive when looking up
-    roll: float     # degrees, the eye line's angle, positive clockwise in the image
+    yaw: float          # degrees, positive when the nose moves to the image right
+    pitch: float        # degrees, positive when looking up
+    roll: float         # degrees, the eye line's angle, positive clockwise in the image
+    nose_ratio: float   # the nose tip between the eye line (0) and the mouth line (1), the pitch's raw value
 
 
 @dataclass(frozen=True)
@@ -48,6 +39,7 @@ class FaceObservation:
     eyes: float | None                          # openness of the less open eye, None if not measured
     quality: float
     rejection: Rejection | None
+    limit: float                                # the setting the failed check compared to; 0 when accepted
     subject: bool                               # the face the sequence uses
 
     @property
@@ -55,12 +47,34 @@ class FaceObservation:
         return self.rejection is None
 
 
+def rejection_label(face: FaceObservation) -> str:
+    """Why the face was rejected, in the panel's names: the value measured and the limit it missed,
+    e.g. `yaw 32 > 20` (an angle keeps its sign: `yaw -32 > 20` is beyond 20 the other way)."""
+    p: Pose = face.pose
+    if face.rejection is None:
+        return ''
+    if face.rejection == Rejection.LOW_SCORE:
+        return f'score {face.score:.2f} < {face.limit:.2f}'
+    if face.rejection == Rejection.SMALL:
+        return f'size {face.size:.2f} < {face.limit:.2f}'
+    if face.rejection == Rejection.TURNED:
+        return f'yaw {p.yaw:.0f} > {face.limit:.0f}'
+    if face.rejection == Rejection.PITCHED:
+        return f'pitch {p.pitch:.0f} > {face.limit:.0f}'
+    if face.rejection == Rejection.TILTED:
+        return f'roll {p.roll:.0f} > {face.limit:.0f}'
+    eyes: str = '-' if face.eyes is None else f'{face.eyes:.2f}'
+    return f'eyes {eyes} < {face.limit:.2f}'
+
+
 # Approximate face proportions, for the 5 keypoints. Nose tip depth in front of the eye plane relative
 # to the eye distance; nose tip depth in front of the eye-mouth plane relative to the eye-mouth
-# distance; where the nose tip sits between the eye line (0) and the mouth line (1) when frontal.
+# distance; where the nose tip sits between the eye line (0) and the mouth line (1) when looking at
+# the camera: the median of 301 visitor captures (p25 0.43, p75 0.53). It depends on the camera
+# height, so the panel can set it (FaceSettings.pitch_zero).
 NOSE_DEPTH_YAW: float = 0.5
 NOSE_DEPTH_PITCH: float = 0.45
-NOSE_NEUTRAL: float = 0.58
+NOSE_NEUTRAL: float = 0.48
 
 # Eye contour indices of the 106 landmarks (insightface 2d106det)
 LEFT_EYE: tuple[int, ...] = tuple(range(33, 43))
@@ -79,10 +93,11 @@ def _derolled(points: np.ndarray, roll: float, origin: np.ndarray) -> np.ndarray
     return (points - origin) @ matrix.T + origin
 
 
-def head_pose(kps: np.ndarray) -> Pose:
+def head_pose(kps: np.ndarray, neutral: float = NOSE_NEUTRAL) -> Pose:
     """Yaw, pitch and roll from the 5 keypoints: the eye line gives the roll; with the roll undone,
     the nose tip's offset between the eyes gives the yaw and its height between the eye line and
-    the mouth line gives the pitch. Approximate degrees: the face proportions are assumed."""
+    the mouth line gives the pitch, zero at `neutral`. Approximate degrees: the face proportions
+    are assumed."""
     eye_a, eye_b = kps[0], kps[1]
     if eye_a[0] > eye_b[0]:
         eye_a, eye_b = eye_b, eye_a
@@ -99,8 +114,8 @@ def head_pose(kps: np.ndarray) -> Pose:
 
     face_height: float = max(1e-6, float(mouth_mid[1] - eye_mid[1]))
     nose_ratio: float = float(nose[1] - eye_mid[1]) / face_height
-    pitch: float = math.degrees(math.atan((NOSE_NEUTRAL - nose_ratio) / NOSE_DEPTH_PITCH))
-    return Pose(yaw, pitch, roll)
+    pitch: float = math.degrees(math.atan((neutral - nose_ratio) / NOSE_DEPTH_PITCH))
+    return Pose(yaw, pitch, roll, nose_ratio)
 
 
 def eye_openness(landmarks: np.ndarray, roll: float) -> float:

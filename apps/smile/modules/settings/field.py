@@ -77,8 +77,8 @@ class Field(Generic[T]):
     - ``label`` — the panel's title for the control; ``None`` derives it from the name.
     - ``row_label`` — a text title the panel renders before this field: the name of the row it
       starts.
-    - ``width`` — a Tailwind width step for a control with a fixed width (a select); ``None``
-      keeps the control's own.
+    - ``width`` — a Tailwind width step for a control with a fixed width (a select, a slider);
+      ``None`` keeps the control's own.
     - ``visible`` — whether the field appears in the panel.
     - ``pinned`` — whether the field is shown in a pinned summary section.
         - ``newline`` — start this field on a new compact UI row.

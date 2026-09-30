@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from modules.face.quality import LEFT_EYE, RIGHT_EYE, NOSE_NEUTRAL, Pose, Rejection, eye_openness, gate, head_pose, quality
+from modules.face.quality import LEFT_EYE, RIGHT_EYE, NOSE_NEUTRAL, FaceObservation, Pose, Rejection, eye_openness, gate, head_pose, quality, rejection_label
 
 
 def keypoints(nose_dx: float = 0.0, nose_ratio: float = NOSE_NEUTRAL, roll: float = 0.0) -> np.ndarray:
@@ -57,6 +57,13 @@ class TestHeadPose(unittest.TestCase):
         self.assertAlmostEqual(pose.yaw, 0.0, places=3)
         self.assertAlmostEqual(pose.pitch, 0.0, places=3)
 
+    def test_the_neutral_sets_the_zero_and_the_raw_ratio_is_kept(self):
+        pose = head_pose(keypoints(nose_ratio=0.48), neutral=0.48)
+        self.assertAlmostEqual(pose.pitch, 0.0, places=5)
+        self.assertAlmostEqual(pose.nose_ratio, 0.48, places=5)
+        self.assertLess(head_pose(keypoints(nose_ratio=0.58), neutral=0.48).pitch, -10.0)
+        self.assertAlmostEqual(head_pose(keypoints(nose_ratio=0.58), neutral=0.58).pitch, 0.0, places=5)
+
     def test_eye_order_does_not_matter(self):
         points = keypoints(nose_dx=0.2, roll=10.0)
         swapped = points.copy()
@@ -66,7 +73,7 @@ class TestHeadPose(unittest.TestCase):
 
 class TestGate(unittest.TestCase):
     def check(self, score=0.9, size=0.2, yaw=0.0, pitch=0.0, roll=0.0):
-        return gate(score, size, Pose(yaw, pitch, roll), confidence=0.7, size_filter=0.1, max_yaw=20.0, max_pitch=25.0, max_roll=30.0)
+        return gate(score, size, Pose(yaw, pitch, roll, 0.48), confidence=0.7, size_filter=0.1, max_yaw=20.0, max_pitch=25.0, max_roll=30.0)
 
     def test_a_good_face_passes(self):
         self.assertIsNone(self.check())
@@ -82,6 +89,21 @@ class TestGate(unittest.TestCase):
         self.assertEqual(self.check(size=0.05, yaw=40.0), Rejection.SMALL)
 
 
+class TestRejectionLabel(unittest.TestCase):
+    def face(self, rejection, limit, pose=Pose(0.0, 0.0, 0.0, 0.48), eyes=None, score=0.9, size=0.3):
+        return FaceObservation(bbox=(0, 0, 1, 1), kps=(), score=score, size=size, pose=pose, eyes=eyes,
+                               quality=0.5, rejection=rejection, limit=limit, subject=False)
+
+    def test_every_reason_names_the_check_the_value_and_the_limit(self):
+        self.assertEqual(rejection_label(self.face(Rejection.LOW_SCORE, 0.7, score=0.55)), 'score 0.55 < 0.70')
+        self.assertEqual(rejection_label(self.face(Rejection.SMALL, 0.11, size=0.08)), 'size 0.08 < 0.11')
+        self.assertEqual(rejection_label(self.face(Rejection.TURNED, 20.0, pose=Pose(32.0, 0.0, 0.0, 0.48))), 'yaw 32 > 20')
+        self.assertEqual(rejection_label(self.face(Rejection.PITCHED, 25.0, pose=Pose(0.0, -41.0, 0.0, 0.48))), 'pitch -41 > 25')
+        self.assertEqual(rejection_label(self.face(Rejection.TILTED, 30.0, pose=Pose(0.0, 0.0, 35.0, 0.48))), 'roll 35 > 30')
+        self.assertEqual(rejection_label(self.face(Rejection.EYES, 0.2, eyes=0.12)), 'eyes 0.12 < 0.20')
+        self.assertEqual(rejection_label(self.face(None, 0.0)), '')
+
+
 class TestEyeOpenness(unittest.TestCase):
     def test_the_less_open_eye_counts(self):
         self.assertAlmostEqual(eye_openness(landmarks(12.0, 6.0), 0.0), 0.2, places=5)
@@ -93,17 +115,17 @@ class TestEyeOpenness(unittest.TestCase):
 
 class TestQuality(unittest.TestCase):
     def test_frontal_open_sharp_is_best(self):
-        best = quality(Pose(0.0, 0.0, 0.0), 0.4, 1e9, 20.0, 25.0, 0.2)
+        best = quality(Pose(0.0, 0.0, 0.0, 0.48), 0.4, 1e9, 20.0, 25.0, 0.2)
         self.assertAlmostEqual(best, 1.0, places=3)
-        self.assertLess(quality(Pose(15.0, 0.0, 0.0), 0.4, 1e9, 20.0, 25.0, 0.2), best)
-        self.assertLess(quality(Pose(0.0, 0.0, 0.0), 0.25, 1e9, 20.0, 25.0, 0.2), best)
-        self.assertLess(quality(Pose(0.0, 0.0, 0.0), 0.4, 50.0, 20.0, 25.0, 0.2), best)
+        self.assertLess(quality(Pose(15.0, 0.0, 0.0, 0.48), 0.4, 1e9, 20.0, 25.0, 0.2), best)
+        self.assertLess(quality(Pose(0.0, 0.0, 0.0, 0.48), 0.25, 1e9, 20.0, 25.0, 0.2), best)
+        self.assertLess(quality(Pose(0.0, 0.0, 0.0, 0.48), 0.4, 50.0, 20.0, 25.0, 0.2), best)
 
     def test_the_limit_halves_the_pose_term(self):
-        self.assertAlmostEqual(quality(Pose(20.0, 0.0, 0.0), 0.4, 1e9, 20.0, 25.0, 0.2), 0.5, places=3)
+        self.assertAlmostEqual(quality(Pose(20.0, 0.0, 0.0, 0.48), 0.4, 1e9, 20.0, 25.0, 0.2), 0.5, places=3)
 
     def test_unmeasured_eyes_count_half(self):
-        self.assertAlmostEqual(quality(Pose(0.0, 0.0, 0.0), None, 1e9, 20.0, 25.0, 0.2), 0.5, places=3)
+        self.assertAlmostEqual(quality(Pose(0.0, 0.0, 0.0, 0.48), None, 1e9, 20.0, 25.0, 0.2), 0.5, places=3)
 
 
 if __name__ == '__main__':

@@ -5,10 +5,19 @@ result is shown with music (Max patch via OSC) and lights (Art-Net). Entry point
 (main app, `modules/Forgettable.py`) and `pl_player.py` (image players). Python 3.12, venv in
 `.venv`, installed with `scripts/install.bat`. Tests: `.venv\Scripts\python -m pytest` from the repo root.
 
+## Camera
+
+`modules/cam/Camera.py` is the one source the app reads: it wraps the device (`VimbaCam` default,
+`WebCam` with `-wc`) and an image source from `input/` that the panel's `use_image` switch puts in
+place of the device frames at any time. A missing device is a warning and `device: none`, never an
+automatic switch to the image. The camera settings (`Settings.camera`) also hold the face settings
+(`camera.face`).
+
 ## Face
 
 `modules/face/`: `FaceFinder` (own thread) detects every face of a camera frame (SCRFD,
-`files/scrfd_10g_bnkps.onnx`) and judges it in `quality.py`: pose from the 5 keypoints, eye
+`files/scrfd_10g_bnkps.onnx`) and judges it in `quality.py`: pose from the 5 keypoints (the pitch's
+zero is `pitch_zero`, set on site with the "Set pitch zero" button: it depends on the camera height), eye
 openness from the 106 landmarks (`FaceLandmarks`, `files/2d106det.onnx`, only run for faces that
 passed the pose checks), sharpness from the pixels; the first failing check is the face's
 `Rejection`. The subject of a frame is its largest qualifying face; `stable_frames` qualifying

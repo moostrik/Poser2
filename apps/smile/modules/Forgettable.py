@@ -1,3 +1,4 @@
+from modules.cam.Camera import Camera
 from modules.face.FaceFinder import FaceFinder, FaceFrame
 from modules.render.SmileRender import SmileRender
 from modules.render.Sequencer import Sequencer, SeqenceMessage, SequenceType, AnimationType, AnimationTypeNames
@@ -19,7 +20,6 @@ logger = logging.getLogger(__name__)
 class CamType(Enum):
     VIMBA   = 2
     WEB     = 3
-    IMAGE   = 4
 
 class Forgettable():
     def __init__(self, path: str, width: int, height: int, portraitMode: bool = False, camType: CamType = CamType.VIMBA) -> None:
@@ -49,17 +49,18 @@ class Forgettable():
         self.diffuse: Generator = Generator(self.settings.pipeline, self.player)
         # the face crop is the image ComfyUI generates from, so it has the workflow's portrait size
         portrait_width, portrait_height = self.diffuse.workflow.portrait_size
-        self.face: FaceFinder = FaceFinder(self.settings.pipeline.face, portrait_width, portrait_height)
+        self.face: FaceFinder = FaceFinder(self.settings.camera.face, portrait_width, portrait_height)
 
+        # the camera device; the panel can switch to an image from input/ at any time
         if camType == CamType.VIMBA:
             from modules.cam.VimbaCam import VimbaCam
-            self.camera = VimbaCam(self.settings.camera, (self.width, self.height))
-        elif camType == CamType.WEB:
-            from modules.cam.WebCam import WebCam
-            self.camera = WebCam(self.settings.camera, (self.width, self.height))
+            device = VimbaCam(self.settings.camera, (self.width, self.height))
+            device_name = 'vimba'
         else:
-            from modules.cam.Image import Image as ImageCam
-            self.camera = ImageCam(self.settings.camera, (self.width, self.height))
+            from modules.cam.WebCam import WebCam
+            device = WebCam(self.settings.camera, (self.width, self.height))
+            device_name = 'webcam'
+        self.camera: Camera = Camera(self.settings.camera, (self.width, self.height), device, device_name)
         self.camera.setRotate90(self.portraitMode)
 
         self.audio: AudioDB = AudioDB(self.settings.audio, 'files/music_map.json')

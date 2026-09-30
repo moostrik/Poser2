@@ -1,5 +1,5 @@
-"""Settings of the pipeline from camera image to grin: one card per stage, the face crop (SMILE's
-own) and then the stages of the ComfyUI workflow.
+"""Settings of the pipeline from face crop to grin: one card per stage of the ComfyUI workflow
+(the face detection and crop, SMILE's own, are under the camera settings).
 
 The panel is the source of truth: every run fills these values into the workflow, whose own values
 only served as the defaults here.
@@ -7,7 +7,6 @@ only served as the defaults here.
 
 from enum import Enum
 
-from modules.face.settings import FaceSettings
 from modules.settings import BaseSettings, Field, Group, Widget
 
 
@@ -138,7 +137,6 @@ class GrinSettings(BaseSettings):
 
 class PipelineSettings(BaseSettings):
     connection: Group[ConnectionSettings] = Group(ConnectionSettings)
-    face:       Group[FaceSettings]       = Group(FaceSettings)     # SMILE's own face crop, the image ComfyUI starts from
     describe:  Group[DescribeSettings]   = Group(DescribeSettings)
     style:      Group[StyleSettings]      = Group(StyleSettings)
     portrait:   Group[PortraitSettings]   = Group(PortraitSettings)

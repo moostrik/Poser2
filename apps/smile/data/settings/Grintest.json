@@ -1,10 +1,24 @@
 {
   "camera": {
+    "use_image": true,
+    "image": "2024_09_09_11_39_48_A.jpg",
     "flip_h": false,
     "flip_v": false,
     "gain_auto": false,
     "gain_target": 40,
-    "image_select": 2
+    "face": {
+      "confidence": 0.5,
+      "size_filter": 0.11,
+      "stable_frames": 3,
+      "max_yaw": 17.0,
+      "max_pitch": 25.0,
+      "max_roll": 30.0,
+      "pitch_zero": 0.48,
+      "eye_open": 0.2,
+      "window": 1.0,
+      "zoom": 1.2,
+      "offset": -0.05
+    }
   },
   "pipeline": {
     "connection": {
@@ -12,13 +26,6 @@
       "port": 8188,
       "workflow": "data/comfy/AIIAv3 portrait grin v3.json",
       "job_timeout": 90.0
-    },
-    "face": {
-      "size_filter": 0.11,
-      "confidence": 0.7,
-      "stable_frames": 3,
-      "zoom": 1.2,
-      "offset": -0.05
     },
     "describe": {
       "instruction": "Describe this person for a text-to-image prompt. Only visible physical features: gender, approximate age, race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no mention of color, no negatives. Short comma-separated phrases on one line. Output only the phrases. ",
@@ -99,6 +106,8 @@
     }
   },
   "sequence": {
+    "pause": true,
+    "save": true,
     "camera_in": 1.0,
     "camera_in_ease": "LINEAR",
     "camera_out": 1.0,
@@ -107,7 +116,7 @@
     "flash_in_ease": "QUAD_IN",
     "flash_hold": 0.5,
     "flash_out_auto": true,
-    "flash_out": 2.6114510774612425,
+    "flash_out": 3.3198404788970945,
     "flash_out_ease": "SINE_OUT",
     "grin_delay": 0.5,
     "grin_fps": 13.0,
@@ -119,6 +128,7 @@
   },
   "render": {
     "show_camera": false,
+    "show_faces": true,
     "freeze": false,
     "trail_active": true,
     "trail": 0.99,
