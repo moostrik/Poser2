@@ -30,7 +30,7 @@ class Image(Thread):
         self.capturing: bool = False
 
         self.image_folder_path = 'input'
-        self.image_files = [f for f in os.listdir(self.image_folder_path) if f.endswith('.jpg')]
+        self.image_files = sorted(f for f in os.listdir(self.image_folder_path) if f.endswith('.jpg'))
         self.load_image()
         self.settings.bind(CameraSettings.image_select, self.load_image)
 

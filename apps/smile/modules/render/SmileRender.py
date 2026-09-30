@@ -49,8 +49,8 @@ class SmileRender(RenderBase):
             diffusion=DiffusionLayer(self.inputs.diffusion),
             destruct=DestructLayer(self.inputs.diffusion_depth),
         )
-        # the operator's face overlay is no stage layer: drawn on top when show_faces is on
-        self._faces: FaceOverlayLayer = FaceOverlayLayer(self.inputs.camera)
+        # the operator's face overlay is no stage layer: drawn over the output when show_faces is on
+        self._faces: FaceOverlayLayer = FaceOverlayLayer()
         self._all_layers: list[LayerBase] = list(vars(self.layers).values()) + [self._faces]
         self._faces_mutex: Lock = Lock()
         self._face_frame: FaceFrame | None = None
@@ -100,7 +100,8 @@ class SmileRender(RenderBase):
 
         self._output = stage.output
         if self.settings.show_faces:
-            self._render_faces()
+            self._render_faces(self._output)
+            self._output = self._faces.texture
         if self.settings.freeze:
             if not self._frozen:
                 copy(self._output, self._freeze_fbo)
@@ -120,14 +121,14 @@ class SmileRender(RenderBase):
         if started or (frame is not None and self.player.playing):
             self.sequencer.set_diffusion_progress(self.player.progress)
 
-    def _render_faces(self) -> None:
+    def _render_faces(self, source: Texture) -> None:
         with self._faces_mutex:
             frame: FaceFrame | None = self._face_frame
         if frame is None or time.time() - frame.time > FACES_STALE:
             self._faces.set_marks([])
         else:
             self._faces.set_marks(build_marks(frame))
-        self._faces.render()
+        self._faces.render(source)
 
     def draw_main(self, width: int, height: int) -> None:
         clear_color(0, 0, 0, 1)
@@ -135,8 +136,6 @@ class SmileRender(RenderBase):
         self._draw_fit(self._output, width, height)
         if self.settings.show_camera and self.inputs.camera.allocated:
             self._draw_fit(self.inputs.camera, width, height)
-        if self.settings.show_faces:
-            self._draw_fit(self._faces.texture, width, height)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         pass

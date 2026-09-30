@@ -51,7 +51,7 @@ def easing_function(value: Easing) -> Callable[[float], float]:
 class RenderSettings(BaseSettings):
     window:        Group[WindowSettings] = Group(WindowSettings)
     show_camera:   Field[bool]  = Field(False, description="Draw the raw camera image on top")
-    show_faces:    Field[bool]  = Field(False, description="Draw the camera with the detected faces on top")
+    show_faces:    Field[bool]  = Field(False, description="Draw the detected faces over the image")
     freeze:        Field[bool]  = Field(False, description="Hold the current frame")
     trail_active:  Field[bool]  = Field(True, description="Blend new diffusion images over the previous ones")
     trail:         Field[float] = Field(0.995, min=0.98, max=1.0, step=0.001, description="Trail amount")

@@ -1,4 +1,4 @@
-from modules.gl import Blit, Fbo, Image, Style, Text, Texture
+from modules.gl import Blit, Fbo, Style, Text, Texture
 from modules.render.shaders import DrawColoredRectangle, DrawRectangleOutline
 
 from .LayerBase import LayerBase
@@ -10,10 +10,9 @@ LABEL_PAD_PX: float = 4.0
 
 
 class FaceOverlayLayer(LayerBase):
-    """The operator's view: the raw camera with a box, keypoints and label per detected face."""
+    """The operator's view: the show's image with a box, keypoints and label per detected face."""
 
-    def __init__(self, camera: Image) -> None:
-        self._camera: Image = camera
+    def __init__(self) -> None:
         self._fbo: Fbo = Fbo()
         self._outline: DrawRectangleOutline = DrawRectangleOutline()
         self._rect: DrawColoredRectangle = DrawColoredRectangle()
@@ -47,11 +46,12 @@ class FaceOverlayLayer(LayerBase):
     def set_marks(self, marks: list[Mark]) -> None:
         self._marks = marks
 
-    def render(self) -> None:
-        if not self._camera.allocated:
+    def render(self, source: Texture) -> None:
+        """Draw the marks over source, the stage's output of the same camera frame."""
+        if not source.allocated:
             return
         self._fbo.begin()
-        Blit.use(self._camera)
+        Blit.use(source)
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         for mark in self._marks:
             self._draw_box(mark)
