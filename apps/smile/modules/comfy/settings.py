@@ -83,13 +83,13 @@ class Prefer(Enum):
 
 
 class GrinSettings(BaseSettings):
-    loop:               Field[bool]  = Field(False, description="Keep replaying the grin with the current values, without a new portrait (testing)")
+    loop:              Field[bool]  = Field(False, description="Keep replaying the grin with the current values, without a new portrait (testing)")
     still:              Field[bool]  = Field(False, description="Show only the peak pose as a still that follows the settings (testing)")
     still_position:     Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Where the still sits in every range: 0 = min, 1 = max")
     frames:             Field[int]   = Field(150, min=10, max=300, step=10, newline=True, description="Frames of the animation")
     face_region:        Field[float] = Field(2.0, min=1.5, max=3.0, step=0.1, description="Area around the face that LivePortrait animates, relative to the face")
     stitching:          Field[bool]  = Field(True, description="LivePortrait stitching (shifts the head; off keeps it in place)")
-    ease:               Field[Ease]  = Field(Ease.SINE_IN_OUT, newline=True, description="Curve from neutral to the peak and back")
+    ease:              Field[Ease]  = Field(Ease.SINE_IN_OUT, newline=True, description="Curve from neutral to the peak and back")
     midpoint:           Field[float] = Field(0.7, min=0.0, max=1.0, step=0.01, description="Moment of the peak, as part of the animation")
     midpoint_deviation: Field[float] = Field(0.2, min=0.0, max=0.5, step=0.01, description="Each parameter peaks at a random moment within midpoint +- this")
 
