@@ -20,7 +20,7 @@ import websocket
 from requests import RequestException
 
 from modules.comfy.client import ComfyClient, Event as ComfyEvent
-from modules.comfy.GrinPlayer import GrinPlayer
+from modules.render.GrinPlayer import GrinPlayer
 from modules.comfy.messages import GenMessage, GenState, MessageCallback
 from modules.comfy.settings import ComfySettings
 from modules.comfy.styles import Styles

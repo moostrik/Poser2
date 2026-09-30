@@ -50,11 +50,11 @@ class PortraitSettings(BaseSettings):
     cfg:                Field[float] = Field(1.5, min=0.5, max=10.0, step=0.1, description="Prompt guidance (CFG)")
     sampler:            Field[str]   = Field("dpmpp_sde", widget=Widget.text_select, options=sampler_options, description="Sampler")
     scheduler:          Field[str]   = Field("exponential", widget=Widget.text_select, options=scheduler_options, description="Scheduler")
-    embedding_strength: Field[float] = Field(1.0, min=0.0, max=2.0, step=0.05, description="InstantID face likeness (ip weight)")
+    embedding_strength: Field[float] = Field(1.0, min=0.0, max=2.0, step=0.05, newline=True, description="InstantID face likeness (ip weight)")
     keypoint_strength:  Field[float] = Field(1.0, min=0.0, max=2.0, step=0.05, description="InstantID face pose (keypoints ControlNet)")
-    depth_strength:     Field[float] = Field(0.5, min=0.0, max=2.0, step=0.05, description="Depth ControlNet strength")
+    depth_strength:     Field[float] = Field(0.5, min=0.0, max=2.0, step=0.05, newline=True, description="Depth ControlNet strength")
     depth_end:          Field[float] = Field(0.5, min=0.0, max=1.0, step=0.05, description="Depth ControlNet stops at this part of the steps")
-    full_preview:       Field[bool]  = Field(True, description="Step previews decoded with the real VAE (off: ComfyUI's quick previews)")
+    full_preview:       Field[bool]  = Field(True, newline=True, description="Step previews decoded with the real VAE (off: ComfyUI's quick previews)")
     fixed_seed:         Field[bool]  = Field(False, description="Same seeds every run, to compare settings (off: random)")
 
 
@@ -86,7 +86,7 @@ class GrinSettings(BaseSettings):
     loop:              Field[bool]  = Field(False, description="Keep replaying the grin with the current values, without a new portrait (testing)")
     still:              Field[bool]  = Field(False, description="Show only the peak pose as a still that follows the settings (testing)")
     still_position:     Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Where the still sits in every range: 0 = min, 1 = max")
-    frames:             Field[int]   = Field(150, min=10, max=300, step=10, newline=True, description="Frames of the animation")
+    frames:             Field[int]   = Field(150, min=10, max=300, step=10, newline=True, description="Frames of the grin; it lasts frames / Grin fps (Sequence tab)")
     face_region:        Field[float] = Field(2.0, min=1.5, max=3.0, step=0.1, description="Area around the face that LivePortrait animates, relative to the face")
     stitching:          Field[bool]  = Field(True, description="LivePortrait stitching (shifts the head; off keeps it in place)")
     ease:              Field[Ease]  = Field(Ease.SINE_IN_OUT, newline=True, description="Curve from neutral to the peak and back")
@@ -134,15 +134,6 @@ class GrinSettings(BaseSettings):
     roll_prefer:    Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
 
 
-class PlaybackSettings(BaseSettings):
-    fps:         Field[float] = Field(15.0, min=5.0, max=30.0, step=1.0, description="Grin playback speed (frames per second)")
-    delay:       Field[float] = Field(1.0, min=0.0, max=5.0, step=0.1, description="Shortest hold on the portrait before the grin plays, for the blend (s)")
-
-    made_fps:    Field[float] = Field(0.0, access=Field.READ, newline=True, description="Speed at which ComfyUI made the last grin (frames per second)")
-    buffer_wait: Field[float] = Field(0.0, access=Field.READ, description="Wait the last grin needed to play without stalling (s)")
-    start_wait:  Field[float] = Field(0.0, access=Field.READ, description="Wait before the last grin played: the longer of delay and buffer wait (s)")
-
-
 class ComfySettings(BaseSettings):
     connection: Group[ConnectionSettings] = Group(ConnectionSettings)
     describe:   Group[DescribeSettings]   = Group(DescribeSettings)
@@ -150,4 +141,3 @@ class ComfySettings(BaseSettings):
     portrait:   Group[PortraitSettings]   = Group(PortraitSettings)
     lora:       Group[LoraSettings]       = Group(LoraSettings)
     grin:       Group[GrinSettings]       = Group(GrinSettings)
-    playback:   Group[PlaybackSettings]   = Group(PlaybackSettings)

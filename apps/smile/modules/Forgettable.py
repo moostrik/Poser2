@@ -2,7 +2,7 @@ from modules.face.FaceFinder import FaceFinder, FaceMessage
 from modules.render.SmileRender import SmileRender
 from modules.render.Sequencer import Sequencer, SeqenceMessage, SequenceType, AnimationType, AnimationTypeNames
 from modules.comfy.Generator import Generator
-from modules.comfy.GrinPlayer import GrinPlayer
+from modules.render.GrinPlayer import GrinPlayer
 from modules.comfy.messages import GenMessage, GenState
 from modules.osc.Sender import Sender as Osc
 from modules.audio.DB import DB as AudioDB
@@ -44,7 +44,7 @@ class Forgettable():
 
         self.sequencer: Sequencer = Sequencer(self.settings.sequence)
         # the generator fills the player with the grin frames, the render plays them on its own clock
-        self.player: GrinPlayer = GrinPlayer(self.settings.comfy.playback)
+        self.player: GrinPlayer = GrinPlayer(self.settings.sequence)
         self.render: SmileRender = SmileRender(self.settings.render, self.sequencer, self.player, self.width, self.height)
         self.diffuse: Generator = Generator(self.settings.comfy, self.player)
         # the face crop is the image ComfyUI generates from, so it has the workflow's portrait size

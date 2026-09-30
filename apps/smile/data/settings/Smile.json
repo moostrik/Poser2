@@ -82,9 +82,6 @@
       "yaw_max": 10.0,
       "roll_min": -10.0,
       "roll_max": 10.0
-    },
-    "playback": {
-      "fps": 15.0
     }
   },
   "save": {
@@ -92,10 +89,6 @@
     "min_files": 16
   },
   "sequence": {
-    "destroy_in": 0.4,
-    "destroy_in_ease": "QUAD_IN",
-    "destroy_out": 1.1,
-    "destroy_out_ease": "CUBIC_OUT",
     "camera_in": 1.0,
     "camera_in_ease": "LINEAR",
     "camera_out": 1.0,
@@ -105,7 +98,12 @@
     "flash_out_auto": true,
     "flash_out": 3.874201774597168,
     "flash_out_ease": "SINE_OUT",
-    "timeout": 1.0
+    "grin_fps": 15.0,
+    "timeout": 1.0,
+    "destroy_in": 0.4,
+    "destroy_in_ease": "QUAD_IN",
+    "destroy_out": 1.1,
+    "destroy_out_ease": "CUBIC_OUT"
   },
   "render": {
     "show_camera": false,

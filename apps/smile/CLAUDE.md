@@ -10,7 +10,6 @@ result is shown with music (Max patch via OSC) and lights (Art-Net). Entry point
 ComfyUI server (installed in `ComfyUI/` from the `comfy/` bundle, both git-ignored, API on
 127.0.0.1:8188). `modules/comfy/`: `Generator` sends each capture to ComfyUI and turns its
 websocket events into `GenMessage`s for the render (CAM_DEPTH → DIFFUSION → DIFF_LOOP → IDLE);
-the grin frames go into the `GrinPlayer`, a buffer the render plays on its own clock;
 `workflow.py` adapts the API export in `data/comfy/` (face crop removed — SMILE crops and rotates
 the face itself — depth outputs added) and fills in every value from `ComfySettings` per run: the
 panel is the source of truth, the workflow only provides the structure. Keep one workflow per
@@ -24,7 +23,9 @@ OpenGL engine copied from poser2 (`modules/gl/`: glfw, GL 4.6 core, render threa
 both. `modules/render/SmileRender.py` runs the `Sequencer` once per frame (it is the app clock:
 Art-Net, OSC and saving hang off its messages), then the stage for the current `SequenceType`
 (`stages.py`) renders the layers (`layers/`) and picks the one to show. Images from other threads go
-through `inputs.py` (`Image.set_image`, uploaded on the render thread). Shaders are
+through `inputs.py` (`Image.set_image`, uploaded on the render thread); the grin frames go
+through `GrinPlayer.py`, a buffer the generator fills and the render plays on its own clock, with
+its timings in the sequence settings. Shaders are
 `classname.frag` next to their `.py` and hot-reload while running. `pl_player.py` uses the same engine
 (`player/Render.py`).
 

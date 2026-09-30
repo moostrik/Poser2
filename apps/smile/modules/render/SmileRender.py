@@ -4,7 +4,7 @@ import glfw
 import numpy as np
 from OpenGL.GL import GL_RGBA32F, glViewport  # type: ignore
 
-from modules.comfy.GrinPlayer import GrinPlayer
+from modules.render.GrinPlayer import GrinPlayer
 from modules.comfy.messages import GenMessage, GenState
 from modules.gl import Blit, Fbo, RenderBase, Shader, Style, Texture, clear_color
 from modules.gl.Utils import fit
