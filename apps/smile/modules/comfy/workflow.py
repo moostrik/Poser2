@@ -86,12 +86,14 @@ class Workflow():
                                    'inputs': {'images': workflow[self.portrait]['inputs']['images']},
                                    '_meta': workflow[self.portrait]['_meta']}
 
+        self.portrait_preview: str = _find(workflow, title='Portrait')     # the workflow's own preview of the portrait
+
         # SMILE streams the grin frames from the previews; writing them as 150 PNGs costs ~2 s,
         # but Grin Frames needs an output node to run at all: a text preview is the cheapest
-        all_frames: str = _find(workflow, title='All frames')
-        workflow[all_frames] = {'class_type': 'PreviewAny',
-                                'inputs': {'source': workflow[all_frames]['inputs']['images']},
-                                '_meta': workflow[all_frames]['_meta']}
+        self.all_frames: str = _find(workflow, title='All frames')
+        workflow[self.all_frames] = {'class_type': 'PreviewAny',
+                                     'inputs': {'source': workflow[self.all_frames]['inputs']['images']},
+                                     '_meta': workflow[self.all_frames]['_meta']}
 
         self.style: str = _find(workflow, title='Prompt: style')
         self.suffix: str = _find(workflow, title='Description + model')
@@ -190,6 +192,14 @@ class Workflow():
         workflow[self.sampler]['inputs']['steps'] = 1
         workflow[self.grin]['inputs']['still'] = True
         workflow[self.last_frame]['inputs']['batch_index'] = 0
+        return workflow
+
+    def build_describe(self, image_name: str, style: str, negative: str, s: PipelineSettings) -> dict:
+        """The same run without the portrait and the grin (connection.skip_generation): only the description
+        and the capture's depth are left as outputs. The other nodes stay, so ComfyUI keeps their cache."""
+        workflow: dict = self.build(image_name, style, negative, s)
+        for node_id in (self.portrait, self.portrait_preview, self.all_frames, self.last_depth):
+            del workflow[node_id]
         return workflow
 
     def build_replay(self, previous: dict, s: PipelineSettings) -> dict:

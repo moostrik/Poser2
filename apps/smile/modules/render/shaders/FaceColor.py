@@ -8,8 +8,9 @@ logger = logging.getLogger(__name__)
 
 
 class FaceColor(Shader):
-    def use(self, tex0: Texture, x: float, y: float, w: float, h: float, saturation: float) -> None:
+    def use(self, tex0: Texture, x: float, y: float, w: float, h: float, saturation: float, rise: bool = False) -> None:
         """Draw tex0 in black and white, with `saturation` (0..1) of its colour inside the rectangle.
+        With `rise` the colour is full and fills that part of the rectangle, from its bottom up.
 
         x, y, w, h: normalised 0..1, top left origin (as DrawRectangleOutline); w or h 0 for no rectangle.
         """
@@ -25,4 +26,5 @@ class FaceColor(Shader):
         glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform4f(self.get_uniform_loc("rect"), x, y, w, h)
         glUniform1f(self.get_uniform_loc("saturation"), saturation)
+        glUniform1f(self.get_uniform_loc("rise"), 1.0 if rise else 0.0)
         draw_quad()

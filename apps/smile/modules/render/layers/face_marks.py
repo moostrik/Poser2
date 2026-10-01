@@ -1,11 +1,11 @@
 """One detected face turned into one mark: its box, colour and label. No GL: arithmetic and text
-(after poser2's marks). `build_marks` is the operator overlay (every face, with its readout);
+(after poser2's marks). `build_marks` is the operator overlay (every face, a rejected one with its reason);
 `SubjectMark` is the show's own mark, the green box of the chosen face."""
 
 from dataclasses import dataclass
 
 from modules.face.FaceFinder import FaceFrame
-from modules.face.quality import FaceObservation, readout, rejection_label
+from modules.face.quality import FaceObservation, rejection_label
 
 Color = tuple[float, float, float, float]
 
@@ -31,38 +31,41 @@ class Mark:
     color: Color
     line: float                                 # outline width in pixels
     label: str
+    dots: Color | None = None                   # colour of the keypoints; None: as the outline
 
 
-def face_label(face: FaceObservation) -> str:
-    """The readout of a qualifying face; the failed check, its value and the limit of a rejected one."""
-    if face.rejection is not None:
-        return rejection_label(face)
-    return readout(face)
+def mix(a: Color, b: Color, t: float) -> Color:
+    """From a (t 0) to b (t 1)."""
+    t = min(max(t, 0.0), 1.0)
+    return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t)
 
 
 def build_marks(frame: FaceFrame, subject_color: Color = SUBJECT_COLOR) -> list[Mark]:
-    """A mark per face: rejected first, under everyone; the subject last, drawn over all."""
+    """A mark per face: rejected first, under everyone; the subject last, drawn over all. A rejected
+    face is labelled with the failed check, its value and the limit; the panel has the readout."""
     marks: list[Mark] = []
     for face in frame.faces:
         x0, y0, x1, y1 = face.bbox
+        label: str = ''
         if face.rejection is not None:
             color = REJECTED_COLOR
+            label = rejection_label(face)
         elif face.subject:
             color = subject_color
         else:
             color = ACCEPTED_COLOR
         # the subject is thick even when rejected: it is still the face a capture would use
         line: float = SUBJECT_LINE_PX if face.subject else LINE_PX
-        marks.append(Mark(x0, y0, x1 - x0, y1 - y0, face.kps, color, line, face_label(face)))
+        marks.append(Mark(x0, y0, x1 - x0, y1 - y0, face.kps, color, line, label))
     order: list[int] = [i for i, f in enumerate(frame.faces)]
     order.sort(key=lambda i: (frame.faces[i].rejection is None, frame.faces[i].subject))
     return [marks[i] for i in order]
 
 
 class SubjectMark:
-    """The show's mark, without a label: the subject's box in the active colour while it qualifies
-    (its charge rises); in grey while the charge drains, on the face that is there or else where it
-    last was; None once the charge is empty."""
+    """The show's mark, without a label: the subject's box, its outline going from grey to the active
+    colour with the charge and its dots grey. While the charge drains it stays on the face that is
+    there, or else where it last was; None once the charge is empty."""
 
     def __init__(self) -> None:
         self._box: tuple[tuple[float, float, float, float], tuple[tuple[float, float], ...]] | None = None
@@ -80,5 +83,5 @@ class SubjectMark:
         if self._box is None:
             return None
         (x0, y0, x1, y1), kps = self._box
-        color: Color = active_color if qualifies else REJECTED_COLOR
-        return Mark(x0, y0, x1 - x0, y1 - y0, kps, color, SUBJECT_LINE_PX, '')
+        color: Color = mix(REJECTED_COLOR, active_color, charge)
+        return Mark(x0, y0, x1 - x0, y1 - y0, kps, color, SUBJECT_LINE_PX, '', REJECTED_COLOR)

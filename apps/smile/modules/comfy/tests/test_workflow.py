@@ -272,6 +272,29 @@ class TestWorkflow(unittest.TestCase):
         warmup[self.wf.last_frame]['inputs']['batch_index'] = full[self.wf.last_frame]['inputs']['batch_index']
         self.assertEqual(warmup, full)
 
+    def test_describe_only_runs_the_description_and_the_capture_depth(self):
+        self.settings.portrait.fixed_seed = True
+        full = self.wf.build('x.png', 'style', 'negative', self.settings)
+        short = self.wf.build_describe('x.png', 'style', 'negative', self.settings)
+        removed = {self.wf.portrait, self.wf.portrait_preview, self.wf.all_frames, self.wf.last_depth}
+        self.assertEqual(set(full) - set(short), removed)
+        # nothing else differs from a visitor's run, so ComfyUI's cache holds
+        for node_id, node in short.items():
+            self.assertEqual(node, full[node_id], node_id)
+        for node_id, name, source in links(short):
+            self.assertIn(source, short, f'{node_id}.{name} -> missing {source}')
+        # ComfyUI runs what its output nodes need: the description and the capture's depth
+        outputs = [node_id for node_id, node in short.items() if node['class_type'] in ('PreviewImage', 'PreviewAny', 'SaveImage')]
+        self.assertTrue({self.wf.capture_depth, self.wf.description} <= set(outputs))
+        needed, todo = set(), outputs
+        while todo:
+            node_id = todo.pop()
+            if node_id not in needed:
+                needed.add(node_id)
+                todo += [value[0] for value in short[node_id]['inputs'].values() if isinstance(value, list) and len(value) == 2]
+        self.assertTrue({self.wf.describe, self.wf.depth_run} <= needed)
+        self.assertFalse({self.wf.sampler, self.wf.grin, self.wf.last_depth_run} & needed)
+
     def test_template_not_changed_by_build(self):
         again = self.wf.build('other.png', 'other', 'other negative', self.settings)
         self.assertEqual(self.built[self.wf.load_image]['inputs']['image'], 'smile_capture.png')

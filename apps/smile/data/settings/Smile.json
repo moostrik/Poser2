@@ -26,7 +26,8 @@
       "host": "127.0.0.1",
       "port": 8188,
       "workflow": "data/comfy/smile_workflow.json",
-      "job_timeout": 45.0
+      "job_timeout": 45.0,
+      "skip_generation": true
     },
     "describe": {
       "instruction": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no colors, no colors for eyes, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips",
@@ -111,6 +112,9 @@
     "pause": false,
     "save": true,
     "encoder": "AUTO",
+    "charge": 2.0,
+    "drain": 4.0,
+    "charge_ease": "LINEAR",
     "flash_in": 0.5,
     "flash_in_ease": "QUAD_IN",
     "flash_hold": 0.5,
@@ -128,6 +132,13 @@
   "render": {
     "show_camera": false,
     "show_faces": true,
+    "face_color": {
+      "r": 0.2,
+      "g": 1.0,
+      "b": 0.2,
+      "a": 1.0
+    },
+    "face_fill": "RISE",
     "freeze": false,
     "trail_active": true,
     "trail": 0.99,
@@ -138,8 +149,8 @@
       "title": "SMILE",
       "v_sync": true,
       "monitor": "M0",
-      "x": 1203,
-      "y": 673,
+      "x": 985,
+      "y": 1071,
       "width": 638,
       "height": 1000,
       "secondary_list": [],

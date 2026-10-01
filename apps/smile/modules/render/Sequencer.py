@@ -252,7 +252,7 @@ class Sequencer():
     thread; set_sequence() and the other setters are called from the generator, face and key threads.
     The flash starts when a face has held its qualification long enough (the charge, see
     camera_message). Two steps wait for the generator: the flash holds (ASK) until start_reveal(), and the grin
-    (DIFF_LOOP) starts when the render's player starts playing."""
+    (DIFF_LOOP) starts when the render's player starts playing. finish() ends the visitor (TIMEOUT)."""
 
     def __init__(self, settings: SequencerSettings) -> None:
         self.settings: SequencerSettings = settings
@@ -268,6 +268,7 @@ class Sequencer():
         self.first_sequence: bool = True
         self.diffusion_progress: float = 0.0
         self._reveal: bool = False      # the capture's depth is in: the flash out may start
+        self._finish: bool = False      # the generator is done: TIMEOUT follows the flash out
         self.blocked: bool = False      # no new sequence: the generator is not ready for a capture
         self._face_qualified: bool = False  # the newest detector frame has a qualifying face
         self._face_time: float = 0.0        # when that frame was made
@@ -312,12 +313,16 @@ class Sequencer():
             message = pre_capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease), CAPTURE_AT)
             if message.initial:
                 self._reveal = False
+                self._finish = False
         elif self._state.type == SequenceType.CAPTURE:
             message = capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease))
         elif self._state.type == SequenceType.ASK:
             message = post_capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease), s.flash_hold, self._reveal)
         elif self._state.type == SequenceType.CONTROL_0:
             message = control_message(self._state, s.flash_out, easing_function(s.flash_out_ease), True)
+            # the generator finished without a portrait to end the flash out: the capture stands as the result
+            if self._finish and message.progress >= 1.0:
+                self._state.type = SequenceType.TIMEOUT
         elif self._state.type == SequenceType.CONTROL_1:
             message = control_message(self._state, s.flash_out, easing_function(s.flash_out_ease))
         elif self._state.type == SequenceType.CONTROL_2:
@@ -383,6 +388,16 @@ class Sequencer():
         """The capture's depth is in: start the flash out, once the full flash has stood for flash_hold."""
         with self._state_mutex:
             self._reveal = True
+
+    def finish(self) -> None:
+        """The generator is done: the result holds (TIMEOUT). With the capture's depth in and the flash
+        still running (nothing was generated: skip_generation, or a failure right after the depth) the
+        flash out plays first."""
+        with self._state_mutex:
+            if self._reveal and SequenceType.FLASH <= self._state.type <= SequenceType.CONTROL_2:
+                self._finish = True
+            else:
+                self._state.type = SequenceType.TIMEOUT
 
     def set_sequence(self, type: SequenceType) -> None:
         with self._state_mutex:

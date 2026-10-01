@@ -6,6 +6,8 @@ GrinPlayer gets them too and the render shows them from there on its own clock) 
 frame has been shown: depth of the last frame (IDLE, the bloom mask) -> IDLE.
 With grin.loop or grin.still on, the grin (or its peak pose as one frame) is made again (DIFF_LOOP)
 with the panel's current grin values until both are off; the portrait comes from ComfyUI's cache.
+With connection.skip_generation (debug) only the description and the capture's depth are made:
+CAM_DEPTH -> IDLE, with the capture's depth as the bloom mask.
 Any failure or timeout ends with IDLE so the sequence can't hang; a reset (interrupt) ends
 silently because the sequence has already moved on.
 """
@@ -49,6 +51,7 @@ class Generator(Thread):
         self._mutex: Lock = Lock()
         self._callbacks: list[MessageCallback] = []
         self._image: np.ndarray | None = None
+        self._capture_depth: np.ndarray | None = None   # of the job that is running
         self._stop_event: Event = Event()
         self._interrupt_event: Event = Event()
         self._silent: bool = False
@@ -228,12 +231,17 @@ class Generator(Thread):
             raise RuntimeError('ComfyUI is still busy with an earlier job')
         self._step('generating')
         name: str = self.client.upload(image, 'smile_capture.png')
-        build = wf.build_warmup if self._silent else wf.build
+        # skip_generation (debug): only the description and the capture's depth; the warm-up stays the full run
+        skip: bool = s.connection.skip_generation and not self._silent
+        build = wf.build_warmup if self._silent else wf.build_describe if skip else wf.build
         workflow: dict = build(name, self.styles.current_text(), self.styles.current_negative(), s)
-        last_depth, _ = self._run_pass(workflow, deadline)
+        self._capture_depth = None
+        last_depth, _ = self._run_pass(workflow, deadline, play=not skip)
+        if skip:
+            last_depth = self._capture_depth    # the capture stands as the result: its depth is the bloom's mask
 
         # grin loop or still (testing): the grin again, with the values the panel has now; not for the warm-up
-        while (s.grin.loop or s.grin.still) and not self._silent:
+        while (s.grin.loop or s.grin.still) and not self._silent and not skip:
             s.connection.status = 'grin still' if s.grin.still else 'grin loop'
             replay: dict = wf.build_replay(workflow, s)
             if replay == workflow:
@@ -251,21 +259,22 @@ class Generator(Thread):
         self._emit(GenMessage(GenState.IDLE, 1.0, last_depth))
         self._emit(GenMessage(GenState.IDLE))
 
-    def _run_pass(self, workflow: dict, deadline: float, replay: bool = False) -> tuple[np.ndarray | None, int]:
+    def _run_pass(self, workflow: dict, deadline: float, replay: bool = False, play: bool = True) -> tuple[np.ndarray | None, int]:
         """Queue the workflow and hand its grin to the player; returns, once the last frame has been shown,
         the depth of that frame and the frames made.
-        A replay only makes the grin: ComfyUI reports the cached capture depth and portrait again."""
+        A replay only makes the grin: ComfyUI reports the cached capture depth and portrait again.
+        Without *play* the workflow makes no grin (skip_generation) and no clip is opened."""
         try:
-            return self._receive_pass(workflow, deadline, replay)
+            return self._receive_pass(workflow, deadline, replay, play)
         except BaseException:
             self.player.clear()     # after a failure or a reset nothing of the grin is left to play
             raise
 
-    def _receive_pass(self, workflow: dict, deadline: float, replay: bool) -> tuple[np.ndarray | None, int]:
+    def _receive_pass(self, workflow: dict, deadline: float, replay: bool, play: bool) -> tuple[np.ndarray | None, int]:
         s: PipelineSettings = self.settings
         wf: Workflow = self.workflow
         total: int = wf.frame_count(workflow)
-        if not self._silent:
+        if play and not self._silent:
             # the first grin after a portrait holds on its first frame (the blend); the warm-up opens no clip
             self.player.begin(total, hold=not replay)
         main_id: str = self.client.queue(workflow)
@@ -325,6 +334,7 @@ class Generator(Thread):
                 elif node == wf.capture_depth and output.get('images'):
                     depth: np.ndarray | None = self.client.view(output['images'][0])
                     if depth is not None:
+                        self._capture_depth = depth
                         self._emit(GenMessage(GenState.CAM_DEPTH, 0.0, depth))
                 elif node == wf.portrait and output.get('images'):
                     portrait: np.ndarray | None = self.client.view(output['images'][0])

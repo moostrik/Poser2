@@ -32,11 +32,11 @@ start charges without a face. The capture is the last frame in which the subject
 last frame at all when none did), cropped by
 `portrait_crop` (eyes levelled, at the workflow's portrait size). Every frame's faces go to the render
 (`Inputs.faces`), for two things. The show: `CameraLayer` draws the camera in black and white with
-the subject's box turning to colour as the charge fills, its outline (green while it qualifies,
-grey while the charge drains), keypoints and a progress bar inside the box's right edge; they are
-part of the camera layer, so the flash fades them to white with it. The
-operator overlay (`render.show_faces`: `FaceOverlayLayer`): every face with its readout or reject
-reason, over the output. Marks are built in `face_marks.py`, drawn by `MarkDrawer`.
+the subject's box turning to colour as the charge fills (`render.face_fill`: fading in, or rising
+from the bottom), its outline (from grey to `render.face_color` with the charge) and grey
+keypoints; they are part of the camera layer, so the flash fades them to white with it. The
+operator overlay (`render.show_faces`: `FaceOverlayLayer`): every face's box, a rejected one with
+its reject reason, over the output (the panel has the readout). Marks are built in `face_marks.py`, drawn by `MarkDrawer`.
 
 ## Image generator
 
@@ -53,6 +53,9 @@ After every connect, a warm-up run on `data/comfy/warmup.jpg` (`build_warmup`: t
 with one sampler step and one grin frame) loads the models and proves the chain works (own limit
 `WARMUP_TIMEOUT`; a visitor has `connection.job_timeout`). Until `Generator.ready` no sequence starts (`Sequencer.blocked`,
 set in `Forgettable`) and the render shows the generator's status as a line (`StatusLayer`).
+For debugging the rest of the cycle, `pipeline.connection.skip_generation` sends the capture for the
+description and its depth only (`build_describe`: no portrait, no grin); the flash out then goes
+to the timeout (`Sequencer.finish`).
 For tests in the ComfyUI page, `python -m modules.comfy.testflow` writes `data/comfy/smile_test.json`
 (drag it into the page): what the app sends with a preset's values, plus an input switch (the
 app's last capture, or any photo through the face crop), previews and a video recorder. Regenerate

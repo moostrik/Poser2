@@ -184,4 +184,4 @@ class SmileRender(RenderBase):
         elif message.state == GenState.IDLE:
             if message.image is not None:
                 self.inputs.diffusion_depth.set_image(message.image)
-            self.sequencer.set_sequence(SequenceType.TIMEOUT)
+            self.sequencer.finish()

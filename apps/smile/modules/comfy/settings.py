@@ -15,6 +15,7 @@ class ConnectionSettings(BaseSettings):
     port:          Field[int]   = Field(8188, access=Field.INIT, widget=Widget.number_field, description="ComfyUI server port")
     workflow:      Field[str]   = Field("data/comfy/smile_workflow.json", access=Field.INIT, description="Workflow in ComfyUI API format (structure only)")
     job_timeout:   Field[float] = Field(45.0, min=10.0, max=300.0, step=5.0, description="Give up on a visitor (generation and grin) after this many seconds")
+    skip_generation: Field[bool] = Field(False, pinned=True, description="Debug: only describe and depth, no portrait and no grin")
 
     connected:     Field[bool]  = Field(False, access=Field.READ, description="Connected to ComfyUI")
     status:        Field[str]   = Field("", access=Field.READ, description="Generator status")

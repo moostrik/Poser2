@@ -9,7 +9,8 @@ LABEL_PAD_PX: float = 4.0
 
 
 class FaceOverlayLayer(LayerBase):
-    """The operator's view: the show's image with a box, keypoints and label per detected face."""
+    """The operator's view: the show's image with a box and keypoints per detected face, and
+    the reject reason of a rejected one."""
 
     def __init__(self) -> None:
         self._fbo: Fbo = Fbo()
@@ -51,7 +52,8 @@ class FaceOverlayLayer(LayerBase):
         for mark in self._marks:
             self._drawer.draw(mark, self._width, self._height)
         for mark in self._marks:
-            self._draw_label(mark)
+            if mark.label:
+                self._draw_label(mark)
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         self._fbo.end()
 

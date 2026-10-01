@@ -164,6 +164,73 @@ class TestSequencer(unittest.TestCase):
             self.assertEqual(message.sequence_type, SequenceType.CONTROL_0)
             self.assertTrue(message.initial)
 
+    def test_finish_with_the_depth_in_lets_the_flash_out_play(self):
+        clock = [100.0]
+        settings = self.sequencer.settings
+        settings.flash_hold = 0.0
+        settings.flash_out_auto = False
+        settings.flash_out = 2.0
+        with mock.patch('modules.render.Sequencer.time.time', lambda: clock[0]):
+            self.flash_until_ask(clock)
+            self.sequencer.start_reveal()
+            self.sequencer.finish()             # nothing generated: done before the flash is full
+            self.assertEqual(self.sequencer.get_sequence(), SequenceType.ASK)
+            clock[0] += 0.3
+            self.sequencer.update()
+            self.assertEqual(self.sequencer.get_sequence(), SequenceType.CONTROL_0)
+            message = self.sequencer.update()
+            self.assertEqual(message.sequence_type, SequenceType.CONTROL_0)
+            self.assertTrue(message.initial)
+            clock[0] += 1.0
+            self.sequencer.update()
+            self.assertEqual(self.sequencer.get_sequence(), SequenceType.CONTROL_0)
+            clock[0] += 1.1                     # the flash out is done
+            self.sequencer.update()
+            self.assertEqual(self.sequencer.get_sequence(), SequenceType.TIMEOUT)
+
+    def test_finish_without_the_depth_frees_the_flash(self):
+        clock = [100.0]
+        with mock.patch('modules.render.Sequencer.time.time', lambda: clock[0]):
+            self.flash_until_ask(clock)
+            self.sequencer.finish()             # the generator failed before the depth
+            self.assertEqual(self.sequencer.get_sequence(), SequenceType.TIMEOUT)
+
+    def test_finish_after_the_flash_is_at_once(self):
+        for state in (SequenceType.DIFFUSION, SequenceType.DIFF_LOOP):
+            self.sequencer.start_reveal()
+            self.sequencer.set_sequence(state)
+            self.sequencer.finish()
+            self.assertEqual(self.sequencer.get_sequence(), SequenceType.TIMEOUT)
+
+    def test_a_finish_of_the_previous_visitor_does_not_end_the_next_flash_out(self):
+        clock = [100.0]
+        settings = self.sequencer.settings
+        settings.flash_hold = 0.0
+        settings.flash_out_auto = False
+        settings.flash_out = 2.0
+        with mock.patch('modules.render.Sequencer.time.time', lambda: clock[0]):
+            self.flash_until_ask(clock)
+            self.sequencer.start_reveal()
+            self.sequencer.finish()
+            self.flash_until_ask(clock)         # the next visitor
+            self.sequencer.start_reveal()
+            clock[0] += 0.3
+            self.sequencer.update()
+            self.sequencer.update()
+            clock[0] += 10.0
+            self.sequencer.update()
+            self.assertEqual(self.sequencer.get_sequence(), SequenceType.CONTROL_0)
+
+    def test_flash_out_waits_for_the_generator(self):
+        clock = [100.0]
+        self.sequencer.settings.flash_out_auto = False
+        with mock.patch('modules.render.Sequencer.time.time', lambda: clock[0]):
+            self.sequencer.set_sequence(SequenceType.CONTROL_0)
+            self.sequencer.update()
+            clock[0] += 10.0
+            self.sequencer.update()
+            self.assertEqual(self.sequencer.get_sequence(), SequenceType.CONTROL_0)
+
     def test_a_depth_from_before_the_flash_does_not_start_the_flash_out(self):
         clock = [100.0]
         self.sequencer.settings.flash_hold = 0.0
