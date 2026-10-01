@@ -9,11 +9,19 @@ ImageCallback= Callable[[str, np.ndarray, bool], None]
 
 LoaderCallback= Callable[[int], None]
 
+def play_rate(fps: float, clip_fps: float, spread: float) -> float:
+    """The speed of one play: fps (the clip's own rate when 0), off by a random fraction up to spread.
+    Drawn per play, so the cells drift against each other and no cell is always the fast one."""
+    rate: float = fps if fps > 0 else clip_fps
+    spread = min(max(spread, 0.0), 0.9)
+    return rate * random.uniform(1.0 - spread, 1.0 + spread)
+
+
 class LoadImages(Thread):
     """One cell: stays empty until the player assigns its first clip, then plays clips from the pool
     on its own clock, one after the other."""
 
-    def __init__(self, id: str, pool: ClipPool, fps: float = 0.0) -> None:
+    def __init__(self, id: str, pool: ClipPool, fps: float = 0.0, spread: float = 0.0) -> None:
         super().__init__()
         self._callback_mutex: Lock = Lock()
         self._stop_event: Event = Event()
@@ -23,6 +31,7 @@ class LoadImages(Thread):
         self._id: str = id
         self.pool: ClipPool = pool
         self._fps: float = fps      # playback speed; 0 plays each clip at its own rate
+        self._spread: float = spread    # random speed difference per play, as a fraction
         self._end_time: float = 0.0
         self._first: Clip | None = None
         self._assigned: Event = Event()
@@ -54,7 +63,7 @@ class LoadImages(Thread):
             clip = None     # release the frames: the pool may have dropped this clip meanwhile
 
     def _play(self, clip: Clip) -> None:
-        interval: float = 1.0 / (self._fps if self._fps > 0 else clip.fps)
+        interval: float = 1.0 / play_rate(self._fps, clip.fps, self._spread)
         count: int = len(clip.frames)
         self._loader_callback(random.randint(0, 2))
         for i in range(count):

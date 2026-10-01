@@ -39,7 +39,7 @@ def place_window(monitor: int, windowed: bool, monitors: int) -> tuple[int, bool
 class Player():
     def __init__(self, osc_port: int, root: str = 'output/', monitor: int = 1, trail: float = 0.9,
                  clips: int = 24, pool: int = 24, hwdecode: int | None = None, windowed: bool = False,
-                 fps: float = 30.0) -> None:
+                 fps: float = 30.0, spread: float = 0.0) -> None:
         osc_settings = OscSettings()
         osc_settings.port = int(osc_port)
         self.osc:Osc = Osc(osc_settings)
@@ -73,7 +73,7 @@ class Player():
 
         self.loaders: list[LoadImages] = []
         for id in ids:
-            loader = LoadImages(id, self.pool, fps)
+            loader = LoadImages(id, self.pool, fps, spread)
             loader.add_image_callback(self.render.set_image)
             loader.add_image_callback(self._count_frame)
             loader.add_loader_callback(self.send_osc)
@@ -87,7 +87,7 @@ class Player():
         # the cells start one by one, each on the next clip that is loaded
         self._start_thread = threading.Thread(target=self._start_loop, name='PlayerStart', daemon=True)
         logger.info('Player %d: %d cells, pool %d, %s, root %s, %s', monitor, clips, pool,
-                    f'{fps:g} fps' if fps > 0 else 'clip fps', root, 'window' if windowed else 'fullscreen')
+                    (f'{fps:g} fps' if fps > 0 else 'clip fps') + (f' +-{spread:.0%}' if spread > 0 else ''), root, 'window' if windowed else 'fullscreen')
 
     def start(self) -> None:
         self.pool.start()

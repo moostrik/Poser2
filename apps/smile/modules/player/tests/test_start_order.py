@@ -5,6 +5,7 @@ import unittest
 import numpy as np
 
 from modules.player.ClipPool import Clip, ClipPool, next_start
+from modules.player.ImgLoader import play_rate
 
 
 def clip(id: str) -> Clip:
@@ -47,3 +48,21 @@ class TestPoolIdle(unittest.TestCase):
         for _ in range(3):
             pool.use(c)
         self.assertEqual(c.usage_count, 2)
+
+
+class TestPlayRate(unittest.TestCase):
+
+    def test_no_spread_is_the_given_rate(self):
+        self.assertEqual(play_rate(20.0, 13.0, 0.0), 20.0)
+
+    def test_zero_fps_is_the_clip_rate(self):
+        self.assertEqual(play_rate(0.0, 13.0, 0.0), 13.0)
+
+    def test_spread_stays_within_its_fraction_and_varies(self):
+        rates = [play_rate(20.0, 13.0, 0.1) for _ in range(500)]
+        self.assertGreaterEqual(min(rates), 18.0)
+        self.assertLessEqual(max(rates), 22.0)
+        self.assertGreater(max(rates) - min(rates), 2.0)
+
+    def test_spread_is_clamped_so_the_rate_stays_positive(self):
+        self.assertGreater(min(play_rate(20.0, 13.0, 5.0) for _ in range(500)), 0.0)
