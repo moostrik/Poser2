@@ -39,6 +39,10 @@ the face itself — depth outputs added) and fills in every value from `Pipeline
 panel is the source of truth, the workflow only provides the structure. Keep one workflow per
 visitor: a second workflow in between drops the first from ComfyUI's cache and reloads the models.
 The warm-up run at startup is skipped when ComfyUI's last run was this pipeline (`same_pipeline`).
+For tests in the ComfyUI page, `python -m modules.comfy.testflow` writes `data/comfy/smile_test.json`
+(drag it into the page): what the app sends with a preset's values, plus an input switch (the
+app's last capture, or any photo through the face crop), previews and a video recorder. Regenerate
+it after changing the workflow or the presets instead of editing a copy by hand.
 Our own ComfyUI nodes live in `comfy/aiia_grin/` (copied into `ComfyUI/custom_nodes/aiia_grin`).
 
 ## Render
