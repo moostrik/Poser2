@@ -10,7 +10,7 @@ from modules.comfy.styles import Styles
 from modules.comfy.workflow import FIXED_SEED, GRIN_ROTATIONS, GRIN_TARGETS, MAX_SEED, Workflow
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-WORKFLOW = os.path.join(ROOT, 'data', 'comfy', 'AIIAv3 portrait grin v3.json')
+WORKFLOW = os.path.join(ROOT, 'data', 'comfy', 'smile_workflow.json')
 
 
 def links(workflow: dict) -> list[tuple[str, str, str]]:
