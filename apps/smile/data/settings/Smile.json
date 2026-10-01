@@ -137,7 +137,7 @@
   },
   "render": {
     "show_camera": true,
-    "show_faces": true,
+    "face_marks": true,
     "face_color": {
       "r": 0.2,
       "g": 1.0,

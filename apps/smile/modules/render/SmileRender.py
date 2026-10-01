@@ -10,8 +10,7 @@ from modules.face.FaceFinder import FaceFrame
 from modules.gl import Blit, Fbo, RenderBase, Shader, Style, Texture, clear_color
 from modules.gl.Utils import fit
 from modules.render.inputs import Inputs
-from modules.render.layers import CameraLayer, DestructLayer, DiffusionLayer, FaceOverlayLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer
-from modules.render.layers.face_marks import FACES_STALE, build_marks
+from modules.render.layers import CameraLayer, DestructLayer, DiffusionLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer
 from modules.render.layers.passes import copy
 from modules.render.Sequencer import SequenceType, Sequencer
 from modules.render.settings import RenderSettings
@@ -45,12 +44,10 @@ class SmileRender(RenderBase):
             diffusion=DiffusionLayer(self.inputs.diffusion),
             destruct=DestructLayer(self.inputs.diffusion_depth),
         )
-        # the operator's face overlay is no stage layer: drawn over the output when show_faces is on
-        self._faces: FaceOverlayLayer = FaceOverlayLayer()
         # the operator's status line, drawn over the output while there is something to say
         self._status: StatusLayer = StatusLayer()
         self._status_text: str | None = None
-        self._all_layers: list[LayerBase] = list(vars(self.layers).values()) + [self._faces, self._status]
+        self._all_layers: list[LayerBase] = list(vars(self.layers).values()) + [self._status]
 
         # one instance per stage class, shared by the sequence types it covers
         stages: dict[type[Stage], Stage] = {cls: cls(self.inputs, self.layers, settings) for cls in set(STAGES.values())}
@@ -96,9 +93,6 @@ class SmileRender(RenderBase):
         stage.update(message)
 
         self._output = stage.output
-        if self.settings.show_faces:
-            self._render_faces(self._output)
-            self._output = self._faces.texture
         status: str | None = self._status_text
         if status:
             self._status.render(self._output, status)
@@ -121,15 +115,6 @@ class SmileRender(RenderBase):
             self.sequencer.set_sequence(SequenceType.DIFF_LOOP)
         if started or (frame is not None and self.player.playing):
             self.sequencer.set_diffusion_progress(self.player.progress)
-
-    def _render_faces(self, source: Texture) -> None:
-        frame: FaceFrame | None = self.inputs.faces.get()
-        if frame is None or time.time() - frame.time > FACES_STALE:
-            self._faces.set_marks([])
-        else:
-            r, g, b, a = self.settings.face_color
-            self._faces.set_marks(build_marks(frame, (r, g, b, a)))
-        self._faces.render(source)
 
     def draw_main(self, width: int, height: int) -> None:
         clear_color(0, 0, 0, 1)

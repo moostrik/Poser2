@@ -127,7 +127,7 @@
   },
   "render": {
     "show_camera": false,
-    "show_faces": true,
+    "face_marks": true,
     "freeze": false,
     "trail_active": true,
     "trail": 0.99,

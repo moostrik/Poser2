@@ -34,12 +34,12 @@ has a qualifying subject (`sequence.charge` seconds to fill) and drains while it
 start charges without a face. The capture is the last frame in which the subject qualified (the
 last frame at all when none did), cropped by
 `portrait_crop` (eyes levelled, at the workflow's portrait size). Every frame's faces go to the render
-(`Inputs.faces`), for two things. The show: `CameraLayer` draws the camera in black and white with
+(`Inputs.faces`): `CameraLayer` draws the camera in black and white with
 the subject's box turning to colour as the charge fills (`render.face_fill`: fading in, or rising
-from the bottom), its outline (from grey to `render.face_color` with the charge) and grey
-keypoints; they are part of the camera layer, so the flash fades them to white with it. The
-operator overlay (`render.show_faces`: `FaceOverlayLayer`): every face's box, a rejected one with
-its reject reason, over the output (the panel has the readout). Marks are built in `face_marks.py`, drawn by `MarkDrawer`.
+from the bottom). `render.face_marks` switches all marks on or off: the subject's outline (from
+grey to `render.face_color` with the charge) and grey keypoints, the other faces in white, a
+rejected one in grey with its reject reason (the panel has the readout). They are part of the
+camera layer, so the flash fades them out with it. Marks are built in `face_marks.py`, drawn by `MarkDrawer`.
 
 ## Image generator
 

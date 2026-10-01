@@ -34,8 +34,11 @@ class TestSubjectMark(unittest.TestCase):
         self.assertEqual(half.dots, REJECTED_COLOR)
         # the same while the charge drains
         self.assertEqual(subject.update(away, 10.1, 0.5, blue).color, half.color)
-        marks = build_marks(FaceFrame((observation(subject=True), observation()), 0.0), blue)
-        self.assertEqual([m.color for m in marks], [ACCEPTED_COLOR, blue])
+        # the subject among all faces is marked the same
+        both = FaceFrame((observation(subject=True), observation()), 0.0)
+        self.assertEqual([m.color for m in build_marks(both, blue, 1.0)], [ACCEPTED_COLOR, blue])
+        self.assertEqual([m.color for m in build_marks(both, blue, 0.5)], [ACCEPTED_COLOR, half.color])
+        self.assertEqual([m.dots for m in build_marks(both, blue, 0.5)], [None, REJECTED_COLOR])
 
     def test_nothing_without_a_charge_or_a_qualifying_subject(self):
         subject = SubjectMark()
@@ -88,19 +91,22 @@ class TestLabels(unittest.TestCase):
 class TestBuildMarks(unittest.TestCase):
     def test_colours_and_lines(self):
         frame = FaceFrame((observation(subject=True), observation(), observation(Rejection.EYES)), 0.0)
-        marks = {m.color: m for m in build_marks(frame)}
+        marks = {m.color: m for m in build_marks(frame, charge=1.0)}
         self.assertEqual(marks[SUBJECT_COLOR].line, SUBJECT_LINE_PX)
         self.assertEqual(marks[ACCEPTED_COLOR].line, LINE_PX)
         self.assertEqual(marks[REJECTED_COLOR].line, LINE_PX)
 
-    def test_a_rejected_subject_is_grey_but_thick(self):
-        marks = build_marks(FaceFrame((observation(Rejection.TURNED, subject=True),), 0.0))
-        self.assertEqual(marks[0].color, REJECTED_COLOR)
-        self.assertEqual(marks[0].line, SUBJECT_LINE_PX)
+    def test_a_rejected_subject_is_thick_labelled_and_follows_the_charge(self):
+        frame = FaceFrame((observation(Rejection.TURNED, subject=True, limit=20.0),), 0.0)
+        mark = build_marks(frame)[0]
+        self.assertEqual(mark.color, REJECTED_COLOR)
+        self.assertEqual(mark.line, SUBJECT_LINE_PX)
+        self.assertTrue(mark.label)
+        self.assertEqual(build_marks(frame, charge=0.5)[0].color, mix(REJECTED_COLOR, SUBJECT_COLOR, 0.5))
 
     def test_rejected_first_subject_last(self):
         frame = FaceFrame((observation(subject=True), observation(Rejection.SMALL), observation()), 0.0)
-        colors = [m.color for m in build_marks(frame)]
+        colors = [m.color for m in build_marks(frame, charge=1.0)]
         self.assertEqual(colors, [REJECTED_COLOR, ACCEPTED_COLOR, SUBJECT_COLOR])
 
     def test_box_from_bbox(self):
