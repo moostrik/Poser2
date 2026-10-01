@@ -58,13 +58,13 @@
     "lora": {
       "clothing": 5.0,
       "looking": 5.0,
-      "dark": 0.0
+      "dark": -0.5
     },
     "grin": {
       "loop": false,
       "still": false,
       "still_position": 1.0,
-      "frames": 10,
+      "frames": 210,
       "face_region": 1.7,
       "stitching": true,
       "ease": "SINE_IN_OUT",
@@ -120,7 +120,7 @@
     "flash_in_ease": "QUAD_IN",
     "flash_hold": 0.5,
     "flash_out_auto": true,
-    "flash_out": 4.809581906454904,
+    "flash_out": 2.7569833278656004,
     "flash_out_ease": "SINE_OUT",
     "grin_delay": 0.5,
     "grin_fps": 13.0,
@@ -143,8 +143,8 @@
       "title": "SMILE",
       "v_sync": true,
       "monitor": "M0",
-      "x": 958,
-      "y": 760,
+      "x": 1203,
+      "y": 673,
       "width": 638,
       "height": 1000,
       "secondary_list": [],

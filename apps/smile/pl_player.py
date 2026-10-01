@@ -10,7 +10,8 @@ parser.add_argument('-m',   '--monitor',    type=int,   default=1,      help='mo
 parser.add_argument('-osc', '--osc_port',   type=int,   default=4115,   help='osc port')
 parser.add_argument('-n',   '--clips',      type=int,   default=24,     help='number of clips playing at once (cells)')
 parser.add_argument('--pool',               type=int,   default=24,     help='number of newest clips kept decoded in RAM (about 200 MB each)')
-parser.add_argument('--fps',                type=float, default=15.0,   help='playback speed of the clips (frames per second); 0 plays each clip at its own rate')
+parser.add_argument('--fps',                type=float, default=20.0,   help='playback speed of the clips (frames per second); 0 plays each clip at its own rate')
+parser.add_argument('--trail',              type=float, default=0.0,    help='blend of each frame with the previous output, 0 = none (0.5 was the old look)')
 parser.add_argument('--root',              type=str,   default='output/', help='output folder (clips in its grins/ subfolder)')
 parser.add_argument('--hwdecode',           type=int,   default=None,   help='decode on the GPU with this DXGI adapter index (default: software)')
 parser.add_argument('--window',             action='store_true',        help='run in a window instead of borderless fullscreen (for testing)')
@@ -20,8 +21,7 @@ args = parser.parse_args()
 setup_logging(verbose=args.verbose, name=f'player{args.monitor}')
 install_thread_excepthook()
 
-trail = 0.5         # the grin is a moving image; a long trail would smear it
-player: Player = Player(args.osc_port, args.root, args.monitor, trail, args.clips, args.pool, args.hwdecode, args.window, args.fps)
+player: Player = Player(args.osc_port, args.root, args.monitor, args.trail, args.clips, args.pool, args.hwdecode, args.window, args.fps)
 player.start()
 
 def signal_handler_exit(sig, frame) -> None:

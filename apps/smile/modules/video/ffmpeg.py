@@ -6,10 +6,12 @@ read when the process ends, so a failure has a message."""
 
 import json
 import logging
+import os
 import shutil
 import subprocess
 from enum import Enum
 from fractions import Fraction
+from typing import BinaryIO
 
 import numpy as np
 
@@ -51,6 +53,22 @@ def popen(args: list[str], stdin, stdout, command: str = FFMPEG, background: boo
     return subprocess.Popen([command, '-hide_banner', '-loglevel', 'error', *args],
                             stdin=stdin, stdout=stdout, stderr=subprocess.PIPE,
                             creationflags=flags)
+
+
+PIPE_SIZE: int = 8 << 20     # the default Windows pipe holds 4 KB: reading a clip through it takes 6 times as long
+
+
+def _big_pipe() -> tuple[BinaryIO, int]:
+    """A pipe with a large buffer: (unbuffered read file, write descriptor to hand to the child)."""
+    if os.name == 'nt':
+        import _winapi
+        import msvcrt
+        read_handle, write_handle = _winapi.CreatePipe(None, PIPE_SIZE)
+        read_fd = msvcrt.open_osfhandle(read_handle, os.O_RDONLY)
+        write_fd = msvcrt.open_osfhandle(write_handle, 0)
+    else:
+        read_fd, write_fd = os.pipe()
+    return os.fdopen(read_fd, 'rb', buffering=0), write_fd
 
 
 def _stderr(output: bytes | None) -> str:
@@ -177,6 +195,18 @@ def hwdecode_args(adapter: int | None) -> list[str]:
     return ['-hwaccel', 'd3d11va', '-hwaccel_device', str(adapter)]
 
 
+def _read_exactly(file: BinaryIO, size: int) -> bytes:
+    """Up to size bytes from an unbuffered file, which returns what the pipe holds per read; short only at its end."""
+    parts: list[bytes] = []
+    while size > 0:
+        data = file.read(size)
+        if not data:
+            break
+        parts.append(data)
+        size -= len(data)
+    return b''.join(parts)
+
+
 def decode_clip(path: str, size: tuple[int, int], hwdecode: int | None = None) -> tuple[np.ndarray, float]:
     """The whole clip as a (frames, height, width, 3) bgr uint8 array scaled to size (width, height), and its fps."""
     frames, fps, _, _ = probe(path)
@@ -185,32 +215,36 @@ def decode_clip(path: str, size: tuple[int, int], hwdecode: int | None = None) -
     args = ['-nostdin', '-threads', str(DECODE_THREADS), *hwdecode_args(hwdecode), '-i', path,
             '-filter_threads', str(DECODE_THREADS), '-vf', f'scale={width}:{height}',
             '-f', 'rawvideo', '-pix_fmt', 'bgr24', 'pipe:1']
-    process = popen(args, subprocess.DEVNULL, subprocess.PIPE, background=True)
-    assert process.stdout is not None and process.stderr is not None
+    out, write_fd = _big_pipe()
+    try:
+        process = popen(args, subprocess.DEVNULL, write_fd, background=True)
+    finally:
+        os.close(write_fd)      # the child has its own copy; ours must close for the read to reach its end
+    assert process.stderr is not None
     if frames > 0:
         # fill a preallocated array, no second copy of the 200 MB
         array = np.empty((frames, height, width, 3), np.uint8)
         view = memoryview(array).cast('B')
         got = 0
         while got < len(view):
-            n = process.stdout.readinto(view[got:])
+            n = out.readinto(view[got:])
             if not n:
                 break
             got += n
-        while process.stdout.read(1 << 20):     # drain frames beyond the count, so ffmpeg can end
+        while out.read(1 << 20):     # drain frames beyond the count, so ffmpeg can end
             pass
     else:
         # the file does not say how many frames: read to the end and stack
         chunks: list[bytes] = []
         while True:
-            data = process.stdout.read(frame_bytes)
+            data = _read_exactly(out, frame_bytes)
             if len(data) < frame_bytes:
                 break
             chunks.append(data)
         got = len(chunks) * frame_bytes
         array = np.frombuffer(b''.join(chunks), np.uint8).reshape(-1, height, width, 3)
     err = process.stderr.read()     # stdout is at its end, so ffmpeg is finishing
-    process.stdout.close()
+    out.close()
     process.stderr.close()
     process.wait(timeout=30)
     if process.returncode != 0:
