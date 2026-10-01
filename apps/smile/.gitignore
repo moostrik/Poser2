@@ -10,7 +10,7 @@ data/audio/*
 data/input/*
 !data/input/.gitkeep
 data/settings/.*
-comfy/*
+comfy/models/
 /ComfyUI/
 
 # Claude Code

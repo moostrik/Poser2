@@ -31,7 +31,7 @@ operator overlay (`render.show_faces`: `FaceOverlayLayer`, marks built in `face_
 
 ## Image generator
 
-ComfyUI server (installed in `ComfyUI/` from the `comfy/` bundle, both git-ignored, API on
+ComfyUI server (installed in `ComfyUI/` from the `comfy/` bundle; `ComfyUI/` and `comfy/models/` are git-ignored, API on
 127.0.0.1:8188), started by `scripts/start_comfy.bat`, with a log per start in `output/logs/comfy_*.log`. Every model is
 local and a run makes no internet calls; a pack only downloads a model that is missing. Keep ComfyUI core and the node packs unmodified; depth comes from
 ComfyUI's own Depth Anything 3 nodes. `modules/comfy/`: `Generator` sends each capture to ComfyUI and turns its
