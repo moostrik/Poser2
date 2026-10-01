@@ -13,7 +13,7 @@ from player.shaders import BlitRotated
 
 class PlayerRender(RenderBase):
     """Grin sequences in a grid of cells, each image turned a quarter, with a trail over the whole grid.
-    A cell flashes white for one frame when its next sequence starts. Keys: f fullscreen, w borderless,
+    A cell flashes white for one frame when its next sequence starts. Keys: f fullscreen (borderless),
     Esc quit (the window manager)."""
 
     COLUMNS: int = 6
@@ -22,6 +22,8 @@ class PlayerRender(RenderBase):
 
     def __init__(self, window: WindowSettings, ids: list[str], trail: float) -> None:
         super().__init__(window)
+        # exclusive fullscreen next to SMILE and the other player chokes the GPU: the generation times out
+        self.window_manager.exclusive_fullscreen = False
         self.trail: float = trail
 
         self.width: int = self.COLUMNS * self.CELL_WIDTH

@@ -88,6 +88,7 @@ class WindowManager():
         self._window_height: int = settings.height
         self._fullscreen_mode: FullscreenMode = FullscreenMode.WINDOWED
         self.frame_interval: int | None = None
+        self.exclusive_fullscreen: bool = True  # False: the f key toggles borderless fullscreen, w does nothing
         self._current_vsync: bool | None = None
         logger.info("Initialized with width=%s, height=%s, fullscreen_mode=%s, v_sync=%s, fps=%s", settings.width, settings.height, settings.fullscreen_mode, settings.v_sync, settings.avg_fps)
         self._fps = FpsCounter()
@@ -548,10 +549,11 @@ class WindowManager():
                 glfw.post_empty_event()
                 return
         if action == glfw.PRESS:
-            if key == glfw.KEY_F:
+            borderless_key: int = glfw.KEY_W if self.exclusive_fullscreen else glfw.KEY_F
+            if key == glfw.KEY_F and self.exclusive_fullscreen:
                 mode = FullscreenMode.WINDOWED if self._fullscreen_mode == FullscreenMode.FULLSCREEN else FullscreenMode.FULLSCREEN
                 self.settings.fullscreen_mode = mode
-            elif key == glfw.KEY_W:
+            elif key == borderless_key:
                 mode = FullscreenMode.WINDOWED if self._fullscreen_mode == FullscreenMode.WINDOWED_FULLSCREEN else FullscreenMode.WINDOWED_FULLSCREEN
                 self.settings.fullscreen_mode = mode
 

@@ -41,7 +41,7 @@ class Player():
         window.width = 1920
         window.height = 1024
         window.secondary_list = []
-        # a plain window for testing (Esc quits, f toggles fullscreen), else borderless fullscreen
+        # a plain window for testing (Esc quits, f toggles borderless fullscreen), else borderless fullscreen
         window.fullscreen_mode = FullscreenMode.WINDOWED if windowed else FullscreenMode.WINDOWED_FULLSCREEN
         window.initialize()
         self.render: PlayerRender = PlayerRender(window, ids, trail)

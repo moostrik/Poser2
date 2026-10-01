@@ -166,6 +166,9 @@ class Generator(Thread):
             self._run_job(image, start)
         except Interrupted:
             logger.info('Generation interrupted')
+        except TimeoutError as e:       # our own job_timeout (an OSError, but not a lost connection)
+            logger.warning('Generation timed out: %s', e)
+            self._emit(GenMessage(GenState.IDLE))
         except (websocket.WebSocketException, RequestException, ConnectionError, OSError):
             self._emit(GenMessage(GenState.IDLE))
             raise
@@ -179,13 +182,13 @@ class Generator(Thread):
             if self.settings.connection.connected:
                 self.settings.connection.status = 'ready'
 
-    def _check(self, deadline: float) -> None:
+    def _check(self, deadline: float, last_event: str = '') -> None:
         if self._stop_event.is_set() or self._interrupt_event.is_set():
             self._interrupt_comfy()
             raise Interrupted()
         if time.time() > deadline:
             self._interrupt_comfy()
-            raise TimeoutError('generation took longer than job_timeout')
+            raise TimeoutError(f'longer than job_timeout{last_event}')
 
     def _interrupt_comfy(self) -> None:
         try:
@@ -204,6 +207,12 @@ class Generator(Thread):
         s: PipelineSettings = self.settings
         wf: Workflow = self.workflow
 
+        if self.client.busy():
+            self._idle(1.0)     # our previous job leaves the queue just after its last event
+        if self.client.busy():
+            # a job that timed out is still running (ComfyUI only stops between steps): don't queue behind it
+            self._interrupt_comfy()
+            raise RuntimeError('ComfyUI is still busy with an earlier job')
         s.connection.status = 'generating'
         name: str = self.client.upload(image, 'smile_capture.png')
         workflow: dict = wf.build(name, self.styles.current_text(), self.styles.current_negative(), s)
@@ -250,9 +259,11 @@ class Generator(Thread):
         made: int = 0
         last_depth: np.ndarray | None = None
         sampler_progress: float = 0.0
+        last_event: str = 'queued'      # for the timeout message: where ComfyUI went silent
+        last_time: float = time.time()
 
         while True:
-            self._check(deadline)
+            self._check(deadline, f", no event for {time.time() - last_time:.0f} s after '{last_event}'")
             event: ComfyEvent | None = self.client.receive(0.05)
             if event is None:
                 continue
@@ -260,6 +271,8 @@ class Generator(Thread):
 
             if prompt_id != main_id:
                 continue
+            last_event = f"{event.type} {event.data.get('node_id') or event.data.get('node') or ''}".strip()
+            last_time = time.time()
 
             if event.type == 'preview' and event.image is not None:
                 node: str | None = event.data.get('node_id')

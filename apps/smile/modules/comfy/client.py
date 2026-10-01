@@ -87,6 +87,13 @@ class ComfyClient():
         response.raise_for_status()
         return response.json()[class_type]
 
+    def busy(self) -> bool:
+        """True while the server has a job running or waiting."""
+        response = requests.get(f'{self.base}/queue', timeout=5)
+        response.raise_for_status()
+        queue: dict = response.json()
+        return bool(queue.get('queue_running') or queue.get('queue_pending'))
+
     def interrupt(self) -> None:
         requests.post(f'{self.base}/queue', json={'clear': True}, timeout=5)
         requests.post(f'{self.base}/interrupt', timeout=5)
