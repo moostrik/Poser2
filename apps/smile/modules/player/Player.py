@@ -6,10 +6,10 @@ import time
 
 import numpy as np
 
-from player.ImgLoader import LoadImages
-from player.Render import PlayerRender
-from player.ClipPool import Clip, ClipPool, next_start
-from player.FolderScanner import FolderScanner
+from modules.player.ImgLoader import LoadImages
+from modules.player.Render import PlayerRender
+from modules.player.ClipPool import Clip, ClipPool, next_start
+from modules.player.FolderScanner import FolderScanner
 
 from modules.osc.Sender import Sender as Osc
 from modules.osc.settings import OscSettings
@@ -23,7 +23,7 @@ MIN_START_GAP: float = 0.1      # s at least between two cells starting, when cl
 
 
 class Player():
-    def __init__(self, osc_port: int, root: str = 'recordings/', monitor: int = 1, trail: float = 0.9,
+    def __init__(self, osc_port: int, root: str = 'output/', monitor: int = 1, trail: float = 0.9,
                  clips: int = 24, pool: int = 24, hwdecode: int | None = None, windowed: bool = False,
                  fps: float = 30.0) -> None:
         osc_settings = OscSettings()

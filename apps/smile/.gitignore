@@ -1,19 +1,15 @@
 # project
 .venv/
-audio/*
-!audio/.gitkeep
-!audio/*.maxpat
-recordings/*
-!recordings/.gitkeep
-input/*
-!input/.gitkeep
-logos/*
-!logos/.gitkeep
 *.log
-logs/*
+output/*
+!output/.gitkeep
+data/audio/*
+!data/audio/.gitkeep
+!data/audio/*.maxpat
+!data/audio/music_map.json
+data/input/*
+!data/input/.gitkeep
 data/settings/.*
-
-
 comfy/*
 /ComfyUI/
 

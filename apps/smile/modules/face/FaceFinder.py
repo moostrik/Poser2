@@ -91,7 +91,7 @@ class FaceFinder(Thread):
     frame callbacks, for the overlay."""
 
     def __init__(self, settings: FaceSettings, composition_width: int, composition_height: int,
-                 model_path: str = 'files/scrfd_10g_bnkps.onnx', landmark_path: str = 'files/2d106det.onnx') -> None:
+                 model_path: str = 'data/models/scrfd_10g_bnkps.onnx', landmark_path: str = 'data/models/2d106det.onnx') -> None:
         super().__init__()
         self.settings: FaceSettings = settings
         self._input_mutex: Lock = Lock()

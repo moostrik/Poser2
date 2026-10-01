@@ -16,7 +16,7 @@ from modules.cam.settings import CameraSettings
 
 logger = logging.getLogger(__name__)
 
-IMAGE_FOLDER: str = 'input'
+IMAGE_FOLDER: str = 'data/input'
 IMAGE_EXTENSIONS: tuple[str, ...] = ('.jpg', '.jpeg', '.png')
 IMAGE_FPS: float = 25.0
 

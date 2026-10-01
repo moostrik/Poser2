@@ -96,15 +96,15 @@ def setup_logging(verbose: bool = False, name: str = "smile") -> Path:
 
     Args:
         verbose: If True, console shows DEBUG level; otherwise INFO.
-        name: Prefix of the log file in logs/ (smile, player1, ...).
+        name: Prefix of the log file in output/logs/ (smile, player1, ...).
 
     Returns:
         Path to the log file.
     """
     global _log_buffer
 
-    log_dir = Path(__file__).resolve().parent.parent / "logs"
-    log_dir.mkdir(exist_ok=True)
+    log_dir = Path(__file__).resolve().parent.parent / "output" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = log_dir / f"{name}_{timestamp}.log"
 

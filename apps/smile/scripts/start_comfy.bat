@@ -4,7 +4,7 @@
 @echo off
 
 set "COMFY_DIR=%~dp0..\ComfyUI"
-set "LOG_DIR=%~dp0..\logs"
+set "LOG_DIR=%~dp0..\output\logs"
 
 curl -s -o nul http://127.0.0.1:8188/system_stats
 if "%ERRORLEVEL%"=="0" (

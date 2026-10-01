@@ -4,11 +4,13 @@ Art installation: a camera captures a face, an image generator turns it into a p
 result is shown with music (Max patch via OSC) and lights (Art-Net). Entry points: `smile.py`
 (main app, `modules/Forgettable.py`) and `pl_player.py` (image players). Python 3.12, venv in
 `.venv`, installed with `scripts/install.bat`. Tests: `.venv\Scripts\python -m pytest` from the repo root.
+All Python code lives in `modules/`; `data/` is what the installation is given (presets, models,
+workflow, audio, test photos), `output/` what it produces (git-ignored, safe to delete).
 
 ## Camera
 
 `modules/cam/Camera.py` is the one source the app reads: it wraps the device (`VimbaCam` default,
-`WebCam` with `-wc`) and an image source from `input/` that the panel's `use_image` switch puts in
+`WebCam` with `-wc`) and an image source from `data/input/` that the panel's `use_image` switch puts in
 place of the device frames at any time. A missing device is a warning and `device: none`, never an
 automatic switch to the image. The camera settings (`Settings.camera`) also hold the face settings
 (`camera.face`).
@@ -16,11 +18,11 @@ automatic switch to the image. The camera settings (`Settings.camera`) also hold
 ## Face
 
 `modules/face/`: `FaceFinder` (own thread) detects every face of a camera frame (SCRFD,
-`files/scrfd_10g_bnkps.onnx`) and judges it in `quality.py`: detector confidence, size (the
+`data/models/scrfd_10g_bnkps.onnx`) and judges it in `quality.py`: detector confidence, size (the
 distance between the eyes, min and max), position (horizontal distance from the image centre),
 pose from the 5 keypoints (the pitch's zero is `pitch_zero`, set on site with the "Set pitch zero"
 button: it depends on the camera height), eye openness from the 106 landmarks (`FaceLandmarks`,
-`files/2d106det.onnx`, only run for faces that passed the other checks); the first failing check
+`data/models/2d106det.onnx`, only run for faces that passed the other checks); the first failing check
 is the face's `Rejection`. Gaze is not checked: the "looking at viewer" LoRA corrects it. The subject of a frame is its largest qualifying face; a face that qualifies for
 `stable_time` without interruption starts a sequence. The capture is the last frame of the
 recording in which the subject qualified (the last frame at all when none did), cropped by
@@ -30,7 +32,7 @@ operator overlay (`render.show_faces`: `FaceOverlayLayer`, marks built in `face_
 ## Image generator
 
 ComfyUI server (installed in `ComfyUI/` from the `comfy/` bundle, both git-ignored, API on
-127.0.0.1:8188), started by `scripts/start_comfy.bat`, with a log per start in `logs/comfy_*.log`. Every model is
+127.0.0.1:8188), started by `scripts/start_comfy.bat`, with a log per start in `output/logs/comfy_*.log`. Every model is
 local and a run makes no internet calls; a pack only downloads a model that is missing. Keep ComfyUI core and the node packs unmodified; depth comes from
 ComfyUI's own Depth Anything 3 nodes. `modules/comfy/`: `Generator` sends each capture to ComfyUI and turns its
 websocket events into `GenMessage`s for the render (CAM_DEPTH → DIFFUSION → DIFF_LOOP → IDLE);
@@ -56,19 +58,19 @@ through `inputs.py` (`Image.set_image`, uploaded on the render thread); the grin
 through `GrinPlayer.py`, a buffer the generator fills and the render plays on its own clock, with
 its timings in the sequence settings. Shaders are
 `classname.frag` next to their `.py` and hot-reload while running. `pl_player.py` uses the same engine
-(`player/Render.py`).
+(`modules/player/Render.py`).
 
 ## Recordings
 
-`modules/save/ClipSaver.py` saves each finished visitor for the players under `recordings/` (git-ignored):
+`modules/save/ClipSaver.py` saves each finished visitor for the players under `output/` (git-ignored):
 the grin as `grins/<id>.mp4` (h264 at the full portrait size, at `grin_fps`), the capture and the
-portrait as `portraits/<id>_capture.jpg` and `<id>_portrait.jpg`. Files are built in `recordings/temp/`
+portrait as `portraits/<id>_capture.jpg` and `<id>_portrait.jpg`. Files are built in `output/temp/`
 and renamed into place when the grin is complete, so the players never see a partial file.
 Encoding and decoding run `ffmpeg`/`ffprobe` subprocesses through `modules/video/ffmpeg.py` (ffmpeg
 must be on the PATH: the gyan.dev full build); the encoder is picked at startup by a trial encode
 (Intel Quick Sync on the iGPU, then Nvidia, then libx264; `sequence.encoder` forces one). Never start
 those processes any other way: the apps run under pythonw, so they need `CREATE_NO_WINDOW` and no
-inherited handles. The players (`player/`) decode each of the newest clips once into RAM
+inherited handles. The players (`modules/player/`) decode each of the newest clips once into RAM
 (`ClipPool`, 512x640, about 200 MB per clip) and play from memory; `pl_player.py -n` sets the number
 of cells, `--pool` the clips kept, `--fps` the playback speed (default 15, 0 = the clip's own rate).
 The cells start one by one, each in a random place on the next clip that is loaded (going round the

@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from os import path, _exit
+from os import _exit
 from signal import signal, SIGINT
 from time import sleep
 from modules.log_config import setup_logging, install_thread_excepthook
@@ -18,8 +18,6 @@ args = parser.parse_args()
 setup_logging(verbose=args.verbose)
 install_thread_excepthook()
 
-currentPath: str = path.dirname(__file__)
-
 modWidth :int = round(args.width / 4) * 4
 modHeight : int = round(args.height / 4) * 4
 
@@ -29,7 +27,7 @@ if args.useVimbaCam:
 if args.useWebCam:
     camType = CamType.WEB
 
-aiia = Forgettable(currentPath, modWidth, modHeight, not(bool(args.landscapeMode)), camType)
+aiia = Forgettable(modWidth, modHeight, not(bool(args.landscapeMode)), camType)
 aiia.start()
 
 def signal_handler_exit(sig, frame) -> None:

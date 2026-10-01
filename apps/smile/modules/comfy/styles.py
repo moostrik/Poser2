@@ -1,6 +1,6 @@
 """Style cycling, as aiia3's 'smile' keyword: one style for N visitors, then the next.
 
-The style id is also the movement id for the music (files/music_map.json).
+The style id is also the movement id for the music (data/audio/music_map.json).
 """
 
 from modules.comfy.settings import StyleSettings

@@ -65,7 +65,7 @@ class SequencerSettings(BaseSettings):
     start:              Field[bool]   = Field(False, widget=Widget.button, description="Start a sequence (key Enter)")
     reset:              Field[bool]   = Field(False, widget=Widget.button, description="Reset the sequence")
     pause:              Field[bool]   = Field(False, pinned=True, description="No new visitors: a found face does not start a cycle (Start still works)")
-    save:               Field[bool]   = Field(True, pinned=True, newline=True, label="Save visitors", description="Save each finished visitor (grin clip, capture, portrait) to recordings/ for the players")
+    save:               Field[bool]   = Field(True, pinned=True, newline=True, label="Save visitors", description="Save each finished visitor (grin clip, capture, portrait) to output/ for the players")
     encoder:            Field[Encoder] = Field(Encoder.AUTO, access=Field.INIT, label="Encoder", description="Video encoder for the grin clip (Auto tries Intel, Nvidia, CPU)")
 
     state:              Field[str]    = Field("", access=Field.READ, newline=True, description="Current sequence state")

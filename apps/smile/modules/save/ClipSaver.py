@@ -18,11 +18,11 @@ Command = tuple
 class ClipSaver:
     """Saves each visitor for the players: the grin as an h264 mp4, the capture and the portrait as stills.
 
-    Files are built in recordings/temp/ and moved (an atomic rename) to recordings/grins/ and
-    recordings/portraits/ when the sequence ends complete, else deleted. The save thread is the only
+    Files are built in output/temp/ and moved (an atomic rename) to output/grins/ and
+    output/portraits/ when the sequence ends complete, else deleted. The save thread is the only
     owner of the encoder process; the other threads only enqueue commands, in order."""
 
-    def __init__(self, settings: SequencerSettings, root: str = 'recordings/', max_queue_size: int = 64) -> None:
+    def __init__(self, settings: SequencerSettings, root: str = 'output/', max_queue_size: int = 64) -> None:
         self.settings: SequencerSettings = settings
         self.temp_dir: str = os.path.join(root, 'temp')
         self.grins_dir: str = os.path.join(root, 'grins')

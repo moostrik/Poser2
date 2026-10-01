@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from player.ClipPool import Clip, ClipPool, next_start
+from modules.player.ClipPool import Clip, ClipPool, next_start
 
 
 def clip(id: str) -> Clip:

@@ -38,7 +38,7 @@ tasklist /FI "IMAGENAME eq Max.exe" 2>NUL | find /I /N "Max.exe">NUL
 IF "%ERRORLEVEL%"=="0" (
     echo Music Player is already running.
 ) ELSE (
-    explorer "%CURRENT_DIR%audio\Smile-Music-Player.maxpat"
+    explorer "%CURRENT_DIR%data\audio\Smile-Music-Player.maxpat"
     timeout /t 3 /nobreak >nul
 )
 timeout /t 1 /nobreak >nul

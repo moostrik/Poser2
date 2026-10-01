@@ -22,8 +22,7 @@ class CamType(Enum):
     WEB     = 3
 
 class Forgettable():
-    def __init__(self, path: str, width: int, height: int, portraitMode: bool = False, camType: CamType = CamType.VIMBA) -> None:
-        self.path: str = path
+    def __init__(self, width: int, height: int, portraitMode: bool = False, camType: CamType = CamType.VIMBA) -> None:
         self.width: int = width
         self.height: int = height
         self.portraitMode: bool = portraitMode
@@ -63,11 +62,11 @@ class Forgettable():
         self.camera: Camera = Camera(self.settings.camera, (self.width, self.height), device, device_name)
         self.camera.setRotate90(self.portraitMode)
 
-        self.audio: AudioDB = AudioDB(self.settings.audio, 'files/music_map.json')
+        self.audio: AudioDB = AudioDB(self.settings.audio, 'data/audio/music_map.json')
         self.osc: Osc = Osc(self.settings.osc)
         self.save: ClipSaver = ClipSaver(self.settings.sequence)
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
-        self.artnet = Artnet(self.settings.artnet, 'files/artnet.json')
+        self.artnet = Artnet(self.settings.artnet, 'data/artnet.json')
 
         self._running: bool = False
         self._stopping: bool = False

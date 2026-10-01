@@ -8,7 +8,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA16F, GL_SCISSOR_TEST, glClear
 from modules.gl import Blit, Fbo, Image, RenderBase, Shader, Style, SwapFbo, WindowSettings, clear_color
 from modules.gl.Utils import fit
 from modules.render.shaders import Blend
-from player.shaders import BlitRotated
+from modules.player.shaders import BlitRotated
 
 
 class PlayerRender(RenderBase):

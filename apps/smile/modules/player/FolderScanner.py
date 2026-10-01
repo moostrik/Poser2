@@ -6,7 +6,7 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.api import BaseObserver
 
-from player.ClipPool import ClipPool
+from modules.player.ClipPool import ClipPool
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class ClipEventHandler(FileSystemEventHandler):
 
 
 class FolderScanner:
-    """Watches recordings/grins/ and keeps the pool fed with the newest clips."""
+    """Watches output/grins/ and keeps the pool fed with the newest clips."""
 
     def __init__(self, folder: str, pool: ClipPool, max_files: int) -> None:
         self.folder: str = folder
