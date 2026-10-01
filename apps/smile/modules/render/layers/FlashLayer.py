@@ -5,11 +5,11 @@ from .LayerBase import LayerBase
 
 
 class FlashLayer(LayerBase):
-    """The flash: the camera brightens, then fades to the logo (white)."""
+    """The flash: the camera brightens, then fades to white."""
 
-    def __init__(self, camera: LayerBase, logo: Image) -> None:
+    def __init__(self, camera: LayerBase, white: Image) -> None:
         self._camera: LayerBase = camera
-        self._logo: Image = logo
+        self._white: Image = white
         self._fbo: Fbo = Fbo()
         self._flash_in: FlashIn = FlashIn()
 
@@ -30,8 +30,8 @@ class FlashLayer(LayerBase):
         return self._fbo
 
     def render(self, flash: float) -> None:
-        if not self._logo.allocated or not self._camera.texture.allocated:
+        if not self._white.allocated or not self._camera.texture.allocated:
             return
         self._fbo.begin()
-        self._flash_in.use(self._camera.texture, self._logo, flash)
+        self._flash_in.use(self._camera.texture, self._white, flash)
         self._fbo.end()

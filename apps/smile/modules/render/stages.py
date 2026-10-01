@@ -39,9 +39,6 @@ class Stage:
 class CameraStage(Stage):
     """Black and white camera, turning to colour when a face is found."""
 
-    def enter(self) -> None:
-        self.inputs.load_logo()
-
     def update(self, message: SeqenceMessage) -> None:
         if message.sequence_type == SequenceType.CAMERA_SHOW:
             self.layers.camera.render(0.0)

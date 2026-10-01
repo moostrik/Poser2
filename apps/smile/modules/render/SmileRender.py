@@ -44,8 +44,8 @@ class SmileRender(RenderBase):
         camera = CameraLayer(self.inputs.camera)
         self.layers: Layers = Layers(
             camera=camera,
-            flash=FlashLayer(camera, self.inputs.logo),
-            reveal=RevealLayer(self.inputs.capture_depth, self.inputs.logo),
+            flash=FlashLayer(camera, self.inputs.white),
+            reveal=RevealLayer(self.inputs.capture_depth, self.inputs.white),
             diffusion=DiffusionLayer(self.inputs.diffusion),
             destruct=DestructLayer(self.inputs.diffusion_depth),
         )

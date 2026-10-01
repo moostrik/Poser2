@@ -8,11 +8,11 @@ from .passes import blur, copy
 
 
 class RevealLayer(LayerBase):
-    """The flash out: an image appears from the logo (white), masked by the depth of the capture."""
+    """The flash out: an image appears from white, masked by the depth of the capture."""
 
-    def __init__(self, depth: Image, logo: Image) -> None:
+    def __init__(self, depth: Image, white: Image) -> None:
         self._depth: Image = depth
-        self._logo: Image = logo
+        self._white: Image = white
         self._fbo: Fbo = Fbo()
         self._mask: SwapFbo = SwapFbo()
         self._flash_out: FlashOut = FlashOut()
@@ -51,9 +51,9 @@ class RevealLayer(LayerBase):
         blur(self._mask, self._blur_h, self._blur_v, 1.0)
 
     def render(self, image: Texture, flash: float) -> None:
-        """flash 1 is all logo, 0 is all image."""
-        if not self._logo.allocated or not image.allocated:
+        """flash 1 is all white, 0 is all image."""
+        if not self._white.allocated or not image.allocated:
             return
         self._fbo.begin()
-        self._flash_out.use(image, self._logo, self._mask.texture, flash)
+        self._flash_out.use(image, self._white, self._mask.texture, flash)
         self._fbo.end()
