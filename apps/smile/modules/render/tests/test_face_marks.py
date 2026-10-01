@@ -9,13 +9,13 @@ from modules.render.layers.face_marks import ACCEPTED_COLOR, REJECTED_COLOR, SUB
 
 def observation(rejection: Rejection | None = None, subject: bool = False, eyes: float | None = 0.3, bbox=(0.1, 0.2, 0.5, 0.7),
                 limit: float = 0.0, pose: Pose = Pose(4.4, -6.0, 2.0, 0.48)) -> FaceObservation:
-    return FaceObservation(bbox=bbox, kps=((0.2, 0.3),) * 5, score=0.9, eye_dist=0.06, pose=pose,
+    return FaceObservation(bbox=bbox, kps=((0.2, 0.3),) * 5, score=0.9, eye_dist=0.06, centre=0.1, pose=pose,
                            eyes=eyes, rejection=rejection, limit=limit, subject=subject)
 
 
 class TestFaceLabel(unittest.TestCase):
     def test_an_accepted_face_reads_out_its_values(self):
-        self.assertEqual(face_label(observation()), 'conf 0.90 eyes 0.06 yaw 4 pitch -6 roll 2 open 0.30')
+        self.assertEqual(face_label(observation()), 'conf 0.90 eyes 0.06 centre 0.10 yaw 4 pitch -6 roll 2 open 0.30')
 
     def test_a_rejected_face_shows_the_check_its_value_and_the_limit(self):
         turned = observation(Rejection.TURNED, eyes=None, limit=20.0, pose=Pose(-32.4, 0.0, 0.0, 0.48))

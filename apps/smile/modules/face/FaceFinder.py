@@ -7,7 +7,7 @@ from typing import Callable
 
 from modules.face.FaceDetector import FaceDetector, Face
 from modules.face.FaceLandmarks import FaceLandmarks
-from modules.face.quality import FaceObservation, Pose, Rejection, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
+from modules.face.quality import FaceObservation, Pose, Rejection, centre_offset, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
 from modules.face.settings import FaceSettings
 
 DETECT_THRESHOLD: float = 0.5
@@ -70,6 +70,7 @@ def portrait_crop(img: np.ndarray, face: Face, portrait_zoom: float, portrait_of
 class _Assessed:
     face: Face
     eye_dist: float
+    centre: float
     pose: Pose
     eyes: float | None
     rejection: Rejection | None
@@ -144,8 +145,10 @@ class FaceFinder(Thread):
         assessed: list[_Assessed] = []
         for face in detector.detect(image, DETECT_THRESHOLD):
             eye_dist: float = eye_distance(face.kps) / float(image_width)
+            centre: float = centre_offset(face.kps, image_width)
             pose: Pose = head_pose(face.kps, s.pitch_zero)
-            rejection: Rejection | None = gate(face.score, eye_dist, pose, s.confidence, s.eye_min, s.eye_max, s.max_yaw, s.max_pitch, s.max_roll)
+            rejection: Rejection | None = gate(face.score, eye_dist, centre, pose, s.confidence, s.eye_min, s.eye_max, s.max_offset,
+                                               s.max_yaw, s.max_pitch, s.max_roll)
             eyes: float | None = None
             if rejection is None:
                 # the landmarks only for faces that passed the cheap checks
@@ -154,10 +157,10 @@ class FaceFinder(Thread):
                     rejection = Rejection.EYES
             # the setting the failed check compared to, for the label
             limits: dict[Rejection, float] = {Rejection.LOW_SCORE: s.confidence, Rejection.SMALL: s.eye_min, Rejection.LARGE: s.eye_max,
-                                              Rejection.TURNED: s.max_yaw, Rejection.PITCHED: s.max_pitch, Rejection.TILTED: s.max_roll,
-                                              Rejection.EYES: s.eye_open}
+                                              Rejection.OFF_CENTRE: s.max_offset, Rejection.TURNED: s.max_yaw, Rejection.PITCHED: s.max_pitch,
+                                              Rejection.TILTED: s.max_roll, Rejection.EYES: s.eye_open}
             limit: float = limits[rejection] if rejection is not None else 0.0
-            assessed.append(_Assessed(face, eye_dist, pose, eyes, rejection, limit))
+            assessed.append(_Assessed(face, eye_dist, centre, pose, eyes, rejection, limit))
 
         # the subject: the largest qualifying face, or the largest face at all
         subject: _Assessed | None = None
@@ -192,6 +195,7 @@ class FaceFinder(Thread):
             kps=tuple((float(k[0]) / width, float(k[1]) / height) for k in a.face.kps),
             score=round(a.face.score, 3),
             eye_dist=round(a.eye_dist, 3),
+            centre=round(a.centre, 3),
             pose=a.pose,
             eyes=a.eyes,
             rejection=a.rejection,

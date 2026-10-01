@@ -16,11 +16,12 @@ automatic switch to the image. The camera settings (`Settings.camera`) also hold
 ## Face
 
 `modules/face/`: `FaceFinder` (own thread) detects every face of a camera frame (SCRFD,
-`files/scrfd_10g_bnkps.onnx`) and judges it in `quality.py`: pose from the 5 keypoints (the pitch's
-zero is `pitch_zero`, set on site with the "Set pitch zero" button: it depends on the camera height), eye
-openness from the 106 landmarks (`FaceLandmarks`, `files/2d106det.onnx`, only run for faces that
-passed the pose checks), sharpness from the pixels; the first failing check is the face's
-`Rejection`. The subject of a frame is its largest qualifying face; a face that qualifies for
+`files/scrfd_10g_bnkps.onnx`) and judges it in `quality.py`: detector confidence, size (the
+distance between the eyes, min and max), position (horizontal distance from the image centre),
+pose from the 5 keypoints (the pitch's zero is `pitch_zero`, set on site with the "Set pitch zero"
+button: it depends on the camera height), eye openness from the 106 landmarks (`FaceLandmarks`,
+`files/2d106det.onnx`, only run for faces that passed the other checks); the first failing check
+is the face's `Rejection`. Gaze is not checked: the "looking at viewer" LoRA corrects it. The subject of a frame is its largest qualifying face; a face that qualifies for
 `stable_time` without interruption starts a sequence. The capture is the last frame of the
 recording in which the subject qualified (the last frame at all when none did), cropped by
 `portrait_crop` (eyes levelled, at the workflow's portrait size). Every frame's faces go to the render for the

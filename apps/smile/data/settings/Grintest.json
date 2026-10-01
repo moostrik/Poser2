@@ -10,7 +10,8 @@
     "face": {
       "confidence": 0.5,
       "stable_time": 0.3,
-      "eye_min": 0.05,
+      "max_offset": 0.15,
+      "eye_min": 0.1,
       "eye_max": 0.33,
       "eye_open": 0.2,
       "max_yaw": 17.0,
@@ -107,7 +108,7 @@
     }
   },
   "sequence": {
-    "pause": false,
+    "pause": true,
     "save": true,
     "encoder": "AUTO",
     "camera_in": 1.0,
@@ -118,7 +119,7 @@
     "flash_in_ease": "QUAD_IN",
     "flash_hold": 0.5,
     "flash_out_auto": true,
-    "flash_out": 4.37352991104126,
+    "flash_out": 4.1507823944091795,
     "flash_out_ease": "SINE_OUT",
     "grin_delay": 0.5,
     "grin_fps": 13.0,
@@ -141,8 +142,8 @@
       "title": "SMILE",
       "v_sync": true,
       "monitor": "M0",
-      "x": 1028,
-      "y": 231,
+      "x": 2777,
+      "y": 241,
       "width": 638,
       "height": 1000,
       "secondary_list": [],

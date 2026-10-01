@@ -4,6 +4,7 @@ from modules.settings import BaseSettings, Field, Widget
 class FaceSettings(BaseSettings):
     confidence:    Field[float] = Field(0.7, min=0.5, max=1.0, step=0.01, newline=True, description="Minimum detector score")
     stable_time:   Field[float] = Field(0.3, min=0.0, max=2.0, step=0.05, label="Stable (s)", description="Time a face must qualify without interruption to start a sequence (s)")
+    max_offset:    Field[float] = Field(0.25, min=0.0, max=0.5, step=0.01, label="Max off centre", description="Maximum horizontal distance of the face from the image centre, relative to the image width (0.5 = edge)")
 
     eye_min:       Field[float] = Field(0.05, min=0.0, max=0.3, step=0.01, newline=True, label="Min eye dist", description="Minimum distance between the eyes, relative to the image width (too far: too few pixels)")
     eye_max:       Field[float] = Field(0.25, min=0.05, max=0.5, step=0.01, label="Max eye dist", description="Maximum distance between the eyes, relative to the image width (too close: the portrait crop leaves the frame)")
