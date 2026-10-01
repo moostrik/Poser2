@@ -7,6 +7,12 @@
     "flip_v": false,
     "gain_auto": true,
     "gain_target": 33,
+    "wb_auto": false,
+    "wb_red": 1.61,
+    "wb_blue": 2.04,
+    "saturation": 1.0,
+    "hue": 0.0,
+    "gamma": 1.0,
     "face": {
       "confidence": 0.5,
       "max_offset": 0.15,
@@ -130,7 +136,7 @@
     "destroy_out_ease": "CUBIC_OUT"
   },
   "render": {
-    "show_camera": false,
+    "show_camera": true,
     "show_faces": true,
     "face_color": {
       "r": 0.2,
@@ -149,8 +155,8 @@
       "title": "SMILE",
       "v_sync": true,
       "monitor": "M0",
-      "x": 985,
-      "y": 1071,
+      "x": 1204,
+      "y": 663,
       "width": 638,
       "height": 1000,
       "secondary_list": [],

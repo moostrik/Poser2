@@ -13,7 +13,10 @@ workflow, audio, test photos), `output/` what it produces (git-ignored, safe to 
 `WebCam` with `-wc`) and an image source from `data/input/` that the panel's `use_image` switch puts in
 place of the device frames at any time. A missing device is a warning and `device: none`, never an
 automatic switch to the image. The camera settings (`Settings.camera`) also hold the face settings
-(`camera.face`).
+(`camera.face`). Gain, white balance and colour (saturation, hue, gamma) are panel settings that
+`FeatureWriter` writes to the Vimba camera when they change, over what the camera's `UserSet2`
+loaded; a feature the camera model lacks is a warning. "Set white balance" lets the camera measure
+once and takes the ratios it found into the panel.
 
 ## Face
 

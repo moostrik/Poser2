@@ -18,4 +18,13 @@ class CameraSettings(BaseSettings):
     gain_auto:     Field[bool]      = Field(False, widget=Widget.switch, newline=True, label="Auto gain", description="Vimba: automatic gain")
     gain_target:   Field[int]       = Field(40, min=0, max=100, step=1, description="Vimba: auto gain target brightness (0-100)")
 
-    face:          Group[FaceSettings] = Group(FaceSettings)     # SMILE's own face detection and crop, the image ComfyUI starts from
+    wb_auto:       Field[bool]      = Field(False, widget=Widget.switch, newline=True, label="Auto white balance", description="Vimba: continuous automatic white balance")
+    wb_set:        Field[bool]      = Field(False, widget=Widget.button, label="Set white balance", description="Vimba: measure the white balance once and keep it (auto off)")
+    wb_red:        Field[float]     = Field(1.0, min=0.5, max=4.0, step=0.01, label="Red", description="Vimba: white balance red ratio (auto off)")
+    wb_blue:       Field[float]     = Field(1.0, min=0.5, max=4.0, step=0.01, label="Blue", description="Vimba: white balance blue ratio (auto off)")
+
+    saturation:    Field[float]     = Field(1.0, min=0.0, max=2.0, step=0.01, newline=True, description="Vimba: colour saturation (1 = unchanged)")
+    hue:           Field[float]     = Field(0.0, min=-40.0, max=40.0, step=0.5, description="Vimba: hue rotation in degrees")
+    gamma:         Field[float]     = Field(1.0, min=0.25, max=4.0, step=0.01, description="Vimba: gamma (1 = linear)")
+
+    face:        Group[FaceSettings] = Group(FaceSettings)     # SMILE's own face detection and crop, the image ComfyUI starts from

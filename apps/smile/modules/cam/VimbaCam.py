@@ -1,5 +1,6 @@
 from modules.cam.vimba import *
 from modules.cam.settings import CameraSettings
+from modules.cam.FeatureWriter import FeatureWriter
 import cv2
 import numpy as np
 from threading import Thread, Lock, Event
@@ -88,9 +89,8 @@ class VimbaCam(Thread):
 
         self.rotate90: bool         = False
 
-        # gain values last applied to the camera, compared to the settings every frame
-        self._gain_auto_applied: bool | None = None
-        self._gain_target_applied: int | None = None
+        # gain, white balance and colour: sent to the camera when the settings change, checked every frame
+        self._features: FeatureWriter = FeatureWriter(settings)
 
         self.capturing: bool = False
         self.camera: Camera | None = None
@@ -121,20 +121,7 @@ class VimbaCam(Thread):
                                     self.outputFrame = newFrame
                                     self.frameNew = True
 
-                                gain_auto: bool = self.settings.gain_auto
-                                if gain_auto != self._gain_auto_applied:
-                                    self._gain_auto_applied = gain_auto
-                                    feature = self.camera.get_feature_by_name('GainAuto')
-                                    if gain_auto:
-                                        feature.set('Continuous')
-                                    else:
-                                        feature.set('Off')
-
-                                gain_target: int = self.settings.gain_target
-                                if gain_target != self._gain_target_applied:
-                                    self._gain_target_applied = gain_target
-                                    feature = self.camera.get_feature_by_name('GainAutoTarget')
-                                    feature.set(gain_target)
+                                self._features.update(self.camera)
 
                             sleep(0.01)
                         if self.camera:
@@ -164,6 +151,7 @@ class VimbaCam(Thread):
 
 
     def close(self) -> None:
+        self._features.close()
 
         if not self.is_alive():
             return
