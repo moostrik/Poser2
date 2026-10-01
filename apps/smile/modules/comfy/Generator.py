@@ -29,6 +29,7 @@ from modules.comfy.workflow import Workflow
 logger = logging.getLogger(__name__)
 
 WARMUP_IMAGE: str = 'data/comfy/warmup.jpg'
+WARMUP_TIMEOUT: float = 300.0   # s; the warm-up loads every model, a visitor has connection.job_timeout
 RECONNECT_INTERVAL: float = 2.0
 
 
@@ -55,6 +56,11 @@ class Generator(Thread):
         self.is_diffusing: bool = False
 
     # PUBLIC
+    @property
+    def ready(self) -> bool:
+        """Connected and warmed up: a capture handed over now is generated at once."""
+        return self._warmed_up and self.client.connected
+
     def stop(self) -> None:
         self._stop_event.set()
         self.interrupt()
@@ -87,6 +93,7 @@ class Generator(Thread):
     def run(self) -> None:
         while not self._stop_event.is_set():
             if not self.client.connected:
+                self._warmed_up = False     # a ComfyUI that was restarted has to load its models again
                 if not self._connect():
                     self._stop_event.wait(RECONNECT_INTERVAL)
                     continue
@@ -97,7 +104,7 @@ class Generator(Thread):
                 if image is None:
                     self.client.receive(0.05)       # keep the websocket drained while idle
                     continue
-                self._generate(image)
+                self._generate(image, self.settings.connection.job_timeout)
             except (websocket.WebSocketException, RequestException, ConnectionError, OSError):
                 logger.warning('Lost the connection to ComfyUI', exc_info=True)
                 self.client.close()
@@ -133,23 +140,22 @@ class Generator(Thread):
             return image
 
     def _warm_up(self) -> None:
-        # the first run loads all models (~80 s); do it before the first visitor if an image is there
-        self._warmed_up = True
-        if not os.path.exists(WARMUP_IMAGE):
-            return
+        # the first run loads all models (~80 s); do it before the first visitor if an image is there.
+        # Until it is done the generator is not ready, and no sequence starts.
         import cv2
-        image: np.ndarray | None = cv2.imread(WARMUP_IMAGE)
+        image: np.ndarray | None = cv2.imread(WARMUP_IMAGE) if os.path.exists(WARMUP_IMAGE) else None
         if image is None:
-            return
-        if self._is_warm():
+            pass
+        elif self._is_warm():
             logger.info('ComfyUI is warm, no warm-up')
-            return
-        self.settings.connection.status = 'warming up'
-        self._silent = True
-        try:
-            self._generate(image)
-        finally:
-            self._silent = False
+        else:
+            self.settings.connection.status = 'warming up'
+            self._silent = True
+            try:
+                self._generate(image, WARMUP_TIMEOUT)
+            finally:
+                self._silent = False
+        self._warmed_up = True
         self.settings.connection.status = 'ready'
 
     def _is_warm(self) -> bool:
@@ -169,12 +175,12 @@ class Generator(Thread):
         for c in callbacks:
             c(message)
 
-    def _generate(self, image: np.ndarray) -> None:
+    def _generate(self, image: np.ndarray, timeout: float) -> None:
         start: float = time.time()
         self._interrupt_event.clear()
         self.is_diffusing = True
         try:
-            self._run_job(image, start)
+            self._run_job(image, start + timeout)
         except Interrupted:
             logger.info('Generation interrupted')
         except TimeoutError as e:       # our own job_timeout (an OSError, but not a lost connection)
@@ -199,7 +205,7 @@ class Generator(Thread):
             raise Interrupted()
         if time.time() > deadline:
             self._interrupt_comfy()
-            raise TimeoutError(f'longer than job_timeout{last_event}')
+            raise TimeoutError(f'longer than its time limit{last_event}')
 
     def _step(self, step: str) -> None:
         """The step of the generation in the panel; the warm-up says so in front."""
@@ -220,7 +226,7 @@ class Generator(Thread):
             self._check(float('inf'))
             self.client.receive(0.05)
 
-    def _run_job(self, image: np.ndarray, start: float) -> None:
+    def _run_job(self, image: np.ndarray, deadline: float) -> None:
         s: PipelineSettings = self.settings
         wf: Workflow = self.workflow
 
@@ -232,8 +238,9 @@ class Generator(Thread):
             raise RuntimeError('ComfyUI is still busy with an earlier job')
         self._step('generating')
         name: str = self.client.upload(image, 'smile_capture.png')
-        workflow: dict = wf.build(name, self.styles.current_text(), self.styles.current_negative(), s)
-        last_depth, _ = self._run_pass(workflow, start + s.connection.job_timeout)
+        build = wf.build_warmup if self._silent else wf.build
+        workflow: dict = build(name, self.styles.current_text(), self.styles.current_negative(), s)
+        last_depth, _ = self._run_pass(workflow, deadline)
 
         # grin loop or still (testing): the grin again, with the values the panel has now; not for the warm-up
         while (s.grin.loop or s.grin.still) and not self._silent:

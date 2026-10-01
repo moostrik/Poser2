@@ -42,6 +42,19 @@ class TestSequencer(unittest.TestCase):
         self.sequencer.start_sequence()
         self.assertEqual(self.sequencer.get_sequence(), SequenceType.CAMERA_DETECT)
 
+    def test_blocked_starts_nothing(self):
+        self.sequencer.blocked = True
+        self.sequencer.set_face_found()
+        self.sequencer.start_sequence()
+        self.assertEqual(self.sequencer.get_sequence(), SequenceType.CAMERA_SHOW)
+        # a sequence that is running goes on
+        self.sequencer.set_sequence(SequenceType.DIFFUSION)
+        self.assertEqual(self.sequencer.get_sequence(), SequenceType.DIFFUSION)
+        self.sequencer.set_sequence(SequenceType.CAMERA_SHOW)
+        self.sequencer.blocked = False
+        self.sequencer.set_face_found()
+        self.assertEqual(self.sequencer.get_sequence(), SequenceType.CAMERA_DETECT)
+
     def test_update_reports_state_and_calls_back(self):
         messages = []
         self.sequencer.add_message_callback(messages.append)

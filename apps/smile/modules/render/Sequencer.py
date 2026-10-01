@@ -270,6 +270,7 @@ class Sequencer():
         self.first_sequence: bool = True
         self.diffusion_progress: float = 0.0
         self._reveal: bool = False      # the capture's depth is in: the flash out may start
+        self.blocked: bool = False      # no new sequence: the generator is not ready for a capture
 
         self.flash_out_start: float = 0.0
         self.flash_out_calculation: bool = False
@@ -360,7 +361,7 @@ class Sequencer():
 
     def start_sequence(self) -> None:
         with self._state_mutex:
-            if self._state.type != SequenceType.CAMERA_SHOW:
+            if self.blocked or self._state.type != SequenceType.CAMERA_SHOW:
                 return
             self._state.type = SequenceType.CAMERA_DETECT
 

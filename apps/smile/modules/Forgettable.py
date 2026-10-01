@@ -132,6 +132,12 @@ class Forgettable():
         ani: AnimationType = message.animation_type
         state: str = AnimationTypeNames[message.animation_type]
 
+        # no visitor while the generator can't take a capture (ComfyUI not there, or still warming up):
+        # the flash would hold until it can. The operator sees why on the image.
+        ready: bool = self.diffuse.ready
+        self.sequencer.blocked = not ready
+        self.render.set_status(None if ready else self.settings.pipeline.connection.status)
+
         cam_image: np.ndarray= self.camera.getColorImg()
         artnet_progress: float = message.progress
         if seq == SequenceType.TIMEOUT:

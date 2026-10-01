@@ -11,7 +11,7 @@ from modules.face.FaceFinder import FaceFrame
 from modules.gl import Blit, Fbo, RenderBase, Shader, Style, Texture, clear_color
 from modules.gl.Utils import fit
 from modules.render.inputs import Inputs
-from modules.render.layers import CameraLayer, DestructLayer, DiffusionLayer, FaceOverlayLayer, FlashLayer, LayerBase, RevealLayer
+from modules.render.layers import CameraLayer, DestructLayer, DiffusionLayer, FaceOverlayLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer
 from modules.render.layers.face_marks import build_marks
 from modules.render.layers.passes import copy
 from modules.render.Sequencer import SequenceType, Sequencer
@@ -51,7 +51,10 @@ class SmileRender(RenderBase):
         )
         # the operator's face overlay is no stage layer: drawn over the output when show_faces is on
         self._faces: FaceOverlayLayer = FaceOverlayLayer()
-        self._all_layers: list[LayerBase] = list(vars(self.layers).values()) + [self._faces]
+        # the operator's status line, drawn over the output while there is something to say
+        self._status: StatusLayer = StatusLayer()
+        self._status_text: str | None = None
+        self._all_layers: list[LayerBase] = list(vars(self.layers).values()) + [self._faces, self._status]
         self._faces_mutex: Lock = Lock()
         self._face_frame: FaceFrame | None = None
 
@@ -102,6 +105,10 @@ class SmileRender(RenderBase):
         if self.settings.show_faces:
             self._render_faces(self._output)
             self._output = self._faces.texture
+        status: str | None = self._status_text
+        if status:
+            self._status.render(self._output, status)
+            self._output = self._status.texture
         if self.settings.freeze:
             if not self._frozen:
                 copy(self._output, self._freeze_fbo)
@@ -161,6 +168,10 @@ class SmileRender(RenderBase):
 
     def set_cap_image(self, image: np.ndarray) -> None:
         self.inputs.capture.set_image(image)
+
+    def set_status(self, text: str | None) -> None:
+        """A line for the operator in the corner of the image; None for no line."""
+        self._status_text = text
 
     def set_faces(self, frame: FaceFrame) -> None:
         with self._faces_mutex:

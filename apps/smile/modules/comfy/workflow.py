@@ -188,6 +188,15 @@ class Workflow():
         self._fill_grin(workflow, s)
         return workflow
 
+    def build_warmup(self, image_name: str, style: str, negative: str, s: PipelineSettings) -> dict:
+        """The same run at its shortest: one sampler step and one grin frame. The models load at the
+        first step and the first frame; the rest of a full run would only cost time."""
+        workflow: dict = self.build(image_name, style, negative, s)
+        workflow[self.sampler]['inputs']['steps'] = 1
+        workflow[self.grin]['inputs']['still'] = True
+        workflow[self.last_frame]['inputs']['batch_index'] = 0
+        return workflow
+
     def build_replay(self, previous: dict, s: PipelineSettings) -> dict:
         """The previous workflow with only the grin filled in again (the grin loop). Everything up to
         the portrait is unchanged, so ComfyUI takes it from its cache and only makes the grin."""

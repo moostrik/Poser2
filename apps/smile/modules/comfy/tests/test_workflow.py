@@ -260,6 +260,20 @@ class TestWorkflow(unittest.TestCase):
         self.assertIsNone(steps[self.wf.load_image])
         self.assertIsNone(self.wf.step(None))
 
+    def test_warmup_is_the_same_run_at_its_shortest(self):
+        self.settings.portrait.fixed_seed = True
+        full = self.wf.build('x.png', 'style', 'negative', self.settings)
+        warmup = self.wf.build_warmup('x.png', 'style', 'negative', self.settings)
+        self.assertEqual(warmup[self.wf.sampler]['inputs']['steps'], 1)
+        self.assertEqual(self.wf.frame_count(warmup), 1)
+        self.assertEqual(warmup[self.wf.last_frame]['inputs']['batch_index'], 0)
+        self.assertTrue(self.wf.same_pipeline(warmup))      # a later start sees ComfyUI as warm
+        # nothing else differs from a visitor's run
+        warmup[self.wf.sampler]['inputs']['steps'] = full[self.wf.sampler]['inputs']['steps']
+        warmup[self.wf.grin]['inputs']['still'] = False
+        warmup[self.wf.last_frame]['inputs']['batch_index'] = full[self.wf.last_frame]['inputs']['batch_index']
+        self.assertEqual(warmup, full)
+
     def test_same_pipeline(self):
         self.assertTrue(self.wf.same_pipeline(self.built))
         self.settings.portrait.full_preview = False

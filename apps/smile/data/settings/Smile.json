@@ -27,7 +27,7 @@
       "host": "127.0.0.1",
       "port": 8188,
       "workflow": "data/comfy/smile_workflow.json",
-      "job_timeout": 90.0
+      "job_timeout": 45.0
     },
     "describe": {
       "instruction": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no colors, no colors for eyes, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips",
@@ -64,7 +64,7 @@
       "loop": false,
       "still": false,
       "still_position": 1.0,
-      "frames": 210,
+      "frames": 200,
       "face_region": 1.7,
       "stitching": true,
       "ease": "SINE_IN_OUT",
