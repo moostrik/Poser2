@@ -56,7 +56,8 @@ the face itself — depth outputs added) and fills in every value from `Pipeline
 panel is the source of truth, the workflow only provides the structure. Each visitor gets one of two
 styles (`style_a`, `style_b`, cycled by `styles.py` every `style_visitors` visitors, or one of them for
 everyone with `style_mode` A or B; the style id is the movement id of the music): a style holds the describe settings (instruction, max tokens, repetition
-penalty, prefix and suffix around the description), the style prompt and the negative. Keep one workflow per
+penalty, prefix and suffix around the description), the style prompt, the negative and three LoRA
+slots (file and strength, filled into the workflow's three LoRA nodes; `none` or 0 is off). Keep one workflow per
 visitor: a second workflow in between drops the first from ComfyUI's cache and reloads the models.
 After every connect, a warm-up run on `data/comfy/warmup.jpg` (`build_warmup`: the same workflow
 with one sampler step and one grin frame) loads the models and proves the chain works (own limit

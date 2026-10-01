@@ -21,8 +21,8 @@ from modules.comfy.settings import PipelineSettings, Prefer, StyleSettings
 MAX_SEED: int = 2 ** 32 - 1     # the smallest maximum of the seeded nodes (QwenVL: 1 .. 4294967295)
 FIXED_SEED: int = 1             # with portrait.fixed_seed: the description and the grin too, or the runs still differ
 
-# LoraSettings field: title of its node
-LORAS: dict[str, str] = {'clothing': 'LoRA: clothing', 'looking': 'LoRA: looking at viewer', 'dark': 'LoRA: dark'}
+LORA_SLOTS: int = 3     # StyleSettings lora_1 .. lora_3: the workflow's LoRA nodes, in the order of their chain
+NO_LORA: str = 'none'
 
 GRIN_TARGETS: tuple[str, ...] = ('smile', 'aaa', 'eee', 'woo', 'eyebrow', 'blink', 'wink', 'pupil_x', 'pupil_y')
 GRIN_ROTATIONS: tuple[str, ...] = ('pitch', 'yaw', 'roll')
@@ -60,6 +60,20 @@ def _remove(workflow: dict, node_ids: set[str], replacement: list | None = None)
                 if replacement is None:
                     raise ValueError(f'node {node_id} input {name!r} still uses removed node {value[0]}')
                 node['inputs'][name] = list(replacement)
+
+
+def _lora_chain(workflow: dict) -> list[str]:
+    """The LoRA nodes in the order the model passes through them, from the checkpoint on."""
+    loras: dict[str, str] = {node['inputs']['model'][0]: node_id for node_id, node in workflow.items()
+                             if node['class_type'] == 'LoraLoader'}      # source node: the LoRA node it feeds
+    chain: list[str] = []
+    source: str = _find(workflow, class_type='CheckpointLoaderSimple')
+    while source in loras:
+        source = loras[source]
+        chain.append(source)
+    if len(chain) != LORA_SLOTS or len(loras) != LORA_SLOTS:
+        raise ValueError(f'workflow needs {LORA_SLOTS} LoraLoader nodes in a row after the checkpoint, found {len(chain)} of {len(loras)}')
+    return chain
 
 
 class Workflow():
@@ -106,7 +120,7 @@ class Workflow():
         self.sampler: str = _find(workflow, class_type='KSampler')
         # KSamplerFullPreview (comfy/aiia_grin) previews every step with the real VAE; it needs the VAE
         self.vae: list = list(workflow[_find(workflow, class_type='VAEDecode')]['inputs']['vae'])
-        self.loras: dict[str, str] = {name: _find(workflow, title=title) for name, title in LORAS.items()}
+        self.loras: list[str] = _lora_chain(workflow)
         self.instantid: str = _find(workflow, class_type='ApplyInstantIDAdvanced')
         self.depth: str = _find(workflow, class_type='ControlNetApplyAdvanced')
         self.describe: str = _find(workflow, class_type='AILab_QwenVL')
@@ -177,9 +191,13 @@ class Workflow():
         workflow[self.instantid]['inputs'].update(ip_weight=p.embedding_strength, cn_strength=p.keypoint_strength)
         workflow[self.depth]['inputs'].update(strength=p.depth_strength, end_percent=p.depth_end)
         # one strength for the model and the text encoder, as A1111's <lora:name:strength>; 0 is off
-        for name, node_id in self.loras.items():
-            strength: float = getattr(s.lora, name)
-            workflow[node_id]['inputs'].update(strength_model=strength, strength_clip=strength)
+        for slot, node_id in enumerate(self.loras, start=1):
+            name: str = getattr(style, f'lora_{slot}')
+            strength: float = getattr(style, f'lora_{slot}_strength')
+            if name == NO_LORA or name not in style.lora_options:
+                # ComfyUI refuses a file it doesn't have: the slot keeps the workflow's file, switched off
+                name, strength = workflow[node_id]['inputs']['lora_name'], 0.0
+            workflow[node_id]['inputs'].update(lora_name=name, strength_model=strength, strength_clip=strength)
 
         for node_id in (self.sampler, self.describe):
             workflow[node_id]['inputs']['seed'] = self._seed(s)

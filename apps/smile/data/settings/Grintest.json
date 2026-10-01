@@ -36,7 +36,13 @@
       "prefix": "nude ",
       "suffix": ", model, looking at viewer, (serious expression: 2.0)",
       "prompt": "(nude) portrait by (Mert and Marcus: 2.0), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 1.5)",
-      "negative": "(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth"
+      "negative": "(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
+      "lora_1": "clothing_slider.safetensors",
+      "lora_1_strength": 5.0,
+      "lora_2": "looking_at_viewer.safetensors",
+      "lora_2_strength": 5.0,
+      "lora_3": "dark.safetensors",
+      "lora_3_strength": -0.5
     },
     "style_b": {
       "instruction": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no mention of color, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips",
@@ -45,7 +51,13 @@
       "prefix": "nude ",
       "suffix": ", model, looking at viewer, (serious expression: 2.0)",
       "prompt": "portrait by (Mert and Marcus: 2.0), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 2.0)",
-      "negative": "(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth"
+      "negative": "(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
+      "lora_1": "clothing_slider.safetensors",
+      "lora_1_strength": 5.0,
+      "lora_2": "looking_at_viewer.safetensors",
+      "lora_2_strength": 5.0,
+      "lora_3": "dark.safetensors",
+      "lora_3_strength": -0.5
     },
     "portrait": {
       "steps": 6,
@@ -58,11 +70,6 @@
       "depth_end": 0.55,
       "full_preview": true,
       "fixed_seed": false
-    },
-    "lora": {
-      "clothing": 5.0,
-      "looking": 5.0,
-      "dark": -0.5
     },
     "grin": {
       "loop": false,

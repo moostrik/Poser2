@@ -29,7 +29,7 @@ from modules.render.GrinPlayer import GrinPlayer
 from modules.comfy.messages import GenMessage, GenState, MessageCallback
 from modules.comfy.settings import PipelineSettings, StyleSettings
 from modules.comfy.styles import Styles
-from modules.comfy.workflow import Workflow
+from modules.comfy.workflow import NO_LORA, Workflow
 
 logger = logging.getLogger(__name__)
 
@@ -144,11 +144,14 @@ class Generator(Thread):
         """The choices the panel offers, as this ComfyUI server has them."""
         try:
             sampler: dict = self.client.object_info('KSampler')['input']['required']
+            loras: list[str] = list(self.client.object_info('LoraLoader')['input']['required']['lora_name'][0])
         except Exception:
             logger.warning('Could not read the option lists from ComfyUI', exc_info=True)
             return
         self.settings.portrait.sampler_options = list(sampler['sampler_name'][0])
         self.settings.portrait.scheduler_options = list(sampler['scheduler'][0])
+        for style in (self.settings.style_a, self.settings.style_b):
+            style.lora_options = [NO_LORA] + loras
 
     def _take_image(self) -> np.ndarray | None:
         with self._mutex:

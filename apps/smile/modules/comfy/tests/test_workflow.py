@@ -70,9 +70,10 @@ class TestWorkflow(unittest.TestCase):
         s.portrait.keypoint_strength = 0.7
         s.portrait.depth_strength = 0.6
         s.portrait.depth_end = 0.4
-        s.lora.clothing = 0.9
-        s.lora.looking = 0.0
-        s.lora.dark = -0.3
+        s.style_b.lora_options = ['none', 'clothing_slider.safetensors', 'looking_at_viewer.safetensors', 'dark.safetensors', 'other.safetensors']
+        s.style_b.lora_1, s.style_b.lora_1_strength = 'other.safetensors', 0.9
+        s.style_b.lora_2, s.style_b.lora_2_strength = 'none', 2.0
+        s.style_b.lora_3, s.style_b.lora_3_strength = 'missing.safetensors', -0.3
         s.grin.ease = Ease.LINEAR
         s.grin.smile_min = s.grin.smile_max = 3.0
         s.grin.yaw_min = s.grin.yaw_max = 10.0
@@ -98,9 +99,16 @@ class TestWorkflow(unittest.TestCase):
         self.assertEqual((instantid['ip_weight'], instantid['cn_strength']), (0.8, 0.7))
         depth = b[self.wf.depth]['inputs']
         self.assertEqual((depth['strength'], depth['end_percent']), (0.6, 0.4))
-        for name, strength in (('clothing', 0.9), ('looking', 0.0), ('dark', -0.3)):
-            lora = b[self.wf.loras[name]]['inputs']
-            self.assertEqual((lora['strength_model'], lora['strength_clip']), (strength, strength))
+        # a slot on none, or on a file ComfyUI doesn't have, keeps the workflow's file, switched off
+        slots = (('other.safetensors', 0.9), ('looking_at_viewer.safetensors', 0.0), ('dark.safetensors', 0.0))
+        for node_id, (name, strength) in zip(self.wf.loras, slots):
+            lora = b[node_id]['inputs']
+            self.assertEqual((lora['lora_name'], lora['strength_model'], lora['strength_clip']), (name, strength, strength))
+        # the other style has its own LoRAs
+        slots = (('clothing_slider.safetensors', 1.0), ('looking_at_viewer.safetensors', 1.0), ('dark.safetensors', -0.5))
+        for node_id, (name, strength) in zip(self.wf.loras, slots):
+            lora = self.wf.build('x.png', s.style_a, s)[node_id]['inputs']
+            self.assertEqual((lora['lora_name'], lora['strength_model'], lora['strength_clip']), (name, strength, strength))
         grin = b[self.wf.grin]['inputs']
         self.assertEqual((grin['ease'], grin['smile'], grin['stitching']), ('linear', 3.0, False))
         self.assertEqual((grin['rotate_yaw_min'], grin['rotate_yaw_max']), (10.0, 10.0))
@@ -235,7 +243,8 @@ class TestWorkflow(unittest.TestCase):
         # checkpoint -> the LoRAs in a row -> InstantID (model) and the three text encoders (clip)
         checkpoint = next(node_id for node_id, node in self.built.items() if node['class_type'] == 'CheckpointLoaderSimple')
         source = checkpoint
-        for node_id in self.wf.loras.values():
+        self.assertEqual(len(self.wf.loras), 3)
+        for node_id in self.wf.loras:
             inputs = self.built[node_id]['inputs']
             self.assertEqual((inputs['model'], inputs['clip']), ([source, 0], [source, 1]))
             source = node_id

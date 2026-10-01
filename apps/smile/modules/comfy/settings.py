@@ -35,6 +35,17 @@ class StyleSettings(BaseSettings):
     negative:    Field[str] = Field("(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
                                     widget=Widget.textarea, description="Negative prompt")
 
+    # three LoRA slots (the workflow's three LoRA nodes, in their order): a file and one strength for
+    # the model and the text encoder
+    lora_options:    Field[list[str]] = Field(["none", "clothing_slider.safetensors", "looking_at_viewer.safetensors", "dark.safetensors"],
+                                              access=Field.READ, visible=False, description="LoRA files offered by ComfyUI")
+    lora_1:          Field[str]   = Field("clothing_slider.safetensors", widget=Widget.text_select, options=lora_options, newline=True, description="LoRA file (none = off)")
+    lora_1_strength: Field[float] = Field(1.0, min=-5.0, max=5.0, step=0.05, description="LoRA strength (0 = off)")
+    lora_2:          Field[str]   = Field("looking_at_viewer.safetensors", widget=Widget.text_select, options=lora_options, newline=True, description="LoRA file (none = off)")
+    lora_2_strength: Field[float] = Field(1.0, min=-5.0, max=5.0, step=0.05, description="LoRA strength (0 = off)")
+    lora_3:          Field[str]   = Field("dark.safetensors", widget=Widget.text_select, options=lora_options, newline=True, description="LoRA file (none = off)")
+    lora_3_strength: Field[float] = Field(-0.5, min=-5.0, max=5.0, step=0.05, description="LoRA strength (0 = off)")
+
 
 class PortraitSettings(BaseSettings):
     sampler_options:   Field[list[str]] = Field(["dpmpp_sde"], access=Field.READ, visible=False, description="Samplers offered by ComfyUI")
@@ -50,12 +61,6 @@ class PortraitSettings(BaseSettings):
     depth_end:          Field[float] = Field(0.5, min=0.0, max=1.0, step=0.05, description="Depth ControlNet stops at this part of the steps")
     full_preview:       Field[bool]  = Field(True, newline=True, description="Step previews decoded with the real VAE (off: ComfyUI's quick previews)")
     fixed_seed:         Field[bool]  = Field(False, description="Same seeds every run, to compare settings (off: random)")
-
-
-class LoraSettings(BaseSettings):
-    clothing: Field[float] = Field(1.0, min=-5.0, max=5.0, step=0.05, description="Clothing slider LoRA strength (0 = off)")
-    looking:  Field[float] = Field(1.0, min=-5.0, max=5.0, step=0.05, description="Looking-at-viewer LoRA strength (0 = off)")
-    dark:     Field[float] = Field(-0.5, min=-5.0, max=5.0, step=0.05, description="Dark LoRA strength (0 = off)")
 
 
 class Ease(Enum):
@@ -145,5 +150,4 @@ class PipelineSettings(BaseSettings):
     style_a:    Group[StyleSettings]      = Group(StyleSettings)    # movement 0000
     style_b:    Group[StyleSettings]      = Group(StyleSettings)    # movement 0001
     portrait:   Group[PortraitSettings]   = Group(PortraitSettings)
-    lora:       Group[LoraSettings]       = Group(LoraSettings)
     grin:       Group[GrinSettings]       = Group(GrinSettings)
