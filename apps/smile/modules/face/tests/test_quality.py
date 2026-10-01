@@ -6,6 +6,8 @@ import unittest
 
 import numpy as np
 
+from modules.face.FaceDetector import Face
+from modules.face.FaceFinder import portrait_box, portrait_crop
 from modules.face.quality import LEFT_EYE, RIGHT_EYE, NOSE_NEUTRAL, FaceObservation, Pose, Rejection, centre_offset, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
 
 
@@ -103,9 +105,36 @@ class TestGate(unittest.TestCase):
         self.assertEqual(self.check(eye_dist=0.03, yaw=40.0), Rejection.SMALL)
 
 
+class TestPortraitBox(unittest.TestCase):
+    def face(self, roll: float = 0.0) -> Face:
+        return Face(np.array([200.0, 100.0, 400.0, 300.0]), 0.9, keypoints(roll=roll))
+
+    def test_the_box_has_the_crop_s_centre_and_size(self):
+        # face 200 high, zoom 1.5: 300 wide, at the portrait's aspect 4:5 375 high, around the face's centre
+        self.assertEqual(portrait_box(self.face(), 1.5, 0.0, 896, 1120), (150.0, 12.5, 450.0, 387.5))
+
+    def test_the_offset_shifts_up_along_the_face(self):
+        x0, y0, x1, y1 = portrait_box(self.face(), 1.5, 0.1, 896, 1120)
+        self.assertAlmostEqual(y0, 12.5 - 20.0)
+        self.assertAlmostEqual(x0, 150.0)
+        # a rolled face: the box stays upright and the same size, its centre moves along the face's own up
+        x0, y0, x1, y1 = portrait_box(self.face(roll=90.0), 1.5, 0.1, 896, 1120)
+        self.assertAlmostEqual(x1 - x0, 300.0)
+        self.assertAlmostEqual(y1 - y0, 375.0)
+        self.assertAlmostEqual((y0 + y1) * 0.5, 200.0)
+        self.assertAlmostEqual(abs((x0 + x1) * 0.5 - 300.0), 20.0)
+
+    def test_the_crop_is_cut_at_that_place(self):
+        image = np.zeros((400, 600, 3), np.uint8)
+        image[12:388, 150:450] = 255        # the box of the first test
+        crop = portrait_crop(image, self.face(), 1.5, 0.0, 896, 1120)
+        self.assertEqual(crop.shape, (1120, 896, 3))
+        self.assertGreater(crop[20:-20, 20:-20].mean(), 250)
+
+
 class TestLabels(unittest.TestCase):
     def face(self, rejection, limit, pose=Pose(0.0, 0.0, 0.0, 0.48), eyes=None, score=0.9, eye_dist=0.06):
-        return FaceObservation(bbox=(0, 0, 1, 1), kps=(), score=score, eye_dist=eye_dist, centre=0.1, pose=pose, eyes=eyes,
+        return FaceObservation(bbox=(0, 0, 1, 1), crop=(0, 0, 1, 1), kps=(), score=score, eye_dist=eye_dist, centre=0.1, pose=pose, eyes=eyes,
                                rejection=rejection, limit=limit, subject=False)
 
     def test_the_readout_shows_every_filtered_value(self):

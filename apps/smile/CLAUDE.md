@@ -34,8 +34,9 @@ has a qualifying subject (`sequence.charge` seconds to fill) and drains while it
 start charges without a face. The capture is the last frame in which the subject qualified (the
 last frame at all when none did), cropped by
 `portrait_crop` (eyes levelled, at the workflow's portrait size). Every frame's faces go to the render
-(`Inputs.faces`): `CameraLayer` draws the camera in black and white with
-the subject's box turning to colour as the charge fills (`render.face_fill`: fading in, or rising
+(`Inputs.faces`): `CameraLayer` draws the camera in black and white with every face's box as a
+darker field (`render.face_dark`; the box is the portrait crop's, upright: `FaceObservation.crop`) and
+the subject's turning from that to colour as the charge fills (`render.face_fill`: fading in, or rising
 from the bottom). `render.face_marks` switches all marks on or off: the subject's outline (from
 grey to `render.face_color` with the charge) and grey keypoints, the other faces in white, a
 rejected one in grey with its reject reason (the panel has the readout). They are part of the

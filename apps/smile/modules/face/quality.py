@@ -33,6 +33,7 @@ class Pose:
 class FaceObservation:
     """One face of one frame, as the overlay shows it. Coordinates are normalised to the image."""
     bbox: tuple[float, float, float, float]     # x0, y0, x1, y1
+    crop: tuple[float, float, float, float]     # the portrait crop as an upright box (may reach past the image)
     kps: tuple[tuple[float, float], ...]        # eyes, nose, mouth corners
     score: float
     eye_dist: float                             # distance between the eyes relative to the image width

@@ -1,4 +1,4 @@
-"""One detected face turned into one mark: its box, colour and label. No GL: arithmetic and text
+"""One detected face turned into one mark: its box (the portrait crop's, upright), colour and label. No GL: arithmetic and text
 (after poser2's marks). `build_marks` marks every face of a detector frame (a rejected one with its
 reason); `SubjectMark` is the chosen face's box, kept while its charge drains: the box the camera
 turns to colour, and its mark when the face has left."""
@@ -41,13 +41,18 @@ def mix(a: Color, b: Color, t: float) -> Color:
     return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t)
 
 
+def face_boxes(frame: FaceFrame) -> list[tuple[float, float, float, float]]:
+    """The box (x, y, w, h) of every face: the fields the camera darkens."""
+    return [(x0, y0, x1 - x0, y1 - y0) for x0, y0, x1, y1 in (face.crop for face in frame.faces)]
+
+
 def build_marks(frame: FaceFrame, subject_color: Color = SUBJECT_COLOR, charge: float = 0.0) -> list[Mark]:
     """A mark per face: rejected first, under everyone; the subject last, drawn over all. A rejected
     face is labelled with the failed check, its value and the limit; the panel has the readout.
     The subject's outline goes from grey to its colour with the charge, its dots are grey."""
     marks: list[Mark] = []
     for face in frame.faces:
-        x0, y0, x1, y1 = face.bbox
+        x0, y0, x1, y1 = face.crop
         label: str = rejection_label(face) if face.rejection is not None else ''
         dots: Color | None = None
         if face.subject:
@@ -78,7 +83,7 @@ class SubjectMark:
         if frame is not None and now - frame.time <= FACES_STALE:
             subject = frame.subject
         if subject is not None:
-            self._box = (subject.bbox, subject.kps)
+            self._box = (subject.crop, subject.kps)
 
         qualifies: bool = subject is not None and subject.rejection is None
         if not qualifies and charge <= 0.0:

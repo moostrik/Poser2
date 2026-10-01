@@ -39,8 +39,9 @@ def largest(faces: list[Face]) -> Face | None:
     return max(faces, key=lambda f: f.width * f.height)
 
 
-def portrait_crop(img: np.ndarray, face: Face, portrait_zoom: float, portrait_offset: float, portrait_width: int, portrait_height: int) -> np.ndarray:
-    """Crop a portrait around the face, rotated so the eyes are level (as ComfyUI's face crop did).
+def crop_geometry(face: Face, portrait_zoom: float, portrait_offset: float, portrait_width: int, portrait_height: int) -> tuple[np.ndarray, float, float, float]:
+    """Where the portrait is cropped from the image: centre (pixels), width, height and the angle of
+    the eye line (radians).
 
     zoom: portrait width relative to the face height; offset: shift up, relative to the face height.
     """
@@ -52,12 +53,27 @@ def portrait_crop(img: np.ndarray, face: Face, portrait_zoom: float, portrait_of
     if eye_a[0] > eye_b[0]:
         eye_a, eye_b = eye_b, eye_a
     angle: float = float(np.arctan2(eye_b[1] - eye_a[1], eye_b[0] - eye_a[0]))
-    axis_x: np.ndarray = np.array([np.cos(angle), np.sin(angle)])     # portrait x axis in the image
     axis_y: np.ndarray = np.array([-np.sin(angle), np.cos(angle)])    # portrait y axis (down) in the image
 
     crop_width: float = real_size * portrait_zoom
     crop_height: float = crop_width * portrait_height / portrait_width
     centre: np.ndarray = np.array([(x0 + x1) * 0.5, (y0 + y1) * 0.5]) - axis_y * portrait_offset * real_size
+    return centre, crop_width, crop_height, angle
+
+
+def portrait_box(face: Face, portrait_zoom: float, portrait_offset: float, portrait_width: int, portrait_height: int) -> tuple[float, float, float, float]:
+    """The portrait crop as an upright box in the image (x0, y0, x1, y1, pixels): its centre and size,
+    without its rotation. It may reach past the image edge."""
+    centre, crop_width, crop_height, _ = crop_geometry(face, portrait_zoom, portrait_offset, portrait_width, portrait_height)
+    return (float(centre[0] - crop_width * 0.5), float(centre[1] - crop_height * 0.5),
+            float(centre[0] + crop_width * 0.5), float(centre[1] + crop_height * 0.5))
+
+
+def portrait_crop(img: np.ndarray, face: Face, portrait_zoom: float, portrait_offset: float, portrait_width: int, portrait_height: int) -> np.ndarray:
+    """Crop a portrait around the face, rotated so the eyes are level (as ComfyUI's face crop did)."""
+    centre, crop_width, crop_height, angle = crop_geometry(face, portrait_zoom, portrait_offset, portrait_width, portrait_height)
+    axis_x: np.ndarray = np.array([np.cos(angle), np.sin(angle)])     # portrait x axis in the image
+    axis_y: np.ndarray = np.array([-np.sin(angle), np.cos(angle)])    # portrait y axis (down) in the image
 
     half_x: np.ndarray = axis_x * crop_width * 0.5
     half_y: np.ndarray = axis_y * crop_height * 0.5
@@ -181,15 +197,17 @@ class FaceFinder(Thread):
                 if qualified:
                     self._qualified = self._last
 
-        frame = FaceFrame(tuple(self._observation(a, a is subject, image_width, image_height) for a in assessed), now)
+        crops = [portrait_box(a.face, s.zoom, s.offset, self._composition_width, self._composition_height) for a in assessed]
+        frame = FaceFrame(tuple(self._observation(a, a is subject, crop, image_width, image_height) for a, crop in zip(assessed, crops)), now)
         s.result = self._result(frame.subject)
         self.frame_callback(frame)
 
     @staticmethod
-    def _observation(a: _Assessed, subject: bool, width: int, height: int) -> FaceObservation:
+    def _observation(a: _Assessed, subject: bool, crop: tuple[float, float, float, float], width: int, height: int) -> FaceObservation:
         x0, y0, x1, y1 = a.face.bbox
         return FaceObservation(
             bbox=(float(x0) / width, float(y0) / height, float(x1) / width, float(y1) / height),
+            crop=(crop[0] / width, crop[1] / height, crop[2] / width, crop[3] / height),
             kps=tuple((float(k[0]) / width, float(k[1]) / height) for k in a.face.kps),
             score=round(a.face.score, 3),
             eye_dist=round(a.eye_dist, 3),

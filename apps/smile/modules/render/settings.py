@@ -61,6 +61,7 @@ class RenderSettings(BaseSettings):
     face_marks:    Field[bool]  = Field(False, description="Draw the faces' outlines, dots and reject reasons on the camera")
     face_color:    Field[Color] = Field(Color(0.2, 1.0, 0.2), description="Colour of the chosen face's box and dots")
     face_fill:     Field[FaceFill] = Field(FaceFill.FADE, description="How the chosen face's box turns to colour: fade in, or rise from the bottom")
+    face_dark:     Field[float] = Field(0.5, min=0.0, max=1.0, step=0.05, description="Brightness of a detected face's box before it turns to colour (1 = not darkened)")
     freeze:        Field[bool]  = Field(False, description="Hold the current frame")
     trail_active:  Field[bool]  = Field(True, description="Blend new diffusion images over the previous ones")
     trail:         Field[float] = Field(0.995, min=0.98, max=1.0, step=0.001, description="Trail amount")

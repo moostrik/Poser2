@@ -4,12 +4,13 @@ import unittest
 
 from modules.face.FaceFinder import FaceFrame
 from modules.face.quality import FaceObservation, Pose, Rejection
-from modules.render.layers.face_marks import ACCEPTED_COLOR, FACES_STALE, REJECTED_COLOR, SUBJECT_COLOR, SUBJECT_LINE_PX, LINE_PX, SubjectMark, build_marks, mix
+from modules.render.layers.face_marks import ACCEPTED_COLOR, FACES_STALE, REJECTED_COLOR, SUBJECT_COLOR, SUBJECT_LINE_PX, LINE_PX, SubjectMark, build_marks, face_boxes, mix
 
 
 def observation(rejection: Rejection | None = None, subject: bool = False, eyes: float | None = 0.3, bbox=(0.1, 0.2, 0.5, 0.7),
                 limit: float = 0.0, pose: Pose = Pose(4.4, -6.0, 2.0, 0.48)) -> FaceObservation:
-    return FaceObservation(bbox=bbox, kps=((0.2, 0.3),) * 5, score=0.9, eye_dist=0.06, centre=0.1, pose=pose,
+    # the marks use the portrait box (crop), not the detector's
+    return FaceObservation(bbox=(0.0, 0.0, 0.0, 0.0), crop=bbox, kps=((0.2, 0.3),) * 5, score=0.9, eye_dist=0.06, centre=0.1, pose=pose,
                            eyes=eyes, rejection=rejection, limit=limit, subject=subject)
 
 
@@ -108,6 +109,14 @@ class TestBuildMarks(unittest.TestCase):
         frame = FaceFrame((observation(subject=True), observation(Rejection.SMALL), observation()), 0.0)
         colors = [m.color for m in build_marks(frame, charge=1.0)]
         self.assertEqual(colors, [REJECTED_COLOR, ACCEPTED_COLOR, SUBJECT_COLOR])
+
+    def test_a_field_per_face(self):
+        self.assertEqual(face_boxes(FaceFrame((), 0.0)), [])
+        frame = FaceFrame((observation(subject=True, bbox=(0.1, 0.2, 0.5, 0.7)), observation(Rejection.SMALL, bbox=(0.5, 0.0, 0.75, 0.25))), 0.0)
+        boxes = face_boxes(frame)
+        self.assertEqual(len(boxes), 2)
+        for got, want in zip(boxes[0] + boxes[1], (0.1, 0.2, 0.4, 0.5, 0.5, 0.0, 0.25, 0.25)):
+            self.assertAlmostEqual(got, want)
 
     def test_box_from_bbox(self):
         mark = build_marks(FaceFrame((observation(bbox=(0.1, 0.2, 0.5, 0.7)),), 0.0))[0]

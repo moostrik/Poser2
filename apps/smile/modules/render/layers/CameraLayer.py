@@ -8,15 +8,15 @@ from modules.render.shaders import FaceColor
 
 from .LayerBase import LayerBase
 from .MarkDrawer import MarkDrawer
-from .face_marks import FACES_STALE, LABEL_BG, REJECTED_COLOR, Mark, SubjectMark, build_marks
+from .face_marks import FACES_STALE, LABEL_BG, REJECTED_COLOR, Mark, SubjectMark, build_marks, face_boxes
 
 FONT_SIZE: int = 18
 LABEL_PAD_PX: float = 4.0
 
 
 class CameraLayer(LayerBase):
-    """The live camera in black and white, with the chosen face's box turning to colour as its
-    charge fills. With settings.face_marks every detected face is marked: the chosen one with an
+    """The live camera in black and white, with every detected face's box (the portrait crop's) as a
+    darker field and the chosen face's turning from that to colour as its charge fills. With settings.face_marks every detected face is marked: the chosen one with an
     outline (from grey to the active colour with the charge) and grey keypoints, the others in
     white, a rejected one in grey with its reason. Keeps its last frame until render() is called
     again (the capture freeze)."""
@@ -67,12 +67,14 @@ class CameraLayer(LayerBase):
         if frame is not None and now - frame.time > FACES_STALE:
             frame = None
         subject: Mark | None = self._subject.update(frame, now, charge, (r, g, b, a))
+        fields = face_boxes(frame) if frame is not None else []
+        dark: float = self.settings.face_dark
         self._fbo.begin()
         if subject is None:
-            self._face_color.use(self._camera, 0.0, 0.0, 0.0, 0.0, 0.0)
+            self._face_color.use(self._camera, 0.0, 0.0, 0.0, 0.0, 0.0, False, fields, dark)
         else:
             rise: bool = self.settings.face_fill is FaceFill.RISE
-            self._face_color.use(self._camera, subject.x, subject.y, subject.w, subject.h, charge, rise)
+            self._face_color.use(self._camera, subject.x, subject.y, subject.w, subject.h, charge, rise, fields, dark)
         if self.settings.face_marks and marks > 0.0:
             face_marks: list[Mark] = build_marks(frame, (r, g, b, a), charge) if frame is not None else []
             if subject is not None and (frame is None or frame.subject is None):
