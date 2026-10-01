@@ -24,7 +24,7 @@ from requests import RequestException
 from modules.comfy.client import ComfyClient, Event as ComfyEvent
 from modules.render.GrinPlayer import GrinPlayer
 from modules.comfy.messages import GenMessage, GenState, MessageCallback
-from modules.comfy.settings import PipelineSettings
+from modules.comfy.settings import PipelineSettings, StyleSettings
 from modules.comfy.styles import Styles
 from modules.comfy.workflow import Workflow
 
@@ -52,6 +52,7 @@ class Generator(Thread):
         self._callbacks: list[MessageCallback] = []
         self._image: np.ndarray | None = None
         self._capture_depth: np.ndarray | None = None   # of the job that is running
+        self._style: StyleSettings = self.styles.current()     # of the job that is running: the next visitor's may be picked already
         self._stop_event: Event = Event()
         self._interrupt_event: Event = Event()
         self._silent: bool = False
@@ -234,7 +235,8 @@ class Generator(Thread):
         # skip_generation (debug): only the description and the capture's depth; the warm-up stays the full run
         skip: bool = s.connection.skip_generation and not self._silent
         build = wf.build_warmup if self._silent else wf.build_describe if skip else wf.build
-        workflow: dict = build(name, self.styles.current(), s)
+        self._style = self.styles.current()
+        workflow: dict = build(name, self._style, s)
         self._capture_depth = None
         last_depth, _ = self._run_pass(workflow, deadline, play=not skip)
         if skip:
@@ -342,7 +344,7 @@ class Generator(Thread):
                         self._emit(GenMessage(GenState.DIFFUSION, 1.0, portrait, final=True))
                         self.player.hold_from_now()
                 elif node == wf.description and output.get('text'):
-                    s.describe.description = str(output['text'][0])
+                    self._style.description = str(output['text'][0])
 
             elif event.type == 'execution_success':
                 break

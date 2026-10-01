@@ -22,19 +22,15 @@ class ConnectionSettings(BaseSettings):
     last_duration: Field[float] = Field(0.0, access=Field.READ, pinned=True, description="Duration of the last generation (s)")
 
 
-class DescribeSettings(BaseSettings):
-    """What both styles share of the description; its text is per style (StyleSettings)."""
-    max_tokens:   Field[int] = Field(120, min=64, max=512, step=8, description="Maximum length of the description (tokens)")
-    repetition_penalty: Field[float] = Field(1.0, min=1.0, max=1.5, step=0.05, description="Penalty on repeated words (1 = none; higher can drop the commas)")
-    description:  Field[str] = Field("", access=Field.READ, widget=Widget.textarea, description="Last prompt: prefix + description + suffix")
-
-
 class StyleSettings(BaseSettings):
     """One style: how the visitor is described and how the portrait is painted."""
+    max_tokens:  Field[int] = Field(120, min=64, max=512, step=8, description="Maximum length of the description (tokens)")
+    repetition_penalty: Field[float] = Field(1.0, min=1.0, max=1.5, step=0.05, description="Penalty on repeated words (1 = none; higher can drop the commas)")
     instruction: Field[str] = Field("Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no mention of color, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips",
-                                    widget=Widget.textarea, description="What QwenVL is asked about the face")
+                                    widget=Widget.textarea, newline=True, description="What QwenVL is asked about the face")
     prefix:      Field[str] = Field("", newline=True, description="Text before the description")
     suffix:      Field[str] = Field(" (super model: 1.5), (serious expression: 2.2)", description="Text after the description")
+    description: Field[str] = Field("", access=Field.READ, widget=Widget.textarea, newline=True, description="Last prompt of this style: prefix + description + suffix")
     prompt:      Field[str] = Field("BREAK nude portrait by (David LaChapelle: 1.4), bold artificial hues, high contrast, harsh dramatic light, 2000s BREAK",
                                     widget=Widget.textarea, newline=True, description="Style prompt")
     negative:    Field[str] = Field("(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
@@ -138,7 +134,6 @@ class PipelineSettings(BaseSettings):
     current_style: Field[str] = Field("A", access=Field.READ, description="Style of the current visitor: A (music: Smooth) or B (music: Party)")
 
     connection: Group[ConnectionSettings] = Group(ConnectionSettings)
-    describe:  Group[DescribeSettings]   = Group(DescribeSettings)
     style_a:    Group[StyleSettings]      = Group(StyleSettings)    # movement 0000
     style_b:    Group[StyleSettings]      = Group(StyleSettings)    # movement 0001
     portrait:   Group[PortraitSettings]   = Group(PortraitSettings)

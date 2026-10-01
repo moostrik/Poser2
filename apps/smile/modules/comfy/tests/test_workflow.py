@@ -55,8 +55,8 @@ class TestWorkflow(unittest.TestCase):
 
     def test_settings_fill_the_nodes(self):
         s = PipelineSettings()
-        s.describe.max_tokens = 200
-        s.describe.repetition_penalty = 1.1
+        s.style_b.max_tokens = 200
+        s.style_b.repetition_penalty = 1.1
         s.style_b.instruction = 'describe'
         s.style_b.prefix = 'prefix'
         s.style_b.suffix = ' suffix'
@@ -80,8 +80,9 @@ class TestWorkflow(unittest.TestCase):
         b = self.wf.build('x.png', s.style_b, s)
         describe = b[self.wf.describe]['inputs']
         self.assertEqual((describe['custom_prompt'], describe['max_tokens']), ('describe', 200))
-        # the other style has its own instruction
-        self.assertEqual(self.wf.build('x.png', s.style_a, s)[self.wf.describe]['inputs']['custom_prompt'], s.style_a.instruction)
+        # the other style has its own describe settings
+        other = self.wf.build('x.png', s.style_a, s)[self.wf.describe]['inputs']
+        self.assertEqual((other['custom_prompt'], other['max_tokens'], other['repetition_penalty']), (s.style_a.instruction, 120, 1.0))
         self.assertNotEqual(s.style_a.instruction, 'describe')
         self.assertEqual((b[self.wf.describe]['class_type'], describe['repetition_penalty']), ('AILab_QwenVL_Advanced', 1.1))
         # prefix + space + description, then + suffix

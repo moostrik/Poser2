@@ -159,8 +159,8 @@ class Workflow():
 
         describe: dict = workflow[self.describe]['inputs']
         describe['custom_prompt'] = style.instruction
-        describe['max_tokens'] = s.describe.max_tokens
-        describe['repetition_penalty'] = s.describe.repetition_penalty
+        describe['max_tokens'] = style.max_tokens
+        describe['repetition_penalty'] = style.repetition_penalty
 
         p = s.portrait
         workflow[self.style]['inputs']['text'] = style.prompt

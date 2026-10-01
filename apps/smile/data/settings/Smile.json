@@ -37,12 +37,10 @@
       "job_timeout": 45.0,
       "skip_generation": true
     },
-    "describe": {
-      "max_tokens": 120,
-      "repetition_penalty": 1.0
-    },
     "style_a": {
       "instruction": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no colors, no colors for eyes, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips",
+      "max_tokens": 120,
+      "repetition_penalty": 1.0,
       "prefix": "nude ",
       "suffix": ", model, looking at viewer, (serious expression: 2.0)",
       "prompt": "(nude) portrait by (Mert and Marcus: 2.0), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 1.5)",
@@ -50,6 +48,8 @@
     },
     "style_b": {
       "instruction": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no colors, no colors for eyes, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips",
+      "max_tokens": 120,
+      "repetition_penalty": 1.0,
       "prefix": "nude ",
       "suffix": ", model, looking at viewer, (serious expression: 2.0)",
       "prompt": "portrait by (Mert and Marcus: 2.0), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 2.0)",
