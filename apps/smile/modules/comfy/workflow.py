@@ -113,6 +113,10 @@ class Workflow():
         self.instantid: str = _find(workflow, class_type='ApplyInstantIDAdvanced')
         self.depth: str = _find(workflow, class_type='ControlNetApplyAdvanced')
         self.describe: str = _find(workflow, class_type='AILab_QwenVL')
+        # the basic node fixes repetition_penalty at 1.2, which drops the commas; the advanced one takes it
+        workflow[self.describe]['class_type'] = 'AILab_QwenVL_Advanced'
+        workflow[self.describe]['inputs'].update(use_torch_compile=False, device='auto', temperature=0.6,
+                                                 top_p=0.9, num_beams=1, repetition_penalty=1.0, frame_count=16)
         self.description: str = _find(workflow, title='Preview as Text')
         self.grin: str = _find(workflow, class_type='GrinFrames')
 
@@ -158,6 +162,7 @@ class Workflow():
         describe: dict = workflow[self.describe]['inputs']
         describe['custom_prompt'] = s.describe.instruction
         describe['max_tokens'] = s.describe.max_tokens
+        describe['repetition_penalty'] = s.describe.repetition_penalty
 
         p = s.portrait
         workflow[self.style]['inputs']['text'] = style

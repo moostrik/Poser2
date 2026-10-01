@@ -22,9 +22,10 @@ class ConnectionSettings(BaseSettings):
 
 
 class DescribeSettings(BaseSettings):
-    instruction:  Field[str] = Field("Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no mention of color, no negatives. Short comma-separated phrases on one line. Output only the phrases. ",
+    instruction:  Field[str] = Field("Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no mention of color, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips",
                                      widget=Widget.textarea, description="What QwenVL is asked about the face")
     max_tokens:   Field[int] = Field(120, min=64, max=512, step=8, description="Maximum length of the description (tokens)")
+    repetition_penalty: Field[float] = Field(1.0, min=1.0, max=1.5, step=0.05, description="Penalty on repeated words (1 = none; higher can drop the commas)")
     prefix:       Field[str] = Field("", description="Text before the description")
     suffix:       Field[str] = Field(" (super model: 1.5), (serious expression: 2.2)", description="Text after the description")
     description:  Field[str] = Field("", access=Field.READ, widget=Widget.textarea, description="Last prompt: prefix + description + suffix")

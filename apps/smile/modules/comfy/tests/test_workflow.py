@@ -56,6 +56,7 @@ class TestWorkflow(unittest.TestCase):
         s = PipelineSettings()
         s.describe.instruction = 'describe'
         s.describe.max_tokens = 200
+        s.describe.repetition_penalty = 1.1
         s.describe.prefix = 'prefix'
         s.describe.suffix = ' suffix'
         s.portrait.steps = 8
@@ -76,6 +77,7 @@ class TestWorkflow(unittest.TestCase):
         b = self.wf.build('x.png', 'style', 'negative', s)
         describe = b[self.wf.describe]['inputs']
         self.assertEqual((describe['custom_prompt'], describe['max_tokens']), ('describe', 200))
+        self.assertEqual((b[self.wf.describe]['class_type'], describe['repetition_penalty']), ('AILab_QwenVL_Advanced', 1.1))
         # prefix + space + description, then + suffix
         prefix = b[self.wf.prefix]['inputs']
         self.assertEqual((prefix['string_a'], prefix['delimiter'], prefix['string_b']), ('prefix', ' ', [self.wf.describe, 0]))
