@@ -4,14 +4,14 @@ import unittest
 
 from modules.face.FaceFinder import FaceFrame
 from modules.face.quality import FaceObservation, Pose, Rejection
-from modules.render.layers.face_marks import ACCEPTED_COLOR, FACES_STALE, REJECTED_COLOR, SUBJECT_COLOR, SUBJECT_LINE_PX, LINE_PX, SubjectMark, build_marks, face_boxes, mix
+from modules.render.layers.face_marks import ACCEPTED_COLOR, FACES_STALE, REJECTED_COLOR, SUBJECT_COLOR, SUBJECT_LINE_PX, LINE_PX, SubjectMark, build_marks, face_fields, mix
 
 
 def observation(rejection: Rejection | None = None, subject: bool = False, eyes: float | None = 0.3, bbox=(0.1, 0.2, 0.5, 0.7),
-                limit: float = 0.0, pose: Pose = Pose(4.4, -6.0, 2.0, 0.48)) -> FaceObservation:
+                limit: float = 0.0, pose: Pose = Pose(4.4, -6.0, 2.0, 0.48), distance: float = 0.0) -> FaceObservation:
     # the marks use the portrait box (crop), not the detector's
     return FaceObservation(bbox=(0.0, 0.0, 0.0, 0.0), crop=bbox, kps=((0.2, 0.3),) * 5, score=0.9, eye_dist=0.06, centre=0.1, pose=pose,
-                           eyes=eyes, rejection=rejection, limit=limit, subject=subject)
+                           eyes=eyes, rejection=rejection, limit=limit, distance=distance, subject=subject)
 
 
 class TestSubjectMark(unittest.TestCase):
@@ -111,12 +111,23 @@ class TestBuildMarks(unittest.TestCase):
         self.assertEqual(colors, [REJECTED_COLOR, ACCEPTED_COLOR, SUBJECT_COLOR])
 
     def test_a_field_per_face(self):
-        self.assertEqual(face_boxes(FaceFrame((), 0.0)), [])
-        frame = FaceFrame((observation(subject=True, bbox=(0.1, 0.2, 0.5, 0.7)), observation(Rejection.SMALL, bbox=(0.5, 0.0, 0.75, 0.25))), 0.0)
-        boxes = face_boxes(frame)
-        self.assertEqual(len(boxes), 2)
-        for got, want in zip(boxes[0] + boxes[1], (0.1, 0.2, 0.4, 0.5, 0.5, 0.0, 0.25, 0.25)):
+        self.assertEqual(face_fields(FaceFrame((), 0.0)), [])
+        frame = FaceFrame((observation(subject=True, bbox=(0.1, 0.2, 0.5, 0.7)),
+                           observation(Rejection.SMALL, bbox=(0.5, 0.0, 0.75, 0.25), distance=0.6)), 0.0)
+        fields = face_fields(frame)
+        self.assertEqual(len(fields), 2)
+        # box and distance from good
+        for got, want in zip(fields[0] + fields[1], (0.1, 0.2, 0.4, 0.5, 0.0, 0.5, 0.0, 0.25, 0.25, 0.6)):
             self.assertAlmostEqual(got, want)
+
+    def test_the_subject_mark_carries_its_distance(self):
+        subject = SubjectMark()
+        away = FaceFrame((observation(Rejection.TURNED, subject=True, distance=0.4),), 10.0)
+        self.assertEqual(subject.update(FaceFrame((observation(subject=True),), 10.0), 10.0, 0.5).far, 0.0)
+        mark = subject.update(away, 10.0, 0.5)
+        self.assertEqual((mark.far, mark.subject), (0.4, True))
+        self.assertEqual(subject.update(FaceFrame((), 10.1), 10.1, 0.4).far, 1.0)     # the face left: as far as can be
+        self.assertEqual(build_marks(away)[0].far, 0.4)
 
     def test_box_from_bbox(self):
         mark = build_marks(FaceFrame((observation(bbox=(0.1, 0.2, 0.5, 0.7)),), 0.0))[0]

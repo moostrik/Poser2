@@ -1,22 +1,32 @@
 import time
 
 from modules.face.FaceFinder import FaceFrame
-from modules.gl import Fbo, Image, Style, Text, Texture
+from modules.gl import Fbo, Image, Style, SwapFbo, Text, Texture
+from modules.gl.shaders.convenience.BlurH import BlurH
+from modules.gl.shaders.convenience.BlurV import BlurV
 from modules.render.inputs import Faces
-from modules.render.settings import FaceFill, RenderSettings
+from modules.render.settings import FaceEffect, FaceFill, RenderSettings
 from modules.render.shaders import FaceColor
 
 from .LayerBase import LayerBase
 from .MarkDrawer import MarkDrawer
-from .face_marks import FACES_STALE, LABEL_BG, REJECTED_COLOR, Mark, SubjectMark, build_marks, face_boxes
+from .face_marks import FACES_STALE, LABEL_BG, REJECTED_COLOR, Mark, SubjectMark, build_marks, face_fields
+from .passes import blur, copy
 
 FONT_SIZE: int = 18
 LABEL_PAD_PX: float = 4.0
+BLUR_RADIUS: float = 2.0    # of the blur effect at amount 1 (1 is about 20 pixels each way)
+NO_RECT: tuple[float, float, float, float, float] = (0.0, 0.0, 0.0, 0.0, 0.0)
+
+# the shader's numbers for the settings' choices: their order in the enum
+EFFECTS: list[FaceEffect] = list(FaceEffect)
+FILLS: list[FaceFill] = list(FaceFill)
 
 
 class CameraLayer(LayerBase):
-    """The live camera in black and white, with every detected face's box (the portrait crop's) as a
-    darker field and the chosen face's turning from that to colour as its charge fills. With settings.face_marks every detected face is marked: the chosen one with an
+    """The live camera in black and white. Every detected face's box (the portrait crop's) shows how
+    far the face is from good (settings.face_effect), and the chosen face's turns to colour as its
+    charge fills (settings.face_fill). With settings.face_marks every detected face is marked: the chosen one with an
     outline (from grey to the active colour with the charge) and grey keypoints, the others in
     white, a rejected one in grey with its reason. Keeps its last frame until render() is called
     again (the capture freeze)."""
@@ -30,6 +40,10 @@ class CameraLayer(LayerBase):
         self._face_color: FaceColor = FaceColor()
         self._drawer: MarkDrawer = MarkDrawer()
         self._text: Text = Text()
+        # a blurred camera frame, only made for the blur effect
+        self._blurred: SwapFbo = SwapFbo()
+        self._blur_h: BlurH = BlurH()
+        self._blur_v: BlurV = BlurV()
         self._width: int = 1
         self._height: int = 1
 
@@ -40,16 +54,24 @@ class CameraLayer(LayerBase):
         self._face_color.allocate()
         self._drawer.allocate()
         self._text.allocate(font_size=FONT_SIZE)
+        self._blurred.allocate(width, height, internal_format)
+        self._blur_h.allocate()
+        self._blur_v.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._face_color.deallocate()
         self._drawer.deallocate()
         self._text.deallocate()
+        self._blurred.deallocate()
+        self._blur_h.deallocate()
+        self._blur_v.deallocate()
 
     def update(self) -> None:
         self._face_color.reload()
         self._drawer.reload()
+        self._blur_h.reload()
+        self._blur_v.reload()
 
     @property
     def texture(self) -> Texture:
@@ -57,7 +79,7 @@ class CameraLayer(LayerBase):
 
     def render(self, charge: float, marks: float = 1.0) -> None:
         """Draw the newest camera frame in black and white; `charge` (0..1) is how far the chosen
-        face is toward the flash: the colour inside its box (fading in or rising, settings.face_fill).
+        face is toward the flash: the colour inside its box.
         `marks` is the opacity of the face marks (the flash fades them out before the capture)."""
         if not self._camera.allocated:
             return
@@ -67,21 +89,27 @@ class CameraLayer(LayerBase):
         if frame is not None and now - frame.time > FACES_STALE:
             frame = None
         subject: Mark | None = self._subject.update(frame, now, charge, (r, g, b, a))
-        fields = face_boxes(frame) if frame is not None else []
-        dark: float = self.settings.face_dark
+        fields = face_fields(frame) if frame is not None else []
+        rect = (subject.x, subject.y, subject.w, subject.h, subject.far) if subject is not None else NO_RECT
+        fill: FaceFill = self.settings.face_fill
+        effect: FaceEffect = self.settings.face_effect
+        amount: float = self.settings.face_amount
+        blurred: Texture | None = None
+        if effect is FaceEffect.BLUR and (fields or subject is not None):
+            copy(self._camera, self._blurred)
+            blur(self._blurred, self._blur_h, self._blur_v, amount * BLUR_RADIUS)
+            blurred = self._blurred
         self._fbo.begin()
-        if subject is None:
-            self._face_color.use(self._camera, 0.0, 0.0, 0.0, 0.0, 0.0, False, fields, dark)
-        else:
-            rise: bool = self.settings.face_fill is FaceFill.RISE
-            self._face_color.use(self._camera, subject.x, subject.y, subject.w, subject.h, charge, rise, fields, dark)
+        self._face_color.use(self._camera, self._width, self._height, fields, EFFECTS.index(effect), amount,
+                             rect, charge, FILLS.index(fill), (r, g, b, a), blurred)
         if self.settings.face_marks and marks > 0.0:
             face_marks: list[Mark] = build_marks(frame, (r, g, b, a), charge) if frame is not None else []
             if subject is not None and (frame is None or frame.subject is None):
                 face_marks.append(subject)      # the face left: its mark stays while the charge drains
             Style.set_blend_mode(Style.BlendMode.ALPHA)
             for mark in face_marks:
-                self._drawer.draw(mark, self._width, self._height, marks)
+                # the trace is the chosen face's outline
+                self._drawer.draw(mark, self._width, self._height, marks, outline=not (mark.subject and fill is FaceFill.TRACE))
             for mark in face_marks:
                 if mark.label:
                     self._draw_label(mark, marks)

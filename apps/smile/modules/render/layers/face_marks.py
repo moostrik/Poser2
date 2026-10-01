@@ -33,6 +33,8 @@ class Mark:
     line: float                                 # outline width in pixels
     label: str
     dots: Color | None = None                   # colour of the keypoints; None: as the outline
+    subject: bool = False                       # the chosen face
+    far: float = 0.0                            # its distance from good, 0..1
 
 
 def mix(a: Color, b: Color, t: float) -> Color:
@@ -41,9 +43,10 @@ def mix(a: Color, b: Color, t: float) -> Color:
     return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t)
 
 
-def face_boxes(frame: FaceFrame) -> list[tuple[float, float, float, float]]:
-    """The box (x, y, w, h) of every face: the fields the camera darkens."""
-    return [(x0, y0, x1 - x0, y1 - y0) for x0, y0, x1, y1 in (face.crop for face in frame.faces)]
+def face_fields(frame: FaceFrame) -> list[tuple[float, float, float, float, float]]:
+    """Per face its box and distance from good (x, y, w, h, far): the fields the camera shows."""
+    return [(face.crop[0], face.crop[1], face.crop[2] - face.crop[0], face.crop[3] - face.crop[1], face.distance)
+            for face in frame.faces]
 
 
 def build_marks(frame: FaceFrame, subject_color: Color = SUBJECT_COLOR, charge: float = 0.0) -> list[Mark]:
@@ -64,7 +67,7 @@ def build_marks(frame: FaceFrame, subject_color: Color = SUBJECT_COLOR, charge: 
         else:
             color = ACCEPTED_COLOR
         line: float = SUBJECT_LINE_PX if face.subject else LINE_PX
-        marks.append(Mark(x0, y0, x1 - x0, y1 - y0, face.kps, color, line, label, dots))
+        marks.append(Mark(x0, y0, x1 - x0, y1 - y0, face.kps, color, line, label, dots, face.subject, face.distance))
     order: list[int] = [i for i, f in enumerate(frame.faces)]
     order.sort(key=lambda i: (frame.faces[i].rejection is None, frame.faces[i].subject))
     return [marks[i] for i in order]
@@ -73,17 +76,20 @@ def build_marks(frame: FaceFrame, subject_color: Color = SUBJECT_COLOR, charge: 
 class SubjectMark:
     """The chosen face's mark, without a label: the subject's box, its outline going from grey to the active
     colour with the charge and its dots grey. While the charge drains it stays on the face that is
-    there, or else where it last was; None once the charge is empty."""
+    there, or else where it last was (then as far from good as can be); None once the charge is empty."""
 
     def __init__(self) -> None:
         self._box: tuple[tuple[float, float, float, float], tuple[tuple[float, float], ...]] | None = None
+        self._far: float = 1.0
 
     def update(self, frame: FaceFrame | None, now: float, charge: float, active_color: Color = SUBJECT_COLOR) -> Mark | None:
         subject: FaceObservation | None = None
         if frame is not None and now - frame.time <= FACES_STALE:
             subject = frame.subject
+        self._far = 1.0
         if subject is not None:
             self._box = (subject.crop, subject.kps)
+            self._far = subject.distance
 
         qualifies: bool = subject is not None and subject.rejection is None
         if not qualifies and charge <= 0.0:
@@ -92,4 +98,4 @@ class SubjectMark:
             return None
         (x0, y0, x1, y1), kps = self._box
         color: Color = mix(REJECTED_COLOR, active_color, charge)
-        return Mark(x0, y0, x1 - x0, y1 - y0, kps, color, SUBJECT_LINE_PX, '', REJECTED_COLOR)
+        return Mark(x0, y0, x1 - x0, y1 - y0, kps, color, SUBJECT_LINE_PX, '', REJECTED_COLOR, True, self._far)

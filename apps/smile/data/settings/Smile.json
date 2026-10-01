@@ -22,6 +22,7 @@
       "max_yaw": 17.0,
       "max_pitch": 25.0,
       "max_roll": 30.0,
+      "falloff": 1.0,
       "pitch_zero": 0.48,
       "zoom": 1.2,
       "offset": 0.0
@@ -141,15 +142,17 @@
     "destroy_out_ease": "CUBIC_OUT"
   },
   "render": {
-    "show_camera": true,
+    "show_camera": false,
     "face_marks": true,
     "face_color": {
-      "r": 0.2,
+      "r": 1.0,
       "g": 1.0,
-      "b": 0.2,
+      "b": 1.0,
       "a": 1.0
     },
-    "face_fill": "RISE",
+    "face_fill": "TRACE",
+    "face_effect": "PIXELS",
+    "face_amount": 0.5,
     "freeze": false,
     "trail_active": true,
     "trail": 0.99,
@@ -159,14 +162,14 @@
     "window": {
       "title": "SMILE",
       "v_sync": true,
-      "monitor": "M0",
-      "x": 1204,
-      "y": 663,
+      "monitor": "M1",
+      "x": 1991,
+      "y": 818,
       "width": 638,
       "height": 1000,
       "secondary_list": [],
       "secondary_fullscreen": false,
-      "fullscreen_mode": "WINDOWED"
+      "fullscreen_mode": "WINDOWED_FULLSCREEN"
     }
   },
   "audio": {},

@@ -7,7 +7,7 @@ from typing import Callable
 
 from modules.face.FaceDetector import FaceDetector, Face
 from modules.face.FaceLandmarks import FaceLandmarks
-from modules.face.quality import FaceObservation, Pose, Rejection, centre_offset, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
+from modules.face.quality import FaceObservation, Pose, Rejection, centre_offset, distance, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
 from modules.face.settings import FaceSettings
 
 DETECT_THRESHOLD: float = 0.5
@@ -96,6 +96,7 @@ class _Assessed:
     eyes: float | None
     rejection: Rejection | None
     limit: float
+    distance: float
 
 
 @dataclass(frozen=True)
@@ -180,7 +181,9 @@ class FaceFinder(Thread):
                                               Rejection.OFF_CENTRE: s.max_offset, Rejection.TURNED: s.max_yaw, Rejection.PITCHED: s.max_pitch,
                                               Rejection.TILTED: s.max_roll, Rejection.EYES: s.eye_open}
             limit: float = limits[rejection] if rejection is not None else 0.0
-            assessed.append(_Assessed(face, eye_dist, centre, pose, eyes, rejection, limit))
+            far: float = distance(face.score, eye_dist, centre, pose, eyes, s.confidence, s.eye_min, s.eye_max, s.max_offset,
+                                  s.max_yaw, s.max_pitch, s.max_roll, s.eye_open, s.falloff)
+            assessed.append(_Assessed(face, eye_dist, centre, pose, eyes, rejection, limit, far))
 
         # the subject: the largest qualifying face, or the largest face at all
         subject: _Assessed | None = None
@@ -216,6 +219,7 @@ class FaceFinder(Thread):
             eyes=a.eyes,
             rejection=a.rejection,
             limit=a.limit,
+            distance=round(a.distance, 3),
             subject=subject,
         )
 

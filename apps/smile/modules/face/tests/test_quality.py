@@ -8,7 +8,7 @@ import numpy as np
 
 from modules.face.FaceDetector import Face
 from modules.face.FaceFinder import portrait_box, portrait_crop
-from modules.face.quality import LEFT_EYE, RIGHT_EYE, NOSE_NEUTRAL, FaceObservation, Pose, Rejection, centre_offset, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
+from modules.face.quality import LEFT_EYE, RIGHT_EYE, NOSE_NEUTRAL, REJECTED_FLOOR, FaceObservation, Pose, Rejection, centre_offset, distance, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
 
 
 def keypoints(nose_dx: float = 0.0, nose_ratio: float = NOSE_NEUTRAL, roll: float = 0.0) -> np.ndarray:
@@ -105,6 +105,39 @@ class TestGate(unittest.TestCase):
         self.assertEqual(self.check(eye_dist=0.03, yaw=40.0), Rejection.SMALL)
 
 
+class TestDistance(unittest.TestCase):
+    def far(self, score=0.9, eye_dist=0.1, centre=0.0, yaw=0.0, pitch=0.0, roll=0.0, eyes=None, falloff=1.0):
+        return distance(score, eye_dist, centre, Pose(yaw, pitch, roll, 0.48), eyes, confidence=0.7, eye_min=0.05, eye_max=0.25,
+                        max_offset=0.25, max_yaw=20.0, max_pitch=25.0, max_roll=30.0, eye_open=0.2, falloff=falloff)
+
+    def test_a_good_face_is_at_zero(self):
+        self.assertEqual(self.far(), 0.0)
+        self.assertEqual(self.far(eyes=0.3), 0.0)
+        self.assertEqual(self.far(yaw=20.0, eye_dist=0.05), 0.0)       # on a limit is still good
+
+    def test_just_past_a_limit_is_the_floor(self):
+        self.assertAlmostEqual(self.far(yaw=20.01), REJECTED_FLOOR, places=3)
+        self.assertAlmostEqual(self.far(eyes=0.1999), REJECTED_FLOOR, places=3)
+
+    def test_it_grows_with_the_excess_to_one(self):
+        half = REJECTED_FLOOR + (1.0 - REJECTED_FLOOR) * 0.5
+        self.assertAlmostEqual(self.far(yaw=-30.0), half)               # a maximum: half the limit past it
+        self.assertAlmostEqual(self.far(eye_dist=0.025), half)          # a minimum: half the limit short
+        self.assertAlmostEqual(self.far(yaw=40.0), 1.0)
+        self.assertAlmostEqual(self.far(yaw=90.0), 1.0)
+        self.assertAlmostEqual(self.far(eye_dist=0.5), 1.0)             # too large
+        self.assertAlmostEqual(self.far(score=0.35, centre=0.375), half)
+        self.assertAlmostEqual(self.far(eyes=0.1), half)
+
+    def test_the_worst_check_counts(self):
+        self.assertAlmostEqual(self.far(yaw=30.0, pitch=50.0), 1.0)
+        self.assertAlmostEqual(self.far(yaw=30.0, roll=31.0), self.far(yaw=30.0))
+
+    def test_falloff_sets_how_far_is_far(self):
+        self.assertAlmostEqual(self.far(yaw=30.0, falloff=0.5), 1.0)
+        self.assertAlmostEqual(self.far(yaw=40.0, falloff=2.0), REJECTED_FLOOR + (1.0 - REJECTED_FLOOR) * 0.5)
+
+
 class TestPortraitBox(unittest.TestCase):
     def face(self, roll: float = 0.0) -> Face:
         return Face(np.array([200.0, 100.0, 400.0, 300.0]), 0.9, keypoints(roll=roll))
@@ -135,7 +168,7 @@ class TestPortraitBox(unittest.TestCase):
 class TestLabels(unittest.TestCase):
     def face(self, rejection, limit, pose=Pose(0.0, 0.0, 0.0, 0.48), eyes=None, score=0.9, eye_dist=0.06):
         return FaceObservation(bbox=(0, 0, 1, 1), crop=(0, 0, 1, 1), kps=(), score=score, eye_dist=eye_dist, centre=0.1, pose=pose, eyes=eyes,
-                               rejection=rejection, limit=limit, subject=False)
+                               rejection=rejection, limit=limit, distance=0.0, subject=False)
 
     def test_the_readout_shows_every_filtered_value(self):
         self.assertEqual(readout(self.face(None, 0.0, pose=Pose(4.4, -6.0, 2.0, 0.48), eyes=0.34)), 'conf 0.90 eyes 0.06 centre 0.10 yaw 4 pitch -6 roll 2 open 0.34')

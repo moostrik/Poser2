@@ -42,6 +42,7 @@ class FaceObservation:
     eyes: float | None                          # openness of the less open eye, None if not measured
     rejection: Rejection | None
     limit: float                                # the setting the failed check compared to; 0 when accepted
+    distance: float                             # how far from qualifying: 0 good .. 1 far (see distance())
     subject: bool                               # the face the sequence uses
 
     @property
@@ -169,3 +170,29 @@ def gate(score: float, eye_dist: float, centre: float, pose: Pose, confidence: f
     if abs(pose.roll) > max_roll:
         return Rejection.TILTED
     return None
+
+
+# a rejected face is never closer to good than this: crossing a limit shows as a step
+REJECTED_FLOOR: float = 0.2
+
+
+def distance(score: float, eye_dist: float, centre: float, pose: Pose, eyes: float | None, confidence: float, eye_min: float,
+             eye_max: float, max_offset: float, max_yaw: float, max_pitch: float, max_roll: float, eye_open: float,
+             falloff: float) -> float:
+    """How far a face is from qualifying: 0 when it passes every check, REJECTED_FLOOR just past a
+    limit, 1 when its worst check is `falloff` times the limit past it (1: twice a maximum, or zero
+    for a minimum). The eyes count only when they were measured."""
+    def below(value: float, limit: float) -> float:
+        return (limit - value) / max(limit, 1e-6)
+
+    def above(value: float, limit: float) -> float:
+        return (value - limit) / max(limit, 1e-6)
+
+    excess: list[float] = [below(score, confidence), below(eye_dist, eye_min), above(eye_dist, eye_max), above(centre, max_offset),
+                           above(abs(pose.yaw), max_yaw), above(abs(pose.pitch), max_pitch), above(abs(pose.roll), max_roll)]
+    if eyes is not None:
+        excess.append(below(eyes, eye_open))
+    worst: float = max(excess)
+    if worst <= 0.0:
+        return 0.0
+    return REJECTED_FLOOR + (1.0 - REJECTED_FLOOR) * min(worst / max(falloff, 1e-6), 1.0)

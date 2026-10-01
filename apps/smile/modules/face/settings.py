@@ -13,7 +13,9 @@ class FaceSettings(BaseSettings):
     max_pitch:     Field[float] = Field(25.0, min=0.0, max=60.0, step=1.0, description="Maximum head tilt up or down (degrees, approximate)")
     max_roll:      Field[float] = Field(30.0, min=0.0, max=90.0, step=1.0, description="Maximum head tilt sideways (degrees)")
 
-    pitch_zero:    Field[float] = Field(0.48, min=0.3, max=0.7, step=0.01, newline=True, description="Nose position between the eyes (0) and the mouth (1) that reads as pitch 0; depends on the camera height")
+    falloff:       Field[float] = Field(1.0, min=0.1, max=3.0, step=0.1, newline=True, label="Far at", description="How far past a limit a face counts as fully far, relative to the limit (1 = twice the limit)")
+
+    pitch_zero:   Field[float] = Field(0.48, min=0.3, max=0.7, step=0.01, newline=True, description="Nose position between the eyes (0) and the mouth (1) that reads as pitch 0; depends on the camera height")
     calibrate:     Field[bool]  = Field(False, widget=Widget.button, label="Set pitch zero", description="Take the pitch zero from the current face: look straight at the camera")
 
     zoom:          Field[float] = Field(1.2, min=1.0, max=5.0, step=0.01, newline=True, label="Portrait zoom", description="Portrait width, relative to the face height")

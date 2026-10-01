@@ -26,7 +26,8 @@ distance between the eyes, min and max), position (horizontal distance from the 
 pose from the 5 keypoints (the pitch's zero is `pitch_zero`, set on site with the "Set pitch zero"
 button: it depends on the camera height), eye openness from the 106 landmarks (`FaceLandmarks`,
 `data/models/2d106det.onnx`, only run for faces that passed the other checks); the first failing check
-is the face's `Rejection`. Gaze is not checked: the "looking at viewer" LoRA corrects it. The subject of a frame is its largest qualifying face.
+is the face's `Rejection`, and `distance()` says how far the face is from qualifying (0 good, a floor
+just past a limit, 1 when its worst check is `falloff` times the limit past it). Gaze is not checked: the "looking at viewer" LoRA corrects it. The subject of a frame is its largest qualifying face.
 The flash is earned: the `Sequencer` keeps a **charge** that rises while the newest detector frame
 has a qualifying subject (`sequence.charge` seconds to fill) and drains while it has none
 (`sequence.drain` seconds, slower); CAMERA_SHOW is an empty charge, CAMERA_DETECT a partial one
@@ -34,10 +35,11 @@ has a qualifying subject (`sequence.charge` seconds to fill) and drains while it
 start charges without a face. The capture is the last frame in which the subject qualified (the
 last frame at all when none did), cropped by
 `portrait_crop` (eyes levelled, at the workflow's portrait size). Every frame's faces go to the render
-(`Inputs.faces`): `CameraLayer` draws the camera in black and white with every face's box as a
-darker field (`render.face_dark`; the box is the portrait crop's, upright: `FaceObservation.crop`) and
-the subject's turning from that to colour as the charge fills (`render.face_fill`: fading in, or rising
-from the bottom). `render.face_marks` switches all marks on or off: the subject's outline (from
+(`Inputs.faces`): `CameraLayer` draws the camera in black and white (`facecolor.frag`). Every face's
+box (the portrait crop's, upright: `FaceObservation.crop`) shows the face's distance from good
+(`render.face_effect`: dark, pixels, blur or fog, at `render.face_amount`), so a visitor sees
+whether they get closer; the subject's box turns to colour as the charge fills (`render.face_fill`:
+fade, rise, iris, trace or scan). `render.face_marks` switches all marks on or off: the subject's outline (from
 grey to `render.face_color` with the charge) and grey keypoints, the other faces in white, a
 rejected one in grey with its reject reason (the panel has the readout). They are part of the
 camera layer, so the flash fades them out with it. Marks are built in `face_marks.py`, drawn by `MarkDrawer`.

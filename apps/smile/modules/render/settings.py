@@ -51,8 +51,18 @@ def easing_function(value: Easing) -> Callable[[float], float]:
 
 
 class FaceFill(Enum):
-    FADE = 'Fade'
-    RISE = 'Rise'
+    FADE  = 'Fade'      # colour over the whole box
+    RISE  = 'Rise'      # colour climbs from the bottom
+    IRIS  = 'Iris'      # colour grows as a circle from the centre
+    TRACE = 'Trace'     # no colour: the outline draws itself around the box
+    SCAN  = 'Scan'      # as Rise, with a bright line at the colour's edge
+
+
+class FaceEffect(Enum):
+    DARK   = 'Dark'
+    PIXELS = 'Pixels'
+    BLUR   = 'Blur'
+    FOG    = 'Fog'
 
 
 class RenderSettings(BaseSettings):
@@ -60,8 +70,9 @@ class RenderSettings(BaseSettings):
     show_camera:   Field[bool]  = Field(False, description="Draw the raw camera image on top; no sequence starts")
     face_marks:    Field[bool]  = Field(False, description="Draw the faces' outlines, dots and reject reasons on the camera")
     face_color:    Field[Color] = Field(Color(0.2, 1.0, 0.2), description="Colour of the chosen face's box and dots")
-    face_fill:     Field[FaceFill] = Field(FaceFill.FADE, description="How the chosen face's box turns to colour: fade in, or rise from the bottom")
-    face_dark:     Field[float] = Field(0.5, min=0.0, max=1.0, step=0.05, description="Brightness of a detected face's box before it turns to colour (1 = not darkened)")
+    face_fill:     Field[FaceFill] = Field(FaceFill.FADE, description="How the chosen face's box turns to colour as its charge fills")
+    face_effect:   Field[FaceEffect] = Field(FaceEffect.DARK, description="How a face's box shows its distance from good")
+    face_amount:   Field[float] = Field(0.5, min=0.0, max=1.0, step=0.05, description="Strength of the effect on a face that is far from good")
     freeze:        Field[bool]  = Field(False, description="Hold the current frame")
     trail_active:  Field[bool]  = Field(True, description="Blend new diffusion images over the previous ones")
     trail:         Field[float] = Field(0.995, min=0.98, max=1.0, step=0.001, description="Trail amount")
