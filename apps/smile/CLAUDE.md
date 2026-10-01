@@ -30,12 +30,15 @@ operator overlay (`render.show_faces`: `FaceOverlayLayer`, marks built in `face_
 ## Image generator
 
 ComfyUI server (installed in `ComfyUI/` from the `comfy/` bundle, both git-ignored, API on
-127.0.0.1:8188). `modules/comfy/`: `Generator` sends each capture to ComfyUI and turns its
+127.0.0.1:8188), started by `scripts/start_comfy.bat`, with a log per start in `logs/comfy_*.log`. Every model is
+local and a run makes no internet calls; a pack only downloads a model that is missing. Keep ComfyUI core and the node packs unmodified; depth comes from
+ComfyUI's own Depth Anything 3 nodes. `modules/comfy/`: `Generator` sends each capture to ComfyUI and turns its
 websocket events into `GenMessage`s for the render (CAM_DEPTH → DIFFUSION → DIFF_LOOP → IDLE);
 `workflow.py` adapts the API export in `data/comfy/` (face crop removed — SMILE crops and rotates
 the face itself — depth outputs added) and fills in every value from `PipelineSettings` per run: the
 panel is the source of truth, the workflow only provides the structure. Keep one workflow per
 visitor: a second workflow in between drops the first from ComfyUI's cache and reloads the models.
+The warm-up run at startup is skipped when ComfyUI's last run was this pipeline (`same_pipeline`).
 Our own ComfyUI nodes live in `comfy/aiia_grin/` (copied into `ComfyUI/custom_nodes/aiia_grin`).
 
 ## Render

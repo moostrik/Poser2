@@ -1,5 +1,6 @@
 """Tests for adapting the exported ComfyUI workflow (no ComfyUI server needed)."""
 
+import copy
 import os
 import random
 import unittest
@@ -238,6 +239,42 @@ class TestWorkflow(unittest.TestCase):
     def test_depth_outputs(self):
         for node_id in (self.wf.capture_depth, self.wf.last_depth):
             self.assertEqual(self.built[node_id]['class_type'], 'PreviewImage')
+        # the capture's depth is the one the portrait is made with, not a second run
+        self.assertEqual(self.built[self.wf.capture_depth]['inputs']['images'], self.built[self.wf.depth]['inputs']['image'])
+        # both depths come from one model, and the last frame's from the last frame
+        runs = [node for node in self.built.values() if node['class_type'] == 'DA3Inference']
+        self.assertEqual(len(runs), 2)
+        self.assertEqual(runs[0]['inputs']['da3_model'], runs[1]['inputs']['da3_model'])
+        self.assertEqual(self.built['smile_last_geometry']['inputs']['image'], [self.wf.last_frame, 0])
+        self.assertEqual(sum(node['class_type'] == 'LoadDA3Model' for node in self.built.values()), 1)
+
+    def test_steps(self):
+        steps = {node_id: self.wf.step(node_id) for node_id in self.built}
+        self.assertEqual({name for name in steps.values() if name},
+                         {'describe', 'depth', 'portrait', 'grin', 'depth of last frame'})
+        self.assertEqual(steps[self.wf.sampler], 'portrait')
+        self.assertEqual(self.built[self.wf.depth_run]['class_type'], 'DA3Inference')
+        self.assertEqual(steps[self.wf.last_depth_run], 'depth of last frame')
+        self.assertIsNone(steps[self.wf.load_image])
+        self.assertIsNone(self.wf.step(None))
+
+    def test_same_pipeline(self):
+        self.assertTrue(self.wf.same_pipeline(self.built))
+        self.settings.portrait.full_preview = False
+        self.settings.portrait.steps = 12
+        self.assertTrue(self.wf.same_pipeline(self.wf.build('other.png', 'other', 'other', self.settings)))
+        self.assertFalse(self.wf.same_pipeline(None))
+        self.assertFalse(self.wf.same_pipeline({}))
+        missing = dict(self.built)
+        missing.pop(self.wf.last_depth)
+        self.assertFalse(self.wf.same_pipeline(missing))
+        checkpoint = next(node_id for node_id, node in self.built.items() if node['class_type'] == 'CheckpointLoaderSimple')
+        other = copy.deepcopy(self.built)
+        other[checkpoint]['inputs']['ckpt_name'] = 'another.safetensors'
+        self.assertFalse(self.wf.same_pipeline(other))
+        rewired = copy.deepcopy(self.built)
+        rewired[self.wf.grin]['inputs']['image'] = [self.wf.load_image, 0]
+        self.assertFalse(self.wf.same_pipeline(rewired))
 
     def test_template_not_changed_by_build(self):
         again = self.wf.build('other.png', 'other', 'other negative', self.settings)

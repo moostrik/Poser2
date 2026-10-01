@@ -245,7 +245,7 @@
   },
   "1001:10": {
     "inputs": {
-      "model_name": "Qwen3-VL-4B-Instruct",
+      "model_name": "Qwen3-VL-2B-Instruct",
       "quantization": "None (FP16)",
       "attention_mode": "auto",
       "preset_prompt": "🖼️ Tags",
@@ -470,19 +470,48 @@
       "title": "Apply InstantID (aiia2: 1.0 / 1.0, no noise)"
     }
   },
-  "1002:31": {
+  "1002:38": {
     "inputs": {
-      "a": 6.283185307179586,
-      "bg_threshold": 0.1,
-      "resolution": 1024,
+      "model_name": "depth_anything_3_mono_large.safetensors",
+      "weight_dtype": "fp16"
+    },
+    "class_type": "LoadDA3Model",
+    "_meta": {
+      "title": "Depth Anything 3 model"
+    }
+  },
+  "1002:39": {
+    "inputs": {
+      "resolution": 1008,
+      "resize_method": "upper_bound_resize",
+      "mode": "mono",
+      "da3_model": [
+        "1002:38",
+        0
+      ],
       "image": [
         "1006",
         0
       ]
     },
-    "class_type": "MiDaS-DepthMapPreprocessor",
+    "class_type": "DA3Inference",
     "_meta": {
-      "title": "Depth (MiDaS)"
+      "title": "Depth (Depth Anything 3)"
+    }
+  },
+  "1002:31": {
+    "inputs": {
+      "output": "depth",
+      "output.normalization": "v2_style",
+      "output.apply_sky_clip": false,
+      "da3_geometry": [
+        "1002:39",
+        0
+      ]
+    },
+    "class_type": "DA3Render",
+    "_meta": {
+      "title": "Depth map"
     }
   },
   "1002:32": {

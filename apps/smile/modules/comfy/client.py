@@ -94,6 +94,15 @@ class ComfyClient():
         queue: dict = response.json()
         return bool(queue.get('queue_running') or queue.get('queue_pending'))
 
+    def last_prompt(self) -> dict | None:
+        """The workflow of the server's newest run when it succeeded, else None (also after a server restart)."""
+        response = requests.get(f'{self.base}/history', params={'max_items': 1}, timeout=5)
+        response.raise_for_status()
+        for entry in response.json().values():
+            if entry.get('status', {}).get('status_str') == 'success':
+                return entry['prompt'][2]
+        return None
+
     def interrupt(self) -> None:
         requests.post(f'{self.base}/queue', json={'clear': True}, timeout=5)
         requests.post(f'{self.base}/interrupt', timeout=5)

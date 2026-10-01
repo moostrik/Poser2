@@ -141,6 +141,9 @@ class Generator(Thread):
         image: np.ndarray | None = cv2.imread(WARMUP_IMAGE)
         if image is None:
             return
+        if self._is_warm():
+            logger.info('ComfyUI is warm, no warm-up')
+            return
         self.settings.connection.status = 'warming up'
         self._silent = True
         try:
@@ -148,6 +151,14 @@ class Generator(Thread):
         finally:
             self._silent = False
         self.settings.connection.status = 'ready'
+
+    def _is_warm(self) -> bool:
+        """ComfyUI's last run was this pipeline: its models are still loaded."""
+        try:
+            return self.workflow.same_pipeline(self.client.last_prompt())
+        except Exception:
+            logger.warning('Could not read the last run from ComfyUI', exc_info=True)
+            return False
 
     # GENERATION
     def _emit(self, message: GenMessage) -> None:
@@ -190,6 +201,12 @@ class Generator(Thread):
             self._interrupt_comfy()
             raise TimeoutError(f'longer than job_timeout{last_event}')
 
+    def _step(self, step: str) -> None:
+        """The step of the generation in the panel; the warm-up says so in front."""
+        status: str = f'warming up: {step}' if self._silent else step
+        if self.settings.connection.status != status:
+            self.settings.connection.status = status
+
     def _interrupt_comfy(self) -> None:
         try:
             self.client.interrupt()
@@ -213,7 +230,7 @@ class Generator(Thread):
             # a job that timed out is still running (ComfyUI only stops between steps): don't queue behind it
             self._interrupt_comfy()
             raise RuntimeError('ComfyUI is still busy with an earlier job')
-        s.connection.status = 'generating'
+        self._step('generating')
         name: str = self.client.upload(image, 'smile_capture.png')
         workflow: dict = wf.build(name, self.styles.current_text(), self.styles.current_negative(), s)
         last_depth, _ = self._run_pass(workflow, start + s.connection.job_timeout)
@@ -261,9 +278,16 @@ class Generator(Thread):
         sampler_progress: float = 0.0
         last_event: str = 'queued'      # for the timeout message: where ComfyUI went silent
         last_time: float = time.time()
+        step: str = 'queued'            # the same for the panel: the step that is running
+
+        def show(text: str) -> None:
+            nonlocal step
+            step = text
+            if not replay:              # a replay keeps 'grin loop' / 'grin still'
+                self._step(text)
 
         while True:
-            self._check(deadline, f", no event for {time.time() - last_time:.0f} s after '{last_event}'")
+            self._check(deadline, f", no event for {time.time() - last_time:.0f} s after '{last_event}' during '{step}'")
             event: ComfyEvent | None = self.client.receive(0.05)
             if event is None:
                 continue
@@ -278,14 +302,21 @@ class Generator(Thread):
                 node: str | None = event.data.get('node_id')
                 if node == wf.grin:
                     made += 1
+                    show(f'grin {made}/{total}')
                     self.player.add(event.image)
                     self._emit(GenMessage(GenState.DIFF_LOOP, min(made / total, 1.0), event.image))
                 elif node == wf.sampler and not replay:
                     self._emit(GenMessage(GenState.DIFFUSION, sampler_progress, event.image))
 
+            elif event.type == 'executing':
+                name: str | None = wf.step(event.data.get('node'))
+                if name is not None:
+                    show(name)
+
             elif event.type == 'progress':
                 if event.data.get('node') == wf.sampler:
                     sampler_progress = event.data['value'] / max(event.data['max'], 1)
+                    show(f"portrait {event.data['value']}/{event.data['max']}")
 
             elif event.type == 'executed':
                 node = event.data.get('node')
@@ -316,6 +347,8 @@ class Generator(Thread):
 
         # the render shows the frames on its own clock: IDLE and the next pass wait for the last one
         self.player.end()
+        if self.player.busy:
+            show('playing grin')
         while self.player.busy:
             self._check(deadline)
             self.client.receive(0.02)
