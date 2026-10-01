@@ -80,7 +80,7 @@ The cells start one by one, each in a random place on the next clip that is load
 loaded clips again when there are fewer than cells). `scripts/start_players.bat` (re)starts both players alone,
 each fullscreen on its own monitor (a player whose monitor is not connected takes a window on the
 primary one); leading `window` puts both in a window for testing, `console` gives them a console
-for logs, other arguments pass through. `scripts/start.bat` is the main startup: it closes and
+for logs, other arguments pass through. `scripts/startSMILE.bat` is the main startup: it closes and
 restarts everything (ComfyUI, Max, the players, SMILE).
 
 ## Settings

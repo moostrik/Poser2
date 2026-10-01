@@ -44,15 +44,15 @@ semi real time webcam diffusers
 * optional: put a portrait photo at `data\comfy\warmup.jpg`, SMILE then runs one generation at startup so the first visitor doesn't wait for the models to load
 
 ### Run Project
-* run ```scripts\start.bat```
+* run ```scripts\startSMILE.bat```: it closes and restarts everything (ComfyUI, Max, the image players, SMILE), all fullscreen
 * `smile.py` does not start ComfyUI itself: when running it on its own (e.g. from VSCode), start the server first with ```scripts\start_comfy.bat``` (add `--enable-manager` for the ComfyUI-Manager)
 * settings panel: open http://localhost:667 in a browser (also reachable from other devices on the network)
 * presets live in `data/settings/`, `Smile.json` loads at startup
-* monitors are numbered primary first, then left to right: SMILE uses the one in its preset (`render.window.monitor`), the two image players the ones in `scripts\start.bat` (`PLAYER_1_MONITOR`, `PLAYER_2_MONITOR`)
+* monitors are numbered primary first, then left to right: SMILE uses the one in its preset (`render.window.monitor`), the two image players the ones in `scripts\start_players.bat` (`PLAYER_1_MONITOR`, `PLAYER_2_MONITOR`); a player whose monitor is not connected opens in a window
 * keys in the SMILE window: Enter starts a sequence, F fullscreen, W borderless fullscreen, Esc quits
 
 ### Startup
-* make a shortcut to `scripts\start.bat`
+* make a shortcut to `scripts\startSMILE.bat`
 * Press Windows+R to open the Run dialog, type shell:Common Startup
 * move shortcut to startup folder
 
