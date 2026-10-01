@@ -12,6 +12,7 @@ parser.add_argument('-wc',  '--useWebCam',      action='store_true',        help
 parser.add_argument('-vc',  '--useVimbaCam',    action='store_true',        help='use vimba camera instead of default cam')
 parser.add_argument('-pm',  '--portraitMode',   action='store_true',        help='use portrait mode (default)')
 parser.add_argument('-lm',  '--landscapeMode',  action='store_true',        help='use landscape mode')
+parser.add_argument('-fs',  '--fullscreen',     action='store_true',        help='open borderless fullscreen (the installation) instead of the window mode of the preset')
 parser.add_argument('-v',   '--verbose',        action='store_true',        help='enable verbose (DEBUG) console output')
 args = parser.parse_args()
 
@@ -27,7 +28,7 @@ if args.useVimbaCam:
 if args.useWebCam:
     camType = CamType.WEB
 
-aiia = Forgettable(modWidth, modHeight, not(bool(args.landscapeMode)), camType)
+aiia = Forgettable(modWidth, modHeight, not(bool(args.landscapeMode)), camType, args.fullscreen)
 aiia.start()
 
 def signal_handler_exit(sig, frame) -> None:

@@ -77,8 +77,11 @@ inherited handles. The players (`modules/player/`) decode each of the newest cli
 (`ClipPool`, 512x640, about 200 MB per clip) and play from memory; `pl_player.py -n` sets the number
 of cells, `--pool` the clips kept, `--fps` the playback speed (default 20, 0 = the clip's own rate), `--trail` a blend with the previous output (default 0: none).
 The cells start one by one, each in a random place on the next clip that is loaded (going round the
-loaded clips again when there are fewer than cells). `scripts/start_players.bat` (re)starts both players alone
-(`console` first for logs, other arguments pass through); `scripts/start.bat` calls it.
+loaded clips again when there are fewer than cells). `scripts/start_players.bat` (re)starts both players alone,
+each fullscreen on its own monitor (a player whose monitor is not connected takes a window on the
+primary one); leading `window` puts both in a window for testing, `console` gives them a console
+for logs, other arguments pass through. `scripts/start.bat` is the main startup: it closes and
+restarts everything (ComfyUI, Max, the players, SMILE).
 
 ## Settings
 

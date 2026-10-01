@@ -22,6 +22,20 @@ START_DELAY: float = 0.5        # s between two cells starting when the loaded c
 MIN_START_GAP: float = 0.1      # s at least between two cells starting, when clips load faster than that
 
 
+def monitor_count() -> int:
+    """Connected monitors, as the window manager will count them."""
+    import glfw
+    return len(glfw.get_monitors()) if glfw.init() else 1
+
+
+def place_window(monitor: int, windowed: bool, monitors: int) -> tuple[int, bool]:
+    """The monitor and mode to open on. Without its own monitor a player takes a plain window on the
+    primary one: fullscreen there would cover SMILE."""
+    if monitor >= monitors:
+        return 0, True
+    return monitor, windowed
+
+
 class Player():
     def __init__(self, osc_port: int, root: str = 'output/', monitor: int = 1, trail: float = 0.9,
                  clips: int = 24, pool: int = 24, hwdecode: int | None = None, windowed: bool = False,
@@ -33,6 +47,11 @@ class Player():
         self._running: bool = False
 
         ids: list[str] = [str(i) for i in range(clips)]
+
+        placed: tuple[int, bool] = place_window(monitor, windowed, monitor_count())
+        if placed != (monitor, windowed):
+            logger.warning('Monitor %d is not connected: the player runs in a window on the primary monitor', monitor)
+            monitor, windowed = placed
 
         # borderless fullscreen: exclusive fullscreen minimizes when another player or SMILE gets focus
         window = WindowSettings()

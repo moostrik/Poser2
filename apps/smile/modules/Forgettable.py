@@ -10,6 +10,7 @@ from modules.audio.DB import DB as AudioDB
 from modules.save.ClipSaver import ClipSaver
 from modules.artnet.Sender import Sender as Artnet
 from modules.settings import presets, NiceServer
+from modules.gl import FullscreenMode
 from modules.smile_settings import Settings
 from enum import Enum
 import logging
@@ -22,7 +23,8 @@ class CamType(Enum):
     WEB     = 3
 
 class Forgettable():
-    def __init__(self, width: int, height: int, portraitMode: bool = False, camType: CamType = CamType.VIMBA) -> None:
+    def __init__(self, width: int, height: int, portraitMode: bool = False, camType: CamType = CamType.VIMBA,
+                 fullscreen: bool = False) -> None:
         self.width: int = width
         self.height: int = height
         self.portraitMode: bool = portraitMode
@@ -38,6 +40,9 @@ class Forgettable():
         preset_file = presets.startup_path()
         if not presets.load(self.settings, preset_file):
             logger.warning('No preset at %s, using defaults', preset_file)
+        if fullscreen:
+            # the installation's start: borderless (exclusive fullscreen minimizes when a player gets focus)
+            self.settings.render.window.fullscreen_mode = FullscreenMode.WINDOWED_FULLSCREEN
         self.settings.initialize()
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
