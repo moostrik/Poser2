@@ -42,12 +42,14 @@ class TestPoolIdle(unittest.TestCase):
         pool.add('missing.mp4')
         self.assertFalse(pool.idle)
 
-    def test_use_counts_up_to_the_maximum(self):
-        pool = ClipPool(4, (2, 2), max_usage_count=2)
+    def test_use_counts_a_play_and_a_cell(self):
+        pool = ClipPool(4, (2, 2))
         c = clip('a')
         for _ in range(3):
             pool.use(c)
-        self.assertEqual(c.usage_count, 2)
+        self.assertEqual((c.plays, c.active), (3, 3))
+        pool.release(c)
+        self.assertEqual((c.plays, c.active), (3, 2))
 
 
 class TestPlayRate(unittest.TestCase):

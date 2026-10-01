@@ -9,7 +9,8 @@ parser: ArgumentParser = ArgumentParser()
 parser.add_argument('-m',   '--monitor',    type=int,   default=1,      help='monitor (0 is the primary, then left to right)')
 parser.add_argument('-osc', '--osc_port',   type=int,   default=4115,   help='osc port')
 parser.add_argument('-n',   '--clips',      type=int,   default=24,     help='number of clips playing at once (cells)')
-parser.add_argument('--pool',               type=int,   default=24,     help='number of newest clips kept decoded in RAM (about 200 MB each)')
+parser.add_argument('--pool',               type=int,   default=30,     help='number of clips kept decoded in RAM (about 200 MB each, 5.9 GB for 30)')
+parser.add_argument('--recent',             type=int,   default=3,      help='the newest clips that are always on the wall; 0 = none')
 parser.add_argument('--fps',                type=float, default=20.0,   help='playback speed of the clips (frames per second); 0 plays each clip at its own rate')
 parser.add_argument('--spread',             type=float, default=0.1,    help='random speed difference per clip, as a fraction of --fps (0.1 = 10 percent slower to faster), 0 = none')
 parser.add_argument('--follow_style',       action=BooleanOptionalAction, default=True, help='show only clips of the style (A or B) of the newest clip, cells change over at the end of their play (default); --no-follow_style shows the newest clips of both styles together')
@@ -23,7 +24,7 @@ args = parser.parse_args()
 setup_logging(verbose=args.verbose, name=f'player{args.monitor}')
 install_thread_excepthook()
 
-player: Player = Player(args.osc_port, args.root, args.monitor, args.trail, args.clips, args.pool, args.hwdecode, args.window, args.fps, args.spread, args.follow_style)
+player: Player = Player(args.osc_port, args.root, args.monitor, args.trail, args.clips, args.pool, args.hwdecode, args.window, args.fps, args.spread, args.follow_style, args.recent)
 player.start()
 
 def signal_handler_exit(sig, frame) -> None:

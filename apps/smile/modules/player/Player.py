@@ -38,8 +38,8 @@ def place_window(monitor: int, windowed: bool, monitors: int) -> tuple[int, bool
 
 class Player():
     def __init__(self, osc_port: int, root: str = 'output/', monitor: int = 1, trail: float = 0.9,
-                 clips: int = 24, pool: int = 24, hwdecode: int | None = None, windowed: bool = False,
-                 fps: float = 30.0, spread: float = 0.0, follow_style: bool = True) -> None:
+                 clips: int = 24, pool: int = 30, hwdecode: int | None = None, windowed: bool = False,
+                 fps: float = 30.0, spread: float = 0.0, follow_style: bool = True, recent: int = 3) -> None:
         osc_settings = OscSettings()
         osc_settings.port = int(osc_port)
         self.osc:Osc = Osc(osc_settings)
@@ -68,8 +68,8 @@ class Player():
 
         # the clips are decoded once into RAM at the size the cells show them (the portrait is turned a quarter)
         cell_size: tuple[int, int] = (PlayerRender.CELL_HEIGHT, PlayerRender.CELL_WIDTH)
-        self.pool: ClipPool = ClipPool(pool, cell_size, hwdecode)
-        self.scanner: FolderScanner = FolderScanner(os.path.join(root, 'grins'), self.pool, pool, follow_style)
+        self.pool: ClipPool = ClipPool(pool, cell_size, hwdecode, recent)
+        self.scanner: FolderScanner = FolderScanner(os.path.join(root, 'grins'), self.pool, pool, follow_style, recent)
 
         self.loaders: list[LoadImages] = []
         for id in ids:
@@ -86,7 +86,7 @@ class Player():
         self._stats_thread = threading.Thread(target=self._stats_loop, name='PlayerStats', daemon=True)
         # the cells start one by one, each on the next clip that is loaded
         self._start_thread = threading.Thread(target=self._start_loop, name='PlayerStart', daemon=True)
-        logger.info('Player %d: %d cells, pool %d, %s, %s, root %s, %s', monitor, clips, pool,
+        logger.info('Player %d: %d cells, pool %d (newest %d always shown), %s, %s, root %s, %s', monitor, clips, pool, recent,
                     'following the style' if follow_style else 'all styles',
                     (f'{fps:g} fps' if fps > 0 else 'clip fps') + (f' +-{spread:.0%}' if spread > 0 else ''), root, 'window' if windowed else 'fullscreen')
 
@@ -141,8 +141,10 @@ class Player():
         while not self._stats_stop.wait(STATS_INTERVAL):
             with self._frames_lock:
                 frames, self._frames = self._frames, 0
-            logger.info('%.1f frames/s per cell, render %d fps (min %d), %d clips in the pool',
-                        frames / STATS_INTERVAL / len(self.loaders), window.avg_fps, window.min_fps, len(self.pool))
+            shown, most = self.pool.spread()
+            logger.info('%.1f frames/s per cell, render %d fps (min %d), %d clips on %d cells: %d shown, most %dx',
+                        frames / STATS_INTERVAL / len(self.loaders), window.avg_fps, window.min_fps,
+                        len(self.pool), len(self.loaders), shown, most)
 
     def isRunning(self) -> bool :
         return self._running

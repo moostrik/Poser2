@@ -54,13 +54,17 @@ class LoadImages(Thread):
         self._end_time = time.time()
         while not self._stop_event.is_set():
             if clip is None:
-                clip = self.pool.get_clip()
-            if clip is None:
                 self._sleep_until(time.time() + 1.0)
                 self._end_time = time.time()
+                clip = self.pool.get_clip()
                 continue
             self._play(clip)
-            clip = None     # release the frames: the pool may have dropped this clip meanwhile
+            if self._stop_event.is_set():
+                self.pool.release(clip)
+                return
+            # the next clip is one the other cells show the least, never the one just played; the
+            # reference to that one is dropped here (the pool may have evicted it meanwhile)
+            clip = self.pool.get_clip(clip)
 
     def _play(self, clip: Clip) -> None:
         interval: float = 1.0 / play_rate(self._fps, clip.fps, self._spread)

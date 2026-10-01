@@ -63,10 +63,11 @@ class FolderScanner:
 
     Default: the newest clips of all styles. With `follow_style`: clips of one style, the style of
     the newest clip. A clip arriving in the other style's folder is the switch: the pool gets a
-    random selection of that style's clips from all on disk, and the new clip itself, which is
-    queued last and therefore decoded first."""
+    random selection of that style's clips from all on disk, its `recent` newest ones and the new
+    clip itself, which is queued last and therefore decoded first."""
 
-    def __init__(self, folder: str, pool: ClipPool, max_files: int, follow_style: bool = False) -> None:
+    def __init__(self, folder: str, pool: ClipPool, max_files: int, follow_style: bool = False, recent: int = 0) -> None:
+        self.recent: int = recent       # the newest clips of a style are always loaded, not left to the random pick
         self.folder: str = folder
         self.pool: ClipPool = pool
         self.max_files: int = max_files
@@ -122,9 +123,11 @@ class FolderScanner:
         """The clip `trigger` is the first of another style: the pool changes over to that style."""
         self.style = style
         self.pool.set_style(style)
-        others: list[str] = [path for id, path in current.items() if id != trigger]
-        picked: list[str] = pick_clips(others, style, self.max_files - 1)
-        logger.info('Style %s: loading %d of its clips', style, len(picked) + 1)
-        for path in picked:
+        others: list[str] = [current[id] for id in sorted(current) if id != trigger and clip_style(current[id]) == style]
+        # the newest ones for sure (with the trigger they are the `recent` clips the wall always shows), the rest at random
+        newest: list[str] = others[len(others) - max(self.recent - 1, 0):]
+        picked: list[str] = pick_clips(others[:len(others) - len(newest)], style, self.max_files - 1 - len(newest))
+        logger.info('Style %s: loading %d of its clips', style, len(picked) + len(newest) + 1)
+        for path in picked + newest:
             self.pool.add(path, style)
-        self.pool.add(current[trigger], style)      # last in: decoded first
+        self.pool.add(current[trigger], style)      # last in: decoded first, the newest right after it

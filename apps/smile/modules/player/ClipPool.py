@@ -3,7 +3,7 @@ import os
 import queue
 import random
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -18,7 +18,9 @@ class Clip:
     frames: np.ndarray      # (frames, height, width, 3) bgr uint8
     fps: float
     style: str = ''         # the folder the clip was saved in: A or B
-    usage_count: int = field(default=0)
+    plays: int = 0          # times started on a cell (a new clip starts level with the least played)
+    active: int = 0         # cells playing it now
+    fresh: bool = True      # not shown yet: the next cell that finishes takes it
 
 
 def next_start(clips: list[Clip], started: set[str]) -> Clip | None:
@@ -27,6 +29,29 @@ def next_start(clips: list[Clip], started: set[str]) -> Clip | None:
         if clip.id not in started:
             return clip
     return None
+
+
+def choose(clips: list[Clip], exclude: Clip | None = None, recent: int = 0) -> Clip | None:
+    """The clip a cell plays next: one that is on the fewest cells now, of those a clip that was
+    never shown, else one that was played the least, of those at random. `exclude` (the clip the
+    cell just played) is left out unless it is the only one. So every clip is on the wall about
+    equally, none repeats in its cell and a new visitor is shown at once.
+
+    Before all that, the `recent` newest clips (the id is the recording time) are always on the
+    wall: one of them that is on no cell is taken first. The cell that just played it leaves it to
+    the next cell that finishes, so it moves around the wall."""
+    candidates: list[Clip] = [clip for clip in clips if clip is not exclude] or clips
+    if not candidates:
+        return None
+    newest: list[Clip] = sorted(clips, key=lambda clip: clip.id, reverse=True)[:max(recent, 0)]
+    missing: list[Clip] = [clip for clip in newest if clip.active == 0 and clip is not exclude]
+    if missing:
+        candidates = missing
+    active: int = min(clip.active for clip in candidates)
+    candidates = [clip for clip in candidates if clip.active == active]
+    candidates = [clip for clip in candidates if clip.fresh] or candidates
+    plays: int = min(clip.plays for clip in candidates)
+    return random.choice([clip for clip in candidates if clip.plays == plays])
 
 
 def evict_id(clips: dict[str, Clip], style: str | None) -> str:
@@ -44,11 +69,11 @@ class ClipPool:
     number. With a `style` set (the players follow SMILE's style) the cells get clips of that style
     and the other style's clips are the first to go."""
 
-    def __init__(self, size: int, cell_size: tuple[int, int], hwdecode: int | None = None, max_usage_count: int = 10) -> None:
+    def __init__(self, size: int, cell_size: tuple[int, int], hwdecode: int | None = None, recent: int = 0) -> None:
         self.size: int = size
+        self.recent: int = recent           # the newest clips that are always on the wall
         self.cell_size: tuple[int, int] = cell_size
         self.hwdecode: int | None = hwdecode
-        self.max_usage_count: int = max_usage_count
         self.style: str | None = None       # None: any style
 
         self._clips: dict[str, Clip] = {}
@@ -103,19 +128,38 @@ class ClipPool:
             return self._outstanding == 0
 
     def use(self, clip: Clip) -> None:
+        """A cell starts on this clip (the player's hand-out at startup)."""
         with self._lock:
-            clip.usage_count = min(clip.usage_count + 1, self.max_usage_count)
+            self._take(clip)
 
-    def get_clip(self) -> Clip | None:
-        """A random clip (of the current style), favouring the least played ones; None while the pool is empty."""
+    def release(self, clip: Clip) -> None:
+        """A cell stopped playing this clip without taking a next one."""
         with self._lock:
-            clips: list[Clip] = self._candidates()
-            if not clips:
-                return None
-            weights: list[float] = [1.0 / (clip.usage_count + 1) for clip in clips]
-            clip: Clip = random.choices(clips, weights=weights, k=1)[0]
-            clip.usage_count = min(clip.usage_count + 1, self.max_usage_count)
+            clip.active -= 1
+
+    def get_clip(self, previous: Clip | None = None) -> Clip | None:
+        """The next clip for a cell that just played `previous` (see `choose`); None while the pool
+        is empty. Taking the next and giving up the previous is one step, so two cells that finish
+        together never both take the same free clip."""
+        with self._lock:
+            clip: Clip | None = choose(self._candidates(), previous, self.recent)
+            if previous is not None:
+                previous.active -= 1
+            if clip is not None:
+                self._take(clip)
             return clip
+
+    @staticmethod
+    def _take(clip: Clip) -> None:
+        clip.plays += 1
+        clip.active += 1
+        clip.fresh = False
+
+    def spread(self) -> tuple[int, int]:
+        """How the clips are spread over the cells now: (clips on at least one cell, most cells on one clip)."""
+        with self._lock:
+            actives: list[int] = [clip.active for clip in self._clips.values()]
+        return sum(1 for a in actives if a > 0), max(actives, default=0)
 
     def __len__(self) -> int:
         with self._lock:
@@ -158,6 +202,9 @@ class ClipPool:
 
     def _insert(self, clip: Clip) -> None:
         with self._lock:
+            # level with the least played, so it is not shown more than the others once it has been shown
+            clip.plays = min((c.plays for c in self._clips.values() if not c.fresh), default=0)
+            clip.fresh = True
             self._clips[clip.id] = clip
             while len(self._clips) > self.size:
                 del self._clips[evict_id(self._clips, self.style)]     # a loader mid-clip keeps its own reference

@@ -111,6 +111,10 @@ of cells, `--pool` the clips kept, `--fps` the playback speed (default 20, 0 = t
 The players show one style (`--no-follow_style`: the newest clips of both together): a clip arriving in the other style's folder is the
 switch (`FolderScanner`), the pool loads a random selection of that style's clips from disk and each
 cell changes over at the end of its play.
+A cell that finishes first takes one of the `--recent` newest clips (default 3) that is on no cell, so
+the latest visitors are always on the wall; else a clip that is on the fewest cells, of those the least played, at random
+among equals and never the one it just played (`ClipPool.choose`), so the pool (`--pool`, default 30)
+is spread evenly over the wall and a new visitor's clip is the next one taken.
 The cells start one by one, each in a random place on the next clip that is loaded (going round the
 loaded clips again when there are fewer than cells). `scripts/start_players.bat` (re)starts both players alone,
 each fullscreen on its own monitor (a player whose monitor is not connected takes a window on the
