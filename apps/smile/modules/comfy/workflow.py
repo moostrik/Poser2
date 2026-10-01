@@ -16,7 +16,7 @@ from typing import Callable
 
 import pytweening as easing
 
-from modules.comfy.settings import PipelineSettings, Prefer
+from modules.comfy.settings import PipelineSettings, Prefer, StyleSettings
 
 MAX_SEED: int = 2 ** 32 - 1     # the smallest maximum of the seeded nodes (QwenVL: 1 .. 4294967295)
 FIXED_SEED: int = 1             # with portrait.fixed_seed: the description and the grin too, or the runs still differ
@@ -152,22 +152,23 @@ class Workflow():
         """The step of the generation a node is, or None for the nodes in between."""
         return self._steps.get(node_id) if node_id is not None else None
 
-    def build(self, image_name: str, style: str, negative: str, s: PipelineSettings) -> dict:
+    def build(self, image_name: str, style: StyleSettings, s: PipelineSettings) -> dict:
+        """The workflow of one visitor, in one of the styles of s (style_a, style_b)."""
         workflow: dict = copy.deepcopy(self._template)
         workflow[self.load_image]['inputs']['image'] = image_name
 
         describe: dict = workflow[self.describe]['inputs']
-        describe['custom_prompt'] = s.describe.instruction
+        describe['custom_prompt'] = style.instruction
         describe['max_tokens'] = s.describe.max_tokens
         describe['repetition_penalty'] = s.describe.repetition_penalty
 
         p = s.portrait
-        workflow[self.style]['inputs']['text'] = style
+        workflow[self.style]['inputs']['text'] = style.prompt
         # a space between the prefix and the description, nothing in front without a prefix
-        prefix: str = s.describe.prefix.strip()
+        prefix: str = style.prefix.strip()
         workflow[self.prefix]['inputs'].update(string_a=prefix, delimiter=' ' if prefix else '')
-        workflow[self.suffix]['inputs']['string_b'] = s.describe.suffix
-        workflow[self.negative]['inputs']['text'] = negative
+        workflow[self.suffix]['inputs']['string_b'] = style.suffix
+        workflow[self.negative]['inputs']['text'] = style.negative
         sampler: dict = workflow[self.sampler]
         sampler['inputs'].update(steps=p.steps, cfg=p.cfg, sampler_name=p.sampler, scheduler=p.scheduler)
         if p.full_preview:
@@ -185,19 +186,19 @@ class Workflow():
         self._fill_grin(workflow, s)
         return workflow
 
-    def build_warmup(self, image_name: str, style: str, negative: str, s: PipelineSettings) -> dict:
+    def build_warmup(self, image_name: str, style: StyleSettings, s: PipelineSettings) -> dict:
         """The same run at its shortest: one sampler step and one grin frame. The models load at the
         first step and the first frame; the rest of a full run would only cost time."""
-        workflow: dict = self.build(image_name, style, negative, s)
+        workflow: dict = self.build(image_name, style, s)
         workflow[self.sampler]['inputs']['steps'] = 1
         workflow[self.grin]['inputs']['still'] = True
         workflow[self.last_frame]['inputs']['batch_index'] = 0
         return workflow
 
-    def build_describe(self, image_name: str, style: str, negative: str, s: PipelineSettings) -> dict:
+    def build_describe(self, image_name: str, style: StyleSettings, s: PipelineSettings) -> dict:
         """The same run without the portrait and the grin (connection.skip_generation): only the description
         and the capture's depth are left as outputs. The other nodes stay, so ComfyUI keeps their cache."""
-        workflow: dict = self.build(image_name, style, negative, s)
+        workflow: dict = self.build(image_name, style, s)
         for node_id in (self.portrait, self.portrait_preview, self.all_frames, self.last_depth):
             del workflow[node_id]
         return workflow

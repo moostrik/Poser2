@@ -26,7 +26,7 @@ OUTPUT_CLASSES: tuple[str, ...] = ('PreviewImage', 'PreviewAny', 'SaveImage')
 def make_test_workflow(workflow_path: str, settings: Settings, style: str = 'a') -> dict:
     wf: Workflow = Workflow(workflow_path)
     p = settings.pipeline
-    workflow: dict = wf.build(CAPTURE, getattr(p.style, f'style_{style}'), getattr(p.style, f'negative_{style}'), p)
+    workflow: dict = wf.build(CAPTURE, getattr(p, f'style_{style}'), p)
     with open(workflow_path, encoding='utf-8') as f:
         source: dict = json.load(f)     # for the nodes Workflow strips: they keep the file's settings
 

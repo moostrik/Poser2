@@ -23,7 +23,9 @@ class TestWorkflow(unittest.TestCase):
         self.wf = Workflow(WORKFLOW)
         self.settings = PipelineSettings()
         self.settings.grin.frames = 120
-        self.built = self.wf.build('smile_capture.png', 'a style', 'a negative', self.settings)
+        self.settings.style_a.prompt = 'a style'
+        self.settings.style_a.negative = 'a negative'
+        self.built = self.wf.build('smile_capture.png', self.settings.style_a, self.settings)
 
     def test_all_links_point_to_existing_nodes(self):
         for node_id, name, source in links(self.built):
@@ -53,11 +55,13 @@ class TestWorkflow(unittest.TestCase):
 
     def test_settings_fill_the_nodes(self):
         s = PipelineSettings()
-        s.describe.instruction = 'describe'
         s.describe.max_tokens = 200
         s.describe.repetition_penalty = 1.1
-        s.describe.prefix = 'prefix'
-        s.describe.suffix = ' suffix'
+        s.style_b.instruction = 'describe'
+        s.style_b.prefix = 'prefix'
+        s.style_b.suffix = ' suffix'
+        s.style_b.prompt = 'style'
+        s.style_b.negative = 'negative'
         s.portrait.steps = 8
         s.portrait.cfg = 2.0
         s.portrait.sampler = 'euler'
@@ -73,9 +77,12 @@ class TestWorkflow(unittest.TestCase):
         s.grin.smile_min = s.grin.smile_max = 3.0
         s.grin.yaw_min = s.grin.yaw_max = 10.0
         s.grin.stitching = False
-        b = self.wf.build('x.png', 'style', 'negative', s)
+        b = self.wf.build('x.png', s.style_b, s)
         describe = b[self.wf.describe]['inputs']
         self.assertEqual((describe['custom_prompt'], describe['max_tokens']), ('describe', 200))
+        # the other style has its own instruction
+        self.assertEqual(self.wf.build('x.png', s.style_a, s)[self.wf.describe]['inputs']['custom_prompt'], s.style_a.instruction)
+        self.assertNotEqual(s.style_a.instruction, 'describe')
         self.assertEqual((b[self.wf.describe]['class_type'], describe['repetition_penalty']), ('AILab_QwenVL_Advanced', 1.1))
         # prefix + space + description, then + suffix
         prefix = b[self.wf.prefix]['inputs']
@@ -83,7 +90,7 @@ class TestWorkflow(unittest.TestCase):
         self.assertEqual(self.built[self.wf.prefix]['inputs']['delimiter'], '')     # no prefix: no leading space
         suffix = b[self.wf.suffix]['inputs']
         self.assertEqual((suffix['string_a'], suffix['string_b']), ([self.wf.prefix, 0], ' suffix'))
-        self.assertEqual(b[self.wf.negative]['inputs']['text'], 'negative')
+        self.assertEqual((b[self.wf.style]['inputs']['text'], b[self.wf.negative]['inputs']['text']), ('style', 'negative'))
         sampler = b[self.wf.sampler]['inputs']
         self.assertEqual((sampler['steps'], sampler['cfg'], sampler['sampler_name'], sampler['scheduler']), (8, 2.0, 'euler', 'karras'))
         instantid = b[self.wf.instantid]['inputs']
@@ -101,7 +108,7 @@ class TestWorkflow(unittest.TestCase):
         g = self.settings.grin
         g.aaa_min, g.aaa_max = -10.0, -20.0      # max may be the lower number
         g.yaw_min, g.yaw_max = -15.0, 15.0
-        peaks = [self.wf.build('x.png', 'style', 'negative', self.settings)[self.wf.grin]['inputs'] for _ in range(20)]
+        peaks = [self.wf.build('x.png', self.settings.style_a, self.settings)[self.wf.grin]['inputs'] for _ in range(20)]
         for grin in peaks:
             self.assertTrue(-20.0 <= grin['aaa'] <= -10.0)
             self.assertTrue(-15.0 <= grin['rotate_yaw_min'] <= 15.0)
@@ -110,15 +117,15 @@ class TestWorkflow(unittest.TestCase):
             self.assertFalse(grin['still'])
         self.assertGreater(len({grin['aaa'] for grin in peaks}), 1)
         self.settings.portrait.fixed_seed = True
-        self.assertEqual(self.wf.build('x.png', 'style', 'negative', self.settings),
-                         self.wf.build('x.png', 'style', 'negative', self.settings))
+        self.assertEqual(self.wf.build('x.png', self.settings.style_a, self.settings),
+                         self.wf.build('x.png', self.settings.style_a, self.settings))
 
     def test_prefer_even_is_the_plain_draw(self):
         g = self.settings.grin
         g.aaa_min, g.aaa_max = -10.0, -20.0
         g.yaw_min, g.yaw_max = -15.0, 15.0
         self.settings.portrait.fixed_seed = True
-        grin = self.wf.build('x.png', 'style', 'negative', self.settings)[self.wf.grin]['inputs']
+        grin = self.wf.build('x.png', self.settings.style_a, self.settings)[self.wf.grin]['inputs']
         # one draw per value, in the order of the values
         rng = random.Random(FIXED_SEED)
         draws = dict(zip(GRIN_TARGETS + GRIN_ROTATIONS, (rng.random() for _ in range(12))))
@@ -137,7 +144,7 @@ class TestWorkflow(unittest.TestCase):
             runs = 400
             near_min = near_max = near_end = 0
             for _ in range(runs):
-                grin = self.wf.build('x.png', 'style', 'negative', self.settings)[self.wf.grin]['inputs']
+                grin = self.wf.build('x.png', self.settings.style_a, self.settings)[self.wf.grin]['inputs']
                 self.assertTrue(-20.0 <= grin['aaa'] <= -10.0)
                 self.assertTrue(-15.0 <= grin['rotate_yaw_min'] <= 15.0)
                 self.assertEqual(grin['smile'], 2.0)     # min == max: exactly that value, whatever the curve
@@ -164,7 +171,7 @@ class TestWorkflow(unittest.TestCase):
         # position 0 is the min field and 1 the max field, also when max is the lower number
         for position, aaa, yaw in ((0.0, -10.0, -15.0), (0.5, -15.0, 0.0), (1.0, -20.0, 15.0)):
             g.still_position = position
-            built = self.wf.build('x.png', 'style', 'negative', self.settings)
+            built = self.wf.build('x.png', self.settings.style_a, self.settings)
             grin = built[self.wf.grin]['inputs']
             self.assertEqual((grin['aaa'], grin['rotate_yaw_min'], grin['rotate_yaw_max']), (aaa, yaw, yaw))
             self.assertEqual((grin['still'], grin['seed']), (True, FIXED_SEED))
@@ -177,7 +184,7 @@ class TestWorkflow(unittest.TestCase):
         self.assertEqual(animation[self.wf.last_frame]['inputs']['batch_index'], 119)
 
     def test_seeds_random_and_in_range(self):
-        other = self.wf.build('smile_capture.png', 'a style', 'a negative', self.settings)
+        other = self.wf.build('smile_capture.png', self.settings.style_a, self.settings)
         for node_id in (self.wf.sampler, self.wf.describe, self.wf.grin):
             seed = self.built[node_id]['inputs']['seed']
             self.assertTrue(1 <= seed <= MAX_SEED)
@@ -185,8 +192,8 @@ class TestWorkflow(unittest.TestCase):
 
     def test_fixed_seed(self):
         self.settings.portrait.fixed_seed = True
-        first = self.wf.build('smile_capture.png', 'a style', 'a negative', self.settings)
-        second = self.wf.build('smile_capture.png', 'a style', 'a negative', self.settings)
+        first = self.wf.build('smile_capture.png', self.settings.style_a, self.settings)
+        second = self.wf.build('smile_capture.png', self.settings.style_a, self.settings)
         for node_id in (self.wf.sampler, self.wf.describe, self.wf.grin):
             self.assertEqual(first[node_id]['inputs']['seed'], FIXED_SEED)
             self.assertEqual(second[node_id]['inputs']['seed'], FIXED_SEED)
@@ -208,7 +215,7 @@ class TestWorkflow(unittest.TestCase):
 
     def test_replay_fixed_seed_without_changes_is_identical(self):
         self.settings.portrait.fixed_seed = True
-        first = self.wf.build('smile_capture.png', 'a style', 'a negative', self.settings)
+        first = self.wf.build('smile_capture.png', self.settings.style_a, self.settings)
         self.assertEqual(self.wf.build_replay(first, self.settings), first)
         self.settings.grin.smile_max = 9.0
         self.assertNotEqual(self.wf.build_replay(first, self.settings), first)
@@ -219,7 +226,7 @@ class TestWorkflow(unittest.TestCase):
         decode = next(node for node in self.built.values() if node['class_type'] == 'VAEDecode')
         self.assertEqual(sampler['inputs']['vae'], decode['inputs']['vae'])
         self.settings.portrait.full_preview = False
-        plain = self.wf.build('x.png', 'style', 'negative', self.settings)[self.wf.sampler]
+        plain = self.wf.build('x.png', self.settings.style_a, self.settings)[self.wf.sampler]
         self.assertEqual(plain['class_type'], 'KSampler')
         self.assertNotIn('vae', plain['inputs'])
 
@@ -261,8 +268,8 @@ class TestWorkflow(unittest.TestCase):
 
     def test_warmup_is_the_same_run_at_its_shortest(self):
         self.settings.portrait.fixed_seed = True
-        full = self.wf.build('x.png', 'style', 'negative', self.settings)
-        warmup = self.wf.build_warmup('x.png', 'style', 'negative', self.settings)
+        full = self.wf.build('x.png', self.settings.style_a, self.settings)
+        warmup = self.wf.build_warmup('x.png', self.settings.style_a, self.settings)
         self.assertEqual(warmup[self.wf.sampler]['inputs']['steps'], 1)
         self.assertEqual(self.wf.frame_count(warmup), 1)
         self.assertEqual(warmup[self.wf.last_frame]['inputs']['batch_index'], 0)
@@ -274,8 +281,8 @@ class TestWorkflow(unittest.TestCase):
 
     def test_describe_only_runs_the_description_and_the_capture_depth(self):
         self.settings.portrait.fixed_seed = True
-        full = self.wf.build('x.png', 'style', 'negative', self.settings)
-        short = self.wf.build_describe('x.png', 'style', 'negative', self.settings)
+        full = self.wf.build('x.png', self.settings.style_a, self.settings)
+        short = self.wf.build_describe('x.png', self.settings.style_a, self.settings)
         removed = {self.wf.portrait, self.wf.portrait_preview, self.wf.all_frames, self.wf.last_depth}
         self.assertEqual(set(full) - set(short), removed)
         # nothing else differs from a visitor's run, so ComfyUI's cache holds
@@ -296,7 +303,7 @@ class TestWorkflow(unittest.TestCase):
         self.assertFalse({self.wf.sampler, self.wf.grin, self.wf.last_depth_run} & needed)
 
     def test_template_not_changed_by_build(self):
-        again = self.wf.build('other.png', 'other', 'other negative', self.settings)
+        again = self.wf.build('other.png', self.settings.style_b, self.settings)
         self.assertEqual(self.built[self.wf.load_image]['inputs']['image'], 'smile_capture.png')
         self.assertEqual(again[self.wf.load_image]['inputs']['image'], 'other.png')
 
@@ -312,18 +319,16 @@ class TestWorkflow(unittest.TestCase):
 class TestStyles(unittest.TestCase):
     def test_cycle(self):
         settings = PipelineSettings()
-        settings.style.repeat = 2
-        settings.style.negative_a = 'negative a'
-        settings.style.negative_b = 'negative b'
-        styles = Styles(settings.style)
+        settings.style_repeat = 2
+        styles = Styles(settings)
         ids = [styles.advance() for _ in range(3)]
         self.assertEqual(ids, ['0000', '0000', '0001'])
-        self.assertEqual(settings.style.current, 'B')
-        self.assertEqual((styles.current_text(), styles.current_negative()), (settings.style.style_b, 'negative b'))
+        self.assertEqual(settings.current_style, 'B')
+        self.assertIs(styles.current(), settings.style_b)
         ids = [styles.advance() for _ in range(2)]
         self.assertEqual(ids, ['0001', '0000'])
-        self.assertEqual(settings.style.current, 'A')
-        self.assertEqual((styles.current_text(), styles.current_negative()), (settings.style.style_a, 'negative a'))
+        self.assertEqual(settings.current_style, 'A')
+        self.assertIs(styles.current(), settings.style_a)
 
 
 if __name__ == '__main__':

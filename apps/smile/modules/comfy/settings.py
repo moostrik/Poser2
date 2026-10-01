@@ -23,26 +23,22 @@ class ConnectionSettings(BaseSettings):
 
 
 class DescribeSettings(BaseSettings):
-    instruction:  Field[str] = Field("Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no mention of color, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips",
-                                     widget=Widget.textarea, description="What QwenVL is asked about the face")
+    """What both styles share of the description; its text is per style (StyleSettings)."""
     max_tokens:   Field[int] = Field(120, min=64, max=512, step=8, description="Maximum length of the description (tokens)")
     repetition_penalty: Field[float] = Field(1.0, min=1.0, max=1.5, step=0.05, description="Penalty on repeated words (1 = none; higher can drop the commas)")
-    prefix:       Field[str] = Field("", description="Text before the description")
-    suffix:       Field[str] = Field(" (super model: 1.5), (serious expression: 2.2)", description="Text after the description")
     description:  Field[str] = Field("", access=Field.READ, widget=Widget.textarea, description="Last prompt: prefix + description + suffix")
 
 
 class StyleSettings(BaseSettings):
-    repeat:     Field[int] = Field(26, min=1, max=100, step=1, description="Visitors per style before switching to the next")
-    current:    Field[str] = Field("A", access=Field.READ, description="Style of the current visitor: A or B")
-    style_a:    Field[str] = Field("BREAK nude portrait by (David LaChapelle: 1.4), bold artificial hues, high contrast, harsh dramatic light, 2000s BREAK",
-                                   widget=Widget.textarea, description="Style of movement 0000 (music: Smooth)")
-    negative_a: Field[str] = Field("(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
-                                   widget=Widget.textarea, description="Negative prompt of style A")
-    style_b:    Field[str] = Field("portrait by (Mert and Marcus: 2.0), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 2.0)",
-                                   widget=Widget.textarea, description="Style of movement 0001 (music: Party)")
-    negative_b: Field[str] = Field("(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
-                                   widget=Widget.textarea, description="Negative prompt of style B")
+    """One style: how the visitor is described and how the portrait is painted."""
+    instruction: Field[str] = Field("Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no mention of color, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips",
+                                    widget=Widget.textarea, description="What QwenVL is asked about the face")
+    prefix:      Field[str] = Field("", newline=True, description="Text before the description")
+    suffix:      Field[str] = Field(" (super model: 1.5), (serious expression: 2.2)", description="Text after the description")
+    prompt:      Field[str] = Field("BREAK nude portrait by (David LaChapelle: 1.4), bold artificial hues, high contrast, harsh dramatic light, 2000s BREAK",
+                                    widget=Widget.textarea, newline=True, description="Style prompt")
+    negative:    Field[str] = Field("(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
+                                    widget=Widget.textarea, description="Negative prompt")
 
 
 class PortraitSettings(BaseSettings):
@@ -138,9 +134,13 @@ class GrinSettings(BaseSettings):
 
 
 class PipelineSettings(BaseSettings):
+    style_repeat:  Field[int] = Field(26, min=1, max=100, step=1, description="Visitors per style before switching to the next")
+    current_style: Field[str] = Field("A", access=Field.READ, description="Style of the current visitor: A (music: Smooth) or B (music: Party)")
+
     connection: Group[ConnectionSettings] = Group(ConnectionSettings)
     describe:  Group[DescribeSettings]   = Group(DescribeSettings)
-    style:      Group[StyleSettings]      = Group(StyleSettings)
+    style_a:    Group[StyleSettings]      = Group(StyleSettings)    # movement 0000
+    style_b:    Group[StyleSettings]      = Group(StyleSettings)    # movement 0001
     portrait:   Group[PortraitSettings]   = Group(PortraitSettings)
     lora:       Group[LoraSettings]       = Group(LoraSettings)
     grin:       Group[GrinSettings]       = Group(GrinSettings)

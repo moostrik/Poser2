@@ -22,7 +22,7 @@ class TestTestflow(unittest.TestCase):
         self.settings.sequence.grin_fps = 13.0
         self.wf = Workflow(WORKFLOW)
         p = self.settings.pipeline
-        self.app = self.wf.build(CAPTURE, p.style.style_b, p.style.negative_b, p)
+        self.app = self.wf.build(CAPTURE, p.style_b, p)
         self.test = make_test_workflow(WORKFLOW, self.settings, 'b')
 
     def test_all_links_point_to_existing_nodes(self):
@@ -66,7 +66,7 @@ class TestTestflow(unittest.TestCase):
         overlay = next(node for node in self.test.values() if node['class_type'] == 'ImageBlend')
         self.assertEqual(overlay['inputs']['image2'], self.test[self.wf.portrait]['inputs']['images'])
         self.assertEqual(self.test[PROMPT]['inputs']['source'], [self.wf.suffix, 0])
-        self.assertEqual(self.test[self.wf.style]['inputs']['text'], self.settings.pipeline.style.style_b)
+        self.assertEqual(self.test[self.wf.style]['inputs']['text'], self.settings.pipeline.style_b.prompt)
 
 
 if __name__ == '__main__':

@@ -45,7 +45,7 @@ class Generator(Thread):
         self.settings: PipelineSettings = settings
         self.player: GrinPlayer = player
         self.workflow: Workflow = Workflow(settings.connection.workflow)
-        self.styles: Styles = Styles(settings.style)
+        self.styles: Styles = Styles(settings)
         self.client: ComfyClient = ComfyClient(settings.connection.host, settings.connection.port)
 
         self._mutex: Lock = Lock()
@@ -234,7 +234,7 @@ class Generator(Thread):
         # skip_generation (debug): only the description and the capture's depth; the warm-up stays the full run
         skip: bool = s.connection.skip_generation and not self._silent
         build = wf.build_warmup if self._silent else wf.build_describe if skip else wf.build
-        workflow: dict = build(name, self.styles.current_text(), self.styles.current_negative(), s)
+        workflow: dict = build(name, self.styles.current(), s)
         self._capture_depth = None
         last_depth, _ = self._run_pass(workflow, deadline, play=not skip)
         if skip:

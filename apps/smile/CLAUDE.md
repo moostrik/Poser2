@@ -50,7 +50,10 @@ ComfyUI's own Depth Anything 3 nodes. `modules/comfy/`: `Generator` sends each c
 websocket events into `GenMessage`s for the render (CAM_DEPTH → DIFFUSION → DIFF_LOOP → IDLE);
 `workflow.py` adapts the API export in `data/comfy/` (face crop removed — SMILE crops and rotates
 the face itself — depth outputs added) and fills in every value from `PipelineSettings` per run: the
-panel is the source of truth, the workflow only provides the structure. Keep one workflow per
+panel is the source of truth, the workflow only provides the structure. Each visitor gets one of two
+styles (`style_a`, `style_b`, cycled by `styles.py` every `style_repeat` visitors; the style id is the
+movement id of the music): a style holds the describe instruction, the prefix and suffix around the
+description, the style prompt and the negative. Keep one workflow per
 visitor: a second workflow in between drops the first from ComfyUI's cache and reloads the models.
 After every connect, a warm-up run on `data/comfy/warmup.jpg` (`build_warmup`: the same workflow
 with one sampler step and one grin frame) loads the models and proves the chain works (own limit
