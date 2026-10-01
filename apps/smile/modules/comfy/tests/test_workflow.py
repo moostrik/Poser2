@@ -1,6 +1,5 @@
 """Tests for adapting the exported ComfyUI workflow (no ComfyUI server needed)."""
 
-import copy
 import os
 import random
 import unittest
@@ -267,30 +266,11 @@ class TestWorkflow(unittest.TestCase):
         self.assertEqual(warmup[self.wf.sampler]['inputs']['steps'], 1)
         self.assertEqual(self.wf.frame_count(warmup), 1)
         self.assertEqual(warmup[self.wf.last_frame]['inputs']['batch_index'], 0)
-        self.assertTrue(self.wf.same_pipeline(warmup))      # a later start sees ComfyUI as warm
         # nothing else differs from a visitor's run
         warmup[self.wf.sampler]['inputs']['steps'] = full[self.wf.sampler]['inputs']['steps']
         warmup[self.wf.grin]['inputs']['still'] = False
         warmup[self.wf.last_frame]['inputs']['batch_index'] = full[self.wf.last_frame]['inputs']['batch_index']
         self.assertEqual(warmup, full)
-
-    def test_same_pipeline(self):
-        self.assertTrue(self.wf.same_pipeline(self.built))
-        self.settings.portrait.full_preview = False
-        self.settings.portrait.steps = 12
-        self.assertTrue(self.wf.same_pipeline(self.wf.build('other.png', 'other', 'other', self.settings)))
-        self.assertFalse(self.wf.same_pipeline(None))
-        self.assertFalse(self.wf.same_pipeline({}))
-        missing = dict(self.built)
-        missing.pop(self.wf.last_depth)
-        self.assertFalse(self.wf.same_pipeline(missing))
-        checkpoint = next(node_id for node_id, node in self.built.items() if node['class_type'] == 'CheckpointLoaderSimple')
-        other = copy.deepcopy(self.built)
-        other[checkpoint]['inputs']['ckpt_name'] = 'another.safetensors'
-        self.assertFalse(self.wf.same_pipeline(other))
-        rewired = copy.deepcopy(self.built)
-        rewired[self.wf.grin]['inputs']['image'] = [self.wf.load_image, 0]
-        self.assertFalse(self.wf.same_pipeline(rewired))
 
     def test_template_not_changed_by_build(self):
         again = self.wf.build('other.png', 'other', 'other negative', self.settings)

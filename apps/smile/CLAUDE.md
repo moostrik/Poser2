@@ -40,9 +40,9 @@ websocket events into `GenMessage`s for the render (CAM_DEPTH → DIFFUSION → 
 the face itself — depth outputs added) and fills in every value from `PipelineSettings` per run: the
 panel is the source of truth, the workflow only provides the structure. Keep one workflow per
 visitor: a second workflow in between drops the first from ComfyUI's cache and reloads the models.
-After connecting, a warm-up run on `data/comfy/warmup.jpg` loads the models (own limit
-`WARMUP_TIMEOUT`; a visitor has `connection.job_timeout`); it is skipped when ComfyUI's last run was
-this pipeline (`same_pipeline`). Until `Generator.ready` no sequence starts (`Sequencer.blocked`,
+After every connect, a warm-up run on `data/comfy/warmup.jpg` (`build_warmup`: the same workflow
+with one sampler step and one grin frame) loads the models and proves the chain works (own limit
+`WARMUP_TIMEOUT`; a visitor has `connection.job_timeout`). Until `Generator.ready` no sequence starts (`Sequencer.blocked`,
 set in `Forgettable`) and the render shows the generator's status as a line (`StatusLayer`).
 For tests in the ComfyUI page, `python -m modules.comfy.testflow` writes `data/comfy/smile_test.json`
 (drag it into the page): what the app sends with a preset's values, plus an input switch (the

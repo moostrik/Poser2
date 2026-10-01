@@ -140,31 +140,21 @@ class Generator(Thread):
             return image
 
     def _warm_up(self) -> None:
-        # the first run loads all models (~80 s); do it before the first visitor if an image is there.
+        # A short run after every connect, if an image is there: it loads the models ComfyUI doesn't have
+        # loaded (all of them when it is cold) and shows that the whole chain works before a visitor comes.
         # Until it is done the generator is not ready, and no sequence starts.
         import cv2
         image: np.ndarray | None = cv2.imread(WARMUP_IMAGE) if os.path.exists(WARMUP_IMAGE) else None
-        if image is None:
-            pass
-        elif self._is_warm():
-            logger.info('ComfyUI is warm, no warm-up')
-        else:
+        if image is not None:
             self.settings.connection.status = 'warming up'
             self._silent = True
             try:
                 self._generate(image, WARMUP_TIMEOUT)
             finally:
                 self._silent = False
+            logger.info('Warm-up took %.1f s', self.settings.connection.last_duration)
         self._warmed_up = True
         self.settings.connection.status = 'ready'
-
-    def _is_warm(self) -> bool:
-        """ComfyUI's last run was this pipeline: its models are still loaded."""
-        try:
-            return self.workflow.same_pipeline(self.client.last_prompt())
-        except Exception:
-            logger.warning('Could not read the last run from ComfyUI', exc_info=True)
-            return False
 
     # GENERATION
     def _emit(self, message: GenMessage) -> None:

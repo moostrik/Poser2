@@ -24,11 +24,6 @@ FIXED_SEED: int = 1             # with portrait.fixed_seed: the description and 
 # LoraSettings field: title of its node
 LORAS: dict[str, str] = {'clothing': 'LoRA: clothing', 'looking': 'LoRA: looking at viewer', 'dark': 'LoRA: dark'}
 
-# inputs that name a model: by these names, or a file name with one of these extensions
-MODEL_INPUTS: tuple[str, ...] = ('model_name', 'quantization', 'weight_dtype')
-MODEL_EXTENSIONS: tuple[str, ...] = ('.safetensors', '.ckpt', '.pt', '.pth', '.bin', '.onnx')
-_SAME_CLASS: dict[str, str] = {'KSamplerFullPreview': 'KSampler'}   # build() swaps the sampler in
-
 GRIN_TARGETS: tuple[str, ...] = ('smile', 'aaa', 'eee', 'woo', 'eyebrow', 'blink', 'wink', 'pupil_x', 'pupil_y')
 GRIN_ROTATIONS: tuple[str, ...] = ('pitch', 'yaw', 'roll')
 
@@ -235,21 +230,6 @@ class Workflow():
         """Grin frames this workflow makes: one for a still."""
         grin: dict = workflow[self.grin]['inputs']
         return 1 if grin['still'] else grin['frames']
-
-    def same_pipeline(self, prompt: dict | None) -> bool:
-        """True when *prompt* (a workflow ComfyUI ran) is this pipeline: the same nodes, links and
-        models, so ComfyUI still has everything loaded. The values filled in per run are not compared."""
-        if not isinstance(prompt, dict) or prompt.keys() != self._template.keys():
-            return False
-        for node_id, node in self._template.items():
-            other: dict = prompt[node_id]
-            if _SAME_CLASS.get(other.get('class_type'), other.get('class_type')) != node['class_type']:
-                return False
-            for name, value in node['inputs'].items():
-                model: bool = name in MODEL_INPUTS or (isinstance(value, str) and value.lower().endswith(MODEL_EXTENSIONS))
-                if (model or isinstance(value, list)) and other.get('inputs', {}).get(name) != value:
-                    return False
-        return True
 
     @staticmethod
     def _seed(s: PipelineSettings) -> int:
