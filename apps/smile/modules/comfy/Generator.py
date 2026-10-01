@@ -6,8 +6,11 @@ GrinPlayer gets them too and the render shows them from there on its own clock) 
 frame has been shown: depth of the last frame (IDLE, the bloom mask) -> IDLE.
 With grin.loop or grin.still on, the grin (or its peak pose as one frame) is made again (DIFF_LOOP)
 with the panel's current grin values until both are off; the portrait comes from ComfyUI's cache.
-With connection.skip_generation (debug) only the description and the capture's depth are made:
-CAM_DEPTH -> IDLE, with the capture's depth as the bloom mask.
+With skip_generation (debug) only the description and the capture's depth are made:
+CAM_DEPTH -> IDLE; with skip_animation the portrait too: CAM_DEPTH -> DIFFUSION -> IDLE.
+Both with the capture's depth as the bloom mask.
+A workflow that ComfyUI ran without sending one event is NoEvents: the generator is not ready until
+a warm-up gets its events again, and a warm-up that fails is tried again instead of counting as ready.
 Any failure or timeout ends with IDLE so the sequence can't hang; a reset (interrupt) ends
 silently because the sequence has already moved on.
 """
@@ -32,11 +35,20 @@ logger = logging.getLogger(__name__)
 
 WARMUP_IMAGE: str = 'data/comfy/warmup.jpg'
 WARMUP_TIMEOUT: float = 300.0   # s; the warm-up loads every model, a visitor has connection.job_timeout
+WARMUP_RETRY: float = 5.0       # s before a failed warm-up is tried again
 RECONNECT_INTERVAL: float = 2.0
+SILENT_AFTER: float = 5.0       # s without any event of a queued workflow before asking whether it still runs
+SILENT_RECHECK: float = 2.0
+NO_EVENTS: str = 'no events from ComfyUI: close or reload its browser tab'
 
 
 class Interrupted(Exception):
     pass
+
+
+class NoEvents(RuntimeError):
+    """ComfyUI ran the workflow without sending us one event. It sends the events of all clients from
+    one queue: a client that stopped reading (a ComfyUI browser tab put to sleep) blocks it for us too."""
 
 
 class Generator(Thread):
@@ -153,9 +165,14 @@ class Generator(Thread):
             self.settings.connection.status = 'warming up'
             self._silent = True
             try:
-                self._generate(image, WARMUP_TIMEOUT)
+                failure: str | None = self._generate(image, WARMUP_TIMEOUT)
             finally:
                 self._silent = False
+            if failure is not None:
+                # not ready: a visitor would fail the same way. The render shows why; try again shortly
+                self.settings.connection.status = f'warm-up failed: {failure}'
+                self._stop_event.wait(WARMUP_RETRY)
+                return
             logger.info('Warm-up took %.1f s', self.settings.connection.last_duration)
         self._warmed_up = True
         self.settings.connection.status = 'ready'
@@ -169,8 +186,10 @@ class Generator(Thread):
         for c in callbacks:
             c(message)
 
-    def _generate(self, image: np.ndarray, timeout: float) -> None:
+    def _generate(self, image: np.ndarray, timeout: float) -> str | None:
+        """Run one job; returns why it failed, or None when it was made (or interrupted)."""
         start: float = time.time()
+        failure: str | None = None
         self._interrupt_event.clear()
         self.is_diffusing = True
         try:
@@ -179,12 +198,19 @@ class Generator(Thread):
             logger.info('Generation interrupted')
         except TimeoutError as e:       # our own job_timeout (an OSError, but not a lost connection)
             logger.warning('Generation timed out: %s', e)
+            failure = 'timed out'
             self._emit(GenMessage(GenState.IDLE))
         except (websocket.WebSocketException, RequestException, ConnectionError, OSError):
             self._emit(GenMessage(GenState.IDLE))
             raise
+        except NoEvents as e:
+            logger.warning('Generation failed: %s', e)
+            failure = str(e)
+            self._warmed_up = False     # not ready until a warm-up gets its events again
+            self._emit(GenMessage(GenState.IDLE))
         except Exception:
             logger.exception('Generation failed')
+            failure = 'failed (see the log)'
             self._emit(GenMessage(GenState.IDLE))
         finally:
             self.is_diffusing = False
@@ -192,6 +218,7 @@ class Generator(Thread):
             self.settings.connection.last_duration = round(time.time() - start, 1)
             if self.settings.connection.connected:
                 self.settings.connection.status = 'ready'
+        return failure
 
     def _check(self, deadline: float, last_event: str = '') -> None:
         if self._stop_event.is_set() or self._interrupt_event.is_set():
@@ -232,18 +259,20 @@ class Generator(Thread):
             raise RuntimeError('ComfyUI is still busy with an earlier job')
         self._step('generating')
         name: str = self.client.upload(image, 'smile_capture.png')
-        # skip_generation (debug): only the description and the capture's depth; the warm-up stays the full run
-        skip: bool = s.connection.skip_generation and not self._silent
-        build = wf.build_warmup if self._silent else wf.build_describe if skip else wf.build
+        # debug: skip_generation leaves out the portrait and with it the grin, skip_animation only the
+        # grin; the warm-up stays the full run
+        no_portrait: bool = s.skip_generation and not self._silent
+        no_grin: bool = no_portrait or (s.skip_animation and not self._silent)
+        build = wf.build_warmup if self._silent else wf.build_describe if no_portrait else wf.build_portrait if no_grin else wf.build
         self._style = self.styles.current()
         workflow: dict = build(name, self._style, s)
         self._capture_depth = None
-        last_depth, _ = self._run_pass(workflow, deadline, play=not skip)
-        if skip:
-            last_depth = self._capture_depth    # the capture stands as the result: its depth is the bloom's mask
+        last_depth, _ = self._run_pass(workflow, deadline, play=not no_grin)
+        if no_grin:
+            last_depth = self._capture_depth    # no last grin frame: the capture's depth is the bloom's mask
 
         # grin loop or still (testing): the grin again, with the values the panel has now; not for the warm-up
-        while (s.grin.loop or s.grin.still) and not self._silent and not skip:
+        while (s.grin.loop or s.grin.still) and not self._silent and not no_grin:
             s.connection.status = 'grin still' if s.grin.still else 'grin loop'
             replay: dict = wf.build_replay(workflow, s)
             if replay == workflow:
@@ -265,7 +294,7 @@ class Generator(Thread):
         """Queue the workflow and hand its grin to the player; returns, once the last frame has been shown,
         the depth of that frame and the frames made.
         A replay only makes the grin: ComfyUI reports the cached capture depth and portrait again.
-        Without *play* the workflow makes no grin (skip_generation) and no clip is opened."""
+        Without *play* the workflow makes no grin (skip_generation, skip_animation) and no clip is opened."""
         try:
             return self._receive_pass(workflow, deadline, replay, play)
         except BaseException:
@@ -287,6 +316,8 @@ class Generator(Thread):
         last_event: str = 'queued'      # for the timeout message: where ComfyUI went silent
         last_time: float = time.time()
         step: str = 'queued'            # the same for the panel: the step that is running
+        seen: bool = False              # an event of this workflow arrived
+        silence_check: float = last_time + SILENT_AFTER
 
         def show(text: str) -> None:
             nonlocal step
@@ -297,12 +328,15 @@ class Generator(Thread):
         while True:
             self._check(deadline, f", no event for {time.time() - last_time:.0f} s after '{last_event}' during '{step}'")
             event: ComfyEvent | None = self.client.receive(0.05)
-            if event is None:
+            if event is None or event.data.get('prompt_id') != main_id:
+                # ComfyUI reports a workflow as soon as it starts: silence while it is no longer
+                # in the queue means its events don't reach us
+                if not seen and time.time() >= silence_check:
+                    if not self.client.busy():
+                        raise NoEvents(NO_EVENTS)
+                    silence_check = time.time() + SILENT_RECHECK
                 continue
-            prompt_id: str | None = event.data.get('prompt_id')
-
-            if prompt_id != main_id:
-                continue
+            seen = True
             last_event = f"{event.type} {event.data.get('node_id') or event.data.get('node') or ''}".strip()
             last_time = time.time()
 

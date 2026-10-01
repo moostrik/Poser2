@@ -54,17 +54,24 @@ websocket events into `GenMessage`s for the render (CAM_DEPTH → DIFFUSION → 
 `workflow.py` adapts the API export in `data/comfy/` (face crop removed — SMILE crops and rotates
 the face itself — depth outputs added) and fills in every value from `PipelineSettings` per run: the
 panel is the source of truth, the workflow only provides the structure. Each visitor gets one of two
-styles (`style_a`, `style_b`, cycled by `styles.py` every `style_repeat` visitors; the style id is the
-movement id of the music): a style holds the describe settings (instruction, max tokens, repetition
+styles (`style_a`, `style_b`, cycled by `styles.py` every `style_visitors` visitors, or one of them for
+everyone with `style_mode` A or B; the style id is the movement id of the music): a style holds the describe settings (instruction, max tokens, repetition
 penalty, prefix and suffix around the description), the style prompt and the negative. Keep one workflow per
 visitor: a second workflow in between drops the first from ComfyUI's cache and reloads the models.
 After every connect, a warm-up run on `data/comfy/warmup.jpg` (`build_warmup`: the same workflow
 with one sampler step and one grin frame) loads the models and proves the chain works (own limit
 `WARMUP_TIMEOUT`; a visitor has `connection.job_timeout`). Until `Generator.ready` no sequence starts (`Sequencer.blocked`,
 set in `Forgettable`) and the render shows the generator's status as a line (`StatusLayer`).
-For debugging the rest of the cycle, `pipeline.connection.skip_generation` sends the capture for the
+For debugging the rest of the cycle, `pipeline.skip_generation` sends the capture for the
 description and its depth only (`build_describe`: no portrait, no grin); the flash out then goes
-to the timeout (`Sequencer.finish`).
+to the timeout (`Sequencer.finish`). `pipeline.skip_animation` only leaves out the grin
+(`build_portrait`): the portrait holds for the timeout.
+ComfyUI sends the events of all its clients from one queue, so a client that stops reading stalls
+them for SMILE too: a ComfyUI browser tab that Edge put to sleep did this (ComfyUI's log says
+"Prompt executed", SMILE gets nothing). The generator sees it (`NoEvents`: a queued workflow left the
+queue without one event), shows `no events from ComfyUI: close or reload its browser tab` and is
+not ready until a warm-up gets its events again; a warm-up that fails is retried, never counted as
+ready. Keep no ComfyUI tab open on the installation, or exclude `127.0.0.1:8188` from Edge's sleeping tabs.
 For tests in the ComfyUI page, `python -m modules.comfy.testflow` writes `data/comfy/smile_test.json`
 (drag it into the page): what the app sends with a preset's values, plus an input switch (the
 app's last capture, or any photo through the face crop), previews and a video recorder. Regenerate

@@ -195,11 +195,19 @@ class Workflow():
         workflow[self.last_frame]['inputs']['batch_index'] = 0
         return workflow
 
-    def build_describe(self, image_name: str, style: StyleSettings, s: PipelineSettings) -> dict:
-        """The same run without the portrait and the grin (connection.skip_generation): only the description
-        and the capture's depth are left as outputs. The other nodes stay, so ComfyUI keeps their cache."""
+    def build_portrait(self, image_name: str, style: StyleSettings, s: PipelineSettings) -> dict:
+        """The same run without the grin (skip_animation): the grin's outputs are removed, so
+        ComfyUI stops after the portrait. The other nodes stay, so ComfyUI keeps their cache."""
         workflow: dict = self.build(image_name, style, s)
-        for node_id in (self.portrait, self.portrait_preview, self.all_frames, self.last_depth):
+        for node_id in (self.all_frames, self.last_depth):
+            del workflow[node_id]
+        return workflow
+
+    def build_describe(self, image_name: str, style: StyleSettings, s: PipelineSettings) -> dict:
+        """The same run without the portrait and the grin (skip_generation): only the description
+        and the capture's depth are left as outputs."""
+        workflow: dict = self.build_portrait(image_name, style, s)
+        for node_id in (self.portrait, self.portrait_preview):
             del workflow[node_id]
         return workflow
 

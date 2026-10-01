@@ -22,7 +22,7 @@
     }
   },
   "pipeline": {
-    "style_repeat": 1,
+    "style_visitors": 1,
     "connection": {
       "host": "127.0.0.1",
       "port": 8188,

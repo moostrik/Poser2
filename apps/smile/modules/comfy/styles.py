@@ -1,12 +1,15 @@
-"""Style cycling, as aiia3's 'smile' keyword: one style for N visitors, then the next.
+"""Style cycling, as aiia3's 'smile' keyword: one style for N visitors, then the next; or one style
+for everyone (style_mode).
 
 The style id is also the movement id for the music (data/audio/music_map.json).
 """
 
-from modules.comfy.settings import PipelineSettings, StyleSettings
+from modules.comfy.settings import PipelineSettings, StyleMode, StyleSettings
 
 # movement id -> the letter of its StyleSettings group (style_a, style_b)
 STYLE_LETTERS: dict[str, str] = {'0000': 'a', '0001': 'b'}
+# style_mode A or B: the index of the one style every visitor gets
+FORCED: dict[StyleMode, int] = {StyleMode.A: 0, StyleMode.B: 1}
 
 
 class Styles():
@@ -18,11 +21,17 @@ class Styles():
 
     def advance(self) -> str:
         """Call once per visitor; returns the style id for this visitor."""
-        if self._count >= self.settings.style_repeat:
+        mode: StyleMode = self.settings.style_mode
+        if mode is StyleMode.BOTH:
+            if self._count >= self.settings.style_visitors:
+                self._count = 0
+                self._index = (self._index + 1) % len(self._ids)
+            self._count += 1
+        else:
+            # forced; back on Both this style starts a full run
+            self._index = FORCED[mode]
             self._count = 0
-            self._index = (self._index + 1) % len(self._ids)
-        self._count += 1
-        self.settings.current_style = STYLE_LETTERS[self.current_id()].upper()
+        self.settings.style_current = STYLE_LETTERS[self.current_id()].upper()
         return self.current_id()
 
     def current_id(self) -> str:

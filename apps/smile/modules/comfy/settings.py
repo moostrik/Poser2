@@ -14,12 +14,11 @@ class ConnectionSettings(BaseSettings):
     host:          Field[str]   = Field("127.0.0.1", access=Field.INIT, widget=Widget.ip_field, description="ComfyUI server address")
     port:          Field[int]   = Field(8188, access=Field.INIT, widget=Widget.number_field, description="ComfyUI server port")
     workflow:      Field[str]   = Field("data/comfy/smile_workflow.json", access=Field.INIT, description="Workflow in ComfyUI API format (structure only)")
-    job_timeout:   Field[float] = Field(45.0, min=10.0, max=300.0, step=5.0, description="Give up on a visitor (generation and grin) after this many seconds")
-    skip_generation: Field[bool] = Field(False, pinned=True, description="Debug: only describe and depth, no portrait and no grin")
-
     connected:     Field[bool]  = Field(False, access=Field.READ, description="Connected to ComfyUI")
     status:        Field[str]   = Field("", access=Field.READ, description="Generator status")
     last_duration: Field[float] = Field(0.0, access=Field.READ, pinned=True, description="Duration of the last generation (s)")
+    job_timeout:   Field[float] = Field(45.0, min=10.0, max=300.0, step=5.0, description="Give up on a visitor (generation and grin) after this many seconds")
+
 
 
 class StyleSettings(BaseSettings):
@@ -129,9 +128,18 @@ class GrinSettings(BaseSettings):
     roll_prefer:    Field[Prefer] = Field(Prefer.EVEN, label="Prefer", width=32, description="Where the random value tends to land between min and max")
 
 
+class StyleMode(Enum):
+    A    = 'A'
+    B    = 'B'
+    BOTH = 'Both'
+
+
 class PipelineSettings(BaseSettings):
-    style_repeat:  Field[int] = Field(26, min=1, max=100, step=1, description="Visitors per style before switching to the next")
-    current_style: Field[str] = Field("A", access=Field.READ, description="Style of the current visitor: A (music: Smooth) or B (music: Party)")
+    style_mode:     Field[StyleMode] = Field(StyleMode.BOTH, description="Style of the visitors: only A, only B, or both in turn")
+    style_visitors: Field[int] = Field(26, min=1, max=100, step=1, description="Visitors per style before the other one, with Both")
+    style_current:  Field[str] = Field("A", access=Field.READ, description="Style of the current visitor: A (music: Smooth) or B (music: Party)")
+    skip_generation: Field[bool] = Field(False, newline=True, description="Debug: only describe and depth, no portrait and no grin")
+    skip_animation:  Field[bool] = Field(False, description="Debug: no grin animation, the portrait is the result")
 
     connection: Group[ConnectionSettings] = Group(ConnectionSettings)
     style_a:    Group[StyleSettings]      = Group(StyleSettings)    # movement 0000

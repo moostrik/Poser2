@@ -4,7 +4,7 @@ import os
 import random
 import unittest
 
-from modules.comfy.settings import PipelineSettings, Ease, Prefer
+from modules.comfy.settings import PipelineSettings, Ease, Prefer, StyleMode
 from modules.comfy.styles import Styles
 from modules.comfy.workflow import FIXED_SEED, GRIN_ROTATIONS, GRIN_TARGETS, MAX_SEED, Workflow
 
@@ -303,6 +303,24 @@ class TestWorkflow(unittest.TestCase):
         self.assertTrue({self.wf.describe, self.wf.depth_run} <= needed)
         self.assertFalse({self.wf.sampler, self.wf.grin, self.wf.last_depth_run} & needed)
 
+    def test_portrait_only_leaves_out_the_grin(self):
+        self.settings.portrait.fixed_seed = True
+        full = self.wf.build('x.png', self.settings.style_a, self.settings)
+        short = self.wf.build_portrait('x.png', self.settings.style_a, self.settings)
+        self.assertEqual(set(full) - set(short), {self.wf.all_frames, self.wf.last_depth})
+        for node_id, node in short.items():
+            self.assertEqual(node, full[node_id], node_id)
+        outputs = [node_id for node_id, node in short.items() if node['class_type'] in ('PreviewImage', 'PreviewAny', 'SaveImage')]
+        self.assertTrue({self.wf.capture_depth, self.wf.description, self.wf.portrait} <= set(outputs))
+        needed, todo = set(), outputs
+        while todo:
+            node_id = todo.pop()
+            if node_id not in needed:
+                needed.add(node_id)
+                todo += [value[0] for value in short[node_id]['inputs'].values() if isinstance(value, list) and len(value) == 2]
+        self.assertTrue({self.wf.describe, self.wf.depth_run, self.wf.sampler} <= needed)
+        self.assertFalse({self.wf.grin, self.wf.last_depth_run} & needed)
+
     def test_template_not_changed_by_build(self):
         again = self.wf.build('other.png', self.settings.style_b, self.settings)
         self.assertEqual(self.built[self.wf.load_image]['inputs']['image'], 'smile_capture.png')
@@ -320,16 +338,31 @@ class TestWorkflow(unittest.TestCase):
 class TestStyles(unittest.TestCase):
     def test_cycle(self):
         settings = PipelineSettings()
-        settings.style_repeat = 2
+        settings.style_visitors = 2
         styles = Styles(settings)
         ids = [styles.advance() for _ in range(3)]
         self.assertEqual(ids, ['0000', '0000', '0001'])
-        self.assertEqual(settings.current_style, 'B')
+        self.assertEqual(settings.style_current, 'B')
         self.assertIs(styles.current(), settings.style_b)
         ids = [styles.advance() for _ in range(2)]
         self.assertEqual(ids, ['0001', '0000'])
-        self.assertEqual(settings.current_style, 'A')
+        self.assertEqual(settings.style_current, 'A')
         self.assertIs(styles.current(), settings.style_a)
+
+    def test_one_style_for_everyone(self):
+        settings = PipelineSettings()
+        settings.style_visitors = 2
+        styles = Styles(settings)
+        settings.style_mode = StyleMode.B
+        self.assertEqual([styles.advance() for _ in range(5)], ['0001'] * 5)
+        self.assertEqual(settings.style_current, 'B')
+        self.assertIs(styles.current(), settings.style_b)
+        settings.style_mode = StyleMode.A
+        self.assertEqual([styles.advance() for _ in range(3)], ['0000'] * 3)
+        self.assertEqual(settings.style_current, 'A')
+        # back on both: a full run of the style that was forced, then the other
+        settings.style_mode = StyleMode.BOTH
+        self.assertEqual([styles.advance() for _ in range(3)], ['0000', '0000', '0001'])
 
 
 if __name__ == '__main__':
