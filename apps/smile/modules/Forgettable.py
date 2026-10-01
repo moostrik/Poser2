@@ -185,7 +185,7 @@ class Forgettable():
 
             self.diffuse.set_image(cap_image)
             self.render.set_cap_image(cap_image)
-            self.save.new_sequence(cap_image)
+            self.save.new_sequence(cap_image, self.settings.pipeline.style_current)
             self._grin_saved = False
             # a test run on images: the next visitor is the next file
             self.camera.next_image()

@@ -96,8 +96,10 @@ no new sequence while it is on (`Sequencer.blocked`). Shaders are
 ## Recordings
 
 `modules/save/ClipSaver.py` saves each finished visitor for the players under `output/` (git-ignored):
-the grin as `grins/<id>.mp4` (h264 at the full portrait size, at `grin_fps`), the capture and the
-portrait as `portraits/<id>_capture.jpg` and `<id>_portrait.jpg`. Files are built in `output/temp/`
+the grin as `grins/<style>/<id>.mp4` (h264 at the full portrait size, at `grin_fps`), the capture and the
+portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`. `<style>` is the visitor's
+style, `A` (colourful and happy) or `B` (monochrome and dark); the folder is the only place it is
+recorded, the id is the time. Files are built in `output/temp/`
 and renamed into place when the grin is complete, so the players never see a partial file.
 Encoding and decoding run `ffmpeg`/`ffprobe` subprocesses through `modules/video/ffmpeg.py` (ffmpeg
 must be on the PATH: the gyan.dev full build); the encoder is picked at startup by a trial encode
@@ -106,6 +108,9 @@ those processes any other way: the apps run under pythonw, so they need `CREATE_
 inherited handles. The players (`modules/player/`) decode each of the newest clips once into RAM
 (`ClipPool`, 512x640, about 200 MB per clip) and play from memory; `pl_player.py -n` sets the number
 of cells, `--pool` the clips kept, `--fps` the playback speed (default 20, 0 = the clip's own rate), `--spread` a random speed difference per play so the cells drift apart (default 0.1), `--trail` a blend with the previous output (default 0: none).
+The players show one style (`--no-follow_style`: the newest clips of both together): a clip arriving in the other style's folder is the
+switch (`FolderScanner`), the pool loads a random selection of that style's clips from disk and each
+cell changes over at the end of its play.
 The cells start one by one, each in a random place on the next clip that is loaded (going round the
 loaded clips again when there are fewer than cells). `scripts/start_players.bat` (re)starts both players alone,
 each fullscreen on its own monitor (a player whose monitor is not connected takes a window on the
