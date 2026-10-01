@@ -269,7 +269,7 @@ class Sequencer():
         self.diffusion_progress: float = 0.0
         self._reveal: bool = False      # the capture's depth is in: the flash out may start
         self._finish: bool = False      # the generator is done: TIMEOUT follows the flash out
-        self.blocked: bool = False      # no new sequence: the generator is not ready for a capture
+        self.blocked: bool = False      # no new sequence: the generator is not ready for a capture, or the raw camera is shown
         self._face_qualified: bool = False  # the newest detector frame has a qualifying face
         self._face_time: float = 0.0        # when that frame was made
         self._forced: bool = False      # a manual start: the charge rises without a face

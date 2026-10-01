@@ -140,8 +140,9 @@ class Forgettable():
 
         # no visitor while the generator can't take a capture (ComfyUI not there, or still warming up):
         # the flash would hold until it can. The operator sees why on the image.
+        # None either while the raw camera is shown: the sequence would run unseen behind it
         ready: bool = self.diffuse.ready
-        self.sequencer.blocked = not ready
+        self.sequencer.blocked = not ready or self.settings.render.show_camera
         self.render.set_status(None if ready else self.settings.pipeline.connection.status)
 
         cam_image: np.ndarray= self.camera.getColorImg()

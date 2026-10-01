@@ -78,7 +78,8 @@ Art-Net, OSC and saving hang off its messages), then the stage for the current `
 (`stages.py`) renders the layers (`layers/`) and picks the one to show. Images from other threads go
 through `inputs.py` (`Image.set_image`, uploaded on the render thread); the grin frames go
 through `GrinPlayer.py`, a buffer the generator fills and the render plays on its own clock, with
-its timings in the sequence settings. Shaders are
+its timings in the sequence settings. `render.show_camera` draws the raw camera on top and starts
+no new sequence while it is on (`Sequencer.blocked`). Shaders are
 `classname.frag` next to their `.py` and hot-reload while running. `pl_player.py` uses the same engine
 (`modules/player/Render.py`).
 
