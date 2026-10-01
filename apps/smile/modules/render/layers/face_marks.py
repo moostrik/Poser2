@@ -17,8 +17,7 @@ LABEL_BG: Color = (0.0, 0.0, 0.0, 0.6)
 SUBJECT_LINE_PX: float = 3.0
 LINE_PX: float = 1.5
 
-# no marks from faces older than this: the detector only runs in the camera states.
-# Also how long the show's mark holds when its face stops qualifying, so a blink does not flicker it
+# no marks from faces older than this: the detector only runs in the camera states
 FACES_STALE: float = 0.5
 
 
@@ -41,7 +40,7 @@ def face_label(face: FaceObservation) -> str:
     return readout(face)
 
 
-def build_marks(frame: FaceFrame) -> list[Mark]:
+def build_marks(frame: FaceFrame, subject_color: Color = SUBJECT_COLOR) -> list[Mark]:
     """A mark per face: rejected first, under everyone; the subject last, drawn over all."""
     marks: list[Mark] = []
     for face in frame.faces:
@@ -49,7 +48,7 @@ def build_marks(frame: FaceFrame) -> list[Mark]:
         if face.rejection is not None:
             color = REJECTED_COLOR
         elif face.subject:
-            color = SUBJECT_COLOR
+            color = subject_color
         else:
             color = ACCEPTED_COLOR
         # the subject is thick even when rejected: it is still the face a capture would use
@@ -61,20 +60,25 @@ def build_marks(frame: FaceFrame) -> list[Mark]:
 
 
 class SubjectMark:
-    """The show's mark: the green box of the subject while it qualifies, without a label. Held for
-    FACES_STALE after the last qualifying frame; None without one."""
+    """The show's mark, without a label: the subject's box in the active colour while it qualifies
+    (its charge rises); in grey while the charge drains, on the face that is there or else where it
+    last was; None once the charge is empty."""
 
     def __init__(self) -> None:
-        self._mark: Mark | None = None
-        self._time: float = 0.0
+        self._box: tuple[tuple[float, float, float, float], tuple[tuple[float, float], ...]] | None = None
 
-    def update(self, frame: FaceFrame | None, now: float) -> Mark | None:
-        if frame is not None and frame.time > self._time:
-            subject: FaceObservation | None = frame.subject
-            if subject is not None and subject.rejection is None:
-                x0, y0, x1, y1 = subject.bbox
-                self._mark = Mark(x0, y0, x1 - x0, y1 - y0, subject.kps, SUBJECT_COLOR, SUBJECT_LINE_PX, '')
-                self._time = frame.time
-        if self._mark is not None and now - self._time > FACES_STALE:
-            self._mark = None
-        return self._mark
+    def update(self, frame: FaceFrame | None, now: float, charge: float, active_color: Color = SUBJECT_COLOR) -> Mark | None:
+        subject: FaceObservation | None = None
+        if frame is not None and now - frame.time <= FACES_STALE:
+            subject = frame.subject
+        if subject is not None:
+            self._box = (subject.bbox, subject.kps)
+
+        qualifies: bool = subject is not None and subject.rejection is None
+        if not qualifies and charge <= 0.0:
+            self._box = None
+        if self._box is None:
+            return None
+        (x0, y0, x1, y1), kps = self._box
+        color: Color = active_color if qualifies else REJECTED_COLOR
+        return Mark(x0, y0, x1 - x0, y1 - y0, kps, color, SUBJECT_LINE_PX, '')

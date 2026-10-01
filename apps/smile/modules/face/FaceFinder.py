@@ -15,14 +15,19 @@ DETECT_THRESHOLD: float = 0.5
 
 @dataclass(frozen=True)
 class FaceFrame:
-    """Every face of one camera frame, for the overlay and the sequence start."""
+    """Every face of one camera frame, for the overlay and the sequencer's charge."""
     faces: tuple[FaceObservation, ...]
-    stable: bool                        # the subject qualified for stable_time without interruption
     time: float
 
     @property
     def subject(self) -> FaceObservation | None:
         return next((f for f in self.faces if f.subject), None)
+
+    @property
+    def qualified(self) -> bool:
+        """The subject passed every check."""
+        subject: FaceObservation | None = self.subject
+        return subject is not None and subject.rejection is None
 
 
 FrameCallback = Callable[[FaceFrame], None]
@@ -105,7 +110,6 @@ class FaceFinder(Thread):
         self._model_path: str = model_path
         self._landmark_path: str = landmark_path
 
-        self._stable_since: float | None = None     # when the subject started qualifying without interruption
         self._qualified: _Saved | None = None       # the last frame in which the subject qualified
         self._last: _Saved | None = None            # the last frame with a subject at all
         self._nose_ratio: float | None = None       # of the last subject, for the pitch calibration
@@ -177,13 +181,7 @@ class FaceFinder(Thread):
                 if qualified:
                     self._qualified = self._last
 
-        if not qualified:
-            self._stable_since = None
-        elif self._stable_since is None:
-            self._stable_since = now
-        stable: bool = self._stable_since is not None and now - self._stable_since >= s.stable_time
-
-        frame = FaceFrame(tuple(self._observation(a, a is subject, image_width, image_height) for a in assessed), stable, now)
+        frame = FaceFrame(tuple(self._observation(a, a is subject, image_width, image_height) for a in assessed), now)
         s.result = self._result(frame.subject)
         self.frame_callback(frame)
 
@@ -222,7 +220,6 @@ class FaceFinder(Thread):
         return portrait_crop(saved.image, saved.face, s.zoom, s.offset, self._composition_width, self._composition_height)
 
     def reset(self) -> None:
-        self._stable_since = None
         with self._saved_mutex:
             self._qualified = None
             self._last = None

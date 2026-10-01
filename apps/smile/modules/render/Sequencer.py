@@ -10,19 +10,18 @@ class SequenceType(IntEnum):
     NONE            = 0         # Nothing happens, last diffusion shown
     BLOOM           = 1         # Destructing the last diffusion, bloom
     FADE            = 2         # Destructing the last diffusion, fade to camera
-    CAMERA_SHOW     = 3         # Show camera (not face)
-    CAMERA_DETECT   = 4         # Record faces
-    CAMERA_REC      = 5         # Record faces
-    FLASH           = 6         # Capture, Flash in
-    CAPTURE         = 7         # MOMENT of capture
-    ASK             = 8         # Capture, Flash out
-    CONTROL_0       = 9         # Preparing first Control Net
-    CONTROL_1       = 10        # Preparing second Control Net
-    CONTROL_2       = 11        # Preparing third Control Net
-    DIFFUSION       = 12        # Diffusion, creating image
-    DIFF_LOOP       = 13        # Diffusion, creating images in loop
-    TIMEOUT         = 14        # Diffusion, showing image
-    RESET           = 15        # MOMENT of reset
+    CAMERA_SHOW     = 3         # Show camera, nobody qualifies: the charge is empty
+    CAMERA_DETECT   = 4         # A face is charging (or its charge is draining) toward the flash
+    FLASH           = 5         # Capture, Flash in
+    CAPTURE         = 6         # MOMENT of capture
+    ASK             = 7         # Capture, Flash out
+    CONTROL_0       = 8         # Preparing first Control Net
+    CONTROL_1       = 9         # Preparing second Control Net
+    CONTROL_2       = 10        # Preparing third Control Net
+    DIFFUSION       = 11        # Diffusion, creating image
+    DIFF_LOOP       = 12        # Diffusion, creating images in loop
+    TIMEOUT         = 13        # Diffusion, showing image
+    RESET           = 14        # MOMENT of reset
 
 SequenceTypeNames: list[str] = [member.name for member in SequenceType]
 
@@ -31,7 +30,7 @@ class AnimationType(IntEnum):
     DESTRUCT_IN     = 1         # Destructing the last diffusion, bloom
     DESTRUCT_OUT    = 2         # Destructing the last diffusion, fade to camera
     CAMERA_IN       = 3         # Show camera, Idle
-    CAMERA_OUT      = 4         # Showing camera, Person found
+    CAMERA_OUT      = 4         # Showing camera, a face is charging: progress is the charge
     FLASH_IN        = 5         # Flash in, the capture routine
     FLASH_OUT       = 6         # Flash out, prepearing control nets
     DIFFUSE_IN      = 7         # Diffusion, creating image
@@ -46,7 +45,7 @@ def ani_type_from_seq_type(seq: SequenceType) -> AnimationType:
         return AnimationType.DESTRUCT_OUT
     if seq == SequenceType.CAMERA_SHOW:
         return AnimationType.CAMERA_IN
-    if seq >= SequenceType.CAMERA_DETECT and seq <= SequenceType.CAMERA_REC:
+    if seq == SequenceType.CAMERA_DETECT:
         return AnimationType.CAMERA_OUT
     if seq >= SequenceType.FLASH and seq <= SequenceType.ASK:
         return AnimationType.FLASH_IN
@@ -64,6 +63,8 @@ class SeqenceState():
         self.previous_type: SequenceType = SequenceType.NONE
         self.start_time: float = 0.0
         self.start_time2: float = 0.0
+        self.charge: float = 0.0            # 0..1: how long a face has held its qualification; 1 starts the flash
+        self.charge_time: float = 0.0       # when the charge was last moved
 
 class SeqenceMessage():
     def __init__(self, type: SequenceType, progress: float, initial: bool = False, value_1: float = 0.0, value_2: float = 0.0) -> None:
@@ -114,51 +115,47 @@ def fade_message(state: SeqenceState, bloom_duration: float, bloom_easing: Easin
         state.type = SequenceType.CAMERA_SHOW
         return SeqenceMessage(state.type, 0, initial, 0)
 
-def cam_show_message(state: SeqenceState, duration: float, easing: Easing = easing.linear) -> SeqenceMessage:
-    initial = False
-    if state.previous_type != state.type:
-        initial = True
-        state.previous_type = state.type
-        state.start_time = time.time()
+CAMERA_STATES: tuple[SequenceType, ...] = (SequenceType.CAMERA_SHOW, SequenceType.CAMERA_DETECT)
 
-    progress: float = min((time.time() - state.start_time) / duration, 1.0)
-    value: float = easing(progress)
-    state.type = SequenceType.CAMERA_SHOW
-    return SeqenceMessage(state.type, progress, initial, value)
+# a detector frame older than this says nothing about who is there now
+FACE_STALE: float = 0.5
 
-def cam_detect_message(state: SeqenceState, duration: float, easing: Easing = easing.linear) -> SeqenceMessage:
-    initial = False
-    if state.previous_type != state.type:
-        initial = True
-        state.previous_type = state.type
-        state.start_time = time.time()
+# the part of the flash in at which the capture is taken (the FLASH state ends there)
+CAPTURE_AT: float = 0.5
 
-    progress: float = min((time.time() - state.start_time) / duration, 1.0)
-    value: float = easing(progress)
+def camera_message(state: SeqenceState, rising: bool, charge_duration: float, drain_duration: float, easing: Easing = easing.linear) -> SeqenceMessage:
+    """The camera phase: the charge rises while a face qualifies and drains while none does.
+    CAMERA_SHOW with an empty charge, CAMERA_DETECT while there is some (progress is the charge),
+    and the flash starts when it is full."""
+    now: float = time.time()
+    if state.previous_type not in CAMERA_STATES:
+        # entering the camera phase: an empty charge, and the idle progress starts
+        state.charge = 0.0
+        state.charge_time = now
+        state.start_time = now
 
-    if progress < 1.0:
-        state.type = SequenceType.CAMERA_DETECT
-        return SeqenceMessage(state.type, progress, initial, value)
+    elapsed: float = max(0.0, now - state.charge_time)
+    state.charge_time = now
+    if rising:
+        state.charge += elapsed / max(charge_duration, 1e-6)
     else:
-        state.type = SequenceType.CAMERA_REC
-        return SeqenceMessage(state.type, 1.0)
+        state.charge -= elapsed / max(drain_duration, 1e-6)
+    state.charge = min(max(state.charge, 0.0), 1.0)
 
-def cam_record_message(state: SeqenceState, duration: float, easing: Easing = easing.linear) -> SeqenceMessage:
-    initial = False
-    if state.previous_type != state.type:
-        initial = True
-        state.previous_type = state.type
-        state.start_time = time.time()
+    current: SequenceType = SequenceType.CAMERA_DETECT if state.charge > 0.0 else SequenceType.CAMERA_SHOW
+    initial: bool = state.previous_type != current
+    state.previous_type = current
+    state.type = current
 
-    progress: float = min((time.time() - state.start_time) / duration, 1.0)
-    value: float = easing(progress)
+    if current == SequenceType.CAMERA_SHOW:
+        progress: float = min((now - state.start_time) / 1.0, 1.0)
+        return SeqenceMessage(current, progress, initial, 0.0)
 
-    if progress < 1.0:
-        state.type = SequenceType.CAMERA_REC
-        return SeqenceMessage(state.type, progress, initial, value)
-    else:
+    message = SeqenceMessage(current, state.charge, initial, easing(state.charge))
+    if state.charge >= 1.0:
+        state.charge = 0.0
         state.type = SequenceType.FLASH
-        return SeqenceMessage(state.type, 1.0, initial)
+    return message
 
 def pre_capture_message(state: SeqenceState, duration: float, easing: Easing, delay: float) -> SeqenceMessage:
     initial = False
@@ -253,7 +250,8 @@ MessageCallback = Callable[[SeqenceMessage], None]
 class Sequencer():
     """Time-based state machine of a visitor cycle. update() runs once per render frame, on the render
     thread; set_sequence() and the other setters are called from the generator, face and key threads.
-    Two steps wait for the generator: the flash holds (ASK) until start_reveal(), and the grin
+    The flash starts when a face has held its qualification long enough (the charge, see
+    camera_message). Two steps wait for the generator: the flash holds (ASK) until start_reveal(), and the grin
     (DIFF_LOOP) starts when the render's player starts playing."""
 
     def __init__(self, settings: SequencerSettings) -> None:
@@ -271,6 +269,9 @@ class Sequencer():
         self.diffusion_progress: float = 0.0
         self._reveal: bool = False      # the capture's depth is in: the flash out may start
         self.blocked: bool = False      # no new sequence: the generator is not ready for a capture
+        self._face_qualified: bool = False  # the newest detector frame has a qualifying face
+        self._face_time: float = 0.0        # when that frame was made
+        self._forced: bool = False      # a manual start: the charge rises without a face
 
         self.flash_out_start: float = 0.0
         self.flash_out_calculation: bool = False
@@ -303,14 +304,12 @@ class Sequencer():
             message = bloom_message(self._state, s.destroy_in, easing_function(s.destroy_in_ease), s.destroy_out, easing_function(s.destroy_out_ease))
         elif self._state.type == SequenceType.FADE:
             message = fade_message(self._state, s.destroy_in, easing_function(s.destroy_in_ease), s.destroy_out, easing_function(s.destroy_out_ease))
-        elif self._state.type == SequenceType.CAMERA_SHOW:
-            message = cam_show_message(self._state, 1.0)
-        elif self._state.type == SequenceType.CAMERA_DETECT:
-            message = cam_detect_message(self._state, s.camera_in, easing_function(s.camera_in_ease))
-        elif self._state.type == SequenceType.CAMERA_REC:
-            message = cam_record_message(self._state, s.camera_out, easing_function(s.camera_out_ease))
+        elif self._state.type in CAMERA_STATES:
+            message = camera_message(self._state, self._rising(), s.charge, s.drain, easing_function(s.charge_ease))
+            if self._state.type == SequenceType.FLASH:
+                self._forced = False
         elif self._state.type == SequenceType.FLASH:
-            message = pre_capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease), 0.5)
+            message = pre_capture_message(self._state, s.flash_in, easing_function(s.flash_in_ease), CAPTURE_AT)
             if message.initial:
                 self._reveal = False
         elif self._state.type == SequenceType.CAPTURE:
@@ -352,18 +351,32 @@ class Sequencer():
         self.flash_out_history.clear()
 
     def reset(self) -> None:
+        self._forced = False
         self.set_sequence(SequenceType.RESET)
 
-    def set_face_found(self) -> None:
+    def set_face(self, qualified: bool, face_time: float) -> None:
+        """The newest detector frame: whether its subject qualifies, and when it was made."""
+        with self._state_mutex:
+            self._face_qualified = qualified
+            self._face_time = face_time
+
+    def _rising(self) -> bool:
+        """Whether the charge rises this frame: a manual start, or a fresh qualifying face while
+        new visitors are welcome (not paused, the generator ready)."""
+        if self.blocked:
+            return False
+        if self._forced:
+            return True
         if self.settings.pause:
-            return      # no new visitors; the start button and the Enter key still work
-        self.start_sequence()
+            return False    # no new visitors; the start button and the Enter key still work
+        return self._face_qualified and time.time() - self._face_time <= FACE_STALE
 
     def start_sequence(self) -> None:
+        """A manual start: the charge rises to the flash without a face."""
         with self._state_mutex:
-            if self.blocked or self._state.type != SequenceType.CAMERA_SHOW:
+            if self.blocked or self._state.type not in CAMERA_STATES:
                 return
-            self._state.type = SequenceType.CAMERA_DETECT
+            self._forced = True
 
 
     def start_reveal(self) -> None:

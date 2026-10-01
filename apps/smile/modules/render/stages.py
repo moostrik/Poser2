@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from modules.gl import Texture
 from modules.render.inputs import Inputs
 from modules.render.layers import CameraLayer, DestructLayer, DiffusionLayer, FlashLayer, RevealLayer
-from modules.render.Sequencer import SeqenceMessage, SequenceType
+from modules.render.Sequencer import CAPTURE_AT, SeqenceMessage, SequenceType
 from modules.render.settings import RenderSettings
 
 
@@ -37,15 +37,11 @@ class Stage:
 
 
 class CameraStage(Stage):
-    """Black and white camera; the chosen face's box turns to colour when the face is found."""
+    """Black and white camera; the chosen face's box turns to colour as its charge fills."""
 
     def update(self, message: SeqenceMessage) -> None:
-        if message.sequence_type == SequenceType.CAMERA_SHOW:
-            self.layers.camera.render(0.0)
-        elif message.sequence_type == SequenceType.CAMERA_DETECT:
-            self.layers.camera.render(message.value_1)
-        else:
-            self.layers.camera.render(1.0)
+        # value_1 is the eased charge: 0 while nobody qualifies
+        self.layers.camera.render(message.value_1)
 
     @property
     def output(self) -> Texture:
@@ -53,11 +49,16 @@ class CameraStage(Stage):
 
 
 class FlashStage(Stage):
-    """Flash to white; the camera freezes at the capture."""
+    """Flash to white; the camera freezes at the capture. The face's marks fade out before it, so
+    the frozen frame has none: their saturated colour would outlast the image in the flash."""
+
+    # the marks are gone at this part of the time before the capture, so the last frames have none
+    MARKS_GONE: float = 0.8
 
     def update(self, message: SeqenceMessage) -> None:
         if message.sequence_type == SequenceType.FLASH:
-            self.layers.camera.render(1.0)
+            marks: float = max(0.0, 1.0 - message.progress / (CAPTURE_AT * self.MARKS_GONE))
+            self.layers.camera.render(1.0, marks)
         self.layers.flash.render(message.value_1)
 
     @property
@@ -123,7 +124,6 @@ STAGES: dict[SequenceType, type[Stage]] = {
     SequenceType.FADE:          DestructStage,
     SequenceType.CAMERA_SHOW:   CameraStage,
     SequenceType.CAMERA_DETECT: CameraStage,
-    SequenceType.CAMERA_REC:    CameraStage,
     SequenceType.FLASH:         FlashStage,
     SequenceType.CAPTURE:       FlashStage,
     SequenceType.ASK:           FlashStage,

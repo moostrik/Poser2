@@ -23,13 +23,18 @@ distance between the eyes, min and max), position (horizontal distance from the 
 pose from the 5 keypoints (the pitch's zero is `pitch_zero`, set on site with the "Set pitch zero"
 button: it depends on the camera height), eye openness from the 106 landmarks (`FaceLandmarks`,
 `data/models/2d106det.onnx`, only run for faces that passed the other checks); the first failing check
-is the face's `Rejection`. Gaze is not checked: the "looking at viewer" LoRA corrects it. The subject of a frame is its largest qualifying face; a face that qualifies for
-`stable_time` without interruption starts a sequence. The capture is the last frame of the
-recording in which the subject qualified (the last frame at all when none did), cropped by
+is the face's `Rejection`. Gaze is not checked: the "looking at viewer" LoRA corrects it. The subject of a frame is its largest qualifying face.
+The flash is earned: the `Sequencer` keeps a **charge** that rises while the newest detector frame
+has a qualifying subject (`sequence.charge` seconds to fill) and drains while it has none
+(`sequence.drain` seconds, slower); CAMERA_SHOW is an empty charge, CAMERA_DETECT a partial one
+(its progress is the charge, also for OSC and Art-Net), and a full one starts the flash. A manual
+start charges without a face. The capture is the last frame in which the subject qualified (the
+last frame at all when none did), cropped by
 `portrait_crop` (eyes levelled, at the workflow's portrait size). Every frame's faces go to the render
 (`Inputs.faces`), for two things. The show: `CameraLayer` draws the camera in black and white with
-the qualifying subject's box in colour (fading in when the face is found), its green outline and
-keypoints; they are part of the camera layer, so the flash fades them to white with it. The
+the subject's box turning to colour as the charge fills, its outline (green while it qualifies,
+grey while the charge drains), keypoints and a progress bar inside the box's right edge; they are
+part of the camera layer, so the flash fades them to white with it. The
 operator overlay (`render.show_faces`: `FaceOverlayLayer`): every face with its readout or reject
 reason, over the output. Marks are built in `face_marks.py`, drawn by `MarkDrawer`.
 

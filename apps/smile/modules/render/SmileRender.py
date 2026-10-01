@@ -37,7 +37,7 @@ class SmileRender(RenderBase):
         self.height: int = height
 
         self.inputs: Inputs = Inputs()
-        camera = CameraLayer(self.inputs.camera, self.inputs.faces)
+        camera = CameraLayer(self.inputs.camera, self.inputs.faces, settings)
         self.layers: Layers = Layers(
             camera=camera,
             flash=FlashLayer(camera, self.inputs.white),
@@ -127,7 +127,8 @@ class SmileRender(RenderBase):
         if frame is None or time.time() - frame.time > FACES_STALE:
             self._faces.set_marks([])
         else:
-            self._faces.set_marks(build_marks(frame))
+            r, g, b, a = self.settings.face_color
+            self._faces.set_marks(build_marks(frame, (r, g, b, a)))
         self._faces.render(source)
 
     def draw_main(self, width: int, height: int) -> None:

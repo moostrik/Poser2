@@ -28,32 +28,97 @@ class TestSequencer(unittest.TestCase):
     def tearDown(self):
         self.sequencer.close()
 
-    def test_starts_only_from_camera_show(self):
-        self.sequencer.start_sequence()
-        self.assertEqual(self.sequencer.get_sequence(), SequenceType.CAMERA_DETECT)
-        self.sequencer.set_sequence(SequenceType.DIFFUSION)
-        self.sequencer.start_sequence()
-        self.assertEqual(self.sequencer.get_sequence(), SequenceType.DIFFUSION)
+    def run_camera(self, clock: list[float], seconds: float, face: bool | None, step: float = 0.1):
+        """Step the sequencer through `seconds` of the camera phase; `face` is what the detector
+        reports every step (None: it reports nothing). Returns the last message."""
+        message = self.sequencer.update()
+        for _ in range(round(seconds / step)):
+            clock[0] += step
+            if face is not None:
+                self.sequencer.set_face(face, clock[0])
+            message = self.sequencer.update()
+        return message
 
-    def test_pause_ignores_a_found_face_but_not_the_start(self):
+    def charging(self, charge: float = 2.0, drain: float = 4.0):
+        self.sequencer.settings.charge = charge
+        self.sequencer.settings.drain = drain
+        clock = [100.0]
+        return clock, mock.patch('modules.render.Sequencer.time.time', lambda: clock[0])
+
+    def test_a_qualifying_face_charges_to_the_flash(self):
+        clock, patched = self.charging()
+        with patched:
+            message = self.run_camera(clock, 1.0, True)
+            self.assertEqual(message.sequence_type, SequenceType.CAMERA_DETECT)
+            self.assertAlmostEqual(message.progress, 0.5, places=5)
+            self.assertAlmostEqual(message.value_1, 0.5, places=5)
+            self.run_camera(clock, 1.1, True)
+            self.assertEqual(self.sequencer.get_sequence(), SequenceType.FLASH)
+
+    def test_the_charge_drains_slower_than_it_rises_and_ends_in_camera_show(self):
+        clock, patched = self.charging()
+        with patched:
+            self.run_camera(clock, 1.0, True)                       # half full
+            message = self.run_camera(clock, 1.0, False)            # a quarter lost
+            self.assertEqual(message.sequence_type, SequenceType.CAMERA_DETECT)
+            self.assertAlmostEqual(message.progress, 0.25, places=5)
+            message = self.run_camera(clock, 1.5, False)
+            self.assertEqual(message.sequence_type, SequenceType.CAMERA_SHOW)
+            self.assertEqual(message.value_1, 0.0)
+            self.assertEqual(self.sequencer.get_sequence(), SequenceType.CAMERA_SHOW)
+
+    def test_a_charge_that_restarts_is_initial_again(self):
+        clock, patched = self.charging()
+        with patched:
+            self.run_camera(clock, 0.2, True)
+            self.run_camera(clock, 1.0, False)                      # drained
+            self.sequencer.set_face(True, clock[0])
+            clock[0] += 0.1
+            message = self.sequencer.update()
+            self.assertEqual(message.sequence_type, SequenceType.CAMERA_DETECT)
+            self.assertTrue(message.initial)
+
+    def test_a_detector_that_stopped_reporting_counts_as_no_face(self):
+        clock, patched = self.charging()
+        with patched:
+            self.run_camera(clock, 1.0, True)
+            message = self.run_camera(clock, 2.0, None)             # the last report goes stale
+            self.assertLess(message.progress, 0.5)
+            self.assertEqual(self.sequencer.get_sequence(), SequenceType.CAMERA_DETECT)
+
+    def test_pause_ignores_a_face_but_not_the_start(self):
+        clock, patched = self.charging()
         self.sequencer.settings.pause = True
-        self.sequencer.set_face_found()
-        self.assertEqual(self.sequencer.get_sequence(), SequenceType.CAMERA_SHOW)
-        self.sequencer.start_sequence()
-        self.assertEqual(self.sequencer.get_sequence(), SequenceType.CAMERA_DETECT)
+        with patched:
+            message = self.run_camera(clock, 1.0, True)
+            self.assertEqual(message.sequence_type, SequenceType.CAMERA_SHOW)
+            self.sequencer.start_sequence()
+            self.run_camera(clock, 2.1, None)                       # the start needs no face
+            self.assertEqual(self.sequencer.get_sequence(), SequenceType.FLASH)
 
-    def test_blocked_starts_nothing(self):
+    def test_starts_only_in_the_camera_phase(self):
+        clock, patched = self.charging()
+        with patched:
+            self.sequencer.set_sequence(SequenceType.DIFFUSION)
+            self.sequencer.start_sequence()
+            self.sequencer.set_sequence(SequenceType.CAMERA_SHOW)
+            message = self.run_camera(clock, 1.0, None)
+            self.assertEqual(message.sequence_type, SequenceType.CAMERA_SHOW)
+
+    def test_blocked_charges_nothing(self):
+        clock, patched = self.charging()
         self.sequencer.blocked = True
-        self.sequencer.set_face_found()
-        self.sequencer.start_sequence()
-        self.assertEqual(self.sequencer.get_sequence(), SequenceType.CAMERA_SHOW)
-        # a sequence that is running goes on
-        self.sequencer.set_sequence(SequenceType.DIFFUSION)
-        self.assertEqual(self.sequencer.get_sequence(), SequenceType.DIFFUSION)
-        self.sequencer.set_sequence(SequenceType.CAMERA_SHOW)
-        self.sequencer.blocked = False
-        self.sequencer.set_face_found()
-        self.assertEqual(self.sequencer.get_sequence(), SequenceType.CAMERA_DETECT)
+        with patched:
+            self.sequencer.start_sequence()
+            message = self.run_camera(clock, 1.0, True)
+            self.assertEqual(message.sequence_type, SequenceType.CAMERA_SHOW)
+            # a sequence that is running goes on
+            self.sequencer.set_sequence(SequenceType.DIFFUSION)
+            self.assertEqual(self.sequencer.get_sequence(), SequenceType.DIFFUSION)
+            self.sequencer.set_sequence(SequenceType.CAMERA_SHOW)
+            self.sequencer.blocked = False
+            message = self.run_camera(clock, 1.0, True)
+            self.assertEqual(message.sequence_type, SequenceType.CAMERA_DETECT)
 
     def test_update_reports_state_and_calls_back(self):
         messages = []

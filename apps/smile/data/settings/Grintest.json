@@ -9,7 +9,6 @@
     "gain_target": 33,
     "face": {
       "confidence": 0.5,
-      "stable_time": 0.3,
       "max_offset": 0.15,
       "eye_min": 0.1,
       "eye_max": 0.33,
@@ -112,10 +111,6 @@
     "pause": false,
     "save": true,
     "encoder": "AUTO",
-    "camera_in": 1.0,
-    "camera_in_ease": "LINEAR",
-    "camera_out": 1.0,
-    "camera_out_ease": "LINEAR",
     "flash_in": 0.5,
     "flash_in_ease": "QUAD_IN",
     "flash_hold": 0.5,

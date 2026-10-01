@@ -5,6 +5,7 @@ import pytweening as easing
 
 from modules.gl import WindowSettings
 from modules.settings import BaseSettings, Field, Group, Widget
+from modules.utils import Color
 from modules.video.ffmpeg import Encoder
 
 
@@ -53,6 +54,7 @@ class RenderSettings(BaseSettings):
     window:        Group[WindowSettings] = Group(WindowSettings)
     show_camera:   Field[bool]  = Field(False, description="Draw the raw camera image on top")
     show_faces:    Field[bool]  = Field(False, description="Draw the detected faces over the image")
+    face_color:    Field[Color] = Field(Color(0.2, 1.0, 0.2), description="Colour of the chosen face's box, dots and bars")
     freeze:        Field[bool]  = Field(False, description="Hold the current frame")
     trail_active:  Field[bool]  = Field(True, description="Blend new diffusion images over the previous ones")
     trail:         Field[float] = Field(0.995, min=0.98, max=1.0, step=0.001, description="Trail amount")
@@ -74,10 +76,9 @@ class SequencerSettings(BaseSettings):
     animation_progress: Field[float]  = Field(0.0, access=Field.READ, description="Progress of the current animation")
 
     # the steps of a visitor's cycle in the order they happen, one row each; the row's title names the step
-    camera_in:          Field[float]  = Field(1.0, min=0.1, max=6.0, step=0.1, newline=True, row_label="Face found", label="Duration (s)", description="The camera turns to colour after a face is found (s)")
-    camera_in_ease:     Field[Easing] = Field(Easing.LINEAR, label="Ease", description="Easing of the turn to colour")
-    camera_out:         Field[float]  = Field(1.0, min=0.1, max=6.0, step=0.1, newline=True, row_label="Recording", label="Duration (s)", description="Colour camera while the best face is picked, until the flash (s)")
-    camera_out_ease:    Field[Easing] = Field(Easing.LINEAR, label="Ease", description="Easing of the recording's progress")
+    charge:             Field[float]  = Field(2.0, min=0.1, max=10.0, step=0.1, newline=True, row_label="Face found", label="Charge (s)", description="Time a face must stay qualified until the flash (s)")
+    drain:              Field[float]  = Field(4.0, min=0.1, max=10.0, step=0.1, label="Drain (s)", description="Time the charge takes to fall back when the face is lost (s)")
+    charge_ease:        Field[Easing] = Field(Easing.LINEAR, label="Ease", description="Easing of the face's turn to colour")
     flash_in:           Field[float]  = Field(0.5, min=0.1, max=6.0, step=0.1, newline=True, row_label="Flash in", label="Duration (s)", description="The camera flashes; the capture is taken halfway (s)")
     flash_in_ease:      Field[Easing] = Field(Easing.QUAD_IN, label="Ease", description="Easing of the flash in")
     flash_hold:         Field[float]  = Field(0.5, min=0.0, max=3.0, step=0.1, label="Hold (s)", description="Hold the full flash at least this long before the capture appears (s)")

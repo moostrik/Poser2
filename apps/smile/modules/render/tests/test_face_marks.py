@@ -15,29 +15,51 @@ def observation(rejection: Rejection | None = None, subject: bool = False, eyes:
 
 class TestSubjectMark(unittest.TestCase):
     def test_a_qualifying_subject_is_the_green_mark_without_label(self):
-        mark = SubjectMark().update(FaceFrame((observation(), observation(subject=True)), True, 10.0), 10.0)
+        mark = SubjectMark().update(FaceFrame((observation(), observation(subject=True)), 10.0), 10.0, 0.0)
         self.assertEqual(mark.color, SUBJECT_COLOR)
         self.assertEqual(mark.label, '')
         self.assertAlmostEqual(mark.w, 0.4)
 
-    def test_nothing_without_a_qualifying_subject(self):
+    def test_the_active_colour_is_given_and_the_drain_stays_grey(self):
         subject = SubjectMark()
-        self.assertIsNone(subject.update(None, 10.0))
-        self.assertIsNone(subject.update(FaceFrame((), False, 10.0), 10.0))
-        self.assertIsNone(subject.update(FaceFrame((observation(Rejection.TURNED, subject=True),), False, 10.1), 10.1))
+        blue = (0.0, 0.0, 1.0, 1.0)
+        good = FaceFrame((observation(subject=True),), 10.0)
+        away = FaceFrame((observation(Rejection.TURNED, subject=True),), 10.1)
+        self.assertEqual(subject.update(good, 10.0, 0.4, blue).color, blue)
+        self.assertEqual(subject.update(away, 10.1, 0.3, blue).color, REJECTED_COLOR)
+        marks = build_marks(FaceFrame((observation(subject=True), observation()), 0.0), blue)
+        self.assertEqual([m.color for m in marks], [ACCEPTED_COLOR, blue])
 
-    def test_the_mark_holds_through_a_short_rejection_and_then_goes(self):
+    def test_nothing_without_a_charge_or_a_qualifying_subject(self):
         subject = SubjectMark()
-        good = FaceFrame((observation(subject=True),), True, 10.0)
-        blink = FaceFrame((observation(Rejection.EYES, subject=True),), False, 10.1)
-        self.assertIsNotNone(subject.update(good, 10.0))
-        self.assertIsNotNone(subject.update(blink, 10.2))
-        self.assertIsNone(subject.update(blink, 10.0 + FACES_STALE + 0.1))
+        self.assertIsNone(subject.update(None, 10.0, 0.0))
+        self.assertIsNone(subject.update(FaceFrame((), 10.0), 10.0, 0.0))
+        self.assertIsNone(subject.update(FaceFrame((observation(Rejection.TURNED, subject=True),), 10.1), 10.1, 0.0))
+
+    def test_grey_on_the_face_while_the_charge_drains(self):
+        subject = SubjectMark()
+        good = FaceFrame((observation(subject=True),), 10.0)
+        away = FaceFrame((observation(Rejection.TURNED, subject=True, bbox=(0.3, 0.2, 0.7, 0.7)),), 10.1)
+        self.assertEqual(subject.update(good, 10.0, 0.4).color, SUBJECT_COLOR)
+        mark = subject.update(away, 10.1, 0.35)
+        self.assertEqual(mark.color, REJECTED_COLOR)
+        self.assertAlmostEqual(mark.x, 0.3)                       # follows the face that is there
+        self.assertIsNone(subject.update(away, 10.2, 0.0))        # drained: gone
+
+    def test_grey_where_the_face_was_when_it_left(self):
+        subject = SubjectMark()
+        good = FaceFrame((observation(subject=True),), 10.0)
+        subject.update(good, 10.0, 0.4)
+        mark = subject.update(FaceFrame((), 10.1), 10.1, 0.3)
+        self.assertEqual(mark.color, REJECTED_COLOR)
+        self.assertAlmostEqual(mark.x, 0.1)
+        stale = subject.update(good, 10.0 + FACES_STALE + 0.1, 0.2)     # the detector stopped: its frame is old
+        self.assertEqual(stale.color, REJECTED_COLOR)
 
     def test_a_stale_detector_frame_gives_no_mark(self):
         subject = SubjectMark()
-        good = FaceFrame((observation(subject=True),), True, 10.0)
-        self.assertIsNone(subject.update(good, 20.0))
+        good = FaceFrame((observation(subject=True),), 10.0)
+        self.assertIsNone(subject.update(good, 20.0, 0.0))
 
 
 class TestFaceLabel(unittest.TestCase):
@@ -53,24 +75,24 @@ class TestFaceLabel(unittest.TestCase):
 
 class TestBuildMarks(unittest.TestCase):
     def test_colours_and_lines(self):
-        frame = FaceFrame((observation(subject=True), observation(), observation(Rejection.EYES)), True, 0.0)
+        frame = FaceFrame((observation(subject=True), observation(), observation(Rejection.EYES)), 0.0)
         marks = {m.color: m for m in build_marks(frame)}
         self.assertEqual(marks[SUBJECT_COLOR].line, SUBJECT_LINE_PX)
         self.assertEqual(marks[ACCEPTED_COLOR].line, LINE_PX)
         self.assertEqual(marks[REJECTED_COLOR].line, LINE_PX)
 
     def test_a_rejected_subject_is_grey_but_thick(self):
-        marks = build_marks(FaceFrame((observation(Rejection.TURNED, subject=True),), False, 0.0))
+        marks = build_marks(FaceFrame((observation(Rejection.TURNED, subject=True),), 0.0))
         self.assertEqual(marks[0].color, REJECTED_COLOR)
         self.assertEqual(marks[0].line, SUBJECT_LINE_PX)
 
     def test_rejected_first_subject_last(self):
-        frame = FaceFrame((observation(subject=True), observation(Rejection.SMALL), observation()), True, 0.0)
+        frame = FaceFrame((observation(subject=True), observation(Rejection.SMALL), observation()), 0.0)
         colors = [m.color for m in build_marks(frame)]
         self.assertEqual(colors, [REJECTED_COLOR, ACCEPTED_COLOR, SUBJECT_COLOR])
 
     def test_box_from_bbox(self):
-        mark = build_marks(FaceFrame((observation(bbox=(0.1, 0.2, 0.5, 0.7)),), False, 0.0))[0]
+        mark = build_marks(FaceFrame((observation(bbox=(0.1, 0.2, 0.5, 0.7)),), 0.0))[0]
         self.assertAlmostEqual(mark.x, 0.1)
         self.assertAlmostEqual(mark.y, 0.2)
         self.assertAlmostEqual(mark.w, 0.4)

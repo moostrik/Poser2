@@ -71,6 +71,7 @@ class Forgettable():
         self.osc: Osc = Osc(self.settings.osc)
         self.save: ClipSaver = ClipSaver(self.settings.sequence)
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
+        self._style_picked: bool = False    # the style of the next visitor is picked: until the flash
         self.artnet = Artnet(self.settings.artnet, 'data/artnet.json')
 
         self._running: bool = False
@@ -147,15 +148,17 @@ class Forgettable():
         artnet_progress: float = message.progress
         if seq == SequenceType.TIMEOUT:
             artnet_progress = 1.0
-        if seq == SequenceType.CAMERA_DETECT:
-            artnet_progress = 0.0
         self.artnet.set_progress(artnet_progress, ani)
 
-        if seq == SequenceType.CAMERA_DETECT and message.initial:
+        if seq == SequenceType.CAMERA_DETECT and not self._style_picked:
             # one style per visitor; the style id is also the movement id that picks the music.
-            # Picked when the sequence starts, so the music player has the track loaded at the flash
+            # Picked when a face starts charging, so the music player has the track loaded at the
+            # flash; a charge that drains and starts again keeps the style that was picked
+            self._style_picked = True
             movement_id: str = self.diffuse.next_style()
             self.audio.update(movement_id)
+        if seq == SequenceType.FLASH and message.initial:
+            self._style_picked = False
 
         if self.settings.osc.active:
             progress: float = message.progress
@@ -167,7 +170,7 @@ class Forgettable():
         if seq == SequenceType.CAMERA_SHOW and message.initial:
             self.face.reset()
 
-        if seq >= SequenceType.CAMERA_SHOW and seq <= SequenceType.CAMERA_REC:
+        if seq >= SequenceType.CAMERA_SHOW and seq <= SequenceType.CAMERA_DETECT:
             self.face.set_image(cam_image)
 
         if seq == SequenceType.CAPTURE:
@@ -196,8 +199,8 @@ class Forgettable():
             self.diffuse.interrupt()
 
     def face_callback(self, frame: FaceFrame) -> None:
-        if frame.stable:
-            self.sequencer.set_face_found()
+        # the sequencer charges toward the flash while the face qualifies
+        self.sequencer.set_face(frame.qualified, frame.time)
 
     def diffusion_callback(self, message: GenMessage) -> None:
         # a visitor's recording: the portrait still and the grin clip (not the step previews)
