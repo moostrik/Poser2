@@ -141,7 +141,8 @@ class StyleMode(Enum):
 
 class PipelineSettings(BaseSettings):
     style_mode:     Field[StyleMode] = Field(StyleMode.BOTH, description="Style of the visitors: only A, only B, or both in turn")
-    style_visitors: Field[int] = Field(26, min=1, max=100, step=1, description="Visitors per style before the other one, with Both")
+    style_visitors_a: Field[int] = Field(26, min=1, max=100, step=1, label="Visitors A", description="Visitors in style A before B takes over, with Both")
+    style_visitors_b: Field[int] = Field(26, min=1, max=100, step=1, label="Visitors B", description="Visitors in style B before A takes over, with Both")
     style_current:  Field[str] = Field("A", access=Field.READ, description="Style of the current visitor: A (music: Smooth) or B (music: Party)")
     skip_generation: Field[bool] = Field(False, newline=True, description="Debug: only describe and depth, no portrait and no grin")
     skip_animation:  Field[bool] = Field(False, description="Debug: no grin animation, the portrait is the result")

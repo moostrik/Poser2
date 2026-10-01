@@ -347,7 +347,7 @@ class TestWorkflow(unittest.TestCase):
 class TestStyles(unittest.TestCase):
     def test_cycle(self):
         settings = PipelineSettings()
-        settings.style_visitors = 2
+        settings.style_visitors_a = settings.style_visitors_b = 2
         styles = Styles(settings)
         ids = [styles.advance() for _ in range(3)]
         self.assertEqual(ids, ['0000', '0000', '0001'])
@@ -358,9 +358,17 @@ class TestStyles(unittest.TestCase):
         self.assertEqual(settings.style_current, 'A')
         self.assertIs(styles.current(), settings.style_a)
 
+    def test_each_style_has_its_own_number_of_visitors(self):
+        settings = PipelineSettings()
+        settings.style_visitors_a = 3
+        settings.style_visitors_b = 1
+        styles = Styles(settings)
+        ids = [styles.advance() for _ in range(9)]
+        self.assertEqual(ids, ['0000', '0000', '0000', '0001', '0000', '0000', '0000', '0001', '0000'])
+
     def test_one_style_for_everyone(self):
         settings = PipelineSettings()
-        settings.style_visitors = 2
+        settings.style_visitors_a = settings.style_visitors_b = 2
         styles = Styles(settings)
         settings.style_mode = StyleMode.B
         self.assertEqual([styles.advance() for _ in range(5)], ['0001'] * 5)

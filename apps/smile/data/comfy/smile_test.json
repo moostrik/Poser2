@@ -34,27 +34,27 @@
   },
   "1024": {
     "inputs": {
-      "seed": 2282865752,
-      "frames": 10,
+      "seed": 1526911975,
+      "frames": 200,
       "ease": "sine_in_out",
       "crop_factor": 1.7,
       "midpoint": 0.72,
       "midpoint_deviation": 0.18,
       "smile": 2.0,
-      "aaa": 6.973178085844877,
-      "eee": -10.589369539362007,
-      "eyebrow": -20.348692419736146,
-      "blink": -13.310951540222852,
+      "aaa": -0.9104525526824467,
+      "eee": -17.847593425618346,
+      "eyebrow": -7.641161991963017,
+      "blink": -14.137003002829006,
       "wink": 0.0,
-      "woo": -19.133171997535996,
+      "woo": -4.959368806394108,
       "pupil_x": 0.0,
       "pupil_y": 0.0,
-      "rotate_pitch_min": -7.847257246194957,
-      "rotate_pitch_max": -7.847257246194957,
-      "rotate_yaw_min": -6.803999974544973,
-      "rotate_yaw_max": -6.803999974544973,
-      "rotate_roll_min": 6.87442756265736,
-      "rotate_roll_max": 6.87442756265736,
+      "rotate_pitch_min": 1.903559095291898,
+      "rotate_pitch_max": 1.903559095291898,
+      "rotate_yaw_min": -10.78326760022216,
+      "rotate_yaw_max": -10.78326760022216,
+      "rotate_roll_min": -9.844474906275739,
+      "rotate_roll_max": -9.844474906275739,
       "image": [
         "1002:36",
         0
@@ -85,10 +85,10 @@
       "quantization": "None (FP16)",
       "attention_mode": "auto",
       "preset_prompt": "🖼️ Tags",
-      "custom_prompt": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no colors, no colors for eyes, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips",
+      "custom_prompt": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips",
       "max_tokens": 120,
       "keep_model_loaded": true,
-      "seed": 3763033410,
+      "seed": 2194637497,
       "image": [
         "1006",
         0
@@ -137,8 +137,8 @@
   "1002:1043": {
     "inputs": {
       "lora_name": "looking_at_viewer.safetensors",
-      "strength_model": 5.0,
-      "strength_clip": 5.0,
+      "strength_model": 1.0,
+      "strength_clip": 1.0,
       "model": [
         "1002:1040",
         0
@@ -156,8 +156,8 @@
   "1002:1045": {
     "inputs": {
       "lora_name": "dark.safetensors",
-      "strength_model": 0.0,
-      "strength_clip": 0.0,
+      "strength_model": -0.65,
+      "strength_clip": -0.65,
       "model": [
         "1002:1043",
         0
@@ -174,7 +174,7 @@
   },
   "1002:22": {
     "inputs": {
-      "text": "(nude) portrait by (Mert and Marcus: 2.0), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 1.5)",
+      "text": "(nude) portrait by (Mert and Marcus: 1.5), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 1.25)",
       "clip": [
         "1002:1045",
         1
@@ -368,9 +368,9 @@
   },
   "1002:33": {
     "inputs": {
-      "strength": 1.0,
+      "strength": 0.0,
       "start_percent": 0,
-      "end_percent": 0.45,
+      "end_percent": 0.0,
       "positive": [
         "1002:30",
         1
@@ -406,7 +406,7 @@
   },
   "1002:35": {
     "inputs": {
-      "seed": 1268090099,
+      "seed": 2859004738,
       "steps": 6,
       "cfg": 1.5,
       "sampler_name": "dpmpp_sde",
@@ -520,7 +520,7 @@
         "1024",
         0
       ],
-      "batch_index": 9,
+      "batch_index": 199,
       "length": 1
     },
     "_meta": {
@@ -573,13 +573,17 @@
       "title": "Depth of last frame"
     }
   },
-  "1000:2": {
+  "1000:3": {
     "inputs": {
-      "precision": "auto"
+      "face_detector": "blazeface_back_camera",
+      "landmarkrunner_device": "CUDA",
+      "face_detector_device": "cuda",
+      "face_detector_dtype": "fp16",
+      "keep_model_loaded": true
     },
-    "class_type": "DownloadAndLoadLivePortraitModels",
+    "class_type": "LivePortraitLoadFaceAlignmentCropper",
     "_meta": {
-      "title": "(Down)Load LivePortraitModels"
+      "title": "LivePortrait Load FaceAlignmentCropper"
     }
   },
   "1000:4": {
@@ -609,17 +613,13 @@
       "title": "Face crop"
     }
   },
-  "1000:3": {
+  "1000:2": {
     "inputs": {
-      "face_detector": "blazeface_back_camera",
-      "landmarkrunner_device": "CUDA",
-      "face_detector_device": "cuda",
-      "face_detector_dtype": "fp16",
-      "keep_model_loaded": true
+      "precision": "auto"
     },
-    "class_type": "LivePortraitLoadFaceAlignmentCropper",
+    "class_type": "DownloadAndLoadLivePortraitModels",
     "_meta": {
-      "title": "LivePortrait Load FaceAlignmentCropper"
+      "title": "(Down)Load LivePortraitModels"
     }
   },
   "1000:5": {

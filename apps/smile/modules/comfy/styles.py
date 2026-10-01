@@ -23,7 +23,7 @@ class Styles():
         """Call once per visitor; returns the style id for this visitor."""
         mode: StyleMode = self.settings.style_mode
         if mode is StyleMode.BOTH:
-            if self._count >= self.settings.style_visitors:
+            if self._count >= self._visitors():
                 self._count = 0
                 self._index = (self._index + 1) % len(self._ids)
             self._count += 1
@@ -33,6 +33,10 @@ class Styles():
             self._count = 0
         self.settings.style_current = STYLE_LETTERS[self.current_id()].upper()
         return self.current_id()
+
+    def _visitors(self) -> int:
+        """How many visitors the current style gets before the other one (each style has its own number)."""
+        return getattr(self.settings, f'style_visitors_{STYLE_LETTERS[self.current_id()]}')
 
     def current_id(self) -> str:
         return self._ids[self._index]
