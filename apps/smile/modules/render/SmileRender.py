@@ -1,5 +1,4 @@
 import time
-from threading import Lock
 
 import glfw
 import numpy as np
@@ -12,7 +11,7 @@ from modules.gl import Blit, Fbo, RenderBase, Shader, Style, Texture, clear_colo
 from modules.gl.Utils import fit
 from modules.render.inputs import Inputs
 from modules.render.layers import CameraLayer, DestructLayer, DiffusionLayer, FaceOverlayLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer
-from modules.render.layers.face_marks import build_marks
+from modules.render.layers.face_marks import FACES_STALE, build_marks
 from modules.render.layers.passes import copy
 from modules.render.Sequencer import SequenceType, Sequencer
 from modules.render.settings import RenderSettings
@@ -20,9 +19,6 @@ from modules.render.stages import STAGES, Layers, Stage
 
 # 32 bit: the trail (0.995) adds steps too small for half floats
 COMPOSITION_FORMAT = GL_RGBA32F
-
-# the face overlay shows no faces older than this: the detector only runs in the camera states
-FACES_STALE: float = 0.5
 
 
 class SmileRender(RenderBase):
@@ -41,7 +37,7 @@ class SmileRender(RenderBase):
         self.height: int = height
 
         self.inputs: Inputs = Inputs()
-        camera = CameraLayer(self.inputs.camera)
+        camera = CameraLayer(self.inputs.camera, self.inputs.faces)
         self.layers: Layers = Layers(
             camera=camera,
             flash=FlashLayer(camera, self.inputs.white),
@@ -55,8 +51,6 @@ class SmileRender(RenderBase):
         self._status: StatusLayer = StatusLayer()
         self._status_text: str | None = None
         self._all_layers: list[LayerBase] = list(vars(self.layers).values()) + [self._faces, self._status]
-        self._faces_mutex: Lock = Lock()
-        self._face_frame: FaceFrame | None = None
 
         # one instance per stage class, shared by the sequence types it covers
         stages: dict[type[Stage], Stage] = {cls: cls(self.inputs, self.layers, settings) for cls in set(STAGES.values())}
@@ -129,8 +123,7 @@ class SmileRender(RenderBase):
             self.sequencer.set_diffusion_progress(self.player.progress)
 
     def _render_faces(self, source: Texture) -> None:
-        with self._faces_mutex:
-            frame: FaceFrame | None = self._face_frame
+        frame: FaceFrame | None = self.inputs.faces.get()
         if frame is None or time.time() - frame.time > FACES_STALE:
             self._faces.set_marks([])
         else:
@@ -174,8 +167,7 @@ class SmileRender(RenderBase):
         self._status_text = text
 
     def set_faces(self, frame: FaceFrame) -> None:
-        with self._faces_mutex:
-            self._face_frame = frame
+        self.inputs.faces.set(frame)
 
     def set_diffusion_message(self, message: GenMessage) -> None:
         # the image first, so it is uploaded no later than the frame the new state starts

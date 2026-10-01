@@ -4,13 +4,40 @@ import unittest
 
 from modules.face.FaceFinder import FaceFrame
 from modules.face.quality import FaceObservation, Pose, Rejection
-from modules.render.layers.face_marks import ACCEPTED_COLOR, REJECTED_COLOR, SUBJECT_COLOR, SUBJECT_LINE_PX, LINE_PX, build_marks, face_label
+from modules.render.layers.face_marks import ACCEPTED_COLOR, FACES_STALE, REJECTED_COLOR, SUBJECT_COLOR, SUBJECT_LINE_PX, LINE_PX, SubjectMark, build_marks, face_label
 
 
 def observation(rejection: Rejection | None = None, subject: bool = False, eyes: float | None = 0.3, bbox=(0.1, 0.2, 0.5, 0.7),
                 limit: float = 0.0, pose: Pose = Pose(4.4, -6.0, 2.0, 0.48)) -> FaceObservation:
     return FaceObservation(bbox=bbox, kps=((0.2, 0.3),) * 5, score=0.9, eye_dist=0.06, centre=0.1, pose=pose,
                            eyes=eyes, rejection=rejection, limit=limit, subject=subject)
+
+
+class TestSubjectMark(unittest.TestCase):
+    def test_a_qualifying_subject_is_the_green_mark_without_label(self):
+        mark = SubjectMark().update(FaceFrame((observation(), observation(subject=True)), True, 10.0), 10.0)
+        self.assertEqual(mark.color, SUBJECT_COLOR)
+        self.assertEqual(mark.label, '')
+        self.assertAlmostEqual(mark.w, 0.4)
+
+    def test_nothing_without_a_qualifying_subject(self):
+        subject = SubjectMark()
+        self.assertIsNone(subject.update(None, 10.0))
+        self.assertIsNone(subject.update(FaceFrame((), False, 10.0), 10.0))
+        self.assertIsNone(subject.update(FaceFrame((observation(Rejection.TURNED, subject=True),), False, 10.1), 10.1))
+
+    def test_the_mark_holds_through_a_short_rejection_and_then_goes(self):
+        subject = SubjectMark()
+        good = FaceFrame((observation(subject=True),), True, 10.0)
+        blink = FaceFrame((observation(Rejection.EYES, subject=True),), False, 10.1)
+        self.assertIsNotNone(subject.update(good, 10.0))
+        self.assertIsNotNone(subject.update(blink, 10.2))
+        self.assertIsNone(subject.update(blink, 10.0 + FACES_STALE + 0.1))
+
+    def test_a_stale_detector_frame_gives_no_mark(self):
+        subject = SubjectMark()
+        good = FaceFrame((observation(subject=True),), True, 10.0)
+        self.assertIsNone(subject.update(good, 20.0))
 
 
 class TestFaceLabel(unittest.TestCase):

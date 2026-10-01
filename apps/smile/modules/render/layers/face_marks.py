@@ -1,5 +1,6 @@
-"""One detected face turned into one mark of the operator overlay: its box, colour and label.
-No GL: arithmetic and text, built once per frame for the FaceOverlayLayer (after poser2's marks)."""
+"""One detected face turned into one mark: its box, colour and label. No GL: arithmetic and text
+(after poser2's marks). `build_marks` is the operator overlay (every face, with its readout);
+`SubjectMark` is the show's own mark, the green box of the chosen face."""
 
 from dataclasses import dataclass
 
@@ -15,6 +16,10 @@ LABEL_BG: Color = (0.0, 0.0, 0.0, 0.6)
 
 SUBJECT_LINE_PX: float = 3.0
 LINE_PX: float = 1.5
+
+# no marks from faces older than this: the detector only runs in the camera states.
+# Also how long the show's mark holds when its face stops qualifying, so a blink does not flicker it
+FACES_STALE: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -53,3 +58,23 @@ def build_marks(frame: FaceFrame) -> list[Mark]:
     order: list[int] = [i for i, f in enumerate(frame.faces)]
     order.sort(key=lambda i: (frame.faces[i].rejection is None, frame.faces[i].subject))
     return [marks[i] for i in order]
+
+
+class SubjectMark:
+    """The show's mark: the green box of the subject while it qualifies, without a label. Held for
+    FACES_STALE after the last qualifying frame; None without one."""
+
+    def __init__(self) -> None:
+        self._mark: Mark | None = None
+        self._time: float = 0.0
+
+    def update(self, frame: FaceFrame | None, now: float) -> Mark | None:
+        if frame is not None and frame.time > self._time:
+            subject: FaceObservation | None = frame.subject
+            if subject is not None and subject.rejection is None:
+                x0, y0, x1, y1 = subject.bbox
+                self._mark = Mark(x0, y0, x1 - x0, y1 - y0, subject.kps, SUBJECT_COLOR, SUBJECT_LINE_PX, '')
+                self._time = frame.time
+        if self._mark is not None and now - self._time > FACES_STALE:
+            self._mark = None
+        return self._mark

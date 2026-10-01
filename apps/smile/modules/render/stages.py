@@ -37,7 +37,7 @@ class Stage:
 
 
 class CameraStage(Stage):
-    """Black and white camera, turning to colour when a face is found."""
+    """Black and white camera; the chosen face's box turns to colour when the face is found."""
 
     def update(self, message: SeqenceMessage) -> None:
         if message.sequence_type == SequenceType.CAMERA_SHOW:
@@ -45,7 +45,7 @@ class CameraStage(Stage):
         elif message.sequence_type == SequenceType.CAMERA_DETECT:
             self.layers.camera.render(message.value_1)
         else:
-            self.layers.camera.render()
+            self.layers.camera.render(1.0)
 
     @property
     def output(self) -> Texture:
@@ -57,7 +57,7 @@ class FlashStage(Stage):
 
     def update(self, message: SeqenceMessage) -> None:
         if message.sequence_type == SequenceType.FLASH:
-            self.layers.camera.render()
+            self.layers.camera.render(1.0)
         self.layers.flash.render(message.value_1)
 
     @property

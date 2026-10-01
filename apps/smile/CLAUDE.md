@@ -26,8 +26,12 @@ button: it depends on the camera height), eye openness from the 106 landmarks (`
 is the face's `Rejection`. Gaze is not checked: the "looking at viewer" LoRA corrects it. The subject of a frame is its largest qualifying face; a face that qualifies for
 `stable_time` without interruption starts a sequence. The capture is the last frame of the
 recording in which the subject qualified (the last frame at all when none did), cropped by
-`portrait_crop` (eyes levelled, at the workflow's portrait size). Every frame's faces go to the render for the
-operator overlay (`render.show_faces`: `FaceOverlayLayer`, marks built in `face_marks.py`).
+`portrait_crop` (eyes levelled, at the workflow's portrait size). Every frame's faces go to the render
+(`Inputs.faces`), for two things. The show: `CameraLayer` draws the camera in black and white with
+the qualifying subject's box in colour (fading in when the face is found), its green outline and
+keypoints; they are part of the camera layer, so the flash fades them to white with it. The
+operator overlay (`render.show_faces`: `FaceOverlayLayer`): every face with its readout or reject
+reason, over the output. Marks are built in `face_marks.py`, drawn by `MarkDrawer`.
 
 ## Image generator
 
