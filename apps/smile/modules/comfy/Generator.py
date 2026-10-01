@@ -72,7 +72,7 @@ class Generator(Thread):
             self.player.clear()
 
     def next_style(self) -> str:
-        """Call once per visitor (at the flash); returns the style id, which also picks the music."""
+        """Call once per visitor (when its sequence starts); returns the style id, which also picks the music."""
         return self.styles.advance()
 
     def add_message_callback(self, callback: MessageCallback) -> None:

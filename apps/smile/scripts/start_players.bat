@@ -3,7 +3,7 @@
 @REM Extra arguments go to both players, e.g.:  start_players.bat -n 12 --pool 30
 @REM Use  start_players.bat console  to run them with a console for the logs (Ctrl+C to stop).
 
-set "PLAYERS=1"
+set "PLAYERS=2"
 set "WINDOWED=1"
 set "PLAYER_1_MONITOR=1"
 set "PLAYER_2_MONITOR=2"

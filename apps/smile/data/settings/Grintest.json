@@ -1,11 +1,12 @@
 {
   "camera": {
-    "use_image": true,
+    "use_image": false,
     "image": "2024_09_15_14_47_39_A.jpg",
+    "image_next": false,
     "flip_h": false,
     "flip_v": false,
-    "gain_auto": false,
-    "gain_target": 40,
+    "gain_auto": true,
+    "gain_target": 33,
     "face": {
       "confidence": 0.5,
       "stable_time": 0.3,
@@ -108,6 +109,7 @@
   "sequence": {
     "pause": false,
     "save": true,
+    "encoder": "AUTO",
     "camera_in": 1.0,
     "camera_in_ease": "LINEAR",
     "camera_out": 1.0,
@@ -116,7 +118,7 @@
     "flash_in_ease": "QUAD_IN",
     "flash_hold": 0.5,
     "flash_out_auto": true,
-    "flash_out": 3.166951251029968,
+    "flash_out": 4.37352991104126,
     "flash_out_ease": "SINE_OUT",
     "grin_delay": 0.5,
     "grin_fps": 13.0,
@@ -139,8 +141,8 @@
       "title": "SMILE",
       "v_sync": true,
       "monitor": "M0",
-      "x": 1281,
-      "y": 31,
+      "x": 1028,
+      "y": 231,
       "width": 638,
       "height": 1000,
       "secondary_list": [],

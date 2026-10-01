@@ -141,6 +141,12 @@ class Forgettable():
             artnet_progress = 0.0
         self.artnet.set_progress(artnet_progress, ani)
 
+        if seq == SequenceType.CAMERA_DETECT and message.initial:
+            # one style per visitor; the style id is also the movement id that picks the music.
+            # Picked when the sequence starts, so the music player has the track loaded at the flash
+            movement_id: str = self.diffuse.next_style()
+            self.audio.update(movement_id)
+
         if self.settings.osc.active:
             progress: float = message.progress
             audio_id: str = self.audio.get_audio_id()
@@ -153,12 +159,6 @@ class Forgettable():
 
         if seq >= SequenceType.CAMERA_SHOW and seq <= SequenceType.CAMERA_REC:
             self.face.set_image(cam_image)
-
-        if seq == SequenceType.FLASH:
-            if message.initial == True:
-                # one style per visitor; the style id is also the movement id that picks the music
-                movement_id: str = self.diffuse.next_style()
-                self.audio.update(movement_id)
 
         if seq == SequenceType.CAPTURE:
             # the last frame of the recording in which the face qualified; the full camera frame without one
