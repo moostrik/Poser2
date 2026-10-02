@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from modules.comfy.settings import PipelineSettings
-from modules.Forgettable import VISITOR_MARGIN, Forgettable
+from modules.main import VISITOR_MARGIN, Main
 from modules.render.Sequencer import SequenceType
 
 
@@ -19,8 +19,8 @@ class TestVisitorLimit(unittest.TestCase):
         self.limit: float = 100.0 + 45.0 + VISITOR_MARGIN
 
     def step(self, now: float, seq: SequenceType) -> None:
-        with mock.patch('modules.Forgettable.time.time', lambda: now):
-            Forgettable._limit_visitor(self.app, seq)
+        with mock.patch('modules.main.time.time', lambda: now):
+            Main._limit_visitor(self.app, seq)
 
     def test_a_visitor_within_its_time_is_left_alone(self):
         self.step(self.limit - 1.0, SequenceType.DIFFUSION)

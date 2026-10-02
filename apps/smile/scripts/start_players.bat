@@ -40,13 +40,13 @@ goto collect
 :collected
 
 echo Closing running players
-powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='pythonw.exe' or Name='python.exe'\" | Where-Object { $_.CommandLine -like '*pl_player.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='pythonw.exe' or Name='python.exe'\" | Where-Object { $_.CommandLine -like '*player.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
 timeout /t 1 /nobreak >nul
 
 echo Opening Video Player 1
-start "Player 1" %WINDOW% "%PYTHON%" pl_player.py -m %PLAYER_1_MONITOR% -osc %PLAYER_1_OSC_PORT%%MODE%%ARGS%
+start "Player 1" %WINDOW% "%PYTHON%" player.py -m %PLAYER_1_MONITOR% -osc %PLAYER_1_OSC_PORT%%MODE%%ARGS%
 timeout /t 2 /nobreak >nul
 
 if %PLAYERS% lss 2 goto :eof
 echo Opening Video Player 2
-start "Player 2" %WINDOW% "%PYTHON%" pl_player.py -m %PLAYER_2_MONITOR% -osc %PLAYER_2_OSC_PORT%%MODE%%ARGS%
+start "Player 2" %WINDOW% "%PYTHON%" player.py -m %PLAYER_2_MONITOR% -osc %PLAYER_2_OSC_PORT%%MODE%%ARGS%

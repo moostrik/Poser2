@@ -2,7 +2,7 @@
 
 Art installation: a camera captures a face, an image generator turns it into a portrait, and the
 result is shown with music (Max patch via OSC) and lights (Art-Net). Entry points: `smile.py`
-(main app, `modules/Forgettable.py`) and `pl_player.py` (image players). Python 3.12, venv in
+(main app, `Main` in `modules/main.py`) and `player.py` (image players). Python 3.12, venv in
 `.venv`, installed with `scripts/install.bat`. Tests: `.venv\Scripts\python -m pytest` from the repo root.
 All Python code lives in `modules/`; `data/` is what the installation is given (presets, models,
 workflow, audio, test photos), `output/` what it produces (git-ignored, safe to delete).
@@ -89,14 +89,14 @@ visitor: a second workflow in between drops the first from ComfyUI's cache and r
 After every connect, a warm-up run on `data/comfy/warmup.jpg` (`build_warmup`: the same workflow
 with one sampler step and one grin frame) loads the models and proves the chain works (own limit
 `WARMUP_TIMEOUT`; a visitor has `connection.job_timeout`). Until `Generator.ready` no sequence starts (`Sequencer.blocked`,
-set in `Forgettable`) and the render shows the generator's status as a line (`StatusLayer`) and the
+set in `Main`) and the render shows the generator's status as a line (`StatusLayer`) and the
 whole camera image in pixels without any face box or mark (`CameraLayer.warmup`, from `Generator.warmup`): 256 pixels
 wide without ComfyUI, smaller with every step the warm-up reaches, sharp when ready.
 The sequence waits for the generator (the flash for the capture's depth, the result for IDLE), so every
 end of a job says IDLE, and three things keep that wait from lasting: a reset (`Generator.interrupt`,
 sent at every RESET) ends a visitor's job only, never a warm-up, which would otherwise count as passed;
 a capture taken while the generator is not ready is not handed over and stands as the result at once;
-and `Forgettable._limit_visitor` ends a visitor the generator did not end 30 s after its `job_timeout`
+and `Main._limit_visitor` ends a visitor the generator did not end 30 s after its `job_timeout`
 (not while the grin loops), which only happens when the generator's thread is stuck.
 For debugging the rest of the cycle, `pipeline.skip_generation` sends the capture for the
 description and its depth only (`build_describe`: no portrait, no grin); the flash out then goes
@@ -130,7 +130,7 @@ its timings in the sequence settings. At the capture the diffusion layer starts 
 a generation that fails shows the capture as its result and nothing of the previous visitor.
 `render.show_camera` draws the raw camera on top and starts
 no new sequence while it is on (`Sequencer.blocked`). Shaders are
-`classname.frag` next to their `.py` and hot-reload while running. `pl_player.py` uses the same engine
+`classname.frag` next to their `.py` and hot-reload while running. `player.py` uses the same engine
 (`modules/player/Render.py`).
 
 ## Recordings
@@ -152,7 +152,7 @@ must be on the PATH: the gyan.dev full build); the encoder is picked at startup 
 (Intel Quick Sync on the iGPU, then Nvidia, then libx264; `sequence.encoder` forces one). Never start
 those processes any other way: the apps run under pythonw, so they need `CREATE_NO_WINDOW` and no
 inherited handles. The players (`modules/player/`) decode each of the newest clips once into RAM
-(`ClipPool`, 512x640, about 200 MB per clip) and play from memory; `pl_player.py -n` sets the number
+(`ClipPool`, 512x640, about 200 MB per clip) and play from memory; `player.py -n` sets the number
 of cells, `--pool` the clips kept, `--fps` the playback speed (default 20, 0 = the clip's own rate), `--spread` a random speed difference per play so the cells drift apart (default 0.1), `--trail` a blend with the previous output (default 0: none).
 The players show one style (`--no-follow_style`: the newest clips of both together): a clip arriving in the other style's folder is the
 switch (`FolderScanner`), the pool loads a random selection of that style's clips from disk and each
@@ -170,7 +170,7 @@ restarts everything (ComfyUI, Max, the players, SMILE).
 
 ## Settings
 
-Settings system copied from poser2 (`modules/settings/`); root tree in `modules/smile_settings.py`,
+Settings system copied from poser2 (`modules/settings/`); root tree in `modules/main_settings.py`,
 presets in `data/settings/`, web panel at `http://localhost:667`.
 
 - `BaseSettings` subclasses are pure data containers with no runtime side effects

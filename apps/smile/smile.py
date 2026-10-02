@@ -3,7 +3,7 @@ from os import _exit
 from signal import signal, SIGINT
 from time import sleep
 from modules.log_config import setup_logging, install_excepthooks
-from modules.Forgettable import Forgettable, CamType
+from modules.main import Main, CamType
 
 parser: ArgumentParser = ArgumentParser()
 parser.add_argument('-dw',  '--width',          type=int,   default=1120,    help='image width (4:5 like the generated portraits)')
@@ -28,16 +28,16 @@ if args.useVimbaCam:
 if args.useWebCam:
     camType = CamType.WEB
 
-aiia = Forgettable(modWidth, modHeight, not(bool(args.landscapeMode)), camType, args.fullscreen)
-aiia.start()
+app = Main(modWidth, modHeight, not(bool(args.landscapeMode)), camType, args.fullscreen)
+app.start()
 
 def signal_handler_exit(sig, frame) -> None:
-    if aiia.isRunning():
-        aiia.stop()
+    if app.isRunning():
+        app.stop()
 
 signal(SIGINT, signal_handler_exit)
 
-while aiia.isRunning():
+while app.isRunning():
     sleep(0.05)
 
 # GLFW does not shut down cleanly outside the main thread (as in poser2)

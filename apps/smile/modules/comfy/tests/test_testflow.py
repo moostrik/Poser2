@@ -5,7 +5,7 @@ import unittest
 
 from modules.comfy.testflow import CAPTURE, OUTPUT_CLASSES, PROMPT, SWITCH, make_test_workflow
 from modules.comfy.workflow import Workflow
-from modules.smile_settings import Settings
+from modules.main_settings import Settings
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 WORKFLOW = os.path.join(ROOT, 'data', 'comfy', 'smile_workflow.json')

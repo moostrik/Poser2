@@ -8,7 +8,7 @@ set "CURRENT_DIR=%~dp0..\"
 cd /d "%CURRENT_DIR%"
 
 echo Closing SMILE and the image players
-powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='pythonw.exe' or Name='python.exe'\" | Where-Object { $_.CommandLine -like '*smile.py*' -or $_.CommandLine -like '*pl_player.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='pythonw.exe' or Name='python.exe'\" | Where-Object { $_.CommandLine -like '*smile.py*' -or $_.CommandLine -like '*player.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
 
 @REM whatever listens on ComfyUI's port, however it was started; then wait until the port is free
 echo Closing Image Generator (ComfyUI)

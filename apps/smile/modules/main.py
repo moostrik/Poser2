@@ -11,7 +11,7 @@ from modules.save.ClipSaver import ClipSaver
 from modules.artnet.Sender import Sender as Artnet
 from modules.settings import presets, NiceServer
 from modules.gl import FullscreenMode
-from modules.smile_settings import Settings
+from modules.main_settings import Settings
 from enum import Enum
 import logging
 import time
@@ -28,7 +28,7 @@ class CamType(Enum):
     VIMBA   = 2
     WEB     = 3
 
-class Forgettable():
+class Main():
     def __init__(self, width: int, height: int, portraitMode: bool = False, camType: CamType = CamType.VIMBA,
                  fullscreen: bool = False) -> None:
         self.width: int = width

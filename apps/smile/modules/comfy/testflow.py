@@ -15,7 +15,7 @@ import os
 
 from modules.comfy.workflow import Workflow, _find
 from modules.settings import presets
-from modules.smile_settings import Settings
+from modules.main_settings import Settings
 
 CAPTURE: str = 'smile_capture.png'      # the name Generator uploads every capture under
 SWITCH: str = 'test_input'

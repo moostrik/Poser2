@@ -8,7 +8,7 @@ paths:
 
 ## Architecture
 
-The app has one **settings tree** defined in `modules/smile_settings.py` using `BaseSettings` subclasses with `Field`, `Group`, and `Child` descriptors. The root class is named `Settings`.
+The app has one **settings tree** defined in `modules/main_settings.py` using `BaseSettings` subclasses with `Field`, `Group`, and `Child` descriptors. The root class is named `Settings`.
 
 Preset JSON files in `data/settings/` mirror the settings tree exactly. The startup preset (default: `Smile.json`) is loaded via `presets.load()` which calls `update_from_dict()`.
 
