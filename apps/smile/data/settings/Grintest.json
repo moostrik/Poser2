@@ -5,8 +5,8 @@
     "image_next": false,
     "flip_h": false,
     "flip_v": false,
-    "gain_auto": true,
-    "gain_target": 33,
+    "auto_gain": true,
+    "target_brightness": 33,
     "face": {
       "confidence": 0.5,
       "max_offset": 0.15,

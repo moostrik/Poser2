@@ -35,7 +35,10 @@ class FakeCamera:
         self.ratios: dict[str, float] = {'Red': 1.0, 'Blue': 1.0}
         self.features: dict[str, FakeFeature] = {}
         for name, value, range_ in (
-            ('GainAuto', 'Off', None), ('GainAutoTarget', 50, (0, 100)),
+            ('GainAuto', 'Off', None), ('GainAutoTarget', 50, (0, 100)), ('GainAutoMax', 15.0, (0.0, 30.0)),
+            ('Gain', 0.0, (0.0, 30.0)),
+            ('ExposureAuto', 'Off', None), ('ExposureAutoTarget', 50, (0, 100)), ('ExposureAutoMax', 15000, (12, 84577817)),
+            ('ExposureTimeAbs', 33000.0, (12.0, 84577817.0)),
             ('Saturation', 1.0, (0.0, 2.0)), ('Hue', 0.0, (-40.0, 40.0)), ('Gamma', 1.0, (0.45, 1.5)),
             ('BalanceWhiteAuto', 'Off', None), ('BalanceRatioSelector', 'Red', None),
             ('BalanceRatioAbs', 1.0, (0.8, 3.0)),
@@ -63,7 +66,7 @@ class TestFeatureWriter(unittest.TestCase):
         self.writer.close()
 
     def test_sends_everything_once_then_only_what_changed(self):
-        self.settings.wb_red = 1.5
+        self.settings.manual_WB_red = 1.5
         self.writer.update(self.camera)
         self.assertEqual(self.camera.written('GainAuto'), ['Off'])
         self.assertEqual(self.camera.written('Saturation'), [1.0])
@@ -78,9 +81,51 @@ class TestFeatureWriter(unittest.TestCase):
         self.writer.update(self.camera)
         self.assertEqual(self.camera.writes, [('Saturation', 1.2)])
 
+    def test_the_auto_target_goes_to_exposure_and_gain(self):
+        self.settings.target_brightness = 30
+        self.settings.exposure_max = 20000.0
+        self.writer.update(self.camera)
+        self.assertEqual(self.camera.written('ExposureAutoTarget'), [30])
+        self.assertEqual(self.camera.written('GainAutoTarget'), [30])
+        written = self.camera.written('ExposureAutoMax')
+        self.assertEqual(written, [20000])
+        self.assertIsInstance(written[0], int)      # the feature's own number type
+
+    def test_manual_gain_and_exposure_are_the_cameras_while_auto_is_on(self):
+        self.settings.auto_gain = True
+        self.settings.auto_exposure = True
+        self.settings.manual_gain = 6.0
+        self.settings.manual_exposure = 10000.0
+        self.writer.update(self.camera)
+        self.assertEqual(self.camera.written('GainAuto'), ['Continuous'])
+        self.assertEqual(self.camera.written('ExposureAuto'), ['Continuous'])
+        self.assertEqual(self.camera.written('Gain'), [])
+        self.assertEqual(self.camera.written('ExposureTimeAbs'), [])
+
+        self.settings.auto_gain = False
+        self.settings.auto_exposure = False
+        self.writer.update(self.camera)
+        self.assertEqual(self.camera.written('Gain'), [6.0])
+        self.assertEqual(self.camera.written('ExposureTimeAbs'), [10000.0])
+
+    def test_the_actual_values_follow_the_camera(self):
+        self.settings.auto_gain = True
+        self.writer.update(self.camera)
+        self.assertEqual(self.settings.exposure, 33000.0)
+        self.camera.features['Gain'].value = 7.26
+        self.writer._read_next = 0.0
+        self.writer.update(self.camera)
+        self.assertEqual(self.settings.gain, 7.3)
+
+        self.camera.ratios = {'Red': 1.61, 'Blue': 2.04}
+        self.writer._read_next = 0.0
+        self.writer.update(self.camera)
+        self.assertEqual(self.settings.WB_red, 1.61)
+        self.assertEqual(self.settings.WB_blue, 2.04)
+
     def test_clamps_to_the_range_of_the_feature(self):
         self.settings.gamma = 3.0
-        self.settings.wb_blue = 0.5
+        self.settings.manual_WB_blue = 0.5
         self.writer.update(self.camera)
         self.assertEqual(self.camera.written('Gamma'), [1.5])
         self.assertEqual(self.camera.ratios['Blue'], 0.8)
@@ -91,31 +136,31 @@ class TestFeatureWriter(unittest.TestCase):
         self.writer.update(camera)
         self.assertEqual(camera.written('Saturation'), [1.0])
         self.settings.hue = 20.0
-        self.settings.wb_red = 2.0
+        self.settings.manual_WB_red = 2.0
         self.writer.update(camera)
         self.assertEqual(camera.written('Hue'), [])
         self.assertEqual(camera.ratios['Red'], 1.0)
 
     def test_auto_owns_the_ratios_and_the_panel_takes_them_back(self):
-        self.settings.wb_auto = True
-        self.settings.wb_red = 2.0
+        self.settings.auto_WB = True
+        self.settings.manual_WB_red = 2.0
         self.writer.update(self.camera)
         self.assertEqual(self.camera.written('BalanceWhiteAuto'), ['Continuous'])
         self.assertEqual(self.camera.written('BalanceRatioAbs'), [])
 
-        self.settings.wb_auto = False
+        self.settings.auto_WB = False
         self.writer.update(self.camera)
         self.assertEqual(self.camera.written('BalanceWhiteAuto'), ['Continuous', 'Off'])
         self.assertEqual(self.camera.ratios['Red'], 2.0)
 
     def test_set_white_balance_measures_once_and_stores_the_ratios(self):
         self.writer.update(self.camera)
-        CameraSettings.wb_set.fire(self.settings)
+        CameraSettings.set_WB.fire(self.settings)
         self.writer.update(self.camera)
         self.assertEqual(self.camera.features['BalanceWhiteAuto'].value, 'Once')
 
         # still measuring: the panel's ratios are not sent
-        self.settings.wb_red = 2.5
+        self.settings.manual_WB_red = 2.5
         self.writer.update(self.camera)
         self.assertEqual(self.camera.ratios['Red'], 1.0)
 
@@ -123,8 +168,8 @@ class TestFeatureWriter(unittest.TestCase):
         self.camera.ratios = {'Red': 1.83, 'Blue': 2.41}
         self.camera.features['BalanceWhiteAuto'].value = 'Off'
         self.writer.update(self.camera)
-        self.assertEqual(self.settings.wb_red, 1.83)
-        self.assertEqual(self.settings.wb_blue, 2.41)
+        self.assertEqual(self.settings.manual_WB_red, 1.83)
+        self.assertEqual(self.settings.manual_WB_blue, 2.41)
 
         self.camera.writes.clear()
         self.writer.update(self.camera)

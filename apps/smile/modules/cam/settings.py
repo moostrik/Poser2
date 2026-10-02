@@ -15,13 +15,27 @@ class CameraSettings(BaseSettings):
     flip_h:        Field[bool]      = Field(False, description="Mirror the camera image horizontally")
     flip_v:        Field[bool]      = Field(False, description="Flip the camera image vertically")
 
-    gain_auto:     Field[bool]      = Field(False, widget=Widget.switch, newline=True, label="Auto gain", description="Vimba: automatic gain")
-    gain_target:   Field[int]       = Field(40, min=0, max=100, step=1, description="Vimba: auto gain target brightness (0-100)")
+    # what the camera uses now, whether auto or manual set it
+    exposure:          Field[float] = Field(0.0, access=Field.READ, newline=True, description="Vimba: exposure time the camera uses now, in µs")
+    gain:              Field[float] = Field(0.0, access=Field.READ, description="Vimba: gain the camera uses now, in dB")
+    WB_red:            Field[float] = Field(0.0, access=Field.READ, description="Vimba: white balance red ratio the camera uses now")
+    WB_blue:           Field[float] = Field(0.0, access=Field.READ, description="Vimba: white balance blue ratio the camera uses now")
 
-    wb_auto:       Field[bool]      = Field(False, widget=Widget.switch, newline=True, label="Auto white balance", description="Vimba: continuous automatic white balance")
-    wb_set:        Field[bool]      = Field(False, widget=Widget.button, label="Set white balance", description="Vimba: measure the white balance once and keep it (auto off)")
-    wb_red:        Field[float]     = Field(1.0, min=0.5, max=4.0, step=0.01, label="Red", description="Vimba: white balance red ratio (auto off)")
-    wb_blue:       Field[float]     = Field(1.0, min=0.5, max=4.0, step=0.01, label="Blue", description="Vimba: white balance blue ratio (auto off)")
+    # exposure and gain: auto lengthens the exposure first (up to its max), then adds gain
+    target_brightness: Field[int]   = Field(40, min=0, max=100, step=1, newline=True, description="Vimba: brightness that auto exposure and auto gain aim for (0-100)")
+
+    manual_exposure:   Field[float] = Field(33000.0, min=12.0, max=50000.0, step=100.0, newline=True, description="Vimba: exposure time in µs (auto off)")
+    auto_exposure:     Field[bool]  = Field(False, widget=Widget.switch, description="Vimba: automatic exposure time")
+    exposure_max:      Field[float] = Field(33000.0, min=12.0, max=50000.0, step=100.0, description="Vimba: longest exposure time auto may use, in µs")
+
+    manual_gain:       Field[float] = Field(0.0, min=0.0, max=30.0, step=0.1, newline=True, description="Vimba: gain in dB (auto off)")
+    auto_gain:         Field[bool]  = Field(False, widget=Widget.switch, description="Vimba: automatic gain")
+    gain_max:          Field[float] = Field(15.0, min=0.0, max=30.0, step=0.1, description="Vimba: most gain auto may add, in dB")
+
+    manual_WB_red:     Field[float] = Field(1.0, min=0.5, max=4.0, step=0.01, newline=True, description="Vimba: white balance red ratio (auto off)")
+    manual_WB_blue:    Field[float] = Field(1.0, min=0.5, max=4.0, step=0.01, description="Vimba: white balance blue ratio (auto off)")
+    auto_WB:           Field[bool]  = Field(False, widget=Widget.switch, description="Vimba: continuous automatic white balance")
+    set_WB:            Field[bool]  = Field(False, widget=Widget.button, description="Vimba: measure the white balance once and keep it (auto off)")
 
     saturation:    Field[float]     = Field(1.0, min=0.0, max=2.0, step=0.01, newline=True, description="Vimba: colour saturation (1 = unchanged)")
     hue:           Field[float]     = Field(0.0, min=-40.0, max=40.0, step=0.5, description="Vimba: hue rotation in degrees")

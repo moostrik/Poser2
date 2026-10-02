@@ -1,7 +1,9 @@
-"""Writes the panel's camera settings (gain, white balance, colour) to the features of a Vimba camera
-when they change. The panel is the source of truth: everything is sent once after the camera opens,
-over what its user set loaded. A feature the camera model does not have is a warning, once.
-"Set white balance" lets the camera measure once and takes the ratios it found back into the panel."""
+"""Writes the panel's camera settings (exposure, gain, white balance, colour) to the features of a
+Vimba camera when they change. The panel is the source of truth: everything is sent once after the
+camera opens, over what its user set loaded. A feature the camera model does not have is a warning,
+once. Exposure and gain are the panel's value with auto off and the camera's with auto on; the
+values in use are read back for the panel.
+"Set WB" (white balance) lets the camera measure once and takes the ratios it found back into the panel."""
 
 import logging
 from threading import Event
@@ -14,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 RATIO_FEATURES: tuple[str, ...] = ('BalanceRatioAbs', 'BalanceRatio')   # GigE models, USB models
 MEASURE_TIMEOUT: float = 5.0    # seconds the camera gets to find its white balance
+READ_INTERVAL: float = 0.5      # seconds between reads of the actual exposure and gain
 
 
 class FeatureWriter:
@@ -24,25 +27,57 @@ class FeatureWriter:
         self._ratio_feature: str | None = None
         self._measure: Event = Event()
         self._measure_end: float | None = None  # set while the camera measures its white balance
+        self._read_next: float = 0.0            # time of the next read of the actual values
 
-        self.settings.bind(CameraSettings.wb_set, self._on_wb_set)
+        self.settings.bind(CameraSettings.set_WB, self._on_wb_set)
 
     def close(self) -> None:
-        self.settings.unbind(CameraSettings.wb_set, self._on_wb_set)
+        self.settings.unbind(CameraSettings.set_WB, self._on_wb_set)
 
     def update(self, camera: Any) -> None:
         """Send what changed. Call on the camera thread, with the camera open."""
         s: CameraSettings = self.settings
-        self._sync('gain_auto', s.gain_auto, lambda v: self._set(camera, 'GainAuto', 'Continuous' if v else 'Off'))
-        self._sync('gain_target', int(s.gain_target), lambda v: self._set(camera, 'GainAutoTarget', v))
+        self._sync('auto_target', int(s.target_brightness), lambda v: (self._set(camera, 'ExposureAutoTarget', v), self._set(camera, 'GainAutoTarget', v)))
+        self._sync('exposure_max', float(s.exposure_max), lambda v: self._set(camera, 'ExposureAutoMax', v))
+        self._sync('gain_max', float(s.gain_max), lambda v: self._set(camera, 'GainAutoMax', v))
+        self._auto_or_manual(camera, 'exposure', s.auto_exposure, float(s.manual_exposure), 'ExposureAuto', 'ExposureTimeAbs')
+        self._auto_or_manual(camera, 'gain', s.auto_gain, float(s.manual_gain), 'GainAuto', 'Gain')
+        self._read_actual(camera)
         self._sync('saturation', float(s.saturation), lambda v: self._set(camera, 'Saturation', v))
         self._sync('hue', float(s.hue), lambda v: self._set(camera, 'Hue', v))
         self._sync('gamma', float(s.gamma), lambda v: self._set(camera, 'Gamma', v))
         self._white_balance(camera)
 
+    def _auto_or_manual(self, camera: Any, key: str, auto: bool, value: float, auto_feature: str, feature: str) -> None:
+        self._sync(key + '_auto', auto, lambda v: self._set(camera, auto_feature, 'Continuous' if v else 'Off'))
+        if auto:
+            # the camera owns the value: the panel's is sent again when auto goes off
+            self._applied.pop(key, None)
+        else:
+            self._sync(key, value, lambda v: self._set(camera, feature, v))
+
+    def _read_actual(self, camera: Any) -> None:
+        """The exposure, gain and white balance the camera uses now, for the panel."""
+        now: float = monotonic()
+        if now < self._read_next:
+            return
+        self._read_next = now + READ_INTERVAL
+        s: CameraSettings = self.settings
+        try:
+            s.exposure = round(float(camera.get_feature_by_name('ExposureTimeAbs').get()))
+            s.gain = round(float(camera.get_feature_by_name('Gain').get()), 1)
+        except Exception:
+            pass
+        red: float | None = self._get_ratio(camera, 'Red')
+        blue: float | None = self._get_ratio(camera, 'Blue')
+        if red is not None:
+            s.WB_red = round(red, 2)
+        if blue is not None:
+            s.WB_blue = round(blue, 2)
+
     def _white_balance(self, camera: Any) -> None:
         s: CameraSettings = self.settings
-        wb_auto: bool = s.wb_auto
+        wb_auto: bool = s.auto_WB
         self._sync('wb_auto', wb_auto, lambda v: self._set(camera, 'BalanceWhiteAuto', 'Continuous' if v else 'Off'))
         if wb_auto:
             # the camera owns the ratios: the panel's are sent again when auto goes off
@@ -60,8 +95,8 @@ class FeatureWriter:
             self._measuring(camera)
             return
 
-        self._sync('wb_red', float(s.wb_red), lambda v: self._set_ratio(camera, 'Red', v))
-        self._sync('wb_blue', float(s.wb_blue), lambda v: self._set_ratio(camera, 'Blue', v))
+        self._sync('wb_red', float(s.manual_WB_red), lambda v: self._set_ratio(camera, 'Red', v))
+        self._sync('wb_blue', float(s.manual_WB_blue), lambda v: self._set_ratio(camera, 'Blue', v))
 
     def _measuring(self, camera: Any) -> None:
         """Wait for the camera to finish its measurement, then take its ratios into the panel."""
@@ -81,11 +116,11 @@ class FeatureWriter:
         red: float | None = self._get_ratio(camera, 'Red')
         blue: float | None = self._get_ratio(camera, 'Blue')
         if red is not None:
-            s.wb_red = round(red, 2)
-            self._applied['wb_red'] = float(s.wb_red)
+            s.manual_WB_red = round(red, 2)
+            self._applied['wb_red'] = float(s.manual_WB_red)
         if blue is not None:
-            s.wb_blue = round(blue, 2)
-            self._applied['wb_blue'] = float(s.wb_blue)
+            s.manual_WB_blue = round(blue, 2)
+            self._applied['wb_blue'] = float(s.manual_WB_blue)
 
     def _sync(self, key: str, value: Any, write: Callable[[Any], Any]) -> None:
         if self._applied.get(key) != value:
@@ -99,7 +134,7 @@ class FeatureWriter:
             feature = camera.get_feature_by_name(name)
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 low, high = feature.get_range()
-                value = type(value)(min(max(value, low), high))
+                value = type(low)(min(max(value, low), high))     # in the feature's range and number type
             feature.set(value)
             return True
         except Exception as e:
