@@ -1,7 +1,7 @@
 """The record of a visitor: how its portrait and grin were made, kept inside the saved files.
 
-A JSON text: id, style, description, seed, the grin's peaks and the pipeline settings in preset shape
-(settings.pipeline). ClipSaver writes it into the clip (the mp4's comment tag) and the portrait (JPEG
+A JSON text: id, style, description, seed, the settings of that style and of the portrait, and the
+grin as it was drawn (each value's peak and the moment of it). ClipSaver writes it into the clip (the mp4's comment tag) and the portrait (JPEG
 comment segments); this module puts it in a JPEG and reads it back from either.
 
     python -m modules.save.record <clip or portrait>                  prints the record
@@ -67,6 +67,19 @@ def read(path: str) -> dict | None:
     return record if isinstance(record, dict) else None
 
 
+def to_preset(record: dict) -> dict:
+    """The record as a preset of the pipeline settings: its style under style_a or style_b, the
+    portrait, and the grin with every range closed on the value that was drawn, so loading it
+    repeats this visitor's pose (the moments stay random around the midpoint: no setting holds them)."""
+    if 'settings' in record:        # a record of the first shape held the preset itself
+        return record['settings']
+    grin: dict = {name: value for name, value in record.get('grin', {}).items() if name not in ('peak', 'peak_at')}
+    for name, value in record.get('grin', {}).get('peak', {}).items():
+        grin[f'{name}_min'] = grin[f'{name}_max'] = value
+    style: str = 'style_b' if record.get('style') == 'B' else 'style_a'
+    return {'pipeline': {style: record.get('style_settings', {}), 'portrait': record.get('portrait', {}), 'grin': grin}}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description='The record in a saved clip or portrait: how it was made')
     parser.add_argument('file', help='a clip (output/grins/<style>/<id>.mp4) or its portrait (<id>_portrait.jpg)')
@@ -83,7 +96,7 @@ def main() -> None:
         presets.set_app('smile')
         presets.validate_name(args.preset)
         preset_path = presets.path(args.preset)
-        preset_path.write_text(json.dumps(record.get('settings', {}), indent=2), encoding='utf-8')
+        preset_path.write_text(json.dumps(to_preset(record), indent=2), encoding='utf-8')
         print(f'Wrote {preset_path}')
     elif args.open:
         id: str = str(record.get('id') or os.path.splitext(os.path.basename(args.file))[0])

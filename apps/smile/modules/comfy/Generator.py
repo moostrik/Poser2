@@ -40,6 +40,8 @@ RECONNECT_INTERVAL: float = 2.0
 SILENT_AFTER: float = 5.0       # s without any event of a queued workflow before asking whether it still runs
 SILENT_RECHECK: float = 2.0
 NO_EVENTS: str = 'no events from ComfyUI: close or reload its browser tab'
+# the grin settings in a visitor's record; of the ranges it has what was drawn from them
+RECORD_GRIN_FIELDS: tuple[str, ...] = ('frames', 'face_region', 'stitching', 'ease', 'midpoint', 'midpoint_deviation')
 
 
 class Interrupted(Exception):
@@ -99,8 +101,9 @@ class Generator(Thread):
         return self.styles.advance()
 
     def record(self) -> dict:
-        """How the running visitor is made, for its saved files: description, seed, the grin's peaks and
-        the pipeline settings in preset shape. Call from a message callback, once the portrait is there."""
+        """How the running visitor is made, for its saved files: description, seed, the settings of its
+        style and of the portrait, and the grin as it was drawn (each value's peak and the moment of it,
+        not the ranges). Call from a message callback, once the portrait is there."""
         return {'description': self._style.description, **self._record}
 
     def add_message_callback(self, callback: MessageCallback) -> None:
@@ -279,7 +282,13 @@ class Generator(Thread):
         workflow: dict = build(name, self._style, s)
         if not self._silent:
             # here, so the settings are the ones the workflow was filled with
-            self._record = {**wf.run_facts(workflow), 'settings': {'pipeline': s.to_dict()}}
+            facts: dict = wf.run_facts(workflow)
+            grin: dict = s.grin.to_dict()
+            self._record = {'seed': facts['seed'],
+                            'style_settings': self._style.to_dict(),
+                            'portrait': s.portrait.to_dict(),
+                            'grin': {**{name: grin[name] for name in RECORD_GRIN_FIELDS},
+                                     'peak': facts['peak'], 'peak_at': facts['peak_at']}}
         self._capture_depth = None
         last_depth, _ = self._run_pass(workflow, deadline, play=not no_grin)
         if no_grin:

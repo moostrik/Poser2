@@ -91,7 +91,9 @@ For tests in the ComfyUI page, `python -m modules.comfy.testflow` writes `data/c
 (drag it into the page): what the app sends with a preset's values, plus an input switch (the
 app's last capture, or any photo through the face crop), previews and a video recorder. Regenerate
 it after changing the workflow or the presets instead of editing a copy by hand.
-Our own ComfyUI nodes live in `comfy/aiia_grin/` (copied into `ComfyUI/custom_nodes/aiia_grin`).
+Our own ComfyUI nodes live in `comfy/aiia_grin/` (copied into `ComfyUI/custom_nodes/aiia_grin`: copy again and restart ComfyUI after a change).
+The grin's random picks are SMILE's (`Workflow._fill_grin`, from the visitor's seed): each value's peak between its min and max, and
+the moment of that peak within midpoint ± deviation, sent to Grin Frames as `<name>_peak` (without them the node draws its own moments).
 
 ## Render
 
@@ -115,10 +117,11 @@ portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`. `<styl
 style, `A` (colourful and happy) or `B` (monochrome and dark); the players read it from the folder, the id is the time. Files are built in `output/temp/`
 and renamed into place when the grin is complete, so the players never see a partial file.
 The clip (its `comment` tag) and the portrait (JPEG comment segments) carry the visitor's **record** as JSON: id, style, description,
-the visitor's one seed (portrait, description and grin share it), the grin's peaks and the pipeline settings as the workflow was
-filled with them, in preset shape (`Generator.record`, handed to the saver with the final portrait). `modules/save/record.py` reads it:
-`python -m modules.save.record <file>` prints it, `--preset <name>` writes its settings to `data/settings/<name>.json`;
-dropping a clip or portrait on `scripts/clip_info.bat` opens it.
+the visitor's one seed (portrait, description and grin share it), the settings of its style (not the other's) and of the portrait
+as the workflow was filled with them, and the grin as it was drawn: each value's peak and the moment of it (`peak`, `peak_at`), not
+the ranges (`Generator.record`, handed to the saver with the final portrait). `modules/save/record.py` reads it:
+`python -m modules.save.record <file>` prints it, `--preset <name>` writes it as a preset to `data/settings/<name>.json` (the grin's
+ranges closed on the drawn values, so loading it repeats the pose); dropping a clip or portrait on `scripts/clip_info.bat` opens it.
 Encoding and decoding run `ffmpeg`/`ffprobe` subprocesses through `modules/video/ffmpeg.py` (ffmpeg
 must be on the PATH: the gyan.dev full build); the encoder is picked at startup by a trial encode
 (Intel Quick Sync on the iGPU, then Nvidia, then libx264; `sequence.encoder` forces one). Never start

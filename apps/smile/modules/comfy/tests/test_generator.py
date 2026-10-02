@@ -100,13 +100,16 @@ class TestGenerator(unittest.TestCase):
         self.settings.style_a.description = 'a face'
         record = self.generator.record()
         self.assertEqual(record['description'], 'a face')
-        self.assertEqual(record['seed'], sent[0][self.generator.workflow.sampler]['inputs']['seed'])
-        self.assertEqual(record['grin'], self.generator.workflow.run_facts(sent[0])['grin'])
-        self.assertEqual(record['settings']['pipeline']['portrait']['steps'], 9)
-        # preset shape: loads back into the settings
-        restored = PipelineSettings()
-        restored.update_from_dict(json.loads(json.dumps(record))['settings']['pipeline'])
-        self.assertEqual(restored.portrait.steps, 9)
+        facts = self.generator.workflow.run_facts(sent[0])
+        self.assertEqual(record['seed'], facts['seed'])
+        self.assertEqual(record['portrait']['steps'], 9)
+        # the style of this visitor only, and of the grin what was drawn, not the ranges
+        self.assertEqual(record['style_settings'], self.settings.style_a.to_dict())
+        self.assertEqual((record['grin']['peak'], record['grin']['peak_at']), (facts['peak'], facts['peak_at']))
+        self.assertEqual(record['grin']['frames'], self.settings.grin.frames)
+        text = json.dumps(record)
+        for gone in ('_min', '_max', '_prefer', 'style_b', 'connection'):
+            self.assertNotIn(gone, text)
 
     def test_a_failed_warm_up_is_not_ready(self):
         self.generator._stop_event.set()        # no wait before the retry

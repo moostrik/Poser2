@@ -251,11 +251,16 @@ class Workflow():
         return workflow
 
     def run_facts(self, workflow: dict) -> dict:
-        """What only this run knows, read back from its workflow: the visitor's seed and the grin's peaks."""
+        """What only this run knows, read back from its workflow: the visitor's seed, and of every grin
+        value its peak and the moment of that peak (rounded: this is for the visitor's record)."""
         grin: dict = workflow[self.grin]['inputs']
-        peaks: dict[str, float] = {name: grin[name] for name in GRIN_TARGETS}
-        peaks.update({name: grin[f'rotate_{name}_min'] for name in GRIN_ROTATIONS})
-        return {'seed': workflow[self.sampler]['inputs']['seed'], 'grin': peaks}
+        peak: dict[str, float] = {name: grin[name] for name in GRIN_TARGETS}
+        peak.update({name: grin[f'rotate_{name}_min'] for name in GRIN_ROTATIONS})
+        peak_at: dict[str, float] = {name: grin[f'{name}_peak'] for name in GRIN_TARGETS}
+        peak_at.update({name: grin[f'rotate_{name}_peak'] for name in GRIN_ROTATIONS})
+        return {'seed': workflow[self.sampler]['inputs']['seed'],
+                'peak': {name: round(value, 2) for name, value in peak.items()},
+                'peak_at': {name: round(value, 3) for name, value in peak_at.items()}}
 
     def _fill_grin(self, workflow: dict, s: PipelineSettings, seed: int | None = None) -> None:
         """seed is the visitor's; without one (a replay) the grin draws its own."""
@@ -285,6 +290,15 @@ class Workflow():
             grin[name] = peak(name)
         for name in GRIN_ROTATIONS:
             grin[f'rotate_{name}_min'] = grin[f'rotate_{name}_max'] = peak(name)
+
+        # the moment of each peak is SMILE's pick too (the node would draw its own), so the record has it
+        def moment() -> float:
+            return min(max(g.midpoint + rng.uniform(-g.midpoint_deviation, g.midpoint_deviation), 0.01), 0.99)
+
+        for name in GRIN_TARGETS:
+            grin[f'{name}_peak'] = moment()
+        for name in GRIN_ROTATIONS:
+            grin[f'rotate_{name}_peak'] = moment()
         grin.update(seed=seed, still=still)
         workflow[self.last_frame]['inputs']['batch_index'] = 0 if still else g.frames - 1
 

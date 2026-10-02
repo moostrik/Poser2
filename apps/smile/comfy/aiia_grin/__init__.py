@@ -42,7 +42,8 @@ EASES = {
 
 class GrinFrames:
     """Animate a portrait as a loop: from neutral up to an extreme expression with a random head
-    turn and back to neutral, each parameter peaking at its own random moment, one frame at a time.
+    turn and back to neutral, each parameter peaking at its own moment (random, or given as
+    <name>_peak), one frame at a time.
 
     Uses Advanced Live Portrait's Expression Editor for the face math. Each frame is sent as a
     progress preview the moment it is rendered; the output is all frames as one batch."""
@@ -75,6 +76,10 @@ class GrinFrames:
             "still": ("BOOLEAN", {"default": False,
                                   "tooltip": "Only the peak pose: one frame with every parameter at its target."}),
         }
+        for name in [name for name, _ in TARGETS] + [name for name, _, _ in ROTATIONS]:
+            optional[f"{name}_peak"] = ("FLOAT", {"default": -1.0, "min": -1.0, "max": 1.0, "step": 0.01,
+                                                  "tooltip": "Moment this parameter peaks, as a fraction of the loop. "
+                                                             "-1: random within midpoint +- deviation."})
         return {"required": required, "optional": optional}
 
     RETURN_TYPES = ("IMAGE",)
@@ -91,8 +96,12 @@ class GrinFrames:
         rng = np.random.default_rng(seed)
         for name, _, _ in ROTATIONS:
             targets[name] = float(rng.uniform(params[f"{name}_min"], params[f"{name}_max"]))
-        peaks = {name: float(np.clip(midpoint + rng.uniform(-midpoint_deviation, midpoint_deviation), 0.01, 0.99))
-                 for name in targets}
+        peaks = {}
+        for name in targets:
+            # always drawn, so a given moment doesn't shift the draws of the others
+            moment = midpoint + rng.uniform(-midpoint_deviation, midpoint_deviation)
+            given = params.get(f"{name}_peak", -1.0)
+            peaks[name] = float(np.clip(given if given >= 0 else moment, 0.01, 0.99))
 
         # prepare the face once; the editor caches it while the portrait stays the same
         neutral = {name: 0.0 for name in targets}

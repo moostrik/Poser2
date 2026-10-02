@@ -242,8 +242,25 @@ class TestWorkflow(unittest.TestCase):
         facts = self.wf.run_facts(built)
         grin = built[self.wf.grin]['inputs']
         self.assertEqual(facts['seed'], built[self.wf.sampler]['inputs']['seed'])
-        self.assertEqual(set(facts['grin']), set(GRIN_TARGETS + GRIN_ROTATIONS))
-        self.assertEqual((facts['grin']['aaa'], facts['grin']['yaw']), (grin['aaa'], grin['rotate_yaw_min']))
+        for block in ('peak', 'peak_at'):
+            self.assertEqual(set(facts[block]), set(GRIN_TARGETS + GRIN_ROTATIONS))
+        self.assertEqual((facts['peak']['aaa'], facts['peak']['yaw']), (round(grin['aaa'], 2), round(grin['rotate_yaw_min'], 2)))
+        self.assertEqual((facts['peak_at']['aaa'], facts['peak_at']['yaw']),
+                         (round(grin['aaa_peak'], 3), round(grin['rotate_yaw_peak'], 3)))
+
+    def test_peak_moments_are_sent_to_the_node(self):
+        g = self.settings.grin
+        g.midpoint, g.midpoint_deviation = 0.9, 0.3
+        names = [f'{name}_peak' for name in GRIN_TARGETS] + [f'rotate_{name}_peak' for name in GRIN_ROTATIONS]
+        runs = [self.wf.build('x.png', self.settings.style_a, self.settings)[self.wf.grin]['inputs'] for _ in range(20)]
+        for grin in runs:
+            for name in names:
+                self.assertTrue(0.6 <= grin[name] <= 0.99, name)       # midpoint +- deviation, kept inside the loop
+        self.assertGreater(len({grin['smile_peak'] for grin in runs}), 1)
+        self.assertGreater(len({runs[0][name] for name in names}), 1)  # each value its own moment
+        g.midpoint_deviation = 0.0
+        grin = self.wf.build('x.png', self.settings.style_a, self.settings)[self.wf.grin]['inputs']
+        self.assertEqual({grin[name] for name in names}, {0.9})
 
     def test_fixed_seed(self):
         self.settings.portrait.fixed_seed = True

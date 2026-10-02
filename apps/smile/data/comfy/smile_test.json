@@ -34,32 +34,44 @@
   },
   "1024": {
     "inputs": {
-      "seed": 1526911975,
-      "frames": 200,
+      "seed": 4112934062,
+      "frames": 250,
       "ease": "sine_in_out",
       "crop_factor": 1.7,
       "midpoint": 0.72,
       "midpoint_deviation": 0.18,
       "smile": 2.0,
-      "aaa": -0.9104525526824467,
-      "eee": -17.847593425618346,
-      "eyebrow": -7.641161991963017,
-      "blink": -14.137003002829006,
+      "aaa": 1.4427776578136147,
+      "eee": -18.35209543530712,
+      "eyebrow": -28.686893552173522,
+      "blink": -13.746008965151354,
       "wink": 0.0,
-      "woo": -4.959368806394108,
+      "woo": 6.67225637759087,
       "pupil_x": 0.0,
       "pupil_y": 0.0,
-      "rotate_pitch_min": 1.903559095291898,
-      "rotate_pitch_max": 1.903559095291898,
-      "rotate_yaw_min": -10.78326760022216,
-      "rotate_yaw_max": -10.78326760022216,
-      "rotate_roll_min": -9.844474906275739,
-      "rotate_roll_max": -9.844474906275739,
+      "rotate_pitch_min": 4.590716272995493,
+      "rotate_pitch_max": 4.590716272995493,
+      "rotate_yaw_min": -3.095546256902045,
+      "rotate_yaw_max": -3.095546256902045,
+      "rotate_roll_min": 9.765788152572902,
+      "rotate_roll_max": 9.765788152572902,
       "image": [
         "1002:36",
         0
       ],
       "stitching": true,
+      "smile_peak": 0.7709629459568812,
+      "aaa_peak": 0.594685512127823,
+      "eee_peak": 0.6305566566730703,
+      "woo_peak": 0.7508868143933279,
+      "eyebrow_peak": 0.5494394716727934,
+      "blink_peak": 0.7507134611209189,
+      "wink_peak": 0.6990504569079903,
+      "pupil_x_peak": 0.5866221107743346,
+      "pupil_y_peak": 0.6187356849017127,
+      "rotate_pitch_peak": 0.5554406933742033,
+      "rotate_yaw_peak": 0.5953512859083357,
+      "rotate_roll_peak": 0.8578988147369193,
       "still": false
     },
     "class_type": "GrinFrames",
@@ -85,10 +97,10 @@
       "quantization": "None (FP16)",
       "attention_mode": "auto",
       "preset_prompt": "🖼️ Tags",
-      "custom_prompt": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips",
-      "max_tokens": 120,
+      "custom_prompt": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips, happy ",
+      "max_tokens": 64,
       "keep_model_loaded": true,
-      "seed": 2194637497,
+      "seed": 4112934062,
       "image": [
         "1006",
         0
@@ -118,8 +130,8 @@
   "1002:1040": {
     "inputs": {
       "lora_name": "clothing_slider.safetensors",
-      "strength_model": 5.0,
-      "strength_clip": 5.0,
+      "strength_model": 3.0,
+      "strength_clip": 3.0,
       "model": [
         "1002:20",
         0
@@ -156,8 +168,8 @@
   "1002:1045": {
     "inputs": {
       "lora_name": "dark.safetensors",
-      "strength_model": -0.65,
-      "strength_clip": -0.65,
+      "strength_model": -0.5,
+      "strength_clip": -0.5,
       "model": [
         "1002:1043",
         0
@@ -174,7 +186,7 @@
   },
   "1002:22": {
     "inputs": {
-      "text": "(nude) portrait by (Mert and Marcus: 1.5), high gloss, dramatic chiaroscuro, studio lighting, (bright color solid background: 1.25)",
+      "text": "(nude) portrait by (David LaChapelle: 1.3), high gloss, hard studio flash, studio lighting, (bright color solid background)",
       "clip": [
         "1002:1045",
         1
@@ -191,7 +203,7 @@
         "smile_prefix",
         0
       ],
-      "string_b": ", model, looking at viewer, (serious expression: 2.0)",
+      "string_b": ", looking at viewer",
       "delimiter": ""
     },
     "class_type": "StringConcatenate",
@@ -273,7 +285,7 @@
   },
   "1002:30": {
     "inputs": {
-      "ip_weight": 1.0,
+      "ip_weight": 0.9,
       "cn_strength": 1.0,
       "start_at": 0,
       "end_at": 1,
@@ -406,11 +418,11 @@
   },
   "1002:35": {
     "inputs": {
-      "seed": 2859004738,
-      "steps": 6,
-      "cfg": 1.5,
-      "sampler_name": "dpmpp_sde",
-      "scheduler": "karras",
+      "seed": 4112934062,
+      "steps": 4,
+      "cfg": 1.2,
+      "sampler_name": "lcm",
+      "scheduler": "exponential",
       "denoise": 1,
       "model": [
         "1002:30",
@@ -490,7 +502,7 @@
   "smile_prefix": {
     "class_type": "StringConcatenate",
     "inputs": {
-      "string_a": "nude",
+      "string_a": "nude supermodel,",
       "string_b": [
         "1001:10",
         0
@@ -520,7 +532,7 @@
         "1024",
         0
       ],
-      "batch_index": 199,
+      "batch_index": 249,
       "length": 1
     },
     "_meta": {
@@ -573,19 +585,6 @@
       "title": "Depth of last frame"
     }
   },
-  "1000:3": {
-    "inputs": {
-      "face_detector": "blazeface_back_camera",
-      "landmarkrunner_device": "CUDA",
-      "face_detector_device": "cuda",
-      "face_detector_dtype": "fp16",
-      "keep_model_loaded": true
-    },
-    "class_type": "LivePortraitLoadFaceAlignmentCropper",
-    "_meta": {
-      "title": "LivePortrait Load FaceAlignmentCropper"
-    }
-  },
   "1000:4": {
     "inputs": {
       "dsize": 1152,
@@ -620,6 +619,19 @@
     "class_type": "DownloadAndLoadLivePortraitModels",
     "_meta": {
       "title": "(Down)Load LivePortraitModels"
+    }
+  },
+  "1000:3": {
+    "inputs": {
+      "face_detector": "blazeface_back_camera",
+      "landmarkrunner_device": "CUDA",
+      "face_detector_device": "cuda",
+      "face_detector_dtype": "fp16",
+      "keep_model_loaded": true
+    },
+    "class_type": "LivePortraitLoadFaceAlignmentCropper",
+    "_meta": {
+      "title": "LivePortrait Load FaceAlignmentCropper"
     }
   },
   "1000:5": {
