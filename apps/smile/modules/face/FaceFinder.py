@@ -7,7 +7,7 @@ from typing import Callable
 
 from modules.face.FaceDetector import FaceDetector, Face
 from modules.face.FaceLandmarks import FaceLandmarks
-from modules.face.quality import FaceObservation, Pose, Rejection, centre_offset, distance, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
+from modules.face.quality import FaceObservation, Pose, Rejection, distance, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
 from modules.face.settings import FaceSettings
 
 DETECT_THRESHOLD: float = 0.5
@@ -63,10 +63,24 @@ def crop_geometry(face: Face, portrait_zoom: float, portrait_offset: float, port
 
 def portrait_box(face: Face, portrait_zoom: float, portrait_offset: float, portrait_width: int, portrait_height: int) -> tuple[float, float, float, float]:
     """The portrait crop as an upright box in the image (x0, y0, x1, y1, pixels): its centre and size,
-    without its rotation. It may reach past the image edge."""
+    without its rotation. It reaches past the image edge only for a rejected face (`crop_outside`)."""
     centre, crop_width, crop_height, _ = crop_geometry(face, portrait_zoom, portrait_offset, portrait_width, portrait_height)
     return (float(centre[0] - crop_width * 0.5), float(centre[1] - crop_height * 0.5),
             float(centre[0] + crop_width * 0.5), float(centre[1] + crop_height * 0.5))
+
+
+def crop_outside(face: Face, portrait_zoom: float, portrait_offset: float, portrait_width: int, portrait_height: int,
+                 image_width: int, image_height: int) -> float:
+    """How far the portrait crop reaches past the image edge, relative to the crop width: 0 when it
+    lies inside. Both the rotated crop (what `portrait_crop` cuts) and its upright box (what
+    `portrait_box` gives the overlay) count."""
+    centre, crop_width, crop_height, angle = crop_geometry(face, portrait_zoom, portrait_offset, portrait_width, portrait_height)
+    cos, sin = abs(float(np.cos(angle))), abs(float(np.sin(angle)))
+    half_x: float = max(crop_width, crop_width * cos + crop_height * sin) * 0.5
+    half_y: float = max(crop_height, crop_width * sin + crop_height * cos) * 0.5
+    past: float = max(half_x - float(centre[0]), float(centre[0]) + half_x - image_width,
+                      half_y - float(centre[1]), float(centre[1]) + half_y - image_height)
+    return max(past, 0.0) / max(crop_width, 1e-6)
 
 
 def portrait_crop(img: np.ndarray, face: Face, portrait_zoom: float, portrait_offset: float, portrait_width: int, portrait_height: int) -> np.ndarray:
@@ -91,7 +105,7 @@ def portrait_crop(img: np.ndarray, face: Face, portrait_zoom: float, portrait_of
 class _Assessed:
     face: Face
     eye_dist: float
-    centre: float
+    outside: float
     pose: Pose
     eyes: float | None
     rejection: Rejection | None
@@ -107,7 +121,7 @@ class _Saved:
 
 
 class FaceFinder(Thread):
-    """Detects the faces of each camera frame and checks them (confidence, eye distance, pose, eyes). The
+    """Detects the faces of each camera frame and checks them (confidence, eye distance, the portrait crop inside the image, pose, eyes). The
     subject of a frame is its largest qualifying face. The capture is the last frame in which the
     subject qualified (`best()`), or the last frame at all when none did. Every face goes to the
     frame callbacks, for the overlay."""
@@ -166,10 +180,9 @@ class FaceFinder(Thread):
         assessed: list[_Assessed] = []
         for face in detector.detect(image, DETECT_THRESHOLD):
             eye_dist: float = eye_distance(face.kps) / float(image_width)
-            centre: float = centre_offset(face.kps, image_width)
+            outside: float = crop_outside(face, s.zoom, s.offset, self._composition_width, self._composition_height, image_width, image_height)
             pose: Pose = head_pose(face.kps, s.pitch_zero)
-            rejection: Rejection | None = gate(face.score, eye_dist, centre, pose, s.confidence, s.eye_min, s.eye_max, s.max_offset,
-                                               s.max_yaw, s.max_pitch, s.max_roll)
+            rejection: Rejection | None = gate(face.score, eye_dist, outside, pose, s.confidence, s.eye_min, s.max_yaw, s.max_pitch, s.max_roll)
             eyes: float | None = None
             if rejection is None:
                 # the landmarks only for faces that passed the cheap checks
@@ -177,13 +190,13 @@ class FaceFinder(Thread):
                 if eyes < s.eye_open:
                     rejection = Rejection.EYES
             # the setting the failed check compared to, for the label
-            limits: dict[Rejection, float] = {Rejection.LOW_SCORE: s.confidence, Rejection.SMALL: s.eye_min, Rejection.LARGE: s.eye_max,
-                                              Rejection.OFF_CENTRE: s.max_offset, Rejection.TURNED: s.max_yaw, Rejection.PITCHED: s.max_pitch,
+            limits: dict[Rejection, float] = {Rejection.LOW_SCORE: s.confidence, Rejection.SMALL: s.eye_min, Rejection.OUTSIDE: 0.0,
+                                              Rejection.TURNED: s.max_yaw, Rejection.PITCHED: s.max_pitch,
                                               Rejection.TILTED: s.max_roll, Rejection.EYES: s.eye_open}
             limit: float = limits[rejection] if rejection is not None else 0.0
-            far: float = distance(face.score, eye_dist, centre, pose, eyes, s.confidence, s.eye_min, s.eye_max, s.max_offset,
+            far: float = distance(face.score, eye_dist, outside, pose, eyes, s.confidence, s.eye_min,
                                   s.max_yaw, s.max_pitch, s.max_roll, s.eye_open, s.falloff)
-            assessed.append(_Assessed(face, eye_dist, centre, pose, eyes, rejection, limit, far))
+            assessed.append(_Assessed(face, eye_dist, outside, pose, eyes, rejection, limit, far))
 
         # the subject: the largest qualifying face, or the largest face at all
         subject: _Assessed | None = None
@@ -214,7 +227,7 @@ class FaceFinder(Thread):
             kps=tuple((float(k[0]) / width, float(k[1]) / height) for k in a.face.kps),
             score=round(a.face.score, 3),
             eye_dist=round(a.eye_dist, 3),
-            centre=round(a.centre, 3),
+            outside=round(a.outside, 3),
             pose=a.pose,
             eyes=a.eyes,
             rejection=a.rejection,

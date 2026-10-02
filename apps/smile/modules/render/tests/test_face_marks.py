@@ -10,7 +10,7 @@ from modules.render.layers.face_marks import ACCEPTED_COLOR, FACES_STALE, REJECT
 def observation(rejection: Rejection | None = None, subject: bool = False, eyes: float | None = 0.3, bbox=(0.1, 0.2, 0.5, 0.7),
                 limit: float = 0.0, pose: Pose = Pose(4.4, -6.0, 2.0, 0.48), distance: float = 0.0) -> FaceObservation:
     # the marks use the portrait box (crop), not the detector's
-    return FaceObservation(bbox=(0.0, 0.0, 0.0, 0.0), crop=bbox, kps=((0.2, 0.3),) * 5, score=0.9, eye_dist=0.06, centre=0.1, pose=pose,
+    return FaceObservation(bbox=(0.0, 0.0, 0.0, 0.0), crop=bbox, kps=((0.2, 0.3),) * 5, score=0.9, eye_dist=0.06, outside=0.0, pose=pose,
                            eyes=eyes, rejection=rejection, limit=limit, distance=distance, subject=subject)
 
 

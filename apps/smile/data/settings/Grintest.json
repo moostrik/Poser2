@@ -9,9 +9,7 @@
     "target_brightness": 33,
     "face": {
       "confidence": 0.5,
-      "max_offset": 0.15,
       "eye_min": 0.1,
-      "eye_max": 0.33,
       "eye_open": 0.2,
       "max_yaw": 17.0,
       "max_pitch": 25.0,

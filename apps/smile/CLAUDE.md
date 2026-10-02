@@ -33,7 +33,8 @@ drop more easily. The size is only negotiated at open: restart SMILE after chang
 
 `modules/face/`: `FaceFinder` (own thread) detects every face of a camera frame (SCRFD,
 `data/models/scrfd_10g_bnkps.onnx`) and judges it in `quality.py`: detector confidence, size (the
-distance between the eyes, min and max), position (horizontal distance from the image centre),
+distance between the eyes, a minimum), the portrait crop inside the image (`crop_outside`: the one check for too close and
+too near an edge, so a qualifying face's box never passes the border),
 pose from the 5 keypoints (the pitch's zero is `pitch_zero`, set on site with the "Set pitch zero"
 button: it depends on the camera height), eye openness from the 106 landmarks (`FaceLandmarks`,
 `data/models/2d106det.onnx`, only run for faces that passed the other checks); the first failing check
