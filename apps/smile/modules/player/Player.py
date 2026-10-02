@@ -39,7 +39,7 @@ def place_window(monitor: int, windowed: bool, monitors: int) -> tuple[int, bool
 class Player():
     def __init__(self, osc_port: int, root: str = 'output/', monitor: int = 1, trail: float = 0.9,
                  clips: int = 24, pool: int = 30, hwdecode: int | None = None, windowed: bool = False,
-                 fps: float = 30.0, spread: float = 0.0, follow_style: bool = True, recent: int = 3) -> None:
+                 fps: float = 30.0, spread: float = 0.0, recent: int = 4, recycle_every: float = 20.0) -> None:
         osc_settings = OscSettings()
         osc_settings.port = int(osc_port)
         self.osc:Osc = Osc(osc_settings)
@@ -69,7 +69,7 @@ class Player():
         # the clips are decoded once into RAM at the size the cells show them (the portrait is turned a quarter)
         cell_size: tuple[int, int] = (PlayerRender.CELL_HEIGHT, PlayerRender.CELL_WIDTH)
         self.pool: ClipPool = ClipPool(pool, cell_size, hwdecode, recent)
-        self.scanner: FolderScanner = FolderScanner(os.path.join(root, 'grins'), self.pool, pool, follow_style, recent)
+        self.scanner: FolderScanner = FolderScanner(os.path.join(root, 'grins'), self.pool, pool, recent, recycle_every)
 
         self.loaders: list[LoadImages] = []
         for id in ids:
@@ -86,8 +86,8 @@ class Player():
         self._stats_thread = threading.Thread(target=self._stats_loop, name='PlayerStats', daemon=True)
         # the cells start one by one, each on the next clip that is loaded
         self._start_thread = threading.Thread(target=self._start_loop, name='PlayerStart', daemon=True)
-        logger.info('Player %d: %d cells, pool %d (newest %d always shown), %s, %s, root %s, %s', monitor, clips, pool, recent,
-                    'following the style' if follow_style else 'all styles',
+        logger.info('Player %d: %d cells, pool %d (last %d always shown), %s, %s, root %s, %s', monitor, clips, pool, recent,
+                    f'a clip from disk after {recycle_every:g} s without a new one' if recycle_every > 0 else 'no recycling',
                     (f'{fps:g} fps' if fps > 0 else 'clip fps') + (f' +-{spread:.0%}' if spread > 0 else ''), root, 'window' if windowed else 'fullscreen')
 
     def start(self) -> None:

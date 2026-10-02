@@ -154,13 +154,20 @@ those processes any other way: the apps run under pythonw, so they need `CREATE_
 inherited handles. The players (`modules/player/`) decode each of the newest clips once into RAM
 (`ClipPool`, 512x640, about 200 MB per clip) and play from memory; `player.py -n` sets the number
 of cells, `--pool` the clips kept, `--fps` the playback speed (default 20, 0 = the clip's own rate), `--spread` a random speed difference per play so the cells drift apart (default 0.1), `--trail` a blend with the previous output (default 0: none).
-The players show one style (`--no-follow_style`: the newest clips of both together): a clip arriving in the other style's folder is the
-switch (`FolderScanner`), the pool loads a random selection of that style's clips from disk and each
-cell changes over at the end of its play.
-A cell that finishes first takes one of the `--recent` newest clips (default 3) that is on no cell, so
-the latest visitors are always on the wall; else a clip that is on the fewest cells, of those the least played, at random
-among equals and never the one it just played (`ClipPool.choose`), so the pool (`--pool`, default 30)
-is spread evenly over the wall and a new visitor's clip is the next one taken.
+The pool (`--pool`, default 30) is two lists. `recent`: the last `--recent` recordings of the style (default 4), always on
+the wall. `archive`: the other clips, in the order they joined. A new recording joins `recent`; when that holds too many,
+its oldest moves to `archive` as the newest there. A clip from disk joins `archive` as its newest. Over its size, the pool
+drops the oldest of `archive` (a cell playing it finishes its play), so a recording that leaves `recent` gets a full turn.
+The players show one style, that of the newest recording (`FolderScanner`): a recording is a file newer than every clip
+seen, and one in the other style's folder is the switch. The pool then gets that clip and the newest others of its style
+as `recent` and a random selection of that style from disk as `archive`, and each cell changes over at the end of its play;
+an older file that appears (clips sorted into a folder by hand) is archive and waits on disk.
+Recycling keeps the wall changing: whenever no clip has joined for `--recycle_every` seconds (default 20, 0 = never), one
+clip of the style that is on disk and not in the pool joins `archive`, from a shuffled deck, so all come round before any
+repeats; a recording counts as a clip joining, and with every clip of the style already in the pool nothing is loaded.
+A cell that finishes first takes a `recent` clip that is on no cell; else a clip that is on the fewest cells, of those the
+least played, at random among equals and never the one it just played (`ClipPool.choose`), so the pool is spread evenly
+over the wall. Joining `archive` levels a clip's play count, or a recording that was always on a cell would never be drawn there.
 The cells start one by one, each in a random place on the next clip that is loaded (going round the
 loaded clips again when there are fewer than cells). `scripts/start_players.bat` (re)starts both players alone,
 each fullscreen on its own monitor (a player whose monitor is not connected takes a window on the

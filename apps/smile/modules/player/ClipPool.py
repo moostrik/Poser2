@@ -12,15 +12,14 @@ from modules.video import ffmpeg
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(eq=False)        # a clip is itself, not its values: `in` and `==` never compare the frames
 class Clip:
     id: str
     frames: np.ndarray      # (frames, height, width, 3) bgr uint8
     fps: float
     style: str = ''         # the folder the clip was saved in: A or B
-    plays: int = 0          # times started on a cell (a new clip starts level with the least played)
+    plays: int = 0          # times started on a cell (levelled when the clip joins the archive)
     active: int = 0         # cells playing it now
-    fresh: bool = True      # not shown yet: the next cell that finishes takes it
 
 
 def next_start(clips: list[Clip], started: set[str]) -> Clip | None:
@@ -31,54 +30,49 @@ def next_start(clips: list[Clip], started: set[str]) -> Clip | None:
     return None
 
 
-def choose(clips: list[Clip], exclude: Clip | None = None, recent: int = 0) -> Clip | None:
-    """The clip a cell plays next: one that is on the fewest cells now, of those a clip that was
-    never shown, else one that was played the least, of those at random. `exclude` (the clip the
-    cell just played) is left out unless it is the only one. So every clip is on the wall about
-    equally, none repeats in its cell and a new visitor is shown at once.
+def choose(clips: list[Clip], exclude: Clip | None = None, recent: list[Clip] | tuple[Clip, ...] = ()) -> Clip | None:
+    """The clip a cell plays next. `exclude` (the clip the cell just played) is left out unless it
+    is the only one, so no clip repeats in its cell.
 
-    Before all that, the `recent` newest clips (the id is the recording time) are always on the
-    wall: one of them that is on no cell is taken first. The cell that just played it leaves it to
-    the next cell that finishes, so it moves around the wall."""
+    First, the `recent` clips (the last recordings) are always on the wall: one of them that is on
+    no cell is taken. The cell that just played it leaves it to the next cell that finishes, so it
+    moves around the wall. Otherwise: a clip that is on the fewest cells now, of those one that was
+    played the least, of those at random. So every clip is on the wall about equally."""
     candidates: list[Clip] = [clip for clip in clips if clip is not exclude] or clips
     if not candidates:
         return None
-    newest: list[Clip] = sorted(clips, key=lambda clip: clip.id, reverse=True)[:max(recent, 0)]
-    missing: list[Clip] = [clip for clip in newest if clip.active == 0 and clip is not exclude]
+    missing: list[Clip] = [clip for clip in recent if clip.active == 0 and clip is not exclude]
     if missing:
         candidates = missing
     active: int = min(clip.active for clip in candidates)
     candidates = [clip for clip in candidates if clip.active == active]
-    candidates = [clip for clip in candidates if clip.fresh] or candidates
     plays: int = min(clip.plays for clip in candidates)
     return random.choice([clip for clip in candidates if clip.plays == plays])
 
 
-def evict_id(clips: dict[str, Clip], style: str | None) -> str:
-    """The clip to drop when the pool is over its size: the oldest of another style than the
-    current one, else the oldest. A new visitor's clip (the newest id) is never the one."""
-    others: list[str] = [id for id, clip in clips.items() if style is not None and clip.style != style]
-    return min(others) if others else min(clips)
-
-
 class ClipPool:
-    """Clips decoded once into RAM at the cell size; playback never decodes.
+    """Clips decoded once into RAM at the cell size; playback never decodes. Two lists:
 
-    The scanner decides which files to load and adds them; one decode thread works through them,
-    the last added first, so a new visitor never waits behind a reload. The pool only limits the
-    number. With a `style` set (the players follow SMILE's style) the cells get clips of that style
-    and the other style's clips are the first to go."""
+    recent    the last `recent` recordings of the style, oldest to newest; always on the wall
+    archive   the other clips, in the order they joined, oldest first
+
+    A recording joins `recent`; when that holds too many, its oldest moves to `archive` as the
+    newest there. A clip from disk (at a style switch, or recycled) joins `archive` as its newest.
+    When the pool is over its size the oldest of `archive` leaves; a cell still playing it keeps
+    its own reference. The scanner decides which files to load and adds them; one decode thread
+    works through them, the last added first, so a new recording never waits behind a reload."""
 
     def __init__(self, size: int, cell_size: tuple[int, int], hwdecode: int | None = None, recent: int = 0) -> None:
         self.size: int = size
-        self.recent: int = recent           # the newest clips that are always on the wall
+        self.recent: int = recent           # how many of the last recordings are kept in `recent`
         self.cell_size: tuple[int, int] = cell_size
         self.hwdecode: int | None = hwdecode
         self.style: str | None = None       # None: any style
 
-        self._clips: dict[str, Clip] = {}
+        self._recent: list[Clip] = []
+        self._archive: list[Clip] = []
         self._lock = threading.Lock()
-        self._pending: queue.LifoQueue[tuple[str, str] | None] = queue.LifoQueue()
+        self._pending: queue.LifoQueue[tuple[str, str, bool] | None] = queue.LifoQueue()
         self._outstanding: int = 0      # files added and not yet decoded or skipped
         self._stop_event = threading.Event()
         self._thread = threading.Thread(target=self._decode_loop, name='ClipPool', daemon=True)
@@ -93,28 +87,38 @@ class ClipPool:
 
     # SCANNER THREAD
 
-    def add(self, path: str, style: str = '') -> None:
+    def add(self, path: str, style: str = '', recent: bool = False) -> None:
+        """Load this file: a recording (`recent`) or a clip from disk for the archive."""
         with self._lock:
             self._outstanding += 1
-        self._pending.put((path, style))
+        self._pending.put((path, style, recent))
 
     def remove(self, id: str) -> None:
         with self._lock:
-            self._clips.pop(id, None)
+            self._recent = [clip for clip in self._recent if clip.id != id]
+            self._archive = [clip for clip in self._archive if clip.id != id]
 
-    def set_style(self, style: str | None) -> None:
+    def switch(self, style: str | None) -> None:
+        """The wall changes to this style. What is in the pool becomes the oldest of the archive
+        (the last recordings at its end, so they leave last); the new style's clips join behind."""
         with self._lock:
+            self._archive = self._archive + self._recent
+            self._recent = []
             self.style = style
+
+    def ids(self) -> set[str]:
+        with self._lock:
+            return {clip.id for clip in self._recent + self._archive}
 
     # PLAYER AND LOADER THREADS
 
     def clips(self) -> list[Clip]:
-        """The clips in the order they were loaded; those of the current style when there are any."""
+        """The clips of the current style, `recent` then `archive`; any clip while that style has none."""
         with self._lock:
             return self._candidates()
 
     def _candidates(self) -> list[Clip]:
-        clips: list[Clip] = list(self._clips.values())
+        clips: list[Clip] = self._recent + self._archive
         if self.style is not None:
             current: list[Clip] = [clip for clip in clips if clip.style == self.style]
             if current:
@@ -142,7 +146,9 @@ class ClipPool:
         is empty. Taking the next and giving up the previous is one step, so two cells that finish
         together never both take the same free clip."""
         with self._lock:
-            clip: Clip | None = choose(self._candidates(), previous, self.recent)
+            candidates: list[Clip] = self._candidates()
+            recent: list[Clip] = [clip for clip in self._recent if clip in candidates]
+            clip: Clip | None = choose(candidates, previous, recent)
             if previous is not None:
                 previous.active -= 1
             if clip is not None:
@@ -153,17 +159,16 @@ class ClipPool:
     def _take(clip: Clip) -> None:
         clip.plays += 1
         clip.active += 1
-        clip.fresh = False
 
     def spread(self) -> tuple[int, int]:
         """How the clips are spread over the cells now: (clips on at least one cell, most cells on one clip)."""
         with self._lock:
-            actives: list[int] = [clip.active for clip in self._clips.values()]
+            actives: list[int] = [clip.active for clip in self._recent + self._archive]
         return sum(1 for a in actives if a > 0), max(actives, default=0)
 
     def __len__(self) -> int:
         with self._lock:
-            return len(self._clips)
+            return len(self._recent) + len(self._archive)
 
     # DECODE THREAD
 
@@ -172,18 +177,34 @@ class ClipPool:
             item = self._pending.get()
             if item is None or self._stop_event.is_set():
                 continue
-            path, style = item
-            id: str = os.path.splitext(os.path.basename(path))[0]
-            if self._is_wanted(id):
-                clip: Clip | None = self._decode(id, path, style)
-                if clip is not None:
-                    self._insert(clip)
+            self._load(*item)
             with self._lock:
                 self._outstanding -= 1
 
-    def _is_wanted(self, id: str) -> bool:
+    def _load(self, path: str, style: str, recent: bool) -> None:
+        id: str = os.path.splitext(os.path.basename(path))[0]
+        if self._is_stale(style):
+            logger.debug('Not loading %s: the wall left style %s', id, style)
+            return
+        clip: Clip | None = self._find(id)
+        if clip is not None:
+            self._insert(clip, recent, reused=True)     # still in memory: no second decode
+            return
+        clip = self._decode(id, path, style)
+        if clip is not None:
+            self._insert(clip, recent)
+
+    def _is_stale(self, style: str) -> bool:
+        """A file queued for a style the wall has switched away from since."""
         with self._lock:
-            return id not in self._clips
+            return self.style is not None and style != self.style
+
+    def _find(self, id: str) -> Clip | None:
+        with self._lock:
+            for clip in self._recent + self._archive:
+                if clip.id == id:
+                    return clip
+        return None
 
     def _decode(self, id: str, path: str, style: str) -> Clip | None:
         try:
@@ -200,12 +221,31 @@ class ClipPool:
                 return None
         return Clip(id, frames, fps, style)
 
-    def _insert(self, clip: Clip) -> None:
+    def _insert(self, clip: Clip, recent: bool = False, reused: bool = False) -> None:
+        """The clip joins `recent` (a recording) or `archive` (from disk). One that is in the pool
+        already moves to the list it is handed over for."""
         with self._lock:
-            # level with the least played, so it is not shown more than the others once it has been shown
-            clip.plays = min((c.plays for c in self._clips.values() if not c.fresh), default=0)
-            clip.fresh = True
-            self._clips[clip.id] = clip
-            while len(self._clips) > self.size:
-                del self._clips[evict_id(self._clips, self.style)]     # a loader mid-clip keeps its own reference
-        logger.info('Clip %s %s: %d frames at %g fps, %d in the pool', clip.style, clip.id, len(clip.frames), clip.fps, len(self))
+            if self.style is not None and clip.style != self.style:
+                return      # the wall switched while this one was being decoded
+            self._recent = [c for c in self._recent if c is not clip]
+            self._archive = [c for c in self._archive if c is not clip]
+            if recent and self.recent > 0:
+                self._recent.append(clip)
+                self._recent.sort(key=lambda c: c.id)       # the id is the recording time
+                while len(self._recent) > self.recent:
+                    self._join_archive(self._recent.pop(0))
+            else:
+                self._join_archive(clip)
+            while len(self._recent) + len(self._archive) > self.size:
+                (self._archive or self._recent).pop(0)      # the oldest leaves; a loader mid-clip keeps its own reference
+            count: int = len(self._recent) + len(self._archive)
+            joined: str = 'recent' if clip in self._recent else 'archive'
+        logger.info('Clip %s %s: %d frames at %g fps, %s%s, %d in the pool', clip.style, clip.id,
+                    len(clip.frames), clip.fps, joined, ' (reused)' if reused else '', count)
+
+    def _join_archive(self, clip: Clip) -> None:
+        """Onto the end of the archive, level with its least played clip. A clip from `recent` was
+        always on a cell and has many more plays; without the levelling it would lose every draw
+        and sit off the wall for its whole turn in the archive."""
+        clip.plays = min((c.plays for c in self._archive if c.style == clip.style), default=0)
+        self._archive.append(clip)

@@ -1,4 +1,4 @@
-from argparse import ArgumentParser, BooleanOptionalAction
+from argparse import ArgumentParser
 from os import _exit
 from signal import signal, SIGINT
 from time import sleep
@@ -10,10 +10,10 @@ parser.add_argument('-m',   '--monitor',    type=int,   default=1,      help='mo
 parser.add_argument('-osc', '--osc_port',   type=int,   default=4115,   help='osc port')
 parser.add_argument('-n',   '--clips',      type=int,   default=24,     help='number of clips playing at once (cells)')
 parser.add_argument('--pool',               type=int,   default=30,     help='number of clips kept decoded in RAM (about 200 MB each, 5.9 GB for 30)')
-parser.add_argument('--recent',             type=int,   default=3,      help='the newest clips that are always on the wall; 0 = none')
+parser.add_argument('--recent',             type=int,   default=4,      help='the last recordings, always on the wall; 0 = none')
+parser.add_argument('--recycle_every',      type=float, default=20.0,   help='a clip from disk joins when no clip has joined for this many seconds; 0 = never')
 parser.add_argument('--fps',                type=float, default=20.0,   help='playback speed of the clips (frames per second); 0 plays each clip at its own rate')
 parser.add_argument('--spread',             type=float, default=0.1,    help='random speed difference per clip, as a fraction of --fps (0.1 = 10 percent slower to faster), 0 = none')
-parser.add_argument('--follow_style',       action=BooleanOptionalAction, default=True, help='show only clips of the style (A or B) of the newest clip, cells change over at the end of their play (default); --no-follow_style shows the newest clips of both styles together')
 parser.add_argument('--trail',              type=float, default=0.0,    help='blend of each frame with the previous output, 0 = none (0.5 was the old look)')
 parser.add_argument('--root',              type=str,   default='output/', help='output folder (clips in its grins/ subfolder)')
 parser.add_argument('--hwdecode',           type=int,   default=None,   help='decode on the GPU with this DXGI adapter index (default: software)')
@@ -24,7 +24,7 @@ args = parser.parse_args()
 setup_logging(verbose=args.verbose, name=f'player{args.monitor}')
 install_excepthooks()
 
-player: Player = Player(args.osc_port, args.root, args.monitor, args.trail, args.clips, args.pool, args.hwdecode, args.window, args.fps, args.spread, args.follow_style, args.recent)
+player: Player = Player(args.osc_port, args.root, args.monitor, args.trail, args.clips, args.pool, args.hwdecode, args.window, args.fps, args.spread, args.recent, args.recycle_every)
 player.start()
 
 def signal_handler_exit(sig, frame) -> None:

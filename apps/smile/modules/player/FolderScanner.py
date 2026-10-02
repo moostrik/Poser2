@@ -2,6 +2,8 @@ import logging
 import os
 import random
 import threading
+import time
+from typing import Callable
 
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
@@ -32,12 +34,6 @@ def find_clips(folder: str) -> dict[str, str]:
     return clips
 
 
-def list_clips(folder: str, max_files: int) -> dict[str, str]:
-    """The newest clips of all styles by name (the name is the time): id -> path."""
-    clips: dict[str, str] = find_clips(folder)
-    return {id: clips[id] for id in sorted(clips, reverse=True)[:max_files]}
-
-
 def pick_clips(paths: list[str], style: str, count: int) -> list[str]:
     """A random selection of up to count clips of that style, out of all of them."""
     of_style: list[str] = [path for path in paths if clip_style(path) == style]
@@ -61,20 +57,33 @@ class ClipEventHandler(FileSystemEventHandler):
 class FolderScanner:
     """Watches output/grins/ (a folder per style) and decides which clips the pool loads.
 
-    Default: the newest clips of all styles. With `follow_style`: clips of one style, the style of
-    the newest clip. A clip arriving in the other style's folder is the switch: the pool gets a
-    random selection of that style's clips from all on disk, its `recent` newest ones and the new
-    clip itself, which is queued last and therefore decoded first."""
+    The wall shows one style, that of the newest recording. A new recording of that style joins the
+    pool's `recent`. One of the other style is the switch: the pool gets that clip and the newest
+    others of its style as `recent`, and a random selection of that style from all on disk as
+    `archive`; the switching clip is queued last and therefore decoded first.
 
-    def __init__(self, folder: str, pool: ClipPool, max_files: int, follow_style: bool = False, recent: int = 0) -> None:
-        self.recent: int = recent       # the newest clips of a style are always loaded, not left to the random pick
+    A recording is a file newer than every clip seen so far; an older file that appears (clips
+    sorted into a folder by hand) is archive and only waits on disk for its turn.
+
+    Recycling keeps the wall changing: whenever no clip has joined for `recycle_every` seconds, one
+    clip of the style that is on disk and not in the pool joins the `archive`, from a shuffled deck
+    so that all come round before any repeats."""
+
+    def __init__(self, folder: str, pool: ClipPool, max_files: int, recent: int = 0, recycle_every: float = 0.0) -> None:
         self.folder: str = folder
         self.pool: ClipPool = pool
         self.max_files: int = max_files
-        self.follow_style: bool = follow_style
+        self.recent: int = recent                   # the last recordings: the newest of a style are loaded for sure
+        self.recycle_every: float = recycle_every   # s without a clip joining before one comes from disk; 0 = never
         self.style: str | None = None
-        self._known: dict[str, str] = {}    # default: the clips given to the pool; follow_style: every clip seen on disk
+        self._known: dict[str, str] = {}            # every clip seen on disk
+        self._newest_seen: str = ''                 # a file with a newer id (its time) is a recording
+        self._last_join: float = 0.0
+        self._deck: list[str] = []                  # ids waiting to be recycled in, shuffled
+        self._clock: Callable[[], float] = time.monotonic
         self._lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._recycle_thread = threading.Thread(target=self._recycle_loop, name='ClipRecycle', daemon=True)
         self.observer: BaseObserver = Observer()
 
     def start(self) -> None:
@@ -83,51 +92,95 @@ class FolderScanner:
         self.observer.schedule(ClipEventHandler(self), self.folder, recursive=True)
         self.observer.start()
         self.update()
+        if self.recycle_every > 0:
+            self._recycle_thread.start()
 
     def stop(self) -> None:
+        self._stop_event.set()
+        if self._recycle_thread.is_alive():
+            self._recycle_thread.join()
         self.observer.stop()
         self.observer.join()
+
+    # FILE EVENTS
 
     def update(self) -> None:
         with self._lock:
             try:
-                if self.follow_style:
-                    self._update_style(find_clips(self.folder))
-                else:
-                    self._update_newest(list_clips(self.folder, self.max_files))
+                current: dict[str, str] = find_clips(self.folder)
             except OSError as e:
                 logger.warning('Cannot list %s: %s', self.folder, e)
-
-    def _update_newest(self, current: dict[str, str]) -> None:
-        for id in self._known.keys() - current.keys():
-            self.pool.remove(id)
-        for id in sorted(current.keys() - self._known.keys()):     # newest last: on top of the LIFO queue
-            self.pool.add(current[id], clip_style(current[id]))
-        self._known = current
-
-    def _update_style(self, current: dict[str, str]) -> None:
-        for id in self._known.keys() - current.keys():
-            self.pool.remove(id)
-        new: list[str] = sorted(current.keys() - self._known.keys())
-        if self.style is None and new:
-            new = new[-1:]      # at startup: the newest clip on disk sets the style
-        for id in new:
-            style: str = clip_style(current[id])
-            if style == self.style:
-                self.pool.add(current[id], style)      # a new visitor in the current style
-            else:
-                self._switch(style, id, current)
-        self._known = current
+                return
+            for id in self._known.keys() - current.keys():
+                self.pool.remove(id)
+            new: list[str] = sorted(current.keys() - self._known.keys())
+            if self.style is None and new:
+                new = new[-1:]      # at startup: the newest clip on disk sets the style
+            for id in new:
+                if id <= self._newest_seen:
+                    continue        # an older file that appeared: archive, it waits on disk for its turn
+                self._newest_seen = id
+                style: str = clip_style(current[id])
+                if style == self.style:
+                    self.pool.add(current[id], style, recent=True)     # a new recording in the current style
+                    self._last_join = self._clock()
+                else:
+                    self._switch(style, id, current)
+            self._known = current
 
     def _switch(self, style: str, trigger: str, current: dict[str, str]) -> None:
         """The clip `trigger` is the first of another style: the pool changes over to that style."""
         self.style = style
-        self.pool.set_style(style)
+        self.pool.switch(style)
+        self._deck = []
         others: list[str] = [current[id] for id in sorted(current) if id != trigger and clip_style(current[id]) == style]
-        # the newest ones for sure (with the trigger they are the `recent` clips the wall always shows), the rest at random
+        # with the trigger, the newest others are the last recordings of this style; the rest is drawn at random
         newest: list[str] = others[len(others) - max(self.recent - 1, 0):]
         picked: list[str] = pick_clips(others[:len(others) - len(newest)], style, self.max_files - 1 - len(newest))
         logger.info('Style %s: loading %d of its clips', style, len(picked) + len(newest) + 1)
-        for path in picked + newest:
-            self.pool.add(path, style)
-        self.pool.add(current[trigger], style)      # last in: decoded first, the newest right after it
+        for path in picked:
+            self.pool.add(path, style, recent=False)
+        for path in newest:
+            self.pool.add(path, style, recent=True)
+        self.pool.add(current[trigger], style, recent=True)     # last in: decoded first, the newest right after it
+        self._last_join = self._clock()
+
+    # RECYCLING
+
+    def _recycle_loop(self) -> None:
+        while not self._stop_event.wait(1.0):
+            try:
+                self.tick()
+            except Exception as e:
+                logger.warning('Recycling failed: %s', e)
+
+    def tick(self) -> None:
+        """Bring one clip in from disk when no clip has joined for `recycle_every` seconds."""
+        with self._lock:
+            if self.recycle_every <= 0 or self.style is None:
+                return
+            now: float = self._clock()
+            if now - self._last_join < self.recycle_every or not self.pool.idle:
+                return
+            self._last_join = now       # also when there is nothing to bring in: look again after the same wait
+            path: str | None = self._next_old()
+            if path is not None:
+                logger.debug('Recycling %s', os.path.basename(path))
+                self.pool.add(path, self.style, recent=False)
+
+    def _next_old(self) -> str | None:
+        """The next clip of the style that is on disk and not in the pool; None when there is none."""
+        try:
+            current: dict[str, str] = find_clips(self.folder)
+        except OSError as e:
+            logger.warning('Cannot list %s: %s', self.folder, e)
+            return None
+        loaded: set[str] = self.pool.ids()
+        waiting: dict[str, str] = {id: path for id, path in current.items()
+                                   if clip_style(path) == self.style and id not in loaded}
+        if not waiting:
+            return None
+        self._deck = [id for id in self._deck if id in waiting]
+        if not self._deck:
+            self._deck = random.sample(sorted(waiting), len(waiting))      # all of them, before any repeats
+        return waiting[self._deck.pop()]
