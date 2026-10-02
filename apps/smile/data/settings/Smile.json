@@ -37,7 +37,7 @@
   "pipeline": {
     "style_mode": "A",
     "style_visitors_a": 24,
-    "style_visitors_b": 8,
+    "style_visitors_b": 12,
     "skip_generation": false,
     "skip_animation": false,
     "connection": {
@@ -49,9 +49,9 @@
     "style_a": {
       "max_tokens": 64,
       "repetition_penalty": 1.0,
-      "instruction": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips",
-      "prefix": "nude ",
-      "suffix": ", model, looking at viewer, serious expression",
+      "instruction": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips, happy ",
+      "prefix": "nude supermodel,",
+      "suffix": ", looking at viewer",
       "prompt": "(nude) portrait by (David LaChapelle: 1.3), high gloss, hard studio flash, studio lighting, (bright color solid background)",
       "negative": "(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
       "lora_1": "clothing_slider.safetensors",
@@ -66,22 +66,25 @@
       "repetition_penalty": 1.0,
       "instruction": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no expression, no colors, no colors for eyes, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips",
       "prefix": "nude ",
-      "suffix": ", model, looking at viewer, (serious expression: 2.0), monochrome",
-      "prompt": "nude portrait by (Richard Avedon: 1.4), (black and white photography:1.2), Human essence, Deep contrast, Flash, High Key Lighting,  ",
-      "negative": "clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
+      "suffix": ", looking at viewer, (serious expression: 1.4)",
+      "prompt": "nude portrait by (Corinne Day: 1.4), 1990s grunge, raw, gritty, unretouched skin, skin texture, messy hair, flat daylight, (washed out colors: 1.2), film grain, raw, dirty, (solid background), \n",
+      "negative": "clothing, (necklace), glossy, glamour, retouched, smooth skin, clean, studio lighting, colorful background, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth\n",
       "lora_1": "looking_at_viewer.safetensors",
       "lora_1_strength": 1.0,
       "lora_2": "clothing_slider.safetensors",
       "lora_2_strength": 1.0,
-      "lora_3": "none",
-      "lora_3_strength": 1.0
+      "lora_3": "dark.safetensors",
+      "lora_3_strength": 0.3
     },
     "portrait": {
-      "steps": 6,
-      "cfg": 1.8,
-      "sampler": "dpmpp_sde",
-      "scheduler": "karras",
-      "embedding_strength": 0.8,
+      "checkpoint": "realvisxlV40_v40Bakedvae.safetensors",
+      "distill_lora": "dmd2_sdxl_4step_lora_fp16.safetensors",
+      "distill_strength": 1.0,
+      "steps": 4,
+      "cfg": 1.1,
+      "sampler": "lcm",
+      "scheduler": "exponential",
+      "embedding_strength": 0.9,
       "keypoint_strength": 1.0,
       "depth_strength": 0.0,
       "depth_end": 0.0,
@@ -137,7 +140,7 @@
     }
   },
   "sequence": {
-    "pause": true,
+    "pause": false,
     "save": true,
     "encoder": "AUTO",
     "charge": 2.0,
@@ -147,7 +150,7 @@
     "flash_in_ease": "QUAD_IN",
     "flash_hold": 0.5,
     "flash_out_auto": true,
-    "flash_out": 3.1268502235412594,
+    "flash_out": 2.890812873840332,
     "flash_out_ease": "SINE_OUT",
     "grin_delay": 0.5,
     "grin_fps": 13.0,
@@ -158,7 +161,7 @@
     "destroy_out_ease": "CUBIC_OUT"
   },
   "render": {
-    "show_camera": true,
+    "show_camera": false,
     "face_marks": true,
     "face_color": {
       "r": 1.0,

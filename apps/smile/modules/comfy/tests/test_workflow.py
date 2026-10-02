@@ -113,6 +113,37 @@ class TestWorkflow(unittest.TestCase):
         self.assertEqual((grin['ease'], grin['smile'], grin['stitching']), ('linear', 3.0, False))
         self.assertEqual((grin['rotate_yaw_min'], grin['rotate_yaw_max']), (10.0, 10.0))
 
+    def test_checkpoint(self):
+        p = self.settings.portrait
+        default = self.built[self.wf.checkpoint]['inputs']['ckpt_name']
+        p.checkpoint_options = [default, 'other.safetensors']
+        p.checkpoint = 'other.safetensors'
+        b = self.wf.build('x.png', self.settings.style_a, self.settings)
+        self.assertEqual(b[self.wf.checkpoint]['inputs']['ckpt_name'], 'other.safetensors')
+        p.checkpoint = 'missing.safetensors'        # a file ComfyUI doesn't have: the workflow's stays
+        b = self.wf.build('x.png', self.settings.style_a, self.settings)
+        self.assertEqual(b[self.wf.checkpoint]['inputs']['ckpt_name'], default)
+
+    def test_distill_lora(self):
+        p = self.settings.portrait
+        first = self.built[self.wf.loras[0]]['inputs']
+        self.assertNotIn(self.wf.distill, self.built)
+        self.assertEqual(first['model'], [self.wf.checkpoint, 0])
+        p.lora_options = ['none', 'dmd2.safetensors']
+        p.distill_lora, p.distill_strength = 'dmd2.safetensors', 0.7
+        b = self.wf.build('x.png', self.settings.style_a, self.settings)
+        self.assertEqual(b[self.wf.distill], {'class_type': 'LoraLoaderModelOnly',
+                                              'inputs': {'model': [self.wf.checkpoint, 0], 'lora_name': 'dmd2.safetensors', 'strength_model': 0.7}})
+        # the model goes through it to the style LoRAs, the text encoder stays the checkpoint's
+        self.assertEqual(b[self.wf.loras[0]]['inputs']['model'], [self.wf.distill, 0])
+        self.assertEqual(b[self.wf.loras[0]]['inputs']['clip'], [self.wf.checkpoint, 1])
+        # off: none, strength 0, or a file ComfyUI doesn't have
+        for name, strength in (('none', 0.7), ('dmd2.safetensors', 0.0), ('missing.safetensors', 0.7)):
+            p.distill_lora, p.distill_strength = name, strength
+            b = self.wf.build('x.png', self.settings.style_a, self.settings)
+            self.assertNotIn(self.wf.distill, b)
+            self.assertEqual(b[self.wf.loras[0]]['inputs']['model'], [self.wf.checkpoint, 0])
+
     def test_peaks_random_within_the_range(self):
         g = self.settings.grin
         g.aaa_min, g.aaa_max = -10.0, -20.0      # max may be the lower number

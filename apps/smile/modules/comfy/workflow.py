@@ -120,7 +120,10 @@ class Workflow():
         self.sampler: str = _find(workflow, class_type='KSampler')
         # KSamplerFullPreview (comfy/aiia_grin) previews every step with the real VAE; it needs the VAE
         self.vae: list = list(workflow[_find(workflow, class_type='VAEDecode')]['inputs']['vae'])
+        self.checkpoint: str = _find(workflow, class_type='CheckpointLoaderSimple')
         self.loras: list[str] = _lora_chain(workflow)
+        # the distillation LoRA (portrait.distill_lora): a node build() puts between the checkpoint and the style LoRAs
+        self.distill: str = 'smile_distill'
         self.instantid: str = _find(workflow, class_type='ApplyInstantIDAdvanced')
         self.depth: str = _find(workflow, class_type='ControlNetApplyAdvanced')
         self.describe: str = _find(workflow, class_type='AILab_QwenVL')
@@ -190,6 +193,15 @@ class Workflow():
             sampler['inputs']['vae'] = list(self.vae)
         workflow[self.instantid]['inputs'].update(ip_weight=p.embedding_strength, cn_strength=p.keypoint_strength)
         workflow[self.depth]['inputs'].update(strength=p.depth_strength, end_percent=p.depth_end)
+        # ComfyUI refuses a file it doesn't have: the workflow's checkpoint stays, and no distillation
+        if p.checkpoint in p.checkpoint_options:
+            workflow[self.checkpoint]['inputs']['ckpt_name'] = p.checkpoint
+        if p.distill_lora != NO_LORA and p.distill_lora in p.lora_options and p.distill_strength != 0.0:
+            # on the model only (the text encoder stays the checkpoint's), in front of the style LoRAs
+            workflow[self.distill] = {'class_type': 'LoraLoaderModelOnly',
+                                      'inputs': {'model': [self.checkpoint, 0], 'lora_name': p.distill_lora,
+                                                 'strength_model': p.distill_strength}}
+            workflow[self.loras[0]]['inputs']['model'] = [self.distill, 0]
         # one strength for the model and the text encoder, as A1111's <lora:name:strength>; 0 is off
         for slot, node_id in enumerate(self.loras, start=1):
             name: str = getattr(style, f'lora_{slot}')

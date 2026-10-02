@@ -50,8 +50,14 @@ class StyleSettings(BaseSettings):
 class PortraitSettings(BaseSettings):
     sampler_options:   Field[list[str]] = Field(["dpmpp_sde"], access=Field.READ, visible=False, description="Samplers offered by ComfyUI")
     scheduler_options: Field[list[str]] = Field(["exponential"], access=Field.READ, visible=False, description="Schedulers offered by ComfyUI")
+    checkpoint_options: Field[list[str]] = Field(["realvisxlV40_v40LightningBakedvae.safetensors"], access=Field.READ, visible=False, description="Checkpoints offered by ComfyUI")
+    lora_options:      Field[list[str]] = Field(["none"], access=Field.READ, visible=False, description="LoRA files offered by ComfyUI")
 
-    steps:             Field[int]   = Field(6, min=1, max=30, step=1, description="Sampler steps")
+    # the model of both styles: a checkpoint, and a LoRA that distils it (few steps, low CFG) in part or in full
+    checkpoint:         Field[str]   = Field("realvisxlV40_v40LightningBakedvae.safetensors", widget=Widget.text_select, options=checkpoint_options, description="Checkpoint (SDXL)")
+    distill_lora:       Field[str]   = Field("none", widget=Widget.text_select, options=lora_options, description="Distillation LoRA on the checkpoint, e.g. DMD2 (none = off)")
+    distill_strength:   Field[float] = Field(0.6, min=0.0, max=1.5, step=0.05, description="Distillation LoRA strength (0 = off, 1 = fully distilled)")
+    steps:             Field[int]   = Field(6, min=1, max=30, step=1, newline=True, description="Sampler steps")
     cfg:                Field[float] = Field(1.5, min=0.5, max=10.0, step=0.1, description="Prompt guidance (CFG)")
     sampler:            Field[str]   = Field("dpmpp_sde", widget=Widget.text_select, options=sampler_options, description="Sampler")
     scheduler:          Field[str]   = Field("exponential", widget=Widget.text_select, options=scheduler_options, description="Scheduler")

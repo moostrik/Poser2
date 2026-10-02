@@ -145,12 +145,14 @@ class Generator(Thread):
         try:
             sampler: dict = self.client.object_info('KSampler')['input']['required']
             loras: list[str] = list(self.client.object_info('LoraLoader')['input']['required']['lora_name'][0])
+            checkpoints: list[str] = list(self.client.object_info('CheckpointLoaderSimple')['input']['required']['ckpt_name'][0])
         except Exception:
             logger.warning('Could not read the option lists from ComfyUI', exc_info=True)
             return
         self.settings.portrait.sampler_options = list(sampler['sampler_name'][0])
         self.settings.portrait.scheduler_options = list(sampler['scheduler'][0])
-        for style in (self.settings.style_a, self.settings.style_b):
+        self.settings.portrait.checkpoint_options = checkpoints
+        for style in (self.settings.portrait, self.settings.style_a, self.settings.style_b):
             style.lora_options = [NO_LORA] + loras
 
     def _take_image(self) -> np.ndarray | None:

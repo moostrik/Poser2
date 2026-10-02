@@ -68,7 +68,10 @@ panel is the source of truth, the workflow only provides the structure. Each vis
 styles (`style_a`, `style_b`, cycled by `styles.py`: `style_visitors_a` visitors in A, then `style_visitors_b` in B, or one of them for
 everyone with `style_mode` A or B; the style id is the movement id of the music): a style holds the describe settings (instruction, max tokens, repetition
 penalty, prefix and suffix around the description), the style prompt, the negative and three LoRA
-slots (file and strength, filled into the workflow's three LoRA nodes; `none` or 0 is off). Keep one workflow per
+slots (file and strength, filled into the workflow's three LoRA nodes; `none` or 0 is off). The model is
+shared by both styles (`pipeline.portrait`): the `checkpoint`, and a `distill_lora` (e.g. DMD2, on the
+model only, a node `build` adds in front of the style LoRAs) whose strength sets how far the checkpoint
+is distilled; steps, CFG, sampler and scheduler have to be set to match by hand. Keep one workflow per
 visitor: a second workflow in between drops the first from ComfyUI's cache and reloads the models.
 After every connect, a warm-up run on `data/comfy/warmup.jpg` (`build_warmup`: the same workflow
 with one sampler step and one grin frame) loads the models and proves the chain works (own limit
