@@ -146,7 +146,10 @@ class SmileRender(RenderBase):
         self.inputs.camera.set_image(image)
 
     def set_cap_image(self, image: np.ndarray) -> None:
+        """A new visitor's capture. It is the first diffusion image too, until the generator sends
+        one: without that, a failed generation would blend the previous visitor's last frame in."""
         self.inputs.capture.set_image(image)
+        self.inputs.diffusion.set_image(image)
 
     def set_status(self, text: str | None) -> None:
         """A line for the operator in the corner of the image; None for no line."""

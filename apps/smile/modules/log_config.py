@@ -135,9 +135,18 @@ def setup_logging(verbose: bool = False, name: str = "smile") -> Path:
     return log_file
 
 
-def install_thread_excepthook() -> None:
-    """Route unhandled thread exceptions through the logging system."""
+def install_excepthooks() -> None:
+    """Route unhandled exceptions through the logging system: those of the threads and of the main
+    thread. Under pythonw there is no console, so the log file is the only place they show."""
     _logger = logging.getLogger('threading')
+
+    def _main_hook(exc_type, exc_value, exc_traceback) -> None:
+        if issubclass(exc_type, KeyboardInterrupt):
+            return
+        logging.getLogger('main').critical("Unhandled exception in the main thread",
+                                           exc_info=(exc_type, exc_value, exc_traceback))
+
+    sys.excepthook = _main_hook
 
     def _hook(args: threading.ExceptHookArgs) -> None:
         if args.exc_type is SystemExit:

@@ -50,7 +50,9 @@ class CameraStage(Stage):
 
 class FlashStage(Stage):
     """Flash to white; the camera freezes at the capture. The face's marks fade out before it, so
-    the frozen frame has none: their saturated colour would outlast the image in the flash."""
+    the frozen frame has none: their saturated colour would outlast the image in the flash.
+    At the capture the diffusion layer starts over from it: whatever follows the flash (the flash
+    out, or the result at once when the generator fails) has nothing of the previous visitor."""
 
     # the marks are gone at this part of the time before the capture, so the last frames have none
     MARKS_GONE: float = 0.8
@@ -59,6 +61,8 @@ class FlashStage(Stage):
         if message.sequence_type == SequenceType.FLASH:
             marks: float = max(0.0, 1.0 - message.progress / (CAPTURE_AT * self.MARKS_GONE))
             self.layers.camera.render(1.0, marks)
+        elif message.sequence_type == SequenceType.CAPTURE:
+            self.layers.diffusion.seed(self.inputs.capture)     # uploaded this frame
         self.layers.flash.render(message.value_1)
 
     @property
@@ -67,11 +71,11 @@ class FlashStage(Stage):
 
 
 class RevealStage(Stage):
-    """The capture appears from white by its depth, while ComfyUI starts generating."""
+    """The capture (the diffusion layer, seeded at the capture) appears from white by its depth,
+    while ComfyUI starts generating."""
 
     def update(self, message: SeqenceMessage) -> None:
         if message.sequence_type == SequenceType.CONTROL_0 and message.initial:
-            self.layers.diffusion.seed(self.inputs.capture)
             self.layers.reveal.set_mask()
         self.layers.reveal.render(self.layers.diffusion.texture, 1.0 - message.value_1)
 

@@ -4,29 +4,42 @@ from modules.cam.FeatureWriter import FeatureWriter
 import cv2
 import numpy as np
 from threading import Thread, Lock, Event
-from time import sleep
+from time import sleep, monotonic
 from typing import Optional
 import copy
+import logging
 
-def get_camera(camera_id: Optional[str]) -> Camera | None:
+logger = logging.getLogger(__name__)
+
+FRAME_TIMEOUT: float = 5.0      # s without a complete frame while capturing: the camera is opened again
+RETRY_INTERVAL: float = 5.0     # s between two tries to find and open the camera
+STREAM_PAUSE: float = 1.0       # s after a stream that ended, before the camera is opened again
+GRAB_LOG_INTERVAL: float = 10.0 # s between the log lines of a frame grab that keeps failing
+
+
+class NoCamera(Exception):
+    """The camera was not found or could not be set up; the message says why."""
+
+
+def get_camera(camera_id: Optional[str]) -> Camera:
     with Vimba.get_instance() as vimba:
         cams = vimba.get_all_cameras()
         if not cams:
-            print('Vimba', 'no cameras found')
-            return None
+            raise NoCamera('no camera found')
 
         if camera_id:
             try:
                 return vimba.get_camera_by_id(camera_id)
 
             except VimbaCameraError:
-                print('Vimba cam', camera_id, 'not found defaulting to first')
+                logger.warning('Vimba camera %s not found, taking the first', camera_id)
 
-        # print (cams[0], 'found')
         return cams[0]
 
 
-def setup_camera(camera: Camera, user_set: Optional[str]) -> bool:
+def setup_camera(camera: Camera, user_set: Optional[str]) -> int:
+    """Load the user set and let the camera take the largest packet the path accepts; returns that
+    packet size. Raises NoCamera when the camera can't be opened or set up."""
     with Vimba.get_instance():
         try:
             with camera:
@@ -42,10 +55,7 @@ def setup_camera(camera: Camera, user_set: Optional[str]) -> bool:
                             pass
 
                     except VimbaFeatureError:
-                        print('Camera [{}] Failed to load user set \'{}\' from flash.'.format(camera.get_id(), user_set))
-                        return False
-
-                    print('Camera [{}] Loaded \'{}\' from flash.'.format(camera.get_id(), user_set))
+                        raise NoCamera(f'camera [{camera.get_id()}] failed to load {user_set} from flash')
 
                 # after the user set: it holds a packet size of its own and would put that back
                 try:
@@ -55,14 +65,13 @@ def setup_camera(camera: Camera, user_set: Optional[str]) -> bool:
                         pass
 
                 except (AttributeError, VimbaFeatureError):
-                    print('could not set package size')
-                    return False
+                    raise NoCamera(f'camera [{camera.get_id()}] could not set its packet size')
 
-                print('Camera [{}] packet size {}'.format(camera.get_id(), camera.get_feature_by_name('GevSCPSPacketSize').get()))
-                return True
-        except:
-            print('could not access camera, already connected?')
-            return False
+                return int(camera.get_feature_by_name('GevSCPSPacketSize').get())
+        except NoCamera:
+            raise
+        except Exception as e:
+            raise NoCamera(f'could not access the camera (already in use?): {e}')
 
 
 class VimbaCam(Thread):
@@ -94,63 +103,112 @@ class VimbaCam(Thread):
         self._features: FeatureWriter = FeatureWriter(settings)
 
         self.capturing: bool = False
-        self.camera: Camera | None = None
+        self.camera: Camera | None = None       # None while it is not found: the thread keeps looking
+
+        self._running: bool = False
+        self._stop_event: Event = Event()       # (Thread has a _stop of its own)
+        self._problem: str = ''                 # why there are no frames, as logged; '' while they come
+        self._packet_size: int = 0
+        self._grab_error_time: float = 0.0
 
     def run(self) -> None:
-
-        # close() sets self.camera to None from another thread: the loop works on its own reference
-        camera: Camera | None = self.camera
-        while self.camera and camera:
-            if self.capturing:
-                with Vimba.get_instance():
-                    with camera:
-                        camera.start_streaming(handler=self.frameCallback, buffer_count=5, allocation_mode = AllocationMode.AllocAndAnnounceFrame)
-                        # print('start streaming')
-                        while self.capturing:
-                            newFrame = self._take_internal_frame()
-                            if newFrame is not None:
-                                if self.rotate90:
-                                    newFrame = cv2.transpose(newFrame)
-                                if self.settings.flip_v:
-                                    newFrame = cv2.flip(newFrame, 0)
-                                if self.settings.flip_h:
-                                    newFrame = cv2.flip(newFrame, 1)
-                                newFrame = cv2.resize(newFrame, (self.outWidth, self.outHeight))
-
-                                for c in self.frameCallbacks:
-                                    c(newFrame)
-
-                                with self.frameMutex:
-                                    self.outputFrame = newFrame
-                                    self.frameNew = True
-
-                            # also without frames: the readouts then show that none arrive
-                            self._features.update(camera)
-
-                            sleep(0.01)
-                        camera.stop_streaming()
-            else:
+        # The thread streams, and starts over from the search when the camera was not found or its
+        # frames stopped (a cable, its power, a lost heartbeat): open() only makes the first try
+        while self._running:
+            camera: Camera | None = self.camera
+            if camera is None:
+                camera = self._find()
+                if camera is None:
+                    self._stop_event.wait(RETRY_INTERVAL)
+                    continue
+                self.camera = camera
+            if not self.capturing:
                 sleep(0.01)
+                continue
+            try:
+                self._stream(camera)
+            except Exception as e:
+                self._warn(f'the stream ended: {e}')
+            if self._running and self.capturing:
+                self.camera = None
+                self._stop_event.wait(STREAM_PAUSE)
+
+    def _stream(self, camera: Camera) -> None:
+        """Stream until the capture stops, or until no complete frame arrived for FRAME_TIMEOUT."""
+        with Vimba.get_instance():
+            with camera:
+                camera.start_streaming(handler=self.frameCallback, buffer_count=5, allocation_mode = AllocationMode.AllocAndAnnounceFrame)
+                try:
+                    last_frame: float = monotonic()
+                    while self.capturing and self._running:
+                        newFrame = self._take_internal_frame()
+                        if newFrame is not None:
+                            last_frame = monotonic()
+                            if self._problem:
+                                logger.info('Vimba camera delivers frames again (packet size %d)', self._packet_size)
+                                self._problem = ''
+                            if self.rotate90:
+                                newFrame = cv2.transpose(newFrame)
+                            if self.settings.flip_v:
+                                newFrame = cv2.flip(newFrame, 0)
+                            if self.settings.flip_h:
+                                newFrame = cv2.flip(newFrame, 1)
+                            newFrame = cv2.resize(newFrame, (self.outWidth, self.outHeight))
+
+                            for c in self.frameCallbacks:
+                                c(newFrame)
+
+                            with self.frameMutex:
+                                self.outputFrame = newFrame
+                                self.frameNew = True
+                        elif monotonic() - last_frame > FRAME_TIMEOUT:
+                            self._warn(f'no complete frame for {FRAME_TIMEOUT:.0f} s, opening the camera again')
+                            return
+
+                        # also without frames: the readouts then show that none arrive
+                        self._features.update(camera)
+
+                        sleep(0.01)
+                finally:
+                    camera.stop_streaming()
+
+    def _find(self) -> Camera | None:
+        """Find the camera and set it up (user set, packet size); None when that does not work, with
+        the reason in the log once."""
+        try:
+            camera: Camera = get_camera(self.camID)
+            packet_size: int = setup_camera(camera, self.user_set)
+        except NoCamera as e:
+            self._warn(str(e))
+            return None
+        except Exception as e:
+            self._warn(f'could not open the camera: {e}')
+            return None
+        if not self._problem:
+            logger.info('Vimba camera [%s]: loaded %s, packet size %d', camera.get_id(), self.user_set, packet_size)
+        self._packet_size = packet_size
+        # the user set was loaded: the panel's values go to the camera again
+        self._features.reset()
+        return camera
+
+    def _warn(self, problem: str) -> None:
+        """A reason there are no frames: logged when it is a new one, not at every retry."""
+        if problem != self._problem:
+            self._problem = problem
+            logger.warning('Vimba camera: %s', problem)
 
     def __exit__(self) -> None:
         self.close()
 
     def open(self) -> bool:
-        # print('open')
-        if self.camera: return True
+        """The first try, and the start of the thread that keeps trying. True when the camera is there."""
+        if self.is_alive():
+            return self.camera is not None
 
-        self.camera = get_camera(self.camID)
-
-        if not self.camera:
-            print('Cannot access the webcam.')
-            return False
-        else:
-            if not setup_camera(self.camera, self.user_set):
-                print('Cannot setup the webcam.')
-                return False
-
+        self.camera = self._find()
+        self._running = True
         self.start()
-        return True
+        return self.camera is not None
 
 
     def close(self) -> None:
@@ -159,17 +217,16 @@ class VimbaCam(Thread):
         if not self.is_alive():
             return
 
-        # print('close')
-        if self.camera:
-            self.stopCapture()
-            self.camera = None
+        self.stopCapture()
+        self._running = False
+        self._stop_event.set()
         self.join()
+        self.camera = None
 
 
     def startCapture(self) -> None:
-        # print('capture')
-        if self.camera:
-            self.capturing = True
+        # also without a camera: the stream starts when it is found
+        self.capturing = True
 
     def stopCapture(self) -> None:
         self.capturing = False
@@ -190,7 +247,9 @@ class VimbaCam(Thread):
                 self._internal_frame = cvFrame
                 self._internal_frame_new = True
         except Exception as e:
-            print('failed to grab frame', e)
+            if monotonic() - self._grab_error_time > GRAB_LOG_INTERVAL:
+                self._grab_error_time = monotonic()
+                logger.warning('Vimba camera: failed to grab a frame: %s', e)
         finally:
             try:
                 cam.queue_frame(frame)

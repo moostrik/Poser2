@@ -21,6 +21,9 @@ class FakeDevice:
     def open(self) -> bool:
         return self.opens
 
+    def isOpen(self) -> bool:
+        return self.opens
+
     def close(self) -> None:
         self.closed = True
 
@@ -92,12 +95,39 @@ class TestCamera(unittest.TestCase):
         self.assertEqual(image.shape, (6, 8, 3))
         self.assertEqual(int(image[0, 0, 0]), 100)     # a.jpg, at the output size
 
+    def test_a_frame_has_the_time_it_arrived(self):
+        device = FakeDevice()
+        self.make(device)
+        self.assertEqual(self.camera.frame()[1], 0.0)      # no frame yet
+        self.assertTrue(self.camera.stalled)
+        frame = np.zeros((6, 8, 3), dtype=np.uint8)
+        before = time.time()
+        device.push(frame)
+        image, arrived = self.camera.frame()
+        self.assertIs(image, frame)
+        self.assertGreaterEqual(arrived, before)
+        self.assertFalse(self.camera.stalled)
+        # a camera that stops keeps its last frame, with the time of that frame
+        self.assertEqual(self.camera.frame()[1], arrived)
+
     def test_a_missing_device_is_none_and_the_image_still_works(self):
         self.make(FakeDevice(opens=False))
         self.assertEqual(self.settings.device, 'none')
         self.assertEqual(self.frames, [])
         self.settings.use_image = True
         self.assertTrue(wait_for(lambda: len(self.frames) > 0))
+
+    def test_a_device_that_opens_later_delivers_and_shows(self):
+        device = FakeDevice(opens=False)
+        self.make(device)
+        self.assertEqual(self.settings.device, 'none')
+        device.opens = True                     # found after all: it kept trying
+        self.assertTrue(wait_for(lambda: self.settings.device == 'fake'))
+        frame = np.zeros((6, 8, 3), dtype=np.uint8)
+        device.push(frame)
+        self.assertIs(self.camera.frame()[0], frame)
+        device.opens = False                    # and gone again
+        self.assertTrue(wait_for(lambda: self.settings.device == 'none'))
 
     def test_changing_the_image_loads_the_new_file(self):
         self.make(FakeDevice())

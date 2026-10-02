@@ -1,6 +1,9 @@
 import cv2
+import logging
 import numpy as np
 import onnxruntime as ort
+
+logger = logging.getLogger(__name__)
 
 # SCRFD face detector (insightface antelopev2 'scrfd_10g_bnkps'), the same model InstantID uses in comfy.
 # Decoding follows insightface/model_zoo/scrfd.py, without the insightface package.
@@ -49,7 +52,7 @@ class FaceDetector():
         self.output_names: list[str] = [o.name for o in self.session.get_outputs()]
         self.batched: bool = len(self.session.get_outputs()[0].shape) == 3
         self._anchor_centers: dict[int, np.ndarray] = {}
-        print('FaceDetector running on', self.session.get_providers()[0])
+        logger.info('FaceDetector running on %s', self.session.get_providers()[0])
 
     def _get_anchor_centers(self, stride: int) -> np.ndarray:
         if stride not in self._anchor_centers:

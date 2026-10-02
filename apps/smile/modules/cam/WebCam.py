@@ -1,9 +1,12 @@
 import cv2
+import logging
 import numpy as np
 from threading import Thread, Lock
 from time import sleep
 
 from modules.cam.settings import CameraSettings
+
+logger = logging.getLogger(__name__)
 
 
 class WebCam(Thread):
@@ -53,7 +56,6 @@ class WebCam(Thread):
         self.close()
 
     def open(self) -> bool:
-        print('open')
         if self.deviceOpen: return True
         self.capDevice = cv2.VideoCapture(0)
         if not self.capDevice.isOpened():
@@ -64,7 +66,6 @@ class WebCam(Thread):
         return True
 
     def close(self) -> None:
-        print('close')
         if not self.deviceOpen: return
         if self.capturing: self.stopCapture()
 
@@ -77,9 +78,8 @@ class WebCam(Thread):
 
 
     def startCapture(self) -> None:
-        print('capture')
         if not self.deviceOpen:
-            print('CamDepthAi:start', 'device is not open')
+            logger.warning('Webcam is not open, no capture')
             return
         self.capturing = True
 

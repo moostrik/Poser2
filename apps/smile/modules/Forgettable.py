@@ -14,9 +14,15 @@ from modules.gl import FullscreenMode
 from modules.smile_settings import Settings
 from enum import Enum
 import logging
+import time
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# a visitor the generator has not ended this long after its own limit (connection.job_timeout) is ended
+# here: the generator answers by itself unless its thread is stuck, and then the flash would stay
+VISITOR_MARGIN: float = 30.0
+NO_CAMERA: str = 'no camera frames'
 
 class CamType(Enum):
     VIMBA   = 2
@@ -71,7 +77,10 @@ class Forgettable():
         self.osc: Osc = Osc(self.settings.osc)
         self.save: ClipSaver = ClipSaver(self.settings.sequence)
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
+        self._saving: bool = False          # the visitor's files are open in the saver
         self._style_picked: bool = False    # the style of the next visitor is picked: until the flash
+        self._face_frame_time: float = 0.0  # arrival of the camera frame the face finder got last
+        self._visitor_start: float | None = None    # the capture of the visitor the generator is working on
         self.artnet = Artnet(self.settings.artnet, 'data/artnet.json')
 
         self._running: bool = False
@@ -111,27 +120,22 @@ class Forgettable():
         self._stopping = True
 
         # first: stops the sequencer callbacks
-        self.sequencer.clear_message_callbacks()
-        self.render.stop()
-        self.sequencer.close()
-
-        self.artnet.stop()
-        self.osc.stop()
-
-        self.camera.clearColorCallbacks()
-        self.camera.close()
-
-        self.diffuse.clear_message_callbacks()
-        self.diffuse.stop()
-
-        self.face.clear_frame_callbacks()
-        self.face.stop()
-
-        self.save.stop()
-
-        self.settings_server.stop()
-
-        self._running = False
+        steps = (self.sequencer.clear_message_callbacks, self.render.stop, self.sequencer.close,
+                 self.artnet.stop, self.osc.stop,
+                 self.camera.clearColorCallbacks, self.camera.close,
+                 self.diffuse.clear_message_callbacks, self.diffuse.stop,
+                 self.face.clear_frame_callbacks, self.face.stop,
+                 self.save.stop,
+                 self.settings_server.stop)
+        try:
+            for step in steps:
+                # a step that fails must not keep the others, or the process, from ending
+                try:
+                    step()
+                except Exception:
+                    logger.exception('Error while stopping (%s)', getattr(step, '__qualname__', step))
+        finally:
+            self._running = False
 
     def sequence_callback(self, message: SeqenceMessage) -> None:
         seq: SequenceType = message.sequence_type
@@ -143,10 +147,14 @@ class Forgettable():
         # None either while the raw camera is shown: the sequence would run unseen behind it
         ready: bool = self.diffuse.ready
         self.sequencer.blocked = not ready or self.settings.render.show_camera
-        self.render.set_status(None if ready else self.settings.pipeline.connection.status)
+        # the operator's line: the generator's reason first, then a camera that delivers no frames
+        status: str | None = None if ready else self.settings.pipeline.connection.status
+        if status is None and self.camera.stalled:
+            status = NO_CAMERA
+        self.render.set_status(status)
         self.render.set_warmup(self.diffuse.warmup)
 
-        cam_image: np.ndarray= self.camera.getColorImg()
+        cam_image, cam_time = self.camera.frame()
         artnet_progress: float = message.progress
         if seq == SequenceType.TIMEOUT:
             artnet_progress = 1.0
@@ -172,8 +180,10 @@ class Forgettable():
         if seq == SequenceType.CAMERA_SHOW and message.initial:
             self.face.reset()
 
-        if seq >= SequenceType.CAMERA_SHOW and seq <= SequenceType.CAMERA_DETECT:
-            self.face.set_image(cam_image)
+        if seq >= SequenceType.CAMERA_SHOW and seq <= SequenceType.CAMERA_DETECT and cam_time > self._face_frame_time:
+            # new frames only, with the time they arrived: a camera that stopped then stops charging
+            self._face_frame_time = cam_time
+            self.face.set_image(cam_image, cam_time)
 
         if seq == SequenceType.CAPTURE:
             # the last frame of the recording in which the face qualified; the full camera frame without one
@@ -184,21 +194,51 @@ class Forgettable():
             else:
                 logger.warning('No face for the capture, using the camera frame')
 
-            self.diffuse.set_image(cap_image)
+            if ready:
+                self.diffuse.set_image(cap_image)
+                self._visitor_start = time.time()
+            else:
+                # ComfyUI went away during the flash: nobody would end it. The capture is the result
+                logger.warning('Generator not ready at the capture, ending the visitor')
+                self.sequencer.finish()
             self.render.set_cap_image(cap_image)
             self.save.new_sequence(cap_image, self.settings.pipeline.style_current)
+            self._saving = True
             self._grin_saved = False
             # a test run on images: the next visitor is the next file
             self.camera.next_image()
 
+        self._limit_visitor(seq)
 
         if seq == SequenceType.TIMEOUT:
             if message.initial == True:
                 # a failed or stopped visitor has no complete grin: its folder is not kept
+                self._saving = False
                 self.save.end_sequence(keep=self._grin_saved)
 
         if seq == SequenceType.RESET:
             self.diffuse.interrupt()
+            if self._saving:
+                # a reset before the result: the visitor's files are not kept
+                self._saving = False
+                self.save.end_sequence(keep=False)
+
+    def _limit_visitor(self, seq: SequenceType) -> None:
+        """End a visitor the generator did not end: it does so itself at connection.job_timeout, so
+        this only acts when its thread is stuck. Without it the flash, or the portrait, would stay."""
+        if self._visitor_start is None:
+            return
+        now: float = time.time()
+        grin = self.settings.pipeline.grin
+        if not (SequenceType.CAPTURE <= seq <= SequenceType.DIFF_LOOP):
+            self._visitor_start = None      # ended
+        elif grin.loop or grin.still:
+            self._visitor_start = now       # testing: the grin goes round until both are off
+        elif now - self._visitor_start > self.settings.pipeline.connection.job_timeout + VISITOR_MARGIN:
+            logger.error('The generator did not end the visitor after %.0f s, ending it', now - self._visitor_start)
+            self._visitor_start = None
+            self.diffuse.interrupt()
+            self.sequencer.finish()
 
     def face_callback(self, frame: FaceFrame) -> None:
         # the sequencer charges toward the flash while the face qualifies

@@ -1,7 +1,10 @@
 import json
+import logging
 import random
 
 from modules.audio.settings import AudioSettings
+
+logger = logging.getLogger(__name__)
 
 def load_json(file_path: str) -> dict:
     with open(file_path, 'r') as json_file:
@@ -26,7 +29,7 @@ class DB():
 
     def _pick(self, movement_id: str) -> str:
         if not movement_id in self._data:
-            print('warning', movement_id, self._file_path)
+            logger.warning('Movement %s is not in %s: no music', movement_id, self._file_path)
             return 'none'
 
         audio_entries: dict = self._data[movement_id]['audio_ids']
@@ -36,7 +39,7 @@ class DB():
                 filtered_entries[e] = audio_entries[e]
 
         if filtered_entries == {}:
-            print('warning', movement_id, 'no viable entries found')
+            logger.warning('Movement %s has no usable entries in %s: no music', movement_id, self._file_path)
             return 'none'
 
         keys, scores = zip(*[(key, entry["score"]) for key, entry in filtered_entries.items()])

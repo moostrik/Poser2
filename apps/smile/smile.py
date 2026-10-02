@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 from os import _exit
 from signal import signal, SIGINT
 from time import sleep
-from modules.log_config import setup_logging, install_thread_excepthook
+from modules.log_config import setup_logging, install_excepthooks
 from modules.Forgettable import Forgettable, CamType
 
 parser: ArgumentParser = ArgumentParser()
@@ -17,7 +17,7 @@ parser.add_argument('-v',   '--verbose',        action='store_true',        help
 args = parser.parse_args()
 
 setup_logging(verbose=args.verbose)
-install_thread_excepthook()
+install_excepthooks()
 
 modWidth :int = round(args.width / 4) * 4
 modHeight : int = round(args.height / 4) * 4

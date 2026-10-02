@@ -3,7 +3,7 @@
 import unittest
 from unittest import mock
 
-from modules.render.Sequencer import Sequencer, SequenceType
+from modules.render.Sequencer import SeqenceMessage, Sequencer, SequenceType
 from modules.render.settings import SequencerSettings
 from modules.render.stages import STAGES, CameraStage, DestructStage, DiffusionStage, FlashStage, RevealStage
 
@@ -19,6 +19,16 @@ class TestStages(unittest.TestCase):
         self.assertIs(STAGES[SequenceType.CONTROL_0], RevealStage)
         self.assertIs(STAGES[SequenceType.DIFF_LOOP], DiffusionStage)
         self.assertIs(STAGES[SequenceType.FADE], DestructStage)
+
+    def test_the_capture_seeds_the_diffusion_layer(self):
+        # at the capture, not at the flash out: a generation that fails before its depth skips that
+        inputs, layers = mock.Mock(), mock.Mock()
+        stage = FlashStage(inputs, layers, mock.Mock())
+        stage.update(SeqenceMessage(SequenceType.FLASH, 0.2))
+        stage.update(SeqenceMessage(SequenceType.ASK, 0.8))
+        layers.diffusion.seed.assert_not_called()
+        stage.update(SeqenceMessage(SequenceType.CAPTURE, 0.5))
+        layers.diffusion.seed.assert_called_once_with(inputs.capture)
 
 
 class TestSequencer(unittest.TestCase):
@@ -119,6 +129,50 @@ class TestSequencer(unittest.TestCase):
             self.sequencer.blocked = False
             message = self.run_camera(clock, 1.0, True)
             self.assertEqual(message.sequence_type, SequenceType.CAMERA_DETECT)
+
+    def test_a_start_that_was_blocked_does_not_fire_later(self):
+        clock, patched = self.charging()
+        with patched:
+            self.sequencer.start_sequence()
+            self.run_camera(clock, 1.0, None)                       # half full
+            self.sequencer.blocked = True
+            self.run_camera(clock, 3.0, None)                       # drained
+            self.sequencer.blocked = False
+            message = self.run_camera(clock, 3.0, None)
+            self.assertEqual(message.sequence_type, SequenceType.CAMERA_SHOW)
+
+    def test_progress_stays_full_from_the_timeout_into_the_reset(self):
+        clock = [100.0]
+        self.sequencer.settings.timeout = 1.0
+        with mock.patch('modules.render.Sequencer.time.time', lambda: clock[0]):
+            self.sequencer.set_sequence(SequenceType.TIMEOUT)
+            self.sequencer.update()
+            clock[0] += 1.1
+            for _ in range(2):      # the lights and the music follow the progress of both RESET messages
+                message = self.sequencer.update()
+                self.assertEqual(message.sequence_type, SequenceType.RESET)
+                self.assertEqual(message.progress, 1.0)
+            self.assertEqual(self.sequencer.get_sequence(), SequenceType.BLOOM)
+
+    def test_the_first_fade_message_keeps_the_bloom(self):
+        clock = [100.0]
+        settings = self.sequencer.settings
+        settings.destroy_in = 0.4
+        settings.destroy_out = 1.1
+        with mock.patch('modules.render.Sequencer.time.time', lambda: clock[0]):
+            self.sequencer.set_sequence(SequenceType.BLOOM)
+            self.sequencer.update()
+            clock[0] += 0.39
+            bloom = self.sequencer.update()
+            self.assertEqual(bloom.sequence_type, SequenceType.BLOOM)
+            clock[0] += 0.02
+            first = self.sequencer.update()                         # the bloom's last message is a FADE
+            self.assertEqual(first.sequence_type, SequenceType.FADE)
+            self.assertEqual(first.value_1, 0.0)                    # nothing faded yet
+            self.assertGreater(first.value_2, bloom.value_1)        # the bloom goes on
+            second = self.sequencer.update()
+            self.assertEqual(second.sequence_type, SequenceType.FADE)
+            self.assertEqual(second.value_2, first.value_2)
 
     def test_update_reports_state_and_calls_back(self):
         messages = []

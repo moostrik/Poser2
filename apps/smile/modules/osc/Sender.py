@@ -22,7 +22,11 @@ def is_valid_ip_address(ip: str) -> bool:
         return False
 
 def is_valid_port(port: int) -> bool:
-    return port in range(1, 65535)
+    return port in range(1, 65536)
+
+# addresses whose every message counts (a bang per clip start); of the others only the newest value is sent
+EVENT_ADDRESSES: tuple[str, ...] = ('/bang',)
+ERROR_LOG_INTERVAL: float = 10.0    # s between the log lines of a send that keeps failing
 
 class Sender(Thread):
     def __init__(self, settings: OscSettings) -> None:
@@ -36,6 +40,7 @@ class Sender(Thread):
         self.timeout: float = 0.1
         self.mutex: Lock = Lock()
         self.last_message_time: float = time()
+        self._error_time: float = 0.0       # when a failed send was last logged
 
     def start(self) -> None:
         if self.running:
@@ -77,8 +82,11 @@ class Sender(Thread):
                             self.client.send(bundle)
                             self.last_message_time = time()  # Update last message time
                     except Exception:
-                        logger.exception('osc error, stopping')
-                        self.running = False
+                        # this bundle is lost, the next one is sent: a sender that stopped here would
+                        # stay silent for the rest of the run while its queue grows
+                        if time() - self._error_time > ERROR_LOG_INTERVAL:
+                            self._error_time = time()
+                            logger.exception('osc error, bundle not sent')
 
             # Calculate time elapsed since the start of the loop
             elapsed_time: float = time() - start_time
@@ -102,10 +110,12 @@ class Sender(Thread):
         # Process each group and construct a message
         processed_data = []
         for address, args_list in grouped_data.items():
-            # Your logic to handle multiple entries with the same address
-            # Example: Use the latest values for each address
-            latest_args = args_list[-1]
-            processed_data.append((address, latest_args))
+            if address in EVENT_ADDRESSES:
+                # events: each one is sent
+                processed_data.extend((address, args) for args in args_list)
+            else:
+                # states: the latest value
+                processed_data.append((address, args_list[-1]))
 
         return processed_data
 
@@ -120,7 +130,8 @@ class Sender(Thread):
         return bundle.build()
 
     def send(self, address: str, args: ArgValue) -> None:
-        if self.settings.active:
+        # only while the thread takes them: nothing empties the queue otherwise
+        if self.settings.active and self.running:
             self.queue.put((address, args))
 
     def _on_address(self, _=None) -> None:

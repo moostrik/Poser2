@@ -123,6 +123,27 @@ class TestGenerator(unittest.TestCase):
             self.assertTrue(self.generator._warmed_up)
             self.assertEqual(self.settings.connection.status, 'ready')
 
+    def test_a_reset_does_not_end_a_warm_up(self):
+        self.generator.is_diffusing = True
+        self.generator._silent = True
+        self.generator.interrupt()
+        self.assertFalse(self.generator._interrupt_event.is_set())
+        self.generator._silent = False          # a visitor's job
+        self.generator.interrupt()
+        self.assertTrue(self.generator._interrupt_event.is_set())
+
+    def test_an_interrupted_warm_up_is_not_ready(self):
+        self.generator._stop_event.set()        # what interrupts a warm-up: the app stops
+        self.generator.client = FakeClient(self.clock, [], busy=False)
+        with mock.patch('modules.comfy.Generator.WARMUP_IMAGE', WARMUP):
+            self.generator._warm_up()
+        self.assertFalse(self.generator._warmed_up)
+
+    def test_a_reset_drops_a_capture_that_was_not_taken_yet(self):
+        self.generator.set_image(object())
+        self.generator.interrupt()
+        self.assertIsNone(self.generator._take_image())
+
     def test_warmup_rises_with_every_step_of_the_warm_up(self):
         wf = self.generator.workflow
         self.assertEqual(self.generator.warmup, 0.0)

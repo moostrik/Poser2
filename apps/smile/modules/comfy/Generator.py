@@ -12,7 +12,8 @@ Both with the capture's depth as the bloom mask.
 A workflow that ComfyUI ran without sending one event is NoEvents: the generator is not ready until
 a warm-up gets its events again, and a warm-up that fails is tried again instead of counting as ready.
 Any failure or timeout ends with IDLE so the sequence can't hang; a reset (interrupt) ends
-silently because the sequence has already moved on.
+silently because the sequence has already moved on. A reset ends a visitor's job only, never a warm-up.
+An error nobody expected closes the connection and starts over from the connect, so the thread stays alive.
 """
 
 import logging
@@ -40,6 +41,7 @@ RECONNECT_INTERVAL: float = 2.0
 SILENT_AFTER: float = 5.0       # s without any event of a queued workflow before asking whether it still runs
 SILENT_RECHECK: float = 2.0
 NO_EVENTS: str = 'no events from ComfyUI: close or reload its browser tab'
+INTERRUPTED: str = 'interrupted'
 # the grin settings in a visitor's record; of the ranges it has what was drawn from them
 RECORD_GRIN_FIELDS: tuple[str, ...] = ('frames', 'face_region', 'stitching', 'ease', 'midpoint', 'midpoint_deviation')
 
@@ -90,7 +92,7 @@ class Generator(Thread):
         return len(self._warmup_steps) / (self.workflow.step_count + 1)
 
     def stop(self) -> None:
-        self._stop_event.set()
+        self._stop_event.set()      # ends a warm-up too
         self.interrupt()
         if self.is_alive():
             self.join()
@@ -101,7 +103,11 @@ class Generator(Thread):
             self._image = image
 
     def interrupt(self) -> None:
-        if self.is_diffusing:
+        """End the visitor's job (a reset). A warm-up is not a visitor's: it goes on, or it would
+        count as done without having proven anything."""
+        with self._mutex:
+            self._image = None      # a capture that was handed over and not taken yet
+        if self.is_diffusing and not self._silent:
             self._interrupt_event.set()
             self.player.clear()
 
@@ -144,6 +150,12 @@ class Generator(Thread):
                 logger.warning('Lost the connection to ComfyUI', exc_info=True)
                 self.client.close()
                 self.settings.connection.connected = False
+            except Exception:
+                # nothing may end this thread: every visitor waits for it. Start over from the connection
+                logger.exception('Generator error, connecting to ComfyUI again')
+                self.client.close()
+                self.settings.connection.connected = False
+                self._stop_event.wait(RECONNECT_INTERVAL)
 
     def _connect(self) -> bool:
         c = self.settings.connection
@@ -212,7 +224,7 @@ class Generator(Thread):
             c(message)
 
     def _generate(self, image: np.ndarray, timeout: float) -> str | None:
-        """Run one job; returns why it failed, or None when it was made (or interrupted)."""
+        """Run one job; returns why it was not made (a failure, or INTERRUPTED), or None when it was."""
         start: float = time.time()
         failure: str | None = None
         self._interrupt_event.clear()
@@ -221,6 +233,7 @@ class Generator(Thread):
             self._run_job(image, start + timeout)
         except Interrupted:
             logger.info('Generation interrupted')
+            failure = INTERRUPTED
         except TimeoutError as e:       # our own job_timeout (an OSError, but not a lost connection)
             logger.warning('Generation timed out: %s', e)
             failure = 'timed out'

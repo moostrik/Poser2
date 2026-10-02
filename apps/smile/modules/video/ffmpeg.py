@@ -9,6 +9,7 @@ import logging
 import os
 import shutil
 import subprocess
+import threading
 from enum import Enum
 from fractions import Fraction
 from typing import BinaryIO
@@ -44,6 +45,7 @@ def available() -> bool:
 
 BELOW_NORMAL: int = getattr(subprocess, 'BELOW_NORMAL_PRIORITY_CLASS', 0)
 DECODE_THREADS: int = 2     # a background job: the players' render and loaders must keep their cores
+DECODE_TIMEOUT: float = 60.0    # s a clip may take to decode (it takes a few); then ffmpeg is ended
 
 
 def popen(args: list[str], stdin, stdout, command: str = FFMPEG, background: bool = False) -> subprocess.Popen:
@@ -241,34 +243,50 @@ def decode_clip(path: str, size: tuple[int, int], hwdecode: int | None = None) -
     finally:
         os.close(write_fd)      # the child has its own copy; ours must close for the read to reach its end
     assert process.stderr is not None
-    if frames > 0:
-        # fill a preallocated array, no second copy of the 200 MB
-        array = np.empty((frames, height, width, 3), np.uint8)
-        view = memoryview(array).cast('B')
-        got = 0
-        while got < len(view):
-            n = out.readinto(view[got:])
-            if not n:
-                break
-            got += n
-        while out.read(1 << 20):     # drain frames beyond the count, so ffmpeg can end
-            pass
-    else:
-        # the file does not say how many frames: read to the end and stack
-        chunks: list[bytes] = []
-        while True:
-            data = _read_exactly(out, frame_bytes)
-            if len(data) < frame_bytes:
-                break
-            chunks.append(data)
-        got = len(chunks) * frame_bytes
-        array = np.frombuffer(b''.join(chunks), np.uint8).reshape(-1, height, width, 3)
-    err = process.stderr.read()     # stdout is at its end, so ffmpeg is finishing
-    out.close()
-    process.stderr.close()
-    process.wait(timeout=30)
+    # stderr is read while the frames come in: a damaged clip's line per frame would fill its pipe
+    # and stop ffmpeg while we wait for frames
+    errors: list[bytes] = []
+    stderr = process.stderr
+    reader = threading.Thread(target=lambda: errors.append(stderr.read()), name='ffmpeg stderr', daemon=True)
+    reader.start()
+    # a decode that hangs is ended: the read below then reaches its end and the clip is skipped
+    killer = threading.Timer(DECODE_TIMEOUT, process.kill)
+    killer.daemon = True
+    killer.start()
+    try:
+        if frames > 0:
+            # fill a preallocated array, no second copy of the 200 MB
+            array = np.empty((frames, height, width, 3), np.uint8)
+            view = memoryview(array).cast('B')
+            got = 0
+            while got < len(view):
+                n = out.readinto(view[got:])
+                if not n:
+                    break
+                got += n
+            while out.read(1 << 20):     # drain frames beyond the count, so ffmpeg can end
+                pass
+        else:
+            # the file does not say how many frames: read to the end and stack
+            chunks: list[bytes] = []
+            while True:
+                data = _read_exactly(out, frame_bytes)
+                if len(data) < frame_bytes:
+                    break
+                chunks.append(data)
+            got = len(chunks) * frame_bytes
+            array = np.frombuffer(b''.join(chunks), np.uint8).reshape(-1, height, width, 3)
+        out.close()
+        process.wait(timeout=30)        # stdout is at its end, so ffmpeg is finishing
+        reader.join(timeout=5)
+        process.stderr.close()
+    finally:
+        killer.cancel()
+        if process.poll() is None:
+            process.kill()      # something went wrong here: no ffmpeg is left behind
+    err: bytes = b''.join(errors)
     if process.returncode != 0:
-        raise RuntimeError(f'decode failed on {path}: {_stderr(err)}')
+        raise RuntimeError(f'decode failed on {path}: {_stderr(err) or f"exit code {process.returncode}"}')
     if array.shape[0] == 0 or got < array.nbytes:
         raise RuntimeError(f'short read on {path}: {got // frame_bytes} of {array.shape[0]} frames')
     return array, fps if fps > 0 else 15.0

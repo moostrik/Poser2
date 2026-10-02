@@ -1,8 +1,9 @@
 """Writes the panel's camera settings (exposure, gain, white balance, colour) to the features of a
 Vimba camera when they change. The panel is the source of truth: everything is sent once after the
 camera opens, over what its user set loaded. A feature the camera model does not have is a warning,
-once. Exposure and gain are the panel's value with auto off and the camera's with auto on; the
-values in use are read back for the panel.
+once. A write the camera refuses (a value it does not take, a control channel that timed out) is a
+warning too, and is tried again: it does not switch the feature off. Exposure and gain are the panel's
+value with auto off and the camera's with auto on; the values in use are read back for the panel.
 "Set WB" (white balance) lets the camera measure once and takes the ratios it found back into the panel."""
 
 import logging
@@ -24,7 +25,9 @@ class FeatureWriter:
     def __init__(self, settings: CameraSettings) -> None:
         self.settings: CameraSettings = settings
         self._applied: dict[str, Any] = {}      # values last written to the camera, per setting
-        self._missing: set[str] = set()         # features this camera does not take
+        self._missing: set[str] = set()         # features this camera does not have
+        self._retry: dict[str, float] = {}      # per setting whose write failed: when it is tried again
+        self._refused: dict[str, str] = {}      # per feature: the last refusal that was logged
         self._ratio_feature: str | None = None
         self._measure: Event = Event()
         self._measure_end: float | None = None  # set while the camera measures its white balance
@@ -40,6 +43,17 @@ class FeatureWriter:
     def close(self) -> None:
         self.settings.unbind(CameraSettings.set_WB, self._on_wb_set)
 
+    def reset(self) -> None:
+        """The camera was opened and its user set loaded (at the start, or again after its frames
+        stopped): nothing counts as written, everything is sent again. Call on the camera thread,
+        or before it starts."""
+        self._applied.clear()
+        self._missing.clear()
+        self._retry.clear()
+        self._refused.clear()
+        self._ratio_feature = None
+        self._measure_end = None
+
     def count_frame(self, complete: bool = True) -> None:
         """A frame arrived from the camera (any thread): counted for the frame rate readout, or as
         dropped when it is incomplete (network packets lost) and skipped."""
@@ -53,7 +67,7 @@ class FeatureWriter:
         """Send what changed. Call on the camera thread, with the camera open."""
         s: CameraSettings = self.settings
         self._sync('frame_rate', float(s.target_frame_rate), lambda v: self._set(camera, 'AcquisitionFrameRateAbs', v))
-        self._sync('auto_target', int(s.target_brightness), lambda v: (self._set(camera, 'ExposureAutoTarget', v), self._set(camera, 'GainAutoTarget', v)))
+        self._sync('auto_target', int(s.target_brightness), lambda v: all([self._set(camera, 'ExposureAutoTarget', v), self._set(camera, 'GainAutoTarget', v)]))
         self._sync('exposure_max', float(s.exposure_max), lambda v: self._set(camera, 'ExposureAutoMax', v))
         self._sync('gain_max', float(s.gain_max), lambda v: self._set(camera, 'GainAutoMax', v))
         self._auto_or_manual(camera, 'exposure', s.auto_exposure, float(s.manual_exposure), 'ExposureAuto', 'ExposureTimeAbs')
@@ -150,24 +164,43 @@ class FeatureWriter:
             self._applied['wb_blue'] = float(s.manual_WB_blue)
 
     def _sync(self, key: str, value: Any, write: Callable[[Any], Any]) -> None:
-        if self._applied.get(key) != value:
+        """Write the value when it is not the one the camera has. A write that did not get through is
+        not counted as applied: it is tried again, at the pace of the reads."""
+        if self._applied.get(key) == value:
+            return
+        now: float = monotonic()
+        if now < self._retry.get(key, 0.0):
+            return
+        if write(value):
             self._applied[key] = value
-            write(value)
+            self._retry.pop(key, None)
+        else:
+            self._applied.pop(key, None)
+            self._retry[key] = now + READ_INTERVAL
 
     def _set(self, camera: Any, name: str, value: Any) -> bool:
         if name in self._missing:
             return False
         try:
             feature = camera.get_feature_by_name(name)
+        except Exception as e:
+            # the camera model does not have it: not asked again
+            self._missing.add(name)
+            logger.warning('Camera feature %s not available: %s', name, e)
+            return False
+        try:
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 low, high = feature.get_range()
                 value = type(low)(min(max(value, low), high))     # in the feature's range and number type
             feature.set(value)
-            return True
         except Exception as e:
-            self._missing.add(name)
-            logger.warning('Camera feature %s not available: %s', name, e)
+            # refused this time: the feature stays, the caller tries again. Logged once per reason
+            if self._refused.get(name) != str(e):
+                self._refused[name] = str(e)
+                logger.warning('Camera feature %s not set to %s: %s', name, value, e)
             return False
+        self._refused.pop(name, None)
+        return True
 
     def _ratio(self, camera: Any) -> str | None:
         """The name of the camera's balance ratio feature, or None when it has none."""

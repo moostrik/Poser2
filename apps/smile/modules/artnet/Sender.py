@@ -97,7 +97,9 @@ class Sender(Thread):
                  self.cameras[name] = address
                  address += self.camera_led_num * 3
 
+        # even: StupidArtnet rounds its own size up to even and refuses a packet of another length
         self.packet_size: int = address + 1
+        self.packet_size += self.packet_size % 2
 
         self.packet = bytearray(self.packet_size)
 
@@ -166,10 +168,11 @@ class Sender(Thread):
 
     def update_cameras(self) -> None:
 
+        lights: np.ndarray = self.cam_lights    # one reference: the setters replace the array
         for name in self.cameras:
             a: int = self.cameras[name]
             power = 2.0
-            scaled_matrix = (self.cam_lights ** power * 255).astype(np.uint8)
+            scaled_matrix = (lights ** power * 255).astype(np.uint8)
             byte_array = scaled_matrix.tobytes()
             # print(byte_array)
             for i in range(self.camera_led_num * 3):
@@ -223,8 +226,11 @@ class Sender(Thread):
             time.sleep(self._interval())
 
 
+    # the setters build the ring and put it in place in one step: the sender thread reads cam_lights
+    # between any two lines, and a ring that is half filled in is a dark frame on the lights
+
     def set_camera_counter(self, value: float, red: bool = False) -> None:
-        self.cam_lights[:] = 0.0
+        lights: np.ndarray = np.zeros_like(self.cam_lights)
         value = max(min(value, 1.0), 0.0) * 7.0
         v: float = value - math.floor(value)
 
@@ -233,28 +239,25 @@ class Sender(Thread):
         active_leds: list[int] = get_counter_active_light(value)
 
         if red:
-            self.cam_lights[leds, 0] = 1
-            self.cam_lights[active_leds, 0] = v
+            lights[leds, 0] = 1
+            lights[active_leds, 0] = v
         else:
-            self.cam_lights[leds, :] = 1
-            self.cam_lights[active_leds, :] = v
-
-
+            lights[leds, :] = 1
+            lights[active_leds, :] = v
+        self.cam_lights = lights
 
     def set_camera_white(self, value: float) -> None:
         value = max(min(value, 1.0), 0.0)
-        self.cam_lights[:, 0] = value
-        self.cam_lights[:, 1] = value
-        self.cam_lights[:, 2] = value
+        self.cam_lights = np.full_like(self.cam_lights, value)
 
     def set_camera_red(self, value: float) -> None:
         value = max(min(value, 1.0), 0.0)
-        self.cam_lights[:, 0] = value
-        self.cam_lights[:, 1] = 0 #value ** 3.0
-        self.cam_lights[:, 2] = 0 #value ** 3.0
+        lights: np.ndarray = np.zeros_like(self.cam_lights)
+        lights[:, 0] = value
+        self.cam_lights = lights
 
     def set_camera_black(self) -> None:
-        self.cam_lights[:] = 0.0
+        self.cam_lights = np.zeros_like(self.cam_lights)
 
     def set_progress(self, progress: float, type: AnimationType) -> None:
         # self.set_camera_counter(progress)

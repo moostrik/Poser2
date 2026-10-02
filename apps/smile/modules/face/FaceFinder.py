@@ -1,4 +1,5 @@
 import cv2
+import logging
 import numpy as np
 import time
 from dataclasses import dataclass
@@ -10,14 +11,17 @@ from modules.face.FaceLandmarks import FaceLandmarks
 from modules.face.quality import FaceObservation, Pose, Rejection, distance, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
 from modules.face.settings import FaceSettings
 
+logger = logging.getLogger(__name__)
+
 DETECT_THRESHOLD: float = 0.5
+ERROR_LOG_INTERVAL: float = 10.0    # s between the log lines of a detection that keeps failing
 
 
 @dataclass(frozen=True)
 class FaceFrame:
     """Every face of one camera frame, for the overlay and the sequencer's charge."""
     faces: tuple[FaceObservation, ...]
-    time: float
+    time: float     # when the camera frame arrived, not when it was detected: a camera that stopped goes stale
 
     @property
     def subject(self) -> FaceObservation | None:
@@ -134,6 +138,8 @@ class FaceFinder(Thread):
         self._saved_mutex: Lock = Lock()
         self._thread_running: bool = False
         self._image: np.ndarray | None = None
+        self._image_time: float = 0.0               # when that camera frame arrived
+        self._error_time: float = 0.0               # when a failed detection was last logged
         self._frame_callbacks: list[FrameCallback] = []
 
         self._composition_width: int = composition_width
@@ -165,16 +171,21 @@ class FaceFinder(Thread):
         detector: FaceDetector = FaceDetector(self._model_path)
         landmarks: FaceLandmarks = FaceLandmarks(self._landmark_path)
         while self._thread_running:
-            image: np.ndarray | None = self.get_image()
-            self.set_image(None)
-            if image is not None:
-                self._process(image, detector, landmarks)
-            else:
+            image, image_time = self._take_image()
+            if image is None:
                 time.sleep(0.01)
+                continue
+            try:
+                self._process(image, image_time, detector, landmarks)
+            except Exception:
+                # nothing may end this thread: without it nobody is ever chosen. The frame is skipped
+                if time.time() - self._error_time > ERROR_LOG_INTERVAL:
+                    self._error_time = time.time()
+                    logger.exception('Face detection failed')
 
-    def _process(self, image: np.ndarray, detector: FaceDetector, landmarks: FaceLandmarks) -> None:
+    def _process(self, image: np.ndarray, now: float, detector: FaceDetector, landmarks: FaceLandmarks) -> None:
+        """Detect and judge the faces of a camera frame that arrived at `now`."""
         s: FaceSettings = self.settings
-        now: float = time.time()
         image_height, image_width = image.shape[:2]
 
         assessed: list[_Assessed] = []
@@ -259,12 +270,18 @@ class FaceFinder(Thread):
             self._qualified = None
             self._last = None
 
-    def set_image(self, image: np.ndarray | None) -> None:
+    def set_image(self, image: np.ndarray, image_time: float) -> None:
+        """The next camera frame to detect, and when it arrived. Hand over new frames only: the time
+        is what tells the sequencer and the overlay that the camera still delivers."""
         with self._input_mutex:
             self._image = image
-    def get_image(self) -> np.ndarray | None:
+            self._image_time = image_time
+
+    def _take_image(self) -> tuple[np.ndarray | None, float]:
+        """The frame that was handed over, once: None until the next one."""
         with self._input_mutex:
-            return self._image
+            image, self._image = self._image, None
+            return image, self._image_time
 
     def frame_callback(self, frame: FaceFrame) -> None:
         with self._input_mutex:

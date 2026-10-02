@@ -33,7 +33,7 @@
     }
   },
   "pipeline": {
-    "style_mode": "B",
+    "style_mode": "BOTH",
     "style_visitors_a": 24,
     "style_visitors_b": 8,
     "skip_generation": false,

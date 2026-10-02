@@ -92,8 +92,9 @@ def bloom_message(state: SeqenceState, bloom_duration: float, bloom_easing: Easi
     if progress < 1.0:
         return SeqenceMessage(state.type, progress, initial, value)
     else:
+        # the first FADE message: its values where a fade has them (value_1 the fade, value_2 the bloom)
         state.type = SequenceType.FADE
-        return SeqenceMessage(state.type, 0, initial, value)
+        return SeqenceMessage(state.type, 0, initial, 0.0, value)
 
 def fade_message(state: SeqenceState, bloom_duration: float, bloom_easing: Easing, fade_duration: float, fade_easing: Easing) -> SeqenceMessage:
     initial = False
@@ -232,8 +233,9 @@ def timeout_message(state: SeqenceState, duration: float, easing: Easing = easin
     if progress < 1.0:
         return SeqenceMessage(state.type, progress, initial)
     else:
+        # progress stays full, as in reset_message: the lights and the music follow it
         state.type = SequenceType.RESET
-        return SeqenceMessage(state.type, 0, initial, 0)
+        return SeqenceMessage(state.type, 1.0, initial, 0)
 
 def reset_message(state: SeqenceState) -> SeqenceMessage:
     initial = False
@@ -369,6 +371,7 @@ class Sequencer():
         """Whether the charge rises this frame: a manual start, or a fresh qualifying face while
         new visitors are welcome (not paused, the generator ready)."""
         if self.blocked:
+            self._forced = False    # a manual start does not wait for the block to end
             return False
         if self._forced:
             return True

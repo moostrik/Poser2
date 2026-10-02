@@ -22,6 +22,8 @@ class FakeFeature:
         return self.range
 
     def set(self, value) -> None:
+        if self.name in self.camera.refuses:
+            raise RuntimeError('timeout')
         self.camera.writes.append((self.name, value))
         if self.name == 'BalanceRatioAbs':
             self.camera.ratios[self.camera.features['BalanceRatioSelector'].value] = value
@@ -32,6 +34,7 @@ class FakeFeature:
 class FakeCamera:
     def __init__(self, without: tuple[str, ...] = ()) -> None:
         self.writes: list[tuple[str, object]] = []
+        self.refuses: set[str] = set()      # features whose write fails for now
         self.ratios: dict[str, float] = {'Red': 1.0, 'Blue': 1.0}
         self.features: dict[str, FakeFeature] = {}
         for name, value, range_ in (
@@ -155,6 +158,24 @@ class TestFeatureWriter(unittest.TestCase):
         self.writer.update(camera)
         self.assertEqual(camera.written('Hue'), [])
         self.assertEqual(camera.ratios['Red'], 1.0)
+
+    def test_a_refused_write_is_tried_again_and_does_not_switch_the_feature_off(self):
+        self.camera.refuses = {'Hue', 'BalanceRatioSelector'}
+        self.settings.hue = 10.0
+        with self.assertLogs('modules.cam.FeatureWriter', 'WARNING') as logs:
+            self.writer.update(self.camera)
+            self.writer.update(self.camera)                 # not again before the next read interval
+        self.assertEqual(self.camera.written('Hue'), [])
+        self.assertEqual(len([line for line in logs.output if 'Hue' in line]), 1)   # logged once
+        self.assertEqual(self.writer._missing, set())
+
+        self.camera.refuses = set()                         # the camera takes it again
+        self.writer._retry = {key: 0.0 for key in self.writer._retry}
+        self.writer.update(self.camera)
+        self.assertEqual(self.camera.written('Hue'), [10.0])
+        self.settings.manual_WB_red = 2.0
+        self.writer.update(self.camera)
+        self.assertEqual(self.camera.ratios['Red'], 2.0)
 
     def test_auto_owns_the_ratios_and_the_panel_takes_them_back(self):
         self.settings.auto_WB = True

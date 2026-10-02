@@ -6,16 +6,27 @@ result is shown with music (Max patch via OSC) and lights (Art-Net). Entry point
 `.venv`, installed with `scripts/install.bat`. Tests: `.venv\Scripts\python -m pytest` from the repo root.
 All Python code lives in `modules/`; `data/` is what the installation is given (presets, models,
 workflow, audio, test photos), `output/` what it produces (git-ignored, safe to delete).
+The apps run under pythonw, without a console: say things with `logging`, never `print` (the log file
+in `output/logs/` is the only place they show; unhandled exceptions of the threads and of the main
+thread go there too, `log_config.install_excepthooks`). A worker thread's loop catches what its work
+raises, logs it (not at every round) and goes on: a thread that ends leaves an installation that looks
+alive and does nothing (the face finder: nobody is ever chosen; the generator: the flash stays).
 
 ## Camera
 
 `modules/cam/Camera.py` is the one source the app reads: it wraps the device (`VimbaCam` default,
 `WebCam` with `-wc`) and an image source from `data/input/` that the panel's `use_image` switch puts in
 place of the device frames at any time. A missing device is a warning and `device: none`, never an
-automatic switch to the image. The camera settings (`Settings.camera`) also hold the face settings
+automatic switch to the image. `VimbaCam`'s thread keeps the camera: `open()` makes the first try, and
+the thread searches again every 5 s while there is none and opens it again (user set, packet size, the
+panel's values) when no complete frame arrived for 5 s; the `device` readout follows it. Every frame
+has the time it arrived (`Camera.frame()`): the face finder gets new frames only and its faces carry
+that time, so a camera that stopped never charges on its last frame, and the render shows
+`no camera frames` as its status line after 3 s without one (`Camera.stalled`). The camera settings (`Settings.camera`) also hold the face settings
 (`camera.face`). Exposure, gain, white balance and colour (saturation, hue, gamma) are panel settings that
 `FeatureWriter` writes to the Vimba camera (Mako G-125C) when they change, over what the camera's `UserSet2`
-loaded; a feature the camera model lacks is a warning. Exposure and gain each have auto, a manual
+loaded; a feature the camera model lacks is a warning, and so is a write the camera refuses, which is
+tried again (it does not switch the feature off). Exposure and gain each have auto, a manual
 value (sent while auto is off), a limit for auto and a readout of what the camera uses now; both
 autos aim for `target_brightness`, the exposure going up first and the gain after it. "Set WB" (white balance) lets the camera measure
 once and takes the ratios it found into the panel.
@@ -42,9 +53,10 @@ is the face's `Rejection`, and `distance()` says how far the face is from qualif
 just past a limit, 1 when its worst check is `falloff` times the limit past it). Gaze is not checked: the "looking at viewer" LoRA corrects it. The subject of a frame is its largest qualifying face.
 The flash is earned: the `Sequencer` keeps a **charge** that rises while the newest detector frame
 has a qualifying subject (`sequence.charge` seconds to fill) and drains while it has none
-(`sequence.drain` seconds, slower); CAMERA_SHOW is an empty charge, CAMERA_DETECT a partial one
+(`sequence.drain` seconds, slower); a detector frame is as old as its camera frame (`FaceFrame.time`),
+and one older than half a second counts as nobody. CAMERA_SHOW is an empty charge, CAMERA_DETECT a partial one
 (its progress is the charge, also for OSC and Art-Net), and a full one starts the flash. A manual
-start charges without a face. The capture is the last frame in which the subject qualified (the
+start charges without a face; one that gets blocked before it is full is dropped, it does not wait. The capture is the last frame in which the subject qualified (the
 last frame at all when none did), cropped by
 `portrait_crop` (eyes levelled, at the workflow's portrait size). Every frame's faces go to the render
 (`Inputs.faces`): `CameraLayer` draws the camera in black and white (`facecolor.frag`). Every face's
@@ -80,6 +92,12 @@ with one sampler step and one grin frame) loads the models and proves the chain 
 set in `Forgettable`) and the render shows the generator's status as a line (`StatusLayer`) and the
 whole camera image in pixels without any face box or mark (`CameraLayer.warmup`, from `Generator.warmup`): 256 pixels
 wide without ComfyUI, smaller with every step the warm-up reaches, sharp when ready.
+The sequence waits for the generator (the flash for the capture's depth, the result for IDLE), so every
+end of a job says IDLE, and three things keep that wait from lasting: a reset (`Generator.interrupt`,
+sent at every RESET) ends a visitor's job only, never a warm-up, which would otherwise count as passed;
+a capture taken while the generator is not ready is not handed over and stands as the result at once;
+and `Forgettable._limit_visitor` ends a visitor the generator did not end 30 s after its `job_timeout`
+(not while the grin loops), which only happens when the generator's thread is stuck.
 For debugging the rest of the cycle, `pipeline.skip_generation` sends the capture for the
 description and its depth only (`build_describe`: no portrait, no grin); the flash out then goes
 to the timeout (`Sequencer.finish`). `pipeline.skip_animation` only leaves out the grin
@@ -107,7 +125,10 @@ Art-Net, OSC and saving hang off its messages), then the stage for the current `
 (`stages.py`) renders the layers (`layers/`) and picks the one to show. Images from other threads go
 through `inputs.py` (`Image.set_image`, uploaded on the render thread); the grin frames go
 through `GrinPlayer.py`, a buffer the generator fills and the render plays on its own clock, with
-its timings in the sequence settings. `render.show_camera` draws the raw camera on top and starts
+its timings in the sequence settings. At the capture the diffusion layer starts over from it
+(`FlashStage` seeds it, and the capture is the diffusion input until the generator sends an image), so
+a generation that fails shows the capture as its result and nothing of the previous visitor.
+`render.show_camera` draws the raw camera on top and starts
 no new sequence while it is on (`Sequencer.blocked`). Shaders are
 `classname.frag` next to their `.py` and hot-reload while running. `pl_player.py` uses the same engine
 (`modules/player/Render.py`).
@@ -118,7 +139,8 @@ no new sequence while it is on (`Sequencer.blocked`). Shaders are
 the grin as `grins/<style>/<id>.mp4` (h264 at the full portrait size, at `grin_fps`), the capture and the
 portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`. `<style>` is the visitor's
 style, `A` (colourful and happy) or `B` (monochrome and dark); the players read it from the folder, the id is the time. Files are built in `output/temp/`
-and renamed into place when the grin is complete, so the players never see a partial file.
+and renamed into place when the grin is complete, so the players never see a partial file
+(a visitor that failed, or was reset, is closed and deleted there).
 The clip (its `comment` tag) and the portrait (JPEG comment segments) carry the visitor's **record** as JSON: id, style, description,
 the visitor's one seed (portrait, description and grin share it), the settings of its style (not the other's) and of the portrait
 as the workflow was filled with them, and the grin as it was drawn: each value's peak and the moment of it (`peak`, `peak_at`), not

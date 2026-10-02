@@ -2,7 +2,7 @@ from argparse import ArgumentParser, BooleanOptionalAction
 from os import _exit
 from signal import signal, SIGINT
 from time import sleep
-from modules.log_config import setup_logging, install_thread_excepthook
+from modules.log_config import setup_logging, install_excepthooks
 from modules.player.Player import Player
 
 parser: ArgumentParser = ArgumentParser()
@@ -22,7 +22,7 @@ parser.add_argument('-v',   '--verbose',    action='store_true',        help='en
 args = parser.parse_args()
 
 setup_logging(verbose=args.verbose, name=f'player{args.monitor}')
-install_thread_excepthook()
+install_excepthooks()
 
 player: Player = Player(args.osc_port, args.root, args.monitor, args.trail, args.clips, args.pool, args.hwdecode, args.window, args.fps, args.spread, args.follow_style, args.recent)
 player.start()

@@ -1,8 +1,11 @@
 import cv2
+import logging
 import numpy as np
 import onnxruntime as ort
 
 from modules.face.FaceDetector import Face
+
+logger = logging.getLogger(__name__)
 
 # 106 point landmark model (insightface antelopev2 '2d106det'), for the eye contours.
 # Preprocessing follows insightface/model_zoo/landmark.py: a square crop of 1.5 times the face box,
@@ -20,7 +23,7 @@ class FaceLandmarks():
         self.session: ort.InferenceSession = ort.InferenceSession(model_path, providers=providers)
         self.input_name: str = self.session.get_inputs()[0].name
         self.output_name: str = self.session.get_outputs()[0].name
-        print('FaceLandmarks running on', self.session.get_providers()[0])
+        logger.info('FaceLandmarks running on %s', self.session.get_providers()[0])
 
     def detect(self, image: np.ndarray, face: Face, roll: float = 0.0) -> np.ndarray:
         """The 106 landmarks of the face, in image pixels; `roll` in degrees levels the crop."""
