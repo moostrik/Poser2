@@ -230,6 +230,21 @@ class TestWorkflow(unittest.TestCase):
             self.assertTrue(1 <= seed <= MAX_SEED)
             self.assertNotEqual(seed, other[node_id]['inputs']['seed'])
 
+    def test_one_seed_per_visitor(self):
+        seeds = {self.built[node_id]['inputs']['seed'] for node_id in (self.wf.sampler, self.wf.describe, self.wf.grin)}
+        self.assertEqual(len(seeds), 1)
+
+    def test_run_facts(self):
+        g = self.settings.grin
+        g.aaa_min, g.aaa_max = -10.0, -20.0
+        g.yaw_min, g.yaw_max = -15.0, 15.0
+        built = self.wf.build('x.png', self.settings.style_a, self.settings)
+        facts = self.wf.run_facts(built)
+        grin = built[self.wf.grin]['inputs']
+        self.assertEqual(facts['seed'], built[self.wf.sampler]['inputs']['seed'])
+        self.assertEqual(set(facts['grin']), set(GRIN_TARGETS + GRIN_ROTATIONS))
+        self.assertEqual((facts['grin']['aaa'], facts['grin']['yaw']), (grin['aaa'], grin['rotate_yaw_min']))
+
     def test_fixed_seed(self):
         self.settings.portrait.fixed_seed = True
         first = self.wf.build('smile_capture.png', self.settings.style_a, self.settings)

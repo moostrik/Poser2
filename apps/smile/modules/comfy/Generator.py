@@ -65,6 +65,7 @@ class Generator(Thread):
         self._image: np.ndarray | None = None
         self._capture_depth: np.ndarray | None = None   # of the job that is running
         self._style: StyleSettings = self.styles.current()     # of the job that is running: the next visitor's may be picked already
+        self._record: dict = {}                         # of the job that is running: what it was made with
         self._stop_event: Event = Event()
         self._interrupt_event: Event = Event()
         self._silent: bool = False
@@ -96,6 +97,11 @@ class Generator(Thread):
     def next_style(self) -> str:
         """Call once per visitor (when its sequence starts); returns the style id, which also picks the music."""
         return self.styles.advance()
+
+    def record(self) -> dict:
+        """How the running visitor is made, for its saved files: description, seed, the grin's peaks and
+        the pipeline settings in preset shape. Call from a message callback, once the portrait is there."""
+        return {'description': self._style.description, **self._record}
 
     def add_message_callback(self, callback: MessageCallback) -> None:
         with self._mutex:
@@ -271,6 +277,9 @@ class Generator(Thread):
         build = wf.build_warmup if self._silent else wf.build_describe if no_portrait else wf.build_portrait if no_grin else wf.build
         self._style = self.styles.current()
         workflow: dict = build(name, self._style, s)
+        if not self._silent:
+            # here, so the settings are the ones the workflow was filled with
+            self._record = {**wf.run_facts(workflow), 'settings': {'pipeline': s.to_dict()}}
         self._capture_depth = None
         last_depth, _ = self._run_pass(workflow, deadline, play=not no_grin)
         if no_grin:

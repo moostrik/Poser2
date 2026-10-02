@@ -112,9 +112,13 @@ no new sequence while it is on (`Sequencer.blocked`). Shaders are
 `modules/save/ClipSaver.py` saves each finished visitor for the players under `output/` (git-ignored):
 the grin as `grins/<style>/<id>.mp4` (h264 at the full portrait size, at `grin_fps`), the capture and the
 portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`. `<style>` is the visitor's
-style, `A` (colourful and happy) or `B` (monochrome and dark); the folder is the only place it is
-recorded, the id is the time. Files are built in `output/temp/`
+style, `A` (colourful and happy) or `B` (monochrome and dark); the players read it from the folder, the id is the time. Files are built in `output/temp/`
 and renamed into place when the grin is complete, so the players never see a partial file.
+The clip (its `comment` tag) and the portrait (JPEG comment segments) carry the visitor's **record** as JSON: id, style, description,
+the visitor's one seed (portrait, description and grin share it), the grin's peaks and the pipeline settings as the workflow was
+filled with them, in preset shape (`Generator.record`, handed to the saver with the final portrait). `modules/save/record.py` reads it:
+`python -m modules.save.record <file>` prints it, `--preset <name>` writes its settings to `data/settings/<name>.json`;
+dropping a clip or portrait on `scripts/clip_info.bat` opens it.
 Encoding and decoding run `ffmpeg`/`ffprobe` subprocesses through `modules/video/ffmpeg.py` (ffmpeg
 must be on the PATH: the gyan.dev full build); the encoder is picked at startup by a trial encode
 (Intel Quick Sync on the iGPU, then Nvidia, then libx264; `sequence.encoder` forces one). Never start

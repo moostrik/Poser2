@@ -212,6 +212,8 @@ class Forgettable():
         if message.state == GenState.DIFF_LOOP and (grin.loop or grin.still):
             return
         if message.state == GenState.DIFFUSION and message.final:
+            # the record first: it goes into the portrait and the clip
+            self.save.set_record(self.diffuse.record())
             self.save.save_portrait(message.image)
         if message.state == GenState.DIFF_LOOP:
             self.save.save_frame(message.image)

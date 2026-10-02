@@ -1,6 +1,7 @@
 """Tests for the generator's handling of a ComfyUI that runs a workflow but sends no events, and of a
 failed warm-up (a fake client, no ComfyUI server needed)."""
 
+import json
 import os
 import unittest
 from unittest import mock
@@ -38,6 +39,9 @@ class FakeClient:
     def receive(self, timeout: float) -> Event | None:
         self.clock.now += 1.0
         return self.events.pop(0) if self.events else None
+
+    def upload(self, image, name: str) -> str:
+        return name
 
     def busy(self) -> bool:
         return self.is_busy
@@ -85,6 +89,24 @@ class TestGenerator(unittest.TestCase):
         with mock.patch.object(self.generator, '_run_job', side_effect=NoEvents(NO_EVENTS)):
             self.assertEqual(self.generator._generate(None, 30.0), NO_EVENTS)
         self.assertFalse(self.generator._warmed_up)
+
+    def test_record_is_what_the_job_was_made_with(self):
+        self.settings.portrait.steps = 9
+        self.generator.client = FakeClient(self.clock, [], busy=False)
+        sent: list[dict] = []
+        with mock.patch.object(self.generator, '_run_pass', side_effect=lambda workflow, *a, **k: sent.append(workflow) or (None, 0)):
+            self.generator._run_job(None, self.clock.now + 30.0)
+        self.settings.portrait.steps = 5            # changed after the job: not in its record
+        self.settings.style_a.description = 'a face'
+        record = self.generator.record()
+        self.assertEqual(record['description'], 'a face')
+        self.assertEqual(record['seed'], sent[0][self.generator.workflow.sampler]['inputs']['seed'])
+        self.assertEqual(record['grin'], self.generator.workflow.run_facts(sent[0])['grin'])
+        self.assertEqual(record['settings']['pipeline']['portrait']['steps'], 9)
+        # preset shape: loads back into the settings
+        restored = PipelineSettings()
+        restored.update_from_dict(json.loads(json.dumps(record))['settings']['pipeline'])
+        self.assertEqual(restored.portrait.steps, 9)
 
     def test_a_failed_warm_up_is_not_ready(self):
         self.generator._stop_event.set()        # no wait before the retry

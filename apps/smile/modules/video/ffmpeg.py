@@ -109,13 +109,18 @@ def pick_encoder(preference: Encoder = Encoder.AUTO) -> Encoder:
     return Encoder.CPU
 
 
+MAX_COMMENT: int = 30000    # characters; a Windows command line holds 32767
+
+
 class ClipWriter:
-    """Writes bgr24 frames of one size to an h264 mp4; the process starts with the first frame."""
+    """Writes bgr24 frames of one size to an h264 mp4; the process starts with the first frame.
+    comment, set before that frame, goes into the file's comment tag."""
 
     def __init__(self, path: str, fps: float, encoder: Encoder) -> None:
         self.path: str = path
         self.fps: float = fps
         self.encoder: Encoder = encoder
+        self.comment: str = ''
         self.frames: int = 0
         self.failed: bool = False
         self._size: tuple[int, int] = (0, 0)
@@ -144,8 +149,13 @@ class ClipWriter:
     def _start(self) -> None:
         codec, quality, pix_fmt = _CODECS[self.encoder]
         width, height = self._size
+        metadata: list[str] = []
+        if len(self.comment) > MAX_COMMENT:
+            logger.warning('Comment of %s is too long (%d characters), left out', self.path, len(self.comment))
+        elif self.comment:
+            metadata = ['-metadata', f'comment={self.comment}']
         args = ['-y', '-f', 'rawvideo', '-pix_fmt', 'bgr24', '-s', f'{width}x{height}', '-r', f'{self.fps:g}',
-                '-i', 'pipe:0', '-c:v', codec, *quality, '-pix_fmt', pix_fmt, self.path]
+                '-i', 'pipe:0', '-c:v', codec, *quality, '-pix_fmt', pix_fmt, *metadata, self.path]
         self._process = popen(args, subprocess.PIPE, subprocess.DEVNULL)
 
     def close(self) -> bool:
@@ -186,6 +196,16 @@ def probe(path: str) -> tuple[int, float, int, int]:
         frames = 0
     fps = float(Fraction(stream.get('r_frame_rate', '0/1')))
     return frames, fps, int(stream['width']), int(stream['height'])
+
+
+def read_comment(path: str) -> str | None:
+    """The file's comment tag (ClipWriter.comment), or None when it has none."""
+    args = ['-show_entries', 'format_tags=comment', '-of', 'json', path]
+    process = popen(args, subprocess.DEVNULL, subprocess.PIPE, command=FFPROBE)
+    out, err = process.communicate(timeout=20)
+    if process.returncode != 0:
+        raise RuntimeError(f'ffprobe failed on {path}: {_stderr(err)}')
+    return json.loads(out).get('format', {}).get('tags', {}).get('comment')
 
 
 def hwdecode_args(adapter: int | None) -> list[str]:

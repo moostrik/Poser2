@@ -4,9 +4,11 @@ import threading
 import queue
 import os
 import datetime
+import json
 import logging
 
 from modules.render.settings import SequencerSettings
+from modules.save.record import embed_jpeg
 from modules.video import ffmpeg
 from modules.video.ffmpeg import ClipWriter, Encoder
 
@@ -21,8 +23,9 @@ class ClipSaver:
     """Saves each visitor for the players: the grin as an h264 mp4, the capture and the portrait as stills.
 
     Files are built in output/temp/ and moved (an atomic rename) to output/grins/<style>/ and
-    output/portraits/<style>/ when the sequence ends complete, else deleted. The style (A or B) is
-    recorded only as that folder; the players read it from there. The save thread is the only
+    output/portraits/<style>/ when the sequence ends complete, else deleted. The players read the
+    style (A or B) from that folder. The clip and the portrait carry the visitor's record: how they
+    were made (modules/save/record.py). The save thread is the only
     owner of the encoder process; the other threads only enqueue commands, in order."""
 
     def __init__(self, settings: SequencerSettings, root: str = 'output/', max_queue_size: int = 64) -> None:
@@ -59,6 +62,12 @@ class ClipSaver:
         id: str = self._create_sequence_id()
         self.queue.put(('open', id, float(self.settings.grin_fps), style or STYLES[0]))
         self.queue.put(('capture', capture))
+
+    def set_record(self, record: dict) -> None:
+        """How the visitor is made (modules/save/record.py): goes into the portrait and the clip, so
+        hand it over before the portrait."""
+        if self._active():
+            self.queue.put(('record', record))
 
     def save_portrait(self, image: np.ndarray) -> None:
         if self._active():
@@ -118,8 +127,18 @@ class ClipSaver:
                     continue
                 elif kind == 'capture':
                     cv2.imwrite(self._temp_path(id, '_capture.jpg'), command[1])
+                elif kind == 'record':
+                    # the encoder starts with the first grin frame, so the clip still takes it
+                    writer.comment = json.dumps({'id': id, 'style': style, **command[1]}, separators=(',', ':'))
                 elif kind == 'portrait':
-                    cv2.imwrite(self._temp_path(id, '_portrait.jpg'), command[1])
+                    ok, jpeg = cv2.imencode('.jpg', command[1])
+                    if not ok:
+                        raise ValueError('could not encode the portrait')
+                    data: bytes = jpeg.tobytes()
+                    if writer.comment:
+                        data = embed_jpeg(data, writer.comment)
+                    with open(self._temp_path(id, '_portrait.jpg'), 'wb') as f:
+                        f.write(data)
                 elif kind == 'frame':
                     writer.add(command[1])
                 elif kind == 'close':

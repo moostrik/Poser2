@@ -211,9 +211,11 @@ class Workflow():
                 name, strength = workflow[node_id]['inputs']['lora_name'], 0.0
             workflow[node_id]['inputs'].update(lora_name=name, strength_model=strength, strength_clip=strength)
 
+        # one seed per visitor: the portrait, the description and the grin draw from generators of their own
+        seed: int = self._seed(s)
         for node_id in (self.sampler, self.describe):
-            workflow[node_id]['inputs']['seed'] = self._seed(s)
-        self._fill_grin(workflow, s)
+            workflow[node_id]['inputs']['seed'] = seed
+        self._fill_grin(workflow, s, seed)
         return workflow
 
     def build_warmup(self, image_name: str, style: StyleSettings, s: PipelineSettings) -> dict:
@@ -248,7 +250,15 @@ class Workflow():
         self._fill_grin(workflow, s)
         return workflow
 
-    def _fill_grin(self, workflow: dict, s: PipelineSettings) -> None:
+    def run_facts(self, workflow: dict) -> dict:
+        """What only this run knows, read back from its workflow: the visitor's seed and the grin's peaks."""
+        grin: dict = workflow[self.grin]['inputs']
+        peaks: dict[str, float] = {name: grin[name] for name in GRIN_TARGETS}
+        peaks.update({name: grin[f'rotate_{name}_min'] for name in GRIN_ROTATIONS})
+        return {'seed': workflow[self.sampler]['inputs']['seed'], 'grin': peaks}
+
+    def _fill_grin(self, workflow: dict, s: PipelineSettings, seed: int | None = None) -> None:
+        """seed is the visitor's; without one (a replay) the grin draws its own."""
         g = s.grin
         grin: dict = workflow[self.grin]['inputs']
         grin.update(frames=g.frames, ease=g.ease.value, crop_factor=g.face_region, midpoint=g.midpoint,
@@ -256,7 +266,10 @@ class Workflow():
 
         # a still has nothing random left, so its seed is fixed: unchanged settings give an identical workflow
         still: bool = g.still
-        seed: int = FIXED_SEED if still else self._seed(s)
+        if still:
+            seed = FIXED_SEED
+        elif seed is None:
+            seed = self._seed(s)
         rng: random.Random = random.Random(seed)
 
         def peak(name: str) -> float:
