@@ -68,11 +68,12 @@ class WebCam(Thread):
         if not self.deviceOpen: return
         if self.capturing: self.stopCapture()
 
+        # the thread first: it may be reading from the device
         self.deviceOpen = False
+        self.join()
         if self.capDevice:
             self.capDevice.release()
         self.capDevice = None
-        self.join()
 
 
     def startCapture(self) -> None:

@@ -14,9 +14,12 @@ class CameraSettings(BaseSettings):
     device:        Field[str]       = Field("none", access=Field.READ, newline=True, description="Camera device in use")
     flip_h:        Field[bool]      = Field(False, description="Mirror the camera image horizontally")
     flip_v:        Field[bool]      = Field(False, description="Flip the camera image vertically")
+    target_frame_rate: Field[float] = Field(30.0, min=1.0, max=30.0, step=1.0, description="Vimba: frames per second asked of the camera; an exposure longer than a frame lowers it")
 
-    # what the camera uses now, whether auto or manual set it
-    exposure:          Field[float] = Field(0.0, access=Field.READ, newline=True, description="Vimba: exposure time the camera uses now, in µs")
+    # what the camera does now, whether auto or manual set it
+    frame_rate:        Field[float] = Field(0.0, access=Field.READ, newline=True, description="Vimba: frames per second received from the camera")
+    dropped_frames:    Field[int]   = Field(0, access=Field.READ, description="Vimba: frames that arrived incomplete and were skipped, since the start")
+    exposure:          Field[float] = Field(0.0, access=Field.READ, description="Vimba: exposure time the camera uses now, in µs")
     gain:              Field[float] = Field(0.0, access=Field.READ, description="Vimba: gain the camera uses now, in dB")
     WB_red:            Field[float] = Field(0.0, access=Field.READ, description="Vimba: white balance red ratio the camera uses now")
     WB_blue:           Field[float] = Field(0.0, access=Field.READ, description="Vimba: white balance blue ratio the camera uses now")

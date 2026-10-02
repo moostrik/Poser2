@@ -19,6 +19,15 @@ loaded; a feature the camera model lacks is a warning. Exposure and gain each ha
 value (sent while auto is off), a limit for auto and a readout of what the camera uses now; both
 autos aim for `target_brightness`, the exposure going up first and the gain after it. "Set WB" (white balance) lets the camera measure
 once and takes the ratios it found into the panel.
+The camera is a GigE camera on the PC's Ethernet adapter and sends 1220x964 BGR, 3.5 MB per frame
+(106 MB/s at 30 fps, the panel's `target_frame_rate`, also written by `FeatureWriter`; `UserSet2` holds 20; `frame_rate` is the rate of the frames
+that arrive complete; one that lost network packets arrives `Incomplete`, with part of an older image still in its buffer,
+and is skipped and counted in `dropped_frames`). At every open `setup_camera` runs
+`GVSPAdjustPacketSize` (after loading `UserSet2`, which holds a packet size of its own), which takes the largest packet the path accepts (`GevSCPSPacketSize`, up to
+9973). For that the adapter's Jumbo Packet must be on (Device Manager → the Ethernet adapter →
+Advanced → Jumbo Packet → 9014 Bytes; it is off by default on a new PC or after a driver
+reinstall), and so must any switch between camera and PC; otherwise the size stays 1500 and frames
+drop more easily. The size is only negotiated at open: restart SMILE after changing the adapter.
 
 ## Face
 

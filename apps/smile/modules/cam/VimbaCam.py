@@ -30,16 +30,6 @@ def setup_camera(camera: Camera, user_set: Optional[str]) -> bool:
     with Vimba.get_instance():
         try:
             with camera:
-                try:
-                    camera.GVSPAdjustPacketSize.run() # type: ignore
-
-                    while not camera.GVSPAdjustPacketSize.is_done(): # type: ignore
-                        pass
-
-                except (AttributeError, VimbaFeatureError):
-                    print('could not set package size')
-                    return False
-
                 if user_set:
                     try:
 
@@ -56,8 +46,19 @@ def setup_camera(camera: Camera, user_set: Optional[str]) -> bool:
                         return False
 
                     print('Camera [{}] Loaded \'{}\' from flash.'.format(camera.get_id(), user_set))
-                    return True
 
+                # after the user set: it holds a packet size of its own and would put that back
+                try:
+                    camera.GVSPAdjustPacketSize.run() # type: ignore
+
+                    while not camera.GVSPAdjustPacketSize.is_done(): # type: ignore
+                        pass
+
+                except (AttributeError, VimbaFeatureError):
+                    print('could not set package size')
+                    return False
+
+                print('Camera [{}] packet size {}'.format(camera.get_id(), camera.get_feature_by_name('GevSCPSPacketSize').get()))
                 return True
         except:
             print('could not access camera, already connected?')
@@ -71,7 +72,7 @@ class VimbaCam(Thread):
 
         self.user_set: str = 'UserSet2'
 
-        self._internal_frame: np.ndarray
+        self._internal_frame: np.ndarray | None = None
         self._internal_frame_new: bool = False
         self._internal_frame_mutex: Lock = Lock()
 
@@ -85,7 +86,7 @@ class VimbaCam(Thread):
 
         if (forceSize):
             self.outWidth, self.outHeight = forceSize
-        self.outputFrame: np.ndarray = np.zeros((self.outWidth, self.outHeight,3)) # type: ignore
+        self.outputFrame: np.ndarray = np.zeros((self.outHeight, self.outWidth, 3), np.uint8)
 
         self.rotate90: bool         = False
 
@@ -97,15 +98,17 @@ class VimbaCam(Thread):
 
     def run(self) -> None:
 
-        while self.camera:
+        # close() sets self.camera to None from another thread: the loop works on its own reference
+        camera: Camera | None = self.camera
+        while self.camera and camera:
             if self.capturing:
                 with Vimba.get_instance():
-                    with self.camera:
-                        self.camera.start_streaming(handler=self.frameCallback, buffer_count=5, allocation_mode = AllocationMode.AllocAndAnnounceFrame)
+                    with camera:
+                        camera.start_streaming(handler=self.frameCallback, buffer_count=5, allocation_mode = AllocationMode.AllocAndAnnounceFrame)
                         # print('start streaming')
                         while self.capturing:
-                            if self._internal_frame_new:
-                                newFrame = self._get_internal_frame()
+                            newFrame = self._take_internal_frame()
+                            if newFrame is not None:
                                 if self.rotate90:
                                     newFrame = cv2.transpose(newFrame)
                                 if self.settings.flip_v:
@@ -121,11 +124,11 @@ class VimbaCam(Thread):
                                     self.outputFrame = newFrame
                                     self.frameNew = True
 
-                                self._features.update(self.camera)
+                            # also without frames: the readouts then show that none arrive
+                            self._features.update(camera)
 
                             sleep(0.01)
-                        if self.camera:
-                            self.camera.stop_streaming()
+                        camera.stop_streaming()
             else:
                 sleep(0.01)
 
@@ -172,25 +175,34 @@ class VimbaCam(Thread):
         self.capturing = False
 
     def frameCallback(self, cam: Camera, frame: Frame) -> None:
-        if self.camera and self.capturing:
-            frame_cpy: Frame = copy.deepcopy(frame)
-            self.camera.queue_frame(frame)
-            sleep(0.01)
-
-            try:
-                cvFrame: np.ndarray = frame_cpy.as_numpy_ndarray()
-            except:
-                print('failed to grab frame')
+        # runs on Vimba's thread. The frame's buffer is the driver's and is reused once the frame
+        # is queued again, so the pixels are copied first; the frame always goes back
+        try:
+            if not self.capturing:
                 return
-
+            # with packets lost the buffer still holds part of an older image: not shown
+            complete: bool = frame.get_status() == FrameStatus.Complete
+            self._features.count_frame(complete)
+            if not complete:
+                return
+            cvFrame: np.ndarray = frame.as_numpy_ndarray().copy()
             with self._internal_frame_mutex:
                 self._internal_frame = cvFrame
                 self._internal_frame_new = True
+        except Exception as e:
+            print('failed to grab frame', e)
+        finally:
+            try:
+                cam.queue_frame(frame)
+            except Exception:
+                pass    # the stream is stopping
 
-
-
-    def _get_internal_frame(self) -> np.ndarray:
+    def _take_internal_frame(self) -> np.ndarray | None:
+        """The newest camera frame, once: None until the next one arrives."""
         with self._internal_frame_mutex:
+            if not self._internal_frame_new:
+                return None
+            self._internal_frame_new = False
             return self._internal_frame
 
     def isColorFrameNew(self) -> bool:

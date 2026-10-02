@@ -67,7 +67,7 @@ class FaceEffect(Enum):
 
 class RenderSettings(BaseSettings):
     window:        Group[WindowSettings] = Group(WindowSettings)
-    show_camera:   Field[bool]  = Field(False, description="Draw the raw camera image on top; no sequence starts")
+    show_camera:   Field[bool]  = Field(False, description="Draw the raw camera image on top; no sequence starts", pinned=True)
     face_marks:    Field[bool]  = Field(False, description="Draw the faces' outlines, dots and reject reasons on the camera")
     face_color:    Field[Color] = Field(Color(0.2, 1.0, 0.2), description="Colour of the chosen face's box and dots")
     face_fill:     Field[FaceFill] = Field(FaceFill.FADE, description="How the chosen face's box turns to colour as its charge fills")

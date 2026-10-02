@@ -5,10 +5,11 @@
     "image_next": false,
     "flip_h": false,
     "flip_v": false,
+    "target_frame_rate": 30.0,
     "target_brightness": 33,
     "manual_exposure": 33000.0,
     "auto_exposure": true,
-    "exposure_max": 33000.0,
+    "exposure_max": 20000.0,
     "manual_gain": 0.0,
     "auto_gain": true,
     "gain_max": 15.0,
@@ -136,7 +137,7 @@
     }
   },
   "sequence": {
-    "pause": false,
+    "pause": true,
     "save": true,
     "encoder": "AUTO",
     "charge": 2.0,
@@ -157,7 +158,7 @@
     "destroy_out_ease": "CUBIC_OUT"
   },
   "render": {
-    "show_camera": false,
+    "show_camera": true,
     "face_marks": true,
     "face_color": {
       "r": 1.0,

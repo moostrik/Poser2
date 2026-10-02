@@ -35,6 +35,7 @@ class FakeCamera:
         self.ratios: dict[str, float] = {'Red': 1.0, 'Blue': 1.0}
         self.features: dict[str, FakeFeature] = {}
         for name, value, range_ in (
+            ('AcquisitionFrameRateAbs', 20.0, (0.01, 30.3)),
             ('GainAuto', 'Off', None), ('GainAutoTarget', 50, (0, 100)), ('GainAutoMax', 15.0, (0.0, 30.0)),
             ('Gain', 0.0, (0.0, 30.0)),
             ('ExposureAuto', 'Off', None), ('ExposureAutoTarget', 50, (0, 100)), ('ExposureAutoMax', 15000, (12, 84577817)),
@@ -69,6 +70,7 @@ class TestFeatureWriter(unittest.TestCase):
         self.settings.manual_WB_red = 1.5
         self.writer.update(self.camera)
         self.assertEqual(self.camera.written('GainAuto'), ['Off'])
+        self.assertEqual(self.camera.written('AcquisitionFrameRateAbs'), [30.0])
         self.assertEqual(self.camera.written('Saturation'), [1.0])
         self.assertEqual(self.camera.written('BalanceWhiteAuto'), ['Off'])
         self.assertEqual(self.camera.ratios, {'Red': 1.5, 'Blue': 1.0})
@@ -122,6 +124,19 @@ class TestFeatureWriter(unittest.TestCase):
         self.writer.update(self.camera)
         self.assertEqual(self.settings.WB_red, 1.61)
         self.assertEqual(self.settings.WB_blue, 2.04)
+
+    def test_the_frame_rate_and_the_dropped_frames_are_counted(self):
+        self.writer.update(self.camera)
+        self.assertEqual(self.settings.frame_rate, 0.0)     # no interval yet
+        for _ in range(15):
+            self.writer.count_frame()
+        for _ in range(3):
+            self.writer.count_frame(False)                  # incomplete: skipped
+        self.writer._frames_time -= 0.5                     # half a second ago
+        self.writer._read_next = 0.0
+        self.writer.update(self.camera)
+        self.assertAlmostEqual(self.settings.frame_rate, 30.0, delta=0.5)
+        self.assertEqual(self.settings.dropped_frames, 3)
 
     def test_clamps_to_the_range_of_the_feature(self):
         self.settings.gamma = 3.0

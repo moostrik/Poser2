@@ -6,7 +6,7 @@ values in use are read back for the panel.
 "Set WB" (white balance) lets the camera measure once and takes the ratios it found back into the panel."""
 
 import logging
-from threading import Event
+from threading import Event, Lock
 from time import monotonic
 from typing import Any, Callable
 
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 RATIO_FEATURES: tuple[str, ...] = ('BalanceRatioAbs', 'BalanceRatio')   # GigE models, USB models
 MEASURE_TIMEOUT: float = 5.0    # seconds the camera gets to find its white balance
 READ_INTERVAL: float = 0.5      # seconds between reads of the actual exposure and gain
+RATE_SMOOTHING: float = 0.2     # share of the newest half second in the frame rate readout
 
 
 class FeatureWriter:
@@ -28,15 +29,30 @@ class FeatureWriter:
         self._measure: Event = Event()
         self._measure_end: float | None = None  # set while the camera measures its white balance
         self._read_next: float = 0.0            # time of the next read of the actual values
+        self._frames: int = 0                   # complete frames received since the last read
+        self._dropped: int = 0                  # incomplete frames skipped since the start
+        self._frames_lock: Lock = Lock()
+        self._frames_time: float | None = None  # time of the last read
+        self._frame_rate: float | None = None   # smoothed frames per second
 
         self.settings.bind(CameraSettings.set_WB, self._on_wb_set)
 
     def close(self) -> None:
         self.settings.unbind(CameraSettings.set_WB, self._on_wb_set)
 
+    def count_frame(self, complete: bool = True) -> None:
+        """A frame arrived from the camera (any thread): counted for the frame rate readout, or as
+        dropped when it is incomplete (network packets lost) and skipped."""
+        with self._frames_lock:
+            if complete:
+                self._frames += 1
+            else:
+                self._dropped += 1
+
     def update(self, camera: Any) -> None:
         """Send what changed. Call on the camera thread, with the camera open."""
         s: CameraSettings = self.settings
+        self._sync('frame_rate', float(s.target_frame_rate), lambda v: self._set(camera, 'AcquisitionFrameRateAbs', v))
         self._sync('auto_target', int(s.target_brightness), lambda v: (self._set(camera, 'ExposureAutoTarget', v), self._set(camera, 'GainAutoTarget', v)))
         self._sync('exposure_max', float(s.exposure_max), lambda v: self._set(camera, 'ExposureAutoMax', v))
         self._sync('gain_max', float(s.gain_max), lambda v: self._set(camera, 'GainAutoMax', v))
@@ -63,6 +79,17 @@ class FeatureWriter:
             return
         self._read_next = now + READ_INTERVAL
         s: CameraSettings = self.settings
+
+        with self._frames_lock:
+            frames: int = self._frames
+            self._frames = 0
+            s.dropped_frames = self._dropped
+        if self._frames_time is not None and now > self._frames_time:
+            rate: float = frames / (now - self._frames_time)
+            self._frame_rate = rate if self._frame_rate is None else self._frame_rate + RATE_SMOOTHING * (rate - self._frame_rate)
+            s.frame_rate = round(self._frame_rate, 1)
+        self._frames_time = now
+
         try:
             s.exposure = round(float(camera.get_feature_by_name('ExposureTimeAbs').get()))
             s.gain = round(float(camera.get_feature_by_name('Gain').get()), 1)
