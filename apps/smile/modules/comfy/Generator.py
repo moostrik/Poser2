@@ -72,6 +72,7 @@ class Generator(Thread):
         self._interrupt_event: Event = Event()
         self._silent: bool = False
         self._warmed_up: bool = False
+        self._warmup_steps: set[str] = set()    # the steps the running warm-up has reached
         self.is_diffusing: bool = False
 
     # PUBLIC
@@ -79,6 +80,14 @@ class Generator(Thread):
     def ready(self) -> bool:
         """Connected and warmed up: a capture handed over now is generated at once."""
         return self._warmed_up and self.client.connected
+
+    @property
+    def warmup(self) -> float:
+        """How far the generator is toward ready: 0 without ComfyUI or before the warm-up's first step,
+        a part more for every step the warm-up reached, 1 only when ready."""
+        if self.ready:
+            return 1.0
+        return len(self._warmup_steps) / (self.workflow.step_count + 1)
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -119,6 +128,7 @@ class Generator(Thread):
         while not self._stop_event.is_set():
             if not self.client.connected:
                 self._warmed_up = False     # a ComfyUI that was restarted has to load its models again
+                self._warmup_steps = set()
                 if not self._connect():
                     self._stop_event.wait(RECONNECT_INTERVAL)
                     continue
@@ -177,6 +187,7 @@ class Generator(Thread):
         image: np.ndarray | None = cv2.imread(WARMUP_IMAGE) if os.path.exists(WARMUP_IMAGE) else None
         if image is not None:
             self.settings.connection.status = 'warming up'
+            self._warmup_steps = set()
             self._silent = True
             try:
                 failure: str | None = self._generate(image, WARMUP_TIMEOUT)
@@ -221,6 +232,7 @@ class Generator(Thread):
             logger.warning('Generation failed: %s', e)
             failure = str(e)
             self._warmed_up = False     # not ready until a warm-up gets its events again
+            self._warmup_steps = set()
             self._emit(GenMessage(GenState.IDLE))
         except Exception:
             logger.exception('Generation failed')
@@ -377,6 +389,8 @@ class Generator(Thread):
                 name: str | None = wf.step(event.data.get('node'))
                 if name is not None:
                     show(name)
+                    if self._silent:
+                        self._warmup_steps = self._warmup_steps | {name}    # a new set: the render reads it
 
             elif event.type == 'progress':
                 if event.data.get('node') == wf.sampler:

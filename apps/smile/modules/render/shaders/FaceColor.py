@@ -16,7 +16,8 @@ Field = tuple[float, float, float, float, float]    # x, y, w, h, distance from 
 
 class FaceColor(Shader):
     def use(self, tex0: Texture, width: int, height: int, fields: Sequence[Field], effect: int, amount: float,
-            rect: Field, charge: float, fill: int, color: tuple[float, float, float, float], blurred: Texture | None = None) -> None:
+            rect: Field, charge: float, fill: int, color: tuple[float, float, float, float], blurred: Texture | None = None,
+            mosaic: float = 1.0) -> None:
         """Draw tex0 in black and white into a width x height buffer.
 
         fields: the faces' boxes with their distance from good, shown by `effect` (index in FaceEffect)
@@ -24,6 +25,7 @@ class FaceColor(Shader):
         rect: the chosen face's box, turned to colour by `charge` (0..1) as `fill` (index in FaceFill)
         says; `color` is the traced outline's. A rect of width or height 0 is no rect.
         Boxes are normalised 0..1, top left origin (as DrawRectangleOutline).
+        mosaic: block size in pixels of the whole image; 1 or less is none.
         """
         if not self.allocated or not self.shader_program:
             logger.warning("FaceColor shader not allocated or shader program missing.")
@@ -53,4 +55,5 @@ class FaceColor(Shader):
         glUniform1f(self.get_uniform_loc("charge"), charge)
         glUniform1i(self.get_uniform_loc("fill"), fill)
         glUniform4f(self.get_uniform_loc("face_color"), *color)
+        glUniform1f(self.get_uniform_loc("mosaic"), mosaic)
         draw_quad()

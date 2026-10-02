@@ -30,6 +30,7 @@ uniform float rect_far;             // its distance from good
 uniform float charge;               // 0..1 toward the flash
 uniform int fill;
 uniform vec4 face_color;            // of the traced outline
+uniform float mosaic;               // pixels: block size of the whole image (the warm-up); 1 or less is none
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -59,7 +60,11 @@ void main() {
         far = max(far, inside(fields[i], p) * field_far[i]);
     }
 
-    vec4 color = texture(tex0, texCoord);
+    vec2 coord = texCoord;
+    if (mosaic > 1.0) {
+        coord = (floor(texCoord * resolution / mosaic) + 0.5) * mosaic / resolution;
+    }
+    vec4 color = texture(tex0, coord);
     float gray = gray_of(color.rgb);
     if (effect == DARK) {
         gray *= mix(1.0, 1.0 - amount, far);

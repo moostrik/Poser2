@@ -169,6 +169,11 @@ class Workflow():
         """The step of the generation a node is, or None for the nodes in between."""
         return self._steps.get(node_id) if node_id is not None else None
 
+    @property
+    def step_count(self) -> int:
+        """The steps a full run goes through."""
+        return len(self._steps)
+
     def build(self, image_name: str, style: StyleSettings, s: PipelineSettings) -> dict:
         """The workflow of one visitor, in one of the styles of s (style_a, style_b)."""
         workflow: dict = copy.deepcopy(self._template)

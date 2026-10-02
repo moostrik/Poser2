@@ -144,6 +144,7 @@ class Forgettable():
         ready: bool = self.diffuse.ready
         self.sequencer.blocked = not ready or self.settings.render.show_camera
         self.render.set_status(None if ready else self.settings.pipeline.connection.status)
+        self.render.set_warmup(self.diffuse.warmup)
 
         cam_image: np.ndarray= self.camera.getColorImg()
         artnet_progress: float = message.progress

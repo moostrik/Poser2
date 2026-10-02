@@ -123,6 +123,31 @@ class TestGenerator(unittest.TestCase):
             self.assertTrue(self.generator._warmed_up)
             self.assertEqual(self.settings.connection.status, 'ready')
 
+    def test_warmup_rises_with_every_step_of_the_warm_up(self):
+        wf = self.generator.workflow
+        self.assertEqual(self.generator.warmup, 0.0)
+        executing = [Event('executing', {'prompt_id': 'main', 'node': node}) for node in (wf.describe, wf.sampler, wf.sampler)]
+        self.generator._silent = True
+        self.receive(executing + [Event('execution_success', {'prompt_id': 'main'})], busy=False)
+        # two different steps of the five; never 1 before the generator is ready
+        self.assertAlmostEqual(self.generator.warmup, 2 / (wf.step_count + 1))
+        self.generator._warmed_up = True
+        self.generator.client.connected = True
+        self.assertEqual(self.generator.warmup, 1.0)
+
+    def test_a_visitor_does_not_count_as_warm_up(self):
+        executing = Event('executing', {'prompt_id': 'main', 'node': self.generator.workflow.describe})
+        self.receive([executing, Event('execution_success', {'prompt_id': 'main'})], busy=False)
+        self.assertEqual(self.generator.warmup, 0.0)
+
+    def test_a_new_warm_up_starts_at_zero(self):
+        self.generator._warmup_steps = {'describe', 'depth'}
+        self.generator._stop_event.set()
+        with mock.patch('modules.comfy.Generator.WARMUP_IMAGE', WARMUP):
+            with mock.patch.object(self.generator, '_generate', return_value='timed out'):
+                self.generator._warm_up()
+        self.assertEqual(self.generator.warmup, 0.0)
+
 
 if __name__ == '__main__':
     unittest.main()

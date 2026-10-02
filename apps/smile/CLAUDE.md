@@ -76,7 +76,9 @@ visitor: a second workflow in between drops the first from ComfyUI's cache and r
 After every connect, a warm-up run on `data/comfy/warmup.jpg` (`build_warmup`: the same workflow
 with one sampler step and one grin frame) loads the models and proves the chain works (own limit
 `WARMUP_TIMEOUT`; a visitor has `connection.job_timeout`). Until `Generator.ready` no sequence starts (`Sequencer.blocked`,
-set in `Forgettable`) and the render shows the generator's status as a line (`StatusLayer`).
+set in `Forgettable`) and the render shows the generator's status as a line (`StatusLayer`) and the
+whole camera image in pixels without any face box or mark (`CameraLayer.warmup`, from `Generator.warmup`): 256 pixels
+wide without ComfyUI, smaller with every step the warm-up reaches, sharp when ready.
 For debugging the rest of the cycle, `pipeline.skip_generation` sends the capture for the
 description and its depth only (`build_describe`: no portrait, no grin); the flash out then goes
 to the timeout (`Sequencer.finish`). `pipeline.skip_animation` only leaves out the grin
