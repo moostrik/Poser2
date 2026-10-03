@@ -120,7 +120,9 @@ the moment of that peak within midpoint ± deviation, sent to Grin Frames as `<n
 
 OpenGL engine copied from poser2 (`modules/gl/`: glfw, GL 4.6 core, render thread owned by
 `WindowManager`); keep it identical to poser2 so it can be synced with a diff, and fix shared bugs in
-both. `modules/render/SmileRender.py` runs the `Sequencer` once per frame (it is the app clock:
+both. The render loop goes on when `update`, `draw`, an event callback (key, mouse, window, monitor) or
+a deferred settings call raises: it is logged, and a monitor that is unplugged does not close the app
+(`modules/render/tests/test_window.py`). `modules/render/SmileRender.py` runs the `Sequencer` once per frame (it is the app clock:
 Art-Net, OSC and saving hang off its messages), then the stage for the current `SequenceType`
 (`stages.py`) renders the layers (`layers/`) and picks the one to show. Images from other threads go
 through `inputs.py` (`Image.set_image`, uploaded on the render thread); the grin frames go
