@@ -22,6 +22,7 @@
     "face": {
       "confidence": 0.5,
       "eye_min": 0.1,
+      "crop_margin": -0.1,
       "eye_open": 0.2,
       "max_yaw": 17.0,
       "max_pitch": 25.0,

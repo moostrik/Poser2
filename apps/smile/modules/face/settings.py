@@ -5,6 +5,7 @@ class FaceSettings(BaseSettings):
     confidence:    Field[float] = Field(0.7, min=0.5, max=1.0, step=0.01, newline=True, description="Minimum detector score")
 
     eye_min:       Field[float] = Field(0.05, min=0.0, max=0.3, step=0.01, newline=True, label="Min eye dist", description="Minimum distance between the eyes, relative to the image width (too far: too few pixels)")
+    crop_margin:   Field[float] = Field(0.0, min=-0.5, max=0.5, step=0.01, description="Minimum distance of the portrait crop from the image edge, relative to the crop width (negative: it may reach past)")
     eye_open:      Field[float] = Field(0.2, min=0.0, max=0.5, step=0.01, label="Min eye open", description="Minimum eye opening, height relative to the eye width")
 
     max_yaw:       Field[float] = Field(20.0, min=0.0, max=60.0, step=1.0, newline=True, description="Maximum head turn left or right (degrees, approximate)")

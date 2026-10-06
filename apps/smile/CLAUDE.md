@@ -47,8 +47,8 @@ drop more easily. The size is only negotiated at open: restart SMILE after chang
 
 `modules/face/`: `FaceFinder` (own thread) detects every face of a camera frame (SCRFD,
 `data/models/scrfd_10g_bnkps.onnx`) and judges it in `quality.py`: detector confidence, size (the
-distance between the eyes, a minimum), the portrait crop inside the image (`crop_outside`: the one check for too close and
-too near an edge, so a qualifying face's box never passes the border),
+distance between the eyes, a minimum), the portrait crop's box at least `crop_margin` crop widths inside the image edge
+(`crop_edge`: the one check for too close and too near an edge; negative lets it reach past),
 pose from the 5 keypoints (the pitch's zero is `pitch_zero`, set on site with the "Set pitch zero"
 button: it depends on the camera height), eye openness from the 106 landmarks (`FaceLandmarks`,
 `data/models/2d106det.onnx`, only run for faces that passed the other checks); the first failing check
@@ -69,7 +69,8 @@ whether they get closer; the subject's box turns to colour as the charge fills (
 fade, rise, iris, trace or scan). `render.face_marks` switches all marks on or off: the subject's outline (from
 grey to `render.face_color` with the charge) and grey keypoints, the other faces in white, a
 rejected one in grey with its reject reason (the panel has the readout). They are part of the
-camera layer, so the flash fades them out with it. Marks are built in `face_marks.py`, drawn by `MarkDrawer`.
+camera layer, so the flash fades them out with it. Marks are built in `face_marks.py`, drawn by `MarkDrawer`; a box that
+reaches past the image is drawn clamped to `BOX_PAD_PX` inside it (`fit_box`), so the subject's outline and fill stay whole.
 
 ## Image generator
 

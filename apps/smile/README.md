@@ -41,6 +41,13 @@ not in git, safe to delete).
 * the camera's `UserSet2` holds its base configuration (format, frame rate, packet size); the app loads it at every open and writes the panel's camera settings over it
 * Ethernet adapter: Device Manager → the adapter → Advanced → **Jumbo Packet → 9014 Bytes** (it is off on a new PC and after a driver reinstall), and every switch between camera and PC must pass jumbo frames too. Otherwise the packet size stays 1500 and frames drop more easily. The SMILE log says at start which size the camera got: `packet size 8228` or more is good, `packet size 1500` means something on the path does not pass them (the panel's `dropped_frames` shows how much that costs)
 
+### PC (GIGABYTE Z590 AORUS MASTER, Windows 11)
+* network adapter (onboard Marvell AQC107, the camera and everything else share it): driver 3.1.x (Microsoft Update Catalog, "Marvell Net Driver Update"; GIGABYTE's page has 3.1.3). With the 2.2.2.0 driver from 2020 the adapter hung with the link still up: camera and internet gone until the adapter was disabled and enabled (2026-10-05). Advanced tab: Jumbo Packet 9014 Bytes, Recv Segment Coalescing (IPv4 and IPv6) Disabled, Receive Buffers 4096; Power Management tab: nothing ticked
+* power plan: PCI Express → Link State Power Management → Off; sleep, hibernate and display off: never
+* Windows Update, in `gpedit.msc` under Windows Update → Manage updates offered from Windows Update: "Do not include drivers with Windows Updates" enabled, "Select the target Feature Update version" set to the installed version (25H2). Pause updates the week before a show
+* BIOS: Settings → APP Center Download & Install Configuration → Disabled (otherwise the firmware writes a GIGABYTE update service into Windows at every boot). No GIGABYTE APP Center, no NVIDIA App, no Intel Driver & Support Assistant on the rig
+* at login only the startup shortcut, the Realtek audio service and Windows Security start; the user logs in automatically
+
 ### ffmpeg
 * download the "release full" build from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/), extract it to `C:\Developer\ffmpeg` and add `C:\Developer\ffmpeg\bin` to the PATH
 * without it the visitors are not saved as clips and the players have nothing to play (`install.bat` checks)
@@ -110,6 +117,7 @@ rig.
 10. **Both player monitors connected** (open): player 2 fullscreen on its own screen (on the dev PC it runs in a window: `Monitor 2 is not connected`)
 11. **Packet size** (open): the log line at start says `packet size 8228` or more; with 1500, watch `dropped_frames`
 12. **Startup after a reboot** (open): everything comes up by itself through the shortcut, SMILE waits for ComfyUI with its status line
+13. **Network stays up for a day** (open): in the System log the adapter driver (`aqnic650`) reports `Network link is lost` only at boot, and `Microsoft-Windows-NCSI/Operational` has no `ArpProbeFailed`; the SMILE log has no `no complete frame for 5 s`
 
 ## KNOWN LIMITS
 * no automatic restart: an app that ends by itself stays down until `startSMILE.bat` is run; `crashes.log` says what happened

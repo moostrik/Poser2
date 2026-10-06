@@ -4,13 +4,13 @@ import unittest
 
 from modules.face.FaceFinder import FaceFrame
 from modules.face.quality import FaceObservation, Pose, Rejection
-from modules.render.layers.face_marks import ACCEPTED_COLOR, FACES_STALE, REJECTED_COLOR, SUBJECT_COLOR, SUBJECT_LINE_PX, LINE_PX, SubjectMark, build_marks, face_fields, mix
+from modules.render.layers.face_marks import ACCEPTED_COLOR, FACES_STALE, REJECTED_COLOR, SUBJECT_COLOR, SUBJECT_LINE_PX, LINE_PX, SubjectMark, build_marks, face_fields, fit_box, mix
 
 
 def observation(rejection: Rejection | None = None, subject: bool = False, eyes: float | None = 0.3, bbox=(0.1, 0.2, 0.5, 0.7),
                 limit: float = 0.0, pose: Pose = Pose(4.4, -6.0, 2.0, 0.48), distance: float = 0.0) -> FaceObservation:
     # the marks use the portrait box (crop), not the detector's
-    return FaceObservation(bbox=(0.0, 0.0, 0.0, 0.0), crop=bbox, kps=((0.2, 0.3),) * 5, score=0.9, eye_dist=0.06, outside=0.0, pose=pose,
+    return FaceObservation(bbox=(0.0, 0.0, 0.0, 0.0), crop=bbox, kps=((0.2, 0.3),) * 5, score=0.9, eye_dist=0.06, edge=0.1, pose=pose,
                            eyes=eyes, rejection=rejection, limit=limit, distance=distance, subject=subject)
 
 
@@ -135,6 +135,40 @@ class TestBuildMarks(unittest.TestCase):
         self.assertAlmostEqual(mark.y, 0.2)
         self.assertAlmostEqual(mark.w, 0.4)
         self.assertAlmostEqual(mark.h, 0.5)
+
+
+class TestFitBox(unittest.TestCase):
+    PAD = (0.01, 0.02)
+
+    def test_a_box_inside_is_unchanged(self):
+        self.assertEqual(fit_box((0.1, 0.2, 0.5, 0.7), self.PAD), (0.1, 0.2, 0.5, 0.7))
+        self.assertEqual(fit_box((-0.1, 0.2, 0.5, 1.1)), (0.0, 0.2, 0.5, 1.0))     # no padding: the image edge
+
+    def test_an_edge_past_the_padding_is_set_to_it(self):
+        self.assertEqual(fit_box((-0.1, -0.3, 0.5, 0.7), self.PAD), (0.01, 0.02, 0.5, 0.7))      # left, top
+        self.assertEqual(fit_box((0.1, 0.2, 1.2, 1.1), self.PAD), (0.1, 0.2, 0.99, 0.98))        # right, bottom
+        self.assertEqual(fit_box((-0.1, 0.2, 1.2, 0.7), self.PAD), (0.01, 0.2, 0.99, 0.7))       # both sides
+
+    def test_a_box_beyond_the_image_closes_to_nothing(self):
+        x0, y0, x1, y1 = fit_box((1.1, 0.2, 1.3, 0.7), self.PAD)
+        self.assertEqual((x0, x1), (1.1, 1.1))
+        self.assertEqual((y0, y1), (0.2, 0.7))
+
+    def test_every_drawn_box_is_fitted(self):
+        face = observation(subject=True, bbox=(-0.1, 0.2, 0.5, 1.1))
+        frame = FaceFrame((face,), 10.0)
+        mark = build_marks(frame, pad=self.PAD)[0]
+        subject = SubjectMark().update(frame, 10.0, 0.5, pad=self.PAD)
+        for x, y, w, h in ((mark.x, mark.y, mark.w, mark.h), face_fields(frame, self.PAD)[0][:4],
+                           (subject.x, subject.y, subject.w, subject.h)):
+            self.assertAlmostEqual(x, 0.01)
+            self.assertAlmostEqual(y, 0.2)
+            self.assertAlmostEqual(w, 0.49)
+            self.assertAlmostEqual(h, 0.78)
+        # without a padding the box is cut at the image edge
+        self.assertAlmostEqual(build_marks(frame)[0].x, 0.0)
+        self.assertAlmostEqual(face_fields(frame)[0][3], 0.8)
+        self.assertAlmostEqual(SubjectMark().update(frame, 10.0, 0.5).h, 0.8)
 
 
 if __name__ == '__main__':

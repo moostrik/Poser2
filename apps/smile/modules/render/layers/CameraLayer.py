@@ -10,7 +10,7 @@ from modules.render.shaders import FaceColor
 
 from .LayerBase import LayerBase
 from .MarkDrawer import MarkDrawer
-from .face_marks import FACES_STALE, LABEL_BG, REJECTED_COLOR, Mark, SubjectMark, build_marks, face_fields
+from .face_marks import BOX_PAD_PX, FACES_STALE, LABEL_BG, REJECTED_COLOR, Mark, SubjectMark, build_marks, face_fields
 from .passes import blur, copy
 
 FONT_SIZE: int = 18
@@ -29,8 +29,9 @@ class CameraLayer(LayerBase):
     far the face is from good (settings.face_effect), and the chosen face's turns to colour as its
     charge fills (settings.face_fill). With settings.face_marks every detected face is marked: the chosen one with an
     outline (from grey to the active colour with the charge) and grey keypoints, the others in
-    white, a rejected one in grey with its reason. Keeps its last frame until render() is called
-    again (the capture freeze).
+    white, a rejected one in grey with its reason. A box that reaches past the image is drawn up to a
+    padding inside it, so the chosen face's outline and fill stay whole. Keeps its last frame until
+    render() is called again (the capture freeze).
     While the generator is not ready (warmup below 1) the whole image is in pixels instead, smaller
     with every step of the warm-up, and no face is shown."""
 
@@ -98,8 +99,9 @@ class CameraLayer(LayerBase):
         if warmup < 1.0:
             frame = None
             charge = 0.0
-        subject: Mark | None = self._subject.update(frame, now, charge, (r, g, b, a))
-        fields = face_fields(frame) if frame is not None else []
+        pad = (BOX_PAD_PX / self._width, BOX_PAD_PX / self._height)
+        subject: Mark | None = self._subject.update(frame, now, charge, (r, g, b, a), pad)
+        fields = face_fields(frame, pad) if frame is not None else []
         if warmup < 1.0:
             subject = None      # a mark that was still draining
         rect = (subject.x, subject.y, subject.w, subject.h, subject.far) if subject is not None else NO_RECT
@@ -115,7 +117,7 @@ class CameraLayer(LayerBase):
         self._face_color.use(self._camera, self._width, self._height, fields, EFFECTS.index(effect), amount,
                              rect, charge, FILLS.index(fill), (r, g, b, a), blurred, mosaic)
         if self.settings.face_marks and marks > 0.0 and warmup >= 1.0:
-            face_marks: list[Mark] = build_marks(frame, (r, g, b, a), charge) if frame is not None else []
+            face_marks: list[Mark] = build_marks(frame, (r, g, b, a), charge, pad) if frame is not None else []
             if subject is not None and (frame is None or frame.subject is None):
                 face_marks.append(subject)      # the face left: its mark stays while the charge drains
             Style.set_blend_mode(Style.BlendMode.ALPHA)
