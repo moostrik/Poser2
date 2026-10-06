@@ -181,6 +181,21 @@ primary one); leading `window` puts both in a window for testing, `console` give
 for logs, other arguments pass through. `scripts/startSMILE.bat` is the main startup: it closes and
 restarts everything (ComfyUI, Max, the players, SMILE).
 
+## Music
+
+`modules/audio/DB.py` picks the track of a visitor's movement from `data/audio/music_map.json` into
+`audio.music_id`. `modules/osc/Sender.py` (`Settings.audio.osc`; the players build an `OscSettings` of their
+own for their `/bang`) sends what `Main.sequence_callback` queues every frame, the newest value per address:
+`/music_id`, `/state`, `/progress` and the Audio tab's controls `/sound`, `/music_volume`, `/laughter`,
+`/laughter_volume` (both levels in dB; the laughter gets a `dbtoa` in front of its linear multipliers). The panel is
+their source: the patch's own controls follow it, and a control moved
+by hand in Max snaps back (the speaker button holds until the panel's `sound` changes: Max gets it through
+`change -1`, so the DSP is not started every frame). Bools go as ints: python-osc sends a bool as OSC True/False,
+which Max's toggles do not take. The patch `data/audio/Smile-Music-Player.maxpat` routes them off `udpreceive 4114`
+into its controls; the laughter samples are triggered by the players' `/bang` (4115, 4116) through a gate the
+laughter switch controls. The patch is JSON, edited by hand in Max's own formatting (tabs, LF) so the diff stays
+readable; Max rewrites the whole file when the patch is saved from Max.
+
 ## Settings
 
 Settings system copied from poser2 (`modules/settings/`); root tree in `modules/main_settings.py`,

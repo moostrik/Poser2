@@ -77,7 +77,7 @@ class Main():
         self.camera.setRotate90(self.portraitMode)
 
         self.audio: AudioDB = AudioDB(self.settings.audio, 'data/audio/music_map.json')
-        self.osc: Osc = Osc(self.settings.osc)
+        self.osc: Osc = Osc(self.settings.audio.osc)
         self.save: ClipSaver = ClipSaver(self.settings.sequence)
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self._saving: bool = False          # the visitor's files are open in the saver
@@ -173,12 +173,20 @@ class Main():
         if seq == SequenceType.FLASH and message.initial:
             self._style_picked = False
 
-        if self.settings.osc.active:
+        audio = self.settings.audio
+        if audio.osc.active:
             progress: float = message.progress
             audio_id: str = self.audio.get_audio_id()
             self.osc.send('/music_id', audio_id)
             self.osc.send('/state', state)
             self.osc.send('/progress', progress)
+            # the Max panel's controls: the panel is their source, sent every frame like the others
+            # so a Max that restarted follows it within a frame. int(): python-osc sends a bool as
+            # OSC True/False, which Max's toggles do not take
+            self.osc.send('/sound', int(audio.sound))
+            self.osc.send('/music_volume', audio.music_volume)
+            self.osc.send('/laughter', int(audio.laughter))
+            self.osc.send('/laughter_volume', audio.laughter_volume)
 
         if seq == SequenceType.CAMERA_SHOW and message.initial:
             self.face.reset()

@@ -190,12 +190,13 @@
       "fullscreen_mode": "WINDOWED"
     }
   },
-  "audio": {},
-  "osc": {
-    "active": true,
-    "ip": "127.0.0.1",
-    "port": 4114,
-    "fps": 30.0
+  "audio": {
+    "osc": {
+      "active": true,
+      "ip": "127.0.0.1",
+      "port": 4114,
+      "fps": 30.0
+    }
   },
   "artnet": {
     "active": true,

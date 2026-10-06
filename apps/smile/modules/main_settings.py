@@ -5,7 +5,6 @@ from modules.render.settings import RenderSettings, SequencerSettings
 from modules.comfy.settings import PipelineSettings
 from modules.cam.settings import CameraSettings
 from modules.audio.settings import AudioSettings
-from modules.osc.settings import OscSettings
 from modules.artnet.settings import ArtnetSettings
 
 
@@ -15,6 +14,5 @@ class Settings(BaseSettings):
     sequence: Group[SequencerSettings] = Group(SequencerSettings)
     render:   Group[RenderSettings]    = Group(RenderSettings)
     audio:    Group[AudioSettings]     = Group(AudioSettings)
-    osc:      Group[OscSettings]       = Group(OscSettings)
     artnet:   Group[ArtnetSettings]    = Group(ArtnetSettings)
     server:   Group[NiceSettings]      = Group(NiceSettings)
