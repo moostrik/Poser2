@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class WebCam(Thread):
-    def __init__(self, settings: CameraSettings, forceSize: tuple[int, int] | None = None) -> None:
+    def __init__(self, settings: CameraSettings) -> None:
         super().__init__()
         self.settings: CameraSettings = settings
 
@@ -19,12 +19,8 @@ class WebCam(Thread):
         self.colorID: int = 0
         self.colorCallbacks: list = []
 
-        self.outWidth: int = 1920
-        self.outHeight: int = 1080
-
-        if (forceSize):
-            self.outWidth, self.outHeight = forceSize
-        self.outputColor: cv2.Mat = np.zeros((self.outWidth, self.outHeight,3)) # type: ignore
+        # the last frame as the webcam sent it, rotated and flipped; Camera fits it to the render
+        self.outputColor: cv2.Mat = np.zeros((1, 1, 3), np.uint8) # type: ignore
 
         self.rotate90: bool         = False
 
@@ -44,7 +40,6 @@ class WebCam(Thread):
                         frame = cv2.flip(frame, 0)
                     if self.settings.flip_h:
                         frame = cv2.flip(frame, 1)
-                    frame = cv2.resize(frame, (self.outWidth, self.outHeight))
                     with self.colorMutex:
                         self.outputColor = frame
                         self.colorFrameNew = True

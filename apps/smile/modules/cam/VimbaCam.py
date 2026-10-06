@@ -3,6 +3,7 @@ from modules.cam.settings import CameraSettings
 from modules.cam.FeatureWriter import FeatureWriter
 import cv2
 import numpy as np
+from dataclasses import dataclass
 from threading import Thread, Lock, Event
 from time import sleep, monotonic
 from typing import Optional
@@ -15,6 +16,22 @@ FRAME_TIMEOUT: float = 5.0      # s without a complete frame while capturing: th
 RETRY_INTERVAL: float = 5.0     # s between two tries to find and open the camera
 STREAM_PAUSE: float = 1.0       # s after a stream that ended, before the camera is opened again
 GRAB_LOG_INTERVAL: float = 10.0 # s between the log lines of a frame grab that keeps failing
+SMALL_PACKET: int = 1500        # bytes: the packet size without jumbo frames on the path
+
+
+@dataclass
+class CameraSetup:
+    """What the camera was set up with at open: the region of interest its user set holds and the
+    packet size the path accepted."""
+    packet_size: int
+    width: int
+    height: int
+    offset_x: int
+    offset_y: int
+
+    @property
+    def region(self) -> str:
+        return f'{self.width}x{self.height} at {self.offset_x},{self.offset_y}'
 
 
 class NoCamera(Exception):
@@ -37,9 +54,10 @@ def get_camera(camera_id: Optional[str]) -> Camera:
         return cams[0]
 
 
-def setup_camera(camera: Camera, user_set: Optional[str]) -> int:
+def setup_camera(camera: Camera, user_set: Optional[str]) -> CameraSetup:
     """Load the user set and let the camera take the largest packet the path accepts; returns that
-    packet size. Raises NoCamera when the camera can't be opened or set up."""
+    packet size with the region of interest the set holds. Raises NoCamera when the camera can't be
+    opened or set up."""
     with Vimba.get_instance():
         try:
             with camera:
@@ -67,7 +85,10 @@ def setup_camera(camera: Camera, user_set: Optional[str]) -> int:
                 except (AttributeError, VimbaFeatureError):
                     raise NoCamera(f'camera [{camera.get_id()}] could not set its packet size')
 
-                return int(camera.get_feature_by_name('GevSCPSPacketSize').get())
+                def read(name: str) -> int:
+                    return int(camera.get_feature_by_name(name).get())
+
+                return CameraSetup(read('GevSCPSPacketSize'), read('Width'), read('Height'), read('OffsetX'), read('OffsetY'))
         except NoCamera:
             raise
         except Exception as e:
@@ -75,7 +96,7 @@ def setup_camera(camera: Camera, user_set: Optional[str]) -> int:
 
 
 class VimbaCam(Thread):
-    def __init__(self, settings: CameraSettings, forceSize: tuple[int, int] | None = None) -> None:
+    def __init__(self, settings: CameraSettings) -> None:
         super().__init__()
         self.settings: CameraSettings = settings
 
@@ -90,12 +111,8 @@ class VimbaCam(Thread):
         self.camID: str | None = None
         self.frameCallbacks: list = []
 
-        self.outWidth: int = 1920
-        self.outHeight: int = 1080
-
-        if (forceSize):
-            self.outWidth, self.outHeight = forceSize
-        self.outputFrame: np.ndarray = np.zeros((self.outHeight, self.outWidth, 3), np.uint8)
+        # the last frame as the camera sent it, rotated and flipped; Camera fits it to the render
+        self.outputFrame: np.ndarray = np.zeros((1, 1, 3), np.uint8)
 
         self.rotate90: bool         = False
 
@@ -153,7 +170,6 @@ class VimbaCam(Thread):
                                 newFrame = cv2.flip(newFrame, 0)
                             if self.settings.flip_h:
                                 newFrame = cv2.flip(newFrame, 1)
-                            newFrame = cv2.resize(newFrame, (self.outWidth, self.outHeight))
 
                             for c in self.frameCallbacks:
                                 c(newFrame)
@@ -177,7 +193,7 @@ class VimbaCam(Thread):
         the reason in the log once."""
         try:
             camera: Camera = get_camera(self.camID)
-            packet_size: int = setup_camera(camera, self.user_set)
+            setup: CameraSetup = setup_camera(camera, self.user_set)
         except NoCamera as e:
             self._warn(str(e))
             return None
@@ -185,8 +201,11 @@ class VimbaCam(Thread):
             self._warn(f'could not open the camera: {e}')
             return None
         if not self._problem:
-            logger.info('Vimba camera [%s]: loaded %s, packet size %d', camera.get_id(), self.user_set, packet_size)
-        self._packet_size = packet_size
+            logger.info('Vimba camera [%s]: loaded %s, %s, packet size %d', camera.get_id(), self.user_set, setup.region, setup.packet_size)
+        if setup.packet_size <= SMALL_PACKET:
+            logger.warning('Vimba camera packet size is %d: Jumbo Packet is off on the adapter or a switch (see the README), frames drop more easily',
+                           setup.packet_size)
+        self._packet_size = setup.packet_size
         # the user set was loaded: the panel's values go to the camera again
         self._features.reset()
         return camera

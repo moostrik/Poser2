@@ -67,11 +67,11 @@ class Main():
         # the camera device; the panel can switch to an image from input/ at any time
         if camType == CamType.VIMBA:
             from modules.cam.VimbaCam import VimbaCam
-            device = VimbaCam(self.settings.camera, (self.width, self.height))
+            device = VimbaCam(self.settings.camera)
             device_name = 'vimba'
         else:
             from modules.cam.WebCam import WebCam
-            device = WebCam(self.settings.camera, (self.width, self.height))
+            device = WebCam(self.settings.camera)
             device_name = 'webcam'
         self.camera: Camera = Camera(self.settings.camera, (self.width, self.height), device, device_name)
         self.camera.setRotate90(self.portraitMode)

@@ -155,9 +155,9 @@ class SmileRender(RenderBase):
         """A line for the operator in the corner of the image; None for no line."""
         self._status_text = text
 
-    def set_warmup(self, progress: float) -> None:
-        """How far the generator is toward ready (0..1): the camera is in pixels until it is 1."""
-        self.layers.camera.warmup = progress
+    def set_warmup(self, step: int | None) -> None:
+        """The step the generator's warm-up has reached: the camera is in pixels, smaller per step; None is ready."""
+        self.layers.camera.warmup = step
 
     def set_faces(self, frame: FaceFrame) -> None:
         self.inputs.faces.set(frame)

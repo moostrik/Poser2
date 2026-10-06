@@ -1,3 +1,4 @@
+import math
 import time
 
 from modules.face.FaceFinder import FaceFrame
@@ -16,12 +17,21 @@ from .passes import blur, copy
 FONT_SIZE: int = 18
 LABEL_PAD_PX: float = 4.0
 BLUR_RADIUS: float = 2.0    # of the blur effect at amount 1 (1 is about 20 pixels each way)
-WARMUP_BLOCK: float = 256.0 # pixels: block size of the whole image while the generator is at warmup 0
 NO_RECT: tuple[float, float, float, float, float] = (0.0, 0.0, 0.0, 0.0, 0.0)
 
 # the shader's numbers for the settings' choices: their order in the enum
 EFFECTS: list[FaceEffect] = list(FaceEffect)
 FILLS: list[FaceFill] = list(FaceFill)
+
+
+def warmup_block(width: int, height: int, step: int) -> int:
+    """The block size of the warm-up pixels at `step`: the largest block that tiles a width x height
+    image whole (their gcd, 256 at 1024 x 1280) halved per step, or when that is no divisor the
+    common divisor nearest to it in ratio, so the blocks always come out whole."""
+    largest: int = math.gcd(width, height)
+    target: float = largest / 2 ** step
+    divisors = (d for d in range(1, largest + 1) if largest % d == 0)
+    return min(divisors, key=lambda d: abs(math.log(d / target)))
 
 
 class CameraLayer(LayerBase):
@@ -32,14 +42,14 @@ class CameraLayer(LayerBase):
     white, a rejected one in grey with its reason. A box that reaches past the image is drawn up to a
     padding inside it, so the chosen face's outline and fill stay whole. Keeps its last frame until
     render() is called again (the capture freeze).
-    While the generator is not ready (warmup below 1) the whole image is in pixels instead, smaller
-    with every step of the warm-up, and no face is shown."""
+    While the generator is not ready (warmup is its step) the whole image is in pixels instead,
+    blocks that tile the image whole and halve with every step of the warm-up, and no face is shown."""
 
     def __init__(self, camera: Image, faces: Faces, settings: RenderSettings) -> None:
         self._camera: Image = camera
         self._faces: Faces = faces
         self.settings: RenderSettings = settings
-        self.warmup: float = 1.0    # how far the generator is toward ready (any thread sets it)
+        self.warmup: int | None = None  # the step the generator's warm-up reached; None is ready (any thread sets it)
         self._subject: SubjectMark = SubjectMark()
         self._fbo: Fbo = Fbo()
         self._face_color: FaceColor = FaceColor()
@@ -93,16 +103,17 @@ class CameraLayer(LayerBase):
         frame: FaceFrame | None = self._faces.get()
         if frame is not None and now - frame.time > FACES_STALE:
             frame = None
-        # not ready: the image in pixels that shrink to 1 at ready, and no face (nobody can start)
-        warmup: float = min(max(self.warmup, 0.0), 1.0)
-        mosaic: float = WARMUP_BLOCK ** (1.0 - warmup)
-        if warmup < 1.0:
+        # not ready: the image in pixels that halve per step, and no face (nobody can start)
+        warmup: int | None = self.warmup
+        mosaic: float = 1.0
+        if warmup is not None:
+            mosaic = float(warmup_block(self._width, self._height, max(warmup, 0)))
             frame = None
             charge = 0.0
         pad = (BOX_PAD_PX / self._width, BOX_PAD_PX / self._height)
         subject: Mark | None = self._subject.update(frame, now, charge, (r, g, b, a), pad)
         fields = face_fields(frame, pad) if frame is not None else []
-        if warmup < 1.0:
+        if warmup is not None:
             subject = None      # a mark that was still draining
         rect = (subject.x, subject.y, subject.w, subject.h, subject.far) if subject is not None else NO_RECT
         fill: FaceFill = self.settings.face_fill
@@ -116,7 +127,7 @@ class CameraLayer(LayerBase):
         self._fbo.begin()
         self._face_color.use(self._camera, self._width, self._height, fields, EFFECTS.index(effect), amount,
                              rect, charge, FILLS.index(fill), (r, g, b, a), blurred, mosaic)
-        if self.settings.face_marks and marks > 0.0 and warmup >= 1.0:
+        if self.settings.face_marks and marks > 0.0 and warmup is None:
             face_marks: list[Mark] = build_marks(frame, (r, g, b, a), charge, pad) if frame is not None else []
             if subject is not None and (frame is None or frame.subject is None):
                 face_marks.append(subject)      # the face left: its mark stays while the charge drains

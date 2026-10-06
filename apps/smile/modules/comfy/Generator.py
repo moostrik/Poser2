@@ -84,12 +84,12 @@ class Generator(Thread):
         return self._warmed_up and self.client.connected
 
     @property
-    def warmup(self) -> float:
-        """How far the generator is toward ready: 0 without ComfyUI or before the warm-up's first step,
-        a part more for every step the warm-up reached, 1 only when ready."""
+    def warmup(self) -> int | None:
+        """The steps the warm-up has reached (of Workflow.step_count): 0 without ComfyUI or before its
+        first step; None when ready."""
         if self.ready:
-            return 1.0
-        return len(self._warmup_steps) / (self.workflow.step_count + 1)
+            return None
+        return len(self._warmup_steps)
 
     def stop(self) -> None:
         self._stop_event.set()      # ends a warm-up too

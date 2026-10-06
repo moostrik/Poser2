@@ -1,5 +1,7 @@
 """The app's image source: the frames of a camera device (Vimba or webcam), or, with `use_image` on,
-an image from `input/`, whether a device was found or not. A missing device is a warning and the
+an image from `input/`, whether a device was found or not. Every frame is fitted to the output size
+here (`cover`: scaled to fill it, the middle kept, no distortion); the device only rotates and flips.
+A missing device is a warning and the
 `device` readout says `none`; there is no automatic fallback to the image, so a failed camera on
 site stays visible. The device is kept when it did not open: one that keeps trying (Vimba) delivers
 when it is there, and the readout follows it. Every frame has the time it arrived (`frame()`), so
@@ -38,8 +40,11 @@ class Device(Protocol):
 
 
 def cover(image: np.ndarray, width: int, height: int) -> np.ndarray:
-    """Resize the image to cover width x height and crop the middle: no distortion."""
+    """Resize the image to cover width x height and crop the middle: no distortion. An image of that
+    size is returned as it is."""
     image_height, image_width = image.shape[:2]
+    if (image_width, image_height) == (width, height):
+        return image
     scale: float = max(width / image_width, height / image_height)
     resized: np.ndarray = cv2.resize(image, (max(width, round(image_width * scale)), max(height, round(image_height * scale))), interpolation=cv2.INTER_AREA)
     x0: int = (resized.shape[1] - width) // 2
@@ -108,7 +113,7 @@ class Camera:
             self._device.close()
 
     def setRotate90(self, rotate90: bool) -> None:
-        # the image is fitted to the output size as it is
+        # the image source is fitted to the output size as it is
         if self._device is not None:
             self._device.setRotate90(rotate90)
 
@@ -139,7 +144,8 @@ class Camera:
     def _on_device_frame(self, frame: np.ndarray) -> None:
         if self.settings.use_image:
             return
-        self._emit(frame)
+        # the one fit of every source to the output size: the device sends its frames as they are
+        self._emit(cover(frame, self._width, self._height))
 
     def _run(self) -> None:
         # the image source: emitted at its own rate while it is in use

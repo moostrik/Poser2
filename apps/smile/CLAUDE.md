@@ -19,7 +19,8 @@ alive and does nothing (the face finder: nobody is ever chosen; the generator: t
 
 `modules/cam/Camera.py` is the one source the app reads: it wraps the device (`VimbaCam` default,
 `WebCam` with `-wc`) and an image source from `data/input/` that the panel's `use_image` switch puts in
-place of the device frames at any time. A missing device is a warning and `device: none`, never an
+place of the device frames at any time. `Camera` fits every frame to the render size with `cover()`
+(scaled to fill it, the middle kept, no distortion); the devices only rotate and flip. A missing device is a warning and `device: none`, never an
 automatic switch to the image. `VimbaCam`'s thread keeps the camera: `open()` makes the first try, and
 the thread searches again every 5 s while there is none and opens it again (user set, packet size, the
 panel's values) when no complete frame arrived for 5 s; the `device` readout follows it. Every frame
@@ -33,15 +34,17 @@ tried again (it does not switch the feature off). Exposure and gain each have au
 value (sent while auto is off), a limit for auto and a readout of what the camera uses now; both
 autos aim for `target_brightness`, the exposure going up first and the gain after it. "Set WB" (white balance) lets the camera measure
 once and takes the ratios it found into the panel.
-The camera is a GigE camera on the PC's Ethernet adapter and sends 1220x964 BGR, 3.5 MB per frame
-(106 MB/s at 30 fps, the panel's `target_frame_rate`, also written by `FeatureWriter`; `UserSet2` holds 20; `frame_rate` is the rate of the frames
+The camera is a GigE camera on the PC's Ethernet adapter. Its `UserSet2` holds the region of interest, 1200x960 of the
+1292x964 sensor, centred (OffsetX 46, OffsetY 2): the render's 4:5 turned, which `Camera.cover()` scales by exactly 16/15 to
+1024x1280 with nothing cropped; the log line at open shows the region the set loaded. It sends BGR, 3.5 MB per frame
+(104 MB/s at 30 fps, the panel's `target_frame_rate`, also written by `FeatureWriter`; `UserSet2` holds 20; `frame_rate` is the rate of the frames
 that arrive complete; one that lost network packets arrives `Incomplete`, with part of an older image still in its buffer,
 and is skipped and counted in `dropped_frames`). At every open `setup_camera` runs
 `GVSPAdjustPacketSize` (after loading `UserSet2`, which holds a packet size of its own), which takes the largest packet the path accepts (`GevSCPSPacketSize`, up to
 9973). For that the adapter's Jumbo Packet must be on (Device Manager → the Ethernet adapter →
 Advanced → Jumbo Packet → 9014 Bytes; it is off by default on a new PC or after a driver
 reinstall), and so must any switch between camera and PC; otherwise the size stays 1500 and frames
-drop more easily. The size is only negotiated at open: restart SMILE after changing the adapter.
+drop more easily, and the log warns at open. The size is only negotiated at open: restart SMILE after changing the adapter.
 
 ## Face
 
@@ -94,8 +97,9 @@ After every connect, a warm-up run on `data/comfy/warmup.jpg` (`build_warmup`: t
 with one sampler step and one grin frame) loads the models and proves the chain works (own limit
 `WARMUP_TIMEOUT`; a visitor has `connection.job_timeout`). Until `Generator.ready` no sequence starts (`Sequencer.blocked`,
 set in `Main`) and the render shows the generator's status as a line (`StatusLayer`) and the
-whole camera image in pixels without any face box or mark (`CameraLayer.warmup`, from `Generator.warmup`): 256 pixels
-wide without ComfyUI, smaller with every step the warm-up reaches, sharp when ready.
+whole camera image in pixels without any face box or mark (`CameraLayer.warmup`, from `Generator.warmup`: the step
+the warm-up reached, None when ready): the largest block that tiles the image whole (`warmup_block`, 256 pixels at
+1024 x 1280) without ComfyUI, halved with every step the warm-up reaches, sharp when ready.
 The sequence waits for the generator (the flash for the capture's depth, the result for IDLE), so every
 end of a job says IDLE, and three things keep that wait from lasting: a reset (`Generator.interrupt`,
 sent at every RESET) ends a visitor's job only, never a warm-up, which would otherwise count as passed;
@@ -126,7 +130,9 @@ OpenGL engine copied from poser2 (`modules/gl/`: glfw, GL 4.6 core, render threa
 `WindowManager`); keep it identical to poser2 so it can be synced with a diff, and fix shared bugs in
 both. The render loop goes on when `update`, `draw`, an event callback (key, mouse, window, monitor) or
 a deferred settings call raises: it is logged, and a monitor that is unplugged does not close the app
-(`modules/render/tests/test_window.py`). `modules/render/SmileRender.py` runs the `Sequencer` once per frame (it is the app clock:
+(`modules/render/tests/test_window.py`). The render is the display's 1024 x 1280 (`smile.py` defaults, swapped by the
+default portrait mode): the same 4:5 as the workflow's 896 x 1120 portrait, which stays at the size SDXL is best at and fills
+the render as a texture. `modules/render/SmileRender.py` runs the `Sequencer` once per frame (it is the app clock:
 Art-Net, OSC and saving hang off its messages), then the stage for the current `SequenceType`
 (`stages.py`) renders the layers (`layers/`) and picks the one to show. Images from other threads go
 through `inputs.py` (`Image.set_image`, uploaded on the render thread); the grin frames go

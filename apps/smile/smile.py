@@ -6,8 +6,8 @@ from modules.log_config import setup_logging, install_excepthooks
 from modules.main import Main, CamType
 
 parser: ArgumentParser = ArgumentParser()
-parser.add_argument('-dw',  '--width',          type=int,   default=1120,    help='image width (4:5 like the generated portraits)')
-parser.add_argument('-dh',  '--height',         type=int,   default=896,    help='image height')
+parser.add_argument('-dw',  '--width',          type=int,   default=1280,   help='image width (4:5 like the generated portraits; 1280 x 1024 is the display in portrait mode)')
+parser.add_argument('-dh',  '--height',         type=int,   default=1024,   help='image height')
 parser.add_argument('-wc',  '--useWebCam',      action='store_true',        help='use webcam instead of default cam')
 parser.add_argument('-vc',  '--useVimbaCam',    action='store_true',        help='use vimba camera instead of default cam')
 parser.add_argument('-pm',  '--portraitMode',   action='store_true',        help='use portrait mode (default)')

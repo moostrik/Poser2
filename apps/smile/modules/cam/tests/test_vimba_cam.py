@@ -11,7 +11,7 @@ import numpy as np
 from modules.cam.settings import CameraSettings
 
 try:
-    from modules.cam.VimbaCam import NoCamera, VimbaCam
+    from modules.cam.VimbaCam import CameraSetup, NoCamera, VimbaCam
     from modules.cam.vimba import FrameStatus
 except Exception:       # the Vimba library is not installed on this machine
     VimbaCam = None
@@ -42,7 +42,7 @@ class TestVimbaCam(unittest.TestCase):
     def setUp(self):
         self.settings = CameraSettings()
         self.settings.initialize()
-        self.cam = VimbaCam(self.settings, (6, 4))
+        self.cam = VimbaCam(self.settings)
         self.cam.capturing = True
         self.camera = FakeCamera()
 
@@ -116,7 +116,7 @@ class TestVimbaCamReopen(unittest.TestCase):
     def setUp(self):
         self.settings = CameraSettings()
         self.settings.initialize()
-        self.cam = VimbaCam(self.settings, (6, 4))
+        self.cam = VimbaCam(self.settings)
         self.cam._features.update = lambda camera: None     # no features on the fake camera
         self.frames: list[np.ndarray] = []
         self.cam.setColorCallback(self.frames.append)
@@ -132,7 +132,8 @@ class TestVimbaCamReopen(unittest.TestCase):
 
         vimba = mock.Mock()
         vimba.get_instance.return_value = contextlib.nullcontext()
-        for name, value in (('Vimba', vimba), ('get_camera', get_camera), ('setup_camera', lambda camera, user_set: 1500),
+        setup = CameraSetup(1500, 1200, 960, 46, 2)
+        for name, value in (('Vimba', vimba), ('get_camera', get_camera), ('setup_camera', lambda camera, user_set: setup),
                             ('FRAME_TIMEOUT', 0.1), ('RETRY_INTERVAL', 0.02), ('STREAM_PAUSE', 0.02)):
             patcher = mock.patch(f'modules.cam.VimbaCam.{name}', value)
             patcher.start()

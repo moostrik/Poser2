@@ -83,14 +83,19 @@ class TestCamera(unittest.TestCase):
     def test_relays_device_frames_and_drops_them_with_the_image_on(self):
         device = FakeDevice()
         self.make(device)
-        frame = np.zeros((6, 8, 3), dtype=np.uint8)
+        # a frame of another shape is fitted to the output size: scaled to fill it, the middle kept
+        frame = np.zeros((12, 8, 3), dtype=np.uint8)
+        frame[4:8] = 255                    # a band across the middle
         device.push(frame)
         self.assertEqual(len(self.frames), 1)
-        self.assertIs(self.camera.getColorImg(), frame)
+        shown = self.camera.getColorImg()
+        self.assertEqual(shown.shape, (6, 8, 3))
+        self.assertEqual(int(shown[0, 0, 0]), 0)
+        self.assertEqual(int(shown[3, 0, 0]), 255)
 
         self.settings.use_image = True
         device.push(frame)
-        self.assertTrue(wait_for(lambda: len(self.frames) > 1 and self.frames[-1] is not frame))
+        self.assertTrue(wait_for(lambda: len(self.frames) > 1 and self.frames[-1] is not shown))
         image = self.camera.getColorImg()
         self.assertEqual(image.shape, (6, 8, 3))
         self.assertEqual(int(image[0, 0, 0]), 100)     # a.jpg, at the output size

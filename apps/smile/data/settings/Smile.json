@@ -191,6 +191,10 @@
     }
   },
   "audio": {
+    "sound": true,
+    "laughter": false,
+    "music_volume": 0.0,
+    "laughter_volume": 0.0,
     "osc": {
       "active": true,
       "ip": "127.0.0.1",
