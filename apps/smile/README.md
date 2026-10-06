@@ -64,6 +64,7 @@ not in git, safe to delete).
 * install Max (Cycling '74); the patch is `data\audio\Smile-Music-Player.maxpat`
 * the music files go into `data\audio\` by hand (they are not in git); `data\audio\music_map.json` maps the two movements (`0000` for style A, `0001` for style B) to the tracks and their weights
 * SMILE sends OSC to Max on `127.0.0.1:4114` (`/music_id`, `/state`, `/progress`, the panel's OSC tab); the players send a `/bang` on 4115 and 4116 when a clip starts
+* the big checkbox in the patch's window switches the laughter (the samples those `/bang`s trigger) on and off: it is on at every start of Max; off, no new laugh starts and one that plays fades out
 
 ### Lights (Art-Net)
 * the Art-Net node is at the panel's `artnet.ip` (10.0.0.11, universe 1); `data\artnet.json` lists the modules: three cores (pc, audio, video) and the 24-LED ring around the camera (mako)
