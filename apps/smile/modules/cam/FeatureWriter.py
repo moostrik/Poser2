@@ -2,7 +2,8 @@
 Vimba camera when they change. The panel is the source of truth: everything is sent once after the
 camera opens, over what its user set loaded. A feature the camera model does not have is a warning,
 once. A write the camera refuses (a value it does not take, a control channel that timed out) is a
-warning too, and is tried again: it does not switch the feature off. Exposure and gain are the panel's
+warning too, and is tried again: it does not switch the feature off. A failed read is the same kind
+of warning. Both are logged once per reason, not at every retry. Exposure and gain are the panel's
 value with auto off and the camera's with auto on; the values in use are read back for the panel.
 "Set WB" (white balance) lets the camera measure once and takes the ratios it found back into the panel."""
 
@@ -27,7 +28,7 @@ class FeatureWriter:
         self._applied: dict[str, Any] = {}      # values last written to the camera, per setting
         self._missing: set[str] = set()         # features this camera does not have
         self._retry: dict[str, float] = {}      # per setting whose write failed: when it is tried again
-        self._refused: dict[str, str] = {}      # per feature: the last refusal that was logged
+        self._problems: dict[str, str] = {}     # per feature: its trouble (a refused write, a failed read) as logged
         self._ratio_feature: str | None = None
         self._measure: Event = Event()
         self._measure_end: float | None = None  # set while the camera measures its white balance
@@ -50,7 +51,7 @@ class FeatureWriter:
         self._applied.clear()
         self._missing.clear()
         self._retry.clear()
-        self._refused.clear()
+        self._problems.clear()
         self._ratio_feature = None
         self._measure_end = None
 
@@ -143,8 +144,9 @@ class FeatureWriter:
         """Wait for the camera to finish its measurement, then take its ratios into the panel."""
         try:
             done: bool = str(camera.get_feature_by_name('BalanceWhiteAuto').get()) == 'Off'
+            self._problem('BalanceWhiteAuto', None)
         except Exception as e:
-            logger.warning('Camera white balance: %s', e)
+            self._problem('BalanceWhiteAuto', f'not readable: {e}')
             done = True
         if not done:
             if self._measure_end is None or monotonic() < self._measure_end:
@@ -194,13 +196,20 @@ class FeatureWriter:
                 value = type(low)(min(max(value, low), high))     # in the feature's range and number type
             feature.set(value)
         except Exception as e:
-            # refused this time: the feature stays, the caller tries again. Logged once per reason
-            if self._refused.get(name) != str(e):
-                self._refused[name] = str(e)
-                logger.warning('Camera feature %s not set to %s: %s', name, value, e)
+            # refused this time: the feature stays, the caller tries again
+            self._problem(name, f'not set to {value}: {e}')
             return False
-        self._refused.pop(name, None)
+        self._problem(name, None)
         return True
+
+    def _problem(self, name: str, problem: str | None) -> None:
+        """A feature's trouble, logged when it is new, not at every retry (a camera that is away
+        asks every half second); None when the feature worked, so the next trouble is logged again."""
+        if problem is None:
+            self._problems.pop(name, None)
+        elif self._problems.get(name) != problem:
+            self._problems[name] = problem
+            logger.warning('Camera feature %s %s', name, problem)
 
     def _ratio(self, camera: Any) -> str | None:
         """The name of the camera's balance ratio feature, or None when it has none."""
@@ -228,10 +237,12 @@ class FeatureWriter:
         if name is None or not self._set(camera, 'BalanceRatioSelector', channel):
             return None
         try:
-            return float(camera.get_feature_by_name(name).get())
+            value: float = float(camera.get_feature_by_name(name).get())
         except Exception as e:
-            logger.warning('Camera feature %s not readable: %s', name, e)
+            self._problem(name, f'not readable: {e}')
             return None
+        self._problem(name, None)
+        return value
 
     def _on_wb_set(self, _: Any = None) -> None:
         self._measure.set()

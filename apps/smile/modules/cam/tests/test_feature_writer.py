@@ -14,6 +14,8 @@ class FakeFeature:
         self.range = range_
 
     def get(self):
+        if self.name in self.camera.unreadable:
+            raise RuntimeError('<VmbError.Resources: -14>')
         if self.name == 'BalanceRatioAbs':
             return self.camera.ratios[self.camera.features['BalanceRatioSelector'].value]
         return self.value
@@ -35,6 +37,7 @@ class FakeCamera:
     def __init__(self, without: tuple[str, ...] = ()) -> None:
         self.writes: list[tuple[str, object]] = []
         self.refuses: set[str] = set()      # features whose write fails for now
+        self.unreadable: set[str] = set()   # features whose read fails for now (the camera is away)
         self.ratios: dict[str, float] = {'Red': 1.0, 'Blue': 1.0}
         self.features: dict[str, FakeFeature] = {}
         for name, value, range_ in (
@@ -176,6 +179,25 @@ class TestFeatureWriter(unittest.TestCase):
         self.settings.manual_WB_red = 2.0
         self.writer.update(self.camera)
         self.assertEqual(self.camera.ratios['Red'], 2.0)
+
+    def test_a_read_that_keeps_failing_is_logged_once(self):
+        self.writer.update(self.camera)
+        self.camera.unreadable = {'BalanceRatioAbs'}
+        with self.assertLogs('modules.cam.FeatureWriter', 'WARNING') as logs:
+            for _ in range(10):                             # twenty reads: five seconds of a camera that is away
+                self.writer._read_next = 0.0
+                self.writer.update(self.camera)
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn('BalanceRatioAbs not readable', logs.output[0])
+
+        self.camera.unreadable = set()                      # back, then away again: logged again
+        self.writer._read_next = 0.0
+        self.writer.update(self.camera)
+        self.camera.unreadable = {'BalanceRatioAbs'}
+        with self.assertLogs('modules.cam.FeatureWriter', 'WARNING') as logs:
+            self.writer._read_next = 0.0
+            self.writer.update(self.camera)
+        self.assertEqual(len(logs.output), 1)
 
     def test_auto_owns_the_ratios_and_the_panel_takes_them_back(self):
         self.settings.auto_WB = True

@@ -14,6 +14,7 @@ from modules.player.FolderScanner import FolderScanner
 from modules.osc.Sender import Sender as Osc
 from modules.osc.settings import OscSettings
 from modules.gl import FullscreenMode, MonitorId, WindowSettings
+from modules.log_config import crash_summary
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,8 @@ class Player():
     def __init__(self, osc_port: int, root: str = 'output/', monitor: int = 1, trail: float = 0.9,
                  clips: int = 24, pool: int = 30, hwdecode: int | None = None, windowed: bool = False,
                  fps: float = 30.0, spread: float = 0.0, recent: int = 4, recycle_every: float = 20.0) -> None:
+        # the first line of every log: what happened before this start
+        logger.info(crash_summary())
         osc_settings = OscSettings()
         osc_settings.port = int(osc_port)
         self.osc:Osc = Osc(osc_settings)

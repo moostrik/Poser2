@@ -12,6 +12,7 @@ from modules.artnet.Sender import Sender as Artnet
 from modules.settings import presets, NiceServer
 from modules.gl import FullscreenMode
 from modules.main_settings import Settings
+from modules.log_config import crash_summary
 from enum import Enum
 import logging
 import time
@@ -31,6 +32,8 @@ class CamType(Enum):
 class Main():
     def __init__(self, width: int, height: int, portraitMode: bool = False, camType: CamType = CamType.VIMBA,
                  fullscreen: bool = False) -> None:
+        # the first line of every log: what happened before this start
+        logger.info(crash_summary())
         self.width: int = width
         self.height: int = height
         self.portraitMode: bool = portraitMode

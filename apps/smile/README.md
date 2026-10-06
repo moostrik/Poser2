@@ -1,61 +1,122 @@
 # SMILE
-semi real time webcam diffusers
+
+Art installation. A camera watches the visitors; when a face holds still in front of it, the image
+flashes and ComfyUI paints a portrait of that face, which then grins. The result is shown on the main
+screen with music (a Max patch, driven over OSC) and lights (an Art-Net ring around the camera). Two
+image players next to it show the grins of the visitors before.
+
+Runs on one Windows PC: an RTX 4090 (24 GB) with 64 GB RAM, an Allied Vision Mako G-125C GigE camera
+on the PC's Ethernet adapter, the show monitor and two player monitors, an Art-Net node for the
+lights, and Max for the music. Everything the installation is given lives in `data\` (presets,
+models, workflow, audio, test photos); everything it makes goes to `output\` (clips, portraits, logs;
+not in git, safe to delete).
 
 ## INSTALLATION
 
 ### Visual C++ Redistributable
-* install latest Visual C++ Redistributable from [site](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version) and RESTART
+* install the latest Visual C++ Redistributable from [site](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version) and RESTART
 
 ### Python
-* Install python 3.12 Windows Installer (64 bit) [download](https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe) or [site](https://www.python.org/downloads/release/python-31210/)
+* install Python 3.12 Windows Installer (64 bit) [download](https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe) or [site](https://www.python.org/downloads/release/python-31210/)
 * choose **Customize installation**, uncheck "Add python.exe to PATH" and keep the py launcher
 * verify with ```py -0p``` that `-3.12` is listed
 
 ### Git for Windows
-* Install latest version from [site](https://git-scm.com/download/win)
-* Configure Global User Name and Email
+* install the latest version from [site](https://git-scm.com/download/win)
+* configure the global user name and email
 ```git config --global user.name "M.Oostrik"```
 ```git config --global user.email "m.oostrik@gmail.com"```
-* Initialize Git LFS
-```git lfs install```
+* initialize Git LFS: ```git lfs install``` (the face models in `data\models\` and the fonts are LFS files)
 
-### VSCode
-* Install latest version from [site](https://code.visualstudio.com/Download)
-* install extentions
-    * Python
-    * Python Environments
-    * Python Indent
-    * Pylance
+### VSCode (optional, for development)
+* install the latest version from [site](https://code.visualstudio.com/Download)
+* extensions: Python, Python Environments, Python Indent, Pylance
 
 ### ExecutionPolicy
-* open powershell as administrator and type ```Set-ExecutionPolicy -ExecutionPolicy RemoteSigned```
+* open PowerShell as administrator and type ```Set-ExecutionPolicy -ExecutionPolicy RemoteSigned```, so that PowerShell scripts run
 
 ### Allied Vision camera
-* Download from [site](https://www.alliedvision.com/en/products/vimba-sdk/)
-* run installer as administrator
-* restart
+* download the Vimba SDK from [site](https://www.alliedvision.com/en/products/vimba-sdk/) (Vimba, not Vimba X: the app brings VimbaPython, which needs Vimba's VmbC)
+* run the installer as administrator and restart
+* the camera's `UserSet2` holds its base configuration (format, frame rate, packet size); the app loads it at every open and writes the panel's camera settings over it
+* Ethernet adapter: Device Manager → the adapter → Advanced → **Jumbo Packet → 9014 Bytes** (it is off on a new PC and after a driver reinstall), and every switch between camera and PC must pass jumbo frames too. Otherwise the packet size stays 1500 and frames drop more easily. The SMILE log says at start which size the camera got: `packet size 8228` or more is good, `packet size 1500` means something on the path does not pass them (the panel's `dropped_frames` shows how much that costs)
 
-### Install Script
-* in the terminal run ```scripts\install.bat```
+### ffmpeg
+* download the "release full" build from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/), extract it to `C:\Developer\ffmpeg` and add `C:\Developer\ffmpeg\bin` to the PATH
+* without it the visitors are not saved as clips and the players have nothing to play (`install.bat` checks)
 
-### Image Generator (ComfyUI)
-* copy the ComfyUI bundle (with its models) into the repo as `comfy\` and follow `comfy\README.md` (`setup.ps1` installs ComfyUI in `ComfyUI\`); `comfy\models\` and `ComfyUI\` stay out of git
-* SMILE uses the API export of the workflow in `data\comfy\` (re-export with **Export (API)** after changing the workflow in ComfyUI)
-* optional: put a portrait photo at `data\comfy\warmup.jpg`, SMILE then runs one generation at startup so the first visitor doesn't wait for the models to load
+### Install script
+* in a terminal run ```scripts\install.bat```: pulls the LFS files, checks ffmpeg, makes the venv `.venv` and installs `requirements.txt`
 
-### Run Project
-* run ```scripts\startSMILE.bat```: it closes and restarts everything (ComfyUI, Max, the image players, SMILE), all fullscreen
-* `smile.py` does not start ComfyUI itself: when running it on its own (e.g. from VSCode), start the server first with ```scripts\start_comfy.bat``` (add `--enable-manager` for the ComfyUI-Manager)
-* settings panel: open http://localhost:667 in a browser (also reachable from other devices on the network)
-* presets live in `data/settings/`, `Smile.json` loads at startup
-* monitors are numbered primary first, then left to right: SMILE uses the one in its preset (`render.window.monitor`), the two image players the ones in `scripts\start_players.bat` (`PLAYER_1_MONITOR`, `PLAYER_2_MONITOR`); a player whose monitor is not connected opens in a window
-* keys in the SMILE window: Enter starts a sequence, F fullscreen, W borderless fullscreen, Esc quits
+### Image generator (ComfyUI)
+* copy the ComfyUI bundle (with its models, ~23 GB) into the repo as `comfy\` and follow [comfy\README.md](comfy/README.md): `setup.ps1` installs ComfyUI in `ComfyUI\`; `comfy\models\` and `ComfyUI\` stay out of git
+* SMILE runs the API export of the workflow in `data\comfy\smile_workflow.json` and fills in every value from its panel (re-export with **Export (API)** after changing the workflow in ComfyUI)
+* `data\comfy\warmup.jpg` is the photo of the warm-up run SMILE does after every connect, so the models are loaded before the first visitor
 
-### Startup
+### Music (Max)
+* install Max (Cycling '74); the patch is `data\audio\Smile-Music-Player.maxpat`
+* the music files go into `data\audio\` by hand (they are not in git); `data\audio\music_map.json` maps the two movements (`0000` for style A, `0001` for style B) to the tracks and their weights
+* SMILE sends OSC to Max on `127.0.0.1:4114` (`/music_id`, `/state`, `/progress`, the panel's OSC tab); the players send a `/bang` on 4115 and 4116 when a clip starts
+
+### Lights (Art-Net)
+* the Art-Net node is at the panel's `artnet.ip` (10.0.0.11, universe 1); `data\artnet.json` lists the modules: three cores (pc, audio, video) and the 24-LED ring around the camera (mako)
+
+## RUN
+
+### Start everything
+* run ```scripts\startSMILE.bat```: it closes whatever runs of the installation (SMILE, the players, ComfyUI, Max) and starts it all again: ComfyUI in a minimized window, Max, the two players fullscreen on their monitors, SMILE borderless fullscreen on its own
+* SMILE waits for ComfyUI and shows that on its screen: the camera image in pixels with a status line (`waiting for ComfyUI`, `warming up: ...`, sharp when ready). The status line also says `no camera frames` when the camera delivers none, and the generator's reason when ComfyUI stops answering
+* the apps run under `pythonw`, without a console: what they say is in `output\logs\`, one file per start per app (`smile_`, `player1_`, `player2_`, `comfy_`), plus `crashes.log`, one line per unhandled exception across all starts. The first line of every SMILE and player log is the count: `No crashes recorded`, or `3 crashes since 2026-10-02 (output/logs/crashes.log), last ...`. Delete `crashes.log` to start the count over
+
+### Settings panel
+* open http://localhost:667 in a browser (also reachable from other devices on the network, the log says the address)
+* presets live in `data\settings\`; `smile.json` loads at startup (the star in the panel picks the startup preset; it is kept in `data\settings\.ui_preset.json`)
+* monitors are numbered primary first, then left to right: SMILE uses the one in its preset (`render.window.monitor`), the players the ones in `scripts\start_players.bat` (`PLAYER_1_MONITOR`, `PLAYER_2_MONITOR`); a player whose monitor is not connected opens in a window on the primary one
+
+### Keys
+* in the SMILE window: Enter starts a sequence, F fullscreen, W borderless fullscreen, Esc quits (the panel's Exit button does the same)
+* in a player window: F borderless fullscreen, Esc quits
+
+### Pieces on their own
+* ```scripts\start_comfy.bat```: only ComfyUI, in this window (`--enable-manager` for the ComfyUI-Manager); `smile.py` does not start it, so start it first when running SMILE from VSCode
+* ```.venv\Scripts\python smile.py```: `-fs` borderless fullscreen (else the preset's window mode), `-wc` a webcam instead of the Vimba camera, `-lm` landscape instead of portrait, `-v` DEBUG on the console
+* ```scripts\start_players.bat```: (re)starts both players; `window` puts both in a window on the primary monitor, `console` gives them a console for the logs (Ctrl+C stops them), other words go to both players: ```start_players.bat console window -n 12```; ```.venv\Scripts\python player.py -h``` lists them
+* ```scripts\make_test_workflow.bat```: writes `data\comfy\smile_test.json`, the app's workflow with a preset's values plus previews and an input switch, to drag into the ComfyUI page
+* drop a saved clip or portrait on ```scripts\clip_info.bat``` to see what it was made with (the record: id, style, description, seed, settings); ```.venv\Scripts\python -m modules.save.record <file> --preset <name>``` writes those settings to `data\settings\<name>.json`
+* tests: ```.venv\Scripts\python -m pytest``` from the repo root
+
+### Output
+* `output\grins\A\` and `output\grins\B\` hold the grin clips (h264 mp4, the players read the style from the folder), `output\portraits\` the capture and the portrait of each visitor; `output\temp\` is where they are built. About 2.9 MB per visitor, nothing is cleaned up
+
+## STARTUP
 * make a shortcut to `scripts\startSMILE.bat`
-* Press Windows+R to open the Run dialog, type shell:Common Startup
-* move shortcut to startup folder
+* press Windows+R, type `shell:startup`, move the shortcut into that folder
 
+## ON SITE CHECKS
+
+A check passes when the installation does what is expected and the SMILE log of that run has no
+`CRITICAL`, and no `ERROR` other than the ones named. The dates are when a check last passed on the
+rig.
+
+1. **Camera cable out, during the camera phase** (passed 2026-10-02): `no camera frames` on the image after about 3 s, no flash, the panel's `device` goes to `none`; log: `Vimba camera: no complete frame for 5 s, opening the camera again`. Cable back in: the image returns within about 10 s, log: `Vimba camera delivers frames again`
+2. **Start with the camera unplugged, then plug it in** (passed 2026-10-02): `no camera frames` from the start, `Vimba camera: no camera found` once in the log; after plugging in, the image appears by itself within about 10 s
+3. **Monitor cable out while SMILE runs**, once fullscreen, once in a window (passed 2026-10-02): SMILE keeps running (log: at most `Error in event callback`), and the image is back on its own monitor when the cable is in again
+4. **ComfyUI stopped during a visitor** (close its window) (open): the visitor's own capture stands as the result, then the camera in pixels with `waiting for ComfyUI at 127.0.0.1:8188`, nothing of the previous visitor; ComfyUI started again: warm-up, then ready, without restarting SMILE
+5. **Reset during a warm-up** (open): the status stays `warming up: ...` and ends in ready
+6. **An evening unattended** (open): afterwards no `WARNING`, `ERROR` or `CRITICAL` in the log that is not explained, `dropped_frames` low in the panel, `last_duration` well under `job_timeout` (45 s)
+7. **Light ring at the end of a visitor** (open): stays full red into the bloom, no dip
+8. **Music** (open): two clips that start at the same moment send two `/bang`s; Max handles that as wanted
+9. **A failed visitor** (open): a manual start (Enter) with nobody in the image fails in ComfyUI: flash, the camera frame as the result, bloom, back to the camera
+10. **Both player monitors connected** (open): player 2 fullscreen on its own screen (on the dev PC it runs in a window: `Monitor 2 is not connected`)
+11. **Packet size** (open): the log line at start says `packet size 8228` or more; with 1500, watch `dropped_frames`
+12. **Startup after a reboot** (open): everything comes up by itself through the shortcut, SMILE waits for ComfyUI with its status line
+
+## KNOWN LIMITS
+* no automatic restart: an app that ends by itself stays down until `startSMILE.bat` is run; `crashes.log` says what happened
+* an app that hangs without ending is not detected either
+* no messages to a phone when something fails
+* `output\` grows about 2.9 MB per visitor; nothing is cleaned up
+* on a camera path that does not pass jumbo frames the packet size stays 1500 (see the camera section)
 
 ## HINTS
 * Could not find the DLL(s) 'msvcp140.dll: https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170

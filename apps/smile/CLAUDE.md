@@ -6,9 +6,12 @@ result is shown with music (Max patch via OSC) and lights (Art-Net). Entry point
 `.venv`, installed with `scripts/install.bat`. Tests: `.venv\Scripts\python -m pytest` from the repo root.
 All Python code lives in `modules/`; `data/` is what the installation is given (presets, models,
 workflow, audio, test photos), `output/` what it produces (git-ignored, safe to delete).
+`README.md` is for whoever installs or runs the installation: setup, scripts, the on-site checklist
+with the date each check passed, and the known limits; keep it current when any of that changes.
 The apps run under pythonw, without a console: say things with `logging`, never `print` (the log file
 in `output/logs/` is the only place they show; unhandled exceptions of the threads and of the main
-thread go there too, `log_config.install_excepthooks`). A worker thread's loop catches what its work
+thread go there too, `log_config.install_excepthooks`, and each one is a line in
+`output/logs/crashes.log`, which every start reports as its first log line, `crash_summary`). A worker thread's loop catches what its work
 raises, logs it (not at every round) and goes on: a thread that ends leaves an installation that looks
 alive and does nothing (the face finder: nobody is ever chosen; the generator: the flash stays).
 
