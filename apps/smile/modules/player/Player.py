@@ -152,5 +152,7 @@ class Player():
     def isRunning(self) -> bool :
         return self._running
 
-    def send_osc(self, panning: int) -> None:
-        self.osc.send('/bang', panning)
+    def send_osc(self, cell: int) -> None:
+        """A clip starts in a cell: the Max patch places its laugh by that screen's angle
+        (data/audio/screen_angles.txt, by cell for port 4115 and cell + 24 for 4116)."""
+        self.osc.send('/bang', cell)

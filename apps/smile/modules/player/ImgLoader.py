@@ -7,7 +7,7 @@ from modules.player.ClipPool import ClipPool, Clip
 
 ImageCallback= Callable[[str, np.ndarray, bool], None]
 
-LoaderCallback= Callable[[int], None]
+LoaderCallback= Callable[[int], None]     # the cell a play starts in
 
 def play_rate(fps: float, clip_fps: float, spread: float) -> float:
     """The speed of one play: fps (the clip's own rate when 0), off by a random fraction up to spread.
@@ -69,7 +69,8 @@ class LoadImages(Thread):
     def _play(self, clip: Clip) -> None:
         interval: float = 1.0 / play_rate(self._fps, clip.fps, self._spread)
         count: int = len(clip.frames)
-        self._loader_callback(random.randint(0, 2))
+        # the cell this play starts in: the Max patch places the laugh by the cell's screen
+        self._loader_callback(int(self._id))
         for i in range(count):
             if self._stop_event.is_set():
                 return
@@ -112,10 +113,10 @@ class LoadImages(Thread):
             return self._message_callbacks.copy()
 
 
-    def _loader_callback(self, panning: int) -> None:
+    def _loader_callback(self, cell: int) -> None:
         with self._callback_mutex:
             for c in self._loader_callbacks:
-                c(panning)
+                c(cell)
 
     def add_loader_callback(self, callback: LoaderCallback) -> None:
         with self._callback_mutex:

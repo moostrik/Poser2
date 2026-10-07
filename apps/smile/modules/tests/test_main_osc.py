@@ -54,19 +54,21 @@ class TestMaxControls(unittest.TestCase):
         self.assertEqual(sent['/music_volume'], 0.0)
         self.assertEqual(sent['/laughter'], 1)
         self.assertEqual(sent['/laughter_volume'], 0.0)
+        self.assertEqual(sent['/laughter_offset'], 0.0)
         audio = self.settings.audio
         audio.sound, audio.laughter = False, False
-        audio.music_volume, audio.laughter_volume = -12.0, -6.0
+        audio.music_volume, audio.laughter_volume, audio.laughter_offset = -12.0, -6.0, -90.0
         sent = self.frame()
         self.assertEqual((sent['/sound'], sent['/laughter']), (0, 0))
         self.assertEqual((sent['/music_volume'], sent['/laughter_volume']), (-12.0, -6.0))
+        self.assertEqual(sent['/laughter_offset'], -90.0)
 
     def test_the_switches_go_out_as_ints_and_the_levels_as_floats(self):
         # True == 1, so the values alone would pass a bool, which python-osc sends as OSC True
         sent = self.frame()
         for address in ('/sound', '/laughter'):
             self.assertIs(type(sent[address]), int, address)
-        for address in ('/music_volume', '/laughter_volume'):
+        for address in ('/music_volume', '/laughter_volume', '/laughter_offset'):
             self.assertIs(type(sent[address]), float, address)
 
     def test_nothing_goes_out_while_osc_is_off(self):

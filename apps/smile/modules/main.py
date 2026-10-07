@@ -187,6 +187,7 @@ class Main():
             self.osc.send('/music_volume', audio.music_volume)
             self.osc.send('/laughter', int(audio.laughter))
             self.osc.send('/laughter_volume', audio.laughter_volume)
+            self.osc.send('/laughter_offset', audio.laughter_offset)
 
         if seq == SequenceType.CAMERA_SHOW and message.initial:
             self.face.reset()

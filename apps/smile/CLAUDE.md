@@ -199,7 +199,17 @@ by hand in Max snaps back (the speaker button holds until the panel's `sound` ch
 `change -1`, so the DSP is not started every frame). Bools go as ints: python-osc sends a bool as OSC True/False,
 which Max's toggles do not take. The patch `data/audio/Smile-Music-Player.maxpat` routes them off `udpreceive 4114`
 into its controls; the laughter samples are triggered by the players' `/bang` (4115, 4116) through a gate the
-laughter switch controls. The patch is JSON, edited by hand in Max's own formatting (tabs, LF) so the diff stays
+laughter switch controls.
+Three speakers on the Realtek jacks (Windows at Quadraphonic, 4 channels, so the black jack's left is 3; Max on
+`ad_portaudio Windows WASAPI` at 48000; the README has the steps, Max's `ad_mme` is stereo only): the music in
+stereo on channels 1 and 2 (`ezdac~`, `p musicMixer` filters both channels), the laughter panned over 1, 2 and 3
+(`dac~ 1 2 3`). A `/bang` carries the cell its clip starts
+in; `p laughterSampler` adds 24 for port 4116, looks the screen's angle up in `data/audio/screen_angles.txt`
+(`coll screen_angles.txt`, found through the patch's folder; `modules/audio/tests/test_screen_angles.py` checks
+the file), adds the panel's `laughter_offset` (`/laughter_offset`, degrees) and turns the angle into a gain per
+speaker (three `expr`s: speakers at -60, 60 and 180 degrees from the camera, each laugh over its two nearest at
+constant power). The gains travel with the note into the `poly~` voice (`SmileSamplepoly.maxpat`), which
+applies them only on a note-on, so the note-off from `makenote` does not move a fading laugh. The patch is JSON, edited by hand in Max's own formatting (tabs, LF) so the diff stays
 readable; Max rewrites the whole file when the patch is saved from Max.
 
 ## Settings
