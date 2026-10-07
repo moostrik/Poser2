@@ -40,7 +40,6 @@ class FullscreenMode(IntEnum):
     """Mutually exclusive window display modes."""
     WINDOWED            = 0
     WINDOWED_FULLSCREEN = 1  # borderless, monitor resolution
-    FULLSCREEN          = 2  # exclusive fullscreen
 
 
 class WindowSettings(BaseSettings):
@@ -302,12 +301,19 @@ class WindowManager():
         try:
             while not glfw.window_should_close(self._main_window):
                 while not self._deferred.empty():
-                    self._deferred.get_nowait()()
+                    try:
+                        self._deferred.get_nowait()()
+                    except Exception:
+                        logger.exception("Error in deferred call")
                 self._update()
                 self._draw_main_window()
                 for logical_id, win in self._secondary_windows.items():
                     self._draw_secondary_window(logical_id, win)
-                glfw.poll_events()
+                try:
+                    glfw.poll_events()
+                except Exception:
+                    # Raised by one of the callbacks (key, mouse, window, monitor): it must not end the loop
+                    logger.exception("Error in event callback")
 
                 # Frame timing control (active when v_sync is off and frame_interval is set)
                 if not self.settings.v_sync and self.frame_interval:
@@ -393,8 +399,11 @@ class WindowManager():
             win_w, win_h = glfw.get_window_size(window)
             cx, cy = x + win_w // 2, y + win_h // 2
             for m in glfw.get_monitors():
-                mx, my = glfw.get_monitor_pos(m)
-                mode = glfw.get_video_mode(m)
+                try:
+                    mx, my = glfw.get_monitor_pos(m)
+                    mode = glfw.get_video_mode(m)
+                except Exception:
+                    continue  # a monitor that is being disconnected is still listed, without a video mode
                 if mx <= cx < mx + mode.size.width and my <= cy < my + mode.size.height:
                     self._monitor = m
                     break
@@ -481,6 +490,8 @@ class WindowManager():
 
     def _on_monitor_change(self, monitor: glfw._GLFWmonitor, event: int) -> None:
         """GLFW monitor connect/disconnect callback. Fires on render thread during poll_events()."""
+        if event == glfw.DISCONNECTED and self._monitor is not None and self._same_monitor(monitor, self._monitor):
+            self._monitor = None  # its handle is no longer valid; the primary monitor stands in until the window moves
         self._ordered_monitor_ids = self._get_monitors_sorted_by_position()
         secondary_list = list(self.settings.secondary_list)
 
@@ -500,6 +511,11 @@ class WindowManager():
                 logger.info("Monitor slot %s lost, moving secondary window to fallback", logical_id)
                 self._setup_secondary_window_fallback(win, slot_index)
                 self._secondary_fallback.add(logical_id)
+
+    @staticmethod
+    def _same_monitor(a: glfw._GLFWmonitor, b: glfw._GLFWmonitor) -> bool:
+        """Two handles of the same monitor (GLFW hands out a new handle object per call)."""
+        return ctypes.addressof(a.contents) == ctypes.addressof(b.contents)
 
     def _secondary_close_callback(self, window: glfw._GLFWwindow) -> None:
         """Close the whole app when any secondary window is closed."""
@@ -549,9 +565,6 @@ class WindowManager():
                 return
         if action == glfw.PRESS:
             if key == glfw.KEY_F:
-                mode = FullscreenMode.WINDOWED if self._fullscreen_mode == FullscreenMode.FULLSCREEN else FullscreenMode.FULLSCREEN
-                self.settings.fullscreen_mode = mode
-            elif key == glfw.KEY_W:
                 mode = FullscreenMode.WINDOWED if self._fullscreen_mode == FullscreenMode.WINDOWED_FULLSCREEN else FullscreenMode.WINDOWED_FULLSCREEN
                 self.settings.fullscreen_mode = mode
 
@@ -623,18 +636,7 @@ class WindowManager():
 
         self._fullscreen_mode = mode
 
-        if mode == FullscreenMode.FULLSCREEN:
-            ordered_ids = self._ordered_monitor_ids
-            monitors = glfw.get_monitors()
-            monitor_index = ordered_ids[self.settings.monitor] if self.settings.monitor < len(ordered_ids) else ordered_ids[0] if ordered_ids else 0
-            monitor = monitors[monitor_index]
-            video_mode = glfw.get_video_mode(monitor)
-            glfw.set_window_monitor(
-                self._main_window, monitor, 0, 0,
-                video_mode.size.width, video_mode.size.height, video_mode.refresh_rate
-            )
-            glfw.set_input_mode(self._main_window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
-        elif mode == FullscreenMode.WINDOWED_FULLSCREEN:
+        if mode == FullscreenMode.WINDOWED_FULLSCREEN:
             monitor = self._monitor or glfw.get_primary_monitor()
             video_mode = glfw.get_video_mode(monitor)
             posX, posY = glfw.get_monitor_pos(monitor)
@@ -666,8 +668,6 @@ class WindowManager():
         if real_id >= len(monitors):
             return
         self._monitor = monitors[real_id]
-        if self._fullscreen_mode == FullscreenMode.FULLSCREEN:
-            return  # exclusive fullscreen ignores window position; re-apply via set_fullscreen_mode if needed
         if self._fullscreen_mode == FullscreenMode.WINDOWED_FULLSCREEN:
             video_mode = glfw.get_video_mode(self._monitor)
             posX, posY = glfw.get_monitor_pos(self._monitor)
