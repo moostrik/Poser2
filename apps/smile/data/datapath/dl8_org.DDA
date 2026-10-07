@@ -1,0 +1,26 @@
+[Machine 1 Window 1]
+ClassName=X4WindowClass
+ShowState=Restored
+[Machine 1 Window 1 Hardware Resources]
+Input=1
+InputLabel=1
+[Machine 1 Window 1 Input Preferred Timings 1]
+HorFrequency=65687
+PixelClock=262750000
+VerFrequency=29980
+Flags=642
+Timing=0
+HorAddrTime=3840
+HorRightBorder=0
+HorFrontPorch=48
+HorSyncTime=32
+HorBackPorch=80
+HorLeftBorder=0
+VerAddrTime=2160
+VerBottomBorder=0
+VerFrontPorch=3
+VerSyncTime=5
+VerBackPorch=23
+VerTopBorder=0
+[Machine 1 Window 1 Input Equalisation Timings 1]
+Equalisation=0
