@@ -150,11 +150,11 @@
     "window": {
       "title": "Poser",
       "v_sync": true,
-      "monitor": "M0",
-      "x": 1148,
+      "monitor": "M1",
+      "x": 1,
       "y": 31,
-      "width": 1411,
-      "height": 1360,
+      "width": 2558,
+      "height": 2080,
       "secondary_list": [],
       "secondary_fullscreen": true,
       "fullscreen_mode": "WINDOWED"
@@ -226,7 +226,7 @@
     "color": false,
     "square": false,
     "stereo": false,
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "ir_flood_light": 0.75,
     "mono_auto_exposure": true,
@@ -251,8 +251,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 30001,
-        "iso": 1549,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -285,8 +285,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 29992,
-        "iso": 1322,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -319,8 +319,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 29992,
-        "iso": 1497,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -353,8 +353,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 30001,
-        "iso": 1549,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -377,7 +377,7 @@
         "VIDEO"
       ],
       "apply_warp": false,
-      "folder": "20260702-161442_flabber",
+      "folder": "20260924-203306_2_person",
       "sim_passthrough": false,
       "start_norm": 0.0,
       "end_norm": 1.0
@@ -1012,7 +1012,7 @@
     }
   },
   "states": {
-    "blackout": false,
+    "blackout": true,
     "spin_up_seconds": 14.0,
     "off_idle_bars": 2.0,
     "intro_idle_bars": 2.0,
@@ -1032,6 +1032,11 @@
   },
   "server": {
     "title": "White Space",
-    "port": 666
+    "port": 666,
+    "browser": true,
+    "browser_x": 0,
+    "browser_y": 0,
+    "browser_width": 900,
+    "browser_height": 1100
   }
 }
