@@ -24,8 +24,9 @@ def is_valid_ip_address(ip: str) -> bool:
 def is_valid_port(port: int) -> bool:
     return port in range(1, 65536)
 
-# addresses whose every message counts (a bang per clip start); of the others only the newest value is sent
-EVENT_ADDRESSES: tuple[str, ...] = ('/bang',)
+# addresses whose every message counts (a bang per clip start, a test bang per screen); of the others only
+# the newest value is sent
+EVENT_ADDRESSES: tuple[str, ...] = ('/bang', '/test_bang')
 ERROR_LOG_INTERVAL: float = 10.0    # s between the log lines of a send that keeps failing
 
 class Sender(Thread):
@@ -124,7 +125,9 @@ class Sender(Thread):
 
         for address, args in data_list:
             msg = osc_message_builder.OscMessageBuilder(address=address)
-            msg.add_arg(args)
+            # a tuple or list goes as separate arguments (as one add_arg it would be an OSC array, which Max does not take)
+            for arg in (args if isinstance(args, (tuple, list)) else (args,)):
+                msg.add_arg(arg)
             bundle.add_content(msg.build()) # type: ignore
 
         return bundle.build()

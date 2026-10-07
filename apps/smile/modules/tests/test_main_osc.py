@@ -38,7 +38,7 @@ class TestMaxControls(unittest.TestCase):
             # a Mock attribute is truthy: the camera must really not be stalled
             camera=SimpleNamespace(frame=lambda: (None, 0.0), stalled=False, next_image=mock.Mock()),
             render=mock.Mock(), artnet=mock.Mock(), face=mock.Mock(), save=mock.Mock(), sequencer=mock.Mock(),
-            audio=mock.Mock(get_audio_id=lambda: '0001'), osc=mock.Mock(),
+            audio=mock.Mock(get_audio_id=lambda: '0001'), osc=mock.Mock(), screen_test=mock.Mock(),
             _limit_visitor=lambda seq: None,
             _style_picked=False, _face_frame_time=0.0, _visitor_start=None, _saving=False, _grin_saved=False)
 
@@ -66,7 +66,7 @@ class TestMaxControls(unittest.TestCase):
     def test_the_switches_go_out_as_ints_and_the_levels_as_floats(self):
         # True == 1, so the values alone would pass a bool, which python-osc sends as OSC True
         sent = self.frame()
-        for address in ('/sound', '/laughter'):
+        for address in ('/sound', '/laughter', '/laughter_test'):
             self.assertIs(type(sent[address]), int, address)
         for address in ('/music_volume', '/laughter_volume', '/laughter_offset'):
             self.assertIs(type(sent[address]), float, address)
@@ -74,6 +74,24 @@ class TestMaxControls(unittest.TestCase):
     def test_nothing_goes_out_while_osc_is_off(self):
         self.settings.audio.osc.active = False
         self.assertEqual(self.frame(), {})
+
+    def test_the_laughter_test_runs_every_frame_holds_new_visitors_and_tells_max(self):
+        sent = self.frame()
+        self.app.screen_test.update.assert_called_once()
+        self.assertFalse(self.app.sequencer.blocked)
+        self.assertEqual((sent['/laughter_test'], sent['/laughter']), (0, 1))
+        self.settings.audio.laughter_test = True
+        sent = self.frame()
+        self.assertTrue(self.app.sequencer.blocked)
+        self.assertEqual((sent['/laughter_test'], sent['/laughter']), (1, 1))    # the panel's switch is untouched
+        self.settings.audio.laughter_test = False
+        sent = self.frame()
+        self.assertFalse(self.app.sequencer.blocked)
+        self.assertEqual(sent['/laughter_test'], 0)
+
+    def test_the_test_bang_goes_to_max_with_the_screen_and_the_sample(self):
+        Main._test_bang(self.app, 3, 1)
+        self.app.osc.send.assert_called_once_with('/test_bang', (3, 1))
 
 
 if __name__ == '__main__':

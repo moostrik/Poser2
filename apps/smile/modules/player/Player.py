@@ -12,6 +12,7 @@ from modules.player.ClipPool import Clip, ClipPool, next_start
 from modules.player.FolderScanner import FolderScanner
 
 from modules.osc.Sender import Sender as Osc
+from modules.osc.Receiver import Receiver
 from modules.osc.settings import OscSettings
 from modules.gl import FullscreenMode, MonitorId, WindowSettings
 from modules.log_config import crash_summary
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 STATS_INTERVAL: float = 10.0    # s between the log lines with the frame rates
 START_DELAY: float = 0.5        # s between two cells starting when the loaded clips go round again
 MIN_START_GAP: float = 0.1      # s at least between two cells starting, when clips load faster than that
+LIGHT_WARNING_INTERVAL: float = 10.0    # s between the log lines of /light messages that make no sense
 
 
 def monitor_count() -> int:
@@ -40,12 +42,16 @@ def place_window(monitor: int, windowed: bool, monitors: int) -> tuple[int, bool
 class Player():
     def __init__(self, osc_port: int, root: str = 'output/', monitor: int = 1, trail: float = 0.9,
                  clips: int = 24, pool: int = 30, hwdecode: int | None = None, windowed: bool = False,
-                 fps: float = 30.0, spread: float = 0.0, recent: int = 4, recycle_every: float = 20.0) -> None:
+                 fps: float = 30.0, spread: float = 0.0, recent: int = 4, recycle_every: float = 20.0,
+                 listen_port: int = 0) -> None:
         # the first line of every log: what happened before this start
         logger.info(crash_summary())
         osc_settings = OscSettings()
         osc_settings.port = int(osc_port)
         self.osc:Osc = Osc(osc_settings)
+        # SMILE's laughter test lights a cell with its screen's number: /light <cell> <seconds> <number> (0: no port, no test)
+        self.receiver: Receiver | None = Receiver(int(listen_port), {'/light': self._on_light}) if listen_port else None
+        self._light_warning_time: float = 0.0
 
         self._running: bool = False
 
@@ -89,9 +95,10 @@ class Player():
         self._stats_thread = threading.Thread(target=self._stats_loop, name='PlayerStats', daemon=True)
         # the cells start one by one, each on the next clip that is loaded
         self._start_thread = threading.Thread(target=self._start_loop, name='PlayerStart', daemon=True)
-        logger.info('Player %d: %d cells, pool %d (last %d always shown), %s, %s, root %s, %s', monitor, clips, pool, recent,
+        logger.info('Player %d: %d cells, pool %d (last %d always shown), %s, %s, root %s, %s, %s', monitor, clips, pool, recent,
                     f'a clip from disk after {recycle_every:g} s without a new one' if recycle_every > 0 else 'no recycling',
-                    (f'{fps:g} fps' if fps > 0 else 'clip fps') + (f' +-{spread:.0%}' if spread > 0 else ''), root, 'window' if windowed else 'fullscreen')
+                    (f'{fps:g} fps' if fps > 0 else 'clip fps') + (f' +-{spread:.0%}' if spread > 0 else ''), root, 'window' if windowed else 'fullscreen',
+                    f'/light on port {listen_port}' if listen_port else 'no /light port')
 
     def start(self) -> None:
         self.pool.start()
@@ -102,6 +109,9 @@ class Player():
         self.render.start()
         self._stats_thread.start()
         self._start_thread.start()
+        # last: a /light bangs through the sender, which must run by then
+        if self.receiver is not None:
+            self.receiver.start()
         self._running = True
 
     def _start_loop(self) -> None:
@@ -127,6 +137,8 @@ class Player():
 
     def stop(self) -> None:
         self._stats_stop.set()
+        if self.receiver is not None:
+            self.receiver.stop()
         self.osc.stop()
         self.render.stop()
         for l in self.loaders:
@@ -156,3 +168,19 @@ class Player():
         """A clip starts in a cell: the Max patch places its laugh by that screen's angle
         (data/audio/screen_angles.txt, by cell for port 4115 and cell + 24 for 4116)."""
         self.osc.send('/bang', cell)
+
+    def _on_light(self, cell, seconds, number=0) -> None:
+        """SMILE's laughter test (the receiver's thread): show the cell white with the screen's `number` for
+        `seconds`. SMILE bangs Max for the laugh itself, so the sound must come from the numbered screen."""
+        try:
+            cell, seconds, number = int(cell), float(seconds), int(number)
+            valid: bool = 0 <= cell < len(self.loaders) and seconds > 0.0
+        except (TypeError, ValueError):
+            valid = False
+        if not valid:
+            if time.time() - self._light_warning_time > LIGHT_WARNING_INTERVAL:
+                self._light_warning_time = time.time()
+                logger.warning('/light %r %r ignored: %d cells', cell, seconds, len(self.loaders))
+            return
+        self.render.light(str(cell), seconds, number)
+        logger.info('Laughter test: cell %d shows screen %d for %.1f s', cell, number, seconds)

@@ -209,7 +209,15 @@ in; `p laughterSampler` adds 24 for port 4116, looks the screen's angle up in `d
 the file), adds the panel's `laughter_offset` (`/laughter_offset`, degrees) and turns the angle into a gain per
 speaker (three `expr`s: speakers at -60, 60 and 180 degrees from the camera, each laugh over its two nearest at
 constant power). The gains travel with the note into the `poly~` voice (`SmileSamplepoly.maxpat`), which
-applies them only on a note-on, so the note-off from `makenote` does not move a fading laugh. The patch is JSON, edited by hand in Max's own formatting (tabs, LF) so the diff stays
+applies them only on a note-on, so the note-off from `makenote` does not move a fading laugh. The panel's
+`laughter_test` (`modules/audio/ScreenTest.py`, stepped from `Main.sequence_callback`) sends `/light <cell> <seconds> <number>`
+to the players' `Receiver` (`modules/osc/Receiver.py`, ports `player_1_port`/`player_2_port`, `start_players.bat -l`):
+the player shows the cell white with the screen's number (`Text` into a portrait FBO, blitted with `BlitRotated`
+like a clip, so it stands upright on the turned screen). SMILE bangs Max itself with `/test_bang <index> <sample>`
+(`Sender` sends a tuple as separate arguments), which `p laughterSampler` takes past the gates (`r testBang`) with
+the panel's `laughter_test_sample` (a file of the laughter folder; `ScreenTest.list_samples` numbers the folder as
+`polybuffer~ readfolder` does, alphabetical with case ignored) at velocity 100; `/laughter_test` closes the clips' gate meanwhile (an `expr` on
+`laughterOn` and `laughterTest`) and the sequencer is blocked, so only the test laugh sounds. The patch is JSON, edited by hand in Max's own formatting (tabs, LF) so the diff stays
 readable; Max rewrites the whole file when the patch is saved from Max.
 
 ## Settings

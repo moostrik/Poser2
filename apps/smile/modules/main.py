@@ -7,6 +7,7 @@ from modules.render.GrinPlayer import GrinPlayer
 from modules.comfy.messages import GenMessage, GenState
 from modules.osc.Sender import Sender as Osc
 from modules.audio.DB import DB as AudioDB
+from modules.audio.ScreenTest import ScreenTest
 from modules.save.ClipSaver import ClipSaver
 from modules.artnet.Sender import Sender as Artnet
 from modules.settings import presets, NiceServer
@@ -78,6 +79,7 @@ class Main():
 
         self.audio: AudioDB = AudioDB(self.settings.audio, 'data/audio/music_map.json')
         self.osc: Osc = Osc(self.settings.audio.osc)
+        self.screen_test: ScreenTest = ScreenTest(self.settings.audio, bang=self._test_bang)  # the laughter test, stepped from sequence_callback
         self.save: ClipSaver = ClipSaver(self.settings.sequence)
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self._saving: bool = False          # the visitor's files are open in the saver
@@ -140,6 +142,10 @@ class Main():
         finally:
             self._running = False
 
+    def _test_bang(self, index: int, sample: int) -> None:
+        """The laughter test's bang to Max: the screen's index and the sample, past the patch's gates."""
+        self.osc.send('/test_bang', (index, sample))
+
     def sequence_callback(self, message: SeqenceMessage) -> None:
         seq: SequenceType = message.sequence_type
         ani: AnimationType = message.animation_type
@@ -147,9 +153,10 @@ class Main():
 
         # no visitor while the generator can't take a capture (ComfyUI not there, or still warming up):
         # the flash would hold until it can. The operator sees why on the image.
-        # None either while the raw camera is shown: the sequence would run unseen behind it
+        # None either while the raw camera is shown: the sequence would run unseen behind it.
+        # Nor while the laughter test runs: a visitor's state would close Max's laughter gate
         ready: bool = self.diffuse.ready
-        self.sequencer.blocked = not ready or self.settings.render.show_camera
+        self.sequencer.blocked = not ready or self.settings.render.show_camera or self.settings.audio.laughter_test
         # the operator's line: the generator's reason first, then a camera that delivers no frames
         status: str | None = None if ready else self.settings.pipeline.connection.status
         if status is None and self.camera.stalled:
@@ -188,6 +195,10 @@ class Main():
             self.osc.send('/laughter', int(audio.laughter))
             self.osc.send('/laughter_volume', audio.laughter_volume)
             self.osc.send('/laughter_offset', audio.laughter_offset)
+            # the test closes the gate of the clips' laughs in the patch; its own bangs pass that gate
+            self.osc.send('/laughter_test', int(audio.laughter_test))
+        # the laughter test steps on the app clock too (the lights to the players, the test bangs to Max)
+        self.screen_test.update(time.time())
 
         if seq == SequenceType.CAMERA_SHOW and message.initial:
             self.face.reset()

@@ -10,6 +10,9 @@ set "PLAYER_1_MONITOR=1"
 set "PLAYER_2_MONITOR=2"
 set "PLAYER_1_OSC_PORT=4115"
 set "PLAYER_2_OSC_PORT=4116"
+@REM where each player listens for SMILE's laughter test (the panel's player_1_port, player_2_port)
+set "PLAYER_1_LISTEN_PORT=4117"
+set "PLAYER_2_LISTEN_PORT=4118"
 
 set "CURRENT_DIR=%~dp0..\"
 cd /d "%CURRENT_DIR%"
@@ -44,9 +47,9 @@ powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='py
 timeout /t 1 /nobreak >nul
 
 echo Opening Video Player 1
-start "Player 1" %WINDOW% "%PYTHON%" player.py -m %PLAYER_1_MONITOR% -osc %PLAYER_1_OSC_PORT%%MODE%%ARGS%
+start "Player 1" %WINDOW% "%PYTHON%" player.py -m %PLAYER_1_MONITOR% -osc %PLAYER_1_OSC_PORT% -l %PLAYER_1_LISTEN_PORT%%MODE%%ARGS%
 timeout /t 2 /nobreak >nul
 
 if %PLAYERS% lss 2 goto :eof
 echo Opening Video Player 2
-start "Player 2" %WINDOW% "%PYTHON%" player.py -m %PLAYER_2_MONITOR% -osc %PLAYER_2_OSC_PORT%%MODE%%ARGS%
+start "Player 2" %WINDOW% "%PYTHON%" player.py -m %PLAYER_2_MONITOR% -osc %PLAYER_2_OSC_PORT% -l %PLAYER_2_LISTEN_PORT%%MODE%%ARGS%

@@ -29,8 +29,14 @@ class TestSender(unittest.TestCase):
         self.sender.stop()
 
     def test_a_state_sends_its_newest_value_and_an_event_every_one(self):
-        data = [('/progress', 0.1), ('/bang', 0), ('/progress', 0.2), ('/bang', 2), ('/state', 'CAMERA_IN')]
-        self.assertEqual(self.sender.get_last_data(data), [('/progress', 0.2), ('/bang', 0), ('/bang', 2), ('/state', 'CAMERA_IN')])
+        data = [('/progress', 0.1), ('/bang', 0), ('/progress', 0.2), ('/bang', 2), ('/state', 'CAMERA_IN'),
+                ('/test_bang', (0, 1)), ('/test_bang', (1, 1))]
+        self.assertEqual(self.sender.get_last_data(data), [('/progress', 0.2), ('/bang', 0), ('/bang', 2), ('/state', 'CAMERA_IN'),
+                                                           ('/test_bang', (0, 1)), ('/test_bang', (1, 1))])
+
+    def test_a_tuple_goes_as_separate_arguments(self):
+        bundle = self.sender.process_data([('/test_bang', (5, 1)), ('/progress', 0.5)])
+        self.assertEqual([(m.address, m.params) for m in bundle], [('/test_bang', [5, 1]), ('/progress', [0.5])])
 
     def test_nothing_is_queued_while_the_sender_does_not_run(self):
         self.sender.send('/progress', 0.5)

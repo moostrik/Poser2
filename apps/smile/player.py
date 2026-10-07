@@ -8,6 +8,7 @@ from modules.player.Player import Player
 parser: ArgumentParser = ArgumentParser()
 parser.add_argument('-m',   '--monitor',    type=int,   default=1,      help='monitor (0 is the primary, then left to right)')
 parser.add_argument('-osc', '--osc_port',   type=int,   default=4115,   help='osc port')
+parser.add_argument('-l',   '--listen',     type=int,   default=0,      help="port to listen on for /light from SMILE's laughter test, 0 = none")
 parser.add_argument('-n',   '--clips',      type=int,   default=24,     help='number of clips playing at once (cells)')
 parser.add_argument('--pool',               type=int,   default=30,     help='number of clips kept decoded in RAM (about 200 MB each, 5.9 GB for 30)')
 parser.add_argument('--recent',             type=int,   default=4,      help='the last recordings, always on the wall; 0 = none')
@@ -24,7 +25,7 @@ args = parser.parse_args()
 setup_logging(verbose=args.verbose, name=f'player{args.monitor}')
 install_excepthooks()
 
-player: Player = Player(args.osc_port, args.root, args.monitor, args.trail, args.clips, args.pool, args.hwdecode, args.window, args.fps, args.spread, args.recent, args.recycle_every)
+player: Player = Player(args.osc_port, args.root, args.monitor, args.trail, args.clips, args.pool, args.hwdecode, args.window, args.fps, args.spread, args.recent, args.recycle_every, args.listen)
 player.start()
 
 def signal_handler_exit(sig, frame) -> None:

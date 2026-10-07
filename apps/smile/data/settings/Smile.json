@@ -187,7 +187,7 @@
       "height": 1541,
       "secondary_list": [],
       "secondary_fullscreen": false,
-      "fullscreen_mode": "WINDOWED"
+      "fullscreen_mode": "WINDOWED_FULLSCREEN"
     }
   },
   "audio": {
@@ -195,6 +195,12 @@
     "laughter": false,
     "music_volume": 0.0,
     "laughter_volume": 0.0,
+    "laughter_offset": 0.0,
+    "laughter_test": true,
+    "laughter_test_step": 2.0,
+    "laughter_test_sample": "Deep_dutch_laugh-2.mp3",
+    "player_1_port": 4117,
+    "player_2_port": 4118,
     "osc": {
       "active": true,
       "ip": "127.0.0.1",
