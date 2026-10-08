@@ -1172,17 +1172,19 @@ def _format_readout(value) -> str:
 
 
 def _build_pinned_readout(settings, name, field, polls):
-    """A read-only pinned field as one compact chip, "<Label> <value>", instead of a locked input."""
+    """A read-only pinned field as one compact chip, "<Label> <value> <unit>", instead of a
+    locked input."""
     value = getattr(settings, name)
     label = _field_label(name, field)
+    unit = f" {field.unit}" if field.unit else ""
     desc = _wiring_tooltip(settings, name, field.description)
 
     chip = _attach_description_tooltip(
-        ui.label(f"{label} {_format_readout(value)}").classes("bg-grey-8 rounded px-2 py-1"),
+        ui.label(f"{label} {_format_readout(value)}{unit}").classes("bg-grey-8 rounded px-2 py-1"),
         desc,
     )
     polls.append((settings, name, [value],
-                  lambda v, c=chip: c.set_text(f"{label} {_format_readout(v)}")))
+                  lambda v, c=chip: c.set_text(f"{label} {_format_readout(v)}{unit}")))
 
 
 # -- Fallback for unregistered / unsupported types --------------------------

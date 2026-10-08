@@ -5,8 +5,6 @@ a value for every one of them. The **core** knows where each position is in the 
 **waveform** reads that and makes the output: the pulse draws lines, the sine is an LFO's. It knows
 nothing of people, colours, mirroring or the mask, and takes every parameter as an argument, so
 what plays a parameter (a slot, a setting, another oscillator) is the caller's.
-
-The waveforms are static methods so ``HotReloadMethods`` can patch them while the app runs.
 """
 
 import math

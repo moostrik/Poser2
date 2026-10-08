@@ -136,6 +136,7 @@ class Field(Generic[T]):
         step: float | int | None = None,  # UI hint only — not enforced by the descriptor
         description: str = "",
         label: str | None = None,        # UI hint only — the control's title in the panel
+        unit: str | None = None,         # UI hint only — shown after the value in pinned chips (e.g. 'ms', 'fps')
         row_label: str | None = None,    # UI hint only — a text title rendered before this field
         width: int | None = None,        # UI hint only — Tailwind width step for a fixed-width control
         access: Access = Access.READWRITE,
@@ -169,6 +170,7 @@ class Field(Generic[T]):
         self.step = step
         self.description = description
         self.label = label
+        self.unit = unit
         self.row_label = row_label
         self.width = width
         self.access = access

@@ -23,6 +23,12 @@ class CameraCheckSettings(BaseSettings):
                                           description="Camera tilt and roll within tolerance; each camera view shows its error")
     camera_fps:      Field[bool]  = Field(False, access=Field.READ, pinned=True, widget=Widget.status,
                                           description="Camera frame rates within 5 % of fps; each camera view shows its rate")
+    video_rate:      Field[bool]  = Field(False, access=Field.READ, pinned=True, widget=Widget.status, label="Video",
+                                          description="Every camera's momentary video rate above half its fps")
+    video_fps_avg:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Video", unit="fps",
+                                          description="Slowest camera's average video rate")
+    video_min_fps:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Video min", unit="fps",
+                                          description="Worst momentary video rate across the cameras")
 
 
 class CameraReadings(BaseSettings):
@@ -32,8 +38,9 @@ class CameraReadings(BaseSettings):
     is read-only except `roll_offset`, which lives here rather than with the mount constants
     because it is the thing you reach for while looking at the roll it corrects.
     """
-    video_fps:      Field[float] = Field(0.0, access=Field.READ, description="Video FPS")
-    tracker_fps:    Field[float] = Field(0.0, access=Field.READ, description="Tracker updates/s")
+    video_fps:        Field[float] = Field(0.0, access=Field.READ, description="Video FPS")
+    video_min_fps:    Field[float] = Field(0.0, access=Field.READ, description="Lowest momentary video rate: 1 / the worst gap between frames (fps)")
+    tracker_fps:      Field[float] = Field(0.0, access=Field.READ, description="Tracker updates/s")
     tracklets:      Field[int]   = Field(0, access=Field.READ, description="Active tracklets")
     # How the camera is actually mounted, as the board reports it — NaN until measured, which is
     # the honest default for a board with no IMU.

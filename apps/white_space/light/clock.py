@@ -34,10 +34,12 @@ _STATS_INTERVAL: float = 1.0
 class ClockSettings(BaseSettings):
     light_rate:  Field[float] = Field(32.0, min=1.0, max=120.0, description="Light tick rate (fps, shared from the light settings)")
     time:        Field[float] = Field(0.0, access=Field.READ, description="Elapsed wall-clock time (s)")
-    late_max_ms: Field[float] = Field(0.0, access=Field.READ, description="Worst tick lateness vs. its deadline over the last second (ms)")
+    avg_fps:     Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Clock", unit="fps", description="Light tick rate over the last second — should read light_rate")
+    min_fps:     Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Clock min", unit="fps", description="Worst momentary tick rate over the last second (1 / longest interval)")
+    late_max_ms: Field[float] = Field(0.0, access=Field.READ, label="Clock late", unit="ms", description="Worst tick lateness vs. its deadline over the last second (ms)")
     dt_max_ms:   Field[float] = Field(0.0, access=Field.READ, description="Longest tick interval over the last second (ms)")
-    busy_max_ms: Field[float] = Field(0.0, access=Field.READ, description="Longest per-tick work (tick return → next call) over the last second (ms) — the conductor's GIL share is busy/interval")
-    overruns:    Field[int]   = Field(0,   access=Field.READ, description="Ticks that ran more than one interval late and resynced (cumulative)")
+    busy_max_ms: Field[float] = Field(0.0, access=Field.READ, label="Clock busy", unit="ms", description="Longest per-tick work (tick return → next call) over the last second (ms) — the conductor's GIL share is busy/interval")
+    overruns:    Field[int]   = Field(0,   access=Field.READ, pinned=True, label="Clock overruns", description="Ticks that ran more than one interval late and resynced (cumulative)")
 
 
 @dataclass
@@ -69,10 +71,12 @@ class Clock:
         self._last:  float = 0.0
         self._next:  float = 0.0
         self._index: int   = -1            # the last tick's number
-        # Diagnostics: running maxima since the last publish, and the cumulative resync count.
+        # Diagnostics: running maxima and tick count since the last publish, and the cumulative
+        # resync count.
         self._late_max: float = 0.0
         self._dt_max:   float = 0.0
         self._busy_max: float = 0.0
+        self._ticks:    int   = 0
         self._overruns: int   = 0
         self._stats_at: float = 0.0
 
@@ -115,6 +119,7 @@ class Clock:
             self._dt_max = dt
 
         self._index += 1
+        self._ticks += 1
         t = Tick(time=now - self._start, dt=dt, interval=interval, index=self._index)
         self._settings.time = t.time
         if now - self._stats_at >= _STATS_INTERVAL:
@@ -123,6 +128,9 @@ class Clock:
 
     def _publish_stats(self, now: float) -> None:
         """Push the running maxima to the settings (once per _STATS_INTERVAL) and reset them."""
+        elapsed = max(1e-6, now - self._stats_at)
+        self._settings.avg_fps     = self._ticks / elapsed
+        self._settings.min_fps     = 1.0 / self._dt_max if self._dt_max > 0.0 else 0.0
         self._settings.late_max_ms = self._late_max * 1000.0
         self._settings.dt_max_ms   = self._dt_max * 1000.0
         self._settings.busy_max_ms = self._busy_max * 1000.0
@@ -130,6 +138,7 @@ class Clock:
         self._late_max = 0.0
         self._dt_max   = 0.0
         self._busy_max = 0.0
+        self._ticks    = 0
         self._stats_at = now
 
     @staticmethod

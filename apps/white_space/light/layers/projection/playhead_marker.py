@@ -7,7 +7,6 @@ pose instrument draws it over its masks (``pose_instrument.py``); the ``projecti
 debug layer draws it alone. Distinct from the beam-mode ``BeamPlayhead`` and the motor/content
 ``Playhead`` (the NCO in ``light/playhead.py``).
 
-``draw`` is a static method so ``HotReloadMethods`` can patch it while the app runs.
 """
 
 import math

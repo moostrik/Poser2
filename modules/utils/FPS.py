@@ -58,7 +58,9 @@ class FPS:
     def processed(self) -> None:
         with self.mutex:
             last_frame_at: None | float = self.frame_at
-            self.frame_at = time.time()
+            # perf_counter, not time.time: Windows' ~16 ms time() resolution would drown the
+            # frame-gap jitter these deltas measure
+            self.frame_at = time.perf_counter()
             self.count_processed += 1
 
             if last_frame_at is not None:

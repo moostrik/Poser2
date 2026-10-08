@@ -45,8 +45,8 @@ class FullscreenMode(IntEnum):
 class WindowSettings(BaseSettings):
     """Window / init configuration — set once before RenderManager starts."""
     title: Field[str] =           Field("Poser", access=Field.INIT, visible=False)
-    avg_fps: Field[int] =         Field(60, access=Field.READ, pinned=True, description="Average Camera FPS")
-    min_fps: Field[int] =         Field(60, access=Field.READ, pinned=True, description="Minimum Camera FPS")
+    avg_fps: Field[int] =         Field(60, access=Field.READ, pinned=True, label="Render", unit="fps", description="Average render frame rate")
+    min_fps: Field[int] =         Field(60, access=Field.READ, pinned=True, label="Render min", unit="fps", description="Minimum render frame rate")
     v_sync: Field[bool] =         Field(True)
     monitor: Field[MonitorId] =   Field(MonitorId.M0, newline=True)
     x: Field[int] =               Field(0)

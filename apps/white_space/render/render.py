@@ -19,7 +19,6 @@ from modules.pose.nodes import AngleExtractorSettings
 from modules.utils import Color
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
-from modules.utils.HotReloadMethods import HotReloadMethods
 
 from ..board import Board
 from ..pose import PlayheadOffset, GhostFeature, dummy_id
@@ -139,7 +138,6 @@ class Render(RenderBase):
         RenderSettings.camera_view.bind(settings, self._on_layout_setting)
         RenderSettings.layout.bind(settings, self._on_layout_setting)
 
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def _build_rows(self) -> list[SubdivisionRow]:
         """The rows the window shows, top to bottom.

@@ -21,7 +21,6 @@ from OpenGL.GL import * # type: ignore
 from modules.gl import Fbo, Texture, Image
 from modules.board import HasCompositionOutput, HasFlashes
 from modules.render.layers.LayerBase import LayerBase
-from modules.utils import HotReloadMethods
 
 from apps.white_space.light import BUFFER_DTYPE
 from apps.white_space.render.shaders.light_simulation import LightSimulation
@@ -45,7 +44,6 @@ class BeamLightSimulationLayer(LayerBase):
         self._projection: np.ndarray | None = None   # the Frame-shaped (1, R, 3) image, render-thread local
         self._heading: float = 0.0                   # last finite playhead — the bar stays where it stopped
 
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

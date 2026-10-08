@@ -56,7 +56,7 @@ _GRID = np.linspace(0.0, 1.0, 1025)     # where a curve is sampled; read between
 
 
 class Slot:
-    """``parameter = base + amount × source``; static methods so ``HotReloadMethods`` can patch them."""
+    """``parameter = base + amount × source``."""
 
     @staticmethod
     def bypassed(bypass: bool, source: Value) -> Value:

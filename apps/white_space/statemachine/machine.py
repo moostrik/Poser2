@@ -26,7 +26,6 @@ from typing import Callable
 
 from modules.board import HitStreak
 from modules.session import SequencerState
-from modules.utils import HotReloadMethods
 
 from ..board import Board
 from ..light import LightSettings, LayerId, Mix, MotorMode
@@ -99,10 +98,6 @@ class StateMachine:
 
         self._goto_requested: bool = False
         config.manual.bind(ManualSettings.goto, self._on_goto)
-
-        # Hot reload of the state classes: re-instantiate, keep elapsed/bars, re-command motor.
-        self._state_reloader = HotReloadMethods(StateBase, True, True)
-        self._state_reloader.add_file_changed_callback(self._rebuild_states)
 
     # -- Lifecycle -----------------------------------------------------------
 
@@ -233,15 +228,3 @@ class StateMachine:
             except Exception as e:
                 logger.error(f"StateMachine state callback error: {e}")
 
-    # -- Hot reload ------------------------------------------------------------
-
-    def _rebuild_states(self) -> None:
-        """Re-instantiate the state objects after a hot-reload of states.py: keep
-        elapsed/bars, re-command the current state's motor mode (the look re-composes
-        by itself on the next tick)."""
-        from . import states as states_module
-        self._states = {s: cls(self._config, self._light, self._reset_layers)
-                        for s, cls in states_module.STATES.items()}
-        self._active = self._states[self._current]
-        self._set_motor(self._active.MOTOR)
-        logger.info("show states reloaded (current: %s)", self._current.name)

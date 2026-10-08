@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from modules.settings import BaseSettings, Field
-from modules.utils import HotReloadMethods
 from modules.pose import frame as pose_frame
 from modules.pose import features
 
@@ -55,7 +54,6 @@ class TestPlayerLines(ProjectionLayer):
         self._states: dict[int, _PlayerState] = {}
         self._flank_buf: np.ndarray = np.zeros(resolution, dtype=np.float32)
         self._zeros_buf: np.ndarray = np.zeros(resolution, dtype=np.float32)
-        # self.hot_reloader = HotReloadMethods(self.__class__, True)
 
     # ------------------------------------------------------------------
     # Layer interface

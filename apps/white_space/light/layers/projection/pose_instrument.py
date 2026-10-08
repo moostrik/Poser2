@@ -28,7 +28,6 @@ apart parameter by parameter; an oscillator's Bypass All button sets its five at
 its four, and clears them when all are set. ``window.width_bypass`` holds both reaches without a
 partner.
 
-``connect``, the drawing methods and the synth's classes are hot-reloaded while the app runs.
 """
 
 from __future__ import annotations
@@ -41,7 +40,6 @@ import numpy as np
 
 from modules.pose import features
 from modules.settings import BaseSettings, Field, Group, Widget
-from modules.utils import HotReloadMethods
 
 from .._base_layer import ProjectionLayer, LayerSettings
 from .._utilities import normalize_azimuth, mask_half_width
@@ -148,7 +146,6 @@ class PoseInstrument(ProjectionLayer):
             patch.bind(OscillatorSettings.bypass_all, partial(self._bypass_all, patch))
         for strobe in (instrument.white_strobe, instrument.blue_strobe):
             strobe.bind(StrobeSettings.bypass_all, partial(self._strobe_bypass_all, strobe))
-        self._hot_reloaders = tuple(HotReloadMethods(cls, True) for cls in (self.__class__, Voice, Oscillator, Envelope, Slot, Strobe, PlayheadMarker))
 
     def reset(self) -> None:
         """A fresh instrument (S6 entry): forget every player and pass."""

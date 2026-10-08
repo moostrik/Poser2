@@ -317,6 +317,7 @@ class Camera(Thread):
         self.fps_counters[fps_type].processed()
         if fps_type == FrameType.VIDEO:
             self.settings.readings.video_fps = self.fps_counters[fps_type].get_rate_average()
+            self.settings.readings.video_min_fps = self.fps_counters[fps_type].get_rate_minimum()
 
     def _update_tps(self) -> None:
         self.tps_counter.processed()

@@ -16,8 +16,6 @@ The lit ticks are the first ``round(width · T)`` of a cycle and the dark ticks 
 dark ticks of nested rates coincide. ``k`` is a line's count from the person, in intervals: whole
 for standing lines, drifting smoothly as a line travels. The shift is on the strobe's own cycle,
 so the wave it makes is ``2 / shift`` lines long and runs that many lines per cycle.
-
-The methods are static so ``HotReloadMethods`` can patch them while the app runs.
 """
 
 import math

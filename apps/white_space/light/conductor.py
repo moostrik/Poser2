@@ -10,7 +10,6 @@ forwards the finished Frame to the board and the output callbacks (UDP sender, a
 from threading import Event, Thread
 from typing import Any, Callable
 
-from modules.utils import HotReloadMethods
 from modules.gl import FpsCounter
 
 from .clock import Clock, Tick
@@ -97,7 +96,6 @@ class Conductor(Thread):
         self._update_callbacks: list[Callable[[], Any]] = []
         self._render_callbacks: list[FrameCallback] = []
 
-        self.hot_reloader = HotReloadMethods(self.__class__, True)
 
     # ------------------------------------------------------------------
     # Lifecycle
