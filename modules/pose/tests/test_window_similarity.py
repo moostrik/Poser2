@@ -22,12 +22,11 @@ def _window(per_frame: list[np.ndarray], feature: type = Angles, size: int = T) 
     settings = WindowNodeSettings()
     settings.window_size = size
     node = WindowNode(feature, settings)
-    window = None
     for values in per_frame:
         v = values.astype(np.float32)
         s = np.where(np.isnan(v), 0.0, 1.0).astype(np.float32)
-        window = node.process(frame(features={feature: feature(v, s)}))
-    return window
+        node.process(frame(features={feature: feature(v, s)}))
+    return node.get_window()
 
 
 def _ramp(lag: int = 0, offset: float = 0.0) -> list[np.ndarray]:

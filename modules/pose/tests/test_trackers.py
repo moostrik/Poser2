@@ -212,7 +212,8 @@ class WindowNodeTest(unittest.TestCase):
     def test_partial_window_is_full_size_with_unfilled_slots_masked_oldest_first(self) -> None:
         node = WindowNode(Age, _window_settings(3))
         node.process(_age_frame(1.0))
-        window = node.process(_age_frame(2.0))
+        node.process(_age_frame(2.0))
+        window = node.get_window()
         self.assertEqual(window.shape, (3, 1))
         np.testing.assert_array_equal(window.mask[:, 0], [False, True, True])
         np.testing.assert_allclose(window.values[1:, 0], [1.0, 2.0])
@@ -220,32 +221,43 @@ class WindowNodeTest(unittest.TestCase):
     def test_wrapped_ring_buffer_is_oldest_first(self) -> None:
         node = WindowNode(Age, _window_settings(3))
         for v in (1.0, 2.0, 3.0, 4.0):
-            window = node.process(_age_frame(v))
+            node.process(_age_frame(v))
+        window = node.get_window()
         np.testing.assert_allclose(window.values[:, 0], [2.0, 3.0, 4.0])
         self.assertTrue(np.all(window.mask))
 
     def test_missing_value_is_masked(self) -> None:
         node = WindowNode(Age, _window_settings(2))
         node.process(_age_frame(1.0))
-        window = node.process(frame())
+        node.process(frame())
+        window = node.get_window()
         np.testing.assert_array_equal(window.mask[:, 0], [True, False])
         self.assertEqual(window.values[1, 0], 0.0)
 
+    def test_empty_buffer_has_no_window(self) -> None:
+        self.assertIsNone(WindowNode(Age, _window_settings(3)).get_window())
+
     def test_no_partial_emission_until_full(self) -> None:
         node = WindowNode(Age, _window_settings(3, emit_partial=False))
-        self.assertIsNone(node.process(_age_frame(1.0)))
-        self.assertIsNone(node.process(_age_frame(2.0)))
-        self.assertIsNotNone(node.process(_age_frame(3.0)))
+        node.process(_age_frame(1.0))
+        self.assertIsNone(node.get_window())
+        node.process(_age_frame(2.0))
+        self.assertIsNone(node.get_window())
+        node.process(_age_frame(3.0))
+        self.assertIsNotNone(node.get_window())
 
     def test_emitted_window_is_a_copy(self) -> None:
         node = WindowNode(Age, _window_settings(2))
         node.process(_age_frame(1.0))
-        window = node.process(_age_frame(2.0))
+        node.process(_age_frame(2.0))
+        window = node.get_window()
         node.process(_age_frame(3.0))
         np.testing.assert_allclose(window.values[:, 0], [1.0, 2.0])
 
     def test_window_carries_feature_metadata(self) -> None:
-        window = WindowNode(Angles, _window_settings(2)).process(frame())
+        node = WindowNode(Angles, _window_settings(2))
+        node.process(frame())
+        window = node.get_window()
         self.assertEqual(window.feature_len, len(Angles.enum()))
         self.assertEqual(window.range, Angles.range())
 
@@ -254,7 +266,8 @@ class WindowNodeTest(unittest.TestCase):
         node = WindowNode(Age, settings)
         node.process(_age_frame(1.0))
         settings.window_size = 5
-        window = node.process(_age_frame(2.0))
+        node.process(_age_frame(2.0))
+        window = node.get_window()
         self.assertEqual(window.shape, (5, 1))
         self.assertEqual(int(window.mask.sum()), 1)
 
@@ -262,7 +275,8 @@ class WindowNodeTest(unittest.TestCase):
         node = WindowNode(Age, _window_settings(3))
         node.process(_age_frame(1.0))
         node.reset()
-        self.assertEqual(int(node.process(_age_frame(2.0)).mask.sum()), 1)
+        node.process(_age_frame(2.0))
+        self.assertEqual(int(node.get_window().mask.sum()), 1)
 
 
 class WindowTrackerTest(unittest.TestCase):
@@ -294,6 +308,18 @@ class WindowTrackerTest(unittest.TestCase):
         self.assertIn(Angles, received[0])
         self.assertIn(Age, received[0])
         self.assertTrue(math.isfinite(received[0][Angles][0].values.sum()))
+
+    def test_pull_builds_only_present_tracks(self) -> None:
+        tracker = WindowTracker(2, _window_settings(3), features=[Age])
+        tracker.process({0: _age_frame(1.0, 0)})
+        self.assertIsNotNone(tracker.get_window(Age, 0))
+        self.assertIsNone(tracker.get_window(Age, 1))       # never seen
+
+    def test_pull_of_an_absent_track_is_reset(self) -> None:
+        tracker = WindowTracker(2, _window_settings(3), features=[Age])
+        tracker.process({0: _age_frame(1.0, 0), 1: _age_frame(1.0, 1)})
+        tracker.process({0: _age_frame(2.0, 0)})            # track 1 disappears
+        self.assertIsNone(tracker.get_window(Age, 1))
 
 
 if __name__ == "__main__":

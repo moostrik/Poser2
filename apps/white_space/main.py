@@ -75,7 +75,9 @@ class WhiteSpaceMain:
         self.cameras: list[Camera | Simulator] = []
         self.player: Optional[Player] = None
         if self.settings.camera.sim_enabled:
-            self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
+            # The rig is uniform: mono cameras decode their clips straight to gray
+            gray = not self.settings.camera.cameras[0].color
+            self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH, gray=gray)
             for i in range(num_cameras):
                 self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
@@ -125,7 +127,7 @@ class WhiteSpaceMain:
             wt_features = lerp_features if stage == Stage.LERP else None
             tracks = max_players + 1 if stage == Stage.LERP else max_players      # LERP also holds the dummy's id
             wt = window.WindowTracker(tracks, getattr(ps, f'window_{stage.name.lower()}'), features=wt_features)
-            wt.add_windows_callback(partial(self.board.set_windows, stage))
+            self.board.set_window_tracker(stage, wt)
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),

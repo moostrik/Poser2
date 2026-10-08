@@ -54,10 +54,12 @@ class Folder():
 FolderDict = Dict[str, Folder]
 
 class Player(Thread):
-    def __init__(self, settings: SimulatorSettings, data_path: str = "") -> None:
+    def __init__(self, settings: SimulatorSettings, data_path: str = "", gray: bool = False) -> None:
+        """``gray``: the consuming pipeline is mono, so video decodes straight to gray."""
         super().__init__()
         self.settings: SimulatorSettings = settings
         self.data_path: str = data_path
+        self.gray: bool = gray
         self.num_cams: int = settings.num_cameras
         self.types: list[FrameType] = settings.video_frame_types
         self.fps: float = settings.fps
@@ -193,7 +195,8 @@ class Player(Thread):
                 path: Path = folder.path / make_file_name(c, t, self.load_chunk, self.suffix)
                 if path.is_file():
 
-                    player: StreamReader = StreamReader(c, t, self._frame_sync_callback, self.hwt, self.hwd, self.fps)
+                    player: StreamReader = StreamReader(c, t, self._frame_sync_callback, self.hwt, self.hwd, self.fps,
+                                                        gray=self.gray)
                     player.load(str(path), self.load_chunk, lo, hi)
                     self.loaders.append(player)
                 else:

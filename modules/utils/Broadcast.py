@@ -28,6 +28,11 @@ class Broadcast(Generic[T]):
         self._callbacks: list[Callback] = list(dict.fromkeys(callbacks)) if callbacks else []
         self._lock = Lock()
 
+    def __bool__(self) -> bool:
+        """True when any callback is registered — lets producers skip building the payload."""
+        with self._lock:
+            return bool(self._callbacks)
+
     def __call__(self, output: T) -> None:
         with self._lock:
             for callback in self._callbacks:

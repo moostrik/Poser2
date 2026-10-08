@@ -31,11 +31,14 @@ EndCallback = Callable[[int], None]
 
 class StreamReader:
     def __init__(self, cam_id: int, frameType: FrameType, frameCallback,
-                 hw_acceleration_type: str = '', hw_acceleration_device: str = '', fps: float = 0.0) -> None:
+                 hw_acceleration_type: str = '', hw_acceleration_device: str = '', fps: float = 0.0,
+                 gray: bool = False) -> None:
         self.frame_callback = frameCallback
 
         self.cam_id: int = cam_id
         self.frame_type: FrameType = frameType
+        self.gray: bool = gray                   # a mono pipeline wants gray video: ffmpeg extracts
+        self.channels: int = 1                   # the luma, saving the colour conversion and ⅔ of the pipe
         self.hw_acceleration_type: str = hw_acceleration_type
         self.hw_acceleration_device: str = hw_acceleration_device
 
@@ -106,8 +109,10 @@ class StreamReader:
             self.ffmpeg_process = None
             return
 
-        pix_fmt: str = 'bgr24' if self.frame_type == FrameType.VIDEO else 'gray'  # BGR matches getCvFrame, no conversion needed
-        self.bytes_per_frame: int = self.frame_width * self.frame_height * (3 if self.frame_type == FrameType.VIDEO else 1)
+        color: bool = self.frame_type == FrameType.VIDEO and not self.gray
+        pix_fmt: str = 'bgr24' if color else 'gray'          # BGR matches getCvFrame, no conversion needed
+        self.channels = 3 if color else 1
+        self.bytes_per_frame: int = self.frame_width * self.frame_height * self.channels
 
         ffmpeg_process = None
         try:
@@ -156,10 +161,12 @@ class StreamReader:
                 break
             frame_count += 1
 
+        # Absolute schedule on perf_counter (the light clock's pattern): per-iteration sleeps on
+        # the coarse wall clock quantize every frame by up to ~16 ms and let errors accumulate.
+        next_time: float = time.perf_counter()
         while not self.stop_event.is_set():
             if end_frame is not None and frame_count >= end_frame:
                 break
-            start_time: float = time.time()
             try:
                 in_bytes = self.ffmpeg_process.stdout.read(self.bytes_per_frame)
                 if not in_bytes:
@@ -169,7 +176,7 @@ class StreamReader:
                 logger.error('Error reading frame:', e)
                 break
 
-            if self.frame_type == FrameType.VIDEO:
+            if self.channels == 3:
                 frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([self.frame_height, self.frame_width, 3])
             else:
                 frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([self.frame_height, self.frame_width])
@@ -177,9 +184,12 @@ class StreamReader:
             self.frame_callback(self.cam_id, self.frame_type, frame, self.chunk_id, frame_count)
             frame_count += 1
 
-            elapsed_time: float = time.time() - start_time
-            sleep_time: float = max(0, frame_interval - elapsed_time)
-            time.sleep(sleep_time)
+            next_time += frame_interval
+            remaining: float = next_time - time.perf_counter()
+            if remaining > 0:
+                time.sleep(remaining)
+            elif -remaining > frame_interval:
+                next_time = time.perf_counter()   # resync after a stall rather than bursting catch-up frames
         self.ffmpeg_process.stdout.close()
         self.ffmpeg_process.terminate()
         self.ffmpeg_process = None

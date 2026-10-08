@@ -92,8 +92,8 @@ class Simulator(Camera):
                     img.setData(self.to_planar(frame, (width, height))) # type: ignore
                 else:
                     img.setType(dai.ImgFrame.Type.RAW8)
-                    if frame.shape[2] == 3:
-                        frame = cvtColor(frame, COLOR_BGR2GRAY)  # clip frames arrive BGR (OpenCV convention)
+                    if frame.ndim == 3:
+                        frame = cvtColor(frame, COLOR_BGR2GRAY)  # clip frames arrive BGR (OpenCV convention); a gray-decoded clip skips this
                     img.setData(frame.flatten()) # type: ignore
                 img.setTimestamp(frame_time)
                 img.setWidth(width)

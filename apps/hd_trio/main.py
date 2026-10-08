@@ -130,7 +130,7 @@ class HDTrioMain:
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
             wt = window.WindowTracker(num_players, getattr(ps, f'window_{stage.name.lower()}'))
-            wt.add_windows_callback(partial(self.board.set_windows, stage))
+            self.board.set_window_tracker(stage, wt)
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),
