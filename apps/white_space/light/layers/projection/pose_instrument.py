@@ -262,30 +262,37 @@ class PoseInstrument(ProjectionLayer):
         amounts, the range and the direction, are the ``PI.white_lines`` / ``PI.blue_lines``
         settings.
 
-        The arms are ``docs/MATRIX_V2.md``'s Step 1:
+        The arms are ``docs/MATRIX_V2.md``'s Step 2:
 
         - the shoulders, the mean of the two: both pulse widths (white's base 0 and amount 1,
           blue's base 1 and amount −1: arms hanging is full blue, arms raised full white, between
           them the two colours tile)
         - each elbow its own colour's pitch, the left the white and the right the blue: folding an
           elbow makes its colour's lines finer; equal elbows keep the colours in tune
+        - the shoulders' difference, signed, left less right: both phases, the amounts opposite
+          (white +⅛, blue −⅛), so the left higher pulls the colours a quarter interval closer one
+          way and the right higher the other; level shoulders leave them half an interval apart
 
         Every other parameter sits at its base; connections are added one at a time, each earning
         its place under the matrix's rule 4.
 
         The measures come with their dead zones from the pipeline: the arm travels
         (``ArmTravel``, ``pose.arm_travel_extractor``), the absolute taken since the sign is the
-        side of the body the limb passes, which the design gives no meaning. The mean is computed
-        here while the matrix is tried; once liked it moves into the pipeline.
+        side of the body the limb passes, which the design gives no meaning. The mean and the
+        difference are computed here while the matrix is tried; once liked they move into the
+        pipeline.
         """
         shoulders = (p.left_shoulder + p.right_shoulder) / 2.0
+        difference = p.left_shoulder - p.right_shoulder
         white = {
             Parameter.PULSE_WIDTH: shoulders,
             Parameter.PITCH:       p.left_elbow,
+            Parameter.PHASE:       difference,
         }
         blue = {
             Parameter.PULSE_WIDTH: shoulders,
             Parameter.PITCH:       p.right_elbow,
+            Parameter.PHASE:       difference,
         }
         return white, blue
 

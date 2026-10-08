@@ -157,7 +157,13 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertAlmostEqual(blue[Parameter.PULSE_WIDTH], 0.5, places=5)           # the same mean; blue's slot inverts
         self.assertAlmostEqual(white[Parameter.PITCH], 0.5, places=5)                # the left elbow: the white
         self.assertAlmostEqual(blue[Parameter.PITCH], 1.0, places=5)                 # the right elbow: the blue
-        self.assertEqual(set(white) | set(blue), {Parameter.PULSE_WIDTH, Parameter.PITCH})   # nothing else wired
+        self.assertEqual(set(white) | set(blue), {Parameter.PULSE_WIDTH, Parameter.PITCH, Parameter.PHASE})   # nothing else wired
+
+    def test_the_shoulder_difference_is_both_phases_signed(self) -> None:
+        for left, right, diff in ((1.0, 0.0, 1.0), (0.0, 1.0, -1.0), (0.5, 0.5, 0.0)):
+            white, blue = self._connect(_pose(0.5, left_shoulder=shoulder(left), right_shoulder=shoulder(right)))
+            self.assertAlmostEqual(white[Parameter.PHASE], diff, places=5, msg=f"{left}, {right}")
+            self.assertAlmostEqual(blue[Parameter.PHASE], diff, places=5)            # one source; the amounts invert
 
     def test_the_sign_of_a_travel_is_not_a_measure(self) -> None:
         # The sign is the side of the body the arm passes; straight up is π from either side.
@@ -217,13 +223,15 @@ class PoseInstrumentTest(unittest.TestCase):
         for _ in range(60):
             np.testing.assert_array_equal(self._render().light_img, first)
 
-    def test_left_up_and_right_up_draw_the_same(self) -> None:
+    def test_left_up_and_right_up_draw_differently(self) -> None:
+        W, B = self.cfg.white_lines, self.cfg.blue_lines
+        W.phase_amount, B.phase_amount = 0.125, -0.125               # the difference: a quarter interval together
         drawn = []
         for left, right in ((1.0, 0.0), (0.0, 1.0)):
             self.layer.reset()
             self._people({0: _pose(0.5, left_shoulder=shoulder(left), right_shoulder=shoulder(right))})
             drawn.append(self._render().light_img.copy())
-        np.testing.assert_array_equal(drawn[0], drawn[1])                        # the mean reads the arms alike
+        self.assertFalse(np.array_equal(drawn[0], drawn[1]))         # the phases pull opposite ways
 
     def test_level_shoulders_tile_the_colours(self) -> None:
         inner = slice(C + MASK + 1, C + FULL)

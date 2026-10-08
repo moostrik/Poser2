@@ -41,18 +41,19 @@ The similarity is not a matrix source: it drives sync, the reach toward a partne
 
 ## Made sources
 
-What the instrument makes or shapes from the measures before the slot: a mean of two, a sine of
-an angle, a sine in time. A slot has one source and its curve keeps 0 and ±1 in place
+What the instrument makes or shapes from the measures before the slot: a mean and a difference
+of two, a sine of an angle, a sine in time. A slot has one source and its curve keeps 0 and ±1 in place
 (`LIGHT_SYNTH.md`, *Modulation*), so none of these can be made in the slot. They are computed in
 the instrument while the matrix is tried; a shaped measure moves into the pipeline once liked
 (`POSE_INSTRUMENT.md`, *The rules of meaning*).
 
-| Source           | Range | What it is                                                      |
-|------------------|-------|-----------------------------------------------------------------|
-| shoulders        | 0..1  | the mean of the two shoulders                                   |
-| left elbow turn  | −1..1 | sine of the elbow's angle: ±1 at ±90°, 0 straight or folded     |
-| right elbow turn | −1..1 | sine of the elbow's angle                                       |
-| breath           | −1..1 | a sine in time at `PI.breath.rate`, one per person              |
+| Source              | Range | What it is                                                      |
+|---------------------|-------|-----------------------------------------------------------------|
+| shoulders           | 0..1  | the mean of the two shoulders                                   |
+| shoulder difference | −1..1 | the left shoulder less the right, signed                        |
+| left elbow turn     | −1..1 | sine of the elbow's angle: ±1 at ±90°, 0 straight or folded     |
+| right elbow turn    | −1..1 | sine of the elbow's angle                                       |
+| breath              | −1..1 | a sine in time at `PI.breath.rate`, one per person              |
 
 ## Synth inputs
 
@@ -104,8 +105,8 @@ Each connection added wins rule 5 back one combination at a time, at the price r
 
 ## Step 1 — the elbows
 
-The wired matrix (`PoseInstrument.connect`): the base matrix with each elbow on its own colour's
-pitch, the left the white and the right the blue.
+The base matrix with each elbow on its own colour's pitch, the left the white and the right the
+blue.
 
 | Oscillator | Parameter   | Source      | Base | Amount |
 |------------|-------------|-------------|------|--------|
@@ -135,3 +136,34 @@ and 2 hold twice over. The travel is continuous and a change of pitch opens the 
 person as an accordion, so rule 3 holds. Nothing moves in time: a held pose is still a still
 picture. The price to rule 4 is two rows, one measure each; the gain to rule 5 is every elbow
 combination, wherever the shoulders give lines to see it in.
+
+## Step 2 — the shoulder difference
+
+The wired matrix (`PoseInstrument.connect`): Step 1 with the shoulders' difference on both
+phases, the amounts opposite.
+
+| Oscillator | Parameter   | Source              | Base | Amount |
+|------------|-------------|---------------------|------|--------|
+| white      | pitch       | left elbow          | 10   | 20     |
+| white      | pulse width | shoulders           | 0    | 1      |
+| white      | phase       | shoulder difference | 0    | ⅛      |
+| white      | speed       |                     | 0    |        |
+| white      | hardness    |                     | 1    |        |
+| blue       | pitch       | right elbow         | 10   | 20     |
+| blue       | pulse width | shoulders           | 1    | −1     |
+| blue       | phase       | shoulder difference | ½    | −⅛     |
+| blue       | speed       |                     | 0    |        |
+| blue       | hardness    |                     | 1    |        |
+
+The difference moves the two colours' lines opposite ways: level shoulders leave them
+alternating, blue half an interval from white; the left higher brings them a quarter interval
+closer on one side, the right higher on the other, so which arm is the higher shows — rule 5
+wins the shoulder pairs back. ⅛ each keeps those two furthest apart: at ¼ each, left higher and
+right higher would draw the same lines, as a phase repeats every interval. Pulled together the
+colours overlap on one flank and open dark on the other, so the shift reads as a change of tone,
+not only of place.
+
+The difference is 0 with level shoulders, so the fixed points, the T and the tiling are
+untouched, and it is large only with one arm up and the other not, where both widths are near
+half and both colours are lines. Nothing moves in time, and the phase is continuous in the
+difference, so rules 1, 2 and 3 hold.
