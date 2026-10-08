@@ -252,7 +252,7 @@ class Camera(Thread):
 
         logger.info(f'{self.device_id} CLOSED')
 
-    def _video_callback(self, msg: dai.ImgFrame) -> None:
+    def _video_callback(self, msg: dai.ImgFrame) -> ndarray:
         # print('RV', msg.getTimestamp())
         self._update_fps(FrameType.VIDEO)
         if self.do_color:
@@ -262,16 +262,19 @@ class Camera(Thread):
 
         frame: ndarray = msg.getCvFrame()
         self._update_frame_callbacks(FrameType.VIDEO, frame)
+        return frame
 
-    def _left_callback(self, msg: dai.ImgFrame) -> None:
+    def _left_callback(self, msg: dai.ImgFrame) -> ndarray:
         self._update_fps(FrameType.LEFT_)
         frame: ndarray = msg.getCvFrame()
         self._update_frame_callbacks(FrameType.LEFT_, frame)
+        return frame
 
-    def _right_callback(self, msg: dai.ImgFrame) -> None:
+    def _right_callback(self, msg: dai.ImgFrame) -> ndarray:
         self._update_fps(FrameType.RIGHT)
         frame: ndarray = msg.getCvFrame()
         self._update_frame_callbacks(FrameType.RIGHT, frame)
+        return frame
 
     def _stereo_callback(self, msg: dai.ImgFrame) -> None:
         self._update_fps(FrameType.DEPTH)
@@ -285,17 +288,14 @@ class Camera(Thread):
             if type(msg) == dai.ImgFrame:
                 if name == 'video':
                     # print(name, msg.getTimestampDevice(), message_group.getTimestampDevice(), msg.getSequenceNum(), self.cntr)
-                    self._video_callback(msg)
-                    frames[FrameType.VIDEO] = msg.getCvFrame()
+                    frames[FrameType.VIDEO] = self._video_callback(msg)
                 elif name == 'left':
                     name = 'left_'
                     # print(name, msg.getTimestampDevice(), message_group.getTimestampDevice(), msg.getSequenceNum(), self.cntr)
-                    self._left_callback(msg)
-                    frames[FrameType.LEFT_] = msg.getCvFrame()
+                    frames[FrameType.LEFT_] = self._left_callback(msg)
                 elif name == 'right':
                     # print(name, msg.getTimestampDevice(), message_group.getTimestampDevice(), msg.getSequenceNum(), self.cntr)
-                    self._right_callback(msg)
-                    frames[FrameType.RIGHT] = msg.getCvFrame()
+                    frames[FrameType.RIGHT] = self._right_callback(msg)
                 elif name == 'stereo':
                     self._stereo_callback(msg)
                 else:

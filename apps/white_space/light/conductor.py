@@ -119,11 +119,12 @@ class Conductor(Thread):
         self._motor_controller.notify_fall()
 
     def run(self) -> None:
-        # Outrank the process's other threads (inference, GL, analytics): measured to take the
-        # clock's lateness under in-process native load from ~4 ms mean to ~60 µs. HIGHEST, not
-        # TIME_CRITICAL — no measurable difference, and this thread busy-spins ~1 ms per tick.
-        # The light sender and UDP receiver run at this same level: one pipeline, one priority.
-        set_current_thread_priority(ThreadPriority.HIGHEST)
+        # ABOVE_NORMAL, not HIGHEST: the 2026-09 lateness measurement (~4 ms mean to ~60 µs at
+        # HIGHEST) assumed a ~1 ms tick, but the pose instrument now costs most of the 31 ms
+        # budget per tick — at HIGHEST that starves the render and video threads (profiled
+        # 2026-10-08: visible playback stutter with 2+ tracked people). The light sender and UDP
+        # receiver stay at HIGHEST: they are cheap I/O and keep output timing tight.
+        set_current_thread_priority(ThreadPriority.ABOVE_NORMAL)
         while not self._stop_event.is_set():
             try:
                 tick = self._clock.next_tick()   # blocks until the next frame deadline

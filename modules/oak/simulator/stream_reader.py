@@ -3,7 +3,6 @@ import numpy as np
 from threading import Thread, Event, Lock
 from typing import Callable
 from enum import Enum
-from cv2 import cvtColor, COLOR_RGB2BGR
 import time
 
 
@@ -107,7 +106,7 @@ class StreamReader:
             self.ffmpeg_process = None
             return
 
-        pix_fmt: str = 'rgb24' if self.frame_type == FrameType.VIDEO else 'gray'
+        pix_fmt: str = 'bgr24' if self.frame_type == FrameType.VIDEO else 'gray'  # BGR matches getCvFrame, no conversion needed
         self.bytes_per_frame: int = self.frame_width * self.frame_height * (3 if self.frame_type == FrameType.VIDEO else 1)
 
         ffmpeg_process = None
@@ -172,7 +171,6 @@ class StreamReader:
 
             if self.frame_type == FrameType.VIDEO:
                 frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([self.frame_height, self.frame_width, 3])
-                frame = cvtColor(frame, COLOR_RGB2BGR)
             else:
                 frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([self.frame_height, self.frame_width])
 

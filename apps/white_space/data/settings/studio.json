@@ -35,7 +35,7 @@
     },
     "data": {
       "stage": "LERP",
-      "mode": "WINDOW",
+      "mode": "NONE",
       "feature_field": "Similarity",
       "line_width": 3.0,
       "line_smooth": 10.0,
@@ -226,7 +226,7 @@
     "color": false,
     "square": false,
     "stereo": false,
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "ir_flood_light": 0.75,
     "mono_auto_exposure": true,
@@ -251,8 +251,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 4046,
-        "iso": 100,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -285,8 +285,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 19992,
-        "iso": 136,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -319,8 +319,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 29992,
-        "iso": 135,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -353,8 +353,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 29992,
-        "iso": 101,
+        "exposure": 0,
+        "iso": 0,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -377,7 +377,7 @@
         "VIDEO"
       ],
       "apply_warp": false,
-      "folder": "20260924-203306_2_person",
+      "folder": "20260924-184100_2_person",
       "sim_passthrough": false,
       "start_norm": 0.0,
       "end_norm": 1.0
@@ -993,21 +993,21 @@
       "level_bypass": false
     },
     "dummy": {
-      "enabled": true,
-      "solo": true,
+      "enabled": false,
+      "solo": false,
       "azimuth": 223.0,
       "distance": 0.5,
       "torso": 0.0,
-      "left_shoulder": -95.0,
-      "right_shoulder": -95.0,
-      "left_elbow": -1.0,
-      "right_elbow": -1.0,
+      "left_shoulder": -20.0,
+      "right_shoulder": -20.0,
+      "left_elbow": 12.0,
+      "right_elbow": 12.0,
       "left_hip": -10.0,
       "right_hip": -9.0,
       "left_knee": 8.0,
       "right_knee": 8.0,
       "morph": 1.2,
-      "pose": "arms out level, a T",
+      "pose": "neutral",
       "name": "|_|"
     }
   },

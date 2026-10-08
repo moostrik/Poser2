@@ -339,12 +339,6 @@ class Tensor(Texture):
         self.bind()
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width, self.height, upload_format, gl_type, None)
 
-        # Check for OpenGL errors
-        err = glGetError()
-        if err != 0:
-            type_name = 'uint8' if gl_type == GL_UNSIGNED_BYTE else ('FP16' if gl_type == GL_HALF_FLOAT else 'FP32')
-            logger.error("OpenGL error after glTexSubImage2D: %s (channels=%s, format=%s, type=%s)", err, channels, upload_format, type_name)
-
         self.unbind()
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
 

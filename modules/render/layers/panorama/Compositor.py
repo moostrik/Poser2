@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.board import HasObservations, HasTracklets
-from modules.gl import Fbo, Texture, clear_color
+from modules.gl import Blit, Fbo, Texture, clear_color
 from modules.tracker import PanoramicTrackerSettings, Tracklet, row_model
 from modules.utils import HotReloadMethods
 
@@ -69,6 +69,10 @@ class Compositor(LayerBase):
         self._settings: PanoramaLayerSettings = settings
 
         self._fbo: Fbo = Fbo()
+        # Seams and grid depend only on settings, so they are drawn into this cache once and
+        # blitted per frame; _static_key holds the inputs the cache was drawn for.
+        self._static_fbo: Fbo = Fbo()
+        self._static_key: tuple | None = None
 
         self._stitch: StitchRenderer = StitchRenderer(cam_textures, tracker, settings)
         self._seams: SeamRenderer = SeamRenderer(self.num_cams, tracker, settings)
@@ -142,11 +146,14 @@ class Compositor(LayerBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
+        self._static_fbo.allocate(width, height, internal_format)
+        self._static_key = None
         for _, renderer in self._order:
             renderer.allocate(width, height, internal_format)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
+        self._static_fbo.deallocate()
         for _, renderer in self._order:
             renderer.deallocate()
 
@@ -163,14 +170,65 @@ class Compositor(LayerBase):
         if Part.marks in parts or Part.labels in parts:
             self._set_marks(window)
 
+        static_on: bool = Part.seams in parts or Part.grid in parts
+        if static_on:
+            self._update_static(parts, window)
+
+        static_pending: bool = static_on
         self._fbo.begin()
         clear_color(0.0, 0.0, 0.0, 1.0)
         for part, renderer in self._order:
+            if part is Part.seams or part is Part.grid:
+                continue                          # cached: blitted at their slot below
             if part not in parts:
                 continue
+            if static_pending and part is not Part.image:
+                self._blit_static()               # over the image, under the marks and labels
+                static_pending = False
             renderer.update()
             renderer.draw()
+        if static_pending:
+            self._blit_static()
         self._fbo.end()
+
+    def _update_static(self, parts: list[Part], window: tuple[float, float]) -> None:
+        """Redraw the seams + grid cache when any input they read has changed."""
+        key = self._static_inputs(parts, window)
+        if key == self._static_key:
+            return
+        self._static_key = key
+        self._static_fbo.begin()
+        clear_color(0.0, 0.0, 0.0, 0.0)
+        for part, renderer in self._order:
+            if part in parts and (part is Part.seams or part is Part.grid):
+                renderer.update()
+                renderer.draw()
+        self._static_fbo.end()
+
+    def _blit_static(self) -> None:
+        # The cache holds straight-alpha content blended onto transparent black, so its RGB is
+        # already weighted by alpha: composite with ONE / ONE_MINUS_SRC_ALPHA, not SRC_ALPHA.
+        # Leave GL_BLEND enabled with the standard func: the mark and label draws that follow
+        # count on it, as they did when seams and grid drew here directly.
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
+        Blit.use(self._static_fbo.texture)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+    def _static_inputs(self, parts: list[Part], window: tuple[float, float]) -> tuple:
+        """Everything the seam and grid renderers read, so a change redraws the cache."""
+        t = self._tracker
+        rig = t.rig
+        seam = t.seam
+        s = self._settings
+        return (Part.seams in parts, Part.grid in parts, window,
+                s.grid_degrees, s.focus_radius, s.tilt,
+                t.fov, t.reacquire_angle,
+                rig.overlap, rig.camera_height, rig.camera_radius,
+                rig.zone_min_radius, rig.zone_max_radius,
+                rig.angle_bottom, rig.angle_top,
+                seam.dead_zone, seam.link_angle, seam.link_height,
+                self._static_fbo.width, self._static_fbo.height)
 
     def _set_marks(self, window: tuple[float, float]) -> None:
         """Build the marks once, for the mark and label renderers."""

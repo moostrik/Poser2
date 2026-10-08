@@ -8,7 +8,7 @@ from ..camera import frame_size, mode_size
 from ..camera.settings import CameraSettings
 from .settings import SimulatorSettings
 from .player import Player
-from cv2 import resize, COLOR_RGB2GRAY, cvtColor
+from cv2 import resize, COLOR_BGR2GRAY, cvtColor
 from time import process_time
 from datetime import timedelta
 
@@ -93,7 +93,7 @@ class Simulator(Camera):
                 else:
                     img.setType(dai.ImgFrame.Type.RAW8)
                     if frame.shape[2] == 3:
-                        frame = cvtColor(frame, COLOR_RGB2GRAY)
+                        frame = cvtColor(frame, COLOR_BGR2GRAY)  # clip frames arrive BGR (OpenCV convention)
                     img.setData(frame.flatten()) # type: ignore
                 img.setTimestamp(frame_time)
                 img.setWidth(width)

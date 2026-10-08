@@ -2,6 +2,8 @@ import json
 import logging
 import os
 os.environ.setdefault('DEPTHAI_LEVEL', 'error')  # suppress noisy unbooted-device warnings
+import OpenGL
+OpenGL.ERROR_CHECKING = False  # must be set before any other OpenGL import; per-call glGetError otherwise dominates the render thread
 import sys
 import time
 from argparse import ArgumentParser, Namespace

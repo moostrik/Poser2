@@ -4,7 +4,7 @@ from numpy import ndarray
 from typing import Dict
 from enum import Enum, auto
 from queue import Queue
-from time import sleep
+from time import sleep, monotonic
 
 from ..camera.definitions import CoderType, CoderFormat, FrameType, FrameCallback
 from .settings import SimulatorSettings
@@ -101,6 +101,7 @@ class Player(Thread):
 
         self.playback_lock: Lock = Lock()
         self.frameCallbacks: list[FrameCallback] = []
+        self._gui_update_time: float = 0.0
 
         # Bind player settings callbacks
         self.settings.bind(SimulatorSettings.start, self._on_start)
@@ -441,6 +442,12 @@ class Player(Thread):
             self.play(True, self.active_folder)
 
     def update_gui(self, frame_id: int = 0) -> None:
+        # Settings writes run share propagation and callbacks on this (reader) thread; a GUI
+        # readout needs no more than 4 Hz
+        now: float = monotonic()
+        if now - self._gui_update_time < 0.25:
+            return
+        self._gui_update_time = now
         chunk: int = self.get_current_chunk()
         self.settings.current_chunk = chunk
         global_frame: int = self._global_frame(chunk, frame_id)
