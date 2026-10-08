@@ -140,7 +140,7 @@ class PoseInstrument(ProjectionLayer):
         self._pose_stage = pose_stage
         self._players: dict[int, _Player] = {}
         self._crossing = PlayheadCrossing()
-        self._offsets = np.arange(-(resolution // 2), resolution // 2 + 1, dtype=np.float64)   # px from a person
+        self._pixels = np.arange(resolution, dtype=np.float64)              # the strip's pixel indices
         self._mask = np.zeros(resolution, dtype=bool)
         self._mask_white = np.zeros(resolution, dtype=np.float32)
         self._mask_blue = np.zeros(resolution, dtype=np.float32)
@@ -181,16 +181,32 @@ class PoseInstrument(ProjectionLayer):
         mask_white.fill(0.0)
         mask_blue.fill(0.0)
 
-        half_turn = (self.resolution // 2) if self._instrument.opposite else 0
-        for p in self._players.values():
-            centre = int(round(p.position * self.resolution)) % self.resolution
-            self._draw_voice(white, blue, p, (centre + half_turn) % self.resolution)
-            self._draw_mask(mask, mask_white, mask_blue, p, centre)
+        R = self.resolution
+        half_turn = (R // 2) if self._instrument.opposite else 0
+        players = list(self._players.values())
+        if players:
+            # Every voice in one batched pass (``Voice.render_all``): each row of ``signed`` is a
+            # voice's pixels' angle from its person, the shortest way round, taken from the
+            # person's own azimuth (half a turn away with ``opposite``) so a walking person's
+            # lines move smoothly.
+            px_per_degree = R / 360.0
+            centre_px = np.array([p.position * R + half_turn for p in players]).reshape(-1, 1)
+            signed = (((self._pixels - centre_px + R / 2.0) % R) - R / 2.0) / px_per_degree
+            reach_left = np.array([p.reach_left for p in players]).reshape(-1, 1)
+            reach_right = np.array([p.reach_right for p in players]).reshape(-1, 1)
+            out_white, out_blue = Voice.render_all(
+                [p.voice for p in players], signed, reach_left, reach_right,
+                [self._sources(p) for p in players])
+            np.maximum(white, out_white, out=white)
+            np.maximum(blue, out_blue, out=blue)
+
+        for p in players:
+            self._draw_mask(mask, mask_white, mask_blue, p, int(round(p.position * R)) % R)
 
         # The masks go over every pattern, each channel at the mask's level; the marker over all.
         np.copyto(white, mask_white, where=mask)
         np.copyto(blue, mask_blue, where=mask)
-        PlayheadMarker.draw(white, blue, self.resolution, frame.playhead, self._instrument.playhead, mask)
+        PlayheadMarker.draw(white, blue, R, frame.playhead, self._instrument.playhead, mask)
 
     def _min_interval(self) -> float:
         """The visual limit on the interval, in degrees: one period of ``max_lines`` per revolution."""
@@ -359,27 +375,6 @@ class PoseInstrument(ProjectionLayer):
         return 0.5 - 0.5 * math.cos(math.pi * min(max(t, 0.0), 1.0))
 
     # -- Drawing ---------------------------------------------------------------------
-
-    def _draw_voice(self, white: np.ndarray, blue: np.ndarray, p: _Player, centre: int) -> None:
-        """Paint a person's two outputs over their window: output 1 into white, output 2 into
-        blue, the fuller of overlapping voices showing. ``centre`` is where the pattern is drawn,
-        the person or, with ``opposite``, half a turn from them. Distances are taken from the
-        person's own azimuth, not from their centre pixel, so a walking person's lines move
-        smoothly."""
-        R = self.resolution
-        px_per_degree = R / 360.0
-        presence = p.voice.presence
-        left = min(int(math.ceil(p.reach_left * presence * px_per_degree)) + 1, R // 2)
-        right = min(int(math.ceil(p.reach_right * presence * px_per_degree)) + 1, R // 2, R - 1 - left)
-        if left <= 0 and right <= 0:
-            return
-        mid = R // 2
-        offsets = self._offsets[mid - left:mid + right + 1]                # px from the centre pixel
-        signed = (offsets - (p.position * R - round(p.position * R))) / px_per_degree    # deg from the person
-        output_1, output_2 = p.voice.render(signed, p.reach_left, p.reach_right, self._sources(p))
-        idx = (centre + offsets.astype(np.int64)) % R
-        white[idx] = np.maximum(white[idx], output_1)
-        blue[idx] = np.maximum(blue[idx], output_2)
 
     def _draw_mask(self, mask: np.ndarray, mask_white: np.ndarray, mask_blue: np.ndarray, p: _Player,
                    centre: int) -> None:

@@ -305,6 +305,29 @@ class VoiceTest(unittest.TestCase):
         self.one.pulse_width = 0.6                      # the panel changes the patch under a running voice
         self.assertGreater(np.count_nonzero(self._render(voice)[0]), 1.5 * narrow)
 
+    # -- the batched pass --
+
+    def test_render_all_matches_per_voice_render(self) -> None:
+        """The batched pass is ``render`` per voice combined with the elementwise max — including
+        where the reaches overlap, with per-voice sources, travels, strobe time and presences."""
+        self.one.pulse_width_amount = 0.4               # a source difference between the voices
+        self.one.speed = 10.0                           # travel, so the voices' times diverge
+        self.strobe_one.rate = 2.0                      # the gate path, on each voice's own tick
+        a, b = self._arrived(), self._arrived()
+        b.update(0.5, True, False, NO_SOURCES, MIN_INTERVAL, 1, 32)
+        sources_a = ({Parameter.PULSE_WIDTH: 1.0}, {})
+        sources_b = NO_SOURCES
+        pixels = np.arange(1201, dtype=np.float64)
+        row_a = (pixels - 300.0) * STEP                 # a's person at pixel 300, b's at 700:
+        row_b = (pixels - 700.0) * STEP                 # at 40° reaches the two windows overlap
+        expected = [np.maximum(one, other) for one, other in zip(
+            a.render(row_a, 40.0, 40.0, sources_a), b.render(row_b, 40.0, 40.0, sources_b))]
+        batched = Voice.render_all([a, b], np.stack([row_a, row_b]),
+                                   np.full((2, 1), 40.0), np.full((2, 1), 40.0),
+                                   [sources_a, sources_b])
+        for got, want in zip(batched, expected):
+            np.testing.assert_allclose(got, want, atol=1e-6)
+
 
 if __name__ == "__main__":
     unittest.main()

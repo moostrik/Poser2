@@ -10,7 +10,7 @@ forwards the finished Frame to the board and the output callbacks (UDP sender, a
 from threading import Event, Thread
 from typing import Any, Callable
 
-from modules.utils import HotReloadMethods, ThreadPriority, set_current_thread_priority
+from modules.utils import HotReloadMethods
 from modules.gl import FpsCounter
 
 from .clock import Clock, Tick
@@ -119,12 +119,11 @@ class Conductor(Thread):
         self._motor_controller.notify_fall()
 
     def run(self) -> None:
-        # ABOVE_NORMAL, not HIGHEST: the 2026-09 lateness measurement (~4 ms mean to ~60 µs at
-        # HIGHEST) assumed a ~1 ms tick, but the pose instrument now costs most of the 31 ms
-        # budget per tick — at HIGHEST that starves the render and video threads (profiled
-        # 2026-10-08: visible playback stutter with 2+ tracked people). The light sender and UDP
-        # receiver stay at HIGHEST: they are cheap I/O and keep output timing tight.
-        set_current_thread_priority(ThreadPriority.ABOVE_NORMAL)
+        # No thread priority boost: inside the process no thread outranks another — the GIL hands
+        # over on its own schedule regardless of OS priority, so a boost only preempts the pose,
+        # video and render threads without making this one's Python run sooner (profiled
+        # 2026-10-08: an elevated conductor caused playback stutter). Timing is protected by
+        # keeping the tick's work short; the clock's late_max/busy_max/overruns are the watchdog.
         while not self._stop_event.is_set():
             try:
                 tick = self._clock.next_tick()   # blocks until the next frame deadline

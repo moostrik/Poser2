@@ -165,3 +165,54 @@ class Voice:
                 output *= Strobe.gate(self._tick, centre / interval, *strobe, self._ticks_per_second)
             outputs.append(output)
         return outputs[0], outputs[1]
+
+    @classmethod
+    def render_all(cls, voices: list["Voice"], position: np.ndarray, reach_left: np.ndarray,
+                   reach_right: np.ndarray, sources: list[tuple[Sources, Sources]]
+                   ) -> tuple[np.ndarray, np.ndarray]:
+        """``render`` for every voice in one numpy pass: the two outputs over the whole strip,
+        each pixel the fullest voice's (shape ``(R,)``). ``position`` is ``(V, R)``, each voice's
+        pixels' signed angle from its person; the reaches are ``(V, 1)``; ``sources`` is one pair
+        per voice, float values only. All voices share one patch — the settings objects given to
+        the constructor — as the instrument builds them.
+
+        One pass instead of a per-voice loop keeps the array-op count per tick constant in the
+        number of people, which keeps the conductor's tick (a GIL burst every other thread waits
+        on) short. Matches ``render`` within each voice's reach; ``test_synth_voice`` holds the
+        two paths together."""
+        v0 = voices[0]
+        count, resolution = position.shape
+        presence = np.array([v._presence.value for v in voices]).reshape(count, 1)
+        reach = np.where(position < 0.0, reach_left, reach_right) * presence
+        taper = reach * v0._window.taper
+        outputs: list[np.ndarray] = []
+        for i, patch in enumerate(v0._patches):
+            if not patch.enabled:                                           # switched off: dark, whatever its slots say
+                outputs.append(np.zeros(resolution, dtype=np.float32))
+                continue
+            width_col = np.empty((count, 1))
+            phase_col = np.empty((count, 1))
+            hard_col = np.empty((count, 1))
+            for k, (v, source) in enumerate(zip(voices, sources)):
+                s = source[i]
+                width_col[k, 0] = Slot.unit(Slot.modulate(patch.pulse_width, patch.pulse_width_amount,
+                                                          cls._played(patch.pulse_width_bypass, patch.pulse_width_curve, float(s.get(Parameter.PULSE_WIDTH, 0.0)))))
+                phase_col[k, 0] = Slot.modulate(patch.phase, patch.phase_amount,
+                                                cls._played(patch.phase_bypass, patch.phase_curve, float(s.get(Parameter.PHASE, 0.0))))
+                hard_col[k, 0] = Slot.unit(Slot.modulate(patch.hardness, patch.hardness_amount,
+                                                         cls._played(patch.hardness_bypass, patch.hardness_curve, float(s.get(Parameter.HARDNESS, 0.0)))))
+            interval_col = np.array([v._intervals[i] for v in voices]).reshape(count, 1)
+            travel_col = np.array([v._oscillators[i]._travelled for v in voices]).reshape(count, 1)
+            positions = np.abs(position) if patch.mirror else position
+            cycle = positions / interval_col - phase_col - travel_col       # Oscillator.cycle, per row
+            # The window and the strobe are read at line centres, as in ``render``.
+            centre = positions - ((cycle + 0.5) % 1.0 - 0.5) * interval_col
+            line_centre = np.abs(centre)
+            window = Envelope.over_positions(line_centre, 0.0, taper, reach)
+            output = Oscillator.pulse(cycle, width_col * window, hard_col)  # (V, R)
+            for k, v in enumerate(voices):                                  # strobes differ per voice and are usually off
+                strobe = v._strobes[i]
+                if strobe[0] > 0:
+                    output[k] *= Strobe.gate(v._tick, centre[k] / interval_col[k, 0], *strobe, v._ticks_per_second)
+            outputs.append(output.max(axis=0))
+        return outputs[0], outputs[1]
