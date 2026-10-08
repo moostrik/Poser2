@@ -141,5 +141,16 @@
     "right_hip": -9.0,
     "left_knee": 8.0,
     "right_knee": 8.0
+  },
+  "|_|": {
+    "torso": 0.0,
+    "left_shoulder": -95.0,
+    "right_shoulder": -95.0,
+    "left_elbow": -90.0,
+    "right_elbow": -90.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
   }
 }

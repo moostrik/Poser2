@@ -77,8 +77,9 @@ class MaskSettings(BaseSettings):
 
 
 class BreathSettings(BaseSettings):
-    """The breath: a sine in time the bridge makes per person, swinging both widths as far as the
-    shoulders are apart. A depth of ½ or less keeps both fixed points exact."""
+    """The breath: a sine in time the bridge makes per person, a source for ``connect`` to wire;
+    unconnected in the base matrix (``docs/MATRIX_V2.md``). On the widths, a depth of ½ or less
+    keeps both fixed points exact."""
     rate:  Field[float] = Field(0.5, min=0.0, max=4.0, step=0.05, widget=KNOB, label="Rate",  description="Breaths per second (Hz)", row_label="Breath", newline=True)
     depth: Field[float] = Field(0.4, min=0.0, max=0.5, step=0.01, widget=KNOB, label="Depth", description="Width swing per unit of the shoulders' gap (fraction)")
 
@@ -261,47 +262,30 @@ class PoseInstrument(ProjectionLayer):
         amounts, the range and the direction, are the ``PI.white_lines`` / ``PI.blue_lines``
         settings.
 
-        The arms are ``docs/MATRIX.md``'s Option 4:
+        The arms are ``docs/MATRIX_V2.md``'s Step 1:
 
-        - the shoulders, the mean of the two: where both pulse widths rest (white's base 0 and
-          amount 1, blue's base 1 and amount −1: arms hanging is full blue, arms raised full white)
-        - how far apart the shoulders are: both widths breathe around that rest, by
-          ``PI.breath.depth`` × the gap × the breath. Which shoulder is the higher sets the
-          relation, not who breathes: the left higher swings the two colours together (dark to the
-          overlap tone), the right higher swings them complementary (the boundary between them
-          sliding). Level shoulders have no gap, so the fixed points and a T are still.
-        - each elbow plays its own colour, the left the white and the right the blue: its fold is
-          the pitch, its turn (the sine of its signed angle) the phase, a shift one way at +90° and
-          the other at −90°, none when straight and when fully folded
-        - the body bend, signed: both speeds, the only source that sets the lines travelling, so a
-          straight body leaves them standing and a lean carries them
-        - the LFO, the symmetries, the distance, the hardness, the strobes: unconnected
+        - the shoulders, the mean of the two: both pulse widths (white's base 0 and amount 1,
+          blue's base 1 and amount −1: arms hanging is full blue, arms raised full white, between
+          them the two colours tile)
+        - each elbow its own colour's pitch, the left the white and the right the blue: folding an
+          elbow makes its colour's lines finer; equal elbows keep the colours in tune
+
+        Every other parameter sits at its base; connections are added one at a time, each earning
+        its place under the matrix's rule 4.
 
         The measures come with their dead zones from the pipeline: the arm travels
         (``ArmTravel``, ``pose.arm_travel_extractor``), the absolute taken since the sign is the
-        side of the body the limb passes, which the design gives no meaning; the body bend
-        (``pose.torso_tilt_extractor``). The turn is the raw elbow angle. The mean, the gap and
-        the turn are computed here while the matrix is tried; once liked they move into the
-        pipeline. The breath is the bridge's own, as the mask's flash is.
+        side of the body the limb passes, which the design gives no meaning. The mean is computed
+        here while the matrix is tried; once liked it moves into the pipeline.
         """
-        left, right = p.left_shoulder, p.right_shoulder
-        shoulders = (left + right) / 2.0
-        swing = self._instrument.breath.depth * self._breath(p) * abs(left - right)
-        # Blue's slot inverts its source, so the same swing on both is the two colours breathing
-        # together and the opposite swing is the two complementary. The sign turns where the
-        # shoulders are level, and the swing is 0 there, so nothing jumps.
-        together = left >= right
+        shoulders = (p.left_shoulder + p.right_shoulder) / 2.0
         white = {
-            Parameter.PULSE_WIDTH: shoulders + swing,
+            Parameter.PULSE_WIDTH: shoulders,
             Parameter.PITCH:       p.left_elbow,
-            Parameter.PHASE:       math.sin(p.left_turn),
-            Parameter.SPEED:       p.tilt,
         }
         blue = {
-            Parameter.PULSE_WIDTH: shoulders - swing if together else shoulders + swing,
+            Parameter.PULSE_WIDTH: shoulders,
             Parameter.PITCH:       p.right_elbow,
-            Parameter.PHASE:       math.sin(p.right_turn),
-            Parameter.SPEED:       p.tilt,
         }
         return white, blue
 
@@ -312,8 +296,8 @@ class PoseInstrument(ProjectionLayer):
 
     def connect_lfo(self, p: _Player) -> float:
         """The source of the LFO's level: the leg deviation, its dead zone the pipeline's
-        (``pose.leg_deviation_extractor``). The LFO feeds no parameter in Option 1; it is there
-        when one needs it."""
+        (``pose.leg_deviation_extractor``). The LFO feeds no parameter in the matrix yet; it is
+        there when one needs it."""
         return p.legs
 
     # -- Reach and sync ---------------------------------------------------------------

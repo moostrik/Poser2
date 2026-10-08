@@ -88,8 +88,8 @@ synth's side): the instrument decides what each source is, which measure, and th
 measure before it is handed over (the absolute of a travel, a remap; the dead zones are the
 pipeline's, *The body*); when the gates open (presence, the hit);
 the reaches; which output is white and which blue; and the mask. A source may also move in time
-by the bridge's own hand, as the mask's flash does: the breath, a sine per person that swings a
-width (*The connections*). Everything from the slot on is the synth's, and the synth never
+by the bridge's own hand, as the mask's flash does: the breath, a sine per person
+(`MATRIX_V2.md`, *Made sources*). Everything from the slot on is the synth's, and the synth never
 changes a source before the slot and never adds two.
 
 ---
@@ -129,15 +129,14 @@ points is tied to a pose.
 The rules are aims, not gates. Two things are fixed: arms hanging is full blue and arms raised is
 full white. Every combination drawing differently (rule 7) is the aim in the end, not a test of
 each step. A calculation on several measures may live in the instrument while it is tried; once
-the result is liked it moves into the pose pipeline (rule 1): the shoulders' mean and difference
-are such calculations. The elbows depart from rule 4 as an experiment: each elbow plays its own
-colour's pitch.
+the result is liked it moves into the pose pipeline (rule 1): the shoulders' mean is such a calculation. The elbows depart from rule 4 as an
+experiment: each elbow plays its own colour's pitch.
 
 ## What each measure means
 
 Each measure is a musical term of the light synth: a parameter of an oscillator (pitch, pulse
 width, phase, speed), the level of an LFO, a reach. **Primary** measures make the note: the arms,
-worked out in `MATRIX.md`. **Secondary** measures modulate a note that is already sounding: the
+worked out in `MATRIX_V2.md`. **Secondary** measures modulate a note that is already sounding: the
 legs and the body bend. The distance, how far the person stands from the fixture, is the one
 measure that is not of the body's pose.
 
@@ -255,39 +254,21 @@ A **connection** is one measure as the source in one parameter's slot (`LIGHT_SY
 the range and the direction. A measure may feed several parameters; a slot has one source; two
 measures never sum into one parameter.
 
-The arms are `MATRIX.md`'s Option 4. The bases and amounts are the preset's starting values,
-tuned on the machine:
+The arms are `MATRIX_V2.md`'s Step 1, rebuilt one connection at a time under its rule 4: keep
+the visualisation as simple as possible. The bases and amounts are the preset's:
 
-| Source              | Range | Parameter         | Base    | Amount     | At full                                        |
-|---------------------|-------|-------------------|---------|------------|------------------------------------------------|
-| white width         | 0..1  | white pulse width | 0       | 1          | solid white                                    |
-| blue width          | 0..1  | blue pulse width  | 1       | −1         | no blue                                        |
-| left elbow          | 0..1  | white pitch       | 25.7    | 46.3 lines | 72 lines, one every 5°: finer as the arm folds |
-| right elbow         | 0..1  | blue pitch        | 25.7    | 46.3 lines | 72 lines                                       |
-| left elbow turn     | −1..1 | white phase       | 0       | ¼ interval | white a quarter interval out at +90°, in at −90° |
-| right elbow turn    | −1..1 | blue phase        | ½       | ¼ interval | as white's                                     |
-| body bend           | −1..1 | white speed       | 0°/s    | 15°/s      | the lines travelling, a lean carrying them     |
-| body bend           | −1..1 | blue speed        | 0°/s    | 15°/s      | as white's                                     |
-| leg deviation       | 0..1  | the LFO's level   | 0       | 1          | the LFO at full swing; the LFO feeds nothing   |
+| Source        | Range | Parameter         | Base | Amount     | At full                                        |
+|---------------|-------|-------------------|------|------------|------------------------------------------------|
+| shoulders     | 0..1  | white pulse width | 0    | 1          | solid white                                    |
+| shoulders     | 0..1  | blue pulse width  | 1    | −1         | no blue                                        |
+| left elbow    | 0..1  | white pitch       | 10   | 20 lines   | 30 lines, one every 12°: finer as the arm folds |
+| right elbow   | 0..1  | blue pitch        | 10   | 20 lines   | 30 lines                                       |
+| leg deviation | 0..1  | the LFO's level   | 0    | 1          | the LFO at full swing; the LFO feeds nothing   |
 
-The widths are the shoulders' mean, breathing as far as the shoulders are apart:
-
-```
-swing       = depth × |left − right| × breath
-white width = shoulders + swing
-blue width  = shoulders − swing with the left higher, shoulders + swing with the right higher
-```
-
-The breath is a sine in time, −1..1, one per person, at `PI.breath.rate`; the depth is
-`PI.breath.depth`. Blue's slot inverts its source, so the same swing on both is the two colours
-breathing together and the opposite swing keeps them complementary (*Consequences*). Level
-shoulders have no gap, so the fixed points and a T are still; a depth of ½ or less keeps every
-breath inside none and full, so both fixed points stay exact (`MATRIX.md`, Option 4). An elbow's
-turn is the sine of its signed angle: no shift when straight and when fully folded, where +180°
-and −180° are one pose. The body bend is the only source on the speeds, its base 0, so a straight
-body leaves the lines standing and every movement of a held pose comes from moving the arms.
-Unconnected: the LFO, the symmetries, the
-distance, the phases, the hardness, the strobes.
+The shoulders are the mean of the two travels, so both colours read the shoulders alike; each
+elbow plays its own colour, the left the white and the right the blue. Unconnected: the phases,
+the speeds, the hardness, the strobes, the LFO's output, the elbows' turns, the body bend, the
+breath, the symmetries, the distance.
 
 ## Events
 
@@ -310,21 +291,18 @@ bridge's and not the synth's.
 
 What follows from the connections, before the machine has been judged **(deductions)**:
 
-- Level shoulders tile the wall: white's width and blue's add up to the interval and blue sits half
-  an interval from white, so every pixel is one colour, from full blue through the T to full white.
-  Shoulders apart set both colours breathing, so the tiling opens and closes. Which shoulder is
-  the higher says how: the left higher breathes them together, the wall swinging between dark and
-  the overlap tone; the right higher keeps them complementary, so the widths trade and the
-  boundary between the colours slides. Neither arm is the weaker, since both colours move either
-  way.
-- The elbows' symmetry shows by itself, unconnected: equally folded, white and blue share one
-  interval and stay in tune; unequally, the colours slide past each other with distance
-  (`LIGHT_SYNTH.md`, *In the pose instrument*).
+- With the elbows straight the wall tiles: white's width and blue's add up to the interval and
+  blue sits half an interval from white, so every pixel is one colour, from full blue through the
+  T to full white, trading blue for white as the shoulders rise.
+- No source feeds a speed, so a held pose is a still picture and every movement of the light is
+  an arm moving.
+- Equal elbows keep white and blue sharing one interval, in tune; unequal elbows slide the
+  colours past each other with distance, a standing moiré, so the elbows' symmetry shows without
+  a connection of its own (`LIGHT_SYNTH.md`, *In the pose instrument*).
 - An elbow shows nothing while its own colour is solid or dark: the pitch needs a note.
-- An elbow's turn, like its fold, shows nothing while its colour is solid or dark.
-- Unequal elbows open the tiling as a moiré that changes along the wall and stands still; the
-  breath opens it in time, evenly along the wall; a lean sets the whole picture travelling. The
-  three read apart because each moves in a different way.
+- Both colours read the shoulders alike through the mean, so which arm is up does not show:
+  `MATRIX_V2.md`'s rule 5 yields to its temporary rule 4, and the turns, the bend and the legs
+  draw nothing until their connections earn their place.
 
 Once the connections have been played on the machine, the *Pose results* are read back here: what
 each row draws, against what it should.
@@ -417,7 +395,7 @@ tuned together, knobs throughout:
 | `mask`                        | the mask's width, white and blue; the flash's levels, release   |
 | `playhead`                    | the marker's width, white and blue; its level inside a mask     |
 | `window`                      | shape: taper, attack, release; reach: width, bypass, sync       |
-| `breath`                      | the breath's rate and depth (*The connections*)                 |
+| `breath`                      | the breath's rate and depth (`MATRIX_V2.md`, *Made sources*)    |
 | `white_lines`, `blue_lines`   | On, Mirror, Bypass All; a slot per parameter; the push          |
 | `white_strobe`, `blue_strobe` | Bypass All; a slot per parameter of the strobe (`LIGHT_SYNTH.md`, *The strobe*) |
 | `lfo`                         | the LFO: rate, phase, the level's slot                          |
@@ -479,14 +457,12 @@ bridge in `test_pose_instrument.py`; the dummy in `test_dummy.py`.
 
 ### The pose results now
 
-The rows of *Pose results* draw what that table says, in the unit tests
-(`tests/test_pose_instrument.py`: the two fixed points, exact at any breath, one shoulder moving
-both colours, a T still over a breath, both colours breathing whichever shoulder is higher and the
-left higher swinging them together against the right higher's complementary swing, left and right
-up drawn differently, level shoulders tiling, an elbow making its own colour finer, equal elbows in
-tune, an elbow's turn shifting its own colour either way, a straight body standing still while a
-lean carries the lines, and a small move of any arm measure a small change of the picture). What
-they draw on the machine has not been judged yet.
+Step 1's rows of *Pose results* draw what that table says, in the unit tests
+(`tests/test_pose_instrument.py`: the two fixed points, one shoulder moving both colours, level
+shoulders tiling, a held pose still over many ticks, left and right up drawn the same, an elbow
+making its own colour finer, equal elbows in tune, the turns, the bend and the legs drawing
+nothing, and a small move of a shoulder or an elbow a small change of the picture). The rows
+beyond Step 1 wait on their connections (`MATRIX_V2.md`).
 
 ### The dummy
 

@@ -226,7 +226,7 @@
     "color": false,
     "square": false,
     "stereo": false,
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "ir_flood_light": 0.75,
     "mono_auto_exposure": true,
@@ -251,8 +251,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 4046,
+        "iso": 100,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -285,8 +285,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 19992,
+        "iso": 136,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -319,8 +319,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 29992,
+        "iso": 135,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -353,8 +353,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 29992,
+        "iso": 101,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -631,8 +631,8 @@
   },
   "light": {
     "brightness": 1.0,
-    "debug": "OFF",
-    "motor_simulate": false,
+    "debug": "pose_instrument",
+    "motor_simulate": true,
     "clock": {},
     "motor": {
       "beam_rpm": 32.0,
@@ -885,7 +885,7 @@
       "at_mask": 0.23
     },
     "window": {
-      "width": 24.0,
+      "width": 45.0,
       "width_bypass": false,
       "sync_threshold": 0.9,
       "taper": 0.19,
@@ -899,12 +899,12 @@
     "white_lines": {
       "enabled": true,
       "mirror": true,
-      "pitch": 25.7,
-      "pitch_amount": 46.3,
+      "pitch": 10.0,
+      "pitch_amount": 20.0,
       "pitch_curve": "LINEAR",
       "pitch_bypass": false,
       "pulse_width": 0.0,
-      "pulse_width_amount": 0.94,
+      "pulse_width_amount": 1.0,
       "pulse_width_curve": "LINEAR",
       "pulse_width_bypass": false,
       "phase": 0.0,
@@ -925,8 +925,8 @@
     "blue_lines": {
       "enabled": true,
       "mirror": true,
-      "pitch": 25.7,
-      "pitch_amount": 46.3,
+      "pitch": 10.0,
+      "pitch_amount": 20.0,
       "pitch_curve": "LINEAR",
       "pitch_bypass": false,
       "pulse_width": 1.0,
@@ -993,22 +993,22 @@
       "level_bypass": false
     },
     "dummy": {
-      "enabled": false,
-      "solo": false,
-      "azimuth": 22.5,
+      "enabled": true,
+      "solo": true,
+      "azimuth": 223.0,
       "distance": 0.5,
       "torso": 0.0,
-      "left_shoulder": -20.0,
-      "right_shoulder": -20.0,
-      "left_elbow": 12.0,
-      "right_elbow": 12.0,
+      "left_shoulder": -95.0,
+      "right_shoulder": -95.0,
+      "left_elbow": -1.0,
+      "right_elbow": -1.0,
       "left_hip": -10.0,
       "right_hip": -9.0,
       "left_knee": 8.0,
       "right_knee": 8.0,
       "morph": 1.2,
-      "pose": "neutral",
-      "name": ""
+      "pose": "arms out level, a T",
+      "name": "|_|"
     }
   },
   "states": {

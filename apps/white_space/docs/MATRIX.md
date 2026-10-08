@@ -1,5 +1,8 @@
 # White Space — Arm Matrix
 
+Superseded by `MATRIX_V2.md`, the matrix rebuilt from the base; this document is the record of
+the first build, Options 1–4.
+
 The arms' connections to the light synth, filled step by step. Parameters are the synth's
 (`LIGHT_SYNTH.md`); each row's value is `base + amount × curve(source)`.
 
@@ -157,8 +160,8 @@ it thins, dark.
 
 ## Option 4 Matrix
 
-The wired option (`PoseInstrument.connect`): Option 3 with the breath symmetric, the turns on the
-phases and the speed the body bend's alone.
+The first build's last option, the one played on location: Option 3 with the breath symmetric,
+the turns on the phases and the speed the body bend's alone.
 
 Both colours breathe, as far as the shoulders are apart; which shoulder is the higher sets the
 relation between them, not which one breathes. One colour breathing while the other stood still
