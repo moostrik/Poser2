@@ -20,6 +20,7 @@ IRES = 3600                 # one pixel per 0.1°
 C = IRES // 2               # the pixel of a person at normalized azimuth 0.5
 TICK = 1 / 30
 MASK = 15                   # mask half width (px) at the default 3°
+BORDER = 5                  # border half width (px) at the default 1°
 REACH = 450                 # the default 45° reach (px)
 FULL = 360                  # the window is full up to the taper, the last fifth of the reach
 INTERVAL = 140              # the default 14° interval (px)
@@ -93,6 +94,7 @@ class PoseInstrumentTest(unittest.TestCase):
     def setUp(self) -> None:
         self.cfg = PoseInstrumentSettings()
         self.cfg.window.attack_seconds = 0.0              # present at once — geometry tests read one frame
+        self.cfg.mask.border_white = 0.0                  # the band alone; the border has its own tests
         W, B = self.cfg.white_lines, self.cfg.blue_lines              # the placeholder's patch: white out, blue in
         W.pulse_width, W.pulse_width_amount, W.phase = 0.0, 1.0, self.QUARTER
         B.pulse_width, B.pulse_width_amount, B.phase = 1.0, -1.0, -0.5 + self.QUARTER
@@ -150,11 +152,12 @@ class PoseInstrumentTest(unittest.TestCase):
         self._render()
         return self.layer.connect(self.layer._players[0])
 
-    def test_the_shoulders_play_both_widths_and_each_elbow_its_own_pitch(self) -> None:
+    def test_the_arms_play_both_widths_and_each_elbow_its_own_pitch(self) -> None:
         white, blue = self._connect(_pose(0.5, left_shoulder=shoulder(0.25), right_shoulder=shoulder(0.75),
                                           left_elbow=shoulder(0.5), right_elbow=shoulder(1.0), tilt=0.4))
-        self.assertAlmostEqual(white[Parameter.PULSE_WIDTH], 0.5, places=5)          # the mean
-        self.assertAlmostEqual(blue[Parameter.PULSE_WIDTH], 0.5, places=5)           # the same mean; blue's slot inverts
+        arms = (0.4375 + 0.875) / 2                                                  # the unions at lift ½, their mean
+        self.assertAlmostEqual(white[Parameter.PULSE_WIDTH], arms, places=5)
+        self.assertAlmostEqual(blue[Parameter.PULSE_WIDTH], arms, places=5)          # the same mean; blue's slot inverts
         self.assertAlmostEqual(white[Parameter.PITCH], 0.5, places=5)                # the left elbow: the white
         self.assertAlmostEqual(blue[Parameter.PITCH], 1.0, places=5)                 # the right elbow: the blue
         self.assertEqual(set(white) | set(blue), {Parameter.PULSE_WIDTH, Parameter.PITCH, Parameter.PHASE})   # nothing else wired
@@ -164,6 +167,22 @@ class PoseInstrumentTest(unittest.TestCase):
             white, blue = self._connect(_pose(0.5, left_shoulder=shoulder(left), right_shoulder=shoulder(right)))
             self.assertAlmostEqual(white[Parameter.PHASE], diff, places=5, msg=f"{left}, {right}")
             self.assertAlmostEqual(blue[Parameter.PHASE], diff, places=5)            # one source; the amounts invert
+
+    def test_a_folded_elbow_lifts_its_arm(self) -> None:
+        white, blue = self._connect(_pose(0.5, left_elbow=shoulder(1.0)))            # hanging, the left hand folded in
+        self.assertAlmostEqual(white[Parameter.PULSE_WIDTH], 0.25, places=5)         # lift ½: half an arm, the mean
+        self.assertAlmostEqual(blue[Parameter.PULSE_WIDTH], 0.25, places=5)
+        self.cfg.elbow_lift = 0.0                                                    # no lift: the shoulders alone
+        white, _ = self._connect(_pose(0.5, left_elbow=shoulder(1.0)))
+        self.assertAlmostEqual(white[Parameter.PULSE_WIDTH], 0.0, places=5)
+
+    def test_folded_elbows_draw_from_hanging_arms(self) -> None:
+        self.cfg.white_lines.pitch_amount = self.cfg.blue_lines.pitch_amount = 25.7
+        self._people({0: _pose(0.5, left_elbow=shoulder(1.0), right_elbow=shoulder(1.0))})   # arms down, hands folded in
+        f = self._render()
+        white = self._inner(f.white)
+        self.assertGreaterEqual(len(white), 2)                       # white appears from full blue,
+        self._on_grid(white, INTERVAL // 2)                          # finely: the fold is also the pitch
 
     def test_the_sign_of_a_travel_is_not_a_measure(self) -> None:
         # The sign is the side of the body the arm passes; straight up is π from either side.
@@ -260,7 +279,10 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertEqual(self._spacings(f.blue), {INTERVAL})
 
     def test_equal_elbows_keep_the_colours_tuned(self) -> None:
-        self.cfg.white_lines.pitch_amount = self.cfg.blue_lines.pitch_amount = 25.7
+        W, B = self.cfg.white_lines, self.cfg.blue_lines
+        W.pitch_amount = B.pitch_amount = 25.7
+        W.pulse_width = B.pulse_width = 0.5                          # the widths by hand: the tuning alone,
+        W.pulse_width_bypass = B.pulse_width_bypass = True           # unmoved by the folds' lift
         for fold in (0.0, 0.5, 1.0):
             self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, left_elbow=shoulder(fold), right_elbow=shoulder(fold))})
             f = self._render()
@@ -384,6 +406,37 @@ class PoseInstrumentTest(unittest.TestCase):
         f = self._render()
         self.assertEqual(float(f.blue.max()), 1.0)
         self.assertEqual(float(f.blue[C + 100]), 1.0)
+
+    # -- the border --
+
+    def test_the_border_is_a_line_on_each_edge_of_the_mask(self) -> None:
+        M = self.cfg.mask
+        M.border_white = 1.0
+        self._people({0: _pose(0.5)})                                     # full blue pattern
+        f = self._render()
+        for edge in (C - MASK, C + MASK):
+            np.testing.assert_array_equal(f.white[edge - BORDER:edge + BORDER + 1], 1.0)
+        np.testing.assert_allclose(f.blue[C - MASK:C - MASK + BORDER + 1], M.blue, atol=1e-6)   # inner halves keep the band's blue
+        np.testing.assert_allclose(f.blue[C + MASK - BORDER:C + MASK + 1], M.blue, atol=1e-6)
+        np.testing.assert_array_equal(f.blue[C - MASK - BORDER:C - MASK], 0.0)                  # outer halves cut the pattern
+        np.testing.assert_array_equal(f.blue[C + MASK + 1:C + MASK + BORDER + 1], 0.0)
+
+    def test_a_zero_width_border_draws_nothing(self) -> None:
+        M = self.cfg.mask
+        M.border_white = 1.0
+        M.border_width = 0.0
+        self._people({0: _pose(0.5)})                                     # full blue: white only the border could light
+        f = self._render()
+        self.assertEqual(float(f.white.sum()), 0.0)
+
+    def test_the_border_holds_its_levels_while_the_band_flashes(self) -> None:
+        M = self.cfg.mask
+        M.border_white = 1.0
+        M.flash_release_seconds = 0.0                                     # the hit tick only
+        outer = C + MASK + BORDER                                         # a border-only pixel
+        frames = self._sweep()
+        np.testing.assert_allclose([float(f.white[outer]) for f in frames], 1.0, atol=1e-6)
+        self.assertEqual(sum(float(f.blue[outer]) for f in frames), 0.0)  # no flash on the border
 
     # -- the hit --
 

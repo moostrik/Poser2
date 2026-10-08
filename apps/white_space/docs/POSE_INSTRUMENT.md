@@ -142,10 +142,10 @@ measure that is not of the body's pose.
 
 | Measure             | Role      | Term                                                            |
 |---------------------|-----------|-----------------------------------------------------------------|
-| shoulders (mean)    | primary   | the balance of white and blue: both pulse widths                |
+| arms (mean)         | primary   | the balance of white and blue: both pulse widths                |
 | shoulders apart     | primary   | both phases: the colours pull together, one way per higher arm  |
-| left elbow          | primary   | the white: its fold the pitch, its turn a shift                 |
-| right elbow         | primary   | the blue: its fold the pitch, its turn a shift                  |
+| left elbow          | primary   | the white: its fold lifts the arm and is the pitch; its turn a shift |
+| right elbow         | primary   | the blue: its fold lifts the arm and is the pitch; its turn a shift  |
 | leg deviation       | secondary | open                                                            |
 | body bend           | secondary | the flow: the lines travel by the lean and stand without it     |
 | distance            | secondary | open                                                            |
@@ -185,20 +185,25 @@ not described.
 | arms out level, a T                         | white and blue lines, each half the interval, touching           |
 | left arm up, right hanging                  | the T's widths, the colours a quarter interval closer one way   |
 | right arm up, left hanging                  | the T's widths, the colours a quarter interval closer the other |
-| a T, both elbows folded                     | the T's lines, finer, white and blue still in tune               |
-| a T, left elbow folded                      | the white lines finer than the blue: the colours slide apart     |
-| a T, right elbow folded                     | the blue lines finer than the white: the colours slide apart     |
+| neutral, both elbows folded                 | white appears from full blue, finely lined: the folds lift the arms |
+| a T, both elbows folded                     | the T's tiling, finer and whiter, white and blue still in tune   |
+| a T, left elbow folded                      | the white finer, the wall whiter: the colours slide apart        |
+| a T, right elbow folded                     | the blue finer, the wall whiter: the colours slide apart         |
 | a T, leaning left                           | the T, both colours travelling one way                           |
 | a T, leaning right                          | the T, both travelling the other                                 |
 | a T, in a crouch                            | the T: the legs play nothing                                     |
 | \|__ (a T, the right forearm turned 90°)    | the blue finer against the white: a standing moiré               |
 | \_\_\| (a T, the left forearm turned 90°)   | the white finer against the blue: a standing moiré               |
-| \|_\| (a T, both forearms turned up)        | both colours finer equally, in tune: the T's tiling, finer       |
+| \|_\| (a T, both forearms turned up)        | both colours finer equally, in tune: the T's tiling, finer, whiter |
 
 ## The body
 
 The instrument's measures are pose features and nothing else: values the pose pipeline measures
-and publishes with every frame, smoothed. The pipeline derives the leg deviation and the symmetry
+and publishes with every frame, smoothed. The pipeline also caps how fast the joint angles may
+change (the LERP stage's rate limiter: `max_increase` and `max_decrease`, radians per second), so
+no angle-derived measure moves implausibly fast however fast the input jumps, and the light and
+the sound read the same capped values. The azimuth is not capped: the window and the mask track a
+walking person. The pipeline derives the leg deviation and the symmetry
 of a pair from the joint angles. The distance is the tracker's, read from where the feet meet the
 floor (`TRACKING.md`, *The pose's distance*).
 
@@ -257,23 +262,25 @@ A **connection** is one measure as the source in one parameter's slot (`LIGHT_SY
 the range and the direction. A measure may feed several parameters; a slot has one source; two
 measures never sum into one parameter.
 
-The arms are `MATRIX_V2.md`'s Step 2, rebuilt one connection at a time under its rule 4: keep
+The arms are `MATRIX_V2.md`'s Step 3, rebuilt one connection at a time under its rule 4: keep
 the visualisation as simple as possible. The bases and amounts are the preset's:
 
 | Source              | Range | Parameter         | Base | Amount     | At full                                         |
 |---------------------|-------|-------------------|------|------------|-------------------------------------------------|
-| shoulders           | 0..1  | white pulse width | 0    | 1          | solid white                                     |
-| shoulders           | 0..1  | blue pulse width  | 1    | −1         | no blue                                         |
+| arms                | 0..1  | white pulse width | 0    | 1          | solid white                                     |
+| arms                | 0..1  | blue pulse width  | 1    | −1         | no blue                                         |
 | left elbow travel   | 0..1  | white pitch       | 10   | 20 lines   | 30 lines, one every 12°: finer as the arm folds |
 | right elbow travel  | 0..1  | blue pitch        | 10   | 20 lines   | 30 lines                                        |
 | shoulder difference | −1..1 | white phase       | 0    | ⅛ interval | the colours a quarter interval closer, the left higher one way, the right the other |
 | shoulder difference | −1..1 | blue phase        | ½    | −⅛ interval | as white's                                     |
 | leg deviation       | 0..1  | the LFO's level   | 0    | 1          | the LFO at full swing; the LFO feeds nothing    |
 
-The shoulders' mean is both widths, so both colours read a rising arm alike; their difference is
-both phases, so which arm is the higher shows; each elbow plays its own colour's pitch, the left
-the white and the right the blue. Unconnected: the speeds, the hardness, the strobes, the LFO's
-output, the elbows' turns, the body bend, the breath, the symmetries, the distance.
+The arms' mean is both widths: an arm's travel is the weighted union of its shoulder's and its
+elbow's (`PI.elbow_lift`; `MATRIX_V2.md`, *Made sources*), so folded elbows draw with the
+shoulders down and a raised shoulder is a full arm. The shoulders' difference is both phases, so
+which arm is the higher shows; each elbow plays its own colour's pitch, the left the white and
+the right the blue. Unconnected: the speeds, the hardness, the strobes, the LFO's output, the
+elbows' turns, the body bend, the breath, the symmetries, the distance.
 
 ## Events
 
@@ -296,15 +303,18 @@ bridge's and not the synth's.
 
 What follows from the connections, before the machine has been judged **(deductions)**:
 
-- With the elbows straight and the shoulders level the wall tiles: white's width and blue's add
-  up to the interval and blue sits half an interval from white, so every pixel is one colour,
-  from full blue through the T to full white, trading blue for white as the shoulders rise.
+- With level shoulders the wall tiles: white's width and blue's add up to the interval and blue
+  sits half an interval from white, so every pixel is one colour, from full blue through the T
+  to full white, trading blue for white as the arms rise — the folds lift the widths too, so the
+  tiling holds at every arm value.
 - No source feeds a speed, so a held pose is a still picture and every movement of the light is
   an arm moving.
 - Equal elbows keep white and blue sharing one interval, in tune; unequal elbows slide the
   colours past each other with distance, a standing moiré, so the elbows' symmetry shows without
   a connection of its own (`LIGHT_SYNTH.md`, *In the pose instrument*).
-- An elbow shows nothing while its own colour is solid or dark: the pitch needs a note.
+- An elbow's pitch shows only where its colour has lines, but its fold lifts the arm, so from
+  neutral a fold makes the very lines that show it; only at raised does an elbow vanish, the
+  arm already full.
 - Which arm is the higher shows as the colours pulling a quarter interval together, one way for
   the left, the other for the right: overlapping on one flank, opening dark on the other.
 - The turns, the bend and the legs draw nothing: `MATRIX_V2.md`'s rule 5 yields to its temporary
@@ -374,7 +384,10 @@ nothing over the taper (`LIGHT_SYNTH.md`, *The window*).
 The **mask** is a band `mask.width` wide at the person, each channel at its level (`mask.white`,
 `mask.blue`) times presence, and goes over everything at the person: the patterns of every voice.
 A mask cuts a line where it falls, so lines slide out from under it; the window cuts nothing. In
-the preset the white is 0, so the mask is the dim blue band. The playhead's **marker**
+the preset the white is 0, so the mask is the dim blue band. The mask's **border** is a line
+centred on each edge of the band, half over the blue (`mask.border_width`, with `mask.border_white`
+and `mask.border_blue` times presence); it cuts the patterns like the band and does not flash. The
+playhead's **marker**
 (`PI.playhead`: its width, its white and blue) is drawn by the instrument over the masks, dimmed
 to `playhead.at_mask` inside one, so the marker never blinds and no other layer shares a mix with
 the instrument at a person.
@@ -398,7 +411,8 @@ tuned together, knobs throughout:
 |-------------------------------|-----------------------------------------------------------------|
 | `max_lines`                   | the visual limit: the pitch ceiling                             |
 | `opposite`                    | draw the patterns half a turn from their people                 |
-| `mask`                        | the mask's width, white and blue; the flash's levels, release   |
+| `elbow_lift`                  | how much a folded elbow lifts its arm (*The connections*)       |
+| `mask`                        | the mask's width, white and blue; the border's; the flash's levels, release |
 | `playhead`                    | the marker's width, white and blue; its level inside a mask     |
 | `window`                      | shape: taper, attack, release; reach: width, bypass, sync       |
 | `breath`                      | the breath's rate and depth (`MATRIX_V2.md`, *Made sources*)    |
@@ -420,25 +434,16 @@ by the bridge's where a concept spans both (`window`); the voice reads only its 
 layer keeps its `blend`. No setting routes anything: an amount does nothing until `connect` gives
 its parameter a source.
 
-### Hot reload
+### Working the composition
 
-The composition is worked on the machine in two ways. Values are tweaked in the panel and saved in
-the preset. Connections are edited in code and seen at once: `HotReloadMethods` (`modules/utils`)
-watches `pose_instrument.py` and the synth's files and, on save, re-executes their class bodies
-and module constants into the running app, so `connect`, the drawing methods and the synth's
-classes change under the layer without a restart.
+The composition is worked on the machine in two ways. Values — every base, amount, curve and
+bypass — are tweaked live in the panel and saved in the preset. The routing is code: a change of
+`connect` needs a restart, so a session alternates short restarts for the wiring with live
+tuning of its numbers. Hence the rules:
 
-What the reloader patches: methods of a class (instance, static, class), class constants, module
-constants. What it does not: module-level functions, imports, settings fields, and the objects
-already built (a settings instance keeps its fields). Hence the rules:
-
-- Everything that may change lives in a class method or a module constant, never in a module-level
-  function.
-- The synth's `Parameter` is an `IntEnum`, so a source's key still matches after a reload redefines
-  the class.
 - The numbers of a connection are its slot's base and amount, settings, never literals in
-  `connect`, so the preset keeps describing the show.
-- A new setting, feature or parameter needs a restart; a new connection does not.
+  `connect`, so the preset keeps describing the show and a connection is tuned without a
+  restart.
 - The table of *The connections* is `connect` in words; when one changes, the other follows in
   the same change.
 
@@ -463,12 +468,13 @@ bridge in `test_pose_instrument.py`; the dummy in `test_dummy.py`.
 
 ### The pose results now
 
-Step 2's rows of *Pose results* draw what that table says, in the unit tests
+Step 3's rows of *Pose results* draw what that table says, in the unit tests
 (`tests/test_pose_instrument.py`: the two fixed points, one shoulder moving both colours, level
 shoulders tiling, a held pose still over many ticks, left and right up drawn differently with
-the phases pulled opposite ways, an elbow making its own colour finer, equal elbows in tune, the
-turns, the bend and the legs drawing nothing, and a small move of a shoulder or an elbow a small
-change of the picture). The rows beyond Step 2 wait on their connections (`MATRIX_V2.md`).
+the phases pulled opposite ways, an elbow making its own colour finer, equal elbows in tune, a
+folded elbow lifting its arm and folded elbows drawing from hanging arms, the turns, the bend
+and the legs drawing nothing, and a small move of a shoulder or an elbow a small change of the
+picture). The rows beyond Step 3 wait on their connections (`MATRIX_V2.md`).
 
 ### The dummy
 

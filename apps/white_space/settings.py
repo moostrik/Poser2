@@ -178,6 +178,7 @@ class AngleFeature(BaseSettings):
     smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
     prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
     interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+    rate_limiter: Group[nodes.RateLimiterSettings]       = Group(nodes.RateLimiterSettings)
     sticky      : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
 
 

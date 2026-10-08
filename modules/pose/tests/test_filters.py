@@ -13,11 +13,11 @@ from modules.pose.features import (
 from modules.pose.frame import Frame
 from modules.pose.nodes import (
     AgeExtractor, AngleCalibrator, AngleEuroSmoother, AngleExtractor, AngleMotionExtractor, AngleMotionMovingAverageSmoother,
-    AnglePredictor, AngleStickyFiller, AngleSymExtractor, AngleVelEuroSmoother, AngleVelExtractor,
+    AnglePredictor, AngleRateLimiter, AngleStickyFiller, AngleSymExtractor, AngleVelEuroSmoother, AngleVelExtractor,
     AngleVelPredictor, AngleVelStickyFiller, AzimuthEuroSmoother, AzimuthExtractor, AzimuthPredictor,
     DualConfFilterSettings, EuroSmootherSettings, FilterNode, LeaderScoreApplicator, LegDeviationExtractor, MotionGateApplicator, MotionTimeExtractor,
     MovingAverageSettings, PointDualConfFilter, PointEuroSmoother, PointPredictor, PointStickyFiller,
-    PredictionMethod, PredictorSettings, SimilarityApplicator, SimilarityEuroSmoother,
+    PredictionMethod, PredictorSettings, RateLimiterSettings, SimilarityApplicator, SimilarityEuroSmoother,
     StickyFillerSettings, TorsoTiltExtractor, WindowType,
 )
 from modules.utils import Rect
@@ -55,6 +55,7 @@ def _stage_nodes() -> list[FilterNode]:
         AnglePredictor(PredictorSettings()),
         AngleVelPredictor(PredictorSettings()),
         AzimuthPredictor(PredictorSettings()),
+        AngleRateLimiter(RateLimiterSettings()),
         AngleStickyFiller(StickyFillerSettings()),
         AngleVelStickyFiller(StickyFillerSettings()),
         MotionGateApplicator(),

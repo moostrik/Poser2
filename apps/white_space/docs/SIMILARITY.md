@@ -154,7 +154,7 @@ smoothed angles; this stage only takes the edge off.
   not a factor. The deviation extractors keep their own joint lists (`ArmDeviationExtractor`,
   `LegDeviationExtractor`), independent of `joints`.
 - **Angle smoothing feeds both.** `pose.angle.smoother` shapes the angles the feature compares (SMOOTH) and
-  the angles the hit reads (LERP, after prediction and the chase). The similarity smoothers shape only the
+  the angles the hit reads (LERP, after prediction, the chase and the rate cap). The similarity smoothers shape only the
   feature.
 - **The dead zones do not.** Both compare `Angles`, never the arm travel (`POSE_INSTRUMENT.md`, *The body*),
   so the instruments' dead zones widen no match and the degrees above stay true.

@@ -94,7 +94,6 @@ class RateLimit:
     def reset(self) -> None:
         self._limited = np.full(self._vector_size, np.nan)
         self._target = np.full(self._vector_size, np.nan)
-        self._velocity = np.zeros(self._vector_size)
         self._last_update_time = None
 
     @property

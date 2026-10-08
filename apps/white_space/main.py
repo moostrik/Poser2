@@ -265,6 +265,9 @@ class WhiteSpaceMain:
         })
         self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
+                # First, before the extractors: every angle-derived measure (arm travel, leg
+                # deviation) inherits the cap, and the sound's angle messages read the same values.
+                nodes.AngleRateLimiter(ps.angle.rate_limiter),
                 nodes.AngleSymExtractor(ps.leg_deviation_extractor),
                 nodes.LegDeviationExtractor(ps.leg_deviation_extractor),
                 nodes.ArmDeviationExtractor(ps.arm_deviation_extractor),

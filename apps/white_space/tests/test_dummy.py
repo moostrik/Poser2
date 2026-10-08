@@ -32,8 +32,8 @@ POSES_FILE = json.loads(POSES.read_text(encoding='utf-8'))
 NEUTRAL = Measures(**POSES_FILE['neutral'])                     # the saved neutral: a body's, not the extractor's zero
 UP = Measures(**POSES_FILE['raised'])                           # the calibrator's two reference poses
 ROWS = ('neutral', 'raised', 'arms out level, a T', 'left arm up, right hanging', 'right arm up, left hanging',
-        'a T, both elbows folded', 'a T, left elbow folded', 'a T, right elbow folded', 'a T, leaning left', 'a T, leaning right',
-        'a T, in a crouch', '|__', '__|', '|_|')
+        'neutral, both elbows folded', 'a T, both elbows folded', 'a T, left elbow folded', 'a T, right elbow folded',
+        'a T, leaning left', 'a T, leaning right', 'a T, in a crouch', '|__', '__|', '|_|')
 
 
 def from_neutral(**deltas: float) -> Measures:

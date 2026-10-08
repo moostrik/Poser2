@@ -35,10 +35,14 @@ def _read_launcher_file() -> str:
 if __name__ == '__main__':
     process_id = os.getpid()
     psutil.Process(process_id).nice(psutil.HIGH_PRIORITY_CLASS)  # Prioritize over normal apps, below system processes
-    # Do NOT lower sys.setswitchinterval() here. 0.5 ms made the light clock ~65 µs accurate in
-    # isolation, but in the real app it starved the long pure-Python consumers (the pose runner's
-    # callback pipeline): its 2-slot result queue overflowed ("Callback queue full") and pose
-    # recognition collapsed. The default 5 ms keeps those pipelines in real time.
+    # The GIL switch interval is the unit of time a thread waits for its turn at the interpreter.
+    # 0.5 ms (2026-09) starved the pose runner's callback pipeline — its 2-slot result queue
+    # overflowed ("Callback queue full") and pose recognition collapsed — but that predates the
+    # vectorized filters, batched synth/text and lazy windows that shrank every burst. 2 ms is the
+    # cautious middle: shorter waits for the render and reader threads at their deadlines.
+    # Watchdogs: the pinned dashboard chips, and "Callback queue full" floods in the log — on
+    # either regression, delete this line (5 ms default).
+    sys.setswitchinterval(0.002)
     try:
         import torch
         torch.backends.cuda.matmul.allow_tf32 = True  # Use TF32 tensor cores for faster matmul on Ampere+ GPUs

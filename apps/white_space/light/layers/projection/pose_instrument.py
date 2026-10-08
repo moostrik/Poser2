@@ -16,7 +16,8 @@ bridge is everything the synth does not know:
   the crossing: each oscillator's push and the mask's flash), and sync, which grows the reach on
   a partner's side until it reaches them, from ``window.sync_threshold`` on.
 - the **mask**: a band at the person, over every pattern, lit at its levels by presence (dim blue
-  in the preset) and flashing to its flash levels on a hit; and the playhead's **marker** over
+  in the preset) and flashing to its flash levels on a hit; its **border**, a line centred on
+  each edge of the band, half over the blue, that does not flash; and the playhead's **marker** over
   it all (``PlayheadMarker``), dimmed inside the masks. With ``PI.opposite`` the patterns are
   drawn half a turn from their people while the masks stay on them.
 - the colours: output 1 is white, output 2 is blue; where voices overlap the fuller one shows.
@@ -64,11 +65,15 @@ class WindowSettings(SynthWindowSettings):
 
 
 class MaskSettings(BaseSettings):
-    """The mask at the person: its width and its level per channel (0 is off), and the flash, the
-    levels it goes to on a hit and the release it falls back over."""
+    """The mask at the person: its width and its level per channel (0 is off); the border, a line
+    on each edge of the band, centred on it so half overlaps the blue; and the flash, the levels
+    the band goes to on a hit and the release it falls back over. The border does not flash."""
     width:                 Field[float] = Field(3.0, min=0.5, max=20.0, step=0.1,  widget=KNOB, label="Width",   description="Mask width (deg)", row_label="Mask", newline=True)
     white:                 Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="White",   description="Mask white level")
     blue:                  Field[float] = Field(0.3, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Blue",    description="Mask blue level")
+    border_width:          Field[float] = Field(1.0, min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Width",   description="Border line width, centred on each mask edge (deg); 0 = off", row_label="Border", newline=True)
+    border_white:          Field[float] = Field(1.0, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="White",   description="Border white level")
+    border_blue:           Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Blue",    description="Border blue level")
     flash_white:           Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="White",   description="Mask white level at a hit", row_label="Flash", newline=True)
     flash_blue:            Field[float] = Field(1.0, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Blue",    description="Mask blue level at a hit")
     flash_release_seconds: Field[float] = Field(0.3, min=0.0, max=2.0,  step=0.05, widget=KNOB, label="Release", description="Flash falls back to the mask's levels over (s)")
@@ -88,6 +93,7 @@ class PoseInstrumentSettings(BaseSettings):
     parameter), the dummy. The wiring is ``connect``; the measures' dead zones are the pipeline's."""
     max_lines:    Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
     opposite:     Field[bool] = Field(False, description="Draw each person's lines half a turn away; the masks stay on the people")
+    elbow_lift:   Field[float] = Field(0.5, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Elbow Lift", description="How much a folded elbow lifts its arm (fraction of a full raise)")
     mask:         Group[MaskSettings]           = Group(MaskSettings)
     playhead:     Group[PlayheadMarkerSettings] = Group(PlayheadMarkerSettings)
     window:       Group[WindowSettings]         = Group(WindowSettings)
@@ -275,11 +281,14 @@ class PoseInstrument(ProjectionLayer):
         amounts, the range and the direction, are the ``PI.white_lines`` / ``PI.blue_lines``
         settings.
 
-        The arms are ``docs/MATRIX_V2.md``'s Step 2:
+        The arms are ``docs/MATRIX_V2.md``'s Step 3:
 
-        - the shoulders, the mean of the two: both pulse widths (white's base 0 and amount 1,
-          blue's base 1 and amount −1: arms hanging is full blue, arms raised full white, between
-          them the two colours tile)
+        - the arms, the mean of the two arm travels: both pulse widths (white's base 0 and amount
+          1, blue's base 1 and amount −1: arms hanging is full blue, arms raised full white,
+          between them the two colours tile). An arm's travel is the weighted union of its
+          shoulder's and its elbow's, ``s + (1 − s) × lift × e`` (``PI.elbow_lift``): an arm is
+          lifted insofar as any of it is lifted, so folded elbows draw with the shoulders down,
+          and a raised shoulder is a full arm whatever the elbow
         - each elbow its own colour's pitch, the left the white and the right the blue: folding an
           elbow makes its colour's lines finer; equal elbows keep the colours in tune
         - the shoulders' difference, signed, left less right: both phases, the amounts opposite
@@ -291,19 +300,22 @@ class PoseInstrument(ProjectionLayer):
 
         The measures come with their dead zones from the pipeline: the arm travels
         (``ArmTravel``, ``pose.arm_travel_extractor``), the absolute taken since the sign is the
-        side of the body the limb passes, which the design gives no meaning. The mean and the
-        difference are computed here while the matrix is tried; once liked they move into the
-        pipeline.
+        side of the body the limb passes, which the design gives no meaning. The union, the mean
+        and the difference are computed here while the matrix is tried; once liked they move into
+        the pipeline.
         """
-        shoulders = (p.left_shoulder_travel + p.right_shoulder_travel) / 2.0
+        lift = self._instrument.elbow_lift
+        left_arm  = p.left_shoulder_travel  + (1.0 - p.left_shoulder_travel)  * lift * p.left_elbow_travel
+        right_arm = p.right_shoulder_travel + (1.0 - p.right_shoulder_travel) * lift * p.right_elbow_travel
+        arms = (left_arm + right_arm) / 2.0
         difference = p.left_shoulder_travel - p.right_shoulder_travel
-        white = {
-            Parameter.PULSE_WIDTH: shoulders,
+        white: Sources = {
+            Parameter.PULSE_WIDTH: arms,
             Parameter.PITCH:       p.left_elbow_travel,
             Parameter.PHASE:       difference,
         }
-        blue = {
-            Parameter.PULSE_WIDTH: shoulders,
+        blue: Sources = {
+            Parameter.PULSE_WIDTH: arms,
             Parameter.PITCH:       p.right_elbow_travel,
             Parameter.PHASE:       difference,
         }
@@ -376,7 +388,9 @@ class PoseInstrument(ProjectionLayer):
     def _draw_mask(self, mask: np.ndarray, mask_white: np.ndarray, mask_blue: np.ndarray, p: _Player,
                    centre: int) -> None:
         """Mark the person's mask: it goes over every pattern, each channel lit at the mask's level
-        by presence, raised to the flash's level as far as the flash is up."""
+        by presence, raised to the flash's level as far as the flash is up. The border is a line
+        centred on each edge of the band, half over the blue: its own levels by presence, part of
+        the mask like the band, and it does not flash."""
         P = self._instrument.mask
         R = self.resolution
         half = mask_half_width(P.width, R)
@@ -387,3 +401,10 @@ class PoseInstrument(ProjectionLayer):
         for levels, base, at_hit in ((mask_white, P.white, P.flash_white), (mask_blue, P.blue, P.flash_blue)):
             level = (base + (at_hit - base) * flash) * presence
             levels[idx] = np.maximum(levels[idx], level)
+        if P.border_width > 0.0 and (P.border_white > 0.0 or P.border_blue > 0.0):
+            border_half = mask_half_width(P.border_width, R)
+            offsets = np.arange(-border_half, border_half + 1)
+            edges = np.concatenate((centre - half + offsets, centre + half + offsets)) % R
+            mask[edges] = True
+            for levels, base in ((mask_white, P.border_white), (mask_blue, P.border_blue)):
+                levels[edges] = np.maximum(levels[edges], base * presence)

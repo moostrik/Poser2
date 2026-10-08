@@ -377,7 +377,7 @@
         "VIDEO"
       ],
       "apply_warp": false,
-      "folder": "20260924-184100_2_person",
+      "folder": "20260924-203306_2_person",
       "sim_passthrough": false,
       "start_norm": 0.0,
       "end_norm": 1.0
@@ -496,6 +496,10 @@
         "responsiveness": 0.33,
         "friction": 0.05
       },
+      "rate_limiter": {
+        "max_increase": 3.0,
+        "max_decrease": 3.0
+      },
       "sticky": {
         "enabled": true,
         "init_to_zero": false,
@@ -504,8 +508,8 @@
     },
     "azimuth": {
       "smoother": {
-        "min_cutoff": 0.4,
-        "cutoff_rise": 10.0,
+        "min_cutoff": 0.15,
+        "cutoff_rise": 8.0,
         "d_cutoff": 1.0
       },
       "prediction": {
@@ -870,10 +874,14 @@
   "PI": {
     "max_lines": 90,
     "opposite": false,
+    "elbow_lift": 0.5,
     "mask": {
       "width": 15.0,
       "white": 0.0,
       "blue": 0.4,
+      "border_width": 0.0,
+      "border_white": 1.0,
+      "border_blue": 0.0,
       "flash_white": 0.24,
       "flash_blue": 0.98,
       "flash_release_seconds": 0.4
@@ -886,9 +894,9 @@
     },
     "window": {
       "width": 45.0,
-      "width_bypass": false,
+      "width_bypass": true,
       "sync_threshold": 0.9,
-      "taper": 0.19,
+      "taper": 0.04,
       "attack_seconds": 1.0,
       "release_seconds": 1.5
     },
@@ -994,7 +1002,7 @@
     },
     "dummy": {
       "enabled": false,
-      "solo": false,
+      "solo": true,
       "azimuth": 223.0,
       "distance": 0.5,
       "torso": 0.0,
