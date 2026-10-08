@@ -109,12 +109,12 @@ class _Player:
     """One person: their voice, their measures, and this tick's events."""
     voice:          Voice
     position:       float = 0.0     # normalized azimuth
-    left_shoulder:  float = 0.0     # the four arm travels, the absolute of ArmTravel [0, 1]
-    right_shoulder: float = 0.0
-    left_elbow:     float = 0.0
-    right_elbow:    float = 0.0
-    left_turn:      float = 0.0     # the two elbow angles (rad), for the turn
-    right_turn:     float = 0.0
+    left_shoulder_travel:  float = 0.0   # the four arm travels, the absolute of ArmTravel [0, 1]
+    right_shoulder_travel: float = 0.0
+    left_elbow_travel:     float = 0.0
+    right_elbow_travel:    float = 0.0
+    left_elbow_angle:      float = 0.0   # the two raw elbow angles (rad), the turn's measure
+    right_elbow_angle:     float = 0.0
     legs:           float = 0.0     # LegDeviation [0, 1]
     tilt:           float = 0.0     # TorsoTilt [-1, 1]
     distance:       float = 0.0     # Distance [0, 1]
@@ -214,13 +214,13 @@ class PoseInstrument(ProjectionLayer):
             p.present = True
             p.position = normalize_azimuth(azimuth)
             travel = np.abs(pose[features.ArmTravel].values)
-            p.left_shoulder  = self._value(travel[features.TravelElement.left_shoulder],  p.left_shoulder)
-            p.right_shoulder = self._value(travel[features.TravelElement.right_shoulder], p.right_shoulder)
-            p.left_elbow     = self._value(travel[features.TravelElement.left_elbow],     p.left_elbow)
-            p.right_elbow    = self._value(travel[features.TravelElement.right_elbow],    p.right_elbow)
+            p.left_shoulder_travel  = self._value(travel[features.TravelElement.left_shoulder],  p.left_shoulder_travel)
+            p.right_shoulder_travel = self._value(travel[features.TravelElement.right_shoulder], p.right_shoulder_travel)
+            p.left_elbow_travel     = self._value(travel[features.TravelElement.left_elbow],     p.left_elbow_travel)
+            p.right_elbow_travel    = self._value(travel[features.TravelElement.right_elbow],    p.right_elbow_travel)
             angles = pose[features.Angles].values
-            p.left_turn  = self._value(angles[features.AngleLandmark.left_elbow],  p.left_turn)
-            p.right_turn = self._value(angles[features.AngleLandmark.right_elbow], p.right_turn)
+            p.left_elbow_angle  = self._value(angles[features.AngleLandmark.left_elbow],  p.left_elbow_angle)
+            p.right_elbow_angle = self._value(angles[features.AngleLandmark.right_elbow], p.right_elbow_angle)
             p.legs = self._value(pose[features.LegDeviation].value, p.legs)
             p.tilt = self._value(pose[features.TorsoTilt].value, p.tilt)
             p.distance = self._value(pose[features.Distance].value, p.distance)
@@ -282,16 +282,16 @@ class PoseInstrument(ProjectionLayer):
         difference are computed here while the matrix is tried; once liked they move into the
         pipeline.
         """
-        shoulders = (p.left_shoulder + p.right_shoulder) / 2.0
-        difference = p.left_shoulder - p.right_shoulder
+        shoulders = (p.left_shoulder_travel + p.right_shoulder_travel) / 2.0
+        difference = p.left_shoulder_travel - p.right_shoulder_travel
         white = {
             Parameter.PULSE_WIDTH: shoulders,
-            Parameter.PITCH:       p.left_elbow,
+            Parameter.PITCH:       p.left_elbow_travel,
             Parameter.PHASE:       difference,
         }
         blue = {
             Parameter.PULSE_WIDTH: shoulders,
-            Parameter.PITCH:       p.right_elbow,
+            Parameter.PITCH:       p.right_elbow_travel,
             Parameter.PHASE:       difference,
         }
         return white, blue

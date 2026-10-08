@@ -161,6 +161,8 @@ the synth has to be used; they are there to be tried, because several may mean t
 the eye, or the pattern's own workings may already produce what a parameter would add. A
 connection earns its place when a person can find it with their body. Few connections, much
 meaning: a measure may drive more than one parameter, and a parameter may stay at its base.
+What holds the matrix in balance now, and the bar a next connection is judged against, is
+`MATRIX_V2.md`, *Balance*.
 
 ---
 
@@ -262,8 +264,8 @@ the visualisation as simple as possible. The bases and amounts are the preset's:
 |---------------------|-------|-------------------|------|------------|-------------------------------------------------|
 | shoulders           | 0..1  | white pulse width | 0    | 1          | solid white                                     |
 | shoulders           | 0..1  | blue pulse width  | 1    | −1         | no blue                                         |
-| left elbow          | 0..1  | white pitch       | 10   | 20 lines   | 30 lines, one every 12°: finer as the arm folds |
-| right elbow         | 0..1  | blue pitch        | 10   | 20 lines   | 30 lines                                        |
+| left elbow travel   | 0..1  | white pitch       | 10   | 20 lines   | 30 lines, one every 12°: finer as the arm folds |
+| right elbow travel  | 0..1  | blue pitch        | 10   | 20 lines   | 30 lines                                        |
 | shoulder difference | −1..1 | white phase       | 0    | ⅛ interval | the colours a quarter interval closer, the left higher one way, the right the other |
 | shoulder difference | −1..1 | blue phase        | ½    | −⅛ interval | as white's                                     |
 | leg deviation       | 0..1  | the LFO's level   | 0    | 1          | the LFO at full swing; the LFO feeds nothing    |

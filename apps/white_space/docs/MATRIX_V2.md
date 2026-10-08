@@ -23,18 +23,18 @@ above it.
 What the pose pipeline says about the body, smoothed and through its dead zones
 (`POSE_INSTRUMENT.md`, *The body*); listed whether or not a row uses it.
 
-| Measure           | Range | What it is                                                    |
-|-------------------|-------|---------------------------------------------------------------|
-| left shoulder     | 0..1  | 0 hanging → 1 straight up                                     |
-| right shoulder    | 0..1  | 0 hanging → 1 straight up                                     |
-| left elbow        | 0..1  | 0 straight → 1 folded                                         |
-| right elbow       | 0..1  | 0 straight → 1 folded                                         |
-| left elbow angle  | −π..π | the raw angle, 0 straight → ±π folded, the sign the side      |
-| right elbow angle | −π..π | the raw angle, as the left's                                  |
-| body bend         | −1..1 | −1 leaning left → 0 upright → 1 leaning right                 |
-| leg deviation     | 0..1  | 0 standing straight → 1 a leg fully bent                      |
-| distance          | 0..1  | 0 the zone's near edge → 1 its far edge                       |
-| symmetry          | −1..1 | per pair, left minus right (`POSE_INSTRUMENT.md`, *Symmetry*) |
+| Measure               | Range | What it is                                                    |
+|-----------------------|-------|---------------------------------------------------------------|
+| left shoulder travel  | 0..1  | 0 hanging → 1 straight up                                     |
+| right shoulder travel | 0..1  | 0 hanging → 1 straight up                                     |
+| left elbow travel     | 0..1  | 0 straight → 1 folded                                         |
+| right elbow travel    | 0..1  | 0 straight → 1 folded                                         |
+| left elbow angle      | −π..π | the raw angle, 0 straight → ±π folded, the sign the side      |
+| right elbow angle     | −π..π | the raw angle, as the left's                                  |
+| body bend             | −1..1 | −1 leaning left → 0 upright → 1 leaning right                 |
+| leg deviation         | 0..1  | 0 standing straight → 1 a leg fully bent                      |
+| distance              | 0..1  | 0 the zone's near edge → 1 its far edge                       |
+| symmetry              | −1..1 | per pair, left minus right (`POSE_INSTRUMENT.md`, *Symmetry*) |
 
 The similarity is not a matrix source: it drives sync, the reach toward a partner
 (`POSE_INSTRUMENT.md`, *Events*).
@@ -49,10 +49,10 @@ the instrument while the matrix is tried; a shaped measure moves into the pipeli
 
 | Source              | Range | What it is                                                      |
 |---------------------|-------|-----------------------------------------------------------------|
-| shoulders           | 0..1  | the mean of the two shoulders                                   |
-| shoulder difference | −1..1 | the left shoulder less the right, signed                        |
-| left elbow turn     | −1..1 | sine of the elbow's angle: ±1 at ±90°, 0 straight or folded     |
-| right elbow turn    | −1..1 | sine of the elbow's angle                                       |
+| shoulders           | 0..1  | the mean of the two shoulder travels                            |
+| shoulder difference | −1..1 | the left shoulder travel less the right, signed                 |
+| left elbow turn     | −1..1 | sine of the elbow angle: ±1 at ±90°, 0 straight or folded       |
+| right elbow turn    | −1..1 | sine of the elbow angle                                         |
 | breath              | −1..1 | a sine in time at `PI.breath.rate`, one per person              |
 
 ## Synth inputs
@@ -108,18 +108,18 @@ Each connection added wins rule 5 back one combination at a time, at the price r
 The base matrix with each elbow on its own colour's pitch, the left the white and the right the
 blue.
 
-| Oscillator | Parameter   | Source      | Base | Amount |
-|------------|-------------|-------------|------|--------|
-| white      | pitch       | left elbow  | 10   | 20     |
-| white      | pulse width | shoulders   | 0    | 1      |
-| white      | phase       |             | 0    |        |
-| white      | speed       |             | 0    |        |
-| white      | hardness    |             | 1    |        |
-| blue       | pitch       | right elbow | 10   | 20     |
-| blue       | pulse width | shoulders   | 1    | −1     |
-| blue       | phase       |             | ½    |        |
-| blue       | speed       |             | 0    |        |
-| blue       | hardness    |             | 1    |        |
+| Oscillator | Parameter   | Source             | Base | Amount |
+|------------|-------------|--------------------|------|--------|
+| white      | pitch       | left elbow travel  | 10   | 20     |
+| white      | pulse width | shoulders          | 0    | 1      |
+| white      | phase       |                    | 0    |        |
+| white      | speed       |                    | 0    |        |
+| white      | hardness    |                    | 1    |        |
+| blue       | pitch       | right elbow travel | 10   | 20     |
+| blue       | pulse width | shoulders          | 1    | −1     |
+| blue       | phase       |                    | ½    |        |
+| blue       | speed       |                    | 0    |        |
+| blue       | hardness    |                    | 1    |        |
 
 Folding an elbow makes its own colour's lines finer: a full fold triples them, 10 (one every
 36°) to 30 (one every 12°). The first build rested at 25.7 and folded to 72 (one every 5°), and
@@ -144,12 +144,12 @@ phases, the amounts opposite.
 
 | Oscillator | Parameter   | Source              | Base | Amount |
 |------------|-------------|---------------------|------|--------|
-| white      | pitch       | left elbow          | 10   | 20     |
+| white      | pitch       | left elbow travel   | 10   | 20     |
 | white      | pulse width | shoulders           | 0    | 1      |
 | white      | phase       | shoulder difference | 0    | ⅛      |
 | white      | speed       |                     | 0    |        |
 | white      | hardness    |                     | 1    |        |
-| blue       | pitch       | right elbow         | 10   | 20     |
+| blue       | pitch       | right elbow travel  | 10   | 20     |
 | blue       | pulse width | shoulders           | 1    | −1     |
 | blue       | phase       | shoulder difference | ½    | −⅛     |
 | blue       | speed       |                     | 0    |        |
@@ -167,3 +167,25 @@ The difference is 0 with level shoulders, so the fixed points, the T and the til
 untouched, and it is large only with one arm up and the other not, where both widths are near
 half and both colours are lines. Nothing moves in time, and the phase is continuous in the
 difference, so rules 1, 2 and 3 hold.
+
+## Balance
+
+What holds the composition in balance, and what a next connection must keep:
+
+- **The widths are conserved.** Blue's slot inverts white's source, so the two widths sum to one
+  interval: a colour grows only by the other's loss, and the total light holds along the whole
+  neutral–raised path. White and blue are the two ends of one axis, not two competing voices.
+- **One measure, one dimension.** The mean is how much of each colour, the difference where the
+  colours sit against each other, each elbow how fine its own colour. No slot is shared, no
+  measure is split over two parameters, and each parameter does one visible thing
+  (`LIGHT_SYNTH.md`, *The rules*).
+- **The patch is mirror-symmetric.** Swap left and right in the body and white and blue in the
+  light and the matrix maps onto itself: the pitches are mirror-wired, the widths and the phases
+  each take one source with opposite amounts. The arms are counterweights; neither is the louder.
+- **Everything rests at the anchors, and nothing moves by itself.** Every source is 0 at the
+  fixed points, and no source moves in time, so the picture hangs from the two poses of rest and
+  every movement on the wall is the body's, one to one.
+
+This is the bar a candidate connection is judged against (rule 4): it earns its place by adding
+a dimension of its own, not by doubling an owned one or summing into an owned slot. A connection
+that moves in time, as the breath, changes the last point in kind and is judged as that.
