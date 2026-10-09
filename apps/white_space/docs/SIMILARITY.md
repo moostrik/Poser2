@@ -29,8 +29,8 @@ In this order; each step's number is read off the data view (`render.layers.data
    directions, so the same pose reads some degrees apart for that reason alone; the tolerance absorbs it.
 4. **Set the forgiveness** only if one joint, usually an elbow, keeps breaking matches that look right:
    `pose.similarity.posture.forgiveness`. 1 is none.
-5. **Set where the windows open**: `PI.window.sync_threshold`, in PLAY. Windows too rarely open toward each
-   other, lower it; open on unlike poses, raise it.
+5. **Set the sync strobe's band**: `PI.sync_strobe.on_at` and `off_at`, in PLAY. The strobe too
+   rare, lower `on_at`; coming on for unlike poses, raise it; swapping in and out, widen the band.
 
 Restart the app before saving a preset: the running app rewrites `studio.json`.
 
@@ -67,14 +67,14 @@ The arms are alike, then, when every arm joint is within the tolerance, allowing
 | Reads                 | the distance, and the similarity's plateau               | the similarity, 0 to 1                                        |
 | Neutral               | a gate: every hit in the run has `ArmDeviation` 1        | a ramp: the pair times the smaller `ArmDeviation` (`pose/neutral_weight.py`) |
 | In time               | none: the poses as they were at the hits                 | `SimilarityStickyFiller`, `SimilarityEuroSmoother` (SMOOTH), `SimilarityChaseInterpolator` (LERP) |
-| Decision              | a run of hits is in sync when every pair's similarity is 1 and the gate holds; `min_players` in a row | none; each reader shapes it: the window opens from `PI.window.sync_threshold` to 1, eased |
+| Decision              | a run of hits is in sync when every pair's similarity is 1 and the gate holds; `min_players` in a row | none; each reader shapes it: the sync strobe while every pair holds over `PI.sync_strobe.on_at` / `off_at` |
 | Output                | `HitStreak` on the board; `states.sync.hits`, `states.sync.distance` (°) | the rows on the LERP frames; `/pose/N/similarity/pose` to Max |
 
 Both read one settings group, `pose.similarity.posture`, and one switch for neutral,
 `pose.similarity.neutral_weight.enabled`. The feature's chain: `PostureSimilarity` runs on the SMOOTH
 broadcast; its rows pass the sticky filler (a present pair's gap is held, a departed player's slot is NaN)
 and the neutral weight, and are stamped on the next SMOOTH frames by `SimilarityApplicator`, smoothed, then
-chased at LERP. The hit sync reads none of that, so a change to the similarity smoothers changes the windows
+chased at LERP. The hit sync reads none of that, so a change to the similarity smoothers changes the light
 and the sound, never the sync. White Space produces no leader scores; `/pose/N/similarity/leader` carries
 zeros.
 
@@ -95,7 +95,8 @@ zeros.
 | `pose.similarity.smoother` (`min_cutoff`, `cutoff_rise`) | feature          | 0.3, 1.0      | the Euro smoother on the stamped rows |
 | `pose.similarity.interpolator` (`responsiveness`, `friction`) | feature    | 0.33, 0.05    | the chase at LERP |
 | `states.min_players`                                 | hit sync            | 2             | alike hits in a row to spin up |
-| `PI.window.sync_threshold`                           | window              | 0.9           | the feature value from which windows open, fully at 1 |
+| `PI.sync_strobe.on_at`, `off_at`                     | the sync strobe     | 0.95, 0.9     | full sync's band: on when every pair reads `on_at`, off below `off_at` |
+| `PI.sync_strobe.threshold`                           | the reach growth    | 0.9           | where sync's reach growth begins (bypassed in the preset) |
 | `PI.window.width`                                    | window              | 33°           | the window before it opens |
 
 ## What the numbers mean

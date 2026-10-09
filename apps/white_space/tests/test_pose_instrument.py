@@ -1,6 +1,7 @@
 """Tests for the pose instrument, the bridge between the pose data and the light synth: the
 connections, the two fixed points, the window's taper, the mask, the hit (the push and the flash),
-playing by hand, sync and presence. The synth itself is tested in test_synth_*.py."""
+playing by hand, sync (the reach growth and the pulse) and presence. The synth itself is tested
+in test_synth_*.py."""
 
 import math
 import unittest
@@ -12,13 +13,13 @@ from modules.pose import features
 
 from apps.white_space.light import Tick, MotorCommand, MotorMode, LayerSettings
 from apps.white_space.light.frame import Frame
-from apps.white_space.light.layers import PoseInstrument, PoseInstrumentSettings
+from apps.white_space.light.layers import PoseInstrument, PoseInstrumentSettings, SyncStrobeMode
 from apps.white_space.light.synth import Parameter, Curve
 from apps.white_space.pose import PlayheadOffset
 
 IRES = 3600                 # one pixel per 0.1°
 C = IRES // 2               # the pixel of a person at normalized azimuth 0.5
-TICK = 1 / 30
+TICK = 1 / 32                # the light clock's rate (ClockSettings.light_rate), the strobes' and the pulse's grid
 MASK = 15                   # mask half width (px) at the default 3°
 BORDER = 5                  # border half width (px) at the default 1°
 REACH = 450                 # the default 45° reach (px)
@@ -95,12 +96,13 @@ class PoseInstrumentTest(unittest.TestCase):
         self.cfg = PoseInstrumentSettings()
         self.cfg.window.attack_seconds = 0.0              # present at once — geometry tests read one frame
         self.cfg.mask.border_white = 0.0                  # the band alone; the border has its own tests
+        self.cfg.sync_strobe.bypass = True                # the sync strobe has its own tests
         W, B = self.cfg.white_lines, self.cfg.blue_lines              # the placeholder's patch: white out, blue in
         W.pulse_width, W.pulse_width_amount, W.phase = 0.0, 1.0, self.QUARTER
         B.pulse_width, B.pulse_width_amount, B.phase = 1.0, -1.0, -0.5 + self.QUARTER
         self.board = InstrumentBoard(frames={})
         self.layer = PoseInstrument(IRES, LayerSettings(), self.cfg, self.board, pose_stage=4)
-        self.dt = TICK                                    # the tick's interval; the strobe tests run at 32 fps
+        self.dt = TICK                                    # the tick's interval, the show's 32 fps
         self.tick = 0                                     # the clock's tick index, counted by _render
 
     def _people(self, poses: dict[int, FakePose]) -> None:
@@ -520,7 +522,7 @@ class PoseInstrumentTest(unittest.TestCase):
 
     def test_the_flash_falls_back_over_its_release(self) -> None:
         M = self.cfg.mask
-        M.flash_release_seconds = 0.1                                     # three ticks
+        M.flash_release_seconds = 3 / 32                                  # three ticks
         levels = [float(f.blue[C]) for f in self._sweep()]
         self.assertAlmostEqual(levels[3], M.flash_blue, places=6)
         self.assertGreater(levels[4], M.blue)                             # still falling
@@ -568,11 +570,11 @@ class PoseInstrumentTest(unittest.TestCase):
         self.cfg.white_lines.speed = 7.0                              # half an interval per second
         self.cfg.blue_lines.speed = -3.5
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY)})
-        for _ in range(30):                                     # a second
+        for _ in range(32):                                     # a second
             f = self._render()
         self._on_grid(self._inner(f.white), INTERVAL, INTERVAL / 2)         # out by half an interval
         self._on_grid(self._inner(f.blue), INTERVAL, INTERVAL / 4)          # in by a quarter, from the half
-        for _ in range(30):
+        for _ in range(32):
             f = self._render()
         self._on_grid(self._inner(f.white), INTERVAL)                       # a full interval on: the grid again
         self._on_grid(self._inner(f.blue), INTERVAL)
@@ -582,12 +584,12 @@ class PoseInstrumentTest(unittest.TestCase):
         self.cfg.white_lines.speed = 7.0                        # half an interval per second
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY)})
         first = self._render()
-        for _ in range(29):                                     # a second in all
+        for _ in range(31):                                     # a second in all
             f = self._render()
         self._on_grid(self._inner(f.white), INTERVAL, INTERVAL / 2)            # right: away from the person
         before_left = self._centres(self._left(first.white))[-1]
         after_left = self._centres(self._left(f.white))[-1]
-        self.assertAlmostEqual(after_left - before_left, 29 * 7.0 * TICK * 10, delta=1.0)   # left: toward the person
+        self.assertAlmostEqual(after_left - before_left, 31 * 7.0 * TICK * 10, delta=1.0)   # left: toward the person
         self._on_grid(self._inner(f.blue), INTERVAL, INTERVAL / 2)             # blue, mirrored: as before
 
     def test_reset_starts_a_new_pass(self) -> None:
@@ -681,9 +683,8 @@ class PoseInstrumentTest(unittest.TestCase):
     # -- the strobe --
 
     def _strobing(self, rate: float, width: float, shift: float = 0.0, **pose) -> None:
-        """The white strobe set by hand, at 32 fps, one person at C with the given pose (arms
-        halfway by default: alternating lines)."""
-        self.dt = 1 / 32
+        """The white strobe set by hand, one person at C with the given pose (arms halfway by
+        default: alternating lines)."""
         S = self.cfg.white_strobe
         S.rate, S.width, S.shift = rate, width, shift
         self._people({0: _pose(0.5, **(pose or dict(left_shoulder=self.HALFWAY)))})
@@ -780,8 +781,115 @@ class PoseInstrumentTest(unittest.TestCase):
         self._render()
         self._people({0: _pose(0.3, sims={1: 1.0})})             # the partner is gone
         lit = [int(np.count_nonzero(self._render().blue)) for _ in range(40)]
-        self.assertLess(max(abs(b - a) for a, b in zip(lit, lit[1:])), 250)    # closing, never snapping shut
+        self.assertLess(max(abs(b - a) for a, b in zip(lit, lit[1:])), 300)    # closing, never snapping shut (a snap would be the whole grown arc)
         self.assertLess(lit[-1], 2 * REACH + 10)                 # back at the rest reach
+
+    # -- the sync strobe --
+
+    PROBE = round(0.3 * IRES) + 300          # inside the 0.3 person's full window, clear of the mask
+
+    def _sync_pair(self, sim: float = 1.0) -> None:
+        """A pair at neutral (full blue), its one pair reading ``sim``; the strobe at once (no
+        attack or release) — the envelope has its own tests."""
+        S = self.cfg.sync_strobe
+        S.bypass = False
+        S.attack_seconds = S.release_seconds = 0.0
+        self._people({0: _pose(0.3, sims={1: sim}), 1: _pose(0.7, sims={0: sim})})
+
+    def _even_frame(self) -> Frame:
+        """Render to the next even tick, where a strobe frame falls whenever the strobe is up."""
+        if self.tick % 2:
+            self._render()
+        return self._render()
+
+    def test_full_sync_strobes_every_other_tick_swapping_the_colours(self) -> None:
+        self._sync_pair()
+        blue = [float(self._render().blue[self.PROBE]) for _ in range(4)]
+        self.assertEqual(blue, [0.0, 1.0, 0.0, 1.0])
+        self.assertEqual(float(self._even_frame().white[self.PROBE]), 1.0)   # a swap, not darkness
+
+    def test_the_band_holds_the_strobe_and_reentry_needs_full_sync(self) -> None:
+        self._sync_pair(sim=0.92)                                # inside the band from below: not full sync
+        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
+        self._sync_pair()                                        # every pair at on_at: on
+        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 0.0)
+        self._sync_pair(sim=0.92)                                # hovering: the band holds it on
+        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 0.0)
+        self._sync_pair(sim=0.85)                                # below the band: off
+        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
+        self._sync_pair(sim=0.92)                                # back inside: stays off
+        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
+
+    def test_one_unlike_pair_holds_the_room_off(self) -> None:
+        self.cfg.sync_strobe.bypass = False
+        self.cfg.sync_strobe.attack_seconds = 0.0
+        self._people({0: _pose(0.3, sims={1: 1.0, 2: 1.0}), 1: _pose(0.7, sims={0: 1.0, 2: 0.5}),
+                      2: _pose(0.1, sims={0: 1.0, 1: 0.5})})
+        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
+
+    def test_black_mode_darkens_the_patterns_and_keeps_the_mask(self) -> None:
+        self._sync_pair()
+        self.cfg.sync_strobe.mode = SyncStrobeMode.BLACK
+        f = self._even_frame()
+        self.assertEqual(float(f.white[self.PROBE]), 0.0)
+        self.assertEqual(float(f.blue[self.PROBE]), 0.0)
+        self.assertAlmostEqual(float(f.blue[round(0.3 * IRES)]), self.cfg.mask.blue, places=6)   # the mask stays
+        self.assertEqual(float(self._render().blue[self.PROBE]), 1.0)            # off the strobe, as ever
+
+    def test_no_strobe_short_of_the_band_alone_or_bypassed(self) -> None:
+        self._sync_pair(sim=0.5)
+        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
+        self.layer.reset()
+        self.cfg.sync_strobe.bypass = False
+        self._people({0: _pose(0.3)})                            # alone: full sync needs a pair
+        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
+        self.layer.reset()
+        self._sync_pair()
+        self.cfg.sync_strobe.bypass = True
+        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
+
+    def test_reset_forgets_the_sync(self) -> None:
+        self._sync_pair()
+        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 0.0)
+        self.layer.reset()
+        self._sync_pair(sim=0.92)                                # inside the band, but the hold was forgotten
+        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
+
+    def test_the_attack_climbs_the_ladder_on_the_grid(self) -> None:
+        self._sync_pair()
+        self.cfg.sync_strobe.attack_seconds = 1.0                # the helper zeroes it; the climb is this test's
+        ticks = []
+        for _ in range(32):
+            t = self.tick
+            if float(self._render().blue[self.PROBE]) == 0.0:
+                ticks.append(t)
+        self.assertTrue(all(t % 2 == 0 for t in ticks))          # nesting: every strobe frame an even tick
+        self.assertLessEqual(sum(1 for t in ticks if t < 8), 2)  # sparse coming in
+        self.assertEqual(sum(1 for t in ticks if t >= 24), 4)    # every other tick once risen
+
+    def test_the_release_steps_the_strobe_down_to_silence(self) -> None:
+        self._sync_pair()
+        self.assertEqual(float(self._render().blue[self.PROBE]), 0.0)    # on at once
+        self._sync_pair(sim=0.5)                                 # sync lost
+        self.cfg.sync_strobe.release_seconds = 1.0               # the helper zeroes it; the fade is this test's
+        ticks = []
+        for _ in range(40):
+            t = self.tick
+            if float(self._render().blue[self.PROBE]) == 0.0:
+                ticks.append(t)
+        self.assertEqual(ticks, [2, 4, 6, 8, 12, 16])            # thinning out, then silence
+
+    def test_a_resync_mid_release_climbs_from_where_it_is(self) -> None:
+        self._sync_pair()
+        self._render()                                           # on, at once
+        self._sync_pair(sim=0.5)
+        S = self.cfg.sync_strobe
+        S.attack_seconds = S.release_seconds = 1.0               # the helper zeroed them
+        for _ in range(4):
+            self._render()                                       # falling, still near the top
+        self._people({0: _pose(0.3, sims={1: 1.0}), 1: _pose(0.7, sims={0: 1.0})})
+        ticks = [1 for _ in range(8) if float(self._render().blue[self.PROBE]) == 0.0]
+        self.assertGreaterEqual(len(ticks), 3)                   # back near the top at once, not from silence
 
     # -- presence --
 

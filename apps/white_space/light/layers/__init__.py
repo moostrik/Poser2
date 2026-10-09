@@ -9,7 +9,7 @@ from .beam.flash                    import BeamFlash,           BeamFlashSetting
 from .beam.wind_down                import BeamWindDown,        BeamWindDownSettings
 from .beam.haunted                  import BeamHaunted,         BeamHauntedSettings
 from .beam.test                     import BeamTest,            BeamTestSettings
-from .projection.pose_instrument    import PoseInstrument,      PoseInstrumentSettings
+from .projection.pose_instrument    import PoseInstrument,      PoseInstrumentSettings, SyncStrobeMode
 from .projection.playhead_marker    import PlayheadMarker,      PlayheadMarkerSettings
 from .projection.projection_playhead import ProjectionPlayhead
 from .projection.flood              import Flood,               FloodSettings

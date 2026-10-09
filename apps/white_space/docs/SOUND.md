@@ -30,7 +30,7 @@ The events and the place (`POSE_INSTRUMENT.md`, *Events*):
 
 | In the light instrument | Pose feature       | OSC address                  | Index | On the wire                    | The light reads it as                       |
 |-------------------------|--------------------|------------------------------|-------|--------------------------------|---------------------------------------------|
-| sync                    | `Similarity`       | `/pose/{id}/similarity/pose` | other | 0..1 per live player           | the pair's mean, from `sync_threshold` to 1 |
+| sync                    | `Similarity`       | `/pose/{id}/similarity/pose` | other | 0..1 per live player           | the pair's mean, the sync strobe's band over it |
 | hit                     | `PlayheadOffset`   | `/pose/{id}/playhead/offset` | –     | −π..π; azimuth minus playhead  | the ticks closest to 0 (`PlayheadCrossing`) |
 | presence                | the pose itself    | `/pose/{id}/active`          | –     | 1 present, 0 gone              | the presence envelope's gate                |
 | where the person stands | `Azimuth`          | `/pose/{id}/azimuth`         | –     | radians                        | the centre of the window and the mask       |
@@ -49,8 +49,9 @@ where the feet meet the floor (`TRACKING.md`); it is NaN without a reading.
 The similarity is a row: index `n` is this person against live player `n`, `max_players` wide; a
 pair that does not exist is sent as 0.
 What it measures and how it is smoothed is in `SIMILARITY.md`. The light takes the mean of both
-directions of a pair and opens the window from `PI.window.sync_threshold` to 1, eased
-(`PoseInstrument._set_reaches`); Max gets the row and shapes it itself.
+directions of a pair and strobes the room while every pair holds over `PI.sync_strobe.on_at`
+(`PoseInstrument._set_sync_strobe`; `POSE_INSTRUMENT.md`, *The sync strobe*); Max gets the row
+and shapes it itself.
 
 ## The wire
 

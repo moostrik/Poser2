@@ -319,8 +319,8 @@ holding the same pose fills with light.
   2. session: elapsed ≥ `session.play_seconds` → S8 END *(the count is not checked: a session plays out
      its time)*
 - **Mix**: `pose_instrument` 1.0
-- **White**: the pose instrument — patterns per pose plus the sync fill between similarly-posed
-  players — and the playhead line at full white
+- **White**: the pose instrument — patterns per pose plus the sync strobe at full sync — and
+  the playhead line at full white
 - **Blue**: pose instrument (`pose_instrument`'s blue)
 - **Pose sound**: yes
 - **Secondary sound**: ENHANCE spin

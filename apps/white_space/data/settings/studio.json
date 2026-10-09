@@ -895,13 +895,15 @@
     "window": {
       "width": 45.0,
       "width_bypass": true,
-      "sync_threshold": 0.9,
       "scale": 1.5,
       "crowd": 0.75,
       "overlap": 0.0,
       "taper": 0.1,
       "attack_seconds": 1.0,
       "release_seconds": 1.5
+    },
+    "sync_strobe": {
+      "threshold": 0.9
     },
     "breath": {
       "rate": 0.5,

@@ -13,8 +13,12 @@ bridge is everything the synth does not know:
   person's measures into the sources of the synth's slots. The bases and amounts are settings of
   the ``PI`` group; the wiring is code.
 - the **events**: presence (a pose is seen), the hit (``PlayheadCrossing``, the tick closest to
-  the crossing: each oscillator's push and the mask's flash), and sync, which grows the reach on
-  a partner's side until it reaches them, from ``window.sync_threshold`` on.
+  the crossing: each oscillator's push and the mask's flash), and sync: the **sync strobe** —
+  while the room holds full sync, every present pair alike over the band (on from
+  ``sync_strobe.on_at``, off below ``sync_strobe.off_at``), every drawn pattern's white and
+  blue swap on strobe frames (or go dark, ``sync_strobe.mode``), the rate climbing the nested
+  ladder over the attack and stepping back down over the release — and the reach growing on a
+  partner's side from ``sync_strobe.threshold`` until it reaches them.
 - the **scale**: the voices work in pattern degrees, real degrees over ``window.scale`` shrunk
   by ``window.crowd`` per further participant (the sum of presences, so it moves smoothly), and
   the bridge divides the positions it hands them; the whole pattern — reach, lines, motion —
@@ -40,6 +44,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from enum import IntEnum
 from functools import partial
 
 import numpy as np
@@ -63,15 +68,40 @@ _BREATH_POSITION = np.zeros(1)          # the breath is in time: one position
 
 class WindowSettings(SynthWindowSettings):
     """The window: how far the pattern shows each side of a person, and when. The synth's part
-    (taper, attack, release) with the bridge's: the reach at rest, its bypass, sync, the scale,
+    (taper, attack, release) with the bridge's: the reach at rest, its bypass, the scale,
     which compresses the whole pattern — reach, lines, motion — as one picture, and the overlap,
-    which pulls neighbouring windows apart into territories."""
+    which pulls neighbouring windows apart into territories. Sync's threshold is the sync
+    strobe's (``SyncStrobeSettings``); the growth reads it from there."""
     width:          Field[float] = Field(45.0, min=0.0, max=180.0, step=0.5,  widget=KNOB, label="Width",          description="Reach each side of a person at rest (deg)", row_label="Reach", newline=True)
     width_bypass:   Field[bool]  = Field(False,                                            label="Bypass",         description="Both reaches at the width: no sync growth")
-    sync_threshold: Field[float] = Field(0.75, min=0.0, max=0.99,  step=0.01, widget=KNOB, label="Sync Threshold", description="Pair similarity from which the reach grows toward the partner, fully at 1 (alike)")
     scale:          Field[float] = Field(1.0,  min=0.1, max=2.0,   step=0.01, widget=KNOB, label="Scale",          description="Overall window scale: the whole pattern compresses, nothing needs recalibrating", row_label="Scale", newline=True)
     crowd:          Field[float] = Field(1.0,  min=0.5, max=1.0,   step=0.01, widget=KNOB, label="Crowd",          description="Each further participant multiplies the scale by this; 1 = off")
     overlap:        Field[float] = Field(1.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Overlap",        description="How far a window may reach into a neighbour's: 1 full, 0 territories meeting at the midpoint, negative a gap between them")
+
+
+class SyncStrobeMode(IntEnum):
+    """What a sync strobe frame does to the patterns."""
+    INVERT = 0      # white and blue trade places
+    BLACK  = 1      # the patterns go dark
+
+
+class SyncStrobeSettings(BaseSettings):
+    """The sync strobe, full sync's visualisation: while every present pair is fully alike,
+    every drawn pattern's white and blue swap on strobe frames (or go dark, the mode). The
+    band is the hysteresis gate: on when every pair reads ``on_at``, off only when one falls
+    below ``off_at``, so a room hovering at one level never swaps it. The gate drives an
+    envelope whose value picks the rate from the nested powers of two: the strobe comes in
+    climbing 1 to 16 per second over the attack and fades out stepping back down over the
+    release, every change a seamless infill. The bridge's, after the voices render; the
+    per-oscillator strobes are the patch's and independent. The threshold is where sync
+    begins, the reach growth's start."""
+    bypass:          Field[bool]           = Field(False,                 label="Bypass", description="No sync strobe: full sync shows nothing", row_label="Sync Strobe", newline=True)
+    mode:            Field[SyncStrobeMode] = Field(SyncStrobeMode.INVERT, label="Mode",   description="A strobe frame swaps white and blue, or goes dark")
+    on_at:           Field[float]          = Field(0.95, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="On At",   description="The strobe comes on when every pair reads at least this")
+    off_at:          Field[float]          = Field(0.90, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Off At",  description="The strobe goes off when any pair falls below this")
+    attack_seconds:  Field[float]          = Field(2.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Attack",  description="The rate climbs 1 to 16 per second over (s)")
+    release_seconds: Field[float]          = Field(4.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Release", description="The rate steps back down to silence over (s)")
+    threshold:       Field[float]          = Field(0.75, min=0.0, max=0.99, step=0.01, widget=KNOB, label="Threshold", description="Pair similarity from which sync begins: the reach growth's start")
 
 
 class MaskSettings(BaseSettings):
@@ -99,14 +129,16 @@ class BreathSettings(BaseSettings):
 
 class PoseInstrumentSettings(BaseSettings):
     """The ``PI`` root group, a group per concept: the mask, the playhead's marker, the window,
-    the breath, the two oscillators, their strobes and the LFO (the synth's patch, a slot per
-    parameter), the dummy. The wiring is ``connect``; the measures' dead zones are the pipeline's."""
+    the sync strobe, the breath, the two oscillators, their strobes and the LFO (the synth's
+    patch, a slot per parameter), the dummy. The wiring is ``connect``; the measures' dead
+    zones are the pipeline's."""
     max_lines:    Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
     opposite:     Field[bool] = Field(False, description="Draw each person's lines half a turn away; the masks stay on the people")
     elbow_lift:   Field[float] = Field(0.5, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Elbow Lift", description="How much a folded elbow lifts its arm (fraction of a full raise)")
     mask:         Group[MaskSettings]           = Group(MaskSettings)
     playhead:     Group[PlayheadMarkerSettings] = Group(PlayheadMarkerSettings)
     window:       Group[WindowSettings]         = Group(WindowSettings)
+    sync_strobe:  Group[SyncStrobeSettings]     = Group(SyncStrobeSettings)
     breath:       Group[BreathSettings]         = Group(BreathSettings)
     white_lines:  Group[OscillatorSettings]     = Group(OscillatorSettings)
     blue_lines:   Group[OscillatorSettings]     = Group(OscillatorSettings)
@@ -140,6 +172,7 @@ class _Player:
     breath:         Oscillator = field(default_factory=Oscillator)   # the breath: a sine in time on the widths
     reach_left:     float = 0.0     # this tick's reach each side (deg), before presence
     reach_right:    float = 0.0
+    sync_strobe:    bool  = False   # this tick is a sync strobe frame, on the strobes' grid
 
 
 class PoseInstrument(ProjectionLayer):
@@ -154,6 +187,9 @@ class PoseInstrument(ProjectionLayer):
         self._pose_stage = pose_stage
         self._players: dict[int, _Player] = {}
         self._scale = 1.0                                                   # this tick's window scale
+        self._ticks_per_second = 1                                          # this tick's grid, the strobes' and the pulse's
+        self._synced = False                                                # full sync held, inside the band
+        self._sync_strobe = Envelope()                                      # the band's envelope: its value picks the rate
         self._crossing = PlayheadCrossing()
         self._pixels = np.arange(resolution, dtype=np.float64)              # the strip's pixel indices
         self._mask = np.zeros(resolution, dtype=bool)
@@ -165,9 +201,11 @@ class PoseInstrument(ProjectionLayer):
             strobe.bind(StrobeSettings.bypass_all, partial(self._strobe_bypass_all, strobe))
 
     def reset(self) -> None:
-        """A fresh instrument (S6 entry): forget every player and pass."""
+        """A fresh instrument (S6 entry): forget every player, pass and sync."""
         self._players.clear()
         self._crossing.reset()
+        self._synced = False
+        self._sync_strobe.reset()
 
     @staticmethod
     def _bypass_all(patch: OscillatorSettings, _: bool) -> None:
@@ -190,6 +228,7 @@ class PoseInstrument(ProjectionLayer):
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         self._update_players(frame)
         self._set_reaches()
+        self._set_sync_strobe(frame.tick.index, frame.tick.dt)
         mask, mask_white, mask_blue = self._mask, self._mask_white, self._mask_blue
         mask.fill(False)
         mask_white.fill(0.0)
@@ -210,11 +249,20 @@ class PoseInstrument(ProjectionLayer):
             signed = (((self._pixels - centre_px + R / 2.0) % R) - R / 2.0) / px_per_degree
             reach_left = np.array([p.reach_left for p in players]).reshape(-1, 1)
             reach_right = np.array([p.reach_right for p in players]).reshape(-1, 1)
-            out_white, out_blue = Voice.render_all(
-                [p.voice for p in players], signed, reach_left, reach_right,
-                [self._sources(p) for p in players])
-            np.maximum(white, out_white, out=white)
-            np.maximum(blue, out_blue, out=blue)
+            sources = [self._sources(p) for p in players]
+            # On a sync strobe frame the strobing patterns render as their own batch, so their
+            # outputs swap channels (or stay dark); off the strobe everyone is one batch as ever.
+            steady = [k for k, p in enumerate(players) if not p.sync_strobe]
+            strobing = [k for k, p in enumerate(players) if p.sync_strobe]
+            for idx, strobed in ((steady, False), (strobing, True)):
+                if not idx or (strobed and self._instrument.sync_strobe.mode == SyncStrobeMode.BLACK):
+                    continue
+                out_1, out_2 = Voice.render_all(
+                    [players[k].voice for k in idx], signed[idx], reach_left[idx], reach_right[idx],
+                    [sources[k] for k in idx])
+                out_white, out_blue = (out_2, out_1) if strobed else (out_1, out_2)
+                np.maximum(white, out_white, out=white)
+                np.maximum(blue, out_blue, out=blue)
 
         for p in players:
             self._draw_mask(mask, mask_white, mask_blue, p, int(round(p.position * R)) % R)
@@ -264,7 +312,7 @@ class PoseInstrument(ProjectionLayer):
         hits = self._crossing.update(offsets, step, self.HIT_TICKS)
 
         min_interval = self._min_interval()
-        ticks_per_second = max(1, round(1.0 / max(frame.tick.interval, 1e-3)))   # the strobes' grid
+        ticks_per_second = self._ticks_per_second = max(1, round(1.0 / max(frame.tick.interval, 1e-3)))   # the strobes' grid
         # The window scale: the master knob, shrunk per further participant. The participation is
         # the sum of presences — smooth as people arrive and leave — read before the voices
         # advance them, a one-tick lag the attack/release easing makes invisible. The voices work
@@ -352,7 +400,7 @@ class PoseInstrument(ProjectionLayer):
         there when one needs it."""
         return p.legs
 
-    # -- Reach and sync ---------------------------------------------------------------
+    # -- Reach, sync and the pulse ----------------------------------------------------
 
     def _set_reaches(self) -> None:
         """Each side's reach in pattern degrees, before presence: ``window.width``, clipped toward
@@ -368,7 +416,7 @@ class PoseInstrument(ProjectionLayer):
         self._clip_reaches(base)
         if W.width_bypass:
             return
-        threshold = W.sync_threshold
+        threshold = self._instrument.sync_strobe.threshold
         ids = list(self._players)
         for i, id_a in enumerate(ids):
             for id_b in ids[i + 1:]:
@@ -421,6 +469,34 @@ class PoseInstrument(ProjectionLayer):
                     b.reach_right = min(b.reach_right, limits[1])
                     a.reach_right = min(a.reach_right, limits[2])
                     b.reach_left = min(b.reach_left, limits[3])
+
+    def _set_sync_strobe(self, tick: int, dt: float) -> None:
+        """Whether this tick is a sync strobe frame. The room is in **full sync** while every
+        present pair is alike over the band: on when the least alike pair reads
+        ``sync_strobe.on_at``, off only when one falls below ``sync_strobe.off_at``, so a room
+        hovering at one level never swaps the gate. A pair that cannot be read holds the room
+        off, as does a person at neutral (the neutral weight is in the feature); below two
+        people there is no pair. The band gates an envelope whose value picks the rate from
+        the nested powers of two (``Strobe.rate``, ``Strobe.period``): the strobe comes in
+        climbing 1 to 16 per second over the attack — every other tick at a power-of-two tick
+        rate — and fades out stepping back down over the release, every change a seamless
+        infill on the strobes' shared grid, and a gate reopened mid-fade climbs from where it
+        is. While it strobes, every drawn pattern strobes: full sync is the whole room."""
+        P = self._instrument.sync_strobe
+        present = [id for id, p in self._players.items() if p.present]
+        if P.bypass or len(present) < 2:
+            self._synced = False
+        else:
+            sims = [self._pair_similarity(a, b) for i, a in enumerate(present) for b in present[i + 1:]]
+            least = -1.0 if any(math.isnan(s) for s in sims) else min(sims)
+            self._synced = least >= (min(P.off_at, P.on_at) if self._synced else P.on_at)
+        value = self._sync_strobe.update(self._synced, dt, P.attack_seconds, P.release_seconds)
+        strobe = False
+        if self._sync_strobe.level > 0.0:
+            rate = Strobe.rate(float(2.0 ** round(4.0 * value)), self._ticks_per_second)
+            strobe = tick % Strobe.period(rate, self._ticks_per_second) == 0
+        for p in self._players.values():
+            p.sync_strobe = strobe
 
     def _pair_similarity(self, id_a: int, id_b: int) -> float:
         """Mean of both directions' pairwise similarity (one side may be NaN)."""

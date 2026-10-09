@@ -30,7 +30,7 @@ goes over everything at the person, the patterns of everyone and the light of th
 the playhead passes through it dimmed by a setting. Around the mask, mirrored about the person
 (or, per oscillator, passing behind them), their **pattern**: lines of full white and full blue,
 generated behind the mask and coming out from under it. Only a **window** of the pattern is
-visible each side of the person; sync opens the window wider.
+visible each side of the person; sync shows as the sync strobe (*Events*).
 
 The ground rules, as set:
 
@@ -61,7 +61,10 @@ The ground rules, as set:
   the lines reads as a mark **(site facts)**; the mark is the push and the mask's flash
   (*Events*), with the playhead's marker passing the person; each mark is optional through its
   levels.
-- Sync makes more of the pattern visible: the window opens, the lines stay what they are.
+- Sync shows as the **sync strobe**, at full sync only: while every pair is alike, the whole
+  room's white and blue trade places on strobe frames, the lines staying what they are, the
+  rate climbing in over the attack and stepping away over the release. Sync can also open the
+  window toward the partner (off in the preset).
 - A person's pattern can be drawn half a turn from them (`opposite`), their mask staying on them:
   a switch for looking at the two apart, not for the show.
 
@@ -151,8 +154,8 @@ measure that is not of the body's pose.
 | distance            | secondary | open                                                            |
 | elbow symmetry      | secondary | open: it shows unconnected, as the colours in or out of tune    |
 
-Two events sit over every measure: the **accent** of a hit and the **unison** of sync, the windows
-of two people opening toward each other until the two patterns overlap and become one (*Events*).
+Two events sit over every measure: the **accent** of a hit and the **unison** of sync, the
+colours of everyone alike trading places on the same frames, the room one strobe (*Events*).
 
 ## Composition
 
@@ -243,7 +246,7 @@ leg deviation's zones are in their extractors.
 | leg deviation | at standing, degrees; full at each top     | `leg_deviation_extractor.neutral_dead_zone`, `hip_max_degrees`, `knee_max_degrees` |
 
 The distance and the symmetries get theirs with their connection; the similarity has its own
-remap, `window.sync_threshold`.
+remap, `sync_strobe.threshold`.
 
 ## Symmetry
 
@@ -290,11 +293,14 @@ What the instrument triggers in a person's voice, beside the measures:
 |----------|-------------------------------------------------------------|-------------------------------------------------------------|
 | presence | the person is seen: a gate open while they are there        | the presence envelope, on both reaches                      |
 | hit      | the playhead crosses the person: the tick closest to it     | each oscillator's push, and the mask's flash                |
-| sync     | the similarity of a pair is over its threshold              | the reach on the partner's side: full reaches the partner   |
+| sync     | a pair is over the threshold; full sync: every pair alike   | the sync strobe, at full sync; and the reach on the partner's side (off in the preset) |
 
 Presence and the pushes are envelopes of the synth (`LIGHT_SYNTH.md`, *The envelope*). The
 reaches are the bridge's: it gives each side's reach to the voice as a value, the rest width grown
-toward the partner by sync, since only the bridge knows where the partner stands. The mask's
+toward the partner by sync, since only the bridge knows where the partner stands. The sync
+strobe is the bridge's too: the synth renders as ever, and the bridge swaps the voices' outputs
+between the channels for the frame, or leaves them dark, so no parameter and no slot is touched
+(*The sync strobe*). The mask's
 flash is the bridge's own envelope of the same block, opened by the hit at once and falling back
 over its release: the mask goes to its flash levels and returns to its own. The mask is the
 bridge's and not the synth's.
@@ -372,7 +378,7 @@ Presence opens the window from the mask over `window.attack_seconds` and closes 
 `window.release_seconds`, the last pose held while it closes and the mask dimming with it.
 
 The bridge sets each side's **reach** every tick: `window.width`, grown by sync toward every
-partner along the shorter arc. Sync starts at `window.sync_threshold`, on the mean of both
+partner along the shorter arc. Sync starts at `sync_strobe.threshold`, on the mean of both
 directions' similarity; the threshold is the bridge's remap of the similarity, which is well above
 0 for most pairs out of neutral (`SIMILARITY.md`, *Interdependence*). The reach grows eased until
 it meets the partner at similarity 1: full sync is full overlap, one pattern. Only the partner's side opens, over any
@@ -411,6 +417,33 @@ playhead's **marker**
 to `playhead.at_mask` inside one, so the marker never blinds and no other layer shares a mix with
 the instrument at a person.
 
+### The sync strobe
+
+The **sync strobe** is full sync's visualisation: while the room holds full sync, every drawn
+pattern's white and blue trade places on strobe frames (`sync_strobe.mode` invert, the
+default) or go dark (black), whole patterns at once, returning on the frame between. The room
+is in full sync while its least alike present pair holds over the band: the gate opens when
+every pair reads `sync_strobe.on_at` and closes only when one falls below
+`sync_strobe.off_at` — the band is the hysteresis, so a room hovering at one level never
+swaps the gate. A person at neutral holds the room off (the neutral weight is in the feature,
+`SIMILARITY.md`), as does a pair that cannot be read; below two people there is no pair and
+no strobe.
+
+The gate drives an envelope (`LIGHT_SYNTH.md`, *The envelope*; the bridge's, like the mask's
+flash) whose value picks the rate from the nested powers of two: the strobe comes in climbing
+1, 2, 4, 8, 16 per second over `attack_seconds`, holds at every other frame, and fades out
+stepping back down to silence over `release_seconds`; a gate reopened mid-fade climbs from
+where it is. The powers nest on the strobes' shared tick grid (`LIGHT_SYNTH.md`, *The
+strobe*), so every change of rung only adds or removes strobe frames between the ones that
+stay. Full sync holds no graded middle state: rates graded by sync depth read as noise on the
+wall **(site fact)**; the ladder is the strobe's attack and release, not a meter.
+
+The sync strobe acts after the synth: the voices render as ever and the bridge swaps their
+outputs between the channels (or skips painting them), so no parameter, slot or oscillator is
+touched, the per-oscillator strobes stay independent, and the masks and the marker, painted
+after, hold steady through it. The steps are the point, as a strobe's are: a deliberate
+event, not jitter.
+
 ### The hit
 
 On the tick the playhead is closest to a person (`PlayheadCrossing` in `pose/playhead_offset.py`,
@@ -433,7 +466,8 @@ tuned together, knobs throughout:
 | `elbow_lift`                  | how much a folded elbow lifts its arm (*The connections*)       |
 | `mask`                        | the mask's width, white and blue; the border's; the flash's levels, release |
 | `playhead`                    | the marker's width, white and blue; its level inside a mask     |
-| `window`                      | shape: taper, attack, release; reach: width, bypass, sync; the scale, the crowd factor and the overlap |
+| `window`                      | shape: taper, attack, release; reach: width, bypass; the scale, the crowd factor and the overlap |
+| `sync_strobe`                 | full sync's display: bypass, mode (invert or black), the band (on at, off at), attack, release; sync's threshold, the growth's |
 | `breath`                      | the breath's rate and depth (`MATRIX_V2.md`, *Made sources*)    |
 | `white_lines`, `blue_lines`   | On, Mirror, Bypass All; a slot per parameter; the push          |
 | `white_strobe`, `blue_strobe` | Bypass All; a slot per parameter of the strobe (`LIGHT_SYNTH.md`, *The strobe*) |
@@ -536,6 +570,9 @@ Meaning and connections:
   distance*)
 - The composition itself: which connections people find with their bodies
 - Whether the wiring of a connection is chosen in the panel or stays code, as `connect` is
+- Whether the sync strobe's inversion at every other frame fuses into one blended tone, the palette
+  collapsing at full room sync, or reads as flicker; and whether a colour-swap frame's seam on
+  the fixture is quieter or louder than a dark frame's — both to stand in front of
 
 Not yet in the design:
 
