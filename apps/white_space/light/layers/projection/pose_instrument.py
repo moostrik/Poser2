@@ -15,6 +15,10 @@ bridge is everything the synth does not know:
 - the **events**: presence (a pose is seen), the hit (``PlayheadCrossing``, the tick closest to
   the crossing: each oscillator's push and the mask's flash), and sync, which grows the reach on
   a partner's side until it reaches them, from ``window.sync_threshold`` on.
+- the **scale**: the voices work in pattern degrees, real degrees over ``window.scale`` shrunk
+  by ``window.crowd`` per further participant (the sum of presences, so it moves smoothly), and
+  the bridge divides the positions it hands them; the whole pattern — reach, lines, motion —
+  compresses about its person as one picture, the synth none the wiser.
 - the **mask**: a band at the person, over every pattern, lit at its levels by presence (dim blue
   in the preset) and flashing to its flash levels on a hit; its **border**, a line centred on
   each edge of the band, half over the blue, that does not flash; and the playhead's **marker** over
@@ -58,10 +62,13 @@ _BREATH_POSITION = np.zeros(1)          # the breath is in time: one position
 
 class WindowSettings(SynthWindowSettings):
     """The window: how far the pattern shows each side of a person, and when. The synth's part
-    (taper, attack, release) with the bridge's: the reach at rest, its bypass, and sync."""
+    (taper, attack, release) with the bridge's: the reach at rest, its bypass, sync, and the
+    scale, which compresses the whole pattern — reach, lines, motion — as one picture."""
     width:          Field[float] = Field(45.0, min=0.0, max=180.0, step=0.5,  widget=KNOB, label="Width",          description="Reach each side of a person at rest (deg)", row_label="Reach", newline=True)
     width_bypass:   Field[bool]  = Field(False,                                            label="Bypass",         description="Both reaches at the width: no sync growth")
     sync_threshold: Field[float] = Field(0.75, min=0.0, max=0.99,  step=0.01, widget=KNOB, label="Sync Threshold", description="Pair similarity from which the reach grows toward the partner, fully at 1 (alike)")
+    scale:          Field[float] = Field(1.0,  min=0.1, max=2.0,   step=0.01, widget=KNOB, label="Scale",          description="Overall window scale: the whole pattern compresses, nothing needs recalibrating", row_label="Scale", newline=True)
+    crowd:          Field[float] = Field(1.0,  min=0.5, max=1.0,   step=0.01, widget=KNOB, label="Crowd",          description="Each further participant multiplies the scale by this; 1 = off")
 
 
 class MaskSettings(BaseSettings):
@@ -143,6 +150,7 @@ class PoseInstrument(ProjectionLayer):
         self._instrument = instrument
         self._pose_stage = pose_stage
         self._players: dict[int, _Player] = {}
+        self._scale = 1.0                                                   # this tick's window scale
         self._crossing = PlayheadCrossing()
         self._pixels = np.arange(resolution, dtype=np.float64)              # the strip's pixel indices
         self._mask = np.zeros(resolution, dtype=bool)
@@ -191,8 +199,10 @@ class PoseInstrument(ProjectionLayer):
             # Every voice in one batched pass (``Voice.render_all``): each row of ``signed`` is a
             # voice's pixels' angle from its person, the shortest way round, taken from the
             # person's own azimuth (half a turn away with ``opposite``) so a walking person's
-            # lines move smoothly.
-            px_per_degree = R / 360.0
+            # lines move smoothly. The angles are pattern degrees — real degrees over the window
+            # scale — so the whole pattern compresses about its person and the synth stays
+            # scale-agnostic: its knobs keep their meaning relative to the pattern.
+            px_per_degree = R / 360.0 * self._scale
             centre_px = np.array([p.position * R + half_turn for p in players]).reshape(-1, 1)
             signed = (((self._pixels - centre_px + R / 2.0) % R) - R / 2.0) / px_per_degree
             reach_left = np.array([p.reach_left for p in players]).reshape(-1, 1)
@@ -252,12 +262,19 @@ class PoseInstrument(ProjectionLayer):
 
         min_interval = self._min_interval()
         ticks_per_second = max(1, round(1.0 / max(frame.tick.interval, 1e-3)))   # the strobes' grid
+        # The window scale: the master knob, shrunk per further participant. The participation is
+        # the sum of presences — smooth as people arrive and leave — read before the voices
+        # advance them, a one-tick lag the attack/release easing makes invisible. The voices work
+        # in pattern degrees (real degrees over the scale), so the visual limit is converted.
+        W = P.window
+        participation = max(sum(p.voice.presence for p in self._players.values()), 1.0)
+        self._scale = W.scale * W.crowd ** (participation - 1.0)
         gone: list[int] = []
         for id, p in self._players.items():
             p.hit = id in hits
             p.breath.update(frame.tick.dt, 1.0, P.breath.rate)                  # before connect reads it
             p.voice.update_lfo(frame.tick.dt, self.connect_lfo(p))              # first: connect reads its output
-            p.voice.update(frame.tick.dt, p.present, p.hit, self._sources(p), min_interval,
+            p.voice.update(frame.tick.dt, p.present, p.hit, self._sources(p), min_interval / self._scale,
                            frame.tick.index, ticks_per_second)
             p.flash.update(p.hit, frame.tick.dt, 0.0, P.mask.flash_release_seconds)
             if not p.present and not p.voice.alive:
@@ -335,12 +352,12 @@ class PoseInstrument(ProjectionLayer):
     # -- Reach and sync ---------------------------------------------------------------
 
     def _set_reaches(self) -> None:
-        """Each side's reach in degrees, before presence: ``window.width``, grown toward every
+        """Each side's reach in pattern degrees, before presence: ``window.width``, grown toward every
         similarity-matched partner along the shorter arc, full reaching them; the partner's
         presence scales the growth, so a partner leaving lets go smoothly. Bypassed
         (``window.width_bypass``), it is the width and does not grow."""
         W = self._instrument.window
-        base = min(W.width, 180.0)
+        base = min(W.width, 180.0 / self._scale)            # pattern degrees: half the circle real
         for p in self._players.values():
             p.reach_left = p.reach_right = base
         if W.width_bypass:
@@ -355,7 +372,7 @@ class PoseInstrument(ProjectionLayer):
                 a, b = self._players[id_a], self._players[id_b]
                 t = self._ease((sim - threshold) / max(1.0 - threshold, 1e-6))
                 delta = self._signed_offset(a.position, b.position)
-                distance = abs(delta) * 360.0
+                distance = abs(delta) * 360.0 / self._scale                 # the real gap, in pattern degrees
                 grow_a = base + (distance - base) * t * b.voice.presence    # toward b, as far as b is there
                 grow_b = base + (distance - base) * t * a.voice.presence
                 if delta >= 0.0:

@@ -33,7 +33,11 @@ width slot), moves a parameter through its slot (`base + amount × curve(source)
 oscillator turns its parameters into an output (white lines of that width). The wall's own words
 are kept where a synth's would mislead: the interval is a pitch in degrees, the speed a rate in
 degrees per second; reach, taper, window, presence, push and hardness are the amp stage and the
-slew, which here act on width instead of level (*A light synth*).
+slew, which here act on width instead of level (*A light synth*). The degrees are the positions'
+units, which the caller defines: the bridge hands positions in pattern degrees, real degrees over
+the window scale (`POSE_INSTRUMENT.md`, *People*), so the whole picture compresses with no knob
+retuned; under a scale a Mirror-off pitch counts lines per pattern revolution, and lines per
+window are preserved in both mirror modes.
 
 What belongs where:
 

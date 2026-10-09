@@ -379,7 +379,17 @@ it meets the partner at similarity 1: full sync is full overlap, one pattern. On
 person between them, whose own pattern is unchanged. The partner's presence scales the growth, so
 a partner leaving lets go smoothly. A pair with a person at neutral reads 0 and does not open
 (`STATES.md`, *Vocabulary*). The voice multiplies the reach by presence and thins the lines to
-nothing over the taper (`LIGHT_SYNTH.md`, *The window*).
+nothing over the taper (`LIGHT_SYNTH.md`, *The window*). In the preset `window.width_bypass` is
+on: the reaches stay at the width and sync does not grow them.
+
+The window **scale** compresses each person's whole picture — reach, line spacing, motion —
+without changing any other setting: the bridge divides the positions it hands the voices by the
+scale, so the voices draw the same pattern in pattern degrees (real degrees over the scale) and
+the synth's knobs keep their meaning relative to the pattern. The scale is `window.scale`, the
+master knob, times `window.crowd` for each participant beyond the first; the participation is the
+sum of presences, so the scale moves smoothly as people arrive and leave. The visual limit
+(`max_lines`) holds in real degrees: a deep shrink stops adding lines instead of exceeding it.
+The mask, its border and the marker keep their real size.
 
 The **mask** is a band `mask.width` wide at the person, each channel at its level (`mask.white`,
 `mask.blue`) times presence, and goes over everything at the person: the patterns of every voice.
@@ -414,7 +424,7 @@ tuned together, knobs throughout:
 | `elbow_lift`                  | how much a folded elbow lifts its arm (*The connections*)       |
 | `mask`                        | the mask's width, white and blue; the border's; the flash's levels, release |
 | `playhead`                    | the marker's width, white and blue; its level inside a mask     |
-| `window`                      | shape: taper, attack, release; reach: width, bypass, sync       |
+| `window`                      | shape: taper, attack, release; reach: width, bypass, sync; the scale and the crowd factor |
 | `breath`                      | the breath's rate and depth (`MATRIX_V2.md`, *Made sources*)    |
 | `white_lines`, `blue_lines`   | On, Mirror, Bypass All; a slot per parameter; the push          |
 | `white_strobe`, `blue_strobe` | Bypass All; a slot per parameter of the strobe (`LIGHT_SYNTH.md`, *The strobe*) |

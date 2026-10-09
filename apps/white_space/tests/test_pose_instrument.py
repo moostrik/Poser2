@@ -438,6 +438,42 @@ class PoseInstrumentTest(unittest.TestCase):
         np.testing.assert_allclose([float(f.white[outer]) for f in frames], 1.0, atol=1e-6)
         self.assertEqual(sum(float(f.blue[outer]) for f in frames), 0.0)  # no flash on the border
 
+    # -- the scale --
+
+    def test_scale_compresses_the_whole_pattern(self) -> None:
+        self.cfg.window.scale = 0.5
+        self._people({0: _pose(0.5, left_shoulder=self.HALFWAY)})
+        self._render()                                                    # the scale reads last tick's presences
+        f = self._render()
+        starts = [s for s, _ in _runs(f.white) if C + 2 * MASK < s < C + 150]   # whole lines in the full zone, clear of the person's own line at the mask
+        self.assertAlmostEqual(float(np.diff(starts)[0]), INTERVAL / 2, delta=2)   # line spacing halved with the reach
+        self.assertEqual(float(f.white[C + REACH // 2 + 2:C + REACH].sum()), 0.0)  # the window ends at half the reach
+        self.assertEqual(float(f.blue[C + REACH // 2 + 2:C + REACH].sum()), 0.0)
+
+    def test_the_visual_limit_holds_in_real_degrees(self) -> None:
+        self.cfg.window.scale = 0.25                  # the pattern's 14° would be 3.5° real, under the 4° limit
+        self._people({0: _pose(0.5, left_shoulder=self.HALFWAY)})
+        self._render()
+        f = self._render()
+        starts = [s for s, _ in _runs(f.white) if C + MASK < s < C + REACH // 4]
+        self.assertGreaterEqual(float(min(np.diff(starts))), 38)          # floored at 360/max_lines = 4° = 40 px
+
+    def test_crowd_shrinks_the_windows_per_participant(self) -> None:
+        self.cfg.window.crowd = 0.5
+        quarter, three_quarters = IRES // 4, 3 * IRES // 4
+        self._people({0: _pose(0.25), 1: _pose(0.75)})                    # two full blues, far apart
+        self._render()                                                    # the scale reads last tick's presences
+        f = self._render()
+        np.testing.assert_array_equal(f.blue[quarter + MASK + 1:quarter + 100], 1.0)    # the window stays lit
+        self.assertEqual(float(f.blue[quarter + REACH // 2 + 2:three_quarters - REACH // 2 - 2].sum()), 0.0)
+
+    def test_a_lone_person_keeps_the_full_window(self) -> None:
+        self.cfg.window.crowd = 0.5
+        self._people({0: _pose(0.5)})
+        self._render()
+        f = self._render()
+        np.testing.assert_array_equal(f.blue[C + MASK + 1:C + SOLID + 1], 1.0)
+
     # -- the hit --
 
     STEADY = (23.4, 16.2, 9.0, 1.8, -5.4, -12.6)     # 36 rpm at 30 Hz: 7.2° a tick, closest at +1.8°
