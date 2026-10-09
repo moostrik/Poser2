@@ -903,6 +903,12 @@
       "release_seconds": 1.5
     },
     "sync_strobe": {
+      "bypass": false,
+      "mode": "INVERT",
+      "on_at": 0.98,
+      "off_at": 0.93,
+      "attack_seconds": 2.0,
+      "release_seconds": 4.0,
       "threshold": 0.9
     },
     "breath": {

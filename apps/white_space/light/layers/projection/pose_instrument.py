@@ -162,7 +162,7 @@ class _Player:
     left_elbow_angle:      float = 0.0   # the two raw elbow angles (rad), the turn's measure
     right_elbow_angle:     float = 0.0
     legs:           float = 0.0     # LegDeviation [0, 1]
-    tilt:           float = 0.0     # TorsoTilt [-1, 1]
+    body_bend:      float = 0.0     # TorsoTilt [-1, 1]
     distance:       float = 0.0     # Distance [0, 1]
     symmetry:      np.ndarray = field(default_factory=lambda: np.zeros(len(features.SymmetryElement), dtype=np.float32))
     similarity:     np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float32))
@@ -302,7 +302,7 @@ class PoseInstrument(ProjectionLayer):
             p.left_elbow_angle  = self._value(angles[features.AngleLandmark.left_elbow],  p.left_elbow_angle)
             p.right_elbow_angle = self._value(angles[features.AngleLandmark.right_elbow], p.right_elbow_angle)
             p.legs = self._value(pose[features.LegDeviation].value, p.legs)
-            p.tilt = self._value(pose[features.TorsoTilt].value, p.tilt)
+            p.body_bend = self._value(pose[features.TorsoTilt].value, p.body_bend)
             p.distance = self._value(pose[features.Distance].value, p.distance)
             p.symmetry = np.where(np.isnan(pose[features.AngleSymmetry].values), p.symmetry, pose[features.AngleSymmetry].values)
             p.similarity = pose[features.Similarity].values
@@ -349,7 +349,7 @@ class PoseInstrument(ProjectionLayer):
         amounts, the range and the direction, are the ``PI.white_lines`` / ``PI.blue_lines``
         settings.
 
-        The arms are ``docs/MATRIX_V2.md``'s Step 3:
+        The arms are ``docs/MATRIX_V2.md``'s Step 4:
 
         - the arms, the mean of the two arm travels: both pulse widths (white's base 0 and amount
           1, blue's base 1 and amount −1: arms hanging is full blue, arms raised full white,
@@ -362,15 +362,18 @@ class PoseInstrument(ProjectionLayer):
         - the shoulders' difference, signed, left less right: both phases, the amounts opposite
           (white +⅛, blue −⅛), so the left higher pulls the colours a quarter interval closer one
           way and the right higher the other; level shoulders leave them half an interval apart
+        - the body bend, signed: both speeds, base 0 and equal amounts. The oscillators are
+          mirrored, so a lean flows the pattern out of the person or into them, one way per lean
+          side, and a straight body leaves the lines standing
 
         Every other parameter sits at its base; connections are added one at a time, each earning
         its place under the matrix's rule 4.
 
         The measures come with their dead zones from the pipeline: the arm travels
         (``ArmTravel``, ``pose.arm_travel_extractor``), the absolute taken since the sign is the
-        side of the body the limb passes, which the design gives no meaning. The union, the mean
-        and the difference are computed here while the matrix is tried; once liked they move into
-        the pipeline.
+        side of the body the limb passes, which the design gives no meaning; the body bend
+        (``pose.torso_tilt_extractor``). The union, the mean and the difference are computed here
+        while the matrix is tried; once liked they move into the pipeline.
         """
         lift = self._instrument.elbow_lift
         left_arm  = p.left_shoulder_travel  + (1.0 - p.left_shoulder_travel)  * lift * p.left_elbow_travel
@@ -381,11 +384,13 @@ class PoseInstrument(ProjectionLayer):
             Parameter.PULSE_WIDTH: arms,
             Parameter.PITCH:       p.left_elbow_travel,
             Parameter.PHASE:       difference,
+            Parameter.SPEED:       p.body_bend,
         }
         blue: Sources = {
             Parameter.PULSE_WIDTH: arms,
             Parameter.PITCH:       p.right_elbow_travel,
             Parameter.PHASE:       difference,
+            Parameter.SPEED:       p.body_bend,
         }
         return white, blue
 

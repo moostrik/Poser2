@@ -162,7 +162,14 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertAlmostEqual(blue[Parameter.PULSE_WIDTH], arms, places=5)          # the same mean; blue's slot inverts
         self.assertAlmostEqual(white[Parameter.PITCH], 0.5, places=5)                # the left elbow: the white
         self.assertAlmostEqual(blue[Parameter.PITCH], 1.0, places=5)                 # the right elbow: the blue
-        self.assertEqual(set(white) | set(blue), {Parameter.PULSE_WIDTH, Parameter.PITCH, Parameter.PHASE})   # nothing else wired
+        self.assertEqual(set(white) | set(blue),
+                         {Parameter.PULSE_WIDTH, Parameter.PITCH, Parameter.PHASE, Parameter.SPEED})   # nothing else wired
+
+    def test_the_body_bend_is_both_speeds_as_it_comes(self) -> None:
+        for bend in (-1.0, 0.0, 0.4):
+            white, blue = self._connect(_pose(0.5, tilt=bend, left_elbow=math.radians(30.0)))
+            self.assertAlmostEqual(white[Parameter.SPEED], bend, places=5, msg=f"bend {bend}")
+            self.assertAlmostEqual(blue[Parameter.SPEED], bend, places=5)            # one source, both colours alike
 
     def test_the_shoulder_difference_is_both_phases_signed(self) -> None:
         for left, right, diff in ((1.0, 0.0, 1.0), (0.0, 1.0, -1.0), (0.5, 0.5, 0.0)):
@@ -207,12 +214,11 @@ class PoseInstrumentTest(unittest.TestCase):
         self._render()
         self.assertEqual(self.layer._players[0].distance, 1.0)              # no reading: the last one holds
 
-    def test_the_turns_the_bend_and_the_legs_play_nothing_yet(self) -> None:
+    def test_the_turns_and_the_legs_play_nothing_yet(self) -> None:
         self.cfg.white_lines.pitch_amount = self.cfg.blue_lines.pitch_amount = 25.7
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, left_elbow=math.radians(90.0))})
         first = self._render().light_img.copy()
         for moved in (dict(left_elbow=math.radians(-90.0)),                  # the turn's sign: the same fold
-                      dict(left_elbow=math.radians(90.0), tilt=1.0),
                       dict(left_elbow=math.radians(90.0), legs=1.0)):
             self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, **moved)})
             np.testing.assert_array_equal(self._render().light_img, first, err_msg=str(moved))
@@ -239,10 +245,25 @@ class PoseInstrumentTest(unittest.TestCase):
     # -- the shoulders: the widths --
 
     def test_a_held_pose_is_still_over_many_ticks(self) -> None:
-        self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, left_elbow=shoulder(0.5), tilt=0.5)})
+        self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, left_elbow=shoulder(0.5))})   # upright: nothing flows
         first = self._render().light_img.copy()
         for _ in range(60):
             np.testing.assert_array_equal(self._render().light_img, first)
+
+    def test_a_straight_body_stands_still_and_a_lean_flows_the_lines(self) -> None:
+        W, B = self.cfg.white_lines, self.cfg.blue_lines
+        W.speed_amount = B.speed_amount = 3.5                          # a full lean: a quarter interval a second
+        for bend, moved in ((0.0, 0), (1.0, 35), (-1.0, -35)):         # px after a second, outward or inward
+            self.layer.reset()
+            self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, tilt=bend)})
+            start = self._centres(self._inner(self._render().white))
+            for _ in range(30):
+                f = self._render()
+            end = self._centres(self._inner(f.white))
+            # Track the line that started two intervals out: it stays clear of the mask and the taper.
+            start_c = min(start, key=lambda c: abs(c - 2 * INTERVAL))
+            end_c = min(end, key=lambda c: abs(c - (start_c + moved)))
+            self.assertAlmostEqual(end_c - start_c, moved, delta=2.0, msg=f"bend {bend}")
 
     def test_left_up_and_right_up_draw_differently(self) -> None:
         W, B = self.cfg.white_lines, self.cfg.blue_lines
