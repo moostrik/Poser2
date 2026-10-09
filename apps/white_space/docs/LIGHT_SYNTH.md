@@ -235,10 +235,15 @@ an amount without reading the patch back, so it is set whole.
 The window and **presence** are the amp stage, a synth's amp envelope, and sit after the slots
 and not in them, so the pulse width stays free to be connected. Presence is an envelope over time
 (*The envelope*) that multiplies both reaches: the window opens from the person when they arrive
-and closes to the person when they leave. The pulse width is the most a line can be; the window
+and closes to the person when they leave. While it opens or closes the taper widens to the whole
+window and eases back to its knob as presence settles (`window.attack_curve`,
+`window.release_curve`, the slots' curves), so lines enter and leave thin at any resting taper.
+The pulse width is the most a line can be; the window
 only thins it, so a dark output stays dark. A solid output is solid over most of the window and
 opens into thinning lines over the taper. A change of reach is smooth: the lines in the taper grow
-or thin a little, and nothing appears or disappears.
+or thin a little, and nothing appears or disappears. With `window.cap` on, a line's width is also
+capped at twice what remains of the reach beyond its centre, so no line passes the reach: the
+overhang of the outermost line is gone and any reach motion hugs the edge.
 
 ## The strobe
 

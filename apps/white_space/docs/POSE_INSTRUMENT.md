@@ -471,7 +471,7 @@ tuned together, knobs throughout:
 | `elbow_lift`                  | how much a folded elbow lifts its arm (*The connections*)       |
 | `mask`                        | the mask's width, white and blue; the border's; the flash's levels, release |
 | `playhead`                    | the marker's width, white and blue; its level inside a mask     |
-| `window`                      | shape: taper, attack, release; reach: width, bypass; the scale, the crowd factor and the overlap |
+| `window`                      | shape: taper, attack, release, their curves, the cap; reach: width, bypass; the scale, the crowd factor and the overlap |
 | `sync_strobe`                 | full sync's display: bypass, mode (invert or black), the band (on at, off at), attack, release; sync's threshold, the growth's |
 | `breath`                      | the breath's rate and depth (`MATRIX_V2.md`, *Made sources*)    |
 | `white_lines`, `blue_lines`   | On, Mirror, Bypass All; a slot per parameter; the push          |

@@ -56,6 +56,7 @@ class Voice:
         self._lfo_oscillator = Oscillator()
         self._lfo = 0.0                                                     # this tick's LFO output, −1..1
         self._presence = Envelope()
+        self._open = False                                                  # the presence gate as of this tick: picks the taper's curve
         self._pushes = (Envelope(), Envelope())                             # each oscillator's push
         self._intervals = [self._interval(oscillator_1.pitch, 0.0), self._interval(oscillator_2.pitch, 0.0)]   # this tick's, after the slot
         self._strobes: list[tuple[int, float, float, float]] = [(0, 1.0, 0.0, 0.0)] * 2   # this tick's rate, width, phase, shift, after the slots
@@ -106,6 +107,7 @@ class Voice:
         ``tick`` is the clock's tick index, the strobes' shared time."""
         W = self._window
         self._presence.update(present, dt, W.attack_seconds, W.release_seconds)
+        self._open = present
         self._tick, self._ticks_per_second = int(tick), max(1, int(ticks_per_second))
         for i, (oscillator, patch, strobe, source, push) in enumerate(zip(self._oscillators, self._patches, self._strobe_patches, sources, self._pushes)):
             pitch_source = self._played(patch.pitch_bypass, patch.pitch_curve, float(source.get(Parameter.PITCH, 0.0)))
@@ -131,15 +133,25 @@ class Voice:
         """A source as its slot sees it: nothing while bypassed, else eased by its curve."""
         return Slot.curve(Slot.bypassed(bypass, source), int(curve))
 
+    def _taper_fraction(self) -> float:
+        """The taper while the window moves: the knob's value at full presence, widening to the
+        whole window as it opens or closes — lines enter and leave thin at any resting taper —
+        each direction eased by its own curve (the gate picks it)."""
+        W = self._window
+        curve = W.attack_curve if self._open else W.release_curve
+        return W.taper + (1.0 - W.taper) * float(Slot.curve(1.0 - self._presence.value, int(curve)))
+
     def render(self, position: np.ndarray, reach_left: float, reach_right: float,
                sources: tuple[Sources, Sources]) -> tuple[np.ndarray, np.ndarray]:
         """The two outputs over a strip of pixels, 0..1. ``position`` is each pixel's signed
         angle from the person, negative on their left; the reaches are the caller's, in the same
         units, and presence multiplies them. A mirrored oscillator reads the position without its
         sign, an unmirrored one as it is. The window thins the pulse width after its slot, so a
-        dark output stays dark; the strobe gates whole lines after the window."""
+        dark output stays dark; the strobe gates whole lines after the window. While the window
+        opens or closes the taper widens to the whole window (``_taper_fraction``); with
+        ``window.cap`` no line passes the reach."""
         reach = np.where(position < 0.0, reach_left, reach_right) * self._presence.value
-        taper = reach * self._window.taper
+        taper = reach * self._taper_fraction()
         outputs = []
         for oscillator, patch, source, interval, strobe in zip(self._oscillators, self._patches, sources, self._intervals, self._strobes):
             if not patch.enabled:                                           # switched off: dark, whatever its slots say
@@ -160,7 +172,10 @@ class Voice:
             centre = positions - ((cycle + 0.5) % 1.0 - 0.5) * interval
             line_centre = np.abs(centre)
             window = Envelope.over_positions(line_centre, 0.0, taper, reach)
-            output = Oscillator.pulse(cycle, pulse_width * window, hardness)
+            width = pulse_width * window
+            if self._window.cap:
+                width = np.minimum(width, np.maximum(reach - line_centre, 0.0) * 2.0 / interval)
+            output = Oscillator.pulse(cycle, width, hardness)
             if strobe[0] > 0:
                 output *= Strobe.gate(self._tick, centre / interval, *strobe, self._ticks_per_second)
             outputs.append(output)
@@ -184,7 +199,7 @@ class Voice:
         count, resolution = position.shape
         presence = np.array([v._presence.value for v in voices]).reshape(count, 1)
         reach = np.where(position < 0.0, reach_left, reach_right) * presence
-        taper = reach * v0._window.taper
+        taper = reach * np.array([v._taper_fraction() for v in voices]).reshape(count, 1)
         outputs: list[np.ndarray] = []
         for i, patch in enumerate(v0._patches):
             if not patch.enabled:                                           # switched off: dark, whatever its slots say
@@ -209,7 +224,10 @@ class Voice:
             centre = positions - ((cycle + 0.5) % 1.0 - 0.5) * interval_col
             line_centre = np.abs(centre)
             window = Envelope.over_positions(line_centre, 0.0, taper, reach)
-            output = Oscillator.pulse(cycle, width_col * window, hard_col)  # (V, R)
+            width = width_col * window
+            if v0._window.cap:
+                width = np.minimum(width, np.maximum(reach - line_centre, 0.0) * 2.0 / interval_col)
+            output = Oscillator.pulse(cycle, width, hard_col)               # (V, R)
             for k, v in enumerate(voices):                                  # strobes differ per voice and are usually off
                 strobe = v._strobes[i]
                 if strobe[0] > 0:

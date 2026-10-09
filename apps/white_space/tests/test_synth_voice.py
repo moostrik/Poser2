@@ -133,6 +133,31 @@ class VoiceTest(unittest.TestCase):
         self.assertFalse(voice.alive)
         self.assertFalse(self._render(voice)[0].any())
 
+    # -- the moving taper and the cap --
+
+    def test_the_taper_widens_to_the_whole_window_while_it_opens(self) -> None:
+        self.window.taper = 0.0                         # a hard resting edge
+        self.window.attack_seconds = 1.0
+        self.one.pitch = 90.0                           # a 4° interval: lines inside the widened taper
+        voice = self._voice()
+        voice.update(0.5, True, False, NO_SOURCES, MIN_INTERVAL, 0, 32)    # half open: reach 20, taper the half of it
+        found = lines(self._render(voice)[0])
+        self.assertTrue(found)
+        self.assertLess(found[-1][1], 0.7 * 0.3 * 4.0)  # the outer line enters thin, hard taper or not
+        voice.update(0.5, True, False, NO_SOURCES, MIN_INTERVAL, 0, 32)    # settled: the resting taper is back
+        found = lines(self._render(voice)[0])
+        self.assertAlmostEqual(found[-1][1], 0.3 * 4.0, delta=2 * STEP)    # whole to the hard edge
+
+    def test_the_cap_keeps_every_line_inside_the_reach(self) -> None:
+        self.window.taper = 0.0
+        self.one.pulse_width = 1.0                      # solid: the edge line overhangs a hard edge the most
+        without, _ = self._render(self._arrived(), reach_left=31.0, reach_right=31.0)
+        self.assertTrue(without[DISTANCE > 31.0].any())                    # the line at 30° runs past the reach
+        self.window.cap = True
+        capped, _ = self._render(self._arrived(), reach_left=31.0, reach_right=31.0)
+        self.assertFalse(capped[DISTANCE > 31.0].any())                    # capped at the reach
+        self.assertTrue(capped[(DISTANCE > 29.5) & (DISTANCE < 31.0)].any())   # the line is still there, narrowed
+
     # -- the push and the time --
 
     def test_a_push_moves_each_output_its_own_way_and_the_lines_keep_the_gain(self) -> None:

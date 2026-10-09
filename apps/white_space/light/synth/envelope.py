@@ -12,15 +12,25 @@ import numpy as np
 
 from modules.settings import BaseSettings, Field, Widget
 
+from .slot import Curve
+
 Value = float | np.ndarray
+
+CURVE = 36                      # the Curve select's width: narrower than a select's own
 
 
 class WindowSettings(BaseSettings):
     """What the voice reads of the window: the taper of the envelope over distance on the pulse
-    width, and presence, the envelope over time on the reaches. The reaches are the caller's."""
+    width, and presence, the envelope over time on the reaches. The reaches are the caller's.
+    While the window opens or closes the taper widens to the whole window, so lines enter and
+    leave thin at any resting taper, each direction eased by its own curve; the cap keeps every
+    line inside the reach."""
     taper:           Field[float] = Field(0.2, min=0.0, max=1.0,  step=0.01, widget=Widget.knob, label="Taper",   description="Last part of a reach over which the lines thin out", row_label="Shape", newline=True)
     attack_seconds:  Field[float] = Field(1.0, min=0.0, max=5.0,  step=0.1,  widget=Widget.knob, label="Attack",  description="Window opens after arrival (s)")
     release_seconds: Field[float] = Field(1.5, min=0.0, max=5.0,  step=0.1,  widget=Widget.knob, label="Release", description="Window closes after leaving (s)")
+    attack_curve:    Field[Curve] = Field(Curve.LINEAR, width=CURVE,                             label="Attack Curve",  description="How the taper eases from the whole window to its own value as the window opens")
+    release_curve:   Field[Curve] = Field(Curve.LINEAR, width=CURVE,                             label="Release Curve", description="How the taper eases back to the whole window as the window closes")
+    cap:             Field[bool]  = Field(False,                                                 label="Cap",     description="Lines never pass the reach: no overhang")
 
 
 class Envelope:

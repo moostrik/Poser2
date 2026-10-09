@@ -461,6 +461,18 @@ class PoseInstrumentTest(unittest.TestCase):
         np.testing.assert_allclose([float(f.white[outer]) for f in frames], 1.0, atol=1e-6)
         self.assertEqual(sum(float(f.blue[outer]) for f in frames), 0.0)  # no flash on the border
 
+    def test_the_window_opens_with_lines_entering_thin(self) -> None:
+        self.cfg.window.taper = 0.0                                       # a hard resting edge
+        self.cfg.window.attack_seconds = 1.0
+        self._people({0: _pose(0.5)})                                     # full blue
+        for _ in range(15):                                               # half the attack at 30 Hz
+            f = self._render()
+        np.testing.assert_array_equal(f.blue[C + MASK + 1:C + 100], 1.0)  # solid at the person
+        self.assertTrue((f.blue[C + 120:C + 220] < 1.0).any())            # the outer part opened into thin lines
+        for _ in range(30):                                               # settled: the hard edge is back
+            f = self._render()
+        np.testing.assert_array_equal(f.blue[C + MASK + 1:C + 415], 1.0)
+
     # -- the scale --
 
     def test_scale_compresses_the_whole_pattern(self) -> None:
