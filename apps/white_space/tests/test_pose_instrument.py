@@ -467,6 +467,31 @@ class PoseInstrumentTest(unittest.TestCase):
         np.testing.assert_array_equal(f.blue[quarter + MASK + 1:quarter + 100], 1.0)    # the window stays lit
         self.assertEqual(float(f.blue[quarter + REACH // 2 + 2:three_quarters - REACH // 2 - 2].sum()), 0.0)
 
+    def test_overlap_zero_pulls_the_windows_apart_into_territories(self) -> None:
+        self.cfg.window.overlap = 0.0
+        a, b = round(0.45 * IRES), round(0.55 * IRES)                     # 36° apart: midpoint at C
+        self._people({0: _pose(0.45), 1: _pose(0.55)})                    # two full blues
+        f = self._render()
+        np.testing.assert_array_equal(f.blue[a + MASK + 1:a + 135], 1.0)  # each window still lit near its person
+        np.testing.assert_array_equal(f.blue[a + 145:b - 145], 0.0)       # a quiet seam at the midpoint
+        np.testing.assert_array_equal(f.blue[a - SOLID:a - MASK], 1.0)    # the away sides keep the full window
+
+    def test_negative_overlap_carves_a_gap_between_the_territories(self) -> None:
+        self.cfg.window.overlap = -1.0
+        a, b = round(0.45 * IRES), round(0.55 * IRES)                     # close: the facing reaches close fully
+        self._people({0: _pose(0.45), 1: _pose(0.55)})
+        f = self._render()
+        np.testing.assert_array_equal(f.white[a + MASK + 1:b - MASK], 0.0)   # nothing between the masks
+        np.testing.assert_allclose(f.blue[a + MASK + 1:b - MASK], 0.0, atol=1e-6)
+        np.testing.assert_array_equal(f.blue[a - SOLID:a - MASK], 1.0)    # the away sides keep the full window
+
+    def test_overlap_half_lets_the_windows_reach_past_the_midpoint(self) -> None:
+        self.cfg.window.overlap = 0.5
+        a, b = round(0.45 * IRES), round(0.55 * IRES)
+        self._people({0: _pose(0.45), 1: _pose(0.55)})
+        f = self._render()
+        np.testing.assert_array_equal(f.blue[(a + b) // 2:(a + b) // 2 + 50], 1.0)   # the seam is bridged again
+
     def test_a_lone_person_keeps_the_full_window(self) -> None:
         self.cfg.window.crowd = 0.5
         self._people({0: _pose(0.5)})

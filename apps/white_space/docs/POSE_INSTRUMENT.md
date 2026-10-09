@@ -382,6 +382,15 @@ a partner leaving lets go smoothly. A pair with a person at neutral reads 0 and 
 nothing over the taper (`LIGHT_SYNTH.md`, *The window*). In the preset `window.width_bypass` is
 on: the reaches stay at the width and sync does not grow them.
 
+`window.overlap` keeps neighbouring windows out of each other: each side's reach is clipped
+toward the midpoint of the arc to the neighbour — fully at 0, where windows meet as territories
+with a quiet seam of taper between them, not at all at 1, where overlapping patterns interleave.
+Negative values retreat past the midpoint by the same measure, a dark gap that widens to −1,
+where close windows close their facing side entirely; windows already apart are not clipped.
+The neighbour's presence scales their clip, so a neighbour leaving lets go smoothly, and the
+nearest present neighbour on each side is the binding one. The clip applies under the width
+bypass; sync growth, when it runs, overrides it, so full sync remains full overlap.
+
 The window **scale** compresses each person's whole picture — reach, line spacing, motion —
 without changing any other setting: the bridge divides the positions it hands the voices by the
 scale, so the voices draw the same pattern in pattern degrees (real degrees over the scale) and
@@ -424,7 +433,7 @@ tuned together, knobs throughout:
 | `elbow_lift`                  | how much a folded elbow lifts its arm (*The connections*)       |
 | `mask`                        | the mask's width, white and blue; the border's; the flash's levels, release |
 | `playhead`                    | the marker's width, white and blue; its level inside a mask     |
-| `window`                      | shape: taper, attack, release; reach: width, bypass, sync; the scale and the crowd factor |
+| `window`                      | shape: taper, attack, release; reach: width, bypass, sync; the scale, the crowd factor and the overlap |
 | `breath`                      | the breath's rate and depth (`MATRIX_V2.md`, *Made sources*)    |
 | `white_lines`, `blue_lines`   | On, Mirror, Bypass All; a slot per parameter; the push          |
 | `white_strobe`, `blue_strobe` | Bypass All; a slot per parameter of the strobe (`LIGHT_SYNTH.md`, *The strobe*) |

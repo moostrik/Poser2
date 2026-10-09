@@ -18,7 +18,8 @@ bridge is everything the synth does not know:
 - the **scale**: the voices work in pattern degrees, real degrees over ``window.scale`` shrunk
   by ``window.crowd`` per further participant (the sum of presences, so it moves smoothly), and
   the bridge divides the positions it hands them; the whole pattern — reach, lines, motion —
-  compresses about its person as one picture, the synth none the wiser.
+  compresses about its person as one picture, the synth none the wiser. ``window.overlap``
+  clips neighbouring reaches toward their midpoints: windows meet as territories at 0.
 - the **mask**: a band at the person, over every pattern, lit at its levels by presence (dim blue
   in the preset) and flashing to its flash levels on a hit; its **border**, a line centred on
   each edge of the band, half over the blue, that does not flash; and the playhead's **marker** over
@@ -62,13 +63,15 @@ _BREATH_POSITION = np.zeros(1)          # the breath is in time: one position
 
 class WindowSettings(SynthWindowSettings):
     """The window: how far the pattern shows each side of a person, and when. The synth's part
-    (taper, attack, release) with the bridge's: the reach at rest, its bypass, sync, and the
-    scale, which compresses the whole pattern — reach, lines, motion — as one picture."""
+    (taper, attack, release) with the bridge's: the reach at rest, its bypass, sync, the scale,
+    which compresses the whole pattern — reach, lines, motion — as one picture, and the overlap,
+    which pulls neighbouring windows apart into territories."""
     width:          Field[float] = Field(45.0, min=0.0, max=180.0, step=0.5,  widget=KNOB, label="Width",          description="Reach each side of a person at rest (deg)", row_label="Reach", newline=True)
     width_bypass:   Field[bool]  = Field(False,                                            label="Bypass",         description="Both reaches at the width: no sync growth")
     sync_threshold: Field[float] = Field(0.75, min=0.0, max=0.99,  step=0.01, widget=KNOB, label="Sync Threshold", description="Pair similarity from which the reach grows toward the partner, fully at 1 (alike)")
     scale:          Field[float] = Field(1.0,  min=0.1, max=2.0,   step=0.01, widget=KNOB, label="Scale",          description="Overall window scale: the whole pattern compresses, nothing needs recalibrating", row_label="Scale", newline=True)
     crowd:          Field[float] = Field(1.0,  min=0.5, max=1.0,   step=0.01, widget=KNOB, label="Crowd",          description="Each further participant multiplies the scale by this; 1 = off")
+    overlap:        Field[float] = Field(1.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Overlap",        description="How far a window may reach into a neighbour's: 1 full, 0 territories meeting at the midpoint, negative a gap between them")
 
 
 class MaskSettings(BaseSettings):
@@ -352,14 +355,17 @@ class PoseInstrument(ProjectionLayer):
     # -- Reach and sync ---------------------------------------------------------------
 
     def _set_reaches(self) -> None:
-        """Each side's reach in pattern degrees, before presence: ``window.width``, grown toward every
-        similarity-matched partner along the shorter arc, full reaching them; the partner's
-        presence scales the growth, so a partner leaving lets go smoothly. Bypassed
-        (``window.width_bypass``), it is the width and does not grow."""
+        """Each side's reach in pattern degrees, before presence: ``window.width``, clipped toward
+        the midpoint to every neighbour as far as ``window.overlap`` allows (the neighbour's
+        presence scales the clip, so a neighbour leaving lets go smoothly), then grown toward
+        every similarity-matched partner along the shorter arc, full reaching them; the partner's
+        presence scales the growth the same way. Bypassed (``window.width_bypass``), it does not
+        grow; the clip applies regardless."""
         W = self._instrument.window
         base = min(W.width, 180.0 / self._scale)            # pattern degrees: half the circle real
         for p in self._players.values():
             p.reach_left = p.reach_right = base
+        self._clip_reaches(base)
         if W.width_bypass:
             return
         threshold = W.sync_threshold
@@ -381,6 +387,40 @@ class PoseInstrument(ProjectionLayer):
                 else:
                     a.reach_left = max(a.reach_left, grow_a)
                     b.reach_right = max(b.reach_right, grow_b)
+
+    def _clip_reaches(self, base: float) -> None:
+        """Pull neighbouring windows apart into territories: each pair clips its facing sides
+        toward the midpoint of the arc between them and its away sides toward the midpoint of the
+        arc around the back, as far as ``window.overlap`` allows — 1 leaves the reaches alone, 0
+        meets at the midpoints, negative retreats past them, a gap. A neighbour's presence scales
+        their clip, and the min over every pair makes the nearest present neighbour binding."""
+        W = self._instrument.window
+        overlap = W.overlap
+        if overlap >= 1.0:
+            return
+        turn = 360.0 / self._scale
+        players = list(self._players.values())
+        for i, a in enumerate(players):
+            for b in players[i + 1:]:
+                delta = self._signed_offset(a.position, b.position)
+                d_short = abs(delta) * turn                             # the facing arc, pattern degrees
+                d_long = turn - d_short                                 # the arc around the back
+                limits = []
+                for d, presence in ((d_short, b.voice.presence), (d_short, a.voice.presence),
+                                    (d_long, b.voice.presence), (d_long, a.voice.presence)):
+                    half = d / 2.0
+                    target = max(half + (base - half) * overlap, 0.0) if base > half else base
+                    limits.append(base + (target - base) * presence)
+                if delta >= 0.0:
+                    a.reach_right = min(a.reach_right, limits[0])
+                    b.reach_left = min(b.reach_left, limits[1])
+                    a.reach_left = min(a.reach_left, limits[2])
+                    b.reach_right = min(b.reach_right, limits[3])
+                else:
+                    a.reach_left = min(a.reach_left, limits[0])
+                    b.reach_right = min(b.reach_right, limits[1])
+                    a.reach_right = min(a.reach_right, limits[2])
+                    b.reach_left = min(b.reach_left, limits[3])
 
     def _pair_similarity(self, id_a: int, id_b: int) -> float:
         """Mean of both directions' pairwise similarity (one side may be NaN)."""
