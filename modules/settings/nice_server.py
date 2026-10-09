@@ -12,7 +12,7 @@ import webbrowser
 from pathlib import Path
 from typing import Callable, Optional
 
-from nicegui import ui, app as nicegui_app
+from nicegui import ui, app as nicegui_app, Client
 
 from .base_settings import BaseSettings
 from .field import Field
@@ -24,6 +24,24 @@ logger = logging.getLogger(__name__)
 # Dedicated Edge profile: forces a browser process we own, and holds Edge's own record of the
 # app window's last position/size. Deleting the directory resets the window to the preset defaults.
 _EDGE_PROFILE_DIR = Path(tempfile.gettempdir()) / "poser_settings_edge"
+
+# Injected only into the app window (?app=1): close the window when its connection dies, so its
+# lifetime is the server's lifetime on every exit path. Server-side pushes cannot do this — the
+# panel's exit button tears the app down on the UI event loop, which never flushes a pushed close.
+# The beforeunload guard keeps page reloads (panel hot-reload) from closing the window.
+_SELF_CLOSE_SCRIPT = """
+<script>
+  (function () {
+    let unloading = false;
+    window.addEventListener("beforeunload", () => { unloading = true; });
+    const timer = setInterval(() => {
+      if (!window.socket) return;
+      clearInterval(timer);
+      window.socket.on("disconnect", () => { if (!unloading) window.close(); });
+    }, 100);
+  })();
+</script>
+"""
 
 
 class NiceSettings(BaseSettings):
@@ -57,7 +75,6 @@ class NiceServer:
         self.settings = settings
         self.on_exit = on_exit
         self._thread: Optional[threading.Thread] = None
-        self._browser_process: Optional[subprocess.Popen] = None
         self._page_registered = False
         self._panel_file = Path(nice_panel_module.__file__).resolve() if nice_panel_module.__file__ else None
 
@@ -76,7 +93,9 @@ class NiceServer:
             self._page_registered = True
 
             @ui.page("/")
-            def index():
+            def index(client: Client):
+                if "app" in client.request.query_params:
+                    ui.add_body_html(_SELF_CLOSE_SCRIPT)
                 panel_module = nice_panel_module
                 ui.dark_mode(True)
                 ui.add_head_html('<style>* { transition-duration: 0s !important; animation-duration: 0s !important; }</style>')
@@ -148,10 +167,14 @@ class NiceServer:
             return
 
         s = self.settings
+        # The ?app=1 tag makes the page inject the self-close script, so the window closes
+        # itself when the server dies; remote tabs stay untagged. The Popen handle is useless
+        # for closing: msedge.exe relaunches itself, so launch is fire-and-forget.
         args = [
             str(edge),
-            f"--app={url}",
+            f"--app={url}/?app=1",
             f"--user-data-dir={_EDGE_PROFILE_DIR}",
+            "--disable-background-mode",
             "--no-first-run",
             "--no-default-browser-check",
         ]
@@ -163,35 +186,14 @@ class NiceServer:
                 f"--window-size={s.browser_width},{s.browser_height}",
             ]
         try:
-            self._browser_process = subprocess.Popen(args)
+            subprocess.Popen(args)
             logger.info("Settings UI opened in Edge app window")
         except OSError:
             logger.warning("Failed to launch Edge; opening settings UI in the default browser", exc_info=True)
             webbrowser.open(url)
 
-    def _close_browser(self) -> None:
-        """Close the Edge app window if we opened one and it is still running."""
-        process = self._browser_process
-        self._browser_process = None
-        if process is None or process.poll() is not None:
-            return
-        # Graceful close first (taskkill without /F posts WM_CLOSE), so Edge saves the window
-        # placement and doesn't mark the profile as crashed. Hard-terminate only as fallback.
-        try:
-            subprocess.run(["taskkill", "/PID", str(process.pid)], capture_output=True)
-            process.wait(timeout=3)
-            return
-        except (OSError, subprocess.TimeoutExpired):
-            logger.warning("Settings browser window did not close gracefully, terminating")
-        try:
-            process.terminate()
-            process.wait(timeout=3)
-        except (OSError, subprocess.TimeoutExpired):
-            logger.warning("Settings browser window did not close cleanly", exc_info=True)
-
     def stop(self) -> None:
         """Shut down the NiceGUI settings server."""
-        self._close_browser()
         thread = self._thread
         try:
             nicegui_app.shutdown()
