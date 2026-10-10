@@ -297,7 +297,7 @@ What the instrument triggers in a person's voice, beside the measures:
 |----------|-------------------------------------------------------------|-------------------------------------------------------------|
 | presence | the person is seen: a gate open while they are there        | the presence envelope, on both reaches                      |
 | hit      | the playhead crosses the person: the tick closest to it     | each oscillator's push, and the mask's flash                |
-| sync     | full sync: every present pair alike over the band           | the sync strobe, and the growth: every window toward the full circle |
+| sync     | full sync: every present pair alike over the band           | the sync strobe; the growth: every window toward the full circle; the blend: everyone's measures to the room's mean |
 
 Presence and the pushes are envelopes of the synth (`LIGHT_SYNTH.md`, *The envelope*). The
 reaches are the bridge's: it gives each side's reach to the voice as a value, the rest width grown
@@ -393,6 +393,13 @@ territories tiling at 0, interleaved at 1. `window.width_bypass` switches the gr
 voice multiplies the reach by presence and thins the lines to nothing over the taper
 (`LIGHT_SYNTH.md`, *The window*).
 
+The **blend** (`PI.blend`) is full sync's union: while the band holds, everyone's measures ease
+toward the room's presence-weighted mean over `blend.attack_seconds` — every pattern becomes
+one — and return to their own over `blend.release_seconds`. The blend reads the measures; it
+never writes them, and never touches similarity, positions, masks or hits, so everyone keeps
+their place and their marks while playing one pattern. With no speed connected the patterns
+are identical; a person's own pushes can offset their copy by a phase.
+
 `window.overlap` keeps neighbouring windows out of each other: each side's reach is clipped
 toward the midpoint of the arc to the neighbour — fully at 0, where windows meet as territories
 with a quiet seam of taper between them, not at all at 1, where overlapping patterns interleave.
@@ -430,8 +437,8 @@ default) or go dark (black), whole patterns at once, returning on the frame betw
 is in full sync while its least alike present pair holds over the band: the gate opens when
 every pair reads `PI.on_at` and closes only when one falls below
 `PI.off_at` — the band is the hysteresis, so a room hovering at one level never
-swaps the gate. The band is declared on the root and shared into the strobe and the growth,
-each with its own state and envelope. A person at neutral holds the room off (the neutral weight is in the feature,
+swaps the gate. The band is declared on the root and shared into the strobe, the growth and
+the blend, each with its own state and envelope. A person at neutral holds the room off (the neutral weight is in the feature,
 `SIMILARITY.md`), as does a pair that cannot be read; below two people there is no pair and
 no strobe.
 
@@ -473,9 +480,10 @@ tuned together, knobs throughout:
 | `mask`                        | the mask's width, white and blue; the border's; the flash's levels, release |
 | `playhead`                    | the marker's width, white and blue; its level inside a mask     |
 | `window`                      | shape: taper, attack, release, their curves, the cap; reach: width, bypass; the scale, the crowd factor and the overlap |
-| `on_at`, `off_at`             | the full-sync band, shared into `sync_strobe` and `grow`        |
+| `on_at`, `off_at`             | the full-sync band, shared into `sync_strobe`, `grow` and `blend` |
 | `sync_strobe`                 | full sync's display: bypass, mode (invert or black), attack, release |
 | `grow`                        | full sync's reach: windows grow to the full circle; attack, release |
+| `blend`                       | full sync's union: everyone's measures to the room's mean; bypass, attack, release |
 | `breath`                      | the breath's rate and depth (`MATRIX_V2.md`, *Made sources*)    |
 | `white_lines`, `blue_lines`   | On, Mirror, Bypass All; a slot per parameter; the push          |
 | `white_strobe`, `blue_strobe` | Bypass All; a slot per parameter of the strobe (`LIGHT_SYNTH.md`, *The strobe*) |

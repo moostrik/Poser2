@@ -18,9 +18,11 @@ bridge is everything the synth does not know:
   ``sync_strobe.on_at``, off below ``sync_strobe.off_at``), every drawn pattern's white and
   blue swap on strobe frames (or go dark, ``sync_strobe.mode``), the rate climbing the nested
   ladder over the attack and stepping back down over the release — and the **growth**
-  (``PI.grow``): its own envelope on the same band (``PI.on_at``/``off_at``, shared into both)
-  grows every window toward the full circle over its attack, the overlap clip shaping how
-  they meet, and lets them fall back over its release.
+  (``PI.grow``): its own envelope on the same band (``PI.on_at``/``off_at``, shared into all
+  three) grows every window toward the full circle over its attack, the overlap clip shaping
+  how they meet, and lets them fall back over its release — and the **blend** (``PI.blend``):
+  its own envelope eases everyone's measures toward the room's presence-weighted mean, one
+  pattern for everyone; positions, masks and hits stay each person's own.
 - the **scale**: the voices work in pattern degrees, real degrees over ``window.scale`` shrunk
   by ``window.crowd`` per further participant (the sum of presences, so it moves smoothly), and
   the bridge divides the positions it hands them; the whole pattern — reach, lines, motion —
@@ -45,7 +47,7 @@ partner.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import IntEnum
 from functools import partial
 
@@ -117,6 +119,20 @@ class GrowSettings(BaseSettings):
     release_seconds: Field[float] = Field(3.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Release", description="The grown windows fall back to the width over (s)")
 
 
+class BlendSettings(BaseSettings):
+    """The blend, full sync's third effect: while every present pair is alike over the band
+    (the root's, shared with the strobe and the growth, each mechanism its own state and
+    envelope), everyone's measures ease toward the room's presence-weighted mean, so every
+    pattern becomes one; off the band everyone returns to their own. The blend is read-time
+    only — the stored measures stay each person's own — and positions, masks and hits are
+    never blended."""
+    bypass:          Field[bool]  = Field(False,                                           label="Bypass",  description="No blend: everyone keeps their own pattern", row_label="Blend", newline=True)
+    on_at:           Field[float] = Field(0.95, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="On At",   description="Full sync comes on when every pair reads at least this", visible=False)
+    off_at:          Field[float] = Field(0.90, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Off At",  description="Full sync goes off when any pair falls below this", visible=False)
+    attack_seconds:  Field[float] = Field(2.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Attack",  description="Measures ease to the room's mean while full sync holds, over (s)")
+    release_seconds: Field[float] = Field(2.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Release", description="Everyone returns to their own measures over (s)")
+
+
 class MaskSettings(BaseSettings):
     """The mask at the person: its width and its level per channel (0 is off); the border, a line
     on each edge of the band, centred on it so half overlaps the blue; and the flash, the levels
@@ -142,10 +158,10 @@ class BreathSettings(BaseSettings):
 
 class PoseInstrumentSettings(BaseSettings):
     """The ``PI`` root group, a group per concept: the mask, the playhead's marker, the window,
-    the sync strobe and the growth (the full-sync band declared here, shared into both), the
-    breath, the two oscillators, their strobes and the LFO (the synth's patch, a slot per
-    parameter), the dummy. The wiring is ``connect``; the measures' dead zones are the
-    pipeline's."""
+    the sync strobe, the growth and the blend (the full-sync band declared here, shared into
+    all three), the breath, the two oscillators, their strobes and the LFO (the synth's
+    patch, a slot per parameter), the dummy. The wiring is ``connect``; the measures' dead
+    zones are the pipeline's."""
     max_lines:    Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
     opposite:     Field[bool] = Field(False, description="Draw each person's lines half a turn away; the masks stay on the people")
     elbow_lift:   Field[float] = Field(0.5, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Elbow Lift", description="How much a folded elbow lifts its arm (fraction of a full raise)")
@@ -156,6 +172,7 @@ class PoseInstrumentSettings(BaseSettings):
     window:       Group[WindowSettings]         = Group(WindowSettings)
     sync_strobe:  Group[SyncStrobeSettings]     = Group(SyncStrobeSettings, share=[on_at, off_at])
     grow:         Group[GrowSettings]           = Group(GrowSettings, share=[on_at, off_at])
+    blend:        Group[BlendSettings]          = Group(BlendSettings, share=[on_at, off_at])
     breath:       Group[BreathSettings]         = Group(BreathSettings)
     white_lines:  Group[OscillatorSettings]     = Group(OscillatorSettings)
     blue_lines:   Group[OscillatorSettings]     = Group(OscillatorSettings)
@@ -209,6 +226,9 @@ class PoseInstrument(ProjectionLayer):
         self._sync_strobe = Envelope()                                      # the strobe's envelope: its value picks the rate
         self._grow_on = False                                               # the growth's own band state
         self._grow = Envelope()                                             # the growth's envelope: the windows toward the full circle
+        self._blend_on = False                                              # the blend's own band state
+        self._blend = Envelope()                                            # the blend's envelope: the measures toward the room's mean
+        self._means: dict[str, float] = {}                                  # this tick's presence-weighted mean per measure
         self._crossing = PlayheadCrossing()
         self._pixels = np.arange(resolution, dtype=np.float64)              # the strip's pixel indices
         self._mask = np.zeros(resolution, dtype=bool)
@@ -227,6 +247,9 @@ class PoseInstrument(ProjectionLayer):
         self._sync_strobe.reset()
         self._grow_on = False
         self._grow.reset()
+        self._blend_on = False
+        self._blend.reset()
+        self._means = {}
 
     @staticmethod
     def _bypass_all(patch: OscillatorSettings, _: bool) -> None:
@@ -342,11 +365,12 @@ class PoseInstrument(ProjectionLayer):
         W = P.window
         participation = max(sum(p.voice.presence for p in self._players.values()), 1.0)
         self._scale = W.scale * W.crowd ** (participation - 1.0)
+        self._set_blend(frame.tick.dt)                                      # before the loop: connect reads through it
         gone: list[int] = []
         for id, p in self._players.items():
             p.hit = id in hits
             p.breath.update(frame.tick.dt, 1.0, P.breath.rate)                  # before connect reads it
-            p.voice.update_lfo(frame.tick.dt, self.connect_lfo(p))              # first: connect reads its output
+            p.voice.update_lfo(frame.tick.dt, self.connect_lfo(self._blended(p)))   # first: connect reads its output
             p.voice.update(frame.tick.dt, p.present, p.hit, self._sources(p), min_interval / self._scale,
                            frame.tick.index, ticks_per_second)
             p.flash.update(p.hit, frame.tick.dt, 0.0, P.mask.flash_release_seconds)
@@ -362,8 +386,9 @@ class PoseInstrument(ProjectionLayer):
     # -- Connections -----------------------------------------------------------------
 
     def _sources(self, p: _Player) -> tuple[Sources, Sources]:
-        """The voice's sources this tick: the connections."""
-        return self.connect(p)
+        """The voice's sources this tick: the connections, the measures read through the
+        blend (``_blended``)."""
+        return self.connect(self._blended(p))
 
     def connect(self, p: _Player) -> tuple[Sources, Sources]:
         """The connections (``docs/POSE_INSTRUMENT.md``, *The connections*) written out: a person's
@@ -521,6 +546,44 @@ class PoseInstrument(ProjectionLayer):
             least = -1.0 if any(math.isnan(s) for s in sims) else min(sims)
             self._grow_on = least >= (min(P.off_at, P.on_at) if self._grow_on else P.on_at)
         self._grow.update(self._grow_on, dt, P.attack_seconds, P.release_seconds)
+
+    MEASURES = ('left_shoulder_travel', 'right_shoulder_travel', 'left_elbow_travel',
+                'right_elbow_travel', 'left_elbow_angle', 'right_elbow_angle',
+                'legs', 'body_bend', 'distance')    # what the blend averages: never similarity or position
+
+    def _set_blend(self, dt: float) -> None:
+        """Whether full sync blends the measures. The same band as the strobe's and the
+        growth's, shared through the root's settings, with its own state and envelope: while
+        every present pair is alike over the band, the envelope rises over
+        ``blend.attack_seconds`` and ``connect`` reads everyone's measures eased toward the
+        room's presence-weighted mean (``_blended``), one pattern for everyone; off the band
+        it falls back over ``blend.release_seconds``. The presences are last tick's, as the
+        scale's participation is."""
+        P = self._instrument.blend
+        present = [id for id, p in self._players.items() if p.present]
+        if P.bypass or len(present) < 2:
+            self._blend_on = False
+        else:
+            sims = [self._pair_similarity(a, b) for i, a in enumerate(present) for b in present[i + 1:]]
+            least = -1.0 if any(math.isnan(s) for s in sims) else min(sims)
+            self._blend_on = least >= (min(P.off_at, P.on_at) if self._blend_on else P.on_at)
+        self._blend.update(self._blend_on, dt, P.attack_seconds, P.release_seconds)
+        total = sum(p.voice.presence for p in self._players.values())
+        if self._blend.level > 0.0 and total > 0.0:
+            self._means = {name: sum(getattr(p, name) * p.voice.presence for p in self._players.values()) / total
+                           for name in self.MEASURES}
+        else:
+            self._means = {}
+
+    def _blended(self, p: _Player) -> _Player:
+        """The player as ``connect`` reads them: their measures eased toward the room's mean
+        by the blend's envelope. A copy, so the stored measures stay each person's own — a
+        lerp written back each tick would slew everyone to the mean and break the NaN hold."""
+        t = self._blend.value
+        if t <= 0.0 or not self._means:
+            return p
+        return replace(p, **{name: getattr(p, name) + (self._means[name] - getattr(p, name)) * t
+                             for name in self.MEASURES})
 
     def _pair_similarity(self, id_a: int, id_b: int) -> float:
         """Mean of both directions' pairwise similarity (one side may be NaN)."""

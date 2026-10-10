@@ -805,7 +805,8 @@ class PoseInstrumentTest(unittest.TestCase):
         self.cfg.on_at = 0.80                                             # one band, declared on the root
         self.cfg.off_at = 0.75
         self.assertEqual(self.cfg.grow.on_at, 0.80)                       # ...into the growth
-        self.assertEqual(self.cfg.sync_strobe.off_at, 0.75)               # ...and the strobe
+        self.assertEqual(self.cfg.sync_strobe.off_at, 0.75)               # ...the strobe
+        self.assertEqual(self.cfg.blend.on_at, 0.80)                      # ...and the blend
         self._grown_pair(sim=0.85)                                        # over the lowered band
         self.assertEqual(float(self._render().blue[500]), 1.0)
 
@@ -825,6 +826,41 @@ class PoseInstrumentTest(unittest.TestCase):
         counts = [int(np.count_nonzero(self._render().blue)) for _ in range(40)]
         self.assertLess(max(abs(b - a) for a, b in zip(counts, counts[1:])), 800)   # falling, never snapping
         self.assertLessEqual(counts[-1], 4 * REACH + 2 * (2 * MASK + 1))            # back at the rest windows
+
+    # -- the blend --
+
+    def _blend_pair(self, sim: float = 1.0) -> None:
+        """Arms-up A and hanging B, their one pair reading ``sim``; the blend at once (no
+        attack or release), the growth held off by the width bypass — the mechanisms are
+        independent."""
+        self.cfg.window.width_bypass = True
+        B = self.cfg.blend
+        B.attack_seconds = B.release_seconds = 0.0
+        self._people({0: _pose(0.3, left_shoulder=shoulder(1.0), sims={1: sim}), 1: _pose(0.7, sims={0: sim})})
+
+    def test_full_sync_blends_everyone_to_one_pattern(self) -> None:
+        a, b = round(0.3 * IRES), round(0.7 * IRES)
+        self._blend_pair()
+        self._render()                                                    # the means read last tick's presences
+        f = self._render()
+        np.testing.assert_array_equal(f.white[a - 300:a + 301], f.white[b - 300:b + 301])   # one pattern
+        np.testing.assert_array_equal(f.blue[a - 300:a + 301], f.blue[b - 300:b + 301])
+        self.assertEqual(float(f.white[a + MASK + 1:a + 300].max()), 1.0)   # the mean is half-raised:
+        self.assertEqual(float(f.blue[a + MASK + 1:a + 300].max()), 1.0)    # both colours' lines at both people
+
+    def test_below_the_band_everyone_keeps_their_own_pattern(self) -> None:
+        a, b = round(0.3 * IRES), round(0.7 * IRES)
+        self._blend_pair(sim=0.5)
+        f = self._render()
+        self.assertEqual(float(f.white[b + MASK + 1:b + 300].sum()), 0.0)   # B stays all blue
+        self.assertEqual(float(f.blue[a + MASK + 1:a + 300].sum()), 0.0)    # A stays all white
+
+    def test_the_blends_bypass_leaves_everyone_their_own(self) -> None:
+        self.cfg.blend.bypass = True
+        a, b = round(0.3 * IRES), round(0.7 * IRES)
+        self._blend_pair()
+        f = self._render()
+        self.assertEqual(float(f.white[b + MASK + 1:b + 300].sum()), 0.0)
 
     # -- the sync strobe --
 

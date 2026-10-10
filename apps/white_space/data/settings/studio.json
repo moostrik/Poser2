@@ -379,7 +379,7 @@
       "apply_warp": false,
       "folder": "20260924-203306_2_person",
       "sim_passthrough": false,
-      "start_norm": 0.0,
+      "start_norm": 0.04,
       "end_norm": 1.0
     },
     "frame_sync": {},
@@ -896,19 +896,31 @@
     },
     "window": {
       "width": 45.0,
-      "width_bypass": true,
+      "width_bypass": false,
       "scale": 1.5,
       "crowd": 0.75,
       "overlap": 0.0,
       "taper": 0.1,
-      "attack_seconds": 1.0,
-      "release_seconds": 1.5
+      "attack_seconds": 2.0,
+      "release_seconds": 4.0,
+      "attack_curve": "EASE_IN_OUT_SINE",
+      "release_curve": "EASE_IN_OUT_SINE",
+      "cap": false
     },
     "sync_strobe": {
       "bypass": false,
       "mode": "INVERT",
       "attack_seconds": 2.0,
-      "release_seconds": 4.0
+      "release_seconds": 1.2
+    },
+    "grow": {
+      "attack_seconds": 3.0,
+      "release_seconds": 3.0
+    },
+    "blend": {
+      "bypass": false,
+      "attack_seconds": 2.0,
+      "release_seconds": 2.0
     },
     "breath": {
       "rate": 0.5,
