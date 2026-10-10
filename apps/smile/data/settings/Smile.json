@@ -196,7 +196,7 @@
     "music_volume": 0.0,
     "laughter_volume": 0.0,
     "laughter_offset": 0.0,
-    "laughter_test": true,
+    "laughter_test": false,
     "laughter_test_step": 2.0,
     "laughter_test_sample": "Deep_dutch_laugh-2.mp3",
     "player_1_port": 4117,
