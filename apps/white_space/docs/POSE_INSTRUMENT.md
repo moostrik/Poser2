@@ -246,7 +246,7 @@ leg deviation's zones are in their extractors.
 | leg deviation | at standing, degrees; full at each top     | `leg_deviation_extractor.neutral_dead_zone`, `hip_max_degrees`, `knee_max_degrees` |
 
 The distance and the symmetries get theirs with their connection; the similarity has its own
-remap, `sync_strobe.threshold`.
+gate, the full-sync band (`PI.on_at`, `PI.off_at`, shared into the sync strobe and the growth).
 
 ## Symmetry
 
@@ -297,11 +297,11 @@ What the instrument triggers in a person's voice, beside the measures:
 |----------|-------------------------------------------------------------|-------------------------------------------------------------|
 | presence | the person is seen: a gate open while they are there        | the presence envelope, on both reaches                      |
 | hit      | the playhead crosses the person: the tick closest to it     | each oscillator's push, and the mask's flash                |
-| sync     | a pair is over the threshold; full sync: every pair alike   | the sync strobe, at full sync; and the reach on the partner's side (off in the preset) |
+| sync     | full sync: every present pair alike over the band           | the sync strobe, and the growth: every window toward the full circle |
 
 Presence and the pushes are envelopes of the synth (`LIGHT_SYNTH.md`, *The envelope*). The
 reaches are the bridge's: it gives each side's reach to the voice as a value, the rest width grown
-toward the partner by sync, since only the bridge knows where the partner stands. The sync
+toward the full circle by sync, since only the bridge knows the room (*People*). The sync
 strobe is the bridge's too: the synth renders as ever, and the bridge swaps the voices' outputs
 between the channels for the frame, or leaves them dark, so no parameter and no slot is touched
 (*The sync strobe*). The mask's
@@ -382,16 +382,16 @@ has no place in the projection and counts as absent, the one presence test a lay
 Presence opens the window from the mask over `window.attack_seconds` and closes it over
 `window.release_seconds`, the last pose held while it closes and the mask dimming with it.
 
-The bridge sets each side's **reach** every tick: `window.width`, grown by sync toward every
-partner along the shorter arc. Sync starts at `sync_strobe.threshold`, on the mean of both
-directions' similarity; the threshold is the bridge's remap of the similarity, which is well above
-0 for most pairs out of neutral (`SIMILARITY.md`, *Interdependence*). The reach grows eased until
-it meets the partner at similarity 1: full sync is full overlap, one pattern. Only the partner's side opens, over any
-person between them, whose own pattern is unchanged. The partner's presence scales the growth, so
-a partner leaving lets go smoothly. A pair with a person at neutral reads 0 and does not open
-(`STATES.md`, *Vocabulary*). The voice multiplies the reach by presence and thins the lines to
-nothing over the taper (`LIGHT_SYNTH.md`, *The window*). In the preset `window.width_bypass` is
-on: the reaches stay at the width and sync does not grow them.
+The bridge sets each side's **reach** every tick: `window.width`, grown toward the full circle
+by the sync **growth** (`PI.grow`). The growth is room-level: while full sync holds — the band
+(`PI.on_at`, `PI.off_at`), shared with the sync strobe but with its own state and envelope —
+the envelope rises over `grow.attack_seconds` and every
+window grows toward half the circle each side, so at full sync lines are everywhere; when the
+band closes, the windows fall back over `grow.release_seconds`. The grown windows
+meet through the overlap clip below, so the Overlap knob shapes the filled circle too:
+territories tiling at 0, interleaved at 1. `window.width_bypass` switches the growth off. The
+voice multiplies the reach by presence and thins the lines to nothing over the taper
+(`LIGHT_SYNTH.md`, *The window*).
 
 `window.overlap` keeps neighbouring windows out of each other: each side's reach is clipped
 toward the midpoint of the arc to the neighbour — fully at 0, where windows meet as territories
@@ -400,7 +400,7 @@ Negative values retreat past the midpoint by the same measure, a dark gap that w
 where close windows close their facing side entirely; windows already apart are not clipped.
 The neighbour's presence scales their clip, so a neighbour leaving lets go smoothly, and the
 nearest present neighbour on each side is the binding one. The clip applies under the width
-bypass; sync growth, when it runs, overrides it, so full sync remains full overlap.
+bypass, and to the grown windows alike.
 
 The window **scale** compresses each person's whole picture — reach, line spacing, motion —
 without changing any other setting: the bridge divides the positions it hands the voices by the
@@ -428,9 +428,10 @@ The **sync strobe** is full sync's visualisation: while the room holds full sync
 pattern's white and blue trade places on strobe frames (`sync_strobe.mode` invert, the
 default) or go dark (black), whole patterns at once, returning on the frame between. The room
 is in full sync while its least alike present pair holds over the band: the gate opens when
-every pair reads `sync_strobe.on_at` and closes only when one falls below
-`sync_strobe.off_at` — the band is the hysteresis, so a room hovering at one level never
-swaps the gate. A person at neutral holds the room off (the neutral weight is in the feature,
+every pair reads `PI.on_at` and closes only when one falls below
+`PI.off_at` — the band is the hysteresis, so a room hovering at one level never
+swaps the gate. The band is declared on the root and shared into the strobe and the growth,
+each with its own state and envelope. A person at neutral holds the room off (the neutral weight is in the feature,
 `SIMILARITY.md`), as does a pair that cannot be read; below two people there is no pair and
 no strobe.
 
@@ -472,7 +473,9 @@ tuned together, knobs throughout:
 | `mask`                        | the mask's width, white and blue; the border's; the flash's levels, release |
 | `playhead`                    | the marker's width, white and blue; its level inside a mask     |
 | `window`                      | shape: taper, attack, release, their curves, the cap; reach: width, bypass; the scale, the crowd factor and the overlap |
-| `sync_strobe`                 | full sync's display: bypass, mode (invert or black), the band (on at, off at), attack, release; sync's threshold, the growth's |
+| `on_at`, `off_at`             | the full-sync band, shared into `sync_strobe` and `grow`        |
+| `sync_strobe`                 | full sync's display: bypass, mode (invert or black), attack, release |
+| `grow`                        | full sync's reach: windows grow to the full circle; attack, release |
 | `breath`                      | the breath's rate and depth (`MATRIX_V2.md`, *Made sources*)    |
 | `white_lines`, `blue_lines`   | On, Mirror, Bypass All; a slot per parameter; the push          |
 | `white_strobe`, `blue_strobe` | Bypass All; a slot per parameter of the strobe (`LIGHT_SYNTH.md`, *The strobe*) |

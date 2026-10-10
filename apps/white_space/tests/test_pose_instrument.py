@@ -772,50 +772,59 @@ class PoseInstrumentTest(unittest.TestCase):
         type(S).bypass_all.fire(S)
         self.assertFalse(any(getattr(S, name) for name in self.STROBE_BYPASSES))
 
-    # -- sync --
+    # -- the sync growth --
 
-    def test_sync_fills_the_arc_between_the_pair_above_threshold_only(self) -> None:
-        a, b = round(0.3 * IRES), round(0.7 * IRES)
+    def _grown_pair(self, sim: float = 1.0) -> None:
+        """A pair at neutral (full blue), its one pair reading ``sim``; the growth at once (no
+        Grow attack or release) — the envelope has its own tests. The strobe stays bypassed:
+        the growth is its own mechanism on the shared band."""
+        G = self.cfg.grow
+        G.attack_seconds = G.release_seconds = 0.0
+        self._people({0: _pose(0.3, sims={1: sim}), 1: _pose(0.7, sims={0: sim})})
+
+    def test_full_sync_fills_the_circle_through_the_overlap(self) -> None:
+        self.cfg.window.overlap = 0.0
+        self._grown_pair()
+        f = self._render()
+        self.assertEqual(float(f.blue[500]), 1.0)                 # previously dark, now the fill
+        self.assertEqual(float(f.blue[3100]), 1.0)                # the far side of the circle too
+        np.testing.assert_array_equal(f.blue[1798:1803], 0.0)     # territories: a seam at the pair's midpoint
+        self.layer.reset()
+        self._grown_pair(sim=0.5)                                 # below the band: the rest windows
+        self.assertEqual(float(self._render().blue[500]), 0.0)
+
+    def test_the_growth_follows_the_bands_hysteresis(self) -> None:
+        self._grown_pair()
+        self.assertEqual(float(self._render().blue[500]), 1.0)                            # on from on_at
+        self._people({0: _pose(0.3, sims={1: 0.92}), 1: _pose(0.7, sims={0: 0.92})})      # inside the band
+        self.assertEqual(float(self._render().blue[500]), 1.0)                            # held
+        self._people({0: _pose(0.3, sims={1: 0.5}), 1: _pose(0.7, sims={0: 0.5})})        # below off_at
+        self.assertEqual(float(self._render().blue[500]), 0.0)                            # released
+
+    def test_the_band_is_shared_from_the_root(self) -> None:
+        self.cfg.on_at = 0.80                                             # one band, declared on the root
+        self.cfg.off_at = 0.75
+        self.assertEqual(self.cfg.grow.on_at, 0.80)                       # ...into the growth
+        self.assertEqual(self.cfg.sync_strobe.off_at, 0.75)               # ...and the strobe
+        self._grown_pair(sim=0.85)                                        # over the lowered band
+        self.assertEqual(float(self._render().blue[500]), 1.0)
+
+    def test_width_bypass_switches_the_growth_off(self) -> None:
+        self.cfg.window.width_bypass = True
+        self._grown_pair()
+        self.assertEqual(float(self._render().blue[500]), 0.0)
+
+    def test_the_fill_arrives_over_the_grow_attack_and_leaves_over_the_release(self) -> None:
+        self._grown_pair()
+        self.cfg.grow.attack_seconds = 1.0
+        self.cfg.grow.release_seconds = 1.0
+        counts = [int(np.count_nonzero(self._render().blue)) for _ in range(40)]
+        self.assertLess(counts[0], counts[15])                    # growing
+        self.assertLess(counts[15], counts[35])                   # still growing, then full
         self._people({0: _pose(0.3, sims={1: 0.5}), 1: _pose(0.7, sims={0: 0.5})})
-        self.assertEqual(float(self._render().blue[C]), 0.0)
-        self.layer.reset()
-        self._people({0: _pose(0.3, sims={1: 1.0}), 1: _pose(0.7, sims={0: 1.0})})
-        f = self._render()
-        np.testing.assert_array_equal(f.blue[a + MASK + 1:b - MASK], 1.0)
-
-    def test_sync_opens_the_partners_side_only(self) -> None:
-        a, b = round(0.3 * IRES), round(0.7 * IRES)
-        self._people({0: _pose(0.3, sims={1: 1.0}), 1: _pose(0.7, sims={0: 1.0})})
-        f = self._render()
-        self.assertEqual(float(f.blue[:a - REACH].sum()), 0.0)               # the far sides keep their rest reach
-        self.assertEqual(float(f.blue[b + REACH + 1:].sum()), 0.0)
-        np.testing.assert_array_equal(f.blue[a - FULL:a - MASK], 1.0)
-
-    def test_sync_reaches_over_an_intermediate_person(self) -> None:
-        probe = round(0.35 * IRES) + 50         # beyond both rest reaches, inside the arms-up person's
-        raised = shoulder(1.0)
-        self._people({0: _pose(0.2), 1: _pose(0.35, left_shoulder=raised), 2: _pose(0.5)})
-        self.assertEqual(float(self._render().blue[probe]), 0.0)
-        self.layer.reset()
-        self._people({0: _pose(0.2, sims={2: 1.0}), 1: _pose(0.35, left_shoulder=raised), 2: _pose(0.5, sims={0: 1.0})})
-        f = self._render()
-        self.assertEqual(float(f.blue[probe]), 1.0)
-        self.assertEqual(float(f.white[probe]), 1.0)             # the intermediate pattern shows too
-
-    def test_sync_takes_the_shorter_arc_across_the_wrap(self) -> None:
-        self._people({0: _pose(0.95, sims={1: 1.0}), 1: _pose(0.05, sims={0: 1.0})})
-        f = self._render()
-        self.assertEqual(float(f.blue[0]), 1.0)
-        self.assertEqual(float(f.blue[round(0.2 * IRES):round(0.8 * IRES)].sum()), 0.0)
-
-    def test_a_leaving_partner_lets_the_reach_go_smoothly(self) -> None:
-        self.cfg.window.release_seconds = 1.0
-        self._people({0: _pose(0.3, sims={1: 1.0}), 1: _pose(0.7, sims={0: 1.0})})
-        self._render()
-        self._people({0: _pose(0.3, sims={1: 1.0})})             # the partner is gone
-        lit = [int(np.count_nonzero(self._render().blue)) for _ in range(40)]
-        self.assertLess(max(abs(b - a) for a, b in zip(lit, lit[1:])), 300)    # closing, never snapping shut (a snap would be the whole grown arc)
-        self.assertLess(lit[-1], 2 * REACH + 10)                 # back at the rest reach
+        counts = [int(np.count_nonzero(self._render().blue)) for _ in range(40)]
+        self.assertLess(max(abs(b - a) for a, b in zip(counts, counts[1:])), 800)   # falling, never snapping
+        self.assertLessEqual(counts[-1], 4 * REACH + 2 * (2 * MASK + 1))            # back at the rest windows
 
     # -- the sync strobe --
 

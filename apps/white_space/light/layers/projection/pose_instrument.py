@@ -17,8 +17,10 @@ bridge is everything the synth does not know:
   while the room holds full sync, every present pair alike over the band (on from
   ``sync_strobe.on_at``, off below ``sync_strobe.off_at``), every drawn pattern's white and
   blue swap on strobe frames (or go dark, ``sync_strobe.mode``), the rate climbing the nested
-  ladder over the attack and stepping back down over the release — and the reach growing on a
-  partner's side from ``sync_strobe.threshold`` until it reaches them.
+  ladder over the attack and stepping back down over the release — and the **growth**
+  (``PI.grow``): its own envelope on the same band (``PI.on_at``/``off_at``, shared into both)
+  grows every window toward the full circle over its attack, the overlap clip shaping how
+  they meet, and lets them fall back over its release.
 - the **scale**: the voices work in pattern degrees, real degrees over ``window.scale`` shrunk
   by ``window.crowd`` per further participant (the sum of presences, so it moves smoothly), and
   the bridge divides the positions it hands them; the whole pattern — reach, lines, motion —
@@ -70,8 +72,8 @@ class WindowSettings(SynthWindowSettings):
     """The window: how far the pattern shows each side of a person, and when. The synth's part
     (taper, attack, release) with the bridge's: the reach at rest, its bypass, the scale,
     which compresses the whole pattern — reach, lines, motion — as one picture, and the overlap,
-    which pulls neighbouring windows apart into territories. Sync's threshold is the sync
-    strobe's (``SyncStrobeSettings``); the growth reads it from there."""
+    which pulls neighbouring windows apart into territories. Sync's growth is its own mechanism
+    (``GrowSettings``) and is switched off by the width's Bypass."""
     width:          Field[float] = Field(45.0, min=0.0, max=180.0, step=0.5,  widget=KNOB, label="Width",          description="Reach each side of a person at rest (deg)", row_label="Reach", newline=True)
     width_bypass:   Field[bool]  = Field(False,                                            label="Bypass",         description="Both reaches at the width: no sync growth")
     scale:          Field[float] = Field(1.0,  min=0.1, max=2.0,   step=0.01, widget=KNOB, label="Scale",          description="Overall window scale: the whole pattern compresses, nothing needs recalibrating", row_label="Scale", newline=True)
@@ -93,15 +95,26 @@ class SyncStrobeSettings(BaseSettings):
     envelope whose value picks the rate from the nested powers of two: the strobe comes in
     climbing 1 to 16 per second over the attack and fades out stepping back down over the
     release, every change a seamless infill. The bridge's, after the voices render; the
-    per-oscillator strobes are the patch's and independent. The threshold is where sync
-    begins, the reach growth's start."""
+    per-oscillator strobes are the patch's and independent. The band is the root's, shared
+    with the growth (``GrowSettings``); each mechanism keeps its own state and envelope."""
     bypass:          Field[bool]           = Field(False,                 label="Bypass", description="No sync strobe: full sync shows nothing", row_label="Sync Strobe", newline=True)
     mode:            Field[SyncStrobeMode] = Field(SyncStrobeMode.INVERT, label="Mode",   description="A strobe frame swaps white and blue, or goes dark")
-    on_at:           Field[float]          = Field(0.95, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="On At",   description="The strobe comes on when every pair reads at least this")
-    off_at:          Field[float]          = Field(0.90, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Off At",  description="The strobe goes off when any pair falls below this")
+    on_at:           Field[float]          = Field(0.95, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="On At",   description="Full sync comes on when every pair reads at least this", visible=False)
+    off_at:          Field[float]          = Field(0.90, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Off At",  description="Full sync goes off when any pair falls below this", visible=False)
     attack_seconds:  Field[float]          = Field(2.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Attack",  description="The rate climbs 1 to 16 per second over (s)")
     release_seconds: Field[float]          = Field(4.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Release", description="The rate steps back down to silence over (s)")
-    threshold:       Field[float]          = Field(0.75, min=0.0, max=0.99, step=0.01, widget=KNOB, label="Threshold", description="Pair similarity from which sync begins: the reach growth's start")
+
+
+class GrowSettings(BaseSettings):
+    """The growth, full sync's other reach: while every present pair is alike over the band
+    (the root's, shared with the sync strobe, each mechanism its own state and envelope),
+    every window grows toward the full circle over the attack — the overlap clip shapes how
+    the grown windows meet — and falls back over the release. ``window.width_bypass``
+    switches it off."""
+    on_at:           Field[float] = Field(0.95, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="On At",   description="Full sync comes on when every pair reads at least this", visible=False)
+    off_at:          Field[float] = Field(0.90, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Off At",  description="Full sync goes off when any pair falls below this", visible=False)
+    attack_seconds:  Field[float] = Field(3.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Attack",  description="Windows grow to fill the circle while full sync holds, over (s)", row_label="Grow", newline=True)
+    release_seconds: Field[float] = Field(3.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Release", description="The grown windows fall back to the width over (s)")
 
 
 class MaskSettings(BaseSettings):
@@ -129,16 +142,20 @@ class BreathSettings(BaseSettings):
 
 class PoseInstrumentSettings(BaseSettings):
     """The ``PI`` root group, a group per concept: the mask, the playhead's marker, the window,
-    the sync strobe, the breath, the two oscillators, their strobes and the LFO (the synth's
-    patch, a slot per parameter), the dummy. The wiring is ``connect``; the measures' dead
-    zones are the pipeline's."""
+    the sync strobe and the growth (the full-sync band declared here, shared into both), the
+    breath, the two oscillators, their strobes and the LFO (the synth's patch, a slot per
+    parameter), the dummy. The wiring is ``connect``; the measures' dead zones are the
+    pipeline's."""
     max_lines:    Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
     opposite:     Field[bool] = Field(False, description="Draw each person's lines half a turn away; the masks stay on the people")
     elbow_lift:   Field[float] = Field(0.5, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Elbow Lift", description="How much a folded elbow lifts its arm (fraction of a full raise)")
+    on_at:        Field[float] = Field(0.95, min=0.0, max=1.0, step=0.01, widget=KNOB, label="On At",  description="Full sync comes on when every pair reads at least this", row_label="Sync", newline=True)
+    off_at:       Field[float] = Field(0.90, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Off At", description="Full sync goes off when any pair falls below this")
     mask:         Group[MaskSettings]           = Group(MaskSettings)
     playhead:     Group[PlayheadMarkerSettings] = Group(PlayheadMarkerSettings)
     window:       Group[WindowSettings]         = Group(WindowSettings)
-    sync_strobe:  Group[SyncStrobeSettings]     = Group(SyncStrobeSettings)
+    sync_strobe:  Group[SyncStrobeSettings]     = Group(SyncStrobeSettings, share=[on_at, off_at])
+    grow:         Group[GrowSettings]           = Group(GrowSettings, share=[on_at, off_at])
     breath:       Group[BreathSettings]         = Group(BreathSettings)
     white_lines:  Group[OscillatorSettings]     = Group(OscillatorSettings)
     blue_lines:   Group[OscillatorSettings]     = Group(OscillatorSettings)
@@ -188,8 +205,10 @@ class PoseInstrument(ProjectionLayer):
         self._players: dict[int, _Player] = {}
         self._scale = 1.0                                                   # this tick's window scale
         self._ticks_per_second = 1                                          # this tick's grid, the strobes' and the pulse's
-        self._synced = False                                                # full sync held, inside the band
-        self._sync_strobe = Envelope()                                      # the band's envelope: its value picks the rate
+        self._synced = False                                                # the strobe's band state
+        self._sync_strobe = Envelope()                                      # the strobe's envelope: its value picks the rate
+        self._grow_on = False                                               # the growth's own band state
+        self._grow = Envelope()                                             # the growth's envelope: the windows toward the full circle
         self._crossing = PlayheadCrossing()
         self._pixels = np.arange(resolution, dtype=np.float64)              # the strip's pixel indices
         self._mask = np.zeros(resolution, dtype=bool)
@@ -206,6 +225,8 @@ class PoseInstrument(ProjectionLayer):
         self._crossing.reset()
         self._synced = False
         self._sync_strobe.reset()
+        self._grow_on = False
+        self._grow.reset()
 
     @staticmethod
     def _bypass_all(patch: OscillatorSettings, _: bool) -> None:
@@ -227,6 +248,7 @@ class PoseInstrument(ProjectionLayer):
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         self._update_players(frame)
+        self._set_grow(frame.tick.dt)                                      # first: the reaches read its envelope
         self._set_reaches()
         self._set_sync_strobe(frame.tick.index, frame.tick.dt)
         mask, mask_white, mask_blue = self._mask, self._mask_white, self._mask_blue
@@ -408,38 +430,18 @@ class PoseInstrument(ProjectionLayer):
     # -- Reach, sync and the pulse ----------------------------------------------------
 
     def _set_reaches(self) -> None:
-        """Each side's reach in pattern degrees, before presence: ``window.width``, clipped toward
-        the midpoint to every neighbour as far as ``window.overlap`` allows (the neighbour's
-        presence scales the clip, so a neighbour leaving lets go smoothly), then grown toward
-        every similarity-matched partner along the shorter arc, full reaching them; the partner's
-        presence scales the growth the same way. Bypassed (``window.width_bypass``), it does not
-        grow; the clip applies regardless."""
+        """Each side's reach in pattern degrees, before presence: ``window.width``, grown toward
+        the full circle by the sync growth (``_set_grow``'s envelope;
+        ``window.width_bypass`` gates it off), then clipped toward the midpoint to every
+        neighbour as far as ``window.overlap`` allows (the neighbour's presence scales the
+        clip, so a neighbour leaving lets go smoothly). Grown windows meet through the same
+        clip: at full sync the circle fills, lines everywhere, territories at overlap 0."""
         W = self._instrument.window
-        base = min(W.width, 180.0 / self._scale)            # pattern degrees: half the circle real
+        full = 180.0 / self._scale                          # pattern degrees: half the circle real
+        base = min(W.width + (full - W.width) * self._grow.value, full)
         for p in self._players.values():
             p.reach_left = p.reach_right = base
         self._clip_reaches(base)
-        if W.width_bypass:
-            return
-        threshold = self._instrument.sync_strobe.threshold
-        ids = list(self._players)
-        for i, id_a in enumerate(ids):
-            for id_b in ids[i + 1:]:
-                sim = self._pair_similarity(id_a, id_b)
-                if math.isnan(sim) or sim < threshold:
-                    continue
-                a, b = self._players[id_a], self._players[id_b]
-                t = self._ease((sim - threshold) / max(1.0 - threshold, 1e-6))
-                delta = self._signed_offset(a.position, b.position)
-                distance = abs(delta) * 360.0 / self._scale                 # the real gap, in pattern degrees
-                grow_a = base + (distance - base) * t * b.voice.presence    # toward b, as far as b is there
-                grow_b = base + (distance - base) * t * a.voice.presence
-                if delta >= 0.0:
-                    a.reach_right = max(a.reach_right, grow_a)
-                    b.reach_left = max(b.reach_left, grow_b)
-                else:
-                    a.reach_left = max(a.reach_left, grow_a)
-                    b.reach_right = max(b.reach_right, grow_b)
 
     def _clip_reaches(self, base: float) -> None:
         """Pull neighbouring windows apart into territories: each pair clips its facing sides
@@ -503,6 +505,23 @@ class PoseInstrument(ProjectionLayer):
         for p in self._players.values():
             p.sync_strobe = strobe
 
+    def _set_grow(self, dt: float) -> None:
+        """Whether full sync grows the windows. The same band as the sync strobe's, shared
+        through the root's settings, with its own state and envelope so the two mechanisms
+        stay apart: while every present pair is alike over the band, the envelope rises over
+        ``grow.attack_seconds`` and ``_set_reaches`` grows every window toward the full
+        circle; off the band it falls back over ``grow.release_seconds``.
+        ``window.width_bypass`` holds the gate closed."""
+        P = self._instrument.grow
+        present = [id for id, p in self._players.items() if p.present]
+        if self._instrument.window.width_bypass or len(present) < 2:
+            self._grow_on = False
+        else:
+            sims = [self._pair_similarity(a, b) for i, a in enumerate(present) for b in present[i + 1:]]
+            least = -1.0 if any(math.isnan(s) for s in sims) else min(sims)
+            self._grow_on = least >= (min(P.off_at, P.on_at) if self._grow_on else P.on_at)
+        self._grow.update(self._grow_on, dt, P.attack_seconds, P.release_seconds)
+
     def _pair_similarity(self, id_a: int, id_b: int) -> float:
         """Mean of both directions' pairwise similarity (one side may be NaN)."""
         sims = []
@@ -516,10 +535,6 @@ class PoseInstrument(ProjectionLayer):
     def _signed_offset(a: float, b: float) -> float:
         """Signed shortest offset a → b around the projection (normalized azimuth, in [-0.5, 0.5))."""
         return ((b - a + 0.5) % 1.0) - 0.5
-
-    @staticmethod
-    def _ease(t: float) -> float:
-        return 0.5 - 0.5 * math.cos(math.pi * min(max(t, 0.0), 1.0))
 
     # -- Drawing ---------------------------------------------------------------------
 

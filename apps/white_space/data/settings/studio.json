@@ -875,6 +875,8 @@
     "max_lines": 90,
     "opposite": false,
     "elbow_lift": 0.5,
+    "on_at": 0.98,
+    "off_at": 0.93,
     "mask": {
       "width": 15.0,
       "white": 0.0,
@@ -905,11 +907,8 @@
     "sync_strobe": {
       "bypass": false,
       "mode": "INVERT",
-      "on_at": 0.98,
-      "off_at": 0.93,
       "attack_seconds": 2.0,
-      "release_seconds": 4.0,
-      "threshold": 0.9
+      "release_seconds": 4.0
     },
     "breath": {
       "rate": 0.5,
