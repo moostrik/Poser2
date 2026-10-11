@@ -15,11 +15,11 @@ from OpenGL.GL import *  # type: ignore
 import numpy as np
 
 # Local application imports
-from modules.gl import Texture, Style
+from modules.gl import Texture, Style, Text
 from ..LayerBase import LayerBase, Blit
 from modules.board import HasFrames
 from modules.pose.frame import Frame
-from modules.pose.features import Similarity, MotionGate, AngleMotion
+from modules.pose.features import Similarity, MotionGate, AngleMotion, Points2D, PointLandmark
 
 from modules.settings import Field, BaseSettings, Group
 from modules.flow import FluidFlow, FluidFlow3D, FluidFlowSettings
@@ -106,6 +106,13 @@ class Fluid3DLayer(LayerBase):
         self._alloc_height: int = 0
         self._swap_engine_pending: bool = False
 
+        # Legend for the debug depth view (hue = layer)
+        self._legend_text: Text = Text()
+
+        # Smoothed head position for the head-coupled parallax eye
+        self._eye_x: float = 0.0
+        self._eye_y: float = 0.0
+
         # Defer engine swap to GL thread (callbacks fire from websocket thread)
         self.config.bind(Fluid3DLayerSettings.sim_engine, lambda _: self._request_swap_engine())
 
@@ -157,10 +164,12 @@ class Fluid3DLayer(LayerBase):
         self._alloc_width = width
         self._alloc_height = height
         self._fluid_flow.allocate(width, height)
+        self._legend_text.allocate(font_size=18)
 
     def deallocate(self) -> None:
         """Deallocate all resources."""
         self._fluid_flow.deallocate()
+        self._legend_text.deallocate()
 
     def reset(self) -> None:
         """Reset fluid simulation state."""
@@ -219,10 +228,38 @@ class Fluid3DLayer(LayerBase):
             # Add temperature from each flow layer
             self._fluid_flow.add_temperature(flow_layer.temperature, 1.0)
 
+        # Head-coupled parallax eye (3D engine only)
+        self._update_eye(pose)
+
         # Update 3D fluid simulation (handles its own reallocation internally)
         self._fluid_flow.update()
 
         Style.pop_style()
+
+    def _update_eye(self, pose: Frame | None) -> None:
+        """Steer the parallax eye toward the tracked head.
+
+        Head column/row follow white_space's eye-centre convention: the eyes'
+        mean, the nose when they are missing, easing back to centre when both
+        are. Offsets are ±1 across the frame (vertical at half range).
+        """
+        if not isinstance(self._fluid_flow, FluidFlow3D):
+            return
+        target_x, target_y = 0.0, 0.0
+        if pose is not None and Points2D in pose:
+            pts = pose[Points2D].values
+            head = pts[[PointLandmark.left_eye, PointLandmark.right_eye]].mean(axis=0)
+            if np.isnan(head).any():
+                head = pts[PointLandmark.nose]
+            if not np.isnan(head).any():
+                target_x = (float(head[0]) - 0.5) * 2.0
+                target_y = float(head[1]) - 0.5
+        # ~0.4 s ease keeps keypoint jitter out of the eye (render thread only)
+        dt = 1.0 / max(1, self.config.fluid_flow.fps)
+        k = 1.0 - 0.01 ** (dt / 0.4)
+        self._eye_x += (target_x - self._eye_x) * k
+        self._eye_y += (target_y - self._eye_y) * k
+        self._fluid_flow.set_eye(self._eye_x, self._eye_y)
 
     # ========== Rendering ==========
 
@@ -232,4 +269,35 @@ class Fluid3DLayer(LayerBase):
         Style.set_blend_mode(self.config.blend_mode)
         if self.texture.allocated:
             Blit.use(self.texture)
+        if self.config.fluid_flow.depth.debug_depth and self._legend_text.allocated:
+            self._draw_depth_legend()
         Style.pop_style()
+
+    def _draw_depth_legend(self) -> None:
+        """Hue legend for the debug depth view: violet = front ... red = back."""
+        vp = glGetIntegerv(GL_VIEWPORT)
+        w, h = int(vp[2]), int(vp[3])
+        if w <= 0 or h <= 0:
+            return
+        Style.set_blend_mode(Style.BlendMode.ALPHA)
+
+        n = 12
+        swatch_w = 16
+        x = 16
+        y = h - 46
+        self._legend_text.draw_box_text(x, y, "FRONT", (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 0.6), w, h)
+        bar_x = x + 76
+        for i in range(n):
+            hue = 0.8 * (1.0 - i / (n - 1))  # violet (front) -> red (back), matching the shader
+            h6 = hue * 6.0
+            xx = 1.0 - abs(h6 % 2.0 - 1.0)
+            if   h6 < 1.0: rgb = (1.0, xx, 0.0)
+            elif h6 < 2.0: rgb = (xx, 1.0, 0.0)
+            elif h6 < 3.0: rgb = (0.0, 1.0, xx)
+            elif h6 < 4.0: rgb = (0.0, xx, 1.0)
+            elif h6 < 5.0: rgb = (xx, 0.0, 1.0)
+            else:          rgb = (1.0, 0.0, xx)
+            self._legend_text.draw_box_text(bar_x + i * swatch_w, y, " ",
+                                            (0.0, 0.0, 0.0, 0.0), (*rgb, 1.0), w, h)
+        self._legend_text.draw_box_text(bar_x + n * swatch_w + 8, y, "BACK",
+                                        (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 0.6), w, h)

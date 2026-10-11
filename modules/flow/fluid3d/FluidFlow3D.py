@@ -21,6 +21,9 @@ Boundary conditions via per-field wrap modes (no explicit border obstacles):
     Pressure/temp:     GL_CLAMP_TO_EDGE              -> zero-gradient / Neumann
     Obstacle:          GL_CLAMP_TO_BORDER(1,0,0,0)   -> OOB = obstacle
 """
+import math
+import time
+
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, Texture2DArray, SwapTexture2DArray, Profiler
@@ -101,6 +104,9 @@ class FluidFlow3D:
         self._z_extent: float = 1.0   # slab thickness in width units (advection: uRdx.z = 1/z_extent)
 
         self._has_obstacles: bool = False
+
+        # Tracked-head eye offset for the composite (set_eye, polled per frame)
+        self._eye_person: tuple[float, float] = (0.0, 0.0)
 
         self._allocated: bool = False
 
@@ -620,14 +626,35 @@ class FluidFlow3D:
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
+    def set_eye(self, x: float, y: float) -> None:
+        """Store the tracked-head eye offset (±1 range), polled by the composite."""
+        self._eye_person = (x, y)
+
     def _composite_output(self) -> None:
-        """Composite 3D density → 2D output texture."""
+        """Composite 3D density → 2D output with depth cues (virtual eye)."""
+        d = self.config.depth
+        if d.drift_period > 0.0:
+            # Lissajous orbit — never visibly repeats, period in seconds
+            t = (2.0 * math.pi) * time.monotonic() / d.drift_period
+            drift = (d.parallax * math.sin(t), 0.6 * d.parallax * math.cos(t * 0.77))
+        else:
+            drift = (d.parallax, 0.0)
+        # Crossfade autonomous drift <-> head-coupled parallax
+        k = d.eye_tracking
+        eye = (drift[0] * (1.0 - k) + self._eye_person[0] * d.parallax * k,
+               drift[1] * (1.0 - k) + self._eye_person[1] * d.parallax * k)
         self._composite_density_shader.use(
             self._density.texture,
             self._output_texture,
-            self.config.depth.composite_mode,
-            absorption=self.config.depth.absorption,
-            ray_steps=self.config.depth.ray_steps
+            emission=d.emission,
+            absorption=d.absorption,
+            tint=d.tint,
+            fog=d.fog,
+            glow=d.glow,
+            eye=eye,
+            perspective=d.perspective,
+            depth_blur=d.depth_blur,
+            debug_depth=d.debug_depth,
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 

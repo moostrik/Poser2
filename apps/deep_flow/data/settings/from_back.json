@@ -27,7 +27,7 @@
       },
       "color_sensor": {
         "exposure": 29992,
-        "iso": 134,
+        "iso": 137,
         "auto_exposure": true,
         "balance": 3000,
         "auto_balance": true,
@@ -397,12 +397,19 @@
           "depth": 16,
           "sim_depth": 32,
           "spacing": 3.0,
-          "composite_mode": 4,
-          "ray_steps": 16,
-          "absorption": 35.68,
+          "emission": 0.87,
+          "absorption": 20.31,
+          "glow": 0.2,
+          "tint": 0.5,
+          "fog": 1.42,
+          "parallax": 0.05,
+          "perspective": 0.35,
+          "drift_period": 9.4,
+          "depth_blur": 0.25,
+          "debug_depth": false,
           "injection_layer": 1.0,
-          "injection_spread": 0.13,
-          "boundary": "OPEN"
+          "injection_spread": 0.1,
+          "boundary": "CLOSED"
         },
         "velocity": {
           "input_strength": 1.35,

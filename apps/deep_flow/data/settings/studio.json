@@ -398,9 +398,7 @@
           "depth": 16,
           "sim_depth": 32,
           "spacing": 3.0,
-          "composite_mode": 1,
-          "ray_steps": 16,
-          "absorption": 35.68,
+          "absorption": 6.0,
           "injection_layer": 0.0,
           "injection_spread": 0.13,
           "boundary": "OPEN"
