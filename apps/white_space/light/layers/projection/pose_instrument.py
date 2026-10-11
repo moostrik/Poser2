@@ -32,7 +32,9 @@ bridge is everything the synth does not know:
   in the preset) and flashing to its flash levels on a hit; its **border**, a line centred on
   each edge of the band, half over the blue, that does not flash; and the playhead's **marker** over
   it all (``PlayheadMarker``), dimmed inside the masks. With ``PI.opposite`` the patterns are
-  drawn half a turn from their people while the masks stay on them.
+  drawn half a turn from their people (ON) or in both places (BOTH) while the masks stay on
+  them; under BOTH the copies win the overlap — own windows retreat to a copy's settled edge,
+  and yield entirely to a copy reaching over their person (``_clip_against_copies``).
 - the colours: output 1 is white, output 2 is blue; where voices overlap the fuller one shows.
 
 Playing by hand: every parameter has its slot as a row in the panel (``PI.white_lines``,
@@ -81,6 +83,13 @@ class WindowSettings(SynthWindowSettings):
     scale:          Field[float] = Field(1.0,  min=0.1, max=2.0,   step=0.01, widget=KNOB, label="Scale",          description="Overall window scale: the whole pattern compresses, nothing needs recalibrating", row_label="Scale", newline=True)
     crowd:          Field[float] = Field(1.0,  min=0.5, max=1.0,   step=0.01, widget=KNOB, label="Crowd",          description="Each further participant multiplies the scale by this; 1 = off")
     overlap:        Field[float] = Field(1.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Overlap",        description="How far a window may reach into a neighbour's: 1 full, 0 territories meeting at the midpoint, negative a gap between them")
+
+
+class Opposite(IntEnum):
+    """Where a person's pattern is drawn; the mask stays on the person in every mode."""
+    OFF  = 0      # at the person
+    ON   = 1      # half a turn away
+    BOTH = 2      # both places, the copies winning the overlap
 
 
 class SyncStrobeMode(IntEnum):
@@ -163,7 +172,7 @@ class PoseInstrumentSettings(BaseSettings):
     patch, a slot per parameter), the dummy. The wiring is ``connect``; the measures' dead
     zones are the pipeline's."""
     max_lines:    Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
-    opposite:     Field[bool] = Field(False, description="Draw each person's lines half a turn away; the masks stay on the people")
+    opposite:     Field[Opposite] = Field(Opposite.OFF, widget=Widget.select, description="Draw each person's lines at them, half a turn away, or both (the copies win the overlap); the masks stay on the people")
     elbow_lift:   Field[float] = Field(0.5, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Elbow Lift", description="How much a folded elbow lifts its arm (fraction of a full raise)")
     on_at:        Field[float] = Field(0.95, min=0.0, max=1.0, step=0.01, widget=KNOB, label="On At",  description="Full sync comes on when every pair reads at least this", row_label="Sync", newline=True)
     off_at:       Field[float] = Field(0.90, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Off At", description="Full sync goes off when any pair falls below this")
@@ -206,6 +215,8 @@ class _Player:
     breath:         Oscillator = field(default_factory=Oscillator)   # the breath: a sine in time on the widths
     reach_left:     float = 0.0     # this tick's reach each side (deg), before presence
     reach_right:    float = 0.0
+    opposite_reach_left:  float = 0.0   # the opposite copy's reaches (BOTH): never clipped by own windows
+    opposite_reach_right: float = 0.0
     sync_strobe:    bool  = False   # this tick is a sync strobe frame, on the strobes' grid
 
 
@@ -280,31 +291,43 @@ class PoseInstrument(ProjectionLayer):
         mask_blue.fill(0.0)
 
         R = self.resolution
-        half_turn = (R // 2) if self._instrument.opposite else 0
+        opposite = self._instrument.opposite
+        half_turn = (R // 2) if opposite == Opposite.ON else 0
         players = list(self._players.values())
         if players:
             # Every voice in one batched pass (``Voice.render_all``): each row of ``signed`` is a
             # voice's pixels' angle from its person, the shortest way round, taken from the
-            # person's own azimuth (half a turn away with ``opposite``) so a walking person's
-            # lines move smoothly. The angles are pattern degrees — real degrees over the window
-            # scale — so the whole pattern compresses about its person and the synth stays
-            # scale-agnostic: its knobs keep their meaning relative to the pattern.
+            # person's own azimuth (half a turn away with ``opposite`` ON) so a walking person's
+            # lines move smoothly. With BOTH each voice gets a second row at the antipode, the
+            # copy, with its own reaches; ``render_all`` reads voices read-only and merges rows
+            # by max, so a doubled voice is just two windows of one pattern. The angles are
+            # pattern degrees — real degrees over the window scale — so the whole pattern
+            # compresses about its person and the synth stays scale-agnostic: its knobs keep
+            # their meaning relative to the pattern.
             px_per_degree = R / 360.0 * self._scale
-            centre_px = np.array([p.position * R + half_turn for p in players]).reshape(-1, 1)
+            centres = [p.position * R + half_turn for p in players]
+            reaches_left = [p.reach_left for p in players]
+            reaches_right = [p.reach_right for p in players]
+            if opposite == Opposite.BOTH:
+                centres += [p.position * R + R / 2.0 for p in players]
+                reaches_left += [p.opposite_reach_left for p in players]
+                reaches_right += [p.opposite_reach_right for p in players]
+            centre_px = np.array(centres).reshape(-1, 1)
             signed = (((self._pixels - centre_px + R / 2.0) % R) - R / 2.0) / px_per_degree
-            reach_left = np.array([p.reach_left for p in players]).reshape(-1, 1)
-            reach_right = np.array([p.reach_right for p in players]).reshape(-1, 1)
+            reach_left = np.array(reaches_left).reshape(-1, 1)
+            reach_right = np.array(reaches_right).reshape(-1, 1)
             sources = [self._sources(p) for p in players]
+            n = len(players)                                # row k belongs to players[k % n]
             # On a sync strobe frame the strobing patterns render as their own batch, so their
             # outputs swap channels (or stay dark); off the strobe everyone is one batch as ever.
-            steady = [k for k, p in enumerate(players) if not p.sync_strobe]
-            strobing = [k for k, p in enumerate(players) if p.sync_strobe]
+            steady = [k for k in range(len(centres)) if not players[k % n].sync_strobe]
+            strobing = [k for k in range(len(centres)) if players[k % n].sync_strobe]
             for idx, strobed in ((steady, False), (strobing, True)):
                 if not idx or (strobed and self._instrument.sync_strobe.mode == SyncStrobeMode.BLACK):
                     continue
                 out_1, out_2 = Voice.render_all(
-                    [players[k].voice for k in idx], signed[idx], reach_left[idx], reach_right[idx],
-                    [sources[k] for k in idx])
+                    [players[k % n].voice for k in idx], signed[idx], reach_left[idx], reach_right[idx],
+                    [sources[k % n] for k in idx])
                 out_white, out_blue = (out_2, out_1) if strobed else (out_1, out_2)
                 np.maximum(white, out_white, out=white)
                 np.maximum(blue, out_blue, out=blue)
@@ -467,6 +490,13 @@ class PoseInstrument(ProjectionLayer):
         for p in self._players.values():
             p.reach_left = p.reach_right = base
         self._clip_reaches(base)
+        # The copies (BOTH) are the constellation rotated half a turn: their pairwise arcs equal
+        # the owns', so the symmetric clip above is theirs too. They settle first and never
+        # yield; the own windows then clip against them — the copies win.
+        for p in self._players.values():
+            p.opposite_reach_left, p.opposite_reach_right = p.reach_left, p.reach_right
+        if self._instrument.opposite == Opposite.BOTH:
+            self._clip_against_copies(base)
 
     def _clip_reaches(self, base: float) -> None:
         """Pull neighbouring windows apart into territories: each pair clips its facing sides
@@ -529,6 +559,47 @@ class PoseInstrument(ProjectionLayer):
             strobe = tick % Strobe.period(rate, self._ticks_per_second) == 0
         for p in self._players.values():
             p.sync_strobe = strobe
+
+    def _clip_against_copies(self, base: float) -> None:
+        """BOTH only: pull every own window out of the copies' way — the copies win. For each
+        own window and each copy (every person's, their own included, half a turn from its
+        person), the facing side clips with the boundary at the copy's settled edge instead of
+        the midpoint, each arc as in ``_clip_reaches``; and once a copy's window reaches over
+        the person, both own sides scale down by the penetration — edge-clipping cannot carve
+        a copy's interior out of a window — continuous with the edge clip where the copy's
+        edge crosses the person, so walking into exact opposition ends in a full pattern swap,
+        no jump anywhere. The copy-owner's presence scales the whole effect, and
+        ``window.overlap`` lifts it toward 1."""
+        W = self._instrument.window
+        overlap = W.overlap
+        if overlap >= 1.0:
+            return
+        turn = 360.0 / self._scale
+        keep = min(max(overlap, 0.0), 1.0)                  # how much of the containment is lifted
+        players = list(self._players.values())
+        for a in players:
+            for b in players:
+                delta = self._signed_offset(a.position, (b.position + 0.5) % 1.0)
+                d_short = abs(delta) * turn
+                d_long = turn - d_short
+                presence = b.voice.presence
+                if delta >= 0.0:
+                    sides = (('reach_right', d_short, b.opposite_reach_left),
+                             ('reach_left', d_long, b.opposite_reach_right))
+                else:
+                    sides = (('reach_left', d_short, b.opposite_reach_right),
+                             ('reach_right', d_long, b.opposite_reach_left))
+                for side, d, copy_reach in sides:
+                    floor = d - copy_reach
+                    if base > floor:
+                        target = max(floor + (base - floor) * overlap, 0.0)
+                        limit = base + (target - base) * presence
+                        setattr(a, side, min(getattr(a, side), limit))
+                copy_facing = sides[0][2]
+                if copy_facing > 0.0 and d_short < copy_facing:             # the copy reaches over the person
+                    shrink = 1.0 - (1.0 - d_short / copy_facing) * (1.0 - keep) * presence
+                    a.reach_left *= shrink
+                    a.reach_right *= shrink
 
     def _set_grow(self, dt: float) -> None:
         """Whether full sync grows the windows. The same band as the sync strobe's, shared

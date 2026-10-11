@@ -873,7 +873,7 @@
   },
   "PI": {
     "max_lines": 90,
-    "opposite": false,
+    "opposite": "OFF",
     "elbow_lift": 0.5,
     "on_at": 0.98,
     "off_at": 0.93,
