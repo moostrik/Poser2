@@ -18,7 +18,7 @@ class VorticityCurl3D(ComputeShader):
 
     def use(self, velocity: Texture3D, obstacle: Texture3D,
             curl_out: Texture3D,
-            grid_scale: float, aspect: float, depth_scale: float,
+            grid_scale: float, aspect: float, z_spacing: float,
             radius: float, has_obstacles: bool = True) -> None:
         """Compute 3D velocity curl.
 
@@ -28,7 +28,7 @@ class VorticityCurl3D(ComputeShader):
             curl_out: Output curl volume (RGBA16F: xyz = curl vector)
             grid_scale: Grid spacing
             aspect: Width/height ratio
-            depth_scale: Z grid spacing relative to XY
+            z_spacing: Sim-grid Z cell size in sim texels (dz/dx)
             radius: Curl sampling radius in texels
             has_obstacles: Whether obstacle logic is active
         """
@@ -43,7 +43,7 @@ class VorticityCurl3D(ComputeShader):
 
         dx = grid_scale
         dy = grid_scale * aspect
-        dz = grid_scale * depth_scale
+        dz = grid_scale * z_spacing
         # Scale by radius: actual sample spacing is radius texels, not 1 texel
         # half_rdx = 0.5 / (dx * radius) to match the shader's sampling at uRadius texels
         glUniform3f(self.get_uniform_loc("uHalfRdxInv"),

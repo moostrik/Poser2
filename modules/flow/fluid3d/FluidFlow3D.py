@@ -89,13 +89,16 @@ class FluidFlow3D:
         self._simulation_height: int = 0
         self._density_width: int = 0
         self._density_height: int = 0
-        self._depth: int = 0
+        self._depth: int = 0          # density layers
+        self._sim_depth: int = 0      # velocity/pressure/temperature layers
         self._aspect: float = 1.0
 
         self._reference_dt: float = 1.0 / 60.0  # iteration scaling baseline (60fps)
         self._dt: float = self._reference_dt
 
-        self._depth_aspect: float = 1.0
+        # Z metric, recomputed per update from depth.spacing (one physical slab, two layer counts)
+        self._z_spacing: float = 1.0  # sim-grid dz in sim texels (solvers)
+        self._z_extent: float = 1.0   # slab thickness in width units (advection: uRdx.z = 1/z_extent)
 
         self._has_obstacles: bool = False
 
@@ -107,7 +110,7 @@ class FluidFlow3D:
 
         # ---- GPU profiling ----
         self._profiler: Profiler = Profiler(
-            lambda: f"FluidFlow3D {self._simulation_width}x{self._simulation_height}x{self._depth}",
+            lambda: f"FluidFlow3D {self._simulation_width}x{self._simulation_height}x{self._sim_depth}",
             names=["dampen_vel", "advect_vel", "viscosity", "vorticity",
                    "advect_temp", "buoyancy", "advect_pres", "incompress",
                    "advect_den", "composite"],
@@ -161,6 +164,7 @@ class FluidFlow3D:
         # Bind settings actions
         self.config.bind(FluidFlowSettings.reset_sim, lambda _: self._request_reset())
         self.config.depth.bind(DepthSettings.depth, lambda _: self._request_reallocate())
+        self.config.depth.bind(DepthSettings.sim_depth, lambda _: self._request_reallocate())
         self.config.bind(FluidFlowSettings.width, lambda _: self._request_reallocate())
         self.config.bind(FluidFlowSettings.height, lambda _: self._request_reallocate())
         self.config.bind(FluidFlowSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
@@ -223,7 +227,7 @@ class FluidFlow3D:
         self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
         self._grid_scale = self._simulation_width / self._density_width if self._density_width > 0 else 1.0
         self._depth = self.config.depth.depth
-        self._depth_aspect = (self._simulation_width / max(1, self._depth)) * self.config.depth.scale
+        self._sim_depth = self.config.depth.sim_depth
 
     def _allocate_density_fields(self) -> None:
         """(Re)allocate density-resolution volumes (full output resolution × depth)."""
@@ -233,7 +237,7 @@ class FluidFlow3D:
 
     def _allocate_simulation_fields(self) -> None:
         """(Re)allocate simulation-resolution 3D volumes."""
-        d = self._depth
+        d = self._sim_depth
         sim_w = self._simulation_width
         sim_h = self._simulation_height
 
@@ -338,6 +342,11 @@ class FluidFlow3D:
         # Per-frame state
         self._dt = 1.0 / max(1, self.config.fps)
 
+        # Z metric from live settings: solvers see sim-grid cell size, advection sees slab thickness
+        spacing = max(1.0, self.config.depth.spacing)
+        self._z_spacing = spacing
+        self._z_extent = (self._sim_depth * spacing) / max(1, self._simulation_width)
+
         # Dampen velocity (clean input for all steps)
         vel: VelocitySettings = self.config.velocity
         self._profiler.begin("dampen_vel")
@@ -403,7 +412,7 @@ class FluidFlow3D:
             self._velocity.texture,
             self._velocity.back_texture,
             self._simulation_obstacle,
-            self._aspect, self._depth_aspect,
+            self._aspect, self._z_extent,
             advect_step, dissipation,
             internal_format=GL_RGBA16F,
             has_obstacles=self._has_obstacles
@@ -422,7 +431,7 @@ class FluidFlow3D:
             self._velocity.texture,
             self._velocity.back_texture,
             self._simulation_obstacle,
-            self._grid_scale, self._aspect, self._depth_aspect,
+            self._grid_scale, self._aspect, self._z_spacing,
             viscosity_dt,
             total_iterations=iterations,
             iterations_per_dispatch=5,
@@ -445,7 +454,7 @@ class FluidFlow3D:
             self._velocity.texture,
             self._simulation_obstacle,
             self._curl_vol,
-            self._grid_scale, self._aspect, self._depth_aspect,
+            self._grid_scale, self._aspect, self._z_spacing,
             vorticity_radius,
             has_obstacles=self._has_obstacles
         )
@@ -456,7 +465,7 @@ class FluidFlow3D:
             self._curl_vol,
             self._simulation_obstacle,
             self._vorticity_force_vol,
-            self._grid_scale, self._aspect, self._depth_aspect,
+            self._grid_scale, self._aspect, self._z_spacing,
             vorticity_force,
             has_obstacles=self._has_obstacles
         )
@@ -480,7 +489,7 @@ class FluidFlow3D:
             self._temperature.texture,
             self._velocity.texture,
             self._simulation_obstacle,
-            self._aspect, self._depth_aspect,
+            self._aspect, self._z_extent,
             advect_step, dissipation,
             internal_format=GL_R16F,
             has_obstacles=self._has_obstacles
@@ -521,7 +530,7 @@ class FluidFlow3D:
             self._pressure.texture,
             self._velocity.texture,
             self._simulation_obstacle,
-            self._aspect, self._depth_aspect,
+            self._aspect, self._z_extent,
             advect_step, dissipation,
             internal_format=GL_R16F,
             has_obstacles=self._has_obstacles
@@ -535,7 +544,7 @@ class FluidFlow3D:
             self._velocity.texture,
             self._simulation_obstacle,
             self._divergence_vol,
-            self._grid_scale, self._aspect, self._depth_aspect,
+            self._grid_scale, self._aspect, self._z_spacing,
             has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -548,7 +557,7 @@ class FluidFlow3D:
             self._pressure.back_texture,
             self._divergence_vol,
             self._simulation_obstacle,
-            self._grid_scale, self._aspect, self._depth_aspect,
+            self._grid_scale, self._aspect, self._z_spacing,
             total_iterations=iterations,
             iterations_per_dispatch=5,
             has_obstacles=self._has_obstacles
@@ -564,7 +573,7 @@ class FluidFlow3D:
             self._pressure.texture,
             self._simulation_obstacle,
             self._velocity.texture,
-            self._grid_scale, self._aspect, self._depth_aspect,
+            self._grid_scale, self._aspect, self._z_spacing,
             has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -580,7 +589,7 @@ class FluidFlow3D:
             self._density.texture,
             self._velocity.texture,
             self._density_obstacle,
-            self._aspect, self._depth_aspect,
+            self._aspect, self._z_extent,
             advect_step, dissipation,
             internal_format=GL_RGBA16F,
             has_obstacles=self._has_obstacles
@@ -638,14 +647,16 @@ class FluidFlow3D:
         """Process reset and reallocation requests queued from the UI thread."""
         if self._reallocate_pending:
             self._reallocate_pending = False
-            old_w, old_h, old_d = self._simulation_width, self._simulation_height, self._depth
+            old_w, old_h = self._simulation_width, self._simulation_height
+            old_d, old_sd = self._depth, self._sim_depth
             self._update_simulation_dimensions()
-            sim_changed = self._simulation_width != old_w or self._simulation_height != old_h
+            sim_changed = (self._simulation_width != old_w or self._simulation_height != old_h
+                           or self._sim_depth != old_sd)
             depth_changed = self._depth != old_d
-            if sim_changed or depth_changed:
+            if sim_changed:
                 self._allocate_simulation_fields()
-                if depth_changed:
-                    self._allocate_density_fields()
+            if depth_changed:
+                self._allocate_density_fields()
 
         if self._reset_pending:
             self._reset_pending = False

@@ -388,7 +388,8 @@
         "speed": 0.4,
         "depth": {
           "depth": 20,
-          "scale": 0.61,
+          "sim_depth": 20,
+          "spacing": 8.0,
           "composite_mode": 0,
           "ray_steps": 32,
           "absorption": 28.13,

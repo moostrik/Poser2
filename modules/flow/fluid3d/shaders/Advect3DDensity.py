@@ -26,7 +26,7 @@ class Advect3DDensity(Advect3D):
 
     def advect(self, source_read: Texture2DArray, result_write: Texture2DArray,
                velocity: Texture3D, obstacle: Texture3D,
-               aspect: float, depth_scale: float, timestep: float, dissipation: float,
+               aspect: float, z_extent: float, timestep: float, dissipation: float,
                internal_format: int = GL_RGBA16F,
                has_obstacles: bool = True) -> None:
         """Advect density from source_read into result_write (ping-pong).
@@ -37,7 +37,7 @@ class Advect3DDensity(Advect3D):
             velocity: 3D velocity field (Texture3D — sampler3D)
             obstacle: 3D obstacle mask (Texture3D — sampler3D)
             aspect: Width/height ratio
-            depth_scale: Z grid spacing relative to XY
+            z_extent: Slab thickness in sim-width units (uRdx.z = 1/z_extent)
             timestep: dt * speed
             dissipation: Decay multiplier
             internal_format: Image format for output (default RGBA16F)
@@ -61,7 +61,7 @@ class Advect3DDensity(Advect3D):
         # Uniforms
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
         rdx_y = 1.0 / aspect if aspect > 0.0 else 1.0
-        rdx_z = 1.0 / depth_scale if depth_scale > 0.0 else 1.0
+        rdx_z = 1.0 / z_extent if z_extent > 0.0 else 1.0
         glUniform3f(self.get_uniform_loc("uRdx"), 1.0, rdx_y, rdx_z)
         glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)
         glUniform3i(self.get_uniform_loc("uSize"),

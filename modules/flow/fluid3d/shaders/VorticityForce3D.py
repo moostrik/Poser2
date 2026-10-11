@@ -17,7 +17,7 @@ class VorticityForce3D(ComputeShader):
         super().__init__()
 
     def use(self, curl: Texture3D, obstacle: Texture3D, force_out: Texture3D,
-            grid_scale: float, aspect: float, depth_scale: float,
+            grid_scale: float, aspect: float, z_spacing: float,
             timestep: float, has_obstacles: bool = True) -> None:
         """Compute vorticity confinement force.
 
@@ -27,7 +27,7 @@ class VorticityForce3D(ComputeShader):
             force_out: Output force volume (RGBA16F)
             grid_scale: Grid spacing
             aspect: Width/height ratio
-            depth_scale: Z grid spacing relative to XY
+            z_spacing: Sim-grid Z cell size in sim texels (dz/dx)
             timestep: Vorticity strength * dt
             has_obstacles: Whether obstacle logic is active
         """
@@ -42,7 +42,7 @@ class VorticityForce3D(ComputeShader):
 
         dx = grid_scale
         dy = grid_scale * aspect
-        dz = grid_scale * depth_scale
+        dz = grid_scale * z_spacing
         glUniform3f(self.get_uniform_loc("uHalfRdxInv"), 0.5 / dx, 0.5 / dy, 0.5 / dz)
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
         glUniform3i(self.get_uniform_loc("uSize"),
