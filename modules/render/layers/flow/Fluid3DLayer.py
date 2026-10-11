@@ -22,7 +22,7 @@ from modules.pose.frame import Frame
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 
 from modules.settings import Field, BaseSettings, Group
-from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlow3D, FluidFlowSettings
+from modules.flow import FluidFlow, FluidFlow3D, FluidFlowSettings
 
 from modules.utils import HotReloadMethods
 
@@ -46,25 +46,14 @@ _ENGINE_CLASSES: dict[FluidSimEngine, type] = {
 }
 
 
-class Fluid3DDrawMode(IntEnum):
-    """Draw modes for Fluid3DLayer.
-
-    Only fields with a 2D composited output are exposed:
-        DENSITY - RGB-coloured composited density (colour baked in during injection)
-    """
-    DENSITY = 0
-
-
 class Fluid3DLayerSettings(BaseSettings):
     """Configuration for Fluid3DLayer (3D fluid simulation)."""
     stage: Field[int] =                     Field(0, description="Pipeline stage for pose data")
     num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
     sim_engine: Field[FluidSimEngine] =     Field(FluidSimEngine.FLUID_3D)
-    draw_mode: Field[Fluid3DDrawMode] =     Field(Fluid3DDrawMode.DENSITY)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
 
     fluid_flow    = Group(FluidFlowSettings)
-    visualisation = Group(VisualisationFieldSettings)
 
 
 class Fluid3DLayer(LayerBase):
@@ -117,8 +106,6 @@ class Fluid3DLayer(LayerBase):
         self._alloc_height: int = 0
         self._swap_engine_pending: bool = False
 
-        self._visualizer: Visualizer = Visualizer(self.config.visualisation)
-
         # Defer engine swap to GL thread (callbacks fire from websocket thread)
         self.config.bind(Fluid3DLayerSettings.sim_engine, lambda _: self._request_swap_engine())
 
@@ -149,8 +136,8 @@ class Fluid3DLayer(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        """Visualization output texture."""
-        return self._visualizer.texture
+        """Composited 2D density output (RGBA16F, colour baked in)."""
+        return self._fluid_flow.density
 
     @property
     def density(self) -> Texture:
@@ -170,12 +157,10 @@ class Fluid3DLayer(LayerBase):
         self._alloc_width = width
         self._alloc_height = height
         self._fluid_flow.allocate(width, height)
-        self._visualizer.allocate(self._fluid_flow.sim_width, self._fluid_flow.sim_height)
 
     def deallocate(self) -> None:
         """Deallocate all resources."""
         self._fluid_flow.deallocate()
-        self._visualizer.deallocate()
 
     def reset(self) -> None:
         """Reset fluid simulation state."""
@@ -234,18 +219,8 @@ class Fluid3DLayer(LayerBase):
             # Add temperature from each flow layer
             self._fluid_flow.add_temperature(flow_layer.temperature, 1.0)
 
-        # Snapshot sim dims before update for resize detection
-        prev_sw, prev_sh = self._fluid_flow.sim_width, self._fluid_flow.sim_height
-
         # Update 3D fluid simulation (handles its own reallocation internally)
         self._fluid_flow.update()
-
-        # Resize visualizer if sim dims changed
-        if self._fluid_flow.sim_width != prev_sw or self._fluid_flow.sim_height != prev_sh:
-            self._visualizer.allocate(self._fluid_flow.sim_width, self._fluid_flow.sim_height)
-
-        # Update visualization
-        self._visualizer.update(self._get_draw_texture())
 
         Style.pop_style()
 
@@ -258,9 +233,3 @@ class Fluid3DLayer(LayerBase):
         if self.texture.allocated:
             Blit.use(self.texture)
         Style.pop_style()
-
-    # ========== Texture Selection ==========
-
-    def _get_draw_texture(self) -> Texture:
-        """Get texture to draw based on draw_mode."""
-        return self._fluid_flow.density
