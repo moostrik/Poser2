@@ -17,6 +17,9 @@ class BoundaryMode(IntEnum):
 class VelocitySettings(BaseSettings):
     """Velocity field parameters."""
     input_strength: Field[float]    = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="Multiplier applied to all velocity inputs")
+    input_strength_z: Field[float]  = Field(0.1,    min=0.0,    max=2.0,    color="teal",           description="Multiplier applied to Z-velocity input (3D only)")
+    squeeze: Field[float]           = Field(1.0,    min=-10.0,  max=10.0,   color="cyan",           description="Z-velocity from flow divergence; positive: looming pushes ink toward viewer (3D only)")
+    push: Field[float]              = Field(0.0,    min=-2.0,   max=2.0,    color="light-blue",     description="Z-velocity from flow magnitude; positive = away from viewer (3D only)")
     self_advection: Field[float]    = Field(0.01,   min=0.0,    max=1.0,    color="blue-grey",      description="How much velocity advects itself. Keep low for stability.")
     fade_time: Field[float]         = Field(30.0,   min=0.1,    max=60.0,   color="deep-blue",      description="Seconds until velocity fades to ~1%")
     dampen_threshold: Field[float]  = Field(5.0,    min=0.1,    max=50.0,   color="cyan",           description="Magnitude above which velocity is dampened")

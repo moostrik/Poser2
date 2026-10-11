@@ -28,6 +28,7 @@ uniform vec3  uRdx;           // (1.0, 1.0/aspect, 1.0/depth_scale)
 uniform float uDissipation;   // Exponential decay multiplier
 uniform ivec3 uSize;          // Volume dimensions (width, height, depth)
 uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
+uniform bool  uClosedZ;       // Closed Z boundary: density reflects at front/back faces
 
 /*
  * Manual Z-interpolated sample from a sampler2DArray.
@@ -45,8 +46,11 @@ vec4 sampleDensity(vec3 uvw) {
     // z=0 maps to center of first layer (-0.5..+0.5), z=1 maps past last layer
     float z_coord = uvw.z * float(layers) - 0.5;
 
-    // Boundary check: return border color for out-of-range Z
-    if (z_coord < -0.5 || z_coord > float(layers) - 0.5) {
+    if (uClosedZ) {
+        // Neumann: clamp to the face layers (density pools instead of draining)
+        z_coord = clamp(z_coord, 0.0, float(layers) - 1.0);
+    } else if (z_coord < -0.5 || z_coord > float(layers) - 0.5) {
+        // Dirichlet: outside the slab is empty (density drains at the faces)
         return vec4(0.0);
     }
 
