@@ -11,7 +11,7 @@ from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOf
                       PoseDotLayer, PoseDotSettings, PoseLineLayer, PoseLineSettings
 from .flow import     FlowLayer, FlowLayerSettings, FlowSettings, FlowDrawMode, \
                       FluidLayer, FluidLayerSettings, FluidDrawMode, \
-                      Fluid3DLayer, Fluid3DLayerSettings, Fluid3DDrawMode, UnifiedFluidLayer
+                      Fluid3DLayer, Fluid3DLayerSettings, Fluid3DDrawMode
 from .generic import  CompositeLayer, CompositeLayerSettings, LutSettings, \
                       HDTPrepare, HDTBlend, MotionLayer, \
                       MSColorMaskLayer, ColorMaskLayerSettings

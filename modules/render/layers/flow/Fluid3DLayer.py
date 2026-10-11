@@ -22,7 +22,7 @@ from modules.pose.frame import Frame
 from modules.pose.features import Similarity, MotionGate, AngleMotion
 
 from modules.settings import Field, BaseSettings, Group
-from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlow3D, FluidFlow3DArray, FluidFlowSettings
+from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlow3D, FluidFlowSettings
 
 from modules.utils import HotReloadMethods
 
@@ -32,20 +32,17 @@ from ...color_settings import ColorSettings
 class FluidSimEngine(IntEnum):
     """Simulation engine selection.
 
-    FLUID_2D:       2D Navier-Stokes (FluidFlow) — fastest, no depth
-    FLUID_3D:       3D volumetric with GL_TEXTURE_3D density (FluidFlow3D)
-    FLUID_3D_ARRAY: 3D volumetric with GL_TEXTURE_2D_ARRAY density (FluidFlow3DArray) — fastest 3D
+    FLUID_2D: 2D Navier-Stokes (FluidFlow) — the hd_trio reference look, no depth
+    FLUID_3D: 3D volumetric Navier-Stokes (FluidFlow3D)
     """
     FLUID_2D = 0
     FLUID_3D = auto()
-    FLUID_3D_ARRAY = auto()
 
 
 # Map enum -> class for engine creation
 _ENGINE_CLASSES: dict[FluidSimEngine, type] = {
     FluidSimEngine.FLUID_2D: FluidFlow,
     FluidSimEngine.FLUID_3D: FluidFlow3D,
-    FluidSimEngine.FLUID_3D_ARRAY: FluidFlow3DArray,
 }
 
 
@@ -53,18 +50,16 @@ class Fluid3DDrawMode(IntEnum):
     """Draw modes for Fluid3DLayer.
 
     Only fields with a 2D composited output are exposed:
-        DENSITY      - RGB-coloured composited density (colour baked in during injection)
-        DENSITY_RAW  - Alias for DENSITY (kept for API compatibility)
+        DENSITY - RGB-coloured composited density (colour baked in during injection)
     """
     DENSITY = 0
-    DENSITY_RAW = auto()
 
 
 class Fluid3DLayerSettings(BaseSettings):
     """Configuration for Fluid3DLayer (3D fluid simulation)."""
     stage: Field[int] =                     Field(0, description="Pipeline stage for pose data")
     num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
-    sim_engine: Field[FluidSimEngine] =     Field(FluidSimEngine.FLUID_3D_ARRAY)
+    sim_engine: Field[FluidSimEngine] =     Field(FluidSimEngine.FLUID_3D)
     draw_mode: Field[Fluid3DDrawMode] =     Field(Fluid3DDrawMode.DENSITY)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
 
@@ -78,13 +73,12 @@ class Fluid3DLayer(LayerBase):
     Receives velocity, density, and temperature from all FlowLayers and runs
     a volumetric Navier-Stokes fluid simulation:
     1. Aggregate inputs from connected FlowLayers
-    2. Inject velocity, density (decomposed to V+colour), temperature into 3D volume
+    2. Inject velocity, density (RGB colour baked in), temperature into the 3D volume
     3. Run 3D advection, pressure projection, viscosity, buoyancy, vorticity
-    4. Composite 3D density+colour -> 2D output (colour is already baked in)
+    4. Composite the 3D density volume -> coloured 2D output
 
-    The density volume stores scalar brightness (R16F, output resolution).
-    The colour volume stores RGB colour (RGBA16F, sim resolution).
-    Both are composited by Composite3D into a final RGBA16F 2D output.
+    The density volume stores coloured ink directly (RGBA16F GL_TEXTURE_2D_ARRAY,
+    output resolution); Composite3DDensity flattens it to the final RGBA16F 2D output.
 
     Cross-camera support:
         Each Fluid3DLayer receives a dict of all FlowLayers, enabling
@@ -118,7 +112,7 @@ class Fluid3DLayer(LayerBase):
         self._color_settings: ColorSettings = color_settings
 
         # Simulation engine (swappable at runtime)
-        self._fluid_flow: FluidFlow | FluidFlow3D | FluidFlow3DArray = self._create_engine()
+        self._fluid_flow: FluidFlow | FluidFlow3D = self._create_engine()
         self._alloc_width: int = 0
         self._alloc_height: int = 0
         self._swap_engine_pending: bool = False
@@ -130,7 +124,7 @@ class Fluid3DLayer(LayerBase):
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
-    def _create_engine(self) -> FluidFlow | FluidFlow3D | FluidFlow3DArray:
+    def _create_engine(self) -> FluidFlow | FluidFlow3D:
         """Instantiate the selected simulation engine with the shared config."""
         cls = _ENGINE_CLASSES[self.config.sim_engine]
         return cls(self.config.fluid_flow)
@@ -228,8 +222,8 @@ class Fluid3DLayer(LayerBase):
             # Add velocity from each flow layer
             self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
 
-            # Add Z-velocity from motion magnitude (3D engines only)
-            if isinstance(self._fluid_flow, (FluidFlow3D, FluidFlow3DArray)):
+            # Add Z-velocity from motion magnitude (3D engine only)
+            if isinstance(self._fluid_flow, FluidFlow3D):
                 self._fluid_flow.add_velocity_z(flow_layer.magnitude, vel_strength * 0.1)
 
             # Add density to per-camera channel (R=cam0, G=cam1, B=cam2, A=cam3)
@@ -269,17 +263,4 @@ class Fluid3DLayer(LayerBase):
 
     def _get_draw_texture(self) -> Texture:
         """Get texture to draw based on draw_mode."""
-        textures = {
-            Fluid3DDrawMode.DENSITY: self._fluid_flow.density,
-            Fluid3DDrawMode.DENSITY_RAW: self._fluid_flow.density,
-        }
-        return textures.get(self.config.draw_mode, self._fluid_flow.density)
-
-    def _colorize_density(self) -> None:
-        """Removed: colour is now baked into the density volume during injection.
-
-        The RGBA16F colour volume at sim resolution is composited with the R16F
-        density volume by Composite3D, producing an already-coloured 2D output.
-        No post-processing colorisation step is required.
-        """
-        pass  # No-op — kept for API compatibility
+        return self._fluid_flow.density

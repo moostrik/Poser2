@@ -380,11 +380,11 @@
     },
     "fluid3d": {
       "num_players": 1,
-      "sim_engine": "FLUID_3D_ARRAY",
+      "sim_engine": "FLUID_3D",
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",
       "fluid_flow": {
-        "profile": true,
+        "profile": false,
         "width": 896,
         "height": 1600,
         "speed": 0.4,

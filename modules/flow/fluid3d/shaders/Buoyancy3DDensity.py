@@ -9,7 +9,7 @@ from pathlib import Path
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture3D, Texture2DArray
-from ...fluid3d.shaders.Buoyancy3D import Buoyancy3D
+from .Buoyancy3D import Buoyancy3D
 
 
 class Buoyancy3DDensity(Buoyancy3D):

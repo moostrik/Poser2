@@ -1,17 +1,16 @@
 """Composite3DDensity - Composite density stored as GL_TEXTURE_2D_ARRAY into 2D output.
 
-Subclass of Composite3D that binds density as sampler2DArray instead of sampler3D.
+Binds density as sampler2DArray with manual Z interpolation between layers.
 """
 from __future__ import annotations
 from pathlib import Path
 
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl import Texture, Texture2DArray
-from ...fluid3d.shaders.Composite3D import Composite3D
+from modules.gl import Texture, Texture2DArray, ComputeShader
 
 
-class Composite3DDensity(Composite3D):
+class Composite3DDensity(ComputeShader):
     """Composite density volume (GL_TEXTURE_2D_ARRAY) into 2D output."""
 
     def __init__(self) -> None:

@@ -9,7 +9,7 @@ from pathlib import Path
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture3D, Texture2DArray, ComputeShader
-from ...fluid3d.shaders.Advect3D import Advect3D
+from .Advect3D import Advect3D
 
 
 class Advect3DDensity(Advect3D):
