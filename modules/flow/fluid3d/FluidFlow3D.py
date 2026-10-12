@@ -34,7 +34,7 @@ from .shaders import (
     Advect3D, Advect3DDensity, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,
     VorticityCurl3D, VorticityForce3D, Buoyancy3DDensity,
-    Inject3D, Inject3DDensity, InjectChannel3DDensity, InjectVelocityZ3D,
+    Inject3D, Inject3DDensity, InjectChannel3DDensity, InjectFlow3D,
     Dampen3D, Composite3DDensity, Add3D,
     InjectBinary3D
 )
@@ -155,7 +155,7 @@ class FluidFlow3D:
         self._vorticity_curl_shader: VorticityCurl3D = VorticityCurl3D()
         self._vorticity_force_shader: VorticityForce3D = VorticityForce3D()
         self._inject_shader: Inject3D = Inject3D()
-        self._inject_velocity_z_shader: InjectVelocityZ3D = InjectVelocityZ3D()
+        self._inject_flow_shader: InjectFlow3D = InjectFlow3D()
         self._dampen_shader: Dampen3D = Dampen3D()
         # Density-specific shaders (GL_TEXTURE_2D_ARRAY bindings)
         self._advect_density_shader: Advect3DDensity = Advect3DDensity()
@@ -213,7 +213,7 @@ class FluidFlow3D:
         self._vorticity_curl_shader.allocate()
         self._vorticity_force_shader.allocate()
         self._inject_shader.allocate()
-        self._inject_velocity_z_shader.allocate()
+        self._inject_flow_shader.allocate()
         self._dampen_shader.allocate()
         self._advect_density_shader.allocate()
         self._buoyancy_density_shader.allocate()
@@ -293,7 +293,7 @@ class FluidFlow3D:
         self._vorticity_curl_shader.deallocate()
         self._vorticity_force_shader.deallocate()
         self._inject_shader.deallocate()
-        self._inject_velocity_z_shader.deallocate()
+        self._inject_flow_shader.deallocate()
         self._dampen_shader.deallocate()
         self._advect_density_shader.deallocate()
         self._buoyancy_density_shader.deallocate()
@@ -316,7 +316,7 @@ class FluidFlow3D:
         self._vorticity_curl_shader.reload()
         self._vorticity_force_shader.reload()
         self._inject_shader.reload()
-        self._inject_velocity_z_shader.reload()
+        self._inject_flow_shader.reload()
         self._dampen_shader.reload()
         self._advect_density_shader.reload()
         self._buoyancy_density_shader.reload()
@@ -599,7 +599,8 @@ class FluidFlow3D:
             advect_step, dissipation,
             internal_format=GL_RGBA16F,
             has_obstacles=self._has_obstacles,
-            closed_z=self.config.depth.boundary == BoundaryMode.CLOSED
+            closed_z=self.config.depth.boundary == BoundaryMode.CLOSED,
+            evaporation=self.config.density.evaporation * self._dt
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
@@ -647,6 +648,7 @@ class FluidFlow3D:
             self._density.texture,
             self._output_texture,
             emission=d.emission,
+            gamma=d.gamma,
             absorption=d.absorption,
             tint=d.tint,
             fog=d.fog,
@@ -729,41 +731,24 @@ class FluidFlow3D:
     # ========== Input Methods (2D -> 3D injection) ==========
 
     def add_velocity(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject 2D velocity texture into 3D velocity volume.
+        """Inject the 2D flow as one 3D velocity into the gaussian birth slab.
 
-        Uses gaussian depth spread centered at config.z.injection_layer.
-        Applies config velocity.input_strength and delta_time.
-        """
-        if not self._allocated:
-            return
-        effective = strength * self.config.velocity.input_strength * (1.0 / max(1, self.config.fps))
-        self._inject_shader.use(
-            texture, self._velocity.texture,
-            self.config.depth.injection_layer,
-            self.config.depth.injection_spread,
-            effective, mode=0,
-            internal_format=GL_RGBA16F
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
-
-    def add_velocity_z(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject signed Z-velocity (W) from the 2D flow field into the velocity volume.
-
-        W = clamp(squeeze * -div(flow) + push * |flow|, ±dampen_threshold).
-        +W moves fluid away from the viewer (layer 0 is the front face); with
-        positive squeeze, looming/expanding motion pushes ink toward the viewer.
-        Applies config velocity.input_strength_z and delta_time.
+        (u, v) are the measured flow, gained by velocity.input_strength; w
+        cannot be measured and is synthesized from the same flow:
+        w = clamp(push * |flow| + squeeze * -div(flow), ±dampen_threshold).
+        +W moves fluid away from the viewer (layer 0 is the front face).
         """
         if not self._allocated:
             return
         vel = self.config.velocity
         dt = 1.0 / max(1, self.config.fps)
-        effective = strength * vel.input_strength_z * dt
-        self._inject_velocity_z_shader.use(
+        self._inject_flow_shader.use(
             texture, self._velocity.texture,
             self.config.depth.injection_layer,
             self.config.depth.injection_spread,
-            effective, vel.squeeze, vel.push, vel.dampen_threshold
+            strength * vel.input_strength * dt,
+            strength * dt,
+            vel.push, vel.squeeze, vel.dampen_threshold
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 

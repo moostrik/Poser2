@@ -213,12 +213,8 @@ class Fluid3DLayer(LayerBase):
                 vel_strength = m_s[cam_id]
                 den_strength = m_s[cam_id]
 
-            # Add velocity from each flow layer
+            # Add the flow as one velocity input (3D synthesizes w from it)
             self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
-
-            # Add signed Z-velocity from the 2D flow field (3D engine only)
-            if isinstance(self._fluid_flow, FluidFlow3D):
-                self._fluid_flow.add_velocity_z(flow_layer.velocity, vel_strength)
 
             # Add density to per-camera channel (R=cam0, G=cam1, B=cam2, A=cam3)
             channel: int = cam_id % 4

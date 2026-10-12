@@ -29,6 +29,8 @@ uniform float uDissipation;   // Exponential decay multiplier
 uniform ivec3 uSize;          // Volume dimensions (width, height, depth)
 uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
 uniform bool  uClosedZ;       // Closed Z boundary: density reflects at front/back faces
+uniform float uEvaporation;   // Density subtracted this frame; unlike multiplicative
+                              // fade it reaches zero, so low-level haze clears
 
 /*
  * Manual Z-interpolated sample from a sampler2DArray.
@@ -98,6 +100,9 @@ void main() {
 
     // Sample source with manual Z interpolation and apply dissipation
     vec4 result = uDissipation * sampleDensity(st_back);
+
+    // Subtractive evaporation: clears residue that exponential fade never reaches
+    result = max(result - vec4(uEvaporation), vec4(0.0));
 
     imageStore(uResult, gid, result);
 }

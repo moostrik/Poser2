@@ -1,0 +1,68 @@
+#version 460 core
+
+/*
+ * InjectFlow3D - Inject the 2D flow as a full 3D velocity into the birth slab.
+ *
+ * The camera measures (u, v); w cannot be measured, so it is synthesized from
+ * the same flow:
+ *     w = push * |flow| + squeeze * (-divergence)       (clamped to ±uWClamp)
+ * From here on the vec3 is ONE velocity input, treated identically in all
+ * three axes by the simulation (advection, viscosity, pressure projection).
+ *
+ * Sign convention: +W moves fluid toward higher layer indices, i.e. AWAY from
+ * the viewer (layer 0 is the front face). With uSqueeze > 0, expanding motion
+ * (looming) pushes fluid toward the viewer, converging motion away.
+ *
+ * Depth placement: the same gaussian slab as the other injections,
+ *     weight = exp(-0.5 * ((z_norm - target) / spread)²)
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// 2D flow velocity (RG16F, normalized-width units)
+layout(binding = 0) uniform sampler2D uInput;
+
+// 3D velocity volume (read-write; u,v,w = .xyz)
+layout(rgba16f, binding = 0) uniform image3D uVolume;
+
+// Parameters
+uniform float uTargetLayer;  // Normalized depth [0, 1] — center of injection
+uniform float uSpread;       // Gaussian sigma in normalized depth units
+uniform float uStrengthXY;   // strength * input_strength * dt (measured components)
+uniform float uStrengthW;    // strength * dt (synthesized component)
+uniform float uPush;         // W synthesis: gain on |flow| (signed; + = away)
+uniform float uSqueeze;      // W synthesis: gain on -divergence (signed)
+uniform float uWClamp;       // Abs clamp on the synthesized W
+uniform ivec3 uSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    // Gaussian weight along depth
+    float z_norm = (float(gid.z) + 0.5) / float(uSize.z);
+    float target = (0.5 + uTargetLayer * (float(uSize.z) - 1.0)) / float(uSize.z);
+    float dz = (z_norm - target) / max(uSpread, 0.001);
+    float weight = exp(-0.5 * dz * dz);
+    if (weight < 0.001) return;
+
+    vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
+    vec2 v = texture(uInput, uv).xy;
+
+    // Synthesized W: central-difference divergence in normalized units
+    // (matches the velocity convention: 1.0 crosses the width in 1 s at speed 1)
+    vec2 texel = 1.0 / vec2(textureSize(uInput, 0));
+    float vR = texture(uInput, uv + vec2(texel.x, 0.0)).x;
+    float vL = texture(uInput, uv - vec2(texel.x, 0.0)).x;
+    float vT = texture(uInput, uv + vec2(0.0, texel.y)).y;
+    float vB = texture(uInput, uv - vec2(0.0, texel.y)).y;
+    float div = 0.5 * ((vR - vL) / texel.x + (vT - vB) / texel.y);
+    float w = clamp(uPush * length(v) + uSqueeze * (-div), -uWClamp, uWClamp);
+
+    vec3 add = vec3(v * uStrengthXY, w * uStrengthW) * weight;
+    if (dot(abs(add), vec3(1.0)) < 1e-7) return;
+
+    vec4 current = imageLoad(uVolume, gid);
+    current.xyz += add;
+    imageStore(uVolume, gid, current);
+}

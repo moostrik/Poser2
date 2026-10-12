@@ -21,7 +21,7 @@ class Composite3DDensity(ComputeShader):
         self.compute_file_path = Path(__file__).parent / "composite3d_density.comp"
 
     def use(self, density: Texture2DArray, output_2d: Texture, *,
-            emission: float, absorption: float, tint: float, fog: float,
+            emission: float, gamma: float, absorption: float, tint: float, fog: float,
             glow: float, eye: tuple[float, float], perspective: float,
             depth_blur: float, debug_depth: bool) -> None:
         """Composite the density array volume into the 2D output.
@@ -33,6 +33,7 @@ class Composite3DDensity(ComputeShader):
             density: Density volume as Texture2DArray (RGBA16F)
             output_2d: 2D output texture (RGBA16F)
             emission: Ink brightness gain
+            gamma: Density response exponent (>1 hides thin haze, pops dense cores)
             absorption: Extinction per unit density
             tint: 0..1 mix toward per-channel water extinction (red dies first)
             fog: Medium extinction over the full depth
@@ -53,6 +54,7 @@ class Composite3DDensity(ComputeShader):
         glUniform1i(self.get_uniform_loc("uDepth"), density.depth)
         glUniform2i(self.get_uniform_loc("uOutputSize"), output_2d.width, output_2d.height)
         glUniform1f(self.get_uniform_loc("uEmission"), emission)
+        glUniform1f(self.get_uniform_loc("uGamma"), gamma)
         glUniform1f(self.get_uniform_loc("uAbsorption"), absorption)
         glUniform1f(self.get_uniform_loc("uTint"), tint)
         glUniform1f(self.get_uniform_loc("uFog"), fog)

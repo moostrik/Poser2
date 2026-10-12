@@ -27,6 +27,7 @@ layout(rgba16f, binding = 0) writeonly uniform image2D uOutput;
 uniform int   uDepth;        // Number of physical depth layers
 uniform ivec2 uOutputSize;   // 2D output dimensions
 uniform float uEmission;     // Ink brightness gain
+uniform float uGamma;        // Density response exponent: >1 hides haze, pops cores
 uniform float uAbsorption;   // Extinction per unit density
 uniform float uTint;         // 0..1 mix toward per-channel water extinction
 uniform float uFog;          // Medium extinction over the full depth
@@ -101,21 +102,23 @@ void main() {
     vec2 uv = (vec2(gid) + 0.5) / vec2(uOutputSize);
 
     if (uDebugDepth) {
-        // Dominant layer as hue: red = back (last layer), violet = front (0)
-        float max_density = 0.0;
-        int max_z = 0;
+        // Density-weighted mean depth as hue: red = back, violet = front.
+        // (A dominant-layer view is blind to ink traveling behind its own
+        // birth column; the mean shifts as soon as depth fills anywhere.)
+        float sum_d = 0.0;
+        float sum_dz = 0.0;
         for (int z = 0; z < uDepth; z++) {
             float z_norm = (float(z) + 0.5) / float(uDepth);
             vec2 st = layerUV(uv, z_norm);
             vec4 s = sampleDensity(st, z_norm) * borderFade(st);
             float d = max(s.r, max(s.g, s.b));
-            if (d > max_density) {
-                max_density = d;
-                max_z = z;
-            }
+            sum_d += d;
+            sum_dz += d * z_norm;
         }
+        float max_density = sum_d / float(uDepth);
+        float mean_z = (sum_d > 1e-5) ? (sum_dz / sum_d) : 0.0;
 
-        float hue = 0.8 * (1.0 - float(max_z) / max(float(uDepth - 1), 1.0));
+        float hue = 0.8 * (1.0 - mean_z);
         float h6 = hue * 6.0;
         float c = 1.0;
         float x = 1.0 - abs(mod(h6, 2.0) - 1.0);
@@ -127,7 +130,7 @@ void main() {
         else if (h6 < 5.0) rgb = vec3(x, 0.0, c);
         else               rgb = vec3(c, 0.0, x);
 
-        float brightness = min(max_density * 10.0, 1.0);
+        float brightness = min(max_density * 25.0, 1.0);
         imageStore(uOutput, gid, vec4(rgb * brightness, 1.0));
         return;
     }
@@ -154,6 +157,9 @@ void main() {
         vec4 s = (blur > 0.25) ? sampleDensityBlur(st, z_norm, blur)
                                : sampleDensity(st, z_norm);
         s *= borderFade(st);
+
+        // Response shaping: thin haze vanishes, dense cores keep their weight
+        s.rgb = pow(max(s.rgb, vec3(0.0)), vec3(uGamma));
 
         vec3 e = uEmission * s.rgb * dt;
         vol += T * e;

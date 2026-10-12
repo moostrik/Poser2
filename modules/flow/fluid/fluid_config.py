@@ -16,10 +16,9 @@ class BoundaryMode(IntEnum):
 
 class VelocitySettings(BaseSettings):
     """Velocity field parameters."""
-    input_strength: Field[float]    = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="Multiplier applied to all velocity inputs")
-    input_strength_z: Field[float]  = Field(0.1,    min=0.0,    max=2.0,    color="teal",           description="Multiplier applied to Z-velocity input (3D only)")
-    squeeze: Field[float]           = Field(1.0,    min=-10.0,  max=10.0,   color="cyan",           description="Z-velocity from flow divergence; positive: looming pushes ink toward viewer (3D only)")
-    push: Field[float]              = Field(0.0,    min=-2.0,   max=2.0,    color="light-blue",     description="Z-velocity from flow magnitude; positive = away from viewer (3D only)")
+    input_strength: Field[float]    = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="Multiplier applied to the measured (x, y) flow input")
+    squeeze: Field[float]           = Field(0.0,    min=-10.0,  max=10.0,   color="cyan",           description="W synthesis: flow convergence; positive: looming pushes ink toward viewer (3D only)")
+    push: Field[float]              = Field(0.0,    min=-2.0,   max=2.0,    color="light-blue",     description="W synthesis: flow magnitude; positive = away from viewer (3D only)")
     self_advection: Field[float]    = Field(0.01,   min=0.0,    max=1.0,    color="blue-grey",      description="How much velocity advects itself. Keep low for stability.")
     fade_time: Field[float]         = Field(30.0,   min=0.1,    max=60.0,   color="deep-blue",      description="Seconds until velocity fades to ~1%")
     dampen_threshold: Field[float]  = Field(5.0,    min=0.1,    max=50.0,   color="cyan",           description="Magnitude above which velocity is dampened")
@@ -35,6 +34,7 @@ class DensitySettings(BaseSettings):
     input_strength: Field[float]    = Field(1.0,    min=0.0,    max=10.0,    color="teal",          description="Multiplier applied to all density inputs")
     speed_offset: Field[float]      = Field(0.0,    min=-5.0,   max=5.0,    color="blue-grey",      description="Added to base speed for density only. 0 = physically coupled.")
     fade_time: Field[float]         = Field(4.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%")
+    evaporation: Field[float]       = Field(0.0,    min=0.0,    max=2.0,    color="grey",           description="Density removed per second; clears low-level haze (0 = off, 3D only)")
     dampen_threshold: Field[float]  = Field(1.2,    min=0.1,    max=5.0,    color="cyan",           description="Magnitude above which density is dampened")
     dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
     boundary: Field[BoundaryMode]   = Field(BoundaryMode.OPEN,                                      description="Open: density absorbed at edges (fluid escapes). Closed: density reflects at edges")
@@ -65,6 +65,7 @@ class DepthSettings(BaseSettings):
     sim_depth: Field[int]           = Field(4,    min=1,    max=128,    description="Velocity/pressure/temperature depth layers (the sim grid)")
     spacing: Field[float]           = Field(4.0,  min=1.0,  max=64.0,   description="Z layer spacing in sim texels (low = lively depth, high = flat)")
     emission: Field[float]          = Field(1.0,  min=0.0,  max=8.0,    color="amber",          description="Ink brightness gain per unit density")
+    gamma: Field[float]             = Field(1.0,  min=0.5,  max=3.0,    color="orange",         description="Density response exponent: >1 hides thin haze, pops dense cores")
     absorption: Field[float]        = Field(4.0,  min=0.01, max=50.0,   color="deep-orange",    description="Occlusion: extinction per unit density (near ink covers far ink)")
     glow: Field[float]              = Field(0.25, min=0.0,  max=1.0,    color="yellow",         description="Additive glow mix: 1 = legacy additive (depth invisible)")
     tint: Field[float]              = Field(0.5,  min=0.0,  max=1.0,    color="light-blue",     description="Far ink shifts toward water colour (red absorbed first)")

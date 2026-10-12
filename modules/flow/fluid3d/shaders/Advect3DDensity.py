@@ -29,7 +29,8 @@ class Advect3DDensity(Advect3D):
                aspect: float, z_extent: float, timestep: float, dissipation: float,
                internal_format: int = GL_RGBA16F,
                has_obstacles: bool = True,
-               closed_z: bool = False) -> None:
+               closed_z: bool = False,
+               evaporation: float = 0.0) -> None:
         """Advect density from source_read into result_write (ping-pong).
 
         Args:
@@ -44,6 +45,7 @@ class Advect3DDensity(Advect3D):
             internal_format: Image format for output (default RGBA16F)
             has_obstacles: Whether obstacle logic is active
             closed_z: Closed Z boundary — density reflects at front/back faces
+            evaporation: Density subtracted this frame (clears low-level haze)
         """
         if not self.allocated or not self.shader_program:
             return
@@ -70,5 +72,6 @@ class Advect3DDensity(Advect3D):
                     result_write.width, result_write.height, result_write.depth)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
         glUniform1i(self.get_uniform_loc("uClosedZ"), int(closed_z))
+        glUniform1f(self.get_uniform_loc("uEvaporation"), evaporation)
 
         self.dispatch(result_write.width, result_write.height, result_write.depth)
