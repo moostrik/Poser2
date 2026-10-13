@@ -409,14 +409,14 @@
           "eye_tracking": 0.8,
           "depth_blur": 0.25,
           "debug_depth": false,
-          "injection_layer": 1.0,
+          "injection_layer": 0.0,
           "injection_spread": 0.06,
           "boundary": "CLOSED"
         },
         "velocity": {
           "input_strength": 0.57,
           "squeeze": 0.0,
-          "push": -0.5,
+          "push": 0.5,
           "self_advection": 0.2,
           "fade_time": 12.0,
           "dampen_threshold": 10.0,
@@ -436,12 +436,14 @@
           "boundary": "CLOSED"
         },
         "temperature": {
-          "input_strength": 0.0,
+          "input_strength": 1.0,
           "speed_offset": 0.0,
-          "fade_time": 3.0,
-          "buoyancy": 0.0,
-          "weight": -10.0,
-          "ambient": 0.2,
+          "fade_time": 12.0,
+          "buoyancy": 1.5,
+          "weight": 4.0,
+          "gravity_y": 0.0,
+          "gravity_z": 1.0,
+          "ambient": 0.0,
           "boundary": "CLOSED"
         },
         "pressure": {

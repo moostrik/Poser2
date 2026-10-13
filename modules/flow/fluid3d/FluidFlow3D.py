@@ -503,19 +503,27 @@ class FluidFlow3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _apply_buoyancy(self) -> None:
-        """Apply buoyancy force to velocity: F = σ(T − T_ambient) − κρ."""
-        if self.config.temperature.buoyancy == 0.0:
+        """Apply buoyancy to velocity: F = gravity * (κρ − σ(T − T_ambient)).
+
+        Dense ink sinks along gravity; hot (fresh) ink rises against it.
+        The weight term acts wherever ink exists, so it stays active even
+        with thermal buoyancy at 0.
+        """
+        temp = self.config.temperature
+        if temp.buoyancy == 0.0 and temp.weight == 0.0:
             return
 
-        sigma = self._dt * self._grid_scale * self.config.temperature.buoyancy
-        kappa = self._dt * self._grid_scale * self.config.temperature.weight
+        sigma = self._dt * self._grid_scale * temp.buoyancy
+        kappa = self._dt * self._grid_scale * temp.weight
+        gravity = (temp.gravity_x, temp.gravity_y, temp.gravity_z)
 
         self._buoyancy_density_shader.use(
             self._temperature.texture,
             self._density.texture,
             self._simulation_obstacle,
             self._buoyancy_force_vol,
-            sigma, kappa, self.config.temperature.ambient,
+            sigma, kappa, temp.ambient,
+            gravity=gravity,
             has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_IMAGE)

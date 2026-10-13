@@ -22,6 +22,7 @@ class Buoyancy3DDensity(Buoyancy3D):
     def use(self, temperature: Texture3D, density: Texture2DArray,
             obstacle: Texture3D, force_out: Texture3D,
             sigma: float, kappa: float, ambient_temperature: float,
+            gravity: tuple[float, float, float] = (0.0, 1.0, 0.0),
             has_obstacles: bool = True) -> None:
         """Compute buoyancy force with density as 2D array.
 
@@ -31,8 +32,9 @@ class Buoyancy3DDensity(Buoyancy3D):
             obstacle: 3D obstacle mask (Texture3D — sampler3D)
             force_out: Output force volume (Texture3D — image3D)
             sigma: Thermal buoyancy coefficient
-            kappa: Density weight coefficient
+            kappa: Density weight coefficient (dense ink sinks along gravity)
             ambient_temperature: Reference temperature
+            gravity: Gravity direction — (0,1,0) down-screen, (0,0,1) away from viewer
             has_obstacles: Whether obstacle logic is active
         """
         if not self.allocated or not self.shader_program:
@@ -50,6 +52,7 @@ class Buoyancy3DDensity(Buoyancy3D):
         glUniform1f(self.get_uniform_loc("uSigma"), sigma)
         glUniform1f(self.get_uniform_loc("uKappa"), kappa)
         glUniform1f(self.get_uniform_loc("uAmbientTemperature"), ambient_temperature)
+        glUniform3f(self.get_uniform_loc("uGravity"), gravity[0], gravity[1], gravity[2])
         glUniform3i(self.get_uniform_loc("uSize"),
                     force_out.width, force_out.height, force_out.depth)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))

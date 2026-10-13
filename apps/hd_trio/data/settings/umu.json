@@ -616,7 +616,7 @@
           "speed_offset": 0.0,
           "fade_time": 3.0,
           "buoyancy": 0.0,
-          "weight": -10.0,
+          "weight": 0.0,
           "ambient": 0.2,
           "boundary": "CLOSED"
         },

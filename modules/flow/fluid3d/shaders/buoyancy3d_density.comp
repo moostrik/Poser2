@@ -4,7 +4,10 @@
  * Buoyancy3D Density - Temperature-driven buoyancy with density stored
  *                      as GL_TEXTURE_2D_ARRAY.
  *
- * F = σ(T - T_ambient) - κ·density
+ * F = uGravity * (κ·density - σ(T - T_ambient)):
+ *   dense ink sinks along gravity; hot ink rises against it.
+ * The weight term acts wherever ink exists (not gated by temperature),
+ * so accumulated old ink settles even after it has cooled.
  * Temperature and obstacle remain sampler3D (GL_TEXTURE_3D at sim scale).
  * Density is sampler2DArray with manual Z interpolation.
  */
@@ -20,6 +23,7 @@ layout(rgba16f, binding = 0) writeonly uniform image3D uForce;
 uniform float uSigma;               // Thermal buoyancy (includes dt * scale)
 uniform float uKappa;               // Density weight (includes dt * scale)
 uniform float uAmbientTemperature;  // Reference temperature
+uniform vec3  uGravity;             // Gravity direction: (0,1,0) down-screen, (0,0,1) away from viewer
 uniform ivec3 uSize;
 uniform bool  uHasObstacles;
 uniform int   uDensityLayers;       // Number of density array layers
@@ -65,13 +69,13 @@ void main() {
     float temperature = texture(uTemperature, st).r;
     float dtemp = temperature - uAmbientTemperature;
 
-    vec3 buoyancy = vec3(0.0);
+    // Thermal lift where warm; ink weight wherever ink exists
+    float lift = (abs(dtemp) > 0.0001) ? dtemp * uSigma : 0.0;
+    vec4 d = sampleDensity(st);
+    float density = max(d.r, max(d.g, d.b));
+    float force = density * uKappa - lift;
 
-    if (abs(dtemp) > 0.0001) {
-        float density = sampleDensity(st).a;
-        float force = dtemp * uSigma - density * uKappa;
-        buoyancy = vec3(0.0, -1.0, 0.0) * force;
-    }
+    vec3 buoyancy = (abs(force) > 0.00001) ? uGravity * force : vec3(0.0);
 
     imageStore(uForce, gid, vec4(buoyancy, 0.0));
 }
