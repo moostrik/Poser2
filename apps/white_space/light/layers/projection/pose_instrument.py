@@ -271,7 +271,7 @@ class PoseInstrument(ProjectionLayer):
         self._update_players(frame)
         self._set_grow(frame.tick.dt)                                      # first: the reaches read its envelope
         self._set_reaches()
-        self._set_sync_strobe(frame.tick.index, frame.tick.dt)
+        self._set_sync_strobe(frame)
         mask, mask_white, mask_blue = self._mask, self._mask_white, self._mask_blue
         mask.fill(False)
         mask_white.fill(0.0)
@@ -510,7 +510,7 @@ class PoseInstrument(ProjectionLayer):
                     a.reach_right = min(a.reach_right, limits[2])
                     b.reach_left = min(b.reach_left, limits[3])
 
-    def _set_sync_strobe(self, tick: int, dt: float) -> None:
+    def _set_sync_strobe(self, frame: Frame) -> None:
         """Whether this tick is a sync strobe frame. The room is in **full sync** while every
         present pair is alike over the band: on when the least alike pair reads
         ``sync_strobe.on_at``, off only when one falls below ``sync_strobe.off_at``, so a room
@@ -521,7 +521,11 @@ class PoseInstrument(ProjectionLayer):
         climbing 1 to 16 per second over the attack — every other tick at a power-of-two tick
         rate — and fades out stepping back down over the release, every change a seamless
         infill on the strobes' shared grid, and a gate reopened mid-fade climbs from where it
-        is. While it strobes, every drawn pattern strobes: full sync is the whole room."""
+        is. While it strobes, every drawn pattern strobes: full sync is the whole room.
+
+        The envelope's value is also published on the frame (``frame.sync``) for the sound
+        (``docs/SOUND.md``, /global/sync); the compositor carries it out only while this
+        layer draws, so the wire reads 0 whenever the instrument is out of the mix."""
         P = self._instrument.sync_strobe
         present = [id for id, p in self._players.items() if p.present]
         if P.bypass or len(present) < 2:
@@ -530,11 +534,12 @@ class PoseInstrument(ProjectionLayer):
             sims = [self._pair_similarity(a, b) for i, a in enumerate(present) for b in present[i + 1:]]
             least = -1.0 if any(math.isnan(s) for s in sims) else min(sims)
             self._synced = least >= (min(P.off_at, P.on_at) if self._synced else P.on_at)
-        value = self._sync_strobe.update(self._synced, dt, P.attack_seconds, P.release_seconds)
+        value = self._sync_strobe.update(self._synced, frame.tick.dt, P.attack_seconds, P.release_seconds)
+        frame.sync = value
         strobe = False
         if self._sync_strobe.level > 0.0:
             rate = Strobe.rate(float(2.0 ** round(4.0 * value)), self._ticks_per_second)
-            strobe = tick % Strobe.period(rate, self._ticks_per_second) == 0
+            strobe = frame.tick.index % Strobe.period(rate, self._ticks_per_second) == 0
         for p in self._players.values():
             p.sync_strobe = strobe
 

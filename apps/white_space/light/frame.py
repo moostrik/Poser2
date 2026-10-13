@@ -55,6 +55,7 @@ class Frame:
     motor:         MotorMeasurement     = field(default_factory=MotorMeasurement)   # what the playhead advanced under
     motor_command: MotorCommand         = field(default_factory=MotorCommand)       # what this frame is sent with
     playhead:      float                = 0.0   # continuous content playhead (radians [-π,π), offset applied)
+    sync:          float                = 0.0   # full sync's envelope (0..1): the pose instrument's, carried over by the compositor only while the layer draws
     light_img:  np.ndarray              = field(init=False)
     beam_lights: np.ndarray              = field(init=False)
 

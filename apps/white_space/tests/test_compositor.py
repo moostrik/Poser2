@@ -114,6 +114,27 @@ class CompositorTest(unittest.TestCase):
         comp.render(f)
         self.assertEqual(seen, [(36.0, 1.5)])
 
+    def test_sync_rides_out_only_while_its_layer_draws(self) -> None:
+        """The frame's sync (full sync's envelope, the pose instrument's) is carried out of the
+        scratch only for a layer that rendered: out of the mix or at weight 0 it stays 0."""
+        class Syncing(FakeLayer):
+            def render(self, frame: Frame) -> None:
+                frame.sync = 0.8
+
+        comp = Compositor(config(), {LayerId.test_pose_waves: Syncing(0.0), LayerId.beam_playhead: FakeLayer(1.0)})
+        f = frame()
+        comp.set_mix([(LayerId.test_pose_waves, 1.0), (LayerId.beam_playhead, 1.0)])
+        comp.render(f)
+        self.assertEqual(f.sync, 0.8)                            # carried out; the next layer's scratch is cleared
+        f = frame()
+        comp.set_mix([(LayerId.test_pose_waves, 0.0), (LayerId.beam_playhead, 1.0)])   # weight 0: not rendered
+        comp.render(f)
+        self.assertEqual(f.sync, 0.0)
+        f = frame()
+        comp.set_mix([(LayerId.beam_playhead, 1.0)])             # out of the mix entirely
+        comp.render(f)
+        self.assertEqual(f.sync, 0.0)
+
     def test_debug_override_replaces_state_mix(self) -> None:
         # Selecting a layer IS turning debug on: the select replaces the state's mix solo.
         self.cfg.debug = DebugLayer.test_pose_waves

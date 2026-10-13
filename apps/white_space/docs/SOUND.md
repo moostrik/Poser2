@@ -62,7 +62,8 @@ pair that does not exist is sent as 0.
 What it measures and how it is smoothed is in `SIMILARITY.md`. The light takes the mean of both
 directions of a pair and strobes the room while every pair holds over `PI.sync_strobe.on_at`
 (`PoseInstrument._set_sync_strobe`; `POSE_INSTRUMENT.md`, *The sync strobe*); Max gets the row
-and shapes it itself.
+to shape itself, and the light's own gate ready-made on `/global/sync` (*The global messages*):
+the strobe envelope's value, with the band's hysteresis and pair rules already applied.
 
 ## The wire
 
@@ -135,11 +136,13 @@ Sent once per bundle.
 | `/global/progress`        | float   | 0..1     | the show's progress                                          |
 | `/global/playhead`        | float   | −π..π    | the playhead as an azimuth (`CALIBRATION.md`, *Playhead*)    |
 | `/global/motor`           | int     | mode     | the motor command's mode                                     |
+| `/global/sync`            | float   | 0..1     | full sync's envelope: the sync strobe's attack and release while every present pair holds the band (`POSE_INSTRUMENT.md`, *The sync strobe*) |
 | `/global/volume`          | float   | 0..1     | the operator's fader (`CALIBRATION.md`, *Sound (Max)*)       |
 | `/global/speaker/offset`  | float   | radians  | where speaker 0 stands (`CALIBRATION.md`, *Sound (Max)*)     |
 
-The playhead and the motor mode are 0 while no show runs. The volume and the speaker offset are
-operator settings and are never zeroed.
+The playhead, the motor mode and the sync are 0 while no show runs; the sync is also 0 whenever
+the pose instrument layer is not drawn — the compositor carries it out of a rendered frame only.
+The volume and the speaker offset are operator settings and are never zeroed.
 
 ## The return path
 

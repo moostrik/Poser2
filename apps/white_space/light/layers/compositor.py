@@ -100,11 +100,13 @@ class Compositor:
                 continue
             s.light_img.fill(0.0)
             s.beam_lights.fill(0.0)
+            s.sync = 0.0
             try:
                 layer.render(s)   # blends into the private scratch via its own blend mode
             except Exception:
                 logger.exception("Error in %s.render", layer.__class__.__name__)
                 continue
+            frame.sync = max(frame.sync, s.sync)   # full sync rides out only while its layer draws
             if w_white > 0.0:
                 frame.white += w_white * s.white
             if w_blue > 0.0:

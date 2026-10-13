@@ -17,9 +17,10 @@ logger = logging.getLogger(__name__)
 
 class OscSoundSender(BaseOscSound):
     """The sound sender — modules' OscSound extended with the rotation playhead
-    (/global/playhead), the motor mode (/global/motor), the two operator settings
-    (/global/volume, /global/speaker/offset), and the panoramic-only per-pose azimuth, distance
-    and playhead-offset messages.
+    (/global/playhead), the motor mode (/global/motor), full sync's envelope (/global/sync,
+    the light instrument's gate: 0..1, 0 while the instrument is not drawn), the two operator
+    settings (/global/volume, /global/speaker/offset), and the panoramic-only per-pose
+    azimuth, distance and playhead-offset messages.
 
     ``/global/state`` carries the show state (``StateId``, 0–10) from the state machine, and
     −1 in the shutdown blackout. The motor mode goes out on ``/global/motor``.
@@ -102,6 +103,13 @@ class OscSoundSender(BaseOscSound):
         motor_msg = OscMessageBuilder(address="/global/motor")
         motor_msg.add_arg(motor_mode, OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(motor_msg.build())  # type: ignore
+
+        # Full sync's envelope (0..1): the light's own gate, 0 while the pose instrument is
+        # not drawn — the compositor only carries it out of a rendered frame.
+        sync: float = 0.0 if (idle or composition is None) else float(composition.sync)
+        sync_msg = OscMessageBuilder(address="/global/sync")
+        sync_msg.add_arg(sync, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(sync_msg.build())  # type: ignore
 
         # Operator settings, not show state, so they are never zeroed on idle: the fader and
         # the speaker placement must read true whenever they are turned, show or no show.

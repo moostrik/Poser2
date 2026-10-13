@@ -12,7 +12,11 @@ import unittest
 
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
+from modules.session import SequencerState
+
 from apps.white_space.inout.osc_sound_sender import OscSoundSender
+from apps.white_space.light import Tick
+from apps.white_space.light.frame import Frame
 from apps.white_space.settings import _OscSoundSettings
 
 
@@ -54,6 +58,16 @@ class SoundGlobalsTest(unittest.TestCase):
         self.assertEqual(messages["/global/motor"], 0)               # show state: zeroed
         self.assertAlmostEqual(messages["/global/volume"], 0.8, places=6)
         self.assertAlmostEqual(messages["/global/speaker/offset"], math.radians(45.0), places=6)
+
+    def test_sync_is_the_compositions_and_zeroed_on_idle(self) -> None:
+        """/global/sync carries the frame's full-sync envelope while a show runs; it is show
+        state, so idle (no sequencer state) zeroes it like the playhead and the motor."""
+        composition = Frame(360, Tick(0.0, 1 / 32, index=0))
+        composition.sync = 0.7
+        self.sender.set_composition(composition)
+        seq = SequencerState(stage=4, stage_progress=0.5, progress=0.5, elapsed=10.0, active=True)
+        self.assertAlmostEqual(_globals(self.sender, seq)["/global/sync"], 0.7, places=6)
+        self.assertEqual(_globals(self.sender, None)["/global/sync"], 0.0)
 
     def test_defaults_are_full_volume_and_no_offset(self) -> None:
         """Speakers placed by the fixed layout need no constant at all (see CALIBRATION.md)."""

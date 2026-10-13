@@ -981,6 +981,14 @@ class PoseInstrumentTest(unittest.TestCase):
         self._sync_pair(sim=0.92)                                # inside the band, but the hold was forgotten
         self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
 
+    def test_full_sync_rides_the_frame_for_the_sound(self) -> None:
+        self._sync_pair()
+        self.assertEqual(self._render().sync, 1.0)               # the envelope's value, for /global/sync
+        self._sync_pair(sim=0.5)                                 # below the band: released at once
+        self.assertEqual(self._render().sync, 0.0)
+        self._people({0: _pose(0.3)})                            # alone: no pair, no sync
+        self.assertEqual(self._render().sync, 0.0)
+
     def test_the_attack_climbs_the_ladder_on_the_grid(self) -> None:
         self._sync_pair()
         self.cfg.sync_strobe.attack_seconds = 1.0                # the helper zeroes it; the climb is this test's
