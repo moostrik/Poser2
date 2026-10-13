@@ -92,10 +92,8 @@ What is the instrument's and what is the synth's (`LIGHT_SYNTH.md` states the sa
 synth's side): the instrument decides what each source is, which measure, and the shaping of that
 measure before it is handed over (the absolute of a travel, a remap; the dead zones are the
 pipeline's, *The body*); when the gates open (presence, the hit);
-the reaches; which output is white and which blue; and the mask. A source may also move in time
-by the bridge's own hand, as the mask's flash does: the breath, a sine per person
-(`MATRIX_V2.md`, *Made sources*). Everything from the slot on is the synth's, and the synth never
-changes a source before the slot and never adds two.
+the reaches; which output is white and which blue; and the mask. Everything from the slot on is
+the synth's, and the synth never changes a source before the slot and never adds two.
 
 ---
 
@@ -134,7 +132,7 @@ points is tied to a pose.
 The rules are aims, not gates. Two things are fixed: arms hanging is full blue and arms raised is
 full white. Every combination drawing differently (rule 7) is the aim in the end, not a test of
 each step. A calculation on several measures may live in the instrument while it is tried; once
-the result is liked it moves into the pose pipeline (rule 1): the shoulders' mean and difference are such calculations. The elbows depart
+the result is liked it moves into the pose pipeline (rule 1). The elbows depart
 from rule 4 as an experiment: each elbow plays its own colour's pitch.
 
 ## What each measure means
@@ -147,10 +145,10 @@ measure that is not of the body's pose.
 
 | Measure             | Role      | Term                                                            |
 |---------------------|-----------|-----------------------------------------------------------------|
-| arms (mean)         | primary   | the balance of white and blue: both pulse widths                |
+| arms mean           | primary   | the balance of white and blue: both pulse widths                |
 | shoulders apart     | primary   | both phases: the colours pull together, one way per higher arm  |
-| left elbow          | primary   | the white: its fold lifts the arm and is the pitch; its turn a shift |
-| right elbow         | primary   | the blue: its fold lifts the arm and is the pitch; its turn a shift  |
+| left elbow          | primary   | the white: its fold lifts the arm and is the pitch              |
+| right elbow         | primary   | the blue: its fold lifts the arm and is the pitch               |
 | leg deviation       | secondary | open                                                            |
 | body bend           | secondary | the flow: the lines travel by the lean and stand without it     |
 | distance            | secondary | open                                                            |
@@ -208,20 +206,23 @@ and publishes with every frame, smoothed. The pipeline also caps how fast the jo
 change (the LERP stage's rate limiter: `max_increase` and `max_decrease`, radians per second), so
 no angle-derived measure moves implausibly fast however fast the input jumps, and the light and
 the sound read the same capped values. The azimuth is not capped: the window and the mask track a
-walking person. The pipeline derives the leg deviation and the symmetry
-of a pair from the joint angles. The distance is the tracker's, read from where the feet meet the
-floor (`TRACKING.md`, *The pose's distance*).
+walking person. The pipeline derives the leg deviation, the symmetry
+of a pair, the whole arms and the shoulders' difference from the joint angles. The distance is
+the tracker's, read from where the feet meet the floor (`TRACKING.md`, *The pose's distance*).
 
-| Feature           | Measure                                                  | In the pipeline       |
-|-------------------|----------------------------------------------------------|-----------------------|
-| left shoulder     | 0 hanging → ±1 straight up, the sign the side it passes  | `ArmTravel`           |
-| right shoulder    | 0 hanging → ±1 straight up, the sign the side it passes  | `ArmTravel`           |
-| left elbow        | 0 straight → ±1 folded; its turn 0 straight → ±π folded  | `ArmTravel`, `Angles` |
-| right elbow       | 0 straight → ±1 folded; its turn 0 straight → ±π folded  | `ArmTravel`, `Angles` |
-| leg deviation     | 0 standing straight → 1 a leg fully bent                 | `LegDeviation`        |
-| body bend         | −1 left → 0 upright → 1 right                            | `TorsoTilt`           |
-| distance          | 0 the zone's near edge → 1 its far edge                  | `Distance`            |
-| symmetry, a pair  | signed, left minus right: how unequal the two sides are  | `AngleSymmetry`       |
+| Feature             | Measure                                                  | In the pipeline       |
+|---------------------|----------------------------------------------------------|-----------------------|
+| left shoulder       | 0 hanging → ±1 straight up, the sign the side it passes  | `ArmTravel`           |
+| right shoulder      | 0 hanging → ±1 straight up, the sign the side it passes  | `ArmTravel`           |
+| left elbow          | 0 straight → ±1 folded                                   | `ArmTravel`           |
+| right elbow         | 0 straight → ±1 folded                                   | `ArmTravel`           |
+| left, right arm     | 0..1, the union of its shoulder's and its elbow's travel | `ArmTravel`           |
+| arms mean           | 0..1, the mean of the two arm travels                    | `ArmTravel`           |
+| shoulder difference | signed, left travel less right: which arm is the higher  | `ShoulderDifference`  |
+| leg deviation       | 0 standing straight → 1 a leg fully bent                 | `LegDeviation`        |
+| body bend           | −1 left → 0 upright → 1 right                            | `TorsoTilt`           |
+| distance            | 0 the zone's near edge → 1 its far edge                  | `Distance`            |
+| symmetry, a pair    | signed, left minus right: how unequal the two sides are  | `AngleSymmetry`       |
 
 The angles are calibrated from two reference poses, arms hanging and arms raised
 (`AngleCalibrator` in `modules/pose/nodes/filters`, settings `pose.angle_calibrator`), so the
@@ -235,8 +236,14 @@ degrees and a raised one stops short of π, so without the zones the two fixed p
 quite reached and the pattern never quite rests. The arms' zones make a feature of their own, the
 **travel** (`ArmTravel`, from `ArmTravelExtractor` in `modules/pose/nodes/extractors`): where each
 arm joint is along its travel from neutral to the far pose, the calibrated angle's magnitude taken
-from the band between the two zones onto 0..1 with the sign kept. The angles themselves stay raw,
-so the similarity, the symmetry, the velocity and the elbow's turn read the angles and only the
+from the band between the two zones onto 0..1 with the sign kept. From the magnitudes the same
+extractor makes the whole arms: each arm the weighted union of its shoulder's and its elbow's,
+`s + (1 − s) × lift × e` with the lift `arm_travel_extractor.elbow_lift` (½) — an arm is lifted
+insofar as any of it is lifted, a raised shoulder is a full arm whatever the elbow, and with the
+lift under 1 only a raised shoulder reaches 1, so the fixed points stay the shoulders' alone —
+and `arms_mean`, the mean of the two. `ShoulderDifferenceExtractor` beside it takes the left
+shoulder's travel less the right's, signed. The angles themselves stay raw,
+so the similarity, the symmetry and the velocity read the angles and only the
 instruments read the travel, the light and the sound alike (`SOUND.md`). The body bend's and the
 leg deviation's zones are in their extractors.
 
@@ -258,7 +265,10 @@ holds the meaningful pairs, the four joints (shoulder, elbow, hip, knee) and the
 a whole per side (`arms`: shoulder and elbow; `legs`: hip and knee, weighted as the leg deviation
 is), each signed, left minus right, −1..1, so that downstream the signed value or its absolute can
 be used. A person and their mirror image draw differently. `AngleSymExtractor` makes it; it is
-windowed, graphed and sent to Max like the leg deviation.
+windowed, graphed and sent to Max like the leg deviation. The shoulders' **difference**
+(`ShoulderDifference`, *The body*) is its travel-space sibling: left less right of the travels
+instead of the raw angles, so it rests exactly at 0 at both fixed points through the travels'
+dead zones, where the symmetry never quite does.
 
 ## The connections
 
@@ -272,8 +282,8 @@ the visualisation as simple as possible. The bases and amounts are the preset's:
 
 | Source              | Range | Parameter         | Base | Amount     | At full                                         |
 |---------------------|-------|-------------------|------|------------|-------------------------------------------------|
-| arms                | 0..1  | white pulse width | 0    | 1          | solid white                                     |
-| arms                | 0..1  | blue pulse width  | 1    | −1         | no blue                                         |
+| arms mean           | 0..1  | white pulse width | 0    | 1          | solid white                                     |
+| arms mean           | 0..1  | blue pulse width  | 1    | −1         | no blue                                         |
 | left elbow travel   | 0..1  | white pitch       | 10   | 20 lines   | 30 lines, one every 12°: finer as the arm folds |
 | right elbow travel  | 0..1  | blue pitch        | 10   | 20 lines   | 30 lines                                        |
 | shoulder difference | −1..1 | white phase       | 0    | ⅛ interval | the colours a quarter interval closer, the left higher one way, the right the other |
@@ -283,13 +293,13 @@ the visualisation as simple as possible. The bases and amounts are the preset's:
 | leg deviation       | 0..1  | the LFO's level   | 0    | 1          | the LFO at full swing; the LFO feeds nothing    |
 
 The arms' mean is both widths: an arm's travel is the weighted union of its shoulder's and its
-elbow's (`PI.elbow_lift`; `MATRIX_V2.md`, *Made sources*), so folded elbows draw with the
-shoulders down and a raised shoulder is a full arm. The shoulders' difference is both phases, so
+elbow's (the lift `pose.arm_travel_extractor.elbow_lift`; *The body*), so folded elbows draw with
+the shoulders down and a raised shoulder is a full arm. The shoulders' difference is both phases, so
 which arm is the higher shows; each elbow plays its own colour's pitch, the left the white and
 the right the blue. The body bend is both speeds, their bases 0: a straight body leaves the
 lines standing, and a lean flows the mirrored pattern out of the person or into them, one way
-per lean side. Unconnected: the hardness, the strobes, the LFO's output, the elbows' turns, the
-breath, the symmetries, the distance.
+per lean side. Unconnected: the hardness, the strobes, the LFO's output, the symmetries, the
+distance.
 
 ## Events
 
@@ -330,7 +340,7 @@ What follows from the connections, before the machine has been judged **(deducti
   arm already full.
 - Which arm is the higher shows as the colours pulling a quarter interval together, one way for
   the left, the other for the right: overlapping on one flank, opening dark on the other.
-- The turns, the bend and the legs draw nothing: `MATRIX_V2.md`'s rule 5 yields to its temporary
+- The bend and the legs draw nothing: `MATRIX_V2.md`'s rule 5 yields to its temporary
   rule 4 until their connections earn their place.
 
 Once the connections have been played on the machine, the *Pose results* are read back here: what
@@ -371,9 +381,9 @@ per person at 3600 pixels. Its place in the states' mixes is in `LAYERS.md`, *po
 
 ### Sources and connections
 
-The layer reads its sources from the LERP frames: the elements of `ArmTravel` (the four arm
-joints, the absolute taken), the elbows' elements of `Angles` (the turn), `LegDeviation`,
-`TorsoTilt`, `Distance` and `AngleSymmetry` (*The body*, *Symmetry*).
+The layer reads its sources from the LERP frames: the elements of `ArmTravel` (the arms' mean
+and the two elbows, the absolute taken), `ShoulderDifference`, `LegDeviation`, `TorsoTilt`,
+`Distance` and `AngleSymmetry` (*The body*, *Symmetry*).
 
 The connections are code, not settings: `PoseInstrument.connect` takes a person's measures, the
 dead zones already on them (*The body*), and returns the sources of the white and the blue
@@ -483,7 +493,6 @@ tuned together, knobs throughout:
 |-------------------------------|-----------------------------------------------------------------|
 | `max_lines`                   | the visual limit: the pitch ceiling                             |
 | `opposite`                    | draw the patterns at their people, half a turn away, or both (the copies winning) |
-| `elbow_lift`                  | how much a folded elbow lifts its arm (*The connections*)       |
 | `mask`                        | the mask's width, white and blue; the border's; the flash's levels, release |
 | `playhead`                    | the marker's width, white and blue; its level inside a mask     |
 | `window`                      | shape: taper, attack, release, their curves, the cap; reach: width, bypass; the scale, the crowd factor and the overlap |
@@ -491,7 +500,6 @@ tuned together, knobs throughout:
 | `sync_strobe`                 | full sync's display: bypass, mode (invert or black), attack, release |
 | `grow`                        | full sync's reach: windows grow to the full circle; attack, release |
 | `blend`                       | full sync's union: everyone's measures to the room's mean; bypass, attack, release |
-| `breath`                      | the breath's rate and depth (`MATRIX_V2.md`, *Made sources*)    |
 | `white_lines`, `blue_lines`   | On, Mirror, Bypass All; a slot per parameter; the push          |
 | `white_strobe`, `blue_strobe` | Bypass All; a slot per parameter of the strobe (`LIGHT_SYNTH.md`, *The strobe*) |
 | `lfo`                         | the LFO: rate, phase, the level's slot                          |
@@ -549,7 +557,7 @@ Step 4's rows of *Pose results* draw what that table says, in the unit tests
 shoulders tiling, a held upright pose still over many ticks, left and right up drawn
 differently with the phases pulled opposite ways, an elbow making its own colour finer, equal
 elbows in tune, a folded elbow lifting its arm and folded elbows drawing from hanging arms, a
-straight body standing still while a lean flows the lines, the turns and the legs drawing
+straight body standing still while a lean flows the lines, the fold's sign and the legs drawing
 nothing, and a small move of a shoulder or an elbow a small change of the picture). The rows
 beyond Step 4 wait on their connections (`MATRIX_V2.md`).
 
@@ -577,14 +585,11 @@ The open questions of the synth itself are in `LIGHT_SYNTH.md`, *Open*.
 
 Meaning and connections:
 
-- Whether the connections of Part 3 can be found with the body: the shoulders' balance and
-  breath, the elbows' pitch and shift, the lean; what the legs and the symmetries should play
+- Whether the connections of Part 3 can be found with the body: the shoulders' balance, the
+  elbows' pitch, the lean; what the legs and the symmetries should play
 - Which way is "right": a positive `TorsoTilt` is shoulders toward image right; which way that
   lean carries the lines on the wall is to be checked on the dummy
-- The breath's rate and depth, and whether its two relations read as a pair: the colours together
-  for one arm and complementary for the other
-- Which of the instrument's departures from the rules of meaning stay, and which calculations move
-  into the pose pipeline, once the result is liked
+- Which of the instrument's departures from the rules of meaning stay, once the result is liked
 - The lean moves the hips' reading by the lean, on the dummy as on a person, so at full lean the
   leg deviation reads about 0.75 and whatever it plays sounds with the bend; whether the leg
   deviation should be taken against the vertical instead of the torso line

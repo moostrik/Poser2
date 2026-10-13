@@ -13,7 +13,7 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from apps.white_space.inout.osc_sound_sender import OscSoundSender
 from apps.white_space.settings import _OscSoundSettings
-from modules.pose.features import Azimuth, Distance, Angles, AngleLandmark, ArmTravel, TravelElement
+from modules.pose.features import Azimuth, Distance, Angles, AngleLandmark, ArmTravel, TravelElement, ShoulderDifference
 from modules.pose.frame import Frame
 
 ID = 2
@@ -46,12 +46,13 @@ class SoundPosesTest(unittest.TestCase):
         messages = self._active(Frame(ID, 0))
         self.assertTrue(math.isnan(messages[f"/pose/{ID}/distance"][0]))     # as the azimuth is without one
 
-    def test_the_arm_entries_of_the_angles_are_the_travel_times_pi(self) -> None:
+    def test_the_arm_entries_of_the_angles_are_the_joints_travel_times_pi(self) -> None:
         angles = np.full(len(AngleLandmark), 0.3, dtype=np.float32)
-        travel = np.array([0.0, 1.0, -0.5, np.nan], dtype=np.float32)
+        travel = np.array([0.0, 1.0, -0.5, np.nan, 0.6, np.nan, np.nan], dtype=np.float32)
+        scores = np.array([1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0], dtype=np.float32)
         frame = Frame(ID, 0, features={
             Angles: Angles(angles, np.ones(len(AngleLandmark), dtype=np.float32)),
-            ArmTravel: ArmTravel(travel, np.array([1.0, 1.0, 1.0, 0.0], dtype=np.float32)),
+            ArmTravel: ArmTravel(travel, scores),
         })
         sent = self._active(frame)[f"/pose/{ID}/angle/rad"]
         self.assertEqual(len(sent), len(AngleLandmark))
@@ -59,8 +60,28 @@ class SoundPosesTest(unittest.TestCase):
         self.assertAlmostEqual(sent[TravelElement.right_shoulder], math.pi, places=6)
         self.assertAlmostEqual(sent[TravelElement.left_elbow], -math.pi / 2, places=6)
         self.assertTrue(math.isnan(sent[TravelElement.right_elbow]))
-        for i in range(len(TravelElement), len(AngleLandmark)):
-            self.assertAlmostEqual(sent[i], 0.3, places=6)                # the angles as they are
+        for i in range(TravelElement.left_arm, len(AngleLandmark)):
+            self.assertAlmostEqual(sent[i], 0.3, places=6)                # the angles as they are: the arms are no angles
+
+    def test_the_arms_and_the_difference_are_sent_as_on_the_frame(self) -> None:
+        travel = np.array([0.0, 0.5, 0.0, 1.0, 0.25, 0.5, 0.375], dtype=np.float32)
+        frame = Frame(ID, 0, features={
+            ArmTravel: ArmTravel(travel, np.ones(len(TravelElement), dtype=np.float32)),
+            ShoulderDifference: ShoulderDifference.from_value(-0.5),
+        })
+        messages = self._active(frame)
+        self.assertEqual(messages[f"/pose/{ID}/arm"], (0.25, 0.5, 0.375))        # left arm, right arm, their mean
+        self.assertAlmostEqual(messages[f"/pose/{ID}/shoulder/difference"][0], -0.5, places=6)
+
+    def test_without_the_features_the_arms_and_the_difference_are_zero(self) -> None:
+        messages = self._active(Frame(ID, 0))
+        self.assertEqual(messages[f"/pose/{ID}/arm"], (0.0, 0.0, 0.0))
+        self.assertEqual(messages[f"/pose/{ID}/shoulder/difference"], (0.0,))
+
+    def test_an_emptied_slot_resets_the_arms_and_the_difference(self) -> None:
+        messages = _messages(lambda b: self.sender._add_inactive_frame_messages(b, ID, self.settings.max_players))
+        self.assertEqual(messages[f"/pose/{ID}/arm"], (0.0, 0.0, 0.0))
+        self.assertEqual(messages[f"/pose/{ID}/shoulder/difference"], (0.0,))
 
     def test_without_a_travel_the_angles_go_out_as_they_are(self) -> None:
         angles = np.full(len(AngleLandmark), 0.3, dtype=np.float32)

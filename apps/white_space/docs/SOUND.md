@@ -20,6 +20,9 @@ The measures (`POSE_INSTRUMENT.md`, *What each measure means*):
 | right shoulder          | `ArmTravel` × π    | `/pose/{id}/angle/rad`       | 1     | −π..π; 0 hanging, ±π up        | absolute over π, 0..1   |
 | left elbow              | `ArmTravel` × π    | `/pose/{id}/angle/rad`       | 2     | −π..π; 0 straight, ±π folded   | absolute over π, 0..1   |
 | right elbow             | `ArmTravel` × π    | `/pose/{id}/angle/rad`       | 3     | −π..π; 0 straight, ±π folded   | absolute over π, 0..1   |
+| left, right arm         | `ArmTravel`        | `/pose/{id}/arm`             | 0, 1  | 0..1; the union of shoulder and elbow travel | as sent   |
+| arms mean               | `ArmTravel`        | `/pose/{id}/arm`             | 2     | 0..1; the mean of the two arms | as sent                 |
+| shoulder difference     | `ShoulderDifference` | `/pose/{id}/shoulder/difference` | – | −1..1; left travel less right  | as sent                 |
 | leg deviation           | `LegDeviation`     | `/pose/{id}/angle/legs`      | –     | 0..1; 0 standing, 1 bent       | as sent                 |
 | body bend               | `TorsoTilt`        | `/pose/{id}/angle/tilt`      | –     | −1..1; −1 left, 1 right        | as sent                 |
 | distance                | `Distance`         | `/pose/{id}/distance`        | –     | 0..1; 0 near edge, 1 far edge  | unconnected             |
@@ -35,12 +38,20 @@ The events and the place (`POSE_INSTRUMENT.md`, *Events*):
 | presence                | the pose itself    | `/pose/{id}/active`          | –     | 1 present, 0 gone              | the presence envelope's gate                |
 | where the person stands | `Azimuth`          | `/pose/{id}/azimuth`         | –     | radians                        | the centre of the window and the mask       |
 
-The four arm entries of `angle/rad` are the arm travel times π (`POSE_INSTRUMENT.md`, *The body*):
-the calibrated angle through the pipeline's dead zones, so a hanging arm sends exactly 0 and a
-raised one exactly ±π, and the two fixed points are the same for sound and light. The other five
-entries are the calibrated angles as they are. Every entry goes out signed: the sign is the side of
-the body the limb passes. The light takes the absolute over π; Max does the same to read an arm as
-the light reads it. `OscSoundSender._angle_values` builds the list.
+The four arm entries of `angle/rad` are the joints' travel times π (`POSE_INSTRUMENT.md`, *The
+body*): the calibrated angle through the pipeline's dead zones, so a hanging arm sends exactly 0
+and a raised one exactly ±π, and the two fixed points are the same for sound and light. The other
+five entries are the calibrated angles as they are. Every entry goes out signed: the sign is the
+side of the body the limb passes. The light takes the absolute over π; Max does the same to read
+an arm as the light reads it. `OscSoundSender._angle_values` builds the list.
+
+`/pose/{id}/arm` carries three values, unsigned: the left and the right arm, each the weighted
+union of its shoulder's and its elbow's travel (the lift `pose.arm_travel_extractor.elbow_lift`),
+and their mean, the width axis the light plays. `/pose/{id}/shoulder/difference` is the
+shoulders' travel difference, left less right, signed: the light's phase source. Both are the
+pipeline's values (`POSE_INSTRUMENT.md`, *The body*), so Max reads exactly what the light reads,
+and the addresses already carry the documents' terms. An arm with a missing joint is sent NaN,
+as `angle/rad` sends a missing joint.
 
 The distance is how far the person stands from the fixture within the tracked zone: 0 at
 `track.rig.zone_min_radius`, 1 at `track.rig.zone_max_radius`, clamped. The tracker reads it from
@@ -82,7 +93,8 @@ nothing. On shutdown one bundle resets every slot and sends `/global/state` −1
 ## The full lists
 
 `/pose/{id}/angle/rad` and `/pose/{id}/angle/vel` carry nine values in the order of
-`AngleLandmark`; `/pose/{id}/angle/sym` carries six in the order of `SymmetryElement`:
+`AngleLandmark`; `/pose/{id}/angle/sym` carries six in the order of `SymmetryElement`;
+`/pose/{id}/arm` carries three, the tail of `TravelElement`: left arm, right arm, arms mean:
 
 | Index | `angle/rad`, `angle/vel` | `angle/sym`                         |
 |-------|--------------------------|-------------------------------------|

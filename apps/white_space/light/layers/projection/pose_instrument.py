@@ -62,12 +62,11 @@ from .._base_layer import ProjectionLayer, LayerSettings
 from .._utilities import normalize_azimuth, mask_half_width
 from .playhead_marker import PlayheadMarker, PlayheadMarkerSettings
 from ...frame import Frame
-from ...synth import (Voice, Parameter, Sources, Oscillator, Envelope, Slot, Strobe,
+from ...synth import (Voice, Parameter, Sources, Envelope, Strobe,
                       OscillatorSettings, WindowSettings as SynthWindowSettings, LfoSettings, StrobeSettings)
 from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step, DummySettings
 
 KNOB = Widget.knob
-_BREATH_POSITION = np.zeros(1)          # the breath is in time: one position
 
 
 # -- Settings: the PI root group, grouped by what is tuned together ------------------------------
@@ -157,23 +156,14 @@ class MaskSettings(BaseSettings):
     flash_release_seconds: Field[float] = Field(0.3, min=0.0, max=2.0,  step=0.05, widget=KNOB, label="Release", description="Flash falls back to the mask's levels over (s)")
 
 
-class BreathSettings(BaseSettings):
-    """The breath: a sine in time the bridge makes per person, a source for ``connect`` to wire;
-    unconnected in the base matrix (``docs/MATRIX_V2.md``). On the widths, a depth of ½ or less
-    keeps both fixed points exact."""
-    rate:  Field[float] = Field(0.5, min=0.0, max=4.0, step=0.05, widget=KNOB, label="Rate",  description="Breaths per second (Hz)", row_label="Breath", newline=True)
-    depth: Field[float] = Field(0.4, min=0.0, max=0.5, step=0.01, widget=KNOB, label="Depth", description="Width swing per unit of the shoulders' gap (fraction)")
-
-
 class PoseInstrumentSettings(BaseSettings):
     """The ``PI`` root group, a group per concept: the mask, the playhead's marker, the window,
     the sync strobe, the growth and the blend (the full-sync band declared here, shared into
-    all three), the breath, the two oscillators, their strobes and the LFO (the synth's
+    all three), the two oscillators, their strobes and the LFO (the synth's
     patch, a slot per parameter), the dummy. The wiring is ``connect``; the measures' dead
     zones are the pipeline's."""
     max_lines:    Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
     opposite:     Field[Opposite] = Field(Opposite.OFF, widget=Widget.select, description="Draw each person's lines at them, half a turn away, or both (the copies win the overlap); the masks stay on the people")
-    elbow_lift:   Field[float] = Field(0.5, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Elbow Lift", description="How much a folded elbow lifts its arm (fraction of a full raise)")
     on_at:        Field[float] = Field(0.95, min=0.0, max=1.0, step=0.01, widget=KNOB, label="On At",  description="Full sync comes on when every pair reads at least this", row_label="Sync", newline=True)
     off_at:       Field[float] = Field(0.90, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Off At", description="Full sync goes off when any pair falls below this")
     mask:         Group[MaskSettings]           = Group(MaskSettings)
@@ -182,7 +172,6 @@ class PoseInstrumentSettings(BaseSettings):
     sync_strobe:  Group[SyncStrobeSettings]     = Group(SyncStrobeSettings, share=[on_at, off_at])
     grow:         Group[GrowSettings]           = Group(GrowSettings, share=[on_at, off_at])
     blend:        Group[BlendSettings]          = Group(BlendSettings, share=[on_at, off_at])
-    breath:       Group[BreathSettings]         = Group(BreathSettings)
     white_lines:  Group[OscillatorSettings]     = Group(OscillatorSettings)
     blue_lines:   Group[OscillatorSettings]     = Group(OscillatorSettings)
     white_strobe: Group[StrobeSettings]         = Group(StrobeSettings)
@@ -198,12 +187,10 @@ class _Player:
     """One person: their voice, their measures, and this tick's events."""
     voice:          Voice
     position:       float = 0.0     # normalized azimuth
-    left_shoulder_travel:  float = 0.0   # the four arm travels, the absolute of ArmTravel [0, 1]
-    right_shoulder_travel: float = 0.0
-    left_elbow_travel:     float = 0.0
+    arms_mean:      float = 0.0     # the arms' mean travel, ArmTravel's arms_mean element [0, 1]
+    shoulder_difference: float = 0.0     # ShoulderDifference [-1, 1]
+    left_elbow_travel:     float = 0.0   # the elbows' travel, the absolute of ArmTravel [0, 1]
     right_elbow_travel:    float = 0.0
-    left_elbow_angle:      float = 0.0   # the two raw elbow angles (rad), the turn's measure
-    right_elbow_angle:     float = 0.0
     legs:           float = 0.0     # LegDeviation [0, 1]
     body_bend:      float = 0.0     # TorsoTilt [-1, 1]
     distance:       float = 0.0     # Distance [0, 1]
@@ -212,7 +199,6 @@ class _Player:
     present:        bool  = False   # seen this tick
     hit:            bool  = False   # the playhead crosses this person this tick
     flash:          Envelope = field(default_factory=Envelope)   # the mask's flash: up on the hit, then its release
-    breath:         Oscillator = field(default_factory=Oscillator)   # the breath: a sine in time on the widths
     reach_left:     float = 0.0     # this tick's reach each side (deg), before presence
     reach_right:    float = 0.0
     opposite_reach_left:  float = 0.0   # the opposite copy's reaches (BOTH): never clipped by own windows
@@ -362,13 +348,10 @@ class PoseInstrument(ProjectionLayer):
             p.present = True
             p.position = normalize_azimuth(azimuth)
             travel = np.abs(pose[features.ArmTravel].values)
-            p.left_shoulder_travel  = self._value(travel[features.TravelElement.left_shoulder],  p.left_shoulder_travel)
-            p.right_shoulder_travel = self._value(travel[features.TravelElement.right_shoulder], p.right_shoulder_travel)
-            p.left_elbow_travel     = self._value(travel[features.TravelElement.left_elbow],     p.left_elbow_travel)
-            p.right_elbow_travel    = self._value(travel[features.TravelElement.right_elbow],    p.right_elbow_travel)
-            angles = pose[features.Angles].values
-            p.left_elbow_angle  = self._value(angles[features.AngleLandmark.left_elbow],  p.left_elbow_angle)
-            p.right_elbow_angle = self._value(angles[features.AngleLandmark.right_elbow], p.right_elbow_angle)
+            p.arms_mean           = self._value(travel[features.TravelElement.arms_mean],   p.arms_mean)
+            p.shoulder_difference = self._value(pose[features.ShoulderDifference].value,    p.shoulder_difference)
+            p.left_elbow_travel   = self._value(travel[features.TravelElement.left_elbow],  p.left_elbow_travel)
+            p.right_elbow_travel  = self._value(travel[features.TravelElement.right_elbow], p.right_elbow_travel)
             p.legs = self._value(pose[features.LegDeviation].value, p.legs)
             p.body_bend = self._value(pose[features.TorsoTilt].value, p.body_bend)
             p.distance = self._value(pose[features.Distance].value, p.distance)
@@ -392,7 +375,6 @@ class PoseInstrument(ProjectionLayer):
         gone: list[int] = []
         for id, p in self._players.items():
             p.hit = id in hits
-            p.breath.update(frame.tick.dt, 1.0, P.breath.rate)                  # before connect reads it
             p.voice.update_lfo(frame.tick.dt, self.connect_lfo(self._blended(p)))   # first: connect reads its output
             p.voice.update(frame.tick.dt, p.present, p.hit, self._sources(p), min_interval / self._scale,
                            frame.tick.index, ticks_per_second)
@@ -421,12 +403,11 @@ class PoseInstrument(ProjectionLayer):
 
         The arms are ``docs/MATRIX_V2.md``'s Step 4:
 
-        - the arms, the mean of the two arm travels: both pulse widths (white's base 0 and amount
+        - the arms' mean, of the two arm travels: both pulse widths (white's base 0 and amount
           1, blue's base 1 and amount −1: arms hanging is full blue, arms raised full white,
           between them the two colours tile). An arm's travel is the weighted union of its
-          shoulder's and its elbow's, ``s + (1 − s) × lift × e`` (``PI.elbow_lift``): an arm is
-          lifted insofar as any of it is lifted, so folded elbows draw with the shoulders down,
-          and a raised shoulder is a full arm whatever the elbow
+          shoulder's and its elbow's — the fold lifts the arm, so folded elbows draw with the
+          shoulders down, and a raised shoulder is a full arm whatever the elbow
         - each elbow its own colour's pitch, the left the white and the right the blue: folding an
           elbow makes its colour's lines finer; equal elbows keep the colours in tune
         - the shoulders' difference, signed, left less right: both phases, the amounts opposite
@@ -439,35 +420,26 @@ class PoseInstrument(ProjectionLayer):
         Every other parameter sits at its base; connections are added one at a time, each earning
         its place under the matrix's rule 4.
 
-        The measures come with their dead zones from the pipeline: the arm travels
-        (``ArmTravel``, ``pose.arm_travel_extractor``), the absolute taken since the sign is the
-        side of the body the limb passes, which the design gives no meaning; the body bend
-        (``pose.torso_tilt_extractor``). The union, the mean and the difference are computed here
-        while the matrix is tried; once liked they move into the pipeline.
+        Every measure is the pipeline's, dead zones and all: the arms' union, its mean and the
+        shoulders' difference come computed from ``ArmTravel`` and ``ShoulderDifference`` (the
+        lift ``pose.arm_travel_extractor.elbow_lift``), the elbows' travel with its absolute
+        taken since the sign is the side of the body the limb passes, which the design gives no
+        meaning; the body bend from ``pose.torso_tilt_extractor``. The sound reads the same
+        values (``docs/SOUND.md``).
         """
-        lift = self._instrument.elbow_lift
-        left_arm  = p.left_shoulder_travel  + (1.0 - p.left_shoulder_travel)  * lift * p.left_elbow_travel
-        right_arm = p.right_shoulder_travel + (1.0 - p.right_shoulder_travel) * lift * p.right_elbow_travel
-        arms = (left_arm + right_arm) / 2.0
-        difference = p.left_shoulder_travel - p.right_shoulder_travel
         white: Sources = {
-            Parameter.PULSE_WIDTH: arms,
+            Parameter.PULSE_WIDTH: p.arms_mean,
             Parameter.PITCH:       p.left_elbow_travel,
-            Parameter.PHASE:       difference,
+            Parameter.PHASE:       p.shoulder_difference,
             Parameter.SPEED:       p.body_bend,
         }
         blue: Sources = {
-            Parameter.PULSE_WIDTH: arms,
+            Parameter.PULSE_WIDTH: p.arms_mean,
             Parameter.PITCH:       p.right_elbow_travel,
-            Parameter.PHASE:       difference,
+            Parameter.PHASE:       p.shoulder_difference,
             Parameter.SPEED:       p.body_bend,
         }
         return white, blue
-
-    @staticmethod
-    def _breath(p: _Player) -> float:
-        """The person's breath this tick, −1..1."""
-        return float(Oscillator.sine(p.breath.cycle(_BREATH_POSITION, 1.0, 0.0), 1.0)[0])
 
     def connect_lfo(self, p: _Player) -> float:
         """The source of the LFO's level: the leg deviation, its dead zone the pipeline's
@@ -618,9 +590,10 @@ class PoseInstrument(ProjectionLayer):
             self._grow_on = least >= (min(P.off_at, P.on_at) if self._grow_on else P.on_at)
         self._grow.update(self._grow_on, dt, P.attack_seconds, P.release_seconds)
 
-    MEASURES = ('left_shoulder_travel', 'right_shoulder_travel', 'left_elbow_travel',
-                'right_elbow_travel', 'left_elbow_angle', 'right_elbow_angle',
-                'legs', 'body_bend', 'distance')    # what the blend averages: never similarity or position
+    # What the blend averages: never similarity or position. The derived measures (the arms' mean,
+    # the difference) blend linearly themselves; at full blend everyone reads the same value either way.
+    MEASURES = ('arms_mean', 'shoulder_difference', 'left_elbow_travel', 'right_elbow_travel',
+                'legs', 'body_bend', 'distance')
 
     def _set_blend(self, dt: float) -> None:
         """Whether full sync blends the measures. The same band as the strobe's and the

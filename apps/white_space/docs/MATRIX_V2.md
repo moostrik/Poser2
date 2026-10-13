@@ -26,38 +26,31 @@ What the pose pipeline says about the body, smoothed and through its dead zones
 | right shoulder travel | 0..1  | 0 hanging → 1 straight up                                     |
 | left elbow travel     | 0..1  | 0 straight → 1 folded                                         |
 | right elbow travel    | 0..1  | 0 straight → 1 folded                                         |
-| left elbow angle      | −π..π | the raw angle, 0 straight → ±π folded, the sign the side      |
-| right elbow angle     | −π..π | the raw angle, as the left's                                  |
+| left arm travel       | 0..1  | the union of its shoulder's and its elbow's travel (below)    |
+| right arm travel      | 0..1  | the union, as the left's                                      |
+| arms mean             | 0..1  | the mean of the two arm travels                               |
+| shoulder difference   | −1..1 | the left shoulder travel less the right, signed               |
 | body bend             | −1..1 | −1 leaning left → 0 upright → 1 leaning right                 |
 | leg deviation         | 0..1  | 0 standing straight → 1 a leg fully bent                      |
 | distance              | 0..1  | 0 the zone's near edge → 1 its far edge                       |
 | symmetry              | −1..1 | per pair, left minus right (`POSE_INSTRUMENT.md`, *Symmetry*) |
+
+An arm's travel is the weighted union of its parts, `s + (1 − s) × lift × e` with `s` the
+shoulder's travel, `e` the elbow's and the lift `pose.arm_travel_extractor.elbow_lift` (½): an
+arm is lifted insofar as any of it is lifted. A raised shoulder is a full arm whatever the
+elbow, and with the lift under 1 only a raised shoulder reaches 1, so the fixed points stay the
+shoulders' alone (`POSE_INSTRUMENT.md`, *The body*).
 
 The similarity is not a matrix source: it drives sync, the reach toward a partner
 (`POSE_INSTRUMENT.md`, *Events*).
 
 ## Made sources
 
-What the instrument makes or shapes from the measures before the slot: a union, a mean and a
-difference of two, a sine of an angle, a sine in time. A slot has one source and its curve keeps 0 and ±1 in place
-(`LIGHT_SYNTH.md`, *Modulation*), so none of these can be made in the slot. They are computed in
-the instrument while the matrix is tried; a shaped measure moves into the pipeline once liked
-(`POSE_INSTRUMENT.md`, *The rules of meaning*).
-
-| Source              | Range | What it is                                                      |
-|---------------------|-------|-----------------------------------------------------------------|
-| left arm travel     | 0..1  | the union of its shoulder's and its elbow's travel (below)      |
-| right arm travel    | 0..1  | the union, as the left's                                        |
-| arms                | 0..1  | the mean of the two arm travels                                 |
-| shoulder difference | −1..1 | the left shoulder travel less the right, signed                 |
-| left elbow turn     | −1..1 | sine of the elbow angle: ±1 at ±90°, 0 straight or folded       |
-| right elbow turn    | −1..1 | sine of the elbow angle                                         |
-| breath              | −1..1 | a sine in time at `PI.breath.rate`, one per person              |
-
-An arm's travel is the weighted union of its parts, `s + (1 − s) × lift × e` with `s` the
-shoulder's travel, `e` the elbow's and the lift `PI.elbow_lift` (½): an arm is lifted insofar
-as any of it is lifted. A raised shoulder is a full arm whatever the elbow, and with the lift
-under 1 only a raised shoulder reaches 1, so the fixed points stay the shoulders' alone.
+None: every source of the matrix is a measure. A value computed from several measures may be
+made in the instrument while it is tried — a slot has one source and its curve keeps 0 and ±1
+in place (`LIGHT_SYNTH.md`, *Modulation*), so it cannot be made in the slot — and moves into
+the pipeline once liked (`POSE_INSTRUMENT.md`, *The rules of meaning*): the arm travels'
+union, their mean and the shoulders' difference live there (*Measures*).
 
 ## Synth inputs
 
@@ -104,7 +97,7 @@ the interval and blue sits half an interval from white, so the colours tile: eve
 colour, trading blue for white as the shoulders rise. The lines stand still, so a held pose is a
 still picture and every movement of the light is an arm moving. The strobes and the push have no
 source; the legs feed the LFO's level, but the LFO feeds no parameter. Rule 5 yields to rule 4:
-the elbows, the turns, the bend and the legs draw nothing, and which arm is up does not show.
+the elbows, the bend and the legs draw nothing, and which arm is up does not show.
 Each connection added wins rule 5 back one combination at a time, at the price rule 4 allows.
 
 ## Step 1 — the elbows
@@ -181,12 +174,12 @@ show on. The width axis must read the whole arm.
 | Oscillator | Parameter   | Source              | Base | Amount |
 |------------|-------------|---------------------|------|--------|
 | white      | pitch       | left elbow travel   | 10   | 20     |
-| white      | pulse width | arms                | 0    | 1      |
+| white      | pulse width | arms mean           | 0    | 1      |
 | white      | phase       | shoulder difference | 0    | ⅛      |
 | white      | speed       |                     | 0    |        |
 | white      | hardness    |                     | 1    |        |
 | blue       | pitch       | right elbow travel  | 10   | 20     |
-| blue       | pulse width | arms                | 1    | −1     |
+| blue       | pulse width | arms mean           | 1    | −1     |
 | blue       | phase       | shoulder difference | ½    | −⅛     |
 | blue       | speed       |                     | 0    |        |
 | blue       | hardness    |                     | 1    |        |
@@ -208,12 +201,12 @@ and equal amounts.
 | Oscillator | Parameter   | Source              | Base | Amount |
 |------------|-------------|---------------------|------|--------|
 | white      | pitch       | left elbow travel   | 10   | 20     |
-| white      | pulse width | arms                | 0    | 1      |
+| white      | pulse width | arms mean           | 0    | 1      |
 | white      | phase       | shoulder difference | 0    | ⅛      |
 | white      | speed       | body bend           | 0°/s | 15°/s  |
 | white      | hardness    |                     | 1    |        |
 | blue       | pitch       | right elbow travel  | 10   | 20     |
-| blue       | pulse width | arms                | 1    | −1     |
+| blue       | pulse width | arms mean           | 1    | −1     |
 | blue       | phase       | shoulder difference | ½    | −⅛     |
 | blue       | speed       | body bend           | 0°/s | 15°/s  |
 | blue       | hardness    |                     | 1    |        |
@@ -250,4 +243,4 @@ What holds the composition in balance, and what a next connection must keep:
 
 This is the bar a candidate connection is judged against (rule 4): it earns its place by adding
 a dimension of its own, not by doubling an owned one or summing into an owned slot. A connection
-that moves in time, as the breath, changes the last point in kind and is judged as that.
+that moves in time changes the last point in kind and is judged as that.

@@ -14,8 +14,9 @@ import numpy as np
 
 from modules.pose.analytics import SimilarityResult, SimilarityStickyFiller, SimilarityStickyFillerSettings
 from modules.pose.features import (
-    FEATURES, Age, AngleLandmark, AngleMotion, Angles, AngleSymmetry, AngleVelocity, ArmDeviation, Azimuth, BBox,
-    BBoxAzimuth, LeaderScore, LegDeviation, MotionGate, MotionTime, PointLandmark, Points2D, Similarity, TorsoTilt,
+    FEATURES, Age, AngleLandmark, AngleMotion, Angles, AngleSymmetry, AngleVelocity, ArmDeviation, ArmTravel,
+    Azimuth, BBox, BBoxAzimuth, LeaderScore, LegDeviation, MotionGate, MotionTime, PointLandmark, Points2D,
+    ShoulderDifference, Similarity, TorsoTilt,
 )
 from modules.pose.frame import FrameDict
 from modules.pose.nodes import (
@@ -23,13 +24,13 @@ from modules.pose.nodes import (
     AngleMotionExtractor, AngleMotionExtractorSettings, AngleMotionMovingAverageSmoother, AnglePredictor,
     AngleStickyFiller, AngleSymExtractor, AngleVelChaseInterpolator, AngleVelEuroSmoother, AngleVelExtractor,
     AngleVelExtractorSettings, AngleVelPredictor, AngleVelStickyFiller, ArmDeviationExtractor,
-    ArmDeviationExtractorSettings, AzimuthChaseInterpolator,
+    ArmDeviationExtractorSettings, ArmTravelExtractor, ArmTravelExtractorSettings, AzimuthChaseInterpolator,
     AzimuthEuroSmoother, AzimuthExtractor, AzimuthPredictor, ChaseInterpolatorSettings,
     DualConfFilterSettings, EuroSmootherSettings, LeaderScoreApplicator,
     LegDeviationExtractor, LegDeviationExtractorSettings, MotionGateApplicator, MotionTimeExtractor,
     MovingAverageSettings, PointChaseInterpolator, PointDualConfFilter, PointEuroSmoother, PointPredictor,
-    PointStickyFiller, PredictorSettings, SimilarityApplicator, SimilarityChaseInterpolator,
-    SimilarityEuroSmoother, StickyFillerSettings, TorsoTiltExtractor,
+    PointStickyFiller, PredictorSettings, ShoulderDifferenceExtractor, SimilarityApplicator,
+    SimilarityChaseInterpolator, SimilarityEuroSmoother, StickyFillerSettings, TorsoTiltExtractor,
     TorsoTiltExtractorSettings,
 )
 from modules.pose.trackers import FilterPipeline, FilterTracker, InterpolatorPipeline, InterpolatorTracker
@@ -60,6 +61,7 @@ class _Settings:
         self.motion_average = MovingAverageSettings()
         self.leg_deviation = LegDeviationExtractorSettings()
         self.arm_deviation = ArmDeviationExtractorSettings()
+        self.arm_travel = ArmTravelExtractorSettings()
         self.torso_tilt = TorsoTiltExtractorSettings()
         self.similarity_smoother = EuroSmootherSettings()
         self.point_prediction = PredictorSettings()
@@ -108,6 +110,8 @@ class _Stages:
             AngleSymExtractor(ps.leg_deviation),
             LegDeviationExtractor(ps.leg_deviation),
             ArmDeviationExtractor(ps.arm_deviation),
+            ArmTravelExtractor(ps.arm_travel),
+            ShoulderDifferenceExtractor(),
             TorsoTiltExtractor(ps.torso_tilt),
             MotionTimeExtractor(),
             AgeExtractor(),
@@ -136,6 +140,8 @@ class _Stages:
             AngleSymExtractor(ps.leg_deviation),
             LegDeviationExtractor(ps.leg_deviation),
             ArmDeviationExtractor(ps.arm_deviation),
+            ArmTravelExtractor(ps.arm_travel),
+            ShoulderDifferenceExtractor(),
             TorsoTiltExtractor(ps.torso_tilt),
             MotionTimeExtractor(),
             AgeExtractor(),
@@ -253,7 +259,7 @@ class PipelineStagesTest(unittest.TestCase):
 
     def test_smooth_stage_has_every_feature(self) -> None:
         expected = {Points2D, BBox, BBoxAzimuth, Azimuth, Angles, AngleVelocity, AngleMotion, AngleSymmetry, LegDeviation,
-                    ArmDeviation, TorsoTilt, MotionTime, Age, Similarity, LeaderScore}
+                    ArmDeviation, ArmTravel, ShoulderDifference, TorsoTilt, MotionTime, Age, Similarity, LeaderScore}
         _, _, f = list(self._frames('smooth'))[-1]
         self.assertEqual({ft for ft in FEATURES if ft in f}, expected)
 

@@ -49,21 +49,26 @@ def _pose(azimuth_pos: float, sims: dict[int, float] | None = None, left_shoulde
           offset_deg: float = float("nan")) -> FakePose:
     """A fake pose at normalized azimuth ``azimuth_pos`` (0..1) with the arm angles (radians; the
     right shoulder follows the left unless given), leg deviation, body bend, distance, pairwise
-    sims and playhead offset. The arm travel is the angles over π, no dead zones, as the
-    pipeline's extractor gives it with zero zones."""
+    sims and playhead offset. The travels, the arms and the shoulder difference are as the
+    pipeline's extractors give them with zero zones and lift ½ (their own tests are the
+    modules'); the joint travel is the angle over π."""
     angles = np.full(len(features.AngleLandmark), np.nan)
     angles[features.AngleLandmark.left_shoulder] = left_shoulder
     angles[features.AngleLandmark.right_shoulder] = left_shoulder if right_shoulder is None else right_shoulder
     angles[features.AngleLandmark.left_elbow] = left_elbow
     angles[features.AngleLandmark.right_elbow] = right_elbow
-    travel = angles[:len(features.TravelElement)] / math.pi
+    joints = angles[:4] / math.pi
+    magnitude = np.abs(joints)
+    arm = magnitude[:2] + (1.0 - magnitude[:2]) * 0.5 * magnitude[2:]
+    travel = np.concatenate([joints, arm, [arm.mean()]])
+    difference = magnitude[0] - magnitude[1]
     sim_values = np.full(16, np.nan)
     for j, v in (sims or {}).items():
         sim_values[j] = v
     return FakePose({
         features.Azimuth: SimpleNamespace(value=azimuth_pos * math.tau),
-        features.Angles: SimpleNamespace(values=angles),
         features.ArmTravel: SimpleNamespace(values=travel),
+        features.ShoulderDifference: SimpleNamespace(value=difference),
         features.AngleSymmetry: SimpleNamespace(values=np.full(len(features.SymmetryElement), np.nan)),
         features.Similarity: SimpleNamespace(values=sim_values),
         features.LegDeviation: SimpleNamespace(value=legs),
@@ -181,9 +186,6 @@ class PoseInstrumentTest(unittest.TestCase):
         white, blue = self._connect(_pose(0.5, left_elbow=shoulder(1.0)))            # hanging, the left hand folded in
         self.assertAlmostEqual(white[Parameter.PULSE_WIDTH], 0.25, places=5)         # lift ½: half an arm, the mean
         self.assertAlmostEqual(blue[Parameter.PULSE_WIDTH], 0.25, places=5)
-        self.cfg.elbow_lift = 0.0                                                    # no lift: the shoulders alone
-        white, _ = self._connect(_pose(0.5, left_elbow=shoulder(1.0)))
-        self.assertAlmostEqual(white[Parameter.PULSE_WIDTH], 0.0, places=5)
 
     def test_folded_elbows_draw_from_hanging_arms(self) -> None:
         self.cfg.white_lines.pitch_amount = self.cfg.blue_lines.pitch_amount = 25.7
@@ -214,11 +216,11 @@ class PoseInstrumentTest(unittest.TestCase):
         self._render()
         self.assertEqual(self.layer._players[0].distance, 1.0)              # no reading: the last one holds
 
-    def test_the_turns_and_the_legs_play_nothing_yet(self) -> None:
+    def test_the_folds_sign_and_the_legs_play_nothing(self) -> None:
         self.cfg.white_lines.pitch_amount = self.cfg.blue_lines.pitch_amount = 25.7
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, left_elbow=math.radians(90.0))})
         first = self._render().light_img.copy()
-        for moved in (dict(left_elbow=math.radians(-90.0)),                  # the turn's sign: the same fold
+        for moved in (dict(left_elbow=math.radians(-90.0)),                  # the fold's sign: the same fold
                       dict(left_elbow=math.radians(90.0), legs=1.0)):
             self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, **moved)})
             np.testing.assert_array_equal(self._render().light_img, first, err_msg=str(moved))

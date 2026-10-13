@@ -451,7 +451,8 @@
       "shoulder_neutral_dead_zone": 10.0,
       "shoulder_raised_dead_zone": 10.0,
       "elbow_neutral_dead_zone": 10.0,
-      "elbow_folded_dead_zone": 10.0
+      "elbow_folded_dead_zone": 10.0,
+      "elbow_lift": 0.5
     },
     "torso_tilt_extractor": {
       "neutral_dead_zone": 6.0,
@@ -874,7 +875,6 @@
   "PI": {
     "max_lines": 90,
     "opposite": "OFF",
-    "elbow_lift": 0.5,
     "on_at": 0.98,
     "off_at": 0.93,
     "mask": {
@@ -921,10 +921,6 @@
       "bypass": false,
       "attack_seconds": 2.0,
       "release_seconds": 2.0
-    },
-    "breath": {
-      "rate": 0.5,
-      "depth": 0.4
     },
     "white_lines": {
       "enabled": true,

@@ -9,6 +9,7 @@ from .AngleMotion import    AngleMotion
 from .AngleSymmetry import  AngleSymmetry, SymmetryElement
 from .ArmDeviation import   ArmDeviation
 from .ArmTravel import      ArmTravel, TravelElement
+from .ShoulderDifference import ShoulderDifference
 from .Similarity import     Similarity
 from .LeaderScore import    LeaderScore
 from .MotionGate import     MotionGate
@@ -24,7 +25,7 @@ from .TorsoTilt import      TorsoTilt
 FEATURES: list[type[BaseFeature]] = [
     Age, AngleMotion, Angles, AngleSymmetry, AngleVelocity, ArmDeviation, ArmTravel,
     Azimuth, BBox, BBoxAzimuth, Distance, LeaderScore, LegDeviation, MotionGate, MotionTime, Points2D,
-    Similarity, TorsoTilt,
+    ShoulderDifference, Similarity, TorsoTilt,
 ]
 
 Feature: type[IntEnum] = IntEnum('Feature', {cls.__name__: i for i, cls in enumerate(FEATURES, 1)})  # type: ignore[misc]

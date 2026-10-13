@@ -1,5 +1,5 @@
 """Tests for ArmTravelExtractor — each arm joint's signed position along its travel, through the dead
-zones at both ends."""
+zones at both ends, and each whole arm, the weighted union of its joints' magnitudes."""
 
 import math
 import unittest
@@ -84,6 +84,41 @@ class ArmTravelExtractorTest(unittest.TestCase):
         out = ArmTravelExtractor(_settings()).process(_frame())
         self.assertNotIn(ArmTravel, out)
         self.assertTrue(np.all(np.isnan(out[ArmTravel].values)))
+
+    # -- the whole arms --
+
+    def _arms(self, frame: Frame, lift: float = 0.5) -> ArmTravel:
+        cfg = _settings(neutral=0.0, far=0.0)                      # zero zones: a magnitude is its angle over π
+        cfg.elbow_lift = lift
+        return ArmTravelExtractor(cfg).process(frame)[ArmTravel]
+
+    def test_an_arm_is_the_weighted_union_of_its_joints(self) -> None:
+        out = self._arms(_frame(left_shoulder=45.0, left_elbow=90.0, right_shoulder=0.0, right_elbow=0.0))
+        self.assertAlmostEqual(float(out.values[TravelElement.left_arm]), 0.4375, places=5)   # s + (1−s)·lift·e at lift ½
+        self.assertAlmostEqual(float(out.values[TravelElement.right_arm]), 0.0, places=5)
+        self.assertAlmostEqual(float(out.values[TravelElement.arms_mean]), 0.4375 / 2, places=5)   # the mean of the two
+
+    def test_without_the_lift_an_arm_is_its_shoulder(self) -> None:
+        out = self._arms(_frame(left_shoulder=45.0, left_elbow=90.0), lift=0.0)
+        self.assertAlmostEqual(float(out.values[TravelElement.left_arm]), 0.25, places=5)
+
+    def test_a_raised_shoulder_is_a_full_arm_whatever_the_elbow(self) -> None:
+        out = self._arms(_frame(left_shoulder=180.0, left_elbow=30.0))
+        self.assertAlmostEqual(float(out.values[TravelElement.left_arm]), 1.0, places=5)
+
+    def test_the_arms_are_unsigned_whatever_side_the_joints_pass(self) -> None:
+        out = self._arms(_frame(left_shoulder=-90.0, left_elbow=-90.0))
+        self.assertAlmostEqual(float(out.values[TravelElement.left_shoulder]), -0.5, places=5)   # the joint keeps its sign
+        self.assertAlmostEqual(float(out.values[TravelElement.left_arm]), 0.625, places=5)       # the arm takes the magnitudes
+
+    def test_a_missing_joint_nans_its_arm_and_the_mean(self) -> None:
+        out = self._arms(_frame(left_shoulder=90.0, left_elbow=90.0, right_shoulder=90.0))   # the right elbow is missing
+        self.assertAlmostEqual(float(out.values[TravelElement.left_arm]), 0.625, places=5)
+        self.assertTrue(math.isnan(float(out.values[TravelElement.right_arm])))
+        self.assertTrue(math.isnan(float(out.values[TravelElement.arms_mean])))
+        self.assertEqual(float(out.scores[TravelElement.left_arm]), 1.0)
+        self.assertEqual(float(out.scores[TravelElement.right_arm]), 0.0)
+        self.assertEqual(float(out.scores[TravelElement.arms_mean]), 0.0)
 
 
 if __name__ == "__main__":

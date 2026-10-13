@@ -6,7 +6,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 
 from modules.inout import OscSound as BaseOscSound, OscSoundSettings
 from modules.pose.frame import Frame as PoseFrame, FrameDict
-from modules.pose.features import Azimuth, Distance, Angles, ArmTravel, TravelElement
+from modules.pose.features import Azimuth, Distance, Angles, ArmTravel, TravelElement, ShoulderDifference
 from modules.session import SequencerState
 from ..light import Frame
 from ..pose import GhostElement, GhostFeature, PlayheadOffset
@@ -29,9 +29,12 @@ class OscSoundSender(BaseOscSound):
     side, counter-clockwise from there) it is 0 and Max needs no constant at all — see
     ``docs/CALIBRATION.md``. Radians on the wire, like every other azimuth here.
 
-    The four arm entries of ``/pose/{id}/angle/rad`` carry the arm travel times π
+    The four arm entries of ``/pose/{id}/angle/rad`` carry the joints' travel times π
     (``ArmTravel``: the calibrated angle through the pipeline's dead zones), so Max's absolute
     over π reads the value the light reads; the other entries are the angles (``docs/SOUND.md``).
+    ``/pose/{id}/arm`` carries the whole arms — left and right, each the union of its shoulder's
+    and its elbow's travel, and their mean — and ``/pose/{id}/shoulder/difference`` the
+    shoulders' signed travel difference: the pipeline's values, the same ones the light plays.
 
     Also owns the id-slot count: it sends ``max_players`` live slots plus ``virtual_players``
     ghost slots (ids Ghoster injects beyond the tracked players). It overrides the base's
@@ -112,15 +115,29 @@ class OscSoundSender(BaseOscSound):
         bundle_builder.add_content(speaker_msg.build())  # type: ignore
 
     def _angle_values(self, frame: PoseFrame) -> list[float]:
-        """The angles, the four arm entries replaced by the travel × π (see the class doc)."""
+        """The angles, the four arm entries replaced by the joints' travel × π (see the class doc)."""
         values = frame[Angles].values.astype(np.float64)
         if ArmTravel in frame:
-            values[:len(TravelElement)] = frame[ArmTravel].values * math.pi
+            values[:TravelElement.left_arm] = frame[ArmTravel].values[:TravelElement.left_arm] * math.pi
         return values.tolist()
 
     def _add_active_frame_messages(self, bundle_builder: OscBundleBuilder, frame: PoseFrame, frames: FrameDict, num_players: int) -> None:
         super()._add_active_frame_messages(bundle_builder, frame, frames, num_players)
         id: int = frame.track_id
+
+        # range [0, 1] - the whole arms: left, right (each the union of its shoulder's and its
+        # elbow's travel) and their mean
+        arm_values = frame[ArmTravel].values[TravelElement.left_arm:] if ArmTravel in frame else (0.0, 0.0, 0.0)
+        arm_msg = OscMessageBuilder(address=f"/pose/{id}/arm")
+        for value in arm_values:
+            arm_msg.add_arg(float(value), OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(arm_msg.build())  # type: ignore
+
+        # range [-1, 1] - the shoulders' signed travel difference, left less right: the higher arm
+        difference: float = frame[ShoulderDifference].value if ShoulderDifference in frame else 0.0
+        difference_msg = OscMessageBuilder(address=f"/pose/{id}/shoulder/difference")
+        difference_msg.add_arg(float(difference), OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(difference_msg.build())  # type: ignore
 
         azimuth: float = frame[Azimuth].value if Azimuth in frame else np.nan
         azimuth_msg = OscMessageBuilder(address=f"/pose/{id}/azimuth")
@@ -146,7 +163,12 @@ class OscSoundSender(BaseOscSound):
 
     def _add_inactive_frame_messages(self, bundle_builder: OscBundleBuilder, id: int, num_players: int) -> None:
         super()._add_inactive_frame_messages(bundle_builder, id, num_players)
-        for address in (f"/pose/{id}/azimuth", f"/pose/{id}/distance", f"/pose/{id}/playhead/offset", f"/pose/{id}/playhead/fade"):
+        arm_msg = OscMessageBuilder(address=f"/pose/{id}/arm")
+        for _ in range(3):
+            arm_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(arm_msg.build())  # type: ignore
+        for address in (f"/pose/{id}/shoulder/difference", f"/pose/{id}/azimuth", f"/pose/{id}/distance",
+                        f"/pose/{id}/playhead/offset", f"/pose/{id}/playhead/fade"):
             msg = OscMessageBuilder(address=address)
             msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
             bundle_builder.add_content(msg.build())  # type: ignore
