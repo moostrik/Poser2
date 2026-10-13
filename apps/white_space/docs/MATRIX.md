@@ -220,3 +220,10 @@ lines a quarter interval at ±90° and holds them where they are.
   their bases and the push scaled at once, the elbows still choosing each colour's direction.
   Signed, base 1 and amount 1: a lean one way slows the lines to a standstill, the other way
   doubles them. A new parameter of the synth (`LIGHT_SYNTH.md`, *Distance and time*: the clock).
+- The spread, a relation knob of the voice: one parameter with a slot of its own, added half to
+  white's phase and half, negated, to blue's after their slots. Its source merges the colours
+  from tiled (anti-phase) to stacked (in phase, the overlap tone with dark between) and back,
+  without touching what the phase slots say. A new parameter of the synth.
+- The slide, the spread's sibling: the same shape added equally to both phases, so the whole
+  pattern is pushed out of the person or drawn in, springing back — a displacement, bounded
+  under one interval since a phase wraps. A new parameter of the synth.

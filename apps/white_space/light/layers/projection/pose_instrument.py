@@ -164,6 +164,7 @@ class PoseInstrumentSettings(BaseSettings):
     zones are the pipeline's."""
     max_lines:    Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
     opposite:     Field[Opposite] = Field(Opposite.OFF, widget=Widget.select, description="Draw each person's lines at them, half a turn away, or both (the copies win the overlap); the masks stay on the people")
+    lean_share:   Field[float] = Field(2.0, min=0.0, max=4.0, step=0.05, widget=KNOB, label="Lean Share", description="How far a lean hands the arms' pull to one colour: 0 off, 1 all of it at full lean, above overshooting")
     on_at:        Field[float] = Field(0.95, min=0.0, max=1.0, step=0.01, widget=KNOB, label="On At",  description="Full sync comes on when every pair reads at least this", row_label="Sync", newline=True)
     off_at:       Field[float] = Field(0.90, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Off At", description="Full sync goes off when any pair falls below this")
     mask:         Group[MaskSettings]           = Group(MaskSettings)
@@ -401,7 +402,7 @@ class PoseInstrument(ProjectionLayer):
         amounts, the range and the direction, are the ``PI.white_lines`` / ``PI.blue_lines``
         settings.
 
-        The arms are ``docs/MATRIX_V2.md``'s Step 4:
+        The arms are ``docs/MATRIX_V2.md``'s Step 5:
 
         - the arms' mean, of the two arm travels: both pulse widths (white's base 0 and amount
           1, blue's base 1 and amount −1: arms hanging is full blue, arms raised full white,
@@ -410,12 +411,15 @@ class PoseInstrument(ProjectionLayer):
           shoulders down, and a raised shoulder is a full arm whatever the elbow
         - each elbow its own colour's pitch, the left the white and the right the blue: folding an
           elbow makes its colour's lines finer; equal elbows keep the colours in tune
-        - the shoulders' difference, signed, left less right: both phases, the amounts opposite
-          (white +⅛, blue −⅛), so the left higher pulls the colours a quarter interval closer one
-          way and the right higher the other; level shoulders leave them half an interval apart
-        - the body bend, signed: both speeds, base 0 and equal amounts. The oscillators are
-          mirrored, so a lean flows the pattern out of the person or into them, one way per lean
-          side, and a straight body leaves the lines standing
+        - the shoulders' pull, shared by the body bend: each colour's phase takes its share,
+          ``difference × (1 ± share × bend) / 2`` (white +, blue −, clamped to a source's −1..1;
+          the share ``PI.lean_share``), the amounts opposite (white +¼, blue −¼). The arms alone
+          say how far the colours pull together — the relative pull is the difference's, a
+          quarter interval at full, whatever the bend — and the lean says which colour carries
+          it: upright both concede equally, leaned one colour stands on its grid and the other
+          walks. At share 1 a full lean hands over exactly the whole pull; above it the carrying
+          colour overshoots the meeting and the pair stretches open again, the clamp a
+          standstill, not a jump. A lean with level arms says nothing
 
         Every other parameter sits at its base; connections are added one at a time, each earning
         its place under the matrix's rule 4.
@@ -425,19 +429,21 @@ class PoseInstrument(ProjectionLayer):
         lift ``pose.arm_travel_extractor.elbow_lift``), the elbows' travel with its absolute
         taken since the sign is the side of the body the limb passes, which the design gives no
         meaning; the body bend from ``pose.torso_tilt_extractor``. The sound reads the same
-        values (``docs/SOUND.md``).
+        values (``docs/SOUND.md``). The pulls are computed here while the matrix is tried; once
+        liked they move into the pipeline.
         """
+        skew = self._instrument.lean_share * p.body_bend
+        white_pull = min(1.0, max(-1.0, p.shoulder_difference * (1.0 + skew) / 2.0))
+        blue_pull  = min(1.0, max(-1.0, p.shoulder_difference * (1.0 - skew) / 2.0))
         white: Sources = {
             Parameter.PULSE_WIDTH: p.arms_mean,
             Parameter.PITCH:       p.left_elbow_travel,
-            Parameter.PHASE:       p.shoulder_difference,
-            Parameter.SPEED:       p.body_bend,
+            Parameter.PHASE:       white_pull,
         }
         blue: Sources = {
             Parameter.PULSE_WIDTH: p.arms_mean,
             Parameter.PITCH:       p.right_elbow_travel,
-            Parameter.PHASE:       p.shoulder_difference,
-            Parameter.SPEED:       p.body_bend,
+            Parameter.PHASE:       blue_pull,
         }
         return white, blue
 

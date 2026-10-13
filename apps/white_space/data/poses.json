@@ -120,6 +120,28 @@
     "left_knee": 8.0,
     "right_knee": 8.0
   },
+  "left arm up, leaning left": {
+    "torso": -45.0,
+    "left_shoulder": -170.0,
+    "right_shoulder": -20.0,
+    "left_elbow": -14.0,
+    "right_elbow": 12.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "left arm up, leaning right": {
+    "torso": 45.0,
+    "left_shoulder": -170.0,
+    "right_shoulder": -20.0,
+    "left_elbow": -14.0,
+    "right_elbow": 12.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
   "a T, in a crouch": {
     "torso": 0.0,
     "left_shoulder": -95.0,

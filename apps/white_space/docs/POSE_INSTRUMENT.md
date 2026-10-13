@@ -150,7 +150,7 @@ measure that is not of the body's pose.
 | left elbow          | primary   | the white: its fold lifts the arm and is the pitch              |
 | right elbow         | primary   | the blue: its fold lifts the arm and is the pitch               |
 | leg deviation       | secondary | open                                                            |
-| body bend           | secondary | the flow: the lines travel by the lean and stand without it     |
+| body bend           | secondary | who yields: the lean hands the arms' pull to one colour         |
 | distance            | secondary | open                                                            |
 | elbow symmetry      | secondary | open: it shows unconnected, as the colours in or out of tune    |
 
@@ -192,8 +192,10 @@ not described.
 | a T, both elbows folded                     | the T's tiling, finer and whiter, white and blue still in tune   |
 | a T, left elbow folded                      | the white finer, the wall whiter: the colours slide apart        |
 | a T, right elbow folded                     | the blue finer, the wall whiter: the colours slide apart         |
-| a T, leaning left                           | the T, the whole pattern flowing one way: out of the person or in |
-| a T, leaning right                          | the T, flowing the other way (which lean is outward: on the dummy) |
+| a T, leaning left                           | the T, unchanged: a lean alone plays nothing                     |
+| a T, leaning right                          | the T, unchanged                                                 |
+| left arm up, leaning left                   | the pulled pair carried by one colour: it walks the whole pull   |
+| left arm up, leaning right                  | the same pull carried by the other colour                        |
 | a T, in a crouch                            | the T: the legs play nothing                                     |
 | \|__ (a T, the right forearm turned 90°)    | the blue finer against the white: a standing moiré               |
 | \_\_\| (a T, the left forearm turned 90°)   | the white finer against the blue: a standing moiré               |
@@ -277,7 +279,7 @@ A **connection** is one measure as the source in one parameter's slot (`LIGHT_SY
 the range and the direction. A measure may feed several parameters; a slot has one source; two
 measures never sum into one parameter.
 
-The arms are `MATRIX_V2.md`'s Step 4, rebuilt one connection at a time under its rule 4: keep
+The arms are `MATRIX_V2.md`'s Step 5, rebuilt one connection at a time under its rule 4: keep
 the visualisation as simple as possible. The bases and amounts are the preset's:
 
 | Source              | Range | Parameter         | Base | Amount     | At full                                         |
@@ -286,20 +288,19 @@ the visualisation as simple as possible. The bases and amounts are the preset's:
 | arms mean           | 0..1  | blue pulse width  | 1    | −1         | no blue                                         |
 | left elbow travel   | 0..1  | white pitch       | 10   | 20 lines   | 30 lines, one every 12°: finer as the arm folds |
 | right elbow travel  | 0..1  | blue pitch        | 10   | 20 lines   | 30 lines                                        |
-| shoulder difference | −1..1 | white phase       | 0    | ⅛ interval | the colours a quarter interval closer, the left higher one way, the right the other |
-| shoulder difference | −1..1 | blue phase        | ½    | −⅛ interval | as white's                                     |
-| body bend           | −1..1 | white speed       | 0°/s | 15°/s      | the lines flowing out of the person, or in      |
-| body bend           | −1..1 | blue speed        | 0°/s | 15°/s      | as white's                                      |
+| white pull          | −1..1 | white phase       | 0    | ¼ interval | white walks the whole pull alone                |
+| blue pull           | −1..1 | blue phase        | ½    | −¼ interval | blue walks it alone                            |
 | leg deviation       | 0..1  | the LFO's level   | 0    | 1          | the LFO at full swing; the LFO feeds nothing    |
 
 The arms' mean is both widths: an arm's travel is the weighted union of its shoulder's and its
 elbow's (the lift `pose.arm_travel_extractor.elbow_lift`; *The body*), so folded elbows draw with
-the shoulders down and a raised shoulder is a full arm. The shoulders' difference is both phases, so
-which arm is the higher shows; each elbow plays its own colour's pitch, the left the white and
-the right the blue. The body bend is both speeds, their bases 0: a straight body leaves the
-lines standing, and a lean flows the mirrored pattern out of the person or into them, one way
-per lean side. Unconnected: the hardness, the strobes, the LFO's output, the symmetries, the
-distance.
+the shoulders down and a raised shoulder is a full arm. Each elbow plays its own colour's pitch,
+the left the white and the right the blue. The pulls split the shoulders' pull between the
+colours (`MATRIX_V2.md`, *Made sources*): uneven arms pull white and blue a quarter interval
+together at full, and the body bend says which colour carries it — upright both concede equally,
+leaned one stands on its grid and the other walks, the share (`PI.lean_share`) setting how far
+a lean hands it over; a lean with level arms says nothing. Unconnected: the speeds, the
+hardness, the strobes, the LFO's output, the symmetries, the distance.
 
 ## Events
 
@@ -329,9 +330,10 @@ What follows from the connections, before the machine has been judged **(deducti
   sits half an interval from white, so every pixel is one colour, from full blue through the T
   to full white, trading blue for white as the arms rise — the folds lift the widths too, so the
   tiling holds at every arm value.
-- A straight body leaves the picture still, so every movement of a held pose is the body's: a
-  lean flows the whole pattern out of the person or into them, both colours together, and
-  upright the lines stand.
+- Nothing moves in time, so a held pose — a held lean included — is a still picture, and every
+  movement of the light is the body's, one to one.
+- A lean speaks only while the arms are uneven: it slides the pulled-together pair toward one
+  colour's grid or the other's, and with level arms it draws nothing, having no pull to share.
 - Equal elbows keep white and blue sharing one interval, in tune; unequal elbows slide the
   colours past each other with distance, a standing moiré, so the elbows' symmetry shows without
   a connection of its own (`LIGHT_SYNTH.md`, *In the pose instrument*).
@@ -493,6 +495,7 @@ tuned together, knobs throughout:
 |-------------------------------|-----------------------------------------------------------------|
 | `max_lines`                   | the visual limit: the pitch ceiling                             |
 | `opposite`                    | draw the patterns at their people, half a turn away, or both (the copies winning) |
+| `lean_share`                  | how far a lean hands the arms' pull to one colour (*The connections*) |
 | `mask`                        | the mask's width, white and blue; the border's; the flash's levels, release |
 | `playhead`                    | the marker's width, white and blue; its level inside a mask     |
 | `window`                      | shape: taper, attack, release, their curves, the cap; reach: width, bypass; the scale, the crowd factor and the overlap |
@@ -552,14 +555,14 @@ bridge in `test_pose_instrument.py`; the dummy in `test_dummy.py`.
 
 ### The pose results now
 
-Step 4's rows of *Pose results* draw what that table says, in the unit tests
+Step 5's rows of *Pose results* draw what that table says, in the unit tests
 (`tests/test_pose_instrument.py`: the two fixed points, one shoulder moving both colours, level
-shoulders tiling, a held upright pose still over many ticks, left and right up drawn
+shoulders tiling, a held pose — lean included — still over many ticks, left and right up drawn
 differently with the phases pulled opposite ways, an elbow making its own colour finer, equal
-elbows in tune, a folded elbow lifting its arm and folded elbows drawing from hanging arms, a
-straight body standing still while a lean flows the lines, the fold's sign and the legs drawing
-nothing, and a small move of a shoulder or an elbow a small change of the picture). The rows
-beyond Step 4 wait on their connections (`MATRIX_V2.md`).
+elbows in tune, a folded elbow lifting its arm and folded elbows drawing from hanging arms, the
+pull shared upright and handed to one colour by the lean, a lean alone playing nothing, the
+fold's sign and the legs drawing nothing, and a small move of a shoulder or an elbow a small
+change of the picture). The rows beyond Step 5 wait on their connections (`MATRIX_V2.md`).
 
 ### The dummy
 

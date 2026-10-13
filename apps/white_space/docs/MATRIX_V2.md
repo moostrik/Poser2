@@ -46,11 +46,20 @@ The similarity is not a matrix source: it drives sync, the reach toward a partne
 
 ## Made sources
 
-None: every source of the matrix is a measure. A value computed from several measures may be
-made in the instrument while it is tried — a slot has one source and its curve keeps 0 and ±1
-in place (`LIGHT_SYNTH.md`, *Modulation*), so it cannot be made in the slot — and moves into
-the pipeline once liked (`POSE_INSTRUMENT.md`, *The rules of meaning*): the arm travels'
-union, their mean and the shoulders' difference live there (*Measures*).
+What the instrument makes from the measures before the slot, while it is tried. A slot has one
+source and its curve keeps 0 and ±1 in place (`LIGHT_SYNTH.md`, *Modulation*), so a value
+computed from several measures cannot be made in the slot; once liked it moves into the pipeline
+(`POSE_INSTRUMENT.md`, *The rules of meaning*) — the arm travels' union, their mean and the
+shoulders' difference already live there (*Measures*).
+
+| Source     | Range | What it is                                                              |
+|------------|-------|--------------------------------------------------------------------------|
+| white pull | −1..1 | white's share of the shoulders' pull: `difference × (1 + share × bend) / 2`, clamped |
+| blue pull  | −1..1 | blue's share: `difference × (1 − share × bend) / 2`, clamped            |
+
+The share (`PI.lean_share`, 2) scales the handover: at 1 a full lean hands over exactly the
+whole pull; above it the carrying colour overshoots the meeting and the pair stretches open
+again, the clamp a standstill, not a jump.
 
 ## Synth inputs
 
@@ -193,10 +202,9 @@ reads the whole arm at rest; a raised shoulder is a full arm whatever its elbow,
 exact, and with the lift under 1 it stays the only way there. The phases remain the
 shoulders': which arm is the higher is a statement of the shoulders alone.
 
-## Step 4 — the body bend
+## Step 4 — the body bend on the speeds
 
-The wired matrix (`PoseInstrument.connect`): Step 3 with the body bend on both speeds, base 0
-and equal amounts.
+Step 3 with the body bend on both speeds, base 0 and equal amounts.
 
 | Oscillator | Parameter   | Source              | Base | Amount |
 |------------|-------------|---------------------|------|--------|
@@ -220,6 +228,40 @@ its dead zone and is continuous to full lean, so the fixed points stay still and
 (rules 1–3). One measure into both speeds with one amount keeps the mirror symmetry; the
 amounts are the knobs if the colours should ever counter-flow.
 
+## Step 5 — the bend shares the pull
+
+The wired matrix (`PoseInstrument.connect`): Step 3 with the shoulders' pull shared by the body
+bend. The bend leaves the speeds: a flowing pattern moves without the body moving, which read
+as the instrument's motion, not the person's **(site fact)** — the constraint any motion
+connection must answer.
+
+| Oscillator | Parameter   | Source             | Base | Amount |
+|------------|-------------|--------------------|------|--------|
+| white      | pitch       | left elbow travel  | 10   | 20     |
+| white      | pulse width | arms mean          | 0    | 1      |
+| white      | phase       | white pull         | 0    | ¼      |
+| white      | speed       |                    | 0    |        |
+| white      | hardness    |                    | 1    |        |
+| blue       | pitch       | right elbow travel | 10   | 20     |
+| blue       | pulse width | arms mean          | 1    | −1     |
+| blue       | phase       | blue pull          | ½    | −¼     |
+| blue       | speed       |                    | 0    |        |
+| blue       | hardness    |                    | 1    |        |
+
+The difference is the tension between the colours; the bend is who gives in. The pulls split
+the shoulders' pull between the colours: upright each is `difference / 2`, so the picture is
+Step 3's exactly — both colours concede equally and meet in the middle, ⅛ interval each at full
+difference. Leaning hands the walk to one colour: at full lean one stands on its home grid and
+the other walks the whole way. The relative pull is the difference's alone, a quarter interval
+at full whatever the bend — the arms say how far the colours merge, the lean only on whose
+ground they meet.
+
+The bend is a secondary measure (`POSE_INSTRUMENT.md`, *What each measure means*): it modulates
+a note that is already sounding and has no voice of its own — a lean with level arms draws
+nothing, since there is no pull to share. Both pulls are 0 at the fixed points and continuous
+everywhere, and nothing moves in time, so rules 1–3 hold and a held pose, lean included, is a
+still picture.
+
 ## Balance
 
 What holds the composition in balance, and what a next connection must keep:
@@ -228,18 +270,18 @@ What holds the composition in balance, and what a next connection must keep:
   interval: a colour grows only by the other's loss, and the total light holds along the whole
   neutral–raised path. White and blue are the two ends of one axis, not two competing voices.
 - **One owner per dimension.** The arms own how much of each colour, the shoulder difference
-  where the colours sit against each other, each elbow how fine its own colour, the body bend
-  how the picture flows. No slot is shared, and each parameter does one visible thing
-  (`LIGHT_SYNTH.md`, *The rules*). The elbow serves two dimensions as part and whole: through
-  its arm it lifts, on its own it refines — the whole arm says how much, its elbow says how
-  fine.
+  how far the colours pull together, the body bend which colour carries the pull, each elbow
+  how fine its own colour. No slot is shared, and each parameter does one visible thing
+  (`LIGHT_SYNTH.md`, *The rules*). Two hierarchies run through it, whole over part: the arm
+  says how much, its elbow how fine; the arms say how far the colours merge, the trunk on whose
+  ground they meet.
 - **The patch is mirror-symmetric.** Swap left and right in the body and white and blue in the
-  light and the matrix maps onto itself: the pitches are mirror-wired, the widths, the phases
-  and the speeds each take one source. The arms are counterweights; neither is the louder.
-- **Everything rests at the anchors, and nothing moves in the instrument's own time.** Every
-  source is 0 at the fixed points, and no source moves in time, so the picture hangs from the
-  two poses of rest and every movement on the wall is the body's — a held lean included: the
-  flow it sustains is the bend's value, not a clock of the instrument's.
+  light and the matrix maps onto itself: the pitches are mirror-wired, the widths take one
+  source, and the pulls swap with the colours. The arms are counterweights; neither is the
+  louder.
+- **Everything rests at the anchors, and nothing moves in time.** Every source is 0 at the
+  fixed points, and none moves by itself, so the picture hangs from the two poses of rest and
+  every movement on the wall is the body's, one to one.
 
 This is the bar a candidate connection is judged against (rule 4): it earns its place by adding
 a dimension of its own, not by doubling an owned one or summing into an owned slot. A connection

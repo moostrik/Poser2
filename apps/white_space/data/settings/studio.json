@@ -151,9 +151,9 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": -32000,
-      "y": -32000,
-      "width": 2558,
+      "x": 2561,
+      "y": 31,
+      "width": 1278,
       "height": 2080,
       "secondary_list": [],
       "secondary_fullscreen": true,
@@ -208,7 +208,7 @@
     },
     "osc_sound_sender": {
       "stage": "LERP",
-      "volume": 0.47,
+      "volume": 0.93,
       "speaker_offset": 0.0,
       "ip_addresses": "192.168.1.40",
       "port": 8000
@@ -377,7 +377,7 @@
         "VIDEO"
       ],
       "apply_warp": false,
-      "folder": "20260924-203306_2_person",
+      "folder": "20260924-184100_2_person",
       "sim_passthrough": false,
       "start_norm": 0.0,
       "end_norm": 1.0
@@ -636,7 +636,7 @@
   },
   "light": {
     "brightness": 1.0,
-    "debug": "pose_instrument",
+    "debug": "OFF",
     "motor_simulate": true,
     "clock": {},
     "motor": {
@@ -934,7 +934,7 @@
       "pulse_width_curve": "LINEAR",
       "pulse_width_bypass": false,
       "phase": 0.0,
-      "phase_amount": 0.125,
+      "phase_amount": 0.25,
       "phase_curve": "LINEAR",
       "phase_bypass": false,
       "speed": 0.0,
@@ -960,7 +960,7 @@
       "pulse_width_curve": "LINEAR",
       "pulse_width_bypass": false,
       "phase": 0.5,
-      "phase_amount": -0.125,
+      "phase_amount": -0.25,
       "phase_curve": "LINEAR",
       "phase_bypass": false,
       "speed": 0.0,
@@ -1027,18 +1027,18 @@
       "left_shoulder": -95.0,
       "right_shoulder": -95.0,
       "left_elbow": -1.0,
-      "right_elbow": 90.0,
+      "right_elbow": -1.0,
       "left_hip": -10.0,
       "right_hip": -9.0,
       "left_knee": 8.0,
       "right_knee": 8.0,
       "morph": 1.2,
-      "pose": "|__",
+      "pose": "arms out level, a T",
       "name": "|_|"
     }
   },
   "states": {
-    "blackout": true,
+    "blackout": false,
     "spin_up_seconds": 14.0,
     "off_idle_bars": 2.0,
     "intro_idle_bars": 2.0,
@@ -1047,8 +1047,8 @@
     "min_players": 3,
     "sync": {},
     "manual": {
-      "select": "INTRO",
-      "hold": false
+      "select": "PLAY",
+      "hold": true
     },
     "session": {
       "enabled": false,

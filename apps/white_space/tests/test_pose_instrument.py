@@ -168,19 +168,19 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertAlmostEqual(white[Parameter.PITCH], 0.5, places=5)                # the left elbow: the white
         self.assertAlmostEqual(blue[Parameter.PITCH], 1.0, places=5)                 # the right elbow: the blue
         self.assertEqual(set(white) | set(blue),
-                         {Parameter.PULSE_WIDTH, Parameter.PITCH, Parameter.PHASE, Parameter.SPEED})   # nothing else wired
+                         {Parameter.PULSE_WIDTH, Parameter.PITCH, Parameter.PHASE})   # nothing else wired
 
-    def test_the_body_bend_is_both_speeds_as_it_comes(self) -> None:
-        for bend in (-1.0, 0.0, 0.4):
-            white, blue = self._connect(_pose(0.5, tilt=bend, left_elbow=math.radians(30.0)))
-            self.assertAlmostEqual(white[Parameter.SPEED], bend, places=5, msg=f"bend {bend}")
-            self.assertAlmostEqual(blue[Parameter.SPEED], bend, places=5)            # one source, both colours alike
-
-    def test_the_shoulder_difference_is_both_phases_signed(self) -> None:
-        for left, right, diff in ((1.0, 0.0, 1.0), (0.0, 1.0, -1.0), (0.5, 0.5, 0.0)):
-            white, blue = self._connect(_pose(0.5, left_shoulder=shoulder(left), right_shoulder=shoulder(right)))
-            self.assertAlmostEqual(white[Parameter.PHASE], diff, places=5, msg=f"{left}, {right}")
-            self.assertAlmostEqual(blue[Parameter.PHASE], diff, places=5)            # one source; the amounts invert
+    def test_the_pull_is_shared_upright_and_handed_by_the_lean(self) -> None:
+        self.cfg.lean_share = 1.0                                       # a full lean hands exactly the whole pull
+        for left, right, bend, w, b in ((1.0, 0.0, 0.0, 0.5, 0.5),      # upright: both concede equally
+                                        (1.0, 0.0, 1.0, 1.0, 0.0),      # leaned: white walks alone
+                                        (1.0, 0.0, -1.0, 0.0, 1.0),     # the other way: blue walks alone
+                                        (0.0, 1.0, 0.0, -0.5, -0.5),    # the right higher: the other sign
+                                        (0.5, 0.5, 1.0, 0.0, 0.0)):     # level arms: a lean alone is silent
+            white, blue = self._connect(_pose(0.5, left_shoulder=shoulder(left), right_shoulder=shoulder(right),
+                                              tilt=bend))
+            self.assertAlmostEqual(white[Parameter.PHASE], w, places=5, msg=f"{left}, {right}, bend {bend}")
+            self.assertAlmostEqual(blue[Parameter.PHASE], b, places=5, msg=f"{left}, {right}, bend {bend}")
 
     def test_a_folded_elbow_lifts_its_arm(self) -> None:
         white, blue = self._connect(_pose(0.5, left_elbow=shoulder(1.0)))            # hanging, the left hand folded in
@@ -247,29 +247,45 @@ class PoseInstrumentTest(unittest.TestCase):
     # -- the shoulders: the widths --
 
     def test_a_held_pose_is_still_over_many_ticks(self) -> None:
-        self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, left_elbow=shoulder(0.5))})   # upright: nothing flows
-        first = self._render().light_img.copy()
+        self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, left_elbow=shoulder(0.5), tilt=0.5)})
+        first = self._render().light_img.copy()                        # a lean included: nothing moves in time
         for _ in range(60):
             np.testing.assert_array_equal(self._render().light_img, first)
 
-    def test_a_straight_body_stands_still_and_a_lean_flows_the_lines(self) -> None:
+    def test_the_lean_share_scales_the_handover_and_the_source_clamps(self) -> None:
+        self.cfg.lean_share = 2.0
+        up = dict(left_shoulder=shoulder(1.0), right_shoulder=0.0)
+        white, blue = self._connect(_pose(0.5, tilt=0.5, **up))
+        self.assertAlmostEqual(white[Parameter.PHASE], 1.0, places=5)       # (1 + 2·½)/2: the whole pull at half a lean
+        self.assertAlmostEqual(blue[Parameter.PHASE], 0.0, places=5)
+        white, blue = self._connect(_pose(0.5, tilt=1.0, **up))
+        self.assertAlmostEqual(white[Parameter.PHASE], 1.0, places=5)       # clamped: a source stays within −1..1
+        self.assertAlmostEqual(blue[Parameter.PHASE], -0.5, places=5)       # the other walks out the back: the pair opens
+
+    def test_a_lean_hands_the_pull_to_one_colour(self) -> None:
+        self.cfg.lean_share = 1.0
         W, B = self.cfg.white_lines, self.cfg.blue_lines
-        W.speed_amount = B.speed_amount = 3.5                          # a full lean: a quarter interval a second
-        for bend, moved in ((0.0, 0), (1.0, 35), (-1.0, -35)):         # px after a second, outward or inward
+        W.phase_amount, B.phase_amount = 0.25, -0.25
+        up = dict(left_shoulder=shoulder(1.0), right_shoulder=0.0)         # full pull: a quarter interval together
+        for bend, white_off, blue_off in ((0.0, INTERVAL / 8, 3 * INTERVAL / 8),   # upright: met in the middle
+                                          (1.0, INTERVAL / 4, INTERVAL / 2),       # white does all the walking
+                                          (-1.0, 0.0, INTERVAL / 4)):              # blue does all the walking
             self.layer.reset()
-            self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, tilt=bend)})
-            start = self._centres(self._inner(self._render().white))
-            for _ in range(30):
-                f = self._render()
-            end = self._centres(self._inner(f.white))
-            # Track the line that started two intervals out: it stays clear of the mask and the taper.
-            start_c = min(start, key=lambda c: abs(c - 2 * INTERVAL))
-            end_c = min(end, key=lambda c: abs(c - (start_c + moved)))
-            self.assertAlmostEqual(end_c - start_c, moved, delta=2.0, msg=f"bend {bend}")
+            self._people({0: _pose(0.5, tilt=bend, **up)})
+            f = self._render()
+            self._on_grid(self._inner(f.white), INTERVAL, white_off)
+            self._on_grid(self._inner(f.blue), INTERVAL, blue_off)
+
+    def test_a_lean_alone_plays_nothing(self) -> None:
+        self.cfg.white_lines.phase_amount, self.cfg.blue_lines.phase_amount = 0.25, -0.25
+        self._people({0: _pose(0.5, left_shoulder=self.HALFWAY)})
+        first = self._render().light_img.copy()
+        self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, tilt=1.0)})
+        np.testing.assert_array_equal(self._render().light_img, first)     # level arms: no pull to share
 
     def test_left_up_and_right_up_draw_differently(self) -> None:
         W, B = self.cfg.white_lines, self.cfg.blue_lines
-        W.phase_amount, B.phase_amount = 0.125, -0.125               # the difference: a quarter interval together
+        W.phase_amount, B.phase_amount = 0.25, -0.25                 # the difference: a quarter interval together
         drawn = []
         for left, right in ((1.0, 0.0), (0.0, 1.0)):
             self.layer.reset()
