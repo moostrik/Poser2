@@ -147,7 +147,7 @@ class OscSound:
         same leaf builders as the live path, so _build_bundle stays blackout-agnostic.
         """
         bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
-        self._add_global_messages(bundle, None)  # None → zeroed globals
+        self._add_global_messages(bundle, {}, None)  # no frames, None → zeroed globals
         num_players = self._config.max_players
         for id in range(num_players):
             self._add_inactive_frame_messages(bundle, id, num_players)
@@ -156,7 +156,7 @@ class OscSound:
 
     def _build_bundle(self, frames: FrameDict, seq_state: SequencerState | None) -> OscBundleBuilder:
         bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
-        self._add_global_messages(bundle, seq_state)
+        self._add_global_messages(bundle, frames, seq_state)
 
         num_players = self._config.max_players
         self._config.active_players = sum(1 for id in range(num_players) if id in frames)
@@ -182,8 +182,9 @@ class OscSound:
             self._client = SimpleUDPClient(self._config.ip_addresses, self._config.port)
         logger.info(f"Reconnected to {self._config.ip_addresses}:{self._config.port}")
 
-    def _add_global_messages(self, bundle_builder: OscBundleBuilder, seq_state: SequencerState | None) -> None:
-        """Tick-wide messages. A None seq_state yields the all-zero (idle/blackout) globals."""
+    def _add_global_messages(self, bundle_builder: OscBundleBuilder, frames: FrameDict, seq_state: SequencerState | None) -> None:
+        """Tick-wide messages, built from the tick's frames and sequencer state. A None
+        seq_state yields the all-zero (idle/blackout) globals."""
         stage_msg = OscMessageBuilder(address="/global/state")
         stage_msg.add_arg(seq_state.stage if seq_state is not None else _NO_STATE, arg_type=OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(stage_msg.build()) # type: ignore

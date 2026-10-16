@@ -4,7 +4,8 @@ The show state (playhead, motor) is zeroed when there is no sequencer state — 
 blackout. The two operator settings are not show state and are never zeroed: a fader that
 reads 0 while someone is turning it, or a speaker calibration that snaps to 0 between shows,
 would both be wrong. `speaker_offset` is degrees in the panel and radians on the wire, the
-contract every azimuth here keeps.
+contract every azimuth here keeps. The player count is presence data, built from the tick's
+frames: live slots only, true show or no show, 0 only when the frames are gone (the blackout).
 """
 
 import math
@@ -12,6 +13,7 @@ import unittest
 
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
+from modules.pose.frame import Frame as PoseFrame, FrameDict
 from modules.session import SequencerState
 
 from apps.white_space.inout.osc_sound_sender import OscSoundSender
@@ -20,10 +22,10 @@ from apps.white_space.light.frame import Frame
 from apps.white_space.settings import _OscSoundSettings
 
 
-def _globals(sender: OscSoundSender, seq_state=None) -> dict[str, float]:
+def _globals(sender: OscSoundSender, seq_state=None, frames: FrameDict = {}) -> dict[str, float]:
     """Address → first argument, for the bundle's global messages."""
     builder = OscBundleBuilder(IMMEDIATELY)
-    sender._add_global_messages(builder, seq_state)
+    sender._add_global_messages(builder, frames, seq_state)
     bundle = builder.build()
     return {bundle.content(i).address: bundle.content(i).params[0]
             for i in range(bundle.num_contents)}
@@ -68,6 +70,22 @@ class SoundGlobalsTest(unittest.TestCase):
         seq = SequencerState(stage=4, stage_progress=0.5, progress=0.5, elapsed=10.0, active=True)
         self.assertAlmostEqual(_globals(self.sender, seq)["/global/sync"], 0.7, places=6)
         self.assertEqual(_globals(self.sender, None)["/global/sync"], 0.0)
+
+    def test_players_counts_only_live_slots(self) -> None:
+        """/global/players counts the occupied live slots; the dummy and the ghosts don't count."""
+        dummy = self.settings.max_players
+        frames = {id: PoseFrame(id, 0) for id in (0, 2, dummy, dummy + 1)}
+        seq = SequencerState(stage=4, stage_progress=0.5, progress=0.5, elapsed=10.0, active=True)
+        self.assertEqual(_globals(self.sender, seq, frames)["/global/players"], 2)
+
+    def test_players_is_presence_and_survives_idle(self) -> None:
+        """The count is presence data, not show state: no sequencer state leaves it true."""
+        frames = {0: PoseFrame(0, 0)}
+        self.assertEqual(_globals(self.sender, None, frames)["/global/players"], 1)
+
+    def test_players_is_zero_without_frames(self) -> None:
+        """The blackout builds its bundle from no frames, so the count reads 0."""
+        self.assertEqual(_globals(self.sender, None, {})["/global/players"], 0)
 
     def test_defaults_are_full_volume_and_no_offset(self) -> None:
         """Speakers placed by the fixed layout need no constant at all (see CALIBRATION.md)."""

@@ -18,9 +18,11 @@ logger = logging.getLogger(__name__)
 class OscSoundSender(BaseOscSound):
     """The sound sender — modules' OscSound extended with the rotation playhead
     (/global/playhead), the motor mode (/global/motor), full sync's envelope (/global/sync,
-    the light instrument's gate: 0..1, 0 while the instrument is not drawn), the two operator
-    settings (/global/volume, /global/speaker/offset), and the panoramic-only per-pose
-    azimuth, distance and playhead-offset messages.
+    the light instrument's gate: 0..1, 0 while the instrument is not drawn), the live player
+    count (/global/players: occupied live slots, ghosts and the dummy excluded; presence
+    data, never zeroed on idle), the two operator settings (/global/volume,
+    /global/speaker/offset), and the panoramic-only per-pose azimuth, distance and
+    playhead-offset messages.
 
     ``/global/state`` carries the show state (``StateId``, 0–10) from the state machine, and
     −1 in the shutdown blackout. The motor mode goes out on ``/global/motor``.
@@ -62,7 +64,7 @@ class OscSoundSender(BaseOscSound):
     def _build_bundle(self, frames: FrameDict, seq_state: SequencerState | None) -> OscBundleBuilder:
         """Live + ghost slots; per-track arrays stay ``max_players`` wide (see class doc)."""
         bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
-        self._add_global_messages(bundle, seq_state)
+        self._add_global_messages(bundle, frames, seq_state)
 
         track = self._config.max_players   # per-track (similarity/gate/leader) array width
         self._config.active_players = sum(1 for id in range(self._slot_count) if id in frames)
@@ -80,17 +82,17 @@ class OscSoundSender(BaseOscSound):
     def _send_blackout(self) -> None:
         """All-zero bundle across every live + ghost slot."""
         bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
-        self._add_global_messages(bundle, None)  # None → zeroed globals
+        self._add_global_messages(bundle, {}, None)  # no frames, None → zeroed globals
         for id in range(self._slot_count):
             self._add_inactive_frame_messages(bundle, id, self._config.max_players)
         self._config.active_players = 0
         self._send_bundle(bundle)
 
-    def _add_global_messages(self, bundle_builder: OscBundleBuilder, seq_state: SequencerState | None) -> None:
+    def _add_global_messages(self, bundle_builder: OscBundleBuilder, frames: FrameDict, seq_state: SequencerState | None) -> None:
         with self._input_lock:
             composition = self._composition
 
-        super()._add_global_messages(bundle_builder, seq_state)
+        super()._add_global_messages(bundle_builder, frames, seq_state)
 
         # seq_state is None during idle/blackout → zero the playhead and motor.
         idle: bool = seq_state is None
@@ -110,6 +112,13 @@ class OscSoundSender(BaseOscSound):
         sync_msg = OscMessageBuilder(address="/global/sync")
         sync_msg.add_arg(sync, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(sync_msg.build())  # type: ignore
+
+        # Presence, not show state, so never zeroed on idle: the count of live players,
+        # ghosts and the dummy excluded — the same frames the active flags are built from.
+        players: int = sum(1 for id in range(self._config.max_players) if id in frames)
+        players_msg = OscMessageBuilder(address="/global/players")
+        players_msg.add_arg(players, OscMessageBuilder.ARG_TYPE_INT)
+        bundle_builder.add_content(players_msg.build())  # type: ignore
 
         # Operator settings, not show state, so they are never zeroed on idle: the fader and
         # the speaker placement must read true whenever they are turned, show or no show.
