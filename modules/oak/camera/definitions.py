@@ -525,7 +525,7 @@ def frame_coverage(
     # losing a pixel or two NEAR THE HORIZON where the lens's reach falls short of `fov`; that
     # is not a coverage shape but a preset fact, and `_report_lens_reach` (pipeline.py) logs
     # it at open with its size.
-    covered: np.ndarray = inside.any(axis=0)
+    covered: np.ndarray = np.asarray(inside.any(axis=0))
     first: np.ndarray = inside.argmax(axis=0)
     last: np.ndarray = out_h - 1 - inside[::-1, :].argmax(axis=0)
     return np.stack([np.where(covered, first, -1), np.where(covered, last, -1)], axis=1).astype(int)
