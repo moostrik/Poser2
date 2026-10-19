@@ -378,6 +378,17 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         self.assertFalse(height_is_measured(annotation.annotation.height)
                          and abs(annotation.annotation.height - 1.8) < 0.15 * 1.8)
 
+    def test_a_clipped_box_links_on_azimuth_alone(self) -> None:
+        # One camera's box is cut by the frame edge: its height is not a measurement, so it must
+        # not veto a link the azimuth supports — the seam case, where the nearer camera clips
+        # first and its wrong-but-plausible reading would otherwise refuse the join.
+        self.submit(self.person(0, 1, 98.0, height_m=1.8, distance=2.5))
+        whole = self.person(1, 1, 8.0, height_m=1.8, distance=2.5)
+        clipped = replace(whole, roi=replace(whole.roi, height=1.0 - whole.roi.y))  # feet cut off
+        out = self.submit(clipped)
+        self.assertEqual(set(out.keys()), {0})
+        self.assertEqual(self.tracker.observations.world_of(1, 1), 0)
+
     def test_a_view_whose_feet_read_past_the_far_edge_links_once_they_land(self) -> None:
         """The far-edge filter's trade at a seam. Feet 0.45 m up, with the lens at 0.5 m, sit just
         below eye level and read about 21 m out — past even this fixture's open edge — so the second
@@ -410,12 +421,12 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
 
     def test_ambiguous_link_picks_nearest_angle(self) -> None:
         self.submit(make_tracklet(0, 1, 98.0))   # world 0 at world angle 88
-        self.submit(make_tracklet(0, 2, 102.0))  # world 1 at world angle 92
-        # New cam1 observation at world angle 90.5 matches both worlds within
+        self.submit(make_tracklet(0, 2, 104.0))  # world 1 at world angle 94 (past `same_cam_angle`)
+        # New cam1 observation at world angle 91.5 matches both worlds within
         # reach; it must link to the nearest (world 1), and the collapse net
         # must not merge world 0 into it afterwards (its mutual nearest match
         # is its own-world partner, not world 0's observation).
-        out = self.submit(make_tracklet(1, 1, 10.5))
+        out = self.submit(make_tracklet(1, 1, 11.5))
         self.assertEqual(self.tracker.observations.world_of(1, 1), 1)
         self.assertEqual(set(out.keys()), {0, 1})
 
@@ -434,37 +445,66 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         self.assertEqual(self.tracker.observations.world_of(1, 1), 0)
 
 
-class TestOneCameraOnePerson(PanoramicTrackerCase):
-    """Two ids from one camera are two people: the device already de-duplicates, so no rule may put
-    both in one world, and a world that ends up with two active views from one camera is split."""
+class TestSameCameraIdentity(PanoramicTrackerCase):
+    """Within one camera, two readings close together are one person: a LOST anchor re-found within
+    `reacquire_angle`, or a second active track within `same_cam_angle` — the device does not
+    always de-duplicate (NMS double boxes, a re-acquired person's old id coming back). Farther
+    apart they are two people, and `split_worlds` repairs a joined pair that separates."""
 
     def annotated(self, tracklet: Tracklet) -> Tracklet:
         return replace(tracklet, annotation=self.tracker.rig.annotate(tracklet.roi, tracklet.cam_id))
 
+    def test_a_duplicate_box_joins_its_world(self) -> None:
+        # NMS passed two boxes on one body: the second device id lands within `same_cam_angle` of
+        # the first and is the same person — one world, one emitted pose.
+        self.submit(make_tracklet(0, 1, 50.0))
+        out = self.submit(make_tracklet(0, 2, 52.0))
+        self.assertEqual(self.tracker.observations.world_of(0, 2), 0)
+        self.assertEqual(set(out.keys()), {0})
+
+    def test_two_people_beyond_the_gate_stay_two_worlds(self) -> None:
+        self.submit(make_tracklet(0, 1, 50.0))
+        out = self.submit(make_tracklet(0, 2, 58.0))
+        self.assertEqual(self.tracker.observations.world_of(0, 2), 1)
+        self.assertEqual(set(out.keys()), {0, 1})
+
     def test_a_seam_link_skips_a_world_this_camera_already_sees(self) -> None:
         self.submit(make_tracklet(0, 1, 98.0))                        # azimuth 88: world 0
         self.submit(make_tracklet(1, 1, 8.0))                         # the same person in cam 1
-        out = self.submit(make_tracklet(1, 2, 12.0))                  # someone else, 4° along
-        self.assertEqual(self.tracker.observations.world_of(1, 2), 1)
-        self.assertEqual(set(out.keys()), {0, 1})
+        out = self.submit(make_tracklet(1, 2, 14.0))                  # someone else, 6° along: past
+        self.assertEqual(self.tracker.observations.world_of(1, 2), 1)  # `same_cam_angle`, and the
+        self.assertEqual(set(out.keys()), {0, 1})                     # link skips the seen world
 
-    def test_a_re_acquisition_skips_a_world_this_camera_already_sees(self) -> None:
+    def test_a_re_acquisition_skips_a_world_re_found_elsewhere(self) -> None:
         self.submit(make_tracklet(0, 1, 50.0))
         self.submit(make_tracklet(0, 1, 50.0, status=TrackingStatus.REMOVED))   # a LOST anchor at 50
         self.submit(make_tracklet(0, 2, 51.0))                        # re-found: world 0
+        self.submit(make_tracklet(0, 2, 60.0))                        # ...and walks away
         self.submit(make_tracklet(0, 3, 54.0))                        # someone else near the anchor
         self.assertEqual(self.tracker.observations.world_of(0, 2), 0)
         self.assertEqual(self.tracker.observations.world_of(0, 3), 1)
 
-    def test_a_lost_anchor_whose_track_returns_splits_off_the_newcomer(self) -> None:
-        # A is LOST but the device still holds the track (past the far edge, a missed frame); C
-        # passes close by under a new id and re-acquires A's world. When A's id comes back, the
-        # world has two active views from one camera: C, the younger, gets a world of its own.
+    def test_a_lost_anchor_whose_track_returns_stays_one_person(self) -> None:
+        # The comeback race, the doubling `same_cam_angle` exists for: A is LOST but the device
+        # still holds the track; C passes close by under a new id and re-acquires A's world. When
+        # A's id comes back next to C, the two active views are one person seen twice.
         self.submit(make_tracklet(0, 1, 50.0))                        # A: world 0
         self.submit(make_tracklet(0, 1, 50.0, status=TrackingStatus.LOST))
         self.submit(make_tracklet(0, 2, 53.0))                        # C: re-acquires world 0
         self.assertEqual(self.tracker.observations.world_of(0, 2), 0)
         out = self.submit(make_tracklet(0, 1, 50.0), make_tracklet(0, 2, 53.0))
+        self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
+        self.assertEqual(self.tracker.observations.world_of(0, 2), 0)
+        self.assertEqual(set(out.keys()), {0})
+
+    def test_a_joined_pair_that_separates_splits_into_two_people(self) -> None:
+        # The other half of the gate: once the two views walk apart, they were two people after
+        # all, and the younger moves to a world of its own.
+        self.submit(make_tracklet(0, 1, 50.0))
+        self.submit(make_tracklet(0, 1, 50.0, status=TrackingStatus.LOST))
+        self.submit(make_tracklet(0, 2, 53.0))                        # joins world 0
+        self.submit(make_tracklet(0, 1, 50.0), make_tracklet(0, 2, 53.0))
+        out = self.submit(make_tracklet(0, 1, 47.0), make_tracklet(0, 2, 56.0))  # 9° apart
         self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
         self.assertEqual(self.tracker.observations.world_of(0, 2), 1)
         self.assertEqual(set(out.keys()), {0, 1})
@@ -496,13 +536,13 @@ class TestSplitWorlds(PanoramicTrackerCase):
     def test_a_wrong_seam_merge_repairs_itself_when_the_two_separate(self) -> None:
         self.submit(make_tracklet(0, 1, 96.0))              # A, azimuth 86: world 0
         self.submit(make_tracklet(1, 1, 9.0))               # B seen by cam 1 first, azimuth 89: joins A
-        self.submit(make_tracklet(0, 2, 99.0))              # B counted by cam 0: cam 0 already sees world 0
-        observations = self.tracker.observations
+        self.submit(make_tracklet(0, 2, 102.0))             # B counted by cam 0, 6° past A: not a
+        observations = self.tracker.observations            # duplicate, and cam 0 already sees world 0
         self.assertEqual(observations.world_of(1, 1), 0)    # the wrong merge
         self.assertEqual(observations.world_of(0, 2), 1)
 
-        # A walks away to azimuth 70; B stays at 89 in both cameras.
-        self.submit(make_tracklet(0, 1, 80.0), make_tracklet(1, 1, 9.0), make_tracklet(0, 2, 99.0))
+        # A walks away to azimuth 70; B stays put in both cameras.
+        self.submit(make_tracklet(0, 1, 80.0), make_tracklet(1, 1, 9.0), make_tracklet(0, 2, 102.0))
         self.assertEqual(observations.world_of(0, 1), 0)                        # A keeps their world
         self.assertNotEqual(observations.world_of(1, 1), 0)                     # B's cam-1 view left it
         self.assertEqual(observations.world_of(1, 1), observations.world_of(0, 2))   # and rejoined B
@@ -515,11 +555,11 @@ class TestSplitWorlds(PanoramicTrackerCase):
         self.tracker.add_tracklet_callback(self.emitted.append)
         self.submit(make_tracklet(0, 1, 96.0))              # A: world 0, slot 0
         self.submit(make_tracklet(1, 1, 9.0))               # B seen by cam 1 first: wrongly joins A
-        self.submit(make_tracklet(0, 2, 99.0))              # B counted by cam 0: the last slot
+        self.submit(make_tracklet(0, 2, 102.0))             # B counted by cam 0: the last slot
         observations = self.tracker.observations
         self.assertEqual(observations.world_of(1, 1), 0)    # the wrong merge, with nothing free
 
-        out = self.submit(make_tracklet(0, 1, 80.0), make_tracklet(1, 1, 9.0), make_tracklet(0, 2, 99.0))
+        out = self.submit(make_tracklet(0, 1, 80.0), make_tracklet(1, 1, 9.0), make_tracklet(0, 2, 102.0))
         self.assertEqual(observations.world_of(0, 1), 0)                        # A keeps their world
         self.assertEqual(observations.world_of(1, 1), observations.world_of(0, 2))   # B is whole again
         self.assertEqual(set(out.keys()), {0, 1})                               # both still emitted
@@ -990,10 +1030,13 @@ class RigTrackerCase(unittest.TestCase):
 
     def seen(self, radius: float, ext_id: int = 1, seconds_ago: float = 0.0,
              status: TrackingStatus = TrackingStatus.TRACKED, age: int = 10,
-             height: float | None = None) -> TrackletDict:
-        """Camera 0 sees someone on its own axis at `radius`, last detected `seconds_ago`. `height`
-        overrides the box's height (frame fraction), keeping its bottom on the feet."""
-        roi, _distance = synth_observation(0, world_azimuth=self.AXIS, radius=radius)
+             height: float | None = None, azimuth: float | None = None) -> TrackletDict:
+        """Camera 0 sees someone at `radius`, on its own axis unless `azimuth` says otherwise
+        (a second person must stand past `same_cam_angle`, or they read as the first one seen
+        twice), last detected `seconds_ago`. `height` overrides the box's height (frame
+        fraction), keeping its bottom on the feet."""
+        roi, _distance = synth_observation(0, world_azimuth=self.AXIS if azimuth is None else azimuth,
+                                           radius=radius)
         if height is not None:
             roi = replace(roi, y=roi.y + roi.height - height, height=height)
         self.tracker._add_tracklet(Tracklet(cam_id=0, status=status, roi=roi, external_id=ext_id,
@@ -1175,7 +1218,7 @@ class TestRejectedDetections(RigTrackerCase):
         self.tracker.add_observation_callback(self.observed.append)
         self.seen(3.0)                                           # takes the only slot
         with self.assertNoLogs('modules.tracker.panoramic', level='WARNING'):
-            out = self.seen(3.0, ext_id=2)                       # tracked and waiting, not refused
+            out = self.seen(3.0, ext_id=2, azimuth=self.AXIS + 10.0)   # tracked and waiting, not refused
         self.assertEqual(self.rejected(), {})
         self.assertEqual(self.tracker.observations.world_ids(), [0, 1])
         self.assertEqual(set(out.keys()), {0})                   # but only the slotted one is emitted
@@ -1203,7 +1246,7 @@ class TestPlayerSlotLifecycle(RigTrackerCase):
     def test_a_waiter_gets_the_slot_a_leaver_frees(self) -> None:
         self.capped(1)
         self.seen(3.0, seconds_ago=1.5)                          # person 1: world 0, the only slot
-        self.seen(3.0, ext_id=2)                                 # person 2: world 1, waiting
+        self.seen(3.0, ext_id=2, azimuth=self.AXIS + 10.0)       # person 2: world 1, waiting
         self.assertEqual(self.player_of(1), 0)
         self.assertIsNone(self.player_of(2))
         self.assertEqual((self.config.players, self.config.waiting), (1, 1))
@@ -1212,9 +1255,9 @@ class TestPlayerSlotLifecycle(RigTrackerCase):
         # time passing until the tracker forgets them (the pattern of the camera-gone-quiet test).
         self.seen(3.0, status=TrackingStatus.REMOVED, seconds_ago=1.5)
         self.config.lost_timeout = 1.2
-        out = self.seen(3.0, ext_id=2)                           # the tick that forgets person 1
+        out = self.seen(3.0, ext_id=2, azimuth=self.AXIS + 10.0)   # the tick that forgets person 1
         self.assertEqual(out, {})                                # no overlap on the freed slot
-        out = self.seen(3.0, ext_id=2)                           # the next tick emits the waiter
+        out = self.seen(3.0, ext_id=2, azimuth=self.AXIS + 10.0)   # the next tick emits the waiter
         self.assertEqual(set(out.keys()), {0})
         self.assertEqual(out[0].id, 0)                           # stamped with the slot...
         self.assertEqual(self.tracker.observations.world_of(0, 2), 1)   # ...the world id stays 1
@@ -1223,7 +1266,7 @@ class TestPlayerSlotLifecycle(RigTrackerCase):
     def test_a_lost_person_keeps_their_slot(self) -> None:
         self.capped(1)
         self.seen(3.0)                                           # person 1: the only slot
-        self.seen(3.0, ext_id=2)                                 # person 2 waits
+        self.seen(3.0, ext_id=2, azimuth=self.AXIS + 10.0)       # person 2 waits
         self.seen(3.0, status=TrackingStatus.LOST)               # person 1 missed, still remembered
         self.assertEqual(self.player_of(1), 0)                   # LOST holds the slot
         self.assertIsNone(self.player_of(2))
@@ -1351,11 +1394,30 @@ class TestRigHeight(unittest.TestCase):
         self.assertEqual(g.estimate_height(Rect(y=0.1, height=HORIZON_ROW - 0.1 + one_px)), _MAX_HEIGHT)
         self.assertGreater(_MAX_HEIGHT, 2.4)                # a tall person with both arms up
 
-    def test_the_feet_on_the_bottom_row_still_measure(self) -> None:
-        # The nearest the frame can read, which is where the distance estimate saturates too.
+    def test_feet_on_the_bottom_row_read_clipped(self) -> None:
+        # The frame's nearest readable row is also where a closer person's box is cut off, and the
+        # two cannot be told apart — so the bottom row is not a measurement (`_CLIP_MARGIN`), and
+        # the seam veto cannot fire on it.
         g = self.make_rig()
         nearest: float = CAMERA_HEIGHT / math.tan(math.radians(-WINDOW.elevation_bottom))
-        self.assertAlmostEqual(g.estimate_height(self.box(1.8, nearest)), 1.8, places=6)
+        self.assertEqual(g.estimate_height(self.box(1.8, nearest)), _MAX_HEIGHT)
+
+    def test_a_clipped_box_reads_the_cap(self) -> None:
+        # A box cut by the frame edge reads plausible and wrong — hidden feet make a 1.8 m person
+        # read well under their height, inside every gate — so an edge box reads the cap, which
+        # `height_is_measured` already rejects.
+        g = self.make_rig()
+        whole: Rect = self.box(1.8, 2.0)
+        clipped_top: Rect = replace(whole, y=0.0, height=whole.y + whole.height)    # head cut off
+        clipped_feet: Rect = replace(whole, height=1.0 - whole.y)                   # feet cut off
+        self.assertEqual(g.estimate_height(clipped_top), _MAX_HEIGHT)
+        self.assertEqual(g.estimate_height(clipped_feet), _MAX_HEIGHT)
+        self.assertFalse(height_is_measured(g.estimate_height(clipped_feet)))
+
+    def test_a_box_just_inside_the_edges_still_measures(self) -> None:
+        g = self.make_rig()
+        tall: Rect = Rect(x=0.5, y=0.01, width=0.05, height=0.98)
+        self.assertTrue(height_is_measured(g.estimate_height(tall)))
 
     def test_two_cameras_at_a_seam_agree_in_metres(self) -> None:
         """The point of measuring in metres. A person in an overlap but off the seam centre is at
@@ -1364,13 +1426,23 @@ class TestRigHeight(unittest.TestCase):
         different people — while the measured heights agree exactly."""
         g = self.make_rig()
         for azimuth in (80.0, 75.0, 72.0):
-            for radius in (1.35, 2.25, 3.5):
+            for radius in (1.6, 2.25, 3.5):
                 with self.subTest(azimuth=azimuth, radius=radius):
                     roi0, d0 = synth_observation(0, azimuth, radius, person_height=1.8)
                     roi1, d1 = synth_observation(1, azimuth, radius, person_height=1.8)
                     self.assertNotAlmostEqual(d0, d1, places=2)          # different distances
                     self.assertAlmostEqual(g.estimate_height(roi0), 1.8, places=6)
                     self.assertAlmostEqual(g.estimate_height(roi1), 1.8, places=6)
+
+    def test_too_close_for_the_frame_reads_clipped_at_a_seam(self) -> None:
+        # At R 1.35 the near camera's box crosses the frame bottom — the feet are below what the
+        # frame can see, and a real detector would clamp the box there. That is not a measurement
+        # (`_CLIP_MARGIN`), so it reads the cap and the seam veto stays out of the link.
+        g = self.make_rig()
+        for azimuth in (80.0, 75.0, 72.0):
+            with self.subTest(azimuth=azimuth):
+                roi0, _d0 = synth_observation(0, azimuth, 1.35, person_height=1.8)
+                self.assertEqual(g.estimate_height(roi0), _MAX_HEIGHT)
 
     def test_the_annotation_carries_it(self) -> None:
         g = self.make_rig()
@@ -1417,8 +1489,10 @@ class TestFootOffset(unittest.TestCase):
     def test_a_matching_offset_recovers_the_distance_and_the_height(self) -> None:
         # The point of sharing `_foot_px`: one number fixes both readouts at once, at every
         # distance, because it corrects the thing they have in common.
+        # From 2.0 m out: nearer in, the padded bottom crosses the frame edge, which reads as
+        # clipped (`_CLIP_MARGIN`) — the pad past the edge is extrapolation, not a measurement.
         g = self.make_rig(self.PAD)
-        for distance in (1.5, 2.0, 3.0, 3.8):
+        for distance in (2.0, 2.5, 3.0, 3.8):
             with self.subTest(distance=distance):
                 box: Rect = self.padded_box(1.8, distance)
                 self.assertAlmostEqual(g.estimate_distance(box), distance, places=6)
@@ -1428,9 +1502,11 @@ class TestFootOffset(unittest.TestCase):
         """Pins the signature in TRACKING.md: with the pad present and the offset at 0, both readouts
         are short AND the height *falls* as the person walks away. That drift is the whole
         calibration signal — a proportional error would leave `H` flat but wrong instead."""
+        # Distances whose padded boxes stay inside the frame; nearer, the box crosses the bottom
+        # edge and reads as clipped rather than as a short measurement.
         g = self.make_rig()
         heights: list[float] = []
-        for distance in (1.5, 2.5, 3.8):
+        for distance in (2.0, 2.5, 3.8):
             box: Rect = self.padded_box(1.8, distance)
             self.assertLess(g.estimate_distance(box), distance)
             heights.append(g.estimate_height(box))

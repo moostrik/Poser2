@@ -64,11 +64,13 @@ class Seams:
         is made, so it is repaired when the evidence changes — an active view whose azimuth is more
         than `_SPLIT_FACTOR × seam.link_angle` from every other active view of its world moves to a
         world of its own (the youngest first), and `collapse_worlds` then joins it to its own person.
-        Two active views from one camera are two people whatever their angle (the device
-        de-duplicates): a re-acquisition or link off a LOST anchor whose device track comes back.
+        Two active views from one camera are two people once their local angles are more than
+        `same_cam_angle` apart; within it they are one person seen twice (a double box, or a
+        re-acquired person whose old device track comes back) and stay together.
         Only active views count: a LOST anchor left behind by someone walking on is not a disagreement.
         """
         limit: float = _SPLIT_FACTOR * self._config.seam.link_angle
+        same_cam: float = self._config.same_cam_angle
         for world_id in self._observations.world_ids():
             while True:
                 active: list[Tracklet] = [t for t in self._observations.members(world_id)
@@ -76,7 +78,9 @@ class Seams:
                 if len(active) < 2:
                     break
                 inconsistent: list[Tracklet] = [t for t in active if any(
-                    o.cam_id == t.cam_id for o in active if o is not t) or all(
+                    o.cam_id == t.cam_id
+                    and abs(t.annotation.local_angle - o.annotation.local_angle) > same_cam  # type: ignore[union-attr]
+                    for o in active if o is not t) or all(
                     self._rig.angle_diff(t.annotation.world_angle, o.annotation.world_angle) > limit  # type: ignore[union-attr]
                     for o in active if o is not t)]
                 if not inconsistent:

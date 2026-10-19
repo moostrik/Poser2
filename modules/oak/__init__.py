@@ -6,6 +6,6 @@ from .camera import             Camera, CameraSettings, CameraCheck, CameraCheck
                                 horizon_row, FrameWindow, frame_window, frame_coverage, coverage_summary, \
                                 output_focal, source_lens, lens_field, lens_deviation, detector_input_size, \
                                 orientation_from_gravity, imu_to_camera, unroll_imu_frame, IMU_BOARD_ROLL
-from .recorder import           Recorder, RecorderSettings
+from .recorder import           Recorder, RecorderSettings, make_folder_name
 from .simulator import          Simulator, Player, SimulatorSettings
 from .sync import               Sync, SyncSettings

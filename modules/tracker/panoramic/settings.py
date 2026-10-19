@@ -100,6 +100,10 @@ class TrackerSettings(BaseSettings):
     # The same camera re-finding a person, anywhere in its field: not a seam setting.
     reacquire_angle: Field[float] = Field(5.0, min=0.0, max=20.0, step=0.5,
                                           description="How far (°) a re-acquired person may be from the lost one and still be them")
+    # Simultaneous tracks in one camera: the device does not always de-duplicate — NMS can pass two
+    # boxes on one body, and a re-acquired person's old device id can come back.
+    same_cam_angle: Field[float] = Field(5.0, min=0.0, max=20.0, step=0.5,
+                                         description="How far (°) apart two simultaneous tracks in one camera may be and still be one person")
     # How long they keep a pose from their last box is the pose side's `detection_timeout`.
     lost_timeout: Field[float] = Field(2.0, min=1.0, max=5.0, step=0.1,
                                        description="Seconds a lost person is remembered, for seam links and re-acquisition")

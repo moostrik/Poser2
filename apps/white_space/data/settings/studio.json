@@ -181,6 +181,10 @@
         "VIDEO"
       ],
       "enabled": true
+    },
+    "journal": {
+      "enabled": false,
+      "output_path": "diagnosis"
     }
   },
   "inout": {
@@ -378,9 +382,9 @@
         "VIDEO"
       ],
       "apply_warp": false,
-      "folder": "20260924-184100_2_person",
+      "folder": "20260924-203306_2_person",
       "sim_passthrough": false,
-      "start_norm": 0.0,
+      "start_norm": 0.01,
       "end_norm": 1.0
     },
     "frame_sync": {},
@@ -392,6 +396,7 @@
     "zone_filter": true,
     "foot_offset": 0.02,
     "reacquire_angle": 7.0,
+    "same_cam_angle": 7.0,
     "lost_timeout": 2.0,
     "seam": {
       "dead_zone": 9.0,

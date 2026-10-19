@@ -24,9 +24,11 @@ class Tracker(Thread, BaseTracker):
 
     **The second of two tiers.** Each camera runs YOLO into depthai's `ObjectTracker`
     (`modules/oak/camera/pipeline.py`): detection, per-frame association, short misses bridged as
-    LOST under the same id, de-duplication and device ids all happen there. This class joins those
-    per-camera tracks into world identities across seams — it adds no motion model and no per-frame
-    assignment of its own. The parts:
+    LOST under the same id, and device ids all happen there — but not always de-duplication: NMS
+    can pass two boxes on one body, and a dropped person returns under a new id. This class joins
+    those per-camera tracks into world identities — same-camera continuations and duplicates
+    (`same_cam_angle`, `reacquire_angle`) and views across seams — it adds no motion model and no
+    per-frame assignment of its own. The parts:
 
     - `Rig` models the installation and turns a box into an `Annotation` (local angle, world
       azimuth, distance, height); `RigSync` keeps it and the published read-outs in step with
@@ -206,10 +208,10 @@ class Tracker(Thread, BaseTracker):
             self.observations.refresh(new_tracklet)
             return
 
-        # A re-acquisition in the same camera is a continuation, not an arrival, so it is
-        # allowed anywhere in frame — including the edge dead zone, which only exists to stop
-        # *new* people being born on a seam.
-        anchor_world: int | None = self._reacquired_world(new_tracklet)
+        # A same-camera match is a continuation (a re-acquired person) or a duplicate (a second
+        # box on one body), not an arrival, so it is allowed anywhere in frame — including the
+        # edge dead zone, which only exists to stop *new* people being born on a seam.
+        anchor_world: int | None = self._same_camera_world(new_tracklet)
         if anchor_world is not None:
             self._rejected.pop(key, None)
             self.observations.add(new_tracklet, world_id=anchor_world)
@@ -231,31 +233,50 @@ class Tracker(Thread, BaseTracker):
         self._rejected.pop(key, None)
         self.observations.add(new_tracklet)
 
-    def _reacquired_world(self, new_tracklet: Tracklet) -> int | None:
-        """The world of a lost observation in the SAME camera that this new one continues.
+    def _same_camera_world(self, new_tracklet: Tracklet) -> int | None:
+        """The world of a SAME-camera observation this new device track continues or duplicates.
 
-        The device tracker has no appearance model, so a person it drops returns under a new id.
-        Matching on position makes that continuity our rule. Bounded by ``reacquire_angle`` alone —
-        a dropped person's box usually changed, so requiring it to agree asks the wrong question.
+        The device tracker has no appearance model and does not always de-duplicate: a person it
+        drops returns under a new id, and NMS can pass two boxes on one body. Matching on position
+        makes that continuity our rule — a LOST anchor within ``reacquire_angle`` is the person
+        re-found, an active view within ``same_cam_angle`` is the person seen twice. Bounded by the
+        angle alone — a dropped or doubled person's box usually changed, so requiring it to agree
+        asks the wrong question. Nearest wins.
         """
         assert isinstance(new_tracklet.annotation, Annotation)
         new_angle: float = new_tracklet.annotation.local_angle
         best_world: int | None = None
         best_diff: float = float('inf')
         for t in self.observations.all():
-            if t.cam_id != new_tracklet.cam_id or t.is_active or t.is_removed:
+            if t.cam_id != new_tracklet.cam_id or t.is_removed:
                 continue
             if not isinstance(t.annotation, Annotation):
                 continue
-            if self.observations.camera_sees_world(new_tracklet.cam_id, t.id):
-                continue                    # already re-found: this is someone else
+            gate: float = self.config.same_cam_angle if t.is_active else self.config.reacquire_angle
             diff: float = abs(t.annotation.local_angle - new_angle)
-            if diff > self.config.reacquire_angle:
+            if diff > gate:
                 continue
+            if not t.is_active and self._refound_elsewhere(new_tracklet, t.id):
+                continue                    # already re-found: this is someone else
             if diff < best_diff:
                 best_diff = diff
                 best_world = t.id
         return best_world
+
+    def _refound_elsewhere(self, new_tracklet: Tracklet, world_id: int) -> bool:
+        """Whether this camera already tracks ``world_id`` actively away from the new track: the
+        LOST anchor was re-found elsewhere, so a new track near the anchor is someone else. An
+        active view near the new track is not "elsewhere" — it is the duplicate the matcher joins."""
+        assert isinstance(new_tracklet.annotation, Annotation)
+        new_angle: float = new_tracklet.annotation.local_angle
+        for t in self.observations.members(world_id):
+            if t.cam_id != new_tracklet.cam_id or not t.is_active:
+                continue
+            if not isinstance(t.annotation, Annotation):
+                continue
+            if abs(t.annotation.local_angle - new_angle) > self.config.same_cam_angle:
+                return True
+        return False
 
     @staticmethod
     def _with_rejection(tracklet: Tracklet, reason: Rejection) -> Tracklet:

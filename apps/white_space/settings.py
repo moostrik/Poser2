@@ -25,6 +25,7 @@ from .light import LightSettings, PoseInstrumentSettings
 from .inout import OscLightSenderSettings, UdpLightReceiverSettings
 from .pose import GhosterSettings, NeutralWeightSettings
 from .statemachine import StateMachineSettings
+from .tracker_journal import TrackerJournalSettings
 
 
 # ---------------------------------------------------------------------------
@@ -299,6 +300,9 @@ class RecordingGroup(BaseSettings):
     osc:      Group[OscReceiverSettings]    = Group(OscReceiverSettings)
     core:     Group[SessionSettings]        = Group(SessionSettings, share=_session_share)
     video:    Group[RecorderSettings]       = Group(RecorderSettings, share=_recorder_share + [num_cameras, fps])
+    # The tracker diagnosis journal runs for the whole app run while enabled, so it deliberately
+    # does not share the record start/stop buttons.
+    journal:  Group[TrackerJournalSettings] = Group(TrackerJournalSettings)
 
 
 # ---------------------------------------------------------------------------

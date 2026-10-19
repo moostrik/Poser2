@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 from functools import partial
 
+import glfw
 import numpy as np
 
 from modules.utils import Broadcast
@@ -23,6 +24,7 @@ from .inout import OscLightSender, OscSoundSender, UdpLightReceiver
 from .render import Render as WindowRender
 from .settings import Settings, Stage
 from .statemachine import StateMachine
+from .tracker_journal import TrackerJournal
 
 APP_NAME = 'white_space'
 DATA_PATH = 'apps/white_space/data'
@@ -113,6 +115,18 @@ class WhiteSpaceMain:
         self.tracker.add_observation_callback(self.board.set_observations)
         self.tracklet_sync_bang.add_sync_callback(self.tracker.notify_update)
         self.frame_sync_bang.add_sync_callback(self.poses_from_tracklets.process)
+
+        # DIAGNOSIS — a subscribe-only journal of the tracker's inputs, observations and emitted
+        # primaries (JSONL under data/diagnosis), for dissecting identity incidents offline.
+        # Always wired; `record.journal.enabled` (panel, preset or `launcher.py -journal`) toggles
+        # capture live, one folder per capture, and the taps return on a flag check while off.
+        self.tracker_journal = TrackerJournal(self.settings.record.journal, data_path=DATA_PATH,
+                                              meta_provider=self._journal_meta,
+                                              track_provider=self.settings.track.to_dict)
+        for camera in self.cameras:
+            camera.add_tracker_callback(self.tracker_journal.submit_cam_tracklets)
+        self.tracker.add_observation_callback(self.tracker_journal.submit_observations)
+        self.tracker.add_tracklet_callback(self.tracker_journal.submit_tracklets)
 
         self.crop_extractor.add_image_callback(self.pose_predictor.process)
         self.crop_extractor.add_image_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
@@ -319,6 +333,7 @@ class WhiteSpaceMain:
         self.conductor.add_update_callback(self.hit_sync.update)
         self.conductor.add_update_callback(self.state_machine.update)
         self.render.add_exit_callback(self.stop)
+        self.render.window_manager.add_keyboard_callback(self._on_key)
 
     def start(self) -> None:
         self.settings_server.start()
@@ -338,6 +353,7 @@ class WhiteSpaceMain:
         if self.player:
             self.player.start()
         self.video_recorder.start()
+        self.tracker_journal.start()
 
         self.is_running = True
         self.render.start()
@@ -358,6 +374,24 @@ class WhiteSpaceMain:
     def _column_to_azimuth(self, cam_id: int, x: float) -> float:
         """A camera column's world azimuth in radians, through the tracker's own geometry."""
         return math.radians(self.tracker.column_to_azimuth(cam_id, x))
+
+    def _on_key(self, key: int, action: int, _mods: int) -> None:
+        """Render-window hotkeys: M marks an incident in the tracker journal."""
+        if key == glfw.KEY_M and action == glfw.PRESS:
+            self.tracker_journal.mark()
+
+    def _journal_meta(self) -> dict:
+        """The journal's meta line: the numbers an offline analysis recomputes the gates from."""
+        sim = self.settings.camera.simulator
+        return {
+            'app': APP_NAME,
+            'num_cameras': self.settings.camera.num_cameras,
+            'max_players': self.settings.max_players,
+            'fps': self.settings.camera.fps,
+            'track': self.settings.track.to_dict(),
+            'source': {'folder': sim.folder, 'start': sim.start_norm, 'end': sim.end_norm}
+                      if self.player else None,
+        }
 
     def _process_poses(self, poses: FrameDict) -> None:
         images, prev_images = self.source_uploader.snapshot()
@@ -380,6 +414,7 @@ class WhiteSpaceMain:
         self.video_recorder.stop()
 
         self.tracker.stop()
+        self.tracker_journal.stop()
         self.osc_sound_sender.stop()
         self.state_machine.stop()
         self.ghoster.stop()
