@@ -3,11 +3,12 @@
 import importlib
 import logging
 import os
-import socket
 import subprocess
 import tempfile
 import threading
 import time
+import urllib.error
+import urllib.request
 import webbrowser
 from pathlib import Path
 from typing import Callable, Optional
@@ -23,21 +24,58 @@ logger = logging.getLogger(__name__)
 
 # Dedicated Edge profile: forces a browser process we own, and holds Edge's own record of the
 # app window's last position/size. Deleting the directory resets the window to the preset defaults.
-_EDGE_PROFILE_DIR = Path(tempfile.gettempdir()) / "poser_settings_edge"
+# Lives under LOCALAPPDATA, not TEMP: temp cleaners prune half a profile, and its broken HTTP
+# cache then serves truncated page resources (the "ES modules" banner, unstyled panels).
+_EDGE_PROFILE_DIR = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "Poser2" / "settings_edge"
 
-# Injected only into the app window (?app=1): close the window when its connection dies, so its
-# lifetime is the server's lifetime on every exit path. Server-side pushes cannot do this — the
-# panel's exit button tears the app down on the UI event loop, which never flushes a pushed close.
-# The beforeunload guard keeps page reloads (panel hot-reload) from closing the window.
+# Injected only into the app window (?app=1): tie the window's lifetime to the server's on every
+# exit path. A dropped socket alone does not mean the server died — a long settings callback can
+# stall the event loop past the heartbeat timeout — so on disconnect the script probes the server:
+# a dead one refuses the fetch instantly (close), a stalled one leaves it hanging (keep waiting;
+# socket.io reconnects by itself). Server-side pushes cannot drive the close — the panel's exit
+# button tears the app down on the UI event loop, which never flushes a pushed close. The
+# beforeunload guard keeps page reloads (panel hot-reload, self-heal) from closing the window.
+# Self-heal: NiceGUI's #esm-fallback banner still present a few seconds in means a page resource
+# failed to load; reload rather than sit on a dead page.
 _SELF_CLOSE_SCRIPT = """
 <script>
   (function () {
     let unloading = false;
     window.addEventListener("beforeunload", () => { unloading = true; });
+
+    setTimeout(() => {
+      if (document.getElementById("esm-fallback")) window.location.reload();
+    }, 4000);
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    async function serverGone() {
+      const abort = new AbortController();
+      const timer = setTimeout(() => abort.abort(), 1500);
+      try {
+        await fetch(window.location.href, { cache: "no-store", signal: abort.signal });
+        return false;                    // any response: alive
+      } catch (e) {
+        return e.name !== "AbortError";  // instant refusal: gone; abort: stalled, not gone
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function closeWhenServerGone() {
+      while (!unloading && !window.socket.connected) {
+        if (await serverGone()) {
+          window.close();
+          return;
+        }
+        await sleep(1000);
+      }
+    }
+
     const timer = setInterval(() => {
       if (!window.socket) return;
       clearInterval(timer);
-      window.socket.on("disconnect", () => { if (!unloading) window.close(); });
+      window.socket.on("disconnect", () => { if (!unloading) closeWhenServerGone(); });
     }, 100);
   })();
 </script>
@@ -149,16 +187,24 @@ class NiceServer:
     def _open_browser(self) -> None:
         """Open the settings UI in an Edge app-mode window once the server accepts connections."""
         port = self.settings.port
+        # localhost, never 127.0.0.1: Edge keys the app window's saved position by host, and
+        # dots in the key are swallowed by Chromium's pref writer, so the position never restores.
         url = f"http://localhost:{port}"
 
+        # Wait until the server answers HTTP; a bare TCP accept races the app's heavy startup.
+        # HEAD is answered immediately (405) without building the panel page, so any HTTP
+        # response — status errors included — means the server is up.
+        probe = urllib.request.Request(url, method="HEAD")
         for _ in range(50):
             try:
-                with socket.create_connection(("127.0.0.1", port), timeout=0.1):
+                with urllib.request.urlopen(probe, timeout=1.0):
                     break
+            except urllib.error.HTTPError:
+                break
             except OSError:
                 time.sleep(0.1)
         else:
-            logger.warning("Settings server not reachable on port %s; opening browser anyway", port)
+            logger.warning("Settings server not ready on port %s; opening browser anyway", port)
 
         edge = _find_edge()
         if edge is None:
@@ -174,6 +220,7 @@ class NiceServer:
             str(edge),
             f"--app={url}/?app=1",
             f"--user-data-dir={_EDGE_PROFILE_DIR}",
+            "--disable-http-cache",
             "--disable-background-mode",
             "--no-first-run",
             "--no-default-browser-check",

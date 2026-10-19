@@ -41,9 +41,10 @@ class MessageType(Enum):
     NEXT = auto()
 
 class Message():
-    def __init__(self, state: MessageType, value: str = '') -> None:
+    def __init__(self, state: MessageType, value: str = '', prepare: bool = False) -> None:
         self.state: MessageType = state
         self.value: str = value
+        self.prepare: bool = prepare
 
 class Folder():
     def __init__(self, name: str, path: Path, chunks: int) -> None:
@@ -128,8 +129,7 @@ class Player(Thread):
         # Auto-start if a folder was loaded from preset
         folder = self.settings.folder
         if folder and folder in self.folders:
-            self._prepare_folder(folder)
-            self.play(True, folder)
+            self.play(True, folder, prepare=True)
 
         while self.running:
             try:
@@ -140,6 +140,8 @@ class Player(Thread):
                     message = None
 
                 if message and message.state == MessageType.START:
+                    if message.prepare:
+                        self._prepare_folder(message.value)
                     self._set_load_folder(message.value)
                     self._set_load_chunk(-1)
                     self._set_play_chunk(-1)
@@ -353,12 +355,13 @@ class Player(Thread):
             return self.load_folder
 
     # EXTERNAL METHODS
-    def play(self, value: bool, name: str = '') -> None:
+    def play(self, value: bool, name: str = '', prepare: bool = False) -> None:
+        """``prepare``: probe the folder's chunk frame counts on the player thread before loading."""
         if value:
             if not name in self.folders:
                 logger.warning(f"Folder {name} not found")
                 return
-            message: Message = Message(MessageType.START, name)
+            message: Message = Message(MessageType.START, name, prepare)
             self.active_folder = name
         else:
             message: Message = Message(MessageType.STOP)
@@ -428,8 +431,9 @@ class Player(Thread):
 
     def _on_folder_changed(self, folder: str) -> None:
         if folder and folder in self.folders:
-            self._prepare_folder(folder)
-            self.play(True, folder)
+            # prepare on the player thread: the probe decodes whole clips and this callback
+            # runs on the GUI event loop, which must not stall past the socket heartbeat
+            self.play(True, folder, prepare=True)
 
     def _on_refresh_path(self, _=None) -> None:
         self.folders = self._get_video_folders(self.settings, self.data_path)
