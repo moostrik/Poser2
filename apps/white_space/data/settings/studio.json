@@ -384,7 +384,7 @@
       "apply_warp": false,
       "folder": "20260924-203306_2_person",
       "sim_passthrough": false,
-      "start_norm": 0.01,
+      "start_norm": 0.38,
       "end_norm": 1.0
     },
     "frame_sync": {},
@@ -401,7 +401,7 @@
     "seam": {
       "dead_zone": 9.0,
       "link_angle": 15.0,
-      "link_height": 0.25,
+      "link_height": 0.33,
       "hysteresis": 0.6,
       "hold": 1.0
     },
