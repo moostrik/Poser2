@@ -13,9 +13,9 @@ from .projection import azimuth_to_camera_x, camera_azimuth, camera_local_to_azi
 # catches a mangled or edge-clipped box.
 _MAX_HEIGHT: float = 3.0
 
-# A box this close to (or past) the frame's top or bottom edge is clipped: the head or feet are cut
-# off, so the height ratio reads plausible and wrong, and `estimate_height` reports `_MAX_HEIGHT`
-# instead of a measurement.
+# A box this close to (or past) any frame edge is clipped: a cut head or feet, or the sliver of a
+# person half out of frame at a side edge, makes the height ratio read plausible and wrong, and
+# `estimate_height` reports `_MAX_HEIGHT` instead of a measurement.
 _CLIP_MARGIN: float = 0.005
 
 
@@ -23,9 +23,9 @@ def height_is_measured(height: float) -> bool:
     """Whether an `estimate_height` reading is a measurement rather than one of its escapes.
 
     0.0 (feet at or above the horizon) and `_MAX_HEIGHT` (feet barely below it, or a box clipped by
-    the frame's top or bottom edge) both mean "no reading", not "this tall". A gate comparing two
-    heights asks this first, so a person mid-jump or half out of frame is not dropped at the moment
-    they are hardest to re-find.
+    any frame edge) both mean "no reading", not "this tall". A gate comparing two heights asks this
+    first, so a person mid-jump or half out of frame is not dropped at the moment they are hardest
+    to re-find.
     """
     return 0.0 < height < _MAX_HEIGHT
 
@@ -179,15 +179,17 @@ class Rig:
         is the signal `foot_offset` is tuned by: with the detector's pad uncorrected it reads low and
         *falls* with distance; tune until it is flat (CALIBRATION.md, *Calibrating the metres*). 0.0
         when the feet are at or above the horizon; ``_MAX_HEIGHT`` when the box touches or crosses
-        the frame's top or bottom edge (``_CLIP_MARGIN``) — a clipped head or clipped feet make the
-        ratio read plausible and wrong, which no cap can catch; capped at ``_MAX_HEIGHT``.
+        any frame edge (``_CLIP_MARGIN``) — a clipped head or feet, or the sliver of a person
+        walking out at a side edge, makes the ratio read plausible and wrong, which no cap can
+        catch; capped at ``_MAX_HEIGHT``.
         """
         rows: int = self._rows - 1
         foot_px: float = self._foot_px(roi)
         below: float = foot_px - self._horizon_px
         if below <= 0.0:
             return 0.0
-        if roi.y <= _CLIP_MARGIN or roi.y + roi.height >= 1.0 - _CLIP_MARGIN:
+        if (roi.y <= _CLIP_MARGIN or roi.y + roi.height >= 1.0 - _CLIP_MARGIN
+                or roi.x <= _CLIP_MARGIN or roi.x + roi.width >= 1.0 - _CLIP_MARGIN):
             return _MAX_HEIGHT
         span: float = foot_px - roi.y * rows                 # head to corrected feet, px
         return min(_MAX_HEIGHT, max(0.0, self._camera_height * span / below))

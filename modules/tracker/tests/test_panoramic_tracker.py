@@ -389,6 +389,19 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         self.assertEqual(set(out.keys()), {0})
         self.assertEqual(self.tracker.observations.world_of(1, 1), 0)
 
+    def test_an_exit_sliver_cannot_veto_the_link(self) -> None:
+        # The journal-captured crossing (diagnosis 20261019-171644, marks 3/4 at link_angle 25):
+        # the exiting camera's last boxes are border slivers whose height reads short, and that
+        # garbage vetoed the link. A box touching a side edge is not a measurement, so the link
+        # lands on azimuth alone.
+        exiting = self.person(0, 1, 105.0, height_m=1.2, distance=2.5)   # reads 1.2 vs 1.8: vetoes
+        width: float = 2.0 * (1.0 - 105.0 / FOV)                         # right edge on the border
+        exiting = replace(exiting, roi=replace(exiting.roi, x=105.0 / FOV - width / 2.0, width=width))
+        self.submit(exiting)
+        out = self.submit(self.person(1, 1, 15.0, height_m=1.8, distance=2.5))
+        self.assertEqual(self.tracker.observations.world_of(1, 1), 0)
+        self.assertEqual(set(out.keys()), {0})
+
     def test_a_view_whose_feet_read_past_the_far_edge_links_once_they_land(self) -> None:
         """The far-edge filter's trade at a seam. Feet 0.45 m up, with the lens at 0.5 m, sit just
         below eye level and read about 21 m out — past even this fixture's open edge — so the second
@@ -1437,8 +1450,12 @@ class TestRigHeight(unittest.TestCase):
         whole: Rect = self.box(1.8, 2.0)
         clipped_top: Rect = replace(whole, y=0.0, height=whole.y + whole.height)    # head cut off
         clipped_feet: Rect = replace(whole, height=1.0 - whole.y)                   # feet cut off
+        clipped_left: Rect = replace(whole, x=0.0)                                  # walking in
+        clipped_right: Rect = replace(whole, x=1.0 - whole.width)                   # walking out
         self.assertEqual(g.estimate_height(clipped_top), _MAX_HEIGHT)
         self.assertEqual(g.estimate_height(clipped_feet), _MAX_HEIGHT)
+        self.assertEqual(g.estimate_height(clipped_left), _MAX_HEIGHT)
+        self.assertEqual(g.estimate_height(clipped_right), _MAX_HEIGHT)
         self.assertFalse(height_is_measured(g.estimate_height(clipped_feet)))
 
     def test_a_box_just_inside_the_edges_still_measures(self) -> None:
@@ -1448,12 +1465,13 @@ class TestRigHeight(unittest.TestCase):
 
     def test_two_cameras_at_a_seam_agree_in_metres(self) -> None:
         """The point of measuring in metres. A person in an overlap but off the seam centre is at
-        genuinely different distances from the two cameras, so their pixel box heights differ by
-        up to 0.16 of the frame — which a gate on frame fractions could not tell from two
-        different people — while the measured heights agree exactly."""
+        genuinely different distances from the two cameras, so their pixel box heights differ —
+        which a gate on frame fractions could not tell from two different people — while the
+        measured heights agree exactly. The azimuths keep both boxes wholly inside both frames:
+        a box touching a frame edge is a clipped sliver, not a measurement (`_CLIP_MARGIN`)."""
         g = self.make_rig()
-        for azimuth in (80.0, 75.0, 72.0):
-            for radius in (1.6, 2.25, 3.5):
+        for azimuth in (84.0, 86.0, 88.0):
+            for radius in (2.25, 3.5):
                 with self.subTest(azimuth=azimuth, radius=radius):
                     roi0, d0 = synth_observation(0, azimuth, radius, person_height=1.8)
                     roi1, d1 = synth_observation(1, azimuth, radius, person_height=1.8)
