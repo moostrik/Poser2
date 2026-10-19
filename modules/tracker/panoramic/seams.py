@@ -128,6 +128,12 @@ class Seams:
         new primary is often the worse-placed view and the ratio would hand the person straight back
         the moment the old camera returns; ``seam.hold`` blocks that for a while after a forced
         handover, so a one-frame miss costs one camera switch, not two.
+
+        Views inside ``seam.dead_zone`` — the ones `world_azimuth` gives no weight — come last in
+        both of the first two cases: an exit sliver never takes over from a view firmly in frame
+        that merely missed a frame (the device, or a filter no longer counting it), so pose keeps
+        the whole body rather than a clipped edge box. Such a view is held LOST until a view that
+        carries weight is active again or it is retired; only then does the sliver stand in.
         """
         members: list[Tracklet] = [t for t in self._observations.members(world_id)
                                    if not t.is_removed and isinstance(t.annotation, Annotation)]
@@ -138,16 +144,26 @@ class Seams:
             assert isinstance(t.annotation, Annotation)
             return self._rig.angle_from_edge(t.annotation.local_angle)
 
+        dead_zone: float = self._config.seam.dead_zone
+
+        def weighted(views: list[Tracklet]) -> list[Tracklet]:
+            """The views outside the dead zone, or all of them when none is."""
+            return [t for t in views if edge(t) > dead_zone] or views
+
         current_key: int | None = self._primary_for_world.get(world_id)
         current: Tracklet | None = next((t for t in members if t.obs_id == current_key), None)
         active: list[Tracklet] = [t for t in members if t.is_active]
         chosen: Tracklet
         if not active:
-            chosen = max(members, key=lambda t: t.last_active)
+            chosen = max(weighted(members), key=lambda t: t.last_active)
         elif current is None or not current.is_active:
-            chosen = max(active, key=edge)
-            if current is not None:
-                self._handed_over_at[world_id] = now
+            heavy: list[Tracklet] = [t for t in active if edge(t) > dead_zone]
+            if not heavy and current is not None and edge(current) > dead_zone:
+                chosen = current                # held: only edge slivers are active
+            else:
+                chosen = max(heavy or active, key=edge)
+                if current is not None:
+                    self._handed_over_at[world_id] = now
         else:
             best: Tracklet = max(active, key=edge)
             held: bool = now - self._handed_over_at.get(world_id, -math.inf) < self._config.seam.hold
@@ -158,27 +174,30 @@ class Seams:
         return chosen
 
     def world_azimuth(self, world_id: int, primary: Tracklet) -> float:
-        """The azimuth a world is emitted at: its active views blended, each weighted by how far it
-        sits inside its camera's dead zone.
+        """The azimuth a world is emitted at: its views blended, each weighted by how far it sits
+        inside its camera's dead zone.
 
-        One view is its own azimuth. Two views at a seam disagree by the parallax residual — up to
-        ~6.6° at the zone's edges, in opposite directions — so emitting only the primary's would
-        step by that much whenever the primary changes camera. A view's weight is its distance from
-        its field edge less `seam.dead_zone`: a new view can only link once it is that far in, so it
-        arrives weighing nothing, and one walking out weighs nothing before it is lost. The blend then
-        moves continuously through appearance, handover and disappearance, and near the seam it lies
-        between the two errors. A circular mean, so views either side of 0° blend across it. The
-        primary's own azimuth when fewer than two views carry weight.
+        Two views at a seam disagree by the parallax residual — up to ~6.6° at the zone's edges, in
+        opposite directions — so emitting only the primary's would step by that much whenever the
+        primary changes camera. A view's weight is its distance from its field edge less
+        `seam.dead_zone`: a new view can only link once it is that far in, so it arrives weighing
+        nothing, and one walking out weighs nothing before it is lost. The blend then moves
+        continuously through appearance, handover and disappearance, and near the seam it lies
+        between the two errors. A circular mean, so views either side of 0° blend across it.
+
+        LOST views blend too, so a view the dead zone discounts never defines the azimuth on its
+        own: when the deep view misses a frame — the device, or a filter no longer counting it —
+        the edge sliver still holds the primary, but the bearing stays where the person was last
+        weighed, and a view the camera still refreshes while it is not counted keeps steering it.
+        The primary's own azimuth only when no view carries weight.
         """
         assert isinstance(primary.annotation, Annotation)
-        active: list[Tracklet] = [t for t in self._observations.members(world_id)
-                                  if t.is_active and isinstance(t.annotation, Annotation)]
-        if len(active) < 2:
-            return primary.annotation.world_angle
+        members: list[Tracklet] = [t for t in self._observations.members(world_id)
+                                   if not t.is_removed and isinstance(t.annotation, Annotation)]
         dead_zone: float = self._config.seam.dead_zone
         x: float = 0.0
         y: float = 0.0
-        for t in active:
+        for t in members:
             assert isinstance(t.annotation, Annotation)
             weight: float = max(0.0, self._rig.angle_from_edge(t.annotation.local_angle) - dead_zone)
             angle: float = math.radians(t.annotation.world_angle)

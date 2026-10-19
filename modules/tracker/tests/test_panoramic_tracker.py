@@ -294,6 +294,44 @@ class TestPrimaryHysteresis(PanoramicTrackerCase):
         self.assertEqual(set(out.keys()), {0})
         self.assertFalse(out[0].is_active)
 
+    def crossed_to_the_edge(self) -> None:
+        """One person: cam0 firmly in frame (local 95, edge 15), cam1 linked at local 10 and then
+        walked to cam1's edge sliver at local 2 — inside the dead zone (5), weightless."""
+        self.submit(make_tracklet(0, 1, 95.0))
+        self.submit(make_tracklet(0, 1, 95.0), make_tracklet(1, 1, 10.0))
+        out = self.submit(make_tracklet(0, 1, 95.0), make_tracklet(1, 1, 2.0))
+        self.assertEqual(out[0].cam_id, 0)
+
+    def test_an_edge_sliver_does_not_take_over_from_a_view_that_missed_a_frame(self) -> None:
+        # Journal capture 20261019-183605, t+5.44: cam3's view is not counted for a frame while cam2's
+        # exit sliver is; the sliver must not become the box pose gets.
+        self.crossed_to_the_edge()
+        out = self.submit(make_tracklet(0, 1, 95.0, status=TrackingStatus.LOST),
+                          make_tracklet(1, 1, 2.0))
+        self.assertEqual(out[0].cam_id, 0)                          # held, LOST
+        self.assertFalse(out[0].is_active)
+        out = self.submit(make_tracklet(0, 1, 95.0), make_tracklet(1, 1, 2.0))
+        self.assertEqual(out[0].cam_id, 0)                          # back, and no hold was started
+        self.assertTrue(out[0].is_active)
+
+    def test_an_edge_sliver_stands_in_once_the_held_view_is_retired(self) -> None:
+        self.crossed_to_the_edge()
+        # cam0 last seen 1.5 s ago, then LOST: held at `lost_timeout` 2.0; lowering it below that
+        # stands in for time passing, and the sliver is all that is left.
+        self.submit(replace(make_tracklet(0, 1, 95.0), last_active=time.time() - 1.5))
+        out = self.submit(make_tracklet(0, 1, 95.0, status=TrackingStatus.LOST), make_tracklet(1, 1, 2.0))
+        self.assertEqual(out[0].cam_id, 0)
+        self.config.lost_timeout = 1.2
+        out = self.submit(make_tracklet(1, 1, 2.0))
+        self.assertEqual(out[0].cam_id, 1)
+        self.assertTrue(out[0].is_active)
+
+    def test_a_sliver_that_walks_in_takes_over_from_a_lost_view(self) -> None:
+        self.crossed_to_the_edge()
+        out = self.submit(make_tracklet(0, 1, 95.0, status=TrackingStatus.LOST),
+                          make_tracklet(1, 1, 8.0))                 # edge 8 > dead zone: carries weight
+        self.assertEqual(out[0].cam_id, 1)
+
     def test_crossing_hands_off_once_hysteresis_cleared(self) -> None:
         self.submit(make_tracklet(0, 1, 98.0))
         out = self.submit(make_tracklet(1, 1, 8.0))
@@ -1342,8 +1380,9 @@ class TestUnknownStatus(PanoramicTrackerCase):
 
 
 class TestWorldAzimuth(PanoramicTrackerCase):
-    """The emitted azimuth blends the active views, each weighted by its distance from its own field
-    edge less the dead zone (5° here), so it does not step when the primary changes camera."""
+    """The emitted azimuth blends the world's views, LOST ones too, each weighted by its distance
+    from its own field edge less the dead zone (5° here), so it does not step when the primary
+    changes camera and a weightless edge view never defines it alone."""
 
     def azimuth(self, out: TrackletDict, world_id: int = 0) -> float:
         annotation = out[world_id].annotation
@@ -1352,6 +1391,37 @@ class TestWorldAzimuth(PanoramicTrackerCase):
 
     def test_a_single_view_is_emitted_as_seen(self) -> None:
         self.assertEqual(self.azimuth(self.submit(make_tracklet(0, 1, 50.0))), 40.0)
+
+    def test_only_weightless_views_fall_back_to_the_primary(self) -> None:
+        self.submit(make_tracklet(0, 1, 98.0))
+        out = self.submit(make_tracklet(0, 1, 107.0))             # refreshed into the dead zone
+        self.assertAlmostEqual(self.azimuth(out), 97.0, delta=0.05)
+
+    def crossed_to_the_edge(self) -> None:
+        """One person, cam0 deep (local 95: azimuth 85, weight 10) and cam1 linked at local 10
+        (azimuth 90), then walked to cam1's edge sliver at local 2 (azimuth 82, weight 0)."""
+        self.submit(make_tracklet(0, 1, 95.0))
+        self.submit(make_tracklet(0, 1, 95.0), make_tracklet(1, 1, 10.0))
+        self.submit(make_tracklet(0, 1, 95.0), make_tracklet(1, 1, 2.0))
+
+    def test_a_lost_deep_view_outweighs_an_active_edge_sliver(self) -> None:
+        # Journal capture 20261019-182322, t+19.59: the deep view misses a frame and only the sliver
+        # is active — the bearing must not move back across the seam, whichever view is emitted.
+        self.crossed_to_the_edge()
+        out = self.submit(make_tracklet(0, 1, 95.0, status=TrackingStatus.LOST),
+                          make_tracklet(1, 1, 2.0))
+        self.assertEqual(set(out.keys()), {0})
+        self.assertAlmostEqual(self.azimuth(out), 85.0, delta=0.05)
+
+    def test_both_lost_still_blends_by_weight(self) -> None:
+        # Same capture, t+20.15: nobody active, the sliver the more recently seen — the weighted
+        # view still sets the bearing.
+        self.crossed_to_the_edge()
+        self.submit(make_tracklet(0, 1, 95.0, status=TrackingStatus.LOST), make_tracklet(1, 1, 2.0))
+        out = self.submit(make_tracklet(1, 1, 2.0, status=TrackingStatus.LOST))
+        self.assertEqual(set(out.keys()), {0})
+        self.assertFalse(out[0].is_active)
+        self.assertAlmostEqual(self.azimuth(out), 85.0, delta=0.05)
 
     def test_two_views_are_weighted_by_distance_from_their_field_edge(self) -> None:
         self.submit(make_tracklet(0, 1, 98.0))                                  # azimuth 88, weight 12 - 5

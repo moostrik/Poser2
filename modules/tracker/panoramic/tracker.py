@@ -317,7 +317,7 @@ class Tracker(Thread, BaseTracker):
         # a person after `pose.tracklets.detection_timeout`, and the show reads poses. A world
         # retired just above is still in the store until the end of this tick; it is not emitted.
         # The primary supplies the box and the camera (the crop); the azimuth is the world's blend of
-        # its active views, so it does not step when the primary changes camera.
+        # its views, so it does not step when the primary changes camera.
         emitted: TrackletDict = {}
         for world_id in self.observations.world_ids():
             primary: Tracklet | None = self.seams.pick_primary(world_id, now)

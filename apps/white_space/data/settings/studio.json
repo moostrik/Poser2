@@ -382,9 +382,9 @@
         "VIDEO"
       ],
       "apply_warp": false,
-      "folder": "20260924-203306_2_person",
+      "folder": "20260924-200758_2_person",
       "sim_passthrough": false,
-      "start_norm": 0.38,
+      "start_norm": 0.01,
       "end_norm": 1.0
     },
     "frame_sync": {},
