@@ -151,7 +151,11 @@ from a launch, so every start is the same start. What keeps the motor from power
    on, with the debug layer, the dummy and any hold as wanted, and set as the startup preset.
 
 On top of these, `osc_light` holds the commanded rpm at 0 for `startup_delay` seconds after connecting,
-giving the motor controller one clean 0 → target edge. With the site preset, PROJECTION is reachable only
+giving the motor controller one clean 0 → target edge. The firmware acts on the rpm only when it changes,
+and its packet watchdog stops the motor without recording that stop — so after any send silence long
+enough that the watchdog may have fired (leaving motor simulation, a host stall), the sender repeats the
+hold for `resync_hold` seconds; a stopped motor would otherwise never restart
+(`inout/osc_light_sender.py` `FixtureSpeedLatch`). With the site preset, PROJECTION is reachable only
 through an explicit runtime action: the show's own sync into INTRO_PLAY, an operator goto to a PROJECTION
 state, or selecting a projection layer in the debug select.
 

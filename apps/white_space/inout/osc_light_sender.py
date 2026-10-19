@@ -61,9 +61,86 @@ class OscLightSenderSettings(BaseSettings):
     upper_edge:   Field[float] = Field(1.0,  min=0.0, max=1.0, step=0.01, description="Brightness ceiling: the analog LED driver saturates here — software 1.0 maps to this")
     curve:        Field[float] = Field(1.0,  min=0.5, max=3.0, step=0.01, description="Output gamma curve; <1 brightens mids, >1 darkens")
     startup_delay: Field[float] = Field(2.0, min=0.0, max=10.0, step=0.5, description="Hold motor rpm at 0 for this long after connect, then release to the commanded speed — forces a 0→target edge the motor controller acts on at boot")
+    resync_hold:  Field[float] = Field(0.3, min=0.1, max=2.0, step=0.1, description="Rpm-0 hold (s) after a send gap that may have tripped the fixture's watchdog — re-forces the 0→target edge that restarts a stopped motor")
     chunk_interval: Field[float] = Field(0.0,    min=0.0, max=0.005, step=0.0005, description="Seconds between consecutive pixel datagrams (0 = send back-to-back). Only raise this if the fixture reports dropped chunks — it adds output latency")
     projection_offset: Field[float] = Field(0.0, min=0.0, max=360.0, step=0.1, description="Projection offset (degrees): rotates the projection so the authored azimuth lands where it belongs in the room", newline=True)
     interlace:    Group[OscLightInterlaceSettings] = Group(OscLightInterlaceSettings)
+
+
+# The firmware's watchdog stops the motor after >5 revolutions of packet silence (firmware.cpp
+# line 426). Assume it may have fired after this many — the margin covers a physical speed slightly
+# above the ceiling's estimate.
+_WATCHDOG_SAFETY_REVS: float = 4.0
+
+# Slowest assumed spin-down (rpm/s) for the physical-speed ceiling. The real brake is ~3× the
+# ~333 rpm/s spin-up (see `light/motor.py` _SIM_DECEL); staying well under it keeps the ceiling
+# above the bar's true speed while it brakes down from PROJECTION.
+_CEILING_DECAY_RPM_S: float = 250.0
+
+
+class FixtureSpeedLatch:
+    """Host-side model of the fixture's speed latch — decides the rpm to put on the wire.
+
+    The firmware applies a received rpm only when it differs from the last one it applied
+    (firmware.cpp line 543, `vRPM`), and its packet watchdog stops the motor after more than
+    5 revolutions of packet silence *without recording that stop* (line 426). So after any send
+    silence — simulation, a host hitch, a stalled sender — the fixture's latch is stale:
+    re-sending the same rpm is a no-op and a watchdog-stopped motor never restarts.
+
+    While the latch is untrusted — before anything has been sent, after a send gap long enough
+    that the watchdog may have fired, or after `invalidate()` — `rpm_to_send` yields 0 for a
+    hold period and then releases to the target, forcing the 0→target edge the firmware acts on.
+    The hold is anchored at the send that begins it, not at `begin_hold`, so a hold armed while
+    nothing is sent (boot with simulation on) runs in full once sending starts.
+
+    The watchdog counts *physical* revolutions and the bar can spin faster than the last
+    commanded rpm (braking down from PROJECTION), so the gap bound uses a decaying ceiling of
+    the physical speed rather than the last sent value.
+
+    Owned by the sender thread; only `invalidate()` may be called from other threads (an atomic
+    flag, same pattern as the sender's `_config_dirty`).
+    """
+
+    def __init__(self) -> None:
+        self._pending_hold_s: float = 0.0           # armed hold length; anchored at the next send
+        self._hold_until:     float | None = None   # active hold deadline (sender-thread clock)
+        self._last_send:      float | None = None   # when the fixture last got a packet from us
+        self._ceiling:        float = 0.0           # upper bound on the bar's physical rpm
+        self._invalidated:    bool  = False         # cross-thread resync request
+
+    def invalidate(self) -> None:
+        """Distrust the latch from any thread; the sender converts it to a hold on its next pass."""
+        self._invalidated = True
+
+    def begin_hold(self, seconds: float) -> None:
+        """Arm a hold of `seconds` at rpm 0, starting at the next send. Never shortens one."""
+        self._pending_hold_s = max(self._pending_hold_s, seconds)
+
+    def note_sent(self, rpm: int, now: float) -> None:
+        """Record datagrams put on the wire: any packet resets the fixture's watchdog counter."""
+        if self._last_send is not None:
+            self._ceiling = max(0.0, self._ceiling - _CEILING_DECAY_RPM_S * (now - self._last_send))
+        self._ceiling = max(self._ceiling, float(rpm))
+        self._last_send = now
+
+    def rpm_to_send(self, target_rpm: int, resync_hold_s: float, now: float) -> int:
+        """The rpm to put on the wire this frame: `target_rpm`, or 0 while re-establishing."""
+        if self._invalidated:
+            self._invalidated = False
+            self.begin_hold(resync_hold_s)
+        if self._last_send is not None and self._hold_until is None and self._pending_hold_s == 0.0:
+            # Revolutions the bar may have made since our last packet, at the ceiling rate.
+            unseen_revs = (now - self._last_send) * self._ceiling / 60.0
+            if unseen_revs > _WATCHDOG_SAFETY_REVS:
+                self.begin_hold(resync_hold_s)
+        if self._pending_hold_s > 0.0:
+            self._hold_until = now + self._pending_hold_s   # anchor the hold at this send
+            self._pending_hold_s = 0.0
+        if self._hold_until is not None:
+            if now < self._hold_until:
+                return 0
+            self._hold_until = None
+        return target_rpm
 
 
 class OscLightSender:
@@ -99,9 +176,16 @@ class OscLightSender:
     * On a clean quit, ``stop()`` ends with a **blackout** — rpm 0, an all-zero frame, rpm 0
       again — so the fixture goes dark and the motor decelerates immediately. The firmware's
       Ethernet watchdog (packet silence → motor stop + blank) covers the crash path only.
+    * The firmware acts on the rpm only when it **changes** (its `vRPM` latch), and its watchdog
+      stops the motor without recording that stop — so after any send silence, repeating the old
+      rpm would leave a stopped motor stopped forever. `FixtureSpeedLatch` guards this: at boot,
+      after a reconnect, and after any gap long enough that the watchdog may have fired, the rpm
+      is held at 0 (`startup_delay` at boot, `resync_hold` otherwise) and then released, giving
+      the firmware the 0→target edge it acts on.
     * While the motor is simulated (``motor.simulate``) nothing is sent at all — no rpm, no
       pixels — so a simulated motor never reaches the fixture; the flag is read live, so
-      switching it off sends from the next frame.
+      switching it off sends from the next frame — through a resync hold, since the silence has
+      usually tripped the fixture's watchdog.
     """
 
     def __init__(self, settings: OscLightSenderSettings, motor: MotorSettings) -> None:
@@ -120,7 +204,7 @@ class OscLightSender:
             )
 
         self._latest_output: Optional[Frame] = None
-        self._start_time:    Optional[float] = None   # connect time → motor-rpm startup hold (boot edge)
+        self._latch = FixtureSpeedLatch()   # when the fixture's speed latch needs a 0→target edge
         self._output_lock:   Lock  = Lock()
         self._client_lock:   Lock  = Lock()
         self._update_event:  Event = Event()
@@ -188,7 +272,7 @@ class OscLightSender:
             f"{self._num_chunks} chunks of {self._chunk_size} bytes each."
         )
 
-        self._start_time = monotonic()   # begin the startup rpm-zero hold (forces a boot edge)
+        self._latch.begin_hold(self._config.startup_delay)   # boot edge; anchored at the first send
 
         while self._running:
             self._update_event.wait()
@@ -204,21 +288,26 @@ class OscLightSender:
             if self._motor.simulate:
                 continue            # a simulated motor never reaches the fixture: no rpm, no pixels
 
-            # Hold rpm at 0 for `startup_delay` after connect, then release to the commanded speed:
-            # the 0→target edge is what the motor controller acts on. Sending it on change gives
-            # exactly one clean edge; the keepalive below covers a lost packet.
-            held = self._start_time is not None and (monotonic() - self._start_time) < self._config.startup_delay
-            motor_rpm = 0 if held else int(output.motor_command.target_rpm)
-            self._send_config(motor_rpm)
+            # While the fixture's speed latch is untrusted — boot, or a send gap long enough that
+            # its watchdog may have stopped the motor without recording it — hold rpm at 0, then
+            # release: the 0→target edge is the only speed command the firmware acts on.
+            now = monotonic()
+            motor_rpm = self._latch.rpm_to_send(int(output.motor_command.target_rpm),
+                                                self._config.resync_hold, now)
+            sent = self._send_config(motor_rpm)
 
             # The fixture's readout mode follows the rpm we just sent — so does the slot rebuild.
             slow = motor_rpm < FIXTURE_PROJECTION_RPM
             chunks = self._build_chunk_messages(output, self._config, self._chunk_size, self._num_chunks, slow)
             if chunks:
                 self._send_paced(chunks, self._config.chunk_interval)
+                sent = True
+            if sent:   # a pass that put nothing on the wire must not reset the latch's gap clock
+                self._latch.note_sent(motor_rpm, now)
 
-    def _send_config(self, motor_rpm: int) -> None:
+    def _send_config(self, motor_rpm: int) -> bool:
         """Send the interlace and rpm — on change, or when the keepalive interval has elapsed.
+        Returns whether it sent.
 
         Keeping these five datagrams out of the per-frame burst is what buys the fixture's socket
         buffer enough headroom for the six pixel chunks.
@@ -226,12 +315,13 @@ class OscLightSender:
         now = monotonic()
         due = self._config_dirty or motor_rpm != self._sent_rpm or (now - self._last_config_at) >= _CONFIG_KEEPALIVE_S
         if not due:
-            return
+            return False
         self._config_dirty   = False
         self._sent_rpm       = motor_rpm
         self._last_config_at = now
         for message in self._build_config_messages(self._config, motor_rpm):
             self._send(message)
+        return True
 
     def _send_paced(self, messages: OscMessageList, interval: float) -> None:
         """Send `messages` spaced `interval` seconds apart, against a fixed deadline grid.
@@ -267,6 +357,7 @@ class OscLightSender:
             self._client = UDPClient(self._config.ip_addresses, self._config.port)
         self._config_dirty = True   # the new endpoint has not seen the interlace or rpm yet
         self._sent_rpm     = None
+        self._latch.invalidate()    # nor do we know the speed its latch holds
         logger.info(f"reconnected to {self._config.ip_addresses}:{self._config.port}")
 
     def _on_interlace_change(self, _=None) -> None:
