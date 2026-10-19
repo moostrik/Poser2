@@ -215,11 +215,12 @@ def _label(tracklet: Tracklet, annotation: PanoramicAnnotation, centre_dist: flo
     if rejected:
         return reason
     distance: str = f'R{centre_dist:.1f}m' if math.isfinite(centre_dist) else 'R-'
+    height: str = f'H{annotation.height:.1f}m' if math.isfinite(annotation.height) else 'H-'
     player: str = '-' if annotation.player is None else str(annotation.player)
     readout: str = (f'#{player} c{tracklet.cam_id} '
                     f'az{annotation.world_angle % 360.0:03.0f} '
                     f'{distance} '
-                    f'H{annotation.height:.1f}m')
+                    f'{height}')
     if annotation.player is None:
         readout = f'{readout} waiting'
     return f'{readout} {reason}' if reason else readout

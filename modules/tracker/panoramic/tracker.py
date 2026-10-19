@@ -223,12 +223,14 @@ class Tracker(Thread, BaseTracker):
         if self.rig.angle_in_edge(annotation.local_angle, self.config.seam.dead_zone):
             self._reject(new_tracklet, Rejection.DEAD_ZONE)
             return
-        if annotation.overlap:
-            linked_world: int | None = self.seams.linked_world(new_tracklet)
-            if linked_world is not None:
-                self._rejected.pop(key, None)
-                self.observations.add(new_tracklet, world_id=linked_world)
-                return
+        # The seam link is attempted for every arrival: the overlap band is geometry for the
+        # panorama, not a gate — `linked_world` finds no partner outside `seam.link_angle`, and a
+        # fast crossing may only be counted past the band while its anchor is still within reach.
+        linked_world: int | None = self.seams.linked_world(new_tracklet)
+        if linked_world is not None:
+            self._rejected.pop(key, None)
+            self.observations.add(new_tracklet, world_id=linked_world)
+            return
 
         # A new person: always tracked. With every player slot in use they wait on the observation
         # channel until one frees (`PlayerSlots`).

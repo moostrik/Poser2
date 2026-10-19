@@ -258,11 +258,7 @@ class Seams:
         own world cannot drag a neighbour in; each world in at most one pair."""
         observations: list[Tracklet] = [
             t for t in self._observations.all()
-            if not t.is_removed
-            and isinstance(t.annotation, Annotation)
-            # Eligible where a second opinion exists at all: the picture's overlap, not a tuned
-            # zone. Whether two eligible observations are one person is `_observations_match`.
-            and self._rig.angle_in_overlap(t.annotation.local_angle)
+            if not t.is_removed and isinstance(t.annotation, Annotation)
         ]
 
         def nearest_match(t: Tracklet) -> Tracklet | None:

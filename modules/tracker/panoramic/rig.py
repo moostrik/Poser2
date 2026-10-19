@@ -8,9 +8,9 @@ from .projection import azimuth_to_camera_x, camera_azimuth, camera_local_to_azi
     centre_distance, wrap180
 
 
-# Tallest reading `estimate_height` will report (m). Feet a pixel below the horizon divide by almost
-# nothing, so the ratio needs a ceiling — above any real reach (~2.4 m with arms up), so it only ever
-# catches a mangled or edge-clipped box.
+# Tallest reading `estimate_height` will report (m). Feet a pixel below the horizon divide by
+# almost nothing, so the ratio needs a validity bound — above any real reach (~2.4 m with arms up),
+# so only a mangled box reaches it, and such a reading is NaN rather than a clamped value.
 _MAX_HEIGHT: float = 3.0
 
 # A box this close to (or past) any frame edge is clipped: a cut head or feet, or the sliver of a
@@ -20,14 +20,12 @@ _CLIP_MARGIN: float = 0.005
 
 
 def height_is_measured(height: float) -> bool:
-    """Whether an `estimate_height` reading is a measurement rather than one of its escapes.
-
-    0.0 (feet at or above the horizon) and `_MAX_HEIGHT` (feet barely below it, or a box clipped by
-    any frame edge) both mean "no reading", not "this tall". A gate comparing two heights asks this
-    first, so a person mid-jump or half out of frame is not dropped at the moment they are hardest
-    to re-find.
+    """Whether an `estimate_height` reading is a measurement. NaN means "no reading": feet at or
+    above the horizon, a ratio past `_MAX_HEIGHT` (feet barely below it), or a box clipped by any
+    frame edge. A gate comparing two heights asks this first, so a person mid-jump or half out of
+    frame is not dropped at the moment they are hardest to re-find.
     """
-    return 0.0 < height < _MAX_HEIGHT
+    return math.isfinite(height) and 0.0 < height
 
 
 class Rig:
@@ -69,7 +67,8 @@ class Rig:
         """Everything one box says about one person.
 
         The overlap flag is the *picture* — this column is inside the band a neighbour also sees —
-        not a tunable; whether two observations are one person is `seam.link_angle`.
+        a read-out for the panorama, not a gate: the seam link is attempted everywhere and
+        `seam.link_angle` decides.
         """
         local_angle, world_angle, distance = self.calc_angle(roi, cam_id)
         radius: float = self._radius(local_angle, distance)
@@ -177,22 +176,24 @@ class Rig:
 
         It reads **reach, not stature** — raised arms read ~2.2 m where arms down read 1.8 m — and it
         is the signal `foot_offset` is tuned by: with the detector's pad uncorrected it reads low and
-        *falls* with distance; tune until it is flat (CALIBRATION.md, *Calibrating the metres*). 0.0
-        when the feet are at or above the horizon; ``_MAX_HEIGHT`` when the box touches or crosses
-        any frame edge (``_CLIP_MARGIN``) — a clipped head or feet, or the sliver of a person
-        walking out at a side edge, makes the ratio read plausible and wrong, which no cap can
-        catch; capped at ``_MAX_HEIGHT``.
+        *falls* with distance; tune until it is flat (CALIBRATION.md, *Calibrating the metres*).
+        NaN without a reading: feet at or above the horizon; a ratio past ``_MAX_HEIGHT`` (feet
+        barely below it — a mangled box, not a person); or a box touching or crossing any frame
+        edge (``_CLIP_MARGIN``) — a clipped head or feet, or the sliver of a person walking out at
+        a side edge, makes the ratio read plausible and wrong, which no bound can catch. Every
+        finite return is a measurement.
         """
         rows: int = self._rows - 1
         foot_px: float = self._foot_px(roi)
         below: float = foot_px - self._horizon_px
         if below <= 0.0:
-            return 0.0
+            return math.nan
         if (roi.y <= _CLIP_MARGIN or roi.y + roi.height >= 1.0 - _CLIP_MARGIN
                 or roi.x <= _CLIP_MARGIN or roi.x + roi.width >= 1.0 - _CLIP_MARGIN):
-            return _MAX_HEIGHT
+            return math.nan
         span: float = foot_px - roi.y * rows                 # head to corrected feet, px
-        return min(_MAX_HEIGHT, max(0.0, self._camera_height * span / below))
+        height: float = self._camera_height * span / below
+        return height if 0.0 < height < _MAX_HEIGHT else math.nan
 
     def _calc_local_angle(self, roi: Rect) -> float:
         """The bearing of the box centre within this camera's field. Exact: the frame is
@@ -204,10 +205,10 @@ class Rig:
         """Is this column inside the band a neighbouring camera also sees — `overlap_band` in from
         either field edge?
 
-        The precondition for a seam link, not a tunable. Deliberately not per person: the true band
-        narrows with distance, but too wide costs nothing (`Seams.linked_world` finds no partner)
-        while too narrow splits a person, so it is derived once at the zone's far edge, where it is
-        widest (`_update_overlap_band`).
+        A read-out for the panorama, not a gate: the seam link is attempted everywhere, and finds
+        no partner outside `seam.link_angle` anyway. Deliberately not per person: the true band
+        narrows with distance, so it is derived once at the zone's far edge, where it is widest
+        (`_update_overlap_band`).
         """
         return local_angle <= self.overlap_band or local_angle >= self.cam_fov - self.overlap_band
 

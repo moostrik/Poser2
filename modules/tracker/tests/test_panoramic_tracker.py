@@ -389,6 +389,23 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         self.assertEqual(set(out.keys()), {0})
         self.assertEqual(self.tracker.observations.world_of(1, 1), 0)
 
+    def test_a_late_counted_crossing_links_past_the_band(self) -> None:
+        # The overlap band is geometry for the panorama, not a gate (the journal measured a fast
+        # crossing first counted 0.4° inside it — one tick later and no link would have been
+        # tried). A new track counted past the band still links when an anchor is within
+        # `seam.link_angle`.
+        self.submit(make_tracklet(0, 1, 108.0))                       # azimuth 98, near the seam
+        self.submit(make_tracklet(0, 1, 108.0, status=TrackingStatus.LOST))
+        out = self.submit(make_tracklet(1, 1, 25.0))                  # azimuth 105: past the band
+        self.assertEqual(self.tracker.observations.world_of(1, 1), 0)
+        self.assertEqual(set(out.keys()), {0})
+
+    def test_a_mid_field_birth_far_from_any_anchor_stays_a_birth(self) -> None:
+        self.submit(make_tracklet(0, 1, 98.0))                        # azimuth 88
+        out = self.submit(make_tracklet(1, 1, 55.0))                  # azimuth 135: nobody near
+        self.assertEqual(self.tracker.observations.world_of(1, 1), 1)
+        self.assertEqual(set(out.keys()), {0, 1})
+
     def test_an_exit_sliver_cannot_veto_the_link(self) -> None:
         # The journal-captured crossing (diagnosis 20261019-171644, marks 3/4 at link_angle 25):
         # the exiting camera's last boxes are border slivers whose height reads short, and that
@@ -1421,41 +1438,41 @@ class TestRigHeight(unittest.TestCase):
                 self.assertAlmostEqual(g.estimate_height(self.box(1.8, distance)), 1.8, places=6)
                 self.assertAlmostEqual(g.estimate_height(self.box(2.2, distance)), 2.2, places=6)
 
-    def test_zero_when_the_feet_are_not_on_this_floor(self) -> None:
+    def test_no_reading_when_the_feet_are_not_on_this_floor(self) -> None:
         g = self.make_rig()
-        self.assertEqual(g.estimate_height(Rect(y=0.0, height=HORIZON_ROW)), 0.0)   # feet on the horizon
-        self.assertEqual(g.estimate_height(Rect(y=0.0, height=0.2)), 0.0)           # and above it
+        self.assertTrue(math.isnan(g.estimate_height(Rect(y=0.0, height=HORIZON_ROW))))  # feet on the horizon
+        self.assertTrue(math.isnan(g.estimate_height(Rect(y=0.0, height=0.2))))          # and above it
 
-    def test_capped_for_a_box_that_barely_clears_the_horizon(self) -> None:
-        # Feet a pixel below the horizon divide by almost nothing; the cap is what bounds it, and
-        # it sits above any height a person can measure so it only ever catches a mangled box.
+    def test_no_reading_for_a_box_that_barely_clears_the_horizon(self) -> None:
+        # Feet a pixel below the horizon divide by almost nothing; `_MAX_HEIGHT` bounds validity —
+        # it sits above any height a person can measure, so only a mangled box reaches it.
         g = self.make_rig()
         one_px: float = 1.0 / (ROWS - 1)
-        self.assertEqual(g.estimate_height(Rect(y=0.1, height=HORIZON_ROW - 0.1 + one_px)), _MAX_HEIGHT)
+        self.assertTrue(math.isnan(g.estimate_height(Rect(y=0.1, height=HORIZON_ROW - 0.1 + one_px))))
         self.assertGreater(_MAX_HEIGHT, 2.4)                # a tall person with both arms up
 
-    def test_feet_on_the_bottom_row_read_clipped(self) -> None:
+    def test_feet_on_the_bottom_row_read_no_reading(self) -> None:
         # The frame's nearest readable row is also where a closer person's box is cut off, and the
         # two cannot be told apart — so the bottom row is not a measurement (`_CLIP_MARGIN`), and
         # the seam veto cannot fire on it.
         g = self.make_rig()
         nearest: float = CAMERA_HEIGHT / math.tan(math.radians(-WINDOW.elevation_bottom))
-        self.assertEqual(g.estimate_height(self.box(1.8, nearest)), _MAX_HEIGHT)
+        self.assertTrue(math.isnan(g.estimate_height(self.box(1.8, nearest))))
 
-    def test_a_clipped_box_reads_the_cap(self) -> None:
+    def test_a_clipped_box_has_no_reading(self) -> None:
         # A box cut by the frame edge reads plausible and wrong — hidden feet make a 1.8 m person
-        # read well under their height, inside every gate — so an edge box reads the cap, which
-        # `height_is_measured` already rejects.
+        # read well under their height, inside every gate — so an edge box reads NaN, which
+        # `height_is_measured` rejects.
         g = self.make_rig()
         whole: Rect = self.box(1.8, 2.0)
         clipped_top: Rect = replace(whole, y=0.0, height=whole.y + whole.height)    # head cut off
         clipped_feet: Rect = replace(whole, height=1.0 - whole.y)                   # feet cut off
         clipped_left: Rect = replace(whole, x=0.0)                                  # walking in
         clipped_right: Rect = replace(whole, x=1.0 - whole.width)                   # walking out
-        self.assertEqual(g.estimate_height(clipped_top), _MAX_HEIGHT)
-        self.assertEqual(g.estimate_height(clipped_feet), _MAX_HEIGHT)
-        self.assertEqual(g.estimate_height(clipped_left), _MAX_HEIGHT)
-        self.assertEqual(g.estimate_height(clipped_right), _MAX_HEIGHT)
+        self.assertTrue(math.isnan(g.estimate_height(clipped_top)))
+        self.assertTrue(math.isnan(g.estimate_height(clipped_feet)))
+        self.assertTrue(math.isnan(g.estimate_height(clipped_left)))
+        self.assertTrue(math.isnan(g.estimate_height(clipped_right)))
         self.assertFalse(height_is_measured(g.estimate_height(clipped_feet)))
 
     def test_a_box_just_inside_the_edges_still_measures(self) -> None:
@@ -1479,15 +1496,15 @@ class TestRigHeight(unittest.TestCase):
                     self.assertAlmostEqual(g.estimate_height(roi0), 1.8, places=6)
                     self.assertAlmostEqual(g.estimate_height(roi1), 1.8, places=6)
 
-    def test_too_close_for_the_frame_reads_clipped_at_a_seam(self) -> None:
+    def test_too_close_for_the_frame_has_no_reading_at_a_seam(self) -> None:
         # At R 1.35 the near camera's box crosses the frame bottom — the feet are below what the
         # frame can see, and a real detector would clamp the box there. That is not a measurement
-        # (`_CLIP_MARGIN`), so it reads the cap and the seam veto stays out of the link.
+        # (`_CLIP_MARGIN`), so it reads NaN and the seam veto stays out of the link.
         g = self.make_rig()
         for azimuth in (80.0, 75.0, 72.0):
             with self.subTest(azimuth=azimuth):
                 roi0, _d0 = synth_observation(0, azimuth, 1.35, person_height=1.8)
-                self.assertEqual(g.estimate_height(roi0), _MAX_HEIGHT)
+                self.assertTrue(math.isnan(g.estimate_height(roi0)))
 
     def test_the_annotation_carries_it(self) -> None:
         g = self.make_rig()
