@@ -52,6 +52,7 @@ if __name__ == '__main__':
     parser: ArgumentParser = ArgumentParser()
     parser.add_argument('-app',     '--app',            type=str,   default=None, choices=list(APP_REGISTRY.keys()), help='app to launch (default: from .app_select.json or first in registry)')
     parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecorded video with camera')
+    parser.add_argument('-ni',      '--no-interface',   action='store_true',        help='do not open the settings interface in an Edge window')
     parser.add_argument('-v',       '--verbose',        action='store_true',        help='enable verbose (DEBUG) console output')
     args: Namespace = parser.parse_args()
     log_file = setup_logging(verbose=args.verbose)
@@ -63,7 +64,7 @@ if __name__ == '__main__':
     logging.info("Logging to: %s", log_file)
 
     AppClass = APP_REGISTRY[args.app]
-    app = AppClass(simulation=args.simulation)
+    app = AppClass(simulation=args.simulation, interface=not args.no_interface)
     app.start()
 
     shutdown_event = Event()

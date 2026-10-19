@@ -21,7 +21,7 @@ DATA_PATH = 'apps/deep_flow/data'
 
 
 class DeepFlowMain:
-    def __init__(self, simulation: bool = False) -> None:
+    def __init__(self, simulation: bool = False, interface: bool = True) -> None:
 
         self.is_running: bool = False
         self.is_finished: bool = False
@@ -33,6 +33,8 @@ class DeepFlowMain:
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
         self.settings.camera.sim_enabled = simulation
+        if not interface:
+            self.settings.server.browser = False  # launcher override; the preset cannot turn it back on
         self.settings.initialize()
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 

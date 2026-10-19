@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class WhiteSpaceMain:
-    def __init__(self, simulation: bool = False) -> None:
+    def __init__(self, simulation: bool = False, interface: bool = True) -> None:
 
         self.is_running: bool = False
         self.is_finished: bool = False
@@ -44,6 +44,8 @@ class WhiteSpaceMain:
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
         self.settings.camera.sim_enabled = simulation
+        if not interface:
+            self.settings.server.browser = False  # launcher override; the preset cannot turn it back on
         # The crop is the pose model's input, so it is cut at that size: one antialiased resample
         # from the camera frame, rather than a larger crop the runner scales down again. Derived
         # from the model so a change of pose resolution cannot silently reintroduce the second one.
