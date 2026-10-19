@@ -75,9 +75,12 @@ DEAD_ZONE_COLOR: tuple[float, float, float, float] = (1.0, 0.15, 0.1, 0.10)  # n
 # The tracked floor as a band between the two radii, in the overlap's yellow: together they say
 # where the tracker works — the overlap bounds it in azimuth, the zone in distance.
 ZONE_COLOR:     tuple[float, float, float, float] = (1.0, 0.85, 0.0, 0.10)
-# A rejected detection — too young, too small, a new one in the dead zone, past the far edge, no id.
+# A rejected detection — too young, too small, a new one in the dead zone, past the far edge.
 # Grey because it belongs to nobody: every track colour means a person. Also the colour a LOST mark's
 # line fades toward, so a person walking out ends where their grey line begins.
 REJECTED_COLOR: tuple[float, float, float, float] = (0.6, 0.6, 0.6, 0.8)
+# A person tracked but waiting for a free player slot: a real identity, belonging to no slot yet, so
+# neither a track colour nor the rejection grey. White, at the passive line's alpha.
+WAITING_COLOR: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 0.8)
 LABEL_FG:      tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
 LABEL_BG:      tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.6)

@@ -103,5 +103,10 @@ class TrackerSettings(BaseSettings):
     # How long they keep a pose from their last box is the pose side's `detection_timeout`.
     lost_timeout: Field[float] = Field(2.0, min=1.0, max=5.0, step=0.1,
                                        description="Seconds a lost person is remembered, for seam links and re-acquisition")
+    # Live read-outs, written by the tracker each tick (`PlayerSlots`).
+    players: Field[int] = Field(0, access=Field.READ, newline=True,
+                                description="People holding a player slot, of max players")
+    waiting: Field[int] = Field(0, access=Field.READ,
+                                description="People tracked but waiting for a free player slot")
     seam: Group[SeamSettings] = Group(SeamSettings)
     rig: Group[RigSettings] = Group(RigSettings)

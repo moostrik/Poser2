@@ -41,12 +41,14 @@ CONTEXT: MarkContext = MarkContext(
 WHITE: list[tuple[float, float, float, float]] = [(1.0, 1.0, 1.0, 1.0)]
 RED: list[tuple[float, float, float, float]] = [(1.0, 0.0, 0.0, 1.0)]
 GREY: tuple[float, float, float, float] = (0.6, 0.6, 0.6, 0.8)
+WAITING: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 0.8)
 
 
 def observation(cam_id: int, local_angle: float, world_angle: float, *, overlap: bool,
                 distance: float = 3.0, top: float = 0.2, height: float = 0.5,
-                world_id: int = 0, status: TrackingStatus = TrackingStatus.TRACKED) -> Tracklet:
-    """One camera's annotated view of one person, as the tracker would have stored it.
+                world_id: int = 0, status: TrackingStatus = TrackingStatus.TRACKED,
+                player: int | None = 0) -> Tracklet:
+    """One camera's annotated view of one person, as the tracker would have published it.
 
     `local_angle` and `world_angle` are passed independently on purpose: the tracker derives the
     second from the first through the parallax correction, and a mark must use each where it
@@ -56,12 +58,13 @@ def observation(cam_id: int, local_angle: float, world_angle: float, *, overlap:
     return Tracklet(
         cam_id=cam_id, status=status, roi=roi, external_id=1, external_age_in_frames=10,
         annotation=PanoramicAnnotation(local_angle=local_angle, world_angle=world_angle,
-                                       overlap=overlap, distance=distance, height=1.8),
+                                       overlap=overlap, distance=distance, height=1.8,
+                                       player=player),
     )
 
 
 def mark(tracklet: Tracklet, context: MarkContext = CONTEXT) -> Mark:
-    marks: list[Mark] = build_marks([tracklet], set(), WHITE, GREY, context)
+    marks: list[Mark] = build_marks([tracklet], set(), WHITE, GREY, WAITING, context)
     assert len(marks) == 1
     return marks[0]
 
@@ -117,12 +120,12 @@ class TestPlacement(unittest.TestCase):
 
     def test_a_removed_observation_makes_no_mark(self) -> None:
         removed = observation(0, 63.5, 45.0, overlap=False, status=TrackingStatus.REMOVED)
-        self.assertEqual(build_marks([removed], set(), WHITE, GREY, CONTEXT), [])
+        self.assertEqual(build_marks([removed], set(), WHITE, GREY, WAITING, CONTEXT), [])
 
 
 def rejected(reason: Rejection, **kwargs) -> Tracklet:
     """A detection a filter rejected, as the tracker publishes it: no world, with its rejection."""
-    t: Tracklet = observation(0, 63.5, 45.0, overlap=False, **kwargs)
+    t: Tracklet = observation(0, 63.5, 45.0, overlap=False, player=None, **kwargs)
     assert isinstance(t.annotation, PanoramicAnnotation)
     return replace(t, id=-1, annotation=replace(t.annotation, rejected=reason))
 
@@ -140,14 +143,13 @@ class TestRejectedDetections(unittest.TestCase):
 
     def test_each_rejection_labels_itself(self) -> None:
         for reason, text in ((Rejection.YOUNG, 'young'), (Rejection.SMALL, 'small'),
-                             (Rejection.DEAD_ZONE, 'dead zone'), (Rejection.PAST_EDGE, 'past R3.5'),
-                             (Rejection.NO_ID, 'no id')):
+                             (Rejection.DEAD_ZONE, 'dead zone'), (Rejection.PAST_EDGE, 'past R3.5')):
             with self.subTest(reason=reason):
                 self.assertEqual(mark(rejected(reason)).label, text)
 
     def test_rejected_marks_are_drawn_first(self) -> None:
         marks = build_marks([observation(0, 63.5, 45.0, overlap=False), rejected(Rejection.YOUNG)],
-                            set(), WHITE, GREY, CONTEXT)
+                            set(), WHITE, GREY, WAITING, CONTEXT)
         self.assertEqual([m.rejected for m in marks], [True, False])
 
     def test_a_tracked_person_past_the_edge_keeps_their_own_mark(self) -> None:
@@ -155,10 +157,36 @@ class TestRejectedDetections(unittest.TestCase):
         t: Tracklet = observation(0, 63.5, 45.0, overlap=False, status=TrackingStatus.LOST)
         assert isinstance(t.annotation, PanoramicAnnotation)
         t = replace(t, id=0, last_active=NOW, annotation=replace(t.annotation, rejected=Rejection.PAST_EDGE))
-        m: Mark = build_marks([t], set(), RED, GREY, CONTEXT)[0]
+        m: Mark = build_marks([t], set(), RED, GREY, WAITING, CONTEXT)[0]
         self.assertFalse(m.rejected)
         self.assertTrue(m.label.endswith(' past R3.5'))
         self.assertTrue(m.label.startswith('#0 c0'))
+
+
+class TestWaitingForASlot(unittest.TestCase):
+    """A person tracked but waiting for a player slot keeps their own line and field, in the
+    waiting colour and labelled `waiting` — on the strip, belonging to no slot yet."""
+
+    def test_a_waiting_mark_has_the_waiting_colour_and_label(self) -> None:
+        t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, player=None), id=6)
+        m: Mark = build_marks([t], set(), RED, GREY, WAITING, CONTEXT)[0]
+        self.assertFalse(m.rejected)
+        self.assertIsNone(m.player)
+        self.assertEqual(m.color[:3], WAITING[:3])
+        self.assertGreater(m.field_w, 0.0)                      # the join rules still govern them
+        self.assertTrue(m.label.startswith('#- c0'))
+        self.assertTrue(m.label.endswith(' waiting'))
+
+    def test_the_colour_and_label_are_the_slot_not_the_world(self) -> None:
+        # The same index the pose figures colour by, so the strip and the pose row cannot disagree;
+        # the world id is unbounded and never displayed.
+        colors = [(1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0)]
+        t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, player=1), id=7)
+        m: Mark = build_marks([t], set(), colors, GREY, WAITING, CONTEXT)[0]
+        self.assertEqual(m.color[:3], (0.0, 1.0, 0.0))
+        self.assertEqual(m.player, 1)
+        self.assertEqual(m.world_id, 7)
+        self.assertTrue(m.label.startswith('#1 c0'))
 
 
 class TestLostFade(unittest.TestCase):
@@ -168,7 +196,7 @@ class TestLostFade(unittest.TestCase):
     def lost(self, seconds_lost: float, status: TrackingStatus = TrackingStatus.LOST) -> Mark:
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, status=status),
                               id=0, last_active=NOW - seconds_lost)
-        return build_marks([t], set(), RED, GREY, CONTEXT)[0]
+        return build_marks([t], set(), RED, GREY, WAITING, CONTEXT)[0]
 
     def colour(self, seconds_lost: float, status: TrackingStatus = TrackingStatus.LOST):
         return self.lost(seconds_lost, status).color
@@ -182,7 +210,7 @@ class TestLostFade(unittest.TestCase):
     def test_a_lost_field_is_outlined_even_as_primary(self) -> None:
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=False, status=TrackingStatus.LOST),
                               id=0, last_active=NOW)
-        self.assertTrue(build_marks([t], {t.obs_id}, RED, GREY, CONTEXT)[0].field_outline)
+        self.assertTrue(build_marks([t], {t.obs_id}, RED, GREY, WAITING, CONTEXT)[0].field_outline)
 
     def test_fresh_is_the_world_colour(self) -> None:
         self.assertEqual(self.colour(0.0), (1.0, 0.0, 0.0, 0.8))
@@ -208,8 +236,8 @@ class TestPassiveField(unittest.TestCase):
 
     def test_primary_filled_passive_outlined(self) -> None:
         t: Tracklet = replace(observation(0, 63.5, 45.0, overlap=True), id=0)
-        primary: Mark = build_marks([t], {t.obs_id}, RED, GREY, CONTEXT)[0]
-        passive: Mark = build_marks([t], set(), RED, GREY, CONTEXT)[0]
+        primary: Mark = build_marks([t], {t.obs_id}, RED, GREY, WAITING, CONTEXT)[0]
+        passive: Mark = build_marks([t], set(), RED, GREY, WAITING, CONTEXT)[0]
         self.assertFalse(primary.field_outline)
         self.assertTrue(passive.field_outline)
         self.assertEqual(primary.field_color, passive.field_color)

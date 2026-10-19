@@ -150,10 +150,10 @@
     "window": {
       "title": "Poser",
       "v_sync": true,
-      "monitor": "M0",
-      "x": 2561,
+      "monitor": "M1",
+      "x": 1,
       "y": 31,
-      "width": 1278,
+      "width": 2558,
       "height": 2080,
       "secondary_list": [],
       "secondary_fullscreen": true,
@@ -193,6 +193,7 @@
       "upper_edge": 0.68,
       "curve": 2.0,
       "startup_delay": 2.0,
+      "resync_hold": 0.3,
       "chunk_interval": 0.0,
       "projection_offset": 244.0,
       "interlace": {
@@ -875,6 +876,7 @@
   "PI": {
     "max_lines": 90,
     "opposite": "OFF",
+    "lean_share": 2.0,
     "on_at": 0.98,
     "off_at": 0.93,
     "mask": {
@@ -1024,16 +1026,16 @@
       "azimuth": 223.0,
       "distance": 0.5,
       "torso": 0.0,
-      "left_shoulder": -95.0,
-      "right_shoulder": -95.0,
-      "left_elbow": -1.0,
-      "right_elbow": -1.0,
+      "left_shoulder": -20.0,
+      "right_shoulder": -20.0,
+      "left_elbow": 12.0,
+      "right_elbow": 12.0,
       "left_hip": -10.0,
       "right_hip": -9.0,
       "left_knee": 8.0,
       "right_knee": 8.0,
       "morph": 1.2,
-      "pose": "arms out level, a T",
+      "pose": "neutral",
       "name": "|_|"
     }
   },

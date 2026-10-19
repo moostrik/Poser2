@@ -17,10 +17,12 @@ _MARK_GAP_PX: float = 6.0    # between a label and the line it belongs to
 class LabelRenderer(LayerBase):
     """Each mark's label, laid out so labels never overlap and never lie about a bearing.
 
-    **Height is the id.** A label's lane is its world id, the same index its colour comes from, so
-    two different people can never collide however they move, no label shifts when someone else
-    arrives or leaves, and height becomes a second reading of *who* — useful where four track
-    colours are hard to tell apart against a bright stitch. An unoccupied id is simply a gap.
+    **Height is the player slot.** A label's lane is its player slot, the same index its colour
+    comes from, so two different people can never collide however they move, no label shifts when
+    someone else arrives or leaves, and height becomes a second reading of *who* — useful where four
+    track colours are hard to tell apart against a bright stitch. An unoccupied slot is simply a
+    gap. Marks outside the lanes — rejected detections and people waiting for a slot — are labelled
+    at the top of their own line instead (`_draw_line_label`).
 
     **x never moves.** The label anchors on its mark. It is never nudged sideways to make room,
     because sideways is the axis that carries meaning here: a shifted label would imply a bearing
@@ -59,8 +61,8 @@ class LabelRenderer(LayerBase):
 
     def draw(self) -> None:
         for mark in self._marks:
-            if mark.rejected:
-                self._draw_rejected_label(mark)
+            if mark.rejected or mark.player is None:
+                self._draw_line_label(mark)
 
         for group in self._by_world().values():
             count: int = len(group)
@@ -90,20 +92,21 @@ class LabelRenderer(LayerBase):
                 x: float = mark_px - _MARK_GAP_PX - width if to_the_left else mark_px + _MARK_GAP_PX
                 x = min(max(x, 0.0), max(0.0, self._width - width))
 
-                y: float = _LANE_TOP_PX + mark.world_id * (height + _LANE_GAP_PX)
+                y: float = _LANE_TOP_PX + mark.player * (height + _LANE_GAP_PX)
                 if y + height > self._height:
                     continue
 
                 self._text.draw_box_text(x, y, mark.label, mark.color, LABEL_BG,
                                          self._width, self._height)
 
-    def _draw_rejected_label(self, mark: Mark) -> None:
-        """A rejected detection's label — its rejection — at the top of its line.
+    def _draw_line_label(self, mark: Mark) -> None:
+        """A label at the top of its own line, for marks outside the lanes: a rejected detection's
+        rejection, a waiting person's readout.
 
-        Not in a lane: lanes are world ids, and a rejected detection belongs to nobody. Beside the top
-        of the line, reading right from it; flipped to the left at the strip's right edge, for the
-        same reason lane labels flip. Two rejected views of one person at a seam can overlap their
-        labels — rare, and left so.
+        Not in a lane: lanes are player slots, and neither of them holds one. Beside the top of the
+        line, reading right from it; flipped to the left at the strip's right edge, for the same
+        reason lane labels flip. Two such views of one person at a seam can overlap their labels —
+        rare, and left so.
         """
         width, height = self._text.measure_text(mark.label)
         mark_px: float = mark.x * self._width
@@ -115,12 +118,13 @@ class LabelRenderer(LayerBase):
         self._text.draw_box_text(x, y, mark.label, mark.color, LABEL_BG, self._width, self._height)
 
     def _by_world(self) -> dict[int, list[Mark]]:
-        """One person's marks together, ordered left to right — the order the side rule needs.
-        Rejected detections have no world and are labelled at their line instead
-        (`_draw_rejected_label`)."""
+        """One slotted person's marks together, ordered left to right — the order the side rule
+        needs. The group key is the world id — all waiting marks share `player` None, so the slot
+        cannot group them — but the lane drawn is the player's. Rejected and waiting marks are
+        labelled at their line instead (`_draw_line_label`)."""
         grouped: dict[int, list[Mark]] = {}
         for mark in self._marks:
-            if mark.rejected:
+            if mark.rejected or mark.player is None:
                 continue
             grouped.setdefault(mark.world_id, []).append(mark)
         for group in grouped.values():

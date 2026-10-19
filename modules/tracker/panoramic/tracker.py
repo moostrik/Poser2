@@ -32,15 +32,17 @@ class Tracker(Thread, BaseTracker):
       azimuth, distance, height); `RigSync` keeps it and the published read-outs in step with
       `RigSettings`.
     - `ObservationStore` holds the per-camera observations — immutable, host-owned ids — grouped
-      into world ids.
+      into world ids (unbounded), and assigns up to `num_players` concurrent worlds to the player
+      slots downstream is wired for (`PlayerSlots`).
     - `Seams` applies `SeamSettings`: linking a new view across a seam, splitting and collapsing
       worlds, handing the primary view over between cameras, and blending a world's azimuth.
 
     This class runs the thread: the intake (filters, same-camera re-acquisition, the dead zone, then
     the seam link), the per-tick expiry and emission, and the callbacks. Two output channels:
-    ``add_tracklet_callback`` delivers one primary per remembered world — LOST only when no camera
+    ``add_tracklet_callback`` delivers one primary per player slot — LOST only when no camera
     sees the person; freshness is the consumer's call — and ``add_observation_callback`` every
-    observation plus every rejected detection, for the panorama.
+    observation (its slot on the annotation, None while waiting for one) plus every rejected
+    detection, for the panorama.
     """
 
     def __init__(self, config: TrackerSettings, num_players: int, num_cameras: int) -> None:
@@ -81,8 +83,6 @@ class Tracker(Thread, BaseTracker):
         # on the observation channel so the panorama can draw them, never on the primary channel.
         # Touched only on the tracker thread (`_add_tracklet` and `_update_and_notify`).
         self._rejected: dict[tuple[int, int], Tracklet] = {}
-        # Set while births are refused for want of a world id, so that is logged once, not per frame.
-        self._pool_full: bool = False
 
     def column_to_azimuth(self, cam_id: int, x: float) -> float:
         """World azimuth (degrees, [0, 360)) of a normalised column of camera `cam_id`, through the
@@ -226,14 +226,8 @@ class Tracker(Thread, BaseTracker):
                 self.observations.add(new_tracklet, world_id=linked_world)
                 return
 
-        # A new person. Checked here rather than read off `add_tracklet`'s None, which cannot say why.
-        if not self.observations.has_free_id():
-            if not self._pool_full:
-                logger.warning("Every world id is in use: new people are not tracked until one frees up")
-                self._pool_full = True
-            self._reject(new_tracklet, Rejection.NO_ID)
-            return
-        self._pool_full = False
+        # A new person: always tracked. With every player slot in use they wait on the observation
+        # channel until one frees (`PlayerSlots`).
         self._rejected.pop(key, None)
         self.observations.add(new_tracklet)
 
@@ -268,6 +262,14 @@ class Tracker(Thread, BaseTracker):
         assert isinstance(tracklet.annotation, Annotation)
         return replace(tracklet, annotation=replace(tracklet.annotation, rejected=reason))
 
+    def _with_player(self, tracklet: Tracklet) -> Tracklet:
+        """The callback copy of an observation, its world's player slot stamped on the annotation.
+        The stored observation keeps pure world identity."""
+        if not isinstance(tracklet.annotation, Annotation):
+            return tracklet
+        player: int | None = self.observations.players.slot_of(tracklet.id)
+        return replace(tracklet, annotation=replace(tracklet.annotation, player=player))
+
     def _reject(self, tracklet: Tracklet, reason: Rejection) -> None:
         """Not counted this frame: keep the detection, with its rejection, for the panorama."""
         self._rejected[(tracklet.cam_id, tracklet.external_id)] = self._with_rejection(tracklet, reason)
@@ -284,20 +286,26 @@ class Tracker(Thread, BaseTracker):
         self.seams.split_worlds()
         self.seams.collapse_worlds()
 
-        # Emit one primary per world the tracker still remembers until `lost_timeout` retires it —
-        # LOST only when no camera sees the person. How stale is too stale is the consumer's call:
-        # pose stops posing a person after `pose.tracklets.detection_timeout`, and the show reads
-        # poses. A world retired just above is still in the store until the end of this tick; it is
-        # not emitted.
+        # Emit one primary per world holding a player slot, keyed and id-stamped by that slot — the
+        # id everything downstream indexes on. A world waiting for a slot is tracked but kept to the
+        # observation channel; a world is remembered until `lost_timeout` retires it, LOST only when
+        # no camera sees the person. How stale is too stale is the consumer's call: pose stops posing
+        # a person after `pose.tracklets.detection_timeout`, and the show reads poses. A world
+        # retired just above is still in the store until the end of this tick; it is not emitted.
         # The primary supplies the box and the camera (the crop); the azimuth is the world's blend of
         # its active views, so it does not step when the primary changes camera.
         emitted: TrackletDict = {}
         for world_id in self.observations.world_ids():
             primary: Tracklet | None = self.seams.pick_primary(world_id, now)
-            if primary is not None:
-                assert isinstance(primary.annotation, Annotation)
-                azimuth: float = self.seams.world_azimuth(world_id, primary)
-                emitted[world_id] = replace(primary, annotation=replace(primary.annotation, world_angle=azimuth))
+            if primary is None:
+                continue
+            player: int | None = self.observations.players.slot_of(world_id)
+            if player is None:
+                continue
+            assert isinstance(primary.annotation, Annotation)
+            azimuth: float = self.seams.world_azimuth(world_id, primary)
+            emitted[player] = replace(primary, id=player,
+                                      annotation=replace(primary.annotation, world_angle=azimuth, player=player))
         self._notify_callback(emitted)
 
         # Dropped detections a camera has stopped reporting: a device track normally ends with LOST
@@ -308,9 +316,11 @@ class Tracker(Thread, BaseTracker):
 
         # Every live observation, for the calibration view: the two cameras' separate opinions
         # of a person on a seam, which the primaries above deliberately reduce to one — and every
-        # detection a filter rejected, so nobody vanishes from the strip without a reason.
+        # detection a filter rejected, so nobody vanishes from the strip without a reason. Each
+        # observation's copy carries its world's player slot, None while waiting.
         self._notify_observation_callback(
-            [t for t in self.observations.all() if not t.is_removed] + list(self._rejected.values())
+            [self._with_player(t) for t in self.observations.all() if not t.is_removed]
+            + list(self._rejected.values())
         )
 
         # Drop REMOVED observations and the handover state of worlds that went with them
@@ -318,6 +328,11 @@ class Tracker(Thread, BaseTracker):
             if t.status == TrackingStatus.REMOVED:
                 self.observations.remove(t.obs_id)
         self.seams.prune(set(self.observations.world_ids()))
+
+        # The panel's live read-outs, at end-of-tick truth: slots freed by the removals just above
+        # have moved on to the oldest waiters.
+        self.config.players = self.observations.players.in_use
+        self.config.waiting = self.observations.players.waiting
 
     # CALLBACKS
     def _notify_callback(self, tracklets: TrackletDict) -> None:

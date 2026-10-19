@@ -19,7 +19,7 @@ from .MarkRenderer import MarkRenderer
 from .SeamRenderer import SeamRenderer
 from .StitchRenderer import StitchRenderer
 from .marks import Mark, MarkContext, build_marks
-from .settings import PanoramaLayerSettings, Part, REJECTED_COLOR
+from .settings import PanoramaLayerSettings, Part, REJECTED_COLOR, WAITING_COLOR
 from .strip import elevation_window, strip_aspect_ratio
 
 
@@ -254,6 +254,7 @@ class Compositor(LayerBase):
             now=time.time(),
         )
         marks: list[Mark] = build_marks(
-            observations, primaries, self._color_settings.track_color_tuples, REJECTED_COLOR, context)
+            observations, primaries, self._color_settings.track_color_tuples, REJECTED_COLOR,
+            WAITING_COLOR, context)
         self._marks.set_marks(marks)
         self._labels.set_marks(marks)

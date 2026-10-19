@@ -18,6 +18,7 @@ The panoramic tracker owns cross-camera identity only: seam links, world merges 
 
 - One camera never has two active views in one world: links, re-acquisition and collapse refuse it, and `split_worlds` repairs it
 - Observations are immutable; a world id changes only through `ObservationStore` (`add`, `merge_worlds`, `detach`)
+- Player slots are assigned and freed only inside `ObservationStore`; the tracker emits only slotted worlds, keyed and id-stamped by slot
 - Apply the intake filters before any identity branch; a filtered observation already tracked goes LOST with its newest box, and its `last_active` does not advance
 - Never filter on freshness in the tracker; staleness is the consumer's call
 - Never emit a LOST primary while another view of that world is active

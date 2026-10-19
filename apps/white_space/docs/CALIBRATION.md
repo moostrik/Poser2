@@ -439,7 +439,7 @@ image right and marks wrong means the distance model, not the camera.
 | `seams`  | the dead zone (red bands), the seam rule defined on a camera's own frame       |
 | `grid`   | every reference line in the strip's two axes, the degree labels and the footer |
 | `marks`  | a mark per observation, and a grey line per detection a filter rejected        |
-| `labels` | each mark's label: `#id cam az R distance H height`, or a rejection            |
+| `labels` | each mark's label: `#player cam az R distance H height`, or a rejection        |
 
 The grid's lines are the degree lattice, the sector boundaries (orange), the camera axes (blue), the
 overlap (yellow verticals), the green horizon and the yellow zone band. A mark is a line with a foot
@@ -476,9 +476,10 @@ also what `seam.link_height` compares. Two labels of one colour showing differen
 distance model, the levelling or a camera's roll, before any of it reaches the azimuth. The primary
 view is opaque and 2 px; a passive view — another camera's view of the same person — is slightly
 dimmer and 1 px, its field only outlined, so at a seam the passive field's edges show inside or beyond
-the primary's fill. A label's height on the strip is a lane picked by its id — the same index its
-colour comes from — so labels never collide and never move as people do, and its x always sits on its
-own line.
+the primary's fill. A label's height on the strip is a lane picked by its player slot — the same
+index its colour comes from, on the strip and in the pose row alike — so labels never collide and
+never move as people do, and its x always sits on its own line. A person tracked but waiting for a
+free player slot is drawn in white with no lane, labelled `#- … waiting` at the top of their line.
 
 **Nobody leaves the strip without a reason.**
 
@@ -487,6 +488,9 @@ own line.
   in the rejection, `past R3.5` or `small`). How far it has faded says how close it is to being
   forgotten: their pose leaves the show after `pose.tracklets.detection_timeout`, the identity at
   `lost_timeout`, the moment the line is fully grey and the field gone.
+- A white line with its field is a person tracked while every player slot is in use, labelled
+  `waiting` at its top: they enter the show when a slot frees, oldest waiter first (`max_players`;
+  `TRACKING.md`, *Observations and worlds*).
 - A grey line with no field is a detection the tracker rejected, labelled with the rejection at its
   top:
 
@@ -496,7 +500,6 @@ own line.
 | `small`     | the box is shorter than the minimum            | `track.height_filter`                               |
 | `dead zone` | a new person arriving at a camera's field edge | `track.seam.dead_zone`                              |
 | `past R3.5` | standing past the far edge                     | `track.zone_filter`, at `track.rig.zone_max_radius` |
-| `no id`     | a new person while every world id is in use    | `max_players`                                       |
 
 So a person walking out keeps their own mark, fading, and when it has gone grey a grey line labelled
 `past R3.5` takes its place for as long as the camera still sees them.
@@ -527,7 +530,7 @@ centre, y is elevation at the rig centre (`strip_y`). There is no image space �
 a strip column, turns it into (azimuth, elevation), and works backwards into each camera's frame,
 which is what makes drawing data over pixels meaningful. Two things opt out of one axis each and
 neither is a measurement: the dead zone uses x only and runs the full height, and a label's y is a
-lane picked by `world_id`.
+lane picked by the player slot.
 
 What varies is the depth assumed to get into that space. Both axes need an assumed distance to turn a
 camera's view into the centre's, and each thing drawn names its own:
@@ -540,7 +543,7 @@ camera's view into the centre's, and each thing drawn names its own:
 | overlap verticals (`grid`)             | centre azimuth | —                | `parallax_radius`                              |
 | horizon, zone band (`grid`)            | —              | centre elevation | exact                                          |
 | mark: line, foot tick, field (`marks`) | centre azimuth | centre elevation | x: `parallax_radius`, y: the person's distance |
-| label (`labels`)                       | centre azimuth | lane by id       | `parallax_radius`                              |
+| label (`labels`)                       | centre azimuth | lane by player   | `parallax_radius`                              |
 
 **The rule: two things on the strip are comparable only if they share an axis and a depth.** A
 misalignment on this display is a pair that shares the axis and not the depth — an overlap line off

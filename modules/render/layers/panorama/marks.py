@@ -21,7 +21,9 @@ its **label**. Built once by the compositor for both `MarkRenderer` (line, tick,
 A mark's **field** is the join range that governs it, as a width (`_field`). A **rejected**
 detection is a grey line with no field, labelled with its rejection (`rejection_label`). A **LOST**
 mark keeps its line, fading to grey over `lost_timeout` while its field fades out (`_colors`).
-The primary view of a person is drawn strong; the other views are **passive**.
+The primary view of a person is drawn strong; the other views are **passive**. A mark's colour is
+its **player slot's**, the same index the pose figures use; a person tracked but **waiting** for a
+slot keeps their line and field in `waiting_color`, labelled `waiting`.
 """
 
 # Standard library imports
@@ -65,7 +67,8 @@ class MarkContext:
 @dataclass(frozen=True)
 class Mark:
     """Where one observation lands on the strip, and what its label says."""
-    world_id: int
+    world_id: int                                   # groups one person's views; never displayed
+    player: int | None                              # the slot the colour and label lane come from
     cam_id: int
     x: float                                        # normalised strip x, from the world azimuth
     top_y: float                                    # normalised strip y of the box's top row
@@ -84,12 +87,13 @@ class Mark:
 def build_marks(observations: list[Tracklet], primaries: set[int],
                 colors: list[tuple[float, float, float, float]],
                 rejected_color: tuple[float, float, float, float],
+                waiting_color: tuple[float, float, float, float],
                 context: MarkContext) -> list[Mark]:
     """A mark per usable observation. Rejected detections first, under everyone; primaries last, so
     they are drawn over their passive views."""
     marks: list[Mark] = []
     for tracklet in observations:
-        mark: Mark | None = _mark(tracklet, primaries, colors, rejected_color, context)
+        mark: Mark | None = _mark(tracklet, primaries, colors, rejected_color, waiting_color, context)
         if mark is not None:
             marks.append(mark)
     marks.sort(key=lambda m: (not m.rejected, m.is_primary))
@@ -99,6 +103,7 @@ def build_marks(observations: list[Tracklet], primaries: set[int],
 def _mark(tracklet: Tracklet, primaries: set[int],
           colors: list[tuple[float, float, float, float]],
           rejected_color: tuple[float, float, float, float],
+          waiting_color: tuple[float, float, float, float],
           c: MarkContext) -> Mark | None:
     if tracklet is None or tracklet.is_removed:
         return None
@@ -134,10 +139,20 @@ def _mark(tracklet: Tracklet, primaries: set[int],
         field_color: tuple[float, float, float, float] = (*rejected_color[:3], 0.0)
     else:
         field_lo, field_hi = _field(annotation, tracklet.cam_id, c)
-        color, field_color = _colors(tracklet, is_primary, colors, rejected_color, c)
+        # The player slot's colour — the index the pose figures use — so the strip and the pose row
+        # can never disagree about who is who. Waiting for a slot: its own colour, belonging to
+        # nobody downstream yet.
+        if annotation.player is not None and colors:
+            base: Color = colors[annotation.player % len(colors)]
+        elif annotation.player is not None:
+            base = (1.0, 1.0, 1.0, 1.0)
+        else:
+            base = waiting_color
+        color, field_color = _colors(tracklet, is_primary, base, rejected_color, c)
 
     return Mark(
         world_id=tracklet.id,
+        player=annotation.player,
         cam_id=tracklet.cam_id,
         x=(annotation.world_angle % 360.0) / 360.0,
         top_y=top_y,
@@ -162,16 +177,16 @@ def _fade(tracklet: Tracklet, c: MarkContext) -> float:
     return min(1.0, max(0.0, c.now - tracklet.last_active) / max(1e-6, c.lost_timeout))
 
 
-def _colors(tracklet: Tracklet, is_primary: bool, colors: list[Color], grey: Color,
+def _colors(tracklet: Tracklet, is_primary: bool, base: Color, grey: Color,
             c: MarkContext) -> tuple[Color, Color]:
-    """(line, field) colours: the world colour, alpha saying how much to trust it.
+    """(line, field) colours: the person's colour, alpha saying how much to trust it.
 
     A passive view has its line dimmed; its field is told apart by shape (`Mark.field_outline`). A
     **LOST** observation is still an identity the tracker holds, so it keeps its mark, dimmed, and
     over `lost_timeout` its line fades to grey and its field fades out — fully grey is when a
     rejected detection's grey line would take over.
     """
-    r, gr, b, a = colors[tracklet.id % len(colors)] if colors else (1.0, 1.0, 1.0, 1.0)
+    r, gr, b, a = base
     if tracklet.status == TrackingStatus.LOST:
         t: float = _fade(tracklet, c)
         line: Color = (r + (grey[0] - r) * t, gr + (grey[1] - gr) * t, b + (grey[2] - b) * t,
@@ -185,8 +200,7 @@ def rejection_label(reason: Rejection, zone_max_radius: float) -> str:
     tracked person's label when a filter stopped counting them."""
     if reason == Rejection.PAST_EDGE:
         return f'past R{zone_max_radius:g}'
-    return {Rejection.YOUNG: 'young', Rejection.SMALL: 'small', Rejection.DEAD_ZONE: 'dead zone',
-            Rejection.NO_ID: 'no id'}[reason]
+    return {Rejection.YOUNG: 'young', Rejection.SMALL: 'small', Rejection.DEAD_ZONE: 'dead zone'}[reason]
 
 
 def _label(tracklet: Tracklet, annotation: PanoramicAnnotation, centre_dist: float,
@@ -201,10 +215,13 @@ def _label(tracklet: Tracklet, annotation: PanoramicAnnotation, centre_dist: flo
     if rejected:
         return reason
     distance: str = f'R{centre_dist:.1f}m' if math.isfinite(centre_dist) else 'R-'
-    readout: str = (f'#{tracklet.id} c{tracklet.cam_id} '
+    player: str = '-' if annotation.player is None else str(annotation.player)
+    readout: str = (f'#{player} c{tracklet.cam_id} '
                     f'az{annotation.world_angle % 360.0:03.0f} '
                     f'{distance} '
                     f'H{annotation.height:.1f}m')
+    if annotation.player is None:
+        readout = f'{readout} waiting'
     return f'{readout} {reason}' if reason else readout
 
 

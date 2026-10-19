@@ -1,6 +1,6 @@
 """Tests for the panoramic tracker: seam hysteresis, dead-zone handling,
 cross-camera linking, same-camera re-acquisition, device id reuse, emission of lost worlds,
-world id reuse, and the rig's parallax correction."""
+player slot assignment and reuse, and the rig's parallax correction."""
 
 import math
 import time
@@ -13,7 +13,7 @@ from modules.tracker import (
     Tracklet, TrackingStatus, TrackletDict, camera_bearing, camera_local_to_azimuth, focus_distance,
     row_from_elevation, row_model, wrap180,
 )
-from modules.tracker.panoramic.observations import WorldIdPool
+from modules.tracker.panoramic.players import PlayerSlots
 from modules.tracker.panoramic.rig import Rig, _MAX_HEIGHT, height_is_measured
 from modules.tracker.panoramic.rig_sync import HANDS_HEIGHT, reach_radius
 from modules.utils import Rect
@@ -507,6 +507,24 @@ class TestSplitWorlds(PanoramicTrackerCase):
         self.assertNotEqual(observations.world_of(1, 1), 0)                     # B's cam-1 view left it
         self.assertEqual(observations.world_of(1, 1), observations.world_of(0, 2))   # and rejoined B
 
+    def test_the_repair_runs_with_every_slot_in_use(self) -> None:
+        # The repair needs a fresh world for the detached view; world ids are unbounded, so a full
+        # roster cannot block it: B keeps a slot through the split (their rejoined world inherits
+        # it), and A's azimuth stops blending B's cam-1 view.
+        self.tracker = PanoramicTracker(self.config, num_players=2, num_cameras=4)
+        self.tracker.add_tracklet_callback(self.emitted.append)
+        self.submit(make_tracklet(0, 1, 96.0))              # A: world 0, slot 0
+        self.submit(make_tracklet(1, 1, 9.0))               # B seen by cam 1 first: wrongly joins A
+        self.submit(make_tracklet(0, 2, 99.0))              # B counted by cam 0: the last slot
+        observations = self.tracker.observations
+        self.assertEqual(observations.world_of(1, 1), 0)    # the wrong merge, with nothing free
+
+        out = self.submit(make_tracklet(0, 1, 80.0), make_tracklet(1, 1, 9.0), make_tracklet(0, 2, 99.0))
+        self.assertEqual(observations.world_of(0, 1), 0)                        # A keeps their world
+        self.assertEqual(observations.world_of(1, 1), observations.world_of(0, 2))   # B is whole again
+        self.assertEqual(set(out.keys()), {0, 1})                               # both still emitted
+        self.assertEqual((observations.players.in_use, observations.players.waiting), (2, 0))
+
     def test_views_that_drift_within_the_margin_stay_together(self) -> None:
         self.submit(make_tracklet(0, 1, 96.0))              # azimuth 86
         self.submit(make_tracklet(1, 1, 8.0))               # azimuth 88: world 0
@@ -515,35 +533,75 @@ class TestSplitWorlds(PanoramicTrackerCase):
         self.assertEqual(self.tracker.observations.world_of(1, 1), 0)
 
 
-class TestWorldIdPool(unittest.TestCase):
+class TestPlayerSlots(unittest.TestCase):
 
-    def test_fifo_reuse(self) -> None:
-        pool = WorldIdPool(4)
-        self.assertEqual([pool.acquire() for _ in range(3)], [0, 1, 2])
-        pool.release(0)
-        pool.release(1)
-        # Freed ids go to the back: 3 is handed out before 0 and 1 come around
-        self.assertEqual([pool.acquire() for _ in range(3)], [3, 0, 1])
+    def test_slots_are_assigned_in_order(self) -> None:
+        slots = PlayerSlots(4)
+        for world in range(3):
+            slots.add(world)
+        self.assertEqual([slots.slot_of(w) for w in range(3)], [0, 1, 2])
 
-    def test_release_of_free_id_raises(self) -> None:
-        pool = WorldIdPool(2)
-        with self.assertRaises(Exception):
-            pool.release(0)
+    def test_freed_slots_are_reused_as_late_as_possible(self) -> None:
+        slots = PlayerSlots(4)
+        for world in range(3):
+            slots.add(world)
+        slots.remove(0)
+        slots.remove(1)
+        # Freed slots go to the back: the never-used 3 is handed out before 0 and 1 come around
+        for world in range(3, 6):
+            slots.add(world)
+        self.assertEqual([slots.slot_of(w) for w in (3, 4, 5)], [3, 0, 1])
 
-    def test_exhaustion_raises(self) -> None:
-        pool = WorldIdPool(1)
-        pool.acquire()
-        with self.assertRaises(Exception):
-            pool.acquire()
+    def test_exhaustion_waits_instead_of_refusing(self) -> None:
+        slots = PlayerSlots(1)
+        slots.add(0)
+        slots.add(1)
+        self.assertIsNone(slots.slot_of(1))
+        self.assertEqual((slots.in_use, slots.waiting), (1, 1))
 
-    def test_availability_tracking(self) -> None:
-        pool = WorldIdPool(2)
-        self.assertTrue(pool.is_available(0))
-        acquired = pool.acquire()
-        self.assertFalse(pool.is_available(acquired))
-        self.assertEqual(pool.size(), 1)
-        pool.release(acquired)
-        self.assertTrue(pool.is_available(acquired))
+    def test_a_freed_slot_goes_to_the_oldest_waiter(self) -> None:
+        slots = PlayerSlots(1)
+        for world in range(3):
+            slots.add(world)
+        slots.remove(0)
+        self.assertEqual(slots.slot_of(1), 0)
+        self.assertIsNone(slots.slot_of(2))
+
+    def test_a_waiter_that_leaves_is_forgotten(self) -> None:
+        slots = PlayerSlots(1)
+        for world in range(3):
+            slots.add(world)
+        slots.remove(1)                       # the first waiter leaves before being served
+        slots.remove(0)
+        self.assertEqual(slots.slot_of(2), 0)
+        self.assertEqual((slots.in_use, slots.waiting), (1, 0))
+
+    def test_merge_keeps_the_survivors_slot(self) -> None:
+        slots = PlayerSlots(2)
+        slots.add(0)
+        slots.add(1)
+        slots.merge(0, 1)                     # both slotted: the survivor's stays, the other frees
+        self.assertEqual(slots.slot_of(0), 0)
+        self.assertIsNone(slots.slot_of(1))
+        slots.add(2)
+        self.assertEqual(slots.slot_of(2), 1)
+
+    def test_merge_inherits_a_slot_for_a_waiting_survivor(self) -> None:
+        slots = PlayerSlots(1)
+        slots.add(0)
+        slots.add(1)                          # waiting
+        slots.merge(1, 0)                     # the waiter survives (older observations): inherits
+        self.assertEqual(slots.slot_of(1), 0)
+        self.assertEqual((slots.in_use, slots.waiting), (1, 0))
+
+    def test_merge_of_two_waiters_is_bookkeeping_only(self) -> None:
+        slots = PlayerSlots(1)
+        for world in range(3):
+            slots.add(world)
+        slots.merge(1, 2)
+        self.assertEqual(slots.waiting, 1)
+        slots.remove(0)
+        self.assertEqual(slots.slot_of(1), 0)
 
 
 # Rig geometry for the parallax tests: 4 cameras, fov 127, lens 0.36 m out and 0.5 m up.
@@ -1110,18 +1168,68 @@ class TestRejectedDetections(RigTrackerCase):
         self.assertEqual(after.annotation.rejected, Rejection.SMALL)
         self.assertEqual(self.rejected(), {})
 
-    def test_a_full_id_pool_is_rejected_and_logged_once(self) -> None:
+    def test_full_player_slots_are_not_a_rejection(self) -> None:
         self.tracker = PanoramicTracker(self.config, num_players=1, num_cameras=4)
         self.tracker.rig.set_window(WINDOW, ROWS)
         self.tracker.add_tracklet_callback(self.emitted.append)
         self.tracker.add_observation_callback(self.observed.append)
-        self.seen(3.0)                                           # takes the only id
-        with self.assertLogs('modules.tracker.panoramic.tracker', level='WARNING') as logs:
-            self.seen(3.0, ext_id=2)
-            self.seen(3.0, ext_id=2)
-        self.assertEqual(self.rejected(), {Rejection.NO_ID: 1})
-        self.assertEqual(len(logs.records), 1)
-        self.assertEqual(self.tracker.observations.world_ids(), [0])
+        self.seen(3.0)                                           # takes the only slot
+        with self.assertNoLogs('modules.tracker.panoramic', level='WARNING'):
+            out = self.seen(3.0, ext_id=2)                       # tracked and waiting, not refused
+        self.assertEqual(self.rejected(), {})
+        self.assertEqual(self.tracker.observations.world_ids(), [0, 1])
+        self.assertEqual(set(out.keys()), {0})                   # but only the slotted one is emitted
+
+
+class TestPlayerSlotLifecycle(RigTrackerCase):
+    """World ids are unbounded identity; the player slots 0..num_players-1 are what the primary
+    channel emits, stamped as the tracklet's id. A slot is held for life, LOST included; a freed
+    slot goes to the oldest waiter, who first emits the tick after the leaver's world is removed."""
+
+    def capped(self, num_players: int) -> None:
+        self.tracker = PanoramicTracker(self.config, num_players=num_players, num_cameras=4)
+        self.tracker.rig.set_window(WINDOW, ROWS)
+        self.tracker.add_tracklet_callback(self.emitted.append)
+        self.tracker.add_observation_callback(self.observed.append)
+
+    def player_of(self, ext_id: int) -> int | None:
+        """The slot stamped on the observation channel for camera 0's device track `ext_id`."""
+        for t in self.observed[-1]:
+            if t.external_id == ext_id:
+                assert isinstance(t.annotation, PanoramicAnnotation)
+                return t.annotation.player
+        self.fail(f"ext {ext_id} not on the observation channel")
+
+    def test_a_waiter_gets_the_slot_a_leaver_frees(self) -> None:
+        self.capped(1)
+        self.seen(3.0, seconds_ago=1.5)                          # person 1: world 0, the only slot
+        self.seen(3.0, ext_id=2)                                 # person 2: world 1, waiting
+        self.assertEqual(self.player_of(1), 0)
+        self.assertIsNone(self.player_of(2))
+        self.assertEqual((self.config.players, self.config.waiting), (1, 1))
+
+        # Person 1's track ends; lowering `lost_timeout` below their last report stands in for
+        # time passing until the tracker forgets them (the pattern of the camera-gone-quiet test).
+        self.seen(3.0, status=TrackingStatus.REMOVED, seconds_ago=1.5)
+        self.config.lost_timeout = 1.2
+        out = self.seen(3.0, ext_id=2)                           # the tick that forgets person 1
+        self.assertEqual(out, {})                                # no overlap on the freed slot
+        out = self.seen(3.0, ext_id=2)                           # the next tick emits the waiter
+        self.assertEqual(set(out.keys()), {0})
+        self.assertEqual(out[0].id, 0)                           # stamped with the slot...
+        self.assertEqual(self.tracker.observations.world_of(0, 2), 1)   # ...the world id stays 1
+        self.assertEqual((self.config.players, self.config.waiting), (1, 0))
+
+    def test_a_lost_person_keeps_their_slot(self) -> None:
+        self.capped(1)
+        self.seen(3.0)                                           # person 1: the only slot
+        self.seen(3.0, ext_id=2)                                 # person 2 waits
+        self.seen(3.0, status=TrackingStatus.LOST)               # person 1 missed, still remembered
+        self.assertEqual(self.player_of(1), 0)                   # LOST holds the slot
+        self.assertIsNone(self.player_of(2))
+        out = self.seen(3.0)                                     # and is still emitted on it
+        self.assertEqual(set(out.keys()), {0})
+        self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
 
 
 class TestUnknownStatus(PanoramicTrackerCase):

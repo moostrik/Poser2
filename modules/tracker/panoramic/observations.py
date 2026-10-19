@@ -1,52 +1,16 @@
 # Standard library imports
 import logging
-from collections import deque
 from dataclasses import replace
-from threading import Lock
 
 # Local application imports
 from ..tracklet import Tracklet, TrackingStatus
+from .players import PlayerSlots
 
 logger = logging.getLogger(__name__)
 
 
 ObsId = int
 DeviceKey = tuple[int, int]  # (cam_id, external_id) — only meaningful while a device track lives
-
-
-class WorldIdPool:
-    """FIFO pool of world ids: released ids go to the back of the queue, so a freed id
-    is reused as late as possible instead of being handed to the next arrival."""
-
-    def __init__(self, max_size: int) -> None:
-        self._queue: deque[int] = deque(range(max_size))
-        self._available: set[int] = set(range(max_size))
-        self._lock = Lock()
-
-    def acquire(self) -> int:
-        with self._lock:
-            if not self._queue:
-                raise Exception("No more IDs available")
-            id_: int = self._queue.popleft()
-            self._available.remove(id_)
-            return id_
-
-    def release(self, obj: int) -> None:
-        with self._lock:
-            if obj in self._available:
-                raise Exception(
-                    f"ID {obj} is not currently in use and cannot be "
-                    f"released. available: {sorted(self._available)}"
-                )
-            self._queue.append(obj)
-            self._available.add(obj)
-
-    def size(self) -> int:
-        return len(self._queue)
-
-    def is_available(self, obj: int) -> bool:
-        with self._lock:
-            return obj in self._available
 
 
 class ObservationStore:
@@ -64,9 +28,11 @@ class ObservationStore:
     Observations are immutable and never rewritten when worlds are joined: each one's ``cam_id``,
     ``external_id``, ``roi`` and ``annotation`` always reflect the camera it was actually seen by.
 
-    World identities (ids drawn from the pool) own one or more observations. A person visible in
-    two cameras simultaneously has two observations linked to the same world id; one is selected
-    as primary (`Seams.pick_primary`).
+    World identities own one or more observations. A person visible in two cameras simultaneously
+    has two observations linked to the same world id; one is selected as primary
+    (`Seams.pick_primary`). World ids are unbounded — handed out in order, never reused — so
+    identity never runs out; which worlds reach the show is `players` (`PlayerSlots`), assigned and
+    freed only inside this store's world lifecycle (`add`, `detach`, `merge_worlds`, `remove`).
     """
 
     def __init__(self, max_players: int) -> None:
@@ -75,7 +41,8 @@ class ObservationStore:
         self._world_members: dict[int, set[ObsId]] = {}
         self._world_for: dict[ObsId, int] = {}
         self._next_obs_id: ObsId = 0
-        self._id_pool = WorldIdPool(max_players)
+        self._next_world_id: int = 0
+        self.players: PlayerSlots = PlayerSlots(max_players)
 
     # ── live-index lookups ─────────────────────────────────────────────
 
@@ -94,9 +61,9 @@ class ObservationStore:
 
     def add(self, tracklet: Tracklet, world_id: int | None = None) -> int | None:
         """
-        Store a brand-new observation. If `world_id` is None, a fresh world id
-        is acquired from the pool; otherwise the observation is linked into the
-        existing world. Returns the world id, or None if the pool is exhausted.
+        Store a brand-new observation. If `world_id` is None, a fresh world is created (and given a
+        player slot if one is free); otherwise the observation is linked into the existing world.
+        Returns the world id, or None for an unknown `world_id`.
         """
         key: DeviceKey = (tracklet.cam_id, tracklet.external_id)
         if key in self._live:
@@ -104,11 +71,9 @@ class ObservationStore:
             return self._world_for.get(self._live[key])
 
         if world_id is None:
-            try:
-                world_id = self._id_pool.acquire()
-            except Exception as e:
-                logger.info(f"No more world IDs available: {e}")
-                return None
+            world_id = self._next_world_id
+            self._next_world_id += 1
+            self.players.add(world_id)
         elif world_id not in self._world_members:
             logger.warning(f"add linking to unknown world {world_id}.")
             return None
@@ -205,19 +170,18 @@ class ObservationStore:
         members.discard(obs_id)
         if not members:
             self._world_members.pop(world_id, None)
-            self._id_pool.release(world_id)
+            self.players.remove(world_id)
 
     def detach(self, obs_id: ObsId) -> int | None:
-        """Move one observation out of its world into a new world of its own. Returns the new world
-        id, or None when the pool is exhausted or the observation is already alone."""
+        """Move one observation out of its world into a new world of its own (given a player slot if
+        one is free). Returns the new world id, or None when the observation is unknown or already
+        alone."""
         world_id: int | None = self._world_for.get(obs_id)
         if world_id is None or len(self._world_members.get(world_id, ())) < 2:
             return None
-        try:
-            new_world: int = self._id_pool.acquire()
-        except Exception as e:
-            logger.info(f"No world id to detach observation {obs_id} into: {e}")
-            return None
+        new_world: int = self._next_world_id
+        self._next_world_id += 1
+        self.players.add(new_world)
         self._world_members[world_id].discard(obs_id)
         self._world_members[new_world] = {obs_id}
         self._world_for[obs_id] = new_world
@@ -225,7 +189,8 @@ class ObservationStore:
         return new_world
 
     def merge_worlds(self, keep_id: int, drop_id: int) -> bool:
-        """Move all observations from `drop_id` into `keep_id` and release `drop_id`."""
+        """Move all observations from `drop_id` into `keep_id`, which survives with a player slot
+        if either world had one."""
         if keep_id == drop_id:
             return False
         if keep_id not in self._world_members or drop_id not in self._world_members:
@@ -236,14 +201,10 @@ class ObservationStore:
             self._obs[obs_id] = replace(self._obs[obs_id], id=keep_id)
             self._world_members[keep_id].add(obs_id)
         del self._world_members[drop_id]
-        self._id_pool.release(drop_id)
+        self.players.merge(keep_id, drop_id)
         return True
 
     # ── reads ──────────────────────────────────────────────────────────
-
-    def has_free_id(self) -> bool:
-        """Whether a new world can be started."""
-        return self._id_pool.size() > 0
 
     def camera_sees_world(self, cam_id: int, world_id: int) -> bool:
         """Whether this camera already actively tracks someone in this world.

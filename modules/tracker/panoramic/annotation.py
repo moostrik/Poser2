@@ -17,7 +17,6 @@ class Rejection(IntEnum):
     SMALL = auto()       # its box is shorter than `height_filter`
     DEAD_ZONE = auto()   # a new arrival inside `seam.dead_zone` of a field edge
     PAST_EDGE = auto()   # past `rig.zone_max_radius`, with `zone_filter` on
-    NO_ID = auto()       # a new person while every world id is in use
 
 
 @dataclass(frozen=True)
@@ -29,6 +28,8 @@ class Annotation(TrackerAnnotation):
     `rig.zone_max_radius`, NaN without a reading. `height` is absolute (m) and needs no
     re-projection, since the same camera sees the person's feet and head. `rejected` is set when a
     filter rejected this detection (or, for a person already tracked, stopped counting it).
+    `player` is the slot this person is emitted on downstream, stamped by the tracker on its
+    callback copies; None while they wait for a free slot.
     """
     local_angle: float
     world_angle: float
@@ -38,3 +39,4 @@ class Annotation(TrackerAnnotation):
     rejected: Rejection | None = None
     radius: float = 0.0
     zone_distance: float = math.nan
+    player: int | None = None

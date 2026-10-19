@@ -35,9 +35,15 @@ switch, a duplicate box — is a device-tracker setting first.
 
 Each device track becomes an **observation** with a host-owned `obs_id` that is never reused. An
 observation is immutable and always carries its own camera's box and angles. Observations are
-grouped into **worlds**, one per person. A world id comes from a pool of `max_players` ids (6) and
-is the id everything downstream uses (`/pose/N`); a freed id goes to the back of the queue, so it
-is reused as late as possible.
+grouped into **worlds**, one per person. World ids are unbounded — handed out in order, never
+reused — so identity never runs out; which worlds reach the show is the **player slots**: up to
+`max_players` (6) concurrent worlds hold a slot 0..5, which is the id everything downstream uses
+(`/pose/N`). A world gets a slot at birth if one is free and keeps it for life, LOST included; a
+slot freed by a removed world goes to the back of the queue, so it is reused as late as possible
+and a new person never inherits a just-departed person's downstream state. A person beyond
+capacity is tracked, shown waiting on the panorama, and enters the show when a slot frees — the
+oldest waiter first. `PlayerSlots` (`modules/tracker/panoramic/players.py`) owns the assignment;
+the track panel's `players`/`waiting` read-outs publish it.
 
 A device id means something only while its device track lives. After REMOVED the device may give
 the number to someone else, so the observation leaves the live index and stays behind as a LOST
@@ -57,8 +63,7 @@ Each detection is handled by the first row that applies (`Tracker._add_tracklet`
 | 5 | same camera, within `reacquire_angle` of a not-active view | joins that view's world                 |
 | 6 | within `seam.dead_zone` of the field edge                  | not counted (`dead zone`)               |
 | 7 | in the overlap, matching another camera's view             | joins that view's world                 |
-| 8 | no world id free                                           | not counted (`no id`)                   |
-| 9 | anything else                                              | a new world                             |
+| 8 | anything else                                              | a new world                             |
 
 - The filters come before every identity branch, so nobody is born, re-acquired or linked on a box
   a filter rejects. A tracked person a filter stops counting is handled as a missed detection:
@@ -79,9 +84,10 @@ Each detection is handled by the first row that applies (`Tracker._add_tracklet`
    from every other active view, or a second active view from the same camera, moves to a world of
    its own (the youngest first).
 3. **Collapse** (`Seams.collapse_worlds`). Two worlds whose views match across cameras as mutual
-   nearest neighbours merge; the older world keeps its id.
+   nearest neighbours merge; the older world keeps its id, and the merged person keeps a player
+   slot if either world held one — so a split-and-rejoined person never leaves the show.
 4. **Primary** (`Seams.pick_primary`) and **azimuth** (`Seams.world_azimuth`) per world, then one
-   tracklet per world is emitted.
+   tracklet per slotted world is emitted, keyed and id-stamped by its slot.
 
 **Why split.** A seam link can join the wrong pair: two people arrive together and one camera counts
 the second before the other camera does. Nothing about the link is wrong when it is made, so it is
