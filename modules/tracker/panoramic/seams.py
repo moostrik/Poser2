@@ -9,9 +9,15 @@ from .observations import ObservationStore
 from .rig import Rig, height_is_measured
 from .settings import TrackerSettings
 
-# How far past `seam.link_angle` two active views of one world may drift before they are split. Above
-# the link rule, so a pair hovering at the link angle is not split and re-collapsed every tick.
+# How far past a pair's agreement gate — `seam.link_angle` across cameras, `same_cam_angle` within
+# one — two active views of one world may drift before they are split. Above the collapse rule, so
+# a pair hovering at the gate is not split and re-collapsed every tick.
 _SPLIT_FACTOR: float = 1.5
+
+# Least intersection, as a fraction of the smaller box, for two same-camera views to read as one
+# person seen twice: a duplicate box sits on the body it duplicates, while a neighbour's box at a
+# similar bearing barely touches it.
+_SAME_CAM_OVERLAP: float = 0.25
 
 
 class Seams:
@@ -65,12 +71,13 @@ class Seams:
         than `_SPLIT_FACTOR × seam.link_angle` from every other active view of its world moves to a
         world of its own (the youngest first), and `collapse_worlds` then joins it to its own person.
         Two active views from one camera are two people once their local angles are more than
-        `same_cam_angle` apart; within it they are one person seen twice (a double box, or a
-        re-acquired person whose old device track comes back) and stay together.
+        `_SPLIT_FACTOR × same_cam_angle` apart; within that they are one person seen twice (a
+        double box, or a re-acquired person whose old device track comes back) and stay together —
+        the factor leaves room over the collapse gate, so a pair at the gate does not flap.
         Only active views count: a LOST anchor left behind by someone walking on is not a disagreement.
         """
         limit: float = _SPLIT_FACTOR * self._config.seam.link_angle
-        same_cam: float = self._config.same_cam_angle
+        same_cam: float = _SPLIT_FACTOR * self._config.same_cam_angle
         for world_id in self._observations.world_ids():
             while True:
                 active: list[Tracklet] = [t for t in self._observations.members(world_id)
@@ -94,9 +101,13 @@ class Seams:
                     self._handed_over_at.pop(world_id, None)
 
     def collapse_worlds(self) -> None:
-        """Late safety net: merge worlds whose observations match each other (ambiguous
-        simultaneous arrivals that each got their own world). Older world wins."""
-        for keep_id, drop_id in self._collapse_pairs():
+        """The repair that completes the intake: merge worlds whose observations match each other.
+        Across cameras, ambiguous simultaneous arrivals that each got their own world
+        (`_collapse_pairs`); within one camera, two views whose fresh boxes converge on one body
+        (`_same_camera_pairs`) — the intake never joins a simultaneous track, because its store
+        can be stale, so this runs every tick on this tick's boxes and heals a duplicate in the
+        tick it is born, before emission. Older world wins."""
+        for keep_id, drop_id in self._same_camera_pairs() + self._collapse_pairs():
             if self._observations.merge_worlds(keep_id, drop_id):
                 self._primary_for_world.pop(drop_id, None)
                 self._handed_over_at.pop(drop_id, None)
@@ -209,6 +220,37 @@ class Seams:
             return True
         largest: float = max(height_a, height_b)
         return abs(height_a - height_b) / largest <= self._config.seam.link_height
+
+    def _same_camera_pairs(self) -> list[tuple[int, int]]:
+        """(keep_id, drop_id) pairs of worlds that are one person seen twice by one camera.
+
+        Both views must be active this tick — fresh boxes, so a stale store cannot mislead the
+        way it can at intake — within ``same_cam_angle`` of local angle, and overlapping by at
+        least `_SAME_CAM_OVERLAP` of the smaller box: a duplicate sits on the body it duplicates,
+        a neighbour at a similar bearing barely touches it. The lower world id is the older world
+        — ids are handed out in order and never reused — so it wins; each world in at most one
+        pair per tick.
+        """
+        active: list[Tracklet] = [t for t in self._observations.all()
+                                  if t.is_active and isinstance(t.annotation, Annotation)]
+        used: set[int] = set()
+        pairs: list[tuple[int, int]] = []
+        for a, b in combinations(active, 2):
+            if a.cam_id != b.cam_id or a.id == b.id:
+                continue
+            if a.id in used or b.id in used:
+                continue
+            assert isinstance(a.annotation, Annotation) and isinstance(b.annotation, Annotation)
+            if abs(a.annotation.local_angle - b.annotation.local_angle) > self._config.same_cam_angle:
+                continue
+            smaller: float = min(a.roi.area, b.roi.area)
+            if smaller <= 0.0 or a.roi.intersect(b.roi).area / smaller < _SAME_CAM_OVERLAP:
+                continue
+            keep_id, drop_id = (a.id, b.id) if a.id < b.id else (b.id, a.id)
+            used.add(a.id)
+            used.add(b.id)
+            pairs.append((keep_id, drop_id))
+        return pairs
 
     def _collapse_pairs(self) -> list[tuple[int, int]]:
         """(keep_id, drop_id) pairs of worlds whose observations match across cameras; older world

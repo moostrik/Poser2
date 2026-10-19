@@ -455,12 +455,36 @@ class TestSameCameraIdentity(PanoramicTrackerCase):
         return replace(tracklet, annotation=self.tracker.rig.annotate(tracklet.roi, tracklet.cam_id))
 
     def test_a_duplicate_box_joins_its_world(self) -> None:
-        # NMS passed two boxes on one body: the second device id lands within `same_cam_angle` of
-        # the first and is the same person — one world, one emitted pose.
+        # NMS passed two boxes on one body: the second device id births a world, and the same
+        # tick's collapse merges it on the fresh boxes — one world, one emitted pose, and the
+        # ghost never reaches the primary channel.
         self.submit(make_tracklet(0, 1, 50.0))
         out = self.submit(make_tracklet(0, 2, 52.0))
         self.assertEqual(self.tracker.observations.world_of(0, 2), 0)
         self.assertEqual(set(out.keys()), {0})
+
+    def test_a_birth_against_stale_data_heals_in_its_tick(self) -> None:
+        # The journal-captured incident (diagnosis 20261019-160906): the camera goes quiet, the
+        # stored view goes stale at 53°, then one batch carries the duplicate at 39.6° and the
+        # real track at 42.5°. The intake never matches simultaneous tracks, so the duplicate
+        # births a world — and the collapse merges it the same tick, on this tick's boxes.
+        self.submit(make_tracklet(0, 1, 53.0))
+        out = self.submit(make_tracklet(0, 2, 39.6), make_tracklet(0, 1, 42.5))
+        self.assertEqual(self.tracker.observations.world_of(0, 2), 0)
+        self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
+        self.assertEqual(set(out.keys()), {0})
+
+    def test_non_overlapping_neighbours_inside_the_angle_stay_two_worlds(self) -> None:
+        # Two narrow boxes 4° apart: within `same_cam_angle`, but disjoint — a duplicate sits on
+        # the body it duplicates, so no overlap means two people, and the collapse stays out.
+        first = make_tracklet(0, 1, 50.0)
+        first = replace(first, roi=replace(first.roi, x=50.0 / FOV - 0.015, width=0.03))
+        second = make_tracklet(0, 2, 54.0)
+        second = replace(second, roi=replace(second.roi, x=54.0 / FOV - 0.015, width=0.03))
+        self.submit(first)
+        out = self.submit(second)
+        self.assertEqual(self.tracker.observations.world_of(0, 2), 1)
+        self.assertEqual(set(out.keys()), {0, 1})
 
     def test_two_people_beyond_the_gate_stay_two_worlds(self) -> None:
         self.submit(make_tracklet(0, 1, 50.0))
@@ -498,13 +522,14 @@ class TestSameCameraIdentity(PanoramicTrackerCase):
         self.assertEqual(set(out.keys()), {0})
 
     def test_a_joined_pair_that_separates_splits_into_two_people(self) -> None:
-        # The other half of the gate: once the two views walk apart, they were two people after
-        # all, and the younger moves to a world of its own.
+        # The other half of the gate: once the two views walk apart — past the split's 1.5× the
+        # collapse gate, so a pair at the gate does not flap — they were two people after all,
+        # and the younger moves to a world of its own.
         self.submit(make_tracklet(0, 1, 50.0))
         self.submit(make_tracklet(0, 1, 50.0, status=TrackingStatus.LOST))
         self.submit(make_tracklet(0, 2, 53.0))                        # joins world 0
         self.submit(make_tracklet(0, 1, 50.0), make_tracklet(0, 2, 53.0))
-        out = self.submit(make_tracklet(0, 1, 47.0), make_tracklet(0, 2, 56.0))  # 9° apart
+        out = self.submit(make_tracklet(0, 1, 45.0), make_tracklet(0, 2, 58.0))  # 13° apart
         self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
         self.assertEqual(self.tracker.observations.world_of(0, 2), 1)
         self.assertEqual(set(out.keys()), {0, 1})
@@ -520,9 +545,11 @@ class TestSameCameraIdentity(PanoramicTrackerCase):
 
     def test_worlds_this_camera_sees_apart_are_never_collapsed(self) -> None:
         # Cam 1's view (azimuth 89) sits in the world of cam 0's person at 84, and is the mutual
-        # nearest match of cam 0's person at 88 — a pair the collapse net would merge.
+        # nearest match of cam 0's person at 92 — a pair the cross-camera collapse would merge.
+        # The two cam-0 people are 8° apart, past `same_cam_angle`, so the same-camera collapse
+        # stays out of it too.
         observations = self.tracker.observations
-        observations.add(self.annotated(make_tracklet(0, 1, 98.0)))
+        observations.add(self.annotated(make_tracklet(0, 1, 102.0)))
         world: int | None = observations.add(self.annotated(make_tracklet(0, 2, 94.0)))
         observations.add(self.annotated(make_tracklet(1, 1, 9.0)), world_id=world)
         self.submit()
