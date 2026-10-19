@@ -3,10 +3,6 @@
 *.log
 output/*
 !output/.gitkeep
-data/audio/*
-!data/audio/.gitkeep
-!data/audio/*.maxpat
-!data/audio/music_map.json
 data/input/*
 !data/input/.gitkeep
 data/settings/.*
