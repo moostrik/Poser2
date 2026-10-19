@@ -5,9 +5,9 @@ continuous content clock and any calibration offset live in the Playhead.
 Real mode (simulate=False):
     Each "fall" signal marks one full revolution completing. The period is
     measured as the wall-clock time between consecutive falls; the phase is
-    computed with sub-tick precision from monotonic(). If no fall arrives within
-    one stall period the motor is declared unlocked (phase NaN).
-    External callers use notify_fall(); while simulate=True it is a no-op.
+    computed with sub-tick precision from monotonic(). There is no stall
+    detection: the last measurement persists until the next fall updates it
+    (see _measure). External callers use notify_fall(); while simulate=True it is a no-op.
 
 Simulate mode (simulate=True):
     A stand-in for the physical motor + fall sensor, never a decision-maker: an internal

@@ -36,6 +36,9 @@ FIRMWARE_LIGHT_SLOT_AZIMUTHS: np.ndarray = np.array([0.0, 0.5, 0.0, 0.5])
 # repeat of the value it already holds.
 _CONFIG_KEEPALIVE_S: float = 1.0
 
+# How often to re-probe an unreachable endpoint at startup; each failed probe logs an error.
+_CONNECT_RETRY_S: float = 5.0
+
 
 class OscLightInterlaceSettings(BaseSettings):
     """Interlace: the two arms' LEDs have gaps and are mounted out of phase, so one arm's LEDs
@@ -262,8 +265,16 @@ class OscLightSender:
     def _run(self) -> None:
         # No thread priority boost (see Conductor.run): a boost cannot speed this thread's Python
         # up under the GIL, it only preempts the rest of the app.
-        if not validate_connection(self._config.ip_addresses, self._config.port, "OscLightSender"):
-            self._running = False
+        # At boot the fixture may come up after the app: keep probing instead of giving up — a
+        # sender that exits here would never send, and the fixture's watchdog would park the
+        # motor (dark, stopped) for the whole session. The endpoint is read live, so a settings
+        # change mid-retry is picked up.
+        while self._running and not validate_connection(self._config.ip_addresses, self._config.port, "OscLightSender"):
+            retry_at = monotonic() + _CONNECT_RETRY_S
+            while self._running and monotonic() < retry_at:
+                self._update_event.wait(0.5)   # frames keep setting the event; the deadline paces the probe
+                self._update_event.clear()
+        if not self._running:
             return
 
         logger.info(
@@ -279,31 +290,37 @@ class OscLightSender:
             self._update_event.clear()
             if not self._running:
                 break
-            # Take the frame *and* clear the slot under one lock: a plain read leaves the event set
-            # when a new frame lands between the clear and the read, which resends the same frame.
-            with self._output_lock:
-                output, self._latest_output = self._latest_output, None
-            if output is None:
-                continue
-            if self._motor.simulate:
-                continue            # a simulated motor never reaches the fixture: no rpm, no pixels
+            # A dead sender is packet silence to the fixture (watchdog → motor parked), so an
+            # unexpected error skips this frame instead of ending the thread (see Conductor.run).
+            try:
+                # Take the frame *and* clear the slot under one lock: a plain read leaves the event
+                # set when a new frame lands between the clear and the read, which resends the
+                # same frame.
+                with self._output_lock:
+                    output, self._latest_output = self._latest_output, None
+                if output is None:
+                    continue
+                if self._motor.simulate:
+                    continue        # a simulated motor never reaches the fixture: no rpm, no pixels
 
-            # While the fixture's speed latch is untrusted — boot, or a send gap long enough that
-            # its watchdog may have stopped the motor without recording it — hold rpm at 0, then
-            # release: the 0→target edge is the only speed command the firmware acts on.
-            now = monotonic()
-            motor_rpm = self._latch.rpm_to_send(int(output.motor_command.target_rpm),
-                                                self._config.resync_hold, now)
-            sent = self._send_config(motor_rpm)
+                # While the fixture's speed latch is untrusted — boot, or a send gap long enough
+                # that its watchdog may have stopped the motor without recording it — hold rpm at
+                # 0, then release: the 0→target edge is the only speed command the firmware acts on.
+                now = monotonic()
+                motor_rpm = self._latch.rpm_to_send(int(output.motor_command.target_rpm),
+                                                    self._config.resync_hold, now)
+                sent = self._send_config(motor_rpm)
 
-            # The fixture's readout mode follows the rpm we just sent — so does the slot rebuild.
-            slow = motor_rpm < FIXTURE_PROJECTION_RPM
-            chunks = self._build_chunk_messages(output, self._config, self._chunk_size, self._num_chunks, slow)
-            if chunks:
-                self._send_paced(chunks, self._config.chunk_interval)
-                sent = True
-            if sent:   # a pass that put nothing on the wire must not reset the latch's gap clock
-                self._latch.note_sent(motor_rpm, now)
+                # The fixture's readout mode follows the rpm we just sent — so does the slot rebuild.
+                slow = motor_rpm < FIXTURE_PROJECTION_RPM
+                chunks = self._build_chunk_messages(output, self._config, self._chunk_size, self._num_chunks, slow)
+                if chunks:
+                    self._send_paced(chunks, self._config.chunk_interval)
+                    sent = True
+                if sent:   # a pass that put nothing on the wire must not reset the latch's gap clock
+                    self._latch.note_sent(motor_rpm, now)
+            except Exception:
+                logger.exception("Error sending light frame")
 
     def _send_config(self, motor_rpm: int) -> bool:
         """Send the interlace and rpm — on change, or when the keepalive interval has elapsed.

@@ -86,7 +86,7 @@ def validate_connection(ip_address: str, port: int, class_name: str) -> bool:
     """
     # Check network first - if no network, nothing else matters
     if not validate_network(ip_address, port):
-        logger.error(f"{class_name} Network unreachable to {ip_address}:{port}. Stopping sender thread.")
+        logger.error(f"{class_name} Network unreachable to {ip_address}:{port}.")
         return False
 
     # Check IP format
