@@ -30,9 +30,9 @@ Vocabulary:
   on receipt of the *commanded* rpm (see `CALIBRATION.md` *Two modes, two offsets*). A spin-up is in
   projection mode from its first packet; a wind-down is in beam mode from its first packet.
 - **playhead lock** — the playhead tracks the measured rotation at BEAM (`Playhead.is_locked`). At boot
-  that is the first trustworthy measurement. After a spin-down from PROJECTION it waits for a fresh
-  measurement above `beam_rpm` and then one settled within tolerance of it: being under the 200 rpm
-  sensor ceiling is not enough, and stale readings from before the spin-up do not count.
+  that is the first trustworthy measurement. After a spin-down from PROJECTION it re-locks on a reading
+  within tolerance of `beam_rpm` whose last pulse is current: being under the 200 rpm sensor ceiling is
+  not enough, and the reading left from before the spin-up is older than its own period and does not count.
 - **projecting** — PROJECTION is commanded and the sensor has been silent for 2.5 ceiling periods, so the
   bar spins fast enough for the projection to show (`Playhead.is_projecting`). Distinct from
   *projection mode*, the fixture's readout, which switches on the commanded rpm.

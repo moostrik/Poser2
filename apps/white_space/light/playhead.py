@@ -22,12 +22,13 @@ measuring *above* `beam_rpm` as it brakes). The sweep keeps free-running at `bea
 motor has slowed back to content speed, then the normal `tracking` gain eases the internal phase
 onto the measured phase. The sweep stays "live" throughout the spin-down (never NaN).
 
-Re-lock is two-stage to defeat the motor's lack of stall detection: above the sensor ceiling the
-motor keeps reporting its *stale* pre-PROJECTION measurement (`locked` with `measured_rpm ≈ beam_rpm`), so
-trusting the first content-speed reading would re-lock instantly while the light is still spinning
-fast (the content would then race at the resumed sensor rpm). We therefore wait until we have seen a
-*fresh* above-content measurement (the real spin-down in progress) and only re-lock once it has since
-settled to `measured_rpm ≤ beam_rpm × (1 + _RESYNC_RPM_TOL)`.
+Re-lock needs a reading that is *settled* (within `_RESYNC_RPM_TOL` of `beam_rpm`, both sides) and
+*current* (its last pulse no older than `_RESYNC_MAX_AGE_PERIODS` of its own period). The motor has no
+stall detection, so two readings look like content speed without being it and both fail here: the
+stale pre-PROJECTION ≈`beam_rpm` reading the motor keeps reporting through the projection (its pulse is
+as old as the projection, far older than its period), and the first pulse after the silence, which
+pairs with that stale timestamp and so reads near zero rpm. Nothing else is required — the bar
+need not have been seen fast first, so a bar that reaches beam speed by any route re-locks.
 
 The motor is offset-agnostic; the playhead owns the single beam-mode calibration,
 `pulse_offset` — the front lamp's azimuth at the sensor pulse, in degrees (constant → does
@@ -44,6 +45,10 @@ from .motor import MotorMeasurement, MotorCommand, MotorMode, FIXTURE_PROJECTION
 # Re-lock onto the measured phase once the spinning-down motor reaches content speed, within this
 # relative tolerance of beam_rpm (absorbs measurement jitter as it settles at the BEAM target).
 _RESYNC_RPM_TOL: float = 0.05
+
+# A reading counts as current while its last pulse is at most this many of its own periods old: a
+# turning bar pulses once per period, so anything older is a reading the motor kept past its pulses.
+_RESYNC_MAX_AGE_PERIODS: float = 1.5
 
 # Falls silent for this long while commanded PROJECTION → the bar spins fast enough for the projection
 # image (the sensor cannot pulse above the ceiling; 2.5 ceiling-periods absorbs the last slow pulses).
@@ -81,7 +86,6 @@ class Playhead:
         self._bars:     float = 0.0                  # monotonic bar counter (1 bar = 1 full playhead cycle)
         self._prev_mode: MotorMode = MotorMode.STOPPED
         self._resyncing: bool = False                # left PROJECTION → free-running until the motor slows to content speed
-        self._seen_fast: bool = False                # saw a fresh above-content measurement since leaving PROJECTION
         self._live:     bool  = False                # is there a real playhead this tick (locked, PROJECTION, or re-syncing)
         self._rpm_ema = EMAFilter(freq=30.0)         # averages the per-revolution measured speed (feed-forward)
         self._time:    float = 0.0                   # accumulated time for the EMA's dt-correction
@@ -96,19 +100,18 @@ class Playhead:
         # Leaving PROJECTION arms the re-sync: keep free-running until the motor slows back to content speed
         # rather than snapping onto its still-too-fast (or stale, see below) measured phase.
         if self._prev_mode == MotorMode.PROJECTION and command.mode != MotorMode.PROJECTION:
-            self._resyncing, self._seen_fast = True, False
+            self._resyncing = True
         self._prev_mode = command.mode
 
         if command.mode == MotorMode.PROJECTION or command.mode == MotorMode.STOPPED:
             self._resyncing = False                       # PROJECTION free-runs anyway; STOPPED holds
-        elif self._resyncing and motor.locked:
-            # Two-stage gate: first catch a *fresh* above-content reading (the real spin-down — the
-            # motor otherwise keeps reporting its stale pre-PROJECTION ≈beam_rpm measurement), then re-lock
-            # only once that has settled back to content speed.
-            if motor.measured_rpm > command.beam_rpm * (1.0 + _RESYNC_RPM_TOL):
-                self._seen_fast = True
-            elif self._seen_fast:
-                self._resyncing = False                   # motor reached content speed → re-lock
+        elif self._resyncing and motor.locked and motor.measured_rpm > 0.0:
+            # Re-lock on a settled, current reading (module docstring): the stale pre-PROJECTION
+            # reading fails on age, the first pulse after the silence fails on speed.
+            settled = abs(motor.measured_rpm - command.beam_rpm) <= command.beam_rpm * _RESYNC_RPM_TOL
+            current = motor.fall_age <= _RESYNC_MAX_AGE_PERIODS * 60.0 / motor.measured_rpm
+            if settled and current:
+                self._resyncing = False                   # motor at content speed → re-lock
 
         # A real playhead exists with a measurement (locked), in PROJECTION (free-run content sweep), or
         # while re-syncing (a live free-running sweep). IDLE/BEAM with no measurement → not live → NaN.

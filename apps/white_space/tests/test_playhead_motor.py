@@ -16,10 +16,12 @@ def wrap(x: float) -> float:
 
 
 def mstate(phase: float, locked: bool, rpm: float,
-           mode: MotorMode = MotorMode.BEAM, beam_rpm: float = 72.0) -> tuple[MotorMeasurement, MotorCommand]:
+           mode: MotorMode = MotorMode.BEAM, beam_rpm: float = 72.0,
+           fall_age: float = 0.0) -> tuple[MotorMeasurement, MotorCommand]:
     """The (measurement, command) pair the playhead ticks on: `rpm` is the speed to sweep at —
-    measured (with a valid phase) only when locked, otherwise the commanded target."""
-    return (MotorMeasurement(phase=phase, locked=locked, measured_rpm=rpm if locked else 0.0),
+    measured (with a valid phase) only when locked, otherwise the commanded target. `fall_age`
+    defaults to a pulse this tick (a current reading)."""
+    return (MotorMeasurement(phase=phase, locked=locked, measured_rpm=rpm if locked else 0.0, fall_age=fall_age),
             MotorCommand(mode=mode, target_rpm=rpm, beam_rpm=beam_rpm))
 
 
@@ -377,22 +379,43 @@ class ReacquireTest(unittest.TestCase):
         # Hardware spin-down: above the sensor ceiling the motor has no fresh falls and keeps reporting
         # its STALE pre-PROJECTION ≈beam_rpm measurement (locked, no stall detection). That must NOT re-lock
         # while the light is still physically spinning fast — otherwise the content races at the rpm the
-        # sensor reports once falls resume (~ceiling). Re-lock only after a fresh fast reading settles.
+        # sensor reports once falls resume (~ceiling). The stale reading's pulse is as old as the projection.
         dt = 1 / 60
         p = self._into_high()
         before = p._internal
-        # First BEAM ticks: stale content-speed reading, no fast measurement seen yet → stay re-syncing.
+        # First BEAM ticks: stale content-speed reading, pulse 30 s old → stay re-syncing.
         for _ in range(3):
-            p.tick(dt, *mstate(2.5, True, 72.0, mode=self.BEAM, beam_rpm=72.0))
+            p.tick(dt, *mstate(2.5, True, 72.0, mode=self.BEAM, beam_rpm=72.0, fall_age=30.0))
             self.assertTrue(p._resyncing)
-            self.assertFalse(p._seen_fast)
         self.assertAlmostEqual(wrap(p._internal - before), 3 * 72.0 / 60.0 * TAU * dt, places=6)  # free-ran at low
-        # Falls resume as the light passes the ceiling (real fast measurement) → still re-syncing.
+        # Falls resume as the light passes the ceiling (current but fast) → still re-syncing.
         p.tick(dt, *mstate(2.5, True, 180.0, mode=self.BEAM, beam_rpm=72.0))
-        self.assertTrue(p._resyncing); self.assertTrue(p._seen_fast)
-        # Now it has settled to content speed → re-lock.
+        self.assertTrue(p._resyncing)
+        # Now a current reading at content speed → re-lock.
         p.tick(dt, *mstate(2.5, True, 73.0, mode=self.BEAM, beam_rpm=72.0))
         self.assertFalse(p._resyncing)
+
+    def test_relocks_without_a_fast_reading(self) -> None:
+        # The bar reached beam speed by a route that never read fast (the fixture's watchdog stopped it
+        # while the sender was silent, then it spun up from rest to BEAM): the first settled, current
+        # reading re-locks — the gate never waits for a spin-down it cannot see.
+        dt = 1 / 60
+        p = self._into_high()
+        p.tick(dt, *mstate(float("nan"), False, 0.0, mode=self.BEAM, beam_rpm=72.0))   # no pulses yet
+        self.assertTrue(p._resyncing)
+        p.tick(dt, *mstate(2.5, True, 72.0, mode=self.BEAM, beam_rpm=72.0))
+        self.assertFalse(p._resyncing)
+
+    def test_first_pulse_after_silence_does_not_relock(self) -> None:
+        # The first pulse after the projection's silence pairs with the stale pre-PROJECTION timestamp:
+        # a current reading (pulse just now) with a huge period, so near-zero rpm. Not content speed.
+        dt = 1 / 60
+        p = self._into_high()
+        p.tick(dt, *mstate(2.5, True, 0.5, mode=self.BEAM, beam_rpm=72.0))
+        self.assertTrue(p._resyncing)
+        # A bar turning well under beam speed does not pass either.
+        p.tick(dt, *mstate(2.5, True, 32.0, mode=self.BEAM, beam_rpm=72.0))
+        self.assertTrue(p._resyncing)
 
     def test_resync_is_live_while_motor_unmeasurable(self) -> None:
         dt = 1 / 60
@@ -546,13 +569,13 @@ class RegimeSignalsTest(unittest.TestCase):
     def test_relock_is_gated_against_stale_readings(self) -> None:
         p = running_playhead(mode=MotorMode.PROJECTION)
         p.tick(self.DT, *mstate(float("nan"), False, 2000.0, mode=MotorMode.PROJECTION))
-        # Back to BEAM: the stale pre-PROJECTION reading must NOT re-lock instantly (gate not passed).
-        p.tick(self.DT, *mstate(2.5, True, 72.0, mode=MotorMode.BEAM))
+        # Back to BEAM: the stale pre-PROJECTION reading (pulse as old as the projection) must NOT re-lock.
+        p.tick(self.DT, *mstate(2.5, True, 72.0, mode=MotorMode.BEAM, fall_age=30.0))
         self.assertFalse(p.is_locked)
-        # A fresh above-content reading (the real spin-down) passes the gate; still braking.
+        # A current above-content reading: still braking.
         p.tick(self.DT, *mstate(2.5, True, 180.0, mode=MotorMode.BEAM))
         self.assertFalse(p.is_locked)
-        # Settled at content speed → re-lock.
+        # Settled and current → re-lock.
         p.tick(self.DT, *mstate(2.5, True, 73.0, mode=MotorMode.BEAM))
         self.assertTrue(p.is_locked)
 
