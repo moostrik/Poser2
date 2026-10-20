@@ -192,7 +192,7 @@ class StateMachine:
         the exit half: nothing has been entered yet, and ``prev`` stays None."""
         if self._entered:
             self._active.exit()
-            logger.info("show state %s → %s", self._current.name, target.name)
+            logger.debug("show state %s → %s", self._current.name, target.name)
             self._prev_state = self._current
         self._entered = True
         self._current = target
